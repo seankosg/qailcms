@@ -93,7 +93,7 @@ export function SparePartRawDataPage() {
   const search = useSearch({ strict: false }) as UrlSearch;
   const { data: currentUser } = useCurrentUser();
   const userKey = currentUser?.id ?? "anon";
-  const storageKey = `qail.spare-part.raw-data:${userKey}`;
+  const storageKey = `qail.spare-part.raw-data.v2:${userKey}`;
   const canEdit = !!currentUser?.isAdmin;
 
   const [stateLoaded, setStateLoaded] = useState(false);
@@ -120,11 +120,44 @@ export function SparePartRawDataPage() {
     } catch {
       // ignore
     }
-    setSorting(s.sorting?.length ? s.sorting : DEFAULT_SORTING);
-    setSizing(s.sizing ?? {});
-    setVisibility(s.visibility ?? {});
-    setOrder(s.order?.length ? s.order : DEFAULT_ORDER);
-    setFrozenExtras(s.frozenExtras?.length ? s.frozenExtras : DEFAULT_FROZEN_EXTRAS);
+
+    const validKeys = new Set(
+      SPARE_PART_COLUMNS.map((c) => c.key).filter((k) => k !== "doc_ref"),
+    );
+    const validAll = new Set<string>(["__select", "doc_ref", ...validKeys]);
+
+    // order: 저장본 중 유효 키만 유지 + 신규 키를 뒤에 append
+    const savedOrder = (s.order ?? []).filter((k) => validKeys.has(k));
+    const missingOrder = DEFAULT_ORDER.filter((k) => !savedOrder.includes(k));
+    const mergedOrder = savedOrder.length ? [...savedOrder, ...missingOrder] : DEFAULT_ORDER;
+
+    // frozenExtras: 유효 키만, 3개 미만이면 default에서 보충
+    const savedFrozen = (s.frozenExtras ?? []).filter((k) => validKeys.has(k));
+    const frozenFill = DEFAULT_FROZEN_EXTRAS.filter((k) => !savedFrozen.includes(k));
+    const mergedFrozen = [...savedFrozen, ...frozenFill].slice(0, 3);
+
+    // visibility: 유효 키만 유지
+    const cleanedVisibility: VisibilityState = {};
+    for (const [k, v] of Object.entries(s.visibility ?? {})) {
+      if (validKeys.has(k)) cleanedVisibility[k] = v as boolean;
+    }
+
+    // sizing: __select/doc_ref/유효 키만
+    const cleanedSizing: ColumnSizingState = {};
+    for (const [k, v] of Object.entries(s.sizing ?? {})) {
+      if (validAll.has(k)) cleanedSizing[k] = v as number;
+    }
+
+    // columnFilters: 유효 키만
+    const cleanedFilters: ColumnFiltersState = (s.columnFilters ?? []).filter((f) =>
+      validKeys.has(f.id),
+    );
+
+    setSorting(s.sorting?.length ? s.sorting.filter((x) => validAll.has(x.id)) : DEFAULT_SORTING);
+    setSizing(cleanedSizing);
+    setVisibility(cleanedVisibility);
+    setOrder(mergedOrder);
+    setFrozenExtras(mergedFrozen.length ? mergedFrozen : DEFAULT_FROZEN_EXTRAS);
     setIncludeInactive(!!s.includeInactive);
 
     // URL 드릴다운
@@ -136,7 +169,7 @@ export function SparePartRawDataPage() {
     if (search.manufacturer) urlFilters.push({ id: "manufacturer", value: { text: search.manufacturer } });
 
     const hasUrlFilter = urlFilters.length > 0 || !!search.overdue || !!search.q;
-    const baseFilters = hasUrlFilter ? [] : (s.columnFilters ?? []);
+    const baseFilters = hasUrlFilter ? [] : cleanedFilters;
     setColumnFilters([...baseFilters, ...urlFilters]);
 
     const initialGlobal = search.q ?? s.globalFilter ?? "";
