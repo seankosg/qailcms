@@ -40,6 +40,10 @@ const DATE_FIELDS = new Set([
   "stage2_date",
   "stage3_date",
   "stage4_date",
+  "spl_list_target",
+  "quotation_target",
+  "po_target",
+  "delivery_target",
 ]);
 
 const NUMERIC_FIELDS = new Set([
@@ -51,6 +55,12 @@ const NUMERIC_FIELDS = new Set([
   "stage2_progress",
   "stage3_progress",
   "stage4_progress",
+  "cost_impact_usd",
+  "cost_impact_qar",
+  "rfq_progress",
+  "quotation_progress",
+  "po_progress",
+  "delivery_progress",
 ]);
 
 const BOOLEAN_FIELDS = new Set([
@@ -67,6 +77,10 @@ const BOOLEAN_FIELDS = new Set([
   "phy",
   "physical_supply",
   "is_duplicate",
+  "physical_list_agreed",
+  "quotation_done",
+  "po_done",
+  "delivery_done",
 ]);
 
 const SYSTEM_SKIP_HEADERS = new Set([
@@ -174,6 +188,43 @@ const FALLBACK_ALIASES: Record<string, string | "skip"> = {
   "proc remarks": "proc_remarks",
   "procurement remarks": "proc_remarks",
 };
+
+// snake_case DB 컬럼을 그대로 헤더로 사용하는 파일용 identity 매핑.
+// spare_parts_raw 실제 컬럼과 1:1 대응.
+const SNAKE_IDENTITY_FIELDS = [
+  "doc_ref", "plot", "category", "subject", "system_type",
+  "discipline",
+  "approval_code", "approval_status", "revision",
+  "supplier", "manufacturer",
+  "req_qty", "req_unit", "req_notes",
+  "qty_total", "qty_delivered",
+  "cost_usd", "cost_qar", "cost_note", "cost_impact",
+  "cost_impact_usd", "cost_impact_qar",
+  "delivery_date", "delivery_status", "po_date", "po_number",
+  "cert_available", "drawing_available", "manual_available",
+  "spec_available", "warranty_available",
+  "phy", "physical_supply", "is_duplicate",
+  "physical_list_agreed", "physical_remarks",
+  "rec_letter_2y", "rec_letter_5y", "availability_10y", "doc_others",
+  "spl_req_contract", "spl_req_mmjv", "spl_req_hdec",
+  "spl_list_approved", "spl_approval_date",
+  "spl_list_code", "spl_list_target",
+  "proc_category", "proc_remarks",
+  "issue_flag", "issue_action", "issue_owner",
+  "issue_technical", "issue_supplier", "issue_internal",
+  "stage1_date", "stage1_done",
+  "stage2_date", "stage2_done", "stage2_progress",
+  "stage3_date", "stage3_done", "stage3_progress",
+  "stage4_date", "stage4_done", "stage4_progress",
+  "rfq_progress",
+  "quotation_progress", "quotation_target", "quotation_done",
+  "po_progress", "po_target", "po_done",
+  "delivery_progress", "delivery_target", "delivery_done",
+  "action", "remarks",
+];
+for (const f of SNAKE_IDENTITY_FIELDS) {
+  if (!(f in FALLBACK_ALIASES)) FALLBACK_ALIASES[f] = f;
+}
 
 function normalizeHeader(value: unknown): string {
   return String(value ?? "")

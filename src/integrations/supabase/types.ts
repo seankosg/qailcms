@@ -240,15 +240,23 @@ export type Database = {
           action: string | null
           approval_code: string | null
           approval_status: string | null
+          availability_10y: string | null
           category: string | null
           cert_available: boolean | null
           cost_impact: string | null
+          cost_impact_qar: number | null
+          cost_impact_usd: number | null
           cost_note: string | null
           cost_qar: number | null
           cost_usd: number | null
           custom_payload: Json | null
           delivery_date: string | null
+          delivery_done: boolean | null
+          delivery_progress: number | null
           delivery_status: string | null
+          delivery_target: string | null
+          discipline: string | null
+          doc_others: string | null
           doc_ref: string
           drawing_available: boolean | null
           imported_at: string
@@ -256,27 +264,47 @@ export type Database = {
           is_duplicate: boolean | null
           issue_action: string | null
           issue_flag: string | null
+          issue_internal: string | null
           issue_owner: string | null
+          issue_supplier: string | null
+          issue_technical: string | null
           manual_available: boolean | null
           manufacturer: string | null
           phy: boolean | null
+          physical_list_agreed: boolean | null
+          physical_remarks: string | null
           physical_supply: boolean | null
           plot: string
           po_date: string | null
+          po_done: boolean | null
           po_number: string | null
+          po_progress: number | null
+          po_target: string | null
+          proc_category: string | null
           proc_remarks: string | null
           qty_delivered: number | null
           qty_total: number | null
+          quotation_done: boolean | null
+          quotation_progress: number | null
+          quotation_target: string | null
           raw_payload: Json | null
+          rec_letter_2y: string | null
+          rec_letter_5y: string | null
           remarks: string | null
           req_notes: string | null
           req_qty: number | null
           req_unit: string | null
           revision: string | null
+          rfq_progress: number | null
           row_version: number
           spec_available: boolean | null
           spl_approval_date: string | null
           spl_list_approved: boolean | null
+          spl_list_code: string | null
+          spl_list_target: string | null
+          spl_req_contract: string | null
+          spl_req_hdec: string | null
+          spl_req_mmjv: string | null
           stage1_date: string | null
           stage1_done: boolean | null
           stage2_date: string | null
@@ -299,15 +327,23 @@ export type Database = {
           action?: string | null
           approval_code?: string | null
           approval_status?: string | null
+          availability_10y?: string | null
           category?: string | null
           cert_available?: boolean | null
           cost_impact?: string | null
+          cost_impact_qar?: number | null
+          cost_impact_usd?: number | null
           cost_note?: string | null
           cost_qar?: number | null
           cost_usd?: number | null
           custom_payload?: Json | null
           delivery_date?: string | null
+          delivery_done?: boolean | null
+          delivery_progress?: number | null
           delivery_status?: string | null
+          delivery_target?: string | null
+          discipline?: string | null
+          doc_others?: string | null
           doc_ref: string
           drawing_available?: boolean | null
           imported_at?: string
@@ -315,27 +351,47 @@ export type Database = {
           is_duplicate?: boolean | null
           issue_action?: string | null
           issue_flag?: string | null
+          issue_internal?: string | null
           issue_owner?: string | null
+          issue_supplier?: string | null
+          issue_technical?: string | null
           manual_available?: boolean | null
           manufacturer?: string | null
           phy?: boolean | null
+          physical_list_agreed?: boolean | null
+          physical_remarks?: string | null
           physical_supply?: boolean | null
           plot: string
           po_date?: string | null
+          po_done?: boolean | null
           po_number?: string | null
+          po_progress?: number | null
+          po_target?: string | null
+          proc_category?: string | null
           proc_remarks?: string | null
           qty_delivered?: number | null
           qty_total?: number | null
+          quotation_done?: boolean | null
+          quotation_progress?: number | null
+          quotation_target?: string | null
           raw_payload?: Json | null
+          rec_letter_2y?: string | null
+          rec_letter_5y?: string | null
           remarks?: string | null
           req_notes?: string | null
           req_qty?: number | null
           req_unit?: string | null
           revision?: string | null
+          rfq_progress?: number | null
           row_version?: number
           spec_available?: boolean | null
           spl_approval_date?: string | null
           spl_list_approved?: boolean | null
+          spl_list_code?: string | null
+          spl_list_target?: string | null
+          spl_req_contract?: string | null
+          spl_req_hdec?: string | null
+          spl_req_mmjv?: string | null
           stage1_date?: string | null
           stage1_done?: boolean | null
           stage2_date?: string | null
@@ -358,15 +414,23 @@ export type Database = {
           action?: string | null
           approval_code?: string | null
           approval_status?: string | null
+          availability_10y?: string | null
           category?: string | null
           cert_available?: boolean | null
           cost_impact?: string | null
+          cost_impact_qar?: number | null
+          cost_impact_usd?: number | null
           cost_note?: string | null
           cost_qar?: number | null
           cost_usd?: number | null
           custom_payload?: Json | null
           delivery_date?: string | null
+          delivery_done?: boolean | null
+          delivery_progress?: number | null
           delivery_status?: string | null
+          delivery_target?: string | null
+          discipline?: string | null
+          doc_others?: string | null
           doc_ref?: string
           drawing_available?: boolean | null
           imported_at?: string
@@ -374,27 +438,47 @@ export type Database = {
           is_duplicate?: boolean | null
           issue_action?: string | null
           issue_flag?: string | null
+          issue_internal?: string | null
           issue_owner?: string | null
+          issue_supplier?: string | null
+          issue_technical?: string | null
           manual_available?: boolean | null
           manufacturer?: string | null
           phy?: boolean | null
+          physical_list_agreed?: boolean | null
+          physical_remarks?: string | null
           physical_supply?: boolean | null
           plot?: string
           po_date?: string | null
+          po_done?: boolean | null
           po_number?: string | null
+          po_progress?: number | null
+          po_target?: string | null
+          proc_category?: string | null
           proc_remarks?: string | null
           qty_delivered?: number | null
           qty_total?: number | null
+          quotation_done?: boolean | null
+          quotation_progress?: number | null
+          quotation_target?: string | null
           raw_payload?: Json | null
+          rec_letter_2y?: string | null
+          rec_letter_5y?: string | null
           remarks?: string | null
           req_notes?: string | null
           req_qty?: number | null
           req_unit?: string | null
           revision?: string | null
+          rfq_progress?: number | null
           row_version?: number
           spec_available?: boolean | null
           spl_approval_date?: string | null
           spl_list_approved?: boolean | null
+          spl_list_code?: string | null
+          spl_list_target?: string | null
+          spl_req_contract?: string | null
+          spl_req_hdec?: string | null
+          spl_req_mmjv?: string | null
           stage1_date?: string | null
           stage1_done?: boolean | null
           stage2_date?: string | null
