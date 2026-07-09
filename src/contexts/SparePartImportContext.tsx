@@ -79,7 +79,7 @@ async function loadUserMap(): Promise<{
   customFields: Set<string>;
 }> {
   const [{ data: hm }, { data: cf }] = await Promise.all([
-    supabase.from("spare_part_header_mappings").select("header_alias, field_name"),
+    supabase.from("spare_part_header_mappings").select("source_header, target_field"),
     supabase
       .from("spare_part_custom_fields")
       .select("field_name, is_enabled")
@@ -87,8 +87,8 @@ async function loadUserMap(): Promise<{
   ]);
   const map: Record<string, string> = {};
   for (const r of hm ?? []) {
-    if (r.header_alias && r.field_name) {
-      map[String(r.header_alias).toLowerCase().trim()] = r.field_name;
+    if (r.source_header && r.target_field) {
+      map[String(r.source_header).toLowerCase().trim()] = r.target_field;
     }
   }
   const custom = new Set<string>((cf ?? []).map((r) => r.field_name));
@@ -257,10 +257,19 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
           file_hash: f.fileHash ?? null,
           file_size: f.size,
           sheet_name: f.selectedSheets?.join(", ") ?? null,
-          total_rows: parsed.length,
           status: "processing",
           executed_by: userId,
           source_type: "excel_import",
+          unknown_headers: f.unknownHeaders ?? [],
+          excluded_headers: f.excludedHeaders ?? [],
+          row_counts: {
+            total: parsed.length,
+            inserted: 0,
+            updated: 0,
+            rejected: 0,
+            empty_key: f.emptyKeyCount ?? 0,
+            duplicate_key: f.duplicateKeyCount ?? 0,
+          },
           warnings: {
             unknown_headers: f.unknownHeaders ?? [],
             excluded_headers: f.excludedHeaders ?? [],
@@ -310,12 +319,12 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
           doc_ref: p.doc_ref,
           plot: p.plot,
           ...p.struct,
-          raw_payload: p.raw_payload,
-          custom_payload: p.custom_payload,
+          raw_payload: p.raw_payload as never,
+          custom_payload: p.custom_payload as never,
           updated_by: userId,
           is_active: true,
           imported_at: new Date().toISOString(),
-        }));
+        })) as never[];
 
         // Bulk upsert in chunks.
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
@@ -329,7 +338,7 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
             for (const p of slice) {
               const { error: e2 } = await supabase
                 .from("spare_parts_raw")
-                .upsert(p, { onConflict: "doc_ref" });
+                .upsert(p as never, { onConflict: "doc_ref" });
               if (e2) rejected++;
               else if (existingSet.has(p.doc_ref)) updated++;
               else inserted++;
@@ -351,11 +360,15 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
           .from("spare_parts_import_logs")
           .update({
             status: "success",
-            inserted_rows: inserted,
-            updated_rows: updated,
-            rejected_rows: rejected,
+            row_counts: {
+              total: parsed.length,
+              inserted,
+              updated,
+              rejected,
+              empty_key: f.emptyKeyCount ?? 0,
+              duplicate_key: f.duplicateKeyCount ?? 0,
+            },
             duration_ms: Date.now() - startTime,
-            finished_at: new Date().toISOString(),
           })
           .eq("id", logId);
 
@@ -379,7 +392,6 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
             status: "failed",
             error_message: msg,
             duration_ms: Date.now() - startTime,
-            finished_at: new Date().toISOString(),
           })
           .eq("id", logId);
         setFiles((cur) =>
