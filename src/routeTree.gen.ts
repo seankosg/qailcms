@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicBootstrapAdminRouteImport } from './routes/api/public/bootstrap-admin'
 import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './routes/_authenticated/closure/spare-part/raw-data'
 import { Route as AuthenticatedClosureSparePartImportRouteImport } from './routes/_authenticated/closure/spare-part/import'
 import { Route as AuthenticatedClosureSparePartDashboardRouteImport } from './routes/_authenticated/closure/spare-part/dashboard'
@@ -30,6 +31,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBootstrapAdminRoute = ApiPublicBootstrapAdminRouteImport.update({
+  id: '/api/public/bootstrap-admin',
+  path: '/api/public/bootstrap-admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedClosureSparePartRawDataRoute =
@@ -66,6 +72,7 @@ const AuthenticatedClosureSparePartImportLogsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
   '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
@@ -75,6 +82,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
   '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
   '/_authenticated/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
   '/_authenticated/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/_authenticated/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/api/public/bootstrap-admin'
     | '/closure/spare-part/aconex-sync'
     | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/api/public/bootstrap-admin'
     | '/closure/spare-part/aconex-sync'
     | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/api/public/bootstrap-admin'
     | '/_authenticated/closure/spare-part/aconex-sync'
     | '/_authenticated/closure/spare-part/dashboard'
     | '/_authenticated/closure/spare-part/import'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicBootstrapAdminRoute: typeof ApiPublicBootstrapAdminRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -150,6 +163,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bootstrap-admin': {
+      id: '/api/public/bootstrap-admin'
+      path: '/api/public/bootstrap-admin'
+      fullPath: '/api/public/bootstrap-admin'
+      preLoaderRoute: typeof ApiPublicBootstrapAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/closure/spare-part/raw-data': {
@@ -230,6 +250,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicBootstrapAdminRoute: ApiPublicBootstrapAdminRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
