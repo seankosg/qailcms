@@ -2,6 +2,7 @@
 // SHAW parity: type 별 렌더러/필터 그룹 지정
 
 export type SparePartFieldType = "text" | "number" | "date" | "boolean" | "badge" | "progress" | "cost";
+export type SparePartFilterType = "multi-select" | "text" | "date-range" | "number-range" | "boolean";
 
 export interface SparePartColumnDef {
   key: string; // DB 컬럼명
@@ -11,6 +12,61 @@ export interface SparePartColumnDef {
   group: "id" | "approval" | "vendor" | "qty" | "cost" | "delivery" | "avail" | "spl" | "stage" | "issue" | "remark" | "system";
   numeric?: boolean;
 }
+
+export function inferFilterType(t: SparePartFieldType): SparePartFilterType {
+  if (t === "badge") return "multi-select";
+  if (t === "date") return "date-range";
+  if (t === "boolean") return "boolean";
+  if (t === "number" || t === "cost" || t === "progress") return "number-range";
+  return "text";
+}
+
+export const GROUP_HEADER_BG: Record<SparePartColumnDef["group"], string> = {
+  id: "bg-slate-100/80 dark:bg-slate-800/40",
+  approval: "bg-emerald-100/60 dark:bg-emerald-900/20",
+  vendor: "bg-amber-100/60 dark:bg-amber-900/20",
+  qty: "bg-sky-100/60 dark:bg-sky-900/20",
+  cost: "bg-yellow-100/60 dark:bg-yellow-900/20",
+  delivery: "bg-violet-100/60 dark:bg-violet-900/20",
+  avail: "bg-teal-100/60 dark:bg-teal-900/20",
+  spl: "bg-pink-100/60 dark:bg-pink-900/20",
+  stage: "bg-indigo-100/60 dark:bg-indigo-900/20",
+  issue: "bg-rose-100/60 dark:bg-rose-900/20",
+  remark: "bg-neutral-100/60 dark:bg-neutral-900/20",
+  system: "bg-zinc-100/60 dark:bg-zinc-900/20",
+};
+
+// 전역 검색 대상 필드
+export const RAW_SEARCH_FIELDS = [
+  "doc_ref",
+  "subject",
+  "supplier",
+  "manufacturer",
+  "category",
+  "system_type",
+  "po_number",
+  "approval_code",
+  "approval_status",
+  "revision",
+  "remarks",
+  "action",
+  "proc_remarks",
+];
+
+// Bulk 편집 대상 필드
+export const BULK_EDITABLE_FIELDS = [
+  "remarks",
+  "action",
+  "proc_remarks",
+  "is_active",
+  "is_duplicate",
+  "approval_code",
+  "approval_status",
+  "revision",
+] as const;
+export type BulkEditableField = (typeof BULK_EDITABLE_FIELDS)[number];
+
+export const APPROVAL_CODES = ["A", "B", "C", "D", "UR", "DP"];
 
 export const SPARE_PART_COLUMNS: SparePartColumnDef[] = [
   // Identity

@@ -16,6 +16,7 @@ import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './rout
 import { Route as AuthenticatedClosureSparePartImportRouteImport } from './routes/_authenticated/closure/spare-part/import'
 import { Route as AuthenticatedClosureSparePartDashboardRouteImport } from './routes/_authenticated/closure/spare-part/dashboard'
 import { Route as AuthenticatedClosureSparePartAconexSyncRouteImport } from './routes/_authenticated/closure/spare-part/aconex-sync'
+import { Route as AuthenticatedClosureSparePartRecordsDocRefRouteImport } from './routes/_authenticated/closure/spare-part/records.$docRef'
 import { Route as AuthenticatedClosureSparePartImportLogsRouteImport } from './routes/_authenticated/closure/spare-part/import.logs'
 
 const AuthRoute = AuthRouteImport.update({
@@ -56,6 +57,12 @@ const AuthenticatedClosureSparePartAconexSyncRoute =
     path: '/closure/spare-part/aconex-sync',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureSparePartRecordsDocRefRoute =
+  AuthenticatedClosureSparePartRecordsDocRefRouteImport.update({
+    id: '/closure/spare-part/records/$docRef',
+    path: '/closure/spare-part/records/$docRef',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureSparePartImportLogsRoute =
   AuthenticatedClosureSparePartImportLogsRouteImport.update({
     id: '/logs',
@@ -71,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
+  '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -80,6 +88,7 @@ export interface FileRoutesByTo {
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
+  '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -91,6 +100,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/_authenticated/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
+  '/_authenticated/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -102,6 +112,7 @@ export interface FileRouteTypes {
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
     | '/closure/spare-part/import/logs'
+    | '/closure/spare-part/records/$docRef'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +122,7 @@ export interface FileRouteTypes {
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
     | '/closure/spare-part/import/logs'
+    | '/closure/spare-part/records/$docRef'
   id:
     | '__root__'
     | '/'
@@ -121,6 +133,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/spare-part/import'
     | '/_authenticated/closure/spare-part/raw-data'
     | '/_authenticated/closure/spare-part/import/logs'
+    | '/_authenticated/closure/spare-part/records/$docRef'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -180,6 +193,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureSparePartAconexSyncRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/spare-part/records/$docRef': {
+      id: '/_authenticated/closure/spare-part/records/$docRef'
+      path: '/closure/spare-part/records/$docRef'
+      fullPath: '/closure/spare-part/records/$docRef'
+      preLoaderRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/spare-part/import/logs': {
       id: '/_authenticated/closure/spare-part/import/logs'
       path: '/logs'
@@ -210,6 +230,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureSparePartDashboardRoute: typeof AuthenticatedClosureSparePartDashboardRoute
   AuthenticatedClosureSparePartImportRoute: typeof AuthenticatedClosureSparePartImportRouteWithChildren
   AuthenticatedClosureSparePartRawDataRoute: typeof AuthenticatedClosureSparePartRawDataRoute
+  AuthenticatedClosureSparePartRecordsDocRefRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -221,6 +242,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureSparePartImportRouteWithChildren,
   AuthenticatedClosureSparePartRawDataRoute:
     AuthenticatedClosureSparePartRawDataRoute,
+  AuthenticatedClosureSparePartRecordsDocRefRoute:
+    AuthenticatedClosureSparePartRecordsDocRefRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -234,13 +257,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
