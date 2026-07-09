@@ -1,12 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   flexRender,
   getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
   getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type ColumnFiltersState,
   type ColumnSizingState,
+  type RowSelectionState,
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
@@ -18,30 +23,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
   Check,
-  Columns3,
+  Download,
   Filter,
+  Pin,
   RotateCcw,
   Search,
+  Upload,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -49,73 +40,145 @@ import {
   APPROVAL_CODE_COLORS,
   PLOT_COLORS,
   SPARE_PART_COLUMNS,
-  formatDdMmm,
-  formatNumber,
+  GROUP_HEADER_BG,
+  inferFilterType,
+  BULK_EDITABLE_FIELDS,
 } from "@/lib/spare-part/columns";
+import { formatDdMmm, formatNumber, isOverdue } from "@/lib/spare-part/format";
+import {
+  booleanFilterFn,
+  dateRangeFilterFn,
+  EMPTY_TOKEN,
+  globalSearchFilterFn,
+  multiSelectFilterFn,
+  numberRangeFilterFn,
+  textFilterFn,
+} from "@/lib/spare-part/filters";
+import { ColumnFilterDropdown } from "./ColumnFilters";
+import { TopHorizontalScrollbar } from "./TopHorizontalScrollbar";
+import { ColumnOrderMenu } from "./ColumnOrderMenu";
+import { BulkEditBar } from "./BulkEditBar";
+import { ExportDialog } from "./ExportDialog";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 type Row = Record<string, unknown> & { doc_ref: string; plot: string };
 
-const LS_KEY = "qail.spare-part.raw-data.v1";
+const DEFAULT_SORTING: SortingState = [{ id: "doc_ref", desc: false }];
+const DEFAULT_FROZEN_EXTRAS = ["plot", "subject", "approval_code"];
+const DEFAULT_ORDER = SPARE_PART_COLUMNS.map((c) => c.key).filter((k) => k !== "doc_ref");
+
+interface UrlSearch {
+  q?: string;
+  plot?: string;
+  approval_code?: string;
+  supplier?: string;
+  category?: string;
+  manufacturer?: string;
+  overdue?: string;
+}
 
 interface PersistedState {
   sorting: SortingState;
   sizing: ColumnSizingState;
   visibility: VisibilityState;
-  approvalCodes: string[];
-  plots: string[];
-  onlyDuplicate: boolean;
-  onlyActive: boolean;
-}
-
-function loadState(): Partial<PersistedState> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    return raw ? (JSON.parse(raw) as PersistedState) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveState(s: PersistedState) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(s));
-  } catch {
-    // noop
-  }
+  columnFilters: ColumnFiltersState;
+  globalFilter: string;
+  order: string[];
+  frozenExtras: string[];
+  includeInactive: boolean;
 }
 
 export function SparePartRawDataPage() {
-  const persisted = useMemo(loadState, []);
-  const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [sorting, setSorting] = useState<SortingState>(persisted.sorting ?? []);
-  const [sizing, setSizing] = useState<ColumnSizingState>(persisted.sizing ?? {});
-  const [visibility, setVisibility] = useState<VisibilityState>(persisted.visibility ?? {});
-  const [approvalCodes, setApprovalCodes] = useState<string[]>(persisted.approvalCodes ?? []);
-  const [plots, setPlots] = useState<string[]>(persisted.plots ?? []);
-  const [onlyDuplicate, setOnlyDuplicate] = useState<boolean>(persisted.onlyDuplicate ?? false);
-  const [onlyActive, setOnlyActive] = useState<boolean>(persisted.onlyActive ?? true);
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as UrlSearch;
+  const { data: currentUser } = useCurrentUser();
+  const userKey = currentUser?.id ?? "anon";
+  const storageKey = `qail.spare-part.raw-data:${userKey}`;
+  const canEdit = !!currentUser?.isAdmin;
 
+  const [stateLoaded, setStateLoaded] = useState(false);
+  const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
+  const [sizing, setSizing] = useState<ColumnSizingState>({});
+  const [visibility, setVisibility] = useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
+  const [frozenExtras, setFrozenExtras] = useState<string[]>(DEFAULT_FROZEN_EXTRAS);
+  const [includeInactive, setIncludeInactive] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 초기 상태 로드 (localStorage + URL 드릴다운)
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(search.trim().toLowerCase()), 200);
+    let s: Partial<PersistedState> = {};
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) s = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+    setSorting(s.sorting?.length ? s.sorting : DEFAULT_SORTING);
+    setSizing(s.sizing ?? {});
+    setVisibility(s.visibility ?? {});
+    setOrder(s.order?.length ? s.order : DEFAULT_ORDER);
+    setFrozenExtras(s.frozenExtras?.length ? s.frozenExtras : DEFAULT_FROZEN_EXTRAS);
+    setIncludeInactive(!!s.includeInactive);
+
+    // URL 드릴다운
+    const urlFilters: ColumnFiltersState = [];
+    if (search.plot) urlFilters.push({ id: "plot", value: search.plot.split(",") });
+    if (search.approval_code) urlFilters.push({ id: "approval_code", value: search.approval_code.split(",") });
+    if (search.supplier) urlFilters.push({ id: "supplier", value: { text: search.supplier } });
+    if (search.category) urlFilters.push({ id: "category", value: search.category.split(",") });
+    if (search.manufacturer) urlFilters.push({ id: "manufacturer", value: { text: search.manufacturer } });
+
+    const hasUrlFilter = urlFilters.length > 0 || !!search.overdue || !!search.q;
+    const baseFilters = hasUrlFilter ? [] : (s.columnFilters ?? []);
+    setColumnFilters([...baseFilters, ...urlFilters]);
+
+    const initialGlobal = search.q ?? s.globalFilter ?? "";
+    setGlobalFilter(initialGlobal);
+    setSearchInput(initialGlobal);
+
+    setStateLoaded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  // debounce global search
+  useEffect(() => {
+    const t = setTimeout(() => setGlobalFilter(searchInput.trim()), 250);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [searchInput]);
 
+  // localStorage 저장
   useEffect(() => {
-    saveState({ sorting, sizing, visibility, approvalCodes, plots, onlyDuplicate, onlyActive });
-  }, [sorting, sizing, visibility, approvalCodes, plots, onlyDuplicate, onlyActive]);
+    if (!stateLoaded) return;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({ sorting, sizing, visibility, columnFilters, globalFilter, order, frozenExtras, includeInactive } satisfies PersistedState),
+        );
+      } catch {
+        // ignore
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [stateLoaded, storageKey, sorting, sizing, visibility, columnFilters, globalFilter, order, frozenExtras, includeInactive]);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["spare-parts-raw"],
     queryFn: async () => {
-      const selectCols = ["doc_ref", "plot", "is_active", ...SPARE_PART_COLUMNS.map((c) => c.key)];
-      const unique = Array.from(new Set(selectCols));
+      const cols = ["doc_ref", "plot", "is_active", ...SPARE_PART_COLUMNS.map((c) => c.key)];
+      const unique = Array.from(new Set(cols));
       const { data, error } = await supabase
         .from("spare_parts_raw")
         .select(unique.join(","))
         .order("doc_ref", { ascending: true })
-        .limit(5000);
+        .limit(10000);
       if (error) throw error;
       return (data ?? []) as unknown as Row[];
     },
@@ -123,160 +186,217 @@ export function SparePartRawDataPage() {
 
   const rows = useMemo(() => data ?? [], [data]);
 
-  const approvalFacet = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of rows) {
-      const v = String(r.approval_code ?? "").trim() || "—";
-      m.set(v, (m.get(v) ?? 0) + 1);
-    }
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [rows]);
+  // URL 기반 pre-filter (overdue만; 나머지는 columnFilters로 흘림)
+  const preFiltered = useMemo(() => {
+    let out = rows;
+    if (!includeInactive) out = out.filter((r) => r.is_active !== false);
+    if (search.overdue === "true") out = out.filter((r) => isOverdue(r.delivery_date as string | null));
+    return out;
+  }, [rows, includeInactive, search.overdue]);
 
-  const plotFacet = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of rows) {
-      const v = String(r.plot ?? "").trim() || "—";
-      m.set(v, (m.get(v) ?? 0) + 1);
-    }
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [rows]);
-
-  const filtered = useMemo(() => {
-    return rows.filter((r) => {
-      if (onlyActive && r.is_active === false) return false;
-      if (onlyDuplicate && r.is_duplicate !== true) return false;
-      if (approvalCodes.length > 0) {
-        const code = String(r.approval_code ?? "").trim() || "—";
-        if (!approvalCodes.includes(code)) return false;
-      }
-      if (plots.length > 0) {
-        const p = String(r.plot ?? "").trim() || "—";
-        if (!plots.includes(p)) return false;
-      }
-      if (debounced) {
-        const hay = [r.doc_ref, r.subject, r.supplier, r.manufacturer, r.category, r.system_type, r.po_number]
-          .map((v) => String(v ?? "").toLowerCase())
-          .join(" ");
-        if (!hay.includes(debounced)) return false;
-      }
-      return true;
-    });
-  }, [rows, debounced, approvalCodes, plots, onlyDuplicate, onlyActive]);
+  // 컬럼 정의
+  const orderedKeys = useMemo(() => {
+    // 최종 순서: __select → doc_ref → frozenExtras... → 나머지 order 순서
+    const frozenSet = new Set(frozenExtras);
+    const rest = order.filter((k) => !frozenSet.has(k) && k !== "doc_ref");
+    return ["__select", "doc_ref", ...frozenExtras, ...rest];
+  }, [order, frozenExtras]);
 
   const columns = useMemo<ColumnDef<Row>[]>(() => {
-    return SPARE_PART_COLUMNS.map((c) => ({
-      id: c.key,
-      accessorKey: c.key,
-      header: c.label,
-      size: c.width,
-      minSize: 60,
-      maxSize: 480,
-      enableSorting: true,
-      sortingFn: c.type === "number" || c.type === "cost" || c.type === "progress"
-        ? "basic"
-        : c.type === "date"
-        ? (a, b, id) => {
-            const av = a.getValue<string | null>(id);
-            const bv = b.getValue<string | null>(id);
-            const at = av ? new Date(av).getTime() : 0;
-            const bt = bv ? new Date(bv).getTime() : 0;
-            return at - bt;
-          }
-        : "alphanumeric",
-      cell: ({ getValue }) => renderCell(c.key, getValue()),
-    }));
-  }, []);
+    const cols: ColumnDef<Row>[] = [];
+    for (const key of orderedKeys) {
+      if (key === "__select") {
+        cols.push({
+          id: "__select",
+          size: 32,
+          enableSorting: false,
+          enableColumnFilter: false,
+          enableResizing: false,
+          header: ({ table }) => (
+            <span onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+              <Checkbox
+                checked={table.getIsAllRowsSelected() ? true : table.getIsSomeRowsSelected() ? "indeterminate" : false}
+                onCheckedChange={(v) => table.toggleAllRowsSelected(!!v)}
+                className="h-3.5 w-3.5"
+              />
+            </span>
+          ),
+          cell: ({ row }) => (
+            <span onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+              <Checkbox
+                checked={row.getIsSelected()}
+                onCheckedChange={(v) => row.toggleSelected(!!v)}
+                className="h-3.5 w-3.5"
+              />
+            </span>
+          ),
+        });
+        continue;
+      }
+      const c = SPARE_PART_COLUMNS.find((x) => x.key === key);
+      if (!c) continue;
+      const filterType = inferFilterType(c.type);
+      cols.push({
+        id: c.key,
+        accessorKey: c.key,
+        header: c.label,
+        size: c.width,
+        minSize: 60,
+        maxSize: 480,
+        enableSorting: true,
+        enableColumnFilter: true,
+        filterFn:
+          filterType === "multi-select"
+            ? multiSelectFilterFn
+            : filterType === "date-range"
+            ? dateRangeFilterFn
+            : filterType === "number-range"
+            ? numberRangeFilterFn
+            : filterType === "boolean"
+            ? booleanFilterFn
+            : textFilterFn,
+        sortingFn:
+          c.type === "number" || c.type === "cost" || c.type === "progress"
+            ? "basic"
+            : c.type === "date"
+            ? (a, b, id) => {
+                const av = a.getValue<string | null>(id);
+                const bv = b.getValue<string | null>(id);
+                return (av ? new Date(av).getTime() : 0) - (bv ? new Date(bv).getTime() : 0);
+              }
+            : "alphanumeric",
+        meta: { filterType, group: c.group },
+        cell: ({ getValue }) => renderCell(c.key, getValue()),
+      });
+    }
+    return cols;
+  }, [orderedKeys]);
 
   const table = useReactTable({
-    data: filtered,
+    data: preFiltered,
     columns,
-    state: { sorting, columnSizing: sizing, columnVisibility: visibility },
+    state: {
+      sorting,
+      columnSizing: sizing,
+      columnVisibility: visibility,
+      columnFilters,
+      globalFilter,
+      rowSelection,
+    },
+    getRowId: (r) => r.doc_ref,
     onSortingChange: setSorting,
     onColumnSizingChange: setSizing,
     onColumnVisibilityChange: setVisibility,
+    onColumnFiltersChange: setColumnFilters,
+    onRowSelectionChange: setRowSelection,
+    globalFilterFn: globalSearchFilterFn,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
     columnResizeMode: "onChange",
     enableMultiSort: true,
   });
 
-  const virtRef = useRef<HTMLDivElement>(null);
   const rowModel = table.getRowModel();
   const virtualizer = useVirtualizer({
     count: rowModel.rows.length,
-    getScrollElement: () => virtRef.current,
-    estimateSize: () => 34,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 32,
     overscan: 12,
   });
 
   const totalWidth = table.getTotalSize();
+  const frozenColIds = ["__select", "doc_ref", ...frozenExtras];
+  const frozenWidth = table.getVisibleLeafColumns()
+    .filter((c) => frozenColIds.includes(c.id))
+    .reduce((s, c) => s + c.getSize(), 0);
+
+  // 좌측 sticky offset 계산
+  const leftOffsets = useMemo(() => {
+    const off = new Map<string, number>();
+    let acc = 0;
+    for (const c of table.getVisibleLeafColumns()) {
+      if (frozenColIds.includes(c.id)) {
+        off.set(c.id, acc);
+        acc += c.getSize();
+      }
+    }
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table.getState().columnSizing, table.getVisibleLeafColumns(), frozenExtras]);
+
+  const selectedDocRefs = useMemo(() => Object.keys(rowSelection).filter((k) => rowSelection[k]), [rowSelection]);
 
   const resetAll = () => {
-    setSorting([]);
+    setSorting(DEFAULT_SORTING);
     setSizing({});
     setVisibility({});
-    setApprovalCodes([]);
-    setPlots([]);
-    setOnlyDuplicate(false);
-    setOnlyActive(true);
-    setSearch("");
+    setColumnFilters([]);
+    setGlobalFilter("");
+    setSearchInput("");
+    setOrder(DEFAULT_ORDER);
+    setFrozenExtras(DEFAULT_FROZEN_EXTRAS);
+    setIncludeInactive(false);
+    setRowSelection({});
+    navigate({ to: "/closure/spare-part/raw-data", search: {} });
   };
 
-  const activeFilters =
-    (approvalCodes.length > 0 ? 1 : 0) +
-    (plots.length > 0 ? 1 : 0) +
-    (onlyDuplicate ? 1 : 0) +
-    (!onlyActive ? 1 : 0) +
-    (debounced ? 1 : 0);
+  const visibleKeysForExport = useMemo(
+    () => table.getVisibleLeafColumns().map((c) => c.id).filter((id) => id !== "__select"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orderedKeys, visibility],
+  );
+  const filteredRowsForExport = useMemo(
+    () => rowModel.rows.map((r) => r.original),
+    [rowModel.rows],
+  );
+
+  const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0) + (includeInactive ? 0 : 1);
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] flex-col gap-3">
+    <div className="flex h-[calc(100vh-6rem)] flex-col gap-2">
+      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Spare Part — Raw Data</h1>
-        <Badge variant="secondary" className="ml-2">
-          {filtered.length.toLocaleString()} / {rows.length.toLocaleString()} rows
+        <Badge variant="secondary" className="ml-1">
+          {rowModel.rows.length.toLocaleString()} / {rows.length.toLocaleString()}
         </Badge>
+        {selectedDocRefs.length > 0 && (
+          <Badge variant="default" className="tabular-nums">
+            {selectedDocRefs.length} selected
+          </Badge>
+        )}
         {isFetching && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
+
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <div className="relative">
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="doc_ref / subject / supplier…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="전역 검색 (, 는 AND)"
               className="h-8 w-64 pl-7"
             />
           </div>
 
-          <MultiSelectDropdown
-            label="Approval"
-            options={approvalFacet}
-            selected={approvalCodes}
-            onChange={setApprovalCodes}
-          />
-          <MultiSelectDropdown label="Plot" options={plotFacet} selected={plots} onChange={setPlots} />
-
           <Button
-            variant={onlyDuplicate ? "default" : "outline"}
+            variant={includeInactive ? "default" : "outline"}
             size="sm"
             className="h-8"
-            onClick={() => setOnlyDuplicate((v) => !v)}
+            onClick={() => setIncludeInactive((v) => !v)}
           >
-            DP only
-          </Button>
-          <Button
-            variant={onlyActive ? "default" : "outline"}
-            size="sm"
-            className="h-8"
-            onClick={() => setOnlyActive((v) => !v)}
-          >
-            Active only
+            Include inactive
           </Button>
 
-          <ColumnVisibilityMenu
-            visibility={visibility}
-            onChange={setVisibility}
+          <ColumnOrderMenu
+            order={order}
+            visibility={visibility as Record<string, boolean>}
+            frozenExtras={frozenExtras}
+            onOrderChange={setOrder}
+            onVisibilityChange={setVisibility}
+            onFrozenChange={setFrozenExtras}
           />
 
           <Button variant="outline" size="sm" className="h-8" onClick={resetAll}>
@@ -285,39 +405,79 @@ export function SparePartRawDataPage() {
           <Button variant="outline" size="sm" className="h-8" onClick={() => refetch()}>
             Refresh
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => navigate({ to: "/closure/spare-part/import" })}
+          >
+            <Upload className="mr-1 h-3.5 w-3.5" /> Import
+          </Button>
+          <Button size="sm" className="h-8" onClick={() => setExportOpen(true)}>
+            <Download className="mr-1 h-3.5 w-3.5" /> Export
+          </Button>
         </div>
       </div>
 
-      {activeFilters > 0 && (
+      {/* Filter chips */}
+      {activeFilterCount > 0 && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <Filter className="h-3 w-3 text-muted-foreground" />
-          {approvalCodes.map((c) => (
-            <FilterChip key={`ac-${c}`} label={`Approval: ${c}`} onClear={() => setApprovalCodes((s) => s.filter((x) => x !== c))} />
+          {globalFilter && (
+            <FilterChip
+              label={`Search: ${globalFilter}`}
+              onClear={() => {
+                setSearchInput("");
+                setGlobalFilter("");
+              }}
+            />
+          )}
+          {!includeInactive && <FilterChip label="Active only" onClear={() => setIncludeInactive(true)} />}
+          {columnFilters.map((f) => (
+            <FilterChip
+              key={f.id}
+              label={`${SPARE_PART_COLUMNS.find((c) => c.key === f.id)?.label ?? f.id}: ${chipValue(f.value)}`}
+              onClear={() => setColumnFilters((prev) => prev.filter((x) => x.id !== f.id))}
+            />
           ))}
-          {plots.map((p) => (
-            <FilterChip key={`p-${p}`} label={`Plot: ${p}`} onClear={() => setPlots((s) => s.filter((x) => x !== p))} />
-          ))}
-          {onlyDuplicate && <FilterChip label="DP only" onClear={() => setOnlyDuplicate(false)} />}
-          {!onlyActive && <FilterChip label="Including inactive" onClear={() => setOnlyActive(true)} />}
-          {debounced && <FilterChip label={`Search: ${debounced}`} onClear={() => setSearch("")} />}
+          <button className="ml-1 text-[11px] text-muted-foreground hover:underline" onClick={() => setColumnFilters([])}>
+            Clear all
+          </button>
         </div>
       )}
 
-      {/* Table container */}
+      {/* Top horizontal scroll mirror */}
+      <TopHorizontalScrollbar targetRef={scrollRef} width={totalWidth} frozenWidth={frozenWidth} />
+
+      {/* Table */}
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border bg-card">
-        <div ref={virtRef} className="h-full overflow-auto">
+        <div ref={scrollRef} className="h-full overflow-auto">
           <div style={{ width: totalWidth }} className="relative">
             {/* Header */}
             <div className="sticky top-0 z-10 flex border-b bg-muted/70 backdrop-blur">
               {table.getHeaderGroups().map((hg) =>
                 hg.headers.map((h) => {
                   const sort = h.column.getIsSorted();
+                  const meta = h.column.columnDef.meta as any;
+                  const isFrozen = frozenColIds.includes(h.column.id);
+                  const leftOffset = isFrozen ? leftOffsets.get(h.column.id) ?? 0 : undefined;
+                  const bg = meta?.group ? GROUP_HEADER_BG[meta.group as keyof typeof GROUP_HEADER_BG] : "";
                   return (
                     <div
                       key={h.id}
-                      style={{ width: h.getSize() }}
-                      className="relative flex select-none items-center gap-1 border-r px-2 py-1.5 text-xs font-medium"
+                      style={{
+                        width: h.getSize(),
+                        position: isFrozen ? "sticky" : undefined,
+                        left: leftOffset,
+                        zIndex: isFrozen ? 20 : undefined,
+                      }}
+                      className={cn(
+                        "relative flex select-none items-center gap-1 border-r px-2 py-1.5 text-xs font-medium",
+                        bg,
+                        isFrozen && "bg-muted",
+                      )}
                     >
+                      {h.column.id === "doc_ref" && <Pin className="h-3 w-3 text-primary" />}
                       <button
                         type="button"
                         onClick={h.column.getToggleSortingHandler()}
@@ -327,53 +487,81 @@ export function SparePartRawDataPage() {
                         <span className="truncate">
                           {flexRender(h.column.columnDef.header, h.getContext())}
                         </span>
-                        {sort === "asc" ? (
-                          <ArrowUp className="h-3 w-3" />
-                        ) : sort === "desc" ? (
-                          <ArrowDown className="h-3 w-3" />
-                        ) : (
-                          <ArrowUpDown className="h-3 w-3 opacity-30" />
-                        )}
+                        {h.column.getCanSort() &&
+                          (sort === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : sort === "desc" ? (
+                            <ArrowDown className="h-3 w-3" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-30" />
+                          ))}
                       </button>
-                      <div
-                        onMouseDown={h.getResizeHandler()}
-                        onTouchStart={h.getResizeHandler()}
-                        className={cn(
-                          "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none bg-transparent hover:bg-primary/40",
-                          h.column.getIsResizing() && "bg-primary",
-                        )}
-                      />
+                      {h.column.getCanFilter() && meta?.filterType && (
+                        <ColumnFilterDropdown column={h.column} filterType={meta.filterType} />
+                      )}
+                      {h.column.getCanResize() && (
+                        <div
+                          onMouseDown={h.getResizeHandler()}
+                          onTouchStart={h.getResizeHandler()}
+                          className={cn(
+                            "absolute right-0 top-0 h-full w-1 cursor-col-resize touch-none select-none bg-transparent hover:bg-primary/40",
+                            h.column.getIsResizing() && "bg-primary",
+                          )}
+                        />
+                      )}
                     </div>
                   );
                 }),
               )}
             </div>
 
-            {/* Virtualized body */}
+            {/* Body */}
             <div style={{ height: virtualizer.getTotalSize() }} className="relative">
-              {virtualizer.getVirtualItems().map((vRow) => {
-                const row = rowModel.rows[vRow.index];
+              {virtualizer.getVirtualItems().map((v) => {
+                const row = rowModel.rows[v.index];
                 if (!row) return null;
+                const overdueRow = isOverdue(row.original.delivery_date as string | null);
                 return (
                   <div
                     key={row.id}
-                    style={{
-                      transform: `translateY(${vRow.start}px)`,
-                      height: vRow.size,
-                      width: totalWidth,
+                    style={{ transform: `translateY(${v.start}px)`, height: v.size, width: totalWidth }}
+                    className={cn(
+                      "absolute left-0 top-0 flex cursor-pointer border-b text-xs hover:bg-accent/40",
+                      row.getIsSelected() && "bg-primary/5",
+                      overdueRow && "bg-rose-50/40 dark:bg-rose-950/20",
+                    )}
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement;
+                      if (target.closest("input, button, [role='checkbox']")) return;
+                      navigate({
+                        to: "/closure/spare-part/records/$docRef",
+                        params: { docRef: row.original.doc_ref },
+                      });
                     }}
-                    className="absolute left-0 top-0 flex border-b text-xs hover:bg-accent/40"
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <div
-                        key={cell.id}
-                        style={{ width: cell.column.getSize() }}
-                        className="flex items-center overflow-hidden truncate border-r px-2"
-                        title={stringifyForTitle(cell.getValue())}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </div>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      const isFrozen = frozenColIds.includes(cell.column.id);
+                      const leftOffset = isFrozen ? leftOffsets.get(cell.column.id) ?? 0 : undefined;
+                      return (
+                        <div
+                          key={cell.id}
+                          data-column-id={cell.column.id}
+                          style={{
+                            width: cell.column.getSize(),
+                            position: isFrozen ? "sticky" : undefined,
+                            left: leftOffset,
+                            zIndex: isFrozen ? 5 : undefined,
+                          }}
+                          className={cn(
+                            "flex items-center overflow-hidden truncate border-r px-2",
+                            isFrozen && "bg-card",
+                          )}
+                          title={stringifyForTitle(cell.getValue())}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -385,15 +573,43 @@ export function SparePartRawDataPage() {
               </div>
             )}
             {isLoading && (
-              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-                로딩 중…
-              </div>
+              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">로딩 중…</div>
             )}
           </div>
         </div>
       </div>
+
+      <BulkEditBar
+        selectedDocRefs={selectedDocRefs}
+        onClear={() => setRowSelection({})}
+        onSaved={() => {
+          setRowSelection({});
+          refetch();
+        }}
+        canEdit={canEdit}
+      />
+
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        rows={filteredRowsForExport}
+        visibleKeys={visibleKeysForExport}
+      />
     </div>
   );
+}
+
+function chipValue(v: unknown): string {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.map((x) => (x === EMPTY_TOKEN ? "(Empty)" : String(x))).join(", ");
+  if (typeof v === "object") {
+    const o = v as any;
+    if (o.emptyOnly) return "(Empty)";
+    if (o.text) return String(o.text);
+    if (o.from || o.to) return `${o.from ?? ""}~${o.to ?? ""}`;
+    if (o.min != null || o.max != null) return `${o.min ?? ""}~${o.max ?? ""}`;
+  }
+  return String(v);
 }
 
 function stringifyForTitle(v: unknown): string {
@@ -405,8 +621,7 @@ function stringifyForTitle(v: unknown): string {
 function renderCell(key: string, raw: unknown) {
   const col = SPARE_PART_COLUMNS.find((c) => c.key === key);
   if (!col) return <span>{stringifyForTitle(raw)}</span>;
-
-  if (raw == null || raw === "") return <span className="text-muted-foreground/50">—</span>;
+  if (raw == null || raw === "") return <span className="text-muted-foreground/40">—</span>;
 
   if (col.type === "badge" && key === "approval_code") {
     const code = String(raw);
@@ -424,18 +639,12 @@ function renderCell(key: string, raw: unknown) {
     ) : raw === false ? (
       <X className="h-3.5 w-3.5 text-rose-500/70" />
     ) : (
-      <span className="text-muted-foreground/50">—</span>
+      <span className="text-muted-foreground/40">—</span>
     );
   }
-  if (col.type === "date") {
-    return <span className="tabular-nums">{formatDdMmm(String(raw))}</span>;
-  }
-  if (col.type === "number") {
-    return <span className="tabular-nums">{formatNumber(Number(raw))}</span>;
-  }
-  if (col.type === "cost") {
-    return <span className="tabular-nums">{formatNumber(Number(raw), 2)}</span>;
-  }
+  if (col.type === "date") return <span className="tabular-nums">{formatDdMmm(String(raw))}</span>;
+  if (col.type === "number") return <span className="tabular-nums">{formatNumber(Number(raw))}</span>;
+  if (col.type === "cost") return <span className="tabular-nums">{formatNumber(Number(raw), 2)}</span>;
   if (col.type === "progress") {
     const n = Math.max(0, Math.min(1, Number(raw) || 0));
     return (
@@ -466,105 +675,5 @@ function FilterChip({ label, onClear }: { label: string; onClear: () => void }) 
   );
 }
 
-function MultiSelectDropdown({
-  label,
-  options,
-  selected,
-  onChange,
-}: {
-  label: string;
-  options: Array<[string, number]>;
-  selected: string[];
-  onChange: (v: string[]) => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8">
-          {label}
-          {selected.length > 0 && (
-            <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
-              {selected.length}
-            </Badge>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 max-h-80 overflow-y-auto">
-        <DropdownMenuLabel className="text-xs">{label}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {options.length === 0 && (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">값 없음</div>
-        )}
-        {options.map(([val, count]) => {
-          const isChecked = selected.includes(val);
-          return (
-            <DropdownMenuCheckboxItem
-              key={val}
-              checked={isChecked}
-              onCheckedChange={(c) => {
-                onChange(c ? [...selected, val] : selected.filter((x) => x !== val));
-              }}
-              onSelect={(e) => e.preventDefault()}
-              className="text-xs"
-            >
-              <span className="flex-1 truncate">{val}</span>
-              <span className="ml-2 text-muted-foreground">{count}</span>
-            </DropdownMenuCheckboxItem>
-          );
-        })}
-        {selected.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-xs" onSelect={() => onChange([])}>
-              Clear
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function ColumnVisibilityMenu({
-  visibility,
-  onChange,
-}: {
-  visibility: VisibilityState;
-  onChange: (v: VisibilityState) => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8">
-          <Columns3 className="mr-1 h-3.5 w-3.5" />
-          Columns
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-96 w-64 overflow-y-auto">
-        <DropdownMenuLabel className="text-xs">Column visibility</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {SPARE_PART_COLUMNS.map((c) => {
-          const hidden = visibility[c.key] === false;
-          return (
-            <DropdownMenuItem
-              key={c.key}
-              className="text-xs"
-              onSelect={(e) => {
-                e.preventDefault();
-                onChange({ ...visibility, [c.key]: hidden });
-              }}
-            >
-              <Checkbox checked={!hidden} className="mr-2 h-3 w-3" />
-              <span className="flex-1 truncate">{c.label}</span>
-              <span className="ml-2 text-[10px] text-muted-foreground">{c.group}</span>
-            </DropdownMenuItem>
-          );
-        })}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-xs" onSelect={() => onChange({})}>
-          Show all
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+// no-op reference to keep BULK_EDITABLE_FIELDS import used
+void BULK_EDITABLE_FIELDS;
