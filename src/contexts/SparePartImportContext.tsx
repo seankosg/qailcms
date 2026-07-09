@@ -315,23 +315,24 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
         }
 
         // Build payloads.
-        const payloads = parsed.map((p) => ({
+        type Payload = { doc_ref: string; [k: string]: unknown };
+        const payloads: Payload[] = parsed.map((p) => ({
           doc_ref: p.doc_ref,
           plot: p.plot,
           ...p.struct,
-          raw_payload: p.raw_payload as never,
-          custom_payload: p.custom_payload as never,
+          raw_payload: p.raw_payload,
+          custom_payload: p.custom_payload,
           updated_by: userId,
           is_active: true,
           imported_at: new Date().toISOString(),
-        })) as never[];
+        }));
 
         // Bulk upsert in chunks.
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
           const slice = payloads.slice(i, i + INSERT_CHUNK);
           const { data, error } = await supabase
             .from("spare_parts_raw")
-            .upsert(slice, { onConflict: "doc_ref" })
+            .upsert(slice as never, { onConflict: "doc_ref" })
             .select("doc_ref");
           if (error) {
             // Row-by-row fallback.
