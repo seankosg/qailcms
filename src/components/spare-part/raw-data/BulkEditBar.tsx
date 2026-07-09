@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertTriangle, X, Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { BulkEditableField } from "@/lib/spare-part/columns";
 import { APPROVAL_CODES } from "@/lib/spare-part/columns";
 
@@ -36,13 +36,12 @@ export function BulkEditBar({ selectedDocRefs, onClear, onSaved, canEdit }: Prop
   const [value, setValue] = useState<string>("");
   const [boolVal, setBoolVal] = useState<"true" | "false">("true");
   const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
 
   if (selectedDocRefs.length === 0) return null;
 
   const applyValue = async () => {
     if (!canEdit) {
-      toast({ title: "권한 없음", description: "관리자 권한이 필요합니다.", variant: "destructive" });
+      toast.error("권한 없음", { description: "관리자 권한이 필요합니다." });
       return;
     }
     setSaving(true);
@@ -53,14 +52,14 @@ export function BulkEditBar({ selectedDocRefs, onClear, onSaved, canEdit }: Prop
 
       const { error } = await supabase
         .from("spare_parts_raw")
-        .update(payload)
+        .update(payload as any)
         .in("doc_ref", selectedDocRefs);
       if (error) throw error;
-      toast({ title: "저장 완료", description: `${selectedDocRefs.length}개 행 업데이트` });
+      toast.success("저장 완료", { description: `${selectedDocRefs.length}개 행 업데이트` });
       setValue("");
       onSaved();
     } catch (e: any) {
-      toast({ title: "저장 실패", description: e.message ?? String(e), variant: "destructive" });
+      toast.error("저장 실패", { description: e.message ?? String(e) });
     } finally {
       setSaving(false);
     }
