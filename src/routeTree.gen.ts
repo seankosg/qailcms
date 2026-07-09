@@ -9,27 +9,228 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './routes/_authenticated/closure/spare-part/raw-data'
+import { Route as AuthenticatedClosureSparePartImportRouteImport } from './routes/_authenticated/closure/spare-part/import'
+import { Route as AuthenticatedClosureSparePartDashboardRouteImport } from './routes/_authenticated/closure/spare-part/dashboard'
+import { Route as AuthenticatedClosureSparePartAconexSyncRouteImport } from './routes/_authenticated/closure/spare-part/aconex-sync'
+import { Route as AuthenticatedClosureSparePartImportLogsRouteImport } from './routes/_authenticated/closure/spare-part/import.logs'
 
-export interface FileRoutesByFullPath {}
-export interface FileRoutesByTo {}
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedClosureSparePartRawDataRoute =
+  AuthenticatedClosureSparePartRawDataRouteImport.update({
+    id: '/closure/spare-part/raw-data',
+    path: '/closure/spare-part/raw-data',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClosureSparePartImportRoute =
+  AuthenticatedClosureSparePartImportRouteImport.update({
+    id: '/closure/spare-part/import',
+    path: '/closure/spare-part/import',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClosureSparePartDashboardRoute =
+  AuthenticatedClosureSparePartDashboardRouteImport.update({
+    id: '/closure/spare-part/dashboard',
+    path: '/closure/spare-part/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClosureSparePartAconexSyncRoute =
+  AuthenticatedClosureSparePartAconexSyncRouteImport.update({
+    id: '/closure/spare-part/aconex-sync',
+    path: '/closure/spare-part/aconex-sync',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClosureSparePartImportLogsRoute =
+  AuthenticatedClosureSparePartImportLogsRouteImport.update({
+    id: '/logs',
+    path: '/logs',
+    getParentRoute: () => AuthenticatedClosureSparePartImportRoute,
+  } as any)
+
+export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
+  '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
+  '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
+  '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
+  '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
+}
+export interface FileRoutesByTo {
+  '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
+  '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
+  '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
+  '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
+  '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
+}
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
+  '/_authenticated/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
+  '/_authenticated/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
+  '/_authenticated/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
+  '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: never
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/closure/spare-part/aconex-sync'
+    | '/closure/spare-part/dashboard'
+    | '/closure/spare-part/import'
+    | '/closure/spare-part/raw-data'
+    | '/closure/spare-part/import/logs'
   fileRoutesByTo: FileRoutesByTo
-  to: never
-  id: '__root__'
+  to:
+    | '/'
+    | '/auth'
+    | '/closure/spare-part/aconex-sync'
+    | '/closure/spare-part/dashboard'
+    | '/closure/spare-part/import'
+    | '/closure/spare-part/raw-data'
+    | '/closure/spare-part/import/logs'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/closure/spare-part/aconex-sync'
+    | '/_authenticated/closure/spare-part/dashboard'
+    | '/_authenticated/closure/spare-part/import'
+    | '/_authenticated/closure/spare-part/raw-data'
+    | '/_authenticated/closure/spare-part/import/logs'
   fileRoutesById: FileRoutesById
 }
-export interface RootRouteChildren {}
-
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {}
+export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
-const rootRouteChildren: RootRouteChildren = {}
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/closure/spare-part/raw-data': {
+      id: '/_authenticated/closure/spare-part/raw-data'
+      path: '/closure/spare-part/raw-data'
+      fullPath: '/closure/spare-part/raw-data'
+      preLoaderRoute: typeof AuthenticatedClosureSparePartRawDataRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/spare-part/import': {
+      id: '/_authenticated/closure/spare-part/import'
+      path: '/closure/spare-part/import'
+      fullPath: '/closure/spare-part/import'
+      preLoaderRoute: typeof AuthenticatedClosureSparePartImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/spare-part/dashboard': {
+      id: '/_authenticated/closure/spare-part/dashboard'
+      path: '/closure/spare-part/dashboard'
+      fullPath: '/closure/spare-part/dashboard'
+      preLoaderRoute: typeof AuthenticatedClosureSparePartDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/spare-part/aconex-sync': {
+      id: '/_authenticated/closure/spare-part/aconex-sync'
+      path: '/closure/spare-part/aconex-sync'
+      fullPath: '/closure/spare-part/aconex-sync'
+      preLoaderRoute: typeof AuthenticatedClosureSparePartAconexSyncRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/spare-part/import/logs': {
+      id: '/_authenticated/closure/spare-part/import/logs'
+      path: '/logs'
+      fullPath: '/closure/spare-part/import/logs'
+      preLoaderRoute: typeof AuthenticatedClosureSparePartImportLogsRouteImport
+      parentRoute: typeof AuthenticatedClosureSparePartImportRoute
+    }
+  }
+}
+
+interface AuthenticatedClosureSparePartImportRouteChildren {
+  AuthenticatedClosureSparePartImportLogsRoute: typeof AuthenticatedClosureSparePartImportLogsRoute
+}
+
+const AuthenticatedClosureSparePartImportRouteChildren: AuthenticatedClosureSparePartImportRouteChildren =
+  {
+    AuthenticatedClosureSparePartImportLogsRoute:
+      AuthenticatedClosureSparePartImportLogsRoute,
+  }
+
+const AuthenticatedClosureSparePartImportRouteWithChildren =
+  AuthenticatedClosureSparePartImportRoute._addFileChildren(
+    AuthenticatedClosureSparePartImportRouteChildren,
+  )
+
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedClosureSparePartAconexSyncRoute: typeof AuthenticatedClosureSparePartAconexSyncRoute
+  AuthenticatedClosureSparePartDashboardRoute: typeof AuthenticatedClosureSparePartDashboardRoute
+  AuthenticatedClosureSparePartImportRoute: typeof AuthenticatedClosureSparePartImportRouteWithChildren
+  AuthenticatedClosureSparePartRawDataRoute: typeof AuthenticatedClosureSparePartRawDataRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedClosureSparePartAconexSyncRoute:
+    AuthenticatedClosureSparePartAconexSyncRoute,
+  AuthenticatedClosureSparePartDashboardRoute:
+    AuthenticatedClosureSparePartDashboardRoute,
+  AuthenticatedClosureSparePartImportRoute:
+    AuthenticatedClosureSparePartImportRouteWithChildren,
+  AuthenticatedClosureSparePartRawDataRoute:
+    AuthenticatedClosureSparePartRawDataRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
