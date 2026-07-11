@@ -45,6 +45,7 @@ import {
 import {
   AUTO_JUDGMENT_COLORS,
   DISCIPLINE_COLORS,
+  TEAM_COLORS,
   GROUP_HEADER_BG,
   PLOT_COLORS,
   RISK_COLORS,
@@ -113,6 +114,7 @@ function renderBadge(key: string, value: string) {
     auto_judgment: AUTO_JUDGMENT_COLORS,
     plot: PLOT_COLORS,
     discipline: DISCIPLINE_COLORS,
+    team: TEAM_COLORS,
   };
   const colors = map[key];
   const cls = colors?.[value] ?? "bg-muted text-foreground";
