@@ -16,6 +16,11 @@ export interface ParsedSparePartRow {
   raw_payload: Record<string, unknown>;
   custom_payload: Record<string, unknown>;
   struct: Record<string, unknown>;
+  issues: {
+    technical: string | null;
+    supplier: string | null;
+    internal: string | null;
+  };
 }
 
 export interface ParseSparePartResult {
@@ -211,7 +216,6 @@ const SNAKE_IDENTITY_FIELDS = [
   "spl_list_code", "spl_list_target",
   "proc_category", "proc_remarks",
   "issue_flag", "issue_action", "issue_owner",
-  "issue_technical", "issue_supplier", "issue_internal",
   "stage1_date", "stage1_done",
   "stage2_date", "stage2_done", "stage2_progress",
   "stage3_date", "stage3_done", "stage3_progress",
@@ -421,6 +425,11 @@ export async function parseSparePartExcel(
       const rawPayload: Record<string, unknown> = {};
       const customPayload: Record<string, unknown> = {};
       const struct: Record<string, unknown> = {};
+      const issues: { technical: string | null; supplier: string | null; internal: string | null } = {
+        technical: null,
+        supplier: null,
+        internal: null,
+      };
 
       for (let c = 0; c < det.cols.length; c++) {
         const col = det.cols[c];
@@ -430,6 +439,12 @@ export async function parseSparePartExcel(
         if (!col.field || col.field === "skip") continue;
         if (excludedSet.has(col.raw)) {
           excludedFields.add(col.field);
+          continue;
+        }
+        // Legacy issue fields → route to side-channel; not written to spare_parts_raw.
+        if (col.field === "issue_technical" || col.field === "issue_supplier" || col.field === "issue_internal") {
+          const key = col.field === "issue_technical" ? "technical" : col.field === "issue_supplier" ? "supplier" : "internal";
+          issues[key] = toText(cell);
           continue;
         }
         // Custom field routing.
@@ -474,6 +489,7 @@ export async function parseSparePartExcel(
         raw_payload: rawPayload,
         custom_payload: customPayload,
         struct,
+        issues,
       });
     }
   }
