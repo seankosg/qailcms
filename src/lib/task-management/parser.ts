@@ -263,11 +263,30 @@ export async function parseTaskManagementExcel(
     }
 
     const propagate = !isParent ? curParent : null;
-    const parentNo = isParent ? null : parentIdOf(a) ?? curParent?.task_no ?? null;
+    // 자식이면 우선 curParent(구조적 부모)를 신뢰. 엑셀에 접두어가 잘못 입력된 경우
+    // (예: AD-T-07 부모 아래에 AC-T-07-01 로 오타) task_no를 부모 기준으로 교정한다.
+    let taskNo = a;
+    let parentNo: string | null = null;
+    if (!isParent) {
+      const derivedParent = parentIdOf(a);
+      const structParent = curParent?.task_no ?? null;
+      if (structParent && derivedParent && structParent !== derivedParent) {
+        // 접두어 mismatch → 구조적 부모 + 마지막 세그먼트로 재조합
+        const lastSeg = a.split("-").slice(3).join("-") || "01";
+        const corrected = `${structParent}-${lastSeg}`;
+        warnings.push(
+          `행 ${r}: task_no '${a}' 접두어가 부모 '${structParent}'와 불일치 → '${corrected}'로 교정`,
+        );
+        taskNo = corrected;
+        parentNo = structParent;
+      } else {
+        parentNo = derivedParent ?? structParent;
+      }
+    }
 
     rows.push({
       rawRowNo: r,
-      task_no: a,
+      task_no: taskNo,
       parent_task_no: parentNo,
       level,
       category: cat ?? propagate?.category ?? null,
