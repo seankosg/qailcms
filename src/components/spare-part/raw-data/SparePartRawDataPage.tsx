@@ -42,7 +42,6 @@ import {
   SPARE_PART_COLUMNS,
   GROUP_HEADER_BG,
   inferFilterType,
-  BULK_EDITABLE_FIELDS,
 } from "@/lib/spare-part/columns";
 import { formatDdMmm, formatNumber, isOverdue } from "@/lib/spare-part/format";
 import {
@@ -636,13 +635,18 @@ export function SparePartRawDataPage() {
       </div>
 
       <BulkEditBar
-        selectedDocRefs={selectedDocRefs}
+        selectedRows={selectedRowObjects}
+        exportColumns={selectedExportColumns}
+        canEdit={canEdit}
         onClear={() => setRowSelection({})}
         onSaved={() => {
           setRowSelection({});
           refetch();
         }}
-        canEdit={canEdit}
+        onMutated={() => {
+          setRowSelection({});
+          refetch();
+        }}
       />
 
       <ExportDialog
