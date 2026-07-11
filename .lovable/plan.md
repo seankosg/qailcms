@@ -1,41 +1,45 @@
-# Task Raw Data — location / floor_level 컬럼 추가
+## 현황 조사 결과
 
-## 목표
+`Field Config`의 Display Name은 `task_management_field_config` 테이블에 저장되고, `useTaskManagementFieldConfig()` 훅 + `buildTmLabelOverrides()`로 Raw Data 페이지에서 사용됩니다. 저장 시 `TASK_MANAGEMENT_FIELD_CONFIG_QK` 캐시를 invalidate 하므로 이론상 반영됩니다.
 
-- `task_management_raw` 테이블에 `location`, `floor_level` 두 컬럼(text) 추가
-- Raw Data 표에서 **Plot 컬럼 오른쪽**에 두 컬럼 표시
-- 기존 `level`(parent/child) 컬럼 라벨은 **Tier**로 변경 (필드명은 그대로 `level` 유지 — 코드 영향 최소화)
-- 값은 이번 단계에서 채우지 않고 다음 단계에서 채움
+그러나 **테이블 헤더 텍스트만 override가 적용**되어 있고, 나머지 UI들은 여전히 코드 상수(`TM_COLUMNS[i].label`)를 직접 사용해서 Field Config 변경이 반영되지 않습니다.
 
-## 변경 내역
+### 반영되는 곳 (OK)
+- 테이블 헤더 (`TaskManagementRawDataPage.tsx` 367, 394)
+- ColumnOrderMenu 트리거 라벨 계산 (516–517)
 
-### 1. DB 마이그레이션
-- `ALTER TABLE public.task_management_raw ADD COLUMN location text`
-- `ALTER TABLE public.task_management_raw ADD COLUMN floor_level text`
-- `task_management_field_config`에 두 필드 시드 (is_visible=true, group_key='task', Plot 뒤 순서)
+### 반영 안 되는 곳 (버그)
+| 위치 | 문제 |
+|---|---|
+| `ColumnOrderMenu.tsx:18` | 컬럼 표시/숨김 토글 목록이 `c.label` 하드코딩 |
+| `BulkEditBar.tsx:199, 224` | 벌크 편집 필드 선택 드롭다운이 `getBulkEditableFields()` 결과의 `c.label` 사용 |
+| `ExportDialog.tsx:43` | Excel/CSV 내보내기 컬럼 헤더가 `def?.label` 사용 |
+| `TaskManagementRawDataPage.tsx:714` | 필터 chip에 표시되는 필드명이 `c.label` |
+| `EditCellPopover.tsx:55, 88` | 셀 편집 팝오버 제목/토스트가 `column.label` |
+| `BulkConfirmDialog.tsx:49` | 벌크 편집 확인 다이얼로그의 필드명 |
 
-### 2. 프론트엔드 컬럼 정의 (`src/lib/task-management/columns.ts`)
-- `TM_COLUMNS` 배열에서 `plot` 뒤에 두 항목 삽입:
-  - `{ key: "location", label: "위치", type: "text", group: "task", editable: true, editorType: "text", width: 130 }`
-  - `{ key: "floor_level", label: "층", type: "text", group: "task", editable: true, editorType: "text", width: 90 }`
-- `level` 컬럼 label을 `"Level"` → `"Tier"`로 변경
+## 수정 계획
 
-### 3. 타입 / 파서 / 표시 코드
-- `src/integrations/supabase/types.ts`는 마이그레이션 승인 후 자동 재생성
-- `parser.ts`의 Row 타입에 `location`, `floor_level` optional 필드 추가 (임포트 시 아직 매핑 없음 → null 유지)
-- Raw Data 페이지 셀 렌더링은 `TM_COLUMNS` 기반이라 자동 반영, 별도 렌더 분기 불필요
-- Bulk edit / 필터 / export도 `TM_COLUMNS` 기반이므로 자동 포함
+전역 헬퍼로 `labelOverrides`를 훅에서 가져와 라벨을 조회하는 함수를 만들고, 위 6개 위치를 하나씩 override를 사용하도록 교체합니다.
 
-### 4. Header Mapping / Field Config 관리 페이지
-- 자동으로 신규 필드가 목록에 노출됨 (관리자 페이지에서 라벨 오버라이드 가능)
+### 1) 훅에 유틸 추가 — `src/hooks/useTaskManagementFieldConfig.ts`
+`useTmColumnLabel()` 훅을 추가하여 `(key) => overriddenLabel ?? TM_COLUMNS의 label ?? key`를 반환하는 resolver 함수를 노출.
 
-## 다음 단계 (이번 계획 범위 외)
+### 2) 각 컴포넌트 수정
+- **`ColumnOrderMenu.tsx`**: props로 `labelOverrides`(또는 resolver)를 받도록 시그니처 확장. 부모(`TaskManagementRawDataPage`)에서 이미 계산된 `labelOverrides` 전달. 내부 `LABELS` Map 대신 resolver 사용.
+- **`BulkEditBar.tsx`**: 훅으로 resolver 획득 → 필드 옵션 렌더링 시 override 우선.
+- **`ExportDialog.tsx`**: 훅으로 resolver 획득 → export 헤더 라벨에 override 우선 (단, `format === "reimport"`는 기존대로 key 유지).
+- **`TaskManagementRawDataPage.tsx` L714**: 이미 부모에 `labelOverrides` 존재하므로 `labelOverrides[f.id] ?? TM_COLUMNS…` 로 교체.
+- **`EditCellPopover.tsx`**: 훅으로 resolver 획득 후 `column.key`로 조회.
+- **`BulkConfirmDialog.tsx`**: 부모에서 이미 override 반영된 라벨을 계산해 전달하거나 훅 사용.
 
-- 임포트 원본 헤더 → `location` / `floor_level` 매핑 규칙 정의
-- parent→child 값 동기화 로직에 두 필드 포함 여부 결정
-- 값 채우기 (엑셀 재임포트 또는 대량 편집)
+### 3) 캐시 stale 개선 (선택)
+`useTaskManagementFieldConfig`의 `staleTime: 30_000`은 유지 — 저장 시 invalidate가 즉시 refetch를 발동하므로 문제 없음. 별도 조치 불필요.
 
-## 확인 사항
+### 4) 검증
+- Field Config에서 예: `계획 시작` → `Plan Start(테스트)` 변경 후 저장
+- Raw Data 헤더, 필터 chip, ColumnOrderMenu, 벌크 편집 드롭다운, Export 미리보기, 셀 편집 팝오버 제목이 모두 새 라벨 표시하는지 브라우저로 확인 (Playwright 스크린샷)
 
-- `level` 필드명 자체는 유지하고 **표시 라벨만 Tier**로 변경합니다. DB/코드의 `level='parent'|'child'` 로직은 그대로 동작합니다.
-- 신규 두 컬럼은 nullable text로 추가되어 기존 행은 NULL 상태로 남습니다.
+### 범위 밖
+- Spare Part 쪽 Field Config는 이미 유사 패턴이므로 변경 없음.
+- DB, RLS, 마이그레이션 변경 없음. 순수 프론트 프리젠테이션 계층 수정.
