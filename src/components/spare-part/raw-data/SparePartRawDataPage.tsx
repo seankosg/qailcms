@@ -434,7 +434,7 @@ export function SparePartRawDataPage() {
     <div className="flex h-[calc(100vh-6rem)] flex-col gap-2">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-semibold tracking-tight">Spare Part — Raw Data</h1>
+        <h1 className="text-xl font-semibold tracking-tight">SPT-Raw Data</h1>
         <Badge variant="secondary" className="ml-1">
           {rowModel.rows.length.toLocaleString()} / {rows.length.toLocaleString()}
         </Badge>

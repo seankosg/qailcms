@@ -1,0 +1,367 @@
+import { useCallback, useRef, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Eye,
+  FileSpreadsheet,
+  Loader2,
+  Upload,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import {
+  TaskManagementImportProvider,
+  useTaskManagementImport,
+  type TmFileStatus,
+  type TmImportFileItem,
+} from "@/contexts/TaskManagementImportContext";
+import { DISCIPLINES, type Discipline } from "@/lib/task-management/columns";
+
+const statusBadge: Record<TmFileStatus, { label: string; cls: string }> = {
+  pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
+  parsing: { label: "Parsing", cls: "bg-muted text-muted-foreground" },
+  ready: { label: "Ready", cls: "bg-primary/10 text-primary" },
+  processing: { label: "Processing", cls: "bg-muted text-muted-foreground" },
+  done: { label: "Done", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" },
+  failed: { label: "Failed", cls: "bg-destructive/10 text-destructive" },
+};
+
+function formatSize(b: number) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export function TaskManagementImportPage() {
+  return (
+    <TaskManagementImportProvider>
+      <ImportInner />
+    </TaskManagementImportProvider>
+  );
+}
+
+function ImportInner() {
+  const { data: me } = useCurrentUser();
+  const canImport = !!me?.isAdmin;
+  const {
+    files,
+    isRunning,
+    addFiles,
+    removeFile,
+    clearAll,
+    setFileDiscipline,
+    startImport,
+  } = useTaskManagementImport();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      addFiles(Array.from(e.dataTransfer.files));
+    },
+    [addFiles],
+  );
+  const onSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      addFiles(e.target.files ? Array.from(e.target.files) : []);
+      if (inputRef.current) inputRef.current.value = "";
+    },
+    [addFiles],
+  );
+
+  const readyCount = files.filter((f) => f.status === "ready" && !f.validationError).length;
+  const previewFile = files.find((f) => f.id === previewFileId) ?? null;
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm text-muted-foreground">
+          QAIL Task Management Excel(건축/전기/설비)의 <code>Gantt</code> 시트를 파싱하여
+          <code> task_management_raw</code>에 upsert합니다. 키는{" "}
+          <code>(discipline, task_no)</code>.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">1. Upload Files</CardTitle>
+          <CardDescription>.xlsx / .xlsm — 다중 파일 지원. 파일별로 공종을 선택합니다.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+            onClick={() => inputRef.current?.click()}
+            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-10 text-center transition hover:border-primary hover:bg-accent/30"
+          >
+            <Upload className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm font-medium">Excel 파일을 드롭하거나 클릭하여 선택</p>
+            <p className="text-xs text-muted-foreground">.xlsx / .xlsm — Gantt 시트만 파싱</p>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept=".xlsx,.xls,.xlsm"
+              className="hidden"
+              onChange={onSelect}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {files.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">2. Files ({files.length})</CardTitle>
+              <CardDescription>{readyCount} ready to import</CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={clearAll} disabled={isRunning}>
+                Clear all
+              </Button>
+              <Button
+                size="sm"
+                onClick={startImport}
+                disabled={isRunning || readyCount === 0 || !canImport}
+                title={!canImport ? "관리자 권한이 필요합니다" : ""}
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Importing…
+                  </>
+                ) : (
+                  `Start import (${readyCount})`
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {files.map((f) => (
+              <FileRow
+                key={f.id}
+                file={f}
+                isRunning={isRunning}
+                onRemove={() => removeFile(f.id)}
+                onDisciplineChange={(d) => setFileDiscipline(f.id, d)}
+                onPreview={() => setPreviewFileId(f.id)}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <PreviewDialog file={previewFile} onClose={() => setPreviewFileId(null)} />
+    </div>
+  );
+}
+
+function FileRow({
+  file: f,
+  isRunning,
+  onRemove,
+  onDisciplineChange,
+  onPreview,
+}: {
+  file: TmImportFileItem;
+  isRunning: boolean;
+  onRemove: () => void;
+  onDisciplineChange: (d: Discipline) => void;
+  onPreview: () => void;
+}) {
+  const badge = statusBadge[f.status];
+  return (
+    <div className="rounded border p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <FileSpreadsheet className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{f.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatSize(f.size)}
+              {f.dataDate && ` · Data Date ${f.dataDate}`}
+              {typeof f.parentCount === "number" &&
+                ` · Parent ${f.parentCount} / Child ${f.childCount}`}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">공종</span>
+              <Select
+                value={f.discipline ?? ""}
+                onValueChange={(v) => onDisciplineChange(v as Discipline)}
+                disabled={isRunning || f.status === "done" || f.status === "processing"}
+              >
+                <SelectTrigger className="h-7 w-[120px] text-xs">
+                  <SelectValue placeholder="선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DISCIPLINES.map((d) => (
+                    <SelectItem key={d} value={d} className="text-xs">
+                      {d}
+                      {f.disciplineHint === d ? " (권장)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {f.parsed && f.parsed.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={onPreview}
+                >
+                  <Eye className="h-3.5 w-3.5" /> Preview
+                </Button>
+              )}
+            </div>
+            {f.warnings && f.warnings.length > 0 && (
+              <p className="mt-1 text-xs text-amber-600">
+                ⚠ {f.warnings.slice(0, 3).join(" · ")}
+                {f.warnings.length > 3 ? ` (+${f.warnings.length - 3})` : ""}
+              </p>
+            )}
+            {f.validationError && (
+              <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{f.validationError}</span>
+              </div>
+            )}
+            {f.error && (
+              <div className="mt-1 rounded border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+                ⚠ {f.error}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge className={badge.cls}>{badge.label}</Badge>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onRemove}
+            disabled={isRunning}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      {f.status === "processing" && <Progress value={f.progress} className="mt-2 h-1.5" />}
+      {f.result && (
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          <Badge variant="outline" className="border-emerald-300 text-emerald-700">
+            <CheckCircle2 className="mr-1 h-3 w-3" /> Inserted: {f.result.inserted}
+          </Badge>
+          <Badge variant="outline" className="border-blue-300 text-blue-700">
+            Updated: {f.result.updated}
+          </Badge>
+          {f.result.rejected > 0 && (
+            <Badge variant="outline" className="border-destructive text-destructive">
+              <AlertCircle className="mr-1 h-3 w-3" /> Rejected: {f.result.rejected}
+            </Badge>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PreviewDialog({
+  file,
+  onClose,
+}: {
+  file: TmImportFileItem | null;
+  onClose: () => void;
+}) {
+  const open = !!file;
+  const rows = (file?.parsed ?? []).slice(0, 20);
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Preview — {file?.name}</DialogTitle>
+          <DialogDescription>
+            상위 20행 (총 {file?.parsed?.length ?? 0}행). Data Date {file?.dataDate ?? "-"}
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="max-h-[60vh]">
+          <table className="w-full text-[11px]">
+            <thead className="sticky top-0 bg-muted">
+              <tr>
+                {[
+                  "Task No",
+                  "Lv",
+                  "Category",
+                  "Plot",
+                  "항목",
+                  "리스크",
+                  "세부업무",
+                  "담당",
+                  "유형",
+                  "상태",
+                  "계획 시작",
+                  "계획 완료",
+                  "실적%",
+                  "자동판정",
+                ].map((h) => (
+                  <th key={h} className="border-b px-1.5 py-1 text-left font-medium">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.rawRowNo} className="border-b hover:bg-accent/30">
+                  <td className="px-1.5 py-1 font-mono">{r.task_no}</td>
+                  <td className="px-1.5 py-1">{r.level === "parent" ? "P" : "C"}</td>
+                  <td className="px-1.5 py-1">{r.category ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.plot ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.task_name ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.risk ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.sub_task_desc ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.pic ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.row_type ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.status_manual ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.plan_start ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.plan_end ?? ""}</td>
+                  <td className="px-1.5 py-1">
+                    {r.actual_progress != null
+                      ? `${Math.round(r.actual_progress * 100)}%`
+                      : ""}
+                  </td>
+                  <td className="px-1.5 py-1">{r.auto_judgment ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}

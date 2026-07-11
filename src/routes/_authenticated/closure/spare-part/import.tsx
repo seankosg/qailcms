@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TaskManagementImportPage } from "@/components/task-management/import/TaskManagementImportPage";
 import {
   AlertCircle,
   CheckCircle2,
@@ -37,15 +39,34 @@ import {
 } from "@/contexts/SparePartImportContext";
 
 export const Route = createFileRoute("/_authenticated/closure/spare-part/import")({
-  head: () => ({ meta: [{ title: "Spare Part — Import" }] }),
+  head: () => ({ meta: [{ title: "Closure — Import" }] }),
   component: RouteComponent,
 });
 
 function RouteComponent() {
   return (
-    <SparePartImportProvider>
-      <ImportPage />
-    </SparePartImportProvider>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Closure — Import</h1>
+        <p className="text-sm text-muted-foreground">
+          Spare Part / Task Management Excel 파일을 각 탭에서 임포트합니다.
+        </p>
+      </div>
+      <Tabs defaultValue="spare-part" className="w-full">
+        <TabsList>
+          <TabsTrigger value="spare-part">Spare Part</TabsTrigger>
+          <TabsTrigger value="task-management">Task Management</TabsTrigger>
+        </TabsList>
+        <TabsContent value="spare-part" className="mt-4">
+          <SparePartImportProvider>
+            <ImportPage />
+          </SparePartImportProvider>
+        </TabsContent>
+        <TabsContent value="task-management" className="mt-4">
+          <TaskManagementImportPage />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
 

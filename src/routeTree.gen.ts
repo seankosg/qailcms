@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
+import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from './routes/_authenticated/closure/task-management/raw-data'
 import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './routes/_authenticated/closure/spare-part/raw-data'
 import { Route as AuthenticatedClosureSparePartImportRouteImport } from './routes/_authenticated/closure/spare-part/import'
 import { Route as AuthenticatedClosureSparePartDashboardRouteImport } from './routes/_authenticated/closure/spare-part/dashboard'
@@ -51,6 +52,12 @@ const AuthenticatedAdminMappingRoute =
     id: '/mapping',
     path: '/mapping',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedClosureTaskManagementRawDataRoute =
+  AuthenticatedClosureTaskManagementRawDataRouteImport.update({
+    id: '/closure/task-management/raw-data',
+    path: '/closure/task-management/raw-data',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedClosureSparePartRawDataRoute =
   AuthenticatedClosureSparePartRawDataRouteImport.update({
@@ -99,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
+  '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
@@ -111,6 +119,7 @@ export interface FileRoutesByTo {
   '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
+  '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
@@ -126,6 +135,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/_authenticated/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/_authenticated/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
+  '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/_authenticated/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
+    | '/closure/task-management/raw-data'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
   fileRoutesByTo: FileRoutesByTo
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
+    | '/closure/task-management/raw-data'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
   id:
@@ -167,6 +179,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/spare-part/dashboard'
     | '/_authenticated/closure/spare-part/import'
     | '/_authenticated/closure/spare-part/raw-data'
+    | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/spare-part/import/logs'
     | '/_authenticated/closure/spare-part/records/$docRef'
   fileRoutesById: FileRoutesById
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/mapping'
       preLoaderRoute: typeof AuthenticatedAdminMappingRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/closure/task-management/raw-data': {
+      id: '/_authenticated/closure/task-management/raw-data'
+      path: '/closure/task-management/raw-data'
+      fullPath: '/closure/task-management/raw-data'
+      preLoaderRoute: typeof AuthenticatedClosureTaskManagementRawDataRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/closure/spare-part/raw-data': {
       id: '/_authenticated/closure/spare-part/raw-data'
@@ -303,6 +323,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureSparePartDashboardRoute: typeof AuthenticatedClosureSparePartDashboardRoute
   AuthenticatedClosureSparePartImportRoute: typeof AuthenticatedClosureSparePartImportRouteWithChildren
   AuthenticatedClosureSparePartRawDataRoute: typeof AuthenticatedClosureSparePartRawDataRoute
+  AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
   AuthenticatedClosureSparePartRecordsDocRefRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
 
@@ -316,6 +337,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureSparePartImportRouteWithChildren,
   AuthenticatedClosureSparePartRawDataRoute:
     AuthenticatedClosureSparePartRawDataRoute,
+  AuthenticatedClosureTaskManagementRawDataRoute:
+    AuthenticatedClosureTaskManagementRawDataRoute,
   AuthenticatedClosureSparePartRecordsDocRefRoute:
     AuthenticatedClosureSparePartRecordsDocRefRoute,
 }
