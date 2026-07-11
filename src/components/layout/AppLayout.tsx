@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, Package, Wrench, ShieldCheck, Settings2,
+  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, Package, Wrench, ShieldCheck, Settings2, ListTodo,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,10 +18,17 @@ const NAV: NavGroup[] = [
     icon: Package,
     items: [
       { to: "/closure/spare-part/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: Database },
+      { to: "/closure/spare-part/raw-data", label: "SPT-Raw Data", icon: Database },
       { to: "/closure/spare-part/import", label: "Import", icon: Upload, adminOnly: true },
       { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, adminOnly: true },
       { to: "/closure/spare-part/aconex-sync", label: "Aconex Sync", icon: RefreshCw, adminOnly: true },
+    ],
+  },
+  {
+    label: "Task Management",
+    icon: ListTodo,
+    items: [
+      { to: "/closure/task-management/raw-data", label: "Task-Raw Data", icon: Database },
     ],
   },
   {
