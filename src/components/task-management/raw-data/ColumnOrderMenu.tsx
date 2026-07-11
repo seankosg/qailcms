@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Columns3, GripVertical, Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TM_COLUMNS } from "@/lib/task-management/columns";
+import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
 
 interface Props {
   order: string[]; // full column order excluding __select/task_no
@@ -15,8 +16,6 @@ interface Props {
   onFrozenChange: (next: string[]) => void;
 }
 
-const LABELS = new Map(TM_COLUMNS.map((c) => [c.key, c.label] as const));
-
 export function ColumnOrderMenu({
   order,
   visibility,
@@ -26,6 +25,7 @@ export function ColumnOrderMenu({
   onFrozenChange,
 }: Props) {
   const [dragKey, setDragKey] = useState<string | null>(null);
+  const resolveLabel = useTmColumnLabel();
 
   const toggleFrozen = (k: string) => {
     if (frozenExtras.includes(k)) {
@@ -81,7 +81,7 @@ export function ColumnOrderMenu({
           {frozenExtras.map((k) => (
             <div key={k} className="flex items-center gap-1 rounded px-1 py-1 text-xs">
               <Pin className="h-3 w-3 text-primary" />
-              <span className="flex-1 truncate">{LABELS.get(k) ?? k}</span>
+              <span className="flex-1 truncate">{resolveLabel(k)}</span>
               <button
                 className="text-[10px] text-muted-foreground hover:underline"
                 onClick={() => toggleFrozen(k)}
@@ -115,7 +115,7 @@ export function ColumnOrderMenu({
                   className="h-3 w-3"
                 />
                 <span className={cn("flex-1 truncate", hidden && "text-muted-foreground/50")}>
-                  {LABELS.get(k) ?? k}
+                  {resolveLabel(k)}
                 </span>
                 <button
                   className={cn(

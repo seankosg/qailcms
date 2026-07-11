@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import type { TmColumnDef } from "@/lib/task-management/columns";
+import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
 
 interface Props {
   rowId: string;
@@ -36,6 +37,8 @@ export function EditCellPopover({
     currentValue == null ? "" : String(currentValue),
   );
   const [busy, setBusy] = useState(false);
+  const resolveLabel = useTmColumnLabel();
+  const displayLabel = resolveLabel(column.key);
 
   if (!column.editable || !canEdit) return <>{children}</>;
 
@@ -52,7 +55,7 @@ export function EditCellPopover({
         .update({ [column.key]: payload })
         .eq("id", rowId);
       if (error) throw error;
-      toast.success("저장 완료", { description: `${column.label}` });
+      toast.success("저장 완료", { description: displayLabel });
       setOpen(false);
       onSaved();
     } catch (e: any) {
@@ -85,7 +88,7 @@ export function EditCellPopover({
         onClick={(e) => e.stopPropagation()}
       >
         <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-          {column.label} 편집
+          {displayLabel} 편집
         </p>
         {column.editorType === "select" && (
           <Select value={val} onValueChange={setVal}>

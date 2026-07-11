@@ -32,6 +32,7 @@ import {
   getBulkEditableFields,
   type BulkEditableField,
 } from "@/lib/task-management/columns";
+import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
 import {
   applyBulkUpdate,
   copyRowsAsTsv,
@@ -60,15 +61,20 @@ export function BulkEditBar({
   onMutated,
 }: Props) {
   const fields = useMemo(() => getBulkEditableFields(), []);
+  const resolveLabel = useTmColumnLabel();
+  const displayFields = useMemo(
+    () => fields.map((f) => ({ ...f, label: resolveLabel(f.field) })),
+    [fields, resolveLabel],
+  );
   const fieldGroups = useMemo(() => {
     const map = new Map<string, BulkEditableField[]>();
-    for (const f of fields) {
+    for (const f of displayFields) {
       const arr = map.get(f.group) ?? [];
       arr.push(f);
       map.set(f.group, arr);
     }
     return Array.from(map.entries());
-  }, [fields]);
+  }, [displayFields]);
 
   const [fieldName, setFieldName] = useState<string>("");
   const [rawValue, setRawValue] = useState<string>("");
@@ -78,8 +84,8 @@ export function BulkEditBar({
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const field = useMemo(
-    () => fields.find((f) => f.field === fieldName) ?? null,
-    [fields, fieldName],
+    () => displayFields.find((f) => f.field === fieldName) ?? null,
+    [displayFields, fieldName],
   );
 
   const count = selectedRows.length;

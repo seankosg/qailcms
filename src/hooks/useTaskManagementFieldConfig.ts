@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
+import { TM_COLUMNS } from "@/lib/task-management/columns";
 
 export interface TaskManagementFieldConfigRow {
   id: string;
@@ -36,4 +38,17 @@ export function buildTmLabelOverrides(
   const out: Record<string, string> = {};
   for (const r of rows ?? []) out[r.field_name] = r.display_name;
   return out;
+}
+
+/**
+ * Field Config의 Display Name을 최우선으로 하고, 없으면 TM_COLUMNS.label,
+ * 그마저 없으면 key를 반환하는 라벨 resolver를 제공하는 훅.
+ */
+export function useTmColumnLabel(): (key: string) => string {
+  const { data } = useTaskManagementFieldConfig();
+  return useMemo(() => {
+    const overrides = buildTmLabelOverrides(data);
+    const codeLabels = new Map(TM_COLUMNS.map((c) => [c.key, c.label] as const));
+    return (key: string) => overrides[key] ?? codeLabels.get(key) ?? key;
+  }, [data]);
 }
