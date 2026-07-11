@@ -389,6 +389,26 @@ export async function parseTaskManagementExcel(
   const rows: ParsedTaskRow[] = [];
   let sort = 0;
 
+  // 1-pass: task_no 집합 수집 (prefix 기반 parent 판정 및 parent 검증용)
+  const rowEnd = Math.min(range.e.r + 1, 5000);
+  const allTaskNos = new Set<string>();
+  for (let r = 7; r <= rowEnd; r++) {
+    const a = toStr(getCell(sheet, r, cols.no));
+    const f = toStr(getCell(sheet, r, cols.sub_task_desc));
+    if (!a && !f) break;
+    if (!a) continue;
+    allTaskNos.add(a);
+  }
+  const parentSet = new Set<string>();
+  for (const t of allTaskNos) {
+    for (const other of allTaskNos) {
+      if (other !== t && other.startsWith(`${t}-`)) {
+        parentSet.add(t);
+        break;
+      }
+    }
+  }
+
   // Cached parent attributes for propagation
   let curParent: {
     task_no: string;
@@ -398,14 +418,13 @@ export async function parseTaskManagementExcel(
     risk: string | null;
   } | null = null;
 
-  for (let r = 7; r <= Math.min(range.e.r + 1, 5000); r++) {
+  for (let r = 7; r <= rowEnd; r++) {
     const a = toStr(getCell(sheet, r, cols.no));
     const f = toStr(getCell(sheet, r, cols.sub_task_desc));
     if (!a && !f) break;
     if (!a) continue; // task_no is required
 
-    const segs = segmentCount(a);
-    const isParent = segs <= 3;
+    const isParent = parentSet.has(a);
     const level: "parent" | "child" = isParent ? "parent" : "child";
 
     const cat = toStr(getCell(sheet, r, cols.category));
@@ -429,7 +448,8 @@ export async function parseTaskManagementExcel(
     let taskNo = a;
     let parentNo: string | null = null;
     if (!isParent) {
-      const derivedParent = parentIdOf(a);
+      const cand = parentCandidateOf(a);
+      const derivedParent = cand && parentSet.has(cand) ? cand : null;
       const structParent = curParent?.task_no ?? null;
       if (structParent && derivedParent && structParent !== derivedParent) {
         // 접두어 mismatch → 구조적 부모 + 마지막 세그먼트로 재조합
