@@ -98,11 +98,13 @@ export const GROUP_HEADER_BG: Record<TmColumnDef["group"], string> = {
 
 export const TM_COLUMNS: TmColumnDef[] = [
   { key: "task_no", label: "Task No", type: "text", width: 140, group: "id" },
-  { key: "level", label: "Level", type: "badge", width: 90, group: "id" },
+  { key: "level", label: "Tier", type: "badge", width: 90, group: "id" },
   { key: "discipline", label: "공종", type: "badge", width: 90, group: "id" },
   { key: "team", label: "Team", type: "badge", width: 100, group: "id" },
   { key: "category", label: "Category", type: "text", width: 130, group: "task", editable: true, editorType: "text" },
   { key: "plot", label: "Plot", type: "badge", width: 70, group: "task" },
+  { key: "location", label: "위치", type: "text", width: 130, group: "task", editable: true, editorType: "text" },
+  { key: "floor_level", label: "층", type: "text", width: 90, group: "task", editable: true, editorType: "text" },
   { key: "task_name", label: "항목", type: "text", width: 240, group: "task", editable: true, editorType: "text" },
   { key: "risk", label: "리스크", type: "badge", width: 100, group: "task", editable: true, editorType: "select", options: [...RISK_LEVELS] },
   { key: "sub_task_desc", label: "세부 업무", type: "text", width: 220, group: "task", editable: true, editorType: "text" },
