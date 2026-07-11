@@ -1,64 +1,60 @@
-## 비교 결과 요약
+## 원인
 
-업로드한 `20260710_Task_Management_건축-5.xlsx` (Gantt 시트, 137행) 를 DB `task_management_raw` (`discipline='건축'`, 134행) 와 비교했습니다.
-
-- **행 존재**: task_no 기준 완전 일치 (134개 공통, 엑셀에만/DB에만 있는 task_no 없음).  
-  ※ 엑셀에는 137행이 있지만 이 중 3행은 dedupe/parent 처리로 실제 저장 대상은 134행.
-- **필드 값 불일치**: **총 313건**
-  | 필드 | 불일치 건수 |
-  |---|---|
-  | `plan_start` | **134** (전 행) |
-  | `plan_end`   | **134** (전 행) |
-  | `actual_start` | **45** (값이 있는 모든 행) |
-  | 그 외 (`plan_days`, `actual_progress`, `plan_progress`, `progress_variance`, `slip_days`, `forecast_end`, `category`, `plot`, `task_name`, `risk`, `sub_task_desc`, `pic`, `row_type`, `status_manual`, `auto_judgment`) | **0** |
-
----
-
-## 원인 — 날짜 파싱 UTC/로컬 시간대 버그
-
-모든 불일치가 **날짜 필드에서 정확히 하루 이르게(-1일) 저장**됨. 예:
-
-| task_no | 필드 | Excel | DB |
-|---|---|---|---|
-| AR-C-T-01 | plan_start | 2026-05-02 | 2026-05-01 |
-| AR-C-T-01 | plan_end   | 2026-09-03 | 2026-09-02 |
-| AR-C-T-01 | actual_start | 2026-04-29 | 2026-04-28 |
-| AR-C-P-01 | plan_start | 2026-07-04 | 2026-07-03 |
-
-원인은 `src/lib/task-management/parser.ts` 의 `toIsoDate`:
+현재 파서(`src/lib/task-management/parser.ts`)의 parent/child 판정이 **세그먼트 개수 3 이하 = parent** 로 되어 있음 (L210-217):
 
 ```ts
-if (v instanceof Date) {
-  const y = v.getUTCFullYear();
-  const m = String(v.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(v.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+function segmentCount(taskNo: string): number { ... }
+const isParent = segs <= 3;
+function parentIdOf(taskNo: string): string | null {
+  const parts = taskNo.split("-");
+  if (parts.length < 4) return null;
+  return parts.slice(0, 3).join("-");
 }
 ```
 
-`xlsx` 라이브러리가 `cellDates:true` 로 반환한 `Date`는 **로컬 자정** (예: `2026-05-02 00:00 KST`)으로 생성되는데, `getUTC*` 로 읽으면 UTC로 환산되면서 `2026-05-01`이 됨. KST(+09:00)든 어떤 양의 오프셋이든 하루가 밀림.
+그러나 이 프로젝트의 task_no 규칙은:
+- Parent: `AR-C-T-01` (4 세그먼트)
+- Child : `AR-C-T-01-01` (5 세그먼트)
 
----
+따라서 **모든 row가 child 로 분류**되고, `curParent` 가 절대 셋업되지 않아 propagation(부모 → 자식 빈 필드 채움)도 동작하지 않음. 결과적으로 DB의 모든 134행이 `level='child'`, 자식 행의 `category`/`plot`/`task_name`/`risk` 는 비어 있음.
 
-## 계획 — 파서 수정 + 재임포트
+## 계획
 
-### A. `toIsoDate` 로컬 컴포넌트로 교체
-`getUTC*` → `getFullYear/getMonth/getDate` 로 변경. Excel 시리얼 파싱 (`XLSX.SSF.parse_date_code`) 분기는 이미 로컬 y/m/d를 반환하므로 그대로 유지.
+### A. 파서: parent 판정을 "prefix 관계" 기반으로 교체
+`src/lib/task-management/parser.ts`
 
-파일: `src/lib/task-management/parser.ts` (L72~78, `toIsoDate` 내부의 `Date` 처리 분기 3줄)
+1. task_no 세그먼트를 하드코딩 3/4로 판단하지 않고, **파일 안의 다른 task_no 가 `${myTaskNo}-` 로 시작하면 parent** 로 판정. 세그먼트 개수와 무관하게 동작하고, 3-세그먼트/4-세그먼트 스킴 모두 커버.
+2. `parentIdOf(taskNo)` 를 "마지막 세그먼트 제거 → 그 결과가 실제 parent 집합에 존재하면 그 값, 없으면 null" 로 변경. 즉, `AR-C-T-01-01` → `AR-C-T-01`.
+3. 접두어 mismatch 교정 로직(L429~437)은 새 `parentIdOf` 결과 기준으로 자연스럽게 재사용.
+4. propagation 대상 필드는 현행 유지: `category`, `plot`, `task_name`(항목), `risk`. `pic`/`sub_task_desc`/`row_type`/`status_manual` 등은 부모와 자식이 다르므로 propagate 하지 않음.
 
-### B. 재임포트 안내
-파서 수정 후 사용자가 `20260710_..._건축-5.xlsx` 를 다시 Import 하면:
-- 134개 row 의 `plan_start`, `plan_end`, `actual_start` 가 하루씩 뒤로 보정됨
-- `data_date`는 `2026-07-09` → `2026-07-10` 으로 갱신
-- `dataDate`가 이번 파일에서는 D4(=2026-07-10)에서 이미 정상 감지됨 (직전 세션에서 파서 유연화 적용됨)
+구현 스케치:
+```ts
+// 1차 스캔: 파일 내 모든 task_no 수집
+const allTaskNos = new Set<string>(); // rows 7~ 스캔
+// parent 판정: 다른 task_no 가 `${a}-` 로 시작하면 parent
+const isParent = [...allTaskNos].some((t) => t !== a && t.startsWith(`${a}-`));
+// parentIdOf: 마지막 세그먼트 제거, allTaskNos 에 존재해야 함
+const parts = a.split("-");
+const candidate = parts.slice(0, -1).join("-");
+const parentNo = allTaskNos.has(candidate) ? candidate : null;
+```
 
-### C. 검증
-재임포트 후 동일 비교 스크립트를 다시 실행해 불일치 0 인지 확인.
+`isParent` 캐싱을 위해 2-pass 로 변경(1-pass 로 task_no만 먼저 훑어서 Set 채우고, 2-pass 에서 현행 필드 파싱). `curParent`/propagation 로직은 그대로 유지되며 이제 정상 동작.
 
----
+### B. 통계/미리보기
+`ParseTaskManagementResult.parentCount` 는 새 로직에 따라 자동으로 정상 값이 산출됨. UI 문구·컬럼 변경 없음.
+
+### C. 기존 DB 데이터 반영
+- 파서 수정 후 사용자가 동일 파일을 **다시 Import** 하면 upsert 로 134행의 `level`, `category`, `plot`, `task_name`, `risk` 가 갱신됨.
+- 별도 SQL 백필은 하지 않음 (파서/재임포트가 단일 source of truth).
+
+### D. 검증
+- typecheck 통과 확인
+- 재임포트 후 DB에서:
+  - `SELECT COUNT(*) FROM task_management_raw WHERE discipline='건축' AND level='parent'` 가 0이 아님을 확인
+  - `AR-C-T-01-01` 등 자식 행에 `category='OUTSTANDING'`, `plot='C'`, `task_name='TOWER CORRIDOR CEILING FINAL'`, `risk='High'` 가 채워졌는지 확인
 
 ## 참고
-- `sub_task_desc`, `category`, `plot`, `pic` 등 텍스트 필드는 완전 일치했으므로 컬럼 매핑 자체는 정상.
-- `auto_judgment` 필드는 이 파일 전 행이 비어 있고 DB도 `auto_judgment_import`가 비어있어 일치. `auto_judgment_import` 대신 재계산된 `auto_judgment` 컬럼은 rollup + judgment recalc 로직이 채우므로 비교 대상에서 제외.
-- 313 = 134 + 134 + 45 완전한 산술적 대응 → 데이터 무결성 관점에서 다른 이상은 없음.
+- parent_task_no 인덱스 (`task_management_raw_parent_idx`) 는 이미 있으므로 스키마 변경 없음.
+- rollup 로직(별도 `is_rollup` row 생성)은 이 변경과 독립적으로 계속 동작.
