@@ -211,10 +211,15 @@ function segmentCount(taskNo: string): number {
   return taskNo.split("-").filter((s) => s.length > 0).length;
 }
 
-function parentIdOf(taskNo: string): string | null {
-  const parts = taskNo.split("-");
-  if (parts.length < 4) return null;
-  return parts.slice(0, 3).join("-");
+/**
+ * 마지막 세그먼트를 제거한 후보 parent id를 반환.
+ * 세그먼트 개수 하드코딩을 피하고, 실제 file 내 parent 집합과 대조해
+ * 유효 여부를 판단하는 것은 호출부의 역할.
+ */
+function parentCandidateOf(taskNo: string): string | null {
+  const parts = taskNo.split("-").filter((s) => s.length > 0);
+  if (parts.length < 2) return null;
+  return parts.slice(0, -1).join("-");
 }
 
 export interface ParseTaskManagementOptions {
