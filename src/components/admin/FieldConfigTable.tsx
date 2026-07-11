@@ -59,7 +59,7 @@ export function FieldConfigTable() {
       const results = await Promise.all(updates);
       const err = results.find((r) => r.error)?.error;
       if (err) throw err;
-      toast({ title: `${dirtyCount}개 필드 저장 완료` });
+      toast.success(`${dirtyCount}개 필드 저장 완료`);
       setDrafts({});
       qc.invalidateQueries({ queryKey: SPARE_PART_FIELD_CONFIG_QK });
       refetch();
