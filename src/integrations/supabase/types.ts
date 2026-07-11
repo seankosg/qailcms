@@ -363,10 +363,7 @@ export type Database = {
           is_duplicate: boolean | null
           issue_action: string | null
           issue_flag: string | null
-          issue_internal: string | null
           issue_owner: string | null
-          issue_supplier: string | null
-          issue_technical: string | null
           manual_available: boolean | null
           manufacturer: string | null
           phy: boolean | null
@@ -450,10 +447,7 @@ export type Database = {
           is_duplicate?: boolean | null
           issue_action?: string | null
           issue_flag?: string | null
-          issue_internal?: string | null
           issue_owner?: string | null
-          issue_supplier?: string | null
-          issue_technical?: string | null
           manual_available?: boolean | null
           manufacturer?: string | null
           phy?: boolean | null
@@ -537,10 +531,7 @@ export type Database = {
           is_duplicate?: boolean | null
           issue_action?: string | null
           issue_flag?: string | null
-          issue_internal?: string | null
           issue_owner?: string | null
-          issue_supplier?: string | null
-          issue_technical?: string | null
           manual_available?: boolean | null
           manufacturer?: string | null
           phy?: boolean | null
