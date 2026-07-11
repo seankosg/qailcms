@@ -735,5 +735,3 @@ function FilterChip({ label, onClear }: { label: string; onClear: () => void }) 
   );
 }
 
-// no-op reference to keep BULK_EDITABLE_FIELDS import used
-void BULK_EDITABLE_FIELDS;
