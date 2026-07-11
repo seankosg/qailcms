@@ -81,6 +81,11 @@ export const DISCIPLINE_COLORS: Record<string, string> = {
   "설비": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
 };
 
+// Team 배지 색상 — discipline 값을 그대로 사용하므로 동일 색상 재사용.
+// 신규 team이 추가되어 매칭이 없으면 회색 fallback.
+export const TEAM_COLORS: Record<string, string> = { ...DISCIPLINE_COLORS };
+export const TEAM_FALLBACK_COLOR = "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300";
+
 export const GROUP_HEADER_BG: Record<TmColumnDef["group"], string> = {
   id: "bg-slate-100/80 dark:bg-slate-800/40",
   task: "bg-indigo-100/60 dark:bg-indigo-900/20",
@@ -95,6 +100,7 @@ export const TM_COLUMNS: TmColumnDef[] = [
   { key: "task_no", label: "Task No", type: "text", width: 140, group: "id" },
   { key: "level", label: "Level", type: "badge", width: 90, group: "id" },
   { key: "discipline", label: "공종", type: "badge", width: 90, group: "id" },
+  { key: "team", label: "Team", type: "badge", width: 100, group: "id" },
   { key: "category", label: "Category", type: "text", width: 130, group: "task", editable: true, editorType: "text" },
   { key: "plot", label: "Plot", type: "badge", width: 70, group: "task" },
   { key: "task_name", label: "항목", type: "text", width: 240, group: "task", editable: true, editorType: "text" },

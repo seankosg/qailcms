@@ -977,6 +977,7 @@ export type Database = {
           sub_task_desc: string | null
           task_name: string | null
           task_no: string
+          team: string | null
           updated_at: string
         }
         Insert: {
@@ -1013,6 +1014,7 @@ export type Database = {
           sub_task_desc?: string | null
           task_name?: string | null
           task_no: string
+          team?: string | null
           updated_at?: string
         }
         Update: {
@@ -1049,6 +1051,7 @@ export type Database = {
           sub_task_desc?: string | null
           task_name?: string | null
           task_no?: string
+          team?: string | null
           updated_at?: string
         }
         Relationships: [

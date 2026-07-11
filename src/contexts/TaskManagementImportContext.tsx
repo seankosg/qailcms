@@ -256,6 +256,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         parent_task_no: p.parent_task_no,
         level: p.level,
         discipline,
+        team: discipline,
         category: p.category,
         plot: p.plot,
         task_name: p.task_name,
