@@ -86,10 +86,13 @@ function ImportInner() {
     removeFile,
     clearAll,
     setFileDiscipline,
+    setFileDataDateOverride,
+    setFileColumnOverrides,
     startImport,
   } = useTaskManagementImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
+  const [mappingFileId, setMappingFileId] = useState<string | null>(null);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -108,6 +111,7 @@ function ImportInner() {
 
   const readyCount = files.filter((f) => f.status === "ready" && !f.validationError).length;
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
+  const mappingFile = files.find((f) => f.id === mappingFileId) ?? null;
 
   return (
     <div className="space-y-4">
