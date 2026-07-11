@@ -1,78 +1,106 @@
 ## 목표
 
-`spare_parts_raw`의 legacy 필드 `issue_technical`, `issue_supplier`, `issue_internal`를 완전히 제거합니다. 해당 내용은 이미 `spare_part_status_history` 코멘트로 이전되어 있으므로, 앞으로는 코멘트만이 유일한 소스가 됩니다. 엑셀 파싱에서 이 세 컬럼이 들어오더라도 raw 테이블에는 저장하지 않고, 기존 diff-append 로직만 계속 유지됩니다.
+Spare Part Raw Data 화면의 선택-행 mass 변경 UX를 SHAW PROJECT CMS와 동일한 수준으로 끌어올립니다. 사용자 답변에 따라 3가지 기능만 이식하고, 나머지(Soft Delete / Reassign / Duplicate / change_log)는 제외합니다.
 
----
+## 포함 범위
 
-## 1. 마이그레이션 (스키마)
+1. **Bulk Edit** — SHAW의 `BulkActionBar` 상단 바를 그대로 이식
+   - "N selected · Editable K · Will run in X batches of 500" 상태 표시
+   - 그룹별 필드 피커(Select) + 입력 컨트롤(select / date / text / textarea / boolean / number)
+   - Blank 체크박스로 값 clear (`null` 저장)
+   - Apply → 상위 5행 before → after 미리보기 확인 다이얼로그
+   - 500행 단위 auto-chunk + batch 진행 토스트
+   - 변경 이력 로그 없음 (단순 update)
+   - 관리자만 편집 가능(`canEdit`)
 
-`spare_parts_raw`에서 세 컬럼을 DROP하고, `spare_part_field_config`의 해당 row도 정리합니다.
+2. **Hard Delete** — SHAW의 `BulkDeleteDialog`(hard 모드)만 이식
+   - `spare_parts_raw`에서 선택된 `doc_ref` 완전 삭제
+   - Cascade 미리보기: `spare_part_comments`, `spare_part_status_history`, `spare_part_custom_fields`의 관련 행 개수 표시
+   - "DELETE" 타이핑으로 확인
+   - 200행 chunk, 관련 자식 테이블 먼저 삭제 후 raw 삭제
 
-```sql
-ALTER TABLE public.spare_parts_raw
-  DROP COLUMN IF EXISTS issue_technical,
-  DROP COLUMN IF EXISTS issue_supplier,
-  DROP COLUMN IF EXISTS issue_internal;
+3. **Export(선택 행)** — SHAW의 Export 드롭다운 이식
+   - `.xlsx` 다운로드: 사용자가 화면에서 보고 있는 컬럼 순서/라벨 그대로
+   - TSV 클립보드 복사: 헤더 + 값 tab-separated
 
-DELETE FROM public.spare_part_field_config
- WHERE field_key IN ('issue_technical','issue_supplier','issue_internal');
+## 편집 가능 필드 확장
 
--- 헤더 매핑에도 남아 있다면 함께 정리 (사용자가 매핑을 손봤을 수 있으므로 조건부)
-DELETE FROM public.spare_part_header_mappings
- WHERE target_field IN ('issue_technical','issue_supplier','issue_internal');
+`SPARE_PART_COLUMNS`의 그룹(`id/approval/vendor/qty/cost/delivery/avail/spl/stage/issue/remark`)을 그대로 활용하여, `doc_ref`와 자동 계산되는 progress 컬럼을 제외한 대부분(약 40개)을 그룹별 필드 피커에 노출합니다.
+
+컬럼 타입 → 입력 컨트롤 매핑:
+- `boolean` → boolean 셀렉트(Yes/No/Blank)
+- `date` → date input
+- `number` / `cost` → number input
+- `badge`(`approval_code`, `plot`) → 옵션 select
+- 나머지 `text` → text input, `remarks/action/proc_remarks` 같은 긴 값은 textarea popover
+
+Progress 계열(`rfq_progress`, `quotation_progress`, `po_progress`, `delivery_progress`)과 감사 컬럼(`updated_at`, `created_at`, `is_active`는 별도 필터로 관리 중)은 편집 목록에서 제외합니다.
+
+## 기술 설계
+
+### 파일 구조 (신규/수정)
+
+```
+src/lib/spare-part/
+  bulk-edit.ts               (신규) BulkEditableField 타입, applyBulkUpdate, chunkArray, BULK_CHUNK_ROWS
+  bulk-actions.ts            (신규) applyBulkDelete(hard), previewBulkDelete, exportSelectedToXlsx, copyRowsAsTsv
+  columns.ts                 (수정) BULK_EDITABLE_FIELDS 대체 → getBulkEditableFields() 그룹별 정의 반환
+
+src/components/spare-part/raw-data/
+  BulkEditBar.tsx            (전면 교체) SHAW BulkActionBar 스타일로 재작성. sticky top 바.
+  dialogs/
+    BulkDeleteDialog.tsx     (신규) hard-only 버전
+    BulkConfirmDialog.tsx    (신규) Apply 전 before/after 미리보기
+
+  SparePartRawDataPage.tsx   (수정) BulkEditBar props 확장, refetch 후크 연결
 ```
 
-Status History 데이터는 그대로 유지됩니다(이미 마이그레이션된 코멘트).
+### applyBulkUpdate 시그니처
 
----
+```ts
+type BulkUpdateRequest = {
+  ids: string[];               // doc_ref 값 배열
+  field: string;               // 컬럼명
+  value: string | number | boolean | null;
+  extraUpdates?: Record<string, string | number | boolean | null>;
+};
+```
 
-## 2. 파서 (`src/lib/spare-part-import-parser.ts`)
+- PK 컬럼은 `doc_ref` 고정(spare_parts_raw)
+- 100행 chunk로 `.update(...).in('doc_ref', chunk).select('doc_ref')` 반복
+- 반환: `{ attempted, succeeded, failed, errors }`
+- 로그/diff 없음 — SHAW의 change_log 관련 코드는 이식하지 않음
 
-- `SNAKE_IDENTITY_FIELDS`에서 `issue_technical/supplier/internal` 3개 항목 제거 → raw 스키마에 없는 컬럼이 struct에 들어가 upsert 오류가 나는 것을 방지합니다.
-- 대신, 파싱 결과에 별도 필드 `issues: { technical?: string; supplier?: string; internal?: string }` 를 채워 반환하도록 합니다(엑셀에 이 헤더가 있으면 원문 텍스트만 담아둠). 헤더 인식은 기존 매핑 alias를 재사용하되, 최종 write target을 raw 컬럼이 아니라 이 별도 슬롯으로 라우팅합니다.
-- ParsedRow 타입에 `issues?: { technical?: string|null; supplier?: string|null; internal?: string|null }` 추가.
+### applyBulkDelete (hard)
 
----
+- `spare_part_comments`, `spare_part_status_history`, `spare_part_custom_fields`에서 `doc_ref IN (...)` 먼저 삭제
+- 이어서 `spare_parts_raw.delete().in('doc_ref', chunk)` 실행
+- chunk 200개
+- previewBulkDelete는 3개 자식 테이블 각각 `count: 'exact', head: true`로 개수만 조회
 
-## 3. Import Context (`src/contexts/SparePartImportContext.tsx`)
+### Export
 
-- upsert payload(`p`)는 이제 issue_* 컬럼을 포함하지 않으므로 그대로 안전.
-- Status History diff-append 블록은 지금 `p.struct[field]`에서 값을 읽는데, 그 자리를 `p.issues.technical/supplier/internal`로 바꿉니다. 나머지 정규화·중복 방지·insert 로직은 그대로.
+- `exportSelectedToXlsx({ rows, columns, fileName })` — 기존 `excel-export.ts`가 있으니 그 유틸을 재사용하거나 `xlsx` 패키지로 직접 workbook 생성
+- `copyRowsAsTsv({ rows, columns })` — `navigator.clipboard.writeText`로 TSV 문자열 복사
+- `columns`는 SparePartRawDataPage에서 현재 표시 순서·라벨 그대로 전달(`table.getVisibleLeafColumns()` → key/label 매핑)
 
----
+### 상단 바 위치
 
-## 4. 컬럼/필드 정의
+현재 BulkEditBar는 sticky bottom. SHAW와 동일한 UX를 위해 **sticky top**으로 옮기고, 좌측에 primary 컬러 바(border-l-2)로 강조합니다.
 
-- `src/lib/spare-part/columns.ts` : `SPARE_PART_COLUMNS`에서 `issue_technical/supplier/internal` 3개 엔트리 삭제. `RAW_SEARCH_FIELDS`, `BULK_EDITABLE_FIELDS`에는 원래도 없어 별도 변경 없음.
-- Raw Data 그리드/필터 UI는 columns.ts 기반 자동 렌더이므로 자연스럽게 사라집니다.
-- 상세페이지(`SparePartDetailPage.tsx`)는 Status History 카드가 이미 이 정보를 담당하므로 별도 변경 없음.
+### 권한
 
----
+- `canEdit = currentUser.isAdmin`만 사용(SHAW의 per-row scope RPC는 이식하지 않음)
+- 관리자 아닌 사용자에게는 selected count만 보이고 Apply/Delete 버튼은 disabled
 
-## 5. 타입
+## 마이그레이션
 
-마이그레이션 승인 후 `src/integrations/supabase/types.ts`가 자동 재생성되며 세 필드가 사라집니다. 코드에서 이 필드에 대한 직접 참조는 위 변경 이후에는 남지 않게 됩니다.
+DB 변경 없음. change_log 테이블 미생성.
 
----
+## 수용 기준
 
-## 파일 변경 요약
-
-**마이그레이션 (신규)**
-- `supabase/migrations/*.sql` — 컬럼 DROP + field_config/header_mappings 정리
-
-**수정**
-- `src/lib/spare-part-import-parser.ts` — SNAKE_IDENTITY_FIELDS에서 3필드 제거, `issues` 사이드채널 추가
-- `src/contexts/SparePartImportContext.tsx` — diff-append에서 `struct` 대신 `issues` 읽기
-- `src/lib/spare-part/columns.ts` — 3개 컬럼 정의 제거
-
-**변경 없음**
-- Status History 데이터/테이블/컴포넌트
-- 상세페이지 편집 UI
-
----
-
-## 검증
-
-- 재임포트 시 엑셀에 Issue 열이 있어도 raw 테이블에는 반영되지 않고, 새로운 값만 `spare_part_status_history`에 `excel_import` 소스로 추가되는지 확인.
-- Raw Data 그리드/Export/필터에서 3개 컬럼이 완전히 사라졌는지 확인.
-- 기존 History 데이터가 그대로 보이는지 확인.
+- 여러 행 선택 후 Bulk Edit 바에서 그룹별 필드 선택 → 입력 → Apply → 확인 다이얼로그의 상위 5개 행에 이전값/변경값이 나타남 → 확인 시 500행씩 batch로 반영되고 batch 진행 토스트 표시
+- Blank 체크박스 사용 시 실제 DB에 `NULL`이 저장됨
+- More → Delete permanently → cascade 미리보기(comments / status_history / custom_fields 건수) + "DELETE" 타이핑 후 확인 시 자식 테이블 → raw 순으로 삭제되고, 리스트에서 사라짐
+- Export 드롭다운에서 xlsx 다운로드 및 TSV 클립보드 복사 모두 동작. 컬럼 순서·라벨은 현재 화면과 일치
+- 관리자 아닌 사용자에게는 Apply/Delete 비활성화
