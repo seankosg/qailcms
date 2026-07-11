@@ -106,9 +106,12 @@ function toIsoDate(v: unknown): string | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) return null;
-    const y = v.getUTCFullYear();
-    const m = String(v.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(v.getUTCDate()).padStart(2, "0");
+    // xlsx `cellDates:true` returns local midnight for the sheet's day.
+    // Reading UTC components on a positive-offset timezone (e.g. KST)
+    // shifts the date back one day, so use local components.
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, "0");
+    const d = String(v.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
   if (typeof v === "number") {
