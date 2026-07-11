@@ -195,7 +195,7 @@ export function BulkEditBar({
 
   return (
     <>
-      <div className="sticky top-0 z-30 rounded-md border border-l-2 border-l-primary bg-card px-3 py-2 shadow-sm">
+      <div className="rounded-md border border-l-2 border-l-primary bg-card px-3 py-2 shadow-sm">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex items-center gap-2 pr-2">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
