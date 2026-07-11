@@ -55,6 +55,7 @@ export interface TmImportFileItem {
     updated: number;
     skipped: number;
     rejected: number;
+    duplicates?: number;
     rolledUp?: number;
     judgmentRecalculated?: number;
     errors?: ImportErrorEntry[];
