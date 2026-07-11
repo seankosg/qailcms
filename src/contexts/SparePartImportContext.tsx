@@ -357,6 +357,38 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
           );
         }
 
+        // Tag newly-inserted rows with source_import_log_id so rollback can
+        // identify inserts from this batch. Existing rows keep their original
+        // tag (never overwritten).
+        const newDocRefs = parsed
+          .map((p) => p.doc_ref)
+          .filter((d) => !existingSet.has(d));
+        for (let i = 0; i < newDocRefs.length; i += 500) {
+          const chunk = newDocRefs.slice(i, i + 500);
+          await (supabase as any)
+            .from("spare_parts_raw")
+            .update({ source_import_log_id: logId })
+            .in("doc_ref", chunk)
+            .is("source_import_log_id", null);
+        }
+
+        // Write per-row import logs (inserted/updated/rejected).
+        try {
+          const rowLogRows = parsed.map((p, idx) => ({
+            upload_id: logId,
+            raw_row_no: idx + 1,
+            doc_ref: p.doc_ref,
+            action_taken: existingSet.has(p.doc_ref) ? "updated" : "inserted",
+          }));
+          for (let i = 0; i < rowLogRows.length; i += 500) {
+            await (supabase as any)
+              .from("spare_part_import_row_logs")
+              .insert(rowLogRows.slice(i, i + 500));
+          }
+        } catch (e) {
+          console.warn("[SparePartImport] row-log insert failed", e);
+        }
+
         await supabase
           .from("spare_parts_import_logs")
           .update({
