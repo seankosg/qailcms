@@ -18,6 +18,9 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,9 +32,13 @@ import {
   ArrowUpDown,
   Download,
   Filter,
+  History,
+  Loader2,
   Pin,
+  RefreshCcw,
   RotateCcw,
   Search,
+  Sliders,
   Upload,
   X,
 } from "lucide-react";
@@ -60,8 +67,14 @@ import { BulkEditBar } from "./BulkEditBar";
 import { EditCellPopover } from "./EditCellPopover";
 import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { ExportDialog } from "./ExportDialog";
+import { HistoryDrawer } from "./HistoryDrawer";
 import { TopHorizontalScrollbar } from "@/components/spare-part/raw-data/TopHorizontalScrollbar";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import {
+  runRollupAllParents,
+  runRecalcAutoJudgment,
+} from "@/lib/task-management/rollup.functions";
+import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
 
 type Row = Record<string, unknown> & { id: string; task_no: string; discipline: string };
 
@@ -158,7 +171,11 @@ export function TaskManagementRawDataPage() {
   const [frozenExtras, setFrozenExtras] = useState<string[]>(DEFAULT_FROZEN_EXTRAS);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [exportOpen, setExportOpen] = useState(false);
+  const [historyTask, setHistoryTask] = useState<{ discipline: string; task_no: string; task_name?: string | null } | null>(null);
+  const [rollupBusy, setRollupBusy] = useState<null | "rollup" | "judgment">(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rollupFn = useServerFn(runRollupAllParents);
+  const judgmentFn = useServerFn(runRecalcAutoJudgment);
 
   // initial load from localStorage
   useEffect(() => {
@@ -326,6 +343,42 @@ export function TaskManagementRawDataPage() {
       }
       const c = TM_COLUMNS.find((x) => x.key === key);
       if (!c) continue;
+      // 파생 컬럼(오늘 계획/오늘 차이) — 실제 DB 값이 없으므로 accessorFn으로 계산
+      if (c.key === "expected_progress_today" || c.key === "today_gap") {
+        cols.push({
+          id: c.key,
+          size: c.width,
+          minSize: 60,
+          maxSize: 240,
+          enableSorting: true,
+          enableColumnFilter: false,
+          accessorFn: (r: Row) => {
+            if (c.key === "expected_progress_today") return expectedProgressToday(r as any);
+            return todayGap(r as any);
+          },
+          header: c.label,
+          meta: { group: c.group },
+          cell: ({ getValue }) => {
+            const v = Number(getValue()) || 0;
+            if (c.key === "expected_progress_today") {
+              return (
+                <span className="w-full text-right tabular-nums">
+                  {(v * 100).toFixed(1)}%
+                </span>
+              );
+            }
+            const cls = v < -0.05 ? "text-rose-600" : v > 0.05 ? "text-emerald-600" : "text-muted-foreground";
+            const sign = v > 0 ? "+" : "";
+            return (
+              <span className={cn("w-full text-right tabular-nums", cls)}>
+                {sign}
+                {(v * 100).toFixed(1)}%p
+              </span>
+            );
+          },
+        });
+        continue;
+      }
       const filterType = inferTmFilterType(c.type);
       cols.push({
         id: c.key,
@@ -494,6 +547,37 @@ export function TaskManagementRawDataPage() {
 
   const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
 
+  async function handleRollup() {
+    setRollupBusy("rollup");
+    try {
+      const res = await Promise.all([
+        rollupFn({ data: { discipline: "건축" } }),
+        rollupFn({ data: { discipline: "전기" } }),
+        rollupFn({ data: { discipline: "설비" } }),
+      ]);
+      const total = res.reduce((s, r) => s + r.rolledUp, 0);
+      toast.success(`Summary 재계산 완료: ${total}개 parent`);
+      refetch();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "재계산 실패");
+    } finally {
+      setRollupBusy(null);
+    }
+  }
+
+  async function handleRecalcJudgment() {
+    setRollupBusy("judgment");
+    try {
+      const res = await judgmentFn({ data: {} });
+      toast.success(`Auto‑judgment 재계산 완료: ${res.updated}행`);
+      refetch();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "재계산 실패");
+    } finally {
+      setRollupBusy(null);
+    }
+  }
+
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -537,6 +621,45 @@ export function TaskManagementRawDataPage() {
           <Button variant="outline" size="sm" className="h-8" onClick={() => refetch()}>
             Refresh
           </Button>
+          {canEdit && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={handleRollup}
+                disabled={!!rollupBusy}
+                title="자식 진도로 parent 자동 재계산"
+              >
+                {rollupBusy === "rollup" ? (
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCcw className="mr-1 h-3.5 w-3.5" />
+                )}
+                Rollup
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={handleRecalcJudgment}
+                disabled={!!rollupBusy}
+                title="임계값 기준으로 자동 판정 재계산"
+              >
+                {rollupBusy === "judgment" ? (
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCcw className="mr-1 h-3.5 w-3.5" />
+                )}
+                Judgment
+              </Button>
+              <Button variant="outline" size="sm" className="h-8" asChild>
+                <Link to="/admin/task-thresholds">
+                  <Sliders className="mr-1 h-3.5 w-3.5" /> 임계값
+                </Link>
+              </Button>
+            </>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -607,6 +730,8 @@ export function TaskManagementRawDataPage() {
                   const bg = meta?.group
                     ? GROUP_HEADER_BG[meta.group as keyof typeof GROUP_HEADER_BG]
                     : "";
+                  const canSort = h.column.getCanSort();
+                  const isSelectCol = h.column.id === "__select";
                   return (
                     <div
                       key={h.id}
@@ -623,24 +748,29 @@ export function TaskManagementRawDataPage() {
                       )}
                     >
                       {h.column.id === "task_no" && <Pin className="h-3 w-3 text-primary" />}
-                      <button
-                        type="button"
-                        onClick={h.column.getToggleSortingHandler()}
-                        className="flex flex-1 items-center gap-1 truncate text-left"
-                        title={String(h.column.columnDef.header ?? "")}
-                      >
-                        <span className="truncate">
+                      {isSelectCol || !canSort ? (
+                        <span className="flex flex-1 items-center gap-1 truncate">
                           {flexRender(h.column.columnDef.header, h.getContext())}
                         </span>
-                        {h.column.getCanSort() &&
-                          (sort === "asc" ? (
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={h.column.getToggleSortingHandler()}
+                          className="flex flex-1 items-center gap-1 truncate text-left"
+                          title={typeof h.column.columnDef.header === "string" ? h.column.columnDef.header : ""}
+                        >
+                          <span className="truncate">
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                          </span>
+                          {sort === "asc" ? (
                             <ArrowUp className="h-3 w-3" />
                           ) : sort === "desc" ? (
                             <ArrowDown className="h-3 w-3" />
                           ) : (
                             <ArrowUpDown className="h-3 w-3 opacity-30" />
-                          ))}
-                      </button>
+                          )}
+                        </button>
+                      )}
                       {h.column.getCanFilter() && meta?.filterType && (
                         <ColumnFilterDropdown column={h.column} filterType={meta.filterType} />
                       )}
@@ -684,6 +814,7 @@ export function TaskManagementRawDataPage() {
                       const leftOffset = isFrozen
                         ? leftOffsets.get(cell.column.id) ?? 0
                         : undefined;
+                      const isTaskNoCell = cell.column.id === "task_no";
                       return (
                         <div
                           key={cell.id}
@@ -700,7 +831,27 @@ export function TaskManagementRawDataPage() {
                           )}
                           title={stringifyForTitle(cell.getValue())}
                         >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          <div className="min-w-0 flex-1 truncate">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </div>
+                          {isTaskNoCell && (
+                            <button
+                              type="button"
+                              className="ml-1 rounded p-0.5 opacity-50 hover:opacity-100 hover:bg-muted"
+                              title="이력 보기"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const r = row.original as Row;
+                                setHistoryTask({
+                                  discipline: String(r.discipline),
+                                  task_no: String(r.task_no),
+                                  task_name: (r as any).task_name ?? null,
+                                });
+                              }}
+                            >
+                              <History className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -728,6 +879,14 @@ export function TaskManagementRawDataPage() {
         onOpenChange={setExportOpen}
         rows={filteredRowsForExport as Record<string, unknown>[]}
         visibleKeys={visibleKeysForExport}
+      />
+
+      <HistoryDrawer
+        open={!!historyTask}
+        onClose={() => setHistoryTask(null)}
+        discipline={historyTask?.discipline ?? null}
+        taskNo={historyTask?.task_no ?? null}
+        taskName={historyTask?.task_name ?? null}
       />
     </div>
   );
