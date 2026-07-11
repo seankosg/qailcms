@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Column } from "@tanstack/react-table";
 import { Filter } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -34,6 +34,7 @@ function MultiSelectDropdown({ column }: { column: Column<any, unknown> }) {
   const selected: string[] = (column.getFilterValue() as string[]) ?? [];
   const isActive = selected.length > 0;
   const facets = column.getFacetedUniqueValues?.() as Map<any, number> | undefined;
+  const [query, setQuery] = useState("");
 
   const items = useMemo(() => {
     const counts = new Map<string, number>();
@@ -52,6 +53,14 @@ function MultiSelectDropdown({ column }: { column: Column<any, unknown> }) {
     return [{ value: EMPTY_TOKEN, count: emptyCount }, ...list];
   }, [facets, selected]);
 
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((it) =>
+      it.value === EMPTY_TOKEN ? "(empty)".includes(q) : it.value.toLowerCase().includes(q),
+    );
+  }, [items, query]);
+
   const toggle = (v: string) => {
     const next = selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v];
     column.setFilterValue(next.length ? next : undefined);
@@ -63,14 +72,21 @@ function MultiSelectDropdown({ column }: { column: Column<any, unknown> }) {
         <TriggerButton isActive={isActive} />
       </PopoverTrigger>
       <PopoverContent
-        className="max-h-72 w-56 overflow-auto p-2"
+        className="w-64 p-2"
         align="start"
         onClick={(e) => e.stopPropagation()}
       >
+        <Input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="검색..."
+          className="mb-1 h-7 text-xs"
+        />
         <div className="mb-1 flex items-center gap-2 px-1">
           <button
             className="text-[11px] text-muted-foreground hover:underline"
-            onClick={() => column.setFilterValue(items.map((o) => o.value))}
+            onClick={() => column.setFilterValue(filteredItems.map((o) => o.value))}
           >
             Select all
           </button>
@@ -81,23 +97,28 @@ function MultiSelectDropdown({ column }: { column: Column<any, unknown> }) {
             Clear all
           </button>
         </div>
-        {items.map((opt) => (
-          <label
-            key={opt.value}
-            className={cn(
-              "flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/50",
-              opt.count === 0 && !selected.includes(opt.value) && "text-muted-foreground/60",
-            )}
-          >
-            <Checkbox
-              checked={selected.includes(opt.value)}
-              onCheckedChange={() => toggle(opt.value)}
-              className="h-3.5 w-3.5"
-            />
-            <span className="flex-1 truncate">{opt.value === EMPTY_TOKEN ? "(Empty)" : opt.value}</span>
-            <span className="text-[10px] tabular-nums text-muted-foreground">{opt.count}</span>
-          </label>
-        ))}
+        <div className="max-h-64 overflow-auto">
+          {filteredItems.length === 0 && (
+            <div className="py-4 text-center text-[11px] text-muted-foreground">일치하는 값 없음</div>
+          )}
+          {filteredItems.map((opt) => (
+            <label
+              key={opt.value}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/50",
+                opt.count === 0 && !selected.includes(opt.value) && "text-muted-foreground/60",
+              )}
+            >
+              <Checkbox
+                checked={selected.includes(opt.value)}
+                onCheckedChange={() => toggle(opt.value)}
+                className="h-3.5 w-3.5"
+              />
+              <span className="flex-1 truncate">{opt.value === EMPTY_TOKEN ? "(Empty)" : opt.value}</span>
+              <span className="text-[10px] tabular-nums text-muted-foreground">{opt.count}</span>
+            </label>
+          ))}
+        </div>
       </PopoverContent>
     </Popover>
   );
