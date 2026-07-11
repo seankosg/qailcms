@@ -60,6 +60,7 @@ import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useSparePartFieldConfig, buildLabelOverrides } from "@/hooks/useSparePartFieldConfig";
 
 type Row = Record<string, unknown> & { doc_ref: string; plot: string };
 
@@ -92,6 +93,8 @@ export function SparePartRawDataPage() {
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as UrlSearch;
   const { data: currentUser } = useCurrentUser();
+  const { data: fieldConfig } = useSparePartFieldConfig();
+  const labelOverrides = useMemo(() => buildLabelOverrides(fieldConfig), [fieldConfig]);
   const userKey = currentUser?.id ?? "anon";
   const storageKey = `qail.spare-part.raw-data.v2:${userKey}`;
   const canEdit = !!currentUser?.isAdmin;
@@ -272,7 +275,7 @@ export function SparePartRawDataPage() {
       cols.push({
         id: c.key,
         accessorKey: c.key,
-        header: c.label,
+        header: labelOverrides[c.key] ?? c.label,
         size: c.width,
         minSize: 60,
         maxSize: 480,
@@ -303,7 +306,7 @@ export function SparePartRawDataPage() {
       });
     }
     return cols;
-  }, [orderedKeys]);
+  }, [orderedKeys, labelOverrides]);
 
   const table = useReactTable({
     data: preFiltered,
