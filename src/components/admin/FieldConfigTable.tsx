@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { RotateCcw, Save } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import {
   useSparePartFieldConfig,
   SPARE_PART_FIELD_CONFIG_QK,
@@ -27,6 +28,7 @@ export function FieldConfigTable() {
   const [search, setSearch] = useState("");
   const [drafts, setDrafts] = useState<DraftMap>({});
   const [saving, setSaving] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
 
   const merged = useMemo(() => {
     return rows.map((r) => ({ ...r, ...(drafts[r.id] ?? {}) })).sort((a, b) => a.sort_order - b.sort_order);
@@ -45,6 +47,27 @@ export function FieldConfigTable() {
   };
 
   const dirtyCount = Object.keys(drafts).length;
+
+  const reorder = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    const list = [...merged];
+    const from = list.findIndex((x) => x.id === fromId);
+    const to = list.findIndex((x) => x.id === toId);
+    if (from === -1 || to === -1) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    // reassign sort_order in steps of 10 and stage as drafts for changed rows
+    setDrafts((d) => {
+      const next = { ...d };
+      list.forEach((row, i) => {
+        const newOrder = (i + 1) * 10;
+        if (row.sort_order !== newOrder) {
+          next[row.id] = { ...(next[row.id] ?? {}), sort_order: newOrder };
+        }
+      });
+      return next;
+    });
+  };
 
   const saveAll = async () => {
     if (!dirtyCount) return;
@@ -131,7 +154,8 @@ export function FieldConfigTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">Order</TableHead>
+                <TableHead className="w-[40px]"></TableHead>
+                <TableHead className="w-[70px]">Order</TableHead>
                 <TableHead className="w-[220px]">Field Name</TableHead>
                 <TableHead>Display Name (헤더 라벨)</TableHead>
                 <TableHead className="w-[100px]">Group</TableHead>
@@ -142,18 +166,34 @@ export function FieldConfigTable() {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">Loading…</TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">Loading…</TableCell>
                 </TableRow>
               )}
               {!isLoading && filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">일치하는 필드가 없습니다.</TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">일치하는 필드가 없습니다.</TableCell>
                 </TableRow>
               )}
               {filtered.map((r) => {
                 const dirty = !!drafts[r.id];
                 return (
-                  <TableRow key={r.id} className={dirty ? "bg-amber-50/50 dark:bg-amber-900/10" : ""}>
+                  <TableRow
+                    key={r.id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragId(r.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragId && dragId !== r.id) reorder(dragId, r.id);
+                    }}
+                    onDragEnd={() => setDragId(null)}
+                    className={cnRow(dirty, dragId === r.id)}
+                  >
+                    <TableCell className="cursor-grab active:cursor-grabbing text-muted-foreground">
+                      <GripVertical className="h-4 w-4" />
+                    </TableCell>
                     <TableCell>
                       <Input
                         type="number"
