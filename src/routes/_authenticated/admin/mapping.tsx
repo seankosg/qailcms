@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FieldConfigTable } from "@/components/admin/FieldConfigTable";
 import { HeaderMappingTable } from "@/components/admin/HeaderMappingTable";
+import { TmFieldConfigTable } from "@/components/admin/TmFieldConfigTable";
+import { TmHeaderMappingTable } from "@/components/admin/TmHeaderMappingTable";
 
 export const Route = createFileRoute("/_authenticated/admin/mapping")({
   component: MappingPage,
@@ -16,13 +18,31 @@ function MappingPage() {
           Field Config — Raw Data 컬럼 헤더 라벨/정렬/노출. Header Mapping — Excel Import 시 원본 헤더 → 시스템 필드 별칭.
         </p>
       </div>
-      <Tabs defaultValue="field-config" className="space-y-4">
+      <Tabs defaultValue="spare-part" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="field-config">Field Config</TabsTrigger>
-          <TabsTrigger value="header-mapping">Header Mapping</TabsTrigger>
+          <TabsTrigger value="spare-part">Spare Part</TabsTrigger>
+          <TabsTrigger value="task-management">Task Management</TabsTrigger>
         </TabsList>
-        <TabsContent value="field-config"><FieldConfigTable /></TabsContent>
-        <TabsContent value="header-mapping"><HeaderMappingTable /></TabsContent>
+        <TabsContent value="spare-part" className="space-y-4">
+          <Tabs defaultValue="field-config" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="field-config">Field Config</TabsTrigger>
+              <TabsTrigger value="header-mapping">Header Mapping</TabsTrigger>
+            </TabsList>
+            <TabsContent value="field-config"><FieldConfigTable /></TabsContent>
+            <TabsContent value="header-mapping"><HeaderMappingTable /></TabsContent>
+          </Tabs>
+        </TabsContent>
+        <TabsContent value="task-management" className="space-y-4">
+          <Tabs defaultValue="field-config" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="field-config">Field Config</TabsTrigger>
+              <TabsTrigger value="header-mapping">Header Mapping</TabsTrigger>
+            </TabsList>
+            <TabsContent value="field-config"><TmFieldConfigTable /></TabsContent>
+            <TabsContent value="header-mapping"><TmHeaderMappingTable /></TabsContent>
+          </Tabs>
+        </TabsContent>
       </Tabs>
     </div>
   );
