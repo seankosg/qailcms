@@ -55,6 +55,7 @@ export interface TmImportFileItem {
     updated: number;
     skipped: number;
     rejected: number;
+    duplicates?: number;
     rolledUp?: number;
     judgmentRecalculated?: number;
     errors?: ImportErrorEntry[];
@@ -202,7 +203,36 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       }
 
       // Rollup 모드에 따라 parent 행의 진도 계열을 어떻게 보낼지 결정
-      const payloads = parsed.map((p) => {
+      // 1) task_no 중복 dedupe (엑셀에서 같은 task_no 여러 번 나오면 마지막 값 우선, child > parent)
+      const dedupMap = new Map<string, typeof parsed[number]>();
+      const dupDetail = new Map<string, number>();
+      for (const p of parsed) {
+        const key = p.task_no;
+        const prev = dedupMap.get(key);
+        if (!prev) {
+          dedupMap.set(key, p);
+        } else {
+          dupDetail.set(key, (dupDetail.get(key) ?? 1) + 1);
+          // child 우선, 같은 level이면 나중 것 우선
+          if (prev.level === "parent" && p.level === "child") {
+            dedupMap.set(key, p);
+          } else if (prev.level === p.level) {
+            dedupMap.set(key, p);
+          }
+        }
+      }
+      const duplicates = parsed.length - dedupMap.size;
+      if (duplicates > 0) {
+        const sample = Array.from(dupDetail.entries())
+          .slice(0, 5)
+          .map(([k, n]) => `${k}×${n}`)
+          .join(", ");
+        console.warn(`[task-import] ${f.name} 중복 task_no ${duplicates}건 제거: ${sample}`);
+        toast.warning(`${f.name}: 중복 task_no ${duplicates}건 제거 (${sample})`);
+      }
+      const deduped = Array.from(dedupMap.values());
+
+      const payloads = deduped.map((p) => {
         const isParent = p.level === "parent";
         const stripParent = isParent && rollupMode === "auto";
         return {
@@ -367,6 +397,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     updated,
                     skipped: 0,
                     rejected,
+                    duplicates,
                     rolledUp,
                     judgmentRecalculated,
                     errors: importErrors.length ? importErrors : undefined,
