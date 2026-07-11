@@ -95,7 +95,6 @@ export const SPARE_PART_COLUMNS: SparePartColumnDef[] = [
   { key: "cost_impact_qar", label: "Cost Impact (QAR)", type: "cost", width: 140, group: "cost" },
   { key: "action", label: "Action", type: "text", width: 180, group: "remark" },
   { key: "remarks", label: "Remarks", type: "text", width: 220, group: "remark" },
-  { key: "phy", label: "Phy", type: "boolean", width: 70, group: "avail" },
   { key: "proc_category", label: "Proc Category", type: "text", width: 140, group: "stage" },
   { key: "spl_list_code", label: "SPL List Code", type: "text", width: 130, group: "spl" },
   { key: "spl_list_target", label: "SPL List Target", type: "date", width: 130, group: "spl" },
