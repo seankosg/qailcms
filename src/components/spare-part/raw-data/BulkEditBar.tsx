@@ -1,142 +1,428 @@
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo, useState } from "react";
+import {
+  ChevronDown,
+  ClipboardCopy,
+  FileSpreadsheet,
+  Loader2,
+  MoreHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AlertTriangle, X, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import type { BulkEditableField } from "@/lib/spare-part/columns";
-import { APPROVAL_CODES } from "@/lib/spare-part/columns";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  applyBulkUpdate,
+  BULK_CHUNK_ROWS,
+  chunkArray,
+  getBulkEditableFields,
+  type BulkEditableField,
+} from "@/lib/spare-part/bulk-edit";
+import {
+  copyRowsAsTsv,
+  exportSelectedToXlsx,
+  type ExportColumn,
+} from "@/lib/spare-part/bulk-actions";
+import { BulkConfirmDialog } from "./dialogs/BulkConfirmDialog";
+import { BulkDeleteDialog } from "./dialogs/BulkDeleteDialog";
+
+const BLANK = "__BLANK__";
 
 interface Props {
-  selectedDocRefs: string[];
+  selectedRows: Record<string, unknown>[];
+  exportColumns: ExportColumn[];
+  canEdit: boolean;
   onClear: () => void;
   onSaved: () => void;
-  canEdit: boolean;
+  onMutated: () => void;
 }
 
-const FIELD_LABELS: Record<BulkEditableField, string> = {
-  remarks: "Remarks",
-  action: "Action",
-  proc_remarks: "Proc Remarks",
-  is_active: "Active",
-  is_duplicate: "DP",
-  approval_code: "Approval Code",
-  approval_status: "Approval Status",
-  revision: "Revision",
-};
-
-const APPROVAL_FIELDS = new Set<BulkEditableField>(["approval_code", "approval_status", "revision"]);
-const BOOLEAN_FIELDS = new Set<BulkEditableField>(["is_active", "is_duplicate"]);
-
-export function BulkEditBar({ selectedDocRefs, onClear, onSaved, canEdit }: Props) {
-  const [field, setField] = useState<BulkEditableField>("remarks");
-  const [value, setValue] = useState<string>("");
-  const [boolVal, setBoolVal] = useState<"true" | "false">("true");
-  const [saving, setSaving] = useState(false);
-
-  if (selectedDocRefs.length === 0) return null;
-
-  const applyValue = async () => {
-    if (!canEdit) {
-      toast.error("권한 없음", { description: "관리자 권한이 필요합니다." });
-      return;
+export function BulkEditBar({
+  selectedRows,
+  exportColumns,
+  canEdit,
+  onClear,
+  onSaved,
+  onMutated,
+}: Props) {
+  const fields = useMemo(() => getBulkEditableFields(), []);
+  const fieldGroups = useMemo(() => {
+    const map = new Map<string, BulkEditableField[]>();
+    for (const f of fields) {
+      const arr = map.get(f.group) ?? [];
+      arr.push(f);
+      map.set(f.group, arr);
     }
-    setSaving(true);
-    try {
-      const payload: Record<string, unknown> = {};
-      if (BOOLEAN_FIELDS.has(field)) payload[field] = boolVal === "true";
-      else payload[field] = value === "" ? null : value;
+    return Array.from(map.entries());
+  }, [fields]);
 
-      const { error } = await supabase
-        .from("spare_parts_raw")
-        .update(payload as any)
-        .in("doc_ref", selectedDocRefs);
-      if (error) throw error;
-      toast.success("저장 완료", { description: `${selectedDocRefs.length}개 행 업데이트` });
-      setValue("");
+  const [fieldName, setFieldName] = useState<string>("");
+  const [rawValue, setRawValue] = useState<string>("");
+  const [boolValue, setBoolValue] = useState<string>("");
+  const [setBlank, setSetBlank] = useState<boolean>(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const field = useMemo(
+    () => fields.find((f) => f.field === fieldName) ?? null,
+    [fields, fieldName],
+  );
+
+  const count = selectedRows.length;
+  const chunkCount = Math.max(1, Math.ceil(count / BULK_CHUNK_ROWS));
+  const willChunk = count > BULK_CHUNK_ROWS;
+
+  const docRefs = useMemo(
+    () => selectedRows.map((r) => String(r.doc_ref ?? "")).filter(Boolean),
+    [selectedRows],
+  );
+
+  if (count === 0) return null;
+
+  const computedValue: string | number | boolean | null = (() => {
+    if (setBlank) return null;
+    if (!field) return null;
+    if (field.inputType === "boolean") {
+      if (boolValue === "true") return true;
+      if (boolValue === "false") return false;
+      return null;
+    }
+    if (field.inputType === "select" && rawValue === BLANK) return null;
+    if (field.inputType === "number") {
+      if (rawValue === "") return null;
+      const n = Number(rawValue);
+      return Number.isFinite(n) ? n : null;
+    }
+    return rawValue === "" ? null : rawValue;
+  })();
+
+  const valueUnset =
+    !setBlank &&
+    (field?.inputType === "boolean"
+      ? boolValue === ""
+      : rawValue === "" || rawValue == null);
+
+  function reset() {
+    setFieldName("");
+    setRawValue("");
+    setBoolValue("");
+    setSetBlank(false);
+  }
+
+  async function handleApply() {
+    if (!field) return;
+    setSubmitting(true);
+    try {
+      const batches = chunkArray(docRefs, BULK_CHUNK_ROWS);
+      let ok = 0;
+      let failed = 0;
+      for (let i = 0; i < batches.length; i++) {
+        if (batches.length > 1) {
+          toast.info(`Applying… (batch ${i + 1}/${batches.length})`, {
+            description: `${ok} updated so far.`,
+          });
+        }
+        // eslint-disable-next-line no-await-in-loop
+        const r = await applyBulkUpdate({
+          ids: batches[i],
+          field: field.field,
+          value: computedValue,
+        });
+        ok += r.succeeded;
+        failed += r.failed;
+      }
+      toast.success(failed > 0 ? "부분 반영" : "저장 완료", {
+        description: `${ok} updated${failed > 0 ? ` · ${failed} 실패` : ""}`,
+      });
+      setConfirmOpen(false);
+      reset();
       onSaved();
     } catch (e: any) {
-      toast.error("저장 실패", { description: e.message ?? String(e) });
+      toast.error("Bulk edit 실패", { description: e?.message ?? String(e) });
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
-  };
+  }
 
-  const isApprovalField = APPROVAL_FIELDS.has(field);
+  async function handleExportXlsx() {
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+      exportSelectedToXlsx({
+        rows: selectedRows,
+        columns: exportColumns,
+        fileName: `spare-part_selected_${stamp}.xlsx`,
+      });
+      toast.success("Export 완료", { description: `${count} rows exported.` });
+    } catch (e: any) {
+      toast.error("Export 실패", { description: e?.message ?? String(e) });
+    }
+  }
+
+  async function handleCopyTsv() {
+    try {
+      const r = await copyRowsAsTsv({ rows: selectedRows, columns: exportColumns });
+      toast.success("클립보드 복사 완료", {
+        description: `${r.rowCount} rows × ${r.colCount} columns.`,
+      });
+    } catch (e: any) {
+      toast.error("복사 실패", { description: e?.message ?? String(e) });
+    }
+  }
 
   return (
-    <div className="sticky bottom-0 z-20 flex flex-wrap items-center gap-2 border-t bg-background/95 px-3 py-2 backdrop-blur">
-      <span className="text-xs font-medium">
-        선택: <span className="tabular-nums">{selectedDocRefs.length}</span>
-      </span>
-      <Select value={field} onValueChange={(v) => setField(v as BulkEditableField)}>
-        <SelectTrigger className="h-8 w-40">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {(Object.keys(FIELD_LABELS) as BulkEditableField[]).map((f) => (
-            <SelectItem key={f} value={f} className="text-xs">
-              {FIELD_LABELS[f]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <>
+      <div className="sticky top-0 z-30 rounded-md border border-l-2 border-l-primary bg-card px-3 py-2 shadow-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex items-center gap-2 pr-2">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+            <span className="text-sm font-semibold">{count} selected</span>
+            {willChunk && (
+              <span className="text-xs text-muted-foreground">
+                · Will run in {chunkCount} batches of {BULK_CHUNK_ROWS}
+              </span>
+            )}
+          </div>
 
-      {BOOLEAN_FIELDS.has(field) ? (
-        <Select value={boolVal} onValueChange={(v) => setBoolVal(v as any)}>
-          <SelectTrigger className="h-8 w-24">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="true">Yes</SelectItem>
-            <SelectItem value="false">No</SelectItem>
-          </SelectContent>
-        </Select>
-      ) : field === "approval_code" ? (
-        <Select value={value} onValueChange={setValue}>
-          <SelectTrigger className="h-8 w-28">
-            <SelectValue placeholder="Code" />
-          </SelectTrigger>
-          <SelectContent>
-            {APPROVAL_CODES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : field === "remarks" || field === "proc_remarks" ? (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 w-56 justify-start truncate">
-              {value || "값 입력..."}
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            <Select
+              value={fieldName}
+              onValueChange={(v) => {
+                setFieldName(v);
+                setRawValue("");
+                setBoolValue("");
+                setSetBlank(false);
+              }}
+            >
+              <SelectTrigger className="h-8 w-[220px]">
+                <SelectValue placeholder="Edit field…" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[400px]">
+                {fieldGroups.map(([group, list]) => (
+                  <SelectGroup key={group}>
+                    <SelectLabel>{group}</SelectLabel>
+                    {list.map((f) => (
+                      <SelectItem key={f.field} value={f.field} className="text-xs">
+                        {f.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {field && (
+              <>
+                {field.inputType === "select" && (
+                  <Select
+                    value={setBlank ? BLANK : rawValue}
+                    onValueChange={(v) => {
+                      setRawValue(v);
+                      setSetBlank(v === BLANK);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[180px]">
+                      <SelectValue placeholder="New value…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={BLANK}>(Clear / Blank)</SelectItem>
+                      {(field.options ?? []).map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {field.inputType === "boolean" && (
+                  <Select
+                    value={setBlank ? BLANK : boolValue}
+                    onValueChange={(v) => {
+                      setBoolValue(v);
+                      setSetBlank(v === BLANK);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[140px]">
+                      <SelectValue placeholder="Yes / No" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value={BLANK}>(Clear / Blank)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {field.inputType === "date" && (
+                  <Input
+                    type="date"
+                    className="h-8 w-[160px]"
+                    value={setBlank ? "" : rawValue}
+                    disabled={setBlank}
+                    onChange={(e) => setRawValue(e.target.value)}
+                  />
+                )}
+
+                {field.inputType === "number" && (
+                  <Input
+                    type="number"
+                    className="h-8 w-[160px]"
+                    value={setBlank ? "" : rawValue}
+                    disabled={setBlank}
+                    onChange={(e) => setRawValue(e.target.value)}
+                    placeholder="0"
+                  />
+                )}
+
+                {field.inputType === "text" && (
+                  <Input
+                    type="text"
+                    className="h-8 w-[240px]"
+                    value={setBlank ? "" : rawValue}
+                    disabled={setBlank}
+                    onChange={(e) => setRawValue(e.target.value)}
+                    placeholder="New value…"
+                  />
+                )}
+
+                {field.inputType === "textarea" && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-[240px] justify-start truncate text-xs font-normal"
+                        disabled={setBlank}
+                      >
+                        {setBlank ? "(Blank)" : rawValue || "New value…"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-96 p-2" align="start">
+                      <Textarea
+                        value={rawValue}
+                        onChange={(e) => setRawValue(e.target.value)}
+                        rows={5}
+                        className="text-xs"
+                        placeholder="New value…"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Checkbox
+                    checked={setBlank}
+                    onCheckedChange={(c) => {
+                      setSetBlank(!!c);
+                      if (c) {
+                        setRawValue("");
+                        setBoolValue("");
+                      }
+                    }}
+                  />
+                  Blank
+                </label>
+              </>
+            )}
+
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={!canEdit || !field || submitting || (valueUnset && !setBlank)}
+              onClick={() => setConfirmOpen(true)}
+            >
+              {submitting && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              Apply
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 p-2" align="start">
-            <Textarea value={value} onChange={(e) => setValue(e.target.value)} rows={4} className="text-xs" />
-          </PopoverContent>
-        </Popover>
-      ) : (
-        <Input value={value} onChange={(e) => setValue(e.target.value)} className="h-8 w-56 text-xs" placeholder="값 입력..." />
-      )}
+          </div>
 
-      {isApprovalField && (
-        <span className="inline-flex items-center gap-1 rounded bg-amber-100/70 px-2 py-0.5 text-[10px] text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-          <AlertTriangle className="h-3 w-3" /> Aconex Sync 재실행 시 덮어써질 수 있음
-        </span>
-      )}
+          <div className="flex items-center gap-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8">
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" /> Export
+                  <ChevronDown className="ml-1 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportXlsx}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Download .xlsx
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCopyTsv}>
+                  <ClipboardCopy className="mr-2 h-4 w-4" /> Copy as TSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-      <Button size="sm" className="h-8" onClick={applyValue} disabled={saving || !canEdit}>
-        {saving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-        Apply
-      </Button>
-      <Button variant="ghost" size="sm" className="h-8" onClick={onClear}>
-        <X className="mr-1 h-3 w-3" />
-        Clear selection
-      </Button>
-    </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8 px-2">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[200px]">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  disabled={!canEdit}
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete permanently
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onClear}>
+                  <X className="mr-2 h-4 w-4" /> Clear selection
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+
+      <BulkConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        field={field}
+        value={computedValue}
+        rows={selectedRows}
+        submitting={submitting}
+        onConfirm={handleApply}
+        totalCount={count}
+        chunkCount={chunkCount}
+      />
+
+      <BulkDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        docRefs={docRefs}
+        onDone={() => {
+          onClear();
+          onMutated();
+        }}
+      />
+    </>
   );
 }
