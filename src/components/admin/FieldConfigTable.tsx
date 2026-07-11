@@ -189,7 +189,7 @@ export function FieldConfigTable() {
                       if (dragId && dragId !== r.id) reorder(dragId, r.id);
                     }}
                     onDragEnd={() => setDragId(null)}
-                    className={cnRow(dirty, dragId === r.id)}
+                    className={`${dirty ? "bg-amber-50/50 dark:bg-amber-900/10" : ""} ${dragId === r.id ? "opacity-50" : ""}`}
                   >
                     <TableCell className="cursor-grab active:cursor-grabbing text-muted-foreground">
                       <GripVertical className="h-4 w-4" />
