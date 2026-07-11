@@ -79,7 +79,6 @@ const BOOLEAN_FIELDS = new Set([
   "stage2_done",
   "stage3_done",
   "stage4_done",
-  "phy",
   "physical_supply",
   "is_duplicate",
   "physical_list_agreed",
@@ -162,7 +161,7 @@ const FALLBACK_ALIASES: Record<string, string | "skip"> = {
   "spec available": "spec_available",
   "warranty available": "warranty_available",
   // Physical & duplicate
-  "phy": "phy",
+  "phy": "physical_supply",
   "physical supply": "physical_supply",
   "is duplicate": "is_duplicate",
   "duplicate": "is_duplicate",
