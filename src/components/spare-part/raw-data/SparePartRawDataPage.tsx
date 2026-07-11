@@ -92,11 +92,11 @@ interface PersistedState {
 export function SparePartRawDataPage() {
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as UrlSearch;
-  const { data: currentUser } = useCurrentUser();
+  const { data: currentUser, isLoading: userLoading } = useCurrentUser();
   const { data: fieldConfig } = useSparePartFieldConfig();
   const labelOverrides = useMemo(() => buildLabelOverrides(fieldConfig), [fieldConfig]);
-  const userKey = currentUser?.id ?? "anon";
-  const storageKey = `qail.spare-part.raw-data.v2:${userKey}`;
+  const userKey = currentUser?.id ?? null;
+  const storageKey = userKey ? `qail.spare-part.raw-data.v2:${userKey}` : null;
   const canEdit = !!currentUser?.isAdmin;
 
   const [stateLoaded, setStateLoaded] = useState(false);
@@ -116,6 +116,7 @@ export function SparePartRawDataPage() {
 
   // 초기 상태 로드 (localStorage + URL 드릴다운)
   useEffect(() => {
+    if (!storageKey) return;
     let s: Partial<PersistedState> = {};
     try {
       const raw = localStorage.getItem(storageKey);
@@ -191,7 +192,7 @@ export function SparePartRawDataPage() {
 
   // localStorage 저장
   useEffect(() => {
-    if (!stateLoaded) return;
+    if (!stateLoaded || !storageKey) return;
     const t = setTimeout(() => {
       try {
         localStorage.setItem(
