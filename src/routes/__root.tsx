@@ -79,12 +79,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "QAIL Closure Document" },
-      { name: "description", content: "Closure document tracking for QAIL project — Spare Parts, Approvals, Procurement" },
-      { property: "og:title", content: "QAIL Closure Document" },
-      { property: "og:description", content: "Closure document tracking for QAIL project" },
+      { title: "QAIL CMS" },
+      { name: "description", content: "Completion Management System of Lusail Tower Project [Code Name : QAIL]" },
+      { property: "og:title", content: "QAIL CMS" },
+      { property: "og:description", content: "Completion Management System of Lusail Tower Project [Code Name : QAIL]" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "QAIL CMS" },
+      { name: "twitter:description", content: "Completion Management System of Lusail Tower Project [Code Name : QAIL]" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/665c801c-e336-45d8-b550-ed286372cbd0/id-preview-a2fee7bf--c5d84672-611a-4a97-92e3-1b90576d9b68.lovable.app-1783762462899.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/665c801c-e336-45d8-b550-ed286372cbd0/id-preview-a2fee7bf--c5d84672-611a-4a97-92e3-1b90576d9b68.lovable.app-1783762462899.png" },
     ],
     links: [
       {
