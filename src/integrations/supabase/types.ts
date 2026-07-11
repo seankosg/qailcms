@@ -640,6 +640,165 @@ export type Database = {
         }
         Relationships: []
       }
+      task_management_import_logs: {
+        Row: {
+          created_at: string
+          data_date: string | null
+          discipline: string
+          errors: Json | null
+          file_name: string
+          finished_at: string | null
+          id: string
+          imported_by: string | null
+          inserted: number
+          rejected: number
+          sheet_name: string | null
+          skipped: number
+          started_at: string
+          status: string
+          total_rows: number
+          updated: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_date?: string | null
+          discipline: string
+          errors?: Json | null
+          file_name: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          inserted?: number
+          rejected?: number
+          sheet_name?: string | null
+          skipped?: number
+          started_at?: string
+          status?: string
+          total_rows?: number
+          updated?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_date?: string | null
+          discipline?: string
+          errors?: Json | null
+          file_name?: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          inserted?: number
+          rejected?: number
+          sheet_name?: string | null
+          skipped?: number
+          started_at?: string
+          status?: string
+          total_rows?: number
+          updated?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      task_management_raw: {
+        Row: {
+          actual_progress: number | null
+          actual_start: string | null
+          auto_judgment: string | null
+          category: string | null
+          created_at: string
+          data_date: string
+          discipline: string
+          forecast_end: string | null
+          id: string
+          imported_at: string
+          imported_by: string | null
+          level: string
+          parent_task_no: string | null
+          pic: string | null
+          plan_days: number | null
+          plan_end: string | null
+          plan_progress: number | null
+          plan_start: string | null
+          plot: string | null
+          progress_variance: number | null
+          risk: string | null
+          row_type: string | null
+          slip_days: number | null
+          sort_order: number | null
+          source_file: string | null
+          status_manual: string | null
+          sub_task_desc: string | null
+          task_name: string | null
+          task_no: string
+          updated_at: string
+        }
+        Insert: {
+          actual_progress?: number | null
+          actual_start?: string | null
+          auto_judgment?: string | null
+          category?: string | null
+          created_at?: string
+          data_date: string
+          discipline: string
+          forecast_end?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          level: string
+          parent_task_no?: string | null
+          pic?: string | null
+          plan_days?: number | null
+          plan_end?: string | null
+          plan_progress?: number | null
+          plan_start?: string | null
+          plot?: string | null
+          progress_variance?: number | null
+          risk?: string | null
+          row_type?: string | null
+          slip_days?: number | null
+          sort_order?: number | null
+          source_file?: string | null
+          status_manual?: string | null
+          sub_task_desc?: string | null
+          task_name?: string | null
+          task_no: string
+          updated_at?: string
+        }
+        Update: {
+          actual_progress?: number | null
+          actual_start?: string | null
+          auto_judgment?: string | null
+          category?: string | null
+          created_at?: string
+          data_date?: string
+          discipline?: string
+          forecast_end?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          level?: string
+          parent_task_no?: string | null
+          pic?: string | null
+          plan_days?: number | null
+          plan_end?: string | null
+          plan_progress?: number | null
+          plan_start?: string | null
+          plot?: string | null
+          progress_variance?: number | null
+          risk?: string | null
+          row_type?: string | null
+          slip_days?: number | null
+          sort_order?: number | null
+          source_file?: string | null
+          status_manual?: string | null
+          sub_task_desc?: string | null
+          task_name?: string | null
+          task_no?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
