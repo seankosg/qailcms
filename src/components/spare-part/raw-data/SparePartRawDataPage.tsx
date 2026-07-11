@@ -130,10 +130,29 @@ export function SparePartRawDataPage() {
     );
     const validAll = new Set<string>(["__select", "doc_ref", ...validKeys]);
 
-    // order: 저장본 중 유효 키만 유지 + 신규 키를 뒤에 append
+    // order: 저장본 중 유효 키만 유지 + 신규 키를 DEFAULT_ORDER 상의 원래 위치에 삽입
     const savedOrder = (s.order ?? []).filter((k) => validKeys.has(k));
-    const missingOrder = DEFAULT_ORDER.filter((k) => !savedOrder.includes(k));
-    const mergedOrder = savedOrder.length ? [...savedOrder, ...missingOrder] : DEFAULT_ORDER;
+    let mergedOrder: string[];
+    if (!savedOrder.length) {
+      mergedOrder = DEFAULT_ORDER;
+    } else {
+      const savedSet = new Set(savedOrder);
+      mergedOrder = [...savedOrder];
+      DEFAULT_ORDER.forEach((k, defIdx) => {
+        if (savedSet.has(k)) return;
+        // 원래 순서상 바로 앞에 있던 키를 찾아 그 뒤에 삽입
+        let insertAt = mergedOrder.length;
+        for (let i = defIdx - 1; i >= 0; i--) {
+          const prev = DEFAULT_ORDER[i];
+          const idx = mergedOrder.indexOf(prev);
+          if (idx !== -1) {
+            insertAt = idx + 1;
+            break;
+          }
+        }
+        mergedOrder.splice(insertAt, 0, k);
+      });
+    }
 
     // frozenExtras: 유효 키만, 3개 미만이면 default에서 보충
     const savedFrozen = (s.frozenExtras ?? []).filter((k) => validKeys.has(k));
