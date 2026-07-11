@@ -273,14 +273,19 @@ function FileRow({
   onRemove,
   onDisciplineChange,
   onPreview,
+  onOpenMapping,
+  onDataDateChange,
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
   onRemove: () => void;
   onDisciplineChange: (d: Discipline) => void;
   onPreview: () => void;
+  onOpenMapping: () => void;
+  onDataDateChange: (v: string | null) => void;
 }) {
   const badge = statusBadge[f.status];
+  const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
   return (
     <div className="rounded border p-3">
       <div className="flex items-start justify-between gap-3">
@@ -290,7 +295,6 @@ function FileRow({
             <p className="truncate text-sm font-medium">{f.name}</p>
             <p className="text-xs text-muted-foreground">
               {formatSize(f.size)}
-              {f.dataDate && ` · Data Date ${f.dataDate}`}
               {typeof f.parentCount === "number" &&
                 ` · Parent ${f.parentCount} / Child ${f.childCount}`}
             </p>
@@ -313,6 +317,26 @@ function FileRow({
                   ))}
                 </SelectContent>
               </Select>
+              <span className="ml-2 text-xs text-muted-foreground">Data Date</span>
+              <Input
+                type="date"
+                className="h-7 w-[140px] text-xs"
+                value={effectiveDataDate}
+                onChange={(e) =>
+                  onDataDateChange(e.target.value ? e.target.value : null)
+                }
+                disabled={
+                  isRunning || f.status === "done" || f.status === "processing"
+                }
+              />
+              {f.dataDateCell && f.dataDateCell !== "override" && !f.dataDateOverride && (
+                <span className="text-[11px] text-muted-foreground">
+                  ({f.dataDateCell}에서 감지)
+                </span>
+              )}
+              {f.dataDateOverride && (
+                <span className="text-[11px] text-amber-600">(수동 입력)</span>
+              )}
               {f.parsed && f.parsed.length > 0 && (
                 <Button
                   variant="outline"
@@ -321,6 +345,28 @@ function FileRow({
                   onClick={onPreview}
                 >
                   <Eye className="h-3.5 w-3.5" /> Preview
+                </Button>
+              )}
+              {f.sheetHeaders && f.columnMap && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={onOpenMapping}
+                  disabled={
+                    isRunning ||
+                    f.status === "done" ||
+                    f.status === "processing" ||
+                    f.status === "parsing"
+                  }
+                >
+                  <Columns3 className="h-3.5 w-3.5" /> 컬럼 매핑
+                  {f.columnOverrides &&
+                    Object.keys(f.columnOverrides).length > 0 && (
+                      <span className="text-amber-600">
+                        ({Object.keys(f.columnOverrides).length})
+                      </span>
+                    )}
                 </Button>
               )}
             </div>
