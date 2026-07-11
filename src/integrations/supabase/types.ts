@@ -748,6 +748,84 @@ export type Database = {
         }
         Relationships: []
       }
+      task_management_field_config: {
+        Row: {
+          created_at: string
+          display_name: string
+          field_name: string
+          group_key: string | null
+          id: string
+          is_visible: boolean
+          note: string | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          field_name: string
+          group_key?: string | null
+          id?: string
+          is_visible?: boolean
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          field_name?: string
+          group_key?: string | null
+          id?: string
+          is_visible?: boolean
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      task_management_header_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          is_custom: boolean
+          module: string
+          note: string | null
+          source_header: string
+          target_field: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          module?: string
+          note?: string | null
+          source_header: string
+          target_field: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          module?: string
+          note?: string | null
+          source_header?: string
+          target_field?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       task_management_import_logs: {
         Row: {
           created_at: string

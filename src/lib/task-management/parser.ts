@@ -181,6 +181,7 @@ function parentIdOf(taskNo: string): string | null {
 
 export async function parseTaskManagementExcel(
   file: File,
+  extraAliases?: Record<string, string[]>,
 ): Promise<ParseTaskManagementResult> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: true });
@@ -201,26 +202,31 @@ export async function parseTaskManagementExcel(
   // Header map (row 5)
   const { map: headerMap } = buildHeaderMap(sheet);
 
+  const withAlias = (target: string, names: string[]): string[] => {
+    const extra = extraAliases?.[target] ?? [];
+    return [...extra, ...names];
+  };
+
   const cols = {
-    no: resolveColumn(headerMap, ["No", "no"], 1, warnings),
-    category: resolveColumn(headerMap, ["Category"], 2, warnings),
-    plot: resolveColumn(headerMap, ["Plot"], 3, warnings),
-    task_name: resolveColumn(headerMap, ["항목"], 4, warnings),
-    risk: resolveColumn(headerMap, ["리스크"], 5, warnings),
-    sub_task_desc: resolveColumn(headerMap, ["단계별 세부 업무"], 6, warnings),
-    pic: resolveColumn(headerMap, ["담당"], 7, warnings),
-    row_type: resolveColumn(headerMap, ["유형"], 8, warnings),
-    status_manual: resolveColumn(headerMap, ["상태"], 9, warnings),
-    plan_start: resolveColumn(headerMap, ["계획 시작"], 10, warnings),
-    plan_end: resolveColumn(headerMap, ["계획 완료"], 11, warnings),
-    plan_days: resolveColumn(headerMap, ["계획 일수"], 12, warnings),
-    actual_start: resolveColumn(headerMap, ["실제 시작"], 13, warnings),
-    actual_progress: resolveColumn(headerMap, ["실적 진도율"], 14, warnings),
-    plan_progress: resolveColumn(headerMap, ["계획 진도율"], 15, warnings),
-    progress_variance: resolveColumn(headerMap, ["진도차 (%p)", "진도차(%p)"], 16, warnings),
-    forecast_end: resolveColumn(headerMap, ["예상 완료"], 17, warnings),
-    slip_days: resolveColumn(headerMap, ["차이 (일)", "차이(일)"], 18, warnings),
-    auto_judgment: resolveColumn(headerMap, ["자동 판정"], 19, warnings),
+    no: resolveColumn(headerMap, withAlias("task_no", ["No", "no"]), 1, warnings),
+    category: resolveColumn(headerMap, withAlias("category", ["Category"]), 2, warnings),
+    plot: resolveColumn(headerMap, withAlias("plot", ["Plot"]), 3, warnings),
+    task_name: resolveColumn(headerMap, withAlias("task_name", ["항목"]), 4, warnings),
+    risk: resolveColumn(headerMap, withAlias("risk", ["리스크"]), 5, warnings),
+    sub_task_desc: resolveColumn(headerMap, withAlias("sub_task_desc", ["단계별 세부 업무"]), 6, warnings),
+    pic: resolveColumn(headerMap, withAlias("pic", ["담당"]), 7, warnings),
+    row_type: resolveColumn(headerMap, withAlias("row_type", ["유형"]), 8, warnings),
+    status_manual: resolveColumn(headerMap, withAlias("status_manual", ["상태"]), 9, warnings),
+    plan_start: resolveColumn(headerMap, withAlias("plan_start", ["계획 시작"]), 10, warnings),
+    plan_end: resolveColumn(headerMap, withAlias("plan_end", ["계획 완료"]), 11, warnings),
+    plan_days: resolveColumn(headerMap, withAlias("plan_days", ["계획 일수"]), 12, warnings),
+    actual_start: resolveColumn(headerMap, withAlias("actual_start", ["실제 시작"]), 13, warnings),
+    actual_progress: resolveColumn(headerMap, withAlias("actual_progress", ["실적 진도율"]), 14, warnings),
+    plan_progress: resolveColumn(headerMap, withAlias("plan_progress", ["계획 진도율"]), 15, warnings),
+    progress_variance: resolveColumn(headerMap, withAlias("progress_variance", ["진도차 (%p)", "진도차(%p)"]), 16, warnings),
+    forecast_end: resolveColumn(headerMap, withAlias("forecast_end", ["예상 완료"]), 17, warnings),
+    slip_days: resolveColumn(headerMap, withAlias("slip_days", ["차이 (일)", "차이(일)"]), 18, warnings),
+    auto_judgment: resolveColumn(headerMap, withAlias("auto_judgment", ["자동 판정"]), 19, warnings),
   };
 
   // Iterate rows 7~

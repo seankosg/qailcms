@@ -104,9 +104,25 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     }));
     setFiles((cur) => [...cur, ...next]);
 
+    // Fetch active header mappings once per batch
+    let extraAliases: Record<string, string[]> = {};
+    try {
+      const { data: mappings } = await (supabase as any)
+        .from("task_management_header_mappings")
+        .select("source_header, target_field, is_active")
+        .eq("module", "task_management")
+        .eq("is_active", true);
+      for (const m of (mappings ?? []) as Array<{ source_header: string; target_field: string }>) {
+        if (!m.target_field || !m.source_header) continue;
+        (extraAliases[m.target_field] ||= []).push(m.source_header);
+      }
+    } catch {
+      // ignore — fall back to canonical headers
+    }
+
     for (const item of next) {
       try {
-        const parsed = await parseTaskManagementExcel(item.file);
+        const parsed = await parseTaskManagementExcel(item.file, extraAliases);
         setFiles((cur) =>
           cur.map((f) => {
             if (f.id !== item.id) return f;
