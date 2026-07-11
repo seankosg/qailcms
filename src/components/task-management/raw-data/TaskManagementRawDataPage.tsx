@@ -161,6 +161,8 @@ export function TaskManagementRawDataPage() {
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const canEdit = !!currentUser?.isAdmin;
+  const { data: fieldConfig } = useTaskManagementFieldConfig();
+  const labelOverrides = useMemo(() => buildTmLabelOverrides(fieldConfig), [fieldConfig]);
   const userKey = currentUser?.id ?? null;
   const storageKey = userKey ? `qail.task-management.raw-data.v1:${userKey}` : null;
 
@@ -360,7 +362,7 @@ export function TaskManagementRawDataPage() {
             if (c.key === "expected_progress_today") return expectedProgressToday(r as any);
             return todayGap(r as any);
           },
-          header: c.label,
+          header: labelOverrides[c.key] ?? c.label,
           meta: { group: c.group },
           cell: ({ getValue }) => {
             const v = Number(getValue()) || 0;
@@ -387,7 +389,7 @@ export function TaskManagementRawDataPage() {
       cols.push({
         id: c.key,
         accessorKey: c.key,
-        header: c.label,
+        header: labelOverrides[c.key] ?? c.label,
         size: c.width,
         minSize: 60,
         maxSize: 480,
@@ -435,7 +437,7 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, refetch, orderedKeys]);
+  }, [canEdit, refetch, orderedKeys, labelOverrides]);
 
   const table = useReactTable({
     data: rows,
@@ -508,10 +510,13 @@ export function TaskManagementRawDataPage() {
         .filter((c) => c.id !== "__select")
         .map((c) => ({
           key: c.id,
-          label: TM_COLUMNS.find((x) => x.key === c.id)?.label ?? c.id,
+          label:
+            labelOverrides[c.id] ??
+            TM_COLUMNS.find((x) => x.key === c.id)?.label ??
+            c.id,
         })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orderedKeys, visibility],
+    [orderedKeys, visibility, labelOverrides],
   );
 
   const visibleKeysForExport = useMemo(
