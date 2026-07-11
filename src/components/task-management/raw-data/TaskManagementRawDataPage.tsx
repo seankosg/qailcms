@@ -838,7 +838,7 @@ export function TaskManagementRawDataPage() {
                           }}
                           className={cn(
                             "flex items-center overflow-hidden truncate border-r px-2",
-                            isFrozen && (isParent ? "bg-muted/60" : "bg-card"),
+                            isFrozen && (isParent ? "bg-muted" : "bg-card"),
                           )}
                           title={stringifyForTitle(cell.getValue())}
                         >
