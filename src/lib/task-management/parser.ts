@@ -206,11 +206,6 @@ function getCell(sheet: XLSX.WorkSheet, row: number, col: number): unknown {
   return sheet[addr]?.v;
 }
 
-/** parent task 3-segment / child task 4-segment 판정 */
-function segmentCount(taskNo: string): number {
-  return taskNo.split("-").filter((s) => s.length > 0).length;
-}
-
 /**
  * 마지막 세그먼트를 제거한 후보 parent id를 반환.
  * 세그먼트 개수 하드코딩을 피하고, 실제 file 내 parent 집합과 대조해
