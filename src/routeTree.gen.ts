@@ -14,7 +14,9 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedAdminTaskThresholdsRouteImport } from './routes/_authenticated/admin/task-thresholds'
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
+import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './routes/_authenticated/closure/task-management/tree'
 import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from './routes/_authenticated/closure/task-management/raw-data'
 import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './routes/_authenticated/closure/spare-part/raw-data'
 import { Route as AuthenticatedClosureSparePartImportRouteImport } from './routes/_authenticated/closure/spare-part/import'
@@ -47,11 +49,23 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
 } as any)
+const AuthenticatedAdminTaskThresholdsRoute =
+  AuthenticatedAdminTaskThresholdsRouteImport.update({
+    id: '/task-thresholds',
+    path: '/task-thresholds',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminMappingRoute =
   AuthenticatedAdminMappingRouteImport.update({
     id: '/mapping',
     path: '/mapping',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedClosureTaskManagementTreeRoute =
+  AuthenticatedClosureTaskManagementTreeRouteImport.update({
+    id: '/closure/task-management/tree',
+    path: '/closure/task-management/tree',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedClosureTaskManagementRawDataRoute =
   AuthenticatedClosureTaskManagementRawDataRouteImport.update({
@@ -101,12 +115,14 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
+  '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
   '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
+  '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
@@ -114,12 +130,14 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
+  '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
   '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
+  '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
@@ -130,12 +148,14 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/admin/mapping': typeof AuthenticatedAdminMappingRoute
+  '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
   '/_authenticated/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/_authenticated/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/_authenticated/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
+  '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/_authenticated/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
@@ -146,12 +166,14 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin'
     | '/admin/mapping'
+    | '/admin/task-thresholds'
     | '/admin/'
     | '/closure/spare-part/aconex-sync'
     | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
     | '/closure/task-management/raw-data'
+    | '/closure/task-management/tree'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
   fileRoutesByTo: FileRoutesByTo
@@ -159,12 +181,14 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/admin/mapping'
+    | '/admin/task-thresholds'
     | '/admin'
     | '/closure/spare-part/aconex-sync'
     | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
     | '/closure/task-management/raw-data'
+    | '/closure/task-management/tree'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
   id:
@@ -174,12 +198,14 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/admin'
     | '/_authenticated/admin/mapping'
+    | '/_authenticated/admin/task-thresholds'
     | '/_authenticated/admin/'
     | '/_authenticated/closure/spare-part/aconex-sync'
     | '/_authenticated/closure/spare-part/dashboard'
     | '/_authenticated/closure/spare-part/import'
     | '/_authenticated/closure/spare-part/raw-data'
     | '/_authenticated/closure/task-management/raw-data'
+    | '/_authenticated/closure/task-management/tree'
     | '/_authenticated/closure/spare-part/import/logs'
     | '/_authenticated/closure/spare-part/records/$docRef'
   fileRoutesById: FileRoutesById
@@ -227,12 +253,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/task-thresholds': {
+      id: '/_authenticated/admin/task-thresholds'
+      path: '/task-thresholds'
+      fullPath: '/admin/task-thresholds'
+      preLoaderRoute: typeof AuthenticatedAdminTaskThresholdsRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/mapping': {
       id: '/_authenticated/admin/mapping'
       path: '/mapping'
       fullPath: '/admin/mapping'
       preLoaderRoute: typeof AuthenticatedAdminMappingRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/closure/task-management/tree': {
+      id: '/_authenticated/closure/task-management/tree'
+      path: '/closure/task-management/tree'
+      fullPath: '/closure/task-management/tree'
+      preLoaderRoute: typeof AuthenticatedClosureTaskManagementTreeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/closure/task-management/raw-data': {
       id: '/_authenticated/closure/task-management/raw-data'
@@ -288,12 +328,15 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminMappingRoute: typeof AuthenticatedAdminMappingRoute
+  AuthenticatedAdminTaskThresholdsRoute: typeof AuthenticatedAdminTaskThresholdsRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
   {
     AuthenticatedAdminMappingRoute: AuthenticatedAdminMappingRoute,
+    AuthenticatedAdminTaskThresholdsRoute:
+      AuthenticatedAdminTaskThresholdsRoute,
     AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   }
 
@@ -324,6 +367,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureSparePartImportRoute: typeof AuthenticatedClosureSparePartImportRouteWithChildren
   AuthenticatedClosureSparePartRawDataRoute: typeof AuthenticatedClosureSparePartRawDataRoute
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
+  AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
   AuthenticatedClosureSparePartRecordsDocRefRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRoute
 }
 
@@ -339,6 +383,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureSparePartRawDataRoute,
   AuthenticatedClosureTaskManagementRawDataRoute:
     AuthenticatedClosureTaskManagementRawDataRoute,
+  AuthenticatedClosureTaskManagementTreeRoute:
+    AuthenticatedClosureTaskManagementTreeRoute,
   AuthenticatedClosureSparePartRecordsDocRefRoute:
     AuthenticatedClosureSparePartRecordsDocRefRoute,
 }
