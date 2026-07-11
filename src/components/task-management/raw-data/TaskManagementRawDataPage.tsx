@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   flexRender,
   getCoreRowModel,
@@ -9,8 +10,10 @@ import {
   useReactTable,
   type ColumnDef,
   type ColumnFiltersState,
+  type ColumnSizingState,
   type RowSelectionState,
   type SortingState,
+  type VisibilityState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useQuery } from "@tanstack/react-query";
@@ -24,9 +27,12 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Download,
   Filter,
+  Pin,
   RotateCcw,
   Search,
+  Upload,
   X,
 } from "lucide-react";
 import {
@@ -52,14 +58,26 @@ import {
 import { ColumnFilterDropdown } from "./ColumnFilters";
 import { BulkEditBar } from "./BulkEditBar";
 import { EditCellPopover } from "./EditCellPopover";
+import { ColumnOrderMenu } from "./ColumnOrderMenu";
+import { ExportDialog } from "./ExportDialog";
+import { TopHorizontalScrollbar } from "@/components/spare-part/raw-data/TopHorizontalScrollbar";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 type Row = Record<string, unknown> & { id: string; task_no: string; discipline: string };
 
-const DEFAULT_SORTING: SortingState = [
-  { id: "discipline", desc: false },
-  { id: "sort_order" as any, desc: false },
-];
+const DEFAULT_SORTING: SortingState = [{ id: "discipline", desc: false }];
+const DEFAULT_FROZEN_EXTRAS = ["discipline", "level", "task_name"];
+const DEFAULT_ORDER = TM_COLUMNS.map((c) => c.key).filter((k) => k !== "task_no");
+
+interface PersistedState {
+  sorting: SortingState;
+  sizing: ColumnSizingState;
+  visibility: VisibilityState;
+  columnFilters: ColumnFiltersState;
+  globalFilter: string;
+  order: string[];
+  frozenExtras: string[];
+}
 
 function formatDdMmm(v: string | null | undefined): string {
   if (!v) return "";
@@ -123,20 +141,129 @@ function chipValue(v: unknown): string {
 }
 
 export function TaskManagementRawDataPage() {
+  const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const canEdit = !!currentUser?.isAdmin;
+  const userKey = currentUser?.id ?? null;
+  const storageKey = userKey ? `qail.task-management.raw-data.v1:${userKey}` : null;
 
+  const [stateLoaded, setStateLoaded] = useState(false);
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
+  const [sizing, setSizing] = useState<ColumnSizingState>({});
+  const [visibility, setVisibility] = useState<VisibilityState>({});
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
+  const [frozenExtras, setFrozenExtras] = useState<string[]>(DEFAULT_FROZEN_EXTRAS);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [exportOpen, setExportOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // initial load from localStorage
+  useEffect(() => {
+    if (!storageKey) return;
+    let s: Partial<PersistedState> = {};
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) s = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+
+    const validKeys = new Set(TM_COLUMNS.map((c) => c.key).filter((k) => k !== "task_no"));
+    const validAll = new Set<string>(["__select", "task_no", ...validKeys]);
+
+    const savedOrder = (s.order ?? []).filter((k) => validKeys.has(k));
+    let mergedOrder: string[];
+    if (!savedOrder.length) {
+      mergedOrder = DEFAULT_ORDER;
+    } else {
+      const savedSet = new Set(savedOrder);
+      mergedOrder = [...savedOrder];
+      DEFAULT_ORDER.forEach((k, defIdx) => {
+        if (savedSet.has(k)) return;
+        let insertAt = mergedOrder.length;
+        for (let i = defIdx - 1; i >= 0; i--) {
+          const prev = DEFAULT_ORDER[i];
+          const idx = mergedOrder.indexOf(prev);
+          if (idx !== -1) {
+            insertAt = idx + 1;
+            break;
+          }
+        }
+        mergedOrder.splice(insertAt, 0, k);
+      });
+    }
+
+    const savedFrozen = (s.frozenExtras ?? []).filter((k) => validKeys.has(k));
+    const frozenFill = DEFAULT_FROZEN_EXTRAS.filter((k) => !savedFrozen.includes(k));
+    const mergedFrozen = [...savedFrozen, ...frozenFill].slice(0, 3);
+
+    const cleanedVisibility: VisibilityState = {};
+    for (const [k, v] of Object.entries(s.visibility ?? {})) {
+      if (validKeys.has(k)) cleanedVisibility[k] = v as boolean;
+    }
+    const cleanedSizing: ColumnSizingState = {};
+    for (const [k, v] of Object.entries(s.sizing ?? {})) {
+      if (validAll.has(k)) cleanedSizing[k] = v as number;
+    }
+    const cleanedFilters: ColumnFiltersState = (s.columnFilters ?? []).filter((f) =>
+      validKeys.has(f.id),
+    );
+
+    setSorting(
+      s.sorting?.length ? s.sorting.filter((x) => validAll.has(x.id)) : DEFAULT_SORTING,
+    );
+    setSizing(cleanedSizing);
+    setVisibility(cleanedVisibility);
+    setOrder(mergedOrder);
+    setFrozenExtras(mergedFrozen.length ? mergedFrozen : DEFAULT_FROZEN_EXTRAS);
+    setColumnFilters(cleanedFilters);
+    setGlobalFilter(s.globalFilter ?? "");
+    setSearchInput(s.globalFilter ?? "");
+    setStateLoaded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
 
   useEffect(() => {
     const t = setTimeout(() => setGlobalFilter(searchInput.trim()), 250);
     return () => clearTimeout(t);
   }, [searchInput]);
+
+  // localStorage persist
+  useEffect(() => {
+    if (!stateLoaded || !storageKey) return;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            sorting,
+            sizing,
+            visibility,
+            columnFilters,
+            globalFilter,
+            order,
+            frozenExtras,
+          } satisfies PersistedState),
+        );
+      } catch {
+        // ignore
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [
+    stateLoaded,
+    storageKey,
+    sorting,
+    sizing,
+    visibility,
+    columnFilters,
+    globalFilter,
+    order,
+    frozenExtras,
+  ]);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["task-management-raw"],
@@ -154,42 +281,51 @@ export function TaskManagementRawDataPage() {
 
   const rows = useMemo(() => data ?? [], [data]);
 
-  const columns = useMemo<ColumnDef<Row>[]>(() => {
-    const cols: ColumnDef<Row>[] = [
-      {
-        id: "__select",
-        size: 32,
-        enableSorting: false,
-        enableColumnFilter: false,
-        enableResizing: false,
-        header: ({ table }) => (
-          <span onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
-            <Checkbox
-              checked={
-                table.getIsAllRowsSelected()
-                  ? true
-                  : table.getIsSomeRowsSelected()
-                    ? "indeterminate"
-                    : false
-              }
-              onCheckedChange={(v) => table.toggleAllRowsSelected(!!v)}
-              className="h-3.5 w-3.5"
-            />
-          </span>
-        ),
-        cell: ({ row }) => (
-          <span onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
-            <Checkbox
-              checked={row.getIsSelected()}
-              onCheckedChange={(v) => row.toggleSelected(!!v)}
-              className="h-3.5 w-3.5"
-            />
-          </span>
-        ),
-      },
-    ];
+  const orderedKeys = useMemo(() => {
+    const frozenSet = new Set(frozenExtras);
+    const rest = order.filter((k) => !frozenSet.has(k) && k !== "task_no");
+    return ["__select", "task_no", ...frozenExtras, ...rest];
+  }, [order, frozenExtras]);
 
-    for (const c of TM_COLUMNS) {
+  const columns = useMemo<ColumnDef<Row>[]>(() => {
+    const cols: ColumnDef<Row>[] = [];
+    for (const key of orderedKeys) {
+      if (key === "__select") {
+        cols.push({
+          id: "__select",
+          size: 32,
+          enableSorting: false,
+          enableColumnFilter: false,
+          enableResizing: false,
+          header: ({ table }) => (
+            <span onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+              <Checkbox
+                checked={
+                  table.getIsAllRowsSelected()
+                    ? true
+                    : table.getIsSomeRowsSelected()
+                      ? "indeterminate"
+                      : false
+                }
+                onCheckedChange={(v) => table.toggleAllRowsSelected(!!v)}
+                className="h-3.5 w-3.5"
+              />
+            </span>
+          ),
+          cell: ({ row }) => (
+            <span onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+              <Checkbox
+                checked={row.getIsSelected()}
+                onCheckedChange={(v) => row.toggleSelected(!!v)}
+                className="h-3.5 w-3.5"
+              />
+            </span>
+          ),
+        });
+        continue;
+      }
+      const c = TM_COLUMNS.find((x) => x.key === key);
+      if (!c) continue;
       const filterType = inferTmFilterType(c.type);
       cols.push({
         id: c.key,
@@ -197,6 +333,7 @@ export function TaskManagementRawDataPage() {
         header: c.label,
         size: c.width,
         minSize: 60,
+        maxSize: 480,
         enableSorting: true,
         enableColumnFilter: true,
         filterFn:
@@ -241,19 +378,23 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, refetch]);
+  }, [canEdit, refetch, orderedKeys]);
 
   const table = useReactTable({
     data: rows,
     columns,
     state: {
       sorting,
+      columnSizing: sizing,
+      columnVisibility: visibility,
       columnFilters,
       globalFilter,
       rowSelection,
     },
     getRowId: (r) => String(r.id),
     onSortingChange: setSorting,
+    onColumnSizingChange: setSizing,
+    onColumnVisibilityChange: setVisibility,
     onColumnFiltersChange: setColumnFilters,
     onRowSelectionChange: setRowSelection,
     globalFilterFn: globalSearchFilterFn,
@@ -262,6 +403,7 @@ export function TaskManagementRawDataPage() {
     getFilteredRowModel: getFilteredRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
+    columnResizeMode: "onChange",
     enableMultiSort: true,
   });
 
@@ -274,6 +416,25 @@ export function TaskManagementRawDataPage() {
   });
 
   const totalWidth = table.getTotalSize();
+  const frozenColIds = ["__select", "task_no", ...frozenExtras];
+  const frozenWidth = table
+    .getVisibleLeafColumns()
+    .filter((c) => frozenColIds.includes(c.id))
+    .reduce((s, c) => s + c.getSize(), 0);
+
+  const leftOffsets = useMemo(() => {
+    const off = new Map<string, number>();
+    let acc = 0;
+    for (const c of table.getVisibleLeafColumns()) {
+      if (frozenColIds.includes(c.id)) {
+        off.set(c.id, acc);
+        acc += c.getSize();
+      }
+    }
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table.getState().columnSizing, table.getVisibleLeafColumns(), frozenExtras]);
+
   const selectedIds = useMemo(
     () => Object.keys(rowSelection).filter((k) => rowSelection[k]),
     [rowSelection],
@@ -283,7 +444,7 @@ export function TaskManagementRawDataPage() {
     return rows.filter((r) => set.has(String(r.id)));
   }, [rows, selectedIds]);
 
-  const exportColumns = useMemo(
+  const selectedExportColumns = useMemo(
     () =>
       table
         .getVisibleLeafColumns()
@@ -293,7 +454,21 @@ export function TaskManagementRawDataPage() {
           label: TM_COLUMNS.find((x) => x.key === c.id)?.label ?? c.id,
         })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows],
+    [orderedKeys, visibility],
+  );
+
+  const visibleKeysForExport = useMemo(
+    () =>
+      table
+        .getVisibleLeafColumns()
+        .map((c) => c.id)
+        .filter((id) => id !== "__select"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orderedKeys, visibility],
+  );
+  const filteredRowsForExport = useMemo(
+    () => rowModel.rows.map((r) => r.original),
+    [rowModel.rows],
   );
 
   const latestDataDate = useMemo(() => {
@@ -307,9 +482,13 @@ export function TaskManagementRawDataPage() {
 
   function resetAll() {
     setSorting(DEFAULT_SORTING);
+    setSizing({});
+    setVisibility({});
     setColumnFilters([]);
     setGlobalFilter("");
     setSearchInput("");
+    setOrder(DEFAULT_ORDER);
+    setFrozenExtras(DEFAULT_FROZEN_EXTRAS);
     setRowSelection({});
   }
 
@@ -344,18 +523,37 @@ export function TaskManagementRawDataPage() {
               className="h-8 w-64 pl-7"
             />
           </div>
+          <ColumnOrderMenu
+            order={order}
+            visibility={visibility as Record<string, boolean>}
+            frozenExtras={frozenExtras}
+            onOrderChange={setOrder}
+            onVisibilityChange={setVisibility}
+            onFrozenChange={setFrozenExtras}
+          />
           <Button variant="outline" size="sm" className="h-8" onClick={resetAll}>
             <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
           </Button>
           <Button variant="outline" size="sm" className="h-8" onClick={() => refetch()}>
             Refresh
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => navigate({ to: "/closure/spare-part/import" })}
+          >
+            <Upload className="mr-1 h-3.5 w-3.5" /> Import
+          </Button>
+          <Button size="sm" className="h-8" onClick={() => setExportOpen(true)}>
+            <Download className="mr-1 h-3.5 w-3.5" /> Export
+          </Button>
         </div>
       </div>
 
       <BulkEditBar
         selectedRows={selectedRowObjects}
-        exportColumns={exportColumns}
+        exportColumns={selectedExportColumns}
         canEdit={canEdit}
         onClear={() => setRowSelection({})}
         onMutated={() => {
@@ -394,6 +592,8 @@ export function TaskManagementRawDataPage() {
         </div>
       )}
 
+      <TopHorizontalScrollbar targetRef={scrollRef} width={totalWidth} frozenWidth={frozenWidth} />
+
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border bg-card">
         <div ref={scrollRef} className="h-full overflow-auto">
           <div style={{ width: totalWidth }} className="relative">
@@ -402,22 +602,32 @@ export function TaskManagementRawDataPage() {
                 hg.headers.map((h) => {
                   const sort = h.column.getIsSorted();
                   const meta = h.column.columnDef.meta as any;
+                  const isFrozen = frozenColIds.includes(h.column.id);
+                  const leftOffset = isFrozen ? leftOffsets.get(h.column.id) ?? 0 : undefined;
                   const bg = meta?.group
                     ? GROUP_HEADER_BG[meta.group as keyof typeof GROUP_HEADER_BG]
                     : "";
                   return (
                     <div
                       key={h.id}
-                      style={{ width: h.getSize() }}
+                      style={{
+                        width: h.getSize(),
+                        position: isFrozen ? "sticky" : undefined,
+                        left: leftOffset,
+                        zIndex: isFrozen ? 20 : undefined,
+                      }}
                       className={cn(
                         "relative flex select-none items-center gap-1 border-r px-2 py-1.5 text-xs font-medium",
                         bg,
+                        isFrozen && "bg-muted",
                       )}
                     >
+                      {h.column.id === "task_no" && <Pin className="h-3 w-3 text-primary" />}
                       <button
                         type="button"
                         onClick={h.column.getToggleSortingHandler()}
                         className="flex flex-1 items-center gap-1 truncate text-left"
+                        title={String(h.column.columnDef.header ?? "")}
                       >
                         <span className="truncate">
                           {flexRender(h.column.columnDef.header, h.getContext())}
@@ -433,6 +643,16 @@ export function TaskManagementRawDataPage() {
                       </button>
                       {h.column.getCanFilter() && meta?.filterType && (
                         <ColumnFilterDropdown column={h.column} filterType={meta.filterType} />
+                      )}
+                      {h.column.getCanResize() && (
+                        <div
+                          onMouseDown={h.getResizeHandler()}
+                          onTouchStart={h.getResizeHandler()}
+                          className={cn(
+                            "absolute right-0 top-0 h-full w-1 cursor-col-resize touch-none select-none bg-transparent hover:bg-primary/40",
+                            h.column.getIsResizing() && "bg-primary",
+                          )}
+                        />
                       )}
                     </div>
                   );
@@ -459,15 +679,31 @@ export function TaskManagementRawDataPage() {
                       isParent && "bg-muted/30 font-medium",
                     )}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <div
-                        key={cell.id}
-                        style={{ width: cell.column.getSize() }}
-                        className="flex items-center overflow-hidden truncate border-r px-2"
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </div>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      const isFrozen = frozenColIds.includes(cell.column.id);
+                      const leftOffset = isFrozen
+                        ? leftOffsets.get(cell.column.id) ?? 0
+                        : undefined;
+                      return (
+                        <div
+                          key={cell.id}
+                          data-column-id={cell.column.id}
+                          style={{
+                            width: cell.column.getSize(),
+                            position: isFrozen ? "sticky" : undefined,
+                            left: leftOffset,
+                            zIndex: isFrozen ? 5 : undefined,
+                          }}
+                          className={cn(
+                            "flex items-center overflow-hidden truncate border-r px-2",
+                            isFrozen && (isParent ? "bg-muted/60" : "bg-card"),
+                          )}
+                          title={stringifyForTitle(cell.getValue())}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -486,8 +722,21 @@ export function TaskManagementRawDataPage() {
           </div>
         </div>
       </div>
+
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        rows={filteredRowsForExport as Record<string, unknown>[]}
+        visibleKeys={visibleKeysForExport}
+      />
     </div>
   );
+}
+
+function stringifyForTitle(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  return String(v);
 }
 
 function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
