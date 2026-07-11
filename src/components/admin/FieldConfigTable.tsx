@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { RotateCcw, Save } from "lucide-react";
@@ -15,10 +16,12 @@ import {
   SPARE_PART_FIELD_CONFIG_QK,
   type SparePartFieldConfigRow,
 } from "@/hooks/useSparePartFieldConfig";
-import { SPARE_PART_COLUMNS } from "@/lib/spare-part/columns";
+import { SPARE_PART_COLUMNS, GROUP_HEADER_BG } from "@/lib/spare-part/columns";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
-type DraftMap = Record<string, Partial<Pick<SparePartFieldConfigRow, "display_name" | "is_visible" | "sort_order" | "note">>>;
+type DraftMap = Record<string, Partial<Pick<SparePartFieldConfigRow, "display_name" | "is_visible" | "sort_order" | "note" | "group_key">>>;
+
+const GROUP_OPTIONS = Object.keys(GROUP_HEADER_BG);
 
 export function FieldConfigTable() {
   const { data: rows = [], isLoading, refetch } = useSparePartFieldConfig();
@@ -211,7 +214,19 @@ export function FieldConfigTable() {
                       />
                     </TableCell>
                     <TableCell>
-                      {r.group_key ? <Badge variant="secondary" className="text-[10px]">{r.group_key}</Badge> : null}
+                      <Select
+                        value={r.group_key ?? ""}
+                        onValueChange={(v) => setDraft(r.id, { group_key: v })}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="—" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GROUP_OPTIONS.map((g) => (
+                            <SelectItem key={g} value={g} className="text-xs">{g}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell className="text-center">
                       <Switch
