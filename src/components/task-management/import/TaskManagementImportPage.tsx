@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  Columns3,
   Eye,
   FileSpreadsheet,
   Loader2,
@@ -45,6 +46,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { RollupMode } from "@/contexts/TaskManagementImportContext";
+import { ColumnMappingDialog } from "./ColumnMappingDialog";
+import { Input } from "@/components/ui/input";
 
 const statusBadge: Record<TmFileStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
