@@ -16,6 +16,11 @@ export interface ParsedSparePartRow {
   raw_payload: Record<string, unknown>;
   custom_payload: Record<string, unknown>;
   struct: Record<string, unknown>;
+  issues: {
+    technical: string | null;
+    supplier: string | null;
+    internal: string | null;
+  };
 }
 
 export interface ParseSparePartResult {
