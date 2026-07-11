@@ -711,7 +711,7 @@ export function TaskManagementRawDataPage() {
           {columnFilters.map((f) => (
             <FilterChip
               key={f.id}
-              label={`${TM_COLUMNS.find((c) => c.key === f.id)?.label ?? f.id}: ${chipValue(f.value)}`}
+              label={`${labelOverrides[f.id] ?? TM_COLUMNS.find((c) => c.key === f.id)?.label ?? f.id}: ${chipValue(f.value)}`}
               onClear={() =>
                 setColumnFilters((prev) => prev.filter((x) => x.id !== f.id))
               }
