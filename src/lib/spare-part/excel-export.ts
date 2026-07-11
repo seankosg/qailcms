@@ -1,6 +1,12 @@
-import * as XLSX from "xlsx";
 import JSZip from "jszip";
-import { SPARE_PART_COLUMNS } from "./columns";
+import { SPARE_PART_COLUMNS, type SparePartColumnDef } from "./columns";
+import {
+  buildStyledWorkbook,
+  saveStyledWorkbook,
+  styledWorkbookToBuffer,
+  type StyledColumn,
+  type ColumnKind,
+} from "@/lib/excel/styled-workbook";
 
 export type ExportGroupBy = "plot" | "supplier" | "manufacturer";
 export type ExportFormat = "view" | "reimport";
@@ -11,21 +17,36 @@ interface RowLike {
   [k: string]: unknown;
 }
 
-function buildSheet(rows: RowLike[], visibleKeys: string[], format: ExportFormat) {
-  const keys = format === "reimport" ? SPARE_PART_COLUMNS.map((c) => c.key) : visibleKeys;
-  const header = keys.map((k) => {
-    if (format === "reimport") return k;
-    return SPARE_PART_COLUMNS.find((c) => c.key === k)?.label ?? k;
-  });
-  const aoa: any[][] = [header];
-  for (const r of rows) {
-    aoa.push(keys.map((k) => (r[k] ?? "") as any));
-  }
-  return XLSX.utils.aoa_to_sheet(aoa);
+function kindOf(def: SparePartColumnDef | undefined): ColumnKind {
+  if (!def) return "text";
+  if (def.type === "date") return "date";
+  if (def.type === "number" || def.type === "cost" || def.type === "progress") return "number";
+  if (def.type === "boolean") return "boolean";
+  return "text";
 }
 
-function saveWorkbook(wb: XLSX.WorkBook, filename: string) {
-  XLSX.writeFile(wb, filename);
+function styledColumns(keys: string[], format: ExportFormat): StyledColumn[] {
+  return keys.map((k) => {
+    const def = SPARE_PART_COLUMNS.find((c) => c.key === k);
+    return {
+      key: k,
+      label: format === "reimport" ? k : (def?.label ?? k),
+      kind: kindOf(def),
+      widthPx: def?.width,
+    };
+  });
+}
+
+function buildWb(rows: RowLike[], visibleKeys: string[], format: ExportFormat, note?: string) {
+  const keys = format === "reimport" ? SPARE_PART_COLUMNS.map((c) => c.key) : visibleKeys;
+  return buildStyledWorkbook({
+    title: `Spare Part Raw Data  (${format === "reimport" ? "Re-import" : "View"})`,
+    columns: styledColumns(keys, format),
+    rows: rows as Record<string, unknown>[],
+    sheetName: "Raw Data",
+    freezeCols: 1,
+    meta: { note },
+  });
 }
 
 function safeName(s: string): string {
@@ -39,9 +60,8 @@ function timestamp(): string {
 }
 
 export function exportSingle(rows: RowLike[], visibleKeys: string[], format: ExportFormat) {
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, buildSheet(rows, visibleKeys, format), "Raw Data");
-  saveWorkbook(wb, `spare-part_raw_${format}_${timestamp()}.xlsx`);
+  const wb = buildWb(rows, visibleKeys, format);
+  saveStyledWorkbook(wb, `spare-part_raw_${format}_${timestamp()}.xlsx`);
 }
 
 export async function exportGrouped(
@@ -61,9 +81,8 @@ export async function exportGrouped(
   if (entries.length >= ZIP_THRESHOLD) {
     const zip = new JSZip();
     for (const [name, groupRows] of entries) {
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, buildSheet(groupRows, visibleKeys, format), "Raw Data");
-      const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+      const wb = buildWb(groupRows, visibleKeys, format, `${groupBy}: ${name}`);
+      const buf = await styledWorkbookToBuffer(wb);
       zip.file(`${safeName(name)}.xlsx`, buf);
     }
     const blob = await zip.generateAsync({ type: "blob" });
@@ -75,9 +94,8 @@ export async function exportGrouped(
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } else {
     for (const [name, groupRows] of entries) {
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, buildSheet(groupRows, visibleKeys, format), "Raw Data");
-      saveWorkbook(wb, `spare-part_${groupBy}-${safeName(name)}_${format}_${timestamp()}.xlsx`);
+      const wb = buildWb(groupRows, visibleKeys, format, `${groupBy}: ${name}`);
+      saveStyledWorkbook(wb, `spare-part_${groupBy}-${safeName(name)}_${format}_${timestamp()}.xlsx`);
     }
   }
 }

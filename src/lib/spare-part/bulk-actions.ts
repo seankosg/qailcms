@@ -1,6 +1,7 @@
-import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { chunkArray } from "./bulk-edit";
+import { SPARE_PART_COLUMNS } from "./columns";
+import { buildStyledWorkbook, saveStyledWorkbook, type ColumnKind } from "@/lib/excel/styled-workbook";
 
 export interface ExportColumn {
   key: string;
@@ -90,15 +91,24 @@ export function exportSelectedToXlsx(args: {
   columns: ExportColumn[];
   fileName: string;
 }) {
-  const header = args.columns.map((c) => c.label);
-  const aoa: unknown[][] = [header];
-  for (const r of args.rows) {
-    aoa.push(args.columns.map((c) => r[c.key] ?? ""));
-  }
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Selected");
-  XLSX.writeFile(wb, args.fileName);
+  const styled = args.columns.map((c) => {
+    const def = SPARE_PART_COLUMNS.find((d) => d.key === c.key);
+    let kind: ColumnKind = "text";
+    if (def) {
+      if (def.type === "date") kind = "date";
+      else if (def.type === "number" || def.type === "cost" || def.type === "progress") kind = "number";
+      else if (def.type === "boolean") kind = "boolean";
+    }
+    return { key: c.key, label: c.label, kind, widthPx: def?.width };
+  });
+  const wb = buildStyledWorkbook({
+    title: "Spare Part — Selected Rows",
+    columns: styled,
+    rows: args.rows,
+    sheetName: "Selected",
+    freezeCols: 1,
+  });
+  saveStyledWorkbook(wb, args.fileName);
 }
 
 export async function copyRowsAsTsv(args: {

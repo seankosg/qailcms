@@ -1,5 +1,4 @@
 import { useState } from "react";
-import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Download, Loader2 } from "lucide-react";
 import { TM_COLUMNS } from "@/lib/task-management/columns";
+import { buildStyledWorkbook, saveStyledWorkbook, type ColumnKind } from "@/lib/excel/styled-workbook";
 
 type ExportFormat = "view" | "reimport";
 
@@ -29,21 +29,22 @@ function timestamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
-function buildSheet(
-  rows: Record<string, unknown>[],
-  visibleKeys: string[],
-  format: ExportFormat,
-) {
-  const keys =
-    format === "reimport" ? TM_COLUMNS.map((c) => c.key) : visibleKeys;
-  const header = keys.map((k) =>
-    format === "reimport" ? k : (TM_COLUMNS.find((c) => c.key === k)?.label ?? k),
-  );
-  const aoa: any[][] = [header];
-  for (const r of rows) {
-    aoa.push(keys.map((k) => (r[k] ?? "") as any));
-  }
-  return XLSX.utils.aoa_to_sheet(aoa);
+function styledCols(keys: string[], format: ExportFormat) {
+  return keys.map((k) => {
+    const def = TM_COLUMNS.find((c) => c.key === k);
+    let kind: ColumnKind = "text";
+    if (def) {
+      if (def.type === "date") kind = "date";
+      else if (def.type === "number" || def.type === "percent") kind = "number";
+      else if (def.type === "boolean") kind = "boolean";
+    }
+    return {
+      key: k,
+      label: format === "reimport" ? k : (def?.label ?? k),
+      kind,
+      widthPx: def?.width,
+    };
+  });
 }
 
 export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
@@ -53,10 +54,15 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
   const run = () => {
     setBusy(true);
     try {
-      const ws = buildSheet(rows, visibleKeys, format);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Task Management");
-      XLSX.writeFile(wb, `task-management_${format}_${timestamp()}.xlsx`);
+      const keys = format === "reimport" ? TM_COLUMNS.map((c) => c.key) : visibleKeys;
+      const wb = buildStyledWorkbook({
+        title: `Task Management Raw Data  (${format === "reimport" ? "Re-import" : "View"})`,
+        columns: styledCols(keys, format),
+        rows,
+        sheetName: "Task Management",
+        freezeCols: 1,
+      });
+      saveStyledWorkbook(wb, `task-management_${format}_${timestamp()}.xlsx`);
       onOpenChange(false);
     } finally {
       setBusy(false);
