@@ -350,6 +350,11 @@ function FileRow({
               <AlertCircle className="mr-1 h-3 w-3" /> Rejected: {f.result.rejected}
             </Badge>
           )}
+          {typeof f.result.duplicates === "number" && f.result.duplicates > 0 && (
+            <Badge variant="outline" className="border-orange-300 text-orange-700">
+              Duplicates: {f.result.duplicates}
+            </Badge>
+          )}
           {typeof f.result.rolledUp === "number" && f.result.rolledUp > 0 && (
             <Badge variant="outline" className="border-violet-300 text-violet-700">
               Rollup: {f.result.rolledUp}
