@@ -75,6 +75,10 @@ import {
   runRecalcAutoJudgment,
 } from "@/lib/task-management/rollup.functions";
 import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
+import {
+  useTaskManagementFieldConfig,
+  buildTmLabelOverrides,
+} from "@/hooks/useTaskManagementFieldConfig";
 
 type Row = Record<string, unknown> & { id: string; task_no: string; discipline: string };
 
