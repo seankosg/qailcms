@@ -8,23 +8,27 @@ import { cn } from "@/lib/utils";
 import { EMPTY_TOKEN } from "@/lib/spare-part/filters";
 import type { SparePartFilterType } from "@/lib/spare-part/columns";
 
-function TriggerButton({ isActive, onClick }: { isActive: boolean; onClick?: (e: any) => void }) {
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.(e);
-      }}
-      className={cn(
-        "inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/80",
-        isActive ? "text-primary" : "text-muted-foreground/50",
-      )}
-      title="Filter"
-    >
-      <Filter className="h-3 w-3" />
-    </button>
-  );
-}
+const TriggerButton = ({ isActive, ...props }: { isActive: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+  <button
+    type="button"
+    {...props}
+    onClick={(e) => {
+      e.stopPropagation();
+      props.onClick?.(e);
+    }}
+    onPointerDown={(e) => {
+      e.stopPropagation();
+      props.onPointerDown?.(e);
+    }}
+    className={cn(
+      "inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/80",
+      isActive ? "text-primary" : "text-muted-foreground/50",
+    )}
+    title="Filter"
+  >
+    <Filter className="h-3 w-3" />
+  </button>
+);
 
 function MultiSelectDropdown({ column }: { column: Column<any, unknown> }) {
   const selected: string[] = (column.getFilterValue() as string[]) ?? [];
@@ -56,9 +60,7 @@ function MultiSelectDropdown({ column }: { column: Column<any, unknown> }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <span>
-          <TriggerButton isActive={isActive} />
-        </span>
+        <TriggerButton isActive={isActive} />
       </PopoverTrigger>
       <PopoverContent
         className="max-h-72 w-56 overflow-auto p-2"
@@ -113,9 +115,7 @@ function TextFilterDropdown({ column }: { column: Column<any, unknown> }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <span>
-          <TriggerButton isActive={isActive} />
-        </span>
+        <TriggerButton isActive={isActive} />
       </PopoverTrigger>
       <PopoverContent className="w-52 space-y-2 p-3" align="start" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 px-1">
@@ -157,9 +157,7 @@ function DateRangeDropdown({ column }: { column: Column<any, unknown> }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <span>
-          <TriggerButton isActive={isActive} />
-        </span>
+        <TriggerButton isActive={isActive} />
       </PopoverTrigger>
       <PopoverContent className="w-56 space-y-2 p-3" align="start" onClick={(e) => e.stopPropagation()}>
         <button
@@ -211,9 +209,7 @@ function NumberRangeDropdown({ column }: { column: Column<any, unknown> }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <span>
-          <TriggerButton isActive={isActive} />
-        </span>
+        <TriggerButton isActive={isActive} />
       </PopoverTrigger>
       <PopoverContent className="w-52 space-y-2 p-3" align="start" onClick={(e) => e.stopPropagation()}>
         <button
@@ -261,9 +257,7 @@ function BooleanDropdown({ column }: { column: Column<any, unknown> }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <span>
-          <TriggerButton isActive={isActive} />
-        </span>
+        <TriggerButton isActive={isActive} />
       </PopoverTrigger>
       <PopoverContent className="w-44 space-y-1 p-2" align="start" onClick={(e) => e.stopPropagation()}>
         {[
