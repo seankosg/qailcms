@@ -373,6 +373,81 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
           })
           .eq("id", logId);
 
+        // ---- Status History diff-append ---------------------------------
+        // For issue_technical / issue_supplier / issue_internal fields, add a
+        // new history comment whenever the file's value differs from any
+        // existing comment already recorded for that (doc_ref, category).
+        try {
+          const normalize = (s: unknown) =>
+            typeof s === "string" ? s.trim().replace(/\s+/g, " ") : "";
+          const categoryByField: Record<string, "technical" | "supplier" | "internal"> = {
+            issue_technical: "technical",
+            issue_supplier: "supplier",
+            issue_internal: "internal",
+          };
+          const docRefs = parsed.map((p) => p.doc_ref);
+          const existing = new Map<string, Set<string>>(); // key `${docRef}|${category}` -> set of normalized messages
+          for (let i = 0; i < docRefs.length; i += 500) {
+            const chunk = docRefs.slice(i, i + 500);
+            const { data } = await (supabase as any)
+              .from("spare_part_status_history")
+              .select("doc_ref, category, message")
+              .in("doc_ref", chunk)
+              .in("category", ["technical", "supplier", "internal"]);
+            for (const r of (data ?? []) as any[]) {
+              const k = `${r.doc_ref}|${r.category}`;
+              const set = existing.get(k) ?? new Set<string>();
+              set.add(normalize(r.message));
+              existing.set(k, set);
+            }
+          }
+          const inserts: Array<{
+            doc_ref: string;
+            category: string;
+            message: string;
+            source: string;
+            source_file_hash: string | null;
+            author_user_id: string | null;
+          }> = [];
+          for (const p of parsed) {
+            for (const [field, category] of Object.entries(categoryByField)) {
+              const raw = (p.struct as any)?.[field];
+              const norm = normalize(raw);
+              if (!norm) continue;
+              const k = `${p.doc_ref}|${category}`;
+              const set = existing.get(k) ?? new Set<string>();
+              if (set.has(norm)) continue;
+              inserts.push({
+                doc_ref: p.doc_ref,
+                category,
+                message: String(raw).trim(),
+                source: "excel_import",
+                source_file_hash: f.fileHash ?? null,
+                author_user_id: userId,
+              });
+              set.add(norm);
+              existing.set(k, set);
+            }
+          }
+          let historyAdded = 0;
+          if (inserts.length > 0) {
+            for (let i = 0; i < inserts.length; i += 200) {
+              const slice = inserts.slice(i, i + 200);
+              const { data: ins, error: insErr } = await (supabase as any)
+                .from("spare_part_status_history")
+                .insert(slice)
+                .select("id");
+              if (!insErr) historyAdded += ins?.length ?? 0;
+            }
+          }
+          if (historyAdded > 0) {
+            toast.info(`Status history: +${historyAdded} new entries`);
+          }
+        } catch (histErr) {
+          console.warn("[SparePartImport] status history diff failed", histErr);
+        }
+        // -----------------------------------------------------------------
+
         setFiles((cur) =>
           cur.map((x) =>
             x.id === f.id

@@ -184,6 +184,63 @@ export type Database = {
         }
         Relationships: []
       }
+      spare_part_status_history: {
+        Row: {
+          author_user_id: string | null
+          category: string
+          created_at: string
+          doc_ref: string
+          edited: boolean
+          id: string
+          message: string
+          parent_comment_id: string | null
+          source: string
+          source_file_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_user_id?: string | null
+          category: string
+          created_at?: string
+          doc_ref: string
+          edited?: boolean
+          id?: string
+          message: string
+          parent_comment_id?: string | null
+          source?: string
+          source_file_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string | null
+          category?: string
+          created_at?: string
+          doc_ref?: string
+          edited?: boolean
+          id?: string
+          message?: string
+          parent_comment_id?: string | null
+          source?: string
+          source_file_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spare_part_status_history_doc_ref_fkey"
+            columns: ["doc_ref"]
+            isOneToOne: false
+            referencedRelation: "spare_parts_raw"
+            referencedColumns: ["doc_ref"]
+          },
+          {
+            foreignKeyName: "spare_part_status_history_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "spare_part_status_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spare_part_status_mapping: {
         Row: {
           approval_code: string
