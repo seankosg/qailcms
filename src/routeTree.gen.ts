@@ -22,6 +22,7 @@ import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './rout
 import { Route as AuthenticatedClosureSparePartImportRouteImport } from './routes/_authenticated/closure/spare-part/import'
 import { Route as AuthenticatedClosureSparePartDashboardRouteImport } from './routes/_authenticated/closure/spare-part/dashboard'
 import { Route as AuthenticatedClosureSparePartAconexSyncRouteImport } from './routes/_authenticated/closure/spare-part/aconex-sync'
+import { Route as AuthenticatedClosureTaskManagementImportLogsRouteImport } from './routes/_authenticated/closure/task-management/import.logs'
 import { Route as AuthenticatedClosureSparePartRecordsDocRefRouteImport } from './routes/_authenticated/closure/spare-part/records.$docRef'
 import { Route as AuthenticatedClosureSparePartImportLogsRouteImport } from './routes/_authenticated/closure/spare-part/import.logs'
 
@@ -97,6 +98,12 @@ const AuthenticatedClosureSparePartAconexSyncRoute =
     path: '/closure/spare-part/aconex-sync',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureTaskManagementImportLogsRoute =
+  AuthenticatedClosureTaskManagementImportLogsRouteImport.update({
+    id: '/closure/task-management/import/logs',
+    path: '/closure/task-management/import/logs',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureSparePartRecordsDocRefRoute =
   AuthenticatedClosureSparePartRecordsDocRefRouteImport.update({
     id: '/closure/spare-part/records/$docRef',
@@ -125,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
+  '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -140,6 +148,7 @@ export interface FileRoutesByTo {
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
+  '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -158,6 +167,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/_authenticated/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
+  '/_authenticated/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/tree'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
+    | '/closure/task-management/import/logs'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/tree'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
+    | '/closure/task-management/import/logs'
   id:
     | '__root__'
     | '/'
@@ -208,6 +220,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/task-management/tree'
     | '/_authenticated/closure/spare-part/import/logs'
     | '/_authenticated/closure/spare-part/records/$docRef'
+    | '/_authenticated/closure/task-management/import/logs'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -309,6 +322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureSparePartAconexSyncRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/task-management/import/logs': {
+      id: '/_authenticated/closure/task-management/import/logs'
+      path: '/closure/task-management/import/logs'
+      fullPath: '/closure/task-management/import/logs'
+      preLoaderRoute: typeof AuthenticatedClosureTaskManagementImportLogsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/spare-part/records/$docRef': {
       id: '/_authenticated/closure/spare-part/records/$docRef'
       path: '/closure/spare-part/records/$docRef'
@@ -369,6 +389,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
   AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
   AuthenticatedClosureSparePartRecordsDocRefRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRoute
+  AuthenticatedClosureTaskManagementImportLogsRoute: typeof AuthenticatedClosureTaskManagementImportLogsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -387,6 +408,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureTaskManagementTreeRoute,
   AuthenticatedClosureSparePartRecordsDocRefRoute:
     AuthenticatedClosureSparePartRecordsDocRefRoute,
+  AuthenticatedClosureTaskManagementImportLogsRoute:
+    AuthenticatedClosureTaskManagementImportLogsRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -400,13 +423,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

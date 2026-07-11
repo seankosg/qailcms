@@ -24,6 +24,7 @@ const NAV: NavGroup[] = [
       { to: "/closure/spare-part/raw-data", label: "SPT-Raw Data", icon: Database },
       { to: "/closure/spare-part/import", label: "Import", icon: Upload, adminOnly: true },
       { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, adminOnly: true },
+      { to: "/closure/task-management/import/logs", label: "Task Import Logs", icon: FileClock, adminOnly: true },
       { to: "/closure/spare-part/aconex-sync", label: "Aconex Sync", icon: RefreshCw, adminOnly: true },
     ],
   },

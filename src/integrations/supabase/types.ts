@@ -38,6 +38,50 @@ export type Database = {
         }
         Relationships: []
       }
+      spare_part_change_log: {
+        Row: {
+          change_source: string
+          changed_at: string
+          changed_by: string | null
+          changed_field: string
+          doc_ref: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          upload_id: string | null
+        }
+        Insert: {
+          change_source?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_field: string
+          doc_ref: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          upload_id?: string | null
+        }
+        Update: {
+          change_source?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_field?: string
+          doc_ref?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          upload_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spare_part_change_log_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "spare_parts_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spare_part_comments: {
         Row: {
           author_id: string
@@ -184,6 +228,47 @@ export type Database = {
         }
         Relationships: []
       }
+      spare_part_import_row_logs: {
+        Row: {
+          action_taken: string
+          doc_ref: string | null
+          id: string
+          processed_at: string
+          raw_row_no: number | null
+          reason_code: string | null
+          reason_detail: string | null
+          upload_id: string
+        }
+        Insert: {
+          action_taken: string
+          doc_ref?: string | null
+          id?: string
+          processed_at?: string
+          raw_row_no?: number | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          upload_id: string
+        }
+        Update: {
+          action_taken?: string
+          doc_ref?: string | null
+          id?: string
+          processed_at?: string
+          raw_row_no?: number | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spare_part_import_row_logs_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "spare_parts_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spare_part_status_history: {
         Row: {
           author_user_id: string | null
@@ -280,6 +365,10 @@ export type Database = {
           header_row: number | null
           id: string
           module: string
+          note: string | null
+          rollback_force: boolean
+          rolled_back_at: string | null
+          rolled_back_by: string | null
           row_counts: Json | null
           sheet_name: string | null
           source_type: string
@@ -302,6 +391,10 @@ export type Database = {
           header_row?: number | null
           id?: string
           module?: string
+          note?: string | null
+          rollback_force?: boolean
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
           row_counts?: Json | null
           sheet_name?: string | null
           source_type?: string
@@ -324,6 +417,10 @@ export type Database = {
           header_row?: number | null
           id?: string
           module?: string
+          note?: string | null
+          rollback_force?: boolean
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
           row_counts?: Json | null
           sheet_name?: string | null
           source_type?: string
@@ -392,6 +489,7 @@ export type Database = {
           revision: string | null
           rfq_progress: number | null
           row_version: number
+          source_import_log_id: string | null
           spec_available: boolean | null
           spl_approval_date: string | null
           spl_list_approved: boolean | null
@@ -475,6 +573,7 @@ export type Database = {
           revision?: string | null
           rfq_progress?: number | null
           row_version?: number
+          source_import_log_id?: string | null
           spec_available?: boolean | null
           spl_approval_date?: string | null
           spl_list_approved?: boolean | null
@@ -558,6 +657,7 @@ export type Database = {
           revision?: string | null
           rfq_progress?: number | null
           row_version?: number
+          source_import_log_id?: string | null
           spec_available?: boolean | null
           spl_approval_date?: string | null
           spl_list_approved?: boolean | null
@@ -584,7 +684,15 @@ export type Database = {
           updated_by?: string | null
           warranty_available?: boolean | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "spare_parts_raw_source_import_log_id_fkey"
+            columns: ["source_import_log_id"]
+            isOneToOne: false
+            referencedRelation: "spare_parts_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spare_parts_sync_log: {
         Row: {
@@ -651,7 +759,11 @@ export type Database = {
           id: string
           imported_by: string | null
           inserted: number
+          note: string | null
           rejected: number
+          rollback_force: boolean
+          rolled_back_at: string | null
+          rolled_back_by: string | null
           sheet_name: string | null
           skipped: number
           started_at: string
@@ -670,7 +782,11 @@ export type Database = {
           id?: string
           imported_by?: string | null
           inserted?: number
+          note?: string | null
           rejected?: number
+          rollback_force?: boolean
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
           sheet_name?: string | null
           skipped?: number
           started_at?: string
@@ -689,7 +805,11 @@ export type Database = {
           id?: string
           imported_by?: string | null
           inserted?: number
+          note?: string | null
           rejected?: number
+          rollback_force?: boolean
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
           sheet_name?: string | null
           skipped?: number
           started_at?: string
@@ -699,6 +819,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      task_management_import_row_logs: {
+        Row: {
+          action_taken: string
+          discipline: string | null
+          id: string
+          processed_at: string
+          raw_row_no: number | null
+          reason_code: string | null
+          reason_detail: string | null
+          task_no: string | null
+          upload_id: string
+        }
+        Insert: {
+          action_taken: string
+          discipline?: string | null
+          id?: string
+          processed_at?: string
+          raw_row_no?: number | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          task_no?: string | null
+          upload_id: string
+        }
+        Update: {
+          action_taken?: string
+          discipline?: string | null
+          id?: string
+          processed_at?: string
+          raw_row_no?: number | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          task_no?: string | null
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_management_import_row_logs_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "task_management_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_management_raw: {
         Row: {
@@ -714,6 +878,7 @@ export type Database = {
           id: string
           imported_at: string
           imported_by: string | null
+          is_active: boolean
           is_rollup: boolean
           level: string
           parent_task_no: string | null
@@ -729,6 +894,7 @@ export type Database = {
           slip_days: number | null
           sort_order: number | null
           source_file: string | null
+          source_import_log_id: string | null
           status_manual: string | null
           sub_task_desc: string | null
           task_name: string | null
@@ -748,6 +914,7 @@ export type Database = {
           id?: string
           imported_at?: string
           imported_by?: string | null
+          is_active?: boolean
           is_rollup?: boolean
           level: string
           parent_task_no?: string | null
@@ -763,6 +930,7 @@ export type Database = {
           slip_days?: number | null
           sort_order?: number | null
           source_file?: string | null
+          source_import_log_id?: string | null
           status_manual?: string | null
           sub_task_desc?: string | null
           task_name?: string | null
@@ -782,6 +950,7 @@ export type Database = {
           id?: string
           imported_at?: string
           imported_by?: string | null
+          is_active?: boolean
           is_rollup?: boolean
           level?: string
           parent_task_no?: string | null
@@ -797,13 +966,22 @@ export type Database = {
           slip_days?: number | null
           sort_order?: number | null
           source_file?: string | null
+          source_import_log_id?: string | null
           status_manual?: string | null
           sub_task_desc?: string | null
           task_name?: string | null
           task_no?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "task_management_raw_source_import_log_id_fkey"
+            columns: ["source_import_log_id"]
+            isOneToOne: false
+            referencedRelation: "task_management_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_management_settings: {
         Row: {
@@ -847,6 +1025,7 @@ export type Database = {
           source: string
           task_no: string
           task_raw_id: string | null
+          upload_id: string | null
         }
         Insert: {
           changed_at?: string
@@ -859,6 +1038,7 @@ export type Database = {
           source?: string
           task_no: string
           task_raw_id?: string | null
+          upload_id?: string | null
         }
         Update: {
           changed_at?: string
@@ -871,6 +1051,7 @@ export type Database = {
           source?: string
           task_no?: string
           task_raw_id?: string | null
+          upload_id?: string | null
         }
         Relationships: [
           {
@@ -878,6 +1059,13 @@ export type Database = {
             columns: ["task_raw_id"]
             isOneToOne: false
             referencedRelation: "task_management_raw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_management_status_history_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "task_management_import_logs"
             referencedColumns: ["id"]
           },
         ]
@@ -917,6 +1105,14 @@ export type Database = {
         }
         Returns: string
       }
+      delete_spare_part_import_batch: {
+        Args: { _batch_id: string }
+        Returns: Json
+      }
+      delete_task_management_import_batch: {
+        Args: { _batch_id: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -925,9 +1121,25 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }
+      preview_rollback_spare_part_import: {
+        Args: { _batch_id: string }
+        Returns: Json
+      }
+      preview_rollback_task_management_import: {
+        Args: { _batch_id: string }
+        Returns: Json
+      }
       recalc_task_auto_judgment: {
         Args: { _discipline?: string }
         Returns: number
+      }
+      rollback_spare_part_import: {
+        Args: { _batch_id: string; _force?: boolean }
+        Returns: Json
+      }
+      rollback_task_management_import: {
+        Args: { _batch_id: string; _force?: boolean }
+        Returns: Json
       }
       rollup_task_all_parents: {
         Args: { _discipline: string }

@@ -332,6 +332,40 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: pct } : x)));
         }
 
+        // Tag newly-inserted rows with source_import_log_id for rollback tracking.
+        if (logId) {
+          const newTaskNos = deduped
+            .map((p) => p.task_no)
+            .filter((t) => !existingSet.has(t));
+          for (let i = 0; i < newTaskNos.length; i += 500) {
+            const chunk = newTaskNos.slice(i, i + 500);
+            await (supabase as any)
+              .from("task_management_raw")
+              .update({ source_import_log_id: logId })
+              .eq("discipline", discipline)
+              .in("task_no", chunk)
+              .is("source_import_log_id", null);
+          }
+
+          // Per-row import logs
+          try {
+            const rowLogRows = deduped.map((p, idx) => ({
+              upload_id: logId,
+              raw_row_no: idx + 1,
+              discipline,
+              task_no: p.task_no,
+              action_taken: existingSet.has(p.task_no) ? "updated" : "inserted",
+            }));
+            for (let i = 0; i < rowLogRows.length; i += 500) {
+              await (supabase as any)
+                .from("task_management_import_row_logs")
+                .insert(rowLogRows.slice(i, i + 500));
+            }
+          } catch (e) {
+            console.warn("[task-import] row-log insert failed", e);
+          }
+        }
+
         // Post-import: rollup + judgment recalc
         let rolledUp = 0;
         let judgmentRecalculated = 0;
