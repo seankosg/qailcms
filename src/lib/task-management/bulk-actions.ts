@@ -1,5 +1,6 @@
-import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
+import { TM_COLUMNS } from "./columns";
+import { buildStyledWorkbook, saveStyledWorkbook, type ColumnKind } from "@/lib/excel/styled-workbook";
 
 export interface ExportColumn {
   key: string;
@@ -75,15 +76,24 @@ export function exportRowsToXlsx({
   columns: ExportColumn[];
   fileName: string;
 }) {
-  const header = columns.map((c) => c.label);
-  const aoa: any[][] = [header];
-  for (const r of rows) {
-    aoa.push(columns.map((c) => formatCell(r[c.key])));
-  }
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Task Management");
-  XLSX.writeFile(wb, fileName);
+  const styled = columns.map((c) => {
+    const def = TM_COLUMNS.find((d) => d.key === c.key);
+    let kind: ColumnKind = "text";
+    if (def) {
+      if (def.type === "date") kind = "date";
+      else if (def.type === "number" || def.type === "percent") kind = "number";
+      else if (def.type === "boolean") kind = "boolean";
+    }
+    return { key: c.key, label: c.label, kind, widthPx: def?.width };
+  });
+  const wb = buildStyledWorkbook({
+    title: "Task Management — Selected Rows",
+    columns: styled,
+    rows,
+    sheetName: "Task Management",
+    freezeCols: 1,
+  });
+  saveStyledWorkbook(wb, fileName);
 }
 
 export async function copyRowsAsTsv({
