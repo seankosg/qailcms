@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   listAppUsers, createAppUser, resetUserPassword, updateUserRole,
   updateUserProfileFields, deleteAppUser, addMasterName, toggleMasterActive, deleteMasterName,
+  DEFAULT_INITIAL_PASSWORD,
 } from "@/lib/admin/users.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -184,7 +185,7 @@ function UsersTab() {
 
 function ResetPasswordButton({ onReset }: { onReset: (pw: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);
-  const [pw, setPw] = useState("");
+  const [pw, setPw] = useState(DEFAULT_INITIAL_PASSWORD);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -193,14 +194,16 @@ function ResetPasswordButton({ onReset }: { onReset: (pw: string) => Promise<voi
       <DialogContent>
         <DialogHeader>
           <DialogTitle>임시 비밀번호 발급</DialogTitle>
-          <DialogDescription>사용자에게 전달할 임시 비밀번호를 입력하세요. 다음 로그인 시 변경이 강제됩니다.</DialogDescription>
+          <DialogDescription>
+            기본값은 <code className="font-mono">{DEFAULT_INITIAL_PASSWORD}</code> 입니다. 다음 로그인 시 변경이 강제됩니다.
+          </DialogDescription>
         </DialogHeader>
         <Input value={pw} onChange={(e) => setPw(e.target.value)} placeholder="임시 비밀번호 (8자 이상)" />
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>취소</Button>
           <Button onClick={async () => {
             if (pw.length < 8) { toast.error("8자 이상"); return; }
-            await onReset(pw); setOpen(false); setPw("");
+            await onReset(pw); setOpen(false); setPw(DEFAULT_INITIAL_PASSWORD);
           }}>발급</Button>
         </DialogFooter>
       </DialogContent>
@@ -215,20 +218,24 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
   const [displayName, setDisplayName] = useState("");
   const [userType, setUserType] = useState<(typeof USER_TYPES)[number]>("hdec");
   const [role, setRole] = useState<(typeof ROLES)[number]>("user");
-  const [tempPw, setTempPw] = useState("");
+  const [tempPw, setTempPw] = useState(DEFAULT_INITIAL_PASSWORD);
   const [subName, setSubName] = useState<string>("");
   const [picName, setPicName] = useState<string>("");
   const subList = useMasterList("subcontractor");
   const picList = useMasterList("hdec_pic");
 
   const submit = async () => {
-    if (!loginId || !displayName || tempPw.length < 8) {
+    const cleanId = loginId.trim().toLowerCase();
+    if (!cleanId || !displayName || tempPw.length < 8) {
       toast.error("필수 항목을 채우고 임시 PW는 8자 이상"); return;
+    }
+    if (!/^[a-z0-9._-]+$/.test(cleanId)) {
+      toast.error("Login ID는 영문 소문자, 숫자, . _ - 만 사용 가능"); return;
     }
     try {
       await create({
         data: {
-          login_id: loginId.trim(),
+          login_id: cleanId,
           display_name: displayName.trim(),
           user_type: userType,
           role,
@@ -237,9 +244,9 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
           hdec_pic_name: userType === "hdec" ? (picName || null) : null,
         },
       });
-      toast.success("계정이 생성되었습니다");
+      toast.success("계정이 생성되었습니다", { description: `초기 비밀번호: ${tempPw}` });
       setOpen(false);
-      setLoginId(""); setDisplayName(""); setTempPw(""); setSubName(""); setPicName("");
+      setLoginId(""); setDisplayName(""); setTempPw(DEFAULT_INITIAL_PASSWORD); setSubName(""); setPicName("");
       onCreated();
     } catch (e: any) { toast.error(e.message); }
   };
@@ -250,10 +257,19 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
         <Button><UserPlus className="mr-1 h-4 w-4" />신규 계정</Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>신규 계정</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>신규 계정</DialogTitle>
+          <DialogDescription>
+            Login ID는 영문 소문자·숫자·<code>. _ -</code>만 사용. 초기 비밀번호 기본값은{" "}
+            <code className="font-mono">{DEFAULT_INITIAL_PASSWORD}</code>이며 첫 로그인 시 변경이 강제됩니다.
+          </DialogDescription>
+        </DialogHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-2">
-            <div><Label>Login ID</Label><Input value={loginId} onChange={(e) => setLoginId(e.target.value)} /></div>
+            <div>
+              <Label>Login ID</Label>
+              <Input value={loginId} onChange={(e) => setLoginId(e.target.value.toLowerCase())} placeholder="예: hong.gd" />
+            </div>
             <div><Label>이름</Label><Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-2">

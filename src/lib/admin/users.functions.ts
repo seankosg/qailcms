@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const DUMMY_EMAIL_DOMAIN = "qail.local";
+export const DEFAULT_INITIAL_PASSWORD = "qail2026";
 
 async function assertAdmin(supabase: any, userId: string) {
   const { data, error } = await supabase.rpc("has_any_role", {
@@ -49,13 +50,17 @@ export const createAppUser = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const email = `${data.login_id}@${DUMMY_EMAIL_DOMAIN}`;
+    const loginId = data.login_id.trim().toLowerCase();
+    if (!/^[a-z0-9._-]+$/.test(loginId)) {
+      throw new Error("Login ID는 영문 소문자, 숫자, . _ - 만 사용할 수 있습니다.");
+    }
+    const email = `${loginId}@${DUMMY_EMAIL_DOMAIN}`;
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: data.temp_password,
       email_confirm: true,
       user_metadata: {
-        login_id: data.login_id,
+        login_id: loginId,
         display_name: data.display_name,
         user_type: data.user_type,
         subcontractor_name: data.subcontractor_name ?? null,
