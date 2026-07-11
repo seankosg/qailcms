@@ -115,7 +115,7 @@ export const updateUserProfileFields = createServerFn({ method: "POST" })
     await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { user_id, ...rest } = data;
-    const payload: Record<string, unknown> = {};
+    const payload: any = {};
     for (const [k, v] of Object.entries(rest)) if (v !== undefined) payload[k] = v;
     if (Object.keys(payload).length === 0) return { ok: true };
     const { error } = await supabaseAdmin.from("profiles").update(payload).eq("id", user_id);
