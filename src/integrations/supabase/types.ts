@@ -1012,6 +1012,7 @@ export type Database = {
           created_at: string
           data_date: string
           discipline: string
+          floor_level: string | null
           forecast_end: string | null
           id: string
           imported_at: string
@@ -1019,6 +1020,7 @@ export type Database = {
           is_active: boolean
           is_rollup: boolean
           level: string
+          location: string | null
           parent_task_no: string | null
           pic: string | null
           plan_days: number | null
@@ -1049,6 +1051,7 @@ export type Database = {
           created_at?: string
           data_date: string
           discipline: string
+          floor_level?: string | null
           forecast_end?: string | null
           id?: string
           imported_at?: string
@@ -1056,6 +1059,7 @@ export type Database = {
           is_active?: boolean
           is_rollup?: boolean
           level: string
+          location?: string | null
           parent_task_no?: string | null
           pic?: string | null
           plan_days?: number | null
@@ -1086,6 +1090,7 @@ export type Database = {
           created_at?: string
           data_date?: string
           discipline?: string
+          floor_level?: string | null
           forecast_end?: string | null
           id?: string
           imported_at?: string
@@ -1093,6 +1098,7 @@ export type Database = {
           is_active?: boolean
           is_rollup?: boolean
           level?: string
+          location?: string | null
           parent_task_no?: string | null
           pic?: string | null
           plan_days?: number | null
