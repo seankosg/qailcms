@@ -84,7 +84,7 @@ export const SPARE_PART_COLUMNS: SparePartColumnDef[] = [
   { key: "spl_req_contract", label: "SPL Req (Contract)", type: "text", width: 140, group: "spl" },
   { key: "spl_req_mmjv", label: "SPL Req (MMJV)", type: "text", width: 140, group: "spl" },
   { key: "spl_req_hdec", label: "SPL Req (HDEC)", type: "text", width: 140, group: "spl" },
-  { key: "physical_supply", label: "Phy Supply", type: "boolean", width: 90, group: "avail" },
+  { key: "phy", label: "Phy", type: "boolean", width: 90, group: "avail" },
   { key: "physical_list_agreed", label: "Phy List Agreed", type: "text", width: 120, group: "avail" },
   { key: "physical_remarks", label: "Phy Remarks", type: "text", width: 180, group: "avail" },
   { key: "rec_letter_2y", label: "Rec Letter 2Y", type: "text", width: 120, group: "avail" },
