@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  Columns3,
   Eye,
   FileSpreadsheet,
   Loader2,
@@ -45,6 +46,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { RollupMode } from "@/contexts/TaskManagementImportContext";
+import { ColumnMappingDialog } from "./ColumnMappingDialog";
+import { Input } from "@/components/ui/input";
 
 const statusBadge: Record<TmFileStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
@@ -83,10 +86,13 @@ function ImportInner() {
     removeFile,
     clearAll,
     setFileDiscipline,
+    setFileDataDateOverride,
+    setFileColumnOverrides,
     startImport,
   } = useTaskManagementImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
+  const [mappingFileId, setMappingFileId] = useState<string | null>(null);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -105,6 +111,7 @@ function ImportInner() {
 
   const readyCount = files.filter((f) => f.status === "ready" && !f.validationError).length;
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
+  const mappingFile = files.find((f) => f.id === mappingFileId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -236,6 +243,8 @@ function ImportInner() {
                 onRemove={() => removeFile(f.id)}
                 onDisciplineChange={(d) => setFileDiscipline(f.id, d)}
                 onPreview={() => setPreviewFileId(f.id)}
+                onOpenMapping={() => setMappingFileId(f.id)}
+                onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
               />
             ))}
           </CardContent>
@@ -243,6 +252,17 @@ function ImportInner() {
       )}
 
       <PreviewDialog file={previewFile} onClose={() => setPreviewFileId(null)} />
+      {mappingFile && mappingFile.sheetHeaders && mappingFile.columnMap && (
+        <ColumnMappingDialog
+          open={!!mappingFile}
+          onClose={() => setMappingFileId(null)}
+          fileName={mappingFile.name}
+          sheetHeaders={mappingFile.sheetHeaders}
+          currentMap={mappingFile.columnMap}
+          defaultMap={mappingFile.columnMap}
+          onApply={(overrides) => setFileColumnOverrides(mappingFile.id, overrides)}
+        />
+      )}
     </div>
   );
 }
@@ -253,14 +273,19 @@ function FileRow({
   onRemove,
   onDisciplineChange,
   onPreview,
+  onOpenMapping,
+  onDataDateChange,
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
   onRemove: () => void;
   onDisciplineChange: (d: Discipline) => void;
   onPreview: () => void;
+  onOpenMapping: () => void;
+  onDataDateChange: (v: string | null) => void;
 }) {
   const badge = statusBadge[f.status];
+  const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
   return (
     <div className="rounded border p-3">
       <div className="flex items-start justify-between gap-3">
@@ -270,7 +295,6 @@ function FileRow({
             <p className="truncate text-sm font-medium">{f.name}</p>
             <p className="text-xs text-muted-foreground">
               {formatSize(f.size)}
-              {f.dataDate && ` · Data Date ${f.dataDate}`}
               {typeof f.parentCount === "number" &&
                 ` · Parent ${f.parentCount} / Child ${f.childCount}`}
             </p>
@@ -293,6 +317,26 @@ function FileRow({
                   ))}
                 </SelectContent>
               </Select>
+              <span className="ml-2 text-xs text-muted-foreground">Data Date</span>
+              <Input
+                type="date"
+                className="h-7 w-[140px] text-xs"
+                value={effectiveDataDate}
+                onChange={(e) =>
+                  onDataDateChange(e.target.value ? e.target.value : null)
+                }
+                disabled={
+                  isRunning || f.status === "done" || f.status === "processing"
+                }
+              />
+              {f.dataDateCell && f.dataDateCell !== "override" && !f.dataDateOverride && (
+                <span className="text-[11px] text-muted-foreground">
+                  ({f.dataDateCell}에서 감지)
+                </span>
+              )}
+              {f.dataDateOverride && (
+                <span className="text-[11px] text-amber-600">(수동 입력)</span>
+              )}
               {f.parsed && f.parsed.length > 0 && (
                 <Button
                   variant="outline"
@@ -301,6 +345,28 @@ function FileRow({
                   onClick={onPreview}
                 >
                   <Eye className="h-3.5 w-3.5" /> Preview
+                </Button>
+              )}
+              {f.sheetHeaders && f.columnMap && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={onOpenMapping}
+                  disabled={
+                    isRunning ||
+                    f.status === "done" ||
+                    f.status === "processing" ||
+                    f.status === "parsing"
+                  }
+                >
+                  <Columns3 className="h-3.5 w-3.5" /> 컬럼 매핑
+                  {f.columnOverrides &&
+                    Object.keys(f.columnOverrides).length > 0 && (
+                      <span className="text-amber-600">
+                        ({Object.keys(f.columnOverrides).length})
+                      </span>
+                    )}
                 </Button>
               )}
             </div>

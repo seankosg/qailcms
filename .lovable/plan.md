@@ -1,129 +1,115 @@
+## 배경 — 두 가지 문제
 
-## 목표
-SHAW PROJECT CMS의 사용자·권한 체계를 QAIL CMS에 이식한다. 역할은 기존 3단계에 `guest`만 추가, 소속(`user_type`)은 SHAW와 동일(subcontractor/hdec/pm_pd/admin), 모듈 세분 권한은 도입하지 않고 역할로만 통제, 로그인은 login_id 기반 + 최초 비밀번호 강제 변경(이메일은 시스템 내부 더미).
+### 1) `C4 셀에서 Data Date를 읽지 못했습니다` 에러
+업로드한 파일의 `Gantt` 시트 실제 배치는 다음과 같음:
+- **B4** = `"Data Date ▶"` (라벨)
+- **C4** = 비어있음
+- **D4** = `2026-07-10` (실제 날짜)
 
----
+현재 parser (`src/lib/task-management/parser.ts` L196~200)는 `C4`만 하드코딩하여 읽음. 따라서 라벨 위치에 따라 값이 밀린 파일은 무조건 실패.
 
-## 1. DB 마이그레이션
+### 2) 컬럼 매핑 선택 기능 부재
+현재 Import 시 헤더 매핑은 다음 두 곳에서 사용:
+- `task_management_header_mappings` 테이블 (전역 alias)
+- Row 5 헤더 텍스트 기반 자동 매칭 (`buildHeaderMap` + `resolveColumn`)
 
-### 1-1. app_role enum 확장
-- `guest` 값 추가 (`ALTER TYPE ... ADD VALUE 'guest'`)
-- 최종 값: `guest / user / superuser / admin`
-
-### 1-2. user_type enum 신설
-- `CREATE TYPE public.user_type AS ENUM ('subcontractor','hdec','pm_pd','admin')`
-
-### 1-3. profiles 컬럼 확장
-- `login_id text UNIQUE NOT NULL` (기존 계정은 email local-part로 백필)
-- `user_type public.user_type NOT NULL DEFAULT 'hdec'`
-- `subcontractor_name text`, `hdec_pic_name text`
-- `must_change_password boolean NOT NULL DEFAULT true`
-- `is_active boolean NOT NULL DEFAULT true`
-- 서브콘 1업체 1계정 partial unique: `WHERE user_type='subcontractor'`
-
-### 1-4. Master 테이블 (계정 생성 시 name 선택용)
-- `subcontractor_master(name unique, is_active)`
-- `hdec_pic_master(name unique, is_active)`
-- RLS: authenticated read, admin/superuser manage. GRANT 세트 포함.
-
-### 1-5. 헬퍼 함수
-- `has_any_role(_user_id, app_role[])` 추가
-- 기존 `is_admin_or_super` 유지 (superuser 포함)
-
-### 1-6. 트리거 갱신 (`handle_new_user`)
-- `raw_user_meta_data`에서 `login_id / user_type / subcontractor_name / hdec_pic_name / must_change_password / role` 흡수
-- profiles insert, user_roles insert (role 기본 `guest`)
-- 첫 가입자만 admin (기존 로직 유지)
-
-### 1-7. RLS 정책 업데이트 (모든 도메인 테이블)
-- 대상: `spare_parts_raw`, `task_management_raw`, 각 `_import_logs`, `_import_row_logs`, `spare_part_change_log`, `task_management_status_history`, `spare_part_comments`, `spare_part_custom_fields`, `spare_part_status_history` 등
-- 원칙:
-  - **SELECT**: `authenticated` 전체 허용 (guest 포함, 읽기)
-  - **INSERT/UPDATE**: `has_any_role(auth.uid(), ARRAY['user','superuser','admin'])`
-  - **DELETE / rollback / master 관리 / mapping 관리**: `is_admin_or_super(auth.uid())`
-  - guest는 편집/import/삭제 전부 차단
-- profiles: 본인 SELECT + admin SELECT/UPDATE, self UPDATE는 `must_change_password/password` 관련만
-- user_roles: 본인 SELECT, admin manage
+문제:
+- 파일별로 컬럼 순서·헤더명이 다르면 사용자가 수정할 방법이 없음
+- 자동 매칭 실패 시 그냥 canonical index로 fallback (조용히 잘못된 컬럼 읽음)
+- 파일 카드 위에서 매핑을 눈으로 확인/수정할 UI가 없음
 
 ---
 
-## 2. Admin 서버 함수 (계정 라이프사이클)
+## 계획
 
-`src/lib/admin/users.functions.ts` (모두 `requireSupabaseAuth` + admin 체크, 내부에서 `supabaseAdmin` 지연 로드)
+### A. Data Date 파싱 유연화 (parser.ts)
 
-- `createAppUser({ login_id, name, user_type, subcontractor_name?, hdec_pic_name?, role, temp_password })`
-  - 더미 이메일 조립: `${login_id}@qail.local`
-  - `supabaseAdmin.auth.admin.createUser({ email, password, email_confirm:true, user_metadata:{...} })`
-  - 트리거가 profiles/user_roles 채움. 최종 role은 `user_roles`에 upsert로 지정
-- `resetUserPassword({ user_id, temp_password })` — admin API로 password 재설정 + `must_change_password=true`
-- `updateUserRole({ user_id, role })`
-- `updateUserType({ user_id, user_type, subcontractor_name?, hdec_pic_name? })`
-- `setUserActive({ user_id, is_active })`
-- `deleteAppUser({ user_id })` — profiles/user_roles/auth.users 정리
-- Master 관리: `addSubcontractor / addHdecPic / toggleActive / rename`
+`parseTaskManagementExcel`에서 다음 순서로 Data Date를 탐색:
 
----
+1. **행 4 스캔**: B4~F4 범위에서 첫 번째 유효 날짜 값을 찾아 사용
+2. **라벨 기반 탐색**: 행 3~5 중 `"Data Date"`, `"data date"`, `"기준일"` 등의 텍스트를 가진 셀을 찾고, 같은 행의 오른쪽/아래에서 첫 날짜 값 채택
+3. 여전히 없으면 warning + `dataDate = null` (기존 동작)
 
-## 3. 로그인 흐름 재설계
+`ParseTaskManagementResult`에 `dataDateCell: string | null` (예: `"D4"`)을 추가하여 UI에서 어느 셀에서 읽었는지 표시.
 
-### 3-1. 로그인 페이지 (`/auth`)
-- Email 필드 → **ID** 필드로 교체 (`login_id`)
-- 서버 함수 `resolveLoginEmail(login_id)` — profiles에서 email 조회 후 반환 (RLS는 anon SELECT용 좁은 view 또는 SECURITY DEFINER 함수)
-- 그 email로 `supabase.auth.signInWithPassword({ email, password })`
+### B. 파일별 Data Date 수동 입력 UI (ImportPage)
 
-### 3-2. 최초 비밀번호 강제 변경
-- 신규 `/change-password` 페이지 (public 라우트, 세션 필요)
-- `AuthGate` 계층에서 `profile.must_change_password === true`면 다른 어떤 라우트로도 이동 불가, 강제 리디렉트
-- 변경 성공 시 `supabase.auth.updateUser({password})` + `must_change_password=false` 서버 함수
+파일 카드에 다음 요소 추가:
+- Data Date 자동 감지 성공 시: `Data Date 2026-07-10 (D4에서 감지)` 배지 + `수정` 버튼
+- 실패 시: 빨간 배너 대신 **날짜 입력 필드(input type=date)** 를 즉시 표시하여 사용자가 직접 입력 → Ready 상태로 전환
+- Context `TmImportFileItem`에 `dataDateOverride?: string` 추가, 실제 upsert 시 `dataDateOverride ?? parsed.dataDate` 사용
 
-### 3-3. Signup 차단
-- `supabase--configure_auth`로 `disable_signup=true` 설정. admin만 계정 생성 가능.
+### C. 파일별 컬럼 매핑 선택기 (신규 UI)
 
----
+파일 카드에 `컬럼 매핑` 버튼 추가 → Dialog 오픈:
 
-## 4. Guest 역할 UX 처리
+```text
+┌─ 컬럼 매핑 (파일별) ─────────────────────────────┐
+│ 필드              엑셀 컬럼 (행 5 헤더)   미리보기 │
+│ task_no      →    [B: No           ▼]   AC-T-01… │
+│ category     →    [C: Category     ▼]   Tier     │
+│ plot         →    [D: Plot         ▼]   L01      │
+│ task_name    →    [E: 항목          ▼]   Wall…    │
+│ … (전체 19개 필드)                              │
+│                                                  │
+│           [기본값 복원]  [취소]  [적용]          │
+└──────────────────────────────────────────────────┘
+```
 
-- 사이드바에서 편집·Import·Admin 메뉴 숨김 (role check 유틸)
-- 편집 셀·rollback 버튼·delete 버튼·import 화면 진입 시 role 가드
-- Raw Data는 조회 전용으로 완전 사용 가능
+동작:
+- 좌측: parser의 canonical target 필드 목록 (`task_no`, `category`, … `auto_judgment`)
+- 우측 Select: 엑셀 시트의 A~S열 중 선택 (행 5 헤더 텍스트를 라벨로 표시, 예: `E: 항목`)
+- 미리보기: 6행 첫 번째 데이터 값
+- 초기값: 현재 자동 매핑 결과 (headerMap → column index)
+- 적용 시 `TmImportFileItem.columnOverrides: Record<TargetField, number>` 저장
+- 다시 파싱을 트리거하지 않고, upsert 시점에서 `parser.ts`에 `columnOverrides`를 넘겨 사용
 
-프론트 훅: `useCurrentProfile()` — profile + roles 캐시 (React Query)
-헬퍼: `canEdit()`, `canImport()`, `canAdmin()`
+Parser 시그니처 확장:
+```ts
+parseTaskManagementExcel(
+  file: File,
+  opts?: { extraAliases?: ...; columnOverrides?: Record<string, number> }
+)
+```
+`resolveColumn` 앞단에서 override가 있으면 우선 채택.
 
----
+### D. Context / 흐름 변경 (`TaskManagementImportContext.tsx`)
 
-## 5. Admin > Users 화면 (신규)
+`TmImportFileItem`에 필드 추가:
+- `dataDateOverride: string | null`
+- `columnOverrides: Record<string, number> | null`
+- `sheetHeaders: { col: number; letter: string; header: string; sample: string | null }[]` (매핑 다이얼로그용, 파싱 결과에서 수집)
 
-`/admin/users` 라우트
-- 사용자 목록 테이블: login_id, name, user_type, role, subcontractor/hdec_pic, is_active, must_change_password
-- 필터: user_type, role, active
-- 행 액션: 역할 변경, 소속/이름 편집, 임시 PW 재발급, 비활성/활성, 삭제
-- 상단 "신규 계정" 버튼 → 폼 다이얼로그
-  - subcontractor 선택 시 `subcontractor_master` 드롭다운, HDEC 선택 시 `hdec_pic_master` 드롭다운
-  - 서브콘 unique 위반은 서버에서 friendly 에러
-- 하단 탭: Subcontractor Master / HDEC PIC Master 관리
+Import 실행 시:
+1. Override가 있으면 파일을 다시 파싱(재-parse, 사용자 확정 매핑 반영)
+2. 재파싱 실패 시 파일 카드에 에러 표시
+3. Data Date는 override 우선
 
----
+### E. Ready 판정 로직 변경
 
-## 6. 롤아웃 순서
-1. 마이그레이션 (enum·profiles·master·RLS·트리거)
-2. Admin 서버 함수 + 프론트 훅
-3. `/auth` 페이지 리팩터 + `/change-password`
-4. `AuthGate` 강제 PW 변경 로직
-5. `/admin/users` 화면 + 마스터 관리
-6. 사이드바 role 가드 + 편집/Import/Rollback 버튼 가드
-7. `disable_signup=true` 적용
-
----
-
-## 파일 변경 예상
-- 신규 마이그레이션 SQL 1개 (대규모)
-- 신규 라우트: `src/routes/_authenticated/admin/users.tsx`, `src/routes/change-password.tsx`
-- 신규: `src/lib/admin/users.functions.ts`, `src/lib/auth/resolveLoginEmail.functions.ts`, `src/hooks/useCurrentProfile.ts`, `src/lib/auth/roleGuards.ts`, `src/components/admin/UsersTable.tsx`, `SubcontractorMasterTable.tsx`, `HdecPicMasterTable.tsx`, `NewUserDialog.tsx`
-- 수정: `src/routes/auth.tsx` (또는 현행 로그인 라우트), `src/components/layout/AppLayout.tsx` (메뉴 가드), 각 Raw Data 페이지의 편집/삭제/import 가드, `TaskManagementImportContext.tsx` / `SparePartImportContext.tsx` 진입 가드, 각 rollback/delete 버튼
+기존: `parsed.dataDate` 없으면 `validationError`  
+변경: `parsed.dataDate` 없어도 `dataDateOverride` 있으면 Ready. 둘 다 없으면 여전히 Not Ready + 파일 카드에서 입력 유도.
 
 ---
 
-## 검토 필요 사항
-- 이메일 도메인 더미값: `@qail.local` 로 고정 (변경 원하면 알려주세요)
-- guest 기본값: 신규 가입 자체를 막으므로 `handle_new_user`의 기본 role은 `guest`로 설정, admin이 즉시 조정. 첫 사용자만 admin.
+## 파일 변경 목록
+
+- **수정** `src/lib/task-management/parser.ts`  
+  Data Date 유연 탐색, `columnOverrides` 지원, sheet header 목록 수집 반환
+- **수정** `src/contexts/TaskManagementImportContext.tsx`  
+  `dataDateOverride`, `columnOverrides`, `sheetHeaders` 상태 및 저장 시 반영
+- **수정** `src/components/task-management/import/TaskManagementImportPage.tsx`  
+  파일 카드에 Data Date 인라인 편집, `컬럼 매핑` 버튼 추가
+- **신규** `src/components/task-management/import/ColumnMappingDialog.tsx`  
+  필드↔엑셀 컬럼 매핑 편집 다이얼로그
+
+DB 스키마 변경은 없음 (전역 `task_management_header_mappings`는 그대로 유지 — 파일별 override는 클라이언트 세션 한정).
+
+---
+
+## 확인 방법
+
+1. 업로드한 `20260710_Task_Management_건축-4.xlsx`를 다시 드래그
+   - 카드에 `Data Date 2026-07-10 (D4에서 감지)` 표시, `Ready` 상태
+2. `컬럼 매핑` 버튼 클릭 → 19개 필드가 자동 매핑된 상태로 표시
+3. Ready 상태에서 Import 실행 → 정상 upsert 확인

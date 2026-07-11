@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import {
   parseTaskManagementExcel,
   type ParsedTaskRow,
+  type SheetHeaderEntry,
+  type TaskTargetField,
 } from "@/lib/task-management/parser";
 import type { Discipline } from "@/lib/task-management/columns";
 import { runRollupAllParents, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
@@ -42,6 +44,8 @@ export interface TmImportFileItem {
   progress: number;
   parsed?: ParsedTaskRow[];
   dataDate?: string | null;
+  dataDateCell?: string | null;
+  dataDateOverride?: string | null;
   parentCount?: number;
   childCount?: number;
   warnings?: string[];
@@ -50,6 +54,9 @@ export interface TmImportFileItem {
   disciplineHint?: Discipline | null;
   validationError?: string | null;
   error?: string;
+  sheetHeaders?: SheetHeaderEntry[];
+  columnMap?: Record<string, number>;
+  columnOverrides?: Partial<Record<TaskTargetField, number>> | null;
   result?: {
     inserted: number;
     updated: number;
@@ -73,6 +80,11 @@ interface CtxValue {
   removeFile: (id: string) => void;
   clearAll: () => void;
   setFileDiscipline: (id: string, d: Discipline) => void;
+  setFileDataDateOverride: (id: string, date: string | null) => void;
+  setFileColumnOverrides: (
+    id: string,
+    overrides: Partial<Record<TaskTargetField, number>> | null,
+  ) => Promise<void>;
   startImport: () => Promise<void>;
 }
 
@@ -122,7 +134,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
     for (const item of next) {
       try {
-        const parsed = await parseTaskManagementExcel(item.file, extraAliases);
+        const parsed = await parseTaskManagementExcel(item.file, { extraAliases });
         setFiles((cur) =>
           cur.map((f) => {
             if (f.id !== item.id) return f;
@@ -130,19 +142,22 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               parsed.rows.length === 0
                 ? "행을 찾지 못했습니다. 'Gantt' 시트와 헤더 위치를 확인하세요."
                 : !parsed.dataDate
-                  ? "C4 셀에서 Data Date를 읽지 못했습니다."
+                  ? "Data Date를 읽지 못했습니다. 아래에서 직접 입력하세요."
                   : null;
             return {
               ...f,
               status: "ready",
               parsed: parsed.rows,
               dataDate: parsed.dataDate,
+              dataDateCell: parsed.dataDateCell,
               parentCount: parsed.parentCount,
               childCount: parsed.childCount,
               warnings: parsed.warnings,
               sheetName: parsed.sheetName,
               disciplineHint: parsed.disciplineHint,
               discipline: parsed.disciplineHint ?? "건축",
+              sheetHeaders: parsed.sheetHeaders,
+              columnMap: parsed.columnMap,
               validationError: validation,
             };
           }),
@@ -173,6 +188,107 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, discipline: d } : f)));
   }, []);
 
+  const setFileDataDateOverride = useCallback((id: string, date: string | null) => {
+    setFiles((cur) =>
+      cur.map((f) => {
+        if (f.id !== id) return f;
+        const effective = date ?? f.dataDate ?? null;
+        const validation =
+          !f.parsed || f.parsed.length === 0
+            ? f.validationError
+            : !effective
+              ? "Data Date를 입력하세요."
+              : null;
+        return { ...f, dataDateOverride: date, validationError: validation };
+      }),
+    );
+  }, []);
+
+  const setFileColumnOverrides = useCallback(
+    async (id: string, overrides: Partial<Record<TaskTargetField, number>> | null) => {
+      // 컬럼 매핑 override 적용 → 재파싱
+      const current = await new Promise<TmImportFileItem | undefined>((resolve) => {
+        setFiles((cur) => {
+          resolve(cur.find((f) => f.id === id));
+          return cur;
+        });
+      });
+      if (!current) return;
+
+      setFiles((cur) =>
+        cur.map((f) =>
+          f.id === id ? { ...f, status: "parsing", columnOverrides: overrides } : f,
+        ),
+      );
+
+      // aliases 재수집
+      let extraAliases: Record<string, string[]> = {};
+      try {
+        const { data: mappings } = await (supabase as any)
+          .from("task_management_header_mappings")
+          .select("source_header, target_field, is_active")
+          .eq("module", "task_management")
+          .eq("is_active", true);
+        for (const m of (mappings ?? []) as Array<{
+          source_header: string;
+          target_field: string;
+        }>) {
+          if (!m.target_field || !m.source_header) continue;
+          (extraAliases[m.target_field] ||= []).push(m.source_header);
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const parsed = await parseTaskManagementExcel(current.file, {
+          extraAliases,
+          columnOverrides: overrides ?? undefined,
+          dataDateOverride: current.dataDateOverride ?? null,
+        });
+        setFiles((cur) =>
+          cur.map((f) => {
+            if (f.id !== id) return f;
+            const effective = f.dataDateOverride ?? parsed.dataDate ?? null;
+            const validation =
+              parsed.rows.length === 0
+                ? "행을 찾지 못했습니다."
+                : !effective
+                  ? "Data Date를 입력하세요."
+                  : null;
+            return {
+              ...f,
+              status: "ready",
+              parsed: parsed.rows,
+              dataDate: parsed.dataDate,
+              dataDateCell: parsed.dataDateCell,
+              parentCount: parsed.parentCount,
+              childCount: parsed.childCount,
+              warnings: parsed.warnings,
+              sheetName: parsed.sheetName,
+              sheetHeaders: parsed.sheetHeaders,
+              columnMap: parsed.columnMap,
+              validationError: validation,
+            };
+          }),
+        );
+      } catch (e) {
+        setFiles((cur) =>
+          cur.map((f) =>
+            f.id === id
+              ? {
+                  ...f,
+                  status: "failed",
+                  error: e instanceof Error ? e.message : "Re-parse failed",
+                }
+              : f,
+          ),
+        );
+      }
+    },
+    [],
+  );
+
   const executeImport = useCallback(async (ready: TmImportFileItem[]) => {
     setIsRunning(true);
     const { data: userData } = await supabase.auth.getUser();
@@ -190,7 +306,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         .insert({
           file_name: f.name,
           discipline,
-          data_date: f.dataDate ?? null,
+          data_date: f.dataDateOverride ?? f.dataDate ?? null,
           sheet_name: f.sheetName ?? null,
           total_rows: parsed.length,
           status: "processing",
@@ -276,7 +392,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         slip_days: p.slip_days,
         auto_judgment: null as string | null,
         auto_judgment_import: p.auto_judgment,
-        data_date: f.dataDate,
+        data_date: f.dataDateOverride ?? f.dataDate ?? null,
         sort_order: p.sort_order,
         source_file: f.name,
         imported_at: startedAtIso,
@@ -492,7 +608,12 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
   const startImport = useCallback(async () => {
     if (isRunning) return;
     const ready = files.filter(
-      (f) => f.status === "ready" && f.parsed && f.parsed.length > 0 && !f.validationError,
+      (f) =>
+        f.status === "ready" &&
+        f.parsed &&
+        f.parsed.length > 0 &&
+        !f.validationError &&
+        !!(f.dataDateOverride ?? f.dataDate),
     );
     if (ready.length === 0) {
       toast.error("Import 가능한 파일이 없습니다");
@@ -514,6 +635,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         removeFile,
         clearAll,
         setFileDiscipline,
+        setFileDataDateOverride,
+        setFileColumnOverrides,
         startImport,
       }}
     >
