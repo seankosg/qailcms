@@ -366,9 +366,9 @@ export type Database = {
           issue_owner: string | null
           manual_available: boolean | null
           manufacturer: string | null
+          phy: boolean | null
           physical_list_agreed: boolean | null
           physical_remarks: string | null
-          physical_supply: boolean | null
           plot: string
           po_date: string | null
           po_done: boolean | null
@@ -449,9 +449,9 @@ export type Database = {
           issue_owner?: string | null
           manual_available?: boolean | null
           manufacturer?: string | null
+          phy?: boolean | null
           physical_list_agreed?: boolean | null
           physical_remarks?: string | null
-          physical_supply?: boolean | null
           plot: string
           po_date?: string | null
           po_done?: boolean | null
@@ -532,9 +532,9 @@ export type Database = {
           issue_owner?: string | null
           manual_available?: boolean | null
           manufacturer?: string | null
+          phy?: boolean | null
           physical_list_agreed?: boolean | null
           physical_remarks?: string | null
-          physical_supply?: boolean | null
           plot?: string
           po_date?: string | null
           po_done?: boolean | null
