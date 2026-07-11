@@ -14,27 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      hdec_pic_master: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
           display_name: string | null
           email: string | null
+          hdec_pic_name: string | null
           id: string
+          is_active: boolean
+          login_id: string
+          must_change_password: boolean
+          subcontractor_name: string | null
           updated_at: string
+          user_type: Database["public"]["Enums"]["user_type"]
         }
         Insert: {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          hdec_pic_name?: string | null
           id: string
+          is_active?: boolean
+          login_id: string
+          must_change_password?: boolean
+          subcontractor_name?: string | null
           updated_at?: string
+          user_type?: Database["public"]["Enums"]["user_type"]
         }
         Update: {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          hdec_pic_name?: string | null
           id?: string
+          is_active?: boolean
+          login_id?: string
+          must_change_password?: boolean
+          subcontractor_name?: string | null
           updated_at?: string
+          user_type?: Database["public"]["Enums"]["user_type"]
         }
         Relationships: []
       }
@@ -748,6 +787,27 @@ export type Database = {
         }
         Relationships: []
       }
+      subcontractor_master: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       task_management_field_config: {
         Row: {
           created_at: string
@@ -1194,6 +1254,13 @@ export type Database = {
         Args: { _batch_id: string }
         Returns: Json
       }
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1214,6 +1281,7 @@ export type Database = {
         Args: { _discipline?: string }
         Returns: number
       }
+      resolve_login_email: { Args: { _login_id: string }; Returns: string }
       rollback_spare_part_import: {
         Args: { _batch_id: string; _force?: boolean }
         Returns: Json
@@ -1232,7 +1300,8 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "superuser" | "user"
+      app_role: "admin" | "superuser" | "user" | "guest"
+      user_type: "subcontractor" | "hdec" | "pm_pd" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1360,7 +1429,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "superuser", "user"],
+      app_role: ["admin", "superuser", "user", "guest"],
+      user_type: ["subcontractor", "hdec", "pm_pd", "admin"],
     },
   },
 } as const

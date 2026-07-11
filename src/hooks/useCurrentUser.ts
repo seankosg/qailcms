@@ -12,13 +12,21 @@ export function useCurrentUser() {
         supabase.from("user_roles").select("role").eq("user_id", authData.user.id),
       ]);
       const roleSet = new Set((roles ?? []).map((r) => r.role));
+      const isAdmin = roleSet.has("admin") || roleSet.has("superuser");
+      const isEditor = isAdmin || roleSet.has("user");
       return {
         id: authData.user.id,
         email: authData.user.email,
         profile,
         roles: Array.from(roleSet),
-        isAdmin: roleSet.has("admin") || roleSet.has("superuser"),
+        isAdmin,
         isSuperUser: roleSet.has("superuser"),
+        isEditor,
+        isGuest: !isEditor,
+        mustChangePassword: (profile as any)?.must_change_password === true,
+        userType: (profile as any)?.user_type as
+          | "subcontractor" | "hdec" | "pm_pd" | "admin" | undefined,
+        loginId: (profile as any)?.login_id as string | undefined,
       };
     },
     staleTime: 60_000,

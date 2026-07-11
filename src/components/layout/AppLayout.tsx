@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, Package, Wrench, ShieldCheck, Settings2,
+  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, Package, Wrench, ShieldCheck, Settings2, Users,
 } from "lucide-react";
 import { ListTree, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useQueryClient } from "@tanstack/react-query";
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean };
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean; editorOnly?: boolean };
 type NavGroup = { label: string; icon: typeof Package; items: NavItem[] };
 
 const NAV: NavGroup[] = [
@@ -22,10 +22,10 @@ const NAV: NavGroup[] = [
       { to: "/closure/task-management/raw-data", label: "Task-Raw Data", icon: Database },
       { to: "/closure/task-management/tree", label: "Task-Tree", icon: ListTree },
       { to: "/closure/spare-part/raw-data", label: "SPT-Raw Data", icon: Database },
-      { to: "/closure/spare-part/import", label: "Import", icon: Upload, adminOnly: true },
-      { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, adminOnly: true },
-      { to: "/closure/task-management/import/logs", label: "Task Import Logs", icon: FileClock, adminOnly: true },
-      { to: "/closure/spare-part/aconex-sync", label: "Aconex Sync", icon: RefreshCw, adminOnly: true },
+      { to: "/closure/spare-part/import", label: "Import", icon: Upload, editorOnly: true },
+      { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
+      { to: "/closure/task-management/import/logs", label: "Task Import Logs", icon: FileClock, editorOnly: true },
+      { to: "/closure/spare-part/aconex-sync", label: "Aconex Sync", icon: RefreshCw, editorOnly: true },
     ],
   },
   {
@@ -33,6 +33,7 @@ const NAV: NavGroup[] = [
     icon: ShieldCheck,
     items: [
       { to: "/admin", label: "Overview", icon: LayoutDashboard, adminOnly: true },
+      { to: "/admin/users", label: "사용자", icon: Users, adminOnly: true },
       { to: "/admin/mapping", label: "Mapping", icon: Settings2, adminOnly: true },
       { to: "/admin/task-thresholds", label: "Task 임계값", icon: Sliders, adminOnly: true },
     ],
@@ -75,7 +76,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </div>
               <div className="mt-1 space-y-0.5">
                 {group.items
-                  .filter((it) => !it.adminOnly || me?.isAdmin)
+                  .filter((it) => {
+                    if (it.adminOnly && !me?.isAdmin) return false;
+                    if (it.editorOnly && !me?.isEditor) return false;
+                    return true;
+                  })
                   .map((it) => {
                     const active = location.pathname.startsWith(it.to);
                     return (
@@ -100,11 +105,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="border-t p-3">
           <div className="mb-2 truncate text-xs text-muted-foreground">{me?.email}</div>
           <div className="mb-2 flex flex-wrap gap-1">
-            {me?.isAdmin && (
+            {me?.isAdmin ? (
               <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                 <ShieldCheck className="h-3 w-3" />
                 {me.isSuperUser ? "Superuser" : "Admin"}
               </span>
+            ) : me?.isGuest ? (
+              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Guest (읽기)</span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium">User</span>
             )}
           </div>
           <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut}>
