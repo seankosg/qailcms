@@ -67,7 +67,9 @@ export const runRecalcAutoJudgment = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: n, error } = await supabaseAdmin.rpc(
       "recalc_task_auto_judgment",
-      { _discipline: data.discipline ?? null },
+      data.discipline
+        ? { _discipline: data.discipline }
+        : ({} as { _discipline?: string }),
     );
     if (error) throw new Error(error.message);
     return { updated: Number(n ?? 0) };
