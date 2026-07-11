@@ -494,6 +494,21 @@ export function SparePartRawDataPage() {
         </div>
       </div>
 
+      <BulkEditBar
+        selectedRows={selectedRowObjects}
+        exportColumns={selectedExportColumns}
+        canEdit={canEdit}
+        onClear={() => setRowSelection({})}
+        onSaved={() => {
+          setRowSelection({});
+          refetch();
+        }}
+        onMutated={() => {
+          setRowSelection({});
+          refetch();
+        }}
+      />
+
       {/* Filter chips */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
@@ -653,21 +668,6 @@ export function SparePartRawDataPage() {
           </div>
         </div>
       </div>
-
-      <BulkEditBar
-        selectedRows={selectedRowObjects}
-        exportColumns={selectedExportColumns}
-        canEdit={canEdit}
-        onClear={() => setRowSelection({})}
-        onSaved={() => {
-          setRowSelection({});
-          refetch();
-        }}
-        onMutated={() => {
-          setRowSelection({});
-          refetch();
-        }}
-      />
 
       <ExportDialog
         open={exportOpen}
