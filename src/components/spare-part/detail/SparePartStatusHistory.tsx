@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -229,7 +229,7 @@ export function SparePartStatusHistory({ docRef }: Props) {
     );
   };
 
-  const renderThread = (c: StatusHistoryRow, depth = 0): JSX.Element => {
+  const renderThread = (c: StatusHistoryRow, depth = 0): ReactElement => {
     const replies = repliesByParent[c.id] ?? [];
     return (
       <div key={c.id} className="space-y-1.5">
