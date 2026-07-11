@@ -1,114 +1,147 @@
+
 ## 목표
-사이드바에 **Admin** 그룹을 신설하고, 그 안의 **Mapping** 서브메뉴에서 SHAW CMS의 *Field Mapping* + *Field Config* 두 기능을 통합 제공합니다. 결과적으로 관리자는 다음 두 가지를 DB에서 직접 편집할 수 있습니다.
 
-1. **Field Config** — Raw Data 표의 컬럼 헤더 라벨(display_name), 표시 여부, 정렬 순서
-2. **Header Mapping** — Excel Import 시 원본 헤더 문자열 → 시스템 필드 매핑(별칭 관리)
-
-Raw Data 페이지는 하드코딩된 `SPARE_PART_COLUMNS.label` 대신 DB의 `spare_part_field_config.display_name`을 우선 사용합니다.
-
----
-
-## 데이터 모델 변경 (migration)
-
-### 신규: `public.spare_part_field_config`
-Raw Data의 46개 필드에 대해 admin이 라벨/표시/순서를 편집.
-
-| 컬럼 | 타입 | 비고 |
-|---|---|---|
-| `id` | uuid PK | |
-| `field_name` | text UNIQUE NOT NULL | `SPARE_PART_COLUMNS.key`와 1:1 |
-| `display_name` | text NOT NULL | 헤더에 표시되는 라벨 |
-| `is_visible` | boolean NOT NULL default true | Column Menu에서의 기본 노출 |
-| `sort_order` | int NOT NULL default 0 | 기본 컬럼 순서 |
-| `group_key` | text | id/vendor/qty…(현행 그룹) |
-| `note` | text | admin 메모 |
-| `updated_by` | uuid | |
-| `updated_at` | timestamptz default now() | trigger `set_updated_at` |
-
-- GRANT: `SELECT` → `anon`, `authenticated`; `INSERT/UPDATE/DELETE` → `authenticated`(admin RLS로 제한); `ALL` → `service_role`.
-- RLS: 모두 SELECT 가능 / admin만 write (`has_role(auth.uid(),'admin')`).
-- 마이그레이션 끝에 46개 기본 필드를 `ON CONFLICT DO NOTHING` 시드 삽입.
-- `updated_at` 트리거는 기존 `public.set_updated_at()` 재사용.
-
-### 기존 `spare_part_header_mappings` 보강
-- `is_active boolean not null default true` 추가 — SHAW의 enable/disable 토글 지원
-- `note text` 추가
-- `updated_at` 트리거 부여
-- Import 파서(`src/lib/spare-part-import-parser.ts`)에서 이미 이 테이블을 참조 중이면 스키마 확장 후에도 기존 로직 유지 (아래 "파서 영향" 확인 예정)
+1. `/closure/spare-part/records/:docRef` 상세페이지를 SHAW CMS의 Defect Detail 페이지와 동일한 UI 패턴으로 재구현하고 **모든 필드를 편집 가능**하게 구현
+2. 기존 `issue_technical`, `issue_supplier`, `issue_internal` 세 필드의 텍스트를 시계열 **Status History** 코멘트로 1회 마이그레이션
+3. 상세페이지에서 코멘트 직접 추가 + 각 코멘트에 대한 **답글(reply)** 기능
+4. Excel 재업로드 시 세 필드 내용이 기존 코멘트와 다르면 자동으로 신규 코멘트 append
 
 ---
 
-## 파일 구성
+## 1. 데이터베이스 마이그레이션
 
-### 라우트
-```
-src/routes/_authenticated/admin/
-  route.tsx                 // admin 게이트: has_role('admin')이 아니면 raw-data로 redirect, 하위 <Outlet />
-  index.tsx                 // /admin — 간단한 대시보드(카드로 각 서브메뉴 진입)
-  mapping.tsx               // /admin/mapping — 좌측 탭: [Field Config | Header Mapping]
-```
-- `admin/mapping.tsx`는 `Tabs`로 두 패널을 스위치.
+### 신규 테이블: `spare_part_status_history`
+- `id` uuid PK
+- `doc_ref` text (인덱스, FK → `spare_parts_raw.doc_ref` ON DELETE CASCADE)
+- `parent_comment_id` uuid nullable — 답글 트리
+- `category` text: `'technical' | 'supplier' | 'internal' | 'general'`
+- `message` text NOT NULL
+- `source` text: `'migration' | 'excel_import' | 'app_manual'`
+- `source_file_hash` text nullable — 재업로드 중복 감지
+- `author_user_id` uuid nullable (마이그레이션/import는 NULL, 수동 입력은 auth.uid())
+- `edited` boolean default false
+- `created_at`, `updated_at`
 
-### 컴포넌트
-```
-src/components/admin/
-  FieldConfigTable.tsx      // spare_part_field_config CRUD (display_name, is_visible, sort_order, note)
-  HeaderMappingTable.tsx    // spare_part_header_mappings CRUD (source_header, target_field, is_active, is_custom)
-  MappingTestBar.tsx        // 원본 헤더 문자열 넣으면 정규화·매칭 결과 미리보기 (SHAW의 Mapping Test 이식)
+**GRANT & RLS (같은 마이그레이션에서 실행):**
+- `GRANT SELECT, INSERT, UPDATE, DELETE ON public.spare_part_status_history TO authenticated`
+- `GRANT ALL ... TO service_role`
+- authenticated 전원 SELECT/INSERT 가능
+- 본인 작성분 UPDATE/DELETE, admin/superuser는 `has_role()` 기반 전체 관리
+- `updated_at` 트리거
+
+### 1회 마이그레이션 SQL (동일 마이그레이션 내 실행)
+```sql
+INSERT INTO spare_part_status_history (doc_ref, category, message, source, created_at)
+SELECT doc_ref, 'technical', TRIM(issue_technical), 'migration', COALESCE(updated_at, now())
+FROM spare_parts_raw WHERE NULLIF(TRIM(issue_technical),'') IS NOT NULL;
+-- supplier, internal 반복
 ```
 
-### 훅/데이터
-```
-src/hooks/useSparePartFieldConfig.ts   // useQuery(['spare-part-field-config']) — 캐시 & realtime invalidate
-src/hooks/useSparePartHeaderMappings.ts
-```
-
-### Raw Data 통합
-- `src/lib/spare-part/columns.ts`: 기존 `SPARE_PART_COLUMNS`는 그대로 두되 label/width/type의 fallback 소스로 유지.
-- `SparePartRawDataPage.tsx`에서 `useSparePartFieldConfig()`로 오버라이드 맵을 만들고, 컬럼 정의 생성 시 `label = override.display_name ?? c.label`, 그리고 초기 `DEFAULT_ORDER`는 `sort_order` 기준으로 재계산.
-- `is_visible=false` 필드는 기본 hidden(`visibility[key] = false`)으로 마운트 — 저장된 사용자 상태가 있으면 사용자 상태 우선.
-- `ColumnOrderMenu`, Export 헤더도 동일 오버라이드 라벨을 사용.
-
-### 사이드바 (`AppLayout.tsx`)
-- `NAV`에 두 번째 그룹 추가:
-```
-{
-  label: "Admin",
-  icon: ShieldCheck,
-  items: [
-    { to: "/admin", label: "Overview", icon: LayoutDashboard, adminOnly: true },
-    { to: "/admin/mapping", label: "Mapping", icon: Wrench, adminOnly: true },
-  ],
-}
-```
-- 기존 `adminOnly` 필터를 재사용하므로 비관리자에게는 보이지 않음.
+기존 `issue_technical/supplier/internal` 컬럼은 **보존** (감사·엑셀 재업로드 diff 비교용). Raw Data 그리드에는 계속 노출하되, 상세페이지에서는 편집 필드가 아닌 Status History 카드로 대체.
 
 ---
 
-## Field Config UI (요약)
-- 필드 46개를 `sort_order` 오름차순 테이블로 표시.
-- 열: **Field Name (읽기전용)**, **Display Name (인라인 편집)**, **Visible (Switch)**, **Sort Order (숫자, 위/아래 화살표)**, **Group (뱃지)**, **Note**, **Save/Reset**.
-- 상단 검색 인풋 + "Reset to defaults" 버튼(기본 46개 필드 라벨을 codebase 상수값으로 되돌림).
-- 저장 시 낙관적 업데이트 → `invalidateQueries(['spare-part-field-config'])` → Raw Data 화면 즉시 반영.
+## 2. 상세페이지 UI (`SparePartDetailPage.tsx`)
 
-## Header Mapping UI (요약)
-- SHAW의 `HeaderMappingsTab`을 spare_part 단일 모듈로 축소 이식.
-- 상단: 검색, "Show empty targets" 토글, "Add Mapping" 버튼.
-- 본문: `target_field` 별 Accordion — 각 그룹 안에 alias 목록(활성 Switch, 편집, 삭제).
-- **Mapping Test**: 원본 헤더 문자열 입력 → 정규화(소문자/공백 축약)된 값 + 매칭된 target_field 미리보기.
-- 시스템 소유 매핑(`is_custom=false`)은 삭제 잠금(자물쇠 아이콘) — SHAW와 동일 정책.
+SHAW의 `DefectDetailPage.tsx` 구조를 참고하여 카드 그룹으로 구성. **admin/superuser 는 모든 필드를 편집** 가능하며, 그 외 사용자는 read-only.
+
+카드 구성 (그룹은 `columns.ts`의 `group` 값 기반으로 자동 배치):
+
+```
+┌ Header       : Doc Ref · Subject · Approval Badge · ← Raw Data
+├ Identification : doc_ref (RO), plot, discipline, subject, category
+├ Vendor         : supplier, manufacturer
+├ Approval       : approval_status, revision, approval_code, is_duplicate
+├ Quantity       : qty_total, qty_delivered
+├ Cost           : cost_impact_usd, cost_impact_qar
+├ SPL            : spl_req_contract/mmjv/hdec, spl_list_code, spl_list_target, spl_list_approved
+├ Availability   : physical_supply, physical_list_agreed, physical_remarks,
+                   rec_letter_2y/5y, availability_10y, doc_others, phy
+├ Procurement    : proc_category, rfq_progress, quotation_progress/target/done,
+                   po_progress/target/done
+├ Delivery       : delivery_progress, delivery_target, delivery_done
+├ Remarks        : action, remarks, proc_remarks
+└ Status History : (아래 3절)
+```
+
+### 필드 렌더러 (type 기반, `SPARE_PART_COLUMNS[i].type` 사용)
+- `text` → `<Input>` / 긴 텍스트(remarks, action, proc_remarks 등)는 `<Textarea>`
+- `number`, `cost` → `<Input type="number">`
+- `progress` → 0–100 숫자 인풋 + Progress 시각화
+- `date` → `<Input type="date">`
+- `boolean` → `<Switch>` (Y/N)
+- `badge` (approval_code, plot) → `<Select>` (APPROVAL_CODES / ["C","D"])
+
+`doc_ref`는 편집 금지(PK). `raw_payload`, `custom_payload`, `is_active`, `imported_at`, `updated_at` 등 시스템 컬럼은 노출하지 않음.
+
+### 저장 로직
+- 단일 `Save` 버튼. 변경된 필드만 diff → `spare_parts_raw` update
+- 필수 검증: 빈문자열 → NULL 정규화, 숫자/날짜 zod 스키마 검증(client + toast 오류)
+- 저장 성공 시 `updated_by = auth.uid()`, `updated_at = now()`
+- React Query `invalidateQueries(['spare-parts-raw'])` + `['spare-part-detail', docRef]`
+
+### 편집 권한
+- `useCurrentUser().isAdmin || isSuperUser` → 편집 가능
+- 그 외 사용자: 모든 인풋 `disabled`, Save 버튼 숨김
+- Status History 코멘트 작성은 authenticated 사용자 전원 허용
 
 ---
 
-## 구현 순서 (chunk)
-1. **migration** — `spare_part_field_config` 신설 + `spare_part_header_mappings` 확장 + 46개 시드 (승인 필요).
-2. **훅 + 타입** — `useSparePartFieldConfig`, `useSparePartHeaderMappings`.
-3. **라우트/사이드바** — `/admin`, `/admin/mapping`, NAV 확장, admin 가드.
-4. **Field Config UI** — 인라인 편집 테이블 완성.
-5. **Raw Data 통합** — 오버라이드 라벨/순서/가시성 적용 및 Export까지 반영.
-6. **Header Mapping UI** — CRUD + Accordion + Mapping Test.
-7. **회귀 확인** — Import 파서가 `spare_part_header_mappings`를 계속 정상 사용하는지, Raw Data 컬럼 표시가 편집한 라벨로 갱신되는지 확인.
+## 3. Status History 컴포넌트 (`SparePartStatusHistory.tsx`)
 
-## 열려있는 확인 사항 (구현 전 확답 요망 아님 — 기본값 명시)
-- Field Config는 `spare_part` 단일 모듈만 다루며, 추후 다른 모듈 추가는 스키마의 `field_name` 유일성 정책상 필요 시 `module` 컬럼을 추가하는 후속 마이그레이션으로 처리합니다. (지금은 단일 모듈로 단순화)
-- 편집 권한은 admin(`user_roles.role = 'admin'` 또는 `superuser`) 전용. 일반 사용자에게는 사이드바 Admin 그룹 자체가 숨겨집니다.
+SHAW `DefectComments.tsx` 축약본:
+
+- **표시**: 시계열(오름차순) 스크롤 영역. 각 항목:
+  - Category 배지: `technical`(sky) / `supplier`(amber) / `internal`(violet) / `general`(slate)
+  - 작성자명 (마이그레이션·import는 "System · migration" / "System · excel"), 상대 시간
+  - 본문(pre-wrap), 답글 트리 (depth 들여쓰기, `parent_comment_id` self-ref)
+  - 본인 또는 admin: Edit / Delete
+  - 하단 Reply 버튼
+- **작성 폼**: Category `<Select>` + `<Textarea>` + Send. Reply 모드에서는 category 부모 상속.
+- **실시간**: `supabase.channel().on('postgres_changes', ...)` 로 자동 갱신
+- 클라이언트/서버 zod 검증: message 1–2000자
+
+---
+
+## 4. Excel 재업로드 로직 (자동 신규 코멘트)
+
+`SparePartImportContext.tsx`의 `executeImport` 안에서 upsert 완료 후 별도 후처리 단계 추가:
+
+1. 파일별로 `parsed` 행을 순회, `doc_ref` chunk(500)로 `spare_part_status_history` 조회
+2. 각 행의 `issue_technical`, `issue_supplier`, `issue_internal` 을 `normalize(s) = s.trim().replace(/\s+/g,' ')` 로 정규화
+3. 해당 `doc_ref` + `category` 로 이미 저장된 어떤 message와도 정규화 매칭이 안 되면 신규 insert:
+   ```json
+   { doc_ref, category, message, source:'excel_import',
+     source_file_hash: file.fileHash, author_user_id: userId }
+   ```
+4. 동일 파일 반복 실행 방지: `UNIQUE(source_file_hash, doc_ref, category, message)` 인덱스 (source_file_hash NULL 은 UNIQUE 대상 제외)
+5. import 로그의 `warnings` 에 추가된 코멘트 카운트 병기
+
+---
+
+## 5. 파일 변경 목록
+
+**신규**
+- `supabase/migrations/*.sql` — 테이블 + GRANT + RLS + 1회 마이그레이션 INSERT + UNIQUE 인덱스
+- `src/hooks/useSparePartStatusHistory.ts` — fetch/insert/update/delete + realtime 구독
+- `src/hooks/useSparePartRecord.ts` — 단일 doc_ref 상세 fetch/update
+- `src/components/spare-part/detail/SparePartDetailPage.tsx`
+- `src/components/spare-part/detail/SparePartStatusHistory.tsx`
+- `src/components/spare-part/detail/FieldRenderer.tsx` — type별 인풋 스위칭
+- `src/lib/spare-part/detail-schema.ts` — zod 검증 스키마
+
+**수정**
+- `src/routes/_authenticated/closure/spare-part/records.$docRef.tsx` — stub 제거, 실제 페이지 마운트
+- `src/contexts/SparePartImportContext.tsx` — import 완료 후 History diff-append 로직
+- `src/integrations/supabase/types.ts` — 마이그레이션 승인 후 자동 재생성
+
+---
+
+## 기술적 세부사항
+
+- `has_role(auth.uid(),'admin' | 'superuser')` RPC 재사용 — 기존 함수 그대로
+- 상세페이지는 `_authenticated/` 하위 라우트 → SSR 인증 이슈 없음
+- 답글은 별도 카테고리를 만들지 않고 `parent_comment_id`로만 구분 (UI에서 "reply" 배지)
+- Import diff 비교 시 대용량 대응: `doc_ref` chunk 500 단위, 메시지 정규화 in-memory Set 사용
+- 필드가 46개로 많으므로 카드 안에서 `grid grid-cols-1 md:grid-cols-2` 로 컴팩트하게 배치
+- 편집 상태는 로컬 `form` state, `record`와 diff 비교하여 dirty 필드만 payload에 포함 (기존 SHAW 저장 로직과 동일 패턴)
