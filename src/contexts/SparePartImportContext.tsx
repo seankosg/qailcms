@@ -380,11 +380,11 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
         try {
           const normalize = (s: unknown) =>
             typeof s === "string" ? s.trim().replace(/\s+/g, " ") : "";
-          const categoryByField: Record<string, "technical" | "supplier" | "internal"> = {
-            issue_technical: "technical",
-            issue_supplier: "supplier",
-            issue_internal: "internal",
-          };
+          const categories: Array<"technical" | "supplier" | "internal"> = [
+            "technical",
+            "supplier",
+            "internal",
+          ];
           const docRefs = parsed.map((p) => p.doc_ref);
           const existing = new Map<string, Set<string>>(); // key `${docRef}|${category}` -> set of normalized messages
           for (let i = 0; i < docRefs.length; i += 500) {
@@ -410,8 +410,8 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
             author_user_id: string | null;
           }> = [];
           for (const p of parsed) {
-            for (const [field, category] of Object.entries(categoryByField)) {
-              const raw = (p.struct as any)?.[field];
+            for (const category of categories) {
+              const raw = (p as any)?.issues?.[category];
               const norm = normalize(raw);
               if (!norm) continue;
               const k = `${p.doc_ref}|${category}`;
