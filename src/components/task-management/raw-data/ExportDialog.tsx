@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Download, Loader2 } from "lucide-react";
 import { TM_COLUMNS } from "@/lib/task-management/columns";
 import { buildStyledWorkbook, saveStyledWorkbook, type ColumnKind } from "@/lib/excel/styled-workbook";
+import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
 
 type ExportFormat = "view" | "reimport";
 
@@ -29,7 +30,11 @@ function timestamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
-function styledCols(keys: string[], format: ExportFormat) {
+function styledCols(
+  keys: string[],
+  format: ExportFormat,
+  resolveLabel: (key: string) => string,
+) {
   return keys.map((k) => {
     const def = TM_COLUMNS.find((c) => c.key === k);
     let kind: ColumnKind = "text";
@@ -40,7 +45,7 @@ function styledCols(keys: string[], format: ExportFormat) {
     }
     return {
       key: k,
-      label: format === "reimport" ? k : (def?.label ?? k),
+      label: format === "reimport" ? k : resolveLabel(k),
       kind,
       widthPx: def?.width,
     };
@@ -50,6 +55,7 @@ function styledCols(keys: string[], format: ExportFormat) {
 export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
   const [format, setFormat] = useState<ExportFormat>("view");
   const [busy, setBusy] = useState(false);
+  const resolveLabel = useTmColumnLabel();
 
   const run = () => {
     setBusy(true);
@@ -57,7 +63,7 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       const keys = format === "reimport" ? TM_COLUMNS.map((c) => c.key) : visibleKeys;
       const wb = buildStyledWorkbook({
         title: `Task Management Raw Data  (${format === "reimport" ? "Re-import" : "View"})`,
-        columns: styledCols(keys, format),
+        columns: styledCols(keys, format, resolveLabel),
         rows,
         sheetName: "Task Management",
         freezeCols: 1,
