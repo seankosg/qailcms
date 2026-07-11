@@ -243,6 +243,8 @@ function ImportInner() {
                 onRemove={() => removeFile(f.id)}
                 onDisciplineChange={(d) => setFileDiscipline(f.id, d)}
                 onPreview={() => setPreviewFileId(f.id)}
+                onOpenMapping={() => setMappingFileId(f.id)}
+                onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
               />
             ))}
           </CardContent>
@@ -250,6 +252,17 @@ function ImportInner() {
       )}
 
       <PreviewDialog file={previewFile} onClose={() => setPreviewFileId(null)} />
+      {mappingFile && mappingFile.sheetHeaders && mappingFile.columnMap && (
+        <ColumnMappingDialog
+          open={!!mappingFile}
+          onClose={() => setMappingFileId(null)}
+          fileName={mappingFile.name}
+          sheetHeaders={mappingFile.sheetHeaders}
+          currentMap={mappingFile.columnMap}
+          defaultMap={mappingFile.columnMap}
+          onApply={(overrides) => setFileColumnOverrides(mappingFile.id, overrides)}
+        />
+      )}
     </div>
   );
 }
