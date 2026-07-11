@@ -112,11 +112,49 @@ export type Database = {
         }
         Relationships: []
       }
+      spare_part_field_config: {
+        Row: {
+          display_name: string
+          field_name: string
+          group_key: string | null
+          id: string
+          is_visible: boolean
+          note: string | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          display_name: string
+          field_name: string
+          group_key?: string | null
+          id?: string
+          is_visible?: boolean
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          display_name?: string
+          field_name?: string
+          group_key?: string | null
+          id?: string
+          is_visible?: boolean
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       spare_part_header_mappings: {
         Row: {
           id: string
+          is_active: boolean
           is_custom: boolean
           module: string
+          note: string | null
           source_header: string
           target_field: string
           updated_at: string
@@ -124,8 +162,10 @@ export type Database = {
         }
         Insert: {
           id?: string
+          is_active?: boolean
           is_custom?: boolean
           module?: string
+          note?: string | null
           source_header: string
           target_field: string
           updated_at?: string
@@ -133,8 +173,10 @@ export type Database = {
         }
         Update: {
           id?: string
+          is_active?: boolean
           is_custom?: boolean
           module?: string
+          note?: string | null
           source_header?: string
           target_field?: string
           updated_at?: string
