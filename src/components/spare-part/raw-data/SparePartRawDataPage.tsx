@@ -384,6 +384,26 @@ export function SparePartRawDataPage() {
 
   const selectedDocRefs = useMemo(() => Object.keys(rowSelection).filter((k) => rowSelection[k]), [rowSelection]);
 
+  // Bulk Edit Bar 용: 선택된 행 객체와 현재 화면 컬럼(순서/라벨) 그대로 export column
+  const selectedRowObjects = useMemo(() => {
+    const set = new Set(selectedDocRefs);
+    return rows.filter((r) => set.has(r.doc_ref));
+  }, [rows, selectedDocRefs]);
+
+  const selectedExportColumns = useMemo(() => {
+    return table
+      .getVisibleLeafColumns()
+      .filter((c) => c.id !== "__select")
+      .map((c) => {
+        const def = SPARE_PART_COLUMNS.find((x) => x.key === c.id);
+        return {
+          key: c.id,
+          label: labelOverrides[c.id] ?? def?.label ?? c.id,
+        };
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderedKeys, visibility, labelOverrides]);
+
   const resetAll = () => {
     setSorting(DEFAULT_SORTING);
     setSizing({});
