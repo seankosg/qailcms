@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { RotateCcw, Save } from "lucide-react";
 import {
   useSparePartFieldConfig,
@@ -22,7 +22,6 @@ type DraftMap = Record<string, Partial<Pick<SparePartFieldConfigRow, "display_na
 export function FieldConfigTable() {
   const { data: rows = [], isLoading, refetch } = useSparePartFieldConfig();
   const { data: me } = useCurrentUser();
-  const { toast } = useToast();
   const qc = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -65,7 +64,7 @@ export function FieldConfigTable() {
       qc.invalidateQueries({ queryKey: SPARE_PART_FIELD_CONFIG_QK });
       refetch();
     } catch (e: any) {
-      toast({ title: "저장 실패", description: e?.message ?? String(e), variant: "destructive" });
+      toast.error("저장 실패", { description: e?.message ?? String(e) });
     } finally {
       setSaving(false);
     }
@@ -91,12 +90,12 @@ export function FieldConfigTable() {
       );
       const err = results.find((r) => r.error)?.error;
       if (err) throw err;
-      toast({ title: "기본값으로 되돌렸습니다" });
+      toast.success("기본값으로 되돌렸습니다" );
       setDrafts({});
       qc.invalidateQueries({ queryKey: SPARE_PART_FIELD_CONFIG_QK });
       refetch();
     } catch (e: any) {
-      toast({ title: "실패", description: e?.message ?? String(e), variant: "destructive" });
+      toast.error("실패", { description: e?.message ?? String(e) });
     } finally {
       setSaving(false);
     }

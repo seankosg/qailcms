@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Lock, Plus, Trash2 } from "lucide-react";
 import {
   useSparePartHeaderMappings,
@@ -28,7 +28,6 @@ export function HeaderMappingTable() {
   const { data: rows = [], isLoading, refetch } = useSparePartHeaderMappings();
   const { data: fields = [] } = useSparePartFieldConfig();
   const { data: me } = useCurrentUser();
-  const { toast } = useToast();
   const qc = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -57,29 +56,29 @@ export function HeaderMappingTable() {
       .from("spare_part_header_mappings")
       .update({ is_active: !r.is_active, updated_by: me?.id ?? null })
       .eq("id", r.id);
-    if (error) return toast({ title: "실패", description: error.message, variant: "destructive" });
+    if (error) return toast.error("실패", { description: error.message });
     qc.invalidateQueries({ queryKey: SPARE_PART_HEADER_MAPPING_QK });
     refetch();
   };
 
   const removeRow = async (r: SparePartHeaderMappingRow) => {
     if (!r.is_custom) {
-      return toast({ title: "시스템 매핑", description: "시스템 매핑은 삭제할 수 없습니다.", variant: "destructive" });
+      return toast.error("시스템 매핑", { description: "시스템 매핑은 삭제할 수 없습니다." });
     }
     if (!confirm(`매핑 "${r.source_header}" → ${r.target_field} 을(를) 삭제하시겠습니까?`)) return;
     const { error } = await (supabase as any)
       .from("spare_part_header_mappings")
       .delete()
       .eq("id", r.id);
-    if (error) return toast({ title: "삭제 실패", description: error.message, variant: "destructive" });
-    toast({ title: "삭제되었습니다" });
+    if (error) return toast.error("삭제 실패", { description: error.message });
+    toast.success("삭제되었습니다" );
     qc.invalidateQueries({ queryKey: SPARE_PART_HEADER_MAPPING_QK });
     refetch();
   };
 
   const submitNew = async () => {
     if (!newSource.trim() || !newTarget) {
-      return toast({ title: "필수 입력", description: "원본 헤더와 대상 필드를 입력하세요.", variant: "destructive" });
+      return toast.error("필수 입력", { description: "원본 헤더와 대상 필드를 입력하세요." });
     }
     const { error } = await (supabase as any).from("spare_part_header_mappings").insert({
       module: "spare_part",
@@ -89,8 +88,8 @@ export function HeaderMappingTable() {
       is_active: true,
       updated_by: me?.id ?? null,
     });
-    if (error) return toast({ title: "추가 실패", description: error.message, variant: "destructive" });
-    toast({ title: "매핑이 추가되었습니다" });
+    if (error) return toast.error("추가 실패", { description: error.message });
+    toast.success("매핑이 추가되었습니다" );
     setAddOpen(false);
     setNewSource("");
     setNewTarget("");
