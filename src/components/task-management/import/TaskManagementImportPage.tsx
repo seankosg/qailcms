@@ -41,6 +41,10 @@ import {
   type TmImportFileItem,
 } from "@/contexts/TaskManagementImportContext";
 import { DISCIPLINES, type Discipline } from "@/lib/task-management/columns";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { RollupMode } from "@/contexts/TaskManagementImportContext";
 
 const statusBadge: Record<TmFileStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
@@ -71,6 +75,10 @@ function ImportInner() {
   const {
     files,
     isRunning,
+    rollupMode,
+    setRollupMode,
+    recalcJudgment,
+    setRecalcJudgment,
     addFiles,
     removeFile,
     clearAll,
@@ -132,6 +140,63 @@ function ImportInner() {
               onChange={onSelect}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Import 옵션</CardTitle>
+          <CardDescription>Parent(요약) 행 처리 방식과 판정 재계산 여부를 선택합니다.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="mb-2 block text-sm font-medium">Parent 행 진도율 처리</Label>
+            <RadioGroup
+              value={rollupMode}
+              onValueChange={(v) => setRollupMode(v as RollupMode)}
+              className="grid gap-2"
+            >
+              <label className="flex cursor-pointer items-start gap-2 rounded border p-2 text-sm hover:bg-accent/40">
+                <RadioGroupItem value="auto" className="mt-0.5" />
+                <div>
+                  <div className="font-medium">자동 롤업 (권장, 기본)</div>
+                  <div className="text-xs text-muted-foreground">
+                    엑셀의 parent 진도율/기간을 무시하고, 자식 행의 duration 가중평균으로 자동 재계산합니다.
+                  </div>
+                </div>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded border p-2 text-sm hover:bg-accent/40">
+                <RadioGroupItem value="blank" className="mt-0.5" />
+                <div>
+                  <div className="font-medium">비어있을 때만 롤업</div>
+                  <div className="text-xs text-muted-foreground">
+                    parent 값을 그대로 넣되, 이후 롤업 함수가 계산해 채웁니다.
+                  </div>
+                </div>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded border p-2 text-sm hover:bg-accent/40">
+                <RadioGroupItem value="keep" className="mt-0.5" />
+                <div>
+                  <div className="font-medium">엑셀 값 그대로 유지</div>
+                  <div className="text-xs text-muted-foreground">
+                    엑셀의 parent 값을 그대로 저장하고 롤업을 실행하지 않습니다.
+                  </div>
+                </div>
+              </label>
+            </RadioGroup>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <Checkbox
+              checked={recalcJudgment}
+              onCheckedChange={(v) => setRecalcJudgment(!!v)}
+            />
+            <span>
+              <span className="font-medium">Auto‑judgment 재계산</span>
+              <span className="ml-2 text-xs text-muted-foreground">
+                Import 후 전체 행의 자동 판정을 임계값 기준으로 다시 계산합니다.
+              </span>
+            </span>
+          </label>
         </CardContent>
       </Card>
 
@@ -285,6 +350,31 @@ function FileRow({
               <AlertCircle className="mr-1 h-3 w-3" /> Rejected: {f.result.rejected}
             </Badge>
           )}
+          {typeof f.result.rolledUp === "number" && f.result.rolledUp > 0 && (
+            <Badge variant="outline" className="border-violet-300 text-violet-700">
+              Rollup: {f.result.rolledUp}
+            </Badge>
+          )}
+          {typeof f.result.judgmentRecalculated === "number" &&
+            f.result.judgmentRecalculated > 0 && (
+              <Badge variant="outline" className="border-amber-300 text-amber-700">
+                Judgment: {f.result.judgmentRecalculated}
+              </Badge>
+            )}
+        </div>
+      )}
+      {f.result?.errors && f.result.errors.length > 0 && (
+        <div className="mt-2 space-y-1 rounded border border-destructive/40 bg-destructive/5 p-2 text-[11px] text-destructive">
+          <div className="font-semibold">
+            {f.result.errors.length}개 에러 (처음 5건 표시)
+          </div>
+          {f.result.errors.slice(0, 5).map((e, i) => (
+            <div key={i} className="font-mono">
+              [{e.sampleTaskNo ?? "-"}] {e.code ? `${e.code}: ` : ""}
+              {e.message}
+              {e.hint ? ` — hint: ${e.hint}` : ""}
+            </div>
+          ))}
         </div>
       )}
     </div>

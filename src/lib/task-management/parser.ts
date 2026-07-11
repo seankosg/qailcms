@@ -103,6 +103,14 @@ function toNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** numeric(6,4) 안전 반올림 (4자리) */
+function toPct4(v: unknown): number | null {
+  const n = toNumber(v);
+  if (n == null) return null;
+  const clamped = Math.max(-9.9999, Math.min(9.9999, n));
+  return Math.round(clamped * 10000) / 10000;
+}
+
 function toStr(v: unknown): string | null {
   if (v == null) return null;
   const s = String(v).trim();
@@ -274,9 +282,9 @@ export async function parseTaskManagementExcel(
       plan_end: toIsoDate(getCell(sheet, r, cols.plan_end)),
       plan_days: toNumber(getCell(sheet, r, cols.plan_days)),
       actual_start: toIsoDate(getCell(sheet, r, cols.actual_start)),
-      actual_progress: toNumber(getCell(sheet, r, cols.actual_progress)),
-      plan_progress: toNumber(getCell(sheet, r, cols.plan_progress)),
-      progress_variance: toNumber(getCell(sheet, r, cols.progress_variance)),
+      actual_progress: toPct4(getCell(sheet, r, cols.actual_progress)),
+      plan_progress: toPct4(getCell(sheet, r, cols.plan_progress)),
+      progress_variance: toPct4(getCell(sheet, r, cols.progress_variance)),
       forecast_end: toIsoDate(getCell(sheet, r, cols.forecast_end)),
       slip_days: (() => {
         const n = toNumber(getCell(sheet, r, cols.slip_days));

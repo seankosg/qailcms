@@ -12,6 +12,18 @@ import {
   type ParsedTaskRow,
 } from "@/lib/task-management/parser";
 import type { Discipline } from "@/lib/task-management/columns";
+import { runRollupAllParents, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
+
+export type RollupMode = "auto" | "keep" | "blank";
+
+export interface ImportErrorEntry {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+  batch: number;
+  sampleTaskNo?: string;
+}
 
 export type TmFileStatus =
   | "pending"
@@ -43,12 +55,19 @@ export interface TmImportFileItem {
     updated: number;
     skipped: number;
     rejected: number;
+    rolledUp?: number;
+    judgmentRecalculated?: number;
+    errors?: ImportErrorEntry[];
   };
 }
 
 interface CtxValue {
   files: TmImportFileItem[];
   isRunning: boolean;
+  rollupMode: RollupMode;
+  setRollupMode: (m: RollupMode) => void;
+  recalcJudgment: boolean;
+  setRecalcJudgment: (v: boolean) => void;
   addFiles: (files: File[]) => Promise<void>;
   removeFile: (id: string) => void;
   clearAll: () => void;
@@ -69,6 +88,8 @@ const INSERT_CHUNK = 500;
 export function TaskManagementImportProvider({ children }: { children: ReactNode }) {
   const [files, setFiles] = useState<TmImportFileItem[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [rollupMode, setRollupMode] = useState<RollupMode>("auto");
+  const [recalcJudgment, setRecalcJudgment] = useState<boolean>(true);
 
   const addFiles = useCallback(async (selected: File[]) => {
     const excel = selected.filter((f) => /\.(xlsx|xls|xlsm)$/i.test(f.name));
@@ -180,7 +201,11 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         for (const r of data ?? []) existingSet.add(r.task_no);
       }
 
-      const payloads = parsed.map((p) => ({
+      // Rollup 모드에 따라 parent 행의 진도 계열을 어떻게 보낼지 결정
+      const payloads = parsed.map((p) => {
+        const isParent = p.level === "parent";
+        const stripParent = isParent && rollupMode === "auto";
+        return {
         task_no: p.task_no,
         parent_task_no: p.parent_task_no,
         level: p.level,
@@ -193,37 +218,79 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         pic: p.pic,
         row_type: p.row_type,
         status_manual: p.status_manual,
-        plan_start: p.plan_start,
-        plan_end: p.plan_end,
-        plan_days: p.plan_days,
+        plan_start: stripParent ? null : p.plan_start,
+        plan_end: stripParent ? null : p.plan_end,
+        plan_days: stripParent ? null : p.plan_days,
         actual_start: p.actual_start,
-        actual_progress: p.actual_progress,
-        plan_progress: p.plan_progress,
-        progress_variance: p.progress_variance,
+        actual_progress: stripParent ? null : p.actual_progress,
+        plan_progress: stripParent ? null : p.plan_progress,
+        progress_variance: stripParent ? null : p.progress_variance,
         forecast_end: p.forecast_end,
         slip_days: p.slip_days,
-        auto_judgment: p.auto_judgment,
+        auto_judgment: null as string | null,
+        auto_judgment_import: p.auto_judgment,
         data_date: f.dataDate,
         sort_order: p.sort_order,
         source_file: f.name,
         imported_at: startedAtIso,
         imported_by: userId,
-      }));
+        };
+      });
 
       let inserted = 0;
       let updated = 0;
       let rejected = 0;
       let processed = 0;
+      const importErrors: ImportErrorEntry[] = [];
 
       try {
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
           const slice = payloads.slice(i, i + INSERT_CHUNK);
+          const batchIndex = Math.floor(i / INSERT_CHUNK);
           const { data, error } = await (supabase as any)
             .from("task_management_raw")
             .upsert(slice, { onConflict: "discipline,task_no" })
             .select("task_no");
           if (error) {
-            rejected += slice.length;
+            // 실패한 배치를 row-by-row 재시도해 실제 실패 행/에러를 특정
+            console.error("[task-import] batch upsert error", {
+              batchIndex,
+              error,
+              samplePayload: slice[0],
+            });
+            importErrors.push({
+              batch: batchIndex,
+              message: (error as any).message,
+              code: (error as any).code,
+              details: (error as any).details,
+              hint: (error as any).hint,
+              sampleTaskNo: slice[0]?.task_no,
+            });
+            let recovered = 0;
+            for (const row of slice) {
+              const r = await (supabase as any)
+                .from("task_management_raw")
+                .upsert([row], { onConflict: "discipline,task_no" })
+                .select("task_no");
+              if (r.error) {
+                rejected++;
+                importErrors.push({
+                  batch: batchIndex,
+                  message: r.error.message,
+                  code: r.error.code,
+                  details: r.error.details,
+                  hint: r.error.hint,
+                  sampleTaskNo: row.task_no,
+                });
+              } else {
+                recovered++;
+                if (existingSet.has(row.task_no)) updated++;
+                else inserted++;
+              }
+            }
+            console.warn(
+              `[task-import] batch ${batchIndex} row-by-row recovered=${recovered}/${slice.length}`,
+            );
           } else {
             for (const r of data ?? []) {
               if (existingSet.has(r.task_no)) updated++;
@@ -235,14 +302,54 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: pct } : x)));
         }
 
+        // Post-import: rollup + judgment recalc
+        let rolledUp = 0;
+        let judgmentRecalculated = 0;
+        try {
+          if (rollupMode !== "keep") {
+            const res = await runRollupAllParents({
+              data: { discipline },
+            });
+            rolledUp = res.rolledUp;
+          }
+        } catch (e) {
+          console.error("[task-import] rollup failed", e);
+          importErrors.push({
+            batch: -1,
+            message: `Rollup 실패: ${e instanceof Error ? e.message : String(e)}`,
+          });
+        }
+        try {
+          if (recalcJudgment) {
+            const res = await runRecalcAutoJudgment({
+              data: { discipline },
+            });
+            judgmentRecalculated = res.updated;
+          }
+        } catch (e) {
+          console.error("[task-import] judgment recalc failed", e);
+          importErrors.push({
+            batch: -1,
+            message: `Judgment 재계산 실패: ${e instanceof Error ? e.message : String(e)}`,
+          });
+        }
+
+        const finalStatus =
+          rejected === 0 && importErrors.length === 0
+            ? "success"
+            : inserted + updated === 0
+              ? "failed"
+              : "partial";
+
         if (logId) {
           await (supabase as any)
             .from("task_management_import_logs")
             .update({
-              status: "success",
+              status: finalStatus,
               inserted,
               updated,
               rejected,
+              errors: importErrors.length ? importErrors : null,
               finished_at: new Date().toISOString(),
             })
             .eq("id", logId);
@@ -255,19 +362,35 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                   ...x,
                   status: "done",
                   progress: 100,
-                  result: { inserted, updated, skipped: 0, rejected },
+                  result: {
+                    inserted,
+                    updated,
+                    skipped: 0,
+                    rejected,
+                    rolledUp,
+                    judgmentRecalculated,
+                    errors: importErrors.length ? importErrors : undefined,
+                  },
                 }
               : x,
           ),
         );
+        if (importErrors.length && inserted + updated === 0) {
+          toast.error(`${f.name}: 전체 실패 — 첫 에러: ${importErrors[0].message}`);
+        } else if (rejected > 0) {
+          toast.warning(
+            `${f.name}: ${rejected}행 rejected. 콘솔에서 상세 확인.`,
+          );
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        console.error("[task-import] fatal", e);
         if (logId) {
           await (supabase as any)
             .from("task_management_import_logs")
             .update({
               status: "failed",
-              errors: { message: msg },
+              errors: [{ batch: -1, message: msg }],
               finished_at: new Date().toISOString(),
             })
             .eq("id", logId);
@@ -282,7 +405,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
     setIsRunning(false);
     toast.success(`Task Management import 완료: ${ready.length} file(s)`);
-  }, []);
+  }, [rollupMode, recalcJudgment]);
 
   const startImport = useCallback(async () => {
     if (isRunning) return;
@@ -301,6 +424,10 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       value={{
         files,
         isRunning,
+        rollupMode,
+        setRollupMode,
+        recalcJudgment,
+        setRecalcJudgment,
         addFiles,
         removeFile,
         clearAll,

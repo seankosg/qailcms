@@ -38,7 +38,7 @@ export type Discipline = (typeof DISCIPLINES)[number];
 export const ROW_TYPES = ["항목", "실행", "승인", "대기"] as const;
 export const STATUS_MANUAL = ["예정", "진행", "완료"] as const;
 export const RISK_LEVELS = ["Critical", "High", "Med", "Low"] as const;
-export const AUTO_JUDGMENTS = ["완료", "지연", "주의(미착수)", "진행", "예정"] as const;
+export const AUTO_JUDGMENTS = ["완료", "정상", "주의", "지연", "위험"] as const;
 export const PLOTS = ["C", "D"] as const;
 export const LEVELS = ["parent", "child"] as const;
 
@@ -64,10 +64,10 @@ export const STATUS_COLORS: Record<string, string> = {
 
 export const AUTO_JUDGMENT_COLORS: Record<string, string> = {
   "완료": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  "지연": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-  "주의(미착수)": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  "진행": "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  "예정": "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
+  "정상": "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  "주의": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  "지연": "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  "위험": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
 };
 
 export const PLOT_COLORS: Record<string, string> = {
@@ -111,6 +111,8 @@ export const TM_COLUMNS: TmColumnDef[] = [
   { key: "actual_progress", label: "실적 진도율", type: "percent", width: 120, group: "actual", editable: true, editorType: "number" },
   { key: "plan_progress", label: "계획 진도율", type: "percent", width: 120, group: "forecast" },
   { key: "progress_variance", label: "진도차(%p)", type: "percent", width: 110, group: "forecast" },
+  { key: "expected_progress_today", label: "오늘 계획", type: "percent", width: 110, group: "forecast" },
+  { key: "today_gap", label: "오늘 차이", type: "percent", width: 110, group: "forecast" },
   { key: "forecast_end", label: "예상 완료", type: "date", width: 110, group: "forecast", editable: true, editorType: "date" },
   { key: "slip_days", label: "차이(일)", type: "number", width: 90, group: "forecast" },
   { key: "data_date", label: "Data Date", type: "date", width: 110, group: "system" },

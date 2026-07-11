@@ -705,6 +705,7 @@ export type Database = {
           actual_progress: number | null
           actual_start: string | null
           auto_judgment: string | null
+          auto_judgment_import: string | null
           category: string | null
           created_at: string
           data_date: string
@@ -713,6 +714,7 @@ export type Database = {
           id: string
           imported_at: string
           imported_by: string | null
+          is_rollup: boolean
           level: string
           parent_task_no: string | null
           pic: string | null
@@ -737,6 +739,7 @@ export type Database = {
           actual_progress?: number | null
           actual_start?: string | null
           auto_judgment?: string | null
+          auto_judgment_import?: string | null
           category?: string | null
           created_at?: string
           data_date: string
@@ -745,6 +748,7 @@ export type Database = {
           id?: string
           imported_at?: string
           imported_by?: string | null
+          is_rollup?: boolean
           level: string
           parent_task_no?: string | null
           pic?: string | null
@@ -769,6 +773,7 @@ export type Database = {
           actual_progress?: number | null
           actual_start?: string | null
           auto_judgment?: string | null
+          auto_judgment_import?: string | null
           category?: string | null
           created_at?: string
           data_date?: string
@@ -777,6 +782,7 @@ export type Database = {
           id?: string
           imported_at?: string
           imported_by?: string | null
+          is_rollup?: boolean
           level?: string
           parent_task_no?: string | null
           pic?: string | null
@@ -798,6 +804,83 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      task_management_settings: {
+        Row: {
+          behind_late_gap: number
+          behind_warn_gap: number
+          id: string
+          slip_late_days: number
+          slip_warn_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          behind_late_gap?: number
+          behind_warn_gap?: number
+          id?: string
+          slip_late_days?: number
+          slip_warn_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          behind_late_gap?: number
+          behind_warn_gap?: number
+          id?: string
+          slip_late_days?: number
+          slip_warn_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      task_management_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          discipline: string
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          source: string
+          task_no: string
+          task_raw_id: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          discipline: string
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+          task_no: string
+          task_raw_id?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          discipline?: string
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+          task_no?: string
+          task_raw_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_management_status_history_task_raw_id_fkey"
+            columns: ["task_raw_id"]
+            isOneToOne: false
+            referencedRelation: "task_management_raw"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -825,6 +908,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calc_auto_judgment_value: {
+        Args: {
+          _actual_progress: number
+          _plan_end: string
+          _plan_start: string
+          _slip_days: number
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -833,6 +925,18 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }
+      recalc_task_auto_judgment: {
+        Args: { _discipline?: string }
+        Returns: number
+      }
+      rollup_task_all_parents: {
+        Args: { _discipline: string }
+        Returns: number
+      }
+      update_task_summary: {
+        Args: { _discipline: string; _parent_task_no: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "superuser" | "user"
