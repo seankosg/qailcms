@@ -18,7 +18,7 @@ export function inferFilterType(t: SparePartFieldType): SparePartFilterType {
   if (t === "date") return "date-range";
   if (t === "boolean") return "boolean";
   if (t === "number" || t === "cost" || t === "progress") return "number-range";
-  return "text";
+  return "multi-select";
 }
 
 export const GROUP_HEADER_BG: Record<SparePartColumnDef["group"], string> = {
