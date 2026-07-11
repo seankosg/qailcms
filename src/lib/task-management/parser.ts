@@ -29,13 +29,48 @@ export interface ParsedTaskRow {
 
 export interface ParseTaskManagementResult {
   dataDate: string | null;
+  dataDateCell: string | null;
   rows: ParsedTaskRow[];
   warnings: string[];
   parentCount: number;
   childCount: number;
   sheetName: string;
   disciplineHint: Discipline | null;
+  /** 실제 매핑에 사용된 각 target field의 컬럼 인덱스 (1-based) */
+  columnMap: Record<string, number>;
+  /** 시트 행 5 헤더 텍스트 요약 (컬럼 매핑 다이얼로그 표시용) */
+  sheetHeaders: SheetHeaderEntry[];
 }
+
+export interface SheetHeaderEntry {
+  col: number; // 1-based
+  letter: string; // A, B, ...
+  header: string; // row 5 텍스트 (\n → space, trim)
+  sample: string | null; // row 7 첫 데이터 셀 값
+}
+
+export const TASK_TARGET_FIELDS = [
+  "task_no",
+  "category",
+  "plot",
+  "task_name",
+  "risk",
+  "sub_task_desc",
+  "pic",
+  "row_type",
+  "status_manual",
+  "plan_start",
+  "plan_end",
+  "plan_days",
+  "actual_start",
+  "actual_progress",
+  "plan_progress",
+  "progress_variance",
+  "forecast_end",
+  "slip_days",
+  "auto_judgment",
+] as const;
+export type TaskTargetField = (typeof TASK_TARGET_FIELDS)[number];
 
 /** Header text → 컬럼 인덱스 (1-based). */
 const CANONICAL_HEADERS: Record<string, number> = {
@@ -179,10 +214,26 @@ function parentIdOf(taskNo: string): string | null {
   return parts.slice(0, 3).join("-");
 }
 
+export interface ParseTaskManagementOptions {
+  extraAliases?: Record<string, string[]>;
+  columnOverrides?: Partial<Record<TaskTargetField, number>>;
+  /** 사용자가 직접 지정한 Data Date (override). ISO YYYY-MM-DD */
+  dataDateOverride?: string | null;
+}
+
 export async function parseTaskManagementExcel(
   file: File,
-  extraAliases?: Record<string, string[]>,
+  optsOrAliases?: ParseTaskManagementOptions | Record<string, string[]>,
 ): Promise<ParseTaskManagementResult> {
+  // Backward compat: 두 번째 인자를 aliases 맵으로 넘기던 호출 지원
+  const opts: ParseTaskManagementOptions =
+    optsOrAliases && "extraAliases" in optsOrAliases
+      ? (optsOrAliases as ParseTaskManagementOptions)
+      : optsOrAliases && !("columnOverrides" in (optsOrAliases as any))
+        ? { extraAliases: optsOrAliases as Record<string, string[]> }
+        : {};
+  const extraAliases = opts.extraAliases;
+  const columnOverrides = opts.columnOverrides ?? {};
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: true });
 
@@ -192,41 +243,137 @@ export async function parseTaskManagementExcel(
 
   const warnings: string[] = [];
 
-  // Data date at C4
-  const c4 = getCell(sheet, 4, 3);
-  const dataDate = toIsoDate(c4);
+  // Data date: 유연 탐색
+  //  1) 사용자 override 우선
+  //  2) 행 4에서 라벨 "Data Date" 셀 오른쪽으로 스캔
+  //  3) 행 3~5 어디든 라벨 발견 시 같은 행 오른쪽 스캔
+  //  4) 여전히 없으면 행 4 A~F를 앞에서부터 스캔
+  let dataDate: string | null = null;
+  let dataDateCell: string | null = null;
+  if (opts.dataDateOverride) {
+    dataDate = opts.dataDateOverride;
+    dataDateCell = "override";
+  }
+  const scanForDate = (row: number, startCol: number, endCol: number) => {
+    for (let c = startCol; c <= endCol; c++) {
+      const v = getCell(sheet, row, c);
+      const iso = toIsoDate(v);
+      if (iso) {
+        return { iso, ref: `${XLSX.utils.encode_col(c - 1)}${row}` };
+      }
+    }
+    return null;
+  };
+  const looksLikeDataDateLabel = (v: unknown): boolean => {
+    if (v == null) return false;
+    const s = String(v).replace(/\s+/g, " ").trim().toLowerCase();
+    return s.includes("data date") || s.includes("기준일");
+  };
   if (!dataDate) {
-    warnings.push("C4 셀에서 Data Date를 읽지 못했습니다.");
+    // 행 3~5 라벨 탐색
+    outer: for (const row of [4, 3, 5]) {
+      for (let c = 1; c <= 8; c++) {
+        const v = getCell(sheet, row, c);
+        if (looksLikeDataDateLabel(v)) {
+          const hit = scanForDate(row, c + 1, Math.max(c + 6, 10));
+          if (hit) {
+            dataDate = hit.iso;
+            dataDateCell = hit.ref;
+            break outer;
+          }
+        }
+      }
+    }
+  }
+  if (!dataDate) {
+    // 행 4 전체 스캔 (A~F)
+    const hit = scanForDate(4, 1, 6);
+    if (hit) {
+      dataDate = hit.iso;
+      dataDateCell = hit.ref;
+    }
+  }
+  if (!dataDate) {
+    warnings.push("Data Date를 자동으로 읽지 못했습니다. 파일 카드에서 직접 입력하세요.");
   }
 
   // Header map (row 5)
   const { map: headerMap } = buildHeaderMap(sheet);
 
+  // 행 5 헤더 목록 수집 (컬럼 매핑 다이얼로그용)
+  const sheetHeaders: SheetHeaderEntry[] = [];
+  {
+    const rangeAll = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S7");
+    const maxCol = Math.min(rangeAll.e.c, 25);
+    for (let c = 0; c <= maxCol; c++) {
+      const headerCell = sheet[XLSX.utils.encode_cell({ r: 4, c })];
+      const raw = headerCell?.v;
+      const header = raw == null ? "" : String(raw).replace(/\s+/g, " ").trim();
+      // 데이터 샘플: 7행 (첫 데이터 행)
+      const sampleCell = sheet[XLSX.utils.encode_cell({ r: 6, c })];
+      const sampleV = sampleCell?.v;
+      const sample = sampleV == null || sampleV === "" ? null : String(sampleV).trim();
+      sheetHeaders.push({
+        col: c + 1,
+        letter: XLSX.utils.encode_col(c),
+        header,
+        sample,
+      });
+    }
+  }
+
   const withAlias = (target: string, names: string[]): string[] => {
     const extra = extraAliases?.[target] ?? [];
     return [...extra, ...names];
   };
+  const pick = (target: TaskTargetField, names: string[], canonical: number): number => {
+    const ov = columnOverrides[target];
+    if (typeof ov === "number" && ov > 0) return ov;
+    return resolveColumn(headerMap, withAlias(target, names), canonical, warnings);
+  };
 
   const cols = {
-    no: resolveColumn(headerMap, withAlias("task_no", ["No", "no"]), 1, warnings),
-    category: resolveColumn(headerMap, withAlias("category", ["Category"]), 2, warnings),
-    plot: resolveColumn(headerMap, withAlias("plot", ["Plot"]), 3, warnings),
-    task_name: resolveColumn(headerMap, withAlias("task_name", ["항목"]), 4, warnings),
-    risk: resolveColumn(headerMap, withAlias("risk", ["리스크"]), 5, warnings),
-    sub_task_desc: resolveColumn(headerMap, withAlias("sub_task_desc", ["단계별 세부 업무"]), 6, warnings),
-    pic: resolveColumn(headerMap, withAlias("pic", ["담당"]), 7, warnings),
-    row_type: resolveColumn(headerMap, withAlias("row_type", ["유형"]), 8, warnings),
-    status_manual: resolveColumn(headerMap, withAlias("status_manual", ["상태"]), 9, warnings),
-    plan_start: resolveColumn(headerMap, withAlias("plan_start", ["계획 시작"]), 10, warnings),
-    plan_end: resolveColumn(headerMap, withAlias("plan_end", ["계획 완료"]), 11, warnings),
-    plan_days: resolveColumn(headerMap, withAlias("plan_days", ["계획 일수"]), 12, warnings),
-    actual_start: resolveColumn(headerMap, withAlias("actual_start", ["실제 시작"]), 13, warnings),
-    actual_progress: resolveColumn(headerMap, withAlias("actual_progress", ["실적 진도율"]), 14, warnings),
-    plan_progress: resolveColumn(headerMap, withAlias("plan_progress", ["계획 진도율"]), 15, warnings),
-    progress_variance: resolveColumn(headerMap, withAlias("progress_variance", ["진도차 (%p)", "진도차(%p)"]), 16, warnings),
-    forecast_end: resolveColumn(headerMap, withAlias("forecast_end", ["예상 완료"]), 17, warnings),
-    slip_days: resolveColumn(headerMap, withAlias("slip_days", ["차이 (일)", "차이(일)"]), 18, warnings),
-    auto_judgment: resolveColumn(headerMap, withAlias("auto_judgment", ["자동 판정"]), 19, warnings),
+    no: pick("task_no", ["No", "no"], 1),
+    category: pick("category", ["Category"], 2),
+    plot: pick("plot", ["Plot"], 3),
+    task_name: pick("task_name", ["항목"], 4),
+    risk: pick("risk", ["리스크"], 5),
+    sub_task_desc: pick("sub_task_desc", ["단계별 세부 업무"], 6),
+    pic: pick("pic", ["담당"], 7),
+    row_type: pick("row_type", ["유형"], 8),
+    status_manual: pick("status_manual", ["상태"], 9),
+    plan_start: pick("plan_start", ["계획 시작"], 10),
+    plan_end: pick("plan_end", ["계획 완료"], 11),
+    plan_days: pick("plan_days", ["계획 일수"], 12),
+    actual_start: pick("actual_start", ["실제 시작"], 13),
+    actual_progress: pick("actual_progress", ["실적 진도율"], 14),
+    plan_progress: pick("plan_progress", ["계획 진도율"], 15),
+    progress_variance: pick("progress_variance", ["진도차 (%p)", "진도차(%p)"], 16),
+    forecast_end: pick("forecast_end", ["예상 완료"], 17),
+    slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 18),
+    auto_judgment: pick("auto_judgment", ["자동 판정"], 19),
+  };
+
+  const columnMap: Record<string, number> = {
+    task_no: cols.no,
+    category: cols.category,
+    plot: cols.plot,
+    task_name: cols.task_name,
+    risk: cols.risk,
+    sub_task_desc: cols.sub_task_desc,
+    pic: cols.pic,
+    row_type: cols.row_type,
+    status_manual: cols.status_manual,
+    plan_start: cols.plan_start,
+    plan_end: cols.plan_end,
+    plan_days: cols.plan_days,
+    actual_start: cols.actual_start,
+    actual_progress: cols.actual_progress,
+    plan_progress: cols.plan_progress,
+    progress_variance: cols.progress_variance,
+    forecast_end: cols.forecast_end,
+    slip_days: cols.slip_days,
+    auto_judgment: cols.auto_judgment,
   };
 
   // Iterate rows 7~
@@ -326,11 +473,14 @@ export async function parseTaskManagementExcel(
 
   return {
     dataDate,
+    dataDateCell,
     rows,
     warnings,
     parentCount,
     childCount,
     sheetName,
     disciplineHint,
+    columnMap,
+    sheetHeaders,
   };
 }
