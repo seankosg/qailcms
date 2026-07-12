@@ -18,12 +18,17 @@ import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminTaskThresholdsRouteImport } from './routes/_authenticated/admin/task-thresholds'
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
+import { Route as AuthenticatedClosureDashboardIndexRouteImport } from './routes/_authenticated/closure/dashboard/index'
 import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './routes/_authenticated/closure/task-management/tree'
 import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from './routes/_authenticated/closure/task-management/raw-data'
 import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './routes/_authenticated/closure/spare-part/raw-data'
 import { Route as AuthenticatedClosureSparePartImportRouteImport } from './routes/_authenticated/closure/spare-part/import'
 import { Route as AuthenticatedClosureSparePartDashboardRouteImport } from './routes/_authenticated/closure/spare-part/dashboard'
 import { Route as AuthenticatedClosureSparePartAconexSyncRouteImport } from './routes/_authenticated/closure/spare-part/aconex-sync'
+import { Route as AuthenticatedClosureDashboardWarrantyRouteImport } from './routes/_authenticated/closure/dashboard/warranty'
+import { Route as AuthenticatedClosureDashboardTaskRouteImport } from './routes/_authenticated/closure/dashboard/task'
+import { Route as AuthenticatedClosureDashboardSparePartRouteImport } from './routes/_authenticated/closure/dashboard/spare-part'
+import { Route as AuthenticatedClosureDashboardAsBuiltRouteImport } from './routes/_authenticated/closure/dashboard/as-built'
 import { Route as AuthenticatedClosureTaskManagementImportLogsRouteImport } from './routes/_authenticated/closure/task-management/import.logs'
 import { Route as AuthenticatedClosureSparePartRecordsDocRefRouteImport } from './routes/_authenticated/closure/spare-part/records.$docRef'
 import { Route as AuthenticatedClosureSparePartImportLogsRouteImport } from './routes/_authenticated/closure/spare-part/import.logs'
@@ -74,6 +79,12 @@ const AuthenticatedAdminMappingRoute =
     path: '/mapping',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedClosureDashboardIndexRoute =
+  AuthenticatedClosureDashboardIndexRouteImport.update({
+    id: '/closure/dashboard/',
+    path: '/closure/dashboard/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureTaskManagementTreeRoute =
   AuthenticatedClosureTaskManagementTreeRouteImport.update({
     id: '/closure/task-management/tree',
@@ -110,6 +121,30 @@ const AuthenticatedClosureSparePartAconexSyncRoute =
     path: '/closure/spare-part/aconex-sync',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureDashboardWarrantyRoute =
+  AuthenticatedClosureDashboardWarrantyRouteImport.update({
+    id: '/closure/dashboard/warranty',
+    path: '/closure/dashboard/warranty',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClosureDashboardTaskRoute =
+  AuthenticatedClosureDashboardTaskRouteImport.update({
+    id: '/closure/dashboard/task',
+    path: '/closure/dashboard/task',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClosureDashboardSparePartRoute =
+  AuthenticatedClosureDashboardSparePartRouteImport.update({
+    id: '/closure/dashboard/spare-part',
+    path: '/closure/dashboard/spare-part',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClosureDashboardAsBuiltRoute =
+  AuthenticatedClosureDashboardAsBuiltRouteImport.update({
+    id: '/closure/dashboard/as-built',
+    path: '/closure/dashboard/as-built',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureTaskManagementImportLogsRoute =
   AuthenticatedClosureTaskManagementImportLogsRouteImport.update({
     id: '/closure/task-management/import/logs',
@@ -138,12 +173,17 @@ export interface FileRoutesByFullPath {
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
+  '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
+  '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
+  '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
   '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
@@ -156,12 +196,17 @@ export interface FileRoutesByTo {
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
+  '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
+  '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
+  '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
   '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
@@ -177,12 +222,17 @@ export interface FileRoutesById {
   '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
+  '/_authenticated/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
+  '/_authenticated/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
+  '/_authenticated/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/_authenticated/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
   '/_authenticated/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/_authenticated/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/_authenticated/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/_authenticated/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   '/_authenticated/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
@@ -198,12 +248,17 @@ export interface FileRouteTypes {
     | '/admin/task-thresholds'
     | '/admin/users'
     | '/admin/'
+    | '/closure/dashboard/as-built'
+    | '/closure/dashboard/spare-part'
+    | '/closure/dashboard/task'
+    | '/closure/dashboard/warranty'
     | '/closure/spare-part/aconex-sync'
     | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
+    | '/closure/dashboard/'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
     | '/closure/task-management/import/logs'
@@ -216,12 +271,17 @@ export interface FileRouteTypes {
     | '/admin/task-thresholds'
     | '/admin/users'
     | '/admin'
+    | '/closure/dashboard/as-built'
+    | '/closure/dashboard/spare-part'
+    | '/closure/dashboard/task'
+    | '/closure/dashboard/warranty'
     | '/closure/spare-part/aconex-sync'
     | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
+    | '/closure/dashboard'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
     | '/closure/task-management/import/logs'
@@ -236,12 +296,17 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/task-thresholds'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/'
+    | '/_authenticated/closure/dashboard/as-built'
+    | '/_authenticated/closure/dashboard/spare-part'
+    | '/_authenticated/closure/dashboard/task'
+    | '/_authenticated/closure/dashboard/warranty'
     | '/_authenticated/closure/spare-part/aconex-sync'
     | '/_authenticated/closure/spare-part/dashboard'
     | '/_authenticated/closure/spare-part/import'
     | '/_authenticated/closure/spare-part/raw-data'
     | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/task-management/tree'
+    | '/_authenticated/closure/dashboard/'
     | '/_authenticated/closure/spare-part/import/logs'
     | '/_authenticated/closure/spare-part/records/$docRef'
     | '/_authenticated/closure/task-management/import/logs'
@@ -319,6 +384,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminMappingRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/closure/dashboard/': {
+      id: '/_authenticated/closure/dashboard/'
+      path: '/closure/dashboard'
+      fullPath: '/closure/dashboard/'
+      preLoaderRoute: typeof AuthenticatedClosureDashboardIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/task-management/tree': {
       id: '/_authenticated/closure/task-management/tree'
       path: '/closure/task-management/tree'
@@ -359,6 +431,34 @@ declare module '@tanstack/react-router' {
       path: '/closure/spare-part/aconex-sync'
       fullPath: '/closure/spare-part/aconex-sync'
       preLoaderRoute: typeof AuthenticatedClosureSparePartAconexSyncRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/dashboard/warranty': {
+      id: '/_authenticated/closure/dashboard/warranty'
+      path: '/closure/dashboard/warranty'
+      fullPath: '/closure/dashboard/warranty'
+      preLoaderRoute: typeof AuthenticatedClosureDashboardWarrantyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/dashboard/task': {
+      id: '/_authenticated/closure/dashboard/task'
+      path: '/closure/dashboard/task'
+      fullPath: '/closure/dashboard/task'
+      preLoaderRoute: typeof AuthenticatedClosureDashboardTaskRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/dashboard/spare-part': {
+      id: '/_authenticated/closure/dashboard/spare-part'
+      path: '/closure/dashboard/spare-part'
+      fullPath: '/closure/dashboard/spare-part'
+      preLoaderRoute: typeof AuthenticatedClosureDashboardSparePartRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/dashboard/as-built': {
+      id: '/_authenticated/closure/dashboard/as-built'
+      path: '/closure/dashboard/as-built'
+      fullPath: '/closure/dashboard/as-built'
+      preLoaderRoute: typeof AuthenticatedClosureDashboardAsBuiltRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/closure/task-management/import/logs': {
@@ -423,18 +523,31 @@ const AuthenticatedClosureSparePartImportRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
+  AuthenticatedClosureDashboardAsBuiltRoute: typeof AuthenticatedClosureDashboardAsBuiltRoute
+  AuthenticatedClosureDashboardSparePartRoute: typeof AuthenticatedClosureDashboardSparePartRoute
+  AuthenticatedClosureDashboardTaskRoute: typeof AuthenticatedClosureDashboardTaskRoute
+  AuthenticatedClosureDashboardWarrantyRoute: typeof AuthenticatedClosureDashboardWarrantyRoute
   AuthenticatedClosureSparePartAconexSyncRoute: typeof AuthenticatedClosureSparePartAconexSyncRoute
   AuthenticatedClosureSparePartDashboardRoute: typeof AuthenticatedClosureSparePartDashboardRoute
   AuthenticatedClosureSparePartImportRoute: typeof AuthenticatedClosureSparePartImportRouteWithChildren
   AuthenticatedClosureSparePartRawDataRoute: typeof AuthenticatedClosureSparePartRawDataRoute
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
   AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
+  AuthenticatedClosureDashboardIndexRoute: typeof AuthenticatedClosureDashboardIndexRoute
   AuthenticatedClosureSparePartRecordsDocRefRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   AuthenticatedClosureTaskManagementImportLogsRoute: typeof AuthenticatedClosureTaskManagementImportLogsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
+  AuthenticatedClosureDashboardAsBuiltRoute:
+    AuthenticatedClosureDashboardAsBuiltRoute,
+  AuthenticatedClosureDashboardSparePartRoute:
+    AuthenticatedClosureDashboardSparePartRoute,
+  AuthenticatedClosureDashboardTaskRoute:
+    AuthenticatedClosureDashboardTaskRoute,
+  AuthenticatedClosureDashboardWarrantyRoute:
+    AuthenticatedClosureDashboardWarrantyRoute,
   AuthenticatedClosureSparePartAconexSyncRoute:
     AuthenticatedClosureSparePartAconexSyncRoute,
   AuthenticatedClosureSparePartDashboardRoute:
@@ -447,6 +560,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureTaskManagementRawDataRoute,
   AuthenticatedClosureTaskManagementTreeRoute:
     AuthenticatedClosureTaskManagementTreeRoute,
+  AuthenticatedClosureDashboardIndexRoute:
+    AuthenticatedClosureDashboardIndexRoute,
   AuthenticatedClosureSparePartRecordsDocRefRoute:
     AuthenticatedClosureSparePartRecordsDocRefRoute,
   AuthenticatedClosureTaskManagementImportLogsRoute:
