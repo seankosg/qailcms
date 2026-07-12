@@ -613,6 +613,7 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
     applyGanttTemplate(wb, ws, {
       columns,
       rowCount: dataRows.length,
+      rowsData: rows,
       ganttCount,
       dataDateRow,
       headerRowIdx,
@@ -723,6 +724,7 @@ function applyGanttTemplate(
   ctx: {
     columns: StyledColumn[];
     rowCount: number;
+    rowsData: Record<string, unknown>[];
     ganttCount: number;
     dataDateRow: number;
     headerRowIdx: number;
@@ -736,6 +738,7 @@ function applyGanttTemplate(
   const {
     columns,
     rowCount,
+    rowsData,
     ganttCount,
     dataDateRow,
     headerRowIdx,
@@ -752,7 +755,7 @@ function applyGanttTemplate(
   );
   XLSX.utils.book_append_sheet(wb, settingsWs, "설정");
 
-  // Data Date banner: split merged row, put date formula in D column.
+  // Data Date banner: 원본 xlsx 와 동일하게 B4=라벨, D4=하드 날짜(수식 아님)
   const merges = (ws["!merges"] ?? []) as XLSX.Range[];
   const filteredMerges = merges.filter(
     (m) => !(m.s.r === dataDateRow && m.e.r === dataDateRow),
@@ -763,19 +766,21 @@ function applyGanttTemplate(
     font: { name: FONT_KO, sz: 11, bold: true, color: { rgb: "FF1F4E79" } },
     alignment: { vertical: "center", horizontal: "right" },
   });
-  setFormulaCell(ws, dataDateRow, 3, "=설정!$B$3", "yyyy-mm-dd");
   {
+    // D4 = 실제 Data Date (원본: 하드 날짜값)
     const addr = XLSX.utils.encode_cell({ r: dataDateRow, c: 3 });
-    const cell = (ws as Record<string, unknown>)[addr] as {
-      s?: Record<string, unknown>;
-    };
-    if (cell) {
-      cell.s = {
-        ...(cell.s ?? {}),
-        font: { name: FONT_KO, sz: 11, bold: true, color: { rgb: "FF0000FF" } },
-        fill: { fgColor: { rgb: "FFFFF2CC" } },
-        alignment: { vertical: "center", horizontal: "center" },
-        numFmt: "yyyy-mm-dd",
+    const serial = isoToExcelSerial(ctx.dataDateIso);
+    if (serial != null) {
+      (ws as Record<string, unknown>)[addr] = {
+        t: "n",
+        v: serial,
+        z: "yyyy-mm-dd",
+        s: {
+          font: { name: FONT_KO, sz: 11, bold: true, color: { rgb: "FF0000FF" } },
+          fill: { fgColor: { rgb: "FFFFF2CC" } },
+          alignment: { vertical: "center", horizontal: "center" },
+          numFmt: "yyyy-mm-dd",
+        },
       };
     }
   }
@@ -797,12 +802,12 @@ function applyGanttTemplate(
   for (let i = 0; i < ganttCount; i++) {
     const c = firstCalCol0 + i;
     const cL = colLetter(c);
-    // First calendar day = 설정!$B$4 (chart start). Subsequent = prev+1.
+    // 원본: U6 = 설정!$B$3 (차트 시작일). 이후 V6 = U6+1 …
     const dayFormula =
-      i === 0 ? `=설정!$B$4` : `=${colLetter(c - 1)}${dayRow1}+1`;
+      i === 0 ? `=설정!$B$3` : `=${colLetter(c - 1)}${dayRow1}+1`;
     setFormulaCell(ws, headerRowIdx, c, dayFormula, "d");
     if (monthRowIdx >= 0) {
-      const monthFormula = `=IF(OR(DAY(${cL}${dayRow1})=1,${cL}${dayRow1}=설정!$B$4),TEXT(${cL}${dayRow1},"m월"),"")`;
+      const monthFormula = `=IF(OR(DAY(${cL}${dayRow1})=1,${cL}${dayRow1}=설정!$B$3),TEXT(${cL}${dayRow1},"m월"),"")`;
       setFormulaCellText(ws, monthRowIdx, c, monthFormula);
     }
   }
@@ -814,6 +819,7 @@ function applyGanttTemplate(
   });
   const K = letters.plan_start;
   const L = letters.plan_end;
+  const M = letters.plan_days;
   const O = letters.actual_progress;
   const R = letters.forecast_end;
   const J = letters.status_manual;
@@ -824,33 +830,104 @@ function applyGanttTemplate(
 
   const idxOf = (key: string) => columns.findIndex((c) => c.key === key);
 
+  // 부모(항목) 그룹 판별: level === "parent" 인 행이 부모, 다음 부모 직전까지가 자식 범위.
+  const parentGroups = new Map<number, { cs: number; ce: number }>();
+  for (let ri = 0; ri < rowCount; ri++) {
+    if (rowsData[ri]?.level !== "parent") continue;
+    let ce = ri;
+    for (let rj = ri + 1; rj < rowCount; rj++) {
+      if (rowsData[rj]?.level === "parent") break;
+      ce = rj;
+    }
+    if (ce > ri) parentGroups.set(ri, { cs: ri + 1, ce });
+  }
+
   for (let ri = 0; ri < rowCount; ri++) {
     const r0 = dataStart + ri;
     const r1 = r0 + 1;
+    const group = parentGroups.get(ri);
+    if (group) {
+      // 부모 행: 자식 범위 집계 (원본 xlsx 수식 그대로)
+      const cs1 = dataStart + group.cs + 1;
+      const ce1 = dataStart + group.ce + 1;
+      if (K) setFormulaCell(ws, r0, idxOf("plan_start"), `=MIN(${K}${cs1}:${K}${ce1})`, "yyyy-mm-dd");
+      if (L) setFormulaCell(ws, r0, idxOf("plan_end"), `=MAX(${L}${cs1}:${L}${ce1})`, "yyyy-mm-dd");
+      if (M && K && L)
+        setFormulaCell(ws, r0, idxOf("plan_days"), `=${L}${r1}-${K}${r1}+1`, "0;-0;-");
+      if (letters.actual_start)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("actual_start"),
+          `=IF(COUNT(${letters.actual_start}${cs1}:${letters.actual_start}${ce1})=0,"",MIN(${letters.actual_start}${cs1}:${letters.actual_start}${ce1}))`,
+          "yyyy-mm-dd",
+        );
+      if (O && M)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("actual_progress"),
+          `=IFERROR(SUMPRODUCT(${O}${cs1}:${O}${ce1},${M}${cs1}:${M}${ce1})/SUM(${M}${cs1}:${M}${ce1}),0)`,
+          "0.0%",
+        );
+      if (letters.plan_progress && K && M)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("plan_progress"),
+          `=IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/${M}${r1}))`,
+          "0.0%",
+        );
+      if (Q && O && letters.plan_progress)
+        setFormulaCell(ws, r0, idxOf("progress_variance"), `=${O}${r1}-${letters.plan_progress}${r1}`, "+0.0%;-0.0%;0.0%");
+      if (R)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("forecast_end"),
+          `=IF(COUNT(${R}${cs1}:${R}${ce1})=0,"",MAX(${R}${cs1}:${R}${ce1}))`,
+          "yyyy-mm-dd",
+        );
+      if (letters.slip_days && R && L)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("slip_days"),
+          `=IF(ISNUMBER(${R}${r1}),${R}${r1}-${L}${r1},"")`,
+          "+0;-0;-",
+        );
+      if (T && K && L && O) {
+        const jRef = J ? `$${J}${r1}` : `""`;
+        const rRef = R ? `$${R}${r1}` : `""`;
+        const qRef = Q ? `$${Q}${r1}` : `0`;
+        const f = `=IF(OR(${jRef}="완료",$${O}${r1}>=1),"완료",IF(AND(ISNUMBER(${rRef}),${rRef}>$${L}${r1}),"지연",IF(${D4}>$${L}${r1},"지연",IF(${qRef}<=${alarm},"지연",IF(AND(${D4}>=$${K}${r1},$${O}${r1}=0),"주의(미착수)",IF(${D4}>=$${K}${r1},"진행","예정"))))))`;
+        setFormulaCellText(ws, r0, idxOf("auto_judgment"), f);
+      }
+      continue;
+    }
+
+    // 자식 행 (원본과 동일한 수식)
     if (letters.plan_days && K && L) {
-      const f = `=IF(AND(ISNUMBER(${K}${r1}),ISNUMBER(${L}${r1})),${L}${r1}-${K}${r1}+1,"")`;
-      setFormulaCell(ws, r0, idxOf("plan_days"), f, "0;-0;-");
+      setFormulaCell(ws, r0, idxOf("plan_days"), `=${L}${r1}-${K}${r1}+1`, "0;-0;-");
     }
     if (letters.plan_progress && K && L) {
-      const f = `=IF(OR(NOT(ISNUMBER(${K}${r1})),NOT(ISNUMBER(${L}${r1})),(${L}${r1}-${K}${r1}+1)=0),"",IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1))))`;
-      setFormulaCell(ws, r0, idxOf("plan_progress"), f, "0.0%;-0.0%;-");
+      const f = `=IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1)))`;
+      setFormulaCell(ws, r0, idxOf("plan_progress"), f, "0.0%");
     }
     if (letters.progress_variance && O && K && L) {
-      const planProg = `IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1)))`;
-      const f = `=IF(AND(ISNUMBER(${O}${r1}),ISNUMBER(${K}${r1}),ISNUMBER(${L}${r1})),${O}${r1}-${planProg},"")`;
-      setFormulaCell(ws, r0, idxOf("progress_variance"), f, "+0.0%;-0.0%;0.0%");
+      const planProg = letters.plan_progress
+        ? `${letters.plan_progress}${r1}`
+        : `IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1)))`;
+      setFormulaCell(ws, r0, idxOf("progress_variance"), `=${O}${r1}-${planProg}`, "+0.0%;-0.0%;0.0%");
     }
     if (letters.slip_days && R && L) {
-      const f = `=IF(AND(ISNUMBER(${R}${r1}),ISNUMBER(${L}${r1})),${R}${r1}-${L}${r1},"")`;
-      setFormulaCell(ws, r0, idxOf("slip_days"), f, "+0;-0;-");
+      setFormulaCell(ws, r0, idxOf("slip_days"), `=IF(ISNUMBER(${R}${r1}),${R}${r1}-${L}${r1},"")`, "+0;-0;-");
     }
     if (letters.auto_judgment && K && L && O) {
-      const jRef = J ? `${J}${r1}` : `""`;
-      const rRef = R ? `${R}${r1}` : `""`;
-      const qRef = Q
-        ? `${Q}${r1}`
-        : `(${O}${r1}-IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1))))`;
-      const f = `=IF(OR(${jRef}="완료",${O}${r1}>=1),"완료",IF(AND(ISNUMBER(${rRef}),${rRef}>${L}${r1}),"지연",IF(${D4}>${L}${r1},"지연",IF(${qRef}<=${alarm},"지연",IF(AND(${D4}>=${K}${r1},${O}${r1}=0),"주의(미착수)",IF(${D4}>=${K}${r1},"진행","예정"))))))`;
+      const jRef = J ? `$${J}${r1}` : `""`;
+      const rRef = R ? `$${R}${r1}` : `""`;
+      const qRef = Q ? `$${Q}${r1}` : `0`;
+      const f = `=IF(OR(${jRef}="완료",$${O}${r1}>=1),"완료",IF(AND(ISNUMBER(${rRef}),${rRef}>$${L}${r1}),"지연",IF(${D4}>$${L}${r1},"지연",IF(${qRef}<=${alarm},"지연",IF(AND(${D4}>=$${K}${r1},$${O}${r1}=0),"주의(미착수)",IF(${D4}>=$${K}${r1},"진행","예정"))))))`;
       setFormulaCellText(ws, r0, idxOf("auto_judgment"), f);
     }
   }
@@ -872,43 +949,56 @@ function applyGanttTemplate(
   const Irel = I ? `$${I}${firstDataRow1}` : "";
 
   const rules: CfRule[] = [];
-  if (K && L && O && I && R) {
+  // 원본 xlsx CF 규칙(14종) 재현. 계획일수 컬럼 letter (M) 를 직접 참조.
+  const Mrel = M ? `$${M}${firstDataRow1}` : "";
+  if (K && L && M && O && I && R) {
+    // 1) 지연 갭 (실적 이후~계획완료 이전, Data Date 미만)
+    rules.push({
+      ref: calRange,
+      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel}+${Orel}*${Mrel},${dayCellRel}<=${Lrel},${dayCellRel}<${D4})`,
+      fillRgb: "FFE06666",
+    });
+    // 2) 실적 진척 구간
+    rules.push({
+      ref: calRange,
+      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel},${dayCellRel}<${Krel}+${Orel}*${Mrel})`,
+      fillRgb: "FF548235",
+    });
+    // 3) 예상 완료일
     rules.push({
       ref: calRange,
       formula: `AND(${Irel}<>"항목",ISNUMBER(${Rrel}),${dayCellRel}=${Rrel})`,
-      fillRgb: "FFFF6600",
-      bold: true,
-    });
-    rules.push({
-      ref: calRange,
-      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel}+${Orel}*(${Lrel}-${Krel}+1),${dayCellRel}<=${Lrel},${dayCellRel}<${D4})`,
-      fillRgb: "FFFFC7CE",
-    });
-    rules.push({
-      ref: calRange,
-      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel},${dayCellRel}<${Krel}+${Orel}*(${Lrel}-${Krel}+1))`,
-      fillRgb: "FF548235",
+      fillRgb: "FF7030A0",
     });
   }
   if (K && L && I) {
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="실행")`, fillRgb: "FF1F4E79" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="승인")`, fillRgb: "FF7030A0" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="대기")`, fillRgb: "FF808080" });
+    // 4~7) 계획 완료일 (유형별)
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="실행")`, fillRgb: "FF2E75B6" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="승인")`, fillRgb: "FFC55A11" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="대기")`, fillRgb: "FF7F7F7F" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="항목")`, fillRgb: "FF1F4E79" });
+    // 8~11) 계획 구간 (유형별)
     rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="실행")`, fillRgb: "FFBDD7EE" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="승인")`, fillRgb: "FFD9C1F0" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="대기")`, fillRgb: "FFE7E6E6" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="승인")`, fillRgb: "FFFCE4D6" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="대기")`, fillRgb: "FFD9D9D9" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="항목")`, fillRgb: "FFD6DCE4" });
   }
-  rules.push({ ref: calRange, formula: `${dayCellRel}=${D4}`, fillRgb: "FFFFF2CC", borderRgb: "FFC00000" });
-  rules.push({ ref: calRange, formula: `${dayCellRel}=TODAY()`, borderRgb: "FF808080" });
-  rules.push({ ref: calRange, formula: `WEEKDAY(${dayCellRel})=6`, fillRgb: "FFF2F2F2" });
+  // 12) Data Date 열
+  rules.push({ ref: calRange, formula: `${dayCellRel}=${D4}`, fillRgb: "FFFFC000" });
+  // 13) 오늘 열
+  rules.push({ ref: calRange, formula: `${dayCellRel}=TODAY()`, fillRgb: "FFFFE699" });
+  // 14) 금요일 (WEEKDAY 기본 return_type=1 → 금=6)
+  rules.push({ ref: calRange, formula: `WEEKDAY(${dayCellRel})=6`, fillRgb: "FFE7E6E6" });
 
+  // T열 자동판정 색상
   if (T) {
     const tRange = `${T}${firstDataRow1}:${T}${lastDataRow1}`;
     const tRef = `$${T}${firstDataRow1}`;
-    rules.push({ ref: tRange, formula: `${tRef}="지연"`, fillRgb: "FFF4CCCC", fontColorRgb: "FFC00000", bold: true });
-    rules.push({ ref: tRange, formula: `${tRef}="주의(미착수)"`, fillRgb: "FFFCE5CD", fontColorRgb: "FFB45F06", bold: true });
-    rules.push({ ref: tRange, formula: `${tRef}="완료"`, fillRgb: "FFD9EAD3", fontColorRgb: "FF38761D", bold: true });
+    rules.push({ ref: tRange, formula: `${tRef}="지연"`, fillRgb: "FFC00000", fontColorRgb: "FFFFFFFF", bold: true });
+    rules.push({ ref: tRange, formula: `${tRef}="주의(미착수)"`, fillRgb: "FFED7D31", fontColorRgb: "FFFFFFFF", bold: true });
+    rules.push({ ref: tRange, formula: `${tRef}="완료"`, fillRgb: "FF548235", fontColorRgb: "FFFFFFFF", bold: true });
   }
+  // Q열 진도차 색상 (fill only, 원본과 동일)
   if (Q && O && I) {
     const qRange = `${Q}${firstDataRow1}:${Q}${lastDataRow1}`;
     const qRef = `$${Q}${firstDataRow1}`;
@@ -917,15 +1007,24 @@ function applyGanttTemplate(
     rules.push({
       ref: qRange,
       formula: `AND(ISNUMBER(${qRef}),${qRef}<0,${iRef}<>"항목")`,
-      fontColorRgb: "FFC00000",
-      bold: true,
+      fillRgb: "FFFCE4D6",
     });
     rules.push({
       ref: qRange,
       formula: `AND(ISNUMBER(${qRef}),${qRef}>=0,${oRef}>0,${iRef}<>"항목")`,
-      fontColorRgb: "FF38761D",
-      bold: true,
+      fillRgb: "FFE2EFDA",
     });
+  }
+  // B열 No: 지연 행 배경
+  if (T) {
+    const nCol = letters.task_no;
+    if (nCol) {
+      rules.push({
+        ref: `${nCol}${firstDataRow1}:${nCol}${lastDataRow1}`,
+        formula: `$${T}${firstDataRow1}="지연"`,
+        fillRgb: "FFFCE4E4",
+      });
+    }
   }
 
   cfBySheet.set(wb, { sheetName: (wb.SheetNames[0] as string) ?? "Sheet1", rules });
@@ -955,43 +1054,54 @@ function buildSettingsSheet(
   };
   setCell(ws, 0, 0, "Gantt 차트 설정", titleStyle);
 
-  // B3 = Data Date
-  setCell(ws, 2, 0, "Data Date", labelStyle);
-  if (dataDateSerial != null) {
-    const addr = XLSX.utils.encode_cell({ r: 2, c: 1 });
-    (ws as Record<string, unknown>)[addr] = {
-      t: "n",
-      v: dataDateSerial,
-      z: "yyyy-mm-dd",
-      s: {
-        ...valueStyle,
-        numFmt: "yyyy-mm-dd",
-        font: { ...(valueStyle.font as Record<string, unknown>), bold: true, color: { rgb: "FF0000FF" } },
-        fill: { fgColor: { rgb: "FFFFF2CC" } },
-      },
-    };
-  }
-  setCell(ws, 2, 2, "판정·진도율 기준일. 변경 시 알람/진행률 재계산", noteStyle);
+  // 원본 xlsx `설정` 시트 배치:
+  //   B3 = 차트 시작일, B4 = 차트 일수, B5..B7 = 데드라인 1~3, B8 = 진도차 알람 기준
+  //   (Data Date 는 설정 시트에 없음 — Gantt!D4 에 직접 값)
 
-  // B4 = 차트 시작일
-  setCell(ws, 3, 0, "차트 시작일", labelStyle);
+  // B3 = 차트 시작일
+  setCell(ws, 2, 0, "차트 시작일", labelStyle);
   if (startSerial != null) {
-    const addr = XLSX.utils.encode_cell({ r: 3, c: 1 });
+    const addr = XLSX.utils.encode_cell({ r: 2, c: 1 });
     (ws as Record<string, unknown>)[addr] = {
       t: "n",
       v: startSerial,
       z: "yyyy-mm-dd",
-      s: { ...valueStyle, numFmt: "yyyy-mm-dd" },
+      s: {
+        ...valueStyle,
+        numFmt: "yyyy-mm-dd",
+        font: { ...(valueStyle.font as Record<string, unknown>), bold: true },
+        fill: { fgColor: { rgb: "FFFFF2CC" } },
+      },
     };
   }
-  setCell(ws, 3, 2, "타임라인 첫 칸 날짜. 변경 시 타임라인 전체 이동", noteStyle);
+  setCell(ws, 2, 2, "타임라인 첫 칸 날짜. 변경 시 타임라인 전체 이동", noteStyle);
 
-  // B5 = 차트 일수 (원본 템플릿 배치)
-  setCell(ws, 4, 0, "차트 일수", labelStyle);
-  setCell(ws, 4, 1, ganttDays, valueStyle);
-  setCell(ws, 4, 2, "타임라인 총 일수 (원본 기본 153일)", noteStyle);
+  // B4 = 차트 일수
+  setCell(ws, 3, 0, "차트 일수", labelStyle);
+  setCell(ws, 3, 1, ganttDays, { ...valueStyle, fill: { fgColor: { rgb: "FFFFF2CC" } } });
+  setCell(ws, 3, 2, `${ganttDays}일 = 타임라인 총 일수`, noteStyle);
 
-  // B8 = 진도차 알람 임계값 (원본 템플릿 배치)
+  // B5..B7 = 데드라인 1..3
+  const dls = cfg?.deadlines ?? [];
+  for (let i = 0; i < 3; i++) {
+    setCell(ws, 4 + i, 0, `데드라인 ${i + 1}`, labelStyle);
+    const dl = dls[i];
+    if (dl) {
+      const serial = isoToExcelSerial(dl.date);
+      if (serial != null) {
+        const addr = XLSX.utils.encode_cell({ r: 4 + i, c: 1 });
+        (ws as Record<string, unknown>)[addr] = {
+          t: "n",
+          v: serial,
+          z: "yyyy-mm-dd",
+          s: { ...valueStyle, numFmt: "yyyy-mm-dd" },
+        };
+      }
+      setCell(ws, 4 + i, 2, dl.label, noteStyle);
+    }
+  }
+
+  // B8 = 진도차 알람 임계값
   setCell(ws, 7, 0, "진도차 알람 기준", labelStyle);
   setCell(ws, 7, 1, cfg?.alarmThreshold ?? -0.05, {
     ...valueStyle,
@@ -1000,23 +1110,8 @@ function buildSettingsSheet(
   });
   setCell(ws, 7, 2, "실적-계획 진도차가 이 값 이하이면 '지연' 판정·알람 (기본 -5%p)", noteStyle);
 
-  // 데드라인 (5~7행 자리): 옵션 값이 있을 때만 채움
-  const dls = cfg?.deadlines ?? [];
-  for (let i = 0; i < dls.length && i < 2; i++) {
-    setCell(ws, 5 + i, 0, `데드라인 ${i + 1}`, labelStyle);
-    const dl = dls[i];
-    const serial = isoToExcelSerial(dl.date);
-    if (serial != null) {
-      const addr = XLSX.utils.encode_cell({ r: 5 + i, c: 1 });
-      (ws as Record<string, unknown>)[addr] = {
-        t: "n",
-        v: serial,
-        z: "yyyy-mm-dd",
-        s: { ...valueStyle, numFmt: "yyyy-mm-dd" },
-      };
-    }
-    setCell(ws, 5 + i, 2, dl.label, noteStyle);
-  }
+  // dataDateSerial 은 이 시트에서 사용하지 않음 (Gantt!D4 에 직접 값으로 기입)
+  void dataDateSerial;
 
   setCell(ws, 10, 0, "범례 (타임라인)", labelStyle);
   const legend: Array<[string, string]> = [
