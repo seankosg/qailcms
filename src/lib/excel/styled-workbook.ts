@@ -613,6 +613,7 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
     applyGanttTemplate(wb, ws, {
       columns,
       rowCount: dataRows.length,
+      rowsData: rows,
       ganttCount,
       dataDateRow,
       headerRowIdx,
@@ -723,6 +724,7 @@ function applyGanttTemplate(
   ctx: {
     columns: StyledColumn[];
     rowCount: number;
+    rowsData: Record<string, unknown>[];
     ganttCount: number;
     dataDateRow: number;
     headerRowIdx: number;
@@ -736,6 +738,7 @@ function applyGanttTemplate(
   const {
     columns,
     rowCount,
+    rowsData,
     ganttCount,
     dataDateRow,
     headerRowIdx,
@@ -826,33 +829,104 @@ function applyGanttTemplate(
 
   const idxOf = (key: string) => columns.findIndex((c) => c.key === key);
 
+  // 부모(항목) 그룹 판별: level === "parent" 인 행이 부모, 다음 부모 직전까지가 자식 범위.
+  const parentGroups = new Map<number, { cs: number; ce: number }>();
+  for (let ri = 0; ri < rowCount; ri++) {
+    if (rowsData[ri]?.level !== "parent") continue;
+    let ce = ri;
+    for (let rj = ri + 1; rj < rowCount; rj++) {
+      if (rowsData[rj]?.level === "parent") break;
+      ce = rj;
+    }
+    if (ce > ri) parentGroups.set(ri, { cs: ri + 1, ce });
+  }
+
   for (let ri = 0; ri < rowCount; ri++) {
     const r0 = dataStart + ri;
     const r1 = r0 + 1;
+    const group = parentGroups.get(ri);
+    if (group) {
+      // 부모 행: 자식 범위 집계 (원본 xlsx 수식 그대로)
+      const cs1 = dataStart + group.cs + 1;
+      const ce1 = dataStart + group.ce + 1;
+      if (K) setFormulaCell(ws, r0, idxOf("plan_start"), `=MIN(${K}${cs1}:${K}${ce1})`, "yyyy-mm-dd");
+      if (L) setFormulaCell(ws, r0, idxOf("plan_end"), `=MAX(${L}${cs1}:${L}${ce1})`, "yyyy-mm-dd");
+      if (M && K && L)
+        setFormulaCell(ws, r0, idxOf("plan_days"), `=${L}${r1}-${K}${r1}+1`, "0;-0;-");
+      if (letters.actual_start)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("actual_start"),
+          `=IF(COUNT(${letters.actual_start}${cs1}:${letters.actual_start}${ce1})=0,"",MIN(${letters.actual_start}${cs1}:${letters.actual_start}${ce1}))`,
+          "yyyy-mm-dd",
+        );
+      if (O && M)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("actual_progress"),
+          `=IFERROR(SUMPRODUCT(${O}${cs1}:${O}${ce1},${M}${cs1}:${M}${ce1})/SUM(${M}${cs1}:${M}${ce1}),0)`,
+          "0.0%",
+        );
+      if (letters.plan_progress && K && M)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("plan_progress"),
+          `=IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/${M}${r1}))`,
+          "0.0%",
+        );
+      if (Q && O && letters.plan_progress)
+        setFormulaCell(ws, r0, idxOf("progress_variance"), `=${O}${r1}-${letters.plan_progress}${r1}`, "+0.0%;-0.0%;0.0%");
+      if (R)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("forecast_end"),
+          `=IF(COUNT(${R}${cs1}:${R}${ce1})=0,"",MAX(${R}${cs1}:${R}${ce1}))`,
+          "yyyy-mm-dd",
+        );
+      if (letters.slip_days && R && L)
+        setFormulaCell(
+          ws,
+          r0,
+          idxOf("slip_days"),
+          `=IF(ISNUMBER(${R}${r1}),${R}${r1}-${L}${r1},"")`,
+          "+0;-0;-",
+        );
+      if (T && K && L && O) {
+        const jRef = J ? `$${J}${r1}` : `""`;
+        const rRef = R ? `$${R}${r1}` : `""`;
+        const qRef = Q ? `$${Q}${r1}` : `0`;
+        const f = `=IF(OR(${jRef}="완료",$${O}${r1}>=1),"완료",IF(AND(ISNUMBER(${rRef}),${rRef}>$${L}${r1}),"지연",IF(${D4}>$${L}${r1},"지연",IF(${qRef}<=${alarm},"지연",IF(AND(${D4}>=$${K}${r1},$${O}${r1}=0),"주의(미착수)",IF(${D4}>=$${K}${r1},"진행","예정"))))))`;
+        setFormulaCellText(ws, r0, idxOf("auto_judgment"), f);
+      }
+      continue;
+    }
+
+    // 자식 행 (원본과 동일한 수식)
     if (letters.plan_days && K && L) {
-      const f = `=IF(AND(ISNUMBER(${K}${r1}),ISNUMBER(${L}${r1})),${L}${r1}-${K}${r1}+1,"")`;
-      setFormulaCell(ws, r0, idxOf("plan_days"), f, "0;-0;-");
+      setFormulaCell(ws, r0, idxOf("plan_days"), `=${L}${r1}-${K}${r1}+1`, "0;-0;-");
     }
     if (letters.plan_progress && K && L) {
-      const f = `=IF(OR(NOT(ISNUMBER(${K}${r1})),NOT(ISNUMBER(${L}${r1})),(${L}${r1}-${K}${r1}+1)=0),"",IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1))))`;
-      setFormulaCell(ws, r0, idxOf("plan_progress"), f, "0.0%;-0.0%;-");
+      const f = `=IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1)))`;
+      setFormulaCell(ws, r0, idxOf("plan_progress"), f, "0.0%");
     }
     if (letters.progress_variance && O && K && L) {
-      const planProg = `IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1)))`;
-      const f = `=IF(AND(ISNUMBER(${O}${r1}),ISNUMBER(${K}${r1}),ISNUMBER(${L}${r1})),${O}${r1}-${planProg},"")`;
-      setFormulaCell(ws, r0, idxOf("progress_variance"), f, "+0.0%;-0.0%;0.0%");
+      const planProg = letters.plan_progress
+        ? `${letters.plan_progress}${r1}`
+        : `IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1)))`;
+      setFormulaCell(ws, r0, idxOf("progress_variance"), `=${O}${r1}-${planProg}`, "+0.0%;-0.0%;0.0%");
     }
     if (letters.slip_days && R && L) {
-      const f = `=IF(AND(ISNUMBER(${R}${r1}),ISNUMBER(${L}${r1})),${R}${r1}-${L}${r1},"")`;
-      setFormulaCell(ws, r0, idxOf("slip_days"), f, "+0;-0;-");
+      setFormulaCell(ws, r0, idxOf("slip_days"), `=IF(ISNUMBER(${R}${r1}),${R}${r1}-${L}${r1},"")`, "+0;-0;-");
     }
     if (letters.auto_judgment && K && L && O) {
-      const jRef = J ? `${J}${r1}` : `""`;
-      const rRef = R ? `${R}${r1}` : `""`;
-      const qRef = Q
-        ? `${Q}${r1}`
-        : `(${O}${r1}-IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1))))`;
-      const f = `=IF(OR(${jRef}="완료",${O}${r1}>=1),"완료",IF(AND(ISNUMBER(${rRef}),${rRef}>${L}${r1}),"지연",IF(${D4}>${L}${r1},"지연",IF(${qRef}<=${alarm},"지연",IF(AND(${D4}>=${K}${r1},${O}${r1}=0),"주의(미착수)",IF(${D4}>=${K}${r1},"진행","예정"))))))`;
+      const jRef = J ? `$${J}${r1}` : `""`;
+      const rRef = R ? `$${R}${r1}` : `""`;
+      const qRef = Q ? `$${Q}${r1}` : `0`;
+      const f = `=IF(OR(${jRef}="완료",$${O}${r1}>=1),"완료",IF(AND(ISNUMBER(${rRef}),${rRef}>$${L}${r1}),"지연",IF(${D4}>$${L}${r1},"지연",IF(${qRef}<=${alarm},"지연",IF(AND(${D4}>=$${K}${r1},$${O}${r1}=0),"주의(미착수)",IF(${D4}>=$${K}${r1},"진행","예정"))))))`;
       setFormulaCellText(ws, r0, idxOf("auto_judgment"), f);
     }
   }
