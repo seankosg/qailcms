@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export type ViewPreferenceState = Record<string, unknown>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ViewPreferenceState = Record<string, any>;
 
 export const getUserViewPreference = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
