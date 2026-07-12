@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, Package, Wrench, ShieldCheck, Settings2, Users,
+  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle,
 } from "lucide-react";
 import { ListTree, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,10 @@ const NAV: NavGroup[] = [
       { to: "/closure/task-management/raw-data", label: "Task-Raw Data", icon: Database },
       { to: "/closure/task-management/tree", label: "Task-Tree", icon: ListTree },
       { to: "/closure/spare-part/raw-data", label: "SPT-Raw Data", icon: Database },
+      { to: "/closure/defect-management/raw-data", label: "Defect-Raw Data", icon: AlertTriangle },
+      { to: "/closure/defect-management/dashboard", label: "Defect Dashboard", icon: LayoutDashboard },
+      { to: "/closure/defect-management/import", label: "Defect Import", icon: Upload, editorOnly: true },
+      { to: "/closure/defect-management/import/logs", label: "Defect Import Logs", icon: FileClock, editorOnly: true },
       { to: "/closure/spare-part/import", label: "Import", icon: Upload, editorOnly: true },
       { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
       { to: "/closure/task-management/import/logs", label: "Task Import Logs", icon: FileClock, editorOnly: true },
