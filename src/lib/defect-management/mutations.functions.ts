@@ -52,7 +52,7 @@ export const bulkToggleCritical = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => ToggleCriticalSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { error } = await (context.supabase as any)
       .from("defect_items_raw")
       .update({ is_critical: data.value, updated_at: new Date().toISOString() })
       .in("id", data.ids);
