@@ -218,7 +218,10 @@ export function TaskDashboardPage({ compact = false }: Props) {
 
   // ── URL updaters ──
   const patch = (obj: Record<string, unknown>) =>
-    navigate({ to: "/closure/dashboard/task", search: (prev) => ({ ...prev, ...obj }) as any });
+    navigate({
+      to: "/closure/dashboard/task",
+      search: (prev: Record<string, unknown>) => ({ ...prev, ...obj }) as any,
+    });
 
   if (compact) {
     // Overview 축약 뷰
