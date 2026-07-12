@@ -752,7 +752,7 @@ function applyGanttTemplate(
   );
   XLSX.utils.book_append_sheet(wb, settingsWs, "설정");
 
-  // Data Date banner: split merged row, put date formula in D column.
+  // Data Date banner: 원본 xlsx 와 동일하게 B4=라벨, D4=하드 날짜(수식 아님)
   const merges = (ws["!merges"] ?? []) as XLSX.Range[];
   const filteredMerges = merges.filter(
     (m) => !(m.s.r === dataDateRow && m.e.r === dataDateRow),
@@ -763,19 +763,21 @@ function applyGanttTemplate(
     font: { name: FONT_KO, sz: 11, bold: true, color: { rgb: "FF1F4E79" } },
     alignment: { vertical: "center", horizontal: "right" },
   });
-  setFormulaCell(ws, dataDateRow, 3, "=설정!$B$3", "yyyy-mm-dd");
   {
+    // D4 = 실제 Data Date (원본: 하드 날짜값)
     const addr = XLSX.utils.encode_cell({ r: dataDateRow, c: 3 });
-    const cell = (ws as Record<string, unknown>)[addr] as {
-      s?: Record<string, unknown>;
-    };
-    if (cell) {
-      cell.s = {
-        ...(cell.s ?? {}),
-        font: { name: FONT_KO, sz: 11, bold: true, color: { rgb: "FF0000FF" } },
-        fill: { fgColor: { rgb: "FFFFF2CC" } },
-        alignment: { vertical: "center", horizontal: "center" },
-        numFmt: "yyyy-mm-dd",
+    const serial = isoToExcelSerial(ctx.dataDateIso);
+    if (serial != null) {
+      (ws as Record<string, unknown>)[addr] = {
+        t: "n",
+        v: serial,
+        z: "yyyy-mm-dd",
+        s: {
+          font: { name: FONT_KO, sz: 11, bold: true, color: { rgb: "FF0000FF" } },
+          fill: { fgColor: { rgb: "FFFFF2CC" } },
+          alignment: { vertical: "center", horizontal: "center" },
+          numFmt: "yyyy-mm-dd",
+        },
       };
     }
   }
@@ -797,12 +799,12 @@ function applyGanttTemplate(
   for (let i = 0; i < ganttCount; i++) {
     const c = firstCalCol0 + i;
     const cL = colLetter(c);
-    // First calendar day = 설정!$B$4 (chart start). Subsequent = prev+1.
+    // 원본: U6 = 설정!$B$3 (차트 시작일). 이후 V6 = U6+1 …
     const dayFormula =
-      i === 0 ? `=설정!$B$4` : `=${colLetter(c - 1)}${dayRow1}+1`;
+      i === 0 ? `=설정!$B$3` : `=${colLetter(c - 1)}${dayRow1}+1`;
     setFormulaCell(ws, headerRowIdx, c, dayFormula, "d");
     if (monthRowIdx >= 0) {
-      const monthFormula = `=IF(OR(DAY(${cL}${dayRow1})=1,${cL}${dayRow1}=설정!$B$4),TEXT(${cL}${dayRow1},"m월"),"")`;
+      const monthFormula = `=IF(OR(DAY(${cL}${dayRow1})=1,${cL}${dayRow1}=설정!$B$3),TEXT(${cL}${dayRow1},"m월"),"")`;
       setFormulaCellText(ws, monthRowIdx, c, monthFormula);
     }
   }
