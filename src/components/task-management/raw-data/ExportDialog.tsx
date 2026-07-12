@@ -11,7 +11,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Download, Loader2 } from "lucide-react";
-import { TM_COLUMNS } from "@/lib/task-management/columns";
+import { TM_COLUMNS, TM_GANTT_ORIGINAL_ORDER } from "@/lib/task-management/columns";
 import {
   buildStyledWorkbook,
   saveStyledWorkbook,
@@ -41,16 +41,17 @@ function ganttGroup(key: string): ColumnGroupTag {
 }
 
 const NUMFMT_BY_KEY: Record<string, string> = {
-  plan_start: "mm-dd-yy",
-  plan_end: "mm-dd-yy",
-  actual_start: "mm-dd-yy",
-  actual_finish: "mm-dd-yy",
-  forecast_end: "mm-dd-yy",
-  data_date: "mm-dd-yy",
+  // 원본 템플릿과 동일한 yyyy-mm-dd 날짜 표기
+  plan_start: "yyyy-mm-dd",
+  plan_end: "yyyy-mm-dd",
+  actual_start: "yyyy-mm-dd",
+  actual_finish: "yyyy-mm-dd",
+  forecast_end: "yyyy-mm-dd",
+  data_date: "yyyy-mm-dd",
   actual_progress: "0.0%",
-  plan_progress: "0%",
+  plan_progress: "0.0%",
   expected_progress_today: "0%",
-  progress_variance: "+0%;-0%;0%",
+  progress_variance: "+0.0%;-0.0%;0.0%",
   today_gap: "+0%;-0%;0%",
   plan_days: "0;-0;-",
   actual_duration: "0;-0;-",
@@ -68,6 +69,7 @@ function toIso(v: unknown): string | null {
 }
 
 function computeGanttRange(rows: Record<string, unknown>[], dataDateIso: string) {
+function computeGanttRange(rows: Record<string, unknown>[], dataDateIso: string) {
   const dates: string[] = [];
   for (const r of rows) {
     for (const k of ["plan_start", "plan_end", "actual_start", "actual_finish", "forecast_end"]) {
@@ -79,17 +81,17 @@ function computeGanttRange(rows: Record<string, unknown>[], dataDateIso: string)
   dates.push(dataDateIso);
   dates.sort();
   const start = dates[0];
-  const end = dates[dates.length - 1];
-  // Cap total span at 2 years (~730 days) to protect the workbook builder.
+  const endActual = dates[dates.length - 1];
   const startMs = Date.parse(start + "T00:00:00Z");
-  const endMs = Date.parse(end + "T00:00:00Z");
-  const days = Math.round((endMs - startMs) / 86400000);
-  if (!Number.isFinite(days) || days < 0) return null;
-  if (days > 730) {
-    const capped = new Date(startMs + 730 * 86400000).toISOString().slice(0, 10);
-    return { startDate: start, endDate: capped };
-  }
-  return { startDate: start, endDate: end };
+  const endActualMs = Date.parse(endActual + "T00:00:00Z");
+  if (!Number.isFinite(startMs) || !Number.isFinite(endActualMs)) return null;
+  // 원본 템플릿 기본 153일. 데이터가 더 짧으면 최소 153일 확보, 더 길면 730일 캡.
+  const DEFAULT_DAYS = 153;
+  const MAX_DAYS = 730;
+  const actualDays = Math.round((endActualMs - startMs) / 86400000);
+  const days = Math.min(MAX_DAYS, Math.max(DEFAULT_DAYS, actualDays));
+  const capped = new Date(startMs + days * 86400000).toISOString().slice(0, 10);
+  return { startDate: start, endDate: capped };
 }
 
 type ExportFormat = "view" | "reimport";
@@ -129,6 +131,28 @@ function styledCols(
   });
 }
 
+/**
+ * 원본 xlsx `Gantt` 시트 A..T 순서를 재현하는 컬럼 스펙.
+ * View 모드에서만 사용 — user visibility와 무관하게 원본 순서/한글 라벨을 강제.
+ */
+function ganttOriginalCols() {
+  return TM_GANTT_ORIGINAL_ORDER.map((c) => {
+    const def = c.key ? TM_COLUMNS.find((d) => d.key === c.key) : undefined;
+    let kind: ColumnKind = "text";
+    if (def) {
+      if (def.type === "date") kind = "date";
+      else if (def.type === "number" || def.type === "percent") kind = "number";
+      else if (def.type === "boolean") kind = "boolean";
+    }
+    return {
+      key: c.key ?? `__blank_${c.letter}`,
+      label: c.label,
+      kind,
+      widthPx: def?.width,
+    };
+  });
+}
+
 export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
   const [format, setFormat] = useState<ExportFormat>("view");
   const [busy, setBusy] = useState(false);
@@ -137,21 +161,21 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
   const run = async () => {
     setBusy(true);
     try {
-      const keys = format === "reimport" ? TM_COLUMNS.map((c) => c.key) : visibleKeys;
       const isView = format === "view";
+      const keys = format === "reimport" ? TM_COLUMNS.map((c) => c.key) : visibleKeys;
       const dataDateIso = new Date().toISOString().slice(0, 10);
       const ganttRange = isView ? computeGanttRange(rows, dataDateIso) : null;
 
-      // Freeze after "status_manual" (or last visible column ≤ that index)
-      const freezeCols = isView
-        ? Math.min(keys.length, Math.max(1, keys.indexOf("status_manual") + 1 || 12))
-        : 1;
+      // View: 원본 A..T 순서 강제. 프리즈는 I열(상태)까지 = 9.
+      // Re-import: 첫 컬럼만.
+      const viewCols = ganttOriginalCols();
+      const freezeCols = isView ? 9 : 1;
 
       const wb = buildStyledWorkbook({
         title: `Task Management Raw Data  (${format === "reimport" ? "Re-import" : "View"})`,
-        columns: styledCols(keys, format, resolveLabel),
+        columns: isView ? viewCols : styledCols(keys, format, resolveLabel),
         rows,
-        sheetName: "Task Management",
+        sheetName: isView ? "Gantt" : "Task Management",
         freezeCols,
         theme: isView ? "gantt" : "default",
         columnGroup: isView ? ganttGroup : undefined,
