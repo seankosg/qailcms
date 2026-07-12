@@ -134,7 +134,7 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
   const [busy, setBusy] = useState(false);
   const resolveLabel = useTmColumnLabel();
 
-  const run = () => {
+  const run = async () => {
     setBusy(true);
     try {
       const keys = format === "reimport" ? TM_COLUMNS.map((c) => c.key) : visibleKeys;
@@ -184,8 +184,10 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
                 },
               }
             : undefined,
+        formulaMode: isView ? "template" : undefined,
+        settingsSheet: isView ? { alarmThreshold: -0.05 } : undefined,
       });
-      saveStyledWorkbook(wb, `task-management_${format}_${timestamp()}.xlsx`);
+      await saveStyledWorkbook(wb, `task-management_${format}_${timestamp()}.xlsx`);
       onOpenChange(false);
     } finally {
       setBusy(false);
