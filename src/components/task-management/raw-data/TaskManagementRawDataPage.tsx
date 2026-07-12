@@ -78,6 +78,7 @@ import { TopHorizontalScrollbar } from "@/components/spare-part/raw-data/TopHori
 import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
 import { AlarmBadge } from "./AlarmBadge";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import {
   runRollupAllParents,
   runRecalcAutoJudgment,
@@ -172,8 +173,7 @@ export function TaskManagementRawDataPage() {
   const canEdit = !!currentUser?.isAdmin;
   const { data: fieldConfig } = useTaskManagementFieldConfig();
   const labelOverrides = useMemo(() => buildTmLabelOverrides(fieldConfig), [fieldConfig]);
-  const userKey = currentUser?.id ?? null;
-  const storageKey = userKey ? `qail.task-management.raw-data.v1:${userKey}` : null;
+  const viewPref = useUserViewPreference("task-management.raw-data.v1");
 
   const [stateLoaded, setStateLoaded] = useState(false);
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
@@ -194,16 +194,11 @@ export function TaskManagementRawDataPage() {
   const rollupFn = useServerFn(runRollupAllParents);
   const judgmentFn = useServerFn(runRecalcAutoJudgment);
 
-  // initial load from localStorage
+  // initial load from server-backed view preference (with local cache fallback)
   useEffect(() => {
-    if (!storageKey) return;
-    let s: Partial<PersistedState> = {};
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) s = JSON.parse(raw);
-    } catch {
-      // ignore
-    }
+    if (!viewPref.ready) return;
+    if (stateLoaded) return;
+    const s: Partial<PersistedState> = (viewPref.state ?? {}) as Partial<PersistedState>;
 
     const validKeys = new Set(TM_COLUMNS.map((c) => c.key).filter((k) => k !== "task_no"));
     const validAll = new Set<string>(["__select", "task_no", ...validKeys]);
@@ -264,38 +259,27 @@ export function TaskManagementRawDataPage() {
     }
     setStateLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey]);
+  }, [viewPref.ready, viewPref.state]);
 
   useEffect(() => {
     const t = setTimeout(() => setGlobalFilter(searchInput.trim()), 250);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // localStorage persist
+  // persist to server (with local cache) — debounce lives inside the hook
   useEffect(() => {
-    if (!stateLoaded || !storageKey) return;
-    const t = setTimeout(() => {
-      try {
-        localStorage.setItem(
-          storageKey,
-          JSON.stringify({
-            sorting,
-            sizing,
-            visibility,
-            columnFilters,
-            globalFilter,
-            order,
-            frozenExtras,
-          } satisfies PersistedState),
-        );
-      } catch {
-        // ignore
-      }
-    }, 400);
-    return () => clearTimeout(t);
+    if (!stateLoaded) return;
+    viewPref.save({
+      sorting,
+      sizing,
+      visibility,
+      columnFilters,
+      globalFilter,
+      order,
+      frozenExtras,
+    } satisfies PersistedState);
   }, [
     stateLoaded,
-    storageKey,
     sorting,
     sizing,
     visibility,
@@ -303,6 +287,7 @@ export function TaskManagementRawDataPage() {
     globalFilter,
     order,
     frozenExtras,
+    viewPref,
   ]);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
