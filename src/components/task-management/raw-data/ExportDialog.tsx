@@ -69,7 +69,6 @@ function toIso(v: unknown): string | null {
 }
 
 function computeGanttRange(rows: Record<string, unknown>[], dataDateIso: string) {
-function computeGanttRange(rows: Record<string, unknown>[], dataDateIso: string) {
   const dates: string[] = [];
   for (const r of rows) {
     for (const k of ["plan_start", "plan_end", "actual_start", "actual_finish", "forecast_end"]) {
