@@ -950,7 +950,6 @@ function applyGanttTemplate(
 
   const rules: CfRule[] = [];
   // 원본 xlsx CF 규칙(14종) 재현. 계획일수 컬럼 letter (M) 를 직접 참조.
-  const M = letters.plan_days;
   const Mrel = M ? `$${M}${firstDataRow1}` : "";
   if (K && L && M && O && I && R) {
     // 1) 지연 갭 (실적 이후~계획완료 이전, Data Date 미만)
