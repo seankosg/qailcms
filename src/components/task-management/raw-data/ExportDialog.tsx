@@ -21,6 +21,7 @@ import {
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
 // -- Column → Gantt group mapping (matches upload template Gantt sheet) ------
 const GROUP_BY_KEY: Record<string, ColumnGroupTag> = {
+  __sno: "basic",
   plan_start: "plan",
   plan_end: "plan",
   plan_days: "plan",
@@ -28,7 +29,7 @@ const GROUP_BY_KEY: Record<string, ColumnGroupTag> = {
   actual_finish: "actual",
   actual_duration: "actual",
   actual_progress: "actual",
-  forecast_end: "actual",
+  forecast_end: "progress",
   plan_progress: "progress",
   progress_variance: "progress",
   expected_progress_today: "progress",
@@ -143,11 +144,17 @@ function ganttOriginalCols() {
       else if (def.type === "number" || def.type === "percent") kind = "number";
       else if (def.type === "boolean") kind = "boolean";
     }
+    // 원본 컬럼별 너비 (엑셀 wch → 대략적인 px 환산: wch * 7)
+    const WIDTHS_WCH: Record<string, number> = {
+      A: 5, B: 9, C: 15, D: 6, E: 37, F: 9, G: 34, H: 13, I: 7, J: 8,
+      K: 10, L: 11, M: 5, N: 11, O: 7, P: 8, Q: 9, R: 9, S: 6, T: 11,
+    };
+    const widthPx = (WIDTHS_WCH[c.letter] ?? 10) * 7;
     return {
       key: c.key ?? `__blank_${c.letter}`,
       label: c.label,
       kind,
-      widthPx: def?.width,
+      widthPx,
     };
   });
 }
