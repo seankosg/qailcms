@@ -79,27 +79,21 @@ export const addChildTask = createServerFn({ method: "POST" })
     const nextSeg = String(maxSeg + 1).padStart(2, "0");
     const newTaskNo = `${prefix}${nextSeg}`;
 
-    // 3) 뒤 행들 sort_order shift (충돌 방지)
+    // 3) 뒤 행들 sort_order shift (충돌 방지) — 큰 값부터 내려가며 +1
     const insertSort = maxSort + 1;
-    const { error: shiftErr } = await admin.rpc("tm_shift_sort_order", {
-      _discipline: data.discipline,
-      _threshold: maxSort,
-    });
-    // RPC이 없을 수도 있으므로 실패 시 대체 경로
-    if (shiftErr) {
-      const { data: toShift, error: fetchErr } = await admin
+    const { data: toShift, error: fetchErr } = await admin
+      .from("task_management_raw")
+      .select("id, sort_order")
+      .eq("discipline", data.discipline)
+      .gt("sort_order", maxSort)
+      .order("sort_order", { ascending: false });
+    if (fetchErr) throw new Error(fetchErr.message);
+    for (const row of toShift ?? []) {
+      const { error: uErr } = await admin
         .from("task_management_raw")
-        .select("id, sort_order")
-        .eq("discipline", data.discipline)
-        .gt("sort_order", maxSort);
-      if (fetchErr) throw new Error(fetchErr.message);
-      for (const row of toShift ?? []) {
-        const { error: uErr } = await admin
-          .from("task_management_raw")
-          .update({ sort_order: Number(row.sort_order) + 1 })
-          .eq("id", row.id);
-        if (uErr) throw new Error(uErr.message);
-      }
+        .update({ sort_order: Number(row.sort_order) + 1 })
+        .eq("id", row.id);
+      if (uErr) throw new Error(uErr.message);
     }
 
     // 4) 부모 level 승격
