@@ -12,8 +12,70 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Download, Loader2 } from "lucide-react";
 import { TM_COLUMNS } from "@/lib/task-management/columns";
-import { buildStyledWorkbook, saveStyledWorkbook, type ColumnKind } from "@/lib/excel/styled-workbook";
+import {
+  buildStyledWorkbook,
+  saveStyledWorkbook,
+  type ColumnKind,
+  type ColumnGroupTag,
+} from "@/lib/excel/styled-workbook";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
+// -- Column → Gantt group mapping (matches upload template Gantt sheet) ------
+const GROUP_BY_KEY: Record<string, ColumnGroupTag> = {
+  plan_start: "plan",
+  plan_end: "plan",
+  plan_days: "plan",
+  actual_start: "actual",
+  actual_finish: "actual",
+  actual_duration: "actual",
+  actual_progress: "actual",
+  forecast_end: "actual",
+  plan_progress: "progress",
+  progress_variance: "progress",
+  expected_progress_today: "progress",
+  today_gap: "progress",
+  slip_days: "progress",
+  auto_judgment: "progress",
+};
+function ganttGroup(key: string): ColumnGroupTag {
+  return GROUP_BY_KEY[key] ?? "basic";
+}
+
+const NUMFMT_BY_KEY: Record<string, string> = {
+  plan_start: "mm-dd-yy",
+  plan_end: "mm-dd-yy",
+  actual_start: "mm-dd-yy",
+  actual_finish: "mm-dd-yy",
+  forecast_end: "mm-dd-yy",
+  data_date: "mm-dd-yy",
+  actual_progress: "0.0%",
+  plan_progress: "0%",
+  expected_progress_today: "0%",
+  progress_variance: "+0%;-0%;0%",
+  today_gap: "+0%;-0%;0%",
+  plan_days: "0;-0;-",
+  actual_duration: "0;-0;-",
+  slip_days: "+0;-0;-",
+};
+
+function toIso(v: unknown): string | null {
+  if (v == null || v === "") return null;
+  const s = String(v).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return m ? m[0] : null;
+}
+
+function computeGanttRange(rows: Record<string, unknown>[], dataDateIso: string) {
+  const dates: string[] = [dataDateIso];
+  for (const r of rows) {
+    for (const k of ["plan_start", "plan_end", "actual_start", "actual_finish", "forecast_end"]) {
+      const iso = toIso(r[k]);
+      if (iso) dates.push(iso);
+    }
+  }
+  if (dates.length <= 1) return null;
+  dates.sort();
+  return { startDate: dates[0], endDate: dates[dates.length - 1] };
+}
 
 type ExportFormat = "view" | "reimport";
 
@@ -61,12 +123,46 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
     setBusy(true);
     try {
       const keys = format === "reimport" ? TM_COLUMNS.map((c) => c.key) : visibleKeys;
+      const isView = format === "view";
+      const dataDateIso = new Date().toISOString().slice(0, 10);
+      const ganttRange = isView ? computeGanttRange(rows, dataDateIso) : null;
+
+      // Freeze after "status_manual" (or last visible column ≤ that index)
+      const freezeCols = isView
+        ? Math.min(keys.length, Math.max(1, keys.indexOf("status_manual") + 1 || 12))
+        : 1;
+
       const wb = buildStyledWorkbook({
         title: `Task Management Raw Data  (${format === "reimport" ? "Re-import" : "View"})`,
         columns: styledCols(keys, format, resolveLabel),
         rows,
         sheetName: "Task Management",
-        freezeCols: 1,
+        freezeCols,
+        theme: isView ? "gantt" : "default",
+        columnGroup: isView ? ganttGroup : undefined,
+        dataDate: isView ? dataDateIso : undefined,
+        numFmtByKey: isView ? NUMFMT_BY_KEY : undefined,
+        cellFillOverride: isView
+          ? (key, value) => (key === "risk" && value === "High" ? "FFED7D31" : null)
+          : undefined,
+        gantt:
+          isView && ganttRange
+            ? {
+                startDate: ganttRange.startDate,
+                endDate: ganttRange.endDate,
+                rowDates: (row) => {
+                  const ap = Number(row["actual_progress"] ?? 0);
+                  return {
+                    planStart: toIso(row["plan_start"]),
+                    planEnd: toIso(row["plan_end"]),
+                    actualStart: toIso(row["actual_start"]),
+                    actualFinish: toIso(row["actual_finish"]),
+                    forecastEnd: toIso(row["forecast_end"]),
+                    done: Number.isFinite(ap) && ap >= 1,
+                  };
+                },
+              }
+            : undefined,
       });
       saveStyledWorkbook(wb, `task-management_${format}_${timestamp()}.xlsx`);
       onOpenChange(false);
