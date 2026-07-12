@@ -23,7 +23,9 @@ export type Database = {
           id: string
           is_visible: boolean
           note: string | null
+          origin: string | null
           sort_order: number
+          source_label: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -35,7 +37,9 @@ export type Database = {
           id?: string
           is_visible?: boolean
           note?: string | null
+          origin?: string | null
           sort_order?: number
+          source_label?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -47,7 +51,9 @@ export type Database = {
           id?: string
           is_visible?: boolean
           note?: string | null
+          origin?: string | null
           sort_order?: number
+          source_label?: string | null
           updated_at?: string
           updated_by?: string | null
         }

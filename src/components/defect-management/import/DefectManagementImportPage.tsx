@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
-  Columns3,
+  Settings2,
   FileSpreadsheet,
   Loader2,
   Upload,
@@ -34,10 +34,14 @@ import {
   type DefectImportFile,
 } from "@/contexts/DefectManagementImportContext";
 import { DEFECT_TEAMS, type DefectTeam } from "@/lib/defect-management/columns";
-import { DefectColumnMappingDialog } from "./DefectColumnMappingDialog";
+import { DefectColumnSelect } from "./DefectColumnSelect";
 
 const statusBadge: Record<DefectFileStatus, { label: string; cls: string }> = {
   parsing: { label: "Parsing", cls: "bg-muted text-muted-foreground" },
+  pending_sheet_selection: {
+    label: "Sheet 선택",
+    cls: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-200",
+  },
   needs_team: { label: "Team 필요", cls: "bg-amber-100 text-amber-800" },
   ready: { label: "Ready", cls: "bg-primary/10 text-primary" },
   processing: { label: "Processing", cls: "bg-muted text-muted-foreground" },
@@ -76,11 +80,12 @@ function Inner() {
     clearAll,
     setFileTeam,
     setFileDataDateOverride,
-    setFileColumnOverrides,
+    setFileSheet,
+    setFileExcludedHeaders,
     startImport,
   } = useDefectImport();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [mappingFileId, setMappingFileId] = useState<string | null>(null);
+  const [columnDialogFileId, setColumnDialogFileId] = useState<string | null>(null);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -100,7 +105,8 @@ function Inner() {
   const readyCount = files.filter(
     (f) => f.status === "ready" && f.team && !f.validationError,
   ).length;
-  const mappingFile = files.find((f) => f.id === mappingFileId) ?? null;
+  const columnDialogFile =
+    files.find((f) => f.id === columnDialogFileId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -176,24 +182,31 @@ function Inner() {
                 onRemove={() => removeFile(f.id)}
                 onTeamChange={(t) => setFileTeam(f.id, t)}
                 onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
-                onOpenMapping={() => setMappingFileId(f.id)}
+                onOpenColumnSelect={() => setColumnDialogFileId(f.id)}
+                onSheetChange={(sheet) => setFileSheet(f.id, sheet)}
               />
             ))}
           </CardContent>
         </Card>
       )}
 
-      {mappingFile && mappingFile.sheetHeaders && mappingFile.columnMap && (
-        <DefectColumnMappingDialog
-          open={!!mappingFile}
-          onClose={() => setMappingFileId(null)}
-          fileName={mappingFile.name}
-          sheetHeaders={mappingFile.sheetHeaders}
-          currentMap={mappingFile.columnMap}
-          defaultMap={mappingFile.columnMap}
-          onApply={(overrides) => setFileColumnOverrides(mappingFile.id, overrides)}
-        />
-      )}
+      {columnDialogFile &&
+        columnDialogFile.availableHeaders &&
+        columnDialogFile.headerToFieldMap && (
+          <DefectColumnSelect
+            open={!!columnDialogFileId}
+            onClose={() => setColumnDialogFileId(null)}
+            fileName={columnDialogFile.name}
+            headers={columnDialogFile.availableHeaders}
+            samples={columnDialogFile.headerSamples ?? {}}
+            headerToFieldMap={columnDialogFile.headerToFieldMap}
+            defaultExcluded={columnDialogFile.excludedHeaders ?? []}
+            isReimport={!!columnDialogFile.isReimport}
+            onApply={(excluded) =>
+              setFileExcludedHeaders(columnDialogFile.id, excluded)
+            }
+          />
+        )}
     </div>
   );
 }
@@ -204,32 +217,74 @@ function FileRow({
   onRemove,
   onTeamChange,
   onDataDateChange,
-  onOpenMapping,
+  onOpenColumnSelect,
+  onSheetChange,
 }: {
   file: DefectImportFile;
   isRunning: boolean;
   onRemove: () => void;
   onTeamChange: (t: DefectTeam) => void;
   onDataDateChange: (v: string | null) => void;
-  onOpenMapping: () => void;
+  onOpenColumnSelect: () => void;
+  onSheetChange: (sheet: string) => void;
 }) {
   const badge = statusBadge[f.status];
   const rowsCount = f.parsed?.length ?? 0;
   const effectiveDate = f.dataDateOverride ?? "";
   const disabled = isRunning || f.status === "done" || f.status === "processing";
+  const totalHeaders = f.availableHeaders?.length ?? 0;
+  const excludedCount = f.excludedHeaders?.length ?? 0;
+  const selectedHeaders = Math.max(totalHeaders - excludedCount, 0);
   return (
     <div className="rounded border p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <FileSpreadsheet className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{f.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-medium">{f.name}</p>
+              {f.isReimport && (
+                <Badge
+                  variant="outline"
+                  className="bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-200 text-[10px]"
+                >
+                  Re-import (Update only)
+                </Badge>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               {formatSize(f.size)}
               {rowsCount > 0 && ` · ${rowsCount.toLocaleString()} rows`}
               {f.sheetName && ` · sheet: ${f.sheetName}`}
+              {totalHeaders > 0 && ` · ${totalHeaders} headers`}
             </p>
+            {f.isReimport && (
+              <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-200">
+                이 파일은 Re-import 포맷으로 감지되었습니다. 기존 행만 업데이트되며 신규 행은 생성되지 않습니다.
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
+              {f.sheetNames && f.sheetNames.length > 1 && (
+                <>
+                  <span className="text-xs text-muted-foreground">Sheet</span>
+                  <Select
+                    value={f.sheetName ?? ""}
+                    onValueChange={onSheetChange}
+                    disabled={disabled}
+                  >
+                    <SelectTrigger className="h-7 w-[180px] text-xs">
+                      <SelectValue placeholder="시트 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {f.sheetNames.map((s) => (
+                        <SelectItem key={s} value={s} className="text-xs">
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
               <span className="text-xs text-muted-foreground">Team *</span>
               <Select
                 value={f.team ?? ""}
@@ -256,20 +311,16 @@ function FileRow({
                 onChange={(e) => onDataDateChange(e.target.value || null)}
                 disabled={disabled}
               />
-              {f.sheetHeaders && f.columnMap && (
+              {totalHeaders > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-7 gap-1.5 text-xs"
-                  onClick={onOpenMapping}
+                  onClick={onOpenColumnSelect}
                   disabled={disabled || f.status === "parsing"}
                 >
-                  <Columns3 className="h-3.5 w-3.5" /> 컬럼 매핑
-                  {f.columnOverrides && Object.keys(f.columnOverrides).length > 0 && (
-                    <span className="text-amber-600">
-                      ({Object.keys(f.columnOverrides).length})
-                    </span>
-                  )}
+                  <Settings2 className="h-3.5 w-3.5" /> 컬럼 선택 (
+                  {selectedHeaders}/{totalHeaders})
                 </Button>
               )}
             </div>
@@ -322,6 +373,11 @@ function FileRow({
           {f.result.skippedLocked > 0 && (
             <Badge variant="outline" className="border-amber-300 text-amber-700">
               Locked skipped: {f.result.skippedLocked}
+            </Badge>
+          )}
+          {(f.result.skippedReimportNoMatch ?? 0) > 0 && (
+            <Badge variant="outline" className="border-amber-300 text-amber-700">
+              Reimport no-match: {f.result.skippedReimportNoMatch}
             </Badge>
           )}
           {f.result.duplicates > 0 && (
