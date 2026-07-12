@@ -1,67 +1,40 @@
 
+# Defect Raw Data 로딩 개선 (A + B 안)
+
 ## 목표
+Defect Raw Data 페이지 진입/필터 변경 시마다 발생하는 전량 재로딩을 제거해 체감 로딩 시간을 대폭 단축한다. 서버 왕복은 첫 진입과 명시적 “Refresh” 시에만 발생시키고, teams/status/검색어 필터는 클라이언트에서 즉시 반영한다.
 
-Task Management Raw Data 페이지에서 각 사용자가 조절한 컬럼 표시/순서/너비/고정/정렬/필터/검색어 설정을, 새로고침·재로그인·기기 변경 시에도 그대로 유지되도록 서버(Lovable Cloud) 저장 방식으로 전환한다.
+## 변경 내용
 
-## 배경
+### 1) `src/hooks/useDefectRawData.ts`
+- `DefectFilters` 는 유지하되, **서버 쿼리에서는 `includeInactive` 만 반영**. teams / status / q 는 서버 쿼리에서 제거.
+- 쿼리 키를 `["defect-raw-data", { includeInactive }]` 로 단순화 → 필터 변경 시 캐시 재사용.
+- React Query 옵션:
+  - `staleTime: 5 * 60_000` (5분)
+  - `gcTime: 30 * 60_000` (30분)
+  - `refetchOnWindowFocus: false`
+  - `refetchOnMount: false` (캐시 있으면 재요청 안 함, stale 이어도 백그라운드 refetch만)
+- 기존 `getDefectLatestDataDate` 로직 유지.
 
-- 현재 `TaskManagementRawDataPage.tsx`는 `qail.task-management.raw-data.v1:{userId}` 키로 localStorage에만 저장.
-- 재로그인·다른 브라우저·시크릿 모드·캐시 초기화 시 손실.
-- 또한 `currentUser`가 늦게 도착하면 `storageKey`가 늦게 설정되어 초기화 레이스가 발생.
+### 2) `src/components/defect-management/raw-data/DefectRawDataPage.tsx`
+- `useDefectRawData` 는 `{ includeInactive }` 만 넘기고, teams/status/q 필터링은 `useMemo` 로 클라이언트에서 수행:
+  - teams: `filters.teams.length === 0 || filters.teams.includes(row.team)`
+  - status: `filters.status.length === 0 || filters.status.includes(row.status_raw ?? "")`
+  - q: 기존 서버 `or(ilike)` 대상 컬럼 6종(`source_issue_no`, `description`, `location_raw`, `assigned_to`, `subcontractor_name`, `hdec_pic_name`)에 대해 대소문자 무시 `includes` 매칭.
+- 필터 적용된 배열을 기존에 테이블에 넘기던 데이터 자리에 그대로 대입 (하위 로직 변경 없음).
+- 상단 툴바에 **Refresh 버튼**(이미 import 된 `RefreshCcw` 아이콘 사용) 추가 → `queryClient.invalidateQueries({ queryKey: ["defect-raw-data"] })` + `refetch()`.
 
-## 스토리지 설계
-
-### 새 테이블 `public.user_view_preferences`
-
-행 단위 = 사용자 × 화면(view). 여러 페이지에서 재사용 가능하도록 일반화.
-
-| 컬럼 | 타입 | 비고 |
-|---|---|---|
-| `user_id` | uuid | FK `auth.users.id` (PK 일부) |
-| `view_key` | text | PK 일부. 예: `task-management.raw-data.v1` |
-| `state` | jsonb | `{ sorting, sizing, visibility, columnFilters, globalFilter, order, frozenExtras }` |
-| `updated_at` | timestamptz | trigger `set_updated_at` |
-
-- PK: `(user_id, view_key)`
-- RLS 정책 4종: SELECT/INSERT/UPDATE/DELETE 모두 `auth.uid() = user_id`
-- GRANT: `authenticated` 에 SELECT/INSERT/UPDATE/DELETE, `service_role` ALL
-- `anon` 접근 없음
-
-### Server Functions (createServerFn, `requireSupabaseAuth`)
-
-`src/lib/task-management/user-view-preferences.functions.ts`
-- `getUserViewPreference({ viewKey })` → `state | null`
-- `upsertUserViewPreference({ viewKey, state })` → `ok`
-
-### 클라이언트 훅
-
-`src/hooks/useUserViewPreference.ts`
-- TanStack Query 로 `["user-view-pref", viewKey, userId]` 캐시
-- 로컬 캐시(localStorage) 를 `initialData` 로 사용 → 서버 응답 도착 전 즉시 이전 설정 렌더 (오프라인/느린 네트워크에서도 깜빡임 없음)
-- `mutate(state)` 는 300–500ms debounce 로 서버 upsert + 로컬 캐시 동기화
-- 서버 우선 정책: 서버 응답이 도착하면 로컬 캐시를 덮어써 다른 기기 변경분을 반영
-
-## 페이지 통합
-
-`src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`
-- 기존 localStorage load/save `useEffect` 2개 제거
-- `useUserViewPreference("task-management.raw-data.v1")` 로 교체
-- 로드 완료 시 기존과 동일한 검증/병합 로직(신규 컬럼 자동 삽입, 유효 키 필터, 3개 이하 freeze 제한 등)을 재사용 → helper 로 분리해 훅 안에서 실행
-- `collapsedParents` 는 계정 무관 UI 상태이므로 localStorage 유지
-
-## 마이그레이션 (호환성)
-
-- 첫 로드 시 서버 응답이 `null` 이면 기존 localStorage 값을 읽어 서버에 upsert 후 사용 → 사용자별 기존 튜닝 손실 방지
-
-## 인프라 확인 사항
-
-- `src/start.ts` 의 `functionMiddleware` 에 Supabase bearer attacher 가 이미 등록되어 있는지 확인, 없으면 append.
-- Raw Data 페이지는 `_authenticated/` 하위에 있으므로 loader가 아닌 컴포넌트에서 호출 → 안전.
+## 비변경 항목
+- `defect_items_raw` 스키마, 컬럼 선택(`select("*")`), 정렬, 페이지 크기, 40k 안전상한 유지.
+- 상세/편집/BulkEdit/Export 등 다른 흐름 변경 없음.
+- localStorage 컬럼 프리퍼런스 등 다른 저장 로직 변경 없음.
 
 ## 파일 변경 목록
+- 수정: `src/hooks/useDefectRawData.ts`
+- 수정: `src/components/defect-management/raw-data/DefectRawDataPage.tsx`
 
-- 신규 migration: `user_view_preferences` 테이블 + GRANT + RLS + 정책 + `set_updated_at` 트리거
-- 신규: `src/lib/task-management/user-view-preferences.functions.ts`
-- 신규: `src/hooks/useUserViewPreference.ts`
-- 수정: `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx` (persist 로직 훅으로 교체)
-- (필요 시) 수정: `src/start.ts` — bearer middleware 등록 확인
+## 검증
+- 진입 → 30초 이상 대기 후 다른 페이지 갔다 복귀 시 재요청이 발생하지 않는지 확인.
+- teams/status/검색어 변경 시 네트워크 요청 없이 즉시 필터링되는지 확인.
+- Refresh 버튼 클릭 시에만 서버 재조회되는지 확인.
+- 첫 로드 결과 `latestDataDate` 표시 정상 여부 확인.
