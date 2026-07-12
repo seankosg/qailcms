@@ -874,43 +874,57 @@ function applyGanttTemplate(
   const Irel = I ? `$${I}${firstDataRow1}` : "";
 
   const rules: CfRule[] = [];
-  if (K && L && O && I && R) {
+  // 원본 xlsx CF 규칙(14종) 재현. 계획일수 컬럼 letter (M) 를 직접 참조.
+  const M = letters.plan_days;
+  const Mrel = M ? `$${M}${firstDataRow1}` : "";
+  if (K && L && M && O && I && R) {
+    // 1) 지연 갭 (실적 이후~계획완료 이전, Data Date 미만)
+    rules.push({
+      ref: calRange,
+      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel}+${Orel}*${Mrel},${dayCellRel}<=${Lrel},${dayCellRel}<${D4})`,
+      fillRgb: "FFE06666",
+    });
+    // 2) 실적 진척 구간
+    rules.push({
+      ref: calRange,
+      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel},${dayCellRel}<${Krel}+${Orel}*${Mrel})`,
+      fillRgb: "FF548235",
+    });
+    // 3) 예상 완료일
     rules.push({
       ref: calRange,
       formula: `AND(${Irel}<>"항목",ISNUMBER(${Rrel}),${dayCellRel}=${Rrel})`,
-      fillRgb: "FFFF6600",
-      bold: true,
-    });
-    rules.push({
-      ref: calRange,
-      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel}+${Orel}*(${Lrel}-${Krel}+1),${dayCellRel}<=${Lrel},${dayCellRel}<${D4})`,
-      fillRgb: "FFFFC7CE",
-    });
-    rules.push({
-      ref: calRange,
-      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel},${dayCellRel}<${Krel}+${Orel}*(${Lrel}-${Krel}+1))`,
-      fillRgb: "FF548235",
+      fillRgb: "FF7030A0",
     });
   }
   if (K && L && I) {
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="실행")`, fillRgb: "FF1F4E79" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="승인")`, fillRgb: "FF7030A0" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="대기")`, fillRgb: "FF808080" });
+    // 4~7) 계획 완료일 (유형별)
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="실행")`, fillRgb: "FF2E75B6" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="승인")`, fillRgb: "FFC55A11" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="대기")`, fillRgb: "FF7F7F7F" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="항목")`, fillRgb: "FF1F4E79" });
+    // 8~11) 계획 구간 (유형별)
     rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="실행")`, fillRgb: "FFBDD7EE" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="승인")`, fillRgb: "FFD9C1F0" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="대기")`, fillRgb: "FFE7E6E6" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="승인")`, fillRgb: "FFFCE4D6" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="대기")`, fillRgb: "FFD9D9D9" });
+    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="항목")`, fillRgb: "FFD6DCE4" });
   }
-  rules.push({ ref: calRange, formula: `${dayCellRel}=${D4}`, fillRgb: "FFFFF2CC", borderRgb: "FFC00000" });
-  rules.push({ ref: calRange, formula: `${dayCellRel}=TODAY()`, borderRgb: "FF808080" });
-  rules.push({ ref: calRange, formula: `WEEKDAY(${dayCellRel})=6`, fillRgb: "FFF2F2F2" });
+  // 12) Data Date 열
+  rules.push({ ref: calRange, formula: `${dayCellRel}=${D4}`, fillRgb: "FFFFC000" });
+  // 13) 오늘 열
+  rules.push({ ref: calRange, formula: `${dayCellRel}=TODAY()`, fillRgb: "FFFFE699" });
+  // 14) 금요일 (WEEKDAY 기본 return_type=1 → 금=6)
+  rules.push({ ref: calRange, formula: `WEEKDAY(${dayCellRel})=6`, fillRgb: "FFE7E6E6" });
 
+  // T열 자동판정 색상
   if (T) {
     const tRange = `${T}${firstDataRow1}:${T}${lastDataRow1}`;
     const tRef = `$${T}${firstDataRow1}`;
-    rules.push({ ref: tRange, formula: `${tRef}="지연"`, fillRgb: "FFF4CCCC", fontColorRgb: "FFC00000", bold: true });
-    rules.push({ ref: tRange, formula: `${tRef}="주의(미착수)"`, fillRgb: "FFFCE5CD", fontColorRgb: "FFB45F06", bold: true });
-    rules.push({ ref: tRange, formula: `${tRef}="완료"`, fillRgb: "FFD9EAD3", fontColorRgb: "FF38761D", bold: true });
+    rules.push({ ref: tRange, formula: `${tRef}="지연"`, fillRgb: "FFC00000", fontColorRgb: "FFFFFFFF", bold: true });
+    rules.push({ ref: tRange, formula: `${tRef}="주의(미착수)"`, fillRgb: "FFED7D31", fontColorRgb: "FFFFFFFF", bold: true });
+    rules.push({ ref: tRange, formula: `${tRef}="완료"`, fillRgb: "FF548235", fontColorRgb: "FFFFFFFF", bold: true });
   }
+  // Q열 진도차 색상 (fill only, 원본과 동일)
   if (Q && O && I) {
     const qRange = `${Q}${firstDataRow1}:${Q}${lastDataRow1}`;
     const qRef = `$${Q}${firstDataRow1}`;
@@ -919,15 +933,24 @@ function applyGanttTemplate(
     rules.push({
       ref: qRange,
       formula: `AND(ISNUMBER(${qRef}),${qRef}<0,${iRef}<>"항목")`,
-      fontColorRgb: "FFC00000",
-      bold: true,
+      fillRgb: "FFFCE4D6",
     });
     rules.push({
       ref: qRange,
       formula: `AND(ISNUMBER(${qRef}),${qRef}>=0,${oRef}>0,${iRef}<>"항목")`,
-      fontColorRgb: "FF38761D",
-      bold: true,
+      fillRgb: "FFE2EFDA",
     });
+  }
+  // B열 No: 지연 행 배경
+  if (T) {
+    const nCol = letters.task_no;
+    if (nCol) {
+      rules.push({
+        ref: `${nCol}${firstDataRow1}:${nCol}${lastDataRow1}`,
+        formula: `$${T}${firstDataRow1}="지연"`,
+        fillRgb: "FFFCE4E4",
+      });
+    }
   }
 
   cfBySheet.set(wb, { sheetName: (wb.SheetNames[0] as string) ?? "Sheet1", rules });
