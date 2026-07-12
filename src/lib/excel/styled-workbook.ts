@@ -729,6 +729,7 @@ function applyGanttTemplate(
     monthRowIdx: number;
     dataStart: number;
     startDateIso: string;
+    dataDateIso: string;
     settingsSheet?: StyledSheetOptions["settingsSheet"];
   },
 ) {
@@ -743,7 +744,12 @@ function applyGanttTemplate(
   } = ctx;
   if (rowCount === 0 || ganttCount === 0) return;
 
-  const settingsWs = buildSettingsSheet(ctx.startDateIso, ganttCount, ctx.settingsSheet);
+  const settingsWs = buildSettingsSheet(
+    ctx.dataDateIso,
+    ctx.startDateIso,
+    ganttCount,
+    ctx.settingsSheet,
+  );
   XLSX.utils.book_append_sheet(wb, settingsWs, "설정");
 
   // Data Date banner: split merged row, put date formula in D column.
@@ -791,11 +797,12 @@ function applyGanttTemplate(
   for (let i = 0; i < ganttCount; i++) {
     const c = firstCalCol0 + i;
     const cL = colLetter(c);
+    // First calendar day = 설정!$B$4 (chart start). Subsequent = prev+1.
     const dayFormula =
-      i === 0 ? `=설정!$B$3` : `=${colLetter(c - 1)}${dayRow1}+1`;
+      i === 0 ? `=설정!$B$4` : `=${colLetter(c - 1)}${dayRow1}+1`;
     setFormulaCell(ws, headerRowIdx, c, dayFormula, "d");
     if (monthRowIdx >= 0) {
-      const monthFormula = `=IF(OR(DAY(${cL}${dayRow1})=1,${cL}${dayRow1}=설정!$B$3),TEXT(${cL}${dayRow1},"m월"),"")`;
+      const monthFormula = `=IF(OR(DAY(${cL}${dayRow1})=1,${cL}${dayRow1}=설정!$B$4),TEXT(${cL}${dayRow1},"m월"),"")`;
       setFormulaCellText(ws, monthRowIdx, c, monthFormula);
     }
   }
