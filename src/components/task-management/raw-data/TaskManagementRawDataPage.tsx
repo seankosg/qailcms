@@ -480,6 +480,29 @@ export function TaskManagementRawDataPage() {
         cell: ({ row, getValue }) => {
           const val = getValue();
           const rendered = renderCell(c, val);
+          if (c.key === "auto_judgment") {
+            if (val == null || val === "")
+              return <span className="text-muted-foreground/40">—</span>;
+            const rr = row.original as any;
+            return (
+              <AlarmBadge
+                value={String(val)}
+                todayGap={
+                  rr.today_gap != null
+                    ? Number(rr.today_gap)
+                    : todayGap({
+                        actual_progress: rr.actual_progress,
+                        plan_start: rr.plan_start,
+                        plan_end: rr.plan_end,
+                      })
+                }
+                slipDays={rr.slip_days != null ? Number(rr.slip_days) : null}
+                actualProgress={
+                  rr.actual_progress != null ? Number(rr.actual_progress) : null
+                }
+              />
+            );
+          }
           if (c.key === "task_no") {
             const rr = row.original as Row;
             const isParent = rr.level === "parent";
