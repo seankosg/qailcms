@@ -94,7 +94,27 @@ export function useDefectImport() {
   return c;
 }
 
-const INSERT_CHUNK = 500;
+const INSERT_CHUNK = 150;
+const BATCH_DELAY_MS = 60;
+const RETRY_DELAYS_MS = [300, 800, 2000];
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function isNetworkError(err: unknown): boolean {
+  if (!err) return false;
+  const msg =
+    (err as { message?: string })?.message ??
+    (typeof err === "string" ? err : "");
+  const details = (err as { details?: string })?.details ?? "";
+  const combined = `${msg} ${details}`.toLowerCase();
+  return (
+    combined.includes("failed to fetch") ||
+    combined.includes("networkerror") ||
+    combined.includes("network error") ||
+    combined.includes("fetch failed") ||
+    combined.includes("load failed")
+  );
+}
 
 function validate(f: DefectImportFile): string | null {
   if (!f.parsed || f.parsed.length === 0) return "행을 찾지 못했습니다.";
