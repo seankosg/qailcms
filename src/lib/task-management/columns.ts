@@ -111,7 +111,7 @@ export const TM_COLUMNS: TmColumnDef[] = [
   { key: "pic", label: "PIC", type: "text", width: 120, group: "task", editable: true, editorType: "text" },
   { key: "row_type", label: "Work Type", type: "badge", width: 90, group: "task", editable: true, editorType: "select", options: [...ROW_TYPES] },
   { key: "status_manual", label: "Status", type: "badge", width: 90, group: "status", editable: true, editorType: "select", options: [...STATUS_MANUAL] },
-  { key: "auto_judgment", label: "Alarm", type: "badge", width: 120, group: "status" },
+  { key: "auto_judgment", label: "Alarm", type: "badge", width: 100, group: "status" },
   { key: "plan_start", label: "P.Start", type: "date", width: 110, group: "plan", editable: true, editorType: "date" },
   { key: "plan_end", label: "P.Finish", type: "date", width: 110, group: "plan", editable: true, editorType: "date" },
   { key: "plan_days", label: "P.Duration", type: "number", width: 90, group: "plan" },
