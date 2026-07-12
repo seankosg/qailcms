@@ -145,6 +145,12 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
         cellFillOverride: isView
           ? (key, value) => (key === "risk" && value === "High" ? "FFED7D31" : null)
           : undefined,
+        rowStyleOverride: isView
+          ? (row) =>
+              row["level"] === "parent"
+                ? { fillRgb: "FF305496", fontColorRgb: "FFFFFFFF", bold: true }
+                : null
+          : undefined,
         gantt:
           isView && ganttRange
             ? {
