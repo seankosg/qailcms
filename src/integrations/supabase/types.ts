@@ -14,6 +14,465 @@ export type Database = {
   }
   public: {
     Tables: {
+      defect_field_config: {
+        Row: {
+          created_at: string
+          display_name: string
+          field_name: string
+          group_key: string | null
+          id: string
+          is_visible: boolean
+          note: string | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          field_name: string
+          group_key?: string | null
+          id?: string
+          is_visible?: boolean
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          field_name?: string
+          group_key?: string | null
+          id?: string
+          is_visible?: boolean
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      defect_header_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          is_custom: boolean
+          module: string
+          note: string | null
+          source_header: string
+          target_field: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          module?: string
+          note?: string | null
+          source_header: string
+          target_field: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          module?: string
+          note?: string | null
+          source_header?: string
+          target_field?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      defect_import_logs: {
+        Row: {
+          created_at: string
+          data_date: string | null
+          errors: Json | null
+          file_name: string
+          finished_at: string | null
+          id: string
+          imported_by: string | null
+          inserted: number | null
+          note: string | null
+          rejected: number | null
+          rollback_force: boolean | null
+          rolled_back_at: string | null
+          rolled_back_by: string | null
+          sheet_name: string | null
+          skipped: number | null
+          started_at: string | null
+          status: string
+          team: string | null
+          total_rows: number | null
+          updated: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_date?: string | null
+          errors?: Json | null
+          file_name: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          inserted?: number | null
+          note?: string | null
+          rejected?: number | null
+          rollback_force?: boolean | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          sheet_name?: string | null
+          skipped?: number | null
+          started_at?: string | null
+          status?: string
+          team?: string | null
+          total_rows?: number | null
+          updated?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_date?: string | null
+          errors?: Json | null
+          file_name?: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          inserted?: number | null
+          note?: string | null
+          rejected?: number | null
+          rollback_force?: boolean | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          sheet_name?: string | null
+          skipped?: number | null
+          started_at?: string | null
+          status?: string
+          team?: string | null
+          total_rows?: number | null
+          updated?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      defect_import_row_logs: {
+        Row: {
+          action_taken: string | null
+          id: string
+          processed_at: string
+          raw_row_no: number | null
+          reason_code: string | null
+          reason_detail: string | null
+          source_issue_no: string | null
+          team: string | null
+          upload_id: string
+        }
+        Insert: {
+          action_taken?: string | null
+          id?: string
+          processed_at?: string
+          raw_row_no?: number | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          source_issue_no?: string | null
+          team?: string | null
+          upload_id: string
+        }
+        Update: {
+          action_taken?: string | null
+          id?: string
+          processed_at?: string
+          raw_row_no?: number | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          source_issue_no?: string | null
+          team?: string | null
+          upload_id?: string
+        }
+        Relationships: []
+      }
+      defect_items_raw: {
+        Row: {
+          aconex_comments: string | null
+          actual_closure_date: string | null
+          actual_completion_date: string | null
+          actual_progress_pct: number | null
+          actual_start_date: string | null
+          area_level: string | null
+          area_location: string | null
+          area_type: string | null
+          assigned_to: string | null
+          captured_by_name: string | null
+          category: string | null
+          classification: string | null
+          classification_source: string | null
+          classified_at: string | null
+          closure_status: string | null
+          completion_status: string | null
+          created_at: string
+          created_by_name: string | null
+          created_by_team_name: string | null
+          created_date: string | null
+          critical_marked_at: string | null
+          critical_marked_by: string | null
+          custom_payload: Json
+          data_date: string | null
+          defect_type: string | null
+          description: string | null
+          due_by: string | null
+          forms: string | null
+          hdec_comments: string | null
+          hdec_eng_name: string | null
+          hdec_pic_name: string | null
+          hdec_reason: string | null
+          hdec_verification: string | null
+          hdec_verification_locked: boolean
+          id: string
+          ir: string | null
+          is_active: boolean
+          is_critical: boolean
+          issue_no: string | null
+          item: string | null
+          last_updated_at: string | null
+          location_raw: string | null
+          location_reference: string | null
+          main_trade: string | null
+          plan_group: string | null
+          plan_title: string | null
+          planned_closure_date: string | null
+          planned_completion_date: string | null
+          planned_progress_pct: number | null
+          planned_start_date: string | null
+          podium_area: string | null
+          priority: string | null
+          priority_locked: boolean
+          raw_payload: Json
+          remarks: string | null
+          row_version: number
+          source_import_log_id: string | null
+          source_issue_no: string
+          status_manual: string | null
+          status_raw: string | null
+          sub_trade: string | null
+          subcontractor_issue_no: string | null
+          subcontractor_issue_source: string | null
+          subcontractor_name: string | null
+          subsub_name: string | null
+          team: string
+          trade_detail: string | null
+          updated_at: string
+          updated_by: string | null
+          updated_by_name: string | null
+          updated_date_raw: string | null
+          updated_description: string | null
+          updated_status: string | null
+          work_type: string | null
+        }
+        Insert: {
+          aconex_comments?: string | null
+          actual_closure_date?: string | null
+          actual_completion_date?: string | null
+          actual_progress_pct?: number | null
+          actual_start_date?: string | null
+          area_level?: string | null
+          area_location?: string | null
+          area_type?: string | null
+          assigned_to?: string | null
+          captured_by_name?: string | null
+          category?: string | null
+          classification?: string | null
+          classification_source?: string | null
+          classified_at?: string | null
+          closure_status?: string | null
+          completion_status?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          created_by_team_name?: string | null
+          created_date?: string | null
+          critical_marked_at?: string | null
+          critical_marked_by?: string | null
+          custom_payload?: Json
+          data_date?: string | null
+          defect_type?: string | null
+          description?: string | null
+          due_by?: string | null
+          forms?: string | null
+          hdec_comments?: string | null
+          hdec_eng_name?: string | null
+          hdec_pic_name?: string | null
+          hdec_reason?: string | null
+          hdec_verification?: string | null
+          hdec_verification_locked?: boolean
+          id?: string
+          ir?: string | null
+          is_active?: boolean
+          is_critical?: boolean
+          issue_no?: string | null
+          item?: string | null
+          last_updated_at?: string | null
+          location_raw?: string | null
+          location_reference?: string | null
+          main_trade?: string | null
+          plan_group?: string | null
+          plan_title?: string | null
+          planned_closure_date?: string | null
+          planned_completion_date?: string | null
+          planned_progress_pct?: number | null
+          planned_start_date?: string | null
+          podium_area?: string | null
+          priority?: string | null
+          priority_locked?: boolean
+          raw_payload?: Json
+          remarks?: string | null
+          row_version?: number
+          source_import_log_id?: string | null
+          source_issue_no: string
+          status_manual?: string | null
+          status_raw?: string | null
+          sub_trade?: string | null
+          subcontractor_issue_no?: string | null
+          subcontractor_issue_source?: string | null
+          subcontractor_name?: string | null
+          subsub_name?: string | null
+          team: string
+          trade_detail?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+          updated_date_raw?: string | null
+          updated_description?: string | null
+          updated_status?: string | null
+          work_type?: string | null
+        }
+        Update: {
+          aconex_comments?: string | null
+          actual_closure_date?: string | null
+          actual_completion_date?: string | null
+          actual_progress_pct?: number | null
+          actual_start_date?: string | null
+          area_level?: string | null
+          area_location?: string | null
+          area_type?: string | null
+          assigned_to?: string | null
+          captured_by_name?: string | null
+          category?: string | null
+          classification?: string | null
+          classification_source?: string | null
+          classified_at?: string | null
+          closure_status?: string | null
+          completion_status?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          created_by_team_name?: string | null
+          created_date?: string | null
+          critical_marked_at?: string | null
+          critical_marked_by?: string | null
+          custom_payload?: Json
+          data_date?: string | null
+          defect_type?: string | null
+          description?: string | null
+          due_by?: string | null
+          forms?: string | null
+          hdec_comments?: string | null
+          hdec_eng_name?: string | null
+          hdec_pic_name?: string | null
+          hdec_reason?: string | null
+          hdec_verification?: string | null
+          hdec_verification_locked?: boolean
+          id?: string
+          ir?: string | null
+          is_active?: boolean
+          is_critical?: boolean
+          issue_no?: string | null
+          item?: string | null
+          last_updated_at?: string | null
+          location_raw?: string | null
+          location_reference?: string | null
+          main_trade?: string | null
+          plan_group?: string | null
+          plan_title?: string | null
+          planned_closure_date?: string | null
+          planned_completion_date?: string | null
+          planned_progress_pct?: number | null
+          planned_start_date?: string | null
+          podium_area?: string | null
+          priority?: string | null
+          priority_locked?: boolean
+          raw_payload?: Json
+          remarks?: string | null
+          row_version?: number
+          source_import_log_id?: string | null
+          source_issue_no?: string
+          status_manual?: string | null
+          status_raw?: string | null
+          sub_trade?: string | null
+          subcontractor_issue_no?: string | null
+          subcontractor_issue_source?: string | null
+          subcontractor_name?: string | null
+          subsub_name?: string | null
+          team?: string
+          trade_detail?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+          updated_date_raw?: string | null
+          updated_description?: string | null
+          updated_status?: string | null
+          work_type?: string | null
+        }
+        Relationships: []
+      }
+      defect_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          defect_raw_id: string
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          source: string
+          source_issue_no: string | null
+          team: string | null
+          upload_id: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          defect_raw_id: string
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+          source_issue_no?: string | null
+          team?: string | null
+          upload_id?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          defect_raw_id?: string
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+          source_issue_no?: string | null
+          team?: string | null
+          upload_id?: string | null
+        }
+        Relationships: []
+      }
       hdec_pic_master: {
         Row: {
           created_at: string
@@ -1258,6 +1717,7 @@ export type Database = {
         }
         Returns: string
       }
+      delete_defect_import_batch: { Args: { _batch_id: string }; Returns: Json }
       delete_spare_part_import_batch: {
         Args: { _batch_id: string }
         Returns: Json
@@ -1281,6 +1741,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }
+      preview_rollback_defect_import: {
+        Args: { _batch_id: string }
+        Returns: Json
+      }
       preview_rollback_spare_part_import: {
         Args: { _batch_id: string }
         Returns: Json
@@ -1294,6 +1758,10 @@ export type Database = {
         Returns: number
       }
       resolve_login_email: { Args: { _login_id: string }; Returns: string }
+      rollback_defect_import: {
+        Args: { _batch_id: string; _force?: boolean }
+        Returns: Json
+      }
       rollback_spare_part_import: {
         Args: { _batch_id: string; _force?: boolean }
         Returns: Json

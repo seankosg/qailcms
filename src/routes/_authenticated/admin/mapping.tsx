@@ -4,6 +4,8 @@ import { FieldConfigTable } from "@/components/admin/FieldConfigTable";
 import { HeaderMappingTable } from "@/components/admin/HeaderMappingTable";
 import { TmFieldConfigTable } from "@/components/admin/TmFieldConfigTable";
 import { TmHeaderMappingTable } from "@/components/admin/TmHeaderMappingTable";
+import { DefectFieldConfigTable } from "@/components/admin/DefectFieldConfigTable";
+import { DefectHeaderMappingTable } from "@/components/admin/DefectHeaderMappingTable";
 
 export const Route = createFileRoute("/_authenticated/admin/mapping")({
   component: MappingPage,
@@ -22,6 +24,7 @@ function MappingPage() {
         <TabsList>
           <TabsTrigger value="spare-part">Spare Part</TabsTrigger>
           <TabsTrigger value="task-management">Task Management</TabsTrigger>
+          <TabsTrigger value="defect-management">Defect Management</TabsTrigger>
         </TabsList>
         <TabsContent value="spare-part" className="space-y-4">
           <Tabs defaultValue="field-config" className="space-y-4">
@@ -41,6 +44,16 @@ function MappingPage() {
             </TabsList>
             <TabsContent value="field-config"><TmFieldConfigTable /></TabsContent>
             <TabsContent value="header-mapping"><TmHeaderMappingTable /></TabsContent>
+          </Tabs>
+        </TabsContent>
+        <TabsContent value="defect-management" className="space-y-4">
+          <Tabs defaultValue="field-config" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="field-config">Field Config</TabsTrigger>
+              <TabsTrigger value="header-mapping">Header Mapping</TabsTrigger>
+            </TabsList>
+            <TabsContent value="field-config"><DefectFieldConfigTable /></TabsContent>
+            <TabsContent value="header-mapping"><DefectHeaderMappingTable /></TabsContent>
           </Tabs>
         </TabsContent>
       </Tabs>
