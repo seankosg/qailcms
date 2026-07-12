@@ -76,6 +76,7 @@ import { ExportDialog } from "./ExportDialog";
 import { HistoryDrawer } from "./HistoryDrawer";
 import { TopHorizontalScrollbar } from "@/components/spare-part/raw-data/TopHorizontalScrollbar";
 import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
+import { AlarmBadge } from "./AlarmBadge";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   runRollupAllParents,
