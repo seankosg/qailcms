@@ -18,7 +18,7 @@ const NAV: NavGroup[] = [
     label: "Closure Document",
     icon: Package,
     items: [
-      { to: "/closure/spare-part/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/closure/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/closure/task-management/raw-data", label: "Task-Raw Data", icon: Database },
       { to: "/closure/task-management/tree", label: "Task-Tree", icon: ListTree },
       { to: "/closure/spare-part/raw-data", label: "SPT-Raw Data", icon: Database },
