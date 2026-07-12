@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export type ViewPreferenceState = Record<string, unknown>;
+
 export const getUserViewPreference = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { viewKey: string }) => {
@@ -20,14 +22,14 @@ export const getUserViewPreference = createServerFn({ method: "GET" })
     if (error) throw error;
     if (!row) return null;
     return {
-      state: (row.state ?? null) as Record<string, unknown> | null,
+      state: (row.state ?? null) as ViewPreferenceState | null,
       updated_at: row.updated_at as string,
     };
   });
 
 export const upsertUserViewPreference = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { viewKey: string; state: Record<string, unknown> }) => {
+  .inputValidator((data: { viewKey: string; state: ViewPreferenceState }) => {
     if (!data || typeof data.viewKey !== "string" || !data.viewKey) {
       throw new Error("viewKey is required");
     }
@@ -41,7 +43,7 @@ export const upsertUserViewPreference = createServerFn({ method: "POST" })
     const { error } = await supabase
       .from("user_view_preferences")
       .upsert(
-        { user_id: userId, view_key: data.viewKey, state: data.state },
+        { user_id: userId, view_key: data.viewKey, state: data.state as never },
         { onConflict: "user_id,view_key" },
       );
     if (error) throw error;
