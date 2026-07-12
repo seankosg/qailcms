@@ -19,10 +19,8 @@ import {
 } from "@/hooks/useTaskManagementHeaderMappings";
 import { useTaskManagementFieldConfig } from "@/hooks/useTaskManagementFieldConfig";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-
-function normalizeHeader(raw: string): string {
-  return raw.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
-}
+import { EditableSourceHeaderCell } from "@/components/admin/EditableSourceHeaderCell";
+import { normalizeHeader } from "@/lib/admin/header-mapping-validation";
 
 export function TmHeaderMappingTable() {
   const { data: rows = [], isLoading, refetch } = useTaskManagementHeaderMappings();
@@ -50,6 +48,24 @@ export function TmHeaderMappingTable() {
     const hit = rows.find((r) => r.is_active && normalizeHeader(r.source_header) === norm);
     return { norm, target: hit?.target_field ?? null };
   }, [testHeader, rows]);
+
+  const activeTargetFields = useMemo(
+    () => new Set(fields.map((f) => f.field_name)),
+    [fields],
+  );
+
+  const saveSourceHeader = async (r: TaskManagementHeaderMappingRow, trimmed: string) => {
+    const { error } = await (supabase as any)
+      .from("task_management_header_mappings")
+      .update({ source_header: trimmed, updated_by: me?.id ?? null })
+      .eq("id", r.id);
+    if (error) {
+      toast.error("저장 실패", { description: error.message });
+      throw error;
+    }
+    qc.invalidateQueries({ queryKey: TASK_MANAGEMENT_HEADER_MAPPING_QK });
+    await refetch();
+  };
 
   const toggleActive = async (r: TaskManagementHeaderMappingRow) => {
     const { error } = await (supabase as any)
@@ -162,7 +178,14 @@ export function TmHeaderMappingTable() {
               )}
               {filtered.map((r) => (
                 <TableRow key={r.id} className={r.is_active ? "" : "opacity-50"}>
-                  <TableCell className="text-sm">{r.source_header}</TableCell>
+                  <TableCell className="text-sm">
+                    <EditableSourceHeaderCell
+                      row={r}
+                      rows={rows}
+                      activeTargetFields={activeTargetFields}
+                      onSave={(v) => saveSourceHeader(r, v)}
+                    />
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{r.target_field}</TableCell>
                   <TableCell>
                     {r.is_custom ? (
