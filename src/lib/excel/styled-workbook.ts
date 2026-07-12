@@ -619,6 +619,7 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
       monthRowIdx,
       dataStart,
       startDateIso: gantt.startDate,
+      dataDateIso: dataDateIso ?? gantt.startDate,
       settingsSheet: opts.settingsSheet,
     });
   }
