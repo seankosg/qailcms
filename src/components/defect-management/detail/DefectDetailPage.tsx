@@ -1,10 +1,11 @@
-import { useMemo } from "react";
-import { Link, useParams, useNavigate, useRouter } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useParams, useRouter } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCcw } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ArrowLeft, RefreshCcw, Lock, Unlock, ShieldCheck, ShieldOff } from "lucide-react";
 import { DEFECT_COLUMNS, TEAM_COLORS, TEAM_FALLBACK_COLOR, PRIORITY_COLORS } from "@/lib/defect-management/columns";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useDefectFieldHelpers } from "@/hooks/useDefectFieldConfig";
@@ -12,6 +13,8 @@ import { EditCellPopover } from "../raw-data/EditCellPopover";
 import { DefectStatusBadge } from "../raw-data/DefectStatusBadge";
 import { cn } from "@/lib/utils";
 import { formatDdMmm } from "@/lib/defect-management/stage-utils";
+import { updateDefectField } from "@/lib/defect-management/mutations.functions";
+import { toast } from "sonner";
 
 const GROUP_LABELS: Record<string, string> = {
   identity: "Identity", status: "Status", classification: "Classification",
@@ -22,8 +25,8 @@ const GROUP_LABELS: Record<string, string> = {
 
 export function DefectDetailPage() {
   const { id } = useParams({ from: "/_authenticated/closure/defect-management/detail/$id" });
-  const navigate = useNavigate();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const isAdmin = !!user?.isAdmin;
   const helpers = useDefectFieldHelpers();
@@ -58,6 +61,21 @@ export function DefectDetailPage() {
     return <div className="p-6 text-sm text-muted-foreground">{isFetching ? "Loading..." : "Defect not found"}</div>;
   }
 
+  const onFieldSaved = () => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ["defect-status-history", id] });
+  };
+
+  const toggleLock = async (field: "priority_locked" | "hdec_verification_locked", nextValue: boolean) => {
+    try {
+      await updateDefectField({ data: { id: row.id, field, value: nextValue } });
+      toast.success(nextValue ? "잠금 완료" : "잠금 해제 완료");
+      onFieldSaved();
+    } catch (e: any) {
+      toast.error(`실패: ${e?.message ?? e}`);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <header className="flex items-center justify-between gap-2">
@@ -69,9 +87,20 @@ export function DefectDetailPage() {
             {row.is_critical && <Badge className="ml-1 text-[10px] bg-rose-500/15 text-rose-700 dark:text-rose-300">Critical</Badge>}
           </h1>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin ? (
+            <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              <ShieldCheck className="mr-1 h-3 w-3" /> 편집 가능
+            </Badge>
+          ) : (
+            <Badge className="text-[10px] bg-zinc-500/15 text-zinc-700 dark:text-zinc-300">
+              <ShieldOff className="mr-1 h-3 w-3" /> 읽기 전용
+            </Badge>
+          )}
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
+          </Button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -83,14 +112,16 @@ export function DefectDetailPage() {
                 {cols.map((c) => {
                   const v = (row as any)[c.key];
                   const display = renderFieldValue(c, v, row);
-                  const editable = c.editable && isAdmin && c.editorType;
-                  const locked =
-                    (c.key === "priority" && row.priority_locked) ||
-                    (c.key === "hdec_verification" && row.hdec_verification_locked);
+                  const editable = !!c.editable && !!c.editorType;
+                  const lockedFor =
+                    c.key === "priority" ? "priority_locked" :
+                    c.key === "hdec_verification" ? "hdec_verification_locked" :
+                    null;
+                  const locked = !!lockedFor && !!row[lockedFor];
                   return (
                     <div key={c.key} className="flex items-baseline gap-2">
                       <div className="min-w-[110px] text-[11px] text-muted-foreground">{helpers.getLabel(c.key)}</div>
-                      <div className="flex-1 text-xs">
+                      <div className="flex-1 text-xs flex items-center gap-1">
                         {editable ? (
                           <EditCellPopover
                             id={row.id}
@@ -100,9 +131,21 @@ export function DefectDetailPage() {
                             options={c.options}
                             currentValue={v}
                             locked={locked}
-                            onSaved={() => refetch()}
+                            canEdit={isAdmin}
+                            onSaved={onFieldSaved}
                           >{display}</EditCellPopover>
                         ) : display}
+                        {lockedFor && isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 px-1"
+                            title={locked ? "잠금 해제" : "잠그기"}
+                            onClick={() => toggleLock(lockedFor as any, !locked)}
+                          >
+                            {locked ? <Unlock className="h-3 w-3 text-amber-600" /> : <Lock className="h-3 w-3 text-muted-foreground" />}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
