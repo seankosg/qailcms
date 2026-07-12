@@ -8,6 +8,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
+  getDefectExcelSheetNames,
+  getDefectExcelHeaders,
   parseDefectExcel,
   type DefectSheetHeader,
   type DefectTargetField,
@@ -18,6 +20,7 @@ import type { DefectTeam } from "@/lib/defect-management/columns";
 
 export type DefectFileStatus =
   | "parsing"
+  | "pending_sheet_selection"
   | "needs_team"
   | "ready"
   | "processing"
@@ -42,9 +45,16 @@ export interface DefectImportFile {
   progress: number;
   parsed?: ParsedDefectRow[];
   sheetName?: string;
+  sheetNames?: string[];
   sheetHeaders?: DefectSheetHeader[];
   columnMap?: Record<string, number>;
   columnOverrides?: Partial<Record<DefectTargetField, number>> | null;
+  availableHeaders?: string[];
+  headerSamples?: Record<string, unknown>;
+  headerToFieldMap?: Record<string, string>;
+  excludedHeaders?: string[];
+  excludedFields?: Set<string>;
+  isReimport?: boolean;
   warnings?: string[];
   categorySummary?: string[];
   teamHint?: DefectTeam | null;
@@ -58,6 +68,7 @@ export interface DefectImportFile {
     skippedLocked: number;
     rejected: number;
     duplicates: number;
+    skippedReimportNoMatch?: number;
     errors?: DefectImportError[];
   };
 }
@@ -70,10 +81,8 @@ interface CtxValue {
   clearAll: () => void;
   setFileTeam: (id: string, team: DefectTeam) => void;
   setFileDataDateOverride: (id: string, date: string | null) => void;
-  setFileColumnOverrides: (
-    id: string,
-    overrides: Partial<Record<DefectTargetField, number>> | null,
-  ) => Promise<void>;
+  setFileSheet: (id: string, sheetName: string) => Promise<void>;
+  setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
   startImport: () => Promise<void>;
 }
 
@@ -114,6 +123,59 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     return extraAliases;
   }, []);
 
+  /** file.file을 실제로 파싱하고 결과로 파일 상태를 업데이트. */
+  const parseAndApply = useCallback(
+    async (id: string, file: File, sheetName?: string, excludedHeaders?: string[]) => {
+      const extraAliases = await fetchAliases();
+      try {
+        const parsed = await parseDefectExcel(file, {
+          extraAliases,
+          sheetName,
+          excludedHeaders,
+        });
+        setFiles((cur) =>
+          cur.map((f) => {
+            if (f.id !== id) return f;
+            const updated: DefectImportFile = {
+              ...f,
+              parsed: parsed.rows,
+              sheetName: parsed.sheetName,
+              sheetHeaders: parsed.sheetHeaders,
+              columnMap: parsed.columnMap,
+              availableHeaders: parsed.availableHeaders,
+              headerSamples: parsed.headerSamples,
+              headerToFieldMap: parsed.headerToFieldMap,
+              excludedHeaders: parsed.excludedHeaders,
+              excludedFields: parsed.excludedFields,
+              isReimport: parsed.isReimport,
+              warnings: parsed.warnings,
+              teamHint: parsed.teamHint,
+              team: f.team ?? parsed.teamHint ?? null,
+              categorySummary: parsed.categorySummary,
+              status: (f.team ?? parsed.teamHint) ? "ready" : "needs_team",
+              error: undefined,
+            };
+            updated.validationError = validate(updated);
+            return updated;
+          }),
+        );
+      } catch (e) {
+        setFiles((cur) =>
+          cur.map((f) =>
+            f.id === id
+              ? {
+                  ...f,
+                  status: "failed",
+                  error: e instanceof Error ? e.message : "Parse failed",
+                }
+              : f,
+          ),
+        );
+      }
+    },
+    [fetchAliases],
+  );
+
   const addFiles = useCallback(async (selected: File[]) => {
     const excel = selected.filter((f) => /\.(xlsx|xls|xlsm)$/i.test(f.name));
     const next: DefectImportFile[] = excel.map((file) => ({
@@ -126,31 +188,39 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     }));
     setFiles((cur) => [...cur, ...next]);
 
-    const extraAliases = await fetchAliases();
-
     for (const item of next) {
       try {
-        const parsed = await parseDefectExcel(item.file, { extraAliases });
+        const sheetNames = await getDefectExcelSheetNames(item.file);
         setFiles((cur) =>
-          cur.map((f) => {
-            if (f.id !== item.id) return f;
-            const updated: DefectImportFile = {
-              ...f,
-              parsed: parsed.rows,
-              sheetName: parsed.sheetName,
-              sheetHeaders: parsed.sheetHeaders,
-              columnMap: parsed.columnMap,
-              warnings: parsed.warnings,
-              teamHint: parsed.teamHint,
-              team: parsed.teamHint ?? null,
-              categorySummary: parsed.categorySummary,
-              status: parsed.teamHint ? "ready" : "needs_team",
-            };
-            updated.validationError = validate(updated);
-            if (updated.validationError) updated.status = updated.team ? "ready" : "needs_team";
-            return updated;
-          }),
+          cur.map((f) => (f.id === item.id ? { ...f, sheetNames } : f)),
         );
+        if (sheetNames.length > 1) {
+          // 다중 시트 → 사용자 선택 대기
+          setFiles((cur) =>
+            cur.map((f) =>
+              f.id === item.id ? { ...f, status: "pending_sheet_selection" } : f,
+            ),
+          );
+          continue;
+        }
+        // 헤더 프리뷰 캡처
+        const headerInfo = await getDefectExcelHeaders(item.file);
+        if (headerInfo) {
+          setFiles((cur) =>
+            cur.map((f) =>
+              f.id === item.id
+                ? {
+                    ...f,
+                    availableHeaders: headerInfo.headers,
+                    headerSamples: headerInfo.sample,
+                    isReimport: headerInfo.isReimport,
+                    excludedHeaders: [],
+                  }
+                : f,
+            ),
+          );
+        }
+        await parseAndApply(item.id, item.file);
       } catch (e) {
         setFiles((cur) =>
           cur.map((f) =>
@@ -161,7 +231,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         );
       }
     }
-  }, [fetchAliases]);
+  }, [parseAndApply]);
 
   const removeFile = useCallback(
     (id: string) => setFiles((cur) => cur.filter((f) => f.id !== id)),
@@ -173,7 +243,11 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     setFiles((cur) =>
       cur.map((f) => {
         if (f.id !== id) return f;
-        const updated = { ...f, team, status: "ready" as DefectFileStatus };
+        const nextStatus: DefectFileStatus =
+          f.status === "pending_sheet_selection" || f.status === "parsing"
+            ? f.status
+            : "ready";
+        const updated = { ...f, team, status: nextStatus };
         updated.validationError = validate(updated);
         return updated;
       }),
@@ -184,53 +258,74 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, dataDateOverride: date } : f)));
   }, []);
 
-  const setFileColumnOverrides = useCallback(
-    async (id: string, overrides: Partial<Record<DefectTargetField, number>> | null) => {
-      const current = await new Promise<DefectImportFile | undefined>((resolve) => {
-        setFiles((cur) => {
-          resolve(cur.find((f) => f.id === id));
-          return cur;
-        });
-      });
-      if (!current) return;
-
-      setFiles((cur) =>
-        cur.map((f) => (f.id === id ? { ...f, status: "parsing", columnOverrides: overrides } : f)),
-      );
-
-      const extraAliases = await fetchAliases();
-      try {
-        const parsed = await parseDefectExcel(current.file, {
-          extraAliases,
-          columnOverrides: overrides ?? undefined,
-        });
-        setFiles((cur) =>
-          cur.map((f) => {
-            if (f.id !== id) return f;
-            const updated: DefectImportFile = {
-              ...f,
-              parsed: parsed.rows,
-              sheetHeaders: parsed.sheetHeaders,
-              columnMap: parsed.columnMap,
-              warnings: parsed.warnings,
-              categorySummary: parsed.categorySummary,
-              status: f.team ? "ready" : "needs_team",
-            };
-            updated.validationError = validate(updated);
-            return updated;
-          }),
+  const setFileSheet = useCallback(
+    async (id: string, sheetName: string) => {
+      let target: DefectImportFile | undefined;
+      setFiles((cur) => {
+        target = cur.find((f) => f.id === id);
+        return cur.map((f) =>
+          f.id === id
+            ? {
+                ...f,
+                status: "parsing",
+                sheetName,
+                excludedHeaders: [],
+                availableHeaders: undefined,
+                headerSamples: undefined,
+              }
+            : f,
         );
+      });
+      if (!target) return;
+      try {
+        const headerInfo = await getDefectExcelHeaders(target.file, sheetName);
+        if (headerInfo) {
+          setFiles((cur) =>
+            cur.map((f) =>
+              f.id === id
+                ? {
+                    ...f,
+                    availableHeaders: headerInfo.headers,
+                    headerSamples: headerInfo.sample,
+                    isReimport: headerInfo.isReimport,
+                  }
+                : f,
+            ),
+          );
+        }
+        await parseAndApply(id, target.file, sheetName);
       } catch (e) {
         setFiles((cur) =>
           cur.map((f) =>
             f.id === id
-              ? { ...f, status: "failed", error: e instanceof Error ? e.message : "Re-parse failed" }
+              ? {
+                  ...f,
+                  status: "failed",
+                  error: e instanceof Error ? e.message : "Sheet parse failed",
+                }
               : f,
           ),
         );
       }
     },
-    [fetchAliases],
+    [parseAndApply],
+  );
+
+  const setFileExcludedHeaders = useCallback(
+    async (id: string, excluded: string[]) => {
+      let target: DefectImportFile | undefined;
+      setFiles((cur) => {
+        target = cur.find((f) => f.id === id);
+        return cur.map((f) =>
+          f.id === id
+            ? { ...f, status: "parsing", excludedHeaders: excluded }
+            : f,
+        );
+      });
+      if (!target) return;
+      await parseAndApply(id, target.file, target.sheetName, excluded);
+    },
+    [parseAndApply],
   );
 
   const executeImport = useCallback(async (ready: DefectImportFile[]) => {
@@ -243,6 +338,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       const team = f.team!;
       const dataDate = f.dataDateOverride ?? new Date().toISOString().slice(0, 10);
       const startedAtIso = new Date().toISOString();
+      const excludedFields = f.excludedFields ?? new Set<string>();
+      const isReimport = !!f.isReimport;
 
       const { data: logRow } = await (supabase as any)
         .from("defect_import_logs")
@@ -255,6 +352,14 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           status: "processing",
           imported_by: userId,
           started_at: startedAtIso,
+          notes: [
+            isReimport ? "reimport=true" : null,
+            excludedFields.size > 0
+              ? `excluded_fields=${Array.from(excludedFields).join(",")}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" | ") || null,
         })
         .select("id")
         .single();
@@ -272,7 +377,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
       // 기존 행 조회 (id + lock flags)
       const ids = deduped.map((p) => p.source_issue_no);
-      const existing = new Map<string, { priority_locked: boolean; hdec_verification_locked: boolean }>();
+      const existing = new Map<
+        string,
+        { priority_locked: boolean; hdec_verification_locked: boolean }
+      >();
       for (let i = 0; i < ids.length; i += 500) {
         const chunk = ids.slice(i, i + 500);
         const { data } = await (supabase as any)
@@ -287,44 +395,67 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         }
       }
 
-      const payloads = deduped.map((p) => {
+      // Re-import: 기존 매칭 실패한 행은 건너뜀
+      const skippedReimportNoMatch = isReimport
+        ? deduped.filter((p) => !existing.has(p.source_issue_no)).length
+        : 0;
+      const workingRows = isReimport
+        ? deduped.filter((p) => existing.has(p.source_issue_no))
+        : deduped;
+
+      /** 필드가 excludedFields에 있으면 payload에서 제외 (기존 DB 값 보존). */
+      const put = (base: Record<string, unknown>, field: string, value: unknown) => {
+        if (excludedFields.has(field)) return;
+        base[field] = value;
+      };
+
+      const payloads = workingRows.map((p) => {
         const prev = existing.get(p.source_issue_no);
         const skipPriority = prev?.priority_locked;
+        const skipVerification = prev?.hdec_verification_locked;
         const base: Record<string, unknown> = {
           team,
           data_date: dataDate,
           source_issue_no: p.source_issue_no,
-          location_raw: p.location_raw,
-          plan_title: p.plan_title,
-          plan_group: p.plan_group,
-          status_raw: p.status_raw,
-          assigned_to: p.assigned_to,
-          category: p.category,
-          defect_type: p.defect_type,
-          item: p.item,
-          description: p.description,
-          due_by: p.due_by,
-          created_by_name: p.created_by_name,
-          created_by_team_name: p.created_by_team_name,
-          created_date: p.created_date,
-          ir: p.ir,
-          forms: p.forms,
-          last_updated_at: p.last_updated_at,
-          updated_description: p.updated_description,
-          updated_by_name: p.updated_by_name,
-          updated_status: p.updated_status,
-          updated_date_raw: p.updated_date_raw,
-          location_reference: p.location_reference,
-          classification: p.classification,
-          podium_area: p.podium_area,
-          completion_status: deriveCompletionStatus(p.status_raw),
-          closure_status: deriveClosureStatus(p.status_raw),
           raw_payload: p.raw_payload,
           source_import_log_id: logId,
           updated_by: userId,
           is_active: true,
         };
-        if (!skipPriority) base.priority = p.priority;
+        put(base, "location_raw", p.location_raw);
+        put(base, "plan_title", p.plan_title);
+        put(base, "plan_group", p.plan_group);
+        put(base, "status_raw", p.status_raw);
+        put(base, "assigned_to", p.assigned_to);
+        put(base, "category", p.category);
+        put(base, "defect_type", p.defect_type);
+        put(base, "item", p.item);
+        put(base, "description", p.description);
+        put(base, "due_by", p.due_by);
+        put(base, "created_by_name", p.created_by_name);
+        put(base, "created_by_team_name", p.created_by_team_name);
+        put(base, "created_date", p.created_date);
+        put(base, "ir", p.ir);
+        put(base, "forms", p.forms);
+        put(base, "last_updated_at", p.last_updated_at);
+        put(base, "updated_description", p.updated_description);
+        put(base, "updated_by_name", p.updated_by_name);
+        put(base, "updated_status", p.updated_status);
+        put(base, "updated_date_raw", p.updated_date_raw);
+        put(base, "location_reference", p.location_reference);
+        put(base, "classification", p.classification);
+        put(base, "podium_area", p.podium_area);
+        put(base, "completion_status", deriveCompletionStatus(p.status_raw));
+        put(base, "closure_status", deriveClosureStatus(p.status_raw));
+        if (!skipPriority) put(base, "priority", p.priority);
+
+        // Re-import 확장 필드
+        if (p.extra) {
+          for (const [k, v] of Object.entries(p.extra)) {
+            if (k === "hdec_verification" && skipVerification) continue;
+            put(base, k, v);
+          }
+        }
         return base;
       });
 
@@ -386,7 +517,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         // per-row logs
         if (logId) {
           try {
-            const rowLogRows = deduped.map((p, idx) => ({
+            const rowLogRows = workingRows.map((p) => ({
               upload_id: logId,
               raw_row_no: p.rawRowNo,
               team,
@@ -417,7 +548,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               status: finalStatus,
               inserted,
               updated,
-              skipped: skippedLocked,
+              skipped: skippedLocked + skippedReimportNoMatch,
               rejected,
               errors: importErrors.length ? importErrors : null,
               finished_at: new Date().toISOString(),
@@ -438,6 +569,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                     skippedLocked,
                     rejected,
                     duplicates,
+                    skippedReimportNoMatch,
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
@@ -445,6 +577,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           ),
         );
         if (rejected > 0) toast.warning(`${f.name}: ${rejected}행 rejected. 콘솔 확인.`);
+        if (skippedReimportNoMatch > 0)
+          toast.info(
+            `${f.name}: Re-import 매칭 실패 ${skippedReimportNoMatch}행 건너뜀 (신규 생성 안 함).`,
+          );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error("[defect-import] fatal", e);
@@ -490,7 +626,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         clearAll,
         setFileTeam,
         setFileDataDateOverride,
-        setFileColumnOverrides,
+        setFileSheet,
+        setFileExcludedHeaders,
         startImport,
       }}
     >
