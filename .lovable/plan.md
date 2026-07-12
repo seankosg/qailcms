@@ -1,213 +1,58 @@
-# Task Dashboard 개편 계획 (v3) — SHAW Defect Progress 매트릭스 적용
+## 목표
 
-## 요구 정리
+Admin → Mapping의 **Header Mapping** 표(Spare Part / Task Management 양쪽)에서 `Source Header` 값을 직접 수정할 수 있게 하고, 저장 시 정규화·중복·연관 로직 오류를 재점검하여 문제 발생 시 경고를 표시한다.
 
-1. Raw Data(`task_management_raw`)와 실시간 연동되는 **시각적 Task Dashboard**.
-2. Dashboard는 도메인별(Task / Spare Part / Warranty / As-Built …)로 **분리도 가능하고 통합도 가능**한 구조.
-3. SHAW PROJECT CMS `DefectProgressPage`의 **계획 대비 실적 비교 매트릭스**(DefectScheduleMatrix) 를 Task용으로 이식.
-4. 지금은 Task만 구현. 나머지 도메인은 스텁.
+## 적용 대상
 
-## SHAW Defect Progress 매트릭스 분석 (이식 대상)
+- `src/components/admin/HeaderMappingTable.tsx` (Spare Part)
+- `src/components/admin/TmHeaderMappingTable.tsx` (Task Management)
 
-`src/components/defects/DefectScheduleMatrix.tsx` + `DefectProgressPage.tsx` 구조:
+두 컴포넌트가 거의 동일한 구조라, 편집/검증 로직을 담은 공통 훅 `useSourceHeaderEditor`(신규, `src/hooks/`)로 뽑아 재사용한다. 각 테이블은 훅에 `table` 이름(`spare_part_header_mappings` / `task_management_header_mappings`) 및 `queryKey`, 현재 `rows`, `me` 만 넘긴다.
 
-**행 (Group)**: team / plot / (다중 group 조합) — 사용자가 ToggleGroup으로 선택
-**Sticky 좌측 요약 블록** (그룹 옆에 항상 붙어 있음):
-- **Total Scope**: Total / Done / % / Remain
-- **Up to Data Date (혹은 Today)**: Plan / Actual / % / Diff
-**우측 스크롤 타임라인 (Day/Week 버킷)**:
-- 각 bucket × 각 stage(start/completion/closure)마다 Plan cell, Actual cell 2개 (또는 계 1개)
-- 셀 색상: Plan=blue, Actual=green, Actual>Plan=over(주황), Actual<Plan=short(적)
-- 셀 클릭 → Raw Data 페이지로 필터 딥링크
+## UX
 
-**툴바 컨트롤**:
-- Group (team/plot/… 다중 선택)
-- Team 필터
-- Bucket (Day/Week)
-- Stage 필터 (Start/Comp/Close 다중)
-- As-of (Data Date/Today)
-- Range (14/30/60/90일)
-- Lookup 날짜 → Raw Data 딥링크
-- Plan mode (Remaining/Baseline)
-- Hide past / Risk Panel 토글
+- 각 행의 Source Header 셀 우측에 연필 아이콘 버튼 → 클릭 시 그 행이 편집 모드로 전환(같은 셀에 `Input` + 저장/취소 버튼).
+- Enter = 저장, Esc = 취소.
+- 저장 성공 시 sonner `toast.success`, 검증 실패 시 `toast.error`(차단), 위험 조건은 `toast.warning`으로 계속 표시.
+- System 매핑(`is_custom=false`)도 편집 허용하되, 편집 모드 진입 시 상단에 `Alert` 형태 배너("시스템 매핑입니다. 시드/재배포 시 값이 되돌아갈 수 있습니다.") 표시. 답변 반영.
 
-**KPI 상단 4카드**: Cumulative Progress / Delay / Critical (≤7d) / Upcoming 7d Plan
-**Risk Panel (우측 옵션)**: High Risk / Bottleneck / Lagging Groups
+## 저장 시 검증 (순서대로)
 
-핵심 라이브러리: `@tanstack/react-virtual` (행/열 가상화 이미 프로젝트에 있는지 확인 필요).
+1. **필수/형식**: `trim()` 후 빈 문자열 금지 → 차단.
+2. **변경 없음**: 정규화 결과가 원래 값과 동일하면 no-op으로 종료.
+3. **중복 차단**: 같은 `module` 내 자기 자신(id) 제외 후 `normalizeHeader(source_header)`가 동일한 행이 존재하면 저장 거부. 토스트에 충돌한 대상 필드(target_field)를 함께 표기. 답변 반영.
+4. **경고(비차단)**:
+   - target_field가 현재 `useTaskManagementFieldConfig`/`useSparePartFieldConfig`의 활성 필드 목록에 없으면 `toast.warning("대상 필드 비활성/누락 — 매칭되어도 Import 시 무시될 수 있음")`.
+   - 정규화 결과가 원문과 다르면(공백/개행 정리로 값이 실제로 달라진 경우) 정보성 안내 배지 표시.
+5. **DB 업데이트**: `.update({ source_header: trimmed, updated_by: me.id })`. 오류 시 `toast.error(error.message)`.
+6. **후속 동기화**:
+   - `queryClient.invalidateQueries` — 해당 mapping 쿼리키 + Import 관련 프리뷰/매칭 관련 쿼리키(`spare-part-header-mappings`, `task-management-header-mappings`). Import Parser는 실행 시점에 매핑을 다시 읽어오므로 별도 마이그레이션 불필요.
+   - `refetch()`로 즉시 반영.
+   - 페이지 하단 **Mapping Test** 박스 값이 있으면 자동 재평가(useMemo 재실행되므로 별도 코드 없이 rows 갱신만으로 동작).
 
-## Task 도메인 매핑 (Defect stage → Task 개념)
+## "연관된 로직" 재점검 범위
 
-Defect는 3-stage(Start/Completion/Closure)로 이산 완료를 세지만, Task는 `actual_progress` 연속값.
-Task에 맞춰 아래와 같이 **재정의**:
+Source Header는 Excel Import 시 `normalizeHeader(excel셀) === normalizeHeader(mapping.source_header)` 매칭에만 사용된다(파서 `src/lib/spare-part-import-parser.ts`, Task Management 파서). 따라서:
 
-| SHAW 개념 | Task 매핑 |
-|---|---|
-| stage=start | **Start**: `plan_start` vs `actual_start` (있으면 1, 없으면 0) |
-| stage=completion | **Completion**: `plan_end` vs (`actual_progress >= 1`) |
-| stage=closure | 사용 안 함 (또는 향후 확장) |
-| Total Scope Total | 필터 후 task 개수 |
-| Total Scope Done | actual_progress==1 개수 |
-| Up to X Plan | bucket ≤ X 중 plan_end 도래 개수 (Completion 기준) |
-| Up to X Actual | bucket ≤ X 중 실제 완료 개수 |
-| Diff | Actual - Plan |
-| 셀(bucket, plan) | 해당 bucket에 `plan_end`(또는 `plan_start`) 예정 개수 |
-| 셀(bucket, actual) | 해당 bucket에 실제 완료(또는 실제 시작) 발생 개수 |
-| Plan mode Remaining | 이미 완료된 task는 plan에서 제외 |
-| Plan mode Baseline | 전체 plan 그대로 |
-| Critical(≤7d) | 오늘부터 7일 내 plan_end 존재 && 미완료 |
-| Delay | `todayGap < 0` (경중은 임계값 기반) 개수 |
+- 기존에 이 매핑을 참조하던 raw 데이터/이력 테이블 값은 변경 불필요(과거 import 결과에는 영향 없음).
+- 다만 **동일 target_field에 매핑된 다른 활성 source_header가 이미 존재**하면 현재 저장은 허용하되(하나의 target에 여러 alias는 정상), 활성 alias 수를 배지로 안내.
+- 편집 대상이 활성 상태(`is_active=true`)일 때만 위 검증을 강하게 적용. 비활성 매핑 편집은 검증은 하되 문구를 "저장은 되지만 활성화하기 전까지 매칭되지 않음"으로 안내.
 
-**추가 Task 고유 옵션**:
-- Stage 필터를 "Start / Completion" 두 개로 축약.
-- Bucket cell에 "예정 진도율(계획 %)" vs "실적 진도율 평균" 표시 옵션도 추가 가능 (첫 버전은 count 기반, S-Curve 위젯에서 % 시각화).
+## 파일 변경 요약
 
-## 라우트 구조 (통합/분리 양립)
+- 수정: `src/components/admin/HeaderMappingTable.tsx`
+  - Source Header 셀을 편집 가능한 `EditableSourceHeaderCell`로 교체
+  - 편집 상태(`editingId`, `draft`) 및 저장 핸들러 추가
+- 수정: `src/components/admin/TmHeaderMappingTable.tsx` (동일 구조로 적용)
+- 신규: `src/components/admin/EditableSourceHeaderCell.tsx` — 두 테이블 공용 셀 컴포넌트(Input + Save/Cancel + Pencil, 검증 결과 배지).
+- 신규(선택): 훅 형태 대신 검증 유틸 `src/lib/admin/header-mapping-validation.ts` — `validateSourceHeaderEdit(rows, id, newValue, fieldsActiveSet)` 반환 `{ ok, error?, warnings[] }`. 두 테이블에서 공용.
 
-```text
-/closure/dashboard                → 통합 Overview (도메인 요약 위젯 그리드)
-/closure/dashboard/task           → Task Dashboard (매트릭스 + 위젯)
-/closure/dashboard/spare-part     → 스텁
-/closure/dashboard/warranty       → 스텁
-/closure/dashboard/as-built       → 스텁
-```
+## 검증(테스트) 계획
 
-- 사이드바 "Dashboard" 링크 → `/closure/dashboard`.
-- 기존 `src/routes/_authenticated/closure/spare-part/dashboard.tsx` 삭제, `TaskDashboardCards.tsx` 로직 흡수 후 삭제.
-
-## 위젯 아키텍처 (도메인 확장/재조립 가능하도록)
-
-```ts
-// src/lib/dashboard/types.ts
-export interface DashboardWidget<F> {
-  id: string;                        // "task.plan-vs-actual-matrix"
-  domain: "task" | "spare-part" | "warranty" | "as-built";
-  title: string;
-  size: "sm" | "md" | "lg" | "xl";
-  Component: React.FC<{ filters: F; compact?: boolean }>;
-}
-```
-
-- `compact=true`: 통합 Overview에서 축약 렌더.
-- `compact=false`: 개별 도메인 페이지에서 전체 렌더.
-- `src/lib/dashboard/registry.ts`에서 위젯을 등록 → Overview는 registry 기반 자동 조립.
-- 향후 도메인 추가: widget 파일 + registry 등록 + 라우트 1개면 끝.
-
-## 파일 배치
-
-```text
-src/lib/dashboard/
-  types.ts
-  registry.ts
-
-src/components/dashboard/
-  DashboardHubPage.tsx           # /closure/dashboard
-  ComingSoonWidget.tsx
-
-src/components/task-management/dashboard/
-  TaskDashboardPage.tsx          # /closure/dashboard/task
-  filters/TaskDashboardFilterBar.tsx
-  widgets/
-    KpiStrip.tsx                 # SHAW Kpi 스타일 4개 카드
-    PlanVsActualMatrix.tsx       # ★ SHAW DefectScheduleMatrix 이식
-    JudgmentDonut.tsx
-    DisciplineBar.tsx
-    TeamHeatmap.tsx
-    SCurve.tsx
-    BehindScheduleTable.tsx
-    CriticalWatchlist.tsx        # SHAW DefectCriticalWatchlist 축약 이식
-
-src/lib/task-management/
-  schedule-utils.ts              # ★ SHAW defect-schedule-utils 이식 + Task 매핑
-  scurve.ts
-
-src/hooks/useTaskDashboardData.ts
-```
-
-## Task용 schedule-utils.ts 신설
-
-SHAW의 `src/lib/defect-schedule-utils.ts`를 참고해 Task 전용으로 신규 작성:
-
-- 타입: `TaskScheduleBucket = "day"|"week"`, `TaskScheduleStage = "start"|"completion"`, `TaskScheduleGroupBy = "discipline"|"team"|"plot"`.
-- 함수:
-  - `isTaskStagePlannedOn(row, stage, iso)`
-  - `isTaskStagePlannedUpTo(row, stage, iso)`
-  - `isTaskStageActualUpTo(row, stage, iso)` (completion은 `actual_progress==1`, start는 `actual_start<=iso`)
-  - `isTaskStageDelayedAsOf(row, stage, iso)`
-  - `aggregateTaskSchedule(rows, opts)` → `{ buckets: string[], rows: GroupRow[] }`
-  - `findTaskCritical`, `findTaskLaggingGroups`
-- 판정 임계값은 `task_management_settings`에 이미 있는 로더 재사용 (없으면 `DEFAULT_THRESHOLDS`).
-
-**모든 파생값은 `src/lib/task-management/derived.ts`의 `expectedProgressToday`, `todayGap`, `computeJudgment`와 정합**을 유지 → Raw Data 화면과 수치 일치 보장.
-
-## PlanVsActualMatrix 컴포넌트
-
-SHAW `DefectScheduleMatrix.tsx`를 그대로 이식하되:
-
-- import 경로/타입 → Task 전용으로 교체.
-- ScheduleCell 컴포넌트는 SHAW의 `src/components/schedule/ScheduleCell.tsx`도 함께 이식 (색상 토큰 포함).
-- 색상 토큰: SHAW의 `--schedule-plan`, `--schedule-actual`, `--schedule-over`, `--schedule-short` 4종을 `src/styles.css`에 추가 (라이트/다크 모두). 하드코딩 금지.
-- `@tanstack/react-virtual` 미설치면 `bun add @tanstack/react-virtual`.
-- 셀 클릭 시 딥링크: `/closure/task-management/raw-data`로 `q`, discipline, team, plot, plan_start range 등 파라미터 전달.
-- Group 라벨은 `useTmColumnLabel()` 통해 Field Config Display Name 반영.
-
-## 필터 상태 관리
-
-- URL search params 기반 (`validateSearch` + `zodValidator(fallback+default)`).
-- 필터: `group[]`, `bucket`, `stageView[]`, `asofMode`, `team`, `range`, `hidePast`, `riskPanel`, `pickedDate`, `pickedField`, `planMode`, `discipline[]`, `plot[]`, `q`.
-- 딥링크 재현/공유 가능.
-
-## KPI + Watchlist + 부가 위젯
-
-매트릭스 상단/우측에 배치:
-- **KPI 4카드**: Cumulative Progress / Delay Up to Data Date / Critical(≤7d) / Upcoming 7d Plan — 클릭 시 Raw Data 딥링크.
-- **Critical Watchlist**(우측 접이식): High Risk / Bottleneck (Completion 오래 대기) / Lagging Groups.
-- **보조 위젯**(매트릭스 하단):
-  - 자동 판정 도넛
-  - 공종별 진도 스택바
-  - S-Curve (계획 vs 실적) — 이번 버전은 현재 스냅샷 근사.
-
-## Overview 통합 뷰(`/closure/dashboard`)에서의 재사용
-
-- Task 도메인 카드: KpiStrip(compact), PlanVsActualMatrix(compact=축약 — 그룹 상위 5, 최근 30일)로 노출.
-- 나머지 도메인은 `ComingSoonWidget`.
-- Overview에서 각 도메인 카드 헤더 클릭 시 개별 페이지로 이동.
-
-## 데이터 로딩
-
-- `useTaskDashboardData(filters)`가 `task_management_raw`에서 필요 컬럼만 select. 1000행 초과 시 range 페이징.
-- 판정/스케줄 파생값은 클라이언트 계산 (Raw Data와 동일 유틸).
-- 로더에서 `queryClient.ensureQueryData` 프라이밍, 컴포넌트에서 `useSuspenseQuery`.
-- 라우트에 `errorComponent`, `notFoundComponent` 필수 정의.
-
-## 디자인 토큰
-
-- SHAW `schedule-*` 팔레트 4종을 `src/styles.css`에 시맨틱 토큰으로 이식 (라이트/다크).
-- 기존 `AUTO_JUDGMENT_COLORS`, `DISCIPLINE_COLORS`, `TEAM_COLORS`, `RISK_COLORS` 재사용.
-- Recharts 시리즈 색은 `--chart-*` 혹은 판정 토큰 사용, 하드코딩 금지.
-
-## 기존 리소스 처리
-
-- `src/routes/_authenticated/closure/spare-part/dashboard.tsx` 삭제.
-- `src/components/task-management/dashboard/TaskDashboardCards.tsx` 로직 흡수 후 삭제.
-- `AppLayout.tsx` 사이드바 "Dashboard" 링크만 `/closure/dashboard`로 변경.
-
-## 신규 의존성 (필요 시 설치)
-
-- `@tanstack/react-virtual` — 매트릭스 열 가상화.
-- `recharts` — 도넛/바/S-Curve 차트.
-- `date-fns` — SHAW 코드에서 사용, 프로젝트 미설치면 추가.
-
-## 이번 범위에서 제외 (다음 이터레이션)
-
-- S-Curve의 이력 기반(과거 스냅샷) 정확 산출 (`task_management_status_history` 활용).
-- 사용자별 위젯 pin/순서 저장.
-- Excel Export (SHAW `dashboard-excel-export`와 동일 스타일). 필요 시 후속 태스크.
-- Spare Part / Warranty / As-Built 실제 위젯 구현.
-
-## 확인 필요 사항
-
-1. Task의 "stage"는 **Start / Completion** 두 개로 시작해도 되나요? (Defect의 Closure에 상응하는 개념 없음)
-2. Bucket 셀 값은 **건수 기반**(SHAW 방식)으로 시작하고, "진도율 %" 표시는 별도 S-Curve/DisciplineBar 위젯으로 두는 방향 OK?
-3. SHAW의 Plan mode(Remaining/Baseline), Hide past, Risk Panel 토글까지 그대로 이식 진행 OK?
-4. Recharts + `@tanstack/react-virtual` 도입 승인 부탁드립니다.
+- 빌드 통과 확인.
+- 프리뷰에서 `/admin/mapping` → Spare Part & Task Management 탭 각각:
+  1. Custom 매핑 편집 → 정상 저장 → 목록 갱신
+  2. System 매핑 편집 → 경고 배너 노출, 저장 성공
+  3. 다른 매핑과 정규화 후 중복되는 값 입력 → 저장 차단 토스트
+  4. 빈 문자열 저장 시도 → 차단
+  5. Mapping Test 박스에 편집 후 새 문자열을 넣어 즉시 반영되는지 확인
