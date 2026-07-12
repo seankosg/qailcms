@@ -1,10 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useParams, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ArrowLeft, RefreshCcw, Lock, Unlock, ShieldCheck, ShieldOff } from "lucide-react";
 import { DEFECT_COLUMNS, TEAM_COLORS, TEAM_FALLBACK_COLOR, PRIORITY_COLORS } from "@/lib/defect-management/columns";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
