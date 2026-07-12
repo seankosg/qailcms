@@ -1,87 +1,67 @@
-## 배경 — ALSMK My Workspace 스터디 요약 (수정)
 
-ALSMK는 `is_summary` 플래그로 Summary/Task를 구분하지만, **QAIL에서는 Summary를 Task와 동일하게 취급**한다. 즉 별도 타입 없이 "자식이 있으면 Parent, 없으면 Leaf"만 존재하는 2-tier 모델로 단순화한다.
+## 목표
 
-| Type | 판별 (QAIL) | 취급 |
+Task Management Raw Data 페이지에서 각 사용자가 조절한 컬럼 표시/순서/너비/고정/정렬/필터/검색어 설정을, 새로고침·재로그인·기기 변경 시에도 그대로 유지되도록 서버(Lovable Cloud) 저장 방식으로 전환한다.
+
+## 배경
+
+- 현재 `TaskManagementRawDataPage.tsx`는 `qail.task-management.raw-data.v1:{userId}` 키로 localStorage에만 저장.
+- 재로그인·다른 브라우저·시크릿 모드·캐시 초기화 시 손실.
+- 또한 `currentUser`가 늦게 도착하면 `storageKey`가 늦게 설정되어 초기화 레이스가 발생.
+
+## 스토리지 설계
+
+### 새 테이블 `public.user_view_preferences`
+
+행 단위 = 사용자 × 화면(view). 여러 페이지에서 재사용 가능하도록 일반화.
+
+| 컬럼 | 타입 | 비고 |
 |---|---|---|
-| **Parent Task** | `level = 'parent'` 또는 자식 존재 | 일반 Task와 동일하게 편집 가능. 진척률은 수동 편집 or 자식 롤업으로 갱신 |
-| **Child Task (Subtask)** | `parent_task_no != null` | 부모에 종속된 실제 작업 단위 |
+| `user_id` | uuid | FK `auth.users.id` (PK 일부) |
+| `view_key` | text | PK 일부. 예: `task-management.raw-data.v1` |
+| `state` | jsonb | `{ sorting, sizing, visibility, columnFilters, globalFilter, order, frozenExtras }` |
+| `updated_at` | timestamptz | trigger `set_updated_at` |
 
-핵심 시사점:
-- ALSMK의 `is_summary` 자동 생성/갱신 로직(`handleGenerateSummaries`)은 **채택하지 않음** — QAIL은 `parent_task_no`가 명시적으로 지정되므로 자동 그룹핑 불필요.
-- Parent도 그냥 Task이므로 필드 편집, 코멘트, 상태 이력 모두 동일하게 허용. UI 차이는 오직 "계층 표시 + 롤업 계산" 뿐.
+- PK: `(user_id, view_key)`
+- RLS 정책 4종: SELECT/INSERT/UPDATE/DELETE 모두 `auth.uid() = user_id`
+- GRANT: `authenticated` 에 SELECT/INSERT/UPDATE/DELETE, `service_role` ALL
+- `anon` 접근 없음
 
-## 현재 QAIL Task Raw Data 상태
+### Server Functions (createServerFn, `requireSupabaseAuth`)
 
-- 스키마: `task_management_raw`에 `parent_task_no`, `level`, `sort_order`, `sub_task_desc` 존재 — 계층 지원 이미 완비.
-- `TaskTreePage.tsx`는 별도 트리 뷰. `TaskManagementRawDataPage.tsx`는 평탄 그리드.
-- Raw Data에는 계층 UX 없음: 접기/펼치기, 자식 추가, 롤업 재계산 UI 부재.
-- 서버 rollup 함수는 `src/lib/task-management/rollup.functions.ts`에 이미 존재(`parent_task_no` 기준).
+`src/lib/task-management/user-view-preferences.functions.ts`
+- `getUserViewPreference({ viewKey })` → `state | null`
+- `upsertUserViewPreference({ viewKey, state })` → `ok`
 
-## 제안 — Raw Data에 접목할 UI/기능 (우선순위 순)
+### 클라이언트 훅
 
-### P0. 계층 인식 그리드
+`src/hooks/useUserViewPreference.ts`
+- TanStack Query 로 `["user-view-pref", viewKey, userId]` 캐시
+- 로컬 캐시(localStorage) 를 `initialData` 로 사용 → 서버 응답 도착 전 즉시 이전 설정 렌더 (오프라인/느린 네트워크에서도 깜빡임 없음)
+- `mutate(state)` 는 300–500ms debounce 로 서버 upsert + 로컬 캐시 동기화
+- 서버 우선 정책: 서버 응답이 도착하면 로컬 캐시를 덮어써 다른 기기 변경분을 반영
 
-```text
-[▸] TSK-001  parent   설계 검토           45%   ...
-    └ TSK-001-01  child  구조 계산서 리뷰   60%
-    └ TSK-001-02  child  도면 리뷰         30%
-[▸] TSK-002  parent   ...
-```
+## 페이지 통합
 
-- `parent_task_no`로 그룹핑, `sort_order` 정렬.
-- Parent 행: `bg-muted/40` + semi-bold, 앞에 chevron 버튼. Child 행: `task_name` 컬럼 들여쓰기 + `└` 접두.
-- Collapse 상태는 `localStorage["task-raw-collapsed"]`로 유지 (ALSMK `TaskTable.tsx` 방식 그대로).
-- 툴바에 **Collapse All / Expand All** 토글 추가.
-- Parent와 Child 모두 동일하게 편집 가능 — 별도 잠금 없음(현재 `actual_progress` parent 잠금 로직도 롤업 기능이 없다면 제거 검토).
+`src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`
+- 기존 localStorage load/save `useEffect` 2개 제거
+- `useUserViewPreference("task-management.raw-data.v1")` 로 교체
+- 로드 완료 시 기존과 동일한 검증/병합 로직(신규 컬럼 자동 삽입, 유효 키 필터, 3개 이하 freeze 제한 등)을 재사용 → helper 로 분리해 훅 안에서 실행
+- `collapsedParents` 는 계정 무관 UI 상태이므로 localStorage 유지
 
-### P1. Add Child Task 액션
+## 마이그레이션 (호환성)
 
-- Parent 행 hover 시 `+` 버튼, 우클릭 메뉴에도 노출.
-- `AddChildTaskDialog`(신규): 부모의 `discipline`, `pic`, `plan_start`, `plan_end`, `floor_level` 등을 pre-fill.
-- 서버 함수 `addChildTask` (`hierarchy.functions.ts` 신규):
-  - 부모가 leaf(`level='child'` or null)면 `level='parent'`로 승격.
-  - 새 child `task_no` 자동 생성(부모 코드 + `-NN`), `sort_order` 부여.
-  - `has_role('admin'|'superuser')` 가드.
-- 원자성이 필요하면 PL/pgSQL RPC `add_child_task_management(_parent_task_no, ...)` 마이그레이션 추가.
+- 첫 로드 시 서버 응답이 `null` 이면 기존 localStorage 값을 읽어 서버에 upsert 후 사용 → 사용자별 기존 튜닝 손실 방지
 
-### P2. Rollup 재계산 버튼
+## 인프라 확인 사항
 
-- 서버 로직은 이미 있음(`rollup.functions.ts`).
-- 툴바 **"부모 진척률 재계산"** 버튼: 전체 parent에 대해 duration-weighted `actual_progress` + `slip_days` + `auto_judgment` 갱신.
-- 선택 행이 있으면 그 parent들만 대상. 완료 후 갱신 건수 toast.
+- `src/start.ts` 의 `functionMiddleware` 에 Supabase bearer attacher 가 이미 등록되어 있는지 확인, 없으면 append.
+- Raw Data 페이지는 `_authenticated/` 하위에 있으므로 loader가 아닌 컴포넌트에서 호출 → 안전.
 
-### P3. 계층 필터 & 뷰 토글
+## 파일 변경 목록
 
-- Column Filter 프리셋: "Parents only / Children only / Leaves only".
-- 툴바 **"계층 뷰 / 평면 뷰"** 토글 — 평면 뷰는 현재 동작 유지, 계층 뷰에서만 그룹핑·들여쓰기·collapse 활성.
-
-### P4. Export 확장
-
-- `ExportDialog`: Parent → Children 순 재정렬, Parent 행 굵은 스타일.
-- Type 컬럼은 생략(Summary=Task 원칙에 따라). 대신 계층은 `task_name` 들여쓰기(`  └ ...`)로 표현.
-- 상단 메타에 `Totals: Parents N / Children N / Total N` 라인 추가.
-
-### P5. Cascade Soft-Delete (선택)
-
-- Parent 삭제 시 자식 함께 처리 확인 다이얼로그("N개 하위 태스크가 함께 삭제됩니다"). QAIL이 soft-delete를 채택했는지 확인 후 조건부.
-
-## 스코프에서 제외
-
-- **자동 Summary 생성** (ALSMK `handleGenerateSummaries`) — Summary를 Task와 동일 취급하므로 불필요.
-- **`is_summary` 별도 컬럼/타입 배지** — 도입하지 않음.
-- **Realtime 롤업** — 수동 버튼만.
-- **3-tier 이상 계층** — 현재 2-tier 유지.
-
-## 기술 노트
-
-**신규/수정 파일**
-- `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx` — 그룹핑, collapse state, 들여쓰기 렌더.
-- `src/components/task-management/raw-data/AddChildTaskDialog.tsx` (신규).
-- `src/components/task-management/raw-data/ExportDialog.tsx` — Parent→Children 정렬, 스타일, 메타.
-- `src/lib/task-management/hierarchy.functions.ts` (신규) — `addChildTask`, `recalcParentRollup` + admin 가드.
-- (선택) Supabase 마이그레이션: `add_child_task_management` RPC.
-
-## 확인 필요
-
-권장 최소 세트는 **P0(계층 그리드) + P1(Add Child) + P2(롤업 재계산)** 입니다. 이대로 진행할지, 또는 포함/제외할 항목을 지정해 주세요.
+- 신규 migration: `user_view_preferences` 테이블 + GRANT + RLS + 정책 + `set_updated_at` 트리거
+- 신규: `src/lib/task-management/user-view-preferences.functions.ts`
+- 신규: `src/hooks/useUserViewPreference.ts`
+- 수정: `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx` (persist 로직 훅으로 교체)
+- (필요 시) 수정: `src/start.ts` — bearer middleware 등록 확인
