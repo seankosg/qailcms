@@ -86,7 +86,7 @@ export interface DefectItem {
   updated_at: string;
 }
 
-async function fetchAll(filters: DefectFilters): Promise<DefectItem[]> {
+async function fetchAll(filters: Pick<DefectFilters, "includeInactive">): Promise<DefectItem[]> {
   const out: DefectItem[] = [];
   let from = 0;
   let latestDataDate: string | null = null;
@@ -99,14 +99,6 @@ async function fetchAll(filters: DefectFilters): Promise<DefectItem[]> {
       .range(from, from + PAGE_SIZE - 1);
 
     if (!filters.includeInactive) query = query.eq("is_active", true);
-    if (filters.teams.length) query = query.in("team", filters.teams);
-    if (filters.status.length) query = query.in("status_raw", filters.status);
-    if (filters.q.trim()) {
-      const q = filters.q.trim().replace(/[%,]/g, "");
-      query = query.or(
-        `source_issue_no.ilike.%${q}%,description.ilike.%${q}%,location_raw.ilike.%${q}%,assigned_to.ilike.%${q}%,subcontractor_name.ilike.%${q}%,hdec_pic_name.ilike.%${q}%`,
-      );
-    }
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
@@ -127,9 +119,13 @@ async function fetchAll(filters: DefectFilters): Promise<DefectItem[]> {
 
 export function useDefectRawData(filters: DefectFilters) {
   return useQuery({
-    queryKey: ["defect-raw-data", filters],
-    queryFn: () => fetchAll(filters),
-    staleTime: 30_000,
+    queryKey: ["defect-raw-data", { includeInactive: filters.includeInactive }],
+    queryFn: () => fetchAll({ includeInactive: filters.includeInactive }),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 }
 
