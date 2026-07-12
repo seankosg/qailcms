@@ -273,6 +273,12 @@ export interface StyledSheetOptions {
     value: unknown,
     row: Record<string, unknown>,
   ) => string | null;
+  /** Per-row style override — applied to all data columns (and Gantt cell background when no bar). */
+  rowStyleOverride?: (row: Record<string, unknown>) => {
+    fillRgb?: string;
+    fontColorRgb?: string;
+    bold?: boolean;
+  } | null;
   /** Right-side day-by-day Gantt calendar. */
   gantt?: {
     startDate: string;
@@ -301,6 +307,7 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
     dataDate,
     numFmtByKey,
     cellFillOverride,
+    rowStyleOverride,
     gantt,
   } = opts;
   const isGantt = theme === "gantt";
@@ -448,6 +455,7 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
   // Data + gantt bars
   for (let r = 0; r < dataRows.length; r++) {
     const rowObj = rows[r];
+    const rowOv = rowStyleOverride?.(rowObj) ?? null;
 
     for (let c = 0; c < columns.length; c++) {
       const col = columns[c];
@@ -461,6 +469,16 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
         style = { ...STYLE_DATA, fill: { fgColor: { rgb: overrideFill } } };
       } else {
         style = STYLE_DATA;
+      }
+      if (rowOv) {
+        style = { ...style };
+        if (rowOv.fillRgb) style.fill = { fgColor: { rgb: rowOv.fillRgb } };
+        const baseFont = (style.font as Record<string, unknown>) ?? {};
+        style.font = {
+          ...baseFont,
+          ...(rowOv.fontColorRgb ? { color: { rgb: rowOv.fontColorRgb } } : {}),
+          ...(rowOv.bold ? { bold: true } : {}),
+        };
       }
       const explicitFmt = numFmtByKey?.[col.key];
 
@@ -533,6 +551,9 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
         }
         if (!fill && dow === 5) {
           fill = GANTT_BAR.weekend;
+        }
+        if (!fill && rowOv?.fillRgb) {
+          fill = rowOv.fillRgb;
         }
         setCell(ws, dataStart + r, cc, "", gGanttCellStyle(fill, isToday));
       }
