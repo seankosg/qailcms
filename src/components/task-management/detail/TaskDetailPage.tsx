@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { useParams, useRouter } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCcw } from "lucide-react";
+import { ArrowLeft, RefreshCcw, ShieldCheck, ShieldOff } from "lucide-react";
 import {
   TM_COLUMNS,
   DISCIPLINE_COLORS,
@@ -45,6 +45,7 @@ const SOURCE_COLORS: Record<string, string> = {
 export function TaskDetailPage() {
   const { id } = useParams({ from: "/_authenticated/closure/task-management/detail/$id" });
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const isAdmin = !!(user as any)?.isAdmin;
   const resolveLabel = useTmColumnLabel();
@@ -88,6 +89,11 @@ export function TaskDetailPage() {
 
   const isParent = row.level === "parent";
 
+  const onFieldSaved = () => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ["task-detail-history", row.discipline, row.task_no] });
+  };
+
   return (
     <div className="space-y-4">
       <header className="flex items-center justify-between gap-2">
@@ -110,9 +116,20 @@ export function TaskDetailPage() {
             {row.task_name && <span className="text-sm font-normal text-muted-foreground">· {row.task_name}</span>}
           </h1>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin ? (
+            <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              <ShieldCheck className="mr-1 h-3 w-3" /> 편집 가능
+            </Badge>
+          ) : (
+            <Badge className="text-[10px] bg-zinc-500/15 text-zinc-700 dark:text-zinc-300">
+              <ShieldOff className="mr-1 h-3 w-3" /> 읽기 전용
+            </Badge>
+          )}
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
+          </Button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -128,7 +145,6 @@ export function TaskDetailPage() {
                   const display = renderFieldValue(c, v);
                   const editable =
                     !!c.editable &&
-                    isAdmin &&
                     !!c.editorType &&
                     !(c.key === "actual_progress" && isParent);
                   return (
@@ -142,8 +158,8 @@ export function TaskDetailPage() {
                             rowId={String(row.id)}
                             column={c}
                             currentValue={v}
-                            canEdit={true}
-                            onSaved={() => refetch()}
+                            canEdit={isAdmin}
+                            onSaved={onFieldSaved}
                           >
                             {display}
                           </EditCellPopover>
