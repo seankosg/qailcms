@@ -61,20 +61,35 @@ function toIso(v: unknown): string | null {
   if (v == null || v === "") return null;
   const s = String(v).trim();
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  return m ? m[0] : null;
+  if (!m) return null;
+  const y = Number(m[1]);
+  if (y < 2000 || y > 2100) return null;
+  return m[0];
 }
 
 function computeGanttRange(rows: Record<string, unknown>[], dataDateIso: string) {
-  const dates: string[] = [dataDateIso];
+  const dates: string[] = [];
   for (const r of rows) {
     for (const k of ["plan_start", "plan_end", "actual_start", "actual_finish", "forecast_end"]) {
       const iso = toIso(r[k]);
       if (iso) dates.push(iso);
     }
   }
-  if (dates.length <= 1) return null;
+  if (dates.length === 0) return null;
+  dates.push(dataDateIso);
   dates.sort();
-  return { startDate: dates[0], endDate: dates[dates.length - 1] };
+  const start = dates[0];
+  const end = dates[dates.length - 1];
+  // Cap total span at 2 years (~730 days) to protect the workbook builder.
+  const startMs = Date.parse(start + "T00:00:00Z");
+  const endMs = Date.parse(end + "T00:00:00Z");
+  const days = Math.round((endMs - startMs) / 86400000);
+  if (!Number.isFinite(days) || days < 0) return null;
+  if (days > 730) {
+    const capped = new Date(startMs + 730 * 86400000).toISOString().slice(0, 10);
+    return { startDate: start, endDate: capped };
+  }
+  return { startDate: start, endDate: end };
 }
 
 type ExportFormat = "view" | "reimport";
