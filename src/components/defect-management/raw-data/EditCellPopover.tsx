@@ -71,7 +71,7 @@ export function EditCellPopover({ id, field, label, editorType, options, current
           <Select value={String(value ?? "")} onValueChange={setValue}>
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="선택..." /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__null__" onSelect={() => setValue("")}>(비우기)</SelectItem>
+              <SelectItem value="__null__">(비우기)</SelectItem>
               {(options ?? []).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
