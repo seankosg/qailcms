@@ -38,7 +38,7 @@ export const updateDefectField = createServerFn({ method: "POST" })
     if (data.field === "priority" && row.priority_locked) throw new Error("Priority is locked");
     if (data.field === "hdec_verification" && row.hdec_verification_locked) throw new Error("HDEC Verification is locked");
     const patch: Record<string, any> = { [data.field]: data.value, updated_at: new Date().toISOString() };
-    const { error } = await context.supabase.from("defect_items_raw").update(patch).eq("id", data.id);
+    const { error } = await (context.supabase as any).from("defect_items_raw").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -75,7 +75,7 @@ export const bulkUpdateDefects = createServerFn({ method: "POST" })
     }
     if (Object.keys(patch).length === 0) throw new Error("허용된 편집 필드가 없습니다.");
     patch.updated_at = new Date().toISOString();
-    const { error } = await context.supabase.from("defect_items_raw").update(patch).in("id", data.ids);
+    const { error } = await (context.supabase as any).from("defect_items_raw").update(patch).in("id", data.ids);
     if (error) throw new Error(error.message);
     return { ok: true, count: data.ids.length, fields: Object.keys(patch) };
   });
