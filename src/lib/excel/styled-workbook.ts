@@ -955,6 +955,7 @@ function buildSettingsSheet(
   };
   setCell(ws, 0, 0, "Gantt 차트 설정", titleStyle);
 
+  // B3 = Data Date
   setCell(ws, 2, 0, "Data Date", labelStyle);
   if (dataDateSerial != null) {
     const addr = XLSX.utils.encode_cell({ r: 2, c: 1 });
@@ -972,6 +973,7 @@ function buildSettingsSheet(
   }
   setCell(ws, 2, 2, "판정·진도율 기준일. 변경 시 알람/진행률 재계산", noteStyle);
 
+  // B4 = 차트 시작일
   setCell(ws, 3, 0, "차트 시작일", labelStyle);
   if (startSerial != null) {
     const addr = XLSX.utils.encode_cell({ r: 3, c: 1 });
@@ -984,31 +986,37 @@ function buildSettingsSheet(
   }
   setCell(ws, 3, 2, "타임라인 첫 칸 날짜. 변경 시 타임라인 전체 이동", noteStyle);
 
-  setCell(ws, 8, 0, "차트 일수", labelStyle);
-  setCell(ws, 8, 1, ganttDays, valueStyle);
+  // B5 = 차트 일수 (원본 템플릿 배치)
+  setCell(ws, 4, 0, "차트 일수", labelStyle);
+  setCell(ws, 4, 1, ganttDays, valueStyle);
+  setCell(ws, 4, 2, "타임라인 총 일수 (원본 기본 153일)", noteStyle);
 
-  const dls = cfg?.deadlines ?? [];
-  for (let i = 0; i < 3; i++) {
-    setCell(ws, 4 + i, 0, `데드라인 ${i + 1}`, labelStyle);
-    const dl = dls[i];
-    if (dl) {
-      const serial = isoToExcelSerial(dl.date);
-      if (serial != null) {
-        const addr = XLSX.utils.encode_cell({ r: 4 + i, c: 1 });
-        (ws as Record<string, unknown>)[addr] = {
-          t: "n",
-          v: serial,
-          z: "yyyy-mm-dd",
-          s: { ...valueStyle, numFmt: "yyyy-mm-dd" },
-        };
-      }
-      setCell(ws, 4 + i, 2, dl.label, noteStyle);
-    }
-  }
-
+  // B8 = 진도차 알람 임계값 (원본 템플릿 배치)
   setCell(ws, 7, 0, "진도차 알람 기준", labelStyle);
-  setCell(ws, 7, 1, cfg?.alarmThreshold ?? -0.05, { ...valueStyle, numFmt: "0.0%" });
+  setCell(ws, 7, 1, cfg?.alarmThreshold ?? -0.05, {
+    ...valueStyle,
+    numFmt: "0.0%",
+    fill: { fgColor: { rgb: "FFFFF2CC" } },
+  });
   setCell(ws, 7, 2, "실적-계획 진도차가 이 값 이하이면 '지연' 판정·알람 (기본 -5%p)", noteStyle);
+
+  // 데드라인 (5~7행 자리): 옵션 값이 있을 때만 채움
+  const dls = cfg?.deadlines ?? [];
+  for (let i = 0; i < dls.length && i < 2; i++) {
+    setCell(ws, 5 + i, 0, `데드라인 ${i + 1}`, labelStyle);
+    const dl = dls[i];
+    const serial = isoToExcelSerial(dl.date);
+    if (serial != null) {
+      const addr = XLSX.utils.encode_cell({ r: 5 + i, c: 1 });
+      (ws as Record<string, unknown>)[addr] = {
+        t: "n",
+        v: serial,
+        z: "yyyy-mm-dd",
+        s: { ...valueStyle, numFmt: "yyyy-mm-dd" },
+      };
+    }
+    setCell(ws, 5 + i, 2, dl.label, noteStyle);
+  }
 
   setCell(ws, 10, 0, "범례 (타임라인)", labelStyle);
   const legend: Array<[string, string]> = [

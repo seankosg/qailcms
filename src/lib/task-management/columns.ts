@@ -159,6 +159,42 @@ export const TM_AUTO_CALCULATED: string[] = [
   "actual_duration",
 ];
 
+// ---------------------------------------------------------------------------
+// Gantt 원본 템플릿 A..T 컬럼 순서 (원본 xlsx `Gantt` 시트 재현용)
+// ---------------------------------------------------------------------------
+
+export interface TmGanttOriginalCol {
+  /** Excel 컬럼 문자 (A..T) */
+  letter: string;
+  /** snake_case 필드 키 (null → 예비/여백 컬럼) */
+  key: string | null;
+  /** 원본 헤더 라벨 (한글) */
+  label: string;
+}
+
+export const TM_GANTT_ORIGINAL_ORDER: TmGanttOriginalCol[] = [
+  { letter: "A", key: "task_no",           label: "No" },
+  { letter: "B", key: "category",          label: "Category" },
+  { letter: "C", key: "plot",              label: "Plot" },
+  { letter: "D", key: "task_name",         label: "항목" },
+  { letter: "E", key: "risk",              label: "리스크" },
+  { letter: "F", key: "sub_task_desc",     label: "단계별 세부 업무" },
+  { letter: "G", key: "pic",               label: "담당" },
+  { letter: "H", key: "row_type",          label: "유형" },
+  { letter: "I", key: "status_manual",     label: "상태" },
+  { letter: "J", key: "plan_start",        label: "계획시작" },
+  { letter: "K", key: "plan_end",          label: "계획완료" },
+  { letter: "L", key: "plan_days",         label: "계획일수" },
+  { letter: "M", key: "actual_start",      label: "실제시작" },
+  { letter: "N", key: "actual_progress",   label: "실적진도율" },
+  { letter: "O", key: "plan_progress",     label: "계획진도율" },
+  { letter: "P", key: "progress_variance", label: "진도차" },
+  { letter: "Q", key: "forecast_end",      label: "예상완료" },
+  { letter: "R", key: "slip_days",         label: "차이(일)" },
+  { letter: "S", key: "auto_judgment",     label: "자동판정" },
+  { letter: "T", key: null,                label: "" },
+];
+
 export interface BulkEditableField {
   field: string;
   label: string;
