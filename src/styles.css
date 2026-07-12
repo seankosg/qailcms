@@ -51,6 +51,12 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-schedule-plan: var(--schedule-plan);
+  --color-schedule-actual: var(--schedule-actual);
+  --color-schedule-over: var(--schedule-over);
+  --color-schedule-short: var(--schedule-short);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -87,6 +93,12 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  --schedule-plan: oklch(0.62 0.16 250);
+  --schedule-actual: oklch(0.65 0.15 155);
+  --schedule-over: oklch(0.72 0.18 55);
+  --schedule-short: oklch(0.62 0.22 25);
+  --warning: oklch(0.72 0.18 70);
+  --warning-foreground: oklch(0.208 0.042 265.755);
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
   --sidebar-primary: oklch(0.208 0.042 265.755);
@@ -122,6 +134,12 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+  --schedule-plan: oklch(0.7 0.18 250);
+  --schedule-actual: oklch(0.72 0.17 155);
+  --schedule-over: oklch(0.78 0.19 55);
+  --schedule-short: oklch(0.7 0.23 25);
+  --warning: oklch(0.78 0.19 70);
+  --warning-foreground: oklch(0.208 0.042 265.755);
   --sidebar: oklch(0.208 0.042 265.755);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
   --sidebar-primary: oklch(0.488 0.243 264.376);
