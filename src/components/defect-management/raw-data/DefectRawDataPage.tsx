@@ -108,7 +108,7 @@ export function DefectRawDataPage() {
   const isAdmin = !!user?.isAdmin;
   const storageKey = user?.id ? `defect-raw-data-state:${user.id}` : "defect-raw-data-state:anon";
 
-  const tableRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -550,7 +550,7 @@ function renderDefectCell(c: DefectColumnDef, v: any, row: DefectItem, _dataDate
 // ── Virtualized table view with sticky header + frozen first columns ────
 interface TableViewProps {
   table: ReturnType<typeof useReactTable<DefectItem>>;
-  tableRef: React.RefObject<HTMLDivElement>;
+  tableRef: React.RefObject<HTMLDivElement | null>;
   loading: boolean;
   dataDate: string | null;
   onRowClick: (row: DefectItem) => void;

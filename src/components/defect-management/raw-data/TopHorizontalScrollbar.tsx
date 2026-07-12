@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  targetRef: React.RefObject<HTMLDivElement>;
+  targetRef: React.RefObject<HTMLDivElement | null>;
   width: number;
   frozenWidth?: number;
   className?: string;
