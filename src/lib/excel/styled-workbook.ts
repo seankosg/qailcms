@@ -932,11 +932,13 @@ function applyGanttTemplate(
 }
 
 function buildSettingsSheet(
+  dataDateIso: string,
   startDateIso: string,
   ganttDays: number,
   cfg: StyledSheetOptions["settingsSheet"],
 ): XLSX.WorkSheet {
   const ws = XLSX.utils.aoa_to_sheet([[]]);
+  const dataDateSerial = isoToExcelSerial(dataDateIso);
   const startSerial = isoToExcelSerial(startDateIso);
   const titleStyle = {
     font: { name: FONT_KO, sz: 14, bold: true, color: { rgb: "FF1F4E79" } },
@@ -953,9 +955,26 @@ function buildSettingsSheet(
   };
   setCell(ws, 0, 0, "Gantt 차트 설정", titleStyle);
 
-  setCell(ws, 2, 0, "차트 시작일", labelStyle);
-  if (startSerial != null) {
+  setCell(ws, 2, 0, "Data Date", labelStyle);
+  if (dataDateSerial != null) {
     const addr = XLSX.utils.encode_cell({ r: 2, c: 1 });
+    (ws as Record<string, unknown>)[addr] = {
+      t: "n",
+      v: dataDateSerial,
+      z: "yyyy-mm-dd",
+      s: {
+        ...valueStyle,
+        numFmt: "yyyy-mm-dd",
+        font: { ...(valueStyle.font as Record<string, unknown>), bold: true, color: { rgb: "FF0000FF" } },
+        fill: { fgColor: { rgb: "FFFFF2CC" } },
+      },
+    };
+  }
+  setCell(ws, 2, 2, "판정·진도율 기준일. 변경 시 알람/진행률 재계산", noteStyle);
+
+  setCell(ws, 3, 0, "차트 시작일", labelStyle);
+  if (startSerial != null) {
+    const addr = XLSX.utils.encode_cell({ r: 3, c: 1 });
     (ws as Record<string, unknown>)[addr] = {
       t: "n",
       v: startSerial,
@@ -963,10 +982,10 @@ function buildSettingsSheet(
       s: { ...valueStyle, numFmt: "yyyy-mm-dd" },
     };
   }
-  setCell(ws, 2, 2, "변경 시 타임라인 전체 이동", noteStyle);
+  setCell(ws, 3, 2, "타임라인 첫 칸 날짜. 변경 시 타임라인 전체 이동", noteStyle);
 
-  setCell(ws, 3, 0, "차트 일수", labelStyle);
-  setCell(ws, 3, 1, ganttDays, valueStyle);
+  setCell(ws, 8, 0, "차트 일수", labelStyle);
+  setCell(ws, 8, 1, ganttDays, valueStyle);
 
   const dls = cfg?.deadlines ?? [];
   for (let i = 0; i < 3; i++) {
