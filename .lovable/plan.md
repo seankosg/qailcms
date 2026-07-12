@@ -1,58 +1,102 @@
 ## 목표
+Task Raw Data의 라벨/헤더를 완전 영문화하고, 신규 컬럼 `actual_finish` / `actual_duration`을 추가. 기존 한글 Source Header는 alias로 유지(Option B).
 
-Admin → Mapping의 **Header Mapping** 표(Spare Part / Task Management 양쪽)에서 `Source Header` 값을 직접 수정할 수 있게 하고, 저장 시 정규화·중복·연관 로직 오류를 재점검하여 문제 발생 시 경고를 표시한다.
+## 1. 신규 컬럼 추가 (DB 스키마)
 
-## 적용 대상
+`task_management_raw` 테이블에 두 컬럼 신설:
+- `actual_finish date` — 실제 완료일 (사용자 입력, 편집 가능)
+- `actual_duration integer` — 실제 소요일수. 다음 로직으로 자동 계산:
+  - `actual_start`와 `actual_finish`가 모두 있으면 `actual_finish - actual_start + 1`
+  - `actual_finish`가 없고 `actual_start`만 있으면 `current_date - actual_start + 1` (진행중)
+  - `actual_start`가 없으면 null
 
-- `src/components/admin/HeaderMappingTable.tsx` (Spare Part)
-- `src/components/admin/TmHeaderMappingTable.tsx` (Task Management)
+`task_management_status_history` 트리거(`trg_task_history_fn`)에 두 필드 추가 → 편집 이력 기록.
 
-두 컴포넌트가 거의 동일한 구조라, 편집/검증 로직을 담은 공통 훅 `useSourceHeaderEditor`(신규, `src/hooks/`)로 뽑아 재사용한다. 각 테이블은 훅에 `table` 이름(`spare_part_header_mappings` / `task_management_header_mappings`) 및 `queryKey`, 현재 `rows`, `me` 만 넘긴다.
+Parent 롤업 함수(`update_task_summary`)에 `actual_finish = max(child.actual_finish)` 추가. `actual_duration`은 각 row에서 계산되므로 롤업 시 재계산 로직만 반영.
 
-## UX
+Rollback 함수(`rollback_task_management_import`)에 두 필드의 date/int 캐스팅 케이스 추가.
 
-- 각 행의 Source Header 셀 우측에 연필 아이콘 버튼 → 클릭 시 그 행이 편집 모드로 전환(같은 셀에 `Input` + 저장/취소 버튼).
-- Enter = 저장, Esc = 취소.
-- 저장 성공 시 sonner `toast.success`, 검증 실패 시 `toast.error`(차단), 위험 조건은 `toast.warning`으로 계속 표시.
-- System 매핑(`is_custom=false`)도 편집 허용하되, 편집 모드 진입 시 상단에 `Alert` 형태 배너("시스템 매핑입니다. 시드/재배포 시 값이 되돌아갈 수 있습니다.") 표시. 답변 반영.
+## 2. 코드 반영
 
-## 저장 시 검증 (순서대로)
+- **`src/lib/task-management/columns.ts` — `TM_COLUMNS`**
+  - 모든 `label` 값을 아래 영문 매핑으로 교체.
+  - `actual_finish` (A.Finish, date, group: actual, editable date) 신규 추가.
+  - `actual_duration` (A.Duration, number, group: actual, 자동 계산 - editable 아님) 신규 추가.
+  - `TM_AUTO_CALCULATED`에 `actual_duration` 추가.
 
-1. **필수/형식**: `trim()` 후 빈 문자열 금지 → 차단.
-2. **변경 없음**: 정규화 결과가 원래 값과 동일하면 no-op으로 종료.
-3. **중복 차단**: 같은 `module` 내 자기 자신(id) 제외 후 `normalizeHeader(source_header)`가 동일한 행이 존재하면 저장 거부. 토스트에 충돌한 대상 필드(target_field)를 함께 표기. 답변 반영.
-4. **경고(비차단)**:
-   - target_field가 현재 `useTaskManagementFieldConfig`/`useSparePartFieldConfig`의 활성 필드 목록에 없으면 `toast.warning("대상 필드 비활성/누락 — 매칭되어도 Import 시 무시될 수 있음")`.
-   - 정규화 결과가 원문과 다르면(공백/개행 정리로 값이 실제로 달라진 경우) 정보성 안내 배지 표시.
-5. **DB 업데이트**: `.update({ source_header: trimmed, updated_by: me.id })`. 오류 시 `toast.error(error.message)`.
-6. **후속 동기화**:
-   - `queryClient.invalidateQueries` — 해당 mapping 쿼리키 + Import 관련 프리뷰/매칭 관련 쿼리키(`spare-part-header-mappings`, `task-management-header-mappings`). Import Parser는 실행 시점에 매핑을 다시 읽어오므로 별도 마이그레이션 불필요.
-   - `refetch()`로 즉시 반영.
-   - 페이지 하단 **Mapping Test** 박스 값이 있으면 자동 재평가(useMemo 재실행되므로 별도 코드 없이 rows 갱신만으로 동작).
+  | field_name | 신규 label |
+  |---|---|
+  | task_no | Task No |
+  | level | Tier |
+  | discipline | Discipline |
+  | team | Team |
+  | category | Category |
+  | plot | Plot |
+  | location | Location |
+  | floor_level | Level |
+  | task_name | Task |
+  | risk | Risk |
+  | sub_task_desc | Sub-Task |
+  | pic | PIC |
+  | row_type | Work Type |
+  | status_manual | Status |
+  | auto_judgment | Alarm |
+  | plan_start | P.Start |
+  | plan_end | P.Finish |
+  | plan_days | P.Duration |
+  | actual_start | A.Start |
+  | actual_finish | A.Finish (신규) |
+  | actual_duration | A.Duration (신규) |
+  | actual_progress | Actual % |
+  | plan_progress | Plan % |
+  | progress_variance | Variance (%p) |
+  | expected_progress_today | T.Plan |
+  | today_gap | T.Diff |
+  | forecast_end | Revised Finish |
+  | slip_days | Slip (days) |
+  | data_date | Data Date |
+  | source_file | Source File |
+  | imported_at | Imported |
 
-## "연관된 로직" 재점검 범위
+- **Excel Import 파서 / 매퍼**: 신규 두 필드도 매핑 대상에 포함되도록 컬럼 목록 기반으로 자동 반영 확인.
+- **Bulk Edit / Filters / Export**: `TM_COLUMNS` 기반이므로 자동 반영. 스팟체크만.
 
-Source Header는 Excel Import 시 `normalizeHeader(excel셀) === normalizeHeader(mapping.source_header)` 매칭에만 사용된다(파서 `src/lib/spare-part-import-parser.ts`, Task Management 파서). 따라서:
+## 3. DB 데이터 갱신 (Option B — alias 유지)
 
-- 기존에 이 매핑을 참조하던 raw 데이터/이력 테이블 값은 변경 불필요(과거 import 결과에는 영향 없음).
-- 다만 **동일 target_field에 매핑된 다른 활성 source_header가 이미 존재**하면 현재 저장은 허용하되(하나의 target에 여러 alias는 정상), 활성 alias 수를 배지로 안내.
-- 편집 대상이 활성 상태(`is_active=true`)일 때만 위 검증을 강하게 적용. 비활성 매핑 편집은 검증은 하되 문구를 "저장은 되지만 활성화하기 전까지 매칭되지 않음"으로 안내.
+### `task_management_field_config`
+각 `field_name` row의 `display_name`을 위 표대로 UPDATE.
+`actual_finish`, `actual_duration` row는 신규 INSERT (sort_order는 `actual_start` 뒤).
 
-## 파일 변경 요약
+### `task_management_header_mappings` (Option B: alias 유지)
+- 기존 한글 `source_header` row는 **삭제/수정하지 않고 그대로 유지** → 과거 한글 Excel 파일도 계속 Import 가능.
+- 각 `target_field`에 대해 **영문 신규 매핑 row를 INSERT** (중복 방지: `(module, source_header)` 조합 확인 후 없을 때만):
+  - `Discipline`, `Location`, `Level`, `Task`, `Risk`, `Sub-Task`, `PIC`, `Work Type`, `Status`, `Alarm`,
+  - `P.Start`, `P.Finish`, `P.Duration`, `A.Start`, `A.Finish`, `A.Duration`,
+  - `Actual %`, `Plan %`, `Variance (%p)`, `T.Plan`, `T.Diff`, `Revised Finish`, `Slip (days)`
+- 결과: 한 target_field에 한글+영문 두 개의 활성 매핑이 공존. Header Mapping 검증 로직은 `(module, source_header)` unique만 요구하므로 문제없음.
 
-- 수정: `src/components/admin/HeaderMappingTable.tsx`
-  - Source Header 셀을 편집 가능한 `EditableSourceHeaderCell`로 교체
-  - 편집 상태(`editingId`, `draft`) 및 저장 핸들러 추가
-- 수정: `src/components/admin/TmHeaderMappingTable.tsx` (동일 구조로 적용)
-- 신규: `src/components/admin/EditableSourceHeaderCell.tsx` — 두 테이블 공용 셀 컴포넌트(Input + Save/Cancel + Pencil, 검증 결과 배지).
-- 신규(선택): 훅 형태 대신 검증 유틸 `src/lib/admin/header-mapping-validation.ts` — `validateSourceHeaderEdit(rows, id, newValue, fieldsActiveSet)` 반환 `{ ok, error?, warnings[] }`. 두 테이블에서 공용.
+## 4. 롤업 / 자동계산 로직 재점검
 
-## 검증(테스트) 계획
+- `update_task_summary`: `actual_finish = max(child.actual_finish)` 추가. `actual_duration`은 parent에서 `actual_finish - actual_start + 1`로 재계산.
+- `calc_auto_judgment_value`: 기존 로직 유지. `actual_finish` 존재 시 `auto_judgment='완료'` 판정을 강화할지는 후속 논의 (이번 범위에서는 기존 progress 기반 유지).
+- 트리거 이력 기록에 신규 두 필드 반영.
 
-- 빌드 통과 확인.
-- 프리뷰에서 `/admin/mapping` → Spare Part & Task Management 탭 각각:
-  1. Custom 매핑 편집 → 정상 저장 → 목록 갱신
-  2. System 매핑 편집 → 경고 배너 노출, 저장 성공
-  3. 다른 매핑과 정규화 후 중복되는 값 입력 → 저장 차단 토스트
-  4. 빈 문자열 저장 시도 → 차단
-  5. Mapping Test 박스에 편집 후 새 문자열을 넣어 즉시 반영되는지 확인
+## 5. UI 검증
+
+- Task Raw Data 페이지: 신규 A.Finish/A.Duration 컬럼 표시, 라벨 영문화.
+- Admin > Field Config: 24개 필드 라벨 갱신 확인, 신규 2개 row 추가 확인.
+- Admin > Header Mapping: 한글+영문 alias 공존 확인.
+- Excel Import: 영문 헤더 / 한글 헤더 두 종류 모두 매핑 성공하는지 스팟체크.
+
+## 6. 실행 순서 (승인 필요)
+
+1. **Migration 1 (스키마)**: 신규 컬럼 2개 + 트리거/롤업/롤백 함수 갱신.
+2. **코드 수정**: `TM_COLUMNS` 라벨/신규 컬럼 반영.
+3. **데이터 UPDATE/INSERT**: field_config, header_mappings 갱신 (Option B alias).
+4. UI 스팟체크.
+
+## 주의사항
+
+- 신규 `actual_duration`은 계산 필드이므로 사용자 편집 UI에서는 read-only. `actual_finish` 편집 시 즉시 재계산 필요 (client-side 또는 트리거).
+- Option B로 한글 alias를 유지하지만, 시스템 표준은 영문. 향후 신규 Excel 템플릿은 영문 헤더 권장.
+- `TmFieldConfigTable`의 "Reset to defaults" 버튼은 `TM_COLUMNS`를 기준으로 되돌리므로, 코드 라벨과 DB 라벨이 항상 일치해야 함 → 두 곳을 동일한 값으로 반영.

@@ -1004,6 +1004,8 @@ export type Database = {
       }
       task_management_raw: {
         Row: {
+          actual_duration: number | null
+          actual_finish: string | null
           actual_progress: number | null
           actual_start: string | null
           auto_judgment: string | null
@@ -1043,6 +1045,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          actual_duration?: number | null
+          actual_finish?: string | null
           actual_progress?: number | null
           actual_start?: string | null
           auto_judgment?: string | null
@@ -1082,6 +1086,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          actual_duration?: number | null
+          actual_finish?: string | null
           actual_progress?: number | null
           actual_start?: string | null
           auto_judgment?: string | null
