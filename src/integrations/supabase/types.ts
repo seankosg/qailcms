@@ -1709,6 +1709,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_view_preferences: {
+        Row: {
+          created_at: string
+          state: Json
+          updated_at: string
+          user_id: string
+          view_key: string
+        }
+        Insert: {
+          created_at?: string
+          state?: Json
+          updated_at?: string
+          user_id: string
+          view_key: string
+        }
+        Update: {
+          created_at?: string
+          state?: Json
+          updated_at?: string
+          user_id?: string
+          view_key?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
