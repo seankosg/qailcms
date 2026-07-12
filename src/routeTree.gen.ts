@@ -35,6 +35,7 @@ import { Route as AuthenticatedClosureTaskManagementImportLogsRouteImport } from
 import { Route as AuthenticatedClosureSparePartRecordsDocRefRouteImport } from './routes/_authenticated/closure/spare-part/records.$docRef'
 import { Route as AuthenticatedClosureSparePartImportLogsRouteImport } from './routes/_authenticated/closure/spare-part/import.logs'
 import { Route as AuthenticatedClosureDefectManagementImportLogsRouteImport } from './routes/_authenticated/closure/defect-management/import.logs'
+import { Route as AuthenticatedClosureDefectManagementDetailIdRouteImport } from './routes/_authenticated/closure/defect-management/detail.$id'
 
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
   id: '/change-password',
@@ -184,6 +185,12 @@ const AuthenticatedClosureDefectManagementImportLogsRoute =
     path: '/logs',
     getParentRoute: () => AuthenticatedClosureDefectManagementImportRoute,
   } as any)
+const AuthenticatedClosureDefectManagementDetailIdRoute =
+  AuthenticatedClosureDefectManagementDetailIdRouteImport.update({
+    id: '/closure/defect-management/detail/$id',
+    path: '/closure/defect-management/detail/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -207,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
+  '/closure/defect-management/detail/$id': typeof AuthenticatedClosureDefectManagementDetailIdRoute
   '/closure/defect-management/import/logs': typeof AuthenticatedClosureDefectManagementImportLogsRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
@@ -233,6 +241,7 @@ export interface FileRoutesByTo {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
+  '/closure/defect-management/detail/$id': typeof AuthenticatedClosureDefectManagementDetailIdRoute
   '/closure/defect-management/import/logs': typeof AuthenticatedClosureDefectManagementImportLogsRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
@@ -262,6 +271,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
+  '/_authenticated/closure/defect-management/detail/$id': typeof AuthenticatedClosureDefectManagementDetailIdRoute
   '/_authenticated/closure/defect-management/import/logs': typeof AuthenticatedClosureDefectManagementImportLogsRoute
   '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
   '/_authenticated/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
     | '/closure/dashboard/'
+    | '/closure/defect-management/detail/$id'
     | '/closure/defect-management/import/logs'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
     | '/closure/dashboard'
+    | '/closure/defect-management/detail/$id'
     | '/closure/defect-management/import/logs'
     | '/closure/spare-part/import/logs'
     | '/closure/spare-part/records/$docRef'
@@ -345,6 +357,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/task-management/tree'
     | '/_authenticated/closure/dashboard/'
+    | '/_authenticated/closure/defect-management/detail/$id'
     | '/_authenticated/closure/defect-management/import/logs'
     | '/_authenticated/closure/spare-part/import/logs'
     | '/_authenticated/closure/spare-part/records/$docRef'
@@ -542,6 +555,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureDefectManagementImportLogsRouteImport
       parentRoute: typeof AuthenticatedClosureDefectManagementImportRoute
     }
+    '/_authenticated/closure/defect-management/detail/$id': {
+      id: '/_authenticated/closure/defect-management/detail/$id'
+      path: '/closure/defect-management/detail/$id'
+      fullPath: '/closure/defect-management/detail/$id'
+      preLoaderRoute: typeof AuthenticatedClosureDefectManagementDetailIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -611,6 +631,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
   AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
   AuthenticatedClosureDashboardIndexRoute: typeof AuthenticatedClosureDashboardIndexRoute
+  AuthenticatedClosureDefectManagementDetailIdRoute: typeof AuthenticatedClosureDefectManagementDetailIdRoute
   AuthenticatedClosureSparePartRecordsDocRefRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   AuthenticatedClosureTaskManagementImportLogsRoute: typeof AuthenticatedClosureTaskManagementImportLogsRoute
 }
@@ -643,6 +664,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureTaskManagementTreeRoute,
   AuthenticatedClosureDashboardIndexRoute:
     AuthenticatedClosureDashboardIndexRoute,
+  AuthenticatedClosureDefectManagementDetailIdRoute:
+    AuthenticatedClosureDefectManagementDetailIdRoute,
   AuthenticatedClosureSparePartRecordsDocRefRoute:
     AuthenticatedClosureSparePartRecordsDocRefRoute,
   AuthenticatedClosureTaskManagementImportLogsRoute:
