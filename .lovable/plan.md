@@ -1,57 +1,89 @@
-## 소스파일 필드 파싱 재점검 결과
+## Defect Raw Data — SHAW PROJECT CMS 대비 재점검 및 일치화 계획
 
-업로드하신 `260711_MECH_Snagging_PLOT-C_D-2.xlsx` 의 Sheet1 헤더 25개를 XLSX XML에서 직접 읽어 현재 파서(`src/lib/defect-management/parser.ts`) 매핑과 1:1 대조했습니다.
+SHAW `src/pages/DefectRawDataPage.tsx` (1,801줄) 와 현재 `src/components/defect-management/raw-data/DefectRawDataPage.tsx` (200줄) 를 1:1 대조한 결과입니다. UI 골격/필터/편집/네비게이션 대부분이 현재 미구현입니다. 아래 A/B 두 구획으로 나눠 진행합니다.
 
-### 매핑 대조표 (소스 헤더 → canonical field → DB 컬럼)
+### A. 이번 회차 일치화 대상 (전면 재작성)
 
-| # | Excel 헤더 | canonical field | DB 컬럼 | 상태 |
-|---|---|---|---|---|
-| 1 | `ID` | source_issue_no | source_issue_no | ✓ |
-| 2 | `Location` | location_raw | location_raw | ✓ |
-| 3 | `PlanTitle` | plan_title | plan_title | ✓ |
-| 4 | `PlanGroup` | plan_group | plan_group | ✓ |
-| 5 | `Status` | status_raw | status_raw | ✓ |
-| 6 | `AssignedTo` | assigned_to | assigned_to | ✓ |
-| 7 | `Category` | category | category | ✓ |
-| 8 | `Type` | defect_type | defect_type | ✓ |
-| 9 | `Item` | item | item | ✓ |
-| 10 | `Description` | description | description | ✓ |
-| 11 | `Priority` | priority | priority | ✓ (locked 로직 존재) |
-| 12 | `DueBy` | due_by | due_by (date) | ✓ toIsoDate |
-| 13 | `CreatedBy` | created_by_name | created_by_name | ✓ |
-| 14 | `CreatedByTeamName` | created_by_team_name | created_by_team_name | ✓ |
-| 15 | `CreatedDate` | created_date | created_date (timestamptz) | ✓ toIsoDateTime |
-| 16 | `IR` | ir | ir | ✓ |
-| 17 | `Forms` | forms | forms | ✓ |
-| 18 | `LastUpdated` | last_updated_at | last_updated_at (timestamptz) | ✓ toIsoDateTime |
-| 19 | `UpdatedDescription` | updated_description | updated_description | ✓ |
-| 20 | `UpdatedBy` | updated_by_name | updated_by_name | ✓ |
-| 21 | `UpdatedStatus` | updated_status | updated_status | ✓ |
-| 22 | `UpdatedDate` | updated_date_raw | updated_date_raw (timestamptz) | ✓ toIsoDateTime |
-| 23 | `LocationReference` | location_reference | location_reference | ✓ |
-| 24 | `Classification` | classification | classification | ✓ |
-| 25 | `Podium area` | podium_area | podium_area | ✓ (공백은 `normalizeHeader` 에서 제거 → `podiumarea` 매핑) |
+#### A-1. 테이블 인프라 & 필터
+- `@tanstack/react-table`, `@tanstack/react-virtual`, `jszip` 도입 (아직 미설치 확인 후 `bun add`).
+- 컬럼 정의를 SHAW `DEFECT_RAW_FIELDS` 순서/그룹과 동일하게 재구성. 상단 고정 컬럼: `__select`(체크박스), `is_critical`, `stage_progress`(가상), `issue_no`.
+- 필터 훅: `multiSelectFilterFn`, `textFilterFn` (comma AND 토큰), `dateRangeFilterFn`, `progressFilterFn`, `globalDefectFilterFn` — 모두 이식.
+- 컬럼별 드롭다운 UI: `MultiSelectDropdown`(facet count + `(Empty)` + Select/Clear all), `TextFilterDropdown`, `DateRangeDropdown`. 헤더 우측 filter 아이콘.
+- 다중 정렬 (Shift+클릭), 리사이즈 (더블클릭 auto-fit), 컬럼 visibility 는 `useDefectFieldConfig().isFieldVisible(field, roles)` 결과에 연동.
+- 가상 스크롤 바디(row 높이 36px, overscan 12), Sticky 헤더 + 좌측 frozen 컬럼(모바일 1개 / 데스크톱 1~4개, `useFrozenColumnCount` 훅 필요 시 신규 추가).
+- `TopHorizontalScrollbar` 컴포넌트 신규 (SHAW 이식) 로 상단 미러 가로 스크롤.
+- 500행 캡 제거.
 
-**결론: 25개 소스 헤더 전부가 canonical field 로 매핑되고, upsert payload 에 실제 값이 채워지고 있습니다.** 추가 안전망으로 파서는 `raw_payload` (jsonb) 에 25개 헤더의 원시 값을 그대로 저장하므로, 향후 매핑되지 않은 헤더가 새로 등장해도 DB 에는 항상 원본이 보존됩니다.
+#### A-2. 상단 컨트롤 바
+- 전역 검색 (300ms debounce, comma AND, `RAW_SEARCH_FIELDS` 범위).
+- Export 버튼 → `<Dialog>` 형식 선택 (View-friendly / Re-import ready) + 출력 (Single / Per-subcontractor, 서브콘 ≥ 7 시 ZIP 안내). `src/lib/defect-management/excel-export.ts` 신규 (SHAW `defect-excel-export.ts` 기반).
+- Refresh / Dashboard / Import / Import Logs 링크 유지.
+- Latest Data Date, 총건수, Critical 건수 요약 라인 유지.
 
-### 함께 확인한 견고성
+#### A-3. URL Drill-down 파라미터
+SHAW `urlMap` 전체 이식 (파라미터 → columnFilter 자동 세팅):
+`source, actualComplete, closureComplete, overdue, atRisk, atRiskDays, dueOn, unplannedActualOn, stage, capturedByGroup, notClosureDone, catADispute, hdecVerification, hdecReason, dateStart, dateEnd, dateField` (총 17종). 대시보드에서 진입 시 localStorage 저장 상태 무시.
 
-- `normalizeHeader` 가 대소문자/공백을 제거하므로 `PODIUM AREA`, `Podium Area`, `podium_area`, `Podium  area` 등 표기 변형도 모두 `podiumarea` 로 정규화되어 매핑됩니다.
-- 날짜 필드(4개)는 Excel 시리얼(예: `45539.5902829051`) 도 `XLSX.SSF.parse_date_code` 로 UTC ISO 로 변환됩니다.
-- `defect_header_mappings` 테이블에 사용자 정의 alias 를 넣으면 `extraAliases` 로 반영되어 위 25개와 다른 헤더 이름도 자동 매핑됩니다.
-- Re-import 파일(`QAIL_DEFECT_REIMPORT_V1` 마커 포함)에서 등장하는 확장 필드 26종(team / area_type / area_level / area_location / main_trade / sub_trade / work_type / subcontractor_name / subsub_name / hdec_pic_name / hdec_eng_name / hdec_verification / hdec_reason / hdec_comments / planned_* / actual_* / progress_pct / completion_status / closure_status / remarks / data_date) 도 `EXTRA_REIMPORT_FIELDS` 를 통해 파싱됩니다.
+#### A-4. 상태 영속화
+- 사용자별 키 `defect-raw-data-state:${userId}` 로 sorting / columnFilters / columnSizing / globalFilter / rowSelection 저장.
+- Drill-down 파라미터 존재 시 우회.
+- 활성 필터 chip UI 2행 (URL chip + column chip, `buildColumnFilterChips` 유틸 이식).
 
-### 최종 판정
+#### A-5. 셀 렌더링 규칙 (SHAW 일치)
+- `issue_no`: 클릭 시 상세 페이지로 이동 + 코멘트 배지 (본 회차 상세 페이지는 존재하되 코멘트 배지는 스텁으로 표시).
+- `closure_status / status / completion_status`: `DefectStatusBadge` 신규 (기존 `STATUS_COLORS` 재활용).
+- `team`: `formatTeamLabel` 활용.
+- `planned_progress_pct / actual_progress_pct`: `formatPct`.
+- `classification_source`: rule/discipline/manual/unclassified 배지.
+- 날짜 컬럼: `formatDdMmm` (SHAW 이식). Origin 헤더 배경색: `getOriginHeaderStyle` 이식 (`defect_field_config.origin` 컬럼 없으면 all `system`).
+- Sticky 셀 배경: overdue = `hsl(var(--destructive) / 0.06)`, closed = `hsl(var(--muted) / 0.45)`.
 
-**코드 변경 필요 없음.** 현재 파서는 이 샘플 파일의 25개 컬럼을 모두 파싱하고 있으며, 임포트 시 `defect_items_raw` 의 대응 컬럼(+ `raw_payload` jsonb)에 값이 저장됩니다. 이번 점검에서 누락된 필드는 발견되지 않았습니다.
+#### A-6. Bulk 편집 / Critical 토글 바
+- `BulkEditBar` 이식 (defect 엔티티, `getDefectBulkEditableFields` 기반). Reassign 다이얼로그 제외 (별도 필요 시 후속).
+- `CriticalPendingBar` + `CriticalBulkBar` 이식. Admin 판정은 `useCurrentUser` 확장으로 `isAdmin` 반환값 추가.
+- 낙관적 업데이트: 로컬 items 캐시 patch + `useDefectRawData` refetch.
 
-### 선택 옵션 — 안심 강화 (진행 여부 확인)
+#### B-4. 상세 페이지 (`/closure/defect-management/detail/$issueNo`)
+- 신규 라우트 파일 + 컴포넌트: 그룹화된 필드 뷰(identity / status / classification / content / location / plan / trade / people / audit / dates / progress / refs / flags), 상태 이력 타임라인(`defect_status_history`), 뒤로가기 시 `location.search` 복원, 필드별 inline 편집(A-B-6 재사용).
 
-원하시면 아래 두 가지 가시성 개선을 추가로 진행하겠습니다. 지시가 없으면 이번에는 코드를 건드리지 않고 위 재점검 보고로 마감합니다.
+#### B-6. 인라인 편집 (`EditCellPopover`)
+- 컬럼 정의 `editable / editorType` 기반 (text / textarea / select / date / number).
+- 잠금: `priority_locked`, `hdec_verification_locked` 존중.
+- 저장은 `defect_items_raw` 직접 upsert (`requireSupabaseAuth` 사용하는 신규 서버 함수 `updateDefectField.functions.ts`).
+- 감사 로그: `defect_status_history` 에 change_type='inline_edit' 로 기록 (기존 스키마 재활용).
 
-- **옵션 1. Column Select Dialog 에 "Mapped/Unmapped/Unknown" 배지 카운터 요약**
-  다이얼로그 상단에 `매핑됨 25/25 · 확장 0 · 미매핑 0` 처럼 총합을 표시하여 새 파일마다 커버리지를 한눈에 확인.
-- **옵션 2. 임포트 완료 요약에 "파싱된 필드 수" 명시**
-  `defect_import_logs` 요약 카드에 이 임포트에서 실제로 값이 채워진 필드 수(비어있지 않은 컬럼 수)를 표시.
+### B. 일치 불가/후속 보고 (본 회차 제외)
 
-둘 다 진행할지, 하나만 할지, 아니면 재점검 보고만으로 마감할지 알려주세요.
+| 항목 | 사유 | 대안 |
+|---|---|---|
+| B-1. 코멘트/지시(`defect_comments`) 배지·필터·Realtime | 테이블·RPC 부재 | 별도 승인 시 스키마 도입 |
+| B-2. `DefectStageProgress` 정식 pip UI | `defect-dashboard-utils`(isStageDelayedAsOf 등) 미이식 | 이번 회차는 문자열 라벨(`Not Started/In Progress/Completed/Closed/Delayed`)만 표시 |
+| B-3. Origin 헤더 색상(hdec/aconex/system) | `defect_field_config.origin` 컬럼 미존재 | 마이그레이션+세팅 후 후속 |
+| B-5. Aconex Comments 필드 sync | 파이프라인 미존재 | 별도 승인 시 도입 |
+| B-7. Captured By Group | 규칙 사전(`captured-by-groups`) 미존재 | 별도 승인 시 도입 |
+| Reassign 다이얼로그 | 마스터 데이터 규모 필요 | 후속 |
+
+### 구현 순서 & 산출 파일 (신규)
+
+1. `bun add @tanstack/react-table @tanstack/react-virtual jszip xlsx-js-style`
+2. `src/lib/defect-management/filter-fns.ts`, `filter-utils.ts`, `url-filters.ts`, `state-storage.ts`, `excel-export.ts`
+3. `src/components/defect-management/raw-data/`
+   - `ColumnFilters.tsx` (Multi/Text/Date)
+   - `DefectStatusBadge.tsx`
+   - `EditCellPopover.tsx`
+   - `BulkEditBar.tsx`
+   - `CriticalPendingBar.tsx`, `CriticalBulkBar.tsx`
+   - `TopHorizontalScrollbar.tsx`
+   - `ExportDialog.tsx`
+   - `DefectRawDataPage.tsx` (전면 재작성)
+   - `DefectRawTableView.tsx`
+4. 상세 페이지: `src/routes/_authenticated/closure/defect-management/detail.$issueNo.tsx` + `src/components/defect-management/detail/DefectDetailPage.tsx`
+5. 서버 함수: `src/lib/defect-management/mutations.functions.ts` (`updateDefectField`, `bulkUpdateDefects`, `toggleCritical`).
+6. `useCurrentUser` 에 `isAdmin` 추가 (user_roles 조회 이미 존재하는지 확인 후 확장).
+7. 로컬 검증: `bun run build`, Playwright 로 `/closure/defect-management/raw-data` 스크린샷 (필터 열기 / 정렬 / 상세 이동 3장).
+
+### 스코프 준수 확인
+
+- 이전 미구현 지시(A + B4 + B6)를 이번 회차에서 실행합니다.
+- 상기 "일치 불가" 항목은 임의로 축소·대체하지 않고 사용자에게 보고 후 별도 승인 대기합니다.
+- 진행 승인 시 위 순서대로 실행합니다.
