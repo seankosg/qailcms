@@ -16,14 +16,23 @@ export interface EditCellPopoverProps {
   options?: string[];
   currentValue: any;
   locked?: boolean;
+  canEdit?: boolean;
   onSaved?: (val: any) => void;
   children: React.ReactNode;
 }
 
-export function EditCellPopover({ id, field, label, editorType, options, currentValue, locked, onSaved, children }: EditCellPopoverProps) {
+export function EditCellPopover({ id, field, label, editorType, options, currentValue, locked, canEdit = true, onSaved, children }: EditCellPopoverProps) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState<any>(currentValue ?? "");
   const [busy, setBusy] = useState(false);
+
+  if (!canEdit) {
+    return (
+      <span title="관리자만 편집 가능" className="inline-flex items-center gap-1">
+        {children}
+      </span>
+    );
+  }
 
   const save = async () => {
     setBusy(true);
@@ -41,12 +50,12 @@ export function EditCellPopover({ id, field, label, editorType, options, current
   };
 
   return (
-    <Popover open={open} onOpenChange={(o) => { if (locked) return; setOpen(o); if (o) setValue(currentValue ?? ""); }}>
+    <Popover open={open} onOpenChange={(o) => { if (locked) { toast.info("잠긴 필드입니다. 잠금 해제 후 편집하세요."); return; } setOpen(o); if (o) setValue(currentValue ?? ""); }}>
       <PopoverTrigger asChild>
         <span
           className="group inline-flex items-center gap-1 cursor-pointer"
           onClick={(e) => e.stopPropagation()}
-          title={locked ? "잠긴 필드" : "클릭하여 편집"}
+          title={locked ? "잠긴 필드 · 잠금 해제 필요" : "클릭하여 편집"}
         >
           {children}
           {!locked && <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60" />}
@@ -62,6 +71,7 @@ export function EditCellPopover({ id, field, label, editorType, options, current
           <Select value={String(value ?? "")} onValueChange={setValue}>
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="선택..." /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="__null__" onSelect={() => setValue("")}>(비우기)</SelectItem>
               {(options ?? []).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
