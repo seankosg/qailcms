@@ -50,7 +50,7 @@ export function HeaderMappingTable() {
   }, [testHeader, rows]);
 
   const activeTargetFields = useMemo(
-    () => new Set(fields.filter((f) => f.is_active !== false).map((f) => f.field_name)),
+    () => new Set(fields.map((f) => f.field_name)),
     [fields],
   );
 
