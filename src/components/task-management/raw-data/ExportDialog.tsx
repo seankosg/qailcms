@@ -172,6 +172,11 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       const dataDateIso = new Date().toISOString().slice(0, 10);
       const ganttRange = isView ? computeGanttRange(rows, dataDateIso) : null;
 
+      // View 모드: 원본 A열(Sno) 자동 순번 주입
+      const exportRows = isView
+        ? rows.map((r, i) => ({ ...r, __sno: i + 1 }))
+        : rows;
+
       // View: 원본 A..T 순서 강제. 프리즈는 I열(상태)까지 = 9.
       // Re-import: 첫 컬럼만.
       const viewCols = ganttOriginalCols();
@@ -180,7 +185,7 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       const wb = buildStyledWorkbook({
         title: `Task Management Raw Data  (${format === "reimport" ? "Re-import" : "View"})`,
         columns: isView ? viewCols : styledCols(keys, format, resolveLabel),
-        rows,
+        rows: exportRows,
         sheetName: isView ? "Gantt" : "Task Management",
         freezeCols,
         theme: isView ? "gantt" : "default",
