@@ -819,6 +819,7 @@ function applyGanttTemplate(
   });
   const K = letters.plan_start;
   const L = letters.plan_end;
+  const M = letters.plan_days;
   const O = letters.actual_progress;
   const R = letters.forecast_end;
   const J = letters.status_manual;
