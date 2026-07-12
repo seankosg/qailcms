@@ -124,7 +124,6 @@ export function DefectRawDataPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [criticalPending, setCriticalPending] = useState<Map<string, boolean>>(new Map());
   const [exportOpen, setExportOpen] = useState(false);
-  const [includeInactive, setIncludeInactive] = useState(false);
 
   const latestDataDate = getDefectLatestDataDate(items);
   const dataDate = latestDataDate ?? null;
