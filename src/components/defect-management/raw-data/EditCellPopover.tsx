@@ -37,7 +37,8 @@ export function EditCellPopover({ id, field, label, editorType, options, current
   const save = async () => {
     setBusy(true);
     try {
-      const nextVal = value === "" ? null : editorType === "number" ? Number(value) : value;
+      const raw = value === "__null__" ? "" : value;
+      const nextVal = raw === "" ? null : editorType === "number" ? Number(raw) : raw;
       await updateDefectField({ data: { id, field, value: nextVal } });
       toast.success(`${label} 저장됨`);
       onSaved?.(nextVal);
