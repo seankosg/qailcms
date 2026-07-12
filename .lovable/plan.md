@@ -1,102 +1,77 @@
+
 ## 목표
-Task Raw Data의 라벨/헤더를 완전 영문화하고, 신규 컬럼 `actual_finish` / `actual_duration`을 추가. 기존 한글 Source Header는 alias로 유지(Option B).
+Task Raw Data → Export 결과 xlsx에 업로드 템플릿(`20260711_Task_Management_건축.xlsx`) Gantt 시트와 동일한 **디자인·셀서식 + 일별 간트 바차트**를 함께 렌더링.
 
-## 1. 신규 컬럼 추가 (DB 스키마)
+## 1. 데이터/컬럼 스타일 (기존 계획 유지)
 
-`task_management_raw` 테이블에 두 컬럼 신설:
-- `actual_finish date` — 실제 완료일 (사용자 입력, 편집 가능)
-- `actual_duration integer` — 실제 소요일수. 다음 로직으로 자동 계산:
-  - `actual_start`와 `actual_finish`가 모두 있으면 `actual_finish - actual_start + 1`
-  - `actual_finish`가 없고 `actual_start`만 있으면 `current_date - actual_start + 1` (진행중)
-  - `actual_start`가 없으면 null
+- 폰트: Malgun Gothic 8.5 / Noto Sans CJK SC (한글). 타이틀 14pt bold `#1F4E79`.
+- Data Date 배너: `#C00000` + 노란 셀 `#FFF2CC` (`yyyy-mm-dd`).
+- 헤더 3그룹 컬러:
+  - 기본/계획 `#1F4E79`, 실제 `#548235`, 진도/차이 `#2E75B6` (모두 흰 bold).
+- 데이터 행 그룹 fill: Plan `#F2F2F2` / Actual `#EBF6EB` / Progress `#DEEBF7`.
+- Risk="High" 셀 `#ED7D31`.
+- numFmt: 날짜 `mm-dd-yy`, 진도 `0.0%`/`0%`, variance `+0%;-0%;0%`, 정수 `0;-0;-`.
+- Freeze: 기본 컬럼 끝(=`status_manual`) + 헤더 6행.
 
-`task_management_status_history` 트리거(`trg_task_history_fn`)에 두 필드 추가 → 편집 이력 기록.
+## 2. Gantt 바차트 렌더링 (신규)
 
-Parent 롤업 함수(`update_task_summary`)에 `actual_finish = max(child.actual_finish)` 추가. `actual_duration`은 각 row에서 계산되므로 롤업 시 재계산 로직만 반영.
+### 2-1. 일자 범위
+- 데이터셋에서 `min(plan_start)` ~ `max(plan_end, actual_finish, forecast_end)` 자동 계산.
+- 유효 날짜가 하나도 없으면 Gantt 영역 생략(옵션은 그대로 통과).
 
-Rollback 함수(`rollback_task_management_import`)에 두 필드의 date/int 캐스팅 케이스 추가.
+### 2-2. 헤더 (좌측 기본컬럼 끝 이후 오른쪽으로 확장)
+- 행 5: `MONTH` 라벨. 매월 1일 및 Data Date 열에만 `mmm` 표시, 나머지 공란. fill 헤더 그룹색 상속(`#1F4E79`), 폰트 7pt bold white.
+- 행 6: 실제 날짜(serial, `d` numFmt), 폰트 7pt `#444444`.
+- 컬럼폭: 각 일자 열 `wch=2.3` (템플릿 U열 폭과 동일).
 
-## 2. 코드 반영
+### 2-3. 바 렌더링 (한 셀 통합, 색상 우선순위)
+각 데이터 행 × 각 일자 열에 대해 다음 우선순위로 단일 fill 결정:
 
-- **`src/lib/task-management/columns.ts` — `TM_COLUMNS`**
-  - 모든 `label` 값을 아래 영문 매핑으로 교체.
-  - `actual_finish` (A.Finish, date, group: actual, editable date) 신규 추가.
-  - `actual_duration` (A.Duration, number, group: actual, 자동 계산 - editable 아님) 신규 추가.
-  - `TM_AUTO_CALCULATED`에 `actual_duration` 추가.
+1. **지연(Slip)** `plan_end < day ≤ forecast_end` (있고 미완료) → `#FFC7CE` (연한 빨강)
+2. **실적 완료분** `actual_start ≤ day ≤ actual_finish` (또는 진행중이면 `day ≤ Data Date`) → `#548235` (진한 녹색)
+3. **계획 잔여** `plan_start ≤ day ≤ plan_end` (위 두 조건 미해당) → `#BDD7EE` (연한 파랑)
+4. 이외: 아래 4의 배경만 적용
 
-  | field_name | 신규 label |
-  |---|---|
-  | task_no | Task No |
-  | level | Tier |
-  | discipline | Discipline |
-  | team | Team |
-  | category | Category |
-  | plot | Plot |
-  | location | Location |
-  | floor_level | Level |
-  | task_name | Task |
-  | risk | Risk |
-  | sub_task_desc | Sub-Task |
-  | pic | PIC |
-  | row_type | Work Type |
-  | status_manual | Status |
-  | auto_judgment | Alarm |
-  | plan_start | P.Start |
-  | plan_end | P.Finish |
-  | plan_days | P.Duration |
-  | actual_start | A.Start |
-  | actual_finish | A.Finish (신규) |
-  | actual_duration | A.Duration (신규) |
-  | actual_progress | Actual % |
-  | plan_progress | Plan % |
-  | progress_variance | Variance (%p) |
-  | expected_progress_today | T.Plan |
-  | today_gap | T.Diff |
-  | forecast_end | Revised Finish |
-  | slip_days | Slip (days) |
-  | data_date | Data Date |
-  | source_file | Source File |
-  | imported_at | Imported |
+### 2-4. 배경 규칙 (바가 없는 셀)
+- **Today 열** (day == Data Date): 좌우 세로선 = 빨간 medium 테두리(`#C00000`) 상단~하단 연속 → 템플릿과 동일한 세로 강조선.
+- **금요일(중동 휴일)**: fill `#F2F2F2` (연회색). 토·일은 정상 근무이므로 무처리.
+- 그 외: fill 없음.
 
-- **Excel Import 파서 / 매퍼**: 신규 두 필드도 매핑 대상에 포함되도록 컬럼 목록 기반으로 자동 반영 확인.
-- **Bulk Edit / Filters / Export**: `TM_COLUMNS` 기반이므로 자동 반영. 스팟체크만.
+### 2-5. Freeze / Row height
+- Freeze는 기본 컬럼 끝 열 & 데이터 시작 행에 고정(스크롤 시 좌측 데이터 + 상단 헤더 유지, 우측 Gantt만 스크롤).
+- 행 높이: 헤더 32, 데이터 22.
 
-## 3. DB 데이터 갱신 (Option B — alias 유지)
+## 3. 구현 변경 파일
 
-### `task_management_field_config`
-각 `field_name` row의 `display_name`을 위 표대로 UPDATE.
-`actual_finish`, `actual_duration` row는 신규 INSERT (sort_order는 `actual_start` 뒤).
+### `src/lib/excel/styled-workbook.ts`
+- `StyledSheetOptions`에 옵션 추가(모두 optional, SHAW 등 기존 사용자 영향 없음):
+  - `theme?: "default" | "gantt"`
+  - `columnGroup?: (key) => "basic"|"plan"|"actual"|"progress"`
+  - `dataDate?: string` (ISO)
+  - `numFmtByKey?: Record<string,string>`
+  - `cellStyleOverride?: (key, value, row) => Partial<Style> | null`
+  - `gantt?: { startDate: string; endDate: string; rowDates: (row) => { planStart?; planEnd?; actualStart?; actualFinish?; forecastEnd?; done?: boolean } }`
+- Gantt 프리셋 상수(위 색상) 추가.
+- Gantt 활성 시:
+  1. 좌측 데이터 컬럼 후 오른쪽으로 `endDate - startDate + 1` 개 컬럼 append.
+  2. 헤더 2행(월/일) 채우기.
+  3. 데이터 행 루프에서 각 일자 셀 fill/border 결정 & 기록.
 
-### `task_management_header_mappings` (Option B: alias 유지)
-- 기존 한글 `source_header` row는 **삭제/수정하지 않고 그대로 유지** → 과거 한글 Excel 파일도 계속 Import 가능.
-- 각 `target_field`에 대해 **영문 신규 매핑 row를 INSERT** (중복 방지: `(module, source_header)` 조합 확인 후 없을 때만):
-  - `Discipline`, `Location`, `Level`, `Task`, `Risk`, `Sub-Task`, `PIC`, `Work Type`, `Status`, `Alarm`,
-  - `P.Start`, `P.Finish`, `P.Duration`, `A.Start`, `A.Finish`, `A.Duration`,
-  - `Actual %`, `Plan %`, `Variance (%p)`, `T.Plan`, `T.Diff`, `Revised Finish`, `Slip (days)`
-- 결과: 한 target_field에 한글+영문 두 개의 활성 매핑이 공존. Header Mapping 검증 로직은 `(module, source_header)` unique만 요구하므로 문제없음.
+### `src/components/task-management/raw-data/ExportDialog.tsx`
+- `format === "view"`에서만 Gantt 옵션 전달, `reimport`는 기존 방식 유지(재업로드 파서 안정성).
+- `gantt.rowDates`는 각 row에서 `plan_start`, `plan_end`, `actual_start`, `actual_finish`, `forecast_end`, `actual_progress` 추출; `done = actual_progress >= 100`.
+- 컬럼폭·Freeze·numFmt는 위 정책대로.
 
-## 4. 롤업 / 자동계산 로직 재점검
+## 4. 검증
 
-- `update_task_summary`: `actual_finish = max(child.actual_finish)` 추가. `actual_duration`은 parent에서 `actual_finish - actual_start + 1`로 재계산.
-- `calc_auto_judgment_value`: 기존 로직 유지. `actual_finish` 존재 시 `auto_judgment='완료'` 판정을 강화할지는 후속 논의 (이번 범위에서는 기존 progress 기반 유지).
-- 트리거 이력 기록에 신규 두 필드 반영.
+- `tsgo` 타입체크.
+- 실제 데이터로 export 후 openpyxl로 파싱하여:
+  - 헤더 fill 그룹, Gantt 영역 폭·numFmt·요일별 배경, 지연/실적/계획 색 순서, Today 세로선 좌우 위치 검증.
+- 대량 데이터(수백 행 × 수백 일) 성능 확인 — 셀 fill 직접 지정 방식이므로 조건부 서식보다 파일 크기가 크지만 뷰어 호환성 우선.
 
-## 5. UI 검증
+## 결정된 사항 (질문 응답 반영)
+- 통합 1줄 바, 데이터 자동 범위, Today 세로선, 금요일만 회색.
+- Re-import 포맷은 Gantt 미포함.
+- 부모 롤업 하이라이트는 이번 스코프에서 제외(추후 `row_type` 기반 확장 가능).
 
-- Task Raw Data 페이지: 신규 A.Finish/A.Duration 컬럼 표시, 라벨 영문화.
-- Admin > Field Config: 24개 필드 라벨 갱신 확인, 신규 2개 row 추가 확인.
-- Admin > Header Mapping: 한글+영문 alias 공존 확인.
-- Excel Import: 영문 헤더 / 한글 헤더 두 종류 모두 매핑 성공하는지 스팟체크.
-
-## 6. 실행 순서 (승인 필요)
-
-1. **Migration 1 (스키마)**: 신규 컬럼 2개 + 트리거/롤업/롤백 함수 갱신.
-2. **코드 수정**: `TM_COLUMNS` 라벨/신규 컬럼 반영.
-3. **데이터 UPDATE/INSERT**: field_config, header_mappings 갱신 (Option B alias).
-4. UI 스팟체크.
-
-## 주의사항
-
-- 신규 `actual_duration`은 계산 필드이므로 사용자 편집 UI에서는 read-only. `actual_finish` 편집 시 즉시 재계산 필요 (client-side 또는 트리거).
-- Option B로 한글 alias를 유지하지만, 시스템 표준은 영문. 향후 신규 Excel 템플릿은 영문 헤더 권장.
-- `TmFieldConfigTable`의 "Reset to defaults" 버튼은 `TM_COLUMNS`를 기준으로 되돌리므로, 코드 라벨과 DB 라벨이 항상 일치해야 함 → 두 곳을 동일한 값으로 반영.
+승인 시 위 순서대로 구현하겠습니다.
