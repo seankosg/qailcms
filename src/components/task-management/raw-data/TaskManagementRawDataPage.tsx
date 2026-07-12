@@ -419,6 +419,18 @@ export function TaskManagementRawDataPage() {
         cell: ({ row, getValue }) => {
           const val = getValue();
           const rendered = renderCell(c, val);
+          if (c.key === "task_no") {
+            return (
+              <Link
+                to="/closure/task-management/detail/$id"
+                params={{ id: String((row.original as Row).id) }}
+                className="text-primary hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {rendered}
+              </Link>
+            );
+          }
           if (!c.editable) return rendered;
           // Do not allow editing actual_progress on parent rows
           if (c.key === "actual_progress" && (row.original as Row).level === "parent") {
