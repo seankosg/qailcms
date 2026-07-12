@@ -102,7 +102,13 @@ export function DefectRawDataPage() {
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as Record<string, any>;
   const { data: user } = useCurrentUser();
-  const { data: items = [], refetch, isFetching } = useDefectRawData({ teams: [], status: [], q: "", includeInactive: false });
+  const [includeInactive, setIncludeInactive] = useState(false);
+  const { data: items = [], refetch, isFetching } = useDefectRawData({
+    teams: [],
+    status: [],
+    q: "",
+    includeInactive,
+  });
   const { data: fieldConfig = [] } = useDefectFieldConfig();
   const helpers = useDefectFieldHelpers();
   const isAdmin = !!user?.isAdmin;
