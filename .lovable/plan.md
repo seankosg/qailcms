@@ -1,103 +1,29 @@
-## 새 규칙 (메모리 저장 예정)
+## 원인 분석
 
-**지시사항을 축약/생략/변경하려 할 때는 반드시 사전에 사용자에게 확인할 것.** 임의 판단으로 스코프를 줄이거나 다른 방식으로 대체하지 않음. 이 규칙은 승인 후 빌드 모드로 전환되는 즉시 `mem://index.md`의 **Core**에 저장합니다(플랜 모드에서는 메모리 파일 편집이 차단됨).
+화면의 `TypeError: Failed to fetch`는 Supabase가 반환한 에러가 아니라 **브라우저 fetch 자체가 네트워크 레벨에서 실패**한 것입니다. 콘솔 로그에서도 배치 52, 53, 54가 연속으로 `Failed to fetch`로 실패하는 패턴이 보이는데, 이는 다음 조합에서 발생합니다.
 
-또한 이번 실수(SHAW `ColumnSelectDialog` 기능을 단순 매핑 다이얼로그로 축약한 건)는 위 규칙 위반이었음을 인정합니다.
+1. **배치 크기 과다** — `src/contexts/DefectManagementImportContext.tsx:97` 의 `INSERT_CHUNK = 500`. 27,123행 / 500 = 약 55 배치, 각 배치는 500행 × 74컬럼의 대용량 payload를 POST합니다.
+2. **응답에 `.select("source_issue_no")` 포함** — upsert 결과로 500개 row를 매번 되돌려받아 응답 크기가 커집니다.
+3. **연속 요청 시 Cloudflare/PostgREST 연결 재사용에서 abort 발생** — Supabase JS는 keep-alive 커넥션을 재사용하는데, 큰 payload를 55회 연속 던지면 중간에 커넥션이 리셋되며 브라우저 fetch가 `Failed to fetch`로 abort됩니다. `id-preview--...` 도메인은 특히 idle timeout이 짧습니다.
+4. **폴백 재시도 로직이 상황을 악화** — 배치 하나 실패 시 500행을 **각각 개별 upsert**로 재시도하므로 실패한 배치당 500개 추가 요청이 발생, 네트워크 압박이 더 커집니다. 그래서 1,123 rejected(≈ 배치 2~3개 분량)이 발생.
 
----
+즉 **파일이나 데이터 문제가 아니라 네트워크/전송 로직 문제**입니다.
 
-## 배경 — 왜 지시대로 안 되었는지
+## 수정 계획 (`src/contexts/DefectManagementImportContext.tsx` 만 수정)
 
-Phase 2 구현 시 "컬럼 매핑"을 SHAW의 `DefectColumnSelect`(=`ColumnSelectDialog` 기반의 컬럼 포함/제외 + 프리셋 + 필수/소스 배지 + 샘플 프리뷰 UI)가 아니라, **헤더→필드 재매핑 드롭다운**만 있는 단순 다이얼로그(`DefectColumnMappingDialog`)로 축약했습니다. 그 결과 다음 SHAW 기능들이 누락됐습니다.
+1. **배치 크기 축소**: `INSERT_CHUNK` 500 → **150**. 27k행 기준 요청당 payload가 1/3로 감소.
+2. **응답 payload 축소**: 배치 성공 시 반환값이 필요 없으므로 `.upsert(..., { onConflict, count: 'exact' })` 로 바꾸고 `.select()` 제거. inserted/updated 카운트는 이미 만들어 둔 `existing` 맵으로 계산(현재도 폴백 경로에서 그렇게 하고 있음).
+3. **네트워크 실패 자동 재시도**: 배치 upsert가 `TypeError: Failed to fetch` 또는 `error.message`에 `Failed to fetch`/`NetworkError`/`fetch failed` 포함 시, **지수 백오프(300ms → 800ms → 2000ms)로 최대 3회 재시도**. 재시도 성공 시 정상 카운트, 3회 모두 실패해야 개별 row 폴백으로 이동.
+4. **배치 간 짧은 지연**: 성공/실패 무관 각 배치 사이 60ms `await sleep`. 커넥션 압박 완화.
+5. **개별 row 폴백에도 재시도 1회 추가**: 폴백에서도 `Failed to fetch` 시 500ms 후 1회 재시도.
+6. 폴백 진입 시 UI 진행률이 멈추던 부분 유지, 로깅은 기존 `importErrors` 구조 그대로 사용.
 
-**누락된 SHAW 기능**
-- Excel Column | Maps to Field | Sample 3열 리스트 + 첫 데이터 행 프리뷰
-- Required 뱃지 + 사유(system / reimport / config) 툴팁, 필수 제외 시 경고 카운트
-- Source(HDEC/Aconex/System) 색상 배지, Unmapped 필드 표시
-- Preset 4종: **New Upload / Update from Aconex / HDEC's Update / Cat Check**
-- Select all / Deselect all / Reset
-- 하단 Warnings 박스 (필수 제외, `area_raw` 제외 시 파생 필드 초기화 경고 등)
-- 다중 시트 파일 → **Sheet 선택** UI (`pending_sheet_selection`)
-- **Re-import 감지**(`SHAW_DEFECT_REIMPORT_V1` 마커) → update-only 모드 + `id` 필수
-- 파일 카드 상단 "Select Columns (N/Total)" 카운터 뱃지
+## 변경 파일
 
-## 스코프
-
-이번 요청 범위 = **Import UI/컬럼 선택 기능의 SHAW 반영**. Team은 수동 선택 강제(기존 확정 유지). SC 번호 자동 발번은 이번 단계 밖. Preset 4종은 **UI/컬럼 필터 로직만** 이식(팀별 후속 워크플로우 로직은 별도 논의).
-
-> 이 스코프에서 축약/변경이 필요한 지점이 나오면 진행 전에 반드시 사용자에게 확인.
-
-## 구현 계획
-
-### 1. 범용 ColumnSelectDialog 이식
-- 신규: `src/components/import/ColumnSelectDialog.tsx`
-- SHAW 파일 그대로(shadcn Dialog/Checkbox/Badge/Button만 의존). `ColumnSelectHelpers`, `ColumnRequirement`, presets 프롭 동일.
-
-### 2. Defect 전용 래퍼 이식
-- 신규: `src/components/defect-management/import/DefectColumnSelect.tsx`
-- `toFieldName`은 기존 `src/lib/defect-management/parser.ts`의 canonical 매핑 사용.
-- `useDefectFieldConfig`에 `getSourceLabel(field)`, `getSourceOrigin(field)` 헬퍼 추가.
-- 프리셋 4종 SHAW 규칙 그대로(ACONEX/HDEC/CAT_CHECK 필드셋 동일).
-- `area_raw` 제외 시 파생 초기화 경고 이식.
-
-### 3. Field Config 스키마 확장
-- 마이그레이션: `defect_field_config`에 `origin text CHECK IN ('hdec','aconex','system')`, `source_label text` 컬럼 추가.
-- 기존 시드 UPDATE로 origin 채움(규칙: `hdec_*`→hdec, `aconex_*`→aconex, 그 외→system).
-- `DefectFieldConfigTable`에 두 컬럼 편집 UI 노출.
-
-### 4. Import Context 확장 (`DefectManagementImportContext.tsx`)
-파일 상태 필드 추가:
-- `availableHeaders: string[]`, `headerSamples: Record<string, unknown>`
-- `excludedHeaders: string[]`, `excludedFields: Set<string>`
-- `sheetNames: string[]`, `selectedSheet: string`, 상태 `pending_sheet_selection`
-- `isReimport: boolean`
-
-Actions: `setFileSheet(id, sheetName)`, `setFileExcludedHeaders(id, excluded)` (재파싱 트리거).
-
-### 5. Parser 확장 (`src/lib/defect-management/parser.ts`)
-- `getDefectExcelSheetNames(file)`, `getDefectExcelHeaders(file, sheet?)` 추가.
-- `parseDefectExcel(file, sheetName?, excludedHeaders?)` — 제외 헤더 컬럼은 결과에서 제외.
-- `SHAW_DEFECT_REIMPORT_V1` 마커 감지 → `isReimport: true`.
-
-### 6. Import Worker 로직 반영
-- `excludedFields`에 포함된 필드는 upsert payload에서 제거(기존 DB 값 보존).
-- `isReimport === true` → **update-only**: `source_issue_no` 매칭 기존 row만 UPDATE, 신규 INSERT skip.
-- 기존 `priority_locked` / `hdec_verification_locked` skip 유지.
-
-### 7. Import Page UI 갱신
-- Sheet 다중일 때 Select (해당 상태에서 실행 버튼 비활성화).
-- **"Select Columns (선택/전체)"** 버튼 → `DefectColumnSelect` 오픈.
-- Re-import 파일에 "Re-import (Update only)" 뱃지 + 안내 문구.
-- 기존 `DefectColumnMappingDialog` 제거.
-
-### 8. 헤더 매핑 저장 흐름
-현재 프로젝트의 `defect_header_mappings` 관리자 페이지 정책 유지 — ColumnSelect 다이얼로그 내 인라인 매핑 저장은 제공하지 않음(SHAW도 동일).
-
-## 산출물
-
-**신규**
-- `src/components/import/ColumnSelectDialog.tsx`
-- `src/components/defect-management/import/DefectColumnSelect.tsx`
-- 마이그레이션: `defect_field_config` origin/source_label 컬럼 + 시드 업데이트
-
-**수정**
-- `src/lib/defect-management/parser.ts`
-- `src/contexts/DefectManagementImportContext.tsx`
-- `src/components/defect-management/import/DefectManagementImportPage.tsx`
-- `src/hooks/useDefectFieldConfig.ts`
-- `src/components/admin/DefectFieldConfigTable.tsx`
-
-**제거**
-- `src/components/defect-management/import/DefectColumnMappingDialog.tsx`
-
-**메모리**
-- `mem://index.md` Core에 "지시사항 축약/생략/변경 시 사전 확인" 규칙 추가(빌드 모드 전환 즉시 저장).
+- `src/contexts/DefectManagementImportContext.tsx` — 위 6개 항목만 수정. 다른 파일/UI/스키마는 변경 없음.
 
 ## 검증 시나리오
-1. `Elec-_23667.xlsx` → Select Columns 다이얼로그가 열리고 모든 헤더가 Maps to Field에 표시되며 첫 행 샘플이 보인다.
-2. Preset "HDEC's Update" → planned_*/actual_* 등 SHAW와 동일한 헤더만 남는다.
-3. `Issue No` 제외 시 노란 경고 배너 + 카운터 표시.
-4. `Area` 제외 시 "Type/Level/Location 파생 초기화" 경고 라인.
-5. 컬럼 제외 후 Import → 해당 필드는 기존 DB 값 유지.
-6. 다중 시트 xlsx → sheet select 노출, 선택 시 재파싱.
-7. Field Config에서 origin='hdec' 필드는 파란 HDEC 배지.
+
+- 업로드한 `260711_MECH_Snagging_PLOT-C,D.xlsx` (27,123행) 재임포트 시 `Rejected` 가 0에 근접하고, 콘솔에 `Failed to fetch` 반복 로그가 사라지는지 확인.
+- 소량 파일(수백 행)은 동작·성능 회귀 없이 그대로 성공하는지 확인.
+- 의도적 오프라인 상황에서 3회 재시도 후 폴백으로 넘어가고, 최종 실패 row가 `defect_import_row_logs` 에 rejected로 기록되는지 확인.

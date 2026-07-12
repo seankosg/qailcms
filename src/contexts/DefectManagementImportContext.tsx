@@ -94,7 +94,27 @@ export function useDefectImport() {
   return c;
 }
 
-const INSERT_CHUNK = 500;
+const INSERT_CHUNK = 150;
+const BATCH_DELAY_MS = 60;
+const RETRY_DELAYS_MS = [300, 800, 2000];
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function isNetworkError(err: unknown): boolean {
+  if (!err) return false;
+  const msg =
+    (err as { message?: string })?.message ??
+    (typeof err === "string" ? err : "");
+  const details = (err as { details?: string })?.details ?? "";
+  const combined = `${msg} ${details}`.toLowerCase();
+  return (
+    combined.includes("failed to fetch") ||
+    combined.includes("networkerror") ||
+    combined.includes("network error") ||
+    combined.includes("fetch failed") ||
+    combined.includes("load failed")
+  );
+}
 
 function validate(f: DefectImportFile): string | null {
   if (!f.parsed || f.parsed.length === 0) return "행을 찾지 못했습니다.";
@@ -470,10 +490,22 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
           const slice = payloads.slice(i, i + INSERT_CHUNK);
           const batchIndex = Math.floor(i / INSERT_CHUNK);
-          const { data, error } = await (supabase as any)
-            .from("defect_items_raw")
-            .upsert(slice, { onConflict: "source_issue_no" })
-            .select("source_issue_no");
+
+          // 재시도 가능한 배치 upsert. 응답 payload 축소를 위해 .select() 제거.
+          let error: any = null;
+          for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+            const res = await (supabase as any)
+              .from("defect_items_raw")
+              .upsert(slice, { onConflict: "source_issue_no" });
+            error = res.error;
+            if (!error) break;
+            if (!isNetworkError(error)) break;
+            if (attempt < RETRY_DELAYS_MS.length) {
+              await sleep(RETRY_DELAYS_MS[attempt]);
+              continue;
+            }
+          }
+
           if (error) {
             console.error("[defect-import] batch upsert error", { batchIndex, error });
             importErrors.push({
@@ -485,10 +517,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               sampleId: slice[0]?.source_issue_no as string,
             });
             for (const row of slice) {
-              const r = await (supabase as any)
+              let r = await (supabase as any)
                 .from("defect_items_raw")
-                .upsert([row], { onConflict: "source_issue_no" })
-                .select("source_issue_no");
+                .upsert([row], { onConflict: "source_issue_no" });
+              if (r.error && isNetworkError(r.error)) {
+                await sleep(500);
+                r = await (supabase as any)
+                  .from("defect_items_raw")
+                  .upsert([row], { onConflict: "source_issue_no" });
+              }
               if (r.error) {
                 rejected++;
                 importErrors.push({
@@ -501,8 +538,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               else inserted++;
             }
           } else {
-            for (const r of data ?? []) {
-              if (existing.has(r.source_issue_no)) updated++;
+            for (const row of slice) {
+              if (existing.has(row.source_issue_no as string)) updated++;
               else inserted++;
             }
           }
@@ -512,6 +549,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           processed += slice.length;
           const pct = Math.round((processed / Math.max(payloads.length, 1)) * 100);
           setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: pct } : x)));
+          if (i + INSERT_CHUNK < payloads.length) await sleep(BATCH_DELAY_MS);
         }
 
         // per-row logs
