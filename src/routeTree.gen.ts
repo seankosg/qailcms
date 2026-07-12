@@ -23,7 +23,6 @@ import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './ro
 import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from './routes/_authenticated/closure/task-management/raw-data'
 import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './routes/_authenticated/closure/spare-part/raw-data'
 import { Route as AuthenticatedClosureSparePartImportRouteImport } from './routes/_authenticated/closure/spare-part/import'
-import { Route as AuthenticatedClosureSparePartDashboardRouteImport } from './routes/_authenticated/closure/spare-part/dashboard'
 import { Route as AuthenticatedClosureSparePartAconexSyncRouteImport } from './routes/_authenticated/closure/spare-part/aconex-sync'
 import { Route as AuthenticatedClosureDashboardWarrantyRouteImport } from './routes/_authenticated/closure/dashboard/warranty'
 import { Route as AuthenticatedClosureDashboardTaskRouteImport } from './routes/_authenticated/closure/dashboard/task'
@@ -109,12 +108,6 @@ const AuthenticatedClosureSparePartImportRoute =
     path: '/closure/spare-part/import',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedClosureSparePartDashboardRoute =
-  AuthenticatedClosureSparePartDashboardRouteImport.update({
-    id: '/closure/spare-part/dashboard',
-    path: '/closure/spare-part/dashboard',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedClosureSparePartAconexSyncRoute =
   AuthenticatedClosureSparePartAconexSyncRouteImport.update({
     id: '/closure/spare-part/aconex-sync',
@@ -178,7 +171,6 @@ export interface FileRoutesByFullPath {
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
-  '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
@@ -201,7 +193,6 @@ export interface FileRoutesByTo {
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
-  '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
@@ -227,7 +218,6 @@ export interface FileRoutesById {
   '/_authenticated/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/_authenticated/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/_authenticated/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
-  '/_authenticated/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/_authenticated/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
   '/_authenticated/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
@@ -253,7 +243,6 @@ export interface FileRouteTypes {
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
     | '/closure/spare-part/aconex-sync'
-    | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
     | '/closure/task-management/raw-data'
@@ -276,7 +265,6 @@ export interface FileRouteTypes {
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
     | '/closure/spare-part/aconex-sync'
-    | '/closure/spare-part/dashboard'
     | '/closure/spare-part/import'
     | '/closure/spare-part/raw-data'
     | '/closure/task-management/raw-data'
@@ -301,7 +289,6 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/dashboard/task'
     | '/_authenticated/closure/dashboard/warranty'
     | '/_authenticated/closure/spare-part/aconex-sync'
-    | '/_authenticated/closure/spare-part/dashboard'
     | '/_authenticated/closure/spare-part/import'
     | '/_authenticated/closure/spare-part/raw-data'
     | '/_authenticated/closure/task-management/raw-data'
@@ -419,13 +406,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureSparePartImportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/closure/spare-part/dashboard': {
-      id: '/_authenticated/closure/spare-part/dashboard'
-      path: '/closure/spare-part/dashboard'
-      fullPath: '/closure/spare-part/dashboard'
-      preLoaderRoute: typeof AuthenticatedClosureSparePartDashboardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/closure/spare-part/aconex-sync': {
       id: '/_authenticated/closure/spare-part/aconex-sync'
       path: '/closure/spare-part/aconex-sync'
@@ -528,7 +508,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureDashboardTaskRoute: typeof AuthenticatedClosureDashboardTaskRoute
   AuthenticatedClosureDashboardWarrantyRoute: typeof AuthenticatedClosureDashboardWarrantyRoute
   AuthenticatedClosureSparePartAconexSyncRoute: typeof AuthenticatedClosureSparePartAconexSyncRoute
-  AuthenticatedClosureSparePartDashboardRoute: typeof AuthenticatedClosureSparePartDashboardRoute
   AuthenticatedClosureSparePartImportRoute: typeof AuthenticatedClosureSparePartImportRouteWithChildren
   AuthenticatedClosureSparePartRawDataRoute: typeof AuthenticatedClosureSparePartRawDataRoute
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
@@ -550,8 +529,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureDashboardWarrantyRoute,
   AuthenticatedClosureSparePartAconexSyncRoute:
     AuthenticatedClosureSparePartAconexSyncRoute,
-  AuthenticatedClosureSparePartDashboardRoute:
-    AuthenticatedClosureSparePartDashboardRoute,
   AuthenticatedClosureSparePartImportRoute:
     AuthenticatedClosureSparePartImportRouteWithChildren,
   AuthenticatedClosureSparePartRawDataRoute:
