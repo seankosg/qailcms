@@ -352,7 +352,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           status: "processing",
           imported_by: userId,
           started_at: startedAtIso,
-          notes: [
+          note: [
             isReimport ? "reimport=true" : null,
             excludedFields.size > 0
               ? `excluded_fields=${Array.from(excludedFields).join(",")}`
