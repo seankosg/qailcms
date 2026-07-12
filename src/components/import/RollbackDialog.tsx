@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export type RollbackKind = "spare_part" | "task_management";
+export type RollbackKind = "spare_part" | "task_management" | "defect_management";
 
 interface PreviewResult {
   insert_count: number;
@@ -34,11 +34,13 @@ interface Props {
 const PREVIEW_FN = {
   spare_part: "preview_rollback_spare_part_import",
   task_management: "preview_rollback_task_management_import",
+  defect_management: "preview_rollback_defect_import",
 } as const;
 
 const ROLLBACK_FN = {
   spare_part: "rollback_spare_part_import",
   task_management: "rollback_task_management_import",
+  defect_management: "rollback_defect_import",
 } as const;
 
 export function RollbackDialog({ kind, batchId, fileName, onDone }: Props) {
