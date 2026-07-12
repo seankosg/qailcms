@@ -2,6 +2,9 @@ import * as XLSX from "xlsx";
 import type { DefectTeam } from "./columns";
 import { suggestTeamFromCategory } from "./columns";
 
+/** Re-import 마커 헤더 — Raw Data에서 재수출한 파일에만 존재. */
+export const REIMPORT_MARKER_HEADER = "QAIL_DEFECT_REIMPORT_V1";
+
 /** LetsBuild 원본 25 헤더 → 시스템 필드. */
 export const DEFECT_TARGET_FIELDS = [
   "source_issue_no",
@@ -61,6 +64,36 @@ const CANONICAL_HEADERS: Record<string, DefectTargetField> = {
   "podiumarea": "podium_area",
 };
 
+/** Re-import 파일에서 등장 가능한 확장 필드(원본 헤더가 그대로 필드명이라 매핑 필요). */
+const EXTRA_REIMPORT_FIELDS = new Set<string>([
+  "team",
+  "area_type",
+  "area_level",
+  "area_location",
+  "main_trade",
+  "sub_trade",
+  "work_type",
+  "subcontractor_name",
+  "subsub_name",
+  "hdec_pic_name",
+  "hdec_eng_name",
+  "hdec_verification",
+  "hdec_reason",
+  "hdec_comments",
+  "planned_start_date",
+  "planned_completion_date",
+  "planned_closure_date",
+  "actual_start_date",
+  "actual_completion_date",
+  "actual_closure_date",
+  "planned_progress_pct",
+  "actual_progress_pct",
+  "completion_status",
+  "closure_status",
+  "remarks",
+  "data_date",
+]);
+
 export interface DefectSheetHeader {
   col: number; // 1-based
   letter: string;
@@ -96,6 +129,8 @@ export interface ParsedDefectRow {
   classification: string | null;
   podium_area: string | null;
   raw_payload: Record<string, unknown>;
+  /** Re-import 파일에서만 채워지는 확장 필드. */
+  extra?: Record<string, unknown>;
 }
 
 export interface ParseDefectResult {
@@ -106,11 +141,27 @@ export interface ParseDefectResult {
   warnings: string[];
   teamHint: DefectTeam | null;
   categorySummary: string[];
+  /** raw header string 순서 리스트 (컬럼 선택 다이얼로그용) */
+  availableHeaders: string[];
+  /** raw header → 첫 데이터 행 샘플 값 */
+  headerSamples: Record<string, unknown>;
+  /** raw header → canonical field key (unmapped 이면 빈 문자열) */
+  headerToFieldMap: Record<string, string>;
+  /** 사용자가 제외한 raw 헤더 (입력 그대로 되돌려줌) */
+  excludedHeaders: string[];
+  /** 위 raw 헤더에 대응하는 canonical field key 집합. upsert에서 skip 용. */
+  excludedFields: Set<string>;
+  /** REIMPORT 마커 감지 여부 */
+  isReimport: boolean;
 }
 
 export interface ParseDefectOptions {
   extraAliases?: Record<string, string[]>;
   columnOverrides?: Partial<Record<DefectTargetField, number>>;
+  /** 워크북에서 파싱할 시트 이름. 미지정 시 첫 시트. */
+  sheetName?: string;
+  /** 사용자가 제외한 raw 헤더. 해당 컬럼은 결과에 포함되지 않음. */
+  excludedHeaders?: string[];
 }
 
 function normalizeHeader(v: unknown): string {
@@ -213,21 +264,112 @@ function resolveColumn(
   return null;
 }
 
+/** 프로젝트 전역에서 canonical 필드셋. Column Select Dialog의 unmapped 판정 근거. */
+export function isKnownDefectField(field: string): boolean {
+  if (!field) return false;
+  if ((DEFECT_TARGET_FIELDS as readonly string[]).includes(field)) return true;
+  return EXTRA_REIMPORT_FIELDS.has(field);
+}
+
+/** raw 헤더 → canonical field key. aliases는 defect_header_mappings에서 로드한 목록. */
+export function toDefectFieldName(
+  rawHeader: string,
+  extraAliases: Record<string, string[]> = {},
+): string {
+  const norm = normalizeHeader(rawHeader);
+  if (!norm) return "";
+  // 원본 헤더가 그대로 확장 필드명인 경우 (re-import 파일)
+  const asIs = norm; // note: normalizeHeader lowercases & strips ws
+  for (const f of EXTRA_REIMPORT_FIELDS) {
+    if (normalizeHeader(f) === asIs) return f;
+  }
+  // canonical
+  const canonical = CANONICAL_HEADERS[norm];
+  if (canonical) return canonical;
+  // extra aliases (source_header 등록)
+  for (const [field, aliases] of Object.entries(extraAliases)) {
+    for (const a of aliases) {
+      if (normalizeHeader(a) === norm) return field;
+    }
+  }
+  return "";
+}
+
+/** 워크북의 시트 이름 리스트. */
+export async function getDefectExcelSheetNames(file: File): Promise<string[]> {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellDates: true, bookSheets: true });
+  return wb.SheetNames ?? [];
+}
+
+/** 지정된 시트(미지정 시 첫 시트)의 헤더/첫 행 샘플/reimport 여부 반환. */
+export async function getDefectExcelHeaders(
+  file: File,
+  sheetName?: string,
+): Promise<{
+  sheetName: string;
+  headers: string[];
+  entries: DefectSheetHeader[];
+  sample: Record<string, unknown>;
+  isReimport: boolean;
+} | null> {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const name = sheetName ?? wb.SheetNames[0];
+  const sheet = wb.Sheets[name];
+  if (!sheet) return null;
+  const { entries } = scanHeaders(sheet);
+  const headers = entries.map((e) => (e.header ? e.header : e.letter));
+  const sample: Record<string, unknown> = {};
+  for (const e of entries) {
+    if (e.sample != null) sample[e.header || e.letter] = e.sample;
+  }
+  const isReimport = entries.some(
+    (e) => (e.header ?? "").trim().toUpperCase() === REIMPORT_MARKER_HEADER,
+  );
+  return { sheetName: name, headers, entries, sample, isReimport };
+}
+
 export async function parseDefectExcel(
   file: File,
   opts: ParseDefectOptions = {},
 ): Promise<ParseDefectResult> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: true });
-  const sheetName = wb.SheetNames[0];
+  const sheetName = opts.sheetName ?? wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
   if (!sheet) throw new Error("시트를 찾을 수 없습니다");
 
   const warnings: string[] = [];
   const { map: headerMap, entries } = scanHeaders(sheet);
 
+  const excludedHeadersInput = opts.excludedHeaders ?? [];
+  const excludedHeadersSet = new Set(excludedHeadersInput);
+  const availableHeaders = entries.map((e) => e.header || e.letter);
+  const headerSamples: Record<string, unknown> = {};
+  for (const e of entries) {
+    if (e.sample != null) headerSamples[e.header || e.letter] = e.sample;
+  }
+  const isReimport = entries.some(
+    (e) => (e.header ?? "").trim().toUpperCase() === REIMPORT_MARKER_HEADER,
+  );
+
+  // raw header → canonical field
+  const headerToFieldMap: Record<string, string> = {};
+  for (const h of availableHeaders) {
+    headerToFieldMap[h] = toDefectFieldName(h, opts.extraAliases ?? {});
+  }
+
+  // canonical field 기준 excluded set
+  const excludedFields = new Set<string>();
+  for (const h of excludedHeadersInput) {
+    const f = headerToFieldMap[h];
+    if (f) excludedFields.add(f);
+  }
+
   const cols: Partial<Record<DefectTargetField, number>> = {};
   for (const target of DEFECT_TARGET_FIELDS) {
+    if (excludedFields.has(target)) continue;
     const ov = opts.columnOverrides?.[target];
     if (typeof ov === "number" && ov > 0) {
       cols[target] = ov;
@@ -246,6 +388,21 @@ export async function parseDefectExcel(
   if (missingCritical.length > 0) {
     warnings.push(`필수 헤더 누락: ${missingCritical.join(", ")}`);
   }
+  if (isReimport) {
+    warnings.push("Re-import 파일이 감지되었습니다. 신규 행은 생성되지 않고 기존 행만 업데이트됩니다.");
+  }
+
+  // 확장 필드 컬럼 (re-import 파일 지원)
+  const extraFieldCols = new Map<string, number>();
+  for (const e of entries) {
+    const raw = e.header || e.letter;
+    if (excludedHeadersSet.has(raw)) continue;
+    const field = headerToFieldMap[raw];
+    if (!field) continue;
+    if (EXTRA_REIMPORT_FIELDS.has(field)) {
+      extraFieldCols.set(field, e.col);
+    }
+  }
 
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:Z2");
   const rowEnd = range.e.r + 1;
@@ -260,11 +417,32 @@ export async function parseDefectExcel(
     const raw_payload: Record<string, unknown> = {};
     for (const e of entries) {
       const v = getCell(sheet, r, e.col);
-      if (v != null && v !== "") raw_payload[e.header || e.letter] = v;
+      const rawHeader = e.header || e.letter;
+      if (excludedHeadersSet.has(rawHeader)) continue;
+      if (v != null && v !== "") raw_payload[rawHeader] = v;
     }
 
     const category = cols.category ? toStr(getCell(sheet, r, cols.category)) : null;
     if (category) categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
+
+    // Re-import 확장 필드
+    let extra: Record<string, unknown> | undefined;
+    if (extraFieldCols.size > 0) {
+      extra = {};
+      for (const [field, col] of extraFieldCols) {
+        const val = getCell(sheet, r, col);
+        if (val == null || val === "") continue;
+        // 날짜 처리
+        if (field.endsWith("_date")) {
+          extra[field] = toIsoDate(val);
+        } else if (field === "planned_progress_pct" || field === "actual_progress_pct") {
+          const n = typeof val === "number" ? val : Number(String(val).replace("%", "").trim());
+          extra[field] = Number.isFinite(n) ? n : null;
+        } else {
+          extra[field] = toStr(val);
+        }
+      }
+    }
 
     rows.push({
       rawRowNo: r,
@@ -294,6 +472,7 @@ export async function parseDefectExcel(
       classification: cols.classification ? toStr(getCell(sheet, r, cols.classification)) : null,
       podium_area: cols.podium_area ? toStr(getCell(sheet, r, cols.podium_area)) : null,
       raw_payload,
+      extra,
     });
   }
 
@@ -313,5 +492,19 @@ export async function parseDefectExcel(
     .slice(0, 5)
     .map(([c, n]) => `${c} × ${n}`);
 
-  return { rows, sheetName, sheetHeaders: entries, columnMap, warnings, teamHint, categorySummary };
+  return {
+    rows,
+    sheetName,
+    sheetHeaders: entries,
+    columnMap,
+    warnings,
+    teamHint,
+    categorySummary,
+    availableHeaders,
+    headerSamples,
+    headerToFieldMap,
+    excludedHeaders: excludedHeadersInput,
+    excludedFields,
+    isReimport,
+  };
 }
