@@ -17,9 +17,28 @@ import {
 import { DEFECT_COLUMNS, GROUP_HEADER_BG } from "@/lib/defect-management/columns";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
-type DraftMap = Record<string, Partial<Pick<DefectFieldConfigRow, "display_name" | "is_visible" | "sort_order" | "note" | "group_key">>>;
+type DraftMap = Record<
+  string,
+  Partial<
+    Pick<
+      DefectFieldConfigRow,
+      | "display_name"
+      | "is_visible"
+      | "sort_order"
+      | "note"
+      | "group_key"
+      | "origin"
+      | "source_label"
+    >
+  >
+>;
 
 const GROUP_OPTIONS = Object.keys(GROUP_HEADER_BG);
+const ORIGIN_OPTIONS: Array<"hdec" | "aconex" | "system"> = [
+  "hdec",
+  "aconex",
+  "system",
+];
 
 export function DefectFieldConfigTable() {
   const { data: rows = [], isLoading, refetch } = useDefectFieldConfig();
@@ -150,16 +169,18 @@ export function DefectFieldConfigTable() {
                 <TableHead className="w-[220px]">Field Name</TableHead>
                 <TableHead>Display Name</TableHead>
                 <TableHead className="w-[130px]">Group</TableHead>
+                <TableHead className="w-[110px]">Origin</TableHead>
+                <TableHead className="w-[110px]">Source Label</TableHead>
                 <TableHead className="w-[90px] text-center">Visible</TableHead>
                 <TableHead>Note</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
               )}
               {!isLoading && filtered.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">일치하는 필드가 없습니다.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">일치하는 필드가 없습니다.</TableCell></TableRow>
               )}
               {filtered.map((r) => {
                 const dirty = !!drafts[r.id];
@@ -187,6 +208,33 @@ export function DefectFieldConfigTable() {
                           {GROUP_OPTIONS.map((g) => (<SelectItem key={g} value={g} className="text-xs">{g}</SelectItem>))}
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={r.origin ?? ""}
+                        onValueChange={(v) =>
+                          setDraft(r.id, {
+                            origin: v as "hdec" | "aconex" | "system",
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          {ORIGIN_OPTIONS.map((o) => (
+                            <SelectItem key={o} value={o} className="text-xs">
+                              {o}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={r.source_label ?? ""}
+                        onChange={(e) => setDraft(r.id, { source_label: e.target.value })}
+                        className="h-8 text-xs"
+                        placeholder="HDEC / Aconex …"
+                      />
                     </TableCell>
                     <TableCell className="text-center"><Switch checked={r.is_visible} onCheckedChange={(v) => setDraft(r.id, { is_visible: v })} /></TableCell>
                     <TableCell>
