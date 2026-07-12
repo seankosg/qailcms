@@ -30,11 +30,16 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Download,
   Filter,
   History,
   Loader2,
   Pin,
+  Plus,
   RefreshCcw,
   RotateCcw,
   Search,
@@ -70,6 +75,7 @@ import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { ExportDialog } from "./ExportDialog";
 import { HistoryDrawer } from "./HistoryDrawer";
 import { TopHorizontalScrollbar } from "@/components/spare-part/raw-data/TopHorizontalScrollbar";
+import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   runRollupAllParents,
@@ -181,6 +187,8 @@ export function TaskManagementRawDataPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [historyTask, setHistoryTask] = useState<{ discipline: string; task_no: string; task_name?: string | null } | null>(null);
   const [rollupBusy, setRollupBusy] = useState<null | "rollup" | "judgment">(null);
+  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
+  const [addChildParent, setAddChildParent] = useState<ParentSeed | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const rollupFn = useServerFn(runRollupAllParents);
   const judgmentFn = useServerFn(runRecalcAutoJudgment);
@@ -247,6 +255,12 @@ export function TaskManagementRawDataPage() {
     setColumnFilters(cleanedFilters);
     setGlobalFilter(s.globalFilter ?? "");
     setSearchInput(s.globalFilter ?? "");
+    try {
+      const savedCollapsed = localStorage.getItem("qail.task-management.collapsed");
+      if (savedCollapsed) setCollapsedParents(new Set(JSON.parse(savedCollapsed)));
+    } catch {
+      // ignore
+    }
     setStateLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
@@ -305,6 +319,52 @@ export function TaskManagementRawDataPage() {
   });
 
   const rows = useMemo(() => data ?? [], [data]);
+
+  // discipline-task_no 단위 collapse 키 유지 — 접힌 부모의 자식 행 숨김
+  const visibleRows = useMemo(() => {
+    if (collapsedParents.size === 0) return rows;
+    return rows.filter((r) => {
+      const parent = (r as any).parent_task_no as string | null;
+      const disc = (r as any).discipline as string;
+      if (!parent) return true;
+      return !collapsedParents.has(`${disc}::${parent}`);
+    });
+  }, [rows, collapsedParents]);
+
+  const parentKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const r of rows) {
+      if ((r as any).level === "parent") {
+        keys.push(`${(r as any).discipline}::${(r as any).task_no}`);
+      }
+    }
+    return keys;
+  }, [rows]);
+
+  function toggleCollapse(disc: string, taskNo: string) {
+    const key = `${disc}::${taskNo}`;
+    setCollapsedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try {
+        localStorage.setItem("qail.task-management.collapsed", JSON.stringify([...next]));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
+
+  function setAllCollapsed(collapsed: boolean) {
+    const next = collapsed ? new Set(parentKeys) : new Set<string>();
+    setCollapsedParents(next);
+    try {
+      localStorage.setItem("qail.task-management.collapsed", JSON.stringify([...next]));
+    } catch {
+      // ignore
+    }
+  }
 
   const orderedKeys = useMemo(() => {
     const frozenSet = new Set(frozenExtras);
@@ -420,6 +480,71 @@ export function TaskManagementRawDataPage() {
           const val = getValue();
           const rendered = renderCell(c, val);
           if (c.key === "task_no") {
+            const rr = row.original as Row;
+            const isParent = rr.level === "parent";
+            const isChild = !!(rr as any).parent_task_no;
+            const disc = String(rr.discipline);
+            const collapseKey = `${disc}::${rr.task_no}`;
+            const isCollapsed = collapsedParents.has(collapseKey);
+            return (
+              <span className="flex w-full items-center gap-1">
+                {isParent ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCollapse(disc, String(rr.task_no));
+                    }}
+                    className="rounded p-0.5 hover:bg-muted"
+                    title={isCollapsed ? "펼치기" : "접기"}
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3" />
+                    )}
+                  </button>
+                ) : isChild ? (
+                  <span className="ml-2 text-muted-foreground/60">└</span>
+                ) : (
+                  <span className="w-4" />
+                )}
+                <Link
+                  to="/closure/task-management/detail/$id"
+                  params={{ id: String(rr.id) }}
+                  className="min-w-0 flex-1 truncate text-primary hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {rendered}
+                </Link>
+                {isParent && canEdit && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAddChildParent({
+                        task_no: String(rr.task_no),
+                        discipline: disc as ParentSeed["discipline"],
+                        task_name: (rr as any).task_name ?? null,
+                        category: (rr as any).category ?? null,
+                        pic: (rr as any).pic ?? null,
+                        floor_level: (rr as any).floor_level ?? null,
+                        location: (rr as any).location ?? null,
+                        risk: (rr as any).risk ?? null,
+                        plan_start: (rr as any).plan_start ?? null,
+                        plan_end: (rr as any).plan_end ?? null,
+                      });
+                    }}
+                    className="rounded p-0.5 text-muted-foreground opacity-0 hover:bg-primary/10 hover:text-primary group-hover:opacity-100"
+                    title="하위 태스크 추가"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                )}
+              </span>
+            );
+          }
+          if (false) {
             return (
               <Link
                 to="/closure/task-management/detail/$id"
@@ -451,10 +576,10 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, refetch, orderedKeys, labelOverrides]);
+  }, [canEdit, refetch, orderedKeys, labelOverrides, collapsedParents]);
 
   const table = useReactTable({
-    data: rows,
+    data: visibleRows,
     columns,
     state: {
       sorting,
@@ -569,6 +694,7 @@ export function TaskManagementRawDataPage() {
   }
 
   const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
+  const allCollapsed = parentKeys.length > 0 && collapsedParents.size >= parentKeys.length;
 
   async function handleRollup() {
     setRollupBusy("rollup");
@@ -643,6 +769,21 @@ export function TaskManagementRawDataPage() {
           </Button>
           <Button variant="outline" size="sm" className="h-8" onClick={() => refetch()}>
             Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => setAllCollapsed(!allCollapsed)}
+            title={allCollapsed ? "모두 펼치기" : "모두 접기"}
+            disabled={parentKeys.length === 0}
+          >
+            {allCollapsed ? (
+              <ChevronsUpDown className="mr-1 h-3.5 w-3.5" />
+            ) : (
+              <ChevronsDownUp className="mr-1 h-3.5 w-3.5" />
+            )}
+            {allCollapsed ? "Expand All" : "Collapse All"}
           </Button>
           {canEdit && (
             <>
@@ -827,7 +968,7 @@ export function TaskManagementRawDataPage() {
                       width: totalWidth,
                     }}
                     className={cn(
-                      "absolute left-0 top-0 flex border-b text-xs hover:bg-accent/40",
+                      "group absolute left-0 top-0 flex border-b text-xs hover:bg-accent/40",
                       row.getIsSelected() && "bg-primary/5",
                       isParent && "bg-muted/30 font-medium",
                     )}
@@ -910,6 +1051,16 @@ export function TaskManagementRawDataPage() {
         discipline={historyTask?.discipline ?? null}
         taskNo={historyTask?.task_no ?? null}
         taskName={historyTask?.task_name ?? null}
+      />
+
+      <AddChildTaskDialog
+        open={!!addChildParent}
+        onOpenChange={(o) => !o && setAddChildParent(null)}
+        parent={addChildParent}
+        onCreated={() => {
+          setAddChildParent(null);
+          refetch();
+        }}
       />
     </div>
   );
