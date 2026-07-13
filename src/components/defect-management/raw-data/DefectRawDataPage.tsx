@@ -226,7 +226,7 @@ const URL_MAP: Record<string, string> = {
   hdecPic: "hdec_pic_name",
   hdecEng: "hdec_eng_name",
   capturedBy: "captured_by_name",
-  level: "area_level",
+  level: "level_name",
   mainTrade: "main_trade",
   subTrade: "sub_trade",
   workType: "work_type",
