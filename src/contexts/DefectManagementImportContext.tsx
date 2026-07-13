@@ -523,6 +523,23 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       if (!category) return null;
       return teamByCategory.get(String(category).trim()) ?? null;
     };
+    /** 파일의 team 값을 DEFECT_TEAMS 기준으로 정규화. 유효하지 않으면 null. */
+    const normalizeFileTeam = (raw: unknown): DefectTeam | null => {
+      if (raw == null) return null;
+      const s = String(raw).trim();
+      if (!s) return null;
+      const lower = s.toLowerCase();
+      for (const t of DEFECT_TEAMS) {
+        if (t.toLowerCase() === lower) return t;
+      }
+      return null;
+    };
+    /** 파일 team 우선, 없으면 category 자동 매핑. */
+    const pickTeam = (p: ParsedDefectRow): DefectTeam | null => {
+      const fromFile = normalizeFileTeam(p.extra?.team);
+      if (fromFile) return fromFile;
+      return resolveTeam(p.category);
+    };
 
     for (const f of ready) {
       const parsed = f.parsed ?? [];
@@ -610,8 +627,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         const prev = existing.get(p.source_issue_no);
         const skipPriority = prev?.priority_locked;
         const skipVerification = prev?.hdec_verification_locked;
-        const rowTeam = resolveTeam(p.category);
-        if (p.category && !rowTeam) {
+        const rowTeam = pickTeam(p);
+        if (!rowTeam && p.category) {
           unmappedCategories.set(p.category, (unmappedCategories.get(p.category) ?? 0) + 1);
         }
         const base: Record<string, unknown> = {
@@ -741,7 +758,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             const rowLogRows = workingRows.map((p) => ({
               upload_id: logId,
               raw_row_no: p.rawRowNo,
-              team: resolveTeam(p.category),
+              team: pickTeam(p),
               source_issue_no: p.source_issue_no,
               action_taken: existing.has(p.source_issue_no) ? "updated" : "inserted",
             }));
