@@ -128,6 +128,78 @@ const RETRY_DELAYS_MS = [300, 800, 2000];
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/**
+ * parsed 배열에서 source_issue_no 기준 중복 그룹을 계산한다.
+ * - raw_payload JSON 문자열이 동일한 완전 동일 중복은 자동 폐기 카운트에 반영하고 후보에서 제거.
+ * - 자동 dedupe 후 후보가 2개 이상 남는 그룹만 사용자 검토 대상으로 반환.
+ * - 초기 selectedParsedIndex 는 그룹 마지막 후보 (keep_last).
+ */
+function computeDuplicateGroups(parsed: ParsedDefectRow[]): {
+  groups: DuplicateGroup[];
+  autoDedupedIdenticalCount: number;
+} {
+  // 1) source_issue_no 별로 [ {idx, row} ] 수집
+  const byKey = new Map<string, Array<{ idx: number; row: ParsedDefectRow }>>();
+  parsed.forEach((row, idx) => {
+    const key = row.source_issue_no;
+    if (!key) return;
+    const list = byKey.get(key) ?? [];
+    list.push({ idx, row });
+    byKey.set(key, list);
+  });
+
+  const groups: DuplicateGroup[] = [];
+  let autoDedupedIdenticalCount = 0;
+
+  for (const [key, items] of byKey) {
+    if (items.length < 2) continue;
+    // 2) raw_payload JSON 동일 → 마지막만 남기고 나머지 자동 폐기
+    const uniqByPayload = new Map<string, { idx: number; row: ParsedDefectRow }>();
+    for (const item of items) {
+      const sig = JSON.stringify(item.row.raw_payload ?? {});
+      uniqByPayload.set(sig, item); // keep last
+    }
+    const kept = Array.from(uniqByPayload.values()).sort((a, b) => a.idx - b.idx);
+    autoDedupedIdenticalCount += items.length - kept.length;
+    if (kept.length < 2) continue;
+
+    // 3) 사용자 검토 대상
+    const rows: DuplicateGroupRow[] = kept.map(({ idx, row }) => ({
+      parsedIndex: idx,
+      preview: {
+        description: row.description ?? null,
+        status_raw: row.status_raw ?? null,
+        updated_date_raw: row.updated_date_raw ?? null,
+        created_date: row.created_date ?? null,
+        updated_by_name: row.updated_by_name ?? null,
+        updated_status: row.updated_status ?? null,
+      },
+    }));
+    groups.push({
+      key,
+      rows,
+      selectedParsedIndex: rows[rows.length - 1].parsedIndex, // keep_last
+    });
+  }
+
+  return { groups, autoDedupedIdenticalCount };
+}
+
+/** 전략에 따라 그룹의 selectedParsedIndex 재계산 (manual 은 유지). */
+function applyStrategyToGroups(
+  groups: DuplicateGroup[],
+  strategy: DuplicateStrategy,
+): DuplicateGroup[] {
+  if (strategy === "manual") return groups;
+  return groups.map((g) => ({
+    ...g,
+    selectedParsedIndex:
+      strategy === "keep_first"
+        ? g.rows[0].parsedIndex
+        : g.rows[g.rows.length - 1].parsedIndex,
+  }));
+}
+
 function isNetworkError(err: unknown): boolean {
   if (!err) return false;
   const msg =
