@@ -102,11 +102,12 @@ export function DeSnagMatrixBlock({
                 >
                   <button
                     type="button"
-                    onClick={() => onNavigate({
-                      ...basementParam,
-                      ...(block.kind === "basement" ? {} : buildingParam),
-                      roomGroup: rg === "FACADE" ? "FACADE,LANDSCAPE" : rg === "N/A" ? "__EMPTY__" : rg,
-                    })}
+                    onClick={() => {
+                      const p: Record<string, string> = { ...basementParam };
+                      if (block.kind !== "basement") Object.assign(p, buildingParam);
+                      p.roomGroup = rg === "FACADE" ? "FACADE,LANDSCAPE" : rg === "N/A" ? "__EMPTY__" : rg;
+                      onNavigate(p);
+                    }}
                     className="hover:text-primary"
                   >
                     {rg}
@@ -197,7 +198,11 @@ function FragmentRows({
             >
               <button
                 type="button"
-                onClick={() => onNavigate(block.kind === "basement" ? basementParam : { building: r.building })}
+                  onClick={() => {
+                    const p: Record<string, string> =
+                      block.kind === "basement" ? { ...basementParam } : { building: r.building };
+                    onNavigate(p);
+                  }}
                 className="hover:text-primary"
               >
                 {r.building}
@@ -207,10 +212,12 @@ function FragmentRows({
           <td className="sticky left-[110px] z-10 border-b border-r bg-card px-2 py-1 text-[11px]">
             <button
               type="button"
-              onClick={() => onNavigate({
-                ...(block.kind === "basement" ? basementParam : { building: r.building }),
-                level: r.levelDisp,
-              })}
+              onClick={() => {
+                const p: Record<string, string> =
+                  block.kind === "basement" ? { ...basementParam } : { building: r.building };
+                p.level = r.levelDisp;
+                onNavigate(p);
+              }}
               className="hover:text-primary"
             >
               {r.levelDisp}
