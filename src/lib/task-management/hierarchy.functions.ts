@@ -56,28 +56,25 @@ export const addChildTask = createServerFn({ method: "POST" })
     if (pErr) throw new Error(pErr.message);
     if (!parent) throw new Error(`부모 태스크 '${data.parent_task_no}'을(를) 찾을 수 없습니다`);
 
-    // 2) 기존 자식들의 마지막 세그먼트 최댓값 → 다음 번호 채번
-    const prefix = `${parent.task_no}-`;
-    const { data: siblings, error: sErr } = await admin
-      .from("task_management_raw")
-      .select("task_no, sort_order")
-      .eq("discipline", data.discipline)
-      .like("task_no", `${prefix}%`);
-    if (sErr) throw new Error(sErr.message);
+    // 2) 채번: DB advisory lock 기반 RPC (경합 안전)
+    const { data: allocated, error: allocErr } = await admin.rpc("allocate_task_no", {
+      _discipline: data.discipline,
+      _parent_task_no: parent.task_no,
+    });
+    if (allocErr) throw new Error(allocErr.message);
+    const newTaskNo = String(allocated);
 
-    let maxSeg = 0;
+    // sort_order shift 계산용 max값
+    const { data: siblings } = await admin
+      .from("task_management_raw")
+      .select("sort_order")
+      .eq("discipline", data.discipline)
+      .like("task_no", `${parent.task_no}-%`);
     let maxSort = Number(parent.sort_order ?? 0);
     for (const s of siblings ?? []) {
-      const suffix = String(s.task_no).slice(prefix.length);
-      // 손자(예: parent-01-02)는 채번 대상에서 제외 — 첫 세그먼트만 본다
-      const firstSeg = suffix.split("-")[0];
-      const n = parseInt(firstSeg, 10);
-      if (Number.isFinite(n) && n > maxSeg) maxSeg = n;
       const so = Number(s.sort_order ?? 0);
       if (so > maxSort) maxSort = so;
     }
-    const nextSeg = String(maxSeg + 1).padStart(2, "0");
-    const newTaskNo = `${prefix}${nextSeg}`;
 
     // 3) 뒤 행들 sort_order shift (충돌 방지) — 큰 값부터 내려가며 +1
     const insertSort = maxSort + 1;

@@ -15,8 +15,15 @@ import {
 } from "@/lib/task-management/parser";
 import type { Discipline } from "@/lib/task-management/columns";
 import { runRollupAllParents, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
+import {
+  previewTaskImport,
+  allocateTaskNo,
+  type PreflightSummary,
+} from "@/lib/task-management/import-preflight.functions";
 
 export type RollupMode = "auto" | "keep" | "blank";
+
+export type ConflictPolicy = "overwrite" | "skip" | "renumber";
 
 export interface ImportErrorEntry {
   message: string;
@@ -57,6 +64,10 @@ export interface TmImportFileItem {
   sheetHeaders?: SheetHeaderEntry[];
   columnMap?: Record<string, number>;
   columnOverrides?: Partial<Record<TaskTargetField, number>> | null;
+  conflictPolicy?: ConflictPolicy;
+  preflight?: PreflightSummary | null;
+  preflightLoading?: boolean;
+  preflightError?: string | null;
   result?: {
     inserted: number;
     updated: number;
@@ -65,6 +76,7 @@ export interface TmImportFileItem {
     duplicates?: number;
     rolledUp?: number;
     judgmentRecalculated?: number;
+    renumbered?: number;
     errors?: ImportErrorEntry[];
   };
 }
@@ -85,6 +97,8 @@ interface CtxValue {
     id: string,
     overrides: Partial<Record<TaskTargetField, number>> | null,
   ) => Promise<void>;
+  setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
+  runPreflight: (id: string) => Promise<void>;
   startImport: () => Promise<void>;
 }
 
@@ -289,6 +303,59 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     [],
   );
 
+  const setFileConflictPolicy = useCallback((id: string, policy: ConflictPolicy) => {
+    setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, conflictPolicy: policy } : f)));
+  }, []);
+
+  const runPreflight = useCallback(async (id: string) => {
+    let target: TmImportFileItem | undefined;
+    setFiles((cur) => {
+      target = cur.find((f) => f.id === id);
+      return cur.map((f) =>
+        f.id === id ? { ...f, preflightLoading: true, preflightError: null } : f,
+      );
+    });
+    if (!target || !target.parsed || target.parsed.length === 0) {
+      setFiles((cur) =>
+        cur.map((f) =>
+          f.id === id
+            ? { ...f, preflightLoading: false, preflightError: "파싱된 행이 없습니다" }
+            : f,
+        ),
+      );
+      return;
+    }
+    try {
+      const discipline = target.discipline ?? "건축";
+      const rows = target.parsed.map((p) => ({
+        task_no: p.task_no,
+        parent_task_no: p.parent_task_no,
+        level: p.level,
+        task_name: p.task_name,
+        plot: p.plot,
+        category: p.category,
+        plan_start: p.plan_start,
+        plan_end: p.plan_end,
+        actual_progress: p.actual_progress,
+      }));
+      const res = await previewTaskImport({ data: { discipline, rows } });
+      setFiles((cur) =>
+        cur.map((f) =>
+          f.id === id
+            ? { ...f, preflight: res, preflightLoading: false, preflightError: null }
+            : f,
+        ),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setFiles((cur) =>
+        cur.map((f) =>
+          f.id === id ? { ...f, preflightLoading: false, preflightError: msg } : f,
+        ),
+      );
+    }
+  }, []);
+
   const executeImport = useCallback(async (ready: TmImportFileItem[]) => {
     setIsRunning(true);
     const { data: userData } = await supabase.auth.getUser();
@@ -364,7 +431,55 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       }
       const deduped = Array.from(dedupMap.values());
 
-      const payloads = deduped.map((p) => {
+      // ---- 충돌 정책 적용 (skip / renumber / overwrite) ----
+      const conflictPolicy: ConflictPolicy = f.conflictPolicy ?? "overwrite";
+      const conflictSet = new Set<string>(
+        (f.preflight?.conflicts ?? []).map((c) => c.task_no),
+      );
+      let skippedByPolicy = 0;
+      let renumbered = 0;
+      const renumberMap = new Map<string, string>();
+      const applied: typeof deduped = [];
+      for (const p of deduped) {
+        if (!conflictSet.has(p.task_no) || conflictPolicy === "overwrite") {
+          applied.push(p);
+          continue;
+        }
+        if (conflictPolicy === "skip") {
+          skippedByPolicy++;
+          continue;
+        }
+        // renumber
+        try {
+          const { task_no: newTaskNo } = await allocateTaskNo({
+            data: {
+              discipline,
+              parent_task_no: p.parent_task_no ?? null,
+            },
+          });
+          renumberMap.set(p.task_no, newTaskNo);
+          applied.push({ ...p, task_no: newTaskNo });
+          renumbered++;
+        } catch (e) {
+          console.warn("[task-import] renumber failed, fallback overwrite", e);
+          applied.push(p);
+        }
+      }
+      if (renumberMap.size > 0) {
+        // parent_task_no가 renumber 대상을 가리키던 자식들도 함께 교체
+        for (let i = 0; i < applied.length; i++) {
+          const p = applied[i];
+          if (p.parent_task_no && renumberMap.has(p.parent_task_no)) {
+            applied[i] = { ...p, parent_task_no: renumberMap.get(p.parent_task_no)! };
+          }
+        }
+        toast.info(`${f.name}: 충돌 ${renumberMap.size}건 자동 재번호 발급`);
+      }
+      if (skippedByPolicy > 0) {
+        toast.info(`${f.name}: 충돌 ${skippedByPolicy}건 건너뜀`);
+      }
+
+      const payloads = applied.map((p) => {
         const isParent = p.level === "parent";
         const stripParent = isParent && rollupMode === "auto";
         return {
@@ -467,7 +582,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
         // Tag newly-inserted rows with source_import_log_id for rollback tracking.
         if (logId) {
-          const newTaskNos = deduped
+          const newTaskNos = applied
             .map((p) => p.task_no)
             .filter((t) => !existingSet.has(t));
           for (let i = 0; i < newTaskNos.length; i += 500) {
@@ -482,7 +597,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
           // Per-row import logs
           try {
-            const rowLogRows = deduped.map((p, idx) => ({
+            const rowLogRows = applied.map((p, idx) => ({
               upload_id: logId,
               raw_row_no: idx + 1,
               discipline,
@@ -562,11 +677,12 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                   result: {
                     inserted,
                     updated,
-                    skipped: 0,
+                    skipped: skippedByPolicy,
                     rejected,
                     duplicates,
                     rolledUp,
                     judgmentRecalculated,
+                    renumbered,
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
@@ -637,6 +753,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setFileDiscipline,
         setFileDataDateOverride,
         setFileColumnOverrides,
+        setFileConflictPolicy,
+        runPreflight,
         startImport,
       }}
     >

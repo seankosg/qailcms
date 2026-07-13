@@ -47,7 +47,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { RollupMode } from "@/contexts/TaskManagementImportContext";
 import { ColumnMappingDialog } from "./ColumnMappingDialog";
+import { ConflictReviewDialog } from "./ConflictReviewDialog";
 import { Input } from "@/components/ui/input";
+import type { ConflictPolicy } from "@/contexts/TaskManagementImportContext";
+import { AlertTriangle, ScanSearch } from "lucide-react";
 
 const statusBadge: Record<TmFileStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
@@ -88,11 +91,14 @@ function ImportInner() {
     setFileDiscipline,
     setFileDataDateOverride,
     setFileColumnOverrides,
+    setFileConflictPolicy,
+    runPreflight,
     startImport,
   } = useTaskManagementImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [mappingFileId, setMappingFileId] = useState<string | null>(null);
+  const [conflictFileId, setConflictFileId] = useState<string | null>(null);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -112,6 +118,7 @@ function ImportInner() {
   const readyCount = files.filter((f) => f.status === "ready" && !f.validationError).length;
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
   const mappingFile = files.find((f) => f.id === mappingFileId) ?? null;
+  const conflictFile = files.find((f) => f.id === conflictFileId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -245,6 +252,9 @@ function ImportInner() {
                 onPreview={() => setPreviewFileId(f.id)}
                 onOpenMapping={() => setMappingFileId(f.id)}
                 onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
+                onPolicyChange={(p) => setFileConflictPolicy(f.id, p)}
+                onRunPreflight={() => runPreflight(f.id)}
+                onOpenConflict={() => setConflictFileId(f.id)}
               />
             ))}
           </CardContent>
@@ -252,6 +262,14 @@ function ImportInner() {
       )}
 
       <PreviewDialog file={previewFile} onClose={() => setPreviewFileId(null)} />
+      {conflictFile && (
+        <ConflictReviewDialog
+          open={!!conflictFile}
+          onClose={() => setConflictFileId(null)}
+          fileName={conflictFile.name}
+          preflight={conflictFile.preflight ?? null}
+        />
+      )}
       {mappingFile && mappingFile.sheetHeaders && mappingFile.columnMap && (
         <ColumnMappingDialog
           open={!!mappingFile}
@@ -275,6 +293,9 @@ function FileRow({
   onPreview,
   onOpenMapping,
   onDataDateChange,
+  onPolicyChange,
+  onRunPreflight,
+  onOpenConflict,
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
@@ -283,6 +304,9 @@ function FileRow({
   onPreview: () => void;
   onOpenMapping: () => void;
   onDataDateChange: (v: string | null) => void;
+  onPolicyChange: (p: ConflictPolicy) => void;
+  onRunPreflight: () => void;
+  onOpenConflict: () => void;
 }) {
   const badge = statusBadge[f.status];
   const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
@@ -369,7 +393,71 @@ function FileRow({
                     )}
                 </Button>
               )}
+              <span className="ml-2 text-xs text-muted-foreground">충돌 정책</span>
+              <Select
+                value={f.conflictPolicy ?? "overwrite"}
+                onValueChange={(v) => onPolicyChange(v as ConflictPolicy)}
+                disabled={isRunning || f.status === "done" || f.status === "processing"}
+              >
+                <SelectTrigger className="h-7 w-[130px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="overwrite" className="text-xs">덮어쓰기</SelectItem>
+                  <SelectItem value="skip" className="text-xs">건너뛰기</SelectItem>
+                  <SelectItem value="renumber" className="text-xs">자동 재번호</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={onRunPreflight}
+                disabled={
+                  isRunning ||
+                  f.status !== "ready" ||
+                  !f.parsed ||
+                  f.parsed.length === 0 ||
+                  f.preflightLoading
+                }
+              >
+                <ScanSearch className="h-3.5 w-3.5" />
+                {f.preflightLoading ? "점검중…" : "중복 점검"}
+              </Button>
             </div>
+            {f.preflight && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <Badge variant="outline" className="border-emerald-300 text-emerald-700">
+                  신규 {f.preflight.newCount}
+                </Badge>
+                <Badge variant="outline" className="border-blue-300 text-blue-700">
+                  업데이트 {f.preflight.updateCount}
+                </Badge>
+                <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">
+                  변경없음 {f.preflight.unchangedCount}
+                </Badge>
+                {f.preflight.conflictCount > 0 ? (
+                  <>
+                    <Badge variant="outline" className="border-destructive text-destructive gap-1">
+                      <AlertTriangle className="h-3 w-3" /> 충돌 {f.preflight.conflictCount}
+                    </Badge>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-6 px-1 text-xs"
+                      onClick={onOpenConflict}
+                    >
+                      상세 보기
+                    </Button>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">충돌 없음</span>
+                )}
+              </div>
+            )}
+            {f.preflightError && (
+              <p className="mt-1 text-xs text-destructive">중복 점검 실패: {f.preflightError}</p>
+            )}
             {f.warnings && f.warnings.length > 0 && (
               <p className="mt-1 text-xs text-amber-600">
                 ⚠ {f.warnings.slice(0, 3).join(" · ")}
@@ -419,6 +507,16 @@ function FileRow({
           {typeof f.result.duplicates === "number" && f.result.duplicates > 0 && (
             <Badge variant="outline" className="border-orange-300 text-orange-700">
               Duplicates: {f.result.duplicates}
+            </Badge>
+          )}
+          {typeof f.result.renumbered === "number" && f.result.renumbered > 0 && (
+            <Badge variant="outline" className="border-sky-300 text-sky-700">
+              Renumbered: {f.result.renumbered}
+            </Badge>
+          )}
+          {f.result.skipped > 0 && (
+            <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">
+              Skipped: {f.result.skipped}
             </Badge>
           )}
           {typeof f.result.rolledUp === "number" && f.result.rolledUp > 0 && (

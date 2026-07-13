@@ -1738,6 +1738,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      allocate_task_no: {
+        Args: { _discipline: string; _parent_task_no: string }
+        Returns: string
+      }
       calc_auto_judgment_value: {
         Args: {
           _actual_progress: number
