@@ -124,6 +124,7 @@ function validate(f: DefectImportFile): string | null {
 }
 
 export function DefectManagementImportProvider({ children }: { children: ReactNode }) {
+  const qc = useQueryClient();
   const [files, setFiles] = useState<DefectImportFile[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
