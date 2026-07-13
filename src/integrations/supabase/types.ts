@@ -2272,6 +2272,17 @@ export type Database = {
           total_count: number
         }[]
       }
+      defect_snag_dashboard_matrix: {
+        Args: { _plan_groups?: string[]; _teams?: string[] }
+        Returns: {
+          building: string
+          cnt: number
+          level_name: string
+          plan_group: string
+          room_group: string
+          status_raw: string
+        }[]
+      }
       delete_abd_import_batch: { Args: { _batch_id: string }; Returns: Json }
       delete_defect_import_batch: { Args: { _batch_id: string }; Returns: Json }
       delete_spare_part_import_batch: {
