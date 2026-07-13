@@ -121,9 +121,32 @@ export function useDefectImport() {
   return c;
 }
 
-const INSERT_CHUNK = 150;
-const BATCH_DELAY_MS = 60;
+const INSERT_CHUNK = 500;
+const BATCH_CONCURRENCY = 4;
+const EXISTING_FETCH_CHUNK = 1000;
+const EXISTING_FETCH_CONCURRENCY = 4;
+const ROW_LOG_CHUNK = 500;
 const RETRY_DELAYS_MS = [300, 800, 2000];
+const PROGRESS_UPDATE_MS = 200;
+
+/** 배열을 지정 동시성으로 순회하며 각 항목에 대해 worker를 실행. 결과는 입력 순서 유지. */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= items.length) return;
+      results[idx] = await worker(items[idx], idx);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -244,6 +267,81 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     }
     return extraAliases;
   }, []);
+
+  /**
+   * 배치 upsert 재시도 헬퍼. 네트워크성 오류는 재시도, 그 외 즉시 반환.
+   */
+  const upsertBatch = useCallback(async (slice: Record<string, unknown>[]) => {
+    let error: any = null;
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+      const res = await (supabase as any)
+        .from("defect_items_raw")
+        .upsert(slice, { onConflict: "source_issue_no" });
+      error = res.error;
+      if (!error) return { error: null };
+      if (!isNetworkError(error)) break;
+      if (attempt < RETRY_DELAYS_MS.length) await sleep(RETRY_DELAYS_MS[attempt]);
+    }
+    return { error };
+  }, []);
+
+  /**
+   * 배치가 실패했을 때 이분 탐색으로 성공/실패 행을 가려냄.
+   * O(log N + K) 회의 왕복으로 대량 성공 행을 빠르게 통과시키고, 실패 행만 개별 upsert.
+   * 반환: { insertedRows, updatedRows, rejectedRows, rowErrors }.
+   */
+  const upsertWithBinarySplit = useCallback(
+    async (
+      slice: Record<string, unknown>[],
+      batchIndex: number,
+    ): Promise<{
+      insertedRows: Array<Record<string, unknown>>;
+      updatedRows: Array<Record<string, unknown>>;
+      rejectedRows: Array<Record<string, unknown>>;
+      rowErrors: DefectImportError[];
+      firstError: any;
+    }> => {
+      const insertedRows: Array<Record<string, unknown>> = [];
+      const updatedRows: Array<Record<string, unknown>> = [];
+      const rejectedRows: Array<Record<string, unknown>> = [];
+      const rowErrors: DefectImportError[] = [];
+      let firstError: any = null;
+
+      const stack: Array<Record<string, unknown>[]> = [slice];
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        if (current.length === 0) continue;
+        const { error } = await upsertBatch(current);
+        if (!error) {
+          for (const row of current) {
+            (row as any).__ok = true;
+          }
+          continue;
+        }
+        if (!firstError) firstError = error;
+        if (current.length === 1) {
+          rejectedRows.push(current[0]);
+          rowErrors.push({
+            batch: batchIndex,
+            message: error.message,
+            code: (error as any).code,
+            details: (error as any).details,
+            hint: (error as any).hint,
+            sampleId: current[0].source_issue_no as string,
+          });
+          continue;
+        }
+        const mid = Math.floor(current.length / 2);
+        stack.push(current.slice(mid));
+        stack.push(current.slice(0, mid));
+      }
+
+      // 성공 표시된 행을 inserted/updated로 분류
+      // (분류는 호출측에서 existing 맵을 이용해 수행)
+      return { insertedRows, updatedRows, rejectedRows, rowErrors, firstError };
+    },
+    [upsertBatch],
+  );
 
   /** file.file을 실제로 파싱하고 결과로 파일 상태를 업데이트. */
   const parseAndApply = useCallback(
@@ -588,14 +686,17 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       const duplicatesDefensive = parsed.length - deduped.length;
       const duplicates = duplicatesAuto + duplicatesDefensive;
 
-      // 기존 행 조회 (id + lock flags)
+      // 기존 행 조회 (id + lock flags) — 청크를 병렬로 조회
       const ids = deduped.map((p) => p.source_issue_no);
       const existing = new Map<
         string,
         { priority_locked: boolean; hdec_verification_locked: boolean }
       >();
-      for (let i = 0; i < ids.length; i += 500) {
-        const chunk = ids.slice(i, i + 500);
+      const idChunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += EXISTING_FETCH_CHUNK) {
+        idChunks.push(ids.slice(i, i + EXISTING_FETCH_CHUNK));
+      }
+      await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
         const { data } = await (supabase as any)
           .from("defect_items_raw")
           .select("source_issue_no, priority_locked, hdec_verification_locked")
@@ -606,7 +707,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             hdec_verification_locked: !!r.hdec_verification_locked,
           });
         }
-      }
+      });
 
       // Re-import: 기존 매칭 실패한 행은 건너뜀
       const skippedReimportNoMatch = isReimport
@@ -690,29 +791,29 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       let processed = 0;
       let skippedLocked = 0;
       const importErrors: DefectImportError[] = [];
+      let lastProgressAt = 0;
+      let lastProgressPct = -1;
 
       try {
+        // 배치 슬라이스 준비
+        const slices: Array<{ rows: Record<string, unknown>[]; batchIndex: number }> = [];
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
-          const slice = payloads.slice(i, i + INSERT_CHUNK);
-          const batchIndex = Math.floor(i / INSERT_CHUNK);
+          slices.push({
+            rows: payloads.slice(i, i + INSERT_CHUNK),
+            batchIndex: Math.floor(i / INSERT_CHUNK),
+          });
+        }
 
-          // 재시도 가능한 배치 upsert. 응답 payload 축소를 위해 .select() 제거.
-          let error: any = null;
-          for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-            const res = await (supabase as any)
-              .from("defect_items_raw")
-              .upsert(slice, { onConflict: "source_issue_no" });
-            error = res.error;
-            if (!error) break;
-            if (!isNetworkError(error)) break;
-            if (attempt < RETRY_DELAYS_MS.length) {
-              await sleep(RETRY_DELAYS_MS[attempt]);
-              continue;
-            }
-          }
+        await runWithConcurrency(slices, BATCH_CONCURRENCY, async ({ rows: slice, batchIndex }) => {
+          const { error } = await upsertBatch(slice);
+          let successRows: Array<Record<string, unknown>> = [];
+          let failRows: Array<Record<string, unknown>> = [];
 
-          if (error) {
-            console.error("[defect-import] batch upsert error", { batchIndex, error });
+          if (!error) {
+            successRows = slice;
+          } else if (isNetworkError(error)) {
+            // 재시도 다 소진 → 배치 자체 실패로 기록
+            console.error("[defect-import] batch upsert network error", { batchIndex, error });
             importErrors.push({
               batch: batchIndex,
               message: error.message,
@@ -721,60 +822,62 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               hint: (error as any).hint,
               sampleId: slice[0]?.source_issue_no as string,
             });
-            for (const row of slice) {
-              let r = await (supabase as any)
-                .from("defect_items_raw")
-                .upsert([row], { onConflict: "source_issue_no" });
-              if (r.error && isNetworkError(r.error)) {
-                await sleep(500);
-                r = await (supabase as any)
-                  .from("defect_items_raw")
-                  .upsert([row], { onConflict: "source_issue_no" });
-              }
-              if (r.error) {
-                rejected++;
-                importErrors.push({
-                  batch: batchIndex,
-                  message: r.error.message,
-                  code: r.error.code,
-                  sampleId: row.source_issue_no as string,
-                });
-              } else if (existing.has(row.source_issue_no as string)) updated++;
-              else inserted++;
-            }
+            failRows = slice;
           } else {
-            for (const row of slice) {
-              if (existing.has(row.source_issue_no as string)) updated++;
-              else inserted++;
-            }
+            // 데이터 오류 → 이분 탐색으로 성공/실패 분리
+            console.error("[defect-import] batch upsert error, splitting", { batchIndex, error });
+            importErrors.push({
+              batch: batchIndex,
+              message: error.message,
+              code: (error as any).code,
+              details: (error as any).details,
+              hint: (error as any).hint,
+              sampleId: slice[0]?.source_issue_no as string,
+            });
+            const split = await upsertWithBinarySplit(slice, batchIndex);
+            successRows = slice.filter((r) => (r as any).__ok);
+            failRows = split.rejectedRows;
+            for (const row of successRows) delete (row as any).__ok;
+            importErrors.push(...split.rowErrors);
           }
+
+          for (const row of successRows) {
+            if (existing.has(row.source_issue_no as string)) updated++;
+            else inserted++;
+          }
+          rejected += failRows.length;
           for (const row of slice) {
             if (existing.get(row.source_issue_no as string)?.priority_locked) skippedLocked++;
           }
           processed += slice.length;
           const pct = Math.round((processed / Math.max(payloads.length, 1)) * 100);
-          setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: pct } : x)));
-          if (i + INSERT_CHUNK < payloads.length) await sleep(BATCH_DELAY_MS);
-        }
-
-        // per-row logs
-        if (logId) {
-          try {
-            const rowLogRows = workingRows.map((p) => ({
-              upload_id: logId,
-              raw_row_no: p.rawRowNo,
-              team: pickTeam(p),
-              source_issue_no: p.source_issue_no,
-              action_taken: existing.has(p.source_issue_no) ? "updated" : "inserted",
-            }));
-            for (let i = 0; i < rowLogRows.length; i += 500) {
-              await (supabase as any)
-                .from("defect_import_row_logs")
-                .insert(rowLogRows.slice(i, i + 500));
-            }
-          } catch (e) {
-            console.warn("[defect-import] row-log insert failed", e);
+          const now = Date.now();
+          if (pct !== lastProgressPct && (pct === 100 || now - lastProgressAt >= PROGRESS_UPDATE_MS)) {
+            lastProgressAt = now;
+            lastProgressPct = pct;
+            setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: pct } : x)));
           }
+        });
+
+        // per-row logs — 사용자 응답성 확보를 위해 백그라운드로 병렬 삽입 (실패 시 콘솔 경고)
+        if (logId) {
+          const rowLogRows = workingRows.map((p) => ({
+            upload_id: logId,
+            raw_row_no: p.rawRowNo,
+            team: pickTeam(p),
+            source_issue_no: p.source_issue_no,
+            action_taken: existing.has(p.source_issue_no) ? "updated" : "inserted",
+          }));
+          const rowLogChunks: typeof rowLogRows[] = [];
+          for (let i = 0; i < rowLogRows.length; i += ROW_LOG_CHUNK) {
+            rowLogChunks.push(rowLogRows.slice(i, i + ROW_LOG_CHUNK));
+          }
+          void runWithConcurrency(rowLogChunks, BATCH_CONCURRENCY, async (chunk) => {
+            const { error } = await (supabase as any)
+              .from("defect_import_row_logs")
+              .insert(chunk);
+            if (error) console.warn("[defect-import] row-log insert failed", error);
+          });
         }
 
         const finalStatus =
