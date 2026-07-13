@@ -663,6 +663,11 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         put(base, "location_reference", p.location_reference);
         put(base, "classification", p.classification);
         put(base, "podium_area", p.podium_area);
+        put(base, "building", p.building);
+        put(base, "room", p.room);
+        put(base, "room_group", p.room_group);
+        put(base, "level_name", p.level_name);
+        put(base, "review_flag", p.review_flag);
         put(base, "completion_status", deriveCompletionStatus(p.status_raw));
         put(base, "closure_status", deriveClosureStatus(p.status_raw));
         if (!skipPriority) put(base, "priority", p.priority);
