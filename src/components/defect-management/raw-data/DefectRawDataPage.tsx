@@ -362,7 +362,6 @@ export function DefectRawDataPage() {
     // Critical column
     const criticalCol: ColumnDef<DefectItem> = {
       id: "is_critical", accessorKey: "is_critical", header: "Critical", size: 72, enableSorting: true, enableColumnFilter: true,
-      filterFn: multiSelectFilterFn,
       meta: { filterType: "multi-select", filterOptions: [{ value: "true", label: "Critical" }, { value: "false", label: "Non-critical" }] },
       accessorFn: (r) => ((r as any).is_critical ? "true" : "false"),
       cell: ({ row }) => {
@@ -394,7 +393,6 @@ export function DefectRawDataPage() {
     const stageCol: ColumnDef<DefectItem> = {
       id: "stage_progress", header: "Progress", size: 110, enableSorting: true, enableColumnFilter: true,
       accessorFn: (r) => classifyDefectStage(r as any, dataDate),
-      filterFn: multiSelectFilterFn,
       meta: {
         filterType: "multi-select",
         filterOptions: [
