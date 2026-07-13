@@ -677,11 +677,12 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                   result: {
                     inserted,
                     updated,
-                    skipped: 0,
+                    skipped: skippedByPolicy,
                     rejected,
                     duplicates,
                     rolledUp,
                     judgmentRecalculated,
+                    renumbered,
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
