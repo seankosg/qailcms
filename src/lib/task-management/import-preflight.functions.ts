@@ -187,10 +187,10 @@ export const allocateTaskNo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => AllocateSchema.parse(v))
   .handler(async ({ data, context }) => {
-    const { data: next, error } = await context.supabase.rpc("allocate_task_no", {
+    const { data: next, error } = await (context.supabase as any).rpc("allocate_task_no", {
       _discipline: data.discipline,
       _parent_task_no: data.parent_task_no ?? null,
     });
     if (error) throw new Error(error.message);
-    return { task_no: String(next) };
+    return { task_no: String(next ?? "") };
   });
