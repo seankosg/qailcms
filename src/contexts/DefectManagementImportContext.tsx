@@ -369,21 +369,6 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
   );
   const clearAll = useCallback(() => setFiles([]), []);
 
-  const setFileTeam = useCallback((id: string, team: DefectTeam) => {
-    setFiles((cur) =>
-      cur.map((f) => {
-        if (f.id !== id) return f;
-        const nextStatus: DefectFileStatus =
-          f.status === "pending_sheet_selection" || f.status === "parsing"
-            ? f.status
-            : "ready";
-        const updated = { ...f, team, status: nextStatus };
-        updated.validationError = validate(updated);
-        return updated;
-      }),
-    );
-  }, []);
-
   const setFileDataDateOverride = useCallback((id: string, date: string | null) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, dataDateOverride: date } : f)));
   }, []);
@@ -502,7 +487,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           }
         }
         const nextParsed = f.parsed.filter((_, idx) => !dropIndices.has(idx));
-        const nextStatus: DefectFileStatus = f.team ? "ready" : "needs_team";
+        const nextStatus: DefectFileStatus = "ready";
         const updated: DefectImportFile = {
           ...f,
           parsed: nextParsed,
@@ -520,9 +505,27 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id ?? null;
 
+    // Category → Team 매핑 조회 (1회)
+    const teamByCategory = new Map<string, DefectTeam>();
+    try {
+      const { data: mapRows } = await (supabase as any)
+        .from("defect_category_team_map")
+        .select("category, team");
+      for (const m of (mapRows ?? []) as Array<{ category: string; team: string }>) {
+        if (m.category && m.team && (DEFECT_TEAMS as readonly string[]).includes(m.team)) {
+          teamByCategory.set(String(m.category).trim(), m.team as DefectTeam);
+        }
+      }
+    } catch (e) {
+      console.warn("[defect-import] category_team_map fetch failed", e);
+    }
+    const resolveTeam = (category: string | null | undefined): DefectTeam | null => {
+      if (!category) return null;
+      return teamByCategory.get(String(category).trim()) ?? null;
+    };
+
     for (const f of ready) {
       const parsed = f.parsed ?? [];
-      const team = f.team!;
       const dataDate = f.dataDateOverride ?? new Date().toISOString().slice(0, 10);
       const startedAtIso = new Date().toISOString();
       const excludedFields = f.excludedFields ?? new Set<string>();
@@ -534,7 +537,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         .from("defect_import_logs")
         .insert({
           file_name: f.name,
-          team,
+          team: null,
           data_date: dataDate,
           sheet_name: f.sheetName ?? null,
           total_rows: parsed.length,
