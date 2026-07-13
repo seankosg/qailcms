@@ -102,7 +102,8 @@ const CFG = {
     deleteFn: "delete_defect_import_batch",
     keyLabel: "Source Issue No",
     keyColumn: "source_issue_no",
-    extraLabel: "Team",
+    // Team은 파일 단위가 아니라 행 단위 자동매핑 결과이므로 배치 목록에서 노출하지 않음.
+    extraLabel: null,
   },
   abd: {
     title: "ABD — Import Logs",
@@ -133,6 +134,7 @@ function fmtDuration(startedAt: string, finishedAt: string | null) {
 
 export function ImportLogsPage({ kind }: { kind: Kind }) {
   const cfg = CFG[kind];
+  const hasExtra = !!cfg.extraLabel;
   const navigate = useNavigate();
   const { data: me } = useCurrentUser();
   const isAdmin = me?.roles?.includes("admin") || me?.roles?.includes("superuser");
@@ -359,7 +361,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">File</TableHead>
-                    <TableHead className="text-xs">{cfg.extraLabel}</TableHead>
+                    {hasExtra && <TableHead className="text-xs">{cfg.extraLabel}</TableHead>}
                     <TableHead className="text-xs">Uploaded</TableHead>
                     <TableHead className="text-xs">Uploader</TableHead>
                     <TableHead className="text-xs text-right">Duration</TableHead>
@@ -376,7 +378,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   {loading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={isAdmin ? 12 : 11}
+                        colSpan={(isAdmin ? 11 : 10) + (hasExtra ? 1 : 0)}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Loading…
@@ -385,7 +387,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   ) : batches.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={isAdmin ? 12 : 11}
+                        colSpan={(isAdmin ? 11 : 10) + (hasExtra ? 1 : 0)}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Import 이력이 없습니다
@@ -402,12 +404,14 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                           >
                             {b.file_name}
                           </TableCell>
-                          <TableCell
-                            className="text-xs cursor-pointer"
-                            onClick={() => loadDetail(b.id)}
-                          >
-                            {b.extra ?? "—"}
-                          </TableCell>
+                          {hasExtra && (
+                            <TableCell
+                              className="text-xs cursor-pointer"
+                              onClick={() => loadDetail(b.id)}
+                            >
+                              {b.extra ?? "—"}
+                            </TableCell>
+                          )}
                           <TableCell
                             className="text-xs cursor-pointer whitespace-nowrap"
                             onClick={() => loadDetail(b.id)}
