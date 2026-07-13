@@ -257,6 +257,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         setFiles((cur) =>
           cur.map((f) => {
             if (f.id !== id) return f;
+            const { groups, autoDedupedIdenticalCount } = computeDuplicateGroups(parsed.rows);
+            const hasUnresolvedDuplicates = groups.length > 0;
+            const strategy: DuplicateStrategy = f.duplicateStrategy ?? "keep_last";
+            const groupsWithStrategy = applyStrategyToGroups(groups, strategy);
+            const nextStatus: DefectFileStatus = hasUnresolvedDuplicates
+              ? "pending_duplicate_review"
+              : (f.team ?? parsed.teamHint)
+                ? "ready"
+                : "needs_team";
             const updated: DefectImportFile = {
               ...f,
               parsed: parsed.rows,
@@ -273,7 +282,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               teamHint: parsed.teamHint,
               team: f.team ?? parsed.teamHint ?? null,
               categorySummary: parsed.categorySummary,
-              status: (f.team ?? parsed.teamHint) ? "ready" : "needs_team",
+              status: nextStatus,
+              duplicateStrategy: strategy,
+              duplicateGroups: groupsWithStrategy,
+              autoDedupedIdenticalCount,
               error: undefined,
             };
             updated.validationError = validate(updated);
