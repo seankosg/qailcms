@@ -34,7 +34,6 @@ import {
   type DefectFileStatus,
   type DefectImportFile,
 } from "@/contexts/DefectManagementImportContext";
-import { DEFECT_TEAMS, type DefectTeam } from "@/lib/defect-management/columns";
 import { DefectColumnSelect } from "./DefectColumnSelect";
 import { DuplicateReviewDialog } from "./DuplicateReviewDialog";
 
@@ -48,7 +47,6 @@ const statusBadge: Record<DefectFileStatus, { label: string; cls: string }> = {
     label: "중복 검토",
     cls: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-200",
   },
-  needs_team: { label: "Team 필요", cls: "bg-amber-100 text-amber-800" },
   ready: { label: "Ready", cls: "bg-primary/10 text-primary" },
   processing: { label: "Processing", cls: "bg-muted text-muted-foreground" },
   done: {
@@ -84,7 +82,6 @@ function Inner() {
     addFiles,
     removeFile,
     clearAll,
-    setFileTeam,
     setFileDataDateOverride,
     setFileSheet,
     setFileExcludedHeaders,
@@ -113,7 +110,7 @@ function Inner() {
   );
 
   const readyCount = files.filter(
-    (f) => f.status === "ready" && f.team && !f.validationError,
+    (f) => f.status === "ready" && !f.validationError,
   ).length;
   const columnDialogFile =
     files.find((f) => f.id === columnDialogFileId) ?? null;
@@ -124,16 +121,16 @@ function Inner() {
       <div>
         <h1 className="text-xl font-semibold">Defect Management — Import</h1>
         <p className="text-sm text-muted-foreground">
-          LetsBuild 형식 Excel(건축/전기/설비)의 첫 시트를 파싱하여
-          <code> defect_items_raw</code>에 upsert합니다. 키는{" "}
-          <code>source_issue_no</code>. Team은 파일 카드에서 반드시 지정하세요.
+          LetsBuild 형식 Excel의 첫 시트를 파싱하여 <code> defect_items_raw</code>에 upsert합니다.
+          키는 <code>source_issue_no</code>. Team은 각 행의 <b>Category</b> 값에 따라 자동으로 채워집니다
+          (매핑 관리: <code>Defect Settings</code>).
         </p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">1. Upload Files</CardTitle>
-          <CardDescription>.xlsx / .xlsm — 다중 파일. 파일별로 팀을 선택합니다.</CardDescription>
+          <CardDescription>.xlsx / .xlsm — 다중 파일. Team은 Category 자동 매핑.</CardDescription>
         </CardHeader>
         <CardContent>
           <div
