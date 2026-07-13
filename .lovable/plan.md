@@ -1,68 +1,71 @@
+## 사이드메뉴 재구성 계획 (v2)
 
-## 목표
-Defect 임포트 시 각 행의 `Category` 값에 따라 `team` 컬럼을 자동으로 채웁니다. 매핑 규칙은 DB 테이블로 관리하고 관리자용 Settings UI에서 편집 가능하도록 합니다. 팀 이름은 **Arch / Mech / Elec** 3종으로 통일하고, 상세 페이지에서 team을 수동으로 수정할 수 있게 합니다.
+현재 모든 항목이 "Closure Document" 하나에 평평하게 나열되어 있어 가독성이 낮습니다. 이를 **Outstanding Work / Close-Out Doc / Admin** 3개 섹션으로 나누고, 각 섹션의 최상단에 **섹션 대시보드**를 두어 섹션 진입 시 해당 대시보드로 이동시킵니다. 각 모듈은 접이식 서브그룹으로 구성합니다.
 
-## 1. Team 명칭 통일 (건축/설비/전기 → Arch/Mech/Elec)
-`src/lib/defect-management/columns.ts` 의 `DEFECT_TEAMS` 를 `["Arch","Mech","Elec"] as const` 로 변경. `TEAM_COLORS`, `CATEGORY_TO_TEAM`, `TEAM_LABEL`(신설, 화면 표시용 한글 매핑 필요시), 그리고 아래 참조 지점 전부 일괄 변경:
-- `src/components/defect-management/**` 내 team 필터/뱃지/BulkEdit/상세페이지
-- `src/hooks/useDefectItems.ts` team 필터 값
-- `src/lib/defect-management/mutations.functions.ts`, `parser.ts`
-- `src/components/defect-management/import/DefectManagementImportPage.tsx` (팀 선택 UI 제거 — 아래 3항 참조)
+### 최종 사이드바 구조
 
-기존 DB 데이터의 team 문자열('건축'/'설비'/'전기')은 손대지 않지만, UI 표시 호환을 위해 `TEAM_LABEL_MAP: {건축:"Arch", 설비:"Mech", 전기:"Elec"}` 기반 정규화 함수 `normalizeTeam()` 을 조회 결과 렌더링 시에만 적용합니다(요청상 "기존 데이터는 손대지 않음" 유지).
+```
+── OUTSTANDING WORK ──
+· Dashboard                          → /outstanding/dashboard
+▸ Task Management
+    · Raw Data
+    · Tree View
+    · Import Logs           (editor)
+▸ Defect Management
+    · Dashboard  (모듈 단위)
+    · Raw Data
+    · Import                (editor)
+    · Import Logs           (editor)
+    · Settings              (admin)
 
-## 2. DB: 매핑 테이블 + RPC
-새 테이블 `defect_category_team_map`:
-- `category text primary key`, `team text not null check (team in ('Arch','Mech','Elec'))`, `updated_at`, `updated_by`
-- GRANT: authenticated SELECT/INSERT/UPDATE/DELETE, service_role ALL
-- RLS: 전 authenticated 사용자 SELECT 가능, 관리자(has_role admin/manager)만 write
-- 시드 데이터(upsert):
-  - Arch: `Architectural`, `Architecture`, `Structural`, `Civil`, `Façade`, `Facade`, `Acoustics`, `Quality`
-  - Elec: `Electrical`, `MEP-Electrical`, `MEP-ELV`
-  - Mech: `Mechanical`, `MEP-Mechanical`, `Plumbing`, `Fire Fighting`, `Gas`
-- 트리거로 `updated_at` 갱신
+── CLOSE-OUT DOC ──
+· Dashboard                          → /closeout/dashboard
+▸ As Built Drawing
+    · Raw Data
+    · Import                (editor)
+    · Import Logs           (editor)
+    · Settings              (admin)
+▸ Spare Part
+    · Raw Data
+    · Import                (editor)
+    · Import Logs           (editor)
+    · Aconex Sync           (editor)
+▸ Warranty & License        (placeholder, "Soon" 배지, 비활성)
 
-## 3. Import 파이프라인 변경
-- **팀 수동 선택 UI 제거**: `DefectManagementImportPage.tsx` 에서 파일별 팀 선택 셀렉트와 `teamHint` 관련 코드 삭제. 임포트 요청 페이로드에서 `team` 파라미터 제거.
-- **파서**: `parser.ts` 는 그대로 `category` 를 각 행에 채우고, `teamHint` 계산은 삭제(또는 categorySummary 만 유지).
-- **서버 함수** `mutations.functions.ts` 의 배치 임포트에서:
-  1. 함수 시작 시 `defect_category_team_map` 을 한번 조회하여 `Map<string,string>` 캐시.
-  2. 각 행 upsert 직전 `row.team = map.get(row.category?.trim()) ?? null` 설정.
-  3. 매핑 미존재 category 는 `import_log.warnings` 에 `unmapped_categories: {cat: count}` 로 집계 저장.
-- 기존 데이터는 건드리지 않음(요청대로).
+── ADMIN ──  (admin 계정만 노출)
+· Overview
+· 사용자
+· Mapping
+· Task 임계값
+```
 
-## 4. Settings UI (관리자)
-`src/components/defect-management/settings/DefectCategoryTeamMapPage.tsx` 신설, 라우트 `src/routes/_authenticated/closure/defect-management/settings.tsx`:
-- 테이블 뷰: Category / Team(Select: Arch/Mech/Elec) / Updated / 편집·삭제
-- 상단: 새 규칙 추가 (Category 입력 + Team 선택)
-- "최근 임포트에서 감지된 미매핑 category 자동 표시" 배너 (선택 규칙 즉시 등록 가능)
-- 기존 `AbdSettingsPage` UI 톤 재사용
-- 사이드바 메뉴 `Defect Settings` 추가
+### 섹션 대시보드 처리
 
-## 5. 상세 페이지 team 편집
-`DefectDetailPage.tsx` 의 team 뱃지 옆에 편집 팝오버 부착:
-- 기존 `EditCellPopover` 재사용, editorType `select`, options `['Arch','Mech','Elec']`
-- 저장 → `updateDefectField({ id, field:'team', value })`
-- Raw Data 페이지 team 컬럼도 select 편집 허용 (`columns.ts` 정의에 `editable:true, editorType:'select'` 추가)
+- **Outstanding Work Dashboard** (`/outstanding/dashboard`, 신규 라우트): Task 요약 카드 + Defect 요약 카드(기존 Defect Dashboard의 핵심 KPI 미러링). 상세는 각 모듈 페이지로 이동 유도.
+- **Close-Out Doc Dashboard** (`/closeout/dashboard`, 신규 라우트): ABD / Spare Part 진행 요약 카드. Warranty & License는 placeholder 카드.
+- 두 대시보드 모두 신규 `_authenticated` 하위 라우트 파일 생성. 초기 구현은 **기존 데이터 훅을 재사용한 요약 카드 세트**로 구성(신규 집계 로직 없음).
+- 기존 `/closure/dashboard`는 **`/outstanding/dashboard`로 302 리다이렉트**(기본 진입 시 Outstanding으로) 처리하여 링크 호환성 유지. 기존 `/closure/defect-management/dashboard`는 모듈 단위 상세 대시보드로 유지.
 
-## 6. 변경 요약
-**DB 마이그레이션 1건**: `defect_category_team_map` 생성 + 시드 + RLS + GRANT
+> 라우트 prefix를 `/closure/*`에서 새 섹션 prefix로 바꾸지 않습니다. 사이드바 표시상의 그룹만 재편하며, 기존 라우트 경로는 그대로 두고 신규 대시보드 2개만 추가합니다. (경로 대이동은 별도 리팩토링 스코프)
 
-**신규 파일**
-- `src/components/defect-management/settings/DefectCategoryTeamMapPage.tsx`
-- `src/hooks/useDefectCategoryTeamMap.ts`
-- `src/lib/defect-management/category-team-map.functions.ts` (조회/upsert/delete server fn)
-- `src/routes/_authenticated/closure/defect-management/settings.tsx`
+### 동작 규칙
 
-**수정 파일**
-- `src/lib/defect-management/columns.ts` (팀명 3종 변경, TEAM_LABEL 매핑, editable team)
-- `src/lib/defect-management/parser.ts` (teamHint 제거)
-- `src/lib/defect-management/mutations.functions.ts` (import 시 map 기반 team 자동 설정 + unmapped 집계)
-- `src/components/defect-management/import/DefectManagementImportPage.tsx` (팀 셀렉트 UI 제거)
-- `src/components/defect-management/detail/DefectDetailPage.tsx` (team 편집 팝오버)
-- `src/components/defect-management/raw-data/*` (팀 필터/뱃지 라벨 정규화)
-- `src/components/layout/AppLayout.tsx` (Defect Settings 메뉴)
+1. **섹션 헤더**: `OUTSTANDING WORK`, `CLOSE-OUT DOC`, `ADMIN` uppercase 라벨.
+2. **섹션 진입 = Dashboard 진입**: 섹션 헤더 아래 첫 항목은 항상 해당 섹션 Dashboard 링크. 사이드바에서 섹션 헤더 자체 클릭은 하지 않고, 바로 아래 Dashboard 링크가 진입점.
+3. **모듈 그룹**: 접기/펼치기 가능. 현재 라우트가 해당 모듈 prefix에 속하면 자동 펼침. 그 외는 접힘. 접힘 상태는 localStorage 유지.
+4. **하위 라벨 정리**: 모듈 접두어 제거 → `Raw Data`, `Import`, `Import Logs`, `Settings` 등 짧은 이름.
+5. **권한 필터**: 기존 `adminOnly` / `editorOnly` 유지. 모듈 내 항목이 모두 숨겨지면 모듈 자체를 렌더링하지 않음.
+6. **Warranty & License**: 라우트 미구현 → disabled + `Soon` 배지.
+7. **모바일**: 기존 `mobileOpen` 동작 유지.
 
-## 비포함(추후)
-- 기존 defect 행의 team 백필(요청상 제외)
-- Team 다국어 라벨 커스터마이징(현재는 코드 상수)
+### 구현 산출물
+
+- **수정**: `src/components/layout/AppLayout.tsx` — NAV 구조를 `Section → Module → Leaf` 3계층으로 재작성, Collapsible 서브그룹 로직 추가.
+- **신규 라우트 2개**:
+  - `src/routes/_authenticated/outstanding/dashboard.tsx` — Task/Defect 요약 카드.
+  - `src/routes/_authenticated/closeout/dashboard.tsx` — ABD/Spare Part 요약 카드 + Warranty placeholder.
+- **신규 컴포넌트 2개** (요약 카드 조립용):
+  - `src/components/dashboards/OutstandingDashboardPage.tsx`
+  - `src/components/dashboards/CloseOutDashboardPage.tsx`
+- **수정**: `src/routes/_authenticated/closure/dashboard.tsx` — `/outstanding/dashboard`로 redirect.
+- 기존 라우트 경로/비즈니스 로직 변경 없음, DB 스키마 변경 없음.

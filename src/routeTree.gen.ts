@@ -15,6 +15,8 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedOutstandingDashboardRouteImport } from './routes/_authenticated/outstanding/dashboard'
+import { Route as AuthenticatedCloseoutDashboardRouteImport } from './routes/_authenticated/closeout/dashboard'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminTaskThresholdsRouteImport } from './routes/_authenticated/admin/task-thresholds'
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
@@ -72,6 +74,18 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
 } as any)
+const AuthenticatedOutstandingDashboardRoute =
+  AuthenticatedOutstandingDashboardRouteImport.update({
+    id: '/outstanding/dashboard',
+    path: '/outstanding/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCloseoutDashboardRoute =
+  AuthenticatedCloseoutDashboardRouteImport.update({
+    id: '/closeout/dashboard',
+    path: '/closeout/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -242,6 +256,8 @@ export interface FileRoutesByFullPath {
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
+  '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
@@ -275,6 +291,8 @@ export interface FileRoutesByTo {
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
+  '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
@@ -311,6 +329,8 @@ export interface FileRoutesById {
   '/_authenticated/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/_authenticated/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
+  '/_authenticated/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
   '/_authenticated/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
@@ -347,6 +367,8 @@ export interface FileRouteTypes {
     | '/admin/mapping'
     | '/admin/task-thresholds'
     | '/admin/users'
+    | '/closeout/dashboard'
+    | '/outstanding/dashboard'
     | '/admin/'
     | '/closure/abd/import'
     | '/closure/abd/raw-data'
@@ -380,6 +402,8 @@ export interface FileRouteTypes {
     | '/admin/mapping'
     | '/admin/task-thresholds'
     | '/admin/users'
+    | '/closeout/dashboard'
+    | '/outstanding/dashboard'
     | '/admin'
     | '/closure/abd/import'
     | '/closure/abd/raw-data'
@@ -415,6 +439,8 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/mapping'
     | '/_authenticated/admin/task-thresholds'
     | '/_authenticated/admin/users'
+    | '/_authenticated/closeout/dashboard'
+    | '/_authenticated/outstanding/dashboard'
     | '/_authenticated/admin/'
     | '/_authenticated/closure/abd/import'
     | '/_authenticated/closure/abd/raw-data'
@@ -492,6 +518,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/outstanding/dashboard': {
+      id: '/_authenticated/outstanding/dashboard'
+      path: '/outstanding/dashboard'
+      fullPath: '/outstanding/dashboard'
+      preLoaderRoute: typeof AuthenticatedOutstandingDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closeout/dashboard': {
+      id: '/_authenticated/closeout/dashboard'
+      path: '/closeout/dashboard'
+      fullPath: '/closeout/dashboard'
+      preLoaderRoute: typeof AuthenticatedCloseoutDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
@@ -753,6 +793,8 @@ const AuthenticatedClosureSparePartImportRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
+  AuthenticatedCloseoutDashboardRoute: typeof AuthenticatedCloseoutDashboardRoute
+  AuthenticatedOutstandingDashboardRoute: typeof AuthenticatedOutstandingDashboardRoute
   AuthenticatedClosureAbdImportRoute: typeof AuthenticatedClosureAbdImportRouteWithChildren
   AuthenticatedClosureAbdRawDataRoute: typeof AuthenticatedClosureAbdRawDataRoute
   AuthenticatedClosureAbdSettingsRoute: typeof AuthenticatedClosureAbdSettingsRoute
@@ -778,6 +820,9 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
+  AuthenticatedCloseoutDashboardRoute: AuthenticatedCloseoutDashboardRoute,
+  AuthenticatedOutstandingDashboardRoute:
+    AuthenticatedOutstandingDashboardRoute,
   AuthenticatedClosureAbdImportRoute:
     AuthenticatedClosureAbdImportRouteWithChildren,
   AuthenticatedClosureAbdRawDataRoute: AuthenticatedClosureAbdRawDataRoute,

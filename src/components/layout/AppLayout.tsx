@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet,
+  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2,
 } from "lucide-react";
 import { ListTree, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,36 +10,95 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useQueryClient } from "@tanstack/react-query";
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean; editorOnly?: boolean };
-type NavGroup = { label: string; icon: typeof Package; items: NavItem[] };
+type NavLeaf = {
+  to?: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  adminOnly?: boolean;
+  editorOnly?: boolean;
+  disabled?: boolean;
+  badge?: string;
+};
+type NavModule = {
+  label: string;
+  icon: typeof Package;
+  matchPrefix: string;
+  items: NavLeaf[];
+};
+type NavSection = {
+  label: string;
+  dashboard?: NavLeaf;
+  modules?: NavModule[];
+  items?: NavLeaf[];
+};
 
-const NAV: NavGroup[] = [
+const NAV: NavSection[] = [
   {
-    label: "Closure Document",
-    icon: Package,
-    items: [
-      { to: "/closure/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/closure/task-management/raw-data", label: "Task-Raw Data", icon: Database },
-      { to: "/closure/task-management/tree", label: "Task-Tree", icon: ListTree },
-      { to: "/closure/spare-part/raw-data", label: "SPT-Raw Data", icon: Database },
-      { to: "/closure/defect-management/raw-data", label: "Defect-Raw Data", icon: AlertTriangle },
-      { to: "/closure/defect-management/dashboard", label: "Defect Dashboard", icon: LayoutDashboard },
-      { to: "/closure/defect-management/import", label: "Defect Import", icon: Upload, editorOnly: true },
-      { to: "/closure/defect-management/import/logs", label: "Defect Import Logs", icon: FileClock, editorOnly: true },
-      { to: "/closure/defect-management/settings", label: "Defect Settings", icon: Settings2, adminOnly: true },
-      { to: "/closure/abd/raw-data", label: "ABD-Raw Data", icon: FileSpreadsheet },
-      { to: "/closure/abd/import", label: "ABD Import", icon: Upload, editorOnly: true },
-      { to: "/closure/abd/import/logs", label: "ABD Import Logs", icon: FileClock, editorOnly: true },
-      { to: "/closure/abd/settings", label: "ABD Settings", icon: Settings2, adminOnly: true },
-      { to: "/closure/spare-part/import", label: "Import", icon: Upload, editorOnly: true },
-      { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
-      { to: "/closure/task-management/import/logs", label: "Task Import Logs", icon: FileClock, editorOnly: true },
-      { to: "/closure/spare-part/aconex-sync", label: "Aconex Sync", icon: RefreshCw, editorOnly: true },
+    label: "Outstanding Work",
+    dashboard: { to: "/outstanding/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    modules: [
+      {
+        label: "Task Management",
+        icon: ClipboardList,
+        matchPrefix: "/closure/task-management",
+        items: [
+          { to: "/closure/task-management/raw-data", label: "Raw Data", icon: Database },
+          { to: "/closure/task-management/tree", label: "Tree View", icon: ListTree },
+          { to: "/closure/task-management/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
+        ],
+      },
+      {
+        label: "Defect Management",
+        icon: AlertTriangle,
+        matchPrefix: "/closure/defect-management",
+        items: [
+          { to: "/closure/defect-management/dashboard", label: "Dashboard", icon: LayoutDashboard },
+          { to: "/closure/defect-management/raw-data", label: "Raw Data", icon: Database },
+          { to: "/closure/defect-management/import", label: "Import", icon: Upload, editorOnly: true },
+          { to: "/closure/defect-management/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
+          { to: "/closure/defect-management/settings", label: "Settings", icon: Settings2, adminOnly: true },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Close-Out Doc",
+    dashboard: { to: "/closeout/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    modules: [
+      {
+        label: "As Built Drawing",
+        icon: FileSpreadsheet,
+        matchPrefix: "/closure/abd",
+        items: [
+          { to: "/closure/abd/raw-data", label: "Raw Data", icon: Database },
+          { to: "/closure/abd/import", label: "Import", icon: Upload, editorOnly: true },
+          { to: "/closure/abd/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
+          { to: "/closure/abd/settings", label: "Settings", icon: Settings2, adminOnly: true },
+        ],
+      },
+      {
+        label: "Spare Part",
+        icon: Package,
+        matchPrefix: "/closure/spare-part",
+        items: [
+          { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: Database },
+          { to: "/closure/spare-part/import", label: "Import", icon: Upload, editorOnly: true },
+          { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
+          { to: "/closure/spare-part/aconex-sync", label: "Aconex Sync", icon: RefreshCw, editorOnly: true },
+        ],
+      },
+      {
+        label: "Warranty & License",
+        icon: FileCheck2,
+        matchPrefix: "/closure/warranty",
+        items: [
+          { label: "Coming soon", icon: FileCheck2, disabled: true, badge: "Soon" },
+        ],
+      },
     ],
   },
   {
     label: "Admin",
-    icon: ShieldCheck,
     items: [
       { to: "/admin", label: "Overview", icon: LayoutDashboard, adminOnly: true },
       { to: "/admin/users", label: "사용자", icon: Users, adminOnly: true },
@@ -49,18 +108,85 @@ const NAV: NavGroup[] = [
   },
 ];
 
+const MODULE_OPEN_STORAGE_KEY = "qail-cms:sidebar:module-open:v1";
+
+function loadModuleOpen(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(MODULE_OPEN_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 export function AppLayout({ children }: { children: ReactNode }) {
   const { data: me } = useCurrentUser();
   const location = useLocation();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [moduleOpen, setModuleOpen] = useState<Record<string, boolean>>(() => loadModuleOpen());
+
+  const isVisible = (it: NavLeaf) => {
+    if (it.adminOnly && !me?.isAdmin) return false;
+    if (it.editorOnly && !me?.isEditor) return false;
+    return true;
+  };
+
+  const toggleModule = (key: string, defaultOpen: boolean) => {
+    setModuleOpen((prev) => {
+      const current = prev[key] ?? defaultOpen;
+      const next = { ...prev, [key]: !current };
+      try {
+        window.localStorage.setItem(MODULE_OPEN_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   const handleSignOut = async () => {
     await qc.cancelQueries();
     qc.clear();
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
+  };
+
+  const renderLeaf = (it: NavLeaf) => {
+    const active = it.to ? location.pathname === it.to || location.pathname.startsWith(it.to + "/") : false;
+    if (it.disabled || !it.to) {
+      return (
+        <div
+          key={it.label}
+          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground/60 cursor-not-allowed"
+        >
+          <it.icon className="h-4 w-4" />
+          <span className="flex-1">{it.label}</span>
+          {it.badge && (
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">{it.badge}</span>
+          )}
+        </div>
+      );
+    }
+    return (
+      <Link
+        key={it.to}
+        to={it.to}
+        onClick={() => setMobileOpen(false)}
+        className={cn(
+          "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+          active ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground",
+        )}
+      >
+        <it.icon className="h-4 w-4" />
+        <span className="flex-1">{it.label}</span>
+        {it.badge && (
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">{it.badge}</span>
+        )}
+      </Link>
+    );
   };
 
   return (
@@ -77,39 +203,51 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <span className="text-sm font-semibold">QAIL CMS</span>
         </div>
         <nav className="flex-1 space-y-4 overflow-y-auto p-3">
-          {NAV.map((group) => (
-            <div key={group.label}>
-              <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <group.icon className="h-3.5 w-3.5" />
-                {group.label}
-              </div>
-              <div className="mt-1 space-y-0.5">
-                {group.items
-                  .filter((it) => {
-                    if (it.adminOnly && !me?.isAdmin) return false;
-                    if (it.editorOnly && !me?.isEditor) return false;
-                    return true;
-                  })
-                  .map((it) => {
-                    const active = location.pathname.startsWith(it.to);
+          {NAV.map((section) => {
+            // Admin section gate
+            if (section.label === "Admin" && !me?.isAdmin) return null;
+
+            const modules = (section.modules ?? []).filter((m) => m.items.some(isVisible));
+            const flatItems = (section.items ?? []).filter(isVisible);
+            const hasContent = !!section.dashboard || modules.length > 0 || flatItems.length > 0;
+            if (!hasContent) return null;
+
+            return (
+              <div key={section.label}>
+                <div className="px-2 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {section.label}
+                </div>
+                <div className="mt-1 space-y-0.5">
+                  {section.dashboard && renderLeaf(section.dashboard)}
+                  {flatItems.map(renderLeaf)}
+                  {modules.map((mod) => {
+                    const key = section.label + "::" + mod.label;
+                    const autoOpen = location.pathname.startsWith(mod.matchPrefix);
+                    const open = moduleOpen[key] ?? autoOpen;
+                    const visibleItems = mod.items.filter(isVisible);
                     return (
-                      <Link
-                        key={it.to}
-                        to={it.to}
-                        onClick={() => setMobileOpen(false)}
-                        className={cn(
-                          "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                          active ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground",
+                      <div key={mod.label} className="mt-1">
+                        <button
+                          type="button"
+                          onClick={() => toggleModule(key, autoOpen)}
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted"
+                        >
+                          <mod.icon className="h-4 w-4" />
+                          <span className="flex-1 text-left font-medium">{mod.label}</span>
+                          {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                        </button>
+                        {open && (
+                          <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/60 pl-2">
+                            {visibleItems.map(renderLeaf)}
+                          </div>
                         )}
-                      >
-                        <it.icon className="h-4 w-4" />
-                        {it.label}
-                      </Link>
+                      </div>
                     );
                   })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
         <div className="border-t p-3">
           <div className="mb-2 truncate text-xs text-muted-foreground">{me?.email}</div>

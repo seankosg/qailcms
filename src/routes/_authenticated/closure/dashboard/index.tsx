@@ -1,9 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { DashboardHubPage } from "@/components/dashboard/DashboardHubPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/closure/dashboard/")({
-  head: () => ({
-    meta: [{ title: "Closure Dashboard — QAIL CMS" }],
-  }),
-  component: DashboardHubPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/outstanding/dashboard" });
+  },
 });
