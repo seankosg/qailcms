@@ -26,8 +26,11 @@ export function DeSnagMatrixBlock({
     return presentBuildings;
   })();
 
-  const buildingParam = buildingMembers.length ? { building: buildingMembers.join(",") } : {};
-  const basementParam = block.kind === "basement" ? { level: basementLevelParam() } : {};
+  const buildingParam: Record<string, string> = buildingMembers.length
+    ? { building: buildingMembers.join(",") }
+    : {};
+  const basementParam: Record<string, string> =
+    block.kind === "basement" ? { level: basementLevelParam() } : {};
 
   const goCell = (
     rowBuilding: string | null,
