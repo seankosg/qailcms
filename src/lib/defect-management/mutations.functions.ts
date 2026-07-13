@@ -98,3 +98,26 @@ export const bulkUpdateDefects = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true, count: data.ids.length, fields: Object.keys(patch) };
   });
+
+const BulkDeleteSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(5000),
+});
+
+export const bulkDeleteDefects = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => BulkDeleteSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    // 관련 이력 먼저 삭제 (FK cascade 없음)
+    const { error: histErr } = await (context.supabase as any)
+      .from("defect_status_history")
+      .delete()
+      .in("defect_raw_id", data.ids);
+    if (histErr) throw new Error(histErr.message);
+    const { error, count } = await (context.supabase as any)
+      .from("defect_items_raw")
+      .delete({ count: "exact" })
+      .in("id", data.ids);
+    if (error) throw new Error(error.message);
+    return { ok: true, count: count ?? data.ids.length };
+  });
