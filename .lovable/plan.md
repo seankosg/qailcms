@@ -1,75 +1,68 @@
 
-# ABD Phase 2 구현 계획 — Import 상세 & Detail
+## 목표
+Defect 임포트 시 각 행의 `Category` 값에 따라 `team` 컬럼을 자동으로 채웁니다. 매핑 규칙은 DB 테이블로 관리하고 관리자용 Settings UI에서 편집 가능하도록 합니다. 팀 이름은 **Arch / Mech / Elec** 3종으로 통일하고, 상세 페이지에서 team을 수동으로 수정할 수 있게 합니다.
 
-Phase 1(스키마, 파서, Raw Data 3탭, 최소 Import)는 완료. 이번 Phase 2는 **Defect 도메인의 Import 로그/롤백/헤더 매핑/필드 설정 화면과 동일한 UX**를 ABD 로 이식하고, Raw Data 행 클릭 시 **Detail 팝오버**를 붙입니다.
+## 1. Team 명칭 통일 (건축/설비/전기 → Arch/Mech/Elec)
+`src/lib/defect-management/columns.ts` 의 `DEFECT_TEAMS` 를 `["Arch","Mech","Elec"] as const` 로 변경. `TEAM_COLORS`, `CATEGORY_TO_TEAM`, `TEAM_LABEL`(신설, 화면 표시용 한글 매핑 필요시), 그리고 아래 참조 지점 전부 일괄 변경:
+- `src/components/defect-management/**` 내 team 필터/뱃지/BulkEdit/상세페이지
+- `src/hooks/useDefectItems.ts` team 필터 값
+- `src/lib/defect-management/mutations.functions.ts`, `parser.ts`
+- `src/components/defect-management/import/DefectManagementImportPage.tsx` (팀 선택 UI 제거 — 아래 3항 참조)
 
-## 1. Import Logs 화면
-**라우트**: `src/routes/_authenticated/closure/abd/import.logs.tsx`
-**컴포넌트**: `src/components/abd/import/AbdImportLogsPage.tsx`
+기존 DB 데이터의 team 문자열('건축'/'설비'/'전기')은 손대지 않지만, UI 표시 호환을 위해 `TEAM_LABEL_MAP: {건축:"Arch", 설비:"Mech", 전기:"Elec"}` 기반 정규화 함수 `normalizeTeam()` 을 조회 결과 렌더링 시에만 적용합니다(요청상 "기존 데이터는 손대지 않음" 유지).
 
-- Defect `DefectImportLogsPage.tsx` 를 1:1 이식. 컬럼만 ABD 스키마(`team, plot, sheet_name, total_rows, inserted/updated/inactivated/mismatched/skipped_no_key, status, imported_by, started_at/finished_at, rolled_back_at`)로 교체.
-- 필터: team(mech/elec/arch), status(running/success/failed/rolled_back), 기간, 업로더.
-- 행 액션:
-  - **View Detail** → 우측 Sheet 로 `abd_import_row_logs`(신규, 아래) + `errors jsonb` 표시.
-  - **Rollback** → Defect `RollbackDialog` 재사용. `preview_rollback_abd_import` 로 영향 행수 미리보기 후 `rollback_abd_import` 실행.
-  - **Delete Batch** → `delete_abd_import_batch` (soft: 로그만 삭제, raw 데이터는 유지). Admin only.
-- 상단 요약 카드: 최근 7일 임포트 건수, 성공률, 총 upsert 행수.
+## 2. DB: 매핑 테이블 + RPC
+새 테이블 `defect_category_team_map`:
+- `category text primary key`, `team text not null check (team in ('Arch','Mech','Elec'))`, `updated_at`, `updated_by`
+- GRANT: authenticated SELECT/INSERT/UPDATE/DELETE, service_role ALL
+- RLS: 전 authenticated 사용자 SELECT 가능, 관리자(has_role admin/manager)만 write
+- 시드 데이터(upsert):
+  - Arch: `Architectural`, `Architecture`, `Structural`, `Civil`, `Façade`, `Facade`, `Acoustics`, `Quality`
+  - Elec: `Electrical`, `MEP-Electrical`, `MEP-ELV`
+  - Mech: `Mechanical`, `MEP-Mechanical`, `Plumbing`, `Fire Fighting`, `Gas`
+- 트리거로 `updated_at` 갱신
 
-## 2. Import Row Logs 테이블 (신규 마이그레이션)
-Defect 의 `defect_import_row_logs` 대응. 파일 내 각 행의 처리 결과를 저장하여 롤백/디버그를 지원.
+## 3. Import 파이프라인 변경
+- **팀 수동 선택 UI 제거**: `DefectManagementImportPage.tsx` 에서 파일별 팀 선택 셀렉트와 `teamHint` 관련 코드 삭제. 임포트 요청 페이로드에서 `team` 파라미터 제거.
+- **파서**: `parser.ts` 는 그대로 `category` 를 각 행에 채우고, `teamHint` 계산은 삭제(또는 categorySummary 만 유지).
+- **서버 함수** `mutations.functions.ts` 의 배치 임포트에서:
+  1. 함수 시작 시 `defect_category_team_map` 을 한번 조회하여 `Map<string,string>` 캐시.
+  2. 각 행 upsert 직전 `row.team = map.get(row.category?.trim()) ?? null` 설정.
+  3. 매핑 미존재 category 는 `import_log.warnings` 에 `unmapped_categories: {cat: count}` 로 집계 저장.
+- 기존 데이터는 건드리지 않음(요청대로).
 
-- `public.abd_import_row_logs`
-  - `id, import_log_id (FK), row_index int, abd_number text, action ('insert'|'update'|'inactivate'|'skip'|'error'), before jsonb, after jsonb, error_message text, created_at`
-  - RLS: authenticated read, service_role write. GRANT 4행.
-- `AbdImportPage` 의 서버 함수에서 각 행 처리 시 이 테이블에 batch insert.
+## 4. Settings UI (관리자)
+`src/components/defect-management/settings/DefectCategoryTeamMapPage.tsx` 신설, 라우트 `src/routes/_authenticated/closure/defect-management/settings.tsx`:
+- 테이블 뷰: Category / Team(Select: Arch/Mech/Elec) / Updated / 편집·삭제
+- 상단: 새 규칙 추가 (Category 입력 + Team 선택)
+- "최근 임포트에서 감지된 미매핑 category 자동 표시" 배너 (선택 규칙 즉시 등록 가능)
+- 기존 `AbdSettingsPage` UI 톤 재사용
+- 사이드바 메뉴 `Defect Settings` 추가
 
-## 3. Rollback / Delete RPC 실장 강화
-Phase 1 에서 시그니처만 만든 3개 RPC 를 실제 로직으로 채움 (Defect 미러).
-- `rollback_abd_import(_batch_id, _force)`:
-  - 해당 배치가 만든 INSERT 행 삭제, UPDATE 행은 `abd_change_log` 의 `old_value` 로 복원, INACTIVATE 처리는 `is_active=true` 로 되돌림.
-  - `abd_import_logs.status='rolled_back'`, `rolled_back_at/by` 기록.
-  - `_force=false` 이고 이후 다른 배치가 같은 `abd_number` 를 건드렸으면 실패.
-- `preview_rollback_abd_import(_batch_id)`: 영향 행 카운트 반환.
-- `delete_abd_import_batch(_batch_id)`: 로그 + row_logs 만 삭제.
+## 5. 상세 페이지 team 편집
+`DefectDetailPage.tsx` 의 team 뱃지 옆에 편집 팝오버 부착:
+- 기존 `EditCellPopover` 재사용, editorType `select`, options `['Arch','Mech','Elec']`
+- 저장 → `updateDefectField({ id, field:'team', value })`
+- Raw Data 페이지 team 컬럼도 select 편집 허용 (`columns.ts` 정의에 `editable:true, editorType:'select'` 추가)
 
-## 4. 헤더 매핑 / 필드 설정 관리 화면
-**라우트**: `src/routes/_authenticated/closure/abd/settings.tsx` (Admin only)
-**컴포넌트**: `src/components/abd/settings/AbdSettingsPage.tsx`
+## 6. 변경 요약
+**DB 마이그레이션 1건**: `defect_category_team_map` 생성 + 시드 + RLS + GRANT
 
-Defect 의 `HeaderMappingsManager` / `FieldConfigManager` 를 이식.
-- **Header Mappings 탭**: 엑셀 원본 헤더 문자열 ↔ 정규 필드명 별칭 관리. 파서가 시트에서 헤더 감지 실패 시 이 표를 fallback 으로 사용.
-- **Field Config 탭**: 컬럼별 라벨/표시여부/편집가능/필터 타입(text/select/date/num)/기본 정렬을 관리. Raw Data 페이지가 이 설정을 읽어 렌더링에 반영.
-- 두 화면 모두 인라인 편집 + 저장 버튼, 기본값 리셋 기능.
+**신규 파일**
+- `src/components/defect-management/settings/DefectCategoryTeamMapPage.tsx`
+- `src/hooks/useDefectCategoryTeamMap.ts`
+- `src/lib/defect-management/category-team-map.functions.ts` (조회/upsert/delete server fn)
+- `src/routes/_authenticated/closure/defect-management/settings.tsx`
 
-## 5. Raw Data → Detail 팝오버
-`src/components/abd/raw-data/AbdDetailSheet.tsx` — 우측 Sheet.
+**수정 파일**
+- `src/lib/defect-management/columns.ts` (팀명 3종 변경, TEAM_LABEL 매핑, editable team)
+- `src/lib/defect-management/parser.ts` (teamHint 제거)
+- `src/lib/defect-management/mutations.functions.ts` (import 시 map 기반 team 자동 설정 + unmapped 집계)
+- `src/components/defect-management/import/DefectManagementImportPage.tsx` (팀 셀렉트 UI 제거)
+- `src/components/defect-management/detail/DefectDetailPage.tsx` (team 편집 팝오버)
+- `src/components/defect-management/raw-data/*` (팀 필터/뱃지 라벨 정규화)
+- `src/components/layout/AppLayout.tsx` (Defect Settings 메뉴)
 
-- 상단: `abd_number`, `document_title`, `plot`, `team`, `pic`, `latest_rev`, `latest_status`.
-- 섹션:
-  1. **Rounds 타임라인** — R1/R2/R3 의 Drafting → Submission → DAR 를 Plan vs Actual 로 시각화 (Plan 회색선, Actual 컬러 점, 지연 시 빨강).
-  2. **Change Log** — `abd_change_log` 최근 20건 (필드/이전값/새값/출처/시각/유저).
-  3. **Raw Payload** — 접히는 JSON 뷰어 (`raw_payload`).
-  4. **Field Mismatch** — `field_mismatch=true` 인 경우 어떤 필드가 다른지 표.
-- 편집 가능한 필드는 즉시 편집 (Raw Data 셀 편집과 동일 훅 재사용).
-- 라우팅: `?detail={id}` 쿼리로 딥링크.
-
-## 6. 사이드바 & 라우팅
-`src/components/layout/AppLayout.tsx` 의 Closure Document 그룹에 항목 추가:
-- `ABD Import Logs` (editor+) → `/closure/abd/import/logs`
-- `ABD Settings` (admin) → `/closure/abd/settings`
-
-## 7. 산출 파일
-- 마이그레이션 1건: `abd_import_row_logs` + 3개 RPC 실장.
-- `src/components/abd/import/AbdImportLogsPage.tsx`, `AbdRollbackDialog.tsx`
-- `src/components/abd/settings/AbdSettingsPage.tsx`, `AbdHeaderMappingsManager.tsx`, `AbdFieldConfigManager.tsx`
-- `src/components/abd/raw-data/AbdDetailSheet.tsx` + `AbdRawDataPage.tsx` 에 마운트.
-- `src/routes/_authenticated/closure/abd/import.logs.tsx`, `settings.tsx`
-- `src/hooks/useAbdImportLogs.ts`, `src/hooks/useAbdFieldConfig.ts`, `src/hooks/useAbdHeaderMappings.ts`
-- `src/lib/abd/abd.functions.ts` 에 rollback/delete/detail wrapper 추가.
-- `src/components/layout/AppLayout.tsx` NAV 2행 추가.
-
-## 8. 스코프 제외 (Phase 3)
-- ABD Dashboard(요약 카드/차트/지연 리스트)는 Phase 3 에서 별도.
-- 사용자 알림/스케줄 리마인더 미포함.
-
-승인 시 위 순서(마이그레이션 → 로그 화면 → Detail → Settings)로 구현합니다.
+## 비포함(추후)
+- 기존 defect 행의 team 백필(요청상 제외)
+- Team 다국어 라벨 커스터마이징(현재는 코드 상수)
