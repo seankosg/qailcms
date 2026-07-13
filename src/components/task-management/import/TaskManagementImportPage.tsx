@@ -395,6 +395,72 @@ function FileRow({
                     )}
                 </Button>
               )}
+              <span className="ml-2 text-xs text-muted-foreground">충돌 정책</span>
+              <Select
+                value={f.conflictPolicy ?? "overwrite"}
+                onValueChange={(v) => onPolicyChange(v as ConflictPolicy)}
+                disabled={isRunning || f.status === "done" || f.status === "processing"}
+              >
+                <SelectTrigger className="h-7 w-[130px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="overwrite" className="text-xs">덮어쓰기</SelectItem>
+                  <SelectItem value="skip" className="text-xs">건너뛰기</SelectItem>
+                  <SelectItem value="renumber" className="text-xs">자동 재번호</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={onRunPreflight}
+                disabled={
+                  isRunning ||
+                  f.status !== "ready" ||
+                  !f.parsed ||
+                  f.parsed.length === 0 ||
+                  f.preflightLoading
+                }
+              >
+                <ScanSearch className="h-3.5 w-3.5" />
+                {f.preflightLoading ? "점검중…" : "중복 점검"}
+              </Button>
+            </div>
+            {f.preflight && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <Badge variant="outline" className="border-emerald-300 text-emerald-700">
+                  신규 {f.preflight.newCount}
+                </Badge>
+                <Badge variant="outline" className="border-blue-300 text-blue-700">
+                  업데이트 {f.preflight.updateCount}
+                </Badge>
+                <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">
+                  변경없음 {f.preflight.unchangedCount}
+                </Badge>
+                {f.preflight.conflictCount > 0 ? (
+                  <>
+                    <Badge variant="outline" className="border-destructive text-destructive gap-1">
+                      <AlertTriangle className="h-3 w-3" /> 충돌 {f.preflight.conflictCount}
+                    </Badge>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-6 px-1 text-xs"
+                      onClick={onOpenConflict}
+                    >
+                      상세 보기
+                    </Button>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">충돌 없음</span>
+                )}
+              </div>
+            )}
+            {f.preflightError && (
+              <p className="mt-1 text-xs text-destructive">중복 점검 실패: {f.preflightError}</p>
+            )}
+            <div className="mt-0 hidden">
             </div>
             {f.warnings && f.warnings.length > 0 && (
               <p className="mt-1 text-xs text-amber-600">
