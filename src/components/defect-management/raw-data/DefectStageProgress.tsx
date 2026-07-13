@@ -8,11 +8,11 @@ import {
   todayIso,
 } from "@/lib/defect-management/stage-utils";
 
-type StageName = "start" | "completion" | "closure";
-type StageState = "done" | "wip" | "planned" | "hold" | "empty";
+export type StageName = "start" | "completion" | "closure";
+export type StageState = "done" | "wip" | "planned" | "hold" | "empty";
 type Row = Record<string, any>;
 
-function classifyStage(item: Row, stage: StageName, asOfDate: string): StageState {
+export function classifyStage(item: Row, stage: StageName, asOfDate: string): StageState {
   if (isStageDone(item, stage)) return "done";
   if (isStageDelayedAsOf(item, stage, asOfDate)) return "hold";
 
@@ -77,7 +77,7 @@ export function DefectStageProgress({ item, asOfDate = null }: { item: Row; asOf
   const title = [
     `Delay as of ${formatDdMmm(delayAsOfDate)}`,
     `Start: ${stateLabel(start)}${item.actual_start_date ? ` · ${formatDdMmm(item.actual_start_date)}` : item.planned_start_date ? ` (plan ${formatDdMmm(item.planned_start_date)})` : ""}`,
-    `Completion: ${stateLabel(completion)}${item.actual_completion_date ? ` · ${formatDdMmm(item.actual_completion_date)}` : item.planned_completion_date ? ` (plan ${formatDdMmm(item.planned_completion_date)})` : ""}`,
+    `Rectified: ${stateLabel(completion)}${item.actual_completion_date ? ` · ${formatDdMmm(item.actual_completion_date)}` : item.planned_completion_date ? ` (plan ${formatDdMmm(item.planned_completion_date)})` : ""}`,
     `Closure: ${stateLabel(closure)}${item.actual_closure_date ? ` · ${formatDdMmm(item.actual_closure_date)}` : item.planned_closure_date ? ` (plan ${formatDdMmm(item.planned_closure_date)})` : ""}`,
   ].join("\n");
 
@@ -85,7 +85,7 @@ export function DefectStageProgress({ item, asOfDate = null }: { item: Row; asOf
     <span className="inline-flex select-none items-center gap-0.5" title={title} onClick={(event) => event.stopPropagation()}>
       <Pip state={start} label={`Start: ${stateLabel(start)}`} />
       <span className="h-px w-2 bg-muted-foreground/30" aria-hidden />
-      <Pip state={completion} label={`Completion: ${stateLabel(completion)}`} />
+      <Pip state={completion} label={`Rectified: ${stateLabel(completion)}`} />
       <span className="h-px w-2 bg-muted-foreground/30" aria-hidden />
       <Pip state={closure} label={`Closure: ${stateLabel(closure)}`} />
     </span>
@@ -100,7 +100,7 @@ export function DefectStageProgressLegend() {
       <span className="inline-flex items-center gap-1"><Pip state="wip" label="WIP" /> WIP</span>
       <span className="inline-flex items-center gap-1"><Pip state="planned" label="Planned" /> Planned</span>
       <span className="inline-flex items-center gap-1"><Pip state="hold" label="Delay" /> Delay</span>
-      <span className="ml-2">Stages: Start → Completion → Closure</span>
+      <span className="ml-2">Stages: Start → Rectified → Closure</span>
     </div>
   );
 }
