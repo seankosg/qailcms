@@ -1,50 +1,31 @@
-## Defect Import: 미매핑 5개 컬럼 매핑 로직 추가
+# Defect Import 페이지 이탈 시에도 임포트 지속
 
-### 배경
+## 문제
+현재 `DefectManagementImportProvider`는 `DefectManagementImportPage` 컴포넌트 내부(`src/components/defect-management/import/DefectManagementImportPage.tsx:67`)에 마운트되어 있습니다. 다른 라우트로 이동하면 페이지가 언마운트되고 Provider와 그 안의 `executeImport` async 루프가 파괴되면서 진행 중이던 배치 업서트/상태 업데이트가 중단되고 `files` 상태도 모두 사라집니다.
 
-업로드하신 `Overall_open_39146_processed_1.xlsx` 헤더 31개 중 아래 5개가 현재 매핑에서 빠져 있습니다. 나머지 26개(`Team` 포함)는 정상 매핑됩니다.
+## 해결 방향
+Provider를 루트로 승격해 라우트 전환과 무관하게 살아있게 만들고, 페이지는 그 Provider의 상태를 소비만 하도록 변경합니다.
 
-| 파일 헤더 | 신규 canonical field | DB 컬럼 타입 |
-|---|---|---|
-| `Building` | `building` | text NULL |
-| `Room` | `room` | text NULL |
-| `Room Group` | `room_group` | text NULL |
-| `Level` | `level_name` | text NULL |
-| `ReviewFlag` | `review_flag` | text NULL |
+## 변경 사항
 
-`Level`은 기존 `area_level`(Location에서 파생되는 별개 필드)과 충돌하지 않도록 컬럼명을 `level_name`으로 둡니다.
+### 1. `src/routes/__root.tsx`
+- `DefectManagementImportProvider`를 임포트하여 `<TooltipProvider>` 안쪽, `<Outlet />`을 감싸도록 배치.
+- 위치: `QueryClientProvider` → `TooltipProvider` → `DefectManagementImportProvider` → `Outlet`.
+- 이렇게 하면 `useQueryClient()`, Supabase 클라이언트 접근은 유지되며 앱 전 라이프타임 동안 단 하나의 인스턴스가 유지됨.
 
-### 변경 사항
+### 2. `src/components/defect-management/import/DefectManagementImportPage.tsx`
+- `DefectManagementImportPage`에서 `<DefectManagementImportProvider>` 래퍼 제거. `Inner`만 렌더링.
+- `DefectManagementImportProvider` import 제거 (`useDefectImport` 등 나머지 유지).
 
-**A. DB 마이그레이션**
+### 3. `src/contexts/DefectManagementImportContext.tsx`
+- `executeImport`의 `useCallback` deps 배열이 `[]`로 비어있어 최신 `qc`를 캡처하지 못하는 경미한 이슈만 정리 (`[qc]` 추가). 나머지 로직은 그대로 유지.
+- 파일이 언마운트되어도 실행이 지속되도록 하는 별도 로직은 불필요 — Provider가 살아있으면 `setFiles` 콜백/`await` 체인이 그대로 진행됨.
+- 페이지 진입 시 이전 실행 결과(`done`/`failed` 파일)가 남아있을 수 있으므로 UX 변화는 최소한만: 사용자가 명시적으로 `clearAll`/`removeFile`을 눌러야 정리됨(기존 동작 유지).
 
-`public.defect_items_raw`에 5개 text NULL 컬럼 추가. RLS/GRANT는 테이블 단위로 이미 설정되어 있어 컬럼 추가만으로 충분.
+## 검증
+- `bunx tsgo --noEmit`으로 타입 확인.
+- 실사용 시나리오: 임포트 시작 → 다른 라우트로 이동 → 잠시 후 `/closure/defect-management/import` 재진입 → 파일 카드가 progress를 계속 갱신하며 `done`으로 전환되는지 확인. `toast.success` 알림도 페이지 밖에서 표시되는지 확인.
 
-**B. `src/lib/defect-management/parser.ts`**
-- `DEFECT_TARGET_FIELDS`에 `building`, `room`, `room_group`, `level_name`, `review_flag` 추가.
-- `CANONICAL_HEADERS`에 매핑 추가: `building → building`, `room → room`, `roomgroup → room_group`, `level → level_name`, `reviewflag → review_flag` (`normalizeHeader`가 공백 제거 후 소문자화).
-- `ParsedDefectRow`에 5개 필드(`string | null`) 추가.
-- `parseDefectExcel`의 row 생성 블록에서 5개 필드를 `toStr(getCell(...))`로 채우기.
-
-**C. `src/contexts/DefectManagementImportContext.tsx`**
-- `payloads` 생성부에 `put(base, "building", p.building)` 등 5개 `put` 호출 추가.
-
-**D. Column Select / UI**
-- 5개 신규 필드는 `isKnownDefectField`가 자동으로 true를 반환하여 Column Select Dialog의 unmapped 배지가 사라짐. HDEC_FIELDS 등 프리셋 변경 없음.
-- Raw Data 테이블 컬럼/필터/편집·Export 노출은 이번 스코프 밖(후속). 임포트/DB 저장은 정상 동작.
-
-### 산출물
-
-- 마이그레이션 1건 (defect_items_raw ADD COLUMN × 5)
-- 수정: `src/lib/defect-management/parser.ts`, `src/contexts/DefectManagementImportContext.tsx`
-
-### 검증
-
-- 마이그레이션 승인·실행 → `types.ts` 재생성 → `bunx tsgo --noEmit`.
-- 업로드하신 파일로 임포트 후 SQL로 신규 5개 컬럼 값 저장 확인.
-- 해당 컬럼이 없는 기존 파일 회귀 확인 (모두 null이면 OK).
-
-### 후속 (이번 계획 밖)
-
-- Raw Data 페이지 컬럼 표시/필터/편집·Export에 5개 필드 노출.
-- `defect_field_config`에 라벨/정렬 시드.
+## 비고 / 스코프 밖
+- 새로고침(전체 페이지 리로드)이나 탭 종료 시 지속은 이번 스코프 아님(BroadcastChannel/Service Worker/서버 이관 필요). 이번 변경은 "라우트 전환 중 지속"에 한정.
+- 페이지 이탈 시 진행 중임을 알리는 `beforeunload` 경고도 이번 스코프 밖(요청 없음).

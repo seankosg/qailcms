@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
+import { DefectManagementImportProvider } from "@/contexts/DefectManagementImportContext";
 
 function NotFoundComponent() {
   return (
@@ -135,8 +136,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Outlet />
-        <Toaster richColors position="top-right" />
+        <DefectManagementImportProvider>
+          <Outlet />
+          <Toaster richColors position="top-right" />
+        </DefectManagementImportProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
