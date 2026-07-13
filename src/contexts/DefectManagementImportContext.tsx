@@ -830,10 +830,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
   const startImport = useCallback(async () => {
     if (isRunning) return;
     const ready = files.filter(
-      (f) => f.status === "ready" && f.team && !f.validationError && f.parsed && f.parsed.length > 0,
+      (f) => f.status === "ready" && !f.validationError && f.parsed && f.parsed.length > 0,
     );
     if (ready.length === 0) {
-      toast.error("Import 가능한 파일이 없습니다. Team 선택을 확인하세요.");
+      toast.error("Import 가능한 파일이 없습니다.");
       return;
     }
     await executeImport(ready);
@@ -847,7 +847,6 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         addFiles,
         removeFile,
         clearAll,
-        setFileTeam,
         setFileDataDateOverride,
         setFileSheet,
         setFileExcludedHeaders,
