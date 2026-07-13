@@ -1,68 +1,59 @@
+# Snag Raw Data 단계 컬럼 재구성
+
 ## 목표
+Raw Data 테이블 컬럼을 **Start → Rectified → Closure** 3단계 세트로 정렬하고, 각 세트를 **[Planned Date | Actual Date | Status]** 3열 구성으로 나란히 배치합니다. `Completion`은 UI 라벨만 `Rectified`로 변경합니다.
 
-앱 전체의 사용자 노출 문구를 중동 프로젝트 관례에 맞춰 **Defect → Snag** (정식 명칭은 **Snag List**)로 교체합니다. URL 라우트도 `defect-management` → `snag-management`로 변경합니다. DB 테이블·컬럼·함수와 내부 코드 식별자(컴포넌트/훅/타입/파일명)는 리스크 최소화를 위해 **그대로 유지**합니다.
+## 최종 컬럼 순서 (progress 그룹 통합)
 
-## 변경 범위 요약
+```text
+… (identity/classification/content/location 등 기존) …
+[ P.Start | A.Start | Start Status ]        ← Start 세트
+[ P.Rectified | A.Rectified | Rectified Status ]  ← 기존 Completion 리네이밍
+[ P.Closure | A.Closure | Closure Status ]  ← Closure 세트
+[ Plan % | Actual % ]                       ← 진행률
+… (audit/flags 등) …
+```
 
-| 층위 | 변경 | 예시 |
-|---|---|---|
-| UI 문구 | ✅ 전면 | "Defect Management" → "Snag List Management", "Defect Raw Data" → "Snag List — Raw Data", "Defect Item" → "Snag Item", 배지/툴팁/토스트/에러메시지/버튼 라벨/설정 페이지 설명 등 |
-| `<title>` / head meta | ✅ 전면 | 각 route의 `head()` title 및 og:title/description |
-| URL 경로 | ✅ 변경 | `/closure/defect-management/*` → `/closure/snag-management/*` |
-| 사이드바/네비게이션 | ✅ | AppLayout 메뉴 라벨 및 `to=` 경로 |
-| 라우트 파일명 | ✅ 폴더 이름만 변경 | `src/routes/_authenticated/closure/defect-management/` → `.../snag-management/`, 내부 `createFileRoute("...")` 문자열도 새 경로에 맞춰 갱신 |
-| 코드 식별자 | ❌ 유지 | 컴포넌트명(`DefectRawDataPage`), 훅(`useDefectItems`), 타입(`DefectTeam`), 파일 폴더(`src/components/defect-management/`, `src/lib/defect-management/`), 상수(`DEFECT_COLUMNS`, `DEFECT_TEAMS`) 전부 그대로 |
-| DB | ❌ 유지 | `defect_items_raw`, `defect_import_logs`, `rollback_defect_import` 등 60+ 식별자 전부 그대로. 마이그레이션 없음 |
-| Aconex/LetsBuild 등 외부 시스템 헤더 매핑 | ❌ 유지 | 외부에서 "Defect No." 등으로 오는 원본 컬럼 라벨은 그대로 (매핑 소스라 임의 변경 시 import 깨짐) |
+## 변경 사항
 
-## 상세 작업
+### 1. `src/lib/defect-management/columns.ts`
+- `DEFECT_COLUMNS` 재정렬: 위 순서대로 dates/status 컬럼을 `progress` 그룹으로 통합 이동
+- 라벨 변경:
+  - `planned_completion_date` "P.Completion" → **"P.Rectified"**
+  - `actual_completion_date` "A.Completion" → **"A.Rectified"**
+  - `completion_status` "Completion" → **"Rectified Status"**
+  - `closure_status` "Closure" → **"Closure Status"**
+  - `status_raw` "Status" 는 그대로 유지 (LetsBuild 원본 status)
+- **신규 파생 컬럼 추가**: `start_status`
+  - `type: "badge"`, `group: "progress"`, `editable: false`
+  - DB 컬럼 아님 → parser/mutations에서 무시, 렌더링 시에만 계산
+- `COMPLETION_STATUSES` 상수명은 유지 (코드 식별자), 옵션 라벨 표시만 그대로
 
-### 1. 라우트 리네이밍 (URL + 파일)
-`src/routes/_authenticated/closure/defect-management/` 아래 5개 파일을 `snag-management/`로 이동:
-- `import.index.tsx`, `import.logs.tsx`, `raw-data.tsx`, `settings.tsx`, `detail.$id.tsx`
+### 2. `src/components/defect-management/raw-data/DefectRawDataPage.tsx` (렌더 파이프라인)
+- 행 렌더 시점에 `start_status` 파생값 주입 헬퍼 추가:
+  - `classifyStage(row, "start", asOf)` 결과 → `"Done" | "WIP" | "Planned" | "Delay" | "—"` 배지
+  - `stage-utils.ts`의 기존 `classifyStage` 로직 재사용 (별도 export 필요 시 `DefectStageProgress.tsx`에서 export)
+- 셀 렌더러가 `start_status` 키를 만나면 파생 배지 컴포넌트 사용, 정렬/필터는 파생값 기준
 
-각 파일의 `createFileRoute("/_authenticated/closure/defect-management/...")` 문자열을 `.../snag-management/...`로 갱신. `routeTree.gen.ts`는 dev 서버가 자동 재생성.
+### 3. `src/components/defect-management/raw-data/DefectStageProgress.tsx`
+- `classifyStage` 함수를 `export`로 노출 (파생 status 컬럼과 로직 공유)
 
-### 2. 네비게이션·링크 갱신
-- `src/components/layout/AppLayout.tsx`: 사이드바 메뉴 라벨 "Defect Management" → "Snag List Management", `to` 경로 갱신
-- 코드 전역의 `<Link to="/closure/defect-management/...">` 및 `navigate({ to: "..." })` 문자열을 `snag-management`로 일괄 치환
-- `src/lib/defect-management/columns.ts`의 상세 페이지 링크 빌더 등에서도 경로 갱신
-- `.gen.ts`는 자동 재생성되지만, 타입체크 통과 확인 필요
+### 4. 다국어/문구
+- 상세 페이지(`DefectDetailPage.tsx`), Export 다이얼로그, Bulk Edit 등에서 "Completion" 사용자 표시 문구를 **"Rectified"**로 치환 (필드 키/변수/DB는 그대로)
+- Progress 아이콘 legend/tooltip의 "Completion" → "Rectified"
 
-### 3. UI 문구 치환 규칙
-사람 눈에 보이는 곳(JSX 텍스트, 문자열 리터럴 중 라벨/제목/설명·`toast.*`·`title=`·`placeholder=`·`aria-label`·`<meta>` content 등)에서만 다음 규칙 적용:
+## 유지 (변경 없음)
+- DB 스키마, 컬럼명(`planned_completion_date`, `actual_completion_date`, `completion_status`), migration 불필요
+- LetsBuild/Aconex 원본 헤더 매핑 (`defect_header_mappings` 값)
+- `stage-utils.ts` 내부 함수명(`isActualComplete`, `isClosureComplete` 등 식별자)
+- Bulk edit 옵션 값(`"Not Started" | "In Progress" | "Complete"`) — 저장값 호환성
 
-- "Defect Management" → **"Snag List Management"**
-- "Defect Raw Data" → **"Snag List — Raw Data"**
-- "Defect Settings" → **"Snag List Settings"**
-- "Defect Detail" → **"Snag Detail"**
-- "Defect Item(s)" → **"Snag Item(s)"**
-- 단독 "Defect" (문장 내) → **"Snag"**
-- 한국어 "결함" 표기가 있다면 → **"스낵(Snag)"** (첫 등장 시 병기, 이후 "Snag")
+## 기술 세부
+- **파생 컬럼 정렬/필터**: `DefectRawDataPage`의 sort/filter가 `row[key]`를 직접 참조하므로, 행 매핑 시점에 `row.start_status = classifyStage(row, "start", asOf)`를 붙여 넣어 기존 파이프라인 무수정으로 동작
+- **컬럼 순서 변경 영향**: 사용자별 컬럼 순서 저장(`user_view_preferences`)은 저장된 key 배열 기반이므로, 신규 사용자에게만 새 기본 순서 적용. 기존 저장 순서에 `start_status`가 없으면 기본 위치(P.Start 직후)에 자동 삽입되도록 `DefectColumnOrderMenu` 병합 로직 확인
+- **Export**: XLSX export도 신규 라벨/파생값 반영 확인
+- **tsgo 통과**: `bunx tsgo --noEmit`
 
-**치환하지 않는 곳**:
-- 코드 식별자 (변수/함수/타입/파일명/import 경로)
-- DB 컬럼·테이블·RPC 이름
-- 외부 시스템 원본 헤더 문자열(`"Defect No."`, `"Defect Description"` 등 Aconex/LetsBuild 파일에서 오는 헤더 매칭 키) — parser/mapping 로직 내부
-- 이미 생성된 마이그레이션 SQL 파일
-
-### 4. head/meta 갱신
-각 route의 `head()` 내 `meta[title]`, `og:title`, `og:description`을 새 문구로 교체. 예: `"Defect Management — Import Logs"` → `"Snag List — Import Logs"`.
-
-### 5. 검증
-- `bunx tsgo --noEmit` 통과
-- 사이드바에서 "Snag List Management" 클릭 → `/closure/snag-management/raw-data` 이동 확인
-- `/closure/snag-management/import`, `/import/logs`, `/settings`, `/detail/:id` 모두 정상 렌더링
-- 기존 `/closure/defect-management/*` 북마크는 404 처리됨 (사용자에게 안내). 필요 시 후속 이슈로 redirect 추가 가능.
-
-## 리스크 및 주의
-
-- **북마크/외부 링크 깨짐**: 기존 `/closure/defect-management/*` URL은 더 이상 매칭되지 않음. 사내 배포 초기라면 수용 가능하지만, 필요 시 이 계획 승인 후 별도 turn에서 리다이렉트 라우트 추가 가능.
-- **외부 파일 헤더 문자열**: Aconex/LetsBuild import 파일 컬럼명(`"Defect No."` 등)은 외부 시스템 산출물이라 UI 텍스트가 아니라 매칭 키. 절대 변경 금지 (import 실패 원인).
-- **DB·코드 식별자 미변경**: 개발자가 코드를 열면 `defect_*`가 남아있음. 사용자에게는 완전히 Snag로 보이지만 유지보수 시 이 이중 명명 규칙을 인지해야 함.
-- **`routeTree.gen.ts`**: 수동 편집 금지. dev 서버 재시작 시 자동 재생성됨.
-
-## 산출물
-- 5개 route 파일 rename + `createFileRoute` 경로 문자열 갱신
-- UI 문구/head/링크 경로 치환 (약 40~50개 컴포넌트·페이지 파일)
-- DB·코드 식별자·마이그레이션·외부 헤더 매핑은 무변경
+## 리스크
+- 컬럼 순서 저장한 기존 사용자는 새 세트 배치가 반영되지 않음(개인 설정 우선) — 재설정 UI 안내는 이번 스코프 밖
+- `start_status`는 편집 불가(파생값). 사용자가 편집 시도 시 disabled 처리
