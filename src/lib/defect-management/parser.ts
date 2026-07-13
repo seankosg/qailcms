@@ -65,7 +65,6 @@ const CANONICAL_HEADERS: Record<string, DefectTargetField> = {
 
 /** Re-import 파일에서 등장 가능한 확장 필드(원본 헤더가 그대로 필드명이라 매핑 필요). */
 const EXTRA_REIMPORT_FIELDS = new Set<string>([
-  "team",
   "area_type",
   "area_level",
   "area_location",
@@ -138,7 +137,6 @@ export interface ParseDefectResult {
   sheetHeaders: DefectSheetHeader[];
   columnMap: Record<string, number>;
   warnings: string[];
-  teamHint: DefectTeam | null;
   categorySummary: string[];
   /** raw header string 순서 리스트 (컬럼 선택 다이얼로그용) */
   availableHeaders: string[];
@@ -475,10 +473,6 @@ export async function parseDefectExcel(
     });
   }
 
-  // team은 임포트 실행 단계에서 defect_category_team_map 을 조회해
-  // 행별 category 값 기준으로 채워집니다. 파서는 힌트를 생성하지 않습니다.
-  const teamHint: DefectTeam | null = null;
-
   const categorySummary = Array.from(categoryCounts.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
@@ -490,7 +484,6 @@ export async function parseDefectExcel(
     sheetHeaders: entries,
     columnMap,
     warnings,
-    teamHint,
     categorySummary,
     availableHeaders,
     headerSamples,
