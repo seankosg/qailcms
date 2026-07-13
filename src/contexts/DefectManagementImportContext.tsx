@@ -798,6 +798,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
       try {
         // 배치 슬라이스 준비
+        const importStartedAt = performance.now();
+        console.log(
+          `[defect-import] "${f.name}" 시작 rows=${payloads.length} batches=${Math.ceil(payloads.length / INSERT_CHUNK)} concurrency=${BATCH_CONCURRENCY}`,
+        );
         const slices: Array<{ rows: Record<string, unknown>[]; batchIndex: number }> = [];
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
           slices.push({
@@ -807,6 +811,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         }
 
         await runWithConcurrency(slices, BATCH_CONCURRENCY, async ({ rows: slice, batchIndex }) => {
+          const batchStart = performance.now();
           const { error } = await upsertBatch(slice);
           let successRows: Array<Record<string, unknown>> = [];
           let failRows: Array<Record<string, unknown>> = [];
@@ -859,7 +864,11 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             lastProgressPct = pct;
             setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: pct } : x)));
           }
+          const batchMs = Math.round(performance.now() - batchStart);
+          console.log(`[defect-import] batch ${batchIndex} rows=${slice.length} ${batchMs}ms`);
         });
+        const upsertMs = Math.round(performance.now() - importStartedAt);
+        console.log(`[defect-import] "${f.name}" upsert 완료 총 ${upsertMs}ms (rows=${payloads.length}, ${Math.round(payloads.length / (upsertMs / 1000 || 1))} rows/s)`);
 
         // per-row logs — 사용자 응답성 확보를 위해 백그라운드로 병렬 삽입 (실패 시 콘솔 경고)
         if (logId) {
