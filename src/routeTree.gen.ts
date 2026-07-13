@@ -39,6 +39,7 @@ import { Route as AuthenticatedClosureSparePartRecordsDocRefRouteImport } from '
 import { Route as AuthenticatedClosureSparePartImportLogsRouteImport } from './routes/_authenticated/closure/spare-part/import.logs'
 import { Route as AuthenticatedClosureDefectManagementImportLogsRouteImport } from './routes/_authenticated/closure/defect-management/import.logs'
 import { Route as AuthenticatedClosureDefectManagementDetailIdRouteImport } from './routes/_authenticated/closure/defect-management/detail.$id'
+import { Route as AuthenticatedClosureAbdImportLogsRouteImport } from './routes/_authenticated/closure/abd/import.logs'
 
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
   id: '/change-password',
@@ -212,6 +213,12 @@ const AuthenticatedClosureDefectManagementDetailIdRoute =
     path: '/closure/defect-management/detail/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureAbdImportLogsRoute =
+  AuthenticatedClosureAbdImportLogsRouteImport.update({
+    id: '/logs',
+    path: '/logs',
+    getParentRoute: () => AuthenticatedClosureAbdImportRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -222,7 +229,7 @@ export interface FileRoutesByFullPath {
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
-  '/closure/abd/import': typeof AuthenticatedClosureAbdImportRoute
+  '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
   '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
   '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
+  '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/defect-management/detail/$id': typeof AuthenticatedClosureDefectManagementDetailIdRoute
   '/closure/defect-management/import/logs': typeof AuthenticatedClosureDefectManagementImportLogsRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
@@ -252,7 +260,7 @@ export interface FileRoutesByTo {
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
-  '/closure/abd/import': typeof AuthenticatedClosureAbdImportRoute
+  '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
   '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
   '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
@@ -267,6 +275,7 @@ export interface FileRoutesByTo {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
+  '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/defect-management/detail/$id': typeof AuthenticatedClosureDefectManagementDetailIdRoute
   '/closure/defect-management/import/logs': typeof AuthenticatedClosureDefectManagementImportLogsRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
@@ -285,7 +294,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
-  '/_authenticated/closure/abd/import': typeof AuthenticatedClosureAbdImportRoute
+  '/_authenticated/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
   '/_authenticated/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
   '/_authenticated/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
   '/_authenticated/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
@@ -300,6 +309,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
+  '/_authenticated/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/_authenticated/closure/defect-management/detail/$id': typeof AuthenticatedClosureDefectManagementDetailIdRoute
   '/_authenticated/closure/defect-management/import/logs': typeof AuthenticatedClosureDefectManagementImportLogsRoute
   '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
@@ -333,6 +343,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
     | '/closure/dashboard/'
+    | '/closure/abd/import/logs'
     | '/closure/defect-management/detail/$id'
     | '/closure/defect-management/import/logs'
     | '/closure/spare-part/import/logs'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
     | '/closure/dashboard'
+    | '/closure/abd/import/logs'
     | '/closure/defect-management/detail/$id'
     | '/closure/defect-management/import/logs'
     | '/closure/spare-part/import/logs'
@@ -395,6 +407,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/task-management/tree'
     | '/_authenticated/closure/dashboard/'
+    | '/_authenticated/closure/abd/import/logs'
     | '/_authenticated/closure/defect-management/detail/$id'
     | '/_authenticated/closure/defect-management/import/logs'
     | '/_authenticated/closure/spare-part/import/logs'
@@ -622,6 +635,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureDefectManagementDetailIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/abd/import/logs': {
+      id: '/_authenticated/closure/abd/import/logs'
+      path: '/logs'
+      fullPath: '/closure/abd/import/logs'
+      preLoaderRoute: typeof AuthenticatedClosureAbdImportLogsRouteImport
+      parentRoute: typeof AuthenticatedClosureAbdImportRoute
+    }
   }
 }
 
@@ -644,6 +664,21 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
 const AuthenticatedAdminRouteRouteWithChildren =
   AuthenticatedAdminRouteRoute._addFileChildren(
     AuthenticatedAdminRouteRouteChildren,
+  )
+
+interface AuthenticatedClosureAbdImportRouteChildren {
+  AuthenticatedClosureAbdImportLogsRoute: typeof AuthenticatedClosureAbdImportLogsRoute
+}
+
+const AuthenticatedClosureAbdImportRouteChildren: AuthenticatedClosureAbdImportRouteChildren =
+  {
+    AuthenticatedClosureAbdImportLogsRoute:
+      AuthenticatedClosureAbdImportLogsRoute,
+  }
+
+const AuthenticatedClosureAbdImportRouteWithChildren =
+  AuthenticatedClosureAbdImportRoute._addFileChildren(
+    AuthenticatedClosureAbdImportRouteChildren,
   )
 
 interface AuthenticatedClosureDefectManagementImportRouteChildren {
@@ -678,7 +713,7 @@ const AuthenticatedClosureSparePartImportRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
-  AuthenticatedClosureAbdImportRoute: typeof AuthenticatedClosureAbdImportRoute
+  AuthenticatedClosureAbdImportRoute: typeof AuthenticatedClosureAbdImportRouteWithChildren
   AuthenticatedClosureAbdRawDataRoute: typeof AuthenticatedClosureAbdRawDataRoute
   AuthenticatedClosureDashboardAsBuiltRoute: typeof AuthenticatedClosureDashboardAsBuiltRoute
   AuthenticatedClosureDashboardSparePartRoute: typeof AuthenticatedClosureDashboardSparePartRoute
@@ -701,7 +736,8 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
-  AuthenticatedClosureAbdImportRoute: AuthenticatedClosureAbdImportRoute,
+  AuthenticatedClosureAbdImportRoute:
+    AuthenticatedClosureAbdImportRouteWithChildren,
   AuthenticatedClosureAbdRawDataRoute: AuthenticatedClosureAbdRawDataRoute,
   AuthenticatedClosureDashboardAsBuiltRoute:
     AuthenticatedClosureDashboardAsBuiltRoute,
