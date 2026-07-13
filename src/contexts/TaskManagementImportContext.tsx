@@ -303,6 +303,59 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     [],
   );
 
+  const setFileConflictPolicy = useCallback((id: string, policy: ConflictPolicy) => {
+    setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, conflictPolicy: policy } : f)));
+  }, []);
+
+  const runPreflight = useCallback(async (id: string) => {
+    let target: TmImportFileItem | undefined;
+    setFiles((cur) => {
+      target = cur.find((f) => f.id === id);
+      return cur.map((f) =>
+        f.id === id ? { ...f, preflightLoading: true, preflightError: null } : f,
+      );
+    });
+    if (!target || !target.parsed || target.parsed.length === 0) {
+      setFiles((cur) =>
+        cur.map((f) =>
+          f.id === id
+            ? { ...f, preflightLoading: false, preflightError: "파싱된 행이 없습니다" }
+            : f,
+        ),
+      );
+      return;
+    }
+    try {
+      const discipline = target.discipline ?? "건축";
+      const rows = target.parsed.map((p) => ({
+        task_no: p.task_no,
+        parent_task_no: p.parent_task_no,
+        level: p.level,
+        task_name: p.task_name,
+        plot: p.plot,
+        category: p.category,
+        plan_start: p.plan_start,
+        plan_end: p.plan_end,
+        actual_progress: p.actual_progress,
+      }));
+      const res = await previewTaskImport({ data: { discipline, rows } });
+      setFiles((cur) =>
+        cur.map((f) =>
+          f.id === id
+            ? { ...f, preflight: res, preflightLoading: false, preflightError: null }
+            : f,
+        ),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setFiles((cur) =>
+        cur.map((f) =>
+          f.id === id ? { ...f, preflightLoading: false, preflightError: msg } : f,
+        ),
+      );
+    }
+  }, []);
+
   const executeImport = useCallback(async (ready: TmImportFileItem[]) => {
     setIsRunning(true);
     const { data: userData } = await supabase.auth.getUser();
