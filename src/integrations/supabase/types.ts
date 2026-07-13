@@ -644,6 +644,7 @@ export type Database = {
           area_location: string | null
           area_type: string | null
           assigned_to: string | null
+          building: string | null
           captured_by_name: string | null
           category: string | null
           classification: string | null
@@ -676,6 +677,7 @@ export type Database = {
           issue_no: string | null
           item: string | null
           last_updated_at: string | null
+          level_name: string | null
           location_raw: string | null
           location_reference: string | null
           main_trade: string | null
@@ -690,6 +692,9 @@ export type Database = {
           priority_locked: boolean
           raw_payload: Json
           remarks: string | null
+          review_flag: string | null
+          room: string | null
+          room_group: string | null
           row_version: number
           source_import_log_id: string | null
           source_issue_no: string
@@ -721,6 +726,7 @@ export type Database = {
           area_location?: string | null
           area_type?: string | null
           assigned_to?: string | null
+          building?: string | null
           captured_by_name?: string | null
           category?: string | null
           classification?: string | null
@@ -753,6 +759,7 @@ export type Database = {
           issue_no?: string | null
           item?: string | null
           last_updated_at?: string | null
+          level_name?: string | null
           location_raw?: string | null
           location_reference?: string | null
           main_trade?: string | null
@@ -767,6 +774,9 @@ export type Database = {
           priority_locked?: boolean
           raw_payload?: Json
           remarks?: string | null
+          review_flag?: string | null
+          room?: string | null
+          room_group?: string | null
           row_version?: number
           source_import_log_id?: string | null
           source_issue_no: string
@@ -798,6 +808,7 @@ export type Database = {
           area_location?: string | null
           area_type?: string | null
           assigned_to?: string | null
+          building?: string | null
           captured_by_name?: string | null
           category?: string | null
           classification?: string | null
@@ -830,6 +841,7 @@ export type Database = {
           issue_no?: string | null
           item?: string | null
           last_updated_at?: string | null
+          level_name?: string | null
           location_raw?: string | null
           location_reference?: string | null
           main_trade?: string | null
@@ -844,6 +856,9 @@ export type Database = {
           priority_locked?: boolean
           raw_payload?: Json
           remarks?: string | null
+          review_flag?: string | null
+          room?: string | null
+          room_group?: string | null
           row_version?: number
           source_import_log_id?: string | null
           source_issue_no?: string

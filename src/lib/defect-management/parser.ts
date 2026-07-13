@@ -31,6 +31,11 @@ export const DEFECT_TARGET_FIELDS = [
   "location_reference",
   "classification",
   "podium_area",
+  "building",
+  "room",
+  "room_group",
+  "level_name",
+  "review_flag",
 ] as const;
 export type DefectTargetField = (typeof DEFECT_TARGET_FIELDS)[number];
 
@@ -61,6 +66,11 @@ const CANONICAL_HEADERS: Record<string, DefectTargetField> = {
   locationreference: "location_reference",
   classification: "classification",
   "podiumarea": "podium_area",
+  building: "building",
+  room: "room",
+  roomgroup: "room_group",
+  level: "level_name",
+  reviewflag: "review_flag",
 };
 
 /** Re-import 파일에서 등장 가능한 확장 필드(원본 헤더가 그대로 필드명이라 매핑 필요). */
@@ -127,6 +137,11 @@ export interface ParsedDefectRow {
   location_reference: string | null;
   classification: string | null;
   podium_area: string | null;
+  building: string | null;
+  room: string | null;
+  room_group: string | null;
+  level_name: string | null;
+  review_flag: string | null;
   raw_payload: Record<string, unknown>;
   /** Re-import 파일에서만 채워지는 확장 필드. */
   extra?: Record<string, unknown>;
@@ -469,6 +484,11 @@ export async function parseDefectExcel(
       location_reference: cols.location_reference ? toStr(getCell(sheet, r, cols.location_reference)) : null,
       classification: cols.classification ? toStr(getCell(sheet, r, cols.classification)) : null,
       podium_area: cols.podium_area ? toStr(getCell(sheet, r, cols.podium_area)) : null,
+      building: cols.building ? toStr(getCell(sheet, r, cols.building)) : null,
+      room: cols.room ? toStr(getCell(sheet, r, cols.room)) : null,
+      room_group: cols.room_group ? toStr(getCell(sheet, r, cols.room_group)) : null,
+      level_name: cols.level_name ? toStr(getCell(sheet, r, cols.level_name)) : null,
+      review_flag: cols.review_flag ? toStr(getCell(sheet, r, cols.review_flag)) : null,
       raw_payload,
       extra,
     });
