@@ -1144,6 +1144,16 @@ async function applyCfViaExcelJs(
   await wb.xlsx.load(input);
   const ws = wb.getWorksheet(spec.sheetName);
   if (!ws) return input;
+  // Force Excel to recalculate on open. Our formulas are written without
+  // cached `<v>` values (xlsx-js-style doesn't evaluate). Without this flag,
+  // recent Excel versions show the "we found a problem with some content"
+  // XML load dialog and offer to repair before displaying any values.
+  try {
+    (wb as unknown as { calcProperties: { fullCalcOnLoad: boolean } })
+      .calcProperties.fullCalcOnLoad = true;
+  } catch {
+    /* older exceljs — ignore */
+  }
   spec.rules.forEach((r, idx) => {
     const style: Record<string, unknown> = {};
     if (r.fillRgb) {
