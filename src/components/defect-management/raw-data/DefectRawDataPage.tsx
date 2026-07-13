@@ -58,7 +58,6 @@ import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { EditCellPopover } from "./EditCellPopover";
-import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
 import { DefectStageProgress, DefectStageProgressLegend } from "./DefectStageProgress";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
@@ -174,13 +173,38 @@ function formatPct(v: any): string {
   return `${pct.toFixed(1)}%`;
 }
 
-function uniqueOptions(items: DefectItem[], field: keyof DefectItem) {
+function uniqueOptions(items: DefectItem[], field: keyof DefectItem | string) {
   const set = new Set<string>();
   for (const r of items) {
-    const v = r[field];
+    const v = (r as any)[field];
     if (v && typeof v === "string") set.add(v);
   }
   return [...set].sort().map((v) => ({ value: v, label: v }));
+}
+
+function normalizeGroupLabel(group: string | null | undefined): string {
+  const labels: Record<string, string> = {
+    identity: "Identity",
+    status: "Status",
+    classification: "Classification",
+    content: "Content",
+    location: "Location",
+    plan: "Plan",
+    trade: "Classification",
+    people: "Assignment",
+    audit: "Audit",
+    dates: "Schedule",
+    progress: "Progress",
+    refs: "References",
+    flags: "Flags",
+  };
+  return labels[group ?? ""] ?? group ?? "Other";
+}
+
+function clearObjectKeys<T extends Record<string, any>>(keys: string[], value: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const key of keys) (out as any)[key] = "";
+  return out;
 }
 
 const URL_MAP: Record<string, string> = {
@@ -242,7 +266,7 @@ export function DefectRawDataPage() {
   // Sync URL → local (탭 전환 시 URL의 sort/filters를 초기화 반영)
   useEffect(() => {
     setSorting(parseSortFromUrl(urlSearch.sort));
-    setColumnFilters(parseFiltersFromUrl(urlSearch.filters));
+    setColumnFilters(mergeUrlFilters(urlSearch as any, parseFiltersFromUrl(urlSearch.filters)));
     setSearchInput(urlSearch.q ?? "");
     setRowSelection({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -433,16 +457,7 @@ export function DefectRawDataPage() {
           { value: "Completed", label: "Completed" }, { value: "Closed", label: "Closed" }, { value: "Delayed", label: "Delayed" },
         ],
       },
-      cell: ({ getValue }) => {
-        const v = getValue() as string;
-        const cls =
-          v === "Delayed" ? "bg-rose-500/15 text-rose-700 dark:text-rose-300" :
-          v === "Closed" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
-          v === "Completed" ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" :
-          v === "In Progress" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" :
-          "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300";
-        return <Badge className={cn("text-[10px] font-medium", cls)}>{v}</Badge>;
-      },
+      cell: ({ row }) => <DefectStageProgress item={row.original as any} asOfDate={dataDate} />,
     };
 
     // Data columns from DEFECT_COLUMNS, ordered by user-configured orderedKeys
@@ -491,14 +506,96 @@ export function DefectRawDataPage() {
     manualFiltering: true,
     pageCount,
     enableColumnResizing: true,
-    columnResizeMode: "onChange",
+    columnResizeMode: "onEnd",
+    enableMultiSort: true,
+    enableSortingRemoval: true,
+    isMultiSortEvent: (event) => (event as unknown as MouseEvent).shiftKey,
+    maxMultiSortColCount: 5,
+    defaultColumn: { minSize: 64, maxSize: 640 },
     getRowId: (r) => r.id,
   });
 
-  const selectedIds = Object.keys(rowSelection);
+  useEffect(() => {
+    setRowSelection({});
+  }, [columnFilters, q, tab]);
+
+  const selectedRows = useMemo(() => table.getSelectedRowModel().rows.map((r) => r.original), [table, rowSelection, rows]);
+  const bulkFields = useMemo(() => {
+    const optionMap: Record<string, { value: string; label: string }[]> = {
+      team: DEFECT_TEAMS.map((value) => ({ value, label: value })),
+      status_raw: uniqueOptions(rows, "status_raw"),
+      completion_status: uniqueOptions(rows, "completion_status"),
+      closure_status: uniqueOptions(rows, "closure_status"),
+      area_level: uniqueOptions(rows, "area_level"),
+      area_location: uniqueOptions(rows, "area_location"),
+      main_trade: uniqueOptions(rows, "main_trade"),
+      sub_trade: uniqueOptions(rows, "sub_trade"),
+      work_type: uniqueOptions(rows, "work_type"),
+      priority: uniqueOptions(rows, "priority"),
+      defect_type: uniqueOptions(rows, "defect_type"),
+      subcontractor_name: uniqueOptions(rows, "subcontractor_name"),
+      subsub_name: uniqueOptions(rows, "subsub_name"),
+      hdec_pic_name: uniqueOptions(rows, "hdec_pic_name"),
+      hdec_eng_name: uniqueOptions(rows, "hdec_eng_name"),
+    };
+    return DEFECT_COLUMNS.filter((c) => c.editable && c.editorType).map((c) => ({
+      field: c.key,
+      label: helpers.getLabel(c.key),
+      inputType: c.editorType!,
+      options: (c.options?.map((value) => ({ value, label: value })) ?? optionMap[c.key]) as any,
+      group: normalizeGroupLabel(c.group),
+    }));
+  }, [rows, helpers]);
+  const exportColumns = useMemo(() => DEFECT_COLUMNS.map((c) => ({ key: c.key, label: helpers.getLabel(c.key) })), [helpers]);
   const criticalPendingCount = summary?.critical_pending ?? 0;
   const unclosedCount = counts?.unclosed_count ?? 0;
   const closedCount = counts?.closed_count ?? 0;
+
+  const activeUrlFilters = useMemo(() => {
+    const labels: Record<string, string> = {
+      q: "Search",
+      team: "Team",
+      subcontractor: "Subcontractor",
+      subsub: "Sub-Sub",
+      hdecPic: "HDEC PIC",
+      hdecEng: "HDEC ENG",
+      capturedBy: "Captured By",
+      capturedByGroup: "Captured By Group",
+      level: "Level",
+      mainTrade: "Main Trade",
+      subTrade: "Sub Trade",
+      workType: "Work Type",
+      classificationSource: "Classification",
+      status: "Status",
+      closureStatus: "Closure",
+      issueNo: "Issue No",
+      subcontractorIssueNo: "Subcontractor Issue No",
+      critical: "Critical",
+      priority: "Priority",
+    };
+    const chips: { label: string; clears: string[] }[] = [];
+    for (const [param, label] of Object.entries(labels)) {
+      const value = (urlSearch as any)[param];
+      if (!value) continue;
+      chips.push({ label: `${label} ${value === EMPTY_TOKEN ? "(Blank)" : value}`, clears: [param] });
+    }
+    if (urlSearch.dateStart || urlSearch.dateEnd) chips.push({ label: `${urlSearch.dateField ? helpers.getLabel(urlSearch.dateField) : "Date"} ${urlSearch.dateStart || ""}${urlSearch.dateStart && urlSearch.dateEnd ? " → " : ""}${urlSearch.dateEnd || ""}`, clears: ["dateStart", "dateEnd", "dateField"] });
+    if (urlSearch.dueOn) chips.push({ label: `${urlSearch.stage || "Stage"} due ${urlSearch.dueOn} (open)`, clears: ["dueOn", "stage"] });
+    if (urlSearch.unplannedActualOn) chips.push({ label: `${urlSearch.stage || "Stage"} actual ${urlSearch.unplannedActualOn} (unplanned)`, clears: ["unplannedActualOn", "stage"] });
+    if (urlSearch.actualComplete === "true" && urlSearch.closureComplete === "false") chips.push({ label: "Remain Inspection", clears: ["actualComplete", "closureComplete"] });
+    else {
+      if (urlSearch.actualComplete === "true" || urlSearch.actualComplete === "false") chips.push({ label: `Completion: ${urlSearch.actualComplete === "true" ? "Done" : "Open"}`, clears: ["actualComplete"] });
+      if (urlSearch.closureComplete === "true" || urlSearch.closureComplete === "false") chips.push({ label: `Closure: ${urlSearch.closureComplete === "true" ? "Done" : "Open"}`, clears: ["closureComplete"] });
+    }
+    if (urlSearch.overdue === "true") chips.push({ label: urlSearch.stage ? `Overdue — ${urlSearch.stage}` : "Overdue", clears: ["overdue", "stage", "asOf"] });
+    if (urlSearch.remaining_stage && urlSearch.remaining_asof) chips.push({ label: `Remaining — ${urlSearch.remaining_stage} @ ${urlSearch.remaining_asof}`, clears: ["remaining_stage", "remaining_asof"] });
+    if (urlSearch.atRisk === "true") chips.push({ label: urlSearch.atRiskDays ? `At Risk (≤ ${urlSearch.atRiskDays}d)` : "At Risk", clears: ["atRisk", "atRiskDays"] });
+    if (urlSearch.notClosureDone === "true") chips.push({ label: "Closure ≠ Done", clears: ["notClosureDone"] });
+    if (urlSearch.hdecVerification) chips.push({ label: `HDEC Verification: ${urlSearch.hdecVerification === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecVerification}`, clears: ["hdecVerification"] });
+    if (urlSearch.catADispute === "xor") chips.push({ label: "Cat A Dispute (LL ≠ HDEC)", clears: ["catADispute"] });
+    if (urlSearch.hdecReason) chips.push({ label: `HDEC Reason: ${urlSearch.hdecReason === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecReason}`, clears: ["hdecReason"] });
+    return chips;
+  }, [urlSearch, helpers]);
 
   // Active filter chips
   const activeChips = useMemo(() => {
@@ -522,28 +619,15 @@ export function DefectRawDataPage() {
 
   return (
     <div className="space-y-3">
-      <header className="flex flex-wrap items-center justify-between gap-2">
+      <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Defect Management — Raw Data</h1>
-          <p className="text-xs text-muted-foreground">
-            {total.toLocaleString()}건 (전체 Unclosed {unclosedCount.toLocaleString()} · Closed {closedCount.toLocaleString()})
-            {tab === "unclosed" ? ` · Critical ${criticalPendingCount.toLocaleString()}` : ""}
-            {dataDate ? ` · Latest Data Date ${dataDate}` : ""}
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">Defect Raw Data</h1>
+          <p className="text-sm text-muted-foreground">Issue No and subcontractor issue tracking data.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/dashboard"><LayoutDashboard className="mr-1 h-3.5 w-3.5" /> Dashboard</Link></Button>
-          <DefectColumnOrderMenu
-            order={order}
-            visibility={visibility as Record<string, boolean>}
-            frozenExtras={frozenExtras}
-            onOrderChange={setOrder}
-            onVisibilityChange={setVisibility}
-            onFrozenChange={setFrozenExtras}
-          />
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1 h-3.5 w-3.5" /> Export</Button>
+        <div className="flex gap-2">
           <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/import"><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
-          <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/import/logs"><FileClock className="mr-1 h-3.5 w-3.5" /> Import Logs</Link></Button>
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           <Button variant="outline" size="sm" onClick={() => { invalidateDefects(); refetch(); }} disabled={isFetching}>
             <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
           </Button>
@@ -561,44 +645,62 @@ export function DefectRawDataPage() {
         </TabsList>
       </Tabs>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
-        <div className="flex items-center gap-1">
-          {DEFECT_TEAMS.map((t) => {
-            const col = table.getColumn("team");
-            const sel = (col?.getFilterValue() as string[]) ?? [];
-            const active = sel.includes(t);
-            return (
-              <Button key={t} size="sm" variant={active ? "default" : "outline"} className="h-7"
-                onClick={() => col?.setFilterValue(active ? sel.filter((x) => x !== t) : [...sel, t])}
-              >{t}</Button>
-            );
-          })}
+      {activeUrlFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+          <span className="text-xs font-medium text-primary">Active URL filters:</span>
+          {activeUrlFilters.map((filter) => (
+            <button key={filter.label} onClick={() => setUrl(clearObjectKeys(filter.clears, urlSearch as any))} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary hover:bg-primary/20" title="Click to remove">
+              {filter.label} ✕
+            </button>
+          ))}
+          <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setUrl(clearObjectKeys(DRILLDOWN_PARAMS, urlSearch as any))}>Clear all</Button>
         </div>
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      )}
+
+      {activeChips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">Active column filters:</span>
+          {activeChips.map((c) => (
+            <button key={c.id} onClick={c.onClear} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground hover:bg-secondary/80" title="Click to remove">
+              {c.label} ✕
+            </button>
+          ))}
+          <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setColumnFilters([])}>Clear all</Button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3">
+        <div className="relative min-w-[220px] max-w-sm flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="전역 검색 (설명/ID/위치/협력사/PIC 등)"
-            className="pl-7 h-8 text-sm"
+            placeholder="Search defects... (comma = AND)"
+            className="h-9 pl-8"
           />
         </div>
+        <span className="self-center text-sm text-muted-foreground">{total.toLocaleString()} records</span>
+        {sorting.length > 0 && (
+          <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => setSorting([{ id: "source_issue_no", desc: false }])}>Clear sort ({sorting.length})</Button>
+        )}
+        <span className="hidden self-center text-xs text-muted-foreground md:inline">Tip: Shift+Click headers for multi-sort · Click <Filter className="inline h-3 w-3" /> to filter columns</span>
+        <div className="ml-auto"><DefectStageProgressLegend /></div>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Checkbox checked={includeInactive} onCheckedChange={(v) => setUrl({ includeInactive: !!v, page: 1 })} className="h-3.5 w-3.5" />
           비활성 포함
         </label>
       </div>
 
-      {activeChips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {activeChips.map((c) => (
-            <button key={c.id} onClick={c.onClear} className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] hover:bg-muted">
-              {c.label} <X className="h-2.5 w-2.5" />
-            </button>
-          ))}
-          <button onClick={() => setColumnFilters([])} className="text-[11px] text-muted-foreground hover:underline">Clear all</button>
-        </div>
-      )}
+      <CriticalBulkBar isAdmin={isAdmin} selectedRows={selectedRows as any} pending={criticalPending} setPending={setCriticalPending} />
+
+      <BulkEditBar
+        selectedRows={selectedRows as any}
+        fields={bulkFields}
+        exportColumns={exportColumns}
+        canEdit={isAdmin}
+        onClearSelection={() => setRowSelection({})}
+        onApplied={() => { setRowSelection({}); invalidateDefects(); }}
+      />
 
       <DefectRawTableView
         table={table}
@@ -649,8 +751,11 @@ export function DefectRawDataPage() {
       />
 
       <BulkEditBar
-        selectedIds={selectedIds}
-        onCleared={() => setRowSelection({})}
+        selectedRows={[]}
+        fields={[]}
+        exportColumns={[]}
+        canEdit={false}
+        onClearSelection={() => setRowSelection({})}
         onApplied={() => { setRowSelection({}); invalidateDefects(); }}
       />
     </div>
