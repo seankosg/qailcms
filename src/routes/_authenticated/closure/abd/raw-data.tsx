@@ -12,6 +12,7 @@ const abdRawDataSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),
   filters: fallback(z.string(), "").default(""),
   includeInactive: fallback(z.boolean(), false).default(false),
+  detail: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/abd/raw-data")({
