@@ -464,6 +464,63 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     [parseAndApply],
   );
 
+  const setFileDuplicateStrategy = useCallback(
+    (id: string, strategy: DuplicateStrategy) => {
+      setFiles((cur) =>
+        cur.map((f) => {
+          if (f.id !== id) return f;
+          const groups = applyStrategyToGroups(f.duplicateGroups ?? [], strategy);
+          return { ...f, duplicateStrategy: strategy, duplicateGroups: groups };
+        }),
+      );
+    },
+    [],
+  );
+
+  const setFileDuplicateSelection = useCallback(
+    (id: string, groupKey: string, parsedIndex: number) => {
+      setFiles((cur) =>
+        cur.map((f) => {
+          if (f.id !== id) return f;
+          const groups = (f.duplicateGroups ?? []).map((g) =>
+            g.key === groupKey ? { ...g, selectedParsedIndex: parsedIndex } : g,
+          );
+          return {
+            ...f,
+            duplicateStrategy: "manual",
+            duplicateGroups: groups,
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  const resolveDuplicates = useCallback((id: string) => {
+    setFiles((cur) =>
+      cur.map((f) => {
+        if (f.id !== id) return f;
+        if (!f.parsed || !f.duplicateGroups || f.duplicateGroups.length === 0) return f;
+        const dropIndices = new Set<number>();
+        for (const g of f.duplicateGroups) {
+          for (const r of g.rows) {
+            if (r.parsedIndex !== g.selectedParsedIndex) dropIndices.add(r.parsedIndex);
+          }
+        }
+        const nextParsed = f.parsed.filter((_, idx) => !dropIndices.has(idx));
+        const nextStatus: DefectFileStatus = f.team ? "ready" : "needs_team";
+        const updated: DefectImportFile = {
+          ...f,
+          parsed: nextParsed,
+          duplicateGroups: [],
+          status: nextStatus,
+        };
+        updated.validationError = validate(updated);
+        return updated;
+      }),
+    );
+  }, []);
+
   const executeImport = useCallback(async (ready: DefectImportFile[]) => {
     setIsRunning(true);
     const { data: userData } = await supabase.auth.getUser();
