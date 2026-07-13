@@ -1,71 +1,32 @@
-## 사이드메뉴 재구성 계획 (v2)
+## Defect Import: 팀 선택 로직 완전 폐기
 
-현재 모든 항목이 "Closure Document" 하나에 평평하게 나열되어 있어 가독성이 낮습니다. 이를 **Outstanding Work / Close-Out Doc / Admin** 3개 섹션으로 나누고, 각 섹션의 최상단에 **섹션 대시보드**를 두어 섹션 진입 시 해당 대시보드로 이동시킵니다. 각 모듈은 접이식 서브그룹으로 구성합니다.
+Category→Team 자동 매핑이 항상 우선하도록, 임포트 경로에 남아 있는 팀 관련 잔재를 제거합니다.
 
-### 최종 사이드바 구조
+### 현재 남은 잔재
 
-```
-── OUTSTANDING WORK ──
-· Dashboard                          → /outstanding/dashboard
-▸ Task Management
-    · Raw Data
-    · Tree View
-    · Import Logs           (editor)
-▸ Defect Management
-    · Dashboard  (모듈 단위)
-    · Raw Data
-    · Import                (editor)
-    · Import Logs           (editor)
-    · Settings              (admin)
+1. **`src/lib/defect-management/parser.ts`**
+   - `EXTRA_REIMPORT_FIELDS`에 `"team"`이 포함돼 있어 Re-import 파일에 Team 컬럼이 있으면 `p.extra.team`으로 파싱됨.
+   - 임포트 컨텍스트에서 `payloads`를 만들 때 auto-resolve된 `team: rowTeam`을 먼저 넣은 뒤 `p.extra`를 병합하므로, 파일의 team 값이 **자동 매핑을 덮어씀** (스펙 위반).
+   - 사용되지 않는 `teamHint` 필드/상수도 남아있음.
 
-── CLOSE-OUT DOC ──
-· Dashboard                          → /closeout/dashboard
-▸ As Built Drawing
-    · Raw Data
-    · Import                (editor)
-    · Import Logs           (editor)
-    · Settings              (admin)
-▸ Spare Part
-    · Raw Data
-    · Import                (editor)
-    · Import Logs           (editor)
-    · Aconex Sync           (editor)
-▸ Warranty & License        (placeholder, "Soon" 배지, 비활성)
+2. **`src/components/defect-management/import/DefectColumnSelect.tsx`**
+   - `HDEC_FIELDS` 프리셋에 `"team"`이 포함돼 있어 컬럼 선택 다이얼로그의 HDEC 프리셋이 여전히 team을 "유지" 컬럼으로 선택함.
 
-── ADMIN ──  (admin 계정만 노출)
-· Overview
-· 사용자
-· Mapping
-· Task 임계값
-```
+### 변경 사항
 
-### 섹션 대시보드 처리
+**A. `parser.ts`**
+- `EXTRA_REIMPORT_FIELDS`에서 `"team"` 제거 → 파일의 team 컬럼은 파싱 단계에서 무시(raw_payload에는 남되 canonical 필드로 승격되지 않음).
+- `ParseDefectResult.teamHint` 필드 및 `const teamHint = null;` 코드 제거.
+- `ParseDefectResult` 반환 객체에서 `teamHint` 프로퍼티 제거.
 
-- **Outstanding Work Dashboard** (`/outstanding/dashboard`, 신규 라우트): Task 요약 카드 + Defect 요약 카드(기존 Defect Dashboard의 핵심 KPI 미러링). 상세는 각 모듈 페이지로 이동 유도.
-- **Close-Out Doc Dashboard** (`/closeout/dashboard`, 신규 라우트): ABD / Spare Part 진행 요약 카드. Warranty & License는 placeholder 카드.
-- 두 대시보드 모두 신규 `_authenticated` 하위 라우트 파일 생성. 초기 구현은 **기존 데이터 훅을 재사용한 요약 카드 세트**로 구성(신규 집계 로직 없음).
-- 기존 `/closure/dashboard`는 **`/outstanding/dashboard`로 302 리다이렉트**(기본 진입 시 Outstanding으로) 처리하여 링크 호환성 유지. 기존 `/closure/defect-management/dashboard`는 모듈 단위 상세 대시보드로 유지.
+**B. `DefectColumnSelect.tsx`**
+- `HDEC_FIELDS`에서 `"team"` 제거.
 
-> 라우트 prefix를 `/closure/*`에서 새 섹션 prefix로 바꾸지 않습니다. 사이드바 표시상의 그룹만 재편하며, 기존 라우트 경로는 그대로 두고 신규 대시보드 2개만 추가합니다. (경로 대이동은 별도 리팩토링 스코프)
+**C. `DefectManagementImportContext.tsx`**
+- `p.extra` 병합 루프에서 `k === "team"` 이면 건너뛰는 방어 가드 추가 (혹시 다른 경로로 들어와도 auto-team이 절대 덮이지 않도록).
+- 안내 문구는 이미 "Team은 Category 자동 매핑"이라 별도 변경 불필요.
 
-### 동작 규칙
+### 산출물
 
-1. **섹션 헤더**: `OUTSTANDING WORK`, `CLOSE-OUT DOC`, `ADMIN` uppercase 라벨.
-2. **섹션 진입 = Dashboard 진입**: 섹션 헤더 아래 첫 항목은 항상 해당 섹션 Dashboard 링크. 사이드바에서 섹션 헤더 자체 클릭은 하지 않고, 바로 아래 Dashboard 링크가 진입점.
-3. **모듈 그룹**: 접기/펼치기 가능. 현재 라우트가 해당 모듈 prefix에 속하면 자동 펼침. 그 외는 접힘. 접힘 상태는 localStorage 유지.
-4. **하위 라벨 정리**: 모듈 접두어 제거 → `Raw Data`, `Import`, `Import Logs`, `Settings` 등 짧은 이름.
-5. **권한 필터**: 기존 `adminOnly` / `editorOnly` 유지. 모듈 내 항목이 모두 숨겨지면 모듈 자체를 렌더링하지 않음.
-6. **Warranty & License**: 라우트 미구현 → disabled + `Soon` 배지.
-7. **모바일**: 기존 `mobileOpen` 동작 유지.
-
-### 구현 산출물
-
-- **수정**: `src/components/layout/AppLayout.tsx` — NAV 구조를 `Section → Module → Leaf` 3계층으로 재작성, Collapsible 서브그룹 로직 추가.
-- **신규 라우트 2개**:
-  - `src/routes/_authenticated/outstanding/dashboard.tsx` — Task/Defect 요약 카드.
-  - `src/routes/_authenticated/closeout/dashboard.tsx` — ABD/Spare Part 요약 카드 + Warranty placeholder.
-- **신규 컴포넌트 2개** (요약 카드 조립용):
-  - `src/components/dashboards/OutstandingDashboardPage.tsx`
-  - `src/components/dashboards/CloseOutDashboardPage.tsx`
-- **수정**: `src/routes/_authenticated/closure/dashboard.tsx` — `/outstanding/dashboard`로 redirect.
-- 기존 라우트 경로/비즈니스 로직 변경 없음, DB 스키마 변경 없음.
+- **수정**: `src/lib/defect-management/parser.ts`, `src/components/defect-management/import/DefectColumnSelect.tsx`, `src/contexts/DefectManagementImportContext.tsx`
+- DB/라우트/사이드바 변경 없음. 상세 페이지의 team 수동 편집(select) 기능은 **그대로 유지**(임포트 단계에서만 폐기).
