@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  Copy,
   Settings2,
   FileSpreadsheet,
   Loader2,
@@ -35,11 +36,16 @@ import {
 } from "@/contexts/DefectManagementImportContext";
 import { DEFECT_TEAMS, type DefectTeam } from "@/lib/defect-management/columns";
 import { DefectColumnSelect } from "./DefectColumnSelect";
+import { DuplicateReviewDialog } from "./DuplicateReviewDialog";
 
 const statusBadge: Record<DefectFileStatus, { label: string; cls: string }> = {
   parsing: { label: "Parsing", cls: "bg-muted text-muted-foreground" },
   pending_sheet_selection: {
     label: "Sheet 선택",
+    cls: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-200",
+  },
+  pending_duplicate_review: {
+    label: "중복 검토",
     cls: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-200",
   },
   needs_team: { label: "Team 필요", cls: "bg-amber-100 text-amber-800" },
@@ -82,10 +88,14 @@ function Inner() {
     setFileDataDateOverride,
     setFileSheet,
     setFileExcludedHeaders,
+    setFileDuplicateStrategy,
+    setFileDuplicateSelection,
+    resolveDuplicates,
     startImport,
   } = useDefectImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [columnDialogFileId, setColumnDialogFileId] = useState<string | null>(null);
+  const [dupDialogFileId, setDupDialogFileId] = useState<string | null>(null);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -107,6 +117,7 @@ function Inner() {
   ).length;
   const columnDialogFile =
     files.find((f) => f.id === columnDialogFileId) ?? null;
+  const dupDialogFile = files.find((f) => f.id === dupDialogFileId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -184,6 +195,7 @@ function Inner() {
                 onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
                 onOpenColumnSelect={() => setColumnDialogFileId(f.id)}
                 onSheetChange={(sheet) => setFileSheet(f.id, sheet)}
+                onOpenDuplicateReview={() => setDupDialogFileId(f.id)}
               />
             ))}
           </CardContent>
@@ -207,6 +219,20 @@ function Inner() {
             }
           />
         )}
+
+      {dupDialogFile && (dupDialogFile.duplicateGroups?.length ?? 0) > 0 && (
+        <DuplicateReviewDialog
+          file={dupDialogFile}
+          open={!!dupDialogFileId}
+          onOpenChange={(o) => !o && setDupDialogFileId(null)}
+          onChangeStrategy={(s) => setFileDuplicateStrategy(dupDialogFile.id, s)}
+          onChangeSelection={(k, i) => setFileDuplicateSelection(dupDialogFile.id, k, i)}
+          onConfirm={() => {
+            resolveDuplicates(dupDialogFile.id);
+            setDupDialogFileId(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -219,6 +245,7 @@ function FileRow({
   onDataDateChange,
   onOpenColumnSelect,
   onSheetChange,
+  onOpenDuplicateReview,
 }: {
   file: DefectImportFile;
   isRunning: boolean;
@@ -227,6 +254,7 @@ function FileRow({
   onDataDateChange: (v: string | null) => void;
   onOpenColumnSelect: () => void;
   onSheetChange: (sheet: string) => void;
+  onOpenDuplicateReview: () => void;
 }) {
   const badge = statusBadge[f.status];
   const rowsCount = f.parsed?.length ?? 0;
@@ -235,6 +263,9 @@ function FileRow({
   const totalHeaders = f.availableHeaders?.length ?? 0;
   const excludedCount = f.excludedHeaders?.length ?? 0;
   const selectedHeaders = Math.max(totalHeaders - excludedCount, 0);
+  const dupGroupCount = f.duplicateGroups?.length ?? 0;
+  const dupRowCount = (f.duplicateGroups ?? []).reduce((s, g) => s + g.rows.length, 0);
+  const autoDedup = f.autoDedupedIdenticalCount ?? 0;
   return (
     <div className="rounded border p-3">
       <div className="flex items-start justify-between gap-3">
@@ -334,6 +365,34 @@ function FileRow({
               <p className="mt-1 text-xs text-amber-600">
                 ⚠ {f.warnings.slice(0, 3).join(" · ")}
               </p>
+            )}
+            {(dupGroupCount > 0 || autoDedup > 0) && (
+              <div className="mt-2 flex items-start gap-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+                <Copy className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div className="flex-1">
+                  {dupGroupCount > 0 && (
+                    <div>
+                      동일 Issue No 중복이 <strong>{dupGroupCount}그룹 ({dupRowCount}행)</strong> 감지되었습니다. 검토 후 진행하세요.
+                    </div>
+                  )}
+                  {autoDedup > 0 && (
+                    <div className="text-[11px] text-muted-foreground">
+                      완전 동일 중복 <strong>{autoDedup}행</strong>은 자동 제거됨.
+                    </div>
+                  )}
+                </div>
+                {dupGroupCount > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={onOpenDuplicateReview}
+                    disabled={disabled}
+                  >
+                    중복 검토
+                  </Button>
+                )}
+              </div>
             )}
             {f.validationError && (
               <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
