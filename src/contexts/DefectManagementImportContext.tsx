@@ -701,7 +701,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       const ids = deduped.map((p) => p.source_issue_no);
       const existing = new Map<
         string,
-        { priority_locked: boolean; hdec_verification_locked: boolean }
+        { priority_locked: boolean; hdec_verification_locked: boolean; actual_closure_date: string | null }
       >();
       const idChunks: string[][] = [];
       for (let i = 0; i < ids.length; i += EXISTING_FETCH_CHUNK) {
@@ -710,12 +710,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
         const { data } = await (supabase as any)
           .from("defect_items_raw")
-          .select("source_issue_no, priority_locked, hdec_verification_locked")
+          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date")
           .in("source_issue_no", chunk);
         for (const r of (data ?? []) as any[]) {
           existing.set(r.source_issue_no, {
             priority_locked: !!r.priority_locked,
             hdec_verification_locked: !!r.hdec_verification_locked,
+            actual_closure_date: r.actual_closure_date ?? null,
           });
         }
       });
@@ -792,6 +793,17 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             if (k === "hdec_verification" && skipVerification) continue;
             put(base, k, v);
           }
+        }
+        // Status가 Closed로 파생되었을 때 A.Closure 날짜가 파일/DB 모두 비어있으면
+        // last_updated_at (없으면 data_date) 으로 자동 채움.
+        if (
+          base.closure_status === "Closed" &&
+          !excludedFields.has("actual_closure_date") &&
+          !base.actual_closure_date &&
+          !prev?.actual_closure_date
+        ) {
+          const fallback = (p.last_updated_at ? String(p.last_updated_at).slice(0, 10) : null) ?? dataDate;
+          if (fallback) base.actual_closure_date = fallback;
         }
         return base;
       });
