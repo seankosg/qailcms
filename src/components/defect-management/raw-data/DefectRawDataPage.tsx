@@ -296,6 +296,12 @@ export function DefectRawDataPage() {
     if (idx >= 0) Object.assign((filteredItems as any)[idx], patch);
   }, [filteredItems]);
 
+  const orderedKeys = useMemo(() => {
+    const frozenSet = new Set(frozenExtras);
+    const rest = order.filter((k) => !frozenSet.has(k));
+    return [...SYSTEM_FROZEN_IDS, ...frozenExtras, ...rest];
+  }, [order, frozenExtras]);
+
   const columns = useMemo<ColumnDef<DefectItem>[]>(() => {
     // Static select column
     const selectCol: ColumnDef<DefectItem> = {
@@ -371,25 +377,36 @@ export function DefectRawDataPage() {
       },
     };
 
-    // Data columns from DEFECT_COLUMNS
-    const dataCols: ColumnDef<DefectItem>[] = DEFECT_COLUMNS
-      .filter((c) => c.key !== "is_critical") // handled separately
-      .map((c) => buildDataColumn(c, optionFields, dataDate, isAdmin, patchLocalItem, refetch));
-
-    return [selectCol, criticalCol, stageCol, ...dataCols];
-  }, [optionFields, dataDate, criticalPending, isAdmin, patchLocalItem, refetch]);
+    // Data columns from DEFECT_COLUMNS, ordered by user-configured orderedKeys
+    const byKey = new Map(
+      DEFECT_COLUMNS.filter((c) => c.key !== "is_critical").map((c) => [c.key, c] as const),
+    );
+    const cols: ColumnDef<DefectItem>[] = [];
+    for (const id of orderedKeys) {
+      if (id === "__select") { cols.push(selectCol); continue; }
+      if (id === "is_critical") { cols.push(criticalCol); continue; }
+      if (id === "stage_progress") { cols.push(stageCol); continue; }
+      const c = byKey.get(id);
+      if (!c) continue;
+      cols.push(buildDataColumn(c, optionFields, dataDate, isAdmin, patchLocalItem, refetch));
+    }
+    return cols;
+  }, [orderedKeys, optionFields, dataDate, criticalPending, isAdmin, patchLocalItem, refetch]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = { __select: true, is_critical: true, stage_progress: true };
     const configured = new Map(fieldConfig.map((r) => [r.field_name, r]));
+    const frozenSet = new Set(frozenExtras);
     for (const c of columns) {
       const id = (c as any).id ?? (c as any).accessorKey;
       if (!id || id in vis) continue;
+      if (frozenSet.has(id)) { vis[id] = true; continue; }
+      if (id in visibility) { vis[id] = visibility[id] !== false; continue; }
       const row = configured.get(id);
       vis[id] = row ? !!row.is_visible : true;
     }
     return vis;
-  }, [columns, fieldConfig]);
+  }, [columns, fieldConfig, visibility, frozenExtras]);
 
   const table = useReactTable<DefectItem>({
     data: filteredItems,
