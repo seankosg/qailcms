@@ -188,7 +188,6 @@ function Inner() {
                 file={f}
                 isRunning={isRunning}
                 onRemove={() => removeFile(f.id)}
-                onTeamChange={(t) => setFileTeam(f.id, t)}
                 onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
                 onOpenColumnSelect={() => setColumnDialogFileId(f.id)}
                 onSheetChange={(sheet) => setFileSheet(f.id, sheet)}
@@ -238,7 +237,6 @@ function FileRow({
   file: f,
   isRunning,
   onRemove,
-  onTeamChange,
   onDataDateChange,
   onOpenColumnSelect,
   onSheetChange,
@@ -247,7 +245,6 @@ function FileRow({
   file: DefectImportFile;
   isRunning: boolean;
   onRemove: () => void;
-  onTeamChange: (t: DefectTeam) => void;
   onDataDateChange: (v: string | null) => void;
   onOpenColumnSelect: () => void;
   onSheetChange: (sheet: string) => void;
@@ -313,25 +310,7 @@ function FileRow({
                   </Select>
                 </>
               )}
-              <span className="text-xs text-muted-foreground">Team *</span>
-              <Select
-                value={f.team ?? ""}
-                onValueChange={(v) => onTeamChange(v as DefectTeam)}
-                disabled={disabled}
-              >
-                <SelectTrigger className="h-7 w-[110px] text-xs">
-                  <SelectValue placeholder="선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DEFECT_TEAMS.map((t) => (
-                    <SelectItem key={t} value={t} className="text-xs">
-                      {t}
-                      {f.teamHint === t ? " (추정)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="ml-2 text-xs text-muted-foreground">Data Date</span>
+              <span className="text-xs text-muted-foreground">Data Date</span>
               <Input
                 type="date"
                 className="h-7 w-[140px] text-xs"
@@ -355,7 +334,6 @@ function FileRow({
             {f.categorySummary && f.categorySummary.length > 0 && (
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Category 감지: {f.categorySummary.join(" · ")}
-                {f.teamHint && ` → 추정 team: ${f.teamHint}`}
               </p>
             )}
             {f.warnings && f.warnings.length > 0 && (
