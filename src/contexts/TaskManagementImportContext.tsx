@@ -431,7 +431,55 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       }
       const deduped = Array.from(dedupMap.values());
 
-      const payloads = deduped.map((p) => {
+      // ---- 충돌 정책 적용 (skip / renumber / overwrite) ----
+      const conflictPolicy: ConflictPolicy = f.conflictPolicy ?? "overwrite";
+      const conflictSet = new Set<string>(
+        (f.preflight?.conflicts ?? []).map((c) => c.task_no),
+      );
+      let skippedByPolicy = 0;
+      let renumbered = 0;
+      const renumberMap = new Map<string, string>();
+      const applied: typeof deduped = [];
+      for (const p of deduped) {
+        if (!conflictSet.has(p.task_no) || conflictPolicy === "overwrite") {
+          applied.push(p);
+          continue;
+        }
+        if (conflictPolicy === "skip") {
+          skippedByPolicy++;
+          continue;
+        }
+        // renumber
+        try {
+          const { task_no: newTaskNo } = await allocateTaskNo({
+            data: {
+              discipline,
+              parent_task_no: p.parent_task_no ?? null,
+            },
+          });
+          renumberMap.set(p.task_no, newTaskNo);
+          applied.push({ ...p, task_no: newTaskNo });
+          renumbered++;
+        } catch (e) {
+          console.warn("[task-import] renumber failed, fallback overwrite", e);
+          applied.push(p);
+        }
+      }
+      if (renumberMap.size > 0) {
+        // parent_task_no가 renumber 대상을 가리키던 자식들도 함께 교체
+        for (let i = 0; i < applied.length; i++) {
+          const p = applied[i];
+          if (p.parent_task_no && renumberMap.has(p.parent_task_no)) {
+            applied[i] = { ...p, parent_task_no: renumberMap.get(p.parent_task_no)! };
+          }
+        }
+        toast.info(`${f.name}: 충돌 ${renumberMap.size}건 자동 재번호 발급`);
+      }
+      if (skippedByPolicy > 0) {
+        toast.info(`${f.name}: 충돌 ${skippedByPolicy}건 건너뜀`);
+      }
+
+      const payloads = applied.map((p) => {
         const isParent = p.level === "parent";
         const stripParent = isParent && rollupMode === "auto";
         return {
