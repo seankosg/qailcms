@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
+import type { Dispatch, SetStateAction } from "react";
 
 interface Props {
   isAdmin: boolean;
   selectedRows: Array<{ id: string; is_critical?: boolean | null }>;
   pending: Map<string, boolean>;
-  setPending: React.Dispatch<React.SetStateAction<Map<string, boolean>>>;
+  setPending: Dispatch<SetStateAction<Map<string, boolean>>>;
 }
 
 export function CriticalBulkBar({ isAdmin, selectedRows, pending, setPending }: Props) {

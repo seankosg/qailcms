@@ -708,6 +708,7 @@ export function DefectRawDataPage() {
         loading={!stateLoaded || isFetching}
         dataDate={dataDate}
         frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
+        getSourceOrigin={helpers.getSourceOrigin}
         onRowClick={(r) => navigate({ to: "/closure/defect-management/detail/$id", params: { id: r.id } })}
       />
 
@@ -750,14 +751,6 @@ export function DefectRawDataPage() {
         onDiscard={() => setCriticalPending(new Map())}
       />
 
-      <BulkEditBar
-        selectedRows={[]}
-        fields={[]}
-        exportColumns={[]}
-        canEdit={false}
-        onClearSelection={() => setRowSelection({})}
-        onApplied={() => { setRowSelection({}); invalidateDefects(); }}
-      />
     </div>
   );
 }
@@ -844,10 +837,11 @@ interface TableViewProps {
   loading: boolean;
   dataDate: string | null;
   frozenColIds: string[];
+  getSourceOrigin: (field: string) => "hdec" | "aconex" | "system";
   onRowClick: (row: DefectItem) => void;
 }
 
-function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, onRowClick }: TableViewProps) {
+function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, getSourceOrigin, onRowClick }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
   const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
   // 리프 컬럼을 순회하면서 frozen id인 것들만 왼쪽부터 sticky 스택으로 쌓음.
@@ -882,6 +876,33 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
   const vRows = rowVirtualizer.getVirtualItems();
   const paddingTop = vRows.length > 0 ? vRows[0].start : 0;
   const paddingBottom = vRows.length > 0 ? rowVirtualizer.getTotalSize() - vRows[vRows.length - 1].end : 0;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const autoSizeColumn = (columnId: string) => {
+    const container = tableRef.current;
+    if (!container) return;
+    const cells = container.querySelectorAll<HTMLElement>(`[data-column-id="${columnId}"]`);
+    let max = 72;
+    cells.forEach((cell) => {
+      const clone = cell.cloneNode(true) as HTMLElement;
+      clone.style.cssText = "position:absolute; visibility:hidden; width:auto; white-space:nowrap; max-width:none; left:-9999px; top:0;";
+      document.body.appendChild(clone);
+      max = Math.max(max, clone.getBoundingClientRect().width);
+      document.body.removeChild(clone);
+    });
+    table.setColumnSizing((prev) => ({ ...prev, [columnId]: Math.min(Math.ceil(max) + 18, 640) }));
+  };
+
+  const stickyBgFor = (row: DefectItem, index: number): string => {
+    const closed = Boolean((row as any).actual_closure_date) || /closed|complete|done/i.test(`${(row as any).closure_status ?? ""} ${(row as any).status_raw ?? ""}`);
+    const overdue = isOverdueDefect(row as any, dataDate);
+    const base = "hsl(var(--background))";
+    const opaque = `linear-gradient(${base}, ${base})`;
+    if (hoveredIndex === index) return `${opaque}, hsl(var(--muted) / 0.95)`;
+    if (overdue && !closed) return `${opaque}, hsl(var(--destructive) / 0.06)`;
+    if (closed) return `${opaque}, hsl(var(--muted) / 0.45)`;
+    return base;
+  };
 
   return (
     <div className="flex max-h-[calc(100vh-260px)] flex-col overflow-hidden rounded-md border bg-background">
@@ -894,14 +915,18 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                 const isSticky = frozenSet.has(header.column.id);
                 const leftPx = isSticky ? stickyLefts.get(header.column.id) ?? 0 : undefined;
                 const isLastFrozen = i === lastFrozenIndex;
+                const originStyle = getOriginHeaderStyle(getSourceOrigin(header.column.id));
                 return (
                   <TableHead
                     key={header.id}
+                    data-column-id={header.column.id}
+                    title={typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : header.column.id}
                     style={{
                       width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize(),
-                      ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 3, background: "hsl(var(--background))" } : {}),
+                      ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 3, background: originStyle.stickyBg } : {}),
                     }}
-                    className={cn("relative h-9 cursor-pointer select-none whitespace-nowrap border-b px-2 py-0 text-left text-[11px] font-medium",
+                    className={cn("relative h-9 cursor-pointer select-none whitespace-nowrap border-b px-4 py-0 text-left text-xs font-medium",
+                      !isSticky && (originStyle.bg || "bg-background"), originStyle.border,
                       isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                     onClick={header.column.getToggleSortingHandler()}
                   >
@@ -919,6 +944,8 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                         onMouseDown={header.getResizeHandler()}
                         onTouchStart={header.getResizeHandler()}
                         onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => { e.stopPropagation(); autoSizeColumn(header.column.id); }}
+                        title="Drag to resize, double-click to auto-fit"
                         className={cn("absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none touch-none hover:bg-primary/40",
                           header.column.getIsResizing() && "bg-primary/60")}
                       />
@@ -946,6 +973,8 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                       key={row.id}
                       style={{ height: 36 }}
                       className={cn("cursor-pointer", closed && "bg-muted/30 text-muted-foreground", overdue && !closed && "bg-destructive/5", "hover:bg-muted/50")}
+                      onMouseEnter={() => setHoveredIndex(vr.index)}
+                      onMouseLeave={() => setHoveredIndex(null)}
                       onClick={() => onRowClick(row.original)}
                     >
                       {row.getVisibleCells().map((cell, i) => {
@@ -955,11 +984,15 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                         return (
                           <TableCell
                             key={cell.id}
+                            data-column-id={cell.column.id}
                             style={{
                               width: cell.column.getSize(), minWidth: cell.column.getSize(), maxWidth: cell.column.getSize(),
-                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: "hsl(var(--background))" } : {}),
+                              height: 36,
+                              maxHeight: 36,
+                              overflow: "hidden",
+                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: stickyBgFor(row.original, vr.index) } : {}),
                             }}
-                            className={cn("truncate border-b px-2 py-1 text-xs", isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
+                            className={cn("truncate whitespace-nowrap py-2 text-xs", isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </TableCell>
