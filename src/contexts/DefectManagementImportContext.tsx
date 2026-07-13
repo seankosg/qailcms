@@ -701,7 +701,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       const ids = deduped.map((p) => p.source_issue_no);
       const existing = new Map<
         string,
-        { priority_locked: boolean; hdec_verification_locked: boolean }
+        { priority_locked: boolean; hdec_verification_locked: boolean; actual_closure_date: string | null }
       >();
       const idChunks: string[][] = [];
       for (let i = 0; i < ids.length; i += EXISTING_FETCH_CHUNK) {
@@ -710,12 +710,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
         const { data } = await (supabase as any)
           .from("defect_items_raw")
-          .select("source_issue_no, priority_locked, hdec_verification_locked")
+          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date")
           .in("source_issue_no", chunk);
         for (const r of (data ?? []) as any[]) {
           existing.set(r.source_issue_no, {
             priority_locked: !!r.priority_locked,
             hdec_verification_locked: !!r.hdec_verification_locked,
+            actual_closure_date: r.actual_closure_date ?? null,
           });
         }
       });
