@@ -605,12 +605,17 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         base[field] = value;
       };
 
+      const unmappedCategories = new Map<string, number>();
       const payloads = workingRows.map((p) => {
         const prev = existing.get(p.source_issue_no);
         const skipPriority = prev?.priority_locked;
         const skipVerification = prev?.hdec_verification_locked;
+        const rowTeam = resolveTeam(p.category);
+        if (p.category && !rowTeam) {
+          unmappedCategories.set(p.category, (unmappedCategories.get(p.category) ?? 0) + 1);
+        }
         const base: Record<string, unknown> = {
-          team,
+          team: rowTeam,
           data_date: dataDate,
           source_issue_no: p.source_issue_no,
           raw_payload: p.raw_payload,
