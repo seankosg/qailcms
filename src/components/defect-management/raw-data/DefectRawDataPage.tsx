@@ -116,7 +116,8 @@ export function DefectRawDataPage() {
   const { data: fieldConfig = [] } = useDefectFieldConfig();
   const helpers = useDefectFieldHelpers();
   const isAdmin = !!user?.isAdmin;
-  const storageKey = user?.id ? `defect-raw-data-state:${user.id}` : "defect-raw-data-state:anon";
+  const legacyStorageKey = user?.id ? `defect-raw-data-state:${user.id}` : "defect-raw-data-state:anon";
+  const viewPref = useUserViewPreference("defect-management.raw-data.v1");
 
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
@@ -128,30 +129,75 @@ export function DefectRawDataPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [criticalPending, setCriticalPending] = useState<Map<string, boolean>>(new Map());
   const [exportOpen, setExportOpen] = useState(false);
+  const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
+  const [visibility, setVisibility] = useState<VisibilityState>({});
+  const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
 
   const latestDataDate = getDefectLatestDataDate(items);
   const dataDate = latestDataDate ?? null;
 
-  // ── Restore persistent state + URL drilldown params ─────────────────────
+  // ── Restore persistent state (server view pref → legacy localStorage seed) + URL drilldown ─
   useEffect(() => {
+    if (!viewPref.ready) return;
     setStateLoaded(false);
     const isDrilldown = DRILLDOWN_PARAMS.some((p) => search[p] != null);
     let baseFilters: ColumnFiltersState = [];
     let baseSorting = DEFAULT_SORTING;
     let baseGlobal = "";
     let baseSizing: ColumnSizingState = {};
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        baseSizing = parsed.columnSizing && typeof parsed.columnSizing === "object" ? parsed.columnSizing : {};
-        if (!isDrilldown) {
-          baseSorting = Array.isArray(parsed.sorting) && parsed.sorting.length ? parsed.sorting : DEFAULT_SORTING;
-          baseFilters = Array.isArray(parsed.columnFilters) ? parsed.columnFilters : [];
-          baseGlobal = typeof parsed.globalFilter === "string" ? parsed.globalFilter : "";
+    let baseOrder: string[] = DEFAULT_ORDER;
+    let baseVisibility: VisibilityState = {};
+    let baseFrozen: string[] = [];
+
+    const s: any = viewPref.state ?? null;
+    let src: any = null;
+    if (s && typeof s === "object" && Object.keys(s).length > 0) {
+      src = s;
+    } else {
+      // 최초 1회 마이그레이션: 기존 localStorage에서 seed
+      try {
+        const raw = localStorage.getItem(legacyStorageKey);
+        if (raw) src = JSON.parse(raw);
+      } catch { /* ignore */ }
+    }
+
+    if (src) {
+      baseSizing = src.columnSizing && typeof src.columnSizing === "object" ? src.columnSizing : {};
+      if (!isDrilldown) {
+        baseSorting = Array.isArray(src.sorting) && src.sorting.length ? src.sorting : DEFAULT_SORTING;
+        baseFilters = Array.isArray(src.columnFilters) ? src.columnFilters : [];
+        baseGlobal = typeof src.globalFilter === "string" ? src.globalFilter : "";
+      }
+      const validKeys = new Set(DEFAULT_ORDER);
+      const savedOrder: string[] = Array.isArray(src.order)
+        ? src.order.filter((k: any) => typeof k === "string" && validKeys.has(k))
+        : [];
+      if (savedOrder.length) {
+        const savedSet = new Set(savedOrder);
+        const merged = [...savedOrder];
+        DEFAULT_ORDER.forEach((k, defIdx) => {
+          if (savedSet.has(k)) return;
+          let insertAt = merged.length;
+          for (let i = defIdx - 1; i >= 0; i--) {
+            const prev = DEFAULT_ORDER[i];
+            const idx = merged.indexOf(prev);
+            if (idx !== -1) { insertAt = idx + 1; break; }
+          }
+          merged.splice(insertAt, 0, k);
+        });
+        baseOrder = merged;
+      }
+      if (src.visibility && typeof src.visibility === "object") {
+        for (const [k, v] of Object.entries(src.visibility)) {
+          if (validKeys.has(k)) baseVisibility[k] = !!v;
         }
       }
-    } catch { /* ignore */ }
+      if (Array.isArray(src.frozenExtras)) {
+        baseFrozen = src.frozenExtras
+          .filter((k: any) => typeof k === "string" && validKeys.has(k))
+          .slice(0, 3);
+      }
+    }
 
     const overriddenCols = new Set<string>();
     for (const [p, col] of Object.entries(URL_MAP)) if (search[p] != null) overriddenCols.add(col);
@@ -177,8 +223,12 @@ export function DefectRawDataPage() {
     setColumnSizing(baseSizing);
     setGlobalFilter(baseGlobal);
     setSearchInput(baseGlobal);
+    setOrder(baseOrder);
+    setVisibility(baseVisibility);
+    setFrozenExtras(baseFrozen);
     setStateLoaded(true);
-  }, [storageKey, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewPref.ready, legacyStorageKey, search]);
 
   // Debounced global search
   useEffect(() => {
@@ -186,19 +236,19 @@ export function DefectRawDataPage() {
     return () => window.clearTimeout(t);
   }, [searchInput]);
 
-  // Persist state
+  // Persist state (서버 저장 + 로컬 캐시, 훅 내부 debounce)
   useEffect(() => {
     if (!stateLoaded) return;
-    const t = window.setTimeout(() => {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify({
-          sorting: sorting.length ? sorting : DEFAULT_SORTING,
-          columnFilters, globalFilter, columnSizing,
-        }));
-      } catch { /* ignore */ }
-    }, 500);
-    return () => window.clearTimeout(t);
-  }, [stateLoaded, storageKey, sorting, columnFilters, globalFilter, columnSizing]);
+    viewPref.save({
+      sorting: sorting.length ? sorting : DEFAULT_SORTING,
+      columnFilters,
+      globalFilter,
+      columnSizing,
+      order,
+      visibility,
+      frozenExtras,
+    } as any);
+  }, [stateLoaded, sorting, columnFilters, globalFilter, columnSizing, order, visibility, frozenExtras, viewPref]);
 
   // ── Filtered base items (URL post-filters that don't map to columns) ────
   const filteredItems = useMemo(() => {
