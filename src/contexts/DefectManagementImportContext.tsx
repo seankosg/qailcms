@@ -974,7 +974,14 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       toast.error("Import 가능한 파일이 없습니다.");
       return;
     }
-    await executeImport(ready);
+    try {
+      await executeImport(ready);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[defect-import] start failed", e);
+      toast.error(`Defect import 실패: ${msg}`);
+      setIsRunning(false);
+    }
   }, [files, isRunning, executeImport]);
 
   return (
