@@ -31,6 +31,11 @@ export const DEFECT_TARGET_FIELDS = [
   "location_reference",
   "classification",
   "podium_area",
+  "building",
+  "room",
+  "room_group",
+  "level_name",
+  "review_flag",
 ] as const;
 export type DefectTargetField = (typeof DEFECT_TARGET_FIELDS)[number];
 
@@ -61,6 +66,11 @@ const CANONICAL_HEADERS: Record<string, DefectTargetField> = {
   locationreference: "location_reference",
   classification: "classification",
   "podiumarea": "podium_area",
+  building: "building",
+  room: "room",
+  roomgroup: "room_group",
+  level: "level_name",
+  reviewflag: "review_flag",
 };
 
 /** Re-import 파일에서 등장 가능한 확장 필드(원본 헤더가 그대로 필드명이라 매핑 필요). */
@@ -127,6 +137,11 @@ export interface ParsedDefectRow {
   location_reference: string | null;
   classification: string | null;
   podium_area: string | null;
+  building: string | null;
+  room: string | null;
+  room_group: string | null;
+  level_name: string | null;
+  review_flag: string | null;
   raw_payload: Record<string, unknown>;
   /** Re-import 파일에서만 채워지는 확장 필드. */
   extra?: Record<string, unknown>;
