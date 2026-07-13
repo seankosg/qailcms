@@ -220,6 +220,50 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_import_row_logs: {
+        Row: {
+          abd_number: string | null
+          action_taken: string
+          id: string
+          processed_at: string
+          raw_row_no: number | null
+          reason_code: string | null
+          reason_detail: string | null
+          team: string | null
+          upload_id: string
+        }
+        Insert: {
+          abd_number?: string | null
+          action_taken: string
+          id?: string
+          processed_at?: string
+          raw_row_no?: number | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          team?: string | null
+          upload_id: string
+        }
+        Update: {
+          abd_number?: string | null
+          action_taken?: string
+          id?: string
+          processed_at?: string
+          raw_row_no?: number | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          team?: string | null
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_import_row_logs_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "abd_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       abd_items_raw: {
         Row: {
           abd_number: string
