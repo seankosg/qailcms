@@ -509,6 +509,16 @@ function FileRow({
               Duplicates: {f.result.duplicates}
             </Badge>
           )}
+          {typeof f.result.renumbered === "number" && f.result.renumbered > 0 && (
+            <Badge variant="outline" className="border-sky-300 text-sky-700">
+              Renumbered: {f.result.renumbered}
+            </Badge>
+          )}
+          {f.result.skipped > 0 && (
+            <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">
+              Skipped: {f.result.skipped}
+            </Badge>
+          )}
           {typeof f.result.rolledUp === "number" && f.result.rolledUp > 0 && (
             <Badge variant="outline" className="border-violet-300 text-violet-700">
               Rollup: {f.result.rolledUp}
