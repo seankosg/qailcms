@@ -465,6 +465,14 @@ export function DefectRawDataPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/dashboard"><LayoutDashboard className="mr-1 h-3.5 w-3.5" /> Dashboard</Link></Button>
+          <DefectColumnOrderMenu
+            order={order}
+            visibility={visibility as Record<string, boolean>}
+            frozenExtras={frozenExtras}
+            onOrderChange={setOrder}
+            onVisibilityChange={setVisibility}
+            onFrozenChange={setFrozenExtras}
+          />
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1 h-3.5 w-3.5" /> Export</Button>
           <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/import"><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
           <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/import/logs"><FileClock className="mr-1 h-3.5 w-3.5" /> Import Logs</Link></Button>
@@ -518,6 +526,7 @@ export function DefectRawDataPage() {
         tableRef={tableRef}
         loading={!stateLoaded}
         dataDate={dataDate}
+        frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
         onRowClick={(r) => navigate({ to: "/closure/defect-management/detail/$id", params: { id: r.id } })}
       />
 
