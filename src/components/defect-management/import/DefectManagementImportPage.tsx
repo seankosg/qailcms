@@ -426,6 +426,17 @@ function FileRow({
           )}
         </div>
       )}
+      {f.result?.unmappedCategoryCount && f.result.unmappedCategoryCount > 0 ? (
+        <div className="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          <div className="font-semibold">
+            매핑 미등록 Category {f.result.unmappedCategoryCount}행 — Team 값이 비워졌습니다.
+          </div>
+          <div className="mt-0.5">{(f.result.unmappedCategories ?? []).join(" · ")}</div>
+          <div className="mt-0.5 text-muted-foreground">
+            Defect Settings 에서 매핑을 추가한 뒤 다시 임포트하거나 상세 페이지에서 수동으로 팀을 지정하세요.
+          </div>
+        </div>
+      ) : null}
       {f.result?.errors && f.result.errors.length > 0 && (
         <div className="mt-2 space-y-1 rounded border border-destructive/40 bg-destructive/5 p-2 text-[11px] text-destructive">
           <div className="font-semibold">
