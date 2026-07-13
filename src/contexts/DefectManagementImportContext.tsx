@@ -18,12 +18,12 @@ import {
 } from "@/lib/defect-management/parser";
 import { deriveCompletionStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
 import type { DefectTeam } from "@/lib/defect-management/columns";
+import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 
 export type DefectFileStatus =
   | "parsing"
   | "pending_sheet_selection"
   | "pending_duplicate_review"
-  | "needs_team"
   | "ready"
   | "processing"
   | "done"
@@ -79,8 +79,6 @@ export interface DefectImportFile {
   isReimport?: boolean;
   warnings?: string[];
   categorySummary?: string[];
-  teamHint?: DefectTeam | null;
-  team?: DefectTeam | null;
   dataDateOverride?: string | null;
   validationError?: string | null;
   error?: string;
@@ -91,6 +89,8 @@ export interface DefectImportFile {
     rejected: number;
     duplicates: number;
     skippedReimportNoMatch?: number;
+    unmappedCategoryCount?: number;
+    unmappedCategories?: string[];
     errors?: DefectImportError[];
   };
   duplicateStrategy?: DuplicateStrategy;
@@ -104,7 +104,6 @@ interface CtxValue {
   addFiles: (files: File[]) => Promise<void>;
   removeFile: (id: string) => void;
   clearAll: () => void;
-  setFileTeam: (id: string, team: DefectTeam) => void;
   setFileDataDateOverride: (id: string, date: string | null) => void;
   setFileSheet: (id: string, sheetName: string) => Promise<void>;
   setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
@@ -218,7 +217,6 @@ function isNetworkError(err: unknown): boolean {
 
 function validate(f: DefectImportFile): string | null {
   if (!f.parsed || f.parsed.length === 0) return "행을 찾지 못했습니다.";
-  if (!f.team) return "Team을 선택하세요 (건축/전기/설비).";
   if ((f.duplicateGroups?.length ?? 0) > 0) {
     return `동일 Issue No 중복이 ${f.duplicateGroups!.length}그룹 감지되었습니다. "중복 검토"를 완료하세요.`;
   }
@@ -266,9 +264,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             const groupsWithStrategy = applyStrategyToGroups(groups, strategy);
             const nextStatus: DefectFileStatus = hasUnresolvedDuplicates
               ? "pending_duplicate_review"
-              : (f.team ?? parsed.teamHint)
-                ? "ready"
-                : "needs_team";
+              : "ready";
             const updated: DefectImportFile = {
               ...f,
               parsed: parsed.rows,
@@ -282,8 +278,6 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               excludedFields: parsed.excludedFields,
               isReimport: parsed.isReimport,
               warnings: parsed.warnings,
-              teamHint: parsed.teamHint,
-              team: f.team ?? parsed.teamHint ?? null,
               categorySummary: parsed.categorySummary,
               status: nextStatus,
               duplicateStrategy: strategy,
@@ -374,21 +368,6 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     [],
   );
   const clearAll = useCallback(() => setFiles([]), []);
-
-  const setFileTeam = useCallback((id: string, team: DefectTeam) => {
-    setFiles((cur) =>
-      cur.map((f) => {
-        if (f.id !== id) return f;
-        const nextStatus: DefectFileStatus =
-          f.status === "pending_sheet_selection" || f.status === "parsing"
-            ? f.status
-            : "ready";
-        const updated = { ...f, team, status: nextStatus };
-        updated.validationError = validate(updated);
-        return updated;
-      }),
-    );
-  }, []);
 
   const setFileDataDateOverride = useCallback((id: string, date: string | null) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, dataDateOverride: date } : f)));
@@ -508,7 +487,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           }
         }
         const nextParsed = f.parsed.filter((_, idx) => !dropIndices.has(idx));
-        const nextStatus: DefectFileStatus = f.team ? "ready" : "needs_team";
+        const nextStatus: DefectFileStatus = "ready";
         const updated: DefectImportFile = {
           ...f,
           parsed: nextParsed,
@@ -526,9 +505,27 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id ?? null;
 
+    // Category → Team 매핑 조회 (1회)
+    const teamByCategory = new Map<string, DefectTeam>();
+    try {
+      const { data: mapRows } = await (supabase as any)
+        .from("defect_category_team_map")
+        .select("category, team");
+      for (const m of (mapRows ?? []) as Array<{ category: string; team: string }>) {
+        if (m.category && m.team && (DEFECT_TEAMS as readonly string[]).includes(m.team)) {
+          teamByCategory.set(String(m.category).trim(), m.team as DefectTeam);
+        }
+      }
+    } catch (e) {
+      console.warn("[defect-import] category_team_map fetch failed", e);
+    }
+    const resolveTeam = (category: string | null | undefined): DefectTeam | null => {
+      if (!category) return null;
+      return teamByCategory.get(String(category).trim()) ?? null;
+    };
+
     for (const f of ready) {
       const parsed = f.parsed ?? [];
-      const team = f.team!;
       const dataDate = f.dataDateOverride ?? new Date().toISOString().slice(0, 10);
       const startedAtIso = new Date().toISOString();
       const excludedFields = f.excludedFields ?? new Set<string>();
@@ -540,7 +537,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         .from("defect_import_logs")
         .insert({
           file_name: f.name,
-          team,
+          team: null,
           data_date: dataDate,
           sheet_name: f.sheetName ?? null,
           total_rows: parsed.length,
@@ -608,12 +605,17 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         base[field] = value;
       };
 
+      const unmappedCategories = new Map<string, number>();
       const payloads = workingRows.map((p) => {
         const prev = existing.get(p.source_issue_no);
         const skipPriority = prev?.priority_locked;
         const skipVerification = prev?.hdec_verification_locked;
+        const rowTeam = resolveTeam(p.category);
+        if (p.category && !rowTeam) {
+          unmappedCategories.set(p.category, (unmappedCategories.get(p.category) ?? 0) + 1);
+        }
         const base: Record<string, unknown> = {
-          team,
+          team: rowTeam,
           data_date: dataDate,
           source_issue_no: p.source_issue_no,
           raw_payload: p.raw_payload,
@@ -737,7 +739,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             const rowLogRows = workingRows.map((p) => ({
               upload_id: logId,
               raw_row_no: p.rawRowNo,
-              team,
+              team: resolveTeam(p.category),
               source_issue_no: p.source_issue_no,
               action_taken: existing.has(p.source_issue_no) ? "updated" : "inserted",
             }));
@@ -787,6 +789,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                     rejected,
                     duplicates,
                     skippedReimportNoMatch,
+                    unmappedCategoryCount: Array.from(unmappedCategories.values()).reduce((a, b) => a + b, 0),
+                    unmappedCategories: Array.from(unmappedCategories.entries()).map(([c, n]) => `${c} × ${n}`),
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
@@ -826,10 +830,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
   const startImport = useCallback(async () => {
     if (isRunning) return;
     const ready = files.filter(
-      (f) => f.status === "ready" && f.team && !f.validationError && f.parsed && f.parsed.length > 0,
+      (f) => f.status === "ready" && !f.validationError && f.parsed && f.parsed.length > 0,
     );
     if (ready.length === 0) {
-      toast.error("Import 가능한 파일이 없습니다. Team 선택을 확인하세요.");
+      toast.error("Import 가능한 파일이 없습니다.");
       return;
     }
     await executeImport(ready);
@@ -843,7 +847,6 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         addFiles,
         removeFile,
         clearAll,
-        setFileTeam,
         setFileDataDateOverride,
         setFileSheet,
         setFileExcludedHeaders,

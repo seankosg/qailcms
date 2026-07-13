@@ -26,6 +26,7 @@ const NAV: NavGroup[] = [
       { to: "/closure/defect-management/dashboard", label: "Defect Dashboard", icon: LayoutDashboard },
       { to: "/closure/defect-management/import", label: "Defect Import", icon: Upload, editorOnly: true },
       { to: "/closure/defect-management/import/logs", label: "Defect Import Logs", icon: FileClock, editorOnly: true },
+      { to: "/closure/defect-management/settings", label: "Defect Settings", icon: Settings2, adminOnly: true },
       { to: "/closure/abd/raw-data", label: "ABD-Raw Data", icon: FileSpreadsheet },
       { to: "/closure/abd/import", label: "ABD Import", icon: Upload, editorOnly: true },
       { to: "/closure/abd/import/logs", label: "ABD Import Logs", icon: FileClock, editorOnly: true },

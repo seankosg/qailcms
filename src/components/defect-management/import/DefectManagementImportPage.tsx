@@ -34,7 +34,6 @@ import {
   type DefectFileStatus,
   type DefectImportFile,
 } from "@/contexts/DefectManagementImportContext";
-import { DEFECT_TEAMS, type DefectTeam } from "@/lib/defect-management/columns";
 import { DefectColumnSelect } from "./DefectColumnSelect";
 import { DuplicateReviewDialog } from "./DuplicateReviewDialog";
 
@@ -48,7 +47,6 @@ const statusBadge: Record<DefectFileStatus, { label: string; cls: string }> = {
     label: "중복 검토",
     cls: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-200",
   },
-  needs_team: { label: "Team 필요", cls: "bg-amber-100 text-amber-800" },
   ready: { label: "Ready", cls: "bg-primary/10 text-primary" },
   processing: { label: "Processing", cls: "bg-muted text-muted-foreground" },
   done: {
@@ -84,7 +82,6 @@ function Inner() {
     addFiles,
     removeFile,
     clearAll,
-    setFileTeam,
     setFileDataDateOverride,
     setFileSheet,
     setFileExcludedHeaders,
@@ -113,7 +110,7 @@ function Inner() {
   );
 
   const readyCount = files.filter(
-    (f) => f.status === "ready" && f.team && !f.validationError,
+    (f) => f.status === "ready" && !f.validationError,
   ).length;
   const columnDialogFile =
     files.find((f) => f.id === columnDialogFileId) ?? null;
@@ -124,16 +121,16 @@ function Inner() {
       <div>
         <h1 className="text-xl font-semibold">Defect Management — Import</h1>
         <p className="text-sm text-muted-foreground">
-          LetsBuild 형식 Excel(건축/전기/설비)의 첫 시트를 파싱하여
-          <code> defect_items_raw</code>에 upsert합니다. 키는{" "}
-          <code>source_issue_no</code>. Team은 파일 카드에서 반드시 지정하세요.
+          LetsBuild 형식 Excel의 첫 시트를 파싱하여 <code> defect_items_raw</code>에 upsert합니다.
+          키는 <code>source_issue_no</code>. Team은 각 행의 <b>Category</b> 값에 따라 자동으로 채워집니다
+          (매핑 관리: <code>Defect Settings</code>).
         </p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">1. Upload Files</CardTitle>
-          <CardDescription>.xlsx / .xlsm — 다중 파일. 파일별로 팀을 선택합니다.</CardDescription>
+          <CardDescription>.xlsx / .xlsm — 다중 파일. Team은 Category 자동 매핑.</CardDescription>
         </CardHeader>
         <CardContent>
           <div
@@ -191,7 +188,6 @@ function Inner() {
                 file={f}
                 isRunning={isRunning}
                 onRemove={() => removeFile(f.id)}
-                onTeamChange={(t) => setFileTeam(f.id, t)}
                 onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
                 onOpenColumnSelect={() => setColumnDialogFileId(f.id)}
                 onSheetChange={(sheet) => setFileSheet(f.id, sheet)}
@@ -241,7 +237,6 @@ function FileRow({
   file: f,
   isRunning,
   onRemove,
-  onTeamChange,
   onDataDateChange,
   onOpenColumnSelect,
   onSheetChange,
@@ -250,7 +245,6 @@ function FileRow({
   file: DefectImportFile;
   isRunning: boolean;
   onRemove: () => void;
-  onTeamChange: (t: DefectTeam) => void;
   onDataDateChange: (v: string | null) => void;
   onOpenColumnSelect: () => void;
   onSheetChange: (sheet: string) => void;
@@ -316,25 +310,7 @@ function FileRow({
                   </Select>
                 </>
               )}
-              <span className="text-xs text-muted-foreground">Team *</span>
-              <Select
-                value={f.team ?? ""}
-                onValueChange={(v) => onTeamChange(v as DefectTeam)}
-                disabled={disabled}
-              >
-                <SelectTrigger className="h-7 w-[110px] text-xs">
-                  <SelectValue placeholder="선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DEFECT_TEAMS.map((t) => (
-                    <SelectItem key={t} value={t} className="text-xs">
-                      {t}
-                      {f.teamHint === t ? " (추정)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="ml-2 text-xs text-muted-foreground">Data Date</span>
+              <span className="text-xs text-muted-foreground">Data Date</span>
               <Input
                 type="date"
                 className="h-7 w-[140px] text-xs"
@@ -358,7 +334,6 @@ function FileRow({
             {f.categorySummary && f.categorySummary.length > 0 && (
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Category 감지: {f.categorySummary.join(" · ")}
-                {f.teamHint && ` → 추정 team: ${f.teamHint}`}
               </p>
             )}
             {f.warnings && f.warnings.length > 0 && (
@@ -451,6 +426,17 @@ function FileRow({
           )}
         </div>
       )}
+      {f.result?.unmappedCategoryCount && f.result.unmappedCategoryCount > 0 ? (
+        <div className="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          <div className="font-semibold">
+            매핑 미등록 Category {f.result.unmappedCategoryCount}행 — Team 값이 비워졌습니다.
+          </div>
+          <div className="mt-0.5">{(f.result.unmappedCategories ?? []).join(" · ")}</div>
+          <div className="mt-0.5 text-muted-foreground">
+            Defect Settings 에서 매핑을 추가한 뒤 다시 임포트하거나 상세 페이지에서 수동으로 팀을 지정하세요.
+          </div>
+        </div>
+      ) : null}
       {f.result?.errors && f.result.errors.length > 0 && (
         <div className="mt-2 space-y-1 rounded border border-destructive/40 bg-destructive/5 p-2 text-[11px] text-destructive">
           <div className="font-semibold">
