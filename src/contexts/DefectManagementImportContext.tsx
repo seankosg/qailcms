@@ -18,6 +18,7 @@ import {
 } from "@/lib/defect-management/parser";
 import { deriveCompletionStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
 import type { DefectTeam } from "@/lib/defect-management/columns";
+import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 
 export type DefectFileStatus =
   | "parsing"
@@ -263,9 +264,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             const groupsWithStrategy = applyStrategyToGroups(groups, strategy);
             const nextStatus: DefectFileStatus = hasUnresolvedDuplicates
               ? "pending_duplicate_review"
-              : (f.team ?? parsed.teamHint)
-                ? "ready"
-                : "needs_team";
+              : "ready";
             const updated: DefectImportFile = {
               ...f,
               parsed: parsed.rows,
@@ -279,8 +278,6 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               excludedFields: parsed.excludedFields,
               isReimport: parsed.isReimport,
               warnings: parsed.warnings,
-              teamHint: parsed.teamHint,
-              team: f.team ?? parsed.teamHint ?? null,
               categorySummary: parsed.categorySummary,
               status: nextStatus,
               duplicateStrategy: strategy,
