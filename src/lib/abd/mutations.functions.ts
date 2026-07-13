@@ -107,6 +107,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     let inserted = 0, updated = 0, mismatched = 0;
     const seenNumbers = new Set<string>();
     const CHUNK = 500;
+    const rowLogs: any[] = [];
+    let rowIndex = 0;
     for (let i = 0; i < data.rows.length; i += CHUNK) {
       const chunk = data.rows.slice(i, i + CHUNK);
       const payload = chunk.map((r) => {
@@ -166,7 +168,20 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       if (upErr) throw new Error(upErr.message);
 
       for (const r of chunk) {
-        if (existingSet.has(r.abd_number)) updated++; else inserted++;
+        rowIndex++;
+        const wasExisting = existingSet.has(r.abd_number);
+        if (wasExisting) updated++; else inserted++;
+        rowLogs.push({
+          upload_id: batchId,
+          raw_row_no: rowIndex,
+          team: data.team,
+          abd_number: r.abd_number,
+          action_taken: wasExisting ? "updated" : "inserted",
+          reason_code: r.field_mismatch ? "field_mismatch" : null,
+          reason_detail: r.field_mismatch
+            ? `Parsed vs source mismatch: ${Object.keys(r.mismatch_fields ?? {}).join(", ")}`
+            : null,
+        });
       }
     }
 
@@ -179,7 +194,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         .eq("team", data.team)
         .eq("is_active", true);
       const scopeRows = (allActive ?? []).filter((r: any) => (data.plot ? r.plot === data.plot : true));
-      const missingIds = scopeRows.filter((r: any) => !seenNumbers.has(r.abd_number)).map((r: any) => r.id);
+      const missing = scopeRows.filter((r: any) => !seenNumbers.has(r.abd_number));
+      const missingIds = missing.map((r: any) => r.id);
       if (missingIds.length > 0) {
         const { error: inaErr } = await supa
           .from("abd_items_raw")
@@ -192,7 +208,22 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           .in("id", missingIds);
         if (inaErr) throw new Error(inaErr.message);
         inactivated = missingIds.length;
+        for (const m of missing) {
+          rowLogs.push({
+            upload_id: batchId,
+            team: data.team,
+            abd_number: m.abd_number,
+            action_taken: "inactivated",
+            reason_code: "missing_in_upload",
+            reason_detail: `missing_in_upload:${batchId}`,
+          });
+        }
       }
+    }
+
+    // 3.5) persist row logs (chunked to keep request size reasonable)
+    for (let i = 0; i < rowLogs.length; i += 500) {
+      await supa.from("abd_import_row_logs").insert(rowLogs.slice(i, i + 500));
     }
 
     // 4) finalize log
