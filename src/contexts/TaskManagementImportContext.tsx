@@ -582,7 +582,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
         // Tag newly-inserted rows with source_import_log_id for rollback tracking.
         if (logId) {
-          const newTaskNos = deduped
+          const newTaskNos = applied
             .map((p) => p.task_no)
             .filter((t) => !existingSet.has(t));
           for (let i = 0; i < newTaskNos.length; i += 500) {
@@ -597,7 +597,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
           // Per-row import logs
           try {
-            const rowLogRows = deduped.map((p, idx) => ({
+            const rowLogRows = applied.map((p, idx) => ({
               upload_id: logId,
               raw_row_no: idx + 1,
               discipline,
