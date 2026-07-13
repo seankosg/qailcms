@@ -794,6 +794,17 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             put(base, k, v);
           }
         }
+        // Status가 Closed로 파생되었을 때 A.Closure 날짜가 파일/DB 모두 비어있으면
+        // last_updated_at (없으면 data_date) 으로 자동 채움.
+        if (
+          base.closure_status === "Closed" &&
+          !excludedFields.has("actual_closure_date") &&
+          !base.actual_closure_date &&
+          !prev?.actual_closure_date
+        ) {
+          const fallback = (p.last_updated_at ? String(p.last_updated_at).slice(0, 10) : null) ?? dataDate;
+          if (fallback) base.actual_closure_date = fallback;
+        }
         return base;
       });
 
