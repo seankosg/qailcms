@@ -47,7 +47,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { RollupMode } from "@/contexts/TaskManagementImportContext";
 import { ColumnMappingDialog } from "./ColumnMappingDialog";
+import { ConflictReviewDialog } from "./ConflictReviewDialog";
 import { Input } from "@/components/ui/input";
+import type { ConflictPolicy } from "@/contexts/TaskManagementImportContext";
+import { AlertTriangle, ScanSearch } from "lucide-react";
 
 const statusBadge: Record<TmFileStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
@@ -93,6 +96,7 @@ function ImportInner() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [mappingFileId, setMappingFileId] = useState<string | null>(null);
+  const [conflictFileId, setConflictFileId] = useState<string | null>(null);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -112,6 +116,11 @@ function ImportInner() {
   const readyCount = files.filter((f) => f.status === "ready" && !f.validationError).length;
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
   const mappingFile = files.find((f) => f.id === mappingFileId) ?? null;
+  const conflictFile = files.find((f) => f.id === conflictFileId) ?? null;
+  const {
+    setFileConflictPolicy,
+    runPreflight,
+  } = useTaskManagementImport();
 
   return (
     <div className="space-y-4">
@@ -245,6 +254,9 @@ function ImportInner() {
                 onPreview={() => setPreviewFileId(f.id)}
                 onOpenMapping={() => setMappingFileId(f.id)}
                 onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
+                onPolicyChange={(p) => setFileConflictPolicy(f.id, p)}
+                onRunPreflight={() => runPreflight(f.id)}
+                onOpenConflict={() => setConflictFileId(f.id)}
               />
             ))}
           </CardContent>
@@ -252,6 +264,14 @@ function ImportInner() {
       )}
 
       <PreviewDialog file={previewFile} onClose={() => setPreviewFileId(null)} />
+      {conflictFile && (
+        <ConflictReviewDialog
+          open={!!conflictFile}
+          onClose={() => setConflictFileId(null)}
+          fileName={conflictFile.name}
+          preflight={conflictFile.preflight ?? null}
+        />
+      )}
       {mappingFile && mappingFile.sheetHeaders && mappingFile.columnMap && (
         <ColumnMappingDialog
           open={!!mappingFile}
