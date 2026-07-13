@@ -50,7 +50,7 @@ export const updateDefectField = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
     if (fetchErr) throw new Error(fetchErr.message);
-    if (!existing) throw new Error("Defect not found");
+    if (!existing) throw new Error("Snag not found");
     const row = existing as any;
     if (data.field === "priority" && row.priority_locked) throw new Error("Priority is locked");
     if (data.field === "hdec_verification" && row.hdec_verification_locked) throw new Error("HDEC Verification is locked");

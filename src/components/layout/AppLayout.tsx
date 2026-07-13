@@ -48,7 +48,7 @@ const NAV: NavSection[] = [
         ],
       },
       {
-        label: "Defect Management",
+        label: "Snag List Management",
         icon: AlertTriangle,
         matchPrefix: "/closure/snag-management",
         items: [
