@@ -219,6 +219,9 @@ function isNetworkError(err: unknown): boolean {
 function validate(f: DefectImportFile): string | null {
   if (!f.parsed || f.parsed.length === 0) return "행을 찾지 못했습니다.";
   if (!f.team) return "Team을 선택하세요 (건축/전기/설비).";
+  if ((f.duplicateGroups?.length ?? 0) > 0) {
+    return `동일 Issue No 중복이 ${f.duplicateGroups!.length}그룹 감지되었습니다. "중복 검토"를 완료하세요.`;
+  }
   return null;
 }
 
