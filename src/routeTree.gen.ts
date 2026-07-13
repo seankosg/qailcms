@@ -28,7 +28,6 @@ import { Route as AuthenticatedClosureSparePartImportRouteImport } from './route
 import { Route as AuthenticatedClosureSparePartAconexSyncRouteImport } from './routes/_authenticated/closure/spare-part/aconex-sync'
 import { Route as AuthenticatedClosureDefectManagementSettingsRouteImport } from './routes/_authenticated/closure/defect-management/settings'
 import { Route as AuthenticatedClosureDefectManagementRawDataRouteImport } from './routes/_authenticated/closure/defect-management/raw-data'
-import { Route as AuthenticatedClosureDefectManagementImportRouteImport } from './routes/_authenticated/closure/defect-management/import'
 import { Route as AuthenticatedClosureDashboardWarrantyRouteImport } from './routes/_authenticated/closure/dashboard/warranty'
 import { Route as AuthenticatedClosureDashboardTaskRouteImport } from './routes/_authenticated/closure/dashboard/task'
 import { Route as AuthenticatedClosureDashboardSparePartRouteImport } from './routes/_authenticated/closure/dashboard/spare-part'
@@ -36,6 +35,7 @@ import { Route as AuthenticatedClosureDashboardAsBuiltRouteImport } from './rout
 import { Route as AuthenticatedClosureAbdSettingsRouteImport } from './routes/_authenticated/closure/abd/settings'
 import { Route as AuthenticatedClosureAbdRawDataRouteImport } from './routes/_authenticated/closure/abd/raw-data'
 import { Route as AuthenticatedClosureAbdImportRouteImport } from './routes/_authenticated/closure/abd/import'
+import { Route as AuthenticatedClosureDefectManagementImportIndexRouteImport } from './routes/_authenticated/closure/defect-management/import.index'
 import { Route as AuthenticatedClosureTaskManagementImportLogsRouteImport } from './routes/_authenticated/closure/task-management/import.logs'
 import { Route as AuthenticatedClosureTaskManagementDetailIdRouteImport } from './routes/_authenticated/closure/task-management/detail.$id'
 import { Route as AuthenticatedClosureSparePartRecordsDocRefRouteImport } from './routes/_authenticated/closure/spare-part/records.$docRef'
@@ -150,12 +150,6 @@ const AuthenticatedClosureDefectManagementRawDataRoute =
     path: '/closure/defect-management/raw-data',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedClosureDefectManagementImportRoute =
-  AuthenticatedClosureDefectManagementImportRouteImport.update({
-    id: '/closure/defect-management/import',
-    path: '/closure/defect-management/import',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedClosureDashboardWarrantyRoute =
   AuthenticatedClosureDashboardWarrantyRouteImport.update({
     id: '/closure/dashboard/warranty',
@@ -198,6 +192,12 @@ const AuthenticatedClosureAbdImportRoute =
     path: '/closure/abd/import',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureDefectManagementImportIndexRoute =
+  AuthenticatedClosureDefectManagementImportIndexRouteImport.update({
+    id: '/closure/defect-management/import/',
+    path: '/closure/defect-management/import/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureTaskManagementImportLogsRoute =
   AuthenticatedClosureTaskManagementImportLogsRouteImport.update({
     id: '/closure/task-management/import/logs',
@@ -224,9 +224,9 @@ const AuthenticatedClosureSparePartImportLogsRoute =
   } as any)
 const AuthenticatedClosureDefectManagementImportLogsRoute =
   AuthenticatedClosureDefectManagementImportLogsRouteImport.update({
-    id: '/logs',
-    path: '/logs',
-    getParentRoute: () => AuthenticatedClosureDefectManagementImportRoute,
+    id: '/closure/defect-management/import/logs',
+    path: '/closure/defect-management/import/logs',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedClosureDefectManagementDetailIdRoute =
   AuthenticatedClosureDefectManagementDetailIdRouteImport.update({
@@ -259,7 +259,6 @@ export interface FileRoutesByFullPath {
   '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
-  '/closure/defect-management/import': typeof AuthenticatedClosureDefectManagementImportRouteWithChildren
   '/closure/defect-management/raw-data': typeof AuthenticatedClosureDefectManagementRawDataRoute
   '/closure/defect-management/settings': typeof AuthenticatedClosureDefectManagementSettingsRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
@@ -275,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   '/closure/task-management/detail/$id': typeof AuthenticatedClosureTaskManagementDetailIdRoute
   '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
+  '/closure/defect-management/import/': typeof AuthenticatedClosureDefectManagementImportIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -293,7 +293,6 @@ export interface FileRoutesByTo {
   '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
-  '/closure/defect-management/import': typeof AuthenticatedClosureDefectManagementImportRouteWithChildren
   '/closure/defect-management/raw-data': typeof AuthenticatedClosureDefectManagementRawDataRoute
   '/closure/defect-management/settings': typeof AuthenticatedClosureDefectManagementSettingsRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
@@ -309,6 +308,7 @@ export interface FileRoutesByTo {
   '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   '/closure/task-management/detail/$id': typeof AuthenticatedClosureTaskManagementDetailIdRoute
   '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
+  '/closure/defect-management/import': typeof AuthenticatedClosureDefectManagementImportIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -330,7 +330,6 @@ export interface FileRoutesById {
   '/_authenticated/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/_authenticated/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/_authenticated/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
-  '/_authenticated/closure/defect-management/import': typeof AuthenticatedClosureDefectManagementImportRouteWithChildren
   '/_authenticated/closure/defect-management/raw-data': typeof AuthenticatedClosureDefectManagementRawDataRoute
   '/_authenticated/closure/defect-management/settings': typeof AuthenticatedClosureDefectManagementSettingsRoute
   '/_authenticated/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
@@ -346,6 +345,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   '/_authenticated/closure/task-management/detail/$id': typeof AuthenticatedClosureTaskManagementDetailIdRoute
   '/_authenticated/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
+  '/_authenticated/closure/defect-management/import/': typeof AuthenticatedClosureDefectManagementImportIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -367,7 +367,6 @@ export interface FileRouteTypes {
     | '/closure/dashboard/spare-part'
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
-    | '/closure/defect-management/import'
     | '/closure/defect-management/raw-data'
     | '/closure/defect-management/settings'
     | '/closure/spare-part/aconex-sync'
@@ -383,6 +382,7 @@ export interface FileRouteTypes {
     | '/closure/spare-part/records/$docRef'
     | '/closure/task-management/detail/$id'
     | '/closure/task-management/import/logs'
+    | '/closure/defect-management/import/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -401,7 +401,6 @@ export interface FileRouteTypes {
     | '/closure/dashboard/spare-part'
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
-    | '/closure/defect-management/import'
     | '/closure/defect-management/raw-data'
     | '/closure/defect-management/settings'
     | '/closure/spare-part/aconex-sync'
@@ -417,6 +416,7 @@ export interface FileRouteTypes {
     | '/closure/spare-part/records/$docRef'
     | '/closure/task-management/detail/$id'
     | '/closure/task-management/import/logs'
+    | '/closure/defect-management/import'
   id:
     | '__root__'
     | '/'
@@ -437,7 +437,6 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/dashboard/spare-part'
     | '/_authenticated/closure/dashboard/task'
     | '/_authenticated/closure/dashboard/warranty'
-    | '/_authenticated/closure/defect-management/import'
     | '/_authenticated/closure/defect-management/raw-data'
     | '/_authenticated/closure/defect-management/settings'
     | '/_authenticated/closure/spare-part/aconex-sync'
@@ -453,6 +452,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/spare-part/records/$docRef'
     | '/_authenticated/closure/task-management/detail/$id'
     | '/_authenticated/closure/task-management/import/logs'
+    | '/_authenticated/closure/defect-management/import/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -597,13 +597,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureDefectManagementRawDataRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/closure/defect-management/import': {
-      id: '/_authenticated/closure/defect-management/import'
-      path: '/closure/defect-management/import'
-      fullPath: '/closure/defect-management/import'
-      preLoaderRoute: typeof AuthenticatedClosureDefectManagementImportRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/closure/dashboard/warranty': {
       id: '/_authenticated/closure/dashboard/warranty'
       path: '/closure/dashboard/warranty'
@@ -653,6 +646,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureAbdImportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/defect-management/import/': {
+      id: '/_authenticated/closure/defect-management/import/'
+      path: '/closure/defect-management/import'
+      fullPath: '/closure/defect-management/import/'
+      preLoaderRoute: typeof AuthenticatedClosureDefectManagementImportIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/task-management/import/logs': {
       id: '/_authenticated/closure/task-management/import/logs'
       path: '/closure/task-management/import/logs'
@@ -683,10 +683,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/closure/defect-management/import/logs': {
       id: '/_authenticated/closure/defect-management/import/logs'
-      path: '/logs'
+      path: '/closure/defect-management/import/logs'
       fullPath: '/closure/defect-management/import/logs'
       preLoaderRoute: typeof AuthenticatedClosureDefectManagementImportLogsRouteImport
-      parentRoute: typeof AuthenticatedClosureDefectManagementImportRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/closure/defect-management/detail/$id': {
       id: '/_authenticated/closure/defect-management/detail/$id'
@@ -741,21 +741,6 @@ const AuthenticatedClosureAbdImportRouteWithChildren =
     AuthenticatedClosureAbdImportRouteChildren,
   )
 
-interface AuthenticatedClosureDefectManagementImportRouteChildren {
-  AuthenticatedClosureDefectManagementImportLogsRoute: typeof AuthenticatedClosureDefectManagementImportLogsRoute
-}
-
-const AuthenticatedClosureDefectManagementImportRouteChildren: AuthenticatedClosureDefectManagementImportRouteChildren =
-  {
-    AuthenticatedClosureDefectManagementImportLogsRoute:
-      AuthenticatedClosureDefectManagementImportLogsRoute,
-  }
-
-const AuthenticatedClosureDefectManagementImportRouteWithChildren =
-  AuthenticatedClosureDefectManagementImportRoute._addFileChildren(
-    AuthenticatedClosureDefectManagementImportRouteChildren,
-  )
-
 interface AuthenticatedClosureSparePartImportRouteChildren {
   AuthenticatedClosureSparePartImportLogsRoute: typeof AuthenticatedClosureSparePartImportLogsRoute
 }
@@ -782,7 +767,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureDashboardSparePartRoute: typeof AuthenticatedClosureDashboardSparePartRoute
   AuthenticatedClosureDashboardTaskRoute: typeof AuthenticatedClosureDashboardTaskRoute
   AuthenticatedClosureDashboardWarrantyRoute: typeof AuthenticatedClosureDashboardWarrantyRoute
-  AuthenticatedClosureDefectManagementImportRoute: typeof AuthenticatedClosureDefectManagementImportRouteWithChildren
   AuthenticatedClosureDefectManagementRawDataRoute: typeof AuthenticatedClosureDefectManagementRawDataRoute
   AuthenticatedClosureDefectManagementSettingsRoute: typeof AuthenticatedClosureDefectManagementSettingsRoute
   AuthenticatedClosureSparePartAconexSyncRoute: typeof AuthenticatedClosureSparePartAconexSyncRoute
@@ -792,9 +776,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
   AuthenticatedClosureDashboardIndexRoute: typeof AuthenticatedClosureDashboardIndexRoute
   AuthenticatedClosureDefectManagementDetailIdRoute: typeof AuthenticatedClosureDefectManagementDetailIdRoute
+  AuthenticatedClosureDefectManagementImportLogsRoute: typeof AuthenticatedClosureDefectManagementImportLogsRoute
   AuthenticatedClosureSparePartRecordsDocRefRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   AuthenticatedClosureTaskManagementDetailIdRoute: typeof AuthenticatedClosureTaskManagementDetailIdRoute
   AuthenticatedClosureTaskManagementImportLogsRoute: typeof AuthenticatedClosureTaskManagementImportLogsRoute
+  AuthenticatedClosureDefectManagementImportIndexRoute: typeof AuthenticatedClosureDefectManagementImportIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -814,8 +800,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureDashboardTaskRoute,
   AuthenticatedClosureDashboardWarrantyRoute:
     AuthenticatedClosureDashboardWarrantyRoute,
-  AuthenticatedClosureDefectManagementImportRoute:
-    AuthenticatedClosureDefectManagementImportRouteWithChildren,
   AuthenticatedClosureDefectManagementRawDataRoute:
     AuthenticatedClosureDefectManagementRawDataRoute,
   AuthenticatedClosureDefectManagementSettingsRoute:
@@ -834,12 +818,16 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureDashboardIndexRoute,
   AuthenticatedClosureDefectManagementDetailIdRoute:
     AuthenticatedClosureDefectManagementDetailIdRoute,
+  AuthenticatedClosureDefectManagementImportLogsRoute:
+    AuthenticatedClosureDefectManagementImportLogsRoute,
   AuthenticatedClosureSparePartRecordsDocRefRoute:
     AuthenticatedClosureSparePartRecordsDocRefRoute,
   AuthenticatedClosureTaskManagementDetailIdRoute:
     AuthenticatedClosureTaskManagementDetailIdRoute,
   AuthenticatedClosureTaskManagementImportLogsRoute:
     AuthenticatedClosureTaskManagementImportLogsRoute,
+  AuthenticatedClosureDefectManagementImportIndexRoute:
+    AuthenticatedClosureDefectManagementImportIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -854,13 +842,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
