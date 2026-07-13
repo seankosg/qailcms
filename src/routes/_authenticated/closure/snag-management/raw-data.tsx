@@ -49,6 +49,9 @@ const rawDataSearchSchema = z.object({
   hdecReason: z.string().optional(),
   notClosureDone: z.string().optional(),
   catADispute: z.string().optional(),
+  plan_group: z.string().optional(),
+  building: z.string().optional(),
+  roomGroup: z.string().optional(),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/snag-management/raw-data")({

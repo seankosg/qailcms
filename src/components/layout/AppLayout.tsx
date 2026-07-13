@@ -52,6 +52,7 @@ const NAV: NavSection[] = [
         icon: AlertTriangle,
         matchPrefix: "/closure/snag-management",
         items: [
+          { to: "/closure/snag-management/dashboard", label: "Dashboard", icon: LayoutDashboard },
           { to: "/closure/snag-management/raw-data", label: "Raw Data", icon: Database },
           { to: "/closure/snag-management/import", label: "Import", icon: Upload, editorOnly: true },
           { to: "/closure/snag-management/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },

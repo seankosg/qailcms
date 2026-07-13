@@ -20,9 +20,9 @@ export function OutstandingDashboardPage() {
         />
         <SectionDashboardCard
           title="Snag List Management"
-          description="Snag 발생·조치·종결 현황. (KPI/S-Curve/Breakdown은 Phase 3 예정)"
+          description="De-Snagging 매트릭스 대시보드 (Plot · Level × Room Group). 셀 클릭 시 Raw Data 드릴다운."
           icon={AlertTriangle}
-          to="/closure/snag-management/raw-data"
+          to="/closure/snag-management/dashboard"
           cta="Snag List 열기"
         />
       </div>
