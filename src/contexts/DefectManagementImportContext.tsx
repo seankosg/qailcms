@@ -827,9 +827,9 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
           if (!error) {
             successRows = slice;
-          } else if (isNetworkError(error)) {
+          } else if (isNetworkError(error) || isStatementTimeout(error)) {
             // 재시도 다 소진 → 배치 자체 실패로 기록
-            console.error("[defect-import] batch upsert network error", { batchIndex, error });
+            console.error("[defect-import] batch upsert transient error", { batchIndex, error });
             importErrors.push({
               batch: batchIndex,
               message: error.message,
