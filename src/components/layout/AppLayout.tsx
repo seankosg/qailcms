@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle,
+  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet,
 } from "lucide-react";
 import { ListTree, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,8 @@ const NAV: NavGroup[] = [
       { to: "/closure/defect-management/dashboard", label: "Defect Dashboard", icon: LayoutDashboard },
       { to: "/closure/defect-management/import", label: "Defect Import", icon: Upload, editorOnly: true },
       { to: "/closure/defect-management/import/logs", label: "Defect Import Logs", icon: FileClock, editorOnly: true },
+      { to: "/closure/abd/raw-data", label: "ABD-Raw Data", icon: FileSpreadsheet },
+      { to: "/closure/abd/import", label: "ABD Import", icon: Upload, editorOnly: true },
       { to: "/closure/spare-part/import", label: "Import", icon: Upload, editorOnly: true },
       { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
       { to: "/closure/task-management/import/logs", label: "Task Import Logs", icon: FileClock, editorOnly: true },
