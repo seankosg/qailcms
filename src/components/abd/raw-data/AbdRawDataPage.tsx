@@ -405,6 +405,7 @@ export function AbdRawDataPage() {
         tableRef={tableRef}
         loading={!stateLoaded || isFetching}
         frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
+        onRowClick={(id) => setUrl({ detail: id })}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -431,6 +432,10 @@ export function AbdRawDataPage() {
         getRows={() => rows}
         columnHeaders={ABD_COLUMNS.map((c) => ({ key: c.key, label: c.label }))}
         filenamePrefix={`abd-${team}`}
+      />
+      <AbdDetailSheet
+        id={(urlSearch.detail as string) || null}
+        onOpenChange={(open) => { if (!open) setUrl({ detail: "" }); }}
       />
     </div>
   );
