@@ -22,6 +22,7 @@ import type { DefectTeam } from "@/lib/defect-management/columns";
 export type DefectFileStatus =
   | "parsing"
   | "pending_sheet_selection"
+  | "pending_duplicate_review"
   | "needs_team"
   | "ready"
   | "processing"
@@ -35,6 +36,26 @@ export interface DefectImportError {
   details?: string;
   hint?: string;
   sampleId?: string;
+}
+
+export type DuplicateStrategy = "keep_last" | "keep_first" | "manual";
+
+export interface DuplicateGroupRow {
+  parsedIndex: number;
+  preview: {
+    description?: string | null;
+    status_raw?: string | null;
+    updated_date_raw?: string | null;
+    created_date?: string | null;
+    updated_by_name?: string | null;
+    updated_status?: string | null;
+  };
+}
+
+export interface DuplicateGroup {
+  key: string; // source_issue_no
+  rows: DuplicateGroupRow[];
+  selectedParsedIndex: number;
 }
 
 export interface DefectImportFile {
@@ -72,6 +93,9 @@ export interface DefectImportFile {
     skippedReimportNoMatch?: number;
     errors?: DefectImportError[];
   };
+  duplicateStrategy?: DuplicateStrategy;
+  duplicateGroups?: DuplicateGroup[];
+  autoDedupedIdenticalCount?: number;
 }
 
 interface CtxValue {
@@ -84,6 +108,9 @@ interface CtxValue {
   setFileDataDateOverride: (id: string, date: string | null) => void;
   setFileSheet: (id: string, sheetName: string) => Promise<void>;
   setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
+  setFileDuplicateStrategy: (id: string, strategy: DuplicateStrategy) => void;
+  setFileDuplicateSelection: (id: string, groupKey: string, parsedIndex: number) => void;
+  resolveDuplicates: (id: string) => void;
   startImport: () => Promise<void>;
 }
 
