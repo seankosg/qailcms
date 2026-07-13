@@ -96,7 +96,7 @@ const CFG = {
   },
   defect_management: {
     title: "Defect Management — Import Logs",
-    backTo: "/closure/defect-management/import",
+    backTo: "/closure/snag-management/import",
     logsTable: "defect_import_logs",
     rowLogsTable: "defect_import_row_logs",
     deleteFn: "delete_defect_import_batch",

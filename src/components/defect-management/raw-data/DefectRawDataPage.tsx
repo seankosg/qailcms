@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Route as RawDataRoute } from "@/routes/_authenticated/closure/defect-management/raw-data";
+import { Route as RawDataRoute } from "@/routes/_authenticated/closure/snag-management/raw-data";
 import {
   flexRender,
   getCoreRowModel,
@@ -635,7 +635,7 @@ export function DefectRawDataPage() {
           <p className="text-sm text-muted-foreground">Issue No and subcontractor issue tracking data.</p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/import"><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
+          <Button asChild variant="outline" size="sm"><Link to="/closure/snag-management/import"><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           <Button variant="outline" size="sm" onClick={() => { invalidateDefects(); refetch(); }} disabled={isFetching}>
@@ -719,7 +719,7 @@ export function DefectRawDataPage() {
         dataDate={dataDate}
         frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
         getSourceOrigin={helpers.getSourceOrigin}
-        onRowClick={(r) => navigate({ to: "/closure/defect-management/detail/$id", params: { id: r.id } })}
+        onRowClick={(r) => navigate({ to: "/closure/snag-management/detail/$id", params: { id: r.id } })}
       />
 
       {/* Pagination controls */}

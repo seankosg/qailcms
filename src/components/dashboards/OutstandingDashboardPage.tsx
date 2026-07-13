@@ -22,7 +22,7 @@ export function OutstandingDashboardPage() {
           title="Defect Management"
           description="Defect 발생·조치·종결 현황. (KPI/S-Curve/Breakdown은 Phase 3 예정)"
           icon={AlertTriangle}
-          to="/closure/defect-management/raw-data"
+          to="/closure/snag-management/raw-data"
           cta="Defect 열기"
         />
       </div>
