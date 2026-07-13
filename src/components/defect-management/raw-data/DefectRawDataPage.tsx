@@ -203,7 +203,7 @@ function normalizeGroupLabel(group: string | null | undefined): string {
 
 function clearObjectKeys<T extends Record<string, any>>(keys: string[], value: T): Partial<T> {
   const out: Partial<T> = {};
-  for (const key of keys) (out as any)[key] = "";
+  for (const key of keys) (out as any)[key] = undefined;
   return out;
 }
 
@@ -354,7 +354,17 @@ export function DefectRawDataPage() {
   // ── Sync local (columnFilters/sorting/q) → URL (debounced) ──────────────
   const setUrl = useCallback(
     (patch: Record<string, any>) => {
-      navigate({ to: ".", search: (prev: any) => ({ ...prev, ...patch }), replace: true });
+      navigate({
+        to: ".",
+        search: (prev: any) => {
+          const next = { ...prev, ...patch };
+          for (const key of DRILLDOWN_PARAMS) {
+            if (next[key] == null || next[key] === "") delete next[key];
+          }
+          return next;
+        },
+        replace: true,
+      });
     },
     [navigate],
   );
