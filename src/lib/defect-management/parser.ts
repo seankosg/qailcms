@@ -484,6 +484,11 @@ export async function parseDefectExcel(
       location_reference: cols.location_reference ? toStr(getCell(sheet, r, cols.location_reference)) : null,
       classification: cols.classification ? toStr(getCell(sheet, r, cols.classification)) : null,
       podium_area: cols.podium_area ? toStr(getCell(sheet, r, cols.podium_area)) : null,
+      building: cols.building ? toStr(getCell(sheet, r, cols.building)) : null,
+      room: cols.room ? toStr(getCell(sheet, r, cols.room)) : null,
+      room_group: cols.room_group ? toStr(getCell(sheet, r, cols.room_group)) : null,
+      level_name: cols.level_name ? toStr(getCell(sheet, r, cols.level_name)) : null,
+      review_flag: cols.review_flag ? toStr(getCell(sheet, r, cols.review_flag)) : null,
       raw_payload,
       extra,
     });
