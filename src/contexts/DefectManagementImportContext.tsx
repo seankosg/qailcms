@@ -533,6 +533,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       const startedAtIso = new Date().toISOString();
       const excludedFields = f.excludedFields ?? new Set<string>();
       const isReimport = !!f.isReimport;
+      const duplicateStrategy = f.duplicateStrategy ?? "keep_last";
+      const duplicatesAuto = f.autoDedupedIdenticalCount ?? 0;
 
       const { data: logRow } = await (supabase as any)
         .from("defect_import_logs")
@@ -550,6 +552,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             excludedFields.size > 0
               ? `excluded_fields=${Array.from(excludedFields).join(",")}`
               : null,
+            `duplicate_strategy=${duplicateStrategy}`,
+            duplicatesAuto > 0 ? `duplicates_auto=${duplicatesAuto}` : null,
           ]
             .filter(Boolean)
             .join(" | ") || null,
@@ -562,11 +566,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         cur.map((x) => (x.id === f.id ? { ...x, status: "processing", progress: 0 } : x)),
       );
 
-      // dedupe by source_issue_no (keep last)
+      // 파일 카드에서 이미 중복이 해결되었으므로 방어적 dedupe (keep last) 유지.
+      // 통계에는 자동 폐기 카운트만 노출 (수동 폐기분은 이미 parsed 에서 제거됨).
       const dedupMap = new Map<string, ParsedDefectRow>();
       for (const p of parsed) dedupMap.set(p.source_issue_no, p);
       const deduped = Array.from(dedupMap.values());
-      const duplicates = parsed.length - deduped.length;
+      const duplicatesDefensive = parsed.length - deduped.length;
+      const duplicates = duplicatesAuto + duplicatesDefensive;
 
       // 기존 행 조회 (id + lock flags)
       const ids = deduped.map((p) => p.source_issue_no);
