@@ -266,6 +266,7 @@ export type Database = {
           row_version: number
           source_import_log_id: string | null
           source_issue_no: string
+          status_group: string | null
           status_manual: string | null
           status_raw: string | null
           sub_trade: string | null
@@ -342,6 +343,7 @@ export type Database = {
           row_version?: number
           source_import_log_id?: string | null
           source_issue_no: string
+          status_group?: string | null
           status_manual?: string | null
           status_raw?: string | null
           sub_trade?: string | null
@@ -418,6 +420,7 @@ export type Database = {
           row_version?: number
           source_import_log_id?: string | null
           source_issue_no?: string
+          status_group?: string | null
           status_manual?: string | null
           status_raw?: string | null
           sub_trade?: string | null
@@ -1751,6 +1754,44 @@ export type Database = {
         }
         Returns: string
       }
+      defect_items_counts: {
+        Args: { _include_inactive?: boolean }
+        Returns: {
+          closed_count: number
+          total_count: number
+          unclosed_count: number
+        }[]
+      }
+      defect_items_dashboard_summary: {
+        Args: { _include_inactive?: boolean }
+        Returns: Json
+      }
+      defect_items_facets: {
+        Args: {
+          _column: string
+          _include_inactive?: boolean
+          _status_group?: string
+        }
+        Returns: {
+          cnt: number
+          value: string
+        }[]
+      }
+      defect_items_search: {
+        Args: {
+          _filters?: Json
+          _include_inactive?: boolean
+          _limit?: number
+          _offset?: number
+          _q?: string
+          _sort?: Json
+          _status_group?: string
+        }
+        Returns: {
+          rows: Json
+          total_count: number
+        }[]
+      }
       delete_defect_import_batch: { Args: { _batch_id: string }; Returns: Json }
       delete_spare_part_import_batch: {
         Args: { _batch_id: string }
@@ -1808,6 +1849,8 @@ export type Database = {
         Args: { _discipline: string }
         Returns: number
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       update_task_summary: {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
