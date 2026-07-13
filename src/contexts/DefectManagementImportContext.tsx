@@ -971,7 +971,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     setIsRunning(false);
     // Defect 캐시 무효화 → status_group 재계산으로 Unclosed/Closed 탭 자동 정합
     try { qc.invalidateQueries({ queryKey: ["defect"] }); } catch { /* ignore */ }
-    toast.success(`Defect import 완료: ${ready.length} file(s)`);
+    toast.success(`Snag List import 완료: ${ready.length} file(s)`);
   }, [qc]);
 
   const startImport = useCallback(async () => {
@@ -988,7 +988,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("[defect-import] start failed", e);
-      toast.error(`Defect import 실패: ${msg}`);
+      toast.error(`Snag List import 실패: ${msg}`);
       setIsRunning(false);
     }
   }, [files, isRunning, executeImport]);

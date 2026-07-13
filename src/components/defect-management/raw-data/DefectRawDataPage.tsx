@@ -631,7 +631,7 @@ export function DefectRawDataPage() {
     <div className="space-y-3">
       <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Defect Raw Data</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Snag List — Raw Data</h1>
           <p className="text-sm text-muted-foreground">Issue No and subcontractor issue tracking data.</p>
         </div>
         <div className="flex gap-2">
