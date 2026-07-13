@@ -295,6 +295,9 @@ function FileRow({
   onPreview,
   onOpenMapping,
   onDataDateChange,
+  onPolicyChange,
+  onRunPreflight,
+  onOpenConflict,
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
@@ -303,6 +306,9 @@ function FileRow({
   onPreview: () => void;
   onOpenMapping: () => void;
   onDataDateChange: (v: string | null) => void;
+  onPolicyChange: (p: ConflictPolicy) => void;
+  onRunPreflight: () => void;
+  onOpenConflict: () => void;
 }) {
   const badge = statusBadge[f.status];
   const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
