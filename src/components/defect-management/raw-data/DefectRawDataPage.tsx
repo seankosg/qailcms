@@ -53,8 +53,12 @@ import { CriticalPendingBar } from "./CriticalPendingBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { EditCellPopover } from "./EditCellPopover";
+import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
+import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
 const DEFAULT_SORTING: SortingState = [{ id: "source_issue_no", desc: false }];
+const SYSTEM_FROZEN_IDS = ["__select", "is_critical", "stage_progress"];
+const DEFAULT_ORDER = DEFECT_COLUMNS.map((c) => c.key).filter((k) => k !== "is_critical");
 
 function formatPct(v: any): string {
   if (v == null) return "";
