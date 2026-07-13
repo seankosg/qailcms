@@ -1,162 +1,117 @@
+먼저 사과드립니다. 이전 반영이 기대와 달랐던 이유는, 제가 25만행 성능 개선을 우선하면서 현재 프로젝트의 기존 Raw Data UI를 유지한 채 서버 페이지네이션·Unclosed/Closed 탭 구조로 재작성했기 때문입니다. 사용자의 지시는 @project의 UI/기능/데이터 흐름을 그대로 이식하라는 의미였으므로, 단순 성능 개선이 아니라 SHAW PROJECT CMS의 Defect Raw Data 기준으로 재정렬해야 합니다.
 
-# Defect Raw Data — 서버 페이지네이션 전환 + Unclosed/Closed 탭 분리 (총 25만행 기준)
+## 목표
+현재 Defect Raw Data를 [SHAW PROJECT CMS](/projects/5e5a7b8e-c4af-4278-baec-3446e05cc4be)의 Defect Raw Data와 기능/화면 동작이 일치하도록 수정합니다. 단, 현재 데이터가 최대 25만행이므로 원본의 클라이언트 전량 캐시 방식은 그대로 복원하지 않고, 서버 페이지네이션/RPC 기반 성능 구조 위에서 동일한 사용 경험을 구현합니다.
 
-전제 명확화: **Closed + Unclosed 합산 최대 약 25만행**. 이미 10만행을 넘겼고, 성장 여지를 고려해도 최대 25만 규모.
+## 반영 기준
 
-이 규모에서도 클라이언트 전량 fetch(`useDefectRawData`)는 이미 한계에 도달했고(`DataCloneError: out of memory` 재현됨), Closed까지 포함해 조회할수록 악화됩니다. 따라서 **탭 분리 + 서버 사이드 필터/정렬/페이지네이션**을 이번 스프린트의 기본 아키텍처로 확정합니다. 물리적 데이터 이동은 하지 않고 `status_group` 파생 컬럼으로 논리 분리합니다.
+### 1. 상단 UI를 SHAW 원본과 맞춤
+- 제목을 `Defect Raw Data`로 변경
+- 설명 문구를 원본과 동일한 톤으로 변경
+- 현재 추가된 `Dashboard`, `Import Logs`, `Column Order Menu`, 팀 빠른 필터 카드, Unclosed/Closed 탭의 시각적 배치를 원본 기준으로 재조정
+- 버튼 구성은 원본 기준으로 정렬
+  - `Import`
+  - `Export Excel`
+  - `Export`
+- 검색 영역을 원본처럼 구성
+  - `Search defects... (comma = AND)`
+  - 현재 필터 적용 record 수 표시
+  - `Clear sort (n)` 버튼
+  - `Shift+Click headers for multi-sort` 안내
+  - Stage Progress Legend 표시
 
----
+### 2. 필터/검색/정렬 동작을 원본과 맞춤
+- 원본의 `Active URL filters` 영역 복원
+  - dashboard drill-down에서 넘어온 URL 필터를 별도 칩으로 표시
+  - 각 칩 개별 해제
+  - `Clear all` 지원
+- 원본의 `Active column filters` 영역 복원
+  - 컬럼 필터 칩 별도 표시
+  - 개별 해제 및 전체 해제
+- 쉼표 검색은 원본처럼 AND 조건으로 처리
+- Shift+Click multi-sort 지원
+- 정렬 초기값은 원본의 Issue No 기준 정렬과 맞추되, 현재 DB 컬럼명인 `source_issue_no`에 매핑
+- 기존 dashboard drill-down 파라미터를 최대한 원본과 동일하게 매핑
+  - `team`, `subcontractor`, `subsub`, `hdecPic`, `hdecEng`, `capturedBy`, `level`, `mainTrade`, `subTrade`, `workType`, `classificationSource`, `status`, `closureStatus`, `issueNo`, `subcontractorIssueNo`, `dateStart`, `dateEnd`, `dateField`, `critical`, `priority`, `hdecVerification`, `hdecReason`, `notClosureDone`, `catADispute` 등
 
-## 1. 아키텍처 결정 (확정)
+### 3. 테이블 UI를 원본과 맞춤
+- 원본의 단일 scroll container + sticky header + sticky/frozen columns 구조 유지
+- 상단 horizontal scrollbar를 원본 방식으로 표시
+- frozen column 폭/좌표 계산 방식 정렬
+- row 높이, header 높이, cell padding, truncate, hover, overdue/closed row tint를 원본과 맞춤
+- header에 원본처럼 source origin 색상 적용
+  - HDEC / Aconex / System origin에 따른 header background/border
+- 컬럼 resize는 원본처럼 `onEnd` 기준으로 변경
+- header resize handle double-click auto-fit 복원
+- scroll 위치 저장/복원 복원
 
-- 리스트 조회는 **서버 사이드 필터/정렬/페이지네이션**으로 일원화.
-- **Unclosed 탭**(Open/Reopen 등) / **Closed 탭**(Closed 전용) 2탭 구조. 같은 페이지 내 전환. 사이드메뉴는 그대로.
-- 임포트 시 Closed로 바뀐 행은 물리 이동 없이 `status_group` 재계산으로 자동 이관.
-- 대시보드/집계는 전량 클라이언트 스캔이 아닌 서버 집계 RPC로 처리.
+### 4. Stage Progress를 원본과 맞춤
+- 현재 Badge 텍스트형 Progress를 원본의 pipeline 스타일 `DefectStageProgress`에 맞춤
+- `DefectStageProgressLegend`를 검색줄 우측에 표시
+- 지연/완료/종결 판정은 원본 로직과 동일하게 맞추되, 현재 필드명에 맞게 매핑
 
----
+### 5. Critical / Bulk 기능을 원본과 맞춤
+- 원본의 `CriticalBulkBar` 동작 복원
+  - 선택 행 기준 critical pending 처리
+  - 관리자 권한 반영
+- 원본의 `CriticalPendingBar` UX와 맞춤
+- 현재 단순 `BulkEditBar`를 원본의 `BulkActionBar` 수준으로 확장
+  - 선택 건수 sticky action bar
+  - 권한 확인 후 editable/skipped 표시
+  - bulk edit confirm
+  - selected rows export
+  - TSV copy
+  - reassign
+  - duplicate/delete가 현재 데이터 모델과 권한 구조에서 가능한 범위까지 반영
+- Closed 탭/Closed 데이터 편집 정책은 기존 논의대로 보호하되, UI는 원본과 최대한 동일하게 보이도록 처리
 
-## 2. DB 마이그레이션 (필수)
+### 6. Export 기능을 원본과 맞춤
+- `Export Excel` dialog를 원본 구조로 맞춤
+  - View-friendly
+  - Re-import ready
+  - Single file
+  - Subcontractor별 분리
+  - 서브콘 7개 이상이면 ZIP 묶음
+- 다만 25만행 대응을 위해 현재 화면의 100행만 export하는 문제는 수정
+  - 현재 필터/검색/정렬 조건 전체 결과를 서버에서 페이지 단위로 가져와 export
+  - 대용량은 브라우저 메모리 폭주를 막기 위해 CSV 우선 또는 chunked XLSX로 구현
+- `Export` 라우트/버튼은 원본에 맞춰 별도 export 화면 또는 현재 프로젝트 구조에 맞는 경로로 연결
 
-### 2-A. `status_group` generated column
-```sql
-alter table public.defect_items_raw
-  add column status_group text generated always as (
-    case when lower(trim(status_raw))='closed' then 'closed' else 'unclosed' end
-  ) stored;
-```
+### 7. 댓글/메타 컬럼 기능 검토 및 반영
+- 원본의 Issue No 옆 comment count/unread 표시 기능을 현재 backend에 대응되는 comment 데이터가 있으면 반영
+- `_meta_instruction_count`, `_meta_comment_count`, `_meta_reply_count`, `_meta_last_activity_at` 같은 메타 컬럼은 현재 스키마가 지원하면 추가
+- 현재 backend에 해당 테이블/RPC가 없으면 기능 껍데기만 만들지 않고, 필요한 DB/RPC를 함께 설계하여 원본 기능과 맞춤
 
-### 2-B. 인덱스 세트 (25만 규모 대응)
-- `(is_active, status_group, source_issue_no desc)` — Unclosed 기본 정렬.
-- `(is_active, status_group, actual_closure_date desc)` — Closed 기본 정렬.
-- `(is_active, status_group, team)`, `(is_active, status_group, subcontractor_name)`, `(is_active, status_group, area_level)` — 흔한 필터.
-- `pg_trgm` GIN: `description`, `source_issue_no`, `location_raw`, `area_location`, `subcontractor_name`, `hdec_pic_name` (글로벌 검색용, 초기엔 컬럼별 개별 trgm 인덱스로 시작).
+### 8. 서버 페이지네이션 구조 유지
+- 원본은 전체 데이터를 클라이언트 캐시에 올려 필터/정렬했지만, 현재 데이터량에서는 그대로 복원하면 다시 로딩 지연과 메모리 문제가 발생합니다.
+- 따라서 UI/기능은 원본과 맞추되, 내부 데이터 흐름은 서버 기반으로 유지합니다.
+- 필요한 RPC 보강
+  - URL drill-down 필터 처리
+  - AND 검색 처리
+  - stage progress 필터/정렬 처리
+  - export 전체 결과 스트리밍/페이지 fetch
+  - facet count 정확도 개선
 
-### 2-C. 서버 검색 RPC `defect_items_search`
-- 인자: `_status_group('unclosed'|'closed'|'all')`, `_include_inactive bool`, `_q text`, `_filters jsonb`, `_sort jsonb`, `_offset int`, `_limit int`.
-- 반환: `rows jsonb`(리스트에 필요한 ~25컬럼만), `total_count bigint`(`count(*) over ()`).
-- Dynamic SQL은 화이트리스트(`DEFECT_COLUMNS.key`) 기반으로 컬럼명 검증. `security invoker` + RLS 유지.
+### 9. 현재 런타임 오류도 함께 해결
+- 현재 preview에 `DataCloneError: Data cannot be cloned, out of memory`가 감지되었습니다.
+- Raw Data에서 대량 객체를 query key, router state, performance 측정, export payload, localStorage 등에 넣는 경로를 점검합니다.
+- URL/search/localStorage에는 큰 데이터가 아닌 최소 상태값만 저장하도록 수정합니다.
+- export나 selected rows 처리도 전체 row 객체 대신 id/필드 목록 중심으로 바꿉니다.
 
-### 2-D. Facets RPC `defect_items_facets`
-- 인자: `_status_group`, `_include_inactive`, `_column`(화이트리스트).
-- 컬럼별 distinct 값 + 카운트. React Query 짧은 staleTime(60s)로 캐시.
+## 구현 순서
+1. SHAW 원본 Defect Raw Data의 구성 요소를 현재 프로젝트 필드명에 매핑
+2. 현재 `DefectRawDataPage.tsx`를 원본 화면 구조 기준으로 재배치
+3. 테이블 렌더링/sticky/frozen/resize/scroll 복원
+4. URL 필터 칩, 컬럼 필터 칩, 검색, multi-sort 동작 복원
+5. Stage Progress UI/Legend 복원
+6. Bulk/Critical action bar를 원본 수준으로 확장
+7. Export dialog와 대용량 export 처리 보강
+8. 필요한 backend RPC/migration 추가 또는 보강
+9. 25만행 기준으로 첫 진입, 탭 전환, 필터, 검색, export, row click을 검증
 
-### 2-E. 카운트 RPC `defect_items_counts`
-- Unclosed / Closed 카운트 반환. 탭 배지 전용.
-
-### 2-F. 대시보드 집계 RPC `defect_items_dashboard_summary`
-- `CriticalPendingBar`, `latestDataDate` 등에 필요한 값만 서버에서 집계.
-
----
-
-## 3. 클라이언트 변경
-
-### 3-A. 폐기
-- `useDefectRawData`(전량 fetch 훅).
-- 클라이언트 전체 정렬/필터/faceted uniqueOptions 계산.
-- 클라이언트 latestDataDate/critical pending 전량 스캔.
-- 40k `SAFETY_CAP`, persist cache 계열 코드.
-
-### 3-B. 신설 훅
-- `useDefectItemsQuery({ statusGroup, page, pageSize, sort, filters, q, includeInactive })` → `defect_items_search`. 반환 `{ rows, total }`.
-- `useDefectFacet(column, { statusGroup })` → `defect_items_facets`.
-- `useDefectStatusCounts({ includeInactive })` → `defect_items_counts`.
-- `useDefectDashboardSummary()` → summary RPC.
-
-### 3-C. URL 상태 (TanStack Router `validateSearch` + `fallback`)
-- `tab: "unclosed" | "closed"` (기본 `unclosed`)
-- `page: number` (기본 1), `pageSize: number` (기본 100)
-- `sort: string`, `q: string`, `filters: string`(압축 JSON), `includeInactive: boolean`
-- 새로고침/공유/뒤로가기 시 상태 보존.
-
-### 3-D. 페이지네이션 UX
-- 기본: **명시 페이지네이션** (페이지 이동 + pageSize 50/100/200/500 선택). 예측 가능·렌더 안정.
-- 페이지 내 최대 500행 범위에서 기존 가상 스크롤 유지.
-- 무한 스크롤은 초기 도입 제외(정렬 자유도와 keyset 요건 때문).
-
-### 3-E. UI 변경
-- 상단 `<Tabs>`: `Unclosed (n)` / `Closed (n)`. 배지는 `useDefectStatusCounts`.
-- **Unclosed 탭**: 현행 기본, 정렬 `source_issue_no desc`. `CriticalPendingBar` 등 상단 위젯 표시.
-- **Closed 탭**: `status_raw` 숨김, `actual_closure_date` / `hdec_verification` / `hdec_reason` 노출. 정렬 `actual_closure_date desc`. Bulk edit은 기본 비활성(관리자 옵션).
-- View preference 키 탭별 분리:
-  - `defect-management.raw-data.unclosed.v1`
-  - `defect-management.raw-data.closed.v1`
-  - 저장: `order`, `visibility`, `frozenExtras`, `columnSizing`, `pageSize`, `sort`. (필터/글로벌 검색은 URL만.)
-
-### 3-F. Export / Bulk edit 재설계
-- Export: 서버 라우트 `POST /api/private/defects/export`에서 현재 필터 결과를 CSV/XLSX 스트리밍. 25만 규모 XLSX는 무거우니 CSV 우선.
-- Bulk edit: 클라이언트는 `{ filters, selectedIds | selectAllMatching }`만 전송. 서버 RPC가 트랜잭션 처리 + 히스토리 기록.
-
-### 3-G. 임포트 후 캐시 무효화
-- 임포트 성공 콜백에서 `queryClient.invalidateQueries({ queryKey: ["defect"] })`.
-- `status_raw` 갱신만으로 `status_group` 자동 재계산 → 다음 조회에서 자동으로 해당 탭으로 이동.
-
----
-
-## 4. “Closed로 변경 시 이동” 정책
-
-논리 이동만 사용(물리 이동 없음).
-
-- 장점: 히스토리(`defect_status_history`)·rollback·상세 링크 그대로. 임포트 로직 최소 변경. Reopen도 대칭 처리.
-- 단점/완화: 열린 캐시 잔상 → 임포트 후 invalidate 필수. 편집 중 status 변경 충돌 → mutation 응답의 최신 status로 감지·토스트. 카운트 배지 정합성 → staleTime 30s + 임포트 후 강제 refetch.
-
----
-
-## 5. 예상 성능 (25만행, 인덱스 적용 후)
-
-- 리스트 100행 페이지 fetch: 50~200ms.
-- Unclosed/Closed 카운트: 10~50ms.
-- Facets(단일 컬럼): 100~500ms, 캐시 후 즉시.
-- 브라우저 메모리: 수백 MB → 수십 MB 이하. `DataCloneError: out of memory` 해소.
-
----
-
-## 6. 마이그레이션 순서
-
-1. DB 마이그레이션(2-A ~ 2-F).
-2. RPC 단위 테스트.
-3. 서버 훅 3~4종 도입, 기존 `useDefectRawData`와 병존.
-4. `DefectRawDataPage`를 새 훅으로 교체 + 탭·URL·페이지네이션 UI.
-5. Export/Bulk edit 서버 경로 전환.
-6. `CriticalPendingBar` 등 위젯을 summary RPC로 교체.
-7. `useDefectRawData` 및 잔재 제거.
-8. 임포트 성공 콜백에서 invalidate 훅업.
-
-각 단계마다 build 통과 확인. 3~4단계는 feature flag로 즉시 롤백 가능하게 유지.
-
----
-
-## 7. 변경 파일 (요약)
-
-- 마이그레이션 (RPC + 인덱스 + generated column)
-- 신규
-  - `src/hooks/useDefectItemsQuery.ts`
-  - `src/hooks/useDefectFacet.ts`
-  - `src/hooks/useDefectStatusCounts.ts`
-  - `src/hooks/useDefectDashboardSummary.ts`
-  - `src/lib/defect-management/server-filters.ts` (URL search 직렬화/역직렬화)
-  - `src/routes/api/private/defects/export.ts` (server route)
-- 수정
-  - `src/routes/_authenticated/closure/defect-management/raw-data.tsx` (`validateSearch`)
-  - `src/components/defect-management/raw-data/DefectRawDataPage.tsx` (탭, URL, 서버 훅)
-  - `src/components/defect-management/raw-data/ColumnFilterDropdowns.tsx` (facets RPC)
-  - `src/components/defect-management/raw-data/CriticalPendingBar.tsx` (summary RPC)
-  - `src/components/defect-management/raw-data/ExportDialog.tsx` (서버 스트림)
-  - `src/components/defect-management/raw-data/BulkEditBar.tsx` (서버 mutation)
-  - `src/lib/defect-management/derived.ts` (status 정규화 상수)
-  - 임포트 콜백 파일(invalidate)
-- 제거
-  - `src/hooks/useDefectRawData.ts` 및 관련 전량 스캔 유틸
-
----
-
-## 8. 결정 필요 항목
-
-1. **RPC 4종 승인**: `defect_items_search`, `defect_items_facets`, `defect_items_counts`, `defect_items_dashboard_summary`.
-2. **인덱스 세트 승인**(2-B). `pg_trgm` 확장 활성 필요.
-3. **Closed 탭 편집 정책**: 완전 읽기전용 / 관리자만 편집 / 모두 편집.
-4. **Reopen 표기 정규화 목록**: `Reopen`, `Re-Open`, `Reopened` 외 변형 여부.
-5. **Export 포맷 우선순위**: 25만행 XLSX는 무거우니 CSV 우선 권장.
-6. **기본 pageSize**: 100 권장(50/100/200/500 선택).
-
-승인 주시면 마이그레이션 → RPC → 훅 → UI 순으로 build 모드에서 즉시 착수합니다.
+## 완료 기준
+- 화면 배치와 주요 버튼/필터/테이블 UX가 SHAW PROJECT CMS Defect Raw Data와 일치
+- 25만행에서도 페이지 진입 시 전체 데이터를 브라우저로 가져오지 않음
+- 검색/필터/정렬/URL drill-down/export가 현재 전체 결과 기준으로 동작
+- Closed/Unclosed 분리는 유지하되 원본 UX와 충돌하지 않게 같은 Raw Data 경험 안에서 제공
+- 현재 out-of-memory 런타임 오류가 재현되지 않음

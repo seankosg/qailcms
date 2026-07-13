@@ -20,31 +20,50 @@ export function TopHorizontalScrollbar({ targetRef, width, frozenWidth = 0, clas
     const target = targetRef.current;
     const self = selfRef.current;
     if (!target || !self) return;
-    const onTop = () => {
-      if (isSyncingRef.current) { isSyncingRef.current = false; return; }
-      isSyncingRef.current = true;
-      target.scrollLeft = self.scrollLeft;
-    };
-    const onBot = () => {
-      if (isSyncingRef.current) { isSyncingRef.current = false; return; }
+
+    const onTargetScroll = () => {
+      if (isSyncingRef.current) return;
       isSyncingRef.current = true;
       self.scrollLeft = target.scrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingRef.current = false;
+      });
     };
-    self.addEventListener("scroll", onTop, { passive: true });
-    target.addEventListener("scroll", onBot, { passive: true });
+
+    const onSelfScroll = () => {
+      if (isSyncingRef.current) return;
+      isSyncingRef.current = true;
+      target.scrollLeft = self.scrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingRef.current = false;
+      });
+    };
+
+    target.addEventListener("scroll", onTargetScroll, { passive: true });
+    self.addEventListener("scroll", onSelfScroll, { passive: true });
+    self.scrollLeft = target.scrollLeft;
     return () => {
-      self.removeEventListener("scroll", onTop);
-      target.removeEventListener("scroll", onBot);
+      target.removeEventListener("scroll", onTargetScroll);
+      self.removeEventListener("scroll", onSelfScroll);
     };
   }, [targetRef]);
 
+  const innerWidth = Math.max(width, 1);
+
   return (
     <div
-      ref={selfRef}
-      className={cn("overflow-x-auto overflow-y-hidden border-b bg-muted/20", className)}
-      style={{ height: 12, marginLeft: frozenWidth }}
+      className={cn("flex h-[16px] shrink-0 border-b bg-muted/30", className)}
+      aria-hidden
     >
-      <div style={{ width: Math.max(0, width - frozenWidth), height: 1 }} />
+      {frozenWidth > 0 && (
+        <div
+          style={{ width: frozenWidth, minWidth: frozenWidth }}
+          className="border-r bg-background"
+        />
+      )}
+      <div ref={selfRef} className="h-full flex-1 overflow-x-auto overflow-y-hidden">
+        <div style={{ width: innerWidth, height: 1 }} />
+      </div>
     </div>
   );
 }

@@ -21,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Search, RefreshCcw, Upload, LayoutDashboard, FileClock, Download, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, RefreshCcw, Upload, Filter, Download, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import {
   DEFECT_COLUMNS,
   DEFECT_TEAMS,
@@ -49,14 +49,17 @@ import {
   PROGRESS_FIELDS,
 } from "@/lib/defect-management/filter-fns";
 import { classifyDefectStage, formatDdMmm, isOverdueDefect } from "@/lib/defect-management/stage-utils";
+import { getOriginHeaderStyle } from "@/lib/defect-management/origin-header-style";
 import { ColumnFilterDropdown } from "./ColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "./TopHorizontalScrollbar";
 import { DefectStatusBadge } from "./DefectStatusBadge";
 import { CriticalPendingBar } from "./CriticalPendingBar";
+import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { EditCellPopover } from "./EditCellPopover";
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
+import { DefectStageProgress, DefectStageProgressLegend } from "./DefectStageProgress";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
 const SYSTEM_FROZEN_IDS = ["__select", "is_critical", "stage_progress"];
@@ -65,7 +68,7 @@ const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
 
 // ── URL <-> table state helpers ────────────────────────────────────────────
 function parseSortFromUrl(s: string): SortingState {
-  if (!s) return [{ id: "source_issue_no", desc: true }];
+  if (!s) return [{ id: "source_issue_no", desc: false }];
   try {
     return s.split(",")
       .map((p) => p.trim())
@@ -74,7 +77,7 @@ function parseSortFromUrl(s: string): SortingState {
         const [id, dir] = p.split(":");
         return { id, desc: (dir ?? "asc").toLowerCase() === "desc" };
       });
-  } catch { return [{ id: "source_issue_no", desc: true }]; }
+  } catch { return [{ id: "source_issue_no", desc: false }]; }
 }
 function serializeSort(s: SortingState): string {
   return s.map((x) => `${x.id}:${x.desc ? "desc" : "asc"}`).join(",");
@@ -105,8 +108,7 @@ function toServerFilters(f: ColumnFiltersState): DefectServerFilter[] {
       if (v.length === 0) continue;
       const hasEmpty = v.includes(EMPTY_TOKEN);
       const rest = v.filter((x) => x !== EMPTY_TOKEN);
-      if (rest.length > 0) out.push({ column: id, op: "in", value: rest });
-      // "(Empty)" 단독 선택은 op:empty
+      if (rest.length > 0) out.push({ column: id, op: hasEmpty ? "in_or_empty" as any : "in", value: rest });
       if (hasEmpty && rest.length === 0) out.push({ column: id, op: "empty", value: null });
       continue;
     }
@@ -128,6 +130,36 @@ function toServerFilters(f: ColumnFiltersState): DefectServerFilter[] {
     }
   }
   return out;
+}
+
+function mergeUrlFilters(urlSearch: Record<string, any>, baseFilters: ColumnFiltersState): ColumnFiltersState {
+  const overridden = new Set<string>();
+  for (const [param, column] of Object.entries(URL_MAP)) {
+    if (urlSearch[param]) overridden.add(column);
+  }
+  if ((urlSearch.dateStart || urlSearch.dateEnd) && urlSearch.dateField && DATE_FILTER_FIELDS.has(urlSearch.dateField)) {
+    overridden.add(urlSearch.dateField);
+  }
+  const next = baseFilters.filter((filter) => !overridden.has(filter.id));
+  for (const [param, column] of Object.entries(URL_MAP)) {
+    const value = urlSearch[param];
+    if (!value) continue;
+    if (TEXT_FILTER_FIELDS.has(column)) next.push({ id: column, value: value === EMPTY_TOKEN ? { text: "", emptyOnly: true } : { text: value } });
+    else next.push({ id: column, value: String(value).split(",").filter(Boolean) });
+  }
+  if ((urlSearch.dateStart || urlSearch.dateEnd) && urlSearch.dateField && DATE_FILTER_FIELDS.has(urlSearch.dateField)) {
+    next.push({ id: urlSearch.dateField, value: { from: urlSearch.dateStart || undefined, to: urlSearch.dateEnd || undefined } });
+  }
+  if (urlSearch.hdecVerification) {
+    next.push({ id: "hdec_verification", value: urlSearch.hdecVerification === EMPTY_TOKEN ? [EMPTY_TOKEN] : String(urlSearch.hdecVerification).split(",").filter(Boolean) });
+  }
+  if (urlSearch.hdecReason) {
+    next.push({ id: "hdec_reason", value: urlSearch.hdecReason === EMPTY_TOKEN ? { text: "", emptyOnly: true } : { text: urlSearch.hdecReason } });
+  }
+  if (urlSearch.notClosureDone === "true") {
+    next.push({ id: "closure_status", value: { text: "Done" } });
+  }
+  return next;
 }
 
 function toServerSort(s: SortingState): DefectServerSort[] {
@@ -172,8 +204,9 @@ const URL_MAP: Record<string, string> = {
 };
 
 const DRILLDOWN_PARAMS = [
-  "source", "actualComplete", "closureComplete", "overdue", "atRisk", "dueOn",
-  ...Object.keys(URL_MAP), "dateStart", "dateEnd", "dateField",
+  "source", "actualComplete", "closureComplete", "overdue", "atRisk", "atRiskDays", "dueOn", "unplannedActualOn",
+  "asOf", "stage", "remaining_stage", "remaining_asof", "capturedByGroup", "notClosureDone", "catADispute",
+  "hdecVerification", "hdecReason", ...Object.keys(URL_MAP), "dateStart", "dateEnd", "dateField",
 ];
 
 export function DefectRawDataPage() {
