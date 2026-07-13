@@ -65,6 +65,7 @@ const CANONICAL_HEADERS: Record<string, DefectTargetField> = {
 
 /** Re-import 파일에서 등장 가능한 확장 필드(원본 헤더가 그대로 필드명이라 매핑 필요). */
 const EXTRA_REIMPORT_FIELDS = new Set<string>([
+  "team",
   "area_type",
   "area_level",
   "area_location",
