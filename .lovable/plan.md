@@ -1,104 +1,162 @@
-# Defect Raw Data — Columns 버튼 추가 (컬럼 순서/보이기·숨기기/좌측 고정)
 
-Task Raw Data 상단의 `Columns` 팝오버(`ColumnOrderMenu`)와 동일한 UX·데이터 저장 방식을 Defect Raw Data 페이지에 이식합니다. 사용자 pin/unpin과 서버 저장 포함.
+# Defect Raw Data — 서버 페이지네이션 전환 + Unclosed/Closed 탭 분리 (총 25만행 기준)
+
+전제 명확화: **Closed + Unclosed 합산 최대 약 25만행**. 이미 10만행을 넘겼고, 성장 여지를 고려해도 최대 25만 규모.
+
+이 규모에서도 클라이언트 전량 fetch(`useDefectRawData`)는 이미 한계에 도달했고(`DataCloneError: out of memory` 재현됨), Closed까지 포함해 조회할수록 악화됩니다. 따라서 **탭 분리 + 서버 사이드 필터/정렬/페이지네이션**을 이번 스프린트의 기본 아키텍처로 확정합니다. 물리적 데이터 이동은 하지 않고 `status_group` 파생 컬럼으로 논리 분리합니다.
 
 ---
 
-## 1. 목표 UX (Task 페이지와 완전 동일)
+## 1. 아키텍처 결정 (확정)
 
-- 툴바(Export 근처)에 **Columns** 버튼 → 팝오버.
-- 팝오버 내부:
-  - **Frozen 섹션**
-    - 시스템 고정 3열(`__select`, `is_critical`, `stage_progress`)은 표시만, unpin 불가.
-    - 사용자 pin 3열까지 추가 가능(총 좌측 고정 = 시스템 3 + 사용자 3, 최대 6). Task는 시스템 2(`__select`, `task_no`) + 사용자 3인데, Defect는 시스템 3 + 사용자 3.
-  - **Columns 섹션**: 나머지 컬럼 드래그 순서 변경, 체크박스 표시/숨김, pin 버튼으로 좌측 고정 토글(사용자 pin 개수 3/3 도달 시 비활성).
-  - **Reset**: 순서·visibility·frozenExtras 초기화.
+- 리스트 조회는 **서버 사이드 필터/정렬/페이지네이션**으로 일원화.
+- **Unclosed 탭**(Open/Reopen 등) / **Closed 탭**(Closed 전용) 2탭 구조. 같은 페이지 내 전환. 사이드메뉴는 그대로.
+- 임포트 시 Closed로 바뀐 행은 물리 이동 없이 `status_group` 재계산으로 자동 이관.
+- 대시보드/집계는 전량 클라이언트 스캔이 아닌 서버 집계 RPC로 처리.
 
-## 2. 상태 및 서버 저장
+---
 
-Task와 동일 구조를 채택:
+## 2. DB 마이그레이션 (필수)
 
-- 상태(`useState`): `order: string[]`, `visibility: VisibilityState`, `frozenExtras: string[]`.
-- 저장 훅: `useUserViewPreference("defect-management.raw-data.v1")` — Task와 같은 훅, 서버(user_view_preferences 테이블) + 로컬 캐시 자동 동기화.
-- 기존 `localStorage` 저장(`sorting/columnFilters/columnSizing/globalFilter`)도 **함께 view preference로 이관**하여 단일 소스로 통일 (Task 페이지가 이렇게 함). 마이그레이션: 훅 최초 로드 시 서버 값이 없고 기존 localStorage 값이 있으면 그 값을 초기 seed로 사용 후 훅으로 저장.
-- 저장 payload 스키마(`DefectPersistedState`):
-  ```
-  {
-    sorting, columnFilters, columnSizing, globalFilter,   // 기존 localStorage에서 이관
-    order, visibility, frozenExtras                        // 신규
-  }
-  ```
-- 유효성 검증: 로드 시 현재 `DEFECT_COLUMNS`에 없는 key 제거, 새 key는 기본 순서 끝에 삽입, `frozenExtras`는 최대 3개로 clamp (Task의 merge 로직 이식).
-
-## 3. 컬럼 파이프라인
-
-현재: `columns = [selectCol, criticalCol, stageCol, ...DEFECT_COLUMNS]` — 정적 순서.
-
-변경 후:
-
-1. `DEFAULT_ORDER = DEFECT_COLUMNS.map(c => c.key).filter(k => k !== "is_critical")` — Critical은 시스템 frozen이므로 order 배열에서 제외.
-2. `orderedKeys = ["__select", "is_critical", "stage_progress", ...frozenExtras, ...order.filter(k => !frozenExtras.includes(k))]`.
-3. 컬럼 빌드: `orderedKeys`를 순회, id별로 기존 정의(selectCol/criticalCol/stageCol) 또는 `buildDataColumn`으로 생성.
-4. `columnVisibility`: 시스템 3열 + 사용자 pin된 열은 항상 `true`, 나머지는 사용자 `visibility` 우선, 없으면 admin `fieldConfig.is_visible` 값 유지.
-
-## 4. Sticky/Frozen 렌더링 변경
-
-현재 `DefectRawTableView`는 `FROZEN = 3` 상수로 앞 3열만 sticky 처리. 사용자 pin을 지원하려면 Task와 같은 방식으로 리팩터:
-
-- `FROZEN` 상수 제거. 대신 상위 페이지에서 `frozenColIds = ["__select", "is_critical", "stage_progress", ...frozenExtras]`를 계산해 `props`로 내려줌.
-- `TableView`는 `frozenColIds` set을 받아, 리프 컬럼을 순회하며 해당 id면 sticky + `left` 오프셋을 누적 계산.
-- `frozenWidth` / `stickyLefts` / 경계 그림자(`shadow-[2px_0_4px_-2px]`)를 프로즌 마지막 컬럼에만 적용하도록 조건 변경.
-- `TopHorizontalScrollbar`에도 새 `frozenWidth` 전달.
-
-## 5. Columns 팝오버 컴포넌트
-
-- 신규: `src/components/defect-management/raw-data/DefectColumnOrderMenu.tsx`
-- Task의 `ColumnOrderMenu` 구조 그대로 이식. 차이점:
-  - `TM_COLUMNS` → `DEFECT_COLUMNS`.
-  - 라벨 리졸버: `useDefectFieldHelpers().getLabel(key)`.
-  - Frozen 섹션 헤더: `Frozen · select/critical/progress (시스템) + 사용자 ({frozenExtras.length}/3)`.
-  - 사용자 frozenExtras는 unpin 가능, 시스템 3개는 표시만 하고 unpin 버튼 없음.
-  - pin 버튼: `frozenExtras.length >= 3`일 때 disabled.
-
-## 6. 툴바 배치
-
-`DefectRawDataPage.tsx` 상단 액션 영역, Export 버튼 왼쪽에 `<DefectColumnOrderMenu ... />` 삽입:
-
-```
-<DefectColumnOrderMenu
-  order={order}
-  visibility={visibility}
-  frozenExtras={frozenExtras}
-  onOrderChange={setOrder}
-  onVisibilityChange={setVisibility}
-  onFrozenChange={setFrozenExtras}
-/>
+### 2-A. `status_group` generated column
+```sql
+alter table public.defect_items_raw
+  add column status_group text generated always as (
+    case when lower(trim(status_raw))='closed' then 'closed' else 'unclosed' end
+  ) stored;
 ```
 
-## 7. 검증 체크리스트
+### 2-B. 인덱스 세트 (25만 규모 대응)
+- `(is_active, status_group, source_issue_no desc)` — Unclosed 기본 정렬.
+- `(is_active, status_group, actual_closure_date desc)` — Closed 기본 정렬.
+- `(is_active, status_group, team)`, `(is_active, status_group, subcontractor_name)`, `(is_active, status_group, area_level)` — 흔한 필터.
+- `pg_trgm` GIN: `description`, `source_issue_no`, `location_raw`, `area_location`, `subcontractor_name`, `hdec_pic_name` (글로벌 검색용, 초기엔 컬럼별 개별 trgm 인덱스로 시작).
 
-- 팝오버 열림 → 드래그 순서 변경 → 테이블 재정렬.
-- 체크박스로 감춤/표시.
-- pin 버튼으로 사용자 컬럼 좌측 고정 → sticky 렌더링에 반영, 3/3 도달 시 비활성.
-- unpin으로 원위치.
-- Reset → 기본 순서 + 시스템 frozen만 남음.
-- 새로고침 후 상태 복원 (서버 + 로컬 캐시).
-- 다른 기기 로그인 시 서버 값으로 동기화.
-- 기존 sorting/filter/sizing/URL drilldown 회귀 없음.
-- 시스템 frozen 3개는 항상 왼쪽 유지, 그림자는 마지막 frozen 뒤에만.
+### 2-C. 서버 검색 RPC `defect_items_search`
+- 인자: `_status_group('unclosed'|'closed'|'all')`, `_include_inactive bool`, `_q text`, `_filters jsonb`, `_sort jsonb`, `_offset int`, `_limit int`.
+- 반환: `rows jsonb`(리스트에 필요한 ~25컬럼만), `total_count bigint`(`count(*) over ()`).
+- Dynamic SQL은 화이트리스트(`DEFECT_COLUMNS.key`) 기반으로 컬럼명 검증. `security invoker` + RLS 유지.
 
-## 8. 변경 파일
+### 2-D. Facets RPC `defect_items_facets`
+- 인자: `_status_group`, `_include_inactive`, `_column`(화이트리스트).
+- 컬럼별 distinct 값 + 카운트. React Query 짧은 staleTime(60s)로 캐시.
 
-- 신규: `src/components/defect-management/raw-data/DefectColumnOrderMenu.tsx`
-- 수정: `src/components/defect-management/raw-data/DefectRawDataPage.tsx`
-  - `order/visibility/frozenExtras` state 추가
-  - `useUserViewPreference("defect-management.raw-data.v1")` 도입, 기존 localStorage 저장/복원 로직 이관 (기존 localStorage에서 최초 1회 seed 마이그레이션)
-  - `columns` 빌드를 `orderedKeys` 기반으로 재구성
-  - `columnVisibility` 계산에 사용자 값 반영
-  - `DefectRawTableView`에 `frozenColIds` prop 전달, 하드코딩된 `FROZEN=3` 제거
-  - 툴바에 팝오버 삽입
+### 2-E. 카운트 RPC `defect_items_counts`
+- Unclosed / Closed 카운트 반환. 탭 배지 전용.
 
-## 9. 비파괴 보장
+### 2-F. 대시보드 집계 RPC `defect_items_dashboard_summary`
+- `CriticalPendingBar`, `latestDataDate` 등에 필요한 값만 서버에서 집계.
 
-- 서버 스키마 변경 없음(`user_view_preferences`는 Task에서 이미 사용 중, `view_key`만 다름).
-- `DEFECT_COLUMNS`, admin `fieldConfig` 로직 그대로 유지 — 사용자 설정이 없을 때는 현행 동작과 동일.
+---
+
+## 3. 클라이언트 변경
+
+### 3-A. 폐기
+- `useDefectRawData`(전량 fetch 훅).
+- 클라이언트 전체 정렬/필터/faceted uniqueOptions 계산.
+- 클라이언트 latestDataDate/critical pending 전량 스캔.
+- 40k `SAFETY_CAP`, persist cache 계열 코드.
+
+### 3-B. 신설 훅
+- `useDefectItemsQuery({ statusGroup, page, pageSize, sort, filters, q, includeInactive })` → `defect_items_search`. 반환 `{ rows, total }`.
+- `useDefectFacet(column, { statusGroup })` → `defect_items_facets`.
+- `useDefectStatusCounts({ includeInactive })` → `defect_items_counts`.
+- `useDefectDashboardSummary()` → summary RPC.
+
+### 3-C. URL 상태 (TanStack Router `validateSearch` + `fallback`)
+- `tab: "unclosed" | "closed"` (기본 `unclosed`)
+- `page: number` (기본 1), `pageSize: number` (기본 100)
+- `sort: string`, `q: string`, `filters: string`(압축 JSON), `includeInactive: boolean`
+- 새로고침/공유/뒤로가기 시 상태 보존.
+
+### 3-D. 페이지네이션 UX
+- 기본: **명시 페이지네이션** (페이지 이동 + pageSize 50/100/200/500 선택). 예측 가능·렌더 안정.
+- 페이지 내 최대 500행 범위에서 기존 가상 스크롤 유지.
+- 무한 스크롤은 초기 도입 제외(정렬 자유도와 keyset 요건 때문).
+
+### 3-E. UI 변경
+- 상단 `<Tabs>`: `Unclosed (n)` / `Closed (n)`. 배지는 `useDefectStatusCounts`.
+- **Unclosed 탭**: 현행 기본, 정렬 `source_issue_no desc`. `CriticalPendingBar` 등 상단 위젯 표시.
+- **Closed 탭**: `status_raw` 숨김, `actual_closure_date` / `hdec_verification` / `hdec_reason` 노출. 정렬 `actual_closure_date desc`. Bulk edit은 기본 비활성(관리자 옵션).
+- View preference 키 탭별 분리:
+  - `defect-management.raw-data.unclosed.v1`
+  - `defect-management.raw-data.closed.v1`
+  - 저장: `order`, `visibility`, `frozenExtras`, `columnSizing`, `pageSize`, `sort`. (필터/글로벌 검색은 URL만.)
+
+### 3-F. Export / Bulk edit 재설계
+- Export: 서버 라우트 `POST /api/private/defects/export`에서 현재 필터 결과를 CSV/XLSX 스트리밍. 25만 규모 XLSX는 무거우니 CSV 우선.
+- Bulk edit: 클라이언트는 `{ filters, selectedIds | selectAllMatching }`만 전송. 서버 RPC가 트랜잭션 처리 + 히스토리 기록.
+
+### 3-G. 임포트 후 캐시 무효화
+- 임포트 성공 콜백에서 `queryClient.invalidateQueries({ queryKey: ["defect"] })`.
+- `status_raw` 갱신만으로 `status_group` 자동 재계산 → 다음 조회에서 자동으로 해당 탭으로 이동.
+
+---
+
+## 4. “Closed로 변경 시 이동” 정책
+
+논리 이동만 사용(물리 이동 없음).
+
+- 장점: 히스토리(`defect_status_history`)·rollback·상세 링크 그대로. 임포트 로직 최소 변경. Reopen도 대칭 처리.
+- 단점/완화: 열린 캐시 잔상 → 임포트 후 invalidate 필수. 편집 중 status 변경 충돌 → mutation 응답의 최신 status로 감지·토스트. 카운트 배지 정합성 → staleTime 30s + 임포트 후 강제 refetch.
+
+---
+
+## 5. 예상 성능 (25만행, 인덱스 적용 후)
+
+- 리스트 100행 페이지 fetch: 50~200ms.
+- Unclosed/Closed 카운트: 10~50ms.
+- Facets(단일 컬럼): 100~500ms, 캐시 후 즉시.
+- 브라우저 메모리: 수백 MB → 수십 MB 이하. `DataCloneError: out of memory` 해소.
+
+---
+
+## 6. 마이그레이션 순서
+
+1. DB 마이그레이션(2-A ~ 2-F).
+2. RPC 단위 테스트.
+3. 서버 훅 3~4종 도입, 기존 `useDefectRawData`와 병존.
+4. `DefectRawDataPage`를 새 훅으로 교체 + 탭·URL·페이지네이션 UI.
+5. Export/Bulk edit 서버 경로 전환.
+6. `CriticalPendingBar` 등 위젯을 summary RPC로 교체.
+7. `useDefectRawData` 및 잔재 제거.
+8. 임포트 성공 콜백에서 invalidate 훅업.
+
+각 단계마다 build 통과 확인. 3~4단계는 feature flag로 즉시 롤백 가능하게 유지.
+
+---
+
+## 7. 변경 파일 (요약)
+
+- 마이그레이션 (RPC + 인덱스 + generated column)
+- 신규
+  - `src/hooks/useDefectItemsQuery.ts`
+  - `src/hooks/useDefectFacet.ts`
+  - `src/hooks/useDefectStatusCounts.ts`
+  - `src/hooks/useDefectDashboardSummary.ts`
+  - `src/lib/defect-management/server-filters.ts` (URL search 직렬화/역직렬화)
+  - `src/routes/api/private/defects/export.ts` (server route)
+- 수정
+  - `src/routes/_authenticated/closure/defect-management/raw-data.tsx` (`validateSearch`)
+  - `src/components/defect-management/raw-data/DefectRawDataPage.tsx` (탭, URL, 서버 훅)
+  - `src/components/defect-management/raw-data/ColumnFilterDropdowns.tsx` (facets RPC)
+  - `src/components/defect-management/raw-data/CriticalPendingBar.tsx` (summary RPC)
+  - `src/components/defect-management/raw-data/ExportDialog.tsx` (서버 스트림)
+  - `src/components/defect-management/raw-data/BulkEditBar.tsx` (서버 mutation)
+  - `src/lib/defect-management/derived.ts` (status 정규화 상수)
+  - 임포트 콜백 파일(invalidate)
+- 제거
+  - `src/hooks/useDefectRawData.ts` 및 관련 전량 스캔 유틸
+
+---
+
+## 8. 결정 필요 항목
+
+1. **RPC 4종 승인**: `defect_items_search`, `defect_items_facets`, `defect_items_counts`, `defect_items_dashboard_summary`.
+2. **인덱스 세트 승인**(2-B). `pg_trgm` 확장 활성 필요.
+3. **Closed 탭 편집 정책**: 완전 읽기전용 / 관리자만 편집 / 모두 편집.
+4. **Reopen 표기 정규화 목록**: `Reopen`, `Re-Open`, `Reopened` 외 변형 여부.
+5. **Export 포맷 우선순위**: 25만행 XLSX는 무거우니 CSV 우선 권장.
+6. **기본 pageSize**: 100 권장(50/100/200/500 선택).
+
+승인 주시면 마이그레이션 → RPC → 훅 → UI 순으로 build 모드에서 즉시 착수합니다.

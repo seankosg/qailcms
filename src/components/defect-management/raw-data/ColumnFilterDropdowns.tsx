@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EMPTY_TOKEN } from "@/lib/defect-management/filter-fns";
+import { useDefectFacet, type DefectStatusGroup } from "@/hooks/useDefectItems";
 
 export function MultiSelectDropdown({ column, options }: { column: any; options: { value: string; label: string }[] }) {
   const selected: string[] = (column.getFilterValue() as string[]) ?? [];
@@ -14,28 +15,31 @@ export function MultiSelectDropdown({ column, options }: { column: any; options:
     column.setFilterValue(next.length ? next : undefined);
   };
   const labelMap = useMemo(() => new Map(options.map((o) => [o.value, o.label])), [options]);
-  const facets = column.getFacetedUniqueValues?.() as Map<any, number> | undefined;
+  const [open, setOpen] = useState(false);
+  // 서버 facet: meta.serverFacet(column name) + statusGroup/includeInactive
+  const meta = (column.columnDef.meta ?? {}) as any;
+  const serverFacetCol: string | null = meta.serverFacet ?? null;
+  const statusGroup: DefectStatusGroup = (meta.statusGroup as DefectStatusGroup) ?? "unclosed";
+  const includeInactive: boolean = !!meta.includeInactive;
+  const { data: serverFacet } = useDefectFacet(open ? serverFacetCol : null, {
+    statusGroup,
+    includeInactive,
+    enabled: open && !!serverFacetCol,
+  });
   const items = useMemo(() => {
     const counts = new Map<string, number>();
-    let emptyCount = 0;
-    if (facets) {
-      facets.forEach((count, rawVal) => {
-        if (rawVal == null || rawVal === "") emptyCount += count;
-        else {
-          const key = String(rawVal);
-          counts.set(key, (counts.get(key) ?? 0) + count);
-        }
-      });
+    if (serverFacet && serverFacet.length) {
+      for (const f of serverFacet) counts.set(f.value, f.cnt);
     }
     selected.forEach((v) => { if (v !== EMPTY_TOKEN && !counts.has(v)) counts.set(v, 0); });
     options.forEach((o) => { if (!counts.has(o.value)) counts.set(o.value, 0); });
     const list = [...counts.entries()].map(([value, count]) => ({ value, label: labelMap.get(value) ?? value, count }));
     list.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
-    return [{ value: EMPTY_TOKEN, label: "(Empty)", count: emptyCount }, ...list];
-  }, [facets, options, labelMap, selected]);
+    return [{ value: EMPTY_TOKEN, label: "(Empty)", count: 0 }, ...list];
+  }, [serverFacet, options, labelMap, selected]);
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           className={cn("inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/80", isActive ? "text-primary" : "text-muted-foreground/50")}
