@@ -52,7 +52,6 @@ const NAV: NavSection[] = [
         icon: AlertTriangle,
         matchPrefix: "/closure/defect-management",
         items: [
-          { to: "/closure/defect-management/dashboard", label: "Dashboard", icon: LayoutDashboard },
           { to: "/closure/defect-management/raw-data", label: "Raw Data", icon: Database },
           { to: "/closure/defect-management/import", label: "Import", icon: Upload, editorOnly: true },
           { to: "/closure/defect-management/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
