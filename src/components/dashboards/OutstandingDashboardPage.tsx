@@ -20,10 +20,10 @@ export function OutstandingDashboardPage() {
         />
         <SectionDashboardCard
           title="Defect Management"
-          description="Defect 발생·조치·종결 현황 대시보드."
+          description="Defect 발생·조치·종결 현황. (KPI/S-Curve/Breakdown은 Phase 3 예정)"
           icon={AlertTriangle}
-          to="/closure/defect-management/dashboard"
-          cta="Defect 대시보드"
+          to="/closure/defect-management/raw-data"
+          cta="Defect 열기"
         />
       </div>
     </div>
