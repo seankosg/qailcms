@@ -799,13 +799,16 @@ function buildDataColumn(
     "multi-select";
   // multi-select 컬럼은 서버 facet 사용
   const serverFacet = filterType === "multi-select" ? c.key : null;
+  // 파생 컬럼(DB 저장값 없음)은 서버 정렬/필터 불가
+  const isDerived = !!c.derived;
   return {
     id: c.key,
     accessorKey: c.key,
     header: c.label,
     size: c.width,
     // manualFiltering=true 상태이므로 filterFn 불필요
-    enableSorting: !PROGRESS_FIELDS.has(c.key) || c.type === "percent",
+    enableSorting: !isDerived && (!PROGRESS_FIELDS.has(c.key) || c.type === "percent"),
+    enableColumnFilter: !isDerived,
     meta: { filterType, filterOptions: [], serverFacet, statusGroup, includeInactive },
     cell: ({ row, getValue }) => {
       const v: any = getValue();
@@ -840,6 +843,7 @@ function renderDefectCell(c: DefectColumnDef, v: any, row: DefectItem, _dataDate
     return <Badge className={cn("text-[10px]", cls)}>{String(v)}</Badge>;
   }
   if (c.key === "status_raw" || c.key === "completion_status" || c.key === "closure_status") return <DefectStatusBadge status={v} />;
+  if (c.key === "start_status") return <DefectStatusBadge status={v} />;
   if (c.key === "classification_source") {
     const src = String(v).toLowerCase();
     const cls = src === "rule" ? "bg-primary/10 text-primary border-primary/30"
