@@ -512,9 +512,10 @@ interface TableViewProps {
   tableRef: React.RefObject<HTMLDivElement | null>;
   loading: boolean;
   frozenColIds: string[];
+  onRowClick?: (id: string) => void;
 }
 
-function AbdRawTableView({ table, tableRef, loading, frozenColIds }: TableViewProps) {
+function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
   const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
   const { stickyLefts, lastFrozenIndex, frozenWidth } = useMemo(() => {
@@ -623,7 +624,7 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds }: TableViewPr
                       onClick={(e) => {
                         const t = e.target as HTMLElement;
                         if (t.closest('button, a, input, [role="button"], [role="menuitem"], [data-radix-popper-content-wrapper]')) return;
-                        setUrl({ detail: r.id });
+                        onRowClick?.(r.id);
                       }}
                     >
                       {row.getVisibleCells().map((cell, i) => {
@@ -654,10 +655,6 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds }: TableViewPr
           </TableBody>
         </Table>
       </div>
-      <AbdDetailSheet
-        id={urlSearch.detail || null}
-        onOpenChange={(open) => { if (!open) setUrl({ detail: "" }); }}
-      />
     </div>
   );
 }
