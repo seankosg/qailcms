@@ -53,8 +53,12 @@ import { CriticalPendingBar } from "./CriticalPendingBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { EditCellPopover } from "./EditCellPopover";
+import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
+import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
 const DEFAULT_SORTING: SortingState = [{ id: "source_issue_no", desc: false }];
+const SYSTEM_FROZEN_IDS = ["__select", "is_critical", "stage_progress"];
+const DEFAULT_ORDER = DEFECT_COLUMNS.map((c) => c.key).filter((k) => k !== "is_critical");
 
 function formatPct(v: any): string {
   if (v == null) return "";
@@ -112,7 +116,8 @@ export function DefectRawDataPage() {
   const { data: fieldConfig = [] } = useDefectFieldConfig();
   const helpers = useDefectFieldHelpers();
   const isAdmin = !!user?.isAdmin;
-  const storageKey = user?.id ? `defect-raw-data-state:${user.id}` : "defect-raw-data-state:anon";
+  const legacyStorageKey = user?.id ? `defect-raw-data-state:${user.id}` : "defect-raw-data-state:anon";
+  const viewPref = useUserViewPreference("defect-management.raw-data.v1");
 
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
@@ -124,30 +129,75 @@ export function DefectRawDataPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [criticalPending, setCriticalPending] = useState<Map<string, boolean>>(new Map());
   const [exportOpen, setExportOpen] = useState(false);
+  const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
+  const [visibility, setVisibility] = useState<VisibilityState>({});
+  const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
 
   const latestDataDate = getDefectLatestDataDate(items);
   const dataDate = latestDataDate ?? null;
 
-  // ── Restore persistent state + URL drilldown params ─────────────────────
+  // ── Restore persistent state (server view pref → legacy localStorage seed) + URL drilldown ─
   useEffect(() => {
+    if (!viewPref.ready) return;
     setStateLoaded(false);
     const isDrilldown = DRILLDOWN_PARAMS.some((p) => search[p] != null);
     let baseFilters: ColumnFiltersState = [];
     let baseSorting = DEFAULT_SORTING;
     let baseGlobal = "";
     let baseSizing: ColumnSizingState = {};
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        baseSizing = parsed.columnSizing && typeof parsed.columnSizing === "object" ? parsed.columnSizing : {};
-        if (!isDrilldown) {
-          baseSorting = Array.isArray(parsed.sorting) && parsed.sorting.length ? parsed.sorting : DEFAULT_SORTING;
-          baseFilters = Array.isArray(parsed.columnFilters) ? parsed.columnFilters : [];
-          baseGlobal = typeof parsed.globalFilter === "string" ? parsed.globalFilter : "";
+    let baseOrder: string[] = DEFAULT_ORDER;
+    let baseVisibility: VisibilityState = {};
+    let baseFrozen: string[] = [];
+
+    const s: any = viewPref.state ?? null;
+    let src: any = null;
+    if (s && typeof s === "object" && Object.keys(s).length > 0) {
+      src = s;
+    } else {
+      // 최초 1회 마이그레이션: 기존 localStorage에서 seed
+      try {
+        const raw = localStorage.getItem(legacyStorageKey);
+        if (raw) src = JSON.parse(raw);
+      } catch { /* ignore */ }
+    }
+
+    if (src) {
+      baseSizing = src.columnSizing && typeof src.columnSizing === "object" ? src.columnSizing : {};
+      if (!isDrilldown) {
+        baseSorting = Array.isArray(src.sorting) && src.sorting.length ? src.sorting : DEFAULT_SORTING;
+        baseFilters = Array.isArray(src.columnFilters) ? src.columnFilters : [];
+        baseGlobal = typeof src.globalFilter === "string" ? src.globalFilter : "";
+      }
+      const validKeys = new Set(DEFAULT_ORDER);
+      const savedOrder: string[] = Array.isArray(src.order)
+        ? src.order.filter((k: any) => typeof k === "string" && validKeys.has(k))
+        : [];
+      if (savedOrder.length) {
+        const savedSet = new Set(savedOrder);
+        const merged = [...savedOrder];
+        DEFAULT_ORDER.forEach((k, defIdx) => {
+          if (savedSet.has(k)) return;
+          let insertAt = merged.length;
+          for (let i = defIdx - 1; i >= 0; i--) {
+            const prev = DEFAULT_ORDER[i];
+            const idx = merged.indexOf(prev);
+            if (idx !== -1) { insertAt = idx + 1; break; }
+          }
+          merged.splice(insertAt, 0, k);
+        });
+        baseOrder = merged;
+      }
+      if (src.visibility && typeof src.visibility === "object") {
+        for (const [k, v] of Object.entries(src.visibility)) {
+          if (validKeys.has(k)) baseVisibility[k] = !!v;
         }
       }
-    } catch { /* ignore */ }
+      if (Array.isArray(src.frozenExtras)) {
+        baseFrozen = src.frozenExtras
+          .filter((k: any) => typeof k === "string" && validKeys.has(k))
+          .slice(0, 3);
+      }
+    }
 
     const overriddenCols = new Set<string>();
     for (const [p, col] of Object.entries(URL_MAP)) if (search[p] != null) overriddenCols.add(col);
@@ -173,8 +223,12 @@ export function DefectRawDataPage() {
     setColumnSizing(baseSizing);
     setGlobalFilter(baseGlobal);
     setSearchInput(baseGlobal);
+    setOrder(baseOrder);
+    setVisibility(baseVisibility);
+    setFrozenExtras(baseFrozen);
     setStateLoaded(true);
-  }, [storageKey, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewPref.ready, legacyStorageKey, search]);
 
   // Debounced global search
   useEffect(() => {
@@ -182,19 +236,19 @@ export function DefectRawDataPage() {
     return () => window.clearTimeout(t);
   }, [searchInput]);
 
-  // Persist state
+  // Persist state (서버 저장 + 로컬 캐시, 훅 내부 debounce)
   useEffect(() => {
     if (!stateLoaded) return;
-    const t = window.setTimeout(() => {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify({
-          sorting: sorting.length ? sorting : DEFAULT_SORTING,
-          columnFilters, globalFilter, columnSizing,
-        }));
-      } catch { /* ignore */ }
-    }, 500);
-    return () => window.clearTimeout(t);
-  }, [stateLoaded, storageKey, sorting, columnFilters, globalFilter, columnSizing]);
+    viewPref.save({
+      sorting: sorting.length ? sorting : DEFAULT_SORTING,
+      columnFilters,
+      globalFilter,
+      columnSizing,
+      order,
+      visibility,
+      frozenExtras,
+    } as any);
+  }, [stateLoaded, sorting, columnFilters, globalFilter, columnSizing, order, visibility, frozenExtras, viewPref]);
 
   // ── Filtered base items (URL post-filters that don't map to columns) ────
   const filteredItems = useMemo(() => {
@@ -241,6 +295,12 @@ export function DefectRawDataPage() {
     const idx = (filteredItems as any[]).findIndex((i) => i.id === id);
     if (idx >= 0) Object.assign((filteredItems as any)[idx], patch);
   }, [filteredItems]);
+
+  const orderedKeys = useMemo(() => {
+    const frozenSet = new Set(frozenExtras);
+    const rest = order.filter((k) => !frozenSet.has(k));
+    return [...SYSTEM_FROZEN_IDS, ...frozenExtras, ...rest];
+  }, [order, frozenExtras]);
 
   const columns = useMemo<ColumnDef<DefectItem>[]>(() => {
     // Static select column
@@ -317,25 +377,36 @@ export function DefectRawDataPage() {
       },
     };
 
-    // Data columns from DEFECT_COLUMNS
-    const dataCols: ColumnDef<DefectItem>[] = DEFECT_COLUMNS
-      .filter((c) => c.key !== "is_critical") // handled separately
-      .map((c) => buildDataColumn(c, optionFields, dataDate, isAdmin, patchLocalItem, refetch));
-
-    return [selectCol, criticalCol, stageCol, ...dataCols];
-  }, [optionFields, dataDate, criticalPending, isAdmin, patchLocalItem, refetch]);
+    // Data columns from DEFECT_COLUMNS, ordered by user-configured orderedKeys
+    const byKey = new Map(
+      DEFECT_COLUMNS.filter((c) => c.key !== "is_critical").map((c) => [c.key, c] as const),
+    );
+    const cols: ColumnDef<DefectItem>[] = [];
+    for (const id of orderedKeys) {
+      if (id === "__select") { cols.push(selectCol); continue; }
+      if (id === "is_critical") { cols.push(criticalCol); continue; }
+      if (id === "stage_progress") { cols.push(stageCol); continue; }
+      const c = byKey.get(id);
+      if (!c) continue;
+      cols.push(buildDataColumn(c, optionFields, dataDate, isAdmin, patchLocalItem, refetch));
+    }
+    return cols;
+  }, [orderedKeys, optionFields, dataDate, criticalPending, isAdmin, patchLocalItem, refetch]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = { __select: true, is_critical: true, stage_progress: true };
     const configured = new Map(fieldConfig.map((r) => [r.field_name, r]));
+    const frozenSet = new Set(frozenExtras);
     for (const c of columns) {
       const id = (c as any).id ?? (c as any).accessorKey;
       if (!id || id in vis) continue;
+      if (frozenSet.has(id)) { vis[id] = true; continue; }
+      if (id in visibility) { vis[id] = visibility[id] !== false; continue; }
       const row = configured.get(id);
       vis[id] = row ? !!row.is_visible : true;
     }
     return vis;
-  }, [columns, fieldConfig]);
+  }, [columns, fieldConfig, visibility, frozenExtras]);
 
   const table = useReactTable<DefectItem>({
     data: filteredItems,
@@ -394,6 +465,14 @@ export function DefectRawDataPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/dashboard"><LayoutDashboard className="mr-1 h-3.5 w-3.5" /> Dashboard</Link></Button>
+          <DefectColumnOrderMenu
+            order={order}
+            visibility={visibility as Record<string, boolean>}
+            frozenExtras={frozenExtras}
+            onOrderChange={setOrder}
+            onVisibilityChange={setVisibility}
+            onFrozenChange={setFrozenExtras}
+          />
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1 h-3.5 w-3.5" /> Export</Button>
           <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/import"><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
           <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/import/logs"><FileClock className="mr-1 h-3.5 w-3.5" /> Import Logs</Link></Button>
@@ -447,6 +526,7 @@ export function DefectRawDataPage() {
         tableRef={tableRef}
         loading={!stateLoaded}
         dataDate={dataDate}
+        frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
         onRowClick={(r) => navigate({ to: "/closure/defect-management/detail/$id", params: { id: r.id } })}
       />
 
@@ -558,19 +638,34 @@ interface TableViewProps {
   tableRef: React.RefObject<HTMLDivElement | null>;
   loading: boolean;
   dataDate: string | null;
+  frozenColIds: string[];
   onRowClick: (row: DefectItem) => void;
 }
 
-function DefectRawTableView({ table, tableRef, loading, dataDate, onRowClick }: TableViewProps) {
-  const FROZEN = 3; // __select + is_critical + stage_progress (or source_issue_no once visible)
+function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, onRowClick }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
-  const stickyLefts = useMemo(() => {
-    const lefts: number[] = []; let acc = 0;
-    for (let i = 0; i < Math.min(FROZEN, leaf.length); i++) { lefts.push(acc); acc += leaf[i].getSize(); }
-    return lefts;
-  }, [leaf, table.getState().columnSizing]);
-  const frozenWidth = useMemo(() => leaf.slice(0, FROZEN).reduce((s, c) => s + c.getSize(), 0), [leaf, table.getState().columnSizing]);
-  const totalWidth = useMemo(() => leaf.reduce((s, c) => s + c.getSize(), 0), [leaf, table.getState().columnSizing]);
+  const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
+  // 리프 컬럼을 순회하면서 frozen id인 것들만 왼쪽부터 sticky 스택으로 쌓음.
+  // 사용자가 pin한 컬럼은 리프 순서(orderedKeys)상 이미 왼쪽에 배치되어 있음.
+  const { stickyLefts, lastFrozenIndex, frozenWidth } = useMemo(() => {
+    const lefts = new Map<string, number>();
+    let acc = 0;
+    let lastIdx = -1;
+    for (let i = 0; i < leaf.length; i++) {
+      const c = leaf[i];
+      if (!frozenSet.has(c.id)) continue;
+      lefts.set(c.id, acc);
+      acc += c.getSize();
+      lastIdx = i;
+    }
+    return { stickyLefts: lefts, lastFrozenIndex: lastIdx, frozenWidth: acc };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaf, frozenSet, table.getState().columnSizing]);
+  const totalWidth = useMemo(
+    () => leaf.reduce((s, c) => s + c.getSize(), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [leaf, table.getState().columnSizing],
+  );
 
   const rows = table.getRowModel().rows;
   const rowVirtualizer = useVirtualizer({
@@ -591,16 +686,18 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, onRowClick }: 
           <TableHeader className="bg-background">
             <TableRow className="border-b bg-background [&>th]:sticky [&>th]:top-0 [&>th]:z-[2] [&>th]:bg-background">
               {table.getHeaderGroups().at(-1)?.headers.map((header, i) => {
-                const isSticky = i < FROZEN;
+                const isSticky = frozenSet.has(header.column.id);
+                const leftPx = isSticky ? stickyLefts.get(header.column.id) ?? 0 : undefined;
+                const isLastFrozen = i === lastFrozenIndex;
                 return (
                   <TableHead
                     key={header.id}
                     style={{
                       width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize(),
-                      ...(isSticky ? { position: "sticky", left: stickyLefts[i], zIndex: 3, background: "hsl(var(--background))" } : {}),
+                      ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 3, background: "hsl(var(--background))" } : {}),
                     }}
                     className={cn("relative h-9 cursor-pointer select-none whitespace-nowrap border-b px-2 py-0 text-left text-[11px] font-medium",
-                      i === FROZEN - 1 && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
+                      isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     <div className="flex w-full items-center justify-between gap-1">
@@ -647,15 +744,17 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, onRowClick }: 
                       onClick={() => onRowClick(row.original)}
                     >
                       {row.getVisibleCells().map((cell, i) => {
-                        const isSticky = i < FROZEN;
+                        const isSticky = frozenSet.has(cell.column.id);
+                        const leftPx = isSticky ? stickyLefts.get(cell.column.id) ?? 0 : undefined;
+                        const isLastFrozen = i === lastFrozenIndex;
                         return (
                           <TableCell
                             key={cell.id}
                             style={{
                               width: cell.column.getSize(), minWidth: cell.column.getSize(), maxWidth: cell.column.getSize(),
-                              ...(isSticky ? { position: "sticky", left: stickyLefts[i], zIndex: 1, background: "hsl(var(--background))" } : {}),
+                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: "hsl(var(--background))" } : {}),
                             }}
-                            className={cn("truncate border-b px-2 py-1 text-xs", i === FROZEN - 1 && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
+                            className={cn("truncate border-b px-2 py-1 text-xs", isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </TableCell>
