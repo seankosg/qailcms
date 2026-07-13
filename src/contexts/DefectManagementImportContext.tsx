@@ -849,7 +849,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     // Defect 캐시 무효화 → status_group 재계산으로 Unclosed/Closed 탭 자동 정합
     try { qc.invalidateQueries({ queryKey: ["defect"] }); } catch { /* ignore */ }
     toast.success(`Defect import 완료: ${ready.length} file(s)`);
-  }, []);
+  }, [qc]);
 
   const startImport = useCallback(async () => {
     if (isRunning) return;
