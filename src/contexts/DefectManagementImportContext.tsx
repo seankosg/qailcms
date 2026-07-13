@@ -739,7 +739,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             const rowLogRows = workingRows.map((p) => ({
               upload_id: logId,
               raw_row_no: p.rawRowNo,
-              team,
+              team: resolveTeam(p.category),
               source_issue_no: p.source_issue_no,
               action_taken: existing.has(p.source_issue_no) ? "updated" : "inserted",
             }));
@@ -789,6 +789,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                     rejected,
                     duplicates,
                     skippedReimportNoMatch,
+                    unmappedCategoryCount: Array.from(unmappedCategories.values()).reduce((a, b) => a + b, 0),
+                    unmappedCategories: Array.from(unmappedCategories.entries()).map(([c, n]) => `${c} × ${n}`),
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
