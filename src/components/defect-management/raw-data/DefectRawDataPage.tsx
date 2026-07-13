@@ -237,6 +237,9 @@ const URL_MAP: Record<string, string> = {
   subcontractorIssueNo: "subcontractor_issue_no",
   critical: "is_critical",
   priority: "priority",
+  plan_group: "plan_group",
+  building: "building",
+  roomGroup: "room_group",
 };
 
 const DRILLDOWN_PARAMS = [
