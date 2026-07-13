@@ -122,7 +122,9 @@ export function useDefectImport() {
 }
 
 const INSERT_CHUNK = 500;
-const BATCH_CONCURRENCY = 4;
+// 서버의 no-op UPDATE 스킵 트리거(trg_defect_suppress_noop_update)로 재임포트
+// 부하가 크게 줄었기 때문에 배치 병렬성을 상향해 왕복 시간을 추가로 단축.
+const BATCH_CONCURRENCY = 6;
 const EXISTING_FETCH_CHUNK = 1000;
 const EXISTING_FETCH_CONCURRENCY = 4;
 const ROW_LOG_CHUNK = 500;
