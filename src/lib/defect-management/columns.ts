@@ -40,6 +40,8 @@ export interface DefectColumnDef {
   editable?: boolean;
   editorType?: "text" | "select" | "date" | "number" | "textarea";
   options?: string[];
+  /** true면 DB 컬럼이 아닌 파생 값. 서버 정렬/필터 비활성. */
+  derived?: boolean;
 }
 
 export const DEFECT_TEAMS = ["Arch", "Mech", "Elec"] as const;
@@ -92,6 +94,11 @@ export const STATUS_COLORS: Record<string, string> = {
   InD: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
   "Not Started": "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
   Complete: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  // Stage-derived status labels
+  Done: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  WIP: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  Planned: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  Delay: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
 };
 
 export const PRIORITY_COLORS: Record<string, string> = {
@@ -122,8 +129,6 @@ export const DEFECT_COLUMNS: DefectColumnDef[] = [
   { key: "source_issue_no", label: "ID", type: "text", width: 90, group: "identity", editable: true, editorType: "text" },
   { key: "team", label: "Team", type: "badge", width: 80, group: "identity", editable: true, editorType: "select", options: [...DEFECT_TEAMS] },
   { key: "status_raw", label: "Status", type: "badge", width: 110, group: "status", editable: true, editorType: "text" },
-  { key: "completion_status", label: "Completion", type: "badge", width: 110, group: "status", editable: true, editorType: "select", options: [...COMPLETION_STATUSES] },
-  { key: "closure_status", label: "Closure", type: "badge", width: 110, group: "status", editable: true, editorType: "select", options: [...CLOSURE_STATUSES] },
   { key: "priority", label: "Priority", type: "badge", width: 200, group: "classification", editable: true, editorType: "select", options: [...PRIORITIES] },
   { key: "hdec_verification", label: "HDEC Verification", type: "badge", width: 200, group: "classification", editable: true, editorType: "select", options: [...HDEC_VERIFICATIONS] },
   { key: "hdec_reason", label: "HDEC Reason", type: "longtext", width: 220, group: "classification", editable: true, editorType: "textarea" },
@@ -151,12 +156,16 @@ export const DEFECT_COLUMNS: DefectColumnDef[] = [
   { key: "created_by_team_name", label: "Created Team", type: "text", width: 130, group: "audit" },
   { key: "created_date", label: "Created", type: "date", width: 110, group: "audit" },
   { key: "due_by", label: "Due By", type: "date", width: 110, group: "dates", editable: true, editorType: "date" },
-  { key: "planned_start_date", label: "P.Start", type: "date", width: 110, group: "dates", editable: true, editorType: "date" },
-  { key: "planned_completion_date", label: "P.Completion", type: "date", width: 120, group: "dates", editable: true, editorType: "date" },
-  { key: "planned_closure_date", label: "P.Closure", type: "date", width: 110, group: "dates", editable: true, editorType: "date" },
-  { key: "actual_start_date", label: "A.Start", type: "date", width: 110, group: "dates", editable: true, editorType: "date" },
-  { key: "actual_completion_date", label: "A.Completion", type: "date", width: 120, group: "dates", editable: true, editorType: "date" },
-  { key: "actual_closure_date", label: "A.Closure", type: "date", width: 110, group: "dates", editable: true, editorType: "date" },
+  // Stage sets: [P.Date | A.Date | Status] × Start → Rectified → Closure
+  { key: "planned_start_date", label: "P.Start", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
+  { key: "actual_start_date", label: "A.Start", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
+  { key: "start_status", label: "Start Status", type: "badge", width: 110, group: "progress", derived: true },
+  { key: "planned_completion_date", label: "P.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
+  { key: "actual_completion_date", label: "A.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
+  { key: "completion_status", label: "Rectified Status", type: "badge", width: 130, group: "progress", editable: true, editorType: "select", options: [...COMPLETION_STATUSES] },
+  { key: "planned_closure_date", label: "P.Closure", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
+  { key: "actual_closure_date", label: "A.Closure", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
+  { key: "closure_status", label: "Closure Status", type: "badge", width: 120, group: "progress", editable: true, editorType: "select", options: [...CLOSURE_STATUSES] },
   { key: "planned_progress_pct", label: "Plan %", type: "percent", width: 90, group: "progress", editable: true, editorType: "number" },
   { key: "actual_progress_pct", label: "Actual %", type: "percent", width: 100, group: "progress", editable: true, editorType: "number" },
   { key: "last_updated_at", label: "Last Updated", type: "datetime", width: 140, group: "audit" },
