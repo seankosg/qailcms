@@ -45,6 +45,7 @@ import { AbdColumnFilterDropdown } from "./AbdColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "@/components/defect-management/raw-data/TopHorizontalScrollbar";
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { AbdExportDialog } from "./AbdExportDialog";
+import { AbdDetailSheet } from "./AbdDetailSheet";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
 const SYSTEM_FROZEN_IDS = ["sl_no", "abd_number"];
@@ -404,6 +405,7 @@ export function AbdRawDataPage() {
         tableRef={tableRef}
         loading={!stateLoaded || isFetching}
         frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
+        onRowClick={(id) => setUrl({ detail: id })}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -430,6 +432,10 @@ export function AbdRawDataPage() {
         getRows={() => rows}
         columnHeaders={ABD_COLUMNS.map((c) => ({ key: c.key, label: c.label }))}
         filenamePrefix={`abd-${team}`}
+      />
+      <AbdDetailSheet
+        id={(urlSearch.detail as string) || null}
+        onOpenChange={(open) => { if (!open) setUrl({ detail: "" }); }}
       />
     </div>
   );
@@ -511,9 +517,10 @@ interface TableViewProps {
   tableRef: React.RefObject<HTMLDivElement | null>;
   loading: boolean;
   frozenColIds: string[];
+  onRowClick?: (id: string) => void;
 }
 
-function AbdRawTableView({ table, tableRef, loading, frozenColIds }: TableViewProps) {
+function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
   const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
   const { stickyLefts, lastFrozenIndex, frozenWidth } = useMemo(() => {
@@ -619,6 +626,11 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds }: TableViewPr
                       className={cn("cursor-default", !r.is_active && "bg-muted/30 text-muted-foreground", "hover:bg-muted/50")}
                       onMouseEnter={() => setHoveredIndex(vr.index)}
                       onMouseLeave={() => setHoveredIndex(null)}
+                      onClick={(e) => {
+                        const t = e.target as HTMLElement;
+                        if (t.closest('button, a, input, [role="button"], [role="menuitem"], [data-radix-popper-content-wrapper]')) return;
+                        onRowClick?.(r.id);
+                      }}
                     >
                       {row.getVisibleCells().map((cell, i) => {
                         const isSticky = frozenSet.has(cell.column.id);

@@ -31,6 +31,7 @@ import { Route as AuthenticatedClosureDashboardWarrantyRouteImport } from './rou
 import { Route as AuthenticatedClosureDashboardTaskRouteImport } from './routes/_authenticated/closure/dashboard/task'
 import { Route as AuthenticatedClosureDashboardSparePartRouteImport } from './routes/_authenticated/closure/dashboard/spare-part'
 import { Route as AuthenticatedClosureDashboardAsBuiltRouteImport } from './routes/_authenticated/closure/dashboard/as-built'
+import { Route as AuthenticatedClosureAbdSettingsRouteImport } from './routes/_authenticated/closure/abd/settings'
 import { Route as AuthenticatedClosureAbdRawDataRouteImport } from './routes/_authenticated/closure/abd/raw-data'
 import { Route as AuthenticatedClosureAbdImportRouteImport } from './routes/_authenticated/closure/abd/import'
 import { Route as AuthenticatedClosureTaskManagementImportLogsRouteImport } from './routes/_authenticated/closure/task-management/import.logs'
@@ -39,6 +40,7 @@ import { Route as AuthenticatedClosureSparePartRecordsDocRefRouteImport } from '
 import { Route as AuthenticatedClosureSparePartImportLogsRouteImport } from './routes/_authenticated/closure/spare-part/import.logs'
 import { Route as AuthenticatedClosureDefectManagementImportLogsRouteImport } from './routes/_authenticated/closure/defect-management/import.logs'
 import { Route as AuthenticatedClosureDefectManagementDetailIdRouteImport } from './routes/_authenticated/closure/defect-management/detail.$id'
+import { Route as AuthenticatedClosureAbdImportLogsRouteImport } from './routes/_authenticated/closure/abd/import.logs'
 
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
   id: '/change-password',
@@ -164,6 +166,12 @@ const AuthenticatedClosureDashboardAsBuiltRoute =
     path: '/closure/dashboard/as-built',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureAbdSettingsRoute =
+  AuthenticatedClosureAbdSettingsRouteImport.update({
+    id: '/closure/abd/settings',
+    path: '/closure/abd/settings',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureAbdRawDataRoute =
   AuthenticatedClosureAbdRawDataRouteImport.update({
     id: '/closure/abd/raw-data',
@@ -212,6 +220,12 @@ const AuthenticatedClosureDefectManagementDetailIdRoute =
     path: '/closure/defect-management/detail/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureAbdImportLogsRoute =
+  AuthenticatedClosureAbdImportLogsRouteImport.update({
+    id: '/logs',
+    path: '/logs',
+    getParentRoute: () => AuthenticatedClosureAbdImportRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -222,8 +236,9 @@ export interface FileRoutesByFullPath {
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
-  '/closure/abd/import': typeof AuthenticatedClosureAbdImportRoute
+  '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
+  '/closure/abd/settings': typeof AuthenticatedClosureAbdSettingsRoute
   '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
   '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
@@ -237,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
+  '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/defect-management/detail/$id': typeof AuthenticatedClosureDefectManagementDetailIdRoute
   '/closure/defect-management/import/logs': typeof AuthenticatedClosureDefectManagementImportLogsRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
@@ -252,8 +268,9 @@ export interface FileRoutesByTo {
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
-  '/closure/abd/import': typeof AuthenticatedClosureAbdImportRoute
+  '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
+  '/closure/abd/settings': typeof AuthenticatedClosureAbdSettingsRoute
   '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
   '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
@@ -267,6 +284,7 @@ export interface FileRoutesByTo {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
+  '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/defect-management/detail/$id': typeof AuthenticatedClosureDefectManagementDetailIdRoute
   '/closure/defect-management/import/logs': typeof AuthenticatedClosureDefectManagementImportLogsRoute
   '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
@@ -285,8 +303,9 @@ export interface FileRoutesById {
   '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
-  '/_authenticated/closure/abd/import': typeof AuthenticatedClosureAbdImportRoute
+  '/_authenticated/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
   '/_authenticated/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
+  '/_authenticated/closure/abd/settings': typeof AuthenticatedClosureAbdSettingsRoute
   '/_authenticated/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
   '/_authenticated/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/_authenticated/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
@@ -300,6 +319,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
+  '/_authenticated/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/_authenticated/closure/defect-management/detail/$id': typeof AuthenticatedClosureDefectManagementDetailIdRoute
   '/_authenticated/closure/defect-management/import/logs': typeof AuthenticatedClosureDefectManagementImportLogsRoute
   '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
@@ -320,6 +340,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/closure/abd/import'
     | '/closure/abd/raw-data'
+    | '/closure/abd/settings'
     | '/closure/dashboard/as-built'
     | '/closure/dashboard/spare-part'
     | '/closure/dashboard/task'
@@ -333,6 +354,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
     | '/closure/dashboard/'
+    | '/closure/abd/import/logs'
     | '/closure/defect-management/detail/$id'
     | '/closure/defect-management/import/logs'
     | '/closure/spare-part/import/logs'
@@ -350,6 +372,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/closure/abd/import'
     | '/closure/abd/raw-data'
+    | '/closure/abd/settings'
     | '/closure/dashboard/as-built'
     | '/closure/dashboard/spare-part'
     | '/closure/dashboard/task'
@@ -363,6 +386,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
     | '/closure/dashboard'
+    | '/closure/abd/import/logs'
     | '/closure/defect-management/detail/$id'
     | '/closure/defect-management/import/logs'
     | '/closure/spare-part/import/logs'
@@ -382,6 +406,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/'
     | '/_authenticated/closure/abd/import'
     | '/_authenticated/closure/abd/raw-data'
+    | '/_authenticated/closure/abd/settings'
     | '/_authenticated/closure/dashboard/as-built'
     | '/_authenticated/closure/dashboard/spare-part'
     | '/_authenticated/closure/dashboard/task'
@@ -395,6 +420,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/task-management/tree'
     | '/_authenticated/closure/dashboard/'
+    | '/_authenticated/closure/abd/import/logs'
     | '/_authenticated/closure/defect-management/detail/$id'
     | '/_authenticated/closure/defect-management/import/logs'
     | '/_authenticated/closure/spare-part/import/logs'
@@ -566,6 +592,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureDashboardAsBuiltRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/abd/settings': {
+      id: '/_authenticated/closure/abd/settings'
+      path: '/closure/abd/settings'
+      fullPath: '/closure/abd/settings'
+      preLoaderRoute: typeof AuthenticatedClosureAbdSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/abd/raw-data': {
       id: '/_authenticated/closure/abd/raw-data'
       path: '/closure/abd/raw-data'
@@ -622,6 +655,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureDefectManagementDetailIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/abd/import/logs': {
+      id: '/_authenticated/closure/abd/import/logs'
+      path: '/logs'
+      fullPath: '/closure/abd/import/logs'
+      preLoaderRoute: typeof AuthenticatedClosureAbdImportLogsRouteImport
+      parentRoute: typeof AuthenticatedClosureAbdImportRoute
+    }
   }
 }
 
@@ -644,6 +684,21 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
 const AuthenticatedAdminRouteRouteWithChildren =
   AuthenticatedAdminRouteRoute._addFileChildren(
     AuthenticatedAdminRouteRouteChildren,
+  )
+
+interface AuthenticatedClosureAbdImportRouteChildren {
+  AuthenticatedClosureAbdImportLogsRoute: typeof AuthenticatedClosureAbdImportLogsRoute
+}
+
+const AuthenticatedClosureAbdImportRouteChildren: AuthenticatedClosureAbdImportRouteChildren =
+  {
+    AuthenticatedClosureAbdImportLogsRoute:
+      AuthenticatedClosureAbdImportLogsRoute,
+  }
+
+const AuthenticatedClosureAbdImportRouteWithChildren =
+  AuthenticatedClosureAbdImportRoute._addFileChildren(
+    AuthenticatedClosureAbdImportRouteChildren,
   )
 
 interface AuthenticatedClosureDefectManagementImportRouteChildren {
@@ -678,8 +733,9 @@ const AuthenticatedClosureSparePartImportRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
-  AuthenticatedClosureAbdImportRoute: typeof AuthenticatedClosureAbdImportRoute
+  AuthenticatedClosureAbdImportRoute: typeof AuthenticatedClosureAbdImportRouteWithChildren
   AuthenticatedClosureAbdRawDataRoute: typeof AuthenticatedClosureAbdRawDataRoute
+  AuthenticatedClosureAbdSettingsRoute: typeof AuthenticatedClosureAbdSettingsRoute
   AuthenticatedClosureDashboardAsBuiltRoute: typeof AuthenticatedClosureDashboardAsBuiltRoute
   AuthenticatedClosureDashboardSparePartRoute: typeof AuthenticatedClosureDashboardSparePartRoute
   AuthenticatedClosureDashboardTaskRoute: typeof AuthenticatedClosureDashboardTaskRoute
@@ -701,8 +757,10 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
-  AuthenticatedClosureAbdImportRoute: AuthenticatedClosureAbdImportRoute,
+  AuthenticatedClosureAbdImportRoute:
+    AuthenticatedClosureAbdImportRouteWithChildren,
   AuthenticatedClosureAbdRawDataRoute: AuthenticatedClosureAbdRawDataRoute,
+  AuthenticatedClosureAbdSettingsRoute: AuthenticatedClosureAbdSettingsRoute,
   AuthenticatedClosureDashboardAsBuiltRoute:
     AuthenticatedClosureDashboardAsBuiltRoute,
   AuthenticatedClosureDashboardSparePartRoute:

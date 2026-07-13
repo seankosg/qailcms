@@ -104,6 +104,16 @@ const CFG = {
     keyColumn: "source_issue_no",
     extraLabel: "Team",
   },
+  abd: {
+    title: "ABD — Import Logs",
+    backTo: "/closure/abd/import",
+    logsTable: "abd_import_logs",
+    rowLogsTable: "abd_import_row_logs",
+    deleteFn: "delete_abd_import_batch",
+    keyLabel: "ABD Number",
+    keyColumn: "abd_number",
+    extraLabel: "Team",
+  },
 } as const;
 
 function fmtDateTime(iso: string | null | undefined) {
@@ -199,8 +209,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       }));
       setBatches(list);
       await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
-    } else {
-      // defect_management
+    } else if (kind === "defect_management") {
       const { data } = await (supabase as any)
         .from("defect_import_logs")
         .select(
@@ -220,6 +229,32 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         updated: r.updated ?? 0,
         skipped: r.skipped ?? 0,
         rejected: r.rejected ?? 0,
+        extra: r.team,
+        rolled_back_at: r.rolled_back_at,
+      }));
+      setBatches(list);
+      await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
+    } else {
+      // abd
+      const { data } = await (supabase as any)
+        .from("abd_import_logs")
+        .select(
+          "id, file_name, status, started_at, finished_at, imported_by, total_rows, inserted, updated, inactivated, mismatched, skipped_no_key, team, rolled_back_at",
+        )
+        .order("started_at", { ascending: false })
+        .limit(100);
+      const list: Batch[] = (data ?? []).map((r: any) => ({
+        id: r.id,
+        file_name: r.file_name,
+        status: r.status,
+        started_at: r.started_at,
+        finished_at: r.finished_at,
+        imported_by: r.imported_by,
+        total: r.total_rows ?? 0,
+        inserted: r.inserted ?? 0,
+        updated: r.updated ?? 0,
+        skipped: (r.skipped_no_key ?? 0) + (r.inactivated ?? 0),
+        rejected: r.mismatched ?? 0,
         extra: r.team,
         rolled_back_at: r.rolled_back_at,
       }));
@@ -255,7 +290,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
           ? "id, raw_row_no, doc_ref, action_taken, reason_code, reason_detail, processed_at"
           : kind === "task_management"
             ? "id, raw_row_no, discipline, task_no, action_taken, reason_code, reason_detail, processed_at"
-            : "id, raw_row_no, team, source_issue_no, action_taken, reason_code, reason_detail, processed_at";
+            : kind === "defect_management"
+              ? "id, raw_row_no, team, source_issue_no, action_taken, reason_code, reason_detail, processed_at"
+              : "id, raw_row_no, team, abd_number, action_taken, reason_code, reason_detail, processed_at";
       const rows = await fetchAllByUploadId<any>(cfg.rowLogsTable, cols, id);
       const mapped: RowLog[] = rows.map((r: any) => ({
         id: r.id,
@@ -268,7 +305,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
             ? r.doc_ref
             : kind === "task_management"
               ? r.task_no
-              : r.source_issue_no,
+              : kind === "defect_management"
+                ? r.source_issue_no
+                : r.abd_number,
         processed_at: r.processed_at,
       }));
       setRowLogs(mapped);

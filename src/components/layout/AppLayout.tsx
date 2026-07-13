@@ -28,6 +28,8 @@ const NAV: NavGroup[] = [
       { to: "/closure/defect-management/import/logs", label: "Defect Import Logs", icon: FileClock, editorOnly: true },
       { to: "/closure/abd/raw-data", label: "ABD-Raw Data", icon: FileSpreadsheet },
       { to: "/closure/abd/import", label: "ABD Import", icon: Upload, editorOnly: true },
+      { to: "/closure/abd/import/logs", label: "ABD Import Logs", icon: FileClock, editorOnly: true },
+      { to: "/closure/abd/settings", label: "ABD Settings", icon: Settings2, adminOnly: true },
       { to: "/closure/spare-part/import", label: "Import", icon: Upload, editorOnly: true },
       { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
       { to: "/closure/task-management/import/logs", label: "Task Import Logs", icon: FileClock, editorOnly: true },
