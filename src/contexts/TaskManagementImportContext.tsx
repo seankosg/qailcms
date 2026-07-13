@@ -15,8 +15,15 @@ import {
 } from "@/lib/task-management/parser";
 import type { Discipline } from "@/lib/task-management/columns";
 import { runRollupAllParents, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
+import {
+  previewTaskImport,
+  allocateTaskNo,
+  type PreflightSummary,
+} from "@/lib/task-management/import-preflight.functions";
 
 export type RollupMode = "auto" | "keep" | "blank";
+
+export type ConflictPolicy = "overwrite" | "skip" | "renumber";
 
 export interface ImportErrorEntry {
   message: string;
@@ -57,6 +64,10 @@ export interface TmImportFileItem {
   sheetHeaders?: SheetHeaderEntry[];
   columnMap?: Record<string, number>;
   columnOverrides?: Partial<Record<TaskTargetField, number>> | null;
+  conflictPolicy?: ConflictPolicy;
+  preflight?: PreflightSummary | null;
+  preflightLoading?: boolean;
+  preflightError?: string | null;
   result?: {
     inserted: number;
     updated: number;
@@ -65,6 +76,7 @@ export interface TmImportFileItem {
     duplicates?: number;
     rolledUp?: number;
     judgmentRecalculated?: number;
+    renumbered?: number;
     errors?: ImportErrorEntry[];
   };
 }
@@ -85,6 +97,8 @@ interface CtxValue {
     id: string,
     overrides: Partial<Record<TaskTargetField, number>> | null,
   ) => Promise<void>;
+  setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
+  runPreflight: (id: string) => Promise<void>;
   startImport: () => Promise<void>;
 }
 
