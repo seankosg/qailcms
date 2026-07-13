@@ -460,8 +460,6 @@ function FileRow({
             {f.preflightError && (
               <p className="mt-1 text-xs text-destructive">중복 점검 실패: {f.preflightError}</p>
             )}
-            <div className="mt-0 hidden">
-            </div>
             {f.warnings && f.warnings.length > 0 && (
               <p className="mt-1 text-xs text-amber-600">
                 ⚠ {f.warnings.slice(0, 3).join(" · ")}
