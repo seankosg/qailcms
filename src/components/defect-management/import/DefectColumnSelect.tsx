@@ -30,7 +30,6 @@ const ACONEX_FIELDS = new Set([
 ]);
 const HDEC_FIELDS = new Set([
   "source_issue_no",
-  "team",
   "subcontractor_name",
   "subsub_name",
   "hdec_pic_name",
