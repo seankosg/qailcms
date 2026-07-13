@@ -91,6 +91,8 @@ function ImportInner() {
     setFileDiscipline,
     setFileDataDateOverride,
     setFileColumnOverrides,
+    setFileConflictPolicy,
+    runPreflight,
     startImport,
   } = useTaskManagementImport();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -117,10 +119,6 @@ function ImportInner() {
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
   const mappingFile = files.find((f) => f.id === mappingFileId) ?? null;
   const conflictFile = files.find((f) => f.id === conflictFileId) ?? null;
-  const {
-    setFileConflictPolicy,
-    runPreflight,
-  } = useTaskManagementImport();
 
   return (
     <div className="space-y-4">
