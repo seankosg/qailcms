@@ -102,7 +102,8 @@ const CFG = {
     deleteFn: "delete_defect_import_batch",
     keyLabel: "Source Issue No",
     keyColumn: "source_issue_no",
-    extraLabel: "Team",
+    // Team은 파일 단위가 아니라 행 단위 자동매핑 결과이므로 배치 목록에서 노출하지 않음.
+    extraLabel: null,
   },
   abd: {
     title: "ABD — Import Logs",
