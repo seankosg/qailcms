@@ -7,11 +7,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { bulkUpdateDefects } from "@/lib/defect-management/mutations.functions";
+import { bulkUpdateDefects, bulkDeleteDefects } from "@/lib/defect-management/mutations.functions";
 import { type DefectColumnDef } from "@/lib/defect-management/columns";
 import { copyRowsAsTsv, exportSelectedToXlsx, type ExportColumn } from "@/lib/defect-management/bulk-actions";
 import { toast } from "sonner";
-import { ChevronDown, ClipboardCopy, FileSpreadsheet, Loader2, MoreHorizontal, X } from "lucide-react";
+import { ChevronDown, ClipboardCopy, FileSpreadsheet, Loader2, MoreHorizontal, Trash2, X } from "lucide-react";
 
 interface Props {
   selectedRows: Record<string, any>[];
@@ -37,6 +37,9 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
   const [setBlank, setSetBlank] = useState<boolean>(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const count = selectedRows.length;
   const ids = useMemo(() => selectedRows.map((row) => String(row.id ?? "")).filter(Boolean), [selectedRows]);
@@ -114,6 +117,29 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
     }
   };
 
+  async function handleDelete() {
+    if (deleteConfirmText !== "DELETE") return;
+    setDeleting(true);
+    let done = 0;
+    try {
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const slice = ids.slice(i, i + CHUNK);
+        if (ids.length > CHUNK) toast.info(`Deleting… (batch ${Math.floor(i / CHUNK) + 1}/${chunkCount})`);
+        // eslint-disable-next-line no-await-in-loop
+        const res = await bulkDeleteDefects({ data: { ids: slice } });
+        done += res?.count ?? slice.length;
+      }
+      toast.success("영구 삭제 완료", { description: `${done}건이 삭제되었습니다.` });
+      setDeleteOpen(false);
+      setDeleteConfirmText("");
+      onApplied();
+    } catch (e: any) {
+      toast.error("삭제 실패", { description: e?.message ?? String(e) });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <>
       <div className="sticky top-0 z-30 rounded-lg border border-l-2 border-l-primary bg-card px-3 py-2 shadow-sm">
@@ -190,7 +216,13 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button size="sm" variant="outline" className="h-8 px-2"><MoreHorizontal className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[190px]">
-                <DropdownMenuItem disabled>Duplicate / Delete unavailable</DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!canEdit}
+                  onClick={() => setDeleteOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> 선택 항목 영구삭제
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onClearSelection}><X className="mr-2 h-4 w-4" /> Clear selection</DropdownMenuItem>
               </DropdownMenuContent>
@@ -223,6 +255,39 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={submitting}>취소</Button>
             <Button onClick={apply} disabled={submitting}>{submitting && <Loader2 className="mr-1 h-3 w-3 animate-spin" />} Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={(open) => { setDeleteOpen(open); if (!open) setDeleteConfirmText(""); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">선택한 {count}건을 영구 삭제하시겠습니까?</DialogTitle>
+            <DialogDescription>
+              이 작업은 <strong>되돌릴 수 없습니다</strong>. 삭제된 데이터는 복구할 수 없으며, 관련 상태 이력도 함께 제거됩니다.
+              {count > CHUNK && <> · {chunkCount} batch 로 실행됩니다.</>}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">확인을 위해 <code className="rounded bg-muted px-1">DELETE</code> 를 입력하세요.</p>
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="h-8"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>취소</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting || deleteConfirmText !== "DELETE"}
+            >
+              {deleting && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              <Trash2 className="mr-1 h-3.5 w-3.5" /> 영구 삭제
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
