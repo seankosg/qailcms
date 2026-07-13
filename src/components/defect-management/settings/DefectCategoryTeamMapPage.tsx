@@ -73,9 +73,9 @@ export function DefectCategoryTeamMapPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">Defect Settings — Category → Team</h1>
+        <h1 className="text-xl font-semibold">Snag List Settings — Category → Team</h1>
         <p className="text-sm text-muted-foreground">
-          Defect 임포트 시 각 행의 <code>Category</code> 값에 따라 자동으로 채워지는 팀을 관리합니다.
+          Snag List 임포트 시 각 행의 <code>Category</code> 값에 따라 자동으로 채워지는 팀을 관리합니다.
           현재 팀 값: <b>Arch</b>(건축) · <b>Mech</b>(설비) · <b>Elec</b>(전기)
         </p>
       </div>
