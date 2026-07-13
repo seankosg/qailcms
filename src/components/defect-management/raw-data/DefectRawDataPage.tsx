@@ -638,19 +638,34 @@ interface TableViewProps {
   tableRef: React.RefObject<HTMLDivElement | null>;
   loading: boolean;
   dataDate: string | null;
+  frozenColIds: string[];
   onRowClick: (row: DefectItem) => void;
 }
 
-function DefectRawTableView({ table, tableRef, loading, dataDate, onRowClick }: TableViewProps) {
-  const FROZEN = 3; // __select + is_critical + stage_progress (or source_issue_no once visible)
+function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, onRowClick }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
-  const stickyLefts = useMemo(() => {
-    const lefts: number[] = []; let acc = 0;
-    for (let i = 0; i < Math.min(FROZEN, leaf.length); i++) { lefts.push(acc); acc += leaf[i].getSize(); }
-    return lefts;
-  }, [leaf, table.getState().columnSizing]);
-  const frozenWidth = useMemo(() => leaf.slice(0, FROZEN).reduce((s, c) => s + c.getSize(), 0), [leaf, table.getState().columnSizing]);
-  const totalWidth = useMemo(() => leaf.reduce((s, c) => s + c.getSize(), 0), [leaf, table.getState().columnSizing]);
+  const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
+  // 리프 컬럼을 순회하면서 frozen id인 것들만 왼쪽부터 sticky 스택으로 쌓음.
+  // 사용자가 pin한 컬럼은 리프 순서(orderedKeys)상 이미 왼쪽에 배치되어 있음.
+  const { stickyLefts, lastFrozenIndex, frozenWidth } = useMemo(() => {
+    const lefts = new Map<string, number>();
+    let acc = 0;
+    let lastIdx = -1;
+    for (let i = 0; i < leaf.length; i++) {
+      const c = leaf[i];
+      if (!frozenSet.has(c.id)) continue;
+      lefts.set(c.id, acc);
+      acc += c.getSize();
+      lastIdx = i;
+    }
+    return { stickyLefts: lefts, lastFrozenIndex: lastIdx, frozenWidth: acc };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaf, frozenSet, table.getState().columnSizing]);
+  const totalWidth = useMemo(
+    () => leaf.reduce((s, c) => s + c.getSize(), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [leaf, table.getState().columnSizing],
+  );
 
   const rows = table.getRowModel().rows;
   const rowVirtualizer = useVirtualizer({
@@ -671,16 +686,18 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, onRowClick }: 
           <TableHeader className="bg-background">
             <TableRow className="border-b bg-background [&>th]:sticky [&>th]:top-0 [&>th]:z-[2] [&>th]:bg-background">
               {table.getHeaderGroups().at(-1)?.headers.map((header, i) => {
-                const isSticky = i < FROZEN;
+                const isSticky = frozenSet.has(header.column.id);
+                const leftPx = isSticky ? stickyLefts.get(header.column.id) ?? 0 : undefined;
+                const isLastFrozen = i === lastFrozenIndex;
                 return (
                   <TableHead
                     key={header.id}
                     style={{
                       width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize(),
-                      ...(isSticky ? { position: "sticky", left: stickyLefts[i], zIndex: 3, background: "hsl(var(--background))" } : {}),
+                      ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 3, background: "hsl(var(--background))" } : {}),
                     }}
                     className={cn("relative h-9 cursor-pointer select-none whitespace-nowrap border-b px-2 py-0 text-left text-[11px] font-medium",
-                      i === FROZEN - 1 && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
+                      isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     <div className="flex w-full items-center justify-between gap-1">
@@ -727,15 +744,17 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, onRowClick }: 
                       onClick={() => onRowClick(row.original)}
                     >
                       {row.getVisibleCells().map((cell, i) => {
-                        const isSticky = i < FROZEN;
+                        const isSticky = frozenSet.has(cell.column.id);
+                        const leftPx = isSticky ? stickyLefts.get(cell.column.id) ?? 0 : undefined;
+                        const isLastFrozen = i === lastFrozenIndex;
                         return (
                           <TableCell
                             key={cell.id}
                             style={{
                               width: cell.column.getSize(), minWidth: cell.column.getSize(), maxWidth: cell.column.getSize(),
-                              ...(isSticky ? { position: "sticky", left: stickyLefts[i], zIndex: 1, background: "hsl(var(--background))" } : {}),
+                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: "hsl(var(--background))" } : {}),
                             }}
-                            className={cn("truncate border-b px-2 py-1 text-xs", i === FROZEN - 1 && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
+                            className={cn("truncate border-b px-2 py-1 text-xs", isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </TableCell>
