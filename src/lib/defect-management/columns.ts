@@ -42,22 +42,25 @@ export interface DefectColumnDef {
   options?: string[];
 }
 
-export const DEFECT_TEAMS = ["건축", "전기", "설비"] as const;
+export const DEFECT_TEAMS = ["Arch", "Mech", "Elec"] as const;
 export type DefectTeam = (typeof DEFECT_TEAMS)[number];
 
-export const CATEGORY_TO_TEAM: Record<string, DefectTeam> = {
-  Electrical: "전기",
-  Mechanical: "설비",
-  Architectural: "건축",
-  Architecture: "건축",
-  Civil: "건축",
-  Structural: "건축",
+/**
+ * 레거시 DB 데이터의 팀 라벨('건축'/'설비'/'전기')을 현재 UI 표시용
+ * ('Arch'/'Mech'/'Elec')로 정규화합니다. DB 값은 손대지 않음.
+ */
+const LEGACY_TEAM_NORMALIZE: Record<string, DefectTeam> = {
+  "건축": "Arch",
+  "설비": "Mech",
+  "전기": "Elec",
+  Arch: "Arch",
+  Mech: "Mech",
+  Elec: "Elec",
 };
 
-export function suggestTeamFromCategory(category: string | null | undefined): DefectTeam | null {
-  if (!category) return null;
-  const key = String(category).trim();
-  return CATEGORY_TO_TEAM[key] ?? null;
+export function normalizeTeam(v: string | null | undefined): DefectTeam | null {
+  if (!v) return null;
+  return LEGACY_TEAM_NORMALIZE[String(v).trim()] ?? null;
 }
 
 export const PRIORITIES = ["Cat A - Major Defect (Before SC)", "Cat B - Minor Defect", "High", "Med", "Low"] as const;
@@ -70,6 +73,11 @@ export const COMPLETION_STATUSES = ["Not Started", "In Progress", "Complete"] as
 export const CLOSURE_STATUSES = ["Not Closed", "Closed", "InD"] as const;
 
 export const TEAM_COLORS: Record<string, string> = {
+  // 신규 라벨
+  Arch: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  Elec: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  Mech: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  // 레거시 라벨 호환
   "건축": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   "전기": "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   "설비": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
