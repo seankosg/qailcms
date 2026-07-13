@@ -58,7 +58,8 @@ import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { EditCellPopover } from "./EditCellPopover";
-import { DefectStageProgress, DefectStageProgressLegend } from "./DefectStageProgress";
+import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
+import { todayIso } from "@/lib/defect-management/stage-utils";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
 const SYSTEM_FROZEN_IDS = ["__select", "is_critical", "stage_progress"];
@@ -182,6 +183,17 @@ function uniqueOptions(items: DefectItem[], field: keyof DefectItem | string) {
   return [...set].sort().map((v) => ({ value: v, label: v }));
 }
 
+// Stage classifyStage 결과("done"/"wip"/"planned"/"hold"/"empty") → 화면 표시 라벨
+function startStatusLabel(state: ReturnType<typeof classifyStage>): string | null {
+  switch (state) {
+    case "done": return "Done";
+    case "wip": return "WIP";
+    case "planned": return "Planned";
+    case "hold": return "Delay";
+    default: return null;
+  }
+}
+
 function normalizeGroupLabel(group: string | null | undefined): string {
   const labels: Record<string, string> = {
     identity: "Identity",
@@ -296,6 +308,12 @@ export function DefectRawDataPage() {
   const { data: counts } = useDefectStatusCounts({ includeInactive });
   const { data: summary } = useDefectDashboardSummary({ includeInactive });
   const dataDate = summary?.latest_data_date ?? null;
+
+  // 파생 start_status 컬럼 값 주입 (렌더/셀 접근용)
+  const enrichedRows = useMemo(() => {
+    const asOf = dataDate ?? todayIso();
+    return rows.map((r) => ({ ...r, start_status: startStatusLabel(classifyStage(r as any, "start", asOf)) }));
+  }, [rows, dataDate]);
 
   // ── Restore view pref (per-tab: order/visibility/frozenExtras/columnSizing) ─
   useEffect(() => {
@@ -503,7 +521,7 @@ export function DefectRawDataPage() {
   }, [columns, fieldConfig, visibility, frozenExtras]);
 
   const table = useReactTable<DefectItem>({
-    data: rows,
+    data: enrichedRows as DefectItem[],
     columns,
     state: { sorting, columnFilters, columnSizing, columnVisibility, rowSelection },
     onSortingChange: setSorting,
@@ -781,13 +799,16 @@ function buildDataColumn(
     "multi-select";
   // multi-select 컬럼은 서버 facet 사용
   const serverFacet = filterType === "multi-select" ? c.key : null;
+  // 파생 컬럼(DB 저장값 없음)은 서버 정렬/필터 불가
+  const isDerived = !!c.derived;
   return {
     id: c.key,
     accessorKey: c.key,
     header: c.label,
     size: c.width,
     // manualFiltering=true 상태이므로 filterFn 불필요
-    enableSorting: !PROGRESS_FIELDS.has(c.key) || c.type === "percent",
+    enableSorting: !isDerived && (!PROGRESS_FIELDS.has(c.key) || c.type === "percent"),
+    enableColumnFilter: !isDerived,
     meta: { filterType, filterOptions: [], serverFacet, statusGroup, includeInactive },
     cell: ({ row, getValue }) => {
       const v: any = getValue();
@@ -822,6 +843,7 @@ function renderDefectCell(c: DefectColumnDef, v: any, row: DefectItem, _dataDate
     return <Badge className={cn("text-[10px]", cls)}>{String(v)}</Badge>;
   }
   if (c.key === "status_raw" || c.key === "completion_status" || c.key === "closure_status") return <DefectStatusBadge status={v} />;
+  if (c.key === "start_status") return <DefectStatusBadge status={v} />;
   if (c.key === "classification_source") {
     const src = String(v).toLowerCase();
     const cls = src === "rule" ? "bg-primary/10 text-primary border-primary/30"
