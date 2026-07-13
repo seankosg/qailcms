@@ -21,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Search, RefreshCcw, Upload, LayoutDashboard, FileClock, Download, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, RefreshCcw, Upload, Filter, Download, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import {
   DEFECT_COLUMNS,
   DEFECT_TEAMS,
@@ -49,14 +49,16 @@ import {
   PROGRESS_FIELDS,
 } from "@/lib/defect-management/filter-fns";
 import { classifyDefectStage, formatDdMmm, isOverdueDefect } from "@/lib/defect-management/stage-utils";
+import { getOriginHeaderStyle } from "@/lib/defect-management/origin-header-style";
 import { ColumnFilterDropdown } from "./ColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "./TopHorizontalScrollbar";
 import { DefectStatusBadge } from "./DefectStatusBadge";
 import { CriticalPendingBar } from "./CriticalPendingBar";
+import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { EditCellPopover } from "./EditCellPopover";
-import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
+import { DefectStageProgress, DefectStageProgressLegend } from "./DefectStageProgress";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
 const SYSTEM_FROZEN_IDS = ["__select", "is_critical", "stage_progress"];
@@ -65,7 +67,7 @@ const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
 
 // ── URL <-> table state helpers ────────────────────────────────────────────
 function parseSortFromUrl(s: string): SortingState {
-  if (!s) return [{ id: "source_issue_no", desc: true }];
+  if (!s) return [{ id: "source_issue_no", desc: false }];
   try {
     return s.split(",")
       .map((p) => p.trim())
@@ -74,7 +76,7 @@ function parseSortFromUrl(s: string): SortingState {
         const [id, dir] = p.split(":");
         return { id, desc: (dir ?? "asc").toLowerCase() === "desc" };
       });
-  } catch { return [{ id: "source_issue_no", desc: true }]; }
+  } catch { return [{ id: "source_issue_no", desc: false }]; }
 }
 function serializeSort(s: SortingState): string {
   return s.map((x) => `${x.id}:${x.desc ? "desc" : "asc"}`).join(",");
@@ -105,8 +107,7 @@ function toServerFilters(f: ColumnFiltersState): DefectServerFilter[] {
       if (v.length === 0) continue;
       const hasEmpty = v.includes(EMPTY_TOKEN);
       const rest = v.filter((x) => x !== EMPTY_TOKEN);
-      if (rest.length > 0) out.push({ column: id, op: "in", value: rest });
-      // "(Empty)" 단독 선택은 op:empty
+      if (rest.length > 0) out.push({ column: id, op: hasEmpty ? "in_or_empty" as any : "in", value: rest });
       if (hasEmpty && rest.length === 0) out.push({ column: id, op: "empty", value: null });
       continue;
     }
@@ -130,6 +131,36 @@ function toServerFilters(f: ColumnFiltersState): DefectServerFilter[] {
   return out;
 }
 
+function mergeUrlFilters(urlSearch: Record<string, any>, baseFilters: ColumnFiltersState): ColumnFiltersState {
+  const overridden = new Set<string>();
+  for (const [param, column] of Object.entries(URL_MAP)) {
+    if (urlSearch[param]) overridden.add(column);
+  }
+  if ((urlSearch.dateStart || urlSearch.dateEnd) && urlSearch.dateField && DATE_FILTER_FIELDS.has(urlSearch.dateField)) {
+    overridden.add(urlSearch.dateField);
+  }
+  const next = baseFilters.filter((filter) => !overridden.has(filter.id));
+  for (const [param, column] of Object.entries(URL_MAP)) {
+    const value = urlSearch[param];
+    if (!value) continue;
+    if (TEXT_FILTER_FIELDS.has(column)) next.push({ id: column, value: value === EMPTY_TOKEN ? { text: "", emptyOnly: true } : { text: value } });
+    else next.push({ id: column, value: String(value).split(",").filter(Boolean) });
+  }
+  if ((urlSearch.dateStart || urlSearch.dateEnd) && urlSearch.dateField && DATE_FILTER_FIELDS.has(urlSearch.dateField)) {
+    next.push({ id: urlSearch.dateField, value: { from: urlSearch.dateStart || undefined, to: urlSearch.dateEnd || undefined } });
+  }
+  if (urlSearch.hdecVerification) {
+    next.push({ id: "hdec_verification", value: urlSearch.hdecVerification === EMPTY_TOKEN ? [EMPTY_TOKEN] : String(urlSearch.hdecVerification).split(",").filter(Boolean) });
+  }
+  if (urlSearch.hdecReason) {
+    next.push({ id: "hdec_reason", value: urlSearch.hdecReason === EMPTY_TOKEN ? { text: "", emptyOnly: true } : { text: urlSearch.hdecReason } });
+  }
+  if (urlSearch.notClosureDone === "true") {
+    next.push({ id: "closure_status", value: { text: "Done" } });
+  }
+  return next;
+}
+
 function toServerSort(s: SortingState): DefectServerSort[] {
   return s.map((x) => ({ column: x.id, desc: !!x.desc }));
 }
@@ -142,13 +173,38 @@ function formatPct(v: any): string {
   return `${pct.toFixed(1)}%`;
 }
 
-function uniqueOptions(items: DefectItem[], field: keyof DefectItem) {
+function uniqueOptions(items: DefectItem[], field: keyof DefectItem | string) {
   const set = new Set<string>();
   for (const r of items) {
-    const v = r[field];
+    const v = (r as any)[field];
     if (v && typeof v === "string") set.add(v);
   }
   return [...set].sort().map((v) => ({ value: v, label: v }));
+}
+
+function normalizeGroupLabel(group: string | null | undefined): string {
+  const labels: Record<string, string> = {
+    identity: "Identity",
+    status: "Status",
+    classification: "Classification",
+    content: "Content",
+    location: "Location",
+    plan: "Plan",
+    trade: "Classification",
+    people: "Assignment",
+    audit: "Audit",
+    dates: "Schedule",
+    progress: "Progress",
+    refs: "References",
+    flags: "Flags",
+  };
+  return labels[group ?? ""] ?? group ?? "Other";
+}
+
+function clearObjectKeys<T extends Record<string, any>>(keys: string[], value: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const key of keys) (out as any)[key] = undefined;
+  return out;
 }
 
 const URL_MAP: Record<string, string> = {
@@ -172,8 +228,9 @@ const URL_MAP: Record<string, string> = {
 };
 
 const DRILLDOWN_PARAMS = [
-  "source", "actualComplete", "closureComplete", "overdue", "atRisk", "dueOn",
-  ...Object.keys(URL_MAP), "dateStart", "dateEnd", "dateField",
+  "source", "actualComplete", "closureComplete", "overdue", "atRisk", "atRiskDays", "dueOn", "unplannedActualOn",
+  "asOf", "stage", "remaining_stage", "remaining_asof", "capturedByGroup", "notClosureDone", "catADispute",
+  "hdecVerification", "hdecReason", ...Object.keys(URL_MAP), "dateStart", "dateEnd", "dateField",
 ];
 
 export function DefectRawDataPage() {
@@ -209,7 +266,7 @@ export function DefectRawDataPage() {
   // Sync URL → local (탭 전환 시 URL의 sort/filters를 초기화 반영)
   useEffect(() => {
     setSorting(parseSortFromUrl(urlSearch.sort));
-    setColumnFilters(parseFiltersFromUrl(urlSearch.filters));
+    setColumnFilters(mergeUrlFilters(urlSearch as any, parseFiltersFromUrl(urlSearch.filters)));
     setSearchInput(urlSearch.q ?? "");
     setRowSelection({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -297,7 +354,17 @@ export function DefectRawDataPage() {
   // ── Sync local (columnFilters/sorting/q) → URL (debounced) ──────────────
   const setUrl = useCallback(
     (patch: Record<string, any>) => {
-      navigate({ to: ".", search: (prev: any) => ({ ...prev, ...patch }), replace: true });
+      navigate({
+        to: ".",
+        search: (prev: any) => {
+          const next = { ...prev, ...patch };
+          for (const key of DRILLDOWN_PARAMS) {
+            if (next[key] == null || next[key] === "") delete next[key];
+          }
+          return next;
+        },
+        replace: true,
+      });
     },
     [navigate],
   );
@@ -400,16 +467,7 @@ export function DefectRawDataPage() {
           { value: "Completed", label: "Completed" }, { value: "Closed", label: "Closed" }, { value: "Delayed", label: "Delayed" },
         ],
       },
-      cell: ({ getValue }) => {
-        const v = getValue() as string;
-        const cls =
-          v === "Delayed" ? "bg-rose-500/15 text-rose-700 dark:text-rose-300" :
-          v === "Closed" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
-          v === "Completed" ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" :
-          v === "In Progress" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" :
-          "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300";
-        return <Badge className={cn("text-[10px] font-medium", cls)}>{v}</Badge>;
-      },
+      cell: ({ row }) => <DefectStageProgress item={row.original as any} asOfDate={dataDate} />,
     };
 
     // Data columns from DEFECT_COLUMNS, ordered by user-configured orderedKeys
@@ -458,14 +516,96 @@ export function DefectRawDataPage() {
     manualFiltering: true,
     pageCount,
     enableColumnResizing: true,
-    columnResizeMode: "onChange",
+    columnResizeMode: "onEnd",
+    enableMultiSort: true,
+    enableSortingRemoval: true,
+    isMultiSortEvent: (event) => (event as unknown as MouseEvent).shiftKey,
+    maxMultiSortColCount: 5,
+    defaultColumn: { minSize: 64, maxSize: 640 },
     getRowId: (r) => r.id,
   });
 
-  const selectedIds = Object.keys(rowSelection);
+  useEffect(() => {
+    setRowSelection({});
+  }, [columnFilters, q, tab]);
+
+  const selectedRows = useMemo(() => table.getSelectedRowModel().rows.map((r) => r.original), [table, rowSelection, rows]);
+  const bulkFields = useMemo(() => {
+    const optionMap: Record<string, { value: string; label: string }[]> = {
+      team: DEFECT_TEAMS.map((value) => ({ value, label: value })),
+      status_raw: uniqueOptions(rows, "status_raw"),
+      completion_status: uniqueOptions(rows, "completion_status"),
+      closure_status: uniqueOptions(rows, "closure_status"),
+      area_level: uniqueOptions(rows, "area_level"),
+      area_location: uniqueOptions(rows, "area_location"),
+      main_trade: uniqueOptions(rows, "main_trade"),
+      sub_trade: uniqueOptions(rows, "sub_trade"),
+      work_type: uniqueOptions(rows, "work_type"),
+      priority: uniqueOptions(rows, "priority"),
+      defect_type: uniqueOptions(rows, "defect_type"),
+      subcontractor_name: uniqueOptions(rows, "subcontractor_name"),
+      subsub_name: uniqueOptions(rows, "subsub_name"),
+      hdec_pic_name: uniqueOptions(rows, "hdec_pic_name"),
+      hdec_eng_name: uniqueOptions(rows, "hdec_eng_name"),
+    };
+    return DEFECT_COLUMNS.filter((c) => c.editable && c.editorType).map((c) => ({
+      field: c.key,
+      label: helpers.getLabel(c.key),
+      inputType: c.editorType!,
+      options: (c.options?.map((value) => ({ value, label: value })) ?? optionMap[c.key]) as any,
+      group: normalizeGroupLabel(c.group),
+    }));
+  }, [rows, helpers]);
+  const exportColumns = useMemo(() => DEFECT_COLUMNS.map((c) => ({ key: c.key, label: helpers.getLabel(c.key) })), [helpers]);
   const criticalPendingCount = summary?.critical_pending ?? 0;
   const unclosedCount = counts?.unclosed_count ?? 0;
   const closedCount = counts?.closed_count ?? 0;
+
+  const activeUrlFilters = useMemo(() => {
+    const labels: Record<string, string> = {
+      q: "Search",
+      team: "Team",
+      subcontractor: "Subcontractor",
+      subsub: "Sub-Sub",
+      hdecPic: "HDEC PIC",
+      hdecEng: "HDEC ENG",
+      capturedBy: "Captured By",
+      capturedByGroup: "Captured By Group",
+      level: "Level",
+      mainTrade: "Main Trade",
+      subTrade: "Sub Trade",
+      workType: "Work Type",
+      classificationSource: "Classification",
+      status: "Status",
+      closureStatus: "Closure",
+      issueNo: "Issue No",
+      subcontractorIssueNo: "Subcontractor Issue No",
+      critical: "Critical",
+      priority: "Priority",
+    };
+    const chips: { label: string; clears: string[] }[] = [];
+    for (const [param, label] of Object.entries(labels)) {
+      const value = (urlSearch as any)[param];
+      if (!value) continue;
+      chips.push({ label: `${label} ${value === EMPTY_TOKEN ? "(Blank)" : value}`, clears: [param] });
+    }
+    if (urlSearch.dateStart || urlSearch.dateEnd) chips.push({ label: `${urlSearch.dateField ? helpers.getLabel(urlSearch.dateField) : "Date"} ${urlSearch.dateStart || ""}${urlSearch.dateStart && urlSearch.dateEnd ? " → " : ""}${urlSearch.dateEnd || ""}`, clears: ["dateStart", "dateEnd", "dateField"] });
+    if (urlSearch.dueOn) chips.push({ label: `${urlSearch.stage || "Stage"} due ${urlSearch.dueOn} (open)`, clears: ["dueOn", "stage"] });
+    if (urlSearch.unplannedActualOn) chips.push({ label: `${urlSearch.stage || "Stage"} actual ${urlSearch.unplannedActualOn} (unplanned)`, clears: ["unplannedActualOn", "stage"] });
+    if (urlSearch.actualComplete === "true" && urlSearch.closureComplete === "false") chips.push({ label: "Remain Inspection", clears: ["actualComplete", "closureComplete"] });
+    else {
+      if (urlSearch.actualComplete === "true" || urlSearch.actualComplete === "false") chips.push({ label: `Completion: ${urlSearch.actualComplete === "true" ? "Done" : "Open"}`, clears: ["actualComplete"] });
+      if (urlSearch.closureComplete === "true" || urlSearch.closureComplete === "false") chips.push({ label: `Closure: ${urlSearch.closureComplete === "true" ? "Done" : "Open"}`, clears: ["closureComplete"] });
+    }
+    if (urlSearch.overdue === "true") chips.push({ label: urlSearch.stage ? `Overdue — ${urlSearch.stage}` : "Overdue", clears: ["overdue", "stage", "asOf"] });
+    if (urlSearch.remaining_stage && urlSearch.remaining_asof) chips.push({ label: `Remaining — ${urlSearch.remaining_stage} @ ${urlSearch.remaining_asof}`, clears: ["remaining_stage", "remaining_asof"] });
+    if (urlSearch.atRisk === "true") chips.push({ label: urlSearch.atRiskDays ? `At Risk (≤ ${urlSearch.atRiskDays}d)` : "At Risk", clears: ["atRisk", "atRiskDays"] });
+    if (urlSearch.notClosureDone === "true") chips.push({ label: "Closure ≠ Done", clears: ["notClosureDone"] });
+    if (urlSearch.hdecVerification) chips.push({ label: `HDEC Verification: ${urlSearch.hdecVerification === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecVerification}`, clears: ["hdecVerification"] });
+    if (urlSearch.catADispute === "xor") chips.push({ label: "Cat A Dispute (LL ≠ HDEC)", clears: ["catADispute"] });
+    if (urlSearch.hdecReason) chips.push({ label: `HDEC Reason: ${urlSearch.hdecReason === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecReason}`, clears: ["hdecReason"] });
+    return chips;
+  }, [urlSearch, helpers]);
 
   // Active filter chips
   const activeChips = useMemo(() => {
@@ -489,28 +629,15 @@ export function DefectRawDataPage() {
 
   return (
     <div className="space-y-3">
-      <header className="flex flex-wrap items-center justify-between gap-2">
+      <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Defect Management — Raw Data</h1>
-          <p className="text-xs text-muted-foreground">
-            {total.toLocaleString()}건 (전체 Unclosed {unclosedCount.toLocaleString()} · Closed {closedCount.toLocaleString()})
-            {tab === "unclosed" ? ` · Critical ${criticalPendingCount.toLocaleString()}` : ""}
-            {dataDate ? ` · Latest Data Date ${dataDate}` : ""}
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">Defect Raw Data</h1>
+          <p className="text-sm text-muted-foreground">Issue No and subcontractor issue tracking data.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/dashboard"><LayoutDashboard className="mr-1 h-3.5 w-3.5" /> Dashboard</Link></Button>
-          <DefectColumnOrderMenu
-            order={order}
-            visibility={visibility as Record<string, boolean>}
-            frozenExtras={frozenExtras}
-            onOrderChange={setOrder}
-            onVisibilityChange={setVisibility}
-            onFrozenChange={setFrozenExtras}
-          />
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1 h-3.5 w-3.5" /> Export</Button>
+        <div className="flex gap-2">
           <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/import"><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
-          <Button asChild variant="outline" size="sm"><Link to="/closure/defect-management/import/logs"><FileClock className="mr-1 h-3.5 w-3.5" /> Import Logs</Link></Button>
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           <Button variant="outline" size="sm" onClick={() => { invalidateDefects(); refetch(); }} disabled={isFetching}>
             <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
           </Button>
@@ -528,44 +655,62 @@ export function DefectRawDataPage() {
         </TabsList>
       </Tabs>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
-        <div className="flex items-center gap-1">
-          {DEFECT_TEAMS.map((t) => {
-            const col = table.getColumn("team");
-            const sel = (col?.getFilterValue() as string[]) ?? [];
-            const active = sel.includes(t);
-            return (
-              <Button key={t} size="sm" variant={active ? "default" : "outline"} className="h-7"
-                onClick={() => col?.setFilterValue(active ? sel.filter((x) => x !== t) : [...sel, t])}
-              >{t}</Button>
-            );
-          })}
+      {activeUrlFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+          <span className="text-xs font-medium text-primary">Active URL filters:</span>
+          {activeUrlFilters.map((filter) => (
+            <button key={filter.label} onClick={() => setUrl(clearObjectKeys(filter.clears, urlSearch as any))} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary hover:bg-primary/20" title="Click to remove">
+              {filter.label} ✕
+            </button>
+          ))}
+          <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setUrl(clearObjectKeys(DRILLDOWN_PARAMS, urlSearch as any))}>Clear all</Button>
         </div>
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      )}
+
+      {activeChips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">Active column filters:</span>
+          {activeChips.map((c) => (
+            <button key={c.id} onClick={c.onClear} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground hover:bg-secondary/80" title="Click to remove">
+              {c.label} ✕
+            </button>
+          ))}
+          <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setColumnFilters([])}>Clear all</Button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3">
+        <div className="relative min-w-[220px] max-w-sm flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="전역 검색 (설명/ID/위치/협력사/PIC 등)"
-            className="pl-7 h-8 text-sm"
+            placeholder="Search defects... (comma = AND)"
+            className="h-9 pl-8"
           />
         </div>
+        <span className="self-center text-sm text-muted-foreground">{total.toLocaleString()} records</span>
+        {sorting.length > 0 && (
+          <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => setSorting([{ id: "source_issue_no", desc: false }])}>Clear sort ({sorting.length})</Button>
+        )}
+        <span className="hidden self-center text-xs text-muted-foreground md:inline">Tip: Shift+Click headers for multi-sort · Click <Filter className="inline h-3 w-3" /> to filter columns</span>
+        <div className="ml-auto"><DefectStageProgressLegend /></div>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Checkbox checked={includeInactive} onCheckedChange={(v) => setUrl({ includeInactive: !!v, page: 1 })} className="h-3.5 w-3.5" />
           비활성 포함
         </label>
       </div>
 
-      {activeChips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {activeChips.map((c) => (
-            <button key={c.id} onClick={c.onClear} className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] hover:bg-muted">
-              {c.label} <X className="h-2.5 w-2.5" />
-            </button>
-          ))}
-          <button onClick={() => setColumnFilters([])} className="text-[11px] text-muted-foreground hover:underline">Clear all</button>
-        </div>
-      )}
+      <CriticalBulkBar isAdmin={isAdmin} selectedRows={selectedRows as any} pending={criticalPending} setPending={setCriticalPending} />
+
+      <BulkEditBar
+        selectedRows={selectedRows as any}
+        fields={bulkFields}
+        exportColumns={exportColumns}
+        canEdit={isAdmin}
+        onClearSelection={() => setRowSelection({})}
+        onApplied={() => { setRowSelection({}); invalidateDefects(); }}
+      />
 
       <DefectRawTableView
         table={table}
@@ -573,6 +718,7 @@ export function DefectRawDataPage() {
         loading={!stateLoaded || isFetching}
         dataDate={dataDate}
         frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
+        getSourceOrigin={helpers.getSourceOrigin}
         onRowClick={(r) => navigate({ to: "/closure/defect-management/detail/$id", params: { id: r.id } })}
       />
 
@@ -615,11 +761,6 @@ export function DefectRawDataPage() {
         onDiscard={() => setCriticalPending(new Map())}
       />
 
-      <BulkEditBar
-        selectedIds={selectedIds}
-        onCleared={() => setRowSelection({})}
-        onApplied={() => { setRowSelection({}); invalidateDefects(); }}
-      />
     </div>
   );
 }
@@ -706,10 +847,11 @@ interface TableViewProps {
   loading: boolean;
   dataDate: string | null;
   frozenColIds: string[];
+  getSourceOrigin: (field: string) => "hdec" | "aconex" | "system";
   onRowClick: (row: DefectItem) => void;
 }
 
-function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, onRowClick }: TableViewProps) {
+function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, getSourceOrigin, onRowClick }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
   const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
   // 리프 컬럼을 순회하면서 frozen id인 것들만 왼쪽부터 sticky 스택으로 쌓음.
@@ -744,6 +886,33 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
   const vRows = rowVirtualizer.getVirtualItems();
   const paddingTop = vRows.length > 0 ? vRows[0].start : 0;
   const paddingBottom = vRows.length > 0 ? rowVirtualizer.getTotalSize() - vRows[vRows.length - 1].end : 0;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const autoSizeColumn = (columnId: string) => {
+    const container = tableRef.current;
+    if (!container) return;
+    const cells = container.querySelectorAll<HTMLElement>(`[data-column-id="${columnId}"]`);
+    let max = 72;
+    cells.forEach((cell) => {
+      const clone = cell.cloneNode(true) as HTMLElement;
+      clone.style.cssText = "position:absolute; visibility:hidden; width:auto; white-space:nowrap; max-width:none; left:-9999px; top:0;";
+      document.body.appendChild(clone);
+      max = Math.max(max, clone.getBoundingClientRect().width);
+      document.body.removeChild(clone);
+    });
+    table.setColumnSizing((prev) => ({ ...prev, [columnId]: Math.min(Math.ceil(max) + 18, 640) }));
+  };
+
+  const stickyBgFor = (row: DefectItem, index: number): string => {
+    const closed = Boolean((row as any).actual_closure_date) || /closed|complete|done/i.test(`${(row as any).closure_status ?? ""} ${(row as any).status_raw ?? ""}`);
+    const overdue = isOverdueDefect(row as any, dataDate);
+    const base = "hsl(var(--background))";
+    const opaque = `linear-gradient(${base}, ${base})`;
+    if (hoveredIndex === index) return `${opaque}, hsl(var(--muted) / 0.95)`;
+    if (overdue && !closed) return `${opaque}, hsl(var(--destructive) / 0.06)`;
+    if (closed) return `${opaque}, hsl(var(--muted) / 0.45)`;
+    return base;
+  };
 
   return (
     <div className="flex max-h-[calc(100vh-260px)] flex-col overflow-hidden rounded-md border bg-background">
@@ -756,14 +925,18 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                 const isSticky = frozenSet.has(header.column.id);
                 const leftPx = isSticky ? stickyLefts.get(header.column.id) ?? 0 : undefined;
                 const isLastFrozen = i === lastFrozenIndex;
+                const originStyle = getOriginHeaderStyle(getSourceOrigin(header.column.id));
                 return (
                   <TableHead
                     key={header.id}
+                    data-column-id={header.column.id}
+                    title={typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : header.column.id}
                     style={{
                       width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize(),
-                      ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 3, background: "hsl(var(--background))" } : {}),
+                      ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 3, background: originStyle.stickyBg } : {}),
                     }}
-                    className={cn("relative h-9 cursor-pointer select-none whitespace-nowrap border-b px-2 py-0 text-left text-[11px] font-medium",
+                    className={cn("relative h-9 cursor-pointer select-none whitespace-nowrap border-b px-4 py-0 text-left text-xs font-medium",
+                      !isSticky && (originStyle.bg || "bg-background"), originStyle.border,
                       isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                     onClick={header.column.getToggleSortingHandler()}
                   >
@@ -781,6 +954,8 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                         onMouseDown={header.getResizeHandler()}
                         onTouchStart={header.getResizeHandler()}
                         onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => { e.stopPropagation(); autoSizeColumn(header.column.id); }}
+                        title="Drag to resize, double-click to auto-fit"
                         className={cn("absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none touch-none hover:bg-primary/40",
                           header.column.getIsResizing() && "bg-primary/60")}
                       />
@@ -808,6 +983,8 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                       key={row.id}
                       style={{ height: 36 }}
                       className={cn("cursor-pointer", closed && "bg-muted/30 text-muted-foreground", overdue && !closed && "bg-destructive/5", "hover:bg-muted/50")}
+                      onMouseEnter={() => setHoveredIndex(vr.index)}
+                      onMouseLeave={() => setHoveredIndex(null)}
                       onClick={() => onRowClick(row.original)}
                     >
                       {row.getVisibleCells().map((cell, i) => {
@@ -817,11 +994,15 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                         return (
                           <TableCell
                             key={cell.id}
+                            data-column-id={cell.column.id}
                             style={{
                               width: cell.column.getSize(), minWidth: cell.column.getSize(), maxWidth: cell.column.getSize(),
-                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: "hsl(var(--background))" } : {}),
+                              height: 36,
+                              maxHeight: 36,
+                              overflow: "hidden",
+                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: stickyBgFor(row.original, vr.index) } : {}),
                             }}
-                            className={cn("truncate border-b px-2 py-1 text-xs", isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
+                            className={cn("truncate whitespace-nowrap py-2 text-xs", isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </TableCell>
