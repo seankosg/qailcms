@@ -29,7 +29,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
-  DefectManagementImportProvider,
   useDefectImport,
   type DefectFileStatus,
   type DefectImportFile,
@@ -63,11 +62,7 @@ function formatSize(b: number) {
 }
 
 export function DefectManagementImportPage() {
-  return (
-    <DefectManagementImportProvider>
-      <Inner />
-    </DefectManagementImportProvider>
-  );
+  return <Inner />;
 }
 
 function Inner() {
