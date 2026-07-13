@@ -23,7 +23,6 @@ export type DefectFileStatus =
   | "parsing"
   | "pending_sheet_selection"
   | "pending_duplicate_review"
-  | "needs_team"
   | "ready"
   | "processing"
   | "done"
@@ -79,8 +78,6 @@ export interface DefectImportFile {
   isReimport?: boolean;
   warnings?: string[];
   categorySummary?: string[];
-  teamHint?: DefectTeam | null;
-  team?: DefectTeam | null;
   dataDateOverride?: string | null;
   validationError?: string | null;
   error?: string;
@@ -91,6 +88,8 @@ export interface DefectImportFile {
     rejected: number;
     duplicates: number;
     skippedReimportNoMatch?: number;
+    unmappedCategoryCount?: number;
+    unmappedCategories?: string[];
     errors?: DefectImportError[];
   };
   duplicateStrategy?: DuplicateStrategy;
@@ -104,7 +103,6 @@ interface CtxValue {
   addFiles: (files: File[]) => Promise<void>;
   removeFile: (id: string) => void;
   clearAll: () => void;
-  setFileTeam: (id: string, team: DefectTeam) => void;
   setFileDataDateOverride: (id: string, date: string | null) => void;
   setFileSheet: (id: string, sheetName: string) => Promise<void>;
   setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
@@ -218,7 +216,6 @@ function isNetworkError(err: unknown): boolean {
 
 function validate(f: DefectImportFile): string | null {
   if (!f.parsed || f.parsed.length === 0) return "행을 찾지 못했습니다.";
-  if (!f.team) return "Team을 선택하세요 (건축/전기/설비).";
   if ((f.duplicateGroups?.length ?? 0) > 0) {
     return `동일 Issue No 중복이 ${f.duplicateGroups!.length}그룹 감지되었습니다. "중복 검토"를 완료하세요.`;
   }
