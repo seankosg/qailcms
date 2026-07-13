@@ -1,45 +1,68 @@
-# Defect Import 속도 개선 — 확정 계획
-
 ## 목표
-현재 남아있는 두 병목(트리거로 인한 UPDATE 폭증, `raw_payload` 대량 전송)을 제거해 재임포트 소요시간을 크게 단축한다. Category→Team 매핑은 병목이 아니므로 손대지 않는다.
 
-## 작업
+앱 전체의 사용자 노출 문구를 중동 프로젝트 관례에 맞춰 **Defect → Snag** (정식 명칭은 **Snag List**)로 교체합니다. URL 라우트도 `defect-management` → `snag-management`로 변경합니다. DB 테이블·컬럼·함수와 내부 코드 식별자(컴포넌트/훅/타입/파일명)는 리스크 최소화를 위해 **그대로 유지**합니다.
 
-### 1단계 — RPC 배치 upsert 도입 (효과 큼)
-**목적**: 재임포트에서 실질적 변경이 없는 행이 트리거를 발동시키지 않게 하고, 배치 왕복을 그대로 유지하되 no-op UPDATE 제거.
+## 변경 범위 요약
 
-- 마이그레이션으로 `public.upsert_defect_items_batch(_rows jsonb)` 함수 생성.
-  - 인자: 행 배열(jsonb). 클라이언트가 넘기던 payload와 동일 구조.
-  - 내부: `INSERT INTO defect_items_raw SELECT ... FROM jsonb_to_recordset(_rows) ON CONFLICT (source_issue_no) DO UPDATE SET <컬럼 나열> = EXCLUDED.<컬럼> WHERE (기존 컬럼들) IS DISTINCT FROM (EXCLUDED 컬럼들)`.
-  - 반환: `jsonb { inserted, updated, skipped_noop }`.
-  - `SECURITY DEFINER` + `SET search_path = public`. 호출자에 `authenticated` GRANT EXECUTE.
-- 클라이언트 `src/contexts/DefectManagementImportContext.tsx`의 `upsertBatch` 를 `supabase.rpc("upsert_defect_items_batch", { _rows: slice })` 호출로 교체.
-- 이분탐색 fallback 유지: RPC 에러(check 제약 등) 시 배치를 반으로 나눠 재시도해 위반 행 격리.
-- 병렬성 `BATCH_CONCURRENCY` 4 → 6 상향. 트리거 부하가 줄어 여유 확보.
+| 층위 | 변경 | 예시 |
+|---|---|---|
+| UI 문구 | ✅ 전면 | "Defect Management" → "Snag List Management", "Defect Raw Data" → "Snag List — Raw Data", "Defect Item" → "Snag Item", 배지/툴팁/토스트/에러메시지/버튼 라벨/설정 페이지 설명 등 |
+| `<title>` / head meta | ✅ 전면 | 각 route의 `head()` title 및 og:title/description |
+| URL 경로 | ✅ 변경 | `/closure/defect-management/*` → `/closure/snag-management/*` |
+| 사이드바/네비게이션 | ✅ | AppLayout 메뉴 라벨 및 `to=` 경로 |
+| 라우트 파일명 | ✅ 폴더 이름만 변경 | `src/routes/_authenticated/closure/defect-management/` → `.../snag-management/`, 내부 `createFileRoute("...")` 문자열도 새 경로에 맞춰 갱신 |
+| 코드 식별자 | ❌ 유지 | 컴포넌트명(`DefectRawDataPage`), 훅(`useDefectItems`), 타입(`DefectTeam`), 파일 폴더(`src/components/defect-management/`, `src/lib/defect-management/`), 상수(`DEFECT_COLUMNS`, `DEFECT_TEAMS`) 전부 그대로 |
+| DB | ❌ 유지 | `defect_items_raw`, `defect_import_logs`, `rollback_defect_import` 등 60+ 식별자 전부 그대로. 마이그레이션 없음 |
+| Aconex/LetsBuild 등 외부 시스템 헤더 매핑 | ❌ 유지 | 외부에서 "Defect No." 등으로 오는 원본 컬럼 라벨은 그대로 (매핑 소스라 임의 변경 시 import 깨짐) |
 
-### 2단계 — raw_payload 무변경 시 스킵 (네트워크 절감)
-- 마이그레이션으로 `defect_items_raw.raw_payload_hash text` 컬럼 추가 + BEFORE INSERT/UPDATE 트리거로 `md5(coalesce(raw_payload::text,''))` 자동 세팅.
-- existing 조회 시 `raw_payload_hash`도 함께 select.
-- 클라이언트에서 payload MD5 계산 후 기존 hash와 같으면 그 행의 payload에서 `raw_payload` 필드만 제외(다른 컬럼 변경은 그대로 반영).
-- 신규 행은 그대로 전송.
+## 상세 작업
 
-### 3단계 — 실측 로그
-- 임포트 전/후, 배치별 소요시간을 콘솔에 임시 기록. 개선 폭 확인 후 로그 정리.
+### 1. 라우트 리네이밍 (URL + 파일)
+`src/routes/_authenticated/closure/defect-management/` 아래 5개 파일을 `snag-management/`로 이동:
+- `import.index.tsx`, `import.logs.tsx`, `raw-data.tsx`, `settings.tsx`, `detail.$id.tsx`
 
-## 범위 밖
-- Category→Team 매핑 로직(병목 아님).
-- `defect_status_history` 스키마 개편.
-- Edge Function 이관.
+각 파일의 `createFileRoute("/_authenticated/closure/defect-management/...")` 문자열을 `.../snag-management/...`로 갱신. `routeTree.gen.ts`는 dev 서버가 자동 재생성.
 
-## 검증
-- `bunx tsgo --noEmit` 통과.
-- 대형 샘플 파일로 1·2단계 각각 적용 전/후 총 소요시간 비교.
-- 기존 성공/실패/부분성공/이분탐색 fallback 회귀 확인.
-- RLS/권한: 기존 authenticated 사용자 정상 임포트.
+### 2. 네비게이션·링크 갱신
+- `src/components/layout/AppLayout.tsx`: 사이드바 메뉴 라벨 "Defect Management" → "Snag List Management", `to` 경로 갱신
+- 코드 전역의 `<Link to="/closure/defect-management/...">` 및 `navigate({ to: "..." })` 문자열을 `snag-management`로 일괄 치환
+- `src/lib/defect-management/columns.ts`의 상세 페이지 링크 빌더 등에서도 경로 갱신
+- `.gen.ts`는 자동 재생성되지만, 타입체크 통과 확인 필요
 
-## 변경 파일
-- 신규 마이그레이션 SQL(1·2단계 함수/컬럼/트리거/GRANT).
-- `src/contexts/DefectManagementImportContext.tsx` (upsertBatch RPC 전환, hash 스킵, 병렬성 상향).
+### 3. UI 문구 치환 규칙
+사람 눈에 보이는 곳(JSX 텍스트, 문자열 리터럴 중 라벨/제목/설명·`toast.*`·`title=`·`placeholder=`·`aria-label`·`<meta>` content 등)에서만 다음 규칙 적용:
 
-## 순서
-1단계 먼저 배포·실측 → 부족하면 2단계 추가. 1단계만으로 충분히 개선될 가능성이 높다.
+- "Defect Management" → **"Snag List Management"**
+- "Defect Raw Data" → **"Snag List — Raw Data"**
+- "Defect Settings" → **"Snag List Settings"**
+- "Defect Detail" → **"Snag Detail"**
+- "Defect Item(s)" → **"Snag Item(s)"**
+- 단독 "Defect" (문장 내) → **"Snag"**
+- 한국어 "결함" 표기가 있다면 → **"스낵(Snag)"** (첫 등장 시 병기, 이후 "Snag")
+
+**치환하지 않는 곳**:
+- 코드 식별자 (변수/함수/타입/파일명/import 경로)
+- DB 컬럼·테이블·RPC 이름
+- 외부 시스템 원본 헤더 문자열(`"Defect No."`, `"Defect Description"` 등 Aconex/LetsBuild 파일에서 오는 헤더 매칭 키) — parser/mapping 로직 내부
+- 이미 생성된 마이그레이션 SQL 파일
+
+### 4. head/meta 갱신
+각 route의 `head()` 내 `meta[title]`, `og:title`, `og:description`을 새 문구로 교체. 예: `"Defect Management — Import Logs"` → `"Snag List — Import Logs"`.
+
+### 5. 검증
+- `bunx tsgo --noEmit` 통과
+- 사이드바에서 "Snag List Management" 클릭 → `/closure/snag-management/raw-data` 이동 확인
+- `/closure/snag-management/import`, `/import/logs`, `/settings`, `/detail/:id` 모두 정상 렌더링
+- 기존 `/closure/defect-management/*` 북마크는 404 처리됨 (사용자에게 안내). 필요 시 후속 이슈로 redirect 추가 가능.
+
+## 리스크 및 주의
+
+- **북마크/외부 링크 깨짐**: 기존 `/closure/defect-management/*` URL은 더 이상 매칭되지 않음. 사내 배포 초기라면 수용 가능하지만, 필요 시 이 계획 승인 후 별도 turn에서 리다이렉트 라우트 추가 가능.
+- **외부 파일 헤더 문자열**: Aconex/LetsBuild import 파일 컬럼명(`"Defect No."` 등)은 외부 시스템 산출물이라 UI 텍스트가 아니라 매칭 키. 절대 변경 금지 (import 실패 원인).
+- **DB·코드 식별자 미변경**: 개발자가 코드를 열면 `defect_*`가 남아있음. 사용자에게는 완전히 Snag로 보이지만 유지보수 시 이 이중 명명 규칙을 인지해야 함.
+- **`routeTree.gen.ts`**: 수동 편집 금지. dev 서버 재시작 시 자동 재생성됨.
+
+## 산출물
+- 5개 route 파일 rename + `createFileRoute` 경로 문자열 갱신
+- UI 문구/head/링크 경로 치환 (약 40~50개 컴포넌트·페이지 파일)
+- DB·코드 식별자·마이그레이션·외부 헤더 매핑은 무변경
