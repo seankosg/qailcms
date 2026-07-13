@@ -22,6 +22,7 @@ import type { DefectTeam } from "@/lib/defect-management/columns";
 export type DefectFileStatus =
   | "parsing"
   | "pending_sheet_selection"
+  | "pending_duplicate_review"
   | "needs_team"
   | "ready"
   | "processing"
@@ -35,6 +36,26 @@ export interface DefectImportError {
   details?: string;
   hint?: string;
   sampleId?: string;
+}
+
+export type DuplicateStrategy = "keep_last" | "keep_first" | "manual";
+
+export interface DuplicateGroupRow {
+  parsedIndex: number;
+  preview: {
+    description?: string | null;
+    status_raw?: string | null;
+    updated_date_raw?: string | null;
+    created_date?: string | null;
+    updated_by_name?: string | null;
+    updated_status?: string | null;
+  };
+}
+
+export interface DuplicateGroup {
+  key: string; // source_issue_no
+  rows: DuplicateGroupRow[];
+  selectedParsedIndex: number;
 }
 
 export interface DefectImportFile {
@@ -72,6 +93,9 @@ export interface DefectImportFile {
     skippedReimportNoMatch?: number;
     errors?: DefectImportError[];
   };
+  duplicateStrategy?: DuplicateStrategy;
+  duplicateGroups?: DuplicateGroup[];
+  autoDedupedIdenticalCount?: number;
 }
 
 interface CtxValue {
@@ -84,6 +108,9 @@ interface CtxValue {
   setFileDataDateOverride: (id: string, date: string | null) => void;
   setFileSheet: (id: string, sheetName: string) => Promise<void>;
   setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
+  setFileDuplicateStrategy: (id: string, strategy: DuplicateStrategy) => void;
+  setFileDuplicateSelection: (id: string, groupKey: string, parsedIndex: number) => void;
+  resolveDuplicates: (id: string) => void;
   startImport: () => Promise<void>;
 }
 
@@ -100,6 +127,78 @@ const BATCH_DELAY_MS = 60;
 const RETRY_DELAYS_MS = [300, 800, 2000];
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * parsed 배열에서 source_issue_no 기준 중복 그룹을 계산한다.
+ * - raw_payload JSON 문자열이 동일한 완전 동일 중복은 자동 폐기 카운트에 반영하고 후보에서 제거.
+ * - 자동 dedupe 후 후보가 2개 이상 남는 그룹만 사용자 검토 대상으로 반환.
+ * - 초기 selectedParsedIndex 는 그룹 마지막 후보 (keep_last).
+ */
+function computeDuplicateGroups(parsed: ParsedDefectRow[]): {
+  groups: DuplicateGroup[];
+  autoDedupedIdenticalCount: number;
+} {
+  // 1) source_issue_no 별로 [ {idx, row} ] 수집
+  const byKey = new Map<string, Array<{ idx: number; row: ParsedDefectRow }>>();
+  parsed.forEach((row, idx) => {
+    const key = row.source_issue_no;
+    if (!key) return;
+    const list = byKey.get(key) ?? [];
+    list.push({ idx, row });
+    byKey.set(key, list);
+  });
+
+  const groups: DuplicateGroup[] = [];
+  let autoDedupedIdenticalCount = 0;
+
+  for (const [key, items] of byKey) {
+    if (items.length < 2) continue;
+    // 2) raw_payload JSON 동일 → 마지막만 남기고 나머지 자동 폐기
+    const uniqByPayload = new Map<string, { idx: number; row: ParsedDefectRow }>();
+    for (const item of items) {
+      const sig = JSON.stringify(item.row.raw_payload ?? {});
+      uniqByPayload.set(sig, item); // keep last
+    }
+    const kept = Array.from(uniqByPayload.values()).sort((a, b) => a.idx - b.idx);
+    autoDedupedIdenticalCount += items.length - kept.length;
+    if (kept.length < 2) continue;
+
+    // 3) 사용자 검토 대상
+    const rows: DuplicateGroupRow[] = kept.map(({ idx, row }) => ({
+      parsedIndex: idx,
+      preview: {
+        description: row.description ?? null,
+        status_raw: row.status_raw ?? null,
+        updated_date_raw: row.updated_date_raw ?? null,
+        created_date: row.created_date ?? null,
+        updated_by_name: row.updated_by_name ?? null,
+        updated_status: row.updated_status ?? null,
+      },
+    }));
+    groups.push({
+      key,
+      rows,
+      selectedParsedIndex: rows[rows.length - 1].parsedIndex, // keep_last
+    });
+  }
+
+  return { groups, autoDedupedIdenticalCount };
+}
+
+/** 전략에 따라 그룹의 selectedParsedIndex 재계산 (manual 은 유지). */
+function applyStrategyToGroups(
+  groups: DuplicateGroup[],
+  strategy: DuplicateStrategy,
+): DuplicateGroup[] {
+  if (strategy === "manual") return groups;
+  return groups.map((g) => ({
+    ...g,
+    selectedParsedIndex:
+      strategy === "keep_first"
+        ? g.rows[0].parsedIndex
+        : g.rows[g.rows.length - 1].parsedIndex,
+  }));
+}
 
 function isNetworkError(err: unknown): boolean {
   if (!err) return false;
@@ -120,6 +219,9 @@ function isNetworkError(err: unknown): boolean {
 function validate(f: DefectImportFile): string | null {
   if (!f.parsed || f.parsed.length === 0) return "행을 찾지 못했습니다.";
   if (!f.team) return "Team을 선택하세요 (건축/전기/설비).";
+  if ((f.duplicateGroups?.length ?? 0) > 0) {
+    return `동일 Issue No 중복이 ${f.duplicateGroups!.length}그룹 감지되었습니다. "중복 검토"를 완료하세요.`;
+  }
   return null;
 }
 
@@ -158,6 +260,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         setFiles((cur) =>
           cur.map((f) => {
             if (f.id !== id) return f;
+            const { groups, autoDedupedIdenticalCount } = computeDuplicateGroups(parsed.rows);
+            const hasUnresolvedDuplicates = groups.length > 0;
+            const strategy: DuplicateStrategy = f.duplicateStrategy ?? "keep_last";
+            const groupsWithStrategy = applyStrategyToGroups(groups, strategy);
+            const nextStatus: DefectFileStatus = hasUnresolvedDuplicates
+              ? "pending_duplicate_review"
+              : (f.team ?? parsed.teamHint)
+                ? "ready"
+                : "needs_team";
             const updated: DefectImportFile = {
               ...f,
               parsed: parsed.rows,
@@ -174,7 +285,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               teamHint: parsed.teamHint,
               team: f.team ?? parsed.teamHint ?? null,
               categorySummary: parsed.categorySummary,
-              status: (f.team ?? parsed.teamHint) ? "ready" : "needs_team",
+              status: nextStatus,
+              duplicateStrategy: strategy,
+              duplicateGroups: groupsWithStrategy,
+              autoDedupedIdenticalCount,
               error: undefined,
             };
             updated.validationError = validate(updated);
@@ -350,6 +464,63 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     [parseAndApply],
   );
 
+  const setFileDuplicateStrategy = useCallback(
+    (id: string, strategy: DuplicateStrategy) => {
+      setFiles((cur) =>
+        cur.map((f) => {
+          if (f.id !== id) return f;
+          const groups = applyStrategyToGroups(f.duplicateGroups ?? [], strategy);
+          return { ...f, duplicateStrategy: strategy, duplicateGroups: groups };
+        }),
+      );
+    },
+    [],
+  );
+
+  const setFileDuplicateSelection = useCallback(
+    (id: string, groupKey: string, parsedIndex: number) => {
+      setFiles((cur) =>
+        cur.map((f) => {
+          if (f.id !== id) return f;
+          const groups = (f.duplicateGroups ?? []).map((g) =>
+            g.key === groupKey ? { ...g, selectedParsedIndex: parsedIndex } : g,
+          );
+          return {
+            ...f,
+            duplicateStrategy: "manual",
+            duplicateGroups: groups,
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  const resolveDuplicates = useCallback((id: string) => {
+    setFiles((cur) =>
+      cur.map((f) => {
+        if (f.id !== id) return f;
+        if (!f.parsed || !f.duplicateGroups || f.duplicateGroups.length === 0) return f;
+        const dropIndices = new Set<number>();
+        for (const g of f.duplicateGroups) {
+          for (const r of g.rows) {
+            if (r.parsedIndex !== g.selectedParsedIndex) dropIndices.add(r.parsedIndex);
+          }
+        }
+        const nextParsed = f.parsed.filter((_, idx) => !dropIndices.has(idx));
+        const nextStatus: DefectFileStatus = f.team ? "ready" : "needs_team";
+        const updated: DefectImportFile = {
+          ...f,
+          parsed: nextParsed,
+          duplicateGroups: [],
+          status: nextStatus,
+        };
+        updated.validationError = validate(updated);
+        return updated;
+      }),
+    );
+  }, []);
+
   const executeImport = useCallback(async (ready: DefectImportFile[]) => {
     setIsRunning(true);
     const { data: userData } = await supabase.auth.getUser();
@@ -362,6 +533,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       const startedAtIso = new Date().toISOString();
       const excludedFields = f.excludedFields ?? new Set<string>();
       const isReimport = !!f.isReimport;
+      const duplicateStrategy = f.duplicateStrategy ?? "keep_last";
+      const duplicatesAuto = f.autoDedupedIdenticalCount ?? 0;
 
       const { data: logRow } = await (supabase as any)
         .from("defect_import_logs")
@@ -379,6 +552,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             excludedFields.size > 0
               ? `excluded_fields=${Array.from(excludedFields).join(",")}`
               : null,
+            `duplicate_strategy=${duplicateStrategy}`,
+            duplicatesAuto > 0 ? `duplicates_auto=${duplicatesAuto}` : null,
           ]
             .filter(Boolean)
             .join(" | ") || null,
@@ -391,11 +566,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         cur.map((x) => (x.id === f.id ? { ...x, status: "processing", progress: 0 } : x)),
       );
 
-      // dedupe by source_issue_no (keep last)
+      // 파일 카드에서 이미 중복이 해결되었으므로 방어적 dedupe (keep last) 유지.
+      // 통계에는 자동 폐기 카운트만 노출 (수동 폐기분은 이미 parsed 에서 제거됨).
       const dedupMap = new Map<string, ParsedDefectRow>();
       for (const p of parsed) dedupMap.set(p.source_issue_no, p);
       const deduped = Array.from(dedupMap.values());
-      const duplicates = parsed.length - deduped.length;
+      const duplicatesDefensive = parsed.length - deduped.length;
+      const duplicates = duplicatesAuto + duplicatesDefensive;
 
       // 기존 행 조회 (id + lock flags)
       const ids = deduped.map((p) => p.source_issue_no);
@@ -670,6 +847,9 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         setFileDataDateOverride,
         setFileSheet,
         setFileExcludedHeaders,
+        setFileDuplicateStrategy,
+        setFileDuplicateSelection,
+        resolveDuplicates,
         startImport,
       }}
     >
