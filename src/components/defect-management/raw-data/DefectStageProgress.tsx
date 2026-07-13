@@ -1,4 +1,3 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   formatDdMmm,
@@ -75,29 +74,21 @@ export function DefectStageProgress({ item, asOfDate = null }: { item: Row; asOf
   const start = classifyStage(item, "start", delayAsOfDate);
   const completion = classifyStage(item, "completion", delayAsOfDate);
   const closure = classifyStage(item, "closure", delayAsOfDate);
+  const title = [
+    `Delay as of ${formatDdMmm(delayAsOfDate)}`,
+    `Start: ${stateLabel(start)}${item.actual_start_date ? ` · ${formatDdMmm(item.actual_start_date)}` : item.planned_start_date ? ` (plan ${formatDdMmm(item.planned_start_date)})` : ""}`,
+    `Completion: ${stateLabel(completion)}${item.actual_completion_date ? ` · ${formatDdMmm(item.actual_completion_date)}` : item.planned_completion_date ? ` (plan ${formatDdMmm(item.planned_completion_date)})` : ""}`,
+    `Closure: ${stateLabel(closure)}${item.actual_closure_date ? ` · ${formatDdMmm(item.actual_closure_date)}` : item.planned_closure_date ? ` (plan ${formatDdMmm(item.planned_closure_date)})` : ""}`,
+  ].join("\n");
 
   return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex select-none items-center gap-0.5" onClick={(event) => event.stopPropagation()}>
-            <Pip state={start} label={`Start: ${stateLabel(start)}`} />
-            <span className="h-px w-2 bg-muted-foreground/30" aria-hidden />
-            <Pip state={completion} label={`Completion: ${stateLabel(completion)}`} />
-            <span className="h-px w-2 bg-muted-foreground/30" aria-hidden />
-            <Pip state={closure} label={`Closure: ${stateLabel(closure)}`} />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="right" className="bg-popover text-popover-foreground shadow-md">
-          <div className="space-y-0.5 text-xs">
-            <div className="text-muted-foreground">Delay as of {formatDdMmm(delayAsOfDate)}</div>
-            <div><span className="font-medium">Start:</span> {stateLabel(start)}{item.actual_start_date ? <span className="text-muted-foreground"> · {formatDdMmm(item.actual_start_date)}</span> : item.planned_start_date ? <span className="text-muted-foreground"> (plan {formatDdMmm(item.planned_start_date)})</span> : null}</div>
-            <div><span className="font-medium">Completion:</span> {stateLabel(completion)}{item.actual_completion_date ? <span className="text-muted-foreground"> · {formatDdMmm(item.actual_completion_date)}</span> : item.planned_completion_date ? <span className="text-muted-foreground"> (plan {formatDdMmm(item.planned_completion_date)})</span> : null}</div>
-            <div><span className="font-medium">Closure:</span> {stateLabel(closure)}{item.actual_closure_date ? <span className="text-muted-foreground"> · {formatDdMmm(item.actual_closure_date)}</span> : item.planned_closure_date ? <span className="text-muted-foreground"> (plan {formatDdMmm(item.planned_closure_date)})</span> : null}</div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <span className="inline-flex select-none items-center gap-0.5" title={title} onClick={(event) => event.stopPropagation()}>
+      <Pip state={start} label={`Start: ${stateLabel(start)}`} />
+      <span className="h-px w-2 bg-muted-foreground/30" aria-hidden />
+      <Pip state={completion} label={`Completion: ${stateLabel(completion)}`} />
+      <span className="h-px w-2 bg-muted-foreground/30" aria-hidden />
+      <Pip state={closure} label={`Closure: ${stateLabel(closure)}`} />
+    </span>
   );
 }
 
