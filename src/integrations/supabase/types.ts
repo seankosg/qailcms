@@ -14,6 +14,365 @@ export type Database = {
   }
   public: {
     Tables: {
+      abd_change_log: {
+        Row: {
+          abd_item_id: string | null
+          abd_number: string | null
+          changed_at: string
+          changed_by: string | null
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          source: string
+          team: string | null
+          upload_id: string | null
+        }
+        Insert: {
+          abd_item_id?: string | null
+          abd_number?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+          team?: string | null
+          upload_id?: string | null
+        }
+        Update: {
+          abd_item_id?: string | null
+          abd_number?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+          team?: string | null
+          upload_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_change_log_abd_item_id_fkey"
+            columns: ["abd_item_id"]
+            isOneToOne: false
+            referencedRelation: "abd_items_raw"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      abd_field_config: {
+        Row: {
+          created_at: string
+          data_type: string
+          editable: boolean
+          field_key: string
+          group: string | null
+          id: string
+          label: string
+          options: Json | null
+          sort_order: number
+          updated_at: string
+          visible: boolean
+        }
+        Insert: {
+          created_at?: string
+          data_type?: string
+          editable?: boolean
+          field_key: string
+          group?: string | null
+          id?: string
+          label: string
+          options?: Json | null
+          sort_order?: number
+          updated_at?: string
+          visible?: boolean
+        }
+        Update: {
+          created_at?: string
+          data_type?: string
+          editable?: boolean
+          field_key?: string
+          group?: string | null
+          id?: string
+          label?: string
+          options?: Json | null
+          sort_order?: number
+          updated_at?: string
+          visible?: boolean
+        }
+        Relationships: []
+      }
+      abd_header_mappings: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          plan_or_actual: string | null
+          round_index: number | null
+          source_header: string
+          stage: string | null
+          target_field: string
+          team: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          plan_or_actual?: string | null
+          round_index?: number | null
+          source_header: string
+          stage?: string | null
+          target_field: string
+          team: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          plan_or_actual?: string | null
+          round_index?: number | null
+          source_header?: string
+          stage?: string | null
+          target_field?: string
+          team?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      abd_import_logs: {
+        Row: {
+          created_at: string
+          errors: Json | null
+          file_name: string
+          finished_at: string | null
+          id: string
+          imported_by: string | null
+          inactivated: number | null
+          inserted: number | null
+          mismatched: number | null
+          note: string | null
+          plot: string | null
+          rollback_force: boolean | null
+          rolled_back_at: string | null
+          rolled_back_by: string | null
+          sheet_name: string | null
+          skipped_no_key: number | null
+          started_at: string | null
+          status: string
+          team: string | null
+          total_rows: number | null
+          updated: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          errors?: Json | null
+          file_name: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          inactivated?: number | null
+          inserted?: number | null
+          mismatched?: number | null
+          note?: string | null
+          plot?: string | null
+          rollback_force?: boolean | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          sheet_name?: string | null
+          skipped_no_key?: number | null
+          started_at?: string | null
+          status?: string
+          team?: string | null
+          total_rows?: number | null
+          updated?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          errors?: Json | null
+          file_name?: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          inactivated?: number | null
+          inserted?: number | null
+          mismatched?: number | null
+          note?: string | null
+          plot?: string | null
+          rollback_force?: boolean | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          sheet_name?: string | null
+          skipped_no_key?: number | null
+          started_at?: string | null
+          status?: string
+          team?: string | null
+          total_rows?: number | null
+          updated?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      abd_items_raw: {
+        Row: {
+          abd_number: string
+          abd_ocs_no: string | null
+          approval_date: string | null
+          created_at: string
+          data_date: string | null
+          dis: string | null
+          doc_ax: string | null
+          doc_axx: string | null
+          doc_n: string | null
+          doc_nn1: string | null
+          doc_nn2: string | null
+          document_title: string | null
+          field_mismatch: boolean
+          id: string
+          inactive_reason: string | null
+          is_active: boolean
+          latest_rev: string | null
+          latest_status: string | null
+          mismatch_fields: Json
+          pic: string | null
+          plot: string | null
+          r1_dar_actual: string | null
+          r1_dar_plan: string | null
+          r1_drafting_actual: string | null
+          r1_drafting_plan: string | null
+          r1_submission_actual: string | null
+          r1_submission_plan: string | null
+          r2_dar_actual: string | null
+          r2_dar_plan: string | null
+          r2_drafting_actual: string | null
+          r2_drafting_plan: string | null
+          r2_submission_actual: string | null
+          r2_submission_plan: string | null
+          r3_dar_actual: string | null
+          r3_dar_plan: string | null
+          r3_drafting_actual: string | null
+          r3_drafting_plan: string | null
+          r3_submission_actual: string | null
+          r3_submission_plan: string | null
+          raw_payload: Json
+          row_version: number
+          service: string | null
+          sl_no: number | null
+          source_import_log_id: string | null
+          status_group: string | null
+          team: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          abd_number: string
+          abd_ocs_no?: string | null
+          approval_date?: string | null
+          created_at?: string
+          data_date?: string | null
+          dis?: string | null
+          doc_ax?: string | null
+          doc_axx?: string | null
+          doc_n?: string | null
+          doc_nn1?: string | null
+          doc_nn2?: string | null
+          document_title?: string | null
+          field_mismatch?: boolean
+          id?: string
+          inactive_reason?: string | null
+          is_active?: boolean
+          latest_rev?: string | null
+          latest_status?: string | null
+          mismatch_fields?: Json
+          pic?: string | null
+          plot?: string | null
+          r1_dar_actual?: string | null
+          r1_dar_plan?: string | null
+          r1_drafting_actual?: string | null
+          r1_drafting_plan?: string | null
+          r1_submission_actual?: string | null
+          r1_submission_plan?: string | null
+          r2_dar_actual?: string | null
+          r2_dar_plan?: string | null
+          r2_drafting_actual?: string | null
+          r2_drafting_plan?: string | null
+          r2_submission_actual?: string | null
+          r2_submission_plan?: string | null
+          r3_dar_actual?: string | null
+          r3_dar_plan?: string | null
+          r3_drafting_actual?: string | null
+          r3_drafting_plan?: string | null
+          r3_submission_actual?: string | null
+          r3_submission_plan?: string | null
+          raw_payload?: Json
+          row_version?: number
+          service?: string | null
+          sl_no?: number | null
+          source_import_log_id?: string | null
+          status_group?: string | null
+          team: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          abd_number?: string
+          abd_ocs_no?: string | null
+          approval_date?: string | null
+          created_at?: string
+          data_date?: string | null
+          dis?: string | null
+          doc_ax?: string | null
+          doc_axx?: string | null
+          doc_n?: string | null
+          doc_nn1?: string | null
+          doc_nn2?: string | null
+          document_title?: string | null
+          field_mismatch?: boolean
+          id?: string
+          inactive_reason?: string | null
+          is_active?: boolean
+          latest_rev?: string | null
+          latest_status?: string | null
+          mismatch_fields?: Json
+          pic?: string | null
+          plot?: string | null
+          r1_dar_actual?: string | null
+          r1_dar_plan?: string | null
+          r1_drafting_actual?: string | null
+          r1_drafting_plan?: string | null
+          r1_submission_actual?: string | null
+          r1_submission_plan?: string | null
+          r2_dar_actual?: string | null
+          r2_dar_plan?: string | null
+          r2_drafting_actual?: string | null
+          r2_drafting_plan?: string | null
+          r2_submission_actual?: string | null
+          r2_submission_plan?: string | null
+          r3_dar_actual?: string | null
+          r3_dar_plan?: string | null
+          r3_drafting_actual?: string | null
+          r3_drafting_plan?: string | null
+          r3_submission_actual?: string | null
+          r3_submission_plan?: string | null
+          raw_payload?: Json
+          row_version?: number
+          service?: string | null
+          sl_no?: number | null
+          source_import_log_id?: string | null
+          status_group?: string | null
+          team?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       defect_field_config: {
         Row: {
           created_at: string
@@ -1741,6 +2100,44 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      abd_items_counts: {
+        Args: { _include_inactive?: boolean; _team?: string }
+        Returns: {
+          approved_count: number
+          in_progress_count: number
+          latest_data_date: string
+          not_started_count: number
+          total_count: number
+        }[]
+      }
+      abd_items_facets: {
+        Args: {
+          _column: string
+          _include_inactive?: boolean
+          _status_group?: string
+          _team?: string
+        }
+        Returns: {
+          cnt: number
+          value: string
+        }[]
+      }
+      abd_items_search: {
+        Args: {
+          _filters?: Json
+          _include_inactive?: boolean
+          _limit?: number
+          _offset?: number
+          _q?: string
+          _sort?: Json
+          _status_group?: string
+          _team?: string
+        }
+        Returns: {
+          rows: Json
+          total_count: number
+        }[]
+      }
       allocate_task_no: {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: string
@@ -1792,6 +2189,7 @@ export type Database = {
           total_count: number
         }[]
       }
+      delete_abd_import_batch: { Args: { _batch_id: string }; Returns: Json }
       delete_defect_import_batch: { Args: { _batch_id: string }; Returns: Json }
       delete_spare_part_import_batch: {
         Args: { _batch_id: string }
@@ -1816,6 +2214,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }
+      preview_rollback_abd_import: {
+        Args: { _batch_id: string }
+        Returns: Json
+      }
       preview_rollback_defect_import: {
         Args: { _batch_id: string }
         Returns: Json
@@ -1833,6 +2235,10 @@ export type Database = {
         Returns: number
       }
       resolve_login_email: { Args: { _login_id: string }; Returns: string }
+      rollback_abd_import: {
+        Args: { _batch_id: string; _force?: boolean }
+        Returns: Json
+      }
       rollback_defect_import: {
         Args: { _batch_id: string; _force?: boolean }
         Returns: Json
