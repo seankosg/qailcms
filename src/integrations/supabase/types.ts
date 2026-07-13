@@ -417,6 +417,30 @@ export type Database = {
         }
         Relationships: []
       }
+      defect_category_team_map: {
+        Row: {
+          category: string
+          created_at: string
+          team: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          team: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          team?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       defect_field_config: {
         Row: {
           created_at: string
