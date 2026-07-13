@@ -19,12 +19,12 @@ export function DeSnagDashboardPage() {
   const search = DashboardRoute.useSearch();
   const navigate = useNavigate();
   const plot = (search.plot ?? "C") as PlotKey;
-  const teams = useMemo(
+  const teams = useMemo<TeamKey[]>(
     () =>
       (search.teams ?? "")
         .split(",")
-        .map((s) => s.trim())
-        .filter((s): s is TeamKey => (ALL_TEAMS as readonly string[]).includes(s)),
+        .map((s: string) => s.trim())
+        .filter((s: string): s is TeamKey => (ALL_TEAMS as readonly string[]).includes(s)),
     [search.teams],
   );
 
@@ -91,16 +91,11 @@ export function DeSnagDashboardPage() {
           <DeSnagStatusCell
             stats={matrix.plotTotal}
             onMetric={(m) => {
-              const p =
-                m === "issued"
-                  ? {}
-                  : m === "open"
-                    ? { status: "Open" }
-                    : m === "rectified"
-                      ? { status: "Rectified" }
-                      : m === "reopen"
-                        ? { status: "Re-Opened" }
-                        : { status: "Closed" };
+              const p: Record<string, string> = {};
+              if (m === "open") p.status = "Open";
+              else if (m === "rectified") p.status = "Rectified";
+              else if (m === "reopen") p.status = "Re-Opened";
+              else if (m === "closed" || m === "closurePct") p.status = "Closed";
               goRaw(p);
             }}
           />

@@ -28,6 +28,7 @@ import { Route as AuthenticatedClosureSparePartImportRouteImport } from './route
 import { Route as AuthenticatedClosureSparePartAconexSyncRouteImport } from './routes/_authenticated/closure/spare-part/aconex-sync'
 import { Route as AuthenticatedClosureSnagManagementSettingsRouteImport } from './routes/_authenticated/closure/snag-management/settings'
 import { Route as AuthenticatedClosureSnagManagementRawDataRouteImport } from './routes/_authenticated/closure/snag-management/raw-data'
+import { Route as AuthenticatedClosureSnagManagementDashboardRouteImport } from './routes/_authenticated/closure/snag-management/dashboard'
 import { Route as AuthenticatedClosureDashboardWarrantyRouteImport } from './routes/_authenticated/closure/dashboard/warranty'
 import { Route as AuthenticatedClosureDashboardTaskRouteImport } from './routes/_authenticated/closure/dashboard/task'
 import { Route as AuthenticatedClosureDashboardSparePartRouteImport } from './routes/_authenticated/closure/dashboard/spare-part'
@@ -150,6 +151,12 @@ const AuthenticatedClosureSnagManagementRawDataRoute =
     path: '/closure/snag-management/raw-data',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureSnagManagementDashboardRoute =
+  AuthenticatedClosureSnagManagementDashboardRouteImport.update({
+    id: '/closure/snag-management/dashboard',
+    path: '/closure/snag-management/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureDashboardWarrantyRoute =
   AuthenticatedClosureDashboardWarrantyRouteImport.update({
     id: '/closure/dashboard/warranty',
@@ -259,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
+  '/closure/snag-management/dashboard': typeof AuthenticatedClosureSnagManagementDashboardRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
@@ -293,6 +301,7 @@ export interface FileRoutesByTo {
   '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
+  '/closure/snag-management/dashboard': typeof AuthenticatedClosureSnagManagementDashboardRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
   '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
@@ -330,6 +339,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/_authenticated/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/_authenticated/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
+  '/_authenticated/closure/snag-management/dashboard': typeof AuthenticatedClosureSnagManagementDashboardRoute
   '/_authenticated/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/_authenticated/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
   '/_authenticated/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
@@ -367,6 +377,7 @@ export interface FileRouteTypes {
     | '/closure/dashboard/spare-part'
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
+    | '/closure/snag-management/dashboard'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
     | '/closure/spare-part/aconex-sync'
@@ -401,6 +412,7 @@ export interface FileRouteTypes {
     | '/closure/dashboard/spare-part'
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
+    | '/closure/snag-management/dashboard'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
     | '/closure/spare-part/aconex-sync'
@@ -437,6 +449,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/dashboard/spare-part'
     | '/_authenticated/closure/dashboard/task'
     | '/_authenticated/closure/dashboard/warranty'
+    | '/_authenticated/closure/snag-management/dashboard'
     | '/_authenticated/closure/snag-management/raw-data'
     | '/_authenticated/closure/snag-management/settings'
     | '/_authenticated/closure/spare-part/aconex-sync'
@@ -595,6 +608,13 @@ declare module '@tanstack/react-router' {
       path: '/closure/snag-management/raw-data'
       fullPath: '/closure/snag-management/raw-data'
       preLoaderRoute: typeof AuthenticatedClosureSnagManagementRawDataRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/snag-management/dashboard': {
+      id: '/_authenticated/closure/snag-management/dashboard'
+      path: '/closure/snag-management/dashboard'
+      fullPath: '/closure/snag-management/dashboard'
+      preLoaderRoute: typeof AuthenticatedClosureSnagManagementDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/closure/dashboard/warranty': {
@@ -767,6 +787,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureDashboardSparePartRoute: typeof AuthenticatedClosureDashboardSparePartRoute
   AuthenticatedClosureDashboardTaskRoute: typeof AuthenticatedClosureDashboardTaskRoute
   AuthenticatedClosureDashboardWarrantyRoute: typeof AuthenticatedClosureDashboardWarrantyRoute
+  AuthenticatedClosureSnagManagementDashboardRoute: typeof AuthenticatedClosureSnagManagementDashboardRoute
   AuthenticatedClosureSnagManagementRawDataRoute: typeof AuthenticatedClosureSnagManagementRawDataRoute
   AuthenticatedClosureSnagManagementSettingsRoute: typeof AuthenticatedClosureSnagManagementSettingsRoute
   AuthenticatedClosureSparePartAconexSyncRoute: typeof AuthenticatedClosureSparePartAconexSyncRoute
@@ -800,6 +821,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureDashboardTaskRoute,
   AuthenticatedClosureDashboardWarrantyRoute:
     AuthenticatedClosureDashboardWarrantyRoute,
+  AuthenticatedClosureSnagManagementDashboardRoute:
+    AuthenticatedClosureSnagManagementDashboardRoute,
   AuthenticatedClosureSnagManagementRawDataRoute:
     AuthenticatedClosureSnagManagementRawDataRoute,
   AuthenticatedClosureSnagManagementSettingsRoute:
