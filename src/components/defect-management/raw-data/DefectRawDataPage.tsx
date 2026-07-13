@@ -58,7 +58,8 @@ import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { EditCellPopover } from "./EditCellPopover";
-import { DefectStageProgress, DefectStageProgressLegend } from "./DefectStageProgress";
+import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
+import { todayIso } from "@/lib/defect-management/stage-utils";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
 const SYSTEM_FROZEN_IDS = ["__select", "is_critical", "stage_progress"];
@@ -182,6 +183,17 @@ function uniqueOptions(items: DefectItem[], field: keyof DefectItem | string) {
   return [...set].sort().map((v) => ({ value: v, label: v }));
 }
 
+// Stage classifyStage 결과("done"/"wip"/"planned"/"hold"/"empty") → 화면 표시 라벨
+function startStatusLabel(state: ReturnType<typeof classifyStage>): string | null {
+  switch (state) {
+    case "done": return "Done";
+    case "wip": return "WIP";
+    case "planned": return "Planned";
+    case "hold": return "Delay";
+    default: return null;
+  }
+}
+
 function normalizeGroupLabel(group: string | null | undefined): string {
   const labels: Record<string, string> = {
     identity: "Identity",
@@ -296,6 +308,12 @@ export function DefectRawDataPage() {
   const { data: counts } = useDefectStatusCounts({ includeInactive });
   const { data: summary } = useDefectDashboardSummary({ includeInactive });
   const dataDate = summary?.latest_data_date ?? null;
+
+  // 파생 start_status 컬럼 값 주입 (렌더/셀 접근용)
+  const enrichedRows = useMemo(() => {
+    const asOf = dataDate ?? todayIso();
+    return rows.map((r) => ({ ...r, start_status: startStatusLabel(classifyStage(r as any, "start", asOf)) }));
+  }, [rows, dataDate]);
 
   // ── Restore view pref (per-tab: order/visibility/frozenExtras/columnSizing) ─
   useEffect(() => {
@@ -503,7 +521,7 @@ export function DefectRawDataPage() {
   }, [columns, fieldConfig, visibility, frozenExtras]);
 
   const table = useReactTable<DefectItem>({
-    data: rows,
+    data: enrichedRows as DefectItem[],
     columns,
     state: { sorting, columnFilters, columnSizing, columnVisibility, rowSelection },
     onSortingChange: setSorting,
