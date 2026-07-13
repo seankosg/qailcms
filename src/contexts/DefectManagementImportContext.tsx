@@ -121,10 +121,10 @@ export function useDefectImport() {
   return c;
 }
 
-const INSERT_CHUNK = 500;
-// 서버의 no-op UPDATE 스킵 트리거(trg_defect_suppress_noop_update)로 재임포트
-// 부하가 크게 줄었기 때문에 배치 병렬성을 상향해 왕복 시간을 추가로 단축.
-const BATCH_CONCURRENCY = 6;
+const INSERT_CHUNK = 100;
+// 대량 upsert는 DB 트리거/인덱스 갱신과 맞물리면 500행×고병렬에서 statement timeout이 난다.
+// 작은 배치와 낮은 병렬성으로 안정성을 우선 확보한다.
+const BATCH_CONCURRENCY = 2;
 const EXISTING_FETCH_CHUNK = 1000;
 const EXISTING_FETCH_CONCURRENCY = 4;
 const ROW_LOG_CHUNK = 500;
@@ -237,6 +237,15 @@ function isNetworkError(err: unknown): boolean {
     combined.includes("network error") ||
     combined.includes("fetch failed") ||
     combined.includes("load failed")
+  );
+}
+
+function isStatementTimeout(err: unknown): boolean {
+  return (
+    (err as { code?: string } | null)?.code === "57014" ||
+    String((err as { message?: string } | null)?.message ?? "")
+      .toLowerCase()
+      .includes("statement timeout")
   );
 }
 
@@ -818,9 +827,9 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
           if (!error) {
             successRows = slice;
-          } else if (isNetworkError(error)) {
+          } else if (isNetworkError(error) || isStatementTimeout(error)) {
             // 재시도 다 소진 → 배치 자체 실패로 기록
-            console.error("[defect-import] batch upsert network error", { batchIndex, error });
+            console.error("[defect-import] batch upsert transient error", { batchIndex, error });
             importErrors.push({
               batch: batchIndex,
               message: error.message,
