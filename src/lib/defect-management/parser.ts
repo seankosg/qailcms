@@ -1,6 +1,5 @@
 import * as XLSX from "xlsx";
 import type { DefectTeam } from "./columns";
-import { suggestTeamFromCategory } from "./columns";
 
 /** Re-import 마커 헤더 — Raw Data에서 재수출한 파일에만 존재. */
 export const REIMPORT_MARKER_HEADER = "QAIL_DEFECT_REIMPORT_V1";
@@ -476,16 +475,9 @@ export async function parseDefectExcel(
     });
   }
 
-  // team hint: most common category → team
-  let teamHint: DefectTeam | null = null;
-  let bestCount = 0;
-  for (const [cat, cnt] of categoryCounts.entries()) {
-    const t = suggestTeamFromCategory(cat);
-    if (t && cnt > bestCount) {
-      teamHint = t;
-      bestCount = cnt;
-    }
-  }
+  // team은 임포트 실행 단계에서 defect_category_team_map 을 조회해
+  // 행별 category 값 기준으로 채워집니다. 파서는 힌트를 생성하지 않습니다.
+  const teamHint: DefectTeam | null = null;
 
   const categorySummary = Array.from(categoryCounts.entries())
     .sort((a, b) => b[1] - a[1])
