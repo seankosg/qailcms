@@ -847,6 +847,9 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         setFileDataDateOverride,
         setFileSheet,
         setFileExcludedHeaders,
+        setFileDuplicateStrategy,
+        setFileDuplicateSelection,
+        resolveDuplicates,
         startImport,
       }}
     >
