@@ -24,7 +24,7 @@ function MappingPage() {
         <TabsList>
           <TabsTrigger value="spare-part">Spare Part</TabsTrigger>
           <TabsTrigger value="task-management">Task Management</TabsTrigger>
-          <TabsTrigger value="defect-management">Defect Management</TabsTrigger>
+          <TabsTrigger value="defect-management">Snag List Management</TabsTrigger>
         </TabsList>
         <TabsContent value="spare-part" className="space-y-4">
           <Tabs defaultValue="field-config" className="space-y-4">

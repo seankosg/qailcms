@@ -100,8 +100,8 @@ export function DefectHeaderMappingTable() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle className="text-base">Header Mapping — Defect Excel Import 별칭</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">Defect Management 업로드용 Excel 원본 헤더를 시스템 필드에 연결합니다.</p>
+          <CardTitle className="text-base">Header Mapping — Snag List Excel Import 별칭</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">Snag List 업로드용 Excel 원본 헤더를 시스템 필드에 연결합니다.</p>
         </div>
         <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-1 h-3.5 w-3.5" /> Add Mapping</Button>
       </CardHeader>

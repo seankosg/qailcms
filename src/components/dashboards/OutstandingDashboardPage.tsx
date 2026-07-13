@@ -19,11 +19,11 @@ export function OutstandingDashboardPage() {
           cta="Task 열기"
         />
         <SectionDashboardCard
-          title="Defect Management"
-          description="Defect 발생·조치·종결 현황. (KPI/S-Curve/Breakdown은 Phase 3 예정)"
+          title="Snag List Management"
+          description="Snag 발생·조치·종결 현황. (KPI/S-Curve/Breakdown은 Phase 3 예정)"
           icon={AlertTriangle}
-          to="/closure/defect-management/raw-data"
-          cta="Defect 열기"
+          to="/closure/snag-management/raw-data"
+          cta="Snag List 열기"
         />
       </div>
     </div>

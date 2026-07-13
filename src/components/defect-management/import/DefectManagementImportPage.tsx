@@ -114,11 +114,11 @@ function Inner() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">Defect Management — Import</h1>
+        <h1 className="text-xl font-semibold">Snag List — Import</h1>
         <p className="text-sm text-muted-foreground">
           LetsBuild 형식 Excel의 첫 시트를 파싱하여 <code> defect_items_raw</code>에 upsert합니다.
           키는 <code>source_issue_no</code>. Team은 각 행의 <b>Category</b> 값에 따라 자동으로 채워집니다
-          (매핑 관리: <code>Defect Settings</code>).
+          (매핑 관리: <code>Snag List Settings</code>).
         </p>
       </div>
 
@@ -428,7 +428,7 @@ function FileRow({
           </div>
           <div className="mt-0.5">{(f.result.unmappedCategories ?? []).join(" · ")}</div>
           <div className="mt-0.5 text-muted-foreground">
-            Defect Settings 에서 매핑을 추가한 뒤 다시 임포트하거나 상세 페이지에서 수동으로 팀을 지정하세요.
+            Snag List Settings 에서 매핑을 추가한 뒤 다시 임포트하거나 상세 페이지에서 수동으로 팀을 지정하세요.
           </div>
         </div>
       ) : null}

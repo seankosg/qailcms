@@ -51,8 +51,8 @@ const rawDataSearchSchema = z.object({
   catADispute: z.string().optional(),
 });
 
-export const Route = createFileRoute("/_authenticated/closure/defect-management/raw-data")({
-  head: () => ({ meta: [{ title: "Defect Management — Raw Data" }] }),
+export const Route = createFileRoute("/_authenticated/closure/snag-management/raw-data")({
+  head: () => ({ meta: [{ title: "Snag List — Raw Data" }] }),
   validateSearch: zodValidator(rawDataSearchSchema),
   component: DefectRawDataPage,
 });

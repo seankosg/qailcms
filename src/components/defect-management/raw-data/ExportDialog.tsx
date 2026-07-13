@@ -34,7 +34,7 @@ export function ExportDialog({ open, onOpenChange, getRows, columnHeaders }: Pro
         const wb = XLSX.utils.book_new();
         const ws = buildSheet(rows, columnHeaders, format);
         if (format === "reimport") ws["!marker" as any] = "QAIL_DEFECT_REIMPORT_V1";
-        XLSX.utils.book_append_sheet(wb, ws, "Defects");
+        XLSX.utils.book_append_sheet(wb, ws, "Snags");
         XLSX.writeFile(wb, `defect-raw-${stamp}-${timestamp}.xlsx`);
         toast.success(`${rows.length}건 내보내기 완료`);
       } else {
@@ -51,7 +51,7 @@ export function ExportDialog({ open, onOpenChange, getRows, columnHeaders }: Pro
           const zip = new JSZip();
           for (const [key, rs] of groups.entries()) {
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, buildSheet(rs, columnHeaders, format), "Defects");
+            XLSX.utils.book_append_sheet(wb, buildSheet(rs, columnHeaders, format), "Snags");
             const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
             zip.file(`${sanitize(key)}-${stamp}.xlsx`, buf);
           }
@@ -61,7 +61,7 @@ export function ExportDialog({ open, onOpenChange, getRows, columnHeaders }: Pro
         } else {
           for (const [key, rs] of groups.entries()) {
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, buildSheet(rs, columnHeaders, format), "Defects");
+            XLSX.utils.book_append_sheet(wb, buildSheet(rs, columnHeaders, format), "Snags");
             XLSX.writeFile(wb, `defect-raw-${sanitize(key)}-${stamp}-${timestamp}.xlsx`);
           }
           toast.success(`${groups.size}개 파일 다운로드`);
@@ -77,7 +77,7 @@ export function ExportDialog({ open, onOpenChange, getRows, columnHeaders }: Pro
     <Dialog open={open} onOpenChange={(o) => { if (!busy) onOpenChange(o); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Defect Raw Data 내보내기</DialogTitle>
+          <DialogTitle>Snag List — Raw Data 내보내기</DialogTitle>
           <DialogDescription>필터가 적용된 현재 행만 내보냅니다.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">

@@ -31,7 +31,7 @@ export function exportSelectedToXlsx(args: {
   });
 
   const wb = buildStyledWorkbook({
-    title: "Defect Raw Data — Selected Rows",
+    title: "Snag List — Raw Data (Selected Rows)",
     columns: styled,
     rows: args.rows,
     sheetName: "Selected",

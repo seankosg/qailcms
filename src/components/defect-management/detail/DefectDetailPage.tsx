@@ -23,7 +23,7 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 export function DefectDetailPage() {
-  const { id } = useParams({ from: "/_authenticated/closure/defect-management/detail/$id" });
+  const { id } = useParams({ from: "/_authenticated/closure/snag-management/detail/$id" });
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();

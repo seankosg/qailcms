@@ -146,8 +146,8 @@ export function DefectFieldConfigTable() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle className="text-base">Field Config — Defect Raw Data 컬럼 헤더</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">Defect Management Raw Data 표의 컬럼 라벨/기본 노출/기본 정렬을 편집합니다.</p>
+          <CardTitle className="text-base">Field Config — Snag List — Raw Data 컬럼 헤더</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">Snag List — Raw Data 표의 컬럼 라벨/기본 노출/기본 정렬을 편집합니다.</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={resetToDefaults} disabled={saving}>
