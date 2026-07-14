@@ -516,7 +516,7 @@ export function DefectRawDataPage() {
   }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, isAdmin, patchLocalItem, refetch]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
-    const vis: VisibilityState = { __select: true, is_critical: true, stage_progress: true };
+    const vis: VisibilityState = { __select: true };
     const configured = new Map(fieldConfig.map((r) => [r.field_name, r]));
     const frozenSet = new Set(frozenExtras);
     for (const c of columns) {
@@ -524,6 +524,8 @@ export function DefectRawDataPage() {
       if (!id || id in vis) continue;
       if (frozenSet.has(id)) { vis[id] = true; continue; }
       if (id in visibility) { vis[id] = visibility[id] !== false; continue; }
+      // 파생 가상 컬럼: field_config에 없음. 기본 노출.
+      if (id === "stage_progress" || id === "is_critical") { vis[id] = true; continue; }
       const row = configured.get(id);
       vis[id] = row ? !!row.is_visible : true;
     }
