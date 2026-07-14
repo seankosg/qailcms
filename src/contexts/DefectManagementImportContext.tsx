@@ -1058,6 +1058,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                     unmappedCategories: Array.from(unmappedCategories.entries()).map(([c, n]) => `${c} × ${n}`),
                     errors: importErrors.length ? importErrors : undefined,
                   },
+                  classificationResult,
                 }
               : x,
           ),
