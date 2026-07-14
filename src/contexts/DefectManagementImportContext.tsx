@@ -824,6 +824,111 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         return base;
       });
 
+      // ============ AI 자동 분류 (Defect Location / Main·Sub Trade / Work Type) ============
+      // 각 payload 에서 4개 필드 중 "빈 필드" 만 계산 대상. 이미 값이 있으면 절대 덮어쓰지 않음.
+      try {
+        const classifyQueue: ClassifyRequestItem[] = [];
+        const targetsByKey = new Map<string, string[]>();
+        for (let i = 0; i < workingRows.length; i++) {
+          const p = workingRows[i];
+          const base = payloads[i];
+          // 원본 파싱값 + extra + base 에 이미 설정된 값 종합
+          const incoming = {
+            defect_location: (base.defect_location as string | null | undefined) ?? p.defect_location ?? null,
+            main_trade: (base.main_trade as string | null | undefined) ?? (p.extra?.main_trade as string | undefined) ?? null,
+            sub_trade: (base.sub_trade as string | null | undefined) ?? (p.extra?.sub_trade as string | undefined) ?? null,
+            work_type: (base.work_type as string | null | undefined) ?? (p.extra?.work_type as string | undefined) ?? null,
+          };
+          const prev = existing.get(p.source_issue_no);
+          const targets = computeTargets(incoming, prev);
+          if (targets.length === 0) continue;
+          targetsByKey.set(p.source_issue_no, targets);
+          classifyQueue.push({
+            source_issue_no: p.source_issue_no,
+            category: p.category,
+            type: p.defect_type,
+            item: p.item,
+            description: p.description,
+            targets,
+          });
+        }
+
+        if (classifyQueue.length > 0) {
+          setFiles((cur) =>
+            cur.map((x) => (x.id === f.id ? { ...x, status: "processing", progress: 0 } : x)),
+          );
+          const t0 = performance.now();
+          const { ruleResults, needsLlm } = runRuleStage(classifyQueue);
+
+          // LLM 배치 처리
+          const llmResults = new Map<string, Record<string, string | null>>();
+          const LLM_BATCH = 30;
+          const LLM_CONCURRENCY = 3;
+          const llmBatches: ClassifyRequestItem[][] = [];
+          for (let i = 0; i < needsLlm.length; i += LLM_BATCH) {
+            llmBatches.push(needsLlm.slice(i, i + LLM_BATCH));
+          }
+          if (llmBatches.length > 0) {
+            await runWithConcurrency(llmBatches, LLM_CONCURRENCY, async (batch) => {
+              try {
+                const res = await classifyDefectsWithLlm({
+                  data: {
+                    items: batch.map((b) => ({
+                      source_issue_no: b.source_issue_no,
+                      category: b.category ?? null,
+                      type: b.type ?? null,
+                      item: b.item ?? null,
+                      description: b.description ?? null,
+                      targets: b.targets,
+                    })),
+                  },
+                });
+                for (const r of res.items) {
+                  llmResults.set(r.source_issue_no, {
+                    defect_location: r.defect_location,
+                    main_trade: r.main_trade,
+                    sub_trade: r.sub_trade,
+                    work_type: r.work_type,
+                  });
+                }
+              } catch (err) {
+                console.warn("[defect-import] llm-classify batch failed", err);
+              }
+            });
+          }
+
+          // 결과 병합 → payload 에 반영
+          for (let i = 0; i < workingRows.length; i++) {
+            const p = workingRows[i];
+            const targets = targetsByKey.get(p.source_issue_no);
+            if (!targets || targets.length === 0) continue;
+            const rr = ruleResults.get(p.source_issue_no) ?? {};
+            const lr = llmResults.get(p.source_issue_no);
+            const merged = mergeClassification({
+              input: {
+                source_issue_no: p.source_issue_no,
+                category: p.category,
+                type: p.defect_type,
+                item: p.item,
+                description: p.description,
+              },
+              targets: targets as any,
+              ruleResult: rr,
+              llmResult: lr as any,
+            });
+            for (const [k, v] of Object.entries(merged)) {
+              if (v == null) continue;
+              put(payloads[i], k, v);
+            }
+          }
+          const ms = Math.round(performance.now() - t0);
+          console.log(`[defect-import] AI 분류 완료 rows=${classifyQueue.length} llmBatches=${llmBatches.length} ${ms}ms`);
+        }
+      } catch (err) {
+        console.warn("[defect-import] AI 분류 단계 실패 (임포트는 계속)", err);
+      }
+      // ============ /AI 자동 분류 ============
+
       let inserted = 0;
       let updated = 0;
       let rejected = 0;
