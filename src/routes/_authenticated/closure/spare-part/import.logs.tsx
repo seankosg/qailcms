@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ImportLogsPage } from "@/components/import/ImportLogsPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/closure/spare-part/import/logs")({
-  head: () => ({ meta: [{ title: "Spare Part — Import Logs" }] }),
-  component: () => <ImportLogsPage kind="spare_part" />,
+  beforeLoad: () => {
+    throw redirect({ to: "/import-log/logs", search: { tab: "spare-part" } });
+  },
 });

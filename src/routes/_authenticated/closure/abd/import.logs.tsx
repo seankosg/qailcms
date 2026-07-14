@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ImportLogsPage } from "@/components/import/ImportLogsPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/closure/abd/import/logs")({
-  head: () => ({ meta: [{ title: "ABD — Import Logs" }] }),
-  component: () => <ImportLogsPage kind="abd" />,
+  beforeLoad: () => {
+    throw redirect({ to: "/import-log/logs", search: { tab: "abd" } });
+  },
 });

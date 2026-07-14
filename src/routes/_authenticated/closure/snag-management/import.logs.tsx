@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ImportLogsPage } from "@/components/import/ImportLogsPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/closure/snag-management/import/logs")({
-  head: () => ({ meta: [{ title: "Snag List — Import Logs" }] }),
-  component: () => <ImportLogsPage kind="defect_management" />,
+  beforeLoad: () => {
+    throw redirect({ to: "/import-log/logs", search: { tab: "snag" } });
+  },
 });

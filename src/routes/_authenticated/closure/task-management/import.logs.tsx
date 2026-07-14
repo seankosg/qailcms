@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ImportLogsPage } from "@/components/import/ImportLogsPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/closure/task-management/import/logs")({
-  head: () => ({ meta: [{ title: "Task Management — Import Logs" }] }),
-  component: () => <ImportLogsPage kind="task_management" />,
+  beforeLoad: () => {
+    throw redirect({ to: "/import-log/logs", search: { tab: "task" } });
+  },
 });
