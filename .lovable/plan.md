@@ -1,23 +1,30 @@
 ## 목표
-`DeSnagMatrixBlock`의 매트릭스 테이블을 스크롤할 때, 상단 헤더(2행) 및 좌측 스티키 컬럼(Building / Level)이 고정되고 내부 데이터만 상하좌우로 스크롤되도록 변경.
+파일 내 동일 부모 하위에 `task_no`가 중복될 때 파서가 자동으로 다음 사용 가능한 마지막 세그먼트로 재번호를 부여하고, 경고 목록에 남긴다.
 
 ## 현재 상태
-- `overflow-x-auto` 만 있는 wrapper에 `<table>`이 들어 있어 세로 스크롤 없음(페이지 전체 스크롤). 헤더는 `sticky top-0`이 없어 페이지 스크롤 시 함께 밀림.
-- 좌측 Building/Level `<th>`, `<td>`는 이미 `sticky left-0` / `sticky left-[100px]`가 걸려 있으나 컨테이너에 `overflow-y` 스크롤이 없어 세로 sticky는 무의미.
+`src/lib/task-management/parser.ts` 의 행 순회 루프는 중복 검사를 하지 않아, 같은 `task_no` 두 개(예: `EL-D-04-03` × 2)가 그대로 parsed rows에 들어가고 이후 DB unique key 충돌/중복 점검 다이얼로그가 뜬다.
 
-## 변경 (파일 1개: `src/components/defect-management/dashboard/DeSnagMatrixBlock.tsx`)
+## 변경 (파일 1개: `src/lib/task-management/parser.ts`)
 
-1. 테이블 wrapper 를 `overflow-auto` + `max-h`(뷰포트 기반, 예: `max-h-[calc(100vh-320px)]`) + `relative` 로 변경하여 블록 내부에서 세로/가로 동시 스크롤이 발생하도록 함. 블록 상단 타이틀 바(`블록 전체 보기` 헤더)는 스크롤 영역 밖(현재 구조 유지).
-2. `<thead>`의 두 헤더 `<tr>` 내부 `<th>`들에 세로 스티키 추가:
-   - Row 1 그룹 헤더 `<th>`: `sticky top-0 z-30` (기존 배경 유지, 반투명 금지 → 규칙에 맞게 `bg-muted` 계열 불투명 클래스로 조정 및 `style={{ background: "var(--muted)" }}` 로 확실히 불투명화).
-   - Row 2 서브 헤더 `<th>`: `sticky top-[28px]`(Row1 높이 h-7=28px) `z-20`.
-   - 좌측 sticky 헤더 셀 (Building/Level, `rowSpan={2}`)은 `sticky left-0/left-[100px] top-0 z-40` 로 좌상단 교차 영역에서 최상위.
-3. 본문 스티키 컬럼 `<td>` (Building, Level, 소계의 Level 자리, Column Total 자리)의 배경을 mem 규칙에 맞춰 완전 불투명(`var(--card)` / `var(--muted)` 원본 유지, `hsl(var(--...))` 랩핑 금지) 유지 확인 — 이미 그렇게 되어 있어 그대로 두되, z 인덱스만 `z-10`(기존) 유지. 헤더 sticky 상단 쪽(`z-30~40`)이 본문(`z-10`)보다 위에 오도록 정리.
-4. Column Total 행의 sticky `<td colSpan={2}>` 는 데이터 스크롤 시 위로 사라져도 무방(요청 범위는 헤더/좌측 컬럼 고정만).
+1. 행 순회 루프(416~491) 바깥에 `seenTaskNos = new Set<string>()`, 그리고 부모별 카운터 `usedByParent = new Map<string, Set<string>>()` 준비.
+2. 각 행에서 `taskNo`(교정 후) 확정 직전에 중복 여부 검사:
+   - `seenTaskNos.has(taskNo)` 이면 재번호 필요.
+   - 재번호 규칙:
+     - 부모(parent)인 경우: `${parent-of-current}-${nextSeq}` 형태로 다음 미사용 2자리 시퀀스를 찾음. parent에도 접두어(예: `EL-D-04`)가 있으므로 그 접두어 기준으로 tail 후보를 `01..99`까지 순회.
+     - 자식인 경우: `${structParent}-${nextSeq}` 로 부모 하위에서 안 쓰인 2자리 시퀀스를 찾음.
+   - 시퀀스 산정은 `allTaskNos` + `seenTaskNos` 양쪽을 모두 봐서 파일 다른 곳/이미 방출된 것과 겹치지 않도록 함.
+   - 확정된 새 값을 `taskNo`에 대입, `warnings.push` 로 `행 ${r}: task_no '${원본}' 중복 → '${새값}' 로 자동 재번호` 기록.
+3. 매 행 마지막에 `seenTaskNos.add(taskNo)` 로 추가.
+
+## 유의점
+- 재번호 규칙은 "부모 접두어 유지 + 마지막 세그먼트 재할당" 이므로 계층은 변하지 않음. 즉 부모/자식 관계는 그대로.
+- 접두어 mismatch 자동 교정(451행) 이후에 중복 검사가 오도록 순서 유지. 두 교정이 모두 발생하면 경고 두 줄 나옴.
+- 시퀀스 폭은 원래 tail 자리수를 참고: 대부분 2자리(`01`)지만 `01-01` 처럼 3세그먼트 tail도 존재. 안전을 위해 우선 2자리로 시도, 실패 시 3자리까지 폴백.
+- 100개까지 순회해도 빈 자리가 없으면(비현실적) 원본 유지 + 강한 경고.
 
 ## 검증
-- `bunx tsgo --noEmit`
-- Preview에서 매트릭스 세로/가로 스크롤 시 (a) 두 줄 헤더가 상단에 붙어 있는지 (b) Building/Level 컬럼이 좌측에 붙는지 (c) 좌상단 교차 영역에서 헤더가 컬럼 위에 그려지는지 (d) 스크롤 아래 뒤 셀이 sticky 컬럼 뒤로 비쳐 보이지 않는지 확인.
+- 업로드하신 `Task_Management_전기_260713.xlsx` 로 다시 임포트 → `EL-D-04-03` 두 번째 행이 `EL-D-04-05`(또는 그 다음 미사용 번호)로 자동 재번호되고 경고 1줄 표시, 중복 점검 다이얼로그는 뜨지 않음.
+- `bunx tsgo --noEmit` 통과.
 
-## 한계
-- `max-h`는 뷰포트 상대값(예: `calc(100vh-320px)`)이 필요하며, 페이지 전체 레이아웃 상 값이 완전히 딱 맞지 않을 수 있음. 값 조정이 필요하면 이후 요청 시 미세 조정 예정.
+## 변경 파일
+- `src/lib/task-management/parser.ts` (약 25~35줄 추가)
