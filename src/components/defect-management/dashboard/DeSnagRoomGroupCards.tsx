@@ -44,7 +44,7 @@ function roomGroupParam(col: RoomGroupCol): string {
   return col;
 }
 
-const SLOT_ORDER: StatusSlot[] = ["open", "rectified", "reopen", "closed"];
+const SLOT_ORDER: StatusSlot[] = ["open", "reopen", "rectified", "closed"];
 
 function StackedBar({
   stats,
