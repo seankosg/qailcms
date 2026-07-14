@@ -1,94 +1,132 @@
-## Defect Raw Data — 매핑 컬럼 전부 노출 + Task 스타일 컬럼 UI로 완전 교체
+## Raw Data Columns 메뉴 ↔ Admin Mapping(field_config) 양방향 연동
 
-### 1. 누락 컬럼을 `DEFECT_COLUMNS`에 추가
+3개 모듈(Spare Part / Task Management / Snag List)에서 Raw Data Columns 메뉴와 Admin → Mapping → Field Config가 **동일한 저장소(`*_field_config` 테이블)를 실시간으로 공유**하도록 만듭니다.
 
-parser 및 `defect_field_config`에는 존재하지만 `src/lib/defect-management/columns.ts`의 `DEFECT_COLUMNS`에 없어 헤더 렌더 대상에서 빠진 필드를 추가합니다.
+### 양방향 정의
 
-| key | label | type | group |
-|---|---|---|---|
-| `updated_status` | Updated Status | badge | status |
-| `updated_description` | Updated Description | longtext | content |
-| `updated_by_name` | Updated By | text | audit |
-| `updated_date_raw` | Updated Date | datetime | audit |
-| `ir` | IR | text | refs |
-| `forms` | Forms | text | refs |
-| `subcontractor_issue_no` | Subcon Issue No | text | refs |
-| `captured_by_name` | Captured By | text | people |
-| `trade_detail` | Trade Detail | text | trade |
-| `classification_source` | Classification Source | text | classification |
-| `podium_area` | Podium Area | text | location |
-| `building` | Building | text | location |
-| `room` | Room | text | location |
-| `room_group` | Room Group | text | location |
-| `level_name` | Level | text | location |
-| `review_flag` | Review Flag | text | flags |
-| `remarks` (이미 존재 확인만) | — | — | — |
+| 방향 | 트리거 | 결과 |
+|---|---|---|
+| Admin → Raw Data | Admin Field Config에서 display_name/sort_order/is_visible/group_key 저장 | 해당 모듈 `*_FIELD_CONFIG_QK` invalidate → Raw Data 헤더·순서·노출 즉시 갱신 |
+| Raw Data → Admin | Columns 메뉴에서 드래그 순서 변경 / 체크박스 노출토글 / 라벨(선택) 변경 | 동일 테이블에 upsert → Admin 화면도 자동 갱신 |
 
-- 위치는 각 group 내 논리 순서 유지 (Updated 계열은 audit/content, Location 서브필드는 location, refs 그룹은 IR/Forms/Subcon Issue No).
-- 기본 노출 여부는 `defect_field_config.is_visible` 값을 그대로 따름 (기존 로직 `L520-521` 재사용 → 노이즈 방지, IR/Forms/Podium 등은 초기 hidden 유지).
-- `defect_field_config`에 아직 행이 없는 신규 키(예: `updated_status`/`updated_description`/`updated_by_name`/`updated_date_raw`/`building`/`room`/`room_group`/`level_name`/`review_flag`)는 마이그레이션으로 `INSERT ... ON CONFLICT DO NOTHING` 시딩. `is_visible=false` 기본, `display_name`은 위 label과 동일.
+**핵심 규약**: field_config는 "전체 사용자 공용 설정"이며 양쪽 UI 모두 동일 레코드를 편집. 개인 preference(pin, 컬럼 폭 sizing, 필터, 정렬 등)는 종전대로 `user_view_preferences`에 유지 — 이건 사용자별이라 field_config와 분리.
 
-### 2. 컬럼 순서/선택 UI를 Task와 완전 동일하게 교체
+### 권한 정책
 
-`src/components/defect-management/raw-data/DefectColumnOrderMenu.tsx` 를 삭제하고, Task의 `src/components/task-management/raw-data/ColumnOrderMenu.tsx` 와 동일 구조인 `DefectColumnOrderMenu` 로 재작성:
+`*_field_config`는 이미 admin/superuser 전용 UPDATE RLS. 따라서:
 
-- 상단 안내 텍스트: "드래그로 순서 변경 · 핀으로 좌측 고정({n}/3)".
-- Reset: `visibility={}` / `frozenExtras=[]` / `order = DEFECT_COLUMNS.map(c=>c.key).filter(k => k!=='is_critical' && k!=='stage_progress')`.
-- Frozen 상단 헤더는 "Frozen · Select (고정)" 하나만 (Task와 대칭). 시스템 고정(Select) 표기만 유지, `is_critical`/`stage_progress` 를 시스템 고정 목록에서 제거.
-- 사용자 pin 목록 → Columns 목록 (드래그, checkbox 표시/숨김, pin/unpin) 순서. Task 파일 구조를 1:1 이식.
-- 라벨 해석은 `useDefectFieldHelpers().getLabel(k)` 로 유지 (Task는 `useTmColumnLabel` 사용, Defect는 `useDefectFieldHelpers` 사용 — 프레임워크 차이만 1대1 매핑).
+- **관리자(admin/superuser)**: Columns 메뉴에서 순서·노출 조작이 즉시 field_config에 반영(전체 사용자에 영향).
+- **일반 사용자**: Columns 메뉴에서 조작 시 개인 `user_view_preferences`(또는 localStorage)에만 저장. field_config는 읽기 전용. UI에는 "관리자만 전체 기본값을 수정할 수 있습니다" 힌트 표시.
 
-### 3. `DefectRawDataPage.tsx` 정합 수정
+관리자 여부는 이미 각 페이지에서 `useCurrentUser().isAdmin`으로 판정 중이므로 재사용.
 
-- `SYSTEM_FROZEN_IDS = ["__select"]` 로 축소. `is_critical`/`stage_progress` 는 일반 데이터 컬럼으로 강등.
-- `DEFAULT_ORDER` 에 `is_critical`, `stage_progress` 포함(맨 앞쪽 지점에 삽입) → 사용자 드래그/숨김/pin 대상.
-- `columns` 조합 로직(L494-508)에서 `is_critical`/`stage_progress` 를 특수 case로 두되, 이제 `orderedKeys` 상 위치가 유동 → `for-loop` 안에서 id 매칭으로 특수 컬럼 삽입, 나머지는 `byKey.get(id)` 로 데이터 컬럼 생성. 기존과 동일 패턴 유지.
-- `columnVisibility` 계산에서 `__select` 만 강제 true. `is_critical` / `stage_progress` 는 `visibility[id]` 값을 따르되 default true.
-- `orderedKeys` 는 `[...SYSTEM_FROZEN_IDS, ...frozenExtras, ...order.filter(k => !frozenExtras.includes(k))]` 로 단순화. `is_critical`/`stage_progress` 는 `order` 내부에 존재.
-- `frozenColIds`(sticky) 는 `[...SYSTEM_FROZEN_IDS, ...frozenExtras]` 그대로.
-- 저장/복원 로직(`viewPref.save`)의 `validKeys` 를 `DEFAULT_ORDER` 로 재계산 — `is_critical`/`stage_progress` 포함되어 있어 사용자 pin 대상이 됨.
-- 기존 뷰 프리퍼런스 마이그레이션: 저장된 `order` 에 `is_critical`/`stage_progress` 없으면 자동으로 앞부분에 삽입(현행 코드의 defect 순서 보존 로직 재활용).
+### 항목별 매핑
 
-### 4. 필드 라벨 소스 일관성
+Raw Data Columns 메뉴 조작 → field_config 컬럼:
 
-- 라벨 소스는 `useDefectFieldHelpers().getLabel(k)` 유지. `DEFECT_COLUMNS[i].label` 은 fallback.
-- 새로 추가된 컬럼도 `defect_field_config` 행이 시딩되므로 관리자 페이지(Mapping → Snag List Management → Field Config)에서 라벨/노출/정렬 변경 가능.
+| 메뉴 조작 | 저장 필드 | 비고 |
+|---|---|---|
+| 드래그 순서 변경 | `sort_order` (10 단위 재할당) | 관리자만 |
+| 체크박스 표시/숨김 | `is_visible` | 관리자만 |
+| pin/unpin | (X) `user_view_preferences.frozenExtras` | 개인 설정 유지 |
+| 라벨 편집 | (Columns 메뉴에 없음) | Admin 화면에서만 |
 
-### 5. 마이그레이션
+Admin → Raw Data 방향은 이미 라벨은 반영. 이번 변경으로 `sort_order`·`is_visible`·`group_key`도 반영.
 
-`supabase/migrations/<timestamp>_defect_field_config_missing_fields.sql`:
+### 변경 사항
 
-```sql
-INSERT INTO public.defect_field_config (field_name, display_name, is_visible, sort_order, group_key)
-VALUES
-  ('updated_status',        'Updated Status',        false, 480, 'status'),
-  ('updated_description',   'Updated Description',   false, 490, 'content'),
-  ('updated_by_name',       'Updated By',            false, 500, 'audit'),
-  ('updated_date_raw',      'Updated Date',          false, 510, 'audit'),
-  ('building',              'Building',              false, 175, 'location'),
-  ('room',                  'Room',                  false, 176, 'location'),
-  ('room_group',            'Room Group',            false, 177, 'location'),
-  ('level_name',            'Level',                 false, 178, 'location'),
-  ('review_flag',           'Review Flag',           false, 520, 'flags')
-ON CONFLICT (field_name) DO NOTHING;
+#### 1. field_config → defaults 파생 hook 추가
+
+- `useSparePartFieldConfig` → `useSparePartDefaults()` 추가
+- `useTaskManagementFieldConfig` → `useTmDefaults()` 추가
+- `useDefectFieldConfig` → `useDefectDefaults()` 추가
+
+반환:
+```ts
+{
+  defaultOrder: string[];        // sort_order asc
+  defaultVisibility: Record<string, boolean>;
+  defaultGroup: Record<string, string>;
+  labelOf: (key: string) => string;
+}
 ```
 
-- 이미 존재(`ir`/`forms`/`podium_area`/`subcontractor_issue_no`/`captured_by_name`/`trade_detail`/`classification_source`)는 건드리지 않음.
+코드 `*_COLUMNS`는 컬럼 메타(type/renderer/width)의 소스로만 유지. field_config 로딩 전에는 코드 순서 fallback.
 
-### 6. 변경 파일
+#### 2. Columns 메뉴에 서버 반영 뮤테이션 추가
 
-- `src/lib/defect-management/columns.ts` — `DEFECT_COLUMNS` 확장.
-- `src/components/defect-management/raw-data/DefectColumnOrderMenu.tsx` — Task 스타일로 재작성.
-- `src/components/defect-management/raw-data/DefectRawDataPage.tsx` — SYSTEM_FROZEN 축소, order/visibility 반영.
-- `supabase/migrations/<timestamp>_defect_field_config_missing_fields.sql` — 신규.
+`ColumnOrderMenu`(Spare/Task), `DefectColumnOrderMenu` 3종을 확장:
+
+- Props에 `isAdmin: boolean`, `mutateFieldConfig: (patches) => Promise<void>` 추가.
+- `onOrderChange` / `onVisibilityChange` 시:
+  - 관리자: 로컬 상태 즉시 반영 + `field_config` upsert(변경된 행만 `sort_order`/`is_visible` update) + `queryClient.invalidateQueries(*_FIELD_CONFIG_QK)`.
+  - 비관리자: 종전대로 `user_view_preferences`에만 저장.
+- 저장 실패 시 toast + 로컬 상태 rollback.
+- 드래그 시에는 debounce(300ms)로 서버 호출 묶어 트래픽 완화.
+
+#### 3. Raw Data 3종 페이지 정합 수정
+
+`SparePartRawDataPage.tsx`, `TaskManagementRawDataPage.tsx`, `DefectRawDataPage.tsx`:
+
+- `DEFAULT_ORDER` 상수 → hook `defaultOrder` 사용.
+- 초기 상태 로드에서 개인 preference `order`가 비어있으면 `defaultOrder`, `visibility`가 비어있으면 `defaultVisibility` 사용.
+- `field_config`가 변경되어 refetch되면(무효화 후) 아직 개인 커스터마이즈가 없는 필드는 새 default를 반영, 이미 개인 값을 가진 필드는 유지.
+- Reset 버튼 동작: 개인 preference 삭제 → `defaultOrder`/`defaultVisibility`로 복귀.
+- 관리자면 Columns 메뉴에서 서버 mutation 활성화. 일반 사용자는 종전 동작 유지 + "관리자 전용" 힌트.
+
+#### 4. 서버 mutation 유틸
+
+각 모듈에 `updateFieldConfig(patches)` 서버 함수 추가:
+
+```ts
+// createServerFn + requireSupabaseAuth + admin 검증
+// patches: Array<{ field_name, sort_order?, is_visible? }>
+// UPDATE *_field_config SET ... WHERE field_name = ...
+```
+
+- `src/lib/spare-part/field-config.functions.ts`
+- `src/lib/task-management/field-config.functions.ts`
+- `src/lib/defect-management/field-config.functions.ts`
+
+관리자 판정은 `has_role(user, 'admin' or 'superuser')` DB 함수 사용.
+
+#### 5. Admin Field Config 테이블 자동 갱신
+
+Admin 화면은 이미 `useQuery`로 field_config를 구독 중이므로, Columns 메뉴에서 발생한 invalidate 이벤트가 자동 반영됨. 별도 코드 변경 불필요.
+
+#### 6. UI 힌트
+
+Columns 메뉴 상단 안내 문구:
+- 관리자: "드래그·체크는 전체 사용자 기본값을 변경합니다. 개인 pin은 저장됩니다."
+- 일반 사용자: "드래그·체크는 내 화면에만 적용됩니다. 전체 기본값은 관리자만 변경 가능합니다."
+
+### 변경 파일
+
+- `src/hooks/useSparePartFieldConfig.ts` — `useSparePartDefaults()` 추가
+- `src/hooks/useTaskManagementFieldConfig.ts` — `useTmDefaults()` 추가
+- `src/hooks/useDefectFieldConfig.ts` — `useDefectDefaults()` 추가
+- `src/lib/spare-part/field-config.functions.ts` — 신규
+- `src/lib/task-management/field-config.functions.ts` — 신규
+- `src/lib/defect-management/field-config.functions.ts` — 신규
+- `src/components/spare-part/raw-data/ColumnOrderMenu.tsx` — mutation 연결, admin 분기
+- `src/components/task-management/raw-data/ColumnOrderMenu.tsx` — 동일
+- `src/components/defect-management/raw-data/DefectColumnOrderMenu.tsx` — 동일
+- `src/components/spare-part/raw-data/SparePartRawDataPage.tsx` — defaults 소스 교체, admin prop 전달
+- `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx` — 동일
+- `src/components/defect-management/raw-data/DefectRawDataPage.tsx` — 동일
 
 ### 변경 없음
 
-- parser / 임포트 로직 / 필터 규약 / 드릴다운 URL_MAP / RLS / 데이터 스키마.
+- DB 스키마·마이그레이션·RLS(`*_field_config` 테이블·정책은 이미 존재)
+- Header Mapping / 임포트 파서 / 필터 / 드릴다운 URL_MAP
+- `user_view_preferences` 스키마 및 개인 pin/sizing 저장 로직
+- `Admin → Mapping → Field Config` UI (자동 반영으로 충분)
 
 ### 검증
 
-1. `bunx tsgo --noEmit` 타입 체크 통과.
-2. `/closure/snag-management/raw-data` 진입 → Columns 메뉴에 Task와 동일한 구조(Frozen · Select 만 시스템 고정, 나머지 전부 드래그/pin/hide 가능)로 표시.
-3. 신규 컬럼(Building/Room/Room Group/Level/Updated* 등)이 Columns 메뉴에 리스트업되고 체크박스로 노출 가능.
-4. 노출 시 헤더/셀이 정상 렌더되고 값이 채워짐(샘플 파일 임포트 후 확인).
+1. `bunx tsgo --noEmit` 통과.
+2. 관리자 로그인 상태로 Snag Raw Data → Columns 메뉴에서 컬럼 순서 드래그 → Admin → Mapping → Snag List → Field Config로 이동 시 sort_order가 반영되어 있음.
+3. Admin에서 특정 필드 is_visible 토글 저장 → Raw Data 헤더에서 해당 컬럼 노출/숨김이 즉시 반영.
+4. 일반 사용자 로그인 → Columns 메뉴 드래그 → field_config는 변경 없음, 본인 화면만 변경. 새로고침 후에도 개인 preference 복원.
+5. 관리자가 드래그 중 서버 오류 발생 시 로컬 상태 rollback + toast.
+6. 3개 모듈(Spare/Task/Defect) 모두 동일 동작.

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +19,9 @@ interface Props {
   onOrderChange: (next: string[]) => void;
   onVisibilityChange: (next: Record<string, boolean>) => void;
   onFrozenChange: (next: string[]) => void;
+  isAdmin?: boolean;
+  onServerReorder?: (patches: Array<{ field_name: string; sort_order: number }>) => void;
+  onServerVisibility?: (field_name: string, is_visible: boolean) => void;
 }
 
 export function DefectColumnOrderMenu({
@@ -28,11 +31,25 @@ export function DefectColumnOrderMenu({
   onOrderChange,
   onVisibilityChange,
   onFrozenChange,
+  isAdmin,
+  onServerReorder,
+  onServerVisibility,
 }: Props) {
   const [dragKey, setDragKey] = useState<string | null>(null);
   const { getLabel } = useDefectFieldHelpers();
 
   const resolveLabel = (k: string): string => SYSTEM_LABEL[k] ?? getLabel(k) ?? k;
+
+  const reorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReorderPersist = (nextOrder: string[]) => {
+    if (!isAdmin || !onServerReorder) return;
+    if (reorderTimer.current) clearTimeout(reorderTimer.current);
+    reorderTimer.current = setTimeout(() => {
+      // is_critical / stage_progress 는 field_config에 없어 persist helper가 스킵.
+      onServerReorder(nextOrder.map((k, i) => ({ field_name: k, sort_order: (i + 1) * 10 })));
+    }, 400);
+  };
+  useEffect(() => () => { if (reorderTimer.current) clearTimeout(reorderTimer.current); }, []);
 
   const toggleFrozen = (k: string) => {
     if (frozenExtras.includes(k)) {
@@ -56,8 +73,15 @@ export function DefectColumnOrderMenu({
     next.splice(from, 1);
     next.splice(to, 0, dragKey);
     onOrderChange(next);
+    scheduleReorderPersist(next);
   };
   const onDragEnd = () => setDragKey(null);
+
+  const changeVisibility = (k: string, checked: boolean) => {
+    onVisibilityChange({ ...visibility, [k]: checked });
+    // is_critical / stage_progress 는 field_config에 없어 persist helper가 스킵.
+    if (isAdmin && onServerVisibility) onServerVisibility(k, checked);
+  };
 
   return (
     <Popover>
@@ -69,7 +93,10 @@ export function DefectColumnOrderMenu({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-2">
         <div className="mb-2 flex items-center justify-between px-1 text-[11px] text-muted-foreground">
-          <span>드래그로 순서 변경 · 핀으로 좌측 고정({frozenExtras.length}/3)</span>
+          <span>
+            드래그로 순서 변경 · 핀으로 좌측 고정({frozenExtras.length}/3)
+            {isAdmin ? " · 관리자: 순서/노출은 전체 사용자에 반영" : ""}
+          </span>
           <button
             className="text-primary hover:underline"
             onClick={() => {
@@ -118,7 +145,7 @@ export function DefectColumnOrderMenu({
                 <GripVertical className="h-3 w-3 text-muted-foreground/40" />
                 <Checkbox
                   checked={!hidden}
-                  onCheckedChange={(c) => onVisibilityChange({ ...visibility, [k]: !!c })}
+                  onCheckedChange={(c) => changeVisibility(k, !!c)}
                   className="h-3 w-3"
                 />
                 <span className={cn("flex-1 truncate", hidden && "text-muted-foreground/50")}>

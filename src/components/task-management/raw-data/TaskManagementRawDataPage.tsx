@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   flexRender,
@@ -87,7 +87,10 @@ import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
 import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
+  TASK_MANAGEMENT_FIELD_CONFIG_QK,
+  persistTmFieldConfig,
 } from "@/hooks/useTaskManagementFieldConfig";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Row = Record<string, unknown> & { id: string; task_no: string; discipline: string };
 
@@ -174,6 +177,30 @@ export function TaskManagementRawDataPage() {
   const { data: fieldConfig } = useTaskManagementFieldConfig();
   const labelOverrides = useMemo(() => buildTmLabelOverrides(fieldConfig), [fieldConfig]);
   const viewPref = useUserViewPreference("task-management.raw-data.v1");
+  const qc = useQueryClient();
+
+  const onServerReorder = useCallback(
+    async (patches: Array<{ field_name: string; sort_order: number }>) => {
+      try {
+        await persistTmFieldConfig(patches);
+        qc.invalidateQueries({ queryKey: TASK_MANAGEMENT_FIELD_CONFIG_QK });
+      } catch (e: any) {
+        toast.error("컬럼 순서 저장 실패", { description: e?.message ?? String(e) });
+      }
+    },
+    [qc],
+  );
+  const onServerVisibility = useCallback(
+    async (field_name: string, is_visible: boolean) => {
+      try {
+        await persistTmFieldConfig([{ field_name, is_visible }]);
+        qc.invalidateQueries({ queryKey: TASK_MANAGEMENT_FIELD_CONFIG_QK });
+      } catch (e: any) {
+        toast.error("컬럼 노출 저장 실패", { description: e?.message ?? String(e) });
+      }
+    },
+    [qc],
+  );
 
   const [stateLoaded, setStateLoaded] = useState(false);
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
@@ -772,6 +799,9 @@ export function TaskManagementRawDataPage() {
             onOrderChange={setOrder}
             onVisibilityChange={setVisibility}
             onFrozenChange={setFrozenExtras}
+            isAdmin={canEdit}
+            onServerReorder={onServerReorder}
+            onServerVisibility={onServerVisibility}
           />
           <Button variant="outline" size="sm" className="h-8" onClick={resetAll}>
             <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset

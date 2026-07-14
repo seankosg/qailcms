@@ -40,7 +40,14 @@ import {
   type DefectServerSort,
   type DefectStatusGroup,
 } from "@/hooks/useDefectItems";
-import { useDefectFieldConfig, useDefectFieldHelpers } from "@/hooks/useDefectFieldConfig";
+import {
+  useDefectFieldConfig,
+  useDefectFieldHelpers,
+  DEFECT_FIELD_CONFIG_QK,
+  persistDefectFieldConfig,
+} from "@/hooks/useDefectFieldConfig";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   EMPTY_TOKEN,
@@ -263,6 +270,30 @@ export function DefectRawDataPage() {
   const helpers = useDefectFieldHelpers();
   const isAdmin = !!user?.isAdmin;
   const invalidateDefects = useInvalidateDefects();
+  const qc = useQueryClient();
+
+  const onServerReorder = useCallback(
+    async (patches: Array<{ field_name: string; sort_order: number }>) => {
+      try {
+        await persistDefectFieldConfig(patches);
+        qc.invalidateQueries({ queryKey: DEFECT_FIELD_CONFIG_QK });
+      } catch (e: any) {
+        toast.error("컬럼 순서 저장 실패", { description: e?.message ?? String(e) });
+      }
+    },
+    [qc],
+  );
+  const onServerVisibility = useCallback(
+    async (field_name: string, is_visible: boolean) => {
+      try {
+        await persistDefectFieldConfig([{ field_name, is_visible }]);
+        qc.invalidateQueries({ queryKey: DEFECT_FIELD_CONFIG_QK });
+      } catch (e: any) {
+        toast.error("컬럼 노출 저장 실패", { description: e?.message ?? String(e) });
+      }
+    },
+    [qc],
+  );
 
   const tab: DefectStatusGroup = (urlSearch.tab === "closed" ? "closed" : "unclosed") as DefectStatusGroup;
   const includeInactive = !!urlSearch.includeInactive;
@@ -673,6 +704,9 @@ export function DefectRawDataPage() {
             onOrderChange={setOrder}
             onVisibilityChange={(v) => setVisibility(v)}
             onFrozenChange={setFrozenExtras}
+            isAdmin={isAdmin}
+            onServerReorder={onServerReorder}
+            onServerVisibility={onServerVisibility}
           />
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
