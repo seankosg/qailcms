@@ -20,7 +20,7 @@ import { deriveCompletionStatus, deriveClosureStatus } from "@/lib/defect-manage
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
-import { classifyDefectsWithLlm } from "@/lib/defect-management/classifier/llm-classify.functions";
+import { bulkClassifyDefects } from "@/lib/defect-management/classifier/bulk-classify.functions";
 import { CLASSIFIER_FIELDS } from "@/lib/defect-management/classifier/rules";
 
 export type DefectFileStatus =
