@@ -1087,7 +1087,6 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                 }
               }
               if (idsToClassify.length === 0) return;
-              toast.info(`${f.name}: AI 분류 백그라운드 실행 중 (${idsToClassify.length}행)...`);
               const CLASSIFY_CHUNK = 2000;
               let totalUpdated = 0;
               let totalFailed = 0;
@@ -1103,12 +1102,47 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                 }
               }
               try { qc.invalidateQueries({ queryKey: ["defect"] }); } catch { /* ignore */ }
-              toast.success(
-                `${f.name}: AI 분류 완료 · 업데이트 ${totalUpdated}${totalFailed ? ` · 실패 ${totalFailed}` : ""}`,
+              setFiles((cur) =>
+                cur.map((x) =>
+                  x.id === f.id
+                    ? {
+                        ...x,
+                        classificationResult: {
+                          ...(x.classificationResult ?? {
+                            skippedRows: 0,
+                            ruleOnlyRows: 0,
+                            llmRows: idsToClassify.length,
+                            llmUpdated: 0,
+                            llmFailed: 0,
+                          }),
+                          llmUpdated: totalUpdated,
+                          llmFailed: totalFailed,
+                        },
+                      }
+                    : x,
+                ),
               );
             } catch (err) {
               console.warn("[defect-import] background classify failed", err);
-              toast.warning(`${f.name}: AI 분류 백그라운드 실행 실패. Raw Data 재분류 버튼을 사용하세요.`);
+              setFiles((cur) =>
+                cur.map((x) =>
+                  x.id === f.id
+                    ? {
+                        ...x,
+                        classificationResult: {
+                          ...(x.classificationResult ?? {
+                            skippedRows: 0,
+                            ruleOnlyRows: 0,
+                            llmRows: rowsNeedingBackgroundClassify.length,
+                            llmUpdated: 0,
+                            llmFailed: 0,
+                          }),
+                          llmFailed: rowsNeedingBackgroundClassify.length,
+                        },
+                      }
+                    : x,
+                ),
+              );
             }
           })();
         }
