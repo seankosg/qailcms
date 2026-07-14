@@ -836,6 +836,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       // 규칙 미매칭 필드는 그대로 두어 임포트 후 서버 측 bulkClassifyDefects 가 LLM 으로 채움.
       // 사유: 39k행 × LLM 배치를 인라인으로 돌리면 upsert 가 시작되기 전에 수 분간 블로킹.
       const rowsNeedingBackgroundClassify: string[] = [];
+      let classificationResult: DefectImportFile["classificationResult"] = {
+        skippedRows: 0,
+        ruleOnlyRows: 0,
+        llmRows: 0,
+        llmUpdated: 0,
+        llmFailed: 0,
+      };
       try {
         const t0 = performance.now();
         const classifyQueue: ClassifyRequestItem[] = [];
@@ -883,9 +890,24 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           const ms = Math.round(performance.now() - t0);
           const skippedRows = workingRows.length - classifyQueue.length;
           const ruleOnlyRows = classifyQueue.length - needsLlm.length;
+          classificationResult = {
+            skippedRows,
+            ruleOnlyRows,
+            llmRows: needsLlm.length,
+            llmUpdated: 0,
+            llmFailed: 0,
+          };
           console.log(
             `[defect-import] 규칙 분류 완료 total=${workingRows.length} 스킵=${skippedRows} 규칙매칭=${ruleOnlyRows} LLM대기=${needsLlm.length} ${ms}ms`,
           );
+        } else {
+          classificationResult = {
+            skippedRows: workingRows.length,
+            ruleOnlyRows: 0,
+            llmRows: 0,
+            llmUpdated: 0,
+            llmFailed: 0,
+          };
         }
       } catch (err) {
         console.warn("[defect-import] 규칙 분류 실패 (임포트는 계속)", err);
