@@ -106,6 +106,7 @@ export interface DefectImportFile {
   duplicateStrategy?: DuplicateStrategy;
   duplicateGroups?: DuplicateGroup[];
   autoDedupedIdenticalCount?: number;
+  aiClassifyEnabled?: boolean;
 }
 
 interface CtxValue {
@@ -121,6 +122,7 @@ interface CtxValue {
   setFileDuplicateSelection: (id: string, groupKey: string, parsedIndex: number) => void;
   resolveDuplicates: (id: string) => void;
   startImport: () => Promise<void>;
+  setFileAiClassifyEnabled: (id: string, enabled: boolean) => void;
 }
 
 const Ctx = createContext<CtxValue | null>(null);
@@ -434,6 +436,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       size: file.size,
       status: "parsing",
       progress: 0,
+      aiClassifyEnabled: false,
     }));
     setFiles((cur) => [...cur, ...next]);
 
