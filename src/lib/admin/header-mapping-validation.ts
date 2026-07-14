@@ -66,3 +66,48 @@ export function validateSourceHeaderEdit(
 
   return { ok: true, trimmed, normalized, warnings };
 }
+
+export interface ValidateTargetResult {
+  ok: boolean;
+  next: string;
+  error?: string;
+  warnings: string[];
+  noop?: boolean;
+}
+
+export function validateTargetFieldEdit(
+  rows: HeaderMappingLike[],
+  id: string,
+  newTarget: string,
+  activeTargetFields: Set<string>,
+): ValidateTargetResult {
+  const warnings: string[] = [];
+  const next = (newTarget ?? "").trim();
+
+  if (!next) {
+    return { ok: false, next, error: "대상 필드를 선택하세요.", warnings };
+  }
+  const current = rows.find((r) => r.id === id);
+  if (!current) {
+    return { ok: false, next, error: "대상 매핑을 찾을 수 없습니다.", warnings };
+  }
+  if (current.target_field === next) {
+    return { ok: true, next, warnings, noop: true };
+  }
+  const norm = normalizeHeader(current.source_header);
+  const conflict = rows.find(
+    (r) => r.id !== id && normalizeHeader(r.source_header) === norm && r.target_field === next,
+  );
+  if (conflict) {
+    return {
+      ok: false,
+      next,
+      error: `이미 동일한 (source_header → ${next}) 매핑이 존재합니다${conflict.is_active ? "" : " (비활성)"}.`,
+      warnings,
+    };
+  }
+  if (!activeTargetFields.has(next)) {
+    warnings.push(`대상 필드 "${next}" 가 활성 필드 목록에 없습니다 — 매칭되어도 Import 시 무시될 수 있습니다.`);
+  }
+  return { ok: true, next, warnings };
+}

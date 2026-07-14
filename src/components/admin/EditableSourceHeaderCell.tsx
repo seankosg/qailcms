@@ -14,9 +14,10 @@ interface Props {
   rows: HeaderMappingLike[];
   activeTargetFields: Set<string>;
   onSave: (trimmed: string) => Promise<void>;
+  canEdit?: boolean;
 }
 
-export function EditableSourceHeaderCell({ row, rows, activeTargetFields, onSave }: Props) {
+export function EditableSourceHeaderCell({ row, rows, activeTargetFields, onSave, canEdit = true }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(row.source_header);
   const [saving, setSaving] = useState(false);
@@ -54,15 +55,17 @@ export function EditableSourceHeaderCell({ row, rows, activeTargetFields, onSave
     return (
       <div className="group flex items-center gap-2">
         <span className="text-sm">{row.source_header}</span>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-6 w-6 opacity-0 group-hover:opacity-100"
-          onClick={() => setEditing(true)}
-          title="Source Header 수정"
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
+        {canEdit && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100"
+            onClick={() => setEditing(true)}
+            title="Source Header 수정"
+          >
+            <Pencil className="h-3 w-3" />
+          </Button>
+        )}
       </div>
     );
   }
