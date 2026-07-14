@@ -271,6 +271,7 @@ export function DefectRawDataPage() {
   const { data: fieldConfig = [] } = useDefectFieldConfig();
   const helpers = useDefectFieldHelpers();
   const labelOf = useDefectColumnLabel();
+  const { defaultOrder, defaultVisibility } = useDefectDefaults();
   const isAdmin = !!user?.isAdmin;
   const invalidateDefects = useInvalidateDefects();
   const qc = useQueryClient();
@@ -376,23 +377,23 @@ export function DefectRawDataPage() {
     setStateLoaded(false);
     const s: any = viewPref.state ?? null;
     let baseSizing: ColumnSizingState = {};
-    let baseOrder: string[] = DEFAULT_ORDER;
-    let baseVisibility: VisibilityState = {};
+    let baseOrder: string[] = defaultOrder;
+    let baseVisibility: VisibilityState = { ...defaultVisibility };
     let baseFrozen: string[] = [];
     if (s && typeof s === "object") {
       baseSizing = s.columnSizing && typeof s.columnSizing === "object" ? s.columnSizing : {};
-      const validKeys = new Set(DEFAULT_ORDER);
+      const validKeys = new Set(defaultOrder);
       const savedOrder: string[] = Array.isArray(s.order)
         ? s.order.filter((k: any) => typeof k === "string" && validKeys.has(k))
         : [];
       if (savedOrder.length) {
         const savedSet = new Set(savedOrder);
         const merged = [...savedOrder];
-        DEFAULT_ORDER.forEach((k, defIdx) => {
+        defaultOrder.forEach((k, defIdx) => {
           if (savedSet.has(k)) return;
           let insertAt = merged.length;
           for (let i = defIdx - 1; i >= 0; i--) {
-            const prev = DEFAULT_ORDER[i];
+            const prev = defaultOrder[i];
             const idx = merged.indexOf(prev);
             if (idx !== -1) { insertAt = idx + 1; break; }
           }
@@ -415,7 +416,7 @@ export function DefectRawDataPage() {
     setFrozenExtras(baseFrozen);
     setStateLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewPref.ready, tab]);
+  }, [viewPref.ready, tab, defaultOrder]);
 
   // Save view pref (columnSizing/order/visibility/frozenExtras)
   useEffect(() => {
