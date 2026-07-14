@@ -59,7 +59,14 @@ import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useSparePartFieldConfig, buildLabelOverrides } from "@/hooks/useSparePartFieldConfig";
+import {
+  useSparePartFieldConfig,
+  buildLabelOverrides,
+  SPARE_PART_FIELD_CONFIG_QK,
+  persistSparePartFieldConfig,
+} from "@/hooks/useSparePartFieldConfig";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 type Row = Record<string, unknown> & { doc_ref: string; plot: string };
 
@@ -97,6 +104,30 @@ export function SparePartRawDataPage() {
   const userKey = currentUser?.id ?? null;
   const storageKey = userKey ? `qail.spare-part.raw-data.v2:${userKey}` : null;
   const canEdit = !!currentUser?.isAdmin;
+  const qc = useQueryClient();
+
+  const onServerReorder = useCallback(
+    async (patches: Array<{ field_name: string; sort_order: number }>) => {
+      try {
+        await persistSparePartFieldConfig(patches);
+        qc.invalidateQueries({ queryKey: SPARE_PART_FIELD_CONFIG_QK });
+      } catch (e: any) {
+        toast.error("컬럼 순서 저장 실패", { description: e?.message ?? String(e) });
+      }
+    },
+    [qc],
+  );
+  const onServerVisibility = useCallback(
+    async (field_name: string, is_visible: boolean) => {
+      try {
+        await persistSparePartFieldConfig([{ field_name, is_visible }]);
+        qc.invalidateQueries({ queryKey: SPARE_PART_FIELD_CONFIG_QK });
+      } catch (e: any) {
+        toast.error("컬럼 노출 저장 실패", { description: e?.message ?? String(e) });
+      }
+    },
+    [qc],
+  );
 
   const [stateLoaded, setStateLoaded] = useState(false);
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
@@ -472,6 +503,9 @@ export function SparePartRawDataPage() {
             onOrderChange={setOrder}
             onVisibilityChange={setVisibility}
             onFrozenChange={setFrozenExtras}
+            isAdmin={canEdit}
+            onServerReorder={onServerReorder}
+            onServerVisibility={onServerVisibility}
           />
 
           <Button variant="outline" size="sm" className="h-8" onClick={resetAll}>
