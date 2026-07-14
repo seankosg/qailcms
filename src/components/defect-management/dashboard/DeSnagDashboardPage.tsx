@@ -163,21 +163,36 @@ export function DeSnagDashboardPage() {
             Plot · Building · Level × Room Group 매트릭스. 셀·헤더 클릭 시 Raw Data 드릴다운.
           </p>
         </div>
-        <DeSnagToolbar teams={teams} onChange={setTeams} />
+        <DeSnagToolbar teams={stagedTeams} onChange={setStagedTeams} />
       </div>
 
-      <Tabs value={plot} onValueChange={(v) => setPlot(v as PlotKey)}>
-        <TabsList>
-          <TabsTrigger value="C">Plot C (+Tower 3)</TabsTrigger>
-          <TabsTrigger value="D">Plot D (+Tower 4)</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={stagedPlot} onValueChange={(v) => setStagedPlot(v as PlotKey)}>
+          <TabsList>
+            <TabsTrigger value="C">Plot C (+Tower 3)</TabsTrigger>
+            <TabsTrigger value="D">Plot D (+Tower 4)</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex items-center gap-2">
+          {isDirty && (
+            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+              변경된 필터 적용 필요
+            </span>
+          )}
+          <Button size="sm" onClick={applyFilters} disabled={!isDirty}>
+            재계산
+          </Button>
+          <Button size="sm" variant="ghost" onClick={resetStaged} disabled={!isDirty}>
+            초기화
+          </Button>
+        </div>
+      </div>
 
-      <DeSnagRoomGroupFilterBar selected={roomGroups} onChange={setRoomGroups} />
+      <DeSnagRoomGroupFilterBar selected={appliedRoomGroups} onChange={setRoomGroups} />
 
       {/* Plot Grand Total — KPI 카드 */}
       <DeSnagGrandTotalCards
-        plot={plot}
+        plot={appliedPlot}
         stats={matrix.plotTotal}
         onAll={() => goRaw({})}
         onMetric={(m) => {
