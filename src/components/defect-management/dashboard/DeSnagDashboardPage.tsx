@@ -2,10 +2,9 @@ import { useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Route as DashboardRoute } from "@/routes/_authenticated/closure/snag-management/dashboard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
 import { DeSnagToolbar } from "./DeSnagToolbar";
 import { DeSnagMatrixBlock } from "./DeSnagMatrixBlock";
-import { DeSnagStatusCell } from "./DeSnagStatusCell";
+import { DeSnagGrandTotalCards } from "./DeSnagGrandTotalCards";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
 import {
   ALL_TEAMS,
@@ -73,34 +72,20 @@ export function DeSnagDashboardPage() {
         </TabsList>
       </Tabs>
 
-      {/* Plot Grand Total 배너 */}
-      <Card className="border-primary/40 bg-primary/[0.03] p-3">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Plot {plot} Grand Total
-          </span>
-          <button
-            type="button"
-            onClick={() => goRaw({})}
-            className="text-[11px] text-muted-foreground hover:text-primary"
-          >
-            전체 목록 →
-          </button>
-        </div>
-        <div className="max-w-md">
-          <DeSnagStatusCell
-            stats={matrix.plotTotal}
-            onMetric={(m) => {
-              const p: Record<string, string> = {};
-              if (m === "open") p.status = "Open";
-              else if (m === "rectified") p.status = "Rectified";
-              else if (m === "reopen") p.status = "Re-Opened";
-              else if (m === "closed" || m === "closurePct") p.status = "Closed";
-              goRaw(p);
-            }}
-          />
-        </div>
-      </Card>
+      {/* Plot Grand Total — KPI 카드 */}
+      <DeSnagGrandTotalCards
+        plot={plot}
+        stats={matrix.plotTotal}
+        onAll={() => goRaw({})}
+        onMetric={(m) => {
+          const p: Record<string, string> = {};
+          if (m === "open") p.status = "Open";
+          else if (m === "rectified") p.status = "Rectified";
+          else if (m === "reopen") p.status = "Re-Opened";
+          else if (m === "closed" || m === "closurePct") p.status = "Closed";
+          goRaw(p);
+        }}
+      />
 
       {isLoading && <p className="text-sm text-muted-foreground">불러오는 중…</p>}
       {error && <p className="text-sm text-destructive">오류: {(error as Error).message}</p>}
