@@ -16,6 +16,8 @@ interface Props {
   order: string[]; // full column order excluding __select
   visibility: Record<string, boolean>;
   frozenExtras: string[]; // 사용자 pin (최대 3, __select 뒤에 고정)
+  defaultOrder?: string[];
+  defaultVisibility?: Record<string, boolean>;
   onOrderChange: (next: string[]) => void;
   onVisibilityChange: (next: Record<string, boolean>) => void;
   onFrozenChange: (next: string[]) => void;
@@ -29,6 +31,8 @@ export function DefectColumnOrderMenu({
   order,
   visibility,
   frozenExtras,
+  defaultOrder,
+  defaultVisibility,
   onOrderChange,
   onVisibilityChange,
   onFrozenChange,
@@ -120,9 +124,9 @@ export function DefectColumnOrderMenu({
           <button
             className="text-primary hover:underline"
             onClick={() => {
-              onVisibilityChange({});
+              onVisibilityChange(defaultVisibility ? { ...defaultVisibility } : {});
               onFrozenChange([]);
-              onOrderChange(DEFECT_COLUMNS.map((c) => c.key));
+              onOrderChange(defaultOrder ?? DEFECT_COLUMNS.map((c) => c.key));
             }}
           >
             Reset
