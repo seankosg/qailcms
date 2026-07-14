@@ -269,6 +269,7 @@ export function DefectRawDataPage() {
   const { data: user } = useCurrentUser();
   const { data: fieldConfig = [] } = useDefectFieldConfig();
   const helpers = useDefectFieldHelpers();
+  const labelOf = useDefectColumnLabel();
   const isAdmin = !!user?.isAdmin;
   const invalidateDefects = useInvalidateDefects();
   const qc = useQueryClient();
@@ -291,6 +292,17 @@ export function DefectRawDataPage() {
         qc.invalidateQueries({ queryKey: DEFECT_FIELD_CONFIG_QK });
       } catch (e: any) {
         toast.error("컬럼 노출 저장 실패", { description: e?.message ?? String(e) });
+      }
+    },
+    [qc],
+  );
+  const onServerLabel = useCallback(
+    async (field_name: string, display_name: string) => {
+      try {
+        await persistDefectFieldConfig([{ field_name, display_name }]);
+        qc.invalidateQueries({ queryKey: DEFECT_FIELD_CONFIG_QK });
+      } catch (e: any) {
+        toast.error("컬럼 라벨 저장 실패", { description: e?.message ?? String(e) });
       }
     },
     [qc],
