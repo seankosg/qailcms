@@ -98,6 +98,13 @@ const NAV: NavSection[] = [
     ],
   },
   {
+    label: "Import & Log",
+    items: [
+      { to: "/import-log/import", label: "Import", icon: Upload, editorOnly: true },
+      { to: "/import-log/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
+    ],
+  },
+  {
     label: "Admin",
     items: [
       { to: "/admin", label: "Overview", icon: LayoutDashboard, adminOnly: true },
@@ -107,15 +114,6 @@ const NAV: NavSection[] = [
     ],
   },
 ];
-
-// Insert Import & Log section before Admin
-NAV.splice(NAV.length - 1, 0, {
-  label: "Import & Log",
-  items: [
-    { to: "/import-log/import", label: "Import", icon: Upload, editorOnly: true },
-    { to: "/import-log/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
-  ],
-});
 
 const MODULE_OPEN_STORAGE_KEY = "qail-cms:sidebar:module-open:v1";
 
