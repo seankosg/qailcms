@@ -2,21 +2,20 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Columns3, GripVertical, Lock, Pin } from "lucide-react";
+import { Columns3, GripVertical, Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DEFECT_COLUMNS } from "@/lib/defect-management/columns";
 import { useDefectFieldHelpers } from "@/hooks/useDefectFieldConfig";
 
-const SYSTEM_FROZEN: { id: string; label: string }[] = [
-  { id: "__select", label: "Select" },
-  { id: "is_critical", label: "Critical" },
-  { id: "stage_progress", label: "Progress" },
-];
+const SYSTEM_LABEL: Record<string, string> = {
+  is_critical: "Critical",
+  stage_progress: "Progress",
+};
 
 interface Props {
-  order: string[]; // 데이터 컬럼 순서 (is_critical 제외)
+  order: string[]; // full column order excluding __select
   visibility: Record<string, boolean>;
-  frozenExtras: string[]; // 사용자 pin (최대 3)
+  frozenExtras: string[]; // 사용자 pin (최대 3, __select 뒤에 고정)
   onOrderChange: (next: string[]) => void;
   onVisibilityChange: (next: Record<string, boolean>) => void;
   onFrozenChange: (next: string[]) => void;
@@ -33,11 +32,7 @@ export function DefectColumnOrderMenu({
   const [dragKey, setDragKey] = useState<string | null>(null);
   const { getLabel } = useDefectFieldHelpers();
 
-  const resolveLabel = (k: string): string => {
-    const sys = SYSTEM_FROZEN.find((s) => s.id === k);
-    if (sys) return sys.label;
-    return getLabel(k) || k;
-  };
+  const resolveLabel = (k: string): string => SYSTEM_LABEL[k] ?? getLabel(k) ?? k;
 
   const toggleFrozen = (k: string) => {
     if (frozenExtras.includes(k)) {
@@ -74,15 +69,13 @@ export function DefectColumnOrderMenu({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-2">
         <div className="mb-2 flex items-center justify-between px-1 text-[11px] text-muted-foreground">
-          <span>드래그로 순서 변경 · 핀으로 좌측 고정 ({frozenExtras.length}/3)</span>
+          <span>드래그로 순서 변경 · 핀으로 좌측 고정({frozenExtras.length}/3)</span>
           <button
             className="text-primary hover:underline"
             onClick={() => {
               onVisibilityChange({});
               onFrozenChange([]);
-              onOrderChange(
-                DEFECT_COLUMNS.map((c) => c.key).filter((k) => k !== "is_critical"),
-              );
+              onOrderChange(DEFECT_COLUMNS.map((c) => c.key));
             }}
           >
             Reset
@@ -90,33 +83,20 @@ export function DefectColumnOrderMenu({
         </div>
         <div className="max-h-80 overflow-y-auto pr-1">
           <div className="mb-1 rounded bg-muted/50 px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-            Frozen · 시스템 (고정)
+            Frozen · Select (고정)
           </div>
-          {SYSTEM_FROZEN.map((s) => (
-            <div key={s.id} className="flex items-center gap-1 rounded px-1 py-1 text-xs">
-              <Lock className="h-3 w-3 text-muted-foreground/70" />
-              <span className="flex-1 truncate text-muted-foreground">{s.label}</span>
+          {frozenExtras.map((k) => (
+            <div key={k} className="flex items-center gap-1 rounded px-1 py-1 text-xs">
+              <Pin className="h-3 w-3 text-primary" />
+              <span className="flex-1 truncate">{resolveLabel(k)}</span>
+              <button
+                className="text-[10px] text-muted-foreground hover:underline"
+                onClick={() => toggleFrozen(k)}
+              >
+                unpin
+              </button>
             </div>
           ))}
-          {frozenExtras.length > 0 && (
-            <>
-              <div className="mb-1 mt-2 rounded bg-muted/50 px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Frozen · 사용자
-              </div>
-              {frozenExtras.map((k) => (
-                <div key={k} className="flex items-center gap-1 rounded px-1 py-1 text-xs">
-                  <Pin className="h-3 w-3 text-primary" />
-                  <span className="flex-1 truncate">{resolveLabel(k)}</span>
-                  <button
-                    className="text-[10px] text-muted-foreground hover:underline"
-                    onClick={() => toggleFrozen(k)}
-                  >
-                    unpin
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
           <div className="mb-1 mt-2 rounded bg-muted/50 px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
             Columns
           </div>

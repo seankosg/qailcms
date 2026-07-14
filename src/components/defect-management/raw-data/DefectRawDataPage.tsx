@@ -59,11 +59,18 @@ import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { EditCellPopover } from "./EditCellPopover";
 import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
+import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
 import { todayIso } from "@/lib/defect-management/stage-utils";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
-const SYSTEM_FROZEN_IDS = ["__select", "is_critical", "stage_progress"];
-const DEFAULT_ORDER = DEFECT_COLUMNS.map((c) => c.key).filter((k) => k !== "is_critical");
+const SYSTEM_FROZEN_IDS = ["__select"];
+// is_critical / stage_progress 는 사용자 드래그/pin/hide 가능한 일반 컬럼으로 취급.
+// stage_progress 는 DEFECT_COLUMNS에 없는 가상 컬럼이므로 명시적으로 순서에 포함.
+const DEFAULT_ORDER = [
+  "is_critical",
+  "stage_progress",
+  ...DEFECT_COLUMNS.map((c) => c.key).filter((k) => k !== "is_critical"),
+];
 const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
 
 // ── URL <-> table state helpers ────────────────────────────────────────────
@@ -509,7 +516,7 @@ export function DefectRawDataPage() {
   }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, isAdmin, patchLocalItem, refetch]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
-    const vis: VisibilityState = { __select: true, is_critical: true, stage_progress: true };
+    const vis: VisibilityState = { __select: true };
     const configured = new Map(fieldConfig.map((r) => [r.field_name, r]));
     const frozenSet = new Set(frozenExtras);
     for (const c of columns) {
@@ -517,6 +524,8 @@ export function DefectRawDataPage() {
       if (!id || id in vis) continue;
       if (frozenSet.has(id)) { vis[id] = true; continue; }
       if (id in visibility) { vis[id] = visibility[id] !== false; continue; }
+      // 파생 가상 컬럼: field_config에 없음. 기본 노출.
+      if (id === "stage_progress" || id === "is_critical") { vis[id] = true; continue; }
       const row = configured.get(id);
       vis[id] = row ? !!row.is_visible : true;
     }
@@ -657,6 +666,14 @@ export function DefectRawDataPage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm"><Link to="/closure/snag-management/import"><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
+          <DefectColumnOrderMenu
+            order={order}
+            visibility={visibility as Record<string, boolean>}
+            frozenExtras={frozenExtras}
+            onOrderChange={setOrder}
+            onVisibilityChange={(v) => setVisibility(v)}
+            onFrozenChange={setFrozenExtras}
+          />
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           <Button variant="outline" size="sm" onClick={() => { invalidateDefects(); refetch(); }} disabled={isFetching}>
