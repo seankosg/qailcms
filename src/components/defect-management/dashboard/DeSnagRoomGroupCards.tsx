@@ -6,12 +6,11 @@ type StatusSlot = "open" | "rectified" | "reopen" | "closed";
 
 const STATUS_META: Record<
   StatusSlot,
-  { label: string; dot: string; barTrack: string; barFill: string; text: string; statusParam: string }
+  { label: string; dot: string; barFill: string; text: string; statusParam: string }
 > = {
   open: {
     label: "Open",
     dot: "bg-amber-500",
-    barTrack: "bg-amber-500/15",
     barFill: "bg-amber-500",
     text: "text-amber-600 dark:text-amber-400",
     statusParam: "Open",
@@ -19,7 +18,6 @@ const STATUS_META: Record<
   rectified: {
     label: "Rectified",
     dot: "bg-sky-500",
-    barTrack: "bg-sky-500/15",
     barFill: "bg-sky-500",
     text: "text-sky-600 dark:text-sky-400",
     statusParam: "Rectified",
@@ -27,7 +25,6 @@ const STATUS_META: Record<
   reopen: {
     label: "Re-Opened",
     dot: "bg-rose-500",
-    barTrack: "bg-rose-500/15",
     barFill: "bg-rose-500",
     text: "text-rose-600 dark:text-rose-400",
     statusParam: "Re-Opened",
@@ -35,7 +32,6 @@ const STATUS_META: Record<
   closed: {
     label: "Closed",
     dot: "bg-emerald-400",
-    barTrack: "bg-emerald-400/15",
     barFill: "bg-emerald-400",
     text: "text-emerald-600 dark:text-emerald-400",
     statusParam: "Closed",
@@ -48,7 +44,52 @@ function roomGroupParam(col: RoomGroupCol): string {
   return col;
 }
 
-function StatusRow({
+const SLOT_ORDER: StatusSlot[] = ["open", "rectified", "reopen", "closed"];
+
+function StackedBar({
+  stats,
+  onSegment,
+}: {
+  stats: Stats;
+  onSegment: (slot: StatusSlot) => void;
+}) {
+  const issued = stats.issued;
+  const counts: Record<StatusSlot, number> = {
+    open: stats.open,
+    rectified: stats.rectified,
+    reopen: stats.reopen,
+    closed: stats.closed,
+  };
+  return (
+    <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+      {SLOT_ORDER.map((slot) => {
+        const c = counts[slot];
+        if (c <= 0 || issued <= 0) return null;
+        const pct = (c / issued) * 100;
+        const meta = STATUS_META[slot];
+        return (
+          <button
+            key={slot}
+            type="button"
+            title={`${meta.label}: ${c.toLocaleString()} (${Math.round(pct)}%)`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSegment(slot);
+            }}
+            className={cn(
+              "h-full transition-opacity hover:opacity-80",
+              meta.barFill,
+            )}
+            style={{ width: `${pct}%` }}
+            aria-label={`${meta.label} ${c} (${Math.round(pct)}%)`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function LegendItem({
   slot,
   count,
   issued,
@@ -57,35 +98,25 @@ function StatusRow({
   slot: StatusSlot;
   count: number;
   issued: number;
-  onClick?: () => void;
+  onClick: () => void;
 }) {
   const meta = STATUS_META[slot];
-  const pct = issued > 0 ? (count / issued) * 100 : 0;
+  const pct = issued > 0 ? Math.round((count / issued) * 100) : 0;
   return (
     <button
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        onClick?.();
+        onClick();
       }}
-      className="group/row flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/60"
+      className="flex items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted/60"
     >
       <span className={cn("h-2 w-2 shrink-0 rounded-full", meta.dot)} />
-      <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
-        {meta.label}
-      </span>
-      <span className={cn("w-10 shrink-0 text-right text-xs font-semibold tabular-nums", meta.text)}>
+      <span className="text-[11px] font-medium text-muted-foreground">{meta.label}</span>
+      <span className={cn("text-xs font-semibold tabular-nums", meta.text)}>
         {count.toLocaleString()}
       </span>
-      <div className={cn("relative h-1.5 flex-1 overflow-hidden rounded-full", meta.barTrack)}>
-        <div
-          className={cn("h-full rounded-full transition-all", meta.barFill)}
-          style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
-        />
-      </div>
-      <span className="w-10 shrink-0 text-right text-[11px] font-semibold tabular-nums text-muted-foreground">
-        {issued > 0 ? `${Math.round(pct)}%` : "—"}
-      </span>
+      <span className="text-[11px] tabular-nums text-muted-foreground">· {pct}%</span>
     </button>
   );
 }
@@ -105,12 +136,14 @@ export function DeSnagRoomGroupCards({
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="text-sm font-semibold tracking-tight">Room Group별 현황</h2>
         <p className="text-[11px] text-muted-foreground">
-          % = 그룹 Issued 대비. 카드/행 클릭 시 필터 이동.
+          바 = 그룹 Issued 100% 기준 status 비중. 우측 붉은 숫자 = 처리 필요(Open+Re-Opened).
         </p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {visible.map(({ col, stats }) => {
           const rg = roomGroupParam(col);
+          const pending = stats.open + stats.reopen;
+          const pendingPct = stats.issued > 0 ? Math.round((pending / stats.issued) * 100) : 0;
           return (
             <Card
               key={col}
@@ -118,42 +151,52 @@ export function DeSnagRoomGroupCards({
               className="group cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
               <CardContent className="p-4">
-                <div className="mb-2 flex items-baseline justify-between gap-2">
+                <div className="mb-1 flex items-baseline justify-between gap-2">
                   <p className="truncate text-sm font-semibold uppercase tracking-wide text-foreground">
                     {col}
                   </p>
-                  <p className="text-2xl font-bold tabular-nums text-foreground">
-                    {stats.issued.toLocaleString()}
+                  <p className="flex items-baseline gap-1.5 text-red-600 dark:text-red-500">
+                    <span className="text-2xl font-bold tabular-nums">
+                      {pending.toLocaleString()}
+                    </span>
+                    <span className="text-sm font-semibold tabular-nums">· {pendingPct}%</span>
                   </p>
                 </div>
-                <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Issued (그룹 총계)
-                </p>
-                <div className="flex flex-col gap-0.5">
-                  <StatusRow
-                    slot="open"
-                    count={stats.open}
-                    issued={stats.issued}
-                    onClick={() => onNavigate({ roomGroup: rg, status: "Open" })}
-                  />
-                  <StatusRow
-                    slot="rectified"
-                    count={stats.rectified}
-                    issued={stats.issued}
-                    onClick={() => onNavigate({ roomGroup: rg, status: "Rectified" })}
-                  />
-                  <StatusRow
-                    slot="reopen"
-                    count={stats.reopen}
-                    issued={stats.issued}
-                    onClick={() => onNavigate({ roomGroup: rg, status: "Re-Opened" })}
-                  />
-                  <StatusRow
-                    slot="closed"
-                    count={stats.closed}
-                    issued={stats.issued}
-                    onClick={() => onNavigate({ roomGroup: rg, status: "Closed" })}
-                  />
+                <div className="mb-3 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span>Room Group</span>
+                  <span>
+                    처리 필요 (Open + Re-Opened){" "}
+                    <span className="text-muted-foreground/70">
+                      / Issued {stats.issued.toLocaleString()}
+                    </span>
+                  </span>
+                </div>
+                <StackedBar
+                  stats={stats}
+                  onSegment={(slot) =>
+                    onNavigate({ roomGroup: rg, status: STATUS_META[slot].statusParam })
+                  }
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {SLOT_ORDER.map((slot) => (
+                    <LegendItem
+                      key={slot}
+                      slot={slot}
+                      count={
+                        slot === "open"
+                          ? stats.open
+                          : slot === "rectified"
+                            ? stats.rectified
+                            : slot === "reopen"
+                              ? stats.reopen
+                              : stats.closed
+                      }
+                      issued={stats.issued}
+                      onClick={() =>
+                        onNavigate({ roomGroup: rg, status: STATUS_META[slot].statusParam })
+                      }
+                    />
+                  ))}
                 </div>
               </CardContent>
             </Card>
