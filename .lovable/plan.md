@@ -1,106 +1,94 @@
-# De-Snagging Dashboard — 최종 계획 (프롬프트 재정합)
+## Defect Raw Data — 매핑 컬럼 전부 노출 + Task 스타일 컬럼 UI로 완전 교체
 
-## 결정된 사항
-- 매트릭스 대시보드 단일 뷰 유지 (SHAW의 KPI 카드 세트는 추가하지 않음).
-- 셀·헤더 드릴다운은 SHAW `goRaw` URL 규약을 재사용.
-- Rectified 셀 클릭 시 `status=Rectified` 우선.
-- raw-data `URL_PARAM_TO_COLUMN` 에 `plan_group / building / roomGroup` 3개 파라미터 추가.
+### 1. 누락 컬럼을 `DEFECT_COLUMNS`에 추가
 
-## 데이터 소스 (확정)
-`defect_items_raw` (`is_active = true`)에서 GROUP BY. `status_raw` 실측 값은 `Open / Rectified / Re-Opened / Closed` 4종 → **매트릭스 집계도 `status_raw` exact match, 드릴다운도 `status=<원본값>` 부착**으로 통일. `completion_status`/`closure_status`는 이번 매트릭스 집계·드릴다운에 사용하지 않음(파생 배지는 raw-data에서 별도로 표시됨).
+parser 및 `defect_field_config`에는 존재하지만 `src/lib/defect-management/columns.ts`의 `DEFECT_COLUMNS`에 없어 헤더 렌더 대상에서 빠진 필드를 추가합니다.
 
-## 축·레이아웃 (프롬프트 정합)
+| key | label | type | group |
+|---|---|---|---|
+| `updated_status` | Updated Status | badge | status |
+| `updated_description` | Updated Description | longtext | content |
+| `updated_by_name` | Updated By | text | audit |
+| `updated_date_raw` | Updated Date | datetime | audit |
+| `ir` | IR | text | refs |
+| `forms` | Forms | text | refs |
+| `subcontractor_issue_no` | Subcon Issue No | text | refs |
+| `captured_by_name` | Captured By | text | people |
+| `trade_detail` | Trade Detail | text | trade |
+| `classification_source` | Classification Source | text | classification |
+| `podium_area` | Podium Area | text | location |
+| `building` | Building | text | location |
+| `room` | Room | text | location |
+| `room_group` | Room Group | text | location |
+| `level_name` | Level | text | location |
+| `review_flag` | Review Flag | text | flags |
+| `remarks` (이미 존재 확인만) | — | — | — |
 
-### 탭
-- Plot C = `plan_group ∈ {Plot C, Tower 3}`
-- Plot D = `plan_group ∈ {Plot D, Tower 4}`
+- 위치는 각 group 내 논리 순서 유지 (Updated 계열은 audit/content, Location 서브필드는 location, refs 그룹은 IR/Forms/Subcon Issue No).
+- 기본 노출 여부는 `defect_field_config.is_visible` 값을 그대로 따름 (기존 로직 `L520-521` 재사용 → 노이즈 방지, IR/Forms/Podium 등은 초기 hidden 유지).
+- `defect_field_config`에 아직 행이 없는 신규 키(예: `updated_status`/`updated_description`/`updated_by_name`/`updated_date_raw`/`building`/`room`/`room_group`/`level_name`/`review_flag`)는 마이그레이션으로 `INSERT ... ON CONFLICT DO NOTHING` 시딩. `is_visible=false` 기본, `display_name`은 위 label과 동일.
 
-### 블록 (탭 내부 세로 배열)
-탭 내부는 아래 3개 블록을 이 순서로 배치:
-1. **Tower 블록** — `building` 정규화 후 `Tower / Tower 4` 계열 + Level ∉ 지하
-2. **Podium 블록** — `building` 정규화 후 `Podium / Podium 1~4` 계열 + Level ∉ 지하
-3. **지하(Basement) 블록** — `level_name` 정규화 후 `∈ {B1, B2, B3, B4, LG}` — **Tower·Podium 공통, Plot 하단에 단일 블록으로 배치** (Building 무관)
+### 2. 컬럼 순서/선택 UI를 Task와 완전 동일하게 교체
 
-각 블록 = `행: Level × 열: Room Group` 교차표.
+`src/components/defect-management/raw-data/DefectColumnOrderMenu.tsx` 를 삭제하고, Task의 `src/components/task-management/raw-data/ColumnOrderMenu.tsx` 와 동일 구조인 `DefectColumnOrderMenu` 로 재작성:
 
-### 행(Level) 정렬
-- 지상: 숫자 파싱 후 상→하 (예: L71 → L1)
-- 지하: `LG → B1 → B2 → B3 → B4` 순
-- "Others" 미분류 행은 블록 최하단, 회색 음영
+- 상단 안내 텍스트: "드래그로 순서 변경 · 핀으로 좌측 고정({n}/3)".
+- Reset: `visibility={}` / `frozenExtras=[]` / `order = DEFECT_COLUMNS.map(c=>c.key).filter(k => k!=='is_critical' && k!=='stage_progress')`.
+- Frozen 상단 헤더는 "Frozen · Select (고정)" 하나만 (Task와 대칭). 시스템 고정(Select) 표기만 유지, `is_critical`/`stage_progress` 를 시스템 고정 목록에서 제거.
+- 사용자 pin 목록 → Columns 목록 (드래그, checkbox 표시/숨김, pin/unpin) 순서. Task 파일 구조를 1:1 이식.
+- 라벨 해석은 `useDefectFieldHelpers().getLabel(k)` 로 유지 (Task는 `useTmColumnLabel` 사용, Defect는 `useDefectFieldHelpers` 사용 — 프레임워크 차이만 1대1 매핑).
 
-### 열(Room Group) 순서 (고정)
-`TENANT · BOH · FOH · STAIRCASE · LIFT · CARPARK · CARPARK RAMP · CORRIDOR · FACADE · N/A · Row Total`
-- `FACADE` 열 = `FACADE` + `LANDSCAPE` 합산
-- **`N/A` 열 = Room Group 빈값 항목, 회색 음영, 정규 열들과 시각적으로 분리하여 우측 끝(단, Row Total 왼쪽)**
+### 3. `DefectRawDataPage.tsx` 정합 수정
 
-## 셀 (6지표, 순서 고정)
+- `SYSTEM_FROZEN_IDS = ["__select"]` 로 축소. `is_critical`/`stage_progress` 는 일반 데이터 컬럼으로 강등.
+- `DEFAULT_ORDER` 에 `is_critical`, `stage_progress` 포함(맨 앞쪽 지점에 삽입) → 사용자 드래그/숨김/pin 대상.
+- `columns` 조합 로직(L494-508)에서 `is_critical`/`stage_progress` 를 특수 case로 두되, 이제 `orderedKeys` 상 위치가 유동 → `for-loop` 안에서 id 매칭으로 특수 컬럼 삽입, 나머지는 `byKey.get(id)` 로 데이터 컬럼 생성. 기존과 동일 패턴 유지.
+- `columnVisibility` 계산에서 `__select` 만 강제 true. `is_critical` / `stage_progress` 는 `visibility[id]` 값을 따르되 default true.
+- `orderedKeys` 는 `[...SYSTEM_FROZEN_IDS, ...frozenExtras, ...order.filter(k => !frozenExtras.includes(k))]` 로 단순화. `is_critical`/`stage_progress` 는 `order` 내부에 존재.
+- `frozenColIds`(sticky) 는 `[...SYSTEM_FROZEN_IDS, ...frozenExtras]` 그대로.
+- 저장/복원 로직(`viewPref.save`)의 `validKeys` 를 `DEFAULT_ORDER` 로 재계산 — `is_critical`/`stage_progress` 포함되어 있어 사용자 pin 대상이 됨.
+- 기존 뷰 프리퍼런스 마이그레이션: 저장된 `order` 에 `is_critical`/`stage_progress` 없으면 자동으로 앞부분에 삽입(현행 코드의 defect 순서 보존 로직 재활용).
+
+### 4. 필드 라벨 소스 일관성
+
+- 라벨 소스는 `useDefectFieldHelpers().getLabel(k)` 유지. `DEFECT_COLUMNS[i].label` 은 fallback.
+- 새로 추가된 컬럼도 `defect_field_config` 행이 시딩되므로 관리자 페이지(Mapping → Snag List Management → Field Config)에서 라벨/노출/정렬 변경 가능.
+
+### 5. 마이그레이션
+
+`supabase/migrations/<timestamp>_defect_field_config_missing_fields.sql`:
+
+```sql
+INSERT INTO public.defect_field_config (field_name, display_name, is_visible, sort_order, group_key)
+VALUES
+  ('updated_status',        'Updated Status',        false, 480, 'status'),
+  ('updated_description',   'Updated Description',   false, 490, 'content'),
+  ('updated_by_name',       'Updated By',            false, 500, 'audit'),
+  ('updated_date_raw',      'Updated Date',          false, 510, 'audit'),
+  ('building',              'Building',              false, 175, 'location'),
+  ('room',                  'Room',                  false, 176, 'location'),
+  ('room_group',            'Room Group',            false, 177, 'location'),
+  ('level_name',            'Level',                 false, 178, 'location'),
+  ('review_flag',           'Review Flag',           false, 520, 'flags')
+ON CONFLICT (field_name) DO NOTHING;
 ```
-ISSUED │ Open │ Rectified │ Re-Open │ Closed │ Closure%
-```
-- **표기 형식**: 각 상태 지표는 `건수 (비율%)` 병기 (예: `Closed: 80 (80%)`), 비율 기준 = ISSUED 대비.
-- ISSUED = Open + Rectified + Re-Open + Closed 합 (건수만).
-- Closure% = Closed / ISSUED. ISSUED = 0 인 셀은 `-`.
-- Closure% 색상 코딩: `<40% 적색 / 40–80% 황색 / ≥80% 녹색`.
-- `status_raw` 매칭 (대소문자·공백 무시, `Re-Open`↔`Re-Opened` 동의어): `Open / Rectified / Re-Opened / Closed`.
 
-## 롤업 (프롬프트 8절 4단계, 모두 6지표 동일 적용)
-1. **행 우측 Row Total** — 한 Level의 모든 Area 합
-2. **블록 하단 Column Total** — 한 Area 열의 모든 Level 합
-3. **블록 최하단 Building 소계 행** — Tower/Podium/Basement 블록 각각 아래에 표시
-4. **탭 상단 Plot Grand Total 배너** — Plot 전체 6지표 + Plot Closure%
+- 이미 존재(`ir`/`forms`/`podium_area`/`subcontractor_issue_no`/`captured_by_name`/`trade_detail`/`classification_source`)는 건드리지 않음.
 
-N/A 열은 모든 합계에 포함하되 별도 컬럼으로 유지 (회색 음영으로 시각 구분).
+### 6. 변경 파일
 
-## 필터
-- Team 다중 토글 (`Arch / Mech / Elec`), 미선택 = 전체.
-- URL 상태: `plot: "C"|"D"` (기본 "C"), `teams: "Arch,Mech,Elec"` 콤마 문자열.
+- `src/lib/defect-management/columns.ts` — `DEFECT_COLUMNS` 확장.
+- `src/components/defect-management/raw-data/DefectColumnOrderMenu.tsx` — Task 스타일로 재작성.
+- `src/components/defect-management/raw-data/DefectRawDataPage.tsx` — SYSTEM_FROZEN 축소, order/visibility 반영.
+- `supabase/migrations/<timestamp>_defect_field_config_missing_fields.sql` — 신규.
 
-## 드릴다운 (SHAW `goRaw` 규약, 통합)
+### 변경 없음
 
-부착 순서: 항상 `source=dashboard` + `plot_group` + `team=` (선택 시) + 축 파라미터 + 지표 파라미터.
+- parser / 임포트 로직 / 필터 규약 / 드릴다운 URL_MAP / RLS / 데이터 스키마.
 
-| 클릭 지점 | 축 파라미터 |
-|---|---|
-| 열 헤더 (Room Group) | `roomGroup=<name>` |
-| Building 그룹 헤더 (Tower/Podium/Basement) | `building=<members: 콤마>` (Basement는 `level=B1,B2,B3,B4,LG`) |
-| 행 헤더 (Building + Level) | `building=<name>` + `level=<Level x>` |
-| Row Total | `level=<Level x>` |
-| Col Total | `roomGroup=<name>` |
-| Building 소계 | `building=<members>` |
-| Plot Grand Total | `plot_group` 만 (탭에 이미 부착됨) |
+### 검증
 
-| 셀 지표 클릭 | 지표 파라미터 (축에 추가) |
-|---|---|
-| ISSUED | 없음 |
-| Open | `status=Open` |
-| Rectified | `status=Rectified` |
-| Re-Open | `status=Re-Opened` |
-| Closed | `status=Closed` |
-| Closure% (숫자) | `status=Closed` |
-
-## 시각 요구
-- 계층 병합 헤더: `Building > Area(Room Group) > 상태(6지표)`.
-- Tower / Podium / Basement 블록을 시각적으로 구분(구분선·배경 톤).
-- 지표 순서는 어떤 화면에서도 불변.
-- 참조: 샘플 파일 `복사본_MECH_De-Snagging_work_repor_t_PLOT_C_D_09-July_Rev02.xlsx` 의 **보이는 시트만** (`Summary_C`, `C-Report-T`, `C-Report-P.L.B`, `Snagging(Overall)_C`) 레이아웃을 형태 기준으로 삼되, 수식·값·시트 분리 방식은 복제하지 않음. 숨김 시트(`Summary_D` 등)는 무시.
-
-## 신규 파일
-- `src/routes/_authenticated/closure/snag-management/dashboard.tsx` (route + `validateSearch: {plot, teams}`)
-- `src/components/defect-management/dashboard/DeSnagDashboardPage.tsx` (탭·Team 토글·Plot Grand Total 배너)
-- `src/components/defect-management/dashboard/DeSnagMatrixBlock.tsx` (한 Building 블록의 Level×Area 매트릭스 + 소계)
-- `src/components/defect-management/dashboard/DeSnagStatusCell.tsx` (6지표 셀, `건수 (%)` 표기, Closure% 색상)
-- `src/components/defect-management/dashboard/DeSnagToolbar.tsx` (Team 다중 토글)
-- `src/lib/defect-management/dashboard.functions.ts` — `getSnagDashboardMatrix({plot, teams})`: `defect_items_raw` GROUP BY `plan_group, building, level_name, room_group, status_raw`
-- `src/lib/defect-management/dashboard-shape.ts` — 축 정규화·정렬·소계 계산 유틸
-
-## 수정 파일
-- `src/components/layout/AppLayout.tsx` — 사이드바 Dashboard 링크 추가
-- `src/components/defect-management/outstanding/OutstandingDashboardPage.tsx` — Snag 카드 `to` 교체
-- `src/components/defect-management/raw-data/DefectRawDataPage.tsx` — `URL_PARAM_TO_COLUMN` 에 `plan_group → plan_group`, `building → building`, `roomGroup → room_group` 3키 추가
-- `src/routes/_authenticated/closure/snag-management/raw-data.tsx` — `validateSearch` 에 `plan_group / building / roomGroup` 3키 추가, `DRILLDOWN_PARAMS` 배열에 포함
-
-## 변경 없음
-- DB 스키마·마이그레이션·RLS, `derived.ts`, Import 파이프라인
-- `filter-fns.ts` 스펙, 기존 컬럼 정의
-- SHAW 규약 URL 파라미터 파서 본체, 필터 칩 표시 로직
-- `DefectDetailPage.tsx`
+1. `bunx tsgo --noEmit` 타입 체크 통과.
+2. `/closure/snag-management/raw-data` 진입 → Columns 메뉴에 Task와 동일한 구조(Frozen · Select 만 시스템 고정, 나머지 전부 드래그/pin/hide 가능)로 표시.
+3. 신규 컬럼(Building/Room/Room Group/Level/Updated* 등)이 Columns 메뉴에 리스트업되고 체크박스로 노출 가능.
+4. 노출 시 헤더/셀이 정상 렌더되고 값이 채워짐(샘플 파일 임포트 후 확인).
