@@ -46,7 +46,7 @@ export function ColumnOrderMenu({
   const toggleFrozen = (k: string) => {
     if (frozenExtras.includes(k)) {
       onFrozenChange(frozenExtras.filter((x) => x !== k));
-    } else if (frozenExtras.length < 3) {
+    } else {
       onFrozenChange([...frozenExtras, k]);
     }
   };
@@ -85,7 +85,7 @@ export function ColumnOrderMenu({
       <PopoverContent align="end" className="w-80 p-2">
         <div className="mb-2 flex items-center justify-between px-1 text-[11px] text-muted-foreground">
           <span>
-            드래그로 순서 변경 · 핀으로 좌측 고정({frozenExtras.length}/3)
+            드래그로 순서 변경 · 핀으로 좌측 고정({frozenExtras.length})
             {isAdmin ? " · 관리자: 순서/노출은 전체 사용자에 반영" : ""}
           </span>
           <button
@@ -143,15 +143,9 @@ export function ColumnOrderMenu({
                   {resolveLabel(k)}
                 </span>
                 <button
-                  className={cn(
-                    "text-[10px] hover:underline",
-                    frozenExtras.length >= 3
-                      ? "cursor-not-allowed text-muted-foreground/40"
-                      : "text-muted-foreground",
-                  )}
+                  className="text-[10px] text-muted-foreground hover:underline"
                   onClick={() => toggleFrozen(k)}
-                  disabled={frozenExtras.length >= 3}
-                  title={frozenExtras.length >= 3 ? "최대 3개까지 고정 가능" : "왼쪽 고정"}
+                  title="왼쪽 고정"
                 >
                   pin
                 </button>

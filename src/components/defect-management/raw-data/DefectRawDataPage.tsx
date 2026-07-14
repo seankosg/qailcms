@@ -409,7 +409,7 @@ export function DefectRawDataPage() {
         }
       }
       if (Array.isArray(s.frozenExtras)) {
-        baseFrozen = s.frozenExtras.filter((k: any) => typeof k === "string" && validKeys.has(k)).slice(0, 3);
+        baseFrozen = s.frozenExtras.filter((k: any) => typeof k === "string" && validKeys.has(k));
       }
     }
     setColumnSizing(baseSizing);

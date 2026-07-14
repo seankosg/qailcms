@@ -254,7 +254,7 @@ export function TaskManagementRawDataPage() {
 
     const savedFrozen = (s.frozenExtras ?? []).filter((k) => validKeys.has(k));
     const frozenFill = DEFAULT_FROZEN_EXTRAS.filter((k) => !savedFrozen.includes(k));
-    const mergedFrozen = [...savedFrozen, ...frozenFill].slice(0, 3);
+    const mergedFrozen = [...savedFrozen, ...frozenFill];
 
     const cleanedVisibility: VisibilityState = {};
     for (const [k, v] of Object.entries(s.visibility ?? {})) {

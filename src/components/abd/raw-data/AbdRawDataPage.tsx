@@ -210,7 +210,7 @@ export function AbdRawDataPage() {
       if (s.visibility && typeof s.visibility === "object") {
         for (const [k, v] of Object.entries(s.visibility)) if (valid.has(k)) baseVisibility[k] = !!v;
       }
-      if (Array.isArray(s.frozenExtras)) baseFrozen = s.frozenExtras.filter((k: any) => typeof k === "string" && valid.has(k)).slice(0, 3);
+      if (Array.isArray(s.frozenExtras)) baseFrozen = s.frozenExtras.filter((k: any) => typeof k === "string" && valid.has(k));
     }
     setColumnSizing(baseSizing);
     setOrder(baseOrder);
