@@ -125,7 +125,7 @@ export function useDefectDefaults() {
 
 /** Admin 전용: defect_field_config UPDATE. RLS로 비관리자는 실패. */
 export async function persistDefectFieldConfig(
-  patches: Array<{ field_name: string; sort_order?: number; is_visible?: boolean }>,
+  patches: Array<{ field_name: string; sort_order?: number; is_visible?: boolean; display_name?: string }>,
 ) {
   if (!patches.length) return;
   // is_critical / stage_progress 는 파생 컬럼이라 field_config에 없음 → 스킵
