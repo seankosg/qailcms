@@ -991,13 +991,19 @@ export function TaskManagementRawDataPage() {
                 return (
                   <div
                     key={row.id}
+                    onClick={() =>
+                      navigate({
+                        to: "/closure/task-management/detail/$id",
+                        params: { id: String((row.original as Row).id) },
+                      })
+                    }
                     style={{
                       transform: `translateY(${v.start}px)`,
                       height: v.size,
                       width: totalWidth,
                     }}
                     className={cn(
-                      "group absolute left-0 top-0 flex border-b text-xs hover:bg-accent/40",
+                      "group absolute left-0 top-0 flex cursor-pointer border-b text-xs hover:bg-accent/40",
                       row.getIsSelected() && "bg-primary/5",
                       isParent && "bg-muted/30 font-medium",
                     )}
