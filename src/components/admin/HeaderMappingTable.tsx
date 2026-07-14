@@ -20,6 +20,7 @@ import {
 import { useSparePartFieldConfig } from "@/hooks/useSparePartFieldConfig";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { EditableSourceHeaderCell } from "@/components/admin/EditableSourceHeaderCell";
+import { EditableTargetFieldCell } from "@/components/admin/EditableTargetFieldCell";
 import { normalizeHeader } from "@/lib/admin/header-mapping-validation";
 
 export function HeaderMappingTable() {
@@ -67,6 +68,21 @@ export function HeaderMappingTable() {
     await refetch();
   };
 
+  const canEdit = !!me?.isAdmin;
+
+  const saveTargetField = async (r: SparePartHeaderMappingRow, next: string) => {
+    const { error } = await (supabase as any)
+      .from("spare_part_header_mappings")
+      .update({ target_field: next, updated_by: me?.id ?? null })
+      .eq("id", r.id);
+    if (error) {
+      toast.error("저장 실패", { description: error.message });
+      throw error;
+    }
+    qc.invalidateQueries({ queryKey: SPARE_PART_HEADER_MAPPING_QK });
+    await refetch();
+  };
+
   const toggleActive = async (r: SparePartHeaderMappingRow) => {
     const { error } = await (supabase as any)
       .from("spare_part_header_mappings")
@@ -78,10 +94,11 @@ export function HeaderMappingTable() {
   };
 
   const removeRow = async (r: SparePartHeaderMappingRow) => {
-    if (!r.is_custom) {
-      return toast.error("시스템 매핑", { description: "시스템 매핑은 삭제할 수 없습니다." });
-    }
-    if (!confirm(`매핑 "${r.source_header}" → ${r.target_field} 을(를) 삭제하시겠습니까?`)) return;
+    if (!canEdit) return;
+    const msg = r.is_custom
+      ? `매핑 "${r.source_header}" → ${r.target_field} 을(를) 삭제하시겠습니까?`
+      : `System 매핑 "${r.source_header}" → ${r.target_field} 을(를) 삭제하시겠습니까?\n\n※ 시드 재배포 시 되돌아갈 수 있습니다.`;
+    if (!confirm(msg)) return;
     const { error } = await (supabase as any)
       .from("spare_part_header_mappings")
       .delete()
@@ -125,6 +142,7 @@ export function HeaderMappingTable() {
         <Button size="sm" onClick={() => setAddOpen(true)}>
           <Plus className="mr-1 h-3.5 w-3.5" /> Add Mapping
         </Button>
+        {!canEdit && null}
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="rounded border bg-muted/30 p-3 space-y-2">
