@@ -109,13 +109,13 @@ export function DeSnagDashboardPage() {
   }
 
   const goRaw = (params: Record<string, string>) => {
-    const planGroups = planGroupsForPlot(plot).join(",");
+    const planGroups = planGroupsForPlot(appliedPlot).join(",");
     // 필터 활성 시 roomGroup 파라미터 병합 (호출 측 지정이 우선)
     const rgParam =
-      roomGroups.length > 0
+      appliedRoomGroups.length > 0
         ? Array.from(
             new Set(
-              roomGroups
+              appliedRoomGroups
                 .flatMap((rg) => roomGroupParam(rg).split(","))
                 .map((s) => s.trim())
                 .filter(Boolean),
@@ -125,7 +125,7 @@ export function DeSnagDashboardPage() {
     const merged: Record<string, string> = {
       source: "dashboard",
       plan_group: planGroups,
-      ...(teams.length ? { team: teams.join(",") } : {}),
+      ...(appliedTeams.length ? { team: appliedTeams.join(",") } : {}),
       ...(rgParam ? { roomGroup: rgParam } : {}),
       ...params,
     };
