@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Search, RefreshCcw, Upload, Filter, Download, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Sparkles } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -1044,7 +1044,7 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
     <div className="flex max-h-[calc(100vh-260px)] flex-col overflow-hidden rounded-md border bg-background">
       <TopHorizontalScrollbar targetRef={tableRef} width={totalWidth} frozenWidth={frozenWidth} />
       <div ref={tableRef} className="min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">
-        <Table style={{ width: totalWidth, tableLayout: "fixed" }}>
+        <table className="w-full caption-bottom text-sm" style={{ width: totalWidth, tableLayout: "fixed" }}>
           <TableHeader className="bg-background">
             <TableRow className="border-b bg-background [&>th]:sticky [&>th]:top-0 [&>th]:z-[2] [&>th]:bg-background">
               {table.getHeaderGroups().at(-1)?.headers.map((header, i) => {
@@ -1141,7 +1141,7 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
               </>
             )}
           </TableBody>
-        </Table>
+        </table>
       </div>
     </div>
   );
