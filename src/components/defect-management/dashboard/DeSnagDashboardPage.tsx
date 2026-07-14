@@ -26,8 +26,10 @@ import {
 export function DeSnagDashboardPage() {
   const search = DashboardRoute.useSearch();
   const navigate = useNavigate();
-  const plot = (search.plot ?? "C") as PlotKey;
-  const teams = useMemo<TeamKey[]>(
+
+  // URL에 적용된 필터 (서버 RPC 및 데이터 표시용)
+  const appliedPlot = (search.plot ?? "C") as PlotKey;
+  const appliedTeams = useMemo<TeamKey[]>(
     () =>
       (search.teams ?? "")
         .split(",")
@@ -35,7 +37,7 @@ export function DeSnagDashboardPage() {
         .filter((s: string): s is TeamKey => (ALL_TEAMS as readonly string[]).includes(s)),
     [search.teams],
   );
-  const roomGroups = useMemo<RoomGroupCol[]>(
+  const appliedRoomGroups = useMemo<RoomGroupCol[]>(
     () =>
       (search.roomGroups ?? "")
         .split(",")
@@ -46,33 +48,58 @@ export function DeSnagDashboardPage() {
     [search.roomGroups],
   );
 
-  const { data: rawRows = [], isLoading, error } = useSnagDashboardMatrix(plot, teams);
+  // Plot/Team은 스테이징: 변경해도 서버 재호출 없음, '재계산' 버튼으로 적용
+  const [stagedPlot, setStagedPlot] = useState<PlotKey>(appliedPlot);
+  const [stagedTeams, setStagedTeams] = useState<TeamKey[]>(appliedTeams);
+
+  // URL 변경(뒤로가기/공유 링크 진입 등) 시 스테이징 값도 동기화
+  useEffect(() => {
+    setStagedPlot(appliedPlot);
+    setStagedTeams(appliedTeams);
+  }, [appliedPlot, appliedTeams]);
+
+  const { data: rawRows = [], isLoading, error } = useSnagDashboardMatrix(
+    appliedPlot,
+    appliedTeams,
+  );
   const filteredRows = useMemo(() => {
-    if (roomGroups.length === 0) return rawRows;
-    const set = new Set<RoomGroupCol>(roomGroups);
+    if (appliedRoomGroups.length === 0) return rawRows;
+    const set = new Set<RoomGroupCol>(appliedRoomGroups);
     return rawRows.filter((r) => set.has(normalizeRoomGroup(r.room_group)));
-  }, [rawRows, roomGroups]);
+  }, [rawRows, appliedRoomGroups]);
   const matrix = useMemo(
-    () => buildMatrix(plot, teams, filteredRows),
-    [plot, teams, filteredRows],
+    () => buildMatrix(appliedPlot, appliedTeams, filteredRows),
+    [appliedPlot, appliedTeams, filteredRows],
   );
 
   const teamsStr = search.teams ?? "";
   const rgStr = search.roomGroups ?? "";
-  const setPlot = (p: PlotKey) =>
+
+  const teamKey = (t: TeamKey[]) => [...t].sort().join(",");
+  const isDirty =
+    stagedPlot !== appliedPlot || teamKey(stagedTeams) !== teamKey(appliedTeams);
+
+  const applyFilters = () => {
+    if (!isDirty) return;
     navigate({
       to: "/closure/snag-management/dashboard",
-      search: { plot: p, teams: teamsStr, roomGroups: rgStr },
+      search: {
+        plot: stagedPlot,
+        teams: stagedTeams.join(","),
+        roomGroups: rgStr,
+      },
     });
-  const setTeams = (t: TeamKey[]) =>
-    navigate({
-      to: "/closure/snag-management/dashboard",
-      search: { plot, teams: t.join(","), roomGroups: rgStr },
-    });
+  };
+
+  const resetStaged = () => {
+    setStagedPlot(appliedPlot);
+    setStagedTeams(appliedTeams);
+  };
+
   const setRoomGroups = (rgs: RoomGroupCol[]) =>
     navigate({
       to: "/closure/snag-management/dashboard",
-      search: { plot, teams: teamsStr, roomGroups: rgs.join(",") },
+      search: { plot: appliedPlot, teams: teamsStr, roomGroups: rgs.join(",") },
     });
 
   function roomGroupParam(col: RoomGroupCol): string {
