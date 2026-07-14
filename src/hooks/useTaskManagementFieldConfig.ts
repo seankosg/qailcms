@@ -52,3 +52,46 @@ export function useTmColumnLabel(): (key: string) => string {
     return (key: string) => overrides[key] ?? codeLabels.get(key) ?? key;
   }, [data]);
 }
+
+/**
+ * field_config 기반 기본 컬럼 순서/노출. `task_no`는 시스템 고정 컬럼이므로 제외.
+ */
+export function useTmDefaults() {
+  const { data } = useTaskManagementFieldConfig();
+  return useMemo(() => {
+    const rows = data ?? [];
+    const codeKeys = TM_COLUMNS.map((c) => c.key).filter((k) => k !== "task_no");
+    const codeSet = new Set(codeKeys);
+    const configured = rows
+      .filter((r) => codeSet.has(r.field_name) && r.field_name !== "task_no")
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((r) => r.field_name);
+    const configuredSet = new Set(configured);
+    const defaultOrder = rows.length
+      ? [...configured, ...codeKeys.filter((k) => !configuredSet.has(k))]
+      : codeKeys;
+    const defaultVisibility: Record<string, boolean> = {};
+    for (const r of rows) {
+      if (codeSet.has(r.field_name)) defaultVisibility[r.field_name] = !!r.is_visible;
+    }
+    return { defaultOrder, defaultVisibility };
+  }, [data]);
+}
+
+/** Admin 전용: field_config UPDATE. RLS로 비관리자는 실패. */
+export async function persistTmFieldConfig(
+  patches: Array<{ field_name: string; sort_order?: number; is_visible?: boolean }>,
+) {
+  if (!patches.length) return;
+  const results = await Promise.all(
+    patches.map((p) => {
+      const { field_name, ...patch } = p;
+      return (supabase as any)
+        .from("task_management_field_config")
+        .update(patch)
+        .eq("field_name", field_name);
+    }),
+  );
+  const err = results.find((r) => r.error)?.error;
+  if (err) throw err;
+}

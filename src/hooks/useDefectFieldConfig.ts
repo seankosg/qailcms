@@ -91,3 +91,56 @@ export function useDefectFieldHelpers() {
     return { isFieldRequired, getLabel, getSourceLabel, getSourceOrigin };
   }, [data]);
 }
+
+/**
+ * field_config 기반 기본 컬럼 순서/노출.
+ * `is_critical` / `stage_progress`는 field_config에 없는 파생 가상 컬럼이므로
+ * 별도로 순서 앞부분에 유지. field_config에 없는 신규 코드 컬럼은 뒤에 append.
+ */
+export function useDefectDefaults() {
+  const { data } = useDefectFieldConfig();
+  return useMemo(() => {
+    const rows = data ?? [];
+    const codeKeys = DEFECT_COLUMNS.map((c) => c.key).filter((k) => k !== "is_critical");
+    const codeSet = new Set(codeKeys);
+    const configured = rows
+      .filter((r) => codeSet.has(r.field_name))
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((r) => r.field_name);
+    const configuredSet = new Set(configured);
+    const dataOrder = rows.length
+      ? [...configured, ...codeKeys.filter((k) => !configuredSet.has(k))]
+      : codeKeys;
+    const defaultOrder = ["is_critical", "stage_progress", ...dataOrder];
+    const defaultVisibility: Record<string, boolean> = {
+      is_critical: true,
+      stage_progress: true,
+    };
+    for (const r of rows) {
+      if (codeSet.has(r.field_name)) defaultVisibility[r.field_name] = !!r.is_visible;
+    }
+    return { defaultOrder, defaultVisibility };
+  }, [data]);
+}
+
+/** Admin 전용: defect_field_config UPDATE. RLS로 비관리자는 실패. */
+export async function persistDefectFieldConfig(
+  patches: Array<{ field_name: string; sort_order?: number; is_visible?: boolean }>,
+) {
+  if (!patches.length) return;
+  // is_critical / stage_progress 는 파생 컬럼이라 field_config에 없음 → 스킵
+  const skip = new Set(["is_critical", "stage_progress"]);
+  const filtered = patches.filter((p) => !skip.has(p.field_name));
+  if (!filtered.length) return;
+  const results = await Promise.all(
+    filtered.map((p) => {
+      const { field_name, ...patch } = p;
+      return (supabase as any)
+        .from("defect_field_config")
+        .update(patch)
+        .eq("field_name", field_name);
+    }),
+  );
+  const err = results.find((r) => r.error)?.error;
+  if (err) throw err;
+}
