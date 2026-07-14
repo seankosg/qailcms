@@ -568,14 +568,9 @@ export function TaskManagementRawDataPage() {
                 ) : (
                   <span className="w-4" />
                 )}
-                <Link
-                  to="/closure/task-management/detail/$id"
-                  params={{ id: String(rr.id) }}
-                  className="min-w-0 flex-1 truncate text-primary hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <span className="min-w-0 flex-1 truncate text-primary">
                   {rendered}
-                </Link>
+                </span>
                 {isParent && canEdit && (
                   <button
                     type="button"
@@ -603,34 +598,7 @@ export function TaskManagementRawDataPage() {
               </span>
             );
           }
-          if (false) {
-            return (
-              <Link
-                to="/closure/task-management/detail/$id"
-                params={{ id: String((row.original as Row).id) }}
-                className="text-primary hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {rendered}
-              </Link>
-            );
-          }
-          if (!c.editable) return rendered;
-          // Do not allow editing actual_progress on parent rows
-          if (c.key === "actual_progress" && (row.original as Row).level === "parent") {
-            return rendered;
-          }
-          return (
-            <EditCellPopover
-              rowId={String((row.original as Row).id)}
-              column={c}
-              currentValue={val}
-              canEdit={canEdit}
-              onSaved={() => refetch()}
-            >
-              {rendered}
-            </EditCellPopover>
-          );
+          return rendered;
         },
       });
     }
