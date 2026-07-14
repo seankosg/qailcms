@@ -70,7 +70,6 @@ import {
 } from "@/lib/task-management/filters";
 import { ColumnFilterDropdown } from "./ColumnFilters";
 import { BulkEditBar } from "./BulkEditBar";
-import { EditCellPopover } from "./EditCellPopover";
 import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { ExportDialog } from "./ExportDialog";
 import { HistoryDrawer } from "./HistoryDrawer";
