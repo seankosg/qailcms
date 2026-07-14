@@ -44,7 +44,6 @@ const NAV: NavSection[] = [
         items: [
           { to: "/closure/task-management/raw-data", label: "Raw Data", icon: Database },
           { to: "/closure/task-management/tree", label: "Tree View", icon: ListTree },
-          { to: "/closure/task-management/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
         ],
       },
       {
@@ -54,8 +53,6 @@ const NAV: NavSection[] = [
         items: [
           { to: "/closure/snag-management/dashboard", label: "Dashboard", icon: LayoutDashboard },
           { to: "/closure/snag-management/raw-data", label: "Raw Data", icon: Database },
-          { to: "/closure/snag-management/import", label: "Import", icon: Upload, editorOnly: true },
-          { to: "/closure/snag-management/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
           { to: "/closure/snag-management/settings", label: "Settings", icon: Settings2, adminOnly: true },
         ],
       },
@@ -71,8 +68,6 @@ const NAV: NavSection[] = [
         matchPrefix: "/closure/abd",
         items: [
           { to: "/closure/abd/raw-data", label: "Raw Data", icon: Database },
-          { to: "/closure/abd/import", label: "Import", icon: Upload, editorOnly: true },
-          { to: "/closure/abd/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
           { to: "/closure/abd/settings", label: "Settings", icon: Settings2, adminOnly: true },
         ],
       },
@@ -82,8 +77,6 @@ const NAV: NavSection[] = [
         matchPrefix: "/closure/spare-part",
         items: [
           { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: Database },
-          { to: "/closure/spare-part/import", label: "Import", icon: Upload, editorOnly: true },
-          { to: "/closure/spare-part/import/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
           { to: "/closure/spare-part/aconex-sync", label: "Aconex Sync", icon: RefreshCw, editorOnly: true },
         ],
       },
