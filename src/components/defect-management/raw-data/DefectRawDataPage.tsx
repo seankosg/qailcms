@@ -1004,11 +1004,17 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
   const stickyBgFor = (row: DefectItem, index: number): string => {
     const closed = Boolean((row as any).actual_closure_date) || /closed|complete|done/i.test(`${(row as any).closure_status ?? ""} ${(row as any).status_raw ?? ""}`);
     const overdue = isOverdueDefect(row as any, dataDate);
-    const base = "hsl(var(--background))";
+    // 스티키 컬럼은 항상 불투명이어야 스크롤 시 뒤 컬럼이 비쳐 보이지 않는다.
+    // 기존에 hsl(var(--background)) 로 감쌌으나 이 프로젝트의 컬러 토큰은 oklch(...) 이므로
+    // hsl() 래핑이 유효하지 않아 배경이 실제로 painting 되지 않았다. 토큰을 그대로 사용한다.
+    const base = "var(--background)";
     const opaque = `linear-gradient(${base}, ${base})`;
-    if (hoveredIndex === index) return `${opaque}, hsl(var(--muted) / 0.95)`;
-    if (overdue && !closed) return `${opaque}, hsl(var(--destructive) / 0.06)`;
-    if (closed) return `${opaque}, hsl(var(--muted) / 0.45)`;
+    if (hoveredIndex === index)
+      return `color-mix(in oklab, var(--muted) 95%, var(--background)), ${opaque}`;
+    if (overdue && !closed)
+      return `color-mix(in oklab, var(--destructive) 6%, var(--background)), ${opaque}`;
+    if (closed)
+      return `color-mix(in oklab, var(--muted) 45%, var(--background)), ${opaque}`;
     return base;
   };
 
