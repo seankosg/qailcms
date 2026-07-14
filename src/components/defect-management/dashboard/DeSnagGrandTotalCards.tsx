@@ -134,6 +134,8 @@ export function DeSnagGrandTotalCards({
 }) {
   const { issued, open, rectified, reopen, closed } = stats;
   const ratio = (v: number) => (issued > 0 ? (v / issued) * 100 : null);
+  const pending = open + reopen;
+  const pendingPct = issued > 0 ? Math.round((pending / issued) * 100) : 0;
 
   return (
     <section className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/[0.04] via-transparent to-transparent p-3 md:p-4">
