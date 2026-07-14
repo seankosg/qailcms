@@ -1,102 +1,121 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import {
-  ListChecks,
-  CircleDot,
-  Wrench,
-  RotateCcw,
-  CheckCircle2,
-  Target,
-  ChevronRight,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Stats } from "@/lib/defect-management/dashboard-shape";
 
-type MetricSlot = "issued" | "open" | "rectified" | "reopen" | "closed" | "closurePct";
+export type MetricSlot = "issued" | "open" | "rectified" | "reopen" | "closed";
 
-function fmtPct(pct: number | null): string {
-  if (pct == null || !Number.isFinite(pct)) return "-";
-  return `${Math.round(pct * 100)}%`;
-}
-
-function closureTone(pct: number | null): {
-  text: string;
-  ring: string;
+type Tone = {
+  border: string;
   bg: string;
-} {
-  if (pct == null) return { text: "text-muted-foreground", ring: "", bg: "" };
-  const p = pct * 100;
-  if (p < 40)
-    return {
-      text: "text-destructive",
-      ring: "border-destructive/40",
-      bg: "bg-destructive/5",
-    };
-  if (p < 80)
-    return {
-      text: "text-amber-600 dark:text-amber-400",
-      ring: "border-amber-500/40",
-      bg: "bg-amber-500/5",
-    };
-  return {
-    text: "text-emerald-600 dark:text-emerald-400",
-    ring: "border-emerald-500/40",
-    bg: "bg-emerald-500/5",
-  };
+  value: string;
+  label: string;
+  barTrack: string;
+  barFill: string;
+};
+
+const TONES: Record<MetricSlot, Tone> = {
+  issued: {
+    border: "",
+    bg: "",
+    value: "text-foreground",
+    label: "text-muted-foreground",
+    barTrack: "bg-muted",
+    barFill: "bg-foreground/70",
+  },
+  open: {
+    border: "border-amber-500/40",
+    bg: "bg-amber-500/10",
+    value: "text-amber-600 dark:text-amber-400",
+    label: "text-amber-700/80 dark:text-amber-300/80",
+    barTrack: "bg-amber-500/15",
+    barFill: "bg-amber-500",
+  },
+  rectified: {
+    border: "border-sky-500/40",
+    bg: "bg-sky-500/10",
+    value: "text-sky-600 dark:text-sky-400",
+    label: "text-sky-700/80 dark:text-sky-300/80",
+    barTrack: "bg-sky-500/15",
+    barFill: "bg-sky-500",
+  },
+  reopen: {
+    border: "border-rose-500/40",
+    bg: "bg-rose-500/10",
+    value: "text-rose-600 dark:text-rose-400",
+    label: "text-rose-700/80 dark:text-rose-300/80",
+    barTrack: "bg-rose-500/15",
+    barFill: "bg-rose-500",
+  },
+  closed: {
+    border: "border-emerald-400/40",
+    bg: "bg-emerald-400/10",
+    value: "text-emerald-600 dark:text-emerald-400",
+    label: "text-emerald-700/80 dark:text-emerald-300/80",
+    barTrack: "bg-emerald-400/15",
+    barFill: "bg-emerald-400",
+  },
+};
+
+function ColoredBar({ pct, tone }: { pct: number; tone: Tone }) {
+  const v = Math.max(0, Math.min(100, pct));
+  return (
+    <div className={cn("mt-3 h-2 w-full overflow-hidden rounded-full", tone.barTrack)}>
+      <div
+        className={cn("h-full rounded-full transition-all", tone.barFill)}
+        style={{ width: `${v}%` }}
+      />
+    </div>
+  );
 }
 
 function KpiCard({
-  icon,
+  slot,
   label,
   value,
-  sub,
-  accent,
-  ring,
-  bg,
-  progress,
+  pct,
+  showBar,
   onClick,
 }: {
-  icon: React.ReactNode;
+  slot: MetricSlot;
   label: string;
-  value: string | number;
-  sub?: string;
-  accent?: string;
-  ring?: string;
-  bg?: string;
-  progress?: number | null;
+  value: number;
+  pct: number | null;
+  showBar: boolean;
   onClick?: () => void;
 }) {
+  const tone = TONES[slot];
   return (
     <Card
       onClick={onClick}
       className={cn(
-        "group relative overflow-hidden transition-colors",
-        onClick && "cursor-pointer hover:bg-muted/40",
-        ring,
-        bg,
+        "group relative overflow-hidden transition-all",
+        tone.border,
+        tone.bg,
+        onClick && "cursor-pointer hover:shadow-md hover:-translate-y-0.5",
       )}
     >
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="shrink-0">{icon}</div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {label}
-          </p>
-          <p
-            className={cn(
-              "mt-0.5 text-2xl font-bold leading-tight tabular-nums",
-              accent ?? "text-foreground",
-            )}
-          >
-            {value}
-          </p>
-          {sub && (
-            <p className="text-[11px] text-muted-foreground tabular-nums">{sub}</p>
+      <CardContent className="flex flex-col gap-1 p-5">
+        <p
+          className={cn(
+            "text-sm font-semibold uppercase tracking-wide",
+            tone.label,
           )}
-          {progress != null && (
-            <Progress value={progress} className="mt-2 h-1.5" />
+        >
+          {label}
+        </p>
+        <p
+          className={cn(
+            "mt-1 text-4xl font-bold leading-none tabular-nums md:text-5xl",
+            tone.value,
           )}
-        </div>
+        >
+          {value.toLocaleString()}
+        </p>
+        <p className={cn("mt-1 text-sm font-medium tabular-nums", tone.label)}>
+          {pct == null ? "—" : `${Math.round(pct)}%`}
+        </p>
+        {showBar && <ColoredBar pct={pct ?? 0} tone={tone} />}
       </CardContent>
     </Card>
   );
@@ -113,11 +132,8 @@ export function DeSnagGrandTotalCards({
   onMetric: (m: MetricSlot) => void;
   onAll: () => void;
 }) {
-  const { issued, open, rectified, reopen, closed, closurePct } = stats;
-  const pct = (v: number) =>
-    issued > 0 ? `${Math.round((v / issued) * 100)}% of ISSUED` : "—";
-  const tone = closureTone(closurePct);
-  const pctValue = closurePct == null ? null : Math.round(closurePct * 100);
+  const { issued, open, rectified, reopen, closed } = stats;
+  const ratio = (v: number) => (issued > 0 ? (v / issued) * 100 : null);
 
   return (
     <section className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/[0.04] via-transparent to-transparent p-3 md:p-4">
@@ -137,52 +153,46 @@ export function DeSnagGrandTotalCards({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
         <KpiCard
-          icon={<ListChecks className="h-6 w-6 text-primary" />}
+          slot="issued"
           label="Issued"
-          value={issued.toLocaleString()}
-          sub="Total snags"
+          value={issued}
+          pct={issued > 0 ? 100 : null}
+          showBar={false}
           onClick={() => onMetric("issued")}
         />
         <KpiCard
-          icon={<CircleDot className="h-6 w-6 text-sky-500" />}
+          slot="open"
           label="Open"
-          value={open.toLocaleString()}
-          sub={pct(open)}
+          value={open}
+          pct={ratio(open)}
+          showBar
           onClick={() => onMetric("open")}
         />
         <KpiCard
-          icon={<Wrench className="h-6 w-6 text-amber-500" />}
+          slot="rectified"
           label="Rectified"
-          value={rectified.toLocaleString()}
-          sub={pct(rectified)}
+          value={rectified}
+          pct={ratio(rectified)}
+          showBar
           onClick={() => onMetric("rectified")}
         />
         <KpiCard
-          icon={<RotateCcw className="h-6 w-6 text-rose-500" />}
+          slot="reopen"
           label="Re-Opened"
-          value={reopen.toLocaleString()}
-          sub={pct(reopen)}
+          value={reopen}
+          pct={ratio(reopen)}
+          showBar
           onClick={() => onMetric("reopen")}
         />
         <KpiCard
-          icon={<CheckCircle2 className="h-6 w-6 text-emerald-500" />}
+          slot="closed"
           label="Closed"
-          value={closed.toLocaleString()}
-          sub={pct(closed)}
+          value={closed}
+          pct={ratio(closed)}
+          showBar
           onClick={() => onMetric("closed")}
-        />
-        <KpiCard
-          icon={<Target className={cn("h-6 w-6", tone.text)} />}
-          label="Closure %"
-          value={fmtPct(closurePct)}
-          sub="Closed ÷ Issued"
-          accent={cn("font-bold", tone.text)}
-          ring={tone.ring}
-          bg={tone.bg}
-          progress={pctValue}
-          onClick={() => onMetric("closurePct")}
         />
       </div>
     </section>
