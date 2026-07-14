@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Columns3, GripVertical, Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SPARE_PART_COLUMNS } from "@/lib/spare-part/columns";
+import { useSparePartFieldConfig } from "@/hooks/useSparePartFieldConfig";
 
 interface Props {
   order: string[]; // full column order excluding __select/doc_ref
@@ -13,12 +14,32 @@ interface Props {
   onOrderChange: (next: string[]) => void;
   onVisibilityChange: (next: Record<string, boolean>) => void;
   onFrozenChange: (next: string[]) => void;
+  /** 관리자면 순서/노출 변경을 서버 field_config에 반영 */
+  isAdmin?: boolean;
+  onServerReorder?: (patches: Array<{ field_name: string; sort_order: number }>) => void;
+  onServerVisibility?: (field_name: string, is_visible: boolean) => void;
 }
 
-const LABELS = new Map(SPARE_PART_COLUMNS.map((c) => [c.key, c.label] as const));
+const CODE_LABELS = new Map(SPARE_PART_COLUMNS.map((c) => [c.key, c.label] as const));
 
-export function ColumnOrderMenu({ order, visibility, frozenExtras, onOrderChange, onVisibilityChange, onFrozenChange }: Props) {
+export function ColumnOrderMenu({ order, visibility, frozenExtras, onOrderChange, onVisibilityChange, onFrozenChange, isAdmin, onServerReorder, onServerVisibility }: Props) {
   const [dragKey, setDragKey] = useState<string | null>(null);
+  const { data: fieldConfig } = useSparePartFieldConfig();
+  const labelFor = (k: string) => {
+    const row = fieldConfig?.find((r) => r.field_name === k);
+    return row?.display_name ?? CODE_LABELS.get(k) ?? k;
+  };
+
+  // 관리자 드래그 반영 debounce
+  const reorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReorderPersist = (nextOrder: string[]) => {
+    if (!isAdmin || !onServerReorder) return;
+    if (reorderTimer.current) clearTimeout(reorderTimer.current);
+    reorderTimer.current = setTimeout(() => {
+      onServerReorder(nextOrder.map((k, i) => ({ field_name: k, sort_order: (i + 1) * 10 })));
+    }, 400);
+  };
+  useEffect(() => () => { if (reorderTimer.current) clearTimeout(reorderTimer.current); }, []);
 
   const toggleFrozen = (k: string) => {
     if (frozenExtras.includes(k)) {
@@ -42,8 +63,14 @@ export function ColumnOrderMenu({ order, visibility, frozenExtras, onOrderChange
     next.splice(from, 1);
     next.splice(to, 0, dragKey);
     onOrderChange(next);
+    scheduleReorderPersist(next);
   };
   const onDragEnd = () => setDragKey(null);
+
+  const changeVisibility = (k: string, checked: boolean) => {
+    onVisibilityChange({ ...visibility, [k]: checked });
+    if (isAdmin && onServerVisibility) onServerVisibility(k, checked);
+  };
 
   return (
     <Popover>
@@ -55,7 +82,10 @@ export function ColumnOrderMenu({ order, visibility, frozenExtras, onOrderChange
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-2">
         <div className="mb-2 flex items-center justify-between px-1 text-[11px] text-muted-foreground">
-          <span>드래그로 순서 변경 · 핀으로 좌측 고정({frozenExtras.length}/3)</span>
+          <span>
+            드래그로 순서 변경 · 핀으로 좌측 고정({frozenExtras.length}/3)
+            {isAdmin ? " · 관리자: 순서/노출은 전체 사용자에 반영" : ""}
+          </span>
           <button
             className="text-primary hover:underline"
             onClick={() => {
@@ -74,7 +104,7 @@ export function ColumnOrderMenu({ order, visibility, frozenExtras, onOrderChange
           {frozenExtras.map((k) => (
             <div key={k} className="flex items-center gap-1 rounded px-1 py-1 text-xs">
               <Pin className="h-3 w-3 text-primary" />
-              <span className="flex-1 truncate">{LABELS.get(k) ?? k}</span>
+              <span className="flex-1 truncate">{labelFor(k)}</span>
               <button className="text-[10px] text-muted-foreground hover:underline" onClick={() => toggleFrozen(k)}>
                 unpin
               </button>
@@ -101,10 +131,10 @@ export function ColumnOrderMenu({ order, visibility, frozenExtras, onOrderChange
                 <GripVertical className="h-3 w-3 text-muted-foreground/40" />
                 <Checkbox
                   checked={!hidden}
-                  onCheckedChange={(c) => onVisibilityChange({ ...visibility, [k]: !!c })}
+                  onCheckedChange={(c) => changeVisibility(k, !!c)}
                   className="h-3 w-3"
                 />
-                <span className={cn("flex-1 truncate", hidden && "text-muted-foreground/50")}>{LABELS.get(k) ?? k}</span>
+                <span className={cn("flex-1 truncate", hidden && "text-muted-foreground/50")}>{labelFor(k)}</span>
                 <button
                   className={cn("text-[10px] hover:underline", frozenExtras.length >= 3 ? "cursor-not-allowed text-muted-foreground/40" : "text-muted-foreground")}
                   onClick={() => toggleFrozen(k)}
