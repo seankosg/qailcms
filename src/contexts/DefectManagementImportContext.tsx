@@ -96,6 +96,13 @@ export interface DefectImportFile {
     unmappedCategories?: string[];
     errors?: DefectImportError[];
   };
+  classificationResult?: {
+    skippedRows: number;
+    ruleOnlyRows: number;
+    llmRows: number;
+    llmUpdated: number;
+    llmFailed: number;
+  };
   duplicateStrategy?: DuplicateStrategy;
   duplicateGroups?: DuplicateGroup[];
   autoDedupedIdenticalCount?: number;
