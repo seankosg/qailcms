@@ -716,6 +716,8 @@ export function DefectRawDataPage() {
             order={order}
             visibility={visibility as Record<string, boolean>}
             frozenExtras={frozenExtras}
+            defaultOrder={defaultOrder}
+            defaultVisibility={defaultVisibility}
             onOrderChange={setOrder}
             onVisibilityChange={(v) => setVisibility(v)}
             onFrozenChange={setFrozenExtras}
