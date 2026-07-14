@@ -666,6 +666,14 @@ export function DefectRawDataPage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm"><Link to="/closure/snag-management/import"><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
+          <DefectColumnOrderMenu
+            order={order}
+            visibility={visibility as Record<string, boolean>}
+            frozenExtras={frozenExtras}
+            onOrderChange={setOrder}
+            onVisibilityChange={(v) => setVisibility(v)}
+            onFrozenChange={setFrozenExtras}
+          />
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           <Button variant="outline" size="sm" onClick={() => { invalidateDefects(); refetch(); }} disabled={isFetching}>
