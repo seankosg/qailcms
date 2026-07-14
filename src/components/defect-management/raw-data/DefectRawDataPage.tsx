@@ -82,7 +82,8 @@ const DEFAULT_ORDER = [
   "stage_progress",
   ...DEFECT_COLUMNS.map((c) => c.key).filter((k) => k !== "is_critical"),
 ];
-const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
+const PAGE_SIZE_OPTIONS: Array<number | "all"> = [50, 100, 200, 500, "all"];
+const ALL_PAGE_LIMIT = 1_000_000;
 
 // ── URL <-> table state helpers ────────────────────────────────────────────
 function parseSortFromUrl(s: string): SortingState {
