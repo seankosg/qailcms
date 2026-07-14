@@ -578,7 +578,7 @@ export function SparePartRawDataPage() {
         <div ref={scrollRef} className="h-full overflow-auto">
           <div style={{ width: totalWidth }} className="relative">
             {/* Header */}
-            <div className="sticky top-0 z-10 flex border-b bg-muted/70 backdrop-blur">
+            <div className="sticky top-0 z-10 flex border-b bg-muted">
               {table.getHeaderGroups().map((hg) =>
                 hg.headers.map((h) => {
                   const sort = h.column.getIsSorted();
@@ -597,8 +597,7 @@ export function SparePartRawDataPage() {
                       }}
                       className={cn(
                         "relative flex select-none items-center gap-1 border-r px-2 py-1.5 text-xs font-medium",
-                        bg,
-                        isFrozen && "bg-muted",
+                        isFrozen ? "bg-muted" : bg,
                       )}
                     >
                       {h.column.id === "doc_ref" && <Pin className="h-3 w-3 text-primary" />}
