@@ -1,16 +1,35 @@
-import { useCallback, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useCallback, useRef, useState } from "react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  FileSpreadsheet,
+  Loader2,
+  Upload,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Upload, X, Play, ArrowLeft, FileSpreadsheet, AlertTriangle } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { parseAbdFile, type ParsedFileResult, detectTeamFromFilename } from "@/lib/abd/parser";
 import { importAbdBatch } from "@/lib/abd/mutations.functions";
-import { ABD_TEAMS, TEAM_LABEL, type AbdTeam } from "@/lib/abd/columns";
+import { ABD_TEAMS, type AbdTeam } from "@/lib/abd/columns";
 
 type Status = "queued" | "parsing" | "ready" | "importing" | "done" | "error";
 
@@ -21,50 +40,111 @@ interface FileEntry {
   team: AbdTeam | null;
   parsed?: ParsedFileResult;
   error?: string;
-  result?: { inserted: number; updated: number; inactivated: number; mismatched: number; total: number };
+  result?: {
+    inserted: number;
+    updated: number;
+    inactivated: number;
+    mismatched: number;
+    total: number;
+  };
+  progress?: number;
+}
+
+const statusBadge: Record<Status, { label: string; cls: string }> = {
+  queued: { label: "Pending", cls: "bg-muted text-muted-foreground" },
+  parsing: { label: "Parsing", cls: "bg-muted text-muted-foreground" },
+  ready: { label: "Ready", cls: "bg-primary/10 text-primary" },
+  importing: { label: "Processing", cls: "bg-muted text-muted-foreground" },
+  done: {
+    label: "Done",
+    cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+  },
+  error: { label: "Failed", cls: "bg-destructive/10 text-destructive" },
+};
+
+function formatSize(b: number) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
 export function AbdImportPage() {
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFiles = useCallback(async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const newEntries: FileEntry[] = [];
-    for (const f of Array.from(files)) {
-      newEntries.push({
-        id: crypto.randomUUID(),
-        file: f,
-        status: "queued",
-        team: detectTeamFromFilename(f.name),
-      });
-    }
+  const handleFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    const newEntries: FileEntry[] = files.map((f) => ({
+      id: crypto.randomUUID(),
+      file: f,
+      status: "queued",
+      team: detectTeamFromFilename(f.name),
+    }));
     setEntries((prev) => [...prev, ...newEntries]);
-    // parse each in background
     for (const e of newEntries) {
       try {
-        setEntries((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: "parsing" } : x)));
+        setEntries((prev) =>
+          prev.map((x) => (x.id === e.id ? { ...x, status: "parsing" } : x)),
+        );
         const parsed = await parseAbdFile(e.file, e.team ?? undefined);
-        setEntries((prev) => prev.map((x) => (x.id === e.id ? { ...x, parsed, team: parsed.team_from_filename ?? x.team, status: "ready" } : x)));
+        setEntries((prev) =>
+          prev.map((x) =>
+            x.id === e.id
+              ? {
+                  ...x,
+                  parsed,
+                  team: parsed.team_from_filename ?? x.team,
+                  status: "ready",
+                }
+              : x,
+          ),
+        );
       } catch (err: any) {
-        setEntries((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: "error", error: err?.message ?? String(err) } : x)));
+        setEntries((prev) =>
+          prev.map((x) =>
+            x.id === e.id
+              ? { ...x, status: "error", error: err?.message ?? String(err) }
+              : x,
+          ),
+        );
       }
     }
   }, []);
 
-  const removeEntry = (id: string) => setEntries((p) => p.filter((x) => x.id !== id));
-  const setTeam = (id: string, team: AbdTeam) => setEntries((p) => p.map((x) => (x.id === id ? { ...x, team } : x)));
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      void handleFiles(Array.from(e.dataTransfer.files));
+    },
+    [handleFiles],
+  );
+  const onSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      void handleFiles(e.target.files ? Array.from(e.target.files) : []);
+      if (inputRef.current) inputRef.current.value = "";
+    },
+    [handleFiles],
+  );
 
-  const canStart = entries.length > 0 && entries.every((e) => e.status === "ready" && e.team);
+  const removeEntry = (id: string) =>
+    setEntries((p) => p.filter((x) => x.id !== id));
+  const setTeam = (id: string, team: AbdTeam) =>
+    setEntries((p) => p.map((x) => (x.id === id ? { ...x, team } : x)));
+  const clearAll = () => setEntries([]);
+
+  const readyCount = entries.filter((e) => e.status === "ready" && e.team).length;
+  const isRunning = busy;
 
   const startImport = async () => {
     setBusy(true);
     for (const e of entries) {
       if (e.status !== "ready" || !e.parsed || !e.team) continue;
-      setEntries((p) => p.map((x) => (x.id === e.id ? { ...x, status: "importing" } : x)));
+      setEntries((p) =>
+        p.map((x) => (x.id === e.id ? { ...x, status: "importing", progress: 20 } : x)),
+      );
       try {
-        // combine all sheets into one call per (team, plot)? Simpler: one call per sheet.
-        let agg = { inserted: 0, updated: 0, inactivated: 0, mismatched: 0, total: 0 };
+        const agg = { inserted: 0, updated: 0, inactivated: 0, mismatched: 0, total: 0 };
         for (const sheet of e.parsed.sheets) {
           const rows = sheet.rows.map((r) => ({ ...r, plot: r.plot ?? sheet.plot ?? null }));
           const res = await importAbdBatch({
@@ -84,10 +164,22 @@ export function AbdImportPage() {
           agg.mismatched += res.mismatched;
           agg.total += res.total;
         }
-        setEntries((p) => p.map((x) => (x.id === e.id ? { ...x, status: "done", result: agg } : x)));
-        toast.success(`${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성 / ${agg.mismatched} 필드 mismatch`);
+        setEntries((p) =>
+          p.map((x) =>
+            x.id === e.id ? { ...x, status: "done", result: agg, progress: 100 } : x,
+          ),
+        );
+        toast.success(
+          `${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성 / ${agg.mismatched} 필드 mismatch`,
+        );
       } catch (err: any) {
-        setEntries((p) => p.map((x) => (x.id === e.id ? { ...x, status: "error", error: err?.message ?? String(err) } : x)));
+        setEntries((p) =>
+          p.map((x) =>
+            x.id === e.id
+              ? { ...x, status: "error", error: err?.message ?? String(err) }
+              : x,
+          ),
+        );
         toast.error(`${e.file.name} 임포트 실패: ${err?.message ?? err}`);
       }
     }
@@ -95,15 +187,12 @@ export function AbdImportPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">ABD Import</h1>
-          <p className="text-sm text-muted-foreground">
-            원본 엑셀(다단 헤더)을 그대로 업로드하면 자동으로 파싱 · 평탄화 저장합니다. 재업로드 시 ABD_NUMBER 기준 upsert.
-          </p>
-        </div>
-        <Button asChild variant="outline" size="sm"><Link to="/closure/abd/raw-data"><ArrowLeft className="mr-1 h-3.5 w-3.5" /> Raw Data</Link></Button>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold">ABD — Import</h1>
+        <p className="text-sm text-muted-foreground">
+          원본 엑셀(다단 헤더)을 그대로 업로드하면 자동으로 파싱 · 평탄화 저장합니다. 재업로드 시 ABD_NUMBER 기준 upsert.
+        </p>
       </div>
 
       <Alert>
@@ -116,98 +205,193 @@ export function AbdImportPage() {
         </AlertDescription>
       </Alert>
 
-      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-8 hover:bg-muted/40">
-        <Upload className="h-6 w-6 text-muted-foreground" />
-        <span className="text-sm font-medium">Excel 파일을 클릭 또는 드래그하여 업로드</span>
-        <span className="text-xs text-muted-foreground">.xlsx 여러 개 가능 (설비/전기/건축)</span>
-        <input type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-      </label>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">1. Upload Files</CardTitle>
+          <CardDescription>.xlsx 여러 개 가능 (설비/전기/건축). 팀은 파일명으로 자동 감지 후 수정 가능.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+            onClick={() => inputRef.current?.click()}
+            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-10 text-center transition hover:border-primary hover:bg-accent/30"
+          >
+            <Upload className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm font-medium">Excel 파일을 드롭하거나 클릭하여 선택</p>
+            <p className="text-xs text-muted-foreground">.xlsx / .xls — 다중 파일 지원</p>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={onSelect}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {entries.length > 0 && (
-        <div className="space-y-2">
-          {entries.map((e) => (
-            <div key={e.id} className="rounded-md border bg-card p-3">
-              <div className="flex items-start gap-3">
-                <FileSpreadsheet className="mt-0.5 h-5 w-5 text-primary" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">{e.file.name}</span>
-                    <Badge variant="outline" className="text-[10px]">{(e.file.size / 1024).toFixed(0)} KB</Badge>
-                    <StatusBadge status={e.status} />
-                  </div>
-
-                  {e.status === "parsing" && <Progress value={40} className="mt-2 h-1" />}
-
-                  {e.parsed && (
-                    <div className="mt-2 space-y-1 text-xs">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-muted-foreground">팀:</span>
-                        <Select value={e.team ?? ""} onValueChange={(v) => setTeam(e.id, v as AbdTeam)}>
-                          <SelectTrigger className="h-7 w-24 text-xs"><SelectValue placeholder="선택..." /></SelectTrigger>
-                          <SelectContent>
-                            {ABD_TEAMS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <span className="text-muted-foreground">시트: {e.parsed.sheets.length}</span>
-                        {e.parsed.ignored_sheets.length > 0 && <span className="text-muted-foreground/70">(제외 {e.parsed.ignored_sheets.length}: {e.parsed.ignored_sheets.join(", ")})</span>}
-                      </div>
-                      <div className="rounded border bg-muted/30 p-2 text-[11px]">
-                        {e.parsed.sheets.map((s) => (
-                          <div key={s.sheet_name} className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">{s.sheet_name}</span>
-                            {s.plot && <Badge variant="outline" className="text-[10px]">Plot {s.plot}</Badge>}
-                            <span className="text-muted-foreground">{s.rows.length.toLocaleString()} 행</span>
-                            {s.skipped_no_key > 0 && <span className="text-amber-600">키 없음 스킵 {s.skipped_no_key}</span>}
-                            {(() => {
-                              const mm = s.rows.filter((r) => r.field_mismatch).length;
-                              return mm > 0 ? <span className="text-orange-600">필드 mismatch {mm}</span> : null;
-                            })()}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {e.result && (
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                      <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700">신규 {e.result.inserted}</span>
-                      <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-sky-700">변경 {e.result.updated}</span>
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground">비활성 {e.result.inactivated}</span>
-                      <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700">Mismatch {e.result.mismatched}</span>
-                    </div>
-                  )}
-
-                  {e.error && <div className="mt-2 text-xs text-destructive">{e.error}</div>}
-                </div>
-                <button className="text-muted-foreground/70 hover:text-destructive" onClick={() => removeEntry(e.id)} disabled={busy} title="제거">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">2. Files ({entries.length})</CardTitle>
+              <CardDescription>{readyCount} ready to import</CardDescription>
             </div>
-          ))}
-        </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={clearAll} disabled={isRunning}>
+                Clear all
+              </Button>
+              <Button
+                size="sm"
+                onClick={startImport}
+                disabled={isRunning || readyCount === 0}
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Importing…
+                  </>
+                ) : (
+                  `Start import (${readyCount})`
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {entries.map((e) => (
+              <FileRow
+                key={e.id}
+                entry={e}
+                isRunning={isRunning}
+                onRemove={() => removeEntry(e.id)}
+                onTeamChange={(t) => setTeam(e.id, t)}
+              />
+            ))}
+          </CardContent>
+        </Card>
       )}
-
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => setEntries([])} disabled={busy || entries.length === 0}>모두 지우기</Button>
-        <Button size="sm" onClick={startImport} disabled={busy || !canStart}>
-          <Play className={cn("mr-1.5 h-3.5 w-3.5", busy && "animate-pulse")} />
-          {busy ? "임포트 중..." : "Start Import"}
-        </Button>
-      </div>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: Status }) {
-  const map: Record<Status, { label: string; cls: string }> = {
-    queued: { label: "대기", cls: "bg-muted text-muted-foreground" },
-    parsing: { label: "파싱중", cls: "bg-sky-500/15 text-sky-700" },
-    ready: { label: "준비", cls: "bg-emerald-500/15 text-emerald-700" },
-    importing: { label: "임포트중", cls: "bg-amber-500/15 text-amber-700" },
-    done: { label: "완료", cls: "bg-emerald-500/15 text-emerald-700" },
-    error: { label: "오류", cls: "bg-destructive/15 text-destructive" },
-  };
-  const m = map[status];
-  return <Badge className={cn("text-[10px]", m.cls)}>{m.label}</Badge>;
+function FileRow({
+  entry: e,
+  isRunning,
+  onRemove,
+  onTeamChange,
+}: {
+  entry: FileEntry;
+  isRunning: boolean;
+  onRemove: () => void;
+  onTeamChange: (t: AbdTeam) => void;
+}) {
+  const badge = statusBadge[e.status];
+  const disabled = isRunning || e.status === "done" || e.status === "importing";
+  const sheetCount = e.parsed?.sheets.length ?? 0;
+  const ignoredCount = e.parsed?.ignored_sheets.length ?? 0;
+  const totalRows = (e.parsed?.sheets ?? []).reduce((s, sh) => s + sh.rows.length, 0);
+  const mismatchCount = (e.parsed?.sheets ?? []).reduce(
+    (s, sh) => s + sh.rows.filter((r) => r.field_mismatch).length,
+    0,
+  );
+  return (
+    <div className="rounded border p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <FileSpreadsheet className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{e.file.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatSize(e.file.size)}
+              {totalRows > 0 && ` · ${totalRows.toLocaleString()} rows`}
+              {sheetCount > 0 && ` · ${sheetCount} sheet(s)`}
+              {ignoredCount > 0 && ` · ${ignoredCount} ignored`}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">팀</span>
+              <Select
+                value={e.team ?? ""}
+                onValueChange={(v) => onTeamChange(v as AbdTeam)}
+                disabled={disabled}
+              >
+                <SelectTrigger className="h-7 w-[140px] text-xs">
+                  <SelectValue placeholder="선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ABD_TEAMS.map((t) => (
+                    <SelectItem key={t.value} value={t.value} className="text-xs">
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {e.parsed && e.parsed.sheets.length > 0 && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                시트 감지:{" "}
+                {e.parsed.sheets
+                  .map(
+                    (s) =>
+                      `${s.sheet_name}${s.plot ? ` (Plot ${s.plot})` : ""} ${s.rows.length}행`,
+                  )
+                  .join(" · ")}
+              </p>
+            )}
+            {e.parsed && ignoredCount > 0 && (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                제외 시트: {e.parsed.ignored_sheets.join(", ")}
+              </p>
+            )}
+            {mismatchCount > 0 && (
+              <p className="mt-1 text-xs text-amber-600">
+                ⚠ 필드 mismatch {mismatchCount}행 (ABD_NUMBER 재파싱 결과가 원본 셀과 상이)
+              </p>
+            )}
+            {e.error && (
+              <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{e.error}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge className={badge.cls}>{badge.label}</Badge>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onRemove}
+            disabled={isRunning}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      {e.status === "importing" && (
+        <Progress value={e.progress ?? 40} className="mt-2 h-1.5" />
+      )}
+      {e.result && (
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          <Badge variant="outline" className="border-emerald-300 text-emerald-700">
+            <CheckCircle2 className="mr-1 h-3 w-3" /> Inserted: {e.result.inserted}
+          </Badge>
+          <Badge variant="outline" className="border-blue-300 text-blue-700">
+            Updated: {e.result.updated}
+          </Badge>
+          {e.result.inactivated > 0 && (
+            <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">
+              Inactivated: {e.result.inactivated}
+            </Badge>
+          )}
+          {e.result.mismatched > 0 && (
+            <Badge variant="outline" className="border-amber-300 text-amber-700">
+              Mismatch: {e.result.mismatched}
+            </Badge>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
