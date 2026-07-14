@@ -136,7 +136,7 @@ export function DeSnagRoomGroupCards({
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="text-sm font-semibold tracking-tight">Room Group별 현황</h2>
         <p className="text-[11px] text-muted-foreground">
-          바 = 그룹 Issued 100% 기준 status 비중. 우측 붉은 숫자 = 처리 필요(Open+Re-Opened).
+          바 = 그룹 Issued 100% 기준 status 비중. 우측 붉은 숫자 = Open + Re-Opened.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -162,14 +162,8 @@ export function DeSnagRoomGroupCards({
                     <span className="text-sm font-semibold tabular-nums">· {pendingPct}%</span>
                   </p>
                 </div>
-                <div className="mb-3 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <span>Room Group</span>
-                  <span>
-                    처리 필요 (Open + Re-Opened){" "}
-                    <span className="text-muted-foreground/70">
-                      / Issued {stats.issued.toLocaleString()}
-                    </span>
-                  </span>
+                <div className="mb-3 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                  / Issued {stats.issued.toLocaleString()}
                 </div>
                 <StackedBar
                   stats={stats}
