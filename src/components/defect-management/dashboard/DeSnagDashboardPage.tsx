@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 import { Route as DashboardRoute } from "@/routes/_authenticated/closure/snag-management/dashboard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeSnagToolbar } from "./DeSnagToolbar";
@@ -25,8 +26,10 @@ import {
 export function DeSnagDashboardPage() {
   const search = DashboardRoute.useSearch();
   const navigate = useNavigate();
-  const plot = (search.plot ?? "C") as PlotKey;
-  const teams = useMemo<TeamKey[]>(
+
+  // URL에 적용된 필터 (서버 RPC 및 데이터 표시용)
+  const appliedPlot = (search.plot ?? "C") as PlotKey;
+  const appliedTeams = useMemo<TeamKey[]>(
     () =>
       (search.teams ?? "")
         .split(",")
@@ -34,7 +37,7 @@ export function DeSnagDashboardPage() {
         .filter((s: string): s is TeamKey => (ALL_TEAMS as readonly string[]).includes(s)),
     [search.teams],
   );
-  const roomGroups = useMemo<RoomGroupCol[]>(
+  const appliedRoomGroups = useMemo<RoomGroupCol[]>(
     () =>
       (search.roomGroups ?? "")
         .split(",")
@@ -45,33 +48,58 @@ export function DeSnagDashboardPage() {
     [search.roomGroups],
   );
 
-  const { data: rawRows = [], isLoading, error } = useSnagDashboardMatrix(plot, teams);
+  // Plot/Team은 스테이징: 변경해도 서버 재호출 없음, '재계산' 버튼으로 적용
+  const [stagedPlot, setStagedPlot] = useState<PlotKey>(appliedPlot);
+  const [stagedTeams, setStagedTeams] = useState<TeamKey[]>(appliedTeams);
+
+  // URL 변경(뒤로가기/공유 링크 진입 등) 시 스테이징 값도 동기화
+  useEffect(() => {
+    setStagedPlot(appliedPlot);
+    setStagedTeams(appliedTeams);
+  }, [appliedPlot, appliedTeams]);
+
+  const { data: rawRows = [], isLoading, error } = useSnagDashboardMatrix(
+    appliedPlot,
+    appliedTeams,
+  );
   const filteredRows = useMemo(() => {
-    if (roomGroups.length === 0) return rawRows;
-    const set = new Set<RoomGroupCol>(roomGroups);
+    if (appliedRoomGroups.length === 0) return rawRows;
+    const set = new Set<RoomGroupCol>(appliedRoomGroups);
     return rawRows.filter((r) => set.has(normalizeRoomGroup(r.room_group)));
-  }, [rawRows, roomGroups]);
+  }, [rawRows, appliedRoomGroups]);
   const matrix = useMemo(
-    () => buildMatrix(plot, teams, filteredRows),
-    [plot, teams, filteredRows],
+    () => buildMatrix(appliedPlot, appliedTeams, filteredRows),
+    [appliedPlot, appliedTeams, filteredRows],
   );
 
   const teamsStr = search.teams ?? "";
   const rgStr = search.roomGroups ?? "";
-  const setPlot = (p: PlotKey) =>
+
+  const teamKey = (t: TeamKey[]) => [...t].sort().join(",");
+  const isDirty =
+    stagedPlot !== appliedPlot || teamKey(stagedTeams) !== teamKey(appliedTeams);
+
+  const applyFilters = () => {
+    if (!isDirty) return;
     navigate({
       to: "/closure/snag-management/dashboard",
-      search: { plot: p, teams: teamsStr, roomGroups: rgStr },
+      search: {
+        plot: stagedPlot,
+        teams: stagedTeams.join(","),
+        roomGroups: rgStr,
+      },
     });
-  const setTeams = (t: TeamKey[]) =>
-    navigate({
-      to: "/closure/snag-management/dashboard",
-      search: { plot, teams: t.join(","), roomGroups: rgStr },
-    });
+  };
+
+  const resetStaged = () => {
+    setStagedPlot(appliedPlot);
+    setStagedTeams(appliedTeams);
+  };
+
   const setRoomGroups = (rgs: RoomGroupCol[]) =>
     navigate({
       to: "/closure/snag-management/dashboard",
-      search: { plot, teams: teamsStr, roomGroups: rgs.join(",") },
+      search: { plot: appliedPlot, teams: teamsStr, roomGroups: rgs.join(",") },
     });
 
   function roomGroupParam(col: RoomGroupCol): string {
@@ -81,13 +109,13 @@ export function DeSnagDashboardPage() {
   }
 
   const goRaw = (params: Record<string, string>) => {
-    const planGroups = planGroupsForPlot(plot).join(",");
+    const planGroups = planGroupsForPlot(appliedPlot).join(",");
     // 필터 활성 시 roomGroup 파라미터 병합 (호출 측 지정이 우선)
     const rgParam =
-      roomGroups.length > 0
+      appliedRoomGroups.length > 0
         ? Array.from(
             new Set(
-              roomGroups
+              appliedRoomGroups
                 .flatMap((rg) => roomGroupParam(rg).split(","))
                 .map((s) => s.trim())
                 .filter(Boolean),
@@ -97,7 +125,7 @@ export function DeSnagDashboardPage() {
     const merged: Record<string, string> = {
       source: "dashboard",
       plan_group: planGroups,
-      ...(teams.length ? { team: teams.join(",") } : {}),
+      ...(appliedTeams.length ? { team: appliedTeams.join(",") } : {}),
       ...(rgParam ? { roomGroup: rgParam } : {}),
       ...params,
     };
@@ -135,21 +163,36 @@ export function DeSnagDashboardPage() {
             Plot · Building · Level × Room Group 매트릭스. 셀·헤더 클릭 시 Raw Data 드릴다운.
           </p>
         </div>
-        <DeSnagToolbar teams={teams} onChange={setTeams} />
+        <DeSnagToolbar teams={stagedTeams} onChange={setStagedTeams} />
       </div>
 
-      <Tabs value={plot} onValueChange={(v) => setPlot(v as PlotKey)}>
-        <TabsList>
-          <TabsTrigger value="C">Plot C (+Tower 3)</TabsTrigger>
-          <TabsTrigger value="D">Plot D (+Tower 4)</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={stagedPlot} onValueChange={(v) => setStagedPlot(v as PlotKey)}>
+          <TabsList>
+            <TabsTrigger value="C">Plot C (+Tower 3)</TabsTrigger>
+            <TabsTrigger value="D">Plot D (+Tower 4)</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex items-center gap-2">
+          {isDirty && (
+            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+              변경된 필터 적용 필요
+            </span>
+          )}
+          <Button size="sm" onClick={applyFilters} disabled={!isDirty}>
+            재계산
+          </Button>
+          <Button size="sm" variant="ghost" onClick={resetStaged} disabled={!isDirty}>
+            초기화
+          </Button>
+        </div>
+      </div>
 
-      <DeSnagRoomGroupFilterBar selected={roomGroups} onChange={setRoomGroups} />
+      <DeSnagRoomGroupFilterBar selected={appliedRoomGroups} onChange={setRoomGroups} />
 
       {/* Plot Grand Total — KPI 카드 */}
       <DeSnagGrandTotalCards
-        plot={plot}
+        plot={appliedPlot}
         stats={matrix.plotTotal}
         onAll={() => goRaw({})}
         onMetric={(m) => {
