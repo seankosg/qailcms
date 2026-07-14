@@ -134,23 +134,33 @@ export function DeSnagGrandTotalCards({
 }) {
   const { issued, open, rectified, reopen, closed } = stats;
   const ratio = (v: number) => (issued > 0 ? (v / issued) * 100 : null);
+  const pending = open + reopen;
+  const pendingPct = issued > 0 ? Math.round((pending / issued) * 100) : 0;
 
   return (
     <section className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/[0.04] via-transparent to-transparent p-3 md:p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/70">
-            Plot {plot}
-          </p>
-          <h2 className="text-sm font-semibold tracking-tight">Grand Total</h2>
+      <div className="mb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/70">
+          Plot {plot}
+        </p>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-sm font-semibold tracking-tight">Grand Total</h2>
+            <div className="flex items-baseline gap-1.5 text-red-600 dark:text-red-500">
+              <span className="text-2xl font-bold tabular-nums">
+                {pending.toLocaleString()}
+              </span>
+              <span className="text-sm font-semibold tabular-nums">· {pendingPct}%</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onAll}
+            className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            전체 목록 <ChevronRight className="h-3 w-3" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onAll}
-          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-        >
-          전체 목록 <ChevronRight className="h-3 w-3" />
-        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
