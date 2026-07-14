@@ -754,6 +754,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           is_active: true,
         };
         put(base, "location_raw", p.location_raw);
+        put(base, "defect_location", p.defect_location);
         put(base, "plan_title", p.plan_title);
         put(base, "plan_group", p.plan_group);
         put(base, "status_raw", p.status_raw);
