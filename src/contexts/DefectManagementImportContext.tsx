@@ -19,6 +19,9 @@ import {
 import { deriveCompletionStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
+import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
+import { classifyDefectsWithLlm } from "@/lib/defect-management/classifier/llm-classify.functions";
+import { CLASSIFIER_FIELDS } from "@/lib/defect-management/classifier/rules";
 
 export type DefectFileStatus =
   | "parsing"
@@ -701,7 +704,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       const ids = deduped.map((p) => p.source_issue_no);
       const existing = new Map<
         string,
-        { priority_locked: boolean; hdec_verification_locked: boolean; actual_closure_date: string | null }
+        {
+          priority_locked: boolean;
+          hdec_verification_locked: boolean;
+          actual_closure_date: string | null;
+          defect_location: string | null;
+          main_trade: string | null;
+          sub_trade: string | null;
+          work_type: string | null;
+        }
       >();
       const idChunks: string[][] = [];
       for (let i = 0; i < ids.length; i += EXISTING_FETCH_CHUNK) {
@@ -710,13 +721,17 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
         const { data } = await (supabase as any)
           .from("defect_items_raw")
-          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date")
+          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, defect_location, main_trade, sub_trade, work_type")
           .in("source_issue_no", chunk);
         for (const r of (data ?? []) as any[]) {
           existing.set(r.source_issue_no, {
             priority_locked: !!r.priority_locked,
             hdec_verification_locked: !!r.hdec_verification_locked,
             actual_closure_date: r.actual_closure_date ?? null,
+            defect_location: r.defect_location ?? null,
+            main_trade: r.main_trade ?? null,
+            sub_trade: r.sub_trade ?? null,
+            work_type: r.work_type ?? null,
           });
         }
       });
