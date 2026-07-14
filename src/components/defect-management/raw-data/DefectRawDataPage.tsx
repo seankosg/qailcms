@@ -315,8 +315,13 @@ export function DefectRawDataPage() {
 
   const tab: DefectStatusGroup = (urlSearch.tab === "closed" ? "closed" : "unclosed") as DefectStatusGroup;
   const includeInactive = !!urlSearch.includeInactive;
-  const page = Math.max(1, Number(urlSearch.page) || 1);
-  const pageSize = PAGE_SIZE_OPTIONS.includes(Number(urlSearch.pageSize)) ? Number(urlSearch.pageSize) : 100;
+  const isAllPage = urlSearch.pageSize === "all";
+  const pageSize = isAllPage
+    ? ALL_PAGE_LIMIT
+    : (PAGE_SIZE_OPTIONS as Array<number | "all">).includes(Number(urlSearch.pageSize))
+      ? Number(urlSearch.pageSize)
+      : 100;
+  const page = isAllPage ? 1 : Math.max(1, Number(urlSearch.page) || 1);
 
   // View preference: per-tab
   const viewPref = useUserViewPreference(`defect-management.raw-data.${tab}.v2`);
@@ -362,7 +367,7 @@ export function DefectRawDataPage() {
   });
   const rows = itemsData?.rows ?? [];
   const total = itemsData?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pageCount = isAllPage ? 1 : Math.max(1, Math.ceil(total / pageSize));
 
   const { data: counts } = useDefectStatusCounts({ includeInactive });
   const { data: summary } = useDefectDashboardSummary({ includeInactive });
@@ -820,22 +825,37 @@ export function DefectRawDataPage() {
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="text-muted-foreground">
           {total > 0
-            ? `${((page - 1) * pageSize + 1).toLocaleString()}–${Math.min(page * pageSize, total).toLocaleString()} / ${total.toLocaleString()}`
+            ? isAllPage
+              ? `1–${total.toLocaleString()} / ${total.toLocaleString()}`
+              : `${((page - 1) * pageSize + 1).toLocaleString()}–${Math.min(page * pageSize, total).toLocaleString()} / ${total.toLocaleString()}`
             : "0 / 0"}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">페이지 크기</span>
-          <Select value={String(pageSize)} onValueChange={(v) => setUrl({ pageSize: Number(v), page: 1 })}>
+          <Select
+            value={isAllPage ? "all" : String(pageSize)}
+            onValueChange={(v) =>
+              setUrl({ pageSize: v === "all" ? ("all" as any) : Number(v), page: 1 })
+            }
+          >
             <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <SelectItem key={String(n)} value={String(n)}>
+                  {n === "all" ? "All" : n}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={page <= 1} onClick={() => setUrl({ page: 1 })}><ChevronsLeft className="h-3.5 w-3.5" /></Button>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={page <= 1} onClick={() => setUrl({ page: page - 1 })}><ChevronLeft className="h-3.5 w-3.5" /></Button>
-          <span className="tabular-nums">{page} / {pageCount}</span>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={page >= pageCount} onClick={() => setUrl({ page: page + 1 })}><ChevronRight className="h-3.5 w-3.5" /></Button>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={page >= pageCount} onClick={() => setUrl({ page: pageCount })}><ChevronsRight className="h-3.5 w-3.5" /></Button>
+          {!isAllPage && (
+            <>
+              <Button size="icon" variant="outline" className="h-7 w-7" disabled={page <= 1} onClick={() => setUrl({ page: 1 })}><ChevronsLeft className="h-3.5 w-3.5" /></Button>
+              <Button size="icon" variant="outline" className="h-7 w-7" disabled={page <= 1} onClick={() => setUrl({ page: page - 1 })}><ChevronLeft className="h-3.5 w-3.5" /></Button>
+              <span className="tabular-nums">{page} / {pageCount}</span>
+              <Button size="icon" variant="outline" className="h-7 w-7" disabled={page >= pageCount} onClick={() => setUrl({ page: page + 1 })}><ChevronRight className="h-3.5 w-3.5" /></Button>
+              <Button size="icon" variant="outline" className="h-7 w-7" disabled={page >= pageCount} onClick={() => setUrl({ page: pageCount })}><ChevronsRight className="h-3.5 w-3.5" /></Button>
+            </>
+          )}
         </div>
       </div>
 
