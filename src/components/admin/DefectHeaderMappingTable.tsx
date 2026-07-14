@@ -20,6 +20,7 @@ import {
 import { useDefectFieldConfig } from "@/hooks/useDefectFieldConfig";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { EditableSourceHeaderCell } from "@/components/admin/EditableSourceHeaderCell";
+import { EditableTargetFieldCell } from "@/components/admin/EditableTargetFieldCell";
 import { normalizeHeader } from "@/lib/admin/header-mapping-validation";
 
 export function DefectHeaderMappingTable() {
@@ -59,6 +60,18 @@ export function DefectHeaderMappingTable() {
     await refetch();
   };
 
+  const canEdit = !!me?.isAdmin;
+
+  const saveTargetField = async (r: DefectHeaderMappingRow, next: string) => {
+    const { error } = await (supabase as any)
+      .from("defect_header_mappings")
+      .update({ target_field: next, updated_by: me?.id ?? null })
+      .eq("id", r.id);
+    if (error) { toast.error("저장 실패", { description: error.message }); throw error; }
+    qc.invalidateQueries({ queryKey: DEFECT_HEADER_MAPPING_QK });
+    await refetch();
+  };
+
   const toggleActive = async (r: DefectHeaderMappingRow) => {
     const { error } = await (supabase as any)
       .from("defect_header_mappings")
@@ -70,8 +83,11 @@ export function DefectHeaderMappingTable() {
   };
 
   const removeRow = async (r: DefectHeaderMappingRow) => {
-    if (!r.is_custom) return toast.error("시스템 매핑", { description: "시스템 매핑은 삭제할 수 없습니다." });
-    if (!confirm(`매핑 "${r.source_header}" → ${r.target_field} 을(를) 삭제하시겠습니까?`)) return;
+    if (!canEdit) return;
+    const msg = r.is_custom
+      ? `매핑 "${r.source_header}" → ${r.target_field} 을(를) 삭제하시겠습니까?`
+      : `System 매핑 "${r.source_header}" → ${r.target_field} 을(를) 삭제하시겠습니까?\n\n※ 시드 재배포 시 되돌아갈 수 있습니다.`;
+    if (!confirm(msg)) return;
     const { error } = await (supabase as any).from("defect_header_mappings").delete().eq("id", r.id);
     if (error) return toast.error("삭제 실패", { description: error.message });
     toast.success("삭제되었습니다");
@@ -103,7 +119,9 @@ export function DefectHeaderMappingTable() {
           <CardTitle className="text-base">Header Mapping — Snag List Excel Import 별칭</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">Snag List 업로드용 Excel 원본 헤더를 시스템 필드에 연결합니다.</p>
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-1 h-3.5 w-3.5" /> Add Mapping</Button>
+        {canEdit && (
+          <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-1 h-3.5 w-3.5" /> Add Mapping</Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="rounded border bg-muted/30 p-3 space-y-2">
@@ -142,17 +160,28 @@ export function DefectHeaderMappingTable() {
               {filtered.map((r) => (
                 <TableRow key={r.id} className={r.is_active ? "" : "opacity-50"}>
                   <TableCell className="text-sm">
-                    <EditableSourceHeaderCell row={r} rows={rows} activeTargetFields={activeTargetFields} onSave={(v) => saveSourceHeader(r, v)} />
+                    <EditableSourceHeaderCell row={r} rows={rows} activeTargetFields={activeTargetFields} onSave={(v) => saveSourceHeader(r, v)} canEdit={canEdit} />
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{r.target_field}</TableCell>
+                  <TableCell className="text-xs">
+                    <EditableTargetFieldCell
+                      row={r}
+                      rows={rows}
+                      fields={fields}
+                      activeTargetFields={activeTargetFields}
+                      onSave={(v) => saveTargetField(r, v)}
+                      canEdit={canEdit}
+                    />
+                  </TableCell>
                   <TableCell>
                     {r.is_custom ? (<Badge variant="secondary">Custom</Badge>) : (<Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" />System</Badge>)}
                   </TableCell>
-                  <TableCell className="text-center"><Switch checked={r.is_active} onCheckedChange={() => toggleActive(r)} /></TableCell>
+                  <TableCell className="text-center"><Switch checked={r.is_active} onCheckedChange={() => toggleActive(r)} disabled={!canEdit} /></TableCell>
                   <TableCell className="text-right">
-                    <Button size="icon" variant="ghost" onClick={() => removeRow(r)} disabled={!r.is_custom} title={r.is_custom ? "삭제" : "시스템 매핑은 삭제할 수 없음"}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEdit && (
+                      <Button size="icon" variant="ghost" onClick={() => removeRow(r)} title={r.is_custom ? "삭제" : "System 매핑 삭제 (주의)"}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
