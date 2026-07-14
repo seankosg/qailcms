@@ -860,6 +860,7 @@ function buildDataColumn(
   isAdmin: boolean,
   patchLocal: (id: string, patch: Record<string, any>) => void,
   refetch: () => void,
+  headerLabel?: string,
 ): ColumnDef<DefectItem> {
   const filterType =
     DATE_FILTER_FIELDS.has(c.key) ? "date-range" :
@@ -872,7 +873,7 @@ function buildDataColumn(
   return {
     id: c.key,
     accessorKey: c.key,
-    header: c.label,
+    header: headerLabel ?? c.label,
     size: c.width,
     // manualFiltering=true 상태이므로 filterFn 불필요
     enableSorting: !isDerived && (!PROGRESS_FIELDS.has(c.key) || c.type === "percent"),
