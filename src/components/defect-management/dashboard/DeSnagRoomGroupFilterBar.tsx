@@ -1,0 +1,53 @@
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@/components/ui/button";
+import { ROOM_GROUP_ORDER, type RoomGroupCol } from "@/lib/defect-management/dashboard-shape";
+import { X } from "lucide-react";
+
+export function DeSnagRoomGroupFilterBar({
+  selected,
+  onChange,
+}: {
+  selected: RoomGroupCol[];
+  onChange: (next: RoomGroupCol[]) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+      <span className="text-xs font-medium text-muted-foreground">Room Group</span>
+      <ToggleGroup
+        type="multiple"
+        value={selected}
+        onValueChange={(v) =>
+          onChange(
+            (v as string[]).filter((x): x is RoomGroupCol =>
+              (ROOM_GROUP_ORDER as readonly string[]).includes(x),
+            ),
+          )
+        }
+        className="flex-wrap gap-1"
+      >
+        {ROOM_GROUP_ORDER.map((rg) => (
+          <ToggleGroupItem
+            key={rg}
+            value={rg}
+            className="h-7 px-2 text-[11px] font-medium data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+          >
+            {rg}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {selected.length === 0 ? (
+        <span className="text-[11px] text-muted-foreground">(전체)</span>
+      ) : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onChange([])}
+          className="h-7 gap-1 px-2 text-[11px]"
+        >
+          <X className="h-3 w-3" /> 초기화
+        </Button>
+      )}
+    </div>
+  );
+}

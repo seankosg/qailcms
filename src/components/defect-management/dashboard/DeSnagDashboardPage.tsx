@@ -6,12 +6,14 @@ import { DeSnagToolbar } from "./DeSnagToolbar";
 import { DeSnagMatrixBlock } from "./DeSnagMatrixBlock";
 import { DeSnagGrandTotalCards } from "./DeSnagGrandTotalCards";
 import { DeSnagRoomGroupCards } from "./DeSnagRoomGroupCards";
+import { DeSnagRoomGroupFilterBar } from "./DeSnagRoomGroupFilterBar";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
 import {
   ALL_TEAMS,
   buildMatrix,
   mergeStats,
   newStats,
+  normalizeRoomGroup,
   planGroupsForPlot,
   ROOM_GROUP_ORDER,
   type PlotKey,
@@ -32,22 +34,71 @@ export function DeSnagDashboardPage() {
         .filter((s: string): s is TeamKey => (ALL_TEAMS as readonly string[]).includes(s)),
     [search.teams],
   );
+  const roomGroups = useMemo<RoomGroupCol[]>(
+    () =>
+      (search.roomGroups ?? "")
+        .split(",")
+        .map((s: string) => s.trim())
+        .filter((s: string): s is RoomGroupCol =>
+          (ROOM_GROUP_ORDER as readonly string[]).includes(s),
+        ),
+    [search.roomGroups],
+  );
 
   const { data: rawRows = [], isLoading, error } = useSnagDashboardMatrix(plot, teams);
-  const matrix = useMemo(() => buildMatrix(plot, teams, rawRows), [plot, teams, rawRows]);
+  const filteredRows = useMemo(() => {
+    if (roomGroups.length === 0) return rawRows;
+    const set = new Set<RoomGroupCol>(roomGroups);
+    return rawRows.filter((r) => set.has(normalizeRoomGroup(r.room_group)));
+  }, [rawRows, roomGroups]);
+  const matrix = useMemo(
+    () => buildMatrix(plot, teams, filteredRows),
+    [plot, teams, filteredRows],
+  );
 
-  const setPlot = (p: PlotKey) => navigate({ to: "/closure/snag-management/dashboard", search: { plot: p, teams: search.teams ?? "" } });
-  const setTeams = (t: TeamKey[]) => navigate({
-    to: "/closure/snag-management/dashboard",
-    search: { plot, teams: t.join(",") },
-  });
+  const teamsStr = search.teams ?? "";
+  const rgStr = search.roomGroups ?? "";
+  const setPlot = (p: PlotKey) =>
+    navigate({
+      to: "/closure/snag-management/dashboard",
+      search: { plot: p, teams: teamsStr, roomGroups: rgStr },
+    });
+  const setTeams = (t: TeamKey[]) =>
+    navigate({
+      to: "/closure/snag-management/dashboard",
+      search: { plot, teams: t.join(","), roomGroups: rgStr },
+    });
+  const setRoomGroups = (rgs: RoomGroupCol[]) =>
+    navigate({
+      to: "/closure/snag-management/dashboard",
+      search: { plot, teams: teamsStr, roomGroups: rgs.join(",") },
+    });
+
+  function roomGroupParam(col: RoomGroupCol): string {
+    if (col === "FACADE") return "FACADE,LANDSCAPE";
+    if (col === "N/A") return "__EMPTY__";
+    return col;
+  }
 
   const goRaw = (params: Record<string, string>) => {
     const planGroups = planGroupsForPlot(plot).join(",");
+    // 필터 활성 시 roomGroup 파라미터 병합 (호출 측 지정이 우선)
+    const rgParam =
+      roomGroups.length > 0
+        ? Array.from(
+            new Set(
+              roomGroups
+                .flatMap((rg) => roomGroupParam(rg).split(","))
+                .map((s) => s.trim())
+                .filter(Boolean),
+            ),
+          ).join(",")
+        : "";
     const merged: Record<string, string> = {
       source: "dashboard",
       plan_group: planGroups,
       ...(teams.length ? { team: teams.join(",") } : {}),
+      ...(rgParam ? { roomGroup: rgParam } : {}),
       ...params,
     };
     navigate({ to: "/closure/snag-management/raw-data", search: merged as any });
@@ -93,6 +144,8 @@ export function DeSnagDashboardPage() {
           <TabsTrigger value="D">Plot D (+Tower 4)</TabsTrigger>
         </TabsList>
       </Tabs>
+
+      <DeSnagRoomGroupFilterBar selected={roomGroups} onChange={setRoomGroups} />
 
       {/* Plot Grand Total — KPI 카드 */}
       <DeSnagGrandTotalCards
