@@ -70,7 +70,6 @@ import {
 } from "@/lib/task-management/filters";
 import { ColumnFilterDropdown } from "./ColumnFilters";
 import { BulkEditBar } from "./BulkEditBar";
-import { EditCellPopover } from "./EditCellPopover";
 import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { ExportDialog } from "./ExportDialog";
 import { HistoryDrawer } from "./HistoryDrawer";
@@ -569,14 +568,9 @@ export function TaskManagementRawDataPage() {
                 ) : (
                   <span className="w-4" />
                 )}
-                <Link
-                  to="/closure/task-management/detail/$id"
-                  params={{ id: String(rr.id) }}
-                  className="min-w-0 flex-1 truncate text-primary hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <span className="min-w-0 flex-1 truncate text-primary">
                   {rendered}
-                </Link>
+                </span>
                 {isParent && canEdit && (
                   <button
                     type="button"
@@ -604,34 +598,7 @@ export function TaskManagementRawDataPage() {
               </span>
             );
           }
-          if (false) {
-            return (
-              <Link
-                to="/closure/task-management/detail/$id"
-                params={{ id: String((row.original as Row).id) }}
-                className="text-primary hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {rendered}
-              </Link>
-            );
-          }
-          if (!c.editable) return rendered;
-          // Do not allow editing actual_progress on parent rows
-          if (c.key === "actual_progress" && (row.original as Row).level === "parent") {
-            return rendered;
-          }
-          return (
-            <EditCellPopover
-              rowId={String((row.original as Row).id)}
-              column={c}
-              currentValue={val}
-              canEdit={canEdit}
-              onSaved={() => refetch()}
-            >
-              {rendered}
-            </EditCellPopover>
-          );
+          return rendered;
         },
       });
     }
@@ -1024,13 +991,19 @@ export function TaskManagementRawDataPage() {
                 return (
                   <div
                     key={row.id}
+                    onClick={() =>
+                      navigate({
+                        to: "/closure/task-management/detail/$id",
+                        params: { id: String((row.original as Row).id) },
+                      })
+                    }
                     style={{
                       transform: `translateY(${v.start}px)`,
                       height: v.size,
                       width: totalWidth,
                     }}
                     className={cn(
-                      "group absolute left-0 top-0 flex border-b text-xs hover:bg-accent/40",
+                      "group absolute left-0 top-0 flex cursor-pointer border-b text-xs hover:bg-accent/40",
                       row.getIsSelected() && "bg-primary/5",
                       isParent && "bg-muted/30 font-medium",
                     )}
