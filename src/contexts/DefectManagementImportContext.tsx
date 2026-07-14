@@ -106,6 +106,7 @@ export interface DefectImportFile {
   duplicateStrategy?: DuplicateStrategy;
   duplicateGroups?: DuplicateGroup[];
   autoDedupedIdenticalCount?: number;
+  aiClassifyEnabled?: boolean;
 }
 
 interface CtxValue {
@@ -121,6 +122,7 @@ interface CtxValue {
   setFileDuplicateSelection: (id: string, groupKey: string, parsedIndex: number) => void;
   resolveDuplicates: (id: string) => void;
   startImport: () => Promise<void>;
+  setFileAiClassifyEnabled: (id: string, enabled: boolean) => void;
 }
 
 const Ctx = createContext<CtxValue | null>(null);
@@ -434,6 +436,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       size: file.size,
       status: "parsing",
       progress: 0,
+      aiClassifyEnabled: false,
     }));
     setFiles((cur) => [...cur, ...next]);
 
@@ -490,6 +493,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
   const setFileDataDateOverride = useCallback((id: string, date: string | null) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, dataDateOverride: date } : f)));
+  }, []);
+
+  const setFileAiClassifyEnabled = useCallback((id: string, enabled: boolean) => {
+    setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, aiClassifyEnabled: enabled } : f)));
   }, []);
 
   const setFileSheet = useCallback(
@@ -886,19 +893,21 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             }
           }
           // 규칙으로 못 채운 필드가 남은 행은 임포트 후 백그라운드 LLM 분류 대상
-          for (const it of needsLlm) rowsNeedingBackgroundClassify.push(it.source_issue_no);
+          if (f.aiClassifyEnabled) {
+            for (const it of needsLlm) rowsNeedingBackgroundClassify.push(it.source_issue_no);
+          }
           const ms = Math.round(performance.now() - t0);
           const skippedRows = workingRows.length - classifyQueue.length;
           const ruleOnlyRows = classifyQueue.length - needsLlm.length;
           classificationResult = {
             skippedRows,
             ruleOnlyRows,
-            llmRows: needsLlm.length,
+            llmRows: f.aiClassifyEnabled ? needsLlm.length : 0,
             llmUpdated: 0,
             llmFailed: 0,
           };
           console.log(
-            `[defect-import] 규칙 분류 완료 total=${workingRows.length} 스킵=${skippedRows} 규칙매칭=${ruleOnlyRows} LLM대기=${needsLlm.length} ${ms}ms`,
+            `[defect-import] 규칙 분류 완료 total=${workingRows.length} 스킵=${skippedRows} 규칙매칭=${ruleOnlyRows} LLM대기=${f.aiClassifyEnabled ? needsLlm.length : 0}(AI=${f.aiClassifyEnabled ? "ON" : "OFF"}) ${ms}ms`,
           );
         } else {
           classificationResult = {
@@ -1205,6 +1214,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         setFileDuplicateSelection,
         resolveDuplicates,
         startImport,
+        setFileAiClassifyEnabled,
       }}
     >
       {children}

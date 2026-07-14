@@ -27,6 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   useDefectImport,
@@ -84,6 +86,7 @@ function Inner() {
     setFileDuplicateSelection,
     resolveDuplicates,
     startImport,
+    setFileAiClassifyEnabled,
   } = useDefectImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [columnDialogFileId, setColumnDialogFileId] = useState<string | null>(null);
@@ -187,6 +190,7 @@ function Inner() {
                 onOpenColumnSelect={() => setColumnDialogFileId(f.id)}
                 onSheetChange={(sheet) => setFileSheet(f.id, sheet)}
                 onOpenDuplicateReview={() => setDupDialogFileId(f.id)}
+                onToggleAiClassify={(v) => setFileAiClassifyEnabled(f.id, v)}
               />
             ))}
           </CardContent>
@@ -236,6 +240,7 @@ function FileRow({
   onOpenColumnSelect,
   onSheetChange,
   onOpenDuplicateReview,
+  onToggleAiClassify,
 }: {
   file: DefectImportFile;
   isRunning: boolean;
@@ -244,6 +249,7 @@ function FileRow({
   onOpenColumnSelect: () => void;
   onSheetChange: (sheet: string) => void;
   onOpenDuplicateReview: () => void;
+  onToggleAiClassify: (enabled: boolean) => void;
 }) {
   const badge = statusBadge[f.status];
   const rowsCount = f.parsed?.length ?? 0;
@@ -325,6 +331,20 @@ function FileRow({
                   {selectedHeaders}/{totalHeaders})
                 </Button>
               )}
+              <div className="flex items-center gap-1.5 rounded-md border px-2 py-1">
+                <Switch
+                  id={`ai-classify-${f.id}`}
+                  checked={!!f.aiClassifyEnabled}
+                  onCheckedChange={onToggleAiClassify}
+                  disabled={disabled || f.status === "parsing"}
+                />
+                <Label
+                  htmlFor={`ai-classify-${f.id}`}
+                  className="cursor-pointer text-xs"
+                >
+                  AI 분류
+                </Label>
+              </div>
             </div>
             {f.categorySummary && f.categorySummary.length > 0 && (
               <p className="mt-1 text-[11px] text-muted-foreground">
