@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { DeSnagStatusCell } from "./DeSnagStatusCell";
 import {
   ROOM_GROUP_ORDER,
   type MatrixBlock,
@@ -10,6 +9,228 @@ import {
 } from "@/lib/defect-management/dashboard-shape";
 
 type MetricSlot = "issued" | "open" | "rectified" | "reopen" | "closed" | "closurePct";
+
+// ── Metric column configuration ────────────────────────────────────────────
+const METRIC_COLS: Array<{ slot: MetricSlot; label: string; short: string }> = [
+  { slot: "issued", label: "Issued", short: "ISS" },
+  { slot: "open", label: "Open", short: "OPN" },
+  { slot: "rectified", label: "Rect", short: "RCT" },
+  { slot: "reopen", label: "Re-Op", short: "RO" },
+  { slot: "closed", label: "Closed", short: "CLS" },
+  { slot: "closurePct", label: "Cls%", short: "%" },
+];
+
+function fmtPct(pct: number | null): string {
+  if (pct == null || !Number.isFinite(pct)) return "–";
+  return `${Math.round(pct * 100)}%`;
+}
+
+function closurePctTone(pct: number | null): string {
+  if (pct == null) return "text-muted-foreground";
+  const p = pct * 100;
+  if (p < 40) return "text-destructive font-semibold";
+  if (p < 80) return "text-amber-600 dark:text-amber-400 font-semibold";
+  return "text-emerald-600 dark:text-emerald-400 font-semibold";
+}
+
+function closurePctBg(pct: number | null): string {
+  if (pct == null) return "";
+  const p = pct * 100;
+  if (p < 40) return "bg-destructive/10";
+  if (p < 80) return "bg-amber-500/10";
+  return "bg-emerald-500/10";
+}
+
+/** Render 6 metric <td> cells for a single Stats block. */
+function MetricCells({
+  stats,
+  onMetric,
+  dim,
+  groupIndex,
+  isTotal,
+}: {
+  stats: Stats;
+  onMetric: (m: MetricSlot) => void;
+  dim?: boolean;
+  groupIndex: number;
+  isTotal?: boolean;
+}) {
+  const groupBg = isTotal
+    ? "bg-primary/5"
+    : groupIndex % 2 === 0
+      ? "bg-transparent"
+      : "bg-muted/20";
+  return (
+    <>
+      {METRIC_COLS.map((mc, i) => {
+        const isFirst = i === 0;
+        const value =
+          mc.slot === "issued"
+            ? stats.issued
+            : mc.slot === "open"
+              ? stats.open
+              : mc.slot === "rectified"
+                ? stats.rectified
+                : mc.slot === "reopen"
+                  ? stats.reopen
+                  : mc.slot === "closed"
+                    ? stats.closed
+                    : null; // closurePct handled below
+        const isPct = mc.slot === "closurePct";
+        const pctTone = isPct ? closurePctTone(stats.closurePct) : "";
+        const pctBg = isPct ? closurePctBg(stats.closurePct) : "";
+        const zeroDim = !isPct && (value ?? 0) === 0 ? "text-muted-foreground/50" : "text-foreground";
+        const pctText = isPct ? fmtPct(stats.closurePct) : value!.toLocaleString();
+        const ratio =
+          !isPct && mc.slot !== "issued" && stats.issued > 0 && (value ?? 0) > 0
+            ? ` (${Math.round(((value ?? 0) / stats.issued) * 100)}%)`
+            : "";
+        return (
+          <td
+            key={mc.slot}
+            className={cn(
+              "h-7 border-b p-0 tabular-nums",
+              groupBg,
+              isFirst && "border-l-2 border-l-border",
+              !isFirst && "border-r border-r-border/40",
+              pctBg,
+              dim && "opacity-50",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => onMetric(mc.slot)}
+              title={`${mc.label}: ${pctText}${ratio}`}
+              className={cn(
+                "block h-full w-full px-1.5 text-right text-xs leading-none hover:bg-primary/10",
+                mc.slot === "issued" && "font-medium",
+                pctTone,
+                !isPct && zeroDim,
+              )}
+            >
+              {pctText}
+            </button>
+          </td>
+        );
+      })}
+    </>
+  );
+}
+
+/** Two-row header: group names spanning 6 metric subcolumns each. */
+function MatrixHeader({
+  block,
+  buildingParam,
+  basementParam,
+  onNavigate,
+}: {
+  block: MatrixBlock;
+  buildingParam: Record<string, string>;
+  basementParam: Record<string, string>;
+  onNavigate: (p: Record<string, string>) => void;
+}) {
+  const groups: Array<{ key: string; label: string; isTotal?: boolean; isNa?: boolean }> = [
+    ...ROOM_GROUP_ORDER.map((rg) => ({ key: rg, label: rg, isNa: rg === "N/A" })),
+    { key: "__ROW_TOTAL__", label: "Row Total", isTotal: true },
+  ];
+  return (
+    <thead>
+      {/* Row 1: sticky labels + group names */}
+      <tr className="bg-muted/50">
+        <th
+          rowSpan={2}
+          className="sticky left-0 z-20 min-w-[100px] border-b-2 border-r bg-muted/70 px-2 py-1.5 text-left text-[11px] font-semibold"
+        >
+          Building
+        </th>
+        <th
+          rowSpan={2}
+          className="sticky left-[100px] z-20 min-w-[80px] border-b-2 border-r bg-muted/70 px-2 py-1.5 text-left text-[11px] font-semibold"
+        >
+          Level
+        </th>
+        {groups.map((g, idx) => (
+          <th
+            key={g.key}
+            colSpan={6}
+            className={cn(
+              "border-b border-l-2 border-l-border px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide",
+              g.isTotal && "bg-primary/10",
+              g.isNa && "bg-muted/50 text-muted-foreground",
+              !g.isTotal && !g.isNa && idx % 2 === 1 && "bg-muted/30",
+            )}
+          >
+            {g.isTotal ? (
+              <span>{g.label}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  const p: Record<string, string> = { ...basementParam };
+                  if (block.kind !== "basement") Object.assign(p, buildingParam);
+                  p.roomGroup = g.key === "FACADE" ? "FACADE,LANDSCAPE" : g.key === "N/A" ? "__EMPTY__" : g.key;
+                  onNavigate(p);
+                }}
+                className="hover:text-primary"
+              >
+                {g.label}
+              </button>
+            )}
+          </th>
+        ))}
+      </tr>
+      {/* Row 2: metric subheaders repeating per group */}
+      <tr className="bg-muted/30">
+        {groups.map((g, idx) => (
+          <SubHeaderCells
+            key={g.key}
+            groupIndex={idx}
+            isTotal={g.isTotal}
+            isNa={g.isNa}
+          />
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
+function SubHeaderCells({
+  groupIndex,
+  isTotal,
+  isNa,
+}: {
+  groupIndex: number;
+  isTotal?: boolean;
+  isNa?: boolean;
+}) {
+  const groupBg = isTotal
+    ? "bg-primary/10"
+    : isNa
+      ? "bg-muted/40"
+      : groupIndex % 2 === 1
+        ? "bg-muted/30"
+        : "bg-muted/10";
+  return (
+    <>
+      {METRIC_COLS.map((mc, i) => (
+        <th
+          key={mc.slot}
+          className={cn(
+            "h-7 border-b px-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+            groupBg,
+            i === 0 && "border-l-2 border-l-border",
+            i !== 0 && "border-r border-r-border/40",
+            mc.slot === "issued" && "min-w-[46px]",
+            mc.slot !== "issued" && "min-w-[40px]",
+          )}
+          title={mc.label}
+        >
+          {mc.label}
+        </th>
+      ))}
+    </>
+  );
+}
 
 export function DeSnagMatrixBlock({
   block,
@@ -84,41 +305,12 @@ export function DeSnagMatrixBlock({
       </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="bg-muted/30">
-              <th className="sticky left-0 z-10 min-w-[110px] border-b border-r bg-muted/60 px-2 py-1.5 text-left text-[11px] font-semibold">
-                Building
-              </th>
-              <th className="sticky left-[110px] z-10 min-w-[90px] border-b border-r bg-muted/60 px-2 py-1.5 text-left text-[11px] font-semibold">
-                Level
-              </th>
-              {ROOM_GROUP_ORDER.map((rg) => (
-                <th
-                  key={rg}
-                  className={cn(
-                    "min-w-[180px] border-b border-r px-1 py-1.5 text-center text-[11px] font-semibold",
-                    rg === "N/A" && "bg-muted/50 text-muted-foreground",
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const p: Record<string, string> = { ...basementParam };
-                      if (block.kind !== "basement") Object.assign(p, buildingParam);
-                      p.roomGroup = rg === "FACADE" ? "FACADE,LANDSCAPE" : rg === "N/A" ? "__EMPTY__" : rg;
-                      onNavigate(p);
-                    }}
-                    className="hover:text-primary"
-                  >
-                    {rg}
-                  </button>
-                </th>
-              ))}
-              <th className="min-w-[180px] border-b border-r bg-primary/5 px-1 py-1.5 text-center text-[11px] font-semibold">
-                Row Total
-              </th>
-            </tr>
-          </thead>
+          <MatrixHeader
+            block={block}
+            buildingParam={buildingParam}
+            basementParam={basementParam}
+            onNavigate={onNavigate}
+          />
           <tbody>
             {groups.map((grp) => (
               <FragmentRows
@@ -134,7 +326,7 @@ export function DeSnagMatrixBlock({
 
             {/* Column Total 행 */}
             <tr className="bg-primary/5 font-medium">
-              <td className="sticky left-0 z-10 border-r bg-primary/10 px-2 py-1 text-[11px]" colSpan={2}>
+              <td className="sticky left-0 z-10 border-r border-t-2 border-t-border bg-primary/10 px-2 py-1 text-[11px]" colSpan={2}>
                 <button
                   type="button"
                   onClick={() => onNavigate({ ...buildingParam, ...basementParam })}
@@ -143,26 +335,20 @@ export function DeSnagMatrixBlock({
                   Column Total
                 </button>
               </td>
-              {ROOM_GROUP_ORDER.map((rg) => (
-                <td
+              {ROOM_GROUP_ORDER.map((rg, idx) => (
+                <MetricCells
                   key={rg}
-                  className={cn(
-                    "border-r px-0.5 py-0.5 align-top",
-                    rg === "N/A" && "bg-muted/50",
-                  )}
-                >
-                  <DeSnagStatusCell
-                    stats={block.colTotals[rg]}
-                    onMetric={(m) => goCell(null, null, rg, m)}
-                  />
-                </td>
-              ))}
-              <td className="border-r bg-primary/10 px-0.5 py-0.5 align-top">
-                <DeSnagStatusCell
-                  stats={block.blockTotal}
-                  onMetric={(m) => goCell(null, null, "__ROW_TOTAL__", m)}
+                  stats={block.colTotals[rg]}
+                  onMetric={(m) => goCell(null, null, rg, m)}
+                  groupIndex={idx}
                 />
-              </td>
+              ))}
+              <MetricCells
+                stats={block.blockTotal}
+                onMetric={(m) => goCell(null, null, "__ROW_TOTAL__", m)}
+                groupIndex={ROOM_GROUP_ORDER.length}
+                isTotal
+              />
             </tr>
           </tbody>
         </table>
@@ -195,6 +381,7 @@ function FragmentRows({
             <td
               rowSpan={group.rows.length + (showBuildingSubtotal ? 1 : 0)}
               className="sticky left-0 z-10 border-b border-r bg-card px-2 py-1 align-top text-[11px] font-medium"
+              style={{ background: "var(--card)" }}
             >
               <button
                 type="button"
@@ -209,7 +396,10 @@ function FragmentRows({
               </button>
             </td>
           )}
-          <td className="sticky left-[110px] z-10 border-b border-r bg-card px-2 py-1 text-[11px]">
+          <td
+            className="sticky left-[100px] z-10 border-b border-r bg-card px-2 py-1 text-[11px]"
+            style={{ background: "var(--card)" }}
+          >
             <button
               type="button"
               onClick={() => {
@@ -223,35 +413,32 @@ function FragmentRows({
               {r.levelDisp}
             </button>
           </td>
-          {ROOM_GROUP_ORDER.map((rg) => (
-            <td
+          {ROOM_GROUP_ORDER.map((rg, gIdx) => (
+            <MetricCells
               key={rg}
-              className={cn(
-                "border-b border-r px-0.5 py-0.5 align-top",
-                rg === "N/A" && "bg-muted/40",
-              )}
-            >
-              <DeSnagStatusCell
-                stats={r.cells[rg]}
-                onMetric={(m) => goCell(r.building, r.levelDisp, rg, m)}
-                dim={r.cells[rg].issued === 0}
-              />
-            </td>
-          ))}
-          <td className="border-b border-r bg-primary/5 px-0.5 py-0.5 align-top">
-            <DeSnagStatusCell
-              stats={r.rowTotal}
-              onMetric={(m) => goCell(r.building, r.levelDisp, "__ROW_TOTAL__", m)}
+              stats={r.cells[rg]}
+              onMetric={(m) => goCell(r.building, r.levelDisp, rg, m)}
+              dim={r.cells[rg].issued === 0}
+              groupIndex={gIdx}
             />
-          </td>
+          ))}
+          <MetricCells
+            stats={r.rowTotal}
+            onMetric={(m) => goCell(r.building, r.levelDisp, "__ROW_TOTAL__", m)}
+            groupIndex={ROOM_GROUP_ORDER.length}
+            isTotal
+          />
         </tr>
       ))}
       {showBuildingSubtotal && (
         <tr className="bg-muted/30 font-medium">
-          <td className="sticky left-[110px] z-10 border-b border-r bg-muted/40 px-2 py-1 text-[11px]">
+          <td
+            className="sticky left-[100px] z-10 border-b border-r bg-muted/40 px-2 py-1 text-[11px]"
+            style={{ background: "color-mix(in oklab, var(--muted) 60%, var(--card))" }}
+          >
             {group.building} 소계
           </td>
-          {ROOM_GROUP_ORDER.map((rg) => {
+          {ROOM_GROUP_ORDER.map((rg, gIdx) => {
             const sub: Stats = { open: 0, rectified: 0, reopen: 0, closed: 0, issued: 0, closurePct: null };
             for (const r of group.rows) {
               sub.open += r.cells[rg].open;
@@ -262,20 +449,20 @@ function FragmentRows({
             }
             sub.closurePct = sub.issued > 0 ? sub.closed / sub.issued : null;
             return (
-              <td key={rg} className={cn("border-b border-r px-0.5 py-0.5 align-top", rg === "N/A" && "bg-muted/50")}>
-                <DeSnagStatusCell
-                  stats={sub}
-                  onMetric={(m) => goCell(group.building, null, rg, m)}
-                />
-              </td>
+              <MetricCells
+                key={rg}
+                stats={sub}
+                onMetric={(m) => goCell(group.building, null, rg, m)}
+                groupIndex={gIdx}
+              />
             );
           })}
-          <td className="border-b border-r bg-primary/10 px-0.5 py-0.5 align-top">
-            <DeSnagStatusCell
-              stats={group.subtotal}
-              onMetric={(m) => goCell(group.building, null, "__BUILDING_SUBTOTAL__", m)}
-            />
-          </td>
+          <MetricCells
+            stats={group.subtotal}
+            onMetric={(m) => goCell(group.building, null, "__BUILDING_SUBTOTAL__", m)}
+            groupIndex={ROOM_GROUP_ORDER.length}
+            isTotal
+          />
         </tr>
       )}
     </>
