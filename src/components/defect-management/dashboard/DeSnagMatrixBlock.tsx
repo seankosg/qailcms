@@ -48,18 +48,25 @@ function MetricCells({
   dim,
   groupIndex,
   isTotal,
+  stickyTop,
 }: {
   stats: Stats;
   onMetric: (m: MetricSlot) => void;
   dim?: boolean;
   groupIndex: number;
   isTotal?: boolean;
+  stickyTop?: number;
 }) {
   const groupBg = isTotal
     ? "bg-primary/5"
     : groupIndex % 2 === 0
       ? "bg-transparent"
       : "bg-muted/20";
+  const stickyBg = isTotal
+    ? "color-mix(in oklab, var(--primary) 12%, var(--card))"
+    : groupIndex % 2 === 0
+      ? "var(--card)"
+      : "color-mix(in oklab, var(--muted) 25%, var(--card))";
   return (
     <>
       {METRIC_COLS.map((mc, i) => {
@@ -90,12 +97,14 @@ function MetricCells({
             key={mc.slot}
             className={cn(
               "h-7 border-b p-0 tabular-nums",
-              groupBg,
+              stickyTop === undefined && groupBg,
+              stickyTop !== undefined && "sticky z-20",
               isFirst && "border-l-2 border-l-border",
               !isFirst && "border-r border-r-border/40",
               pctBg,
               dim && "opacity-50",
             )}
+            style={stickyTop !== undefined ? { top: stickyTop, background: stickyBg } : undefined}
           >
             <button
               type="button"
