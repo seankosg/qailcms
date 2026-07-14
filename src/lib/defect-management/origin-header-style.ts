@@ -22,7 +22,9 @@ export const ORIGIN_HEADER_STYLES: Record<Origin, OriginHeaderStyle> = {
   },
   system: {
     bg: "",
-    stickyBg: "hsl(var(--background))",
+    // 프로젝트 컬러 토큰은 oklch(...) 리터럴이라 hsl(var(--background)) 는 무효값이 되어
+    // 배경이 painting 되지 않는다. 토큰을 그대로 사용해 완전 불투명 배경을 보장한다.
+    stickyBg: "var(--background)",
     border: "",
     label: "System",
   },
