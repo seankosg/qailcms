@@ -21,7 +21,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Search, RefreshCcw, Upload, Filter, Download, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, RefreshCcw, Upload, Filter, Download, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Sparkles } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { bulkClassifyDefects } from "@/lib/defect-management/classifier/bulk-classify.functions";
 import {
   DEFECT_COLUMNS,
   DEFECT_TEAMS,
@@ -712,6 +714,7 @@ export function DefectRawDataPage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "snag" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
+          {isAdmin && <AiClassifyButton selectedRows={selectedRows as any} onDone={() => { invalidateDefects(); refetch(); }} />}
           <DefectColumnOrderMenu
             order={order}
             visibility={visibility as Record<string, boolean>}
