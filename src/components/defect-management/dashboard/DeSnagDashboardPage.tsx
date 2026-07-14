@@ -82,7 +82,7 @@ export function DeSnagDashboardPage() {
           if (m === "open") p.status = "Open";
           else if (m === "rectified") p.status = "Rectified";
           else if (m === "reopen") p.status = "Re-Opened";
-          else if (m === "closed" || m === "closurePct") p.status = "Closed";
+          else if (m === "closed") p.status = "Closed";
           goRaw(p);
         }}
       />
