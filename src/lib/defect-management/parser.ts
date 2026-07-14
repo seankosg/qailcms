@@ -8,6 +8,7 @@ export const REIMPORT_MARKER_HEADER = "QAIL_DEFECT_REIMPORT_V1";
 export const DEFECT_TARGET_FIELDS = [
   "source_issue_no",
   "location_raw",
+  "defect_location",
   "plan_title",
   "plan_group",
   "status_raw",
@@ -65,6 +66,7 @@ const CANONICAL_HEADERS: Record<string, DefectTargetField> = {
   updateddate: "updated_date_raw",
   locationreference: "location_reference",
   classification: "classification",
+  defectlocation: "defect_location",
   "podiumarea": "podium_area",
   building: "building",
   room: "room",
@@ -114,6 +116,7 @@ export interface ParsedDefectRow {
   rawRowNo: number;
   source_issue_no: string;
   location_raw: string | null;
+  defect_location: string | null;
   plan_title: string | null;
   plan_group: string | null;
   status_raw: string | null;
@@ -461,6 +464,7 @@ export async function parseDefectExcel(
       rawRowNo: r,
       source_issue_no: id,
       location_raw: cols.location_raw ? toStr(getCell(sheet, r, cols.location_raw)) : null,
+      defect_location: cols.defect_location ? toStr(getCell(sheet, r, cols.defect_location)) : null,
       plan_title: cols.plan_title ? toStr(getCell(sheet, r, cols.plan_title)) : null,
       plan_group: cols.plan_group ? toStr(getCell(sheet, r, cols.plan_group)) : null,
       status_raw: cols.status_raw ? toStr(getCell(sheet, r, cols.status_raw)) : null,
