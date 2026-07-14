@@ -181,20 +181,20 @@ export function DeSnagGrandTotalCards({
           onClick={() => onMetric("open")}
         />
         <KpiCard
-          slot="rectified"
-          label="Rectified"
-          value={rectified}
-          pct={ratio(rectified)}
-          showBar
-          onClick={() => onMetric("rectified")}
-        />
-        <KpiCard
           slot="reopen"
           label="Re-Opened"
           value={reopen}
           pct={ratio(reopen)}
           showBar
           onClick={() => onMetric("reopen")}
+        />
+        <KpiCard
+          slot="rectified"
+          label="Rectified"
+          value={rectified}
+          pct={ratio(rectified)}
+          showBar
+          onClick={() => onMetric("rectified")}
         />
         <KpiCard
           slot="closed"
