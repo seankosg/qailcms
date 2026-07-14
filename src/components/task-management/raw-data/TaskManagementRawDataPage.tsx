@@ -66,6 +66,7 @@ import {
   globalSearchFilterFn,
   multiSelectFilterFn,
   numberRangeFilterFn,
+  stageProgressFilterFn,
   textFilterFn,
 } from "@/lib/task-management/filters";
 import { ColumnFilterDropdown } from "./ColumnFilters";
@@ -432,9 +433,11 @@ export function TaskManagementRawDataPage() {
           minSize: 60,
           maxSize: 120,
           enableSorting: false,
-          enableColumnFilter: false,
+          enableColumnFilter: true,
+          accessorFn: () => "",
+          filterFn: stageProgressFilterFn as any,
           header: labelOverrides[c.key] ?? c.label,
-          meta: { group: c.group },
+          meta: { group: c.group, filterType: "stage-progress" as const },
           cell: ({ row }) => {
             const rr = row.original as Row;
             const dd = (rr as any).data_date ?? null;
