@@ -23,7 +23,7 @@ export function ImportHubPage() {
       </div>
       <Tabs
         value={current}
-        onValueChange={(v) => navigate({ search: { tab: v as any } })}
+        onValueChange={(v) => navigate({ to: "/import-log/import", search: { tab: v } })}
         className="w-full"
       >
         <TabsList>
