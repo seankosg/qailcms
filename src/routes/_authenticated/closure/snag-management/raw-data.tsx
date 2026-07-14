@@ -7,7 +7,7 @@ import { DefectRawDataPage } from "@/components/defect-management/raw-data/Defec
 const rawDataSearchSchema = z.object({
   tab: fallback(z.string(), "unclosed").default("unclosed"),
   page: fallback(z.number().int(), 1).default(1),
-  pageSize: fallback(z.number().int(), 100).default(100),
+  pageSize: fallback(z.union([z.number().int(), z.literal("all")]), 100).default(100),
   sort: fallback(z.string(), "").default(""),
   q: fallback(z.string(), "").default(""),
   filters: fallback(z.string(), "").default(""),
