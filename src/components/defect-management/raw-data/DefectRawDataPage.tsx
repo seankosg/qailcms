@@ -500,7 +500,7 @@ export function DefectRawDataPage() {
 
     // Critical column
     const criticalCol: ColumnDef<DefectItem> = {
-      id: "is_critical", accessorKey: "is_critical", header: "Critical", size: 72, enableSorting: true, enableColumnFilter: true,
+      id: "is_critical", accessorKey: "is_critical", header: labelOf("is_critical"), size: 72, enableSorting: true, enableColumnFilter: true,
       meta: { filterType: "multi-select", filterOptions: [{ value: "true", label: "Critical" }, { value: "false", label: "Non-critical" }] },
       accessorFn: (r) => ((r as any).is_critical ? "true" : "false"),
       cell: ({ row }) => {
@@ -554,10 +554,10 @@ export function DefectRawDataPage() {
       if (hiddenByTab.has(id)) continue;
       const c = byKey.get(id);
       if (!c) continue;
-      cols.push(buildDataColumn(c, tab, includeInactive, dataDate, isAdmin, patchLocalItem, () => refetch()));
+      cols.push(buildDataColumn(c, tab, includeInactive, dataDate, isAdmin, patchLocalItem, () => refetch(), labelOf(c.key)));
     }
     return cols;
-  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, isAdmin, patchLocalItem, refetch]);
+  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, isAdmin, patchLocalItem, refetch, labelOf]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = { __select: true };
@@ -720,6 +720,7 @@ export function DefectRawDataPage() {
             isAdmin={isAdmin}
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
+            onServerLabel={onServerLabel}
           />
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
