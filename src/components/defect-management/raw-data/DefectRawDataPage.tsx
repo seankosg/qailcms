@@ -711,7 +711,7 @@ export function DefectRawDataPage() {
           <p className="text-sm text-muted-foreground">Issue No and subcontractor issue tracking data.</p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm"><Link to="/closure/snag-management/import"><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
+          <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "snag" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
           <DefectColumnOrderMenu
             order={order}
             visibility={visibility as Record<string, boolean>}
