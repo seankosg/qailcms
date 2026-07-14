@@ -1118,3 +1118,52 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI 자동 분류 버튼 (Defect Location / Main·Sub Trade / Work Type)
+// ─────────────────────────────────────────────────────────────────────────────
+function AiClassifyButton({ selectedRows, onDone }: { selectedRows: Array<{ id: string }>; onDone: () => void }) {
+  const [running, setRunning] = useState(false);
+  const runClassify = useServerFn(bulkClassifyDefects);
+  const disabled = running || selectedRows.length === 0;
+  const run = useCallback(async () => {
+    if (disabled) return;
+    const ids = selectedRows.map((r) => r.id);
+    if (ids.length > 5000) {
+      toast.error(`최대 5,000행까지 가능합니다. 선택: ${ids.length.toLocaleString()}`);
+      return;
+    }
+    const ok = window.confirm(`선택된 ${ids.length.toLocaleString()}건에 대해 빈 필드(Defect Location / Main Trade / Sub Trade / Work Type)를 자동 분류합니다. 이미 값이 있는 필드는 유지됩니다. 계속할까요?`);
+    if (!ok) return;
+    setRunning(true);
+    const tId = toast.loading(`AI 분류 실행 중… (${ids.length.toLocaleString()}건)`);
+    try {
+      const res = await runClassify({ data: { ids } });
+      toast.success(
+        `분류 완료: ${res.updated}건 업데이트`,
+        {
+          id: tId,
+          description: `Defect Location ${res.filled.defect_location} · Main Trade ${res.filled.main_trade} · Sub Trade ${res.filled.sub_trade} · Work Type ${res.filled.work_type}${res.failed ? ` · 실패 ${res.failed}` : ""}`,
+        },
+      );
+      onDone();
+    } catch (e: any) {
+      toast.error("AI 분류 실패", { id: tId, description: e?.message ?? String(e) });
+    } finally {
+      setRunning(false);
+    }
+  }, [disabled, selectedRows, runClassify, onDone]);
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={disabled}
+      onClick={run}
+      title={selectedRows.length === 0 ? "행을 선택하세요" : "선택 행의 빈 필드를 AI로 분류"}
+    >
+      <Sparkles className={cn("mr-1 h-3.5 w-3.5", running && "animate-pulse")} />
+      {running ? "분류 중…" : `AI 하자 분류${selectedRows.length > 0 ? ` (${selectedRows.length})` : ""}`}
+    </Button>
+  );
+}
