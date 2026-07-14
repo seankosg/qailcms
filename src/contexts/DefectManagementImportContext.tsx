@@ -96,6 +96,13 @@ export interface DefectImportFile {
     unmappedCategories?: string[];
     errors?: DefectImportError[];
   };
+  classificationResult?: {
+    skippedRows: number;
+    ruleOnlyRows: number;
+    llmRows: number;
+    llmUpdated: number;
+    llmFailed: number;
+  };
   duplicateStrategy?: DuplicateStrategy;
   duplicateGroups?: DuplicateGroup[];
   autoDedupedIdenticalCount?: number;
@@ -829,6 +836,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       // 규칙 미매칭 필드는 그대로 두어 임포트 후 서버 측 bulkClassifyDefects 가 LLM 으로 채움.
       // 사유: 39k행 × LLM 배치를 인라인으로 돌리면 upsert 가 시작되기 전에 수 분간 블로킹.
       const rowsNeedingBackgroundClassify: string[] = [];
+      let classificationResult: DefectImportFile["classificationResult"] = {
+        skippedRows: 0,
+        ruleOnlyRows: 0,
+        llmRows: 0,
+        llmUpdated: 0,
+        llmFailed: 0,
+      };
       try {
         const t0 = performance.now();
         const classifyQueue: ClassifyRequestItem[] = [];
@@ -876,9 +890,24 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           const ms = Math.round(performance.now() - t0);
           const skippedRows = workingRows.length - classifyQueue.length;
           const ruleOnlyRows = classifyQueue.length - needsLlm.length;
+          classificationResult = {
+            skippedRows,
+            ruleOnlyRows,
+            llmRows: needsLlm.length,
+            llmUpdated: 0,
+            llmFailed: 0,
+          };
           console.log(
             `[defect-import] 규칙 분류 완료 total=${workingRows.length} 스킵=${skippedRows} 규칙매칭=${ruleOnlyRows} LLM대기=${needsLlm.length} ${ms}ms`,
           );
+        } else {
+          classificationResult = {
+            skippedRows: workingRows.length,
+            ruleOnlyRows: 0,
+            llmRows: 0,
+            llmUpdated: 0,
+            llmFailed: 0,
+          };
         }
       } catch (err) {
         console.warn("[defect-import] 규칙 분류 실패 (임포트는 계속)", err);
@@ -1029,6 +1058,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                     unmappedCategories: Array.from(unmappedCategories.entries()).map(([c, n]) => `${c} × ${n}`),
                     errors: importErrors.length ? importErrors : undefined,
                   },
+                  classificationResult,
                 }
               : x,
           ),
@@ -1057,7 +1087,6 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                 }
               }
               if (idsToClassify.length === 0) return;
-              toast.info(`${f.name}: AI 분류 백그라운드 실행 중 (${idsToClassify.length}행)...`);
               const CLASSIFY_CHUNK = 2000;
               let totalUpdated = 0;
               let totalFailed = 0;
@@ -1073,12 +1102,47 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                 }
               }
               try { qc.invalidateQueries({ queryKey: ["defect"] }); } catch { /* ignore */ }
-              toast.success(
-                `${f.name}: AI 분류 완료 · 업데이트 ${totalUpdated}${totalFailed ? ` · 실패 ${totalFailed}` : ""}`,
+              setFiles((cur) =>
+                cur.map((x) =>
+                  x.id === f.id
+                    ? {
+                        ...x,
+                        classificationResult: {
+                          ...(x.classificationResult ?? {
+                            skippedRows: 0,
+                            ruleOnlyRows: 0,
+                            llmRows: idsToClassify.length,
+                            llmUpdated: 0,
+                            llmFailed: 0,
+                          }),
+                          llmUpdated: totalUpdated,
+                          llmFailed: totalFailed,
+                        },
+                      }
+                    : x,
+                ),
               );
             } catch (err) {
               console.warn("[defect-import] background classify failed", err);
-              toast.warning(`${f.name}: AI 분류 백그라운드 실행 실패. Raw Data 재분류 버튼을 사용하세요.`);
+              setFiles((cur) =>
+                cur.map((x) =>
+                  x.id === f.id
+                    ? {
+                        ...x,
+                        classificationResult: {
+                          ...(x.classificationResult ?? {
+                            skippedRows: 0,
+                            ruleOnlyRows: 0,
+                            llmRows: rowsNeedingBackgroundClassify.length,
+                            llmUpdated: 0,
+                            llmFailed: 0,
+                          }),
+                          llmFailed: rowsNeedingBackgroundClassify.length,
+                        },
+                      }
+                    : x,
+                ),
+              );
             }
           })();
         }

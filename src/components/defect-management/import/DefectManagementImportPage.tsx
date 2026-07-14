@@ -419,6 +419,35 @@ function FileRow({
               <AlertCircle className="mr-1 h-3 w-3" /> Rejected: {f.result.rejected}
             </Badge>
           )}
+          {f.classificationResult && (
+            <>
+              {f.classificationResult.skippedRows > 0 && (
+                <Badge variant="outline" className="border-slate-300 text-slate-600">
+                  Classification skip: {f.classificationResult.skippedRows}
+                </Badge>
+              )}
+              {f.classificationResult.ruleOnlyRows > 0 && (
+                <Badge variant="outline" className="border-teal-300 text-teal-700">
+                  Rule classified: {f.classificationResult.ruleOnlyRows}
+                </Badge>
+              )}
+              {f.classificationResult.llmRows > 0 && f.classificationResult.llmUpdated === 0 && f.classificationResult.llmFailed === 0 && (
+                <Badge variant="outline" className="border-violet-300 text-violet-700">
+                  AI queued: {f.classificationResult.llmRows}
+                </Badge>
+              )}
+              {f.classificationResult.llmUpdated > 0 && (
+                <Badge variant="outline" className="border-sky-300 text-sky-700">
+                  AI updated: {f.classificationResult.llmUpdated}
+                </Badge>
+              )}
+              {f.classificationResult.llmFailed > 0 && (
+                <Badge variant="outline" className="border-destructive text-destructive">
+                  AI failed: {f.classificationResult.llmFailed}
+                </Badge>
+              )}
+            </>
+          )}
         </div>
       )}
       {f.result?.unmappedCategoryCount && f.result.unmappedCategoryCount > 0 ? (
