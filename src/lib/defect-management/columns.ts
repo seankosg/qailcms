@@ -138,6 +138,7 @@ export const DEFECT_COLUMNS: DefectColumnDef[] = [
   { key: "item", label: "Item", type: "text", width: 140, group: "classification" },
   { key: "description", label: "Description", type: "longtext", width: 320, group: "content", editable: true, editorType: "textarea" },
   { key: "location_raw", label: "Location", type: "text", width: 220, group: "location" },
+  { key: "defect_location", label: "Defect Location", type: "text", width: 180, group: "location" },
   { key: "area_type", label: "Area Type", type: "text", width: 130, group: "location", editable: true, editorType: "text" },
   { key: "area_level", label: "Area Level", type: "text", width: 110, group: "location", editable: true, editorType: "text" },
   { key: "area_location", label: "Area Location", type: "text", width: 180, group: "location", editable: true, editorType: "text" },
