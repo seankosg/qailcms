@@ -331,6 +331,20 @@ function FileRow({
                   {selectedHeaders}/{totalHeaders})
                 </Button>
               )}
+              <div className="flex items-center gap-1.5 rounded-md border px-2 py-1">
+                <Switch
+                  id={`ai-classify-${f.id}`}
+                  checked={!!f.aiClassifyEnabled}
+                  onCheckedChange={onToggleAiClassify}
+                  disabled={disabled || f.status === "parsing"}
+                />
+                <Label
+                  htmlFor={`ai-classify-${f.id}`}
+                  className="cursor-pointer text-xs"
+                >
+                  AI 분류
+                </Label>
+              </div>
             </div>
             {f.categorySummary && f.categorySummary.length > 0 && (
               <p className="mt-1 text-[11px] text-muted-foreground">
