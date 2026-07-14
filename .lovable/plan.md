@@ -1,104 +1,105 @@
+# Snag 하자 자동 분류 엔진 반영 계획
 
-## 목표
-사이드바에 최상위 섹션 **Import & Log**를 신설하고, 각 모듈(Task Management / Snag List / Spare Part / ABD)에 흩어져 있는 Import 및 Import Logs 화면을 각 페이지 내부의 **탭**으로 통합합니다. Export 페이지는 만들지 않습니다. 각 Raw Data 페이지의 기존 바로가기 버튼은 유지하되, 새 통합 라우트로 연결합니다.
+첨부 마크다운(`Snag_Trade_Classification_Prompt.md`)의 규칙을 Snag 임포트/Raw Data 파이프라인에 반영합니다. **하이브리드(규칙+LLM)** 방식, **컬럼 단위 빈 값만 계산**, **임포트 자동 실행 + Raw Data 수동 재실행** 두 경로 모두 지원.
 
-## 사이드바 구조 (`src/components/layout/AppLayout.tsx`)
+## 1. 대상 컬럼 및 계층
+
+4개 대상 필드 (DB `defect_items_raw`):
+- `defect_location` (신규, 지난 턴에 추가 완료)
+- `main_trade`, `sub_trade`, `work_type` (기존 컬럼, 현재는 re-import 시에만 채워짐)
+
+계층 정합성:
 
 ```text
-Outstanding Work
-  Dashboard
-  Task Management …
-  Snag List Management …
-Close-Out Doc
-  Dashboard
-  ABD / Spare Part / Warranty …
-Import & Log           ← 신규 최상위 섹션
-  Import               (/import-log/import)
-  Import Logs          (/import-log/logs)
-Admin …
+Team ⊃ Category ⊃ Main Trade ⊃ Sub Trade   (엄격 4단계)
+Defect Location, Work Type                  (독립 2축)
 ```
 
-- 아이콘: `Upload`(Import), `FileClock`(Import Logs). 섹션 자체는 라벨만.
-- `editorOnly: true`로 노출 제한(기존 각 모듈의 import/logs 링크와 동일 정책).
-- Warranty & License 모듈 내부 링크는 변경 없음.
+Category → Team 매핑은 이미 `defect_category_team_map` 테이블로 관리 중 → 재사용. Main/Sub Trade 계층은 마크다운의 1.1~1.4 표를 코드 상수로 이식.
 
-## 신규 라우트
+## 2. 아키텍처 (하이브리드)
 
-- `src/routes/_authenticated/import-log/import.tsx`
-  - `createFileRoute("/_authenticated/import-log/import")`
-  - `validateSearch`로 `tab` 파라미터: `task | snag | spare-part | abd | warranty`, 기본 `task`.
-  - `head`: "Import — QAIL CMS".
-- `src/routes/_authenticated/import-log/logs.tsx`
-  - `createFileRoute("/_authenticated/import-log/logs")`
-  - 동일한 `tab` 검색 파라미터.
-  - `head`: "Import Logs — QAIL CMS".
+새 모듈 `src/lib/defect-management/classifier/`:
 
-## 신규 컨테이너 컴포넌트
+- `rules.ts` — 마크다운 표를 그대로 옮긴 키워드 사전 및 계층 정의
+  - `TRADE_FAMILIES`: Category → family(Electrical/Mechanical/Facade/Architectural)
+  - `TRADE_RULES[family]`: `[keywords, mainTrade, subTrade]` 순서 배열
+  - `LOCATION_RULES`, `WORK_TYPE_RULES`
+- `rule-classify.ts` — `classifyByRules({ type, item, description, category }) → { defect_location?, main_trade?, sub_trade?, work_type? }`
+  - Type → Item → Description 순으로 키워드 매칭
+  - 매칭 실패 시 undefined (LLM 폴백 대상). 마크다운 규정상 최종 "판별 불가"는 `To Be Confirmed` 문자열.
+- `llm-classify.functions.ts` (server function, `createServerFn` + `requireSupabaseAuth`)
+  - 규칙으로 채우지 못한 필드가 있는 항목만 배치로 LLM에 위임
+  - Lovable AI Gateway + AI SDK, `google/gemini-2.5-flash-lite` (대량·저비용 분류)
+  - `Output.object` 구조화 출력: `{ items: [{ id, defect_location?, main_trade?, sub_trade?, work_type? }] }` — 스키마 필드는 `.nullable()`, 프롬프트에 판별 불가 시 `To Be Confirmed` 지시
+  - 배치 크기 30~50, 실패 시 개별 재시도 없이 `To Be Confirmed` 처리 후 진행
+- `apply-classification.ts` — 규칙+LLM 결과 결합, 계층 검증(Sub∈Main∈Family), 위반 값은 폐기
 
-### `src/components/import-log/ImportHubPage.tsx`
-- 상단 제목 + 설명.
-- `Tabs` (shadcn) — 값: `task`, `snag`, `spare-part`, `abd`, `warranty`.
-- `useSearch`/`useNavigate`로 현재 탭을 URL과 양방향 동기화(모듈별 딥링크 유지).
-- 탭 컨텐츠:
-  - **Task Management**: 기존 `TaskManagementImportPage` 그대로 렌더.
-  - **Snag List**: 기존 `DefectManagementImportPage` 그대로 렌더.
-  - **Spare Part**: 현재 `src/routes/_authenticated/closure/spare-part/import.tsx` 내부에 인라인 정의된 Spare Part 임포트 UI(`SparePartImportProvider` + `ImportPage` + `FileRow` + `ColumnSelectDialog`)를 그대로 `src/components/spare-part/import/SparePartImportPage.tsx`로 이전 후 이 파일에서 import. 로직/문구/파라미터 변경 없음.
-  - **ABD**: 기존 `AbdImportPage` 그대로 렌더.
-  - **Warranty**: "Coming soon" placeholder 카드(비활성).
+## 3. "빈 값" 판정 (증분 처리)
 
-### `src/components/import-log/ImportLogsHubPage.tsx`
-- 동일한 5개 탭 구조.
-- 각 탭에서 기존 `ImportLogsPage` 컴포넌트를 모듈별 props로 재사용 — 현재 `closure/*/import.logs.tsx`가 넘기는 props를 그대로 복제.
-- Warranty 탭은 placeholder.
+각 4개 컬럼을 독립적으로 판별. 계산 대상 조건:
+- 임포트 경로: 파싱된 원본 행에서 `p.<field>`가 null/빈 문자열 **그리고** DB 기존 행의 `<field>` 도 null/빈 문자열/`"To Be Confirmed"`
+- Raw Data 수동 재실행: DB 행의 `<field>` 가 null/빈 문자열/`"To Be Confirmed"` 인 컬럼만
+- 이미 값이 있으면 절대 덮어쓰지 않음 (마크다운 0.1·5.1 엄수)
 
-## 기존 모듈별 Import/Logs 라우트 처리
+## 4. 임포트 자동 실행 통합
 
-기존 URL은 유지하며 새 통합 페이지로 연결하기 위해 **리다이렉트 라우트**로 축소:
+`src/contexts/DefectManagementImportContext.tsx`의 upsert 파이프라인 중간에 자동 분류 단계 삽입:
 
-- `closure/abd/import.tsx` → `/import-log/import?tab=abd`
-- `closure/abd/import.logs.tsx` → `/import-log/logs?tab=abd`
-- `closure/snag-management/import.index.tsx` → `?tab=snag`
-- `closure/snag-management/import.logs.tsx` → `?tab=snag`
-- `closure/spare-part/import.tsx` → `?tab=spare-part`
-- `closure/spare-part/import.logs.tsx` → `?tab=spare-part`
-- `closure/task-management/import.logs.tsx` → `?tab=task`
+1. 기존: 파싱 → dedup → base 행 조립 → upsert
+2. 신규 삽입 지점: base 행 조립 직후, upsert 직전
+   - 각 행마다 4개 필드의 "빈 여부" 계산 (DB 기존값도 이미 `existing` Map으로 조회 중)
+   - 빈 필드가 하나라도 있는 행만 분류 큐에 적재
+   - `classifyByRules` 로 규칙 채움 → 남은 빈 필드 있는 행은 LLM 서버 fn 호출
+   - 결과를 `put(base, field, value)` 로 병합 (계층 검증 통과분만)
+3. 진행 상황을 기존 임포트 진행 UI에 "AI 분류 중 (n/총)" 로 표시
+4. LLM 실패해도 임포트 자체는 계속 (실패 필드는 `To Be Confirmed` 로 채움)
 
-구현: `createFileRoute(...)({ beforeLoad: () => { throw redirect({ to: "/import-log/import", search: { tab: "…" } }) } })`.
+## 5. Raw Data 수동 재실행
 
-## Raw Data 바로가기 버튼
+- `src/components/defect-management/raw-data/DefectRawDataPage.tsx` 툴바에 신규 버튼 `AI 하자 분류` (admin/superuser만 노출)
+- 현재 필터/선택 상태 기반:
+  - 선택 행이 있으면 그 행들만
+  - 없으면 현재 필터 조건 전체 (확인 다이얼로그 필수, 최대 5,000행 캡)
+- 서버 함수 `classifyDefectsBulk` (`createServerFn`, `requireSupabaseAuth` + admin 체크):
+  - 입력: `{ ids: string[] }` 또는 `{ filter: {...} }`
+  - 대상 행을 DB에서 로드 (`type`, `item`, `description`, `category` + 현재 4개 필드값 + `defect_type`/`priority_locked` 등 필요한 최소 컬럼)
+  - 규칙+LLM 분류 (동일 로직 재사용)
+  - 빈 필드만 UPDATE, 결과 통계 반환 `{ processed, filled: { field: count }, failed }`
+  - 완료 후 진행 토스트, TanStack Query invalidate
 
-현재 존재하는 것만 유지하고 새 통합 라우트로 target만 갱신:
+## 6. UI/UX 세부
 
-| 파일 | 현재 링크 | 변경 후 |
-|---|---|---|
-| `AbdRawDataPage.tsx` | `/closure/abd/import` | `/import-log/import` + `search={{ tab: "abd" }}` |
-| `DefectRawDataPage.tsx` | `/closure/snag-management/import` | `/import-log/import` + `search={{ tab: "snag" }}` |
-| `SparePartRawDataPage.tsx` | 없음(Export 버튼만 존재) | 변경 없음 |
-| `TaskManagementRawDataPage.tsx` | 없음(admin 링크만) | 변경 없음 |
+- 임포트 진행 스텝 라벨에 "AI 분류" 추가 (기존 "저장 중" 앞)
+- Raw Data 툴바 버튼: 확인 다이얼로그에 대상 행 수 + 예상 크레딧 소비(대략치) 표시, `Confirm` 후 실행
+- 결과 토스트: `n건 분류: Defect Location m, Main Trade m, Sub Trade m, Work Type m 채움`
+- `To Be Confirmed` 값도 컬럼에 실제로 저장 → 사용자가 필터로 골라 수동 편집 가능
+  - `columns.ts`의 `main_trade`/`sub_trade`/`work_type`/`defect_location` 은 이미 editable text 이므로 편집 UX 그대로 사용
 
-Export 버튼/다이얼로그(각 Raw Data 내부)는 그대로 유지.
+## 7. 계층 검증
 
-## 미변경 항목
-- 각 Raw Data 페이지의 `ExportDialog`, `AbdExportDialog` 및 export 로직.
-- 각 모듈의 Import 컴포넌트 내부 파싱/저장 로직.
-- Aconex Sync(`closure/spare-part/aconex-sync`).
-- Admin 관련 페이지.
+`main_trade`가 후보로 나왔을 때 그 값이 해당 행의 `category` family 아래인지 검증. `sub_trade` 는 채택된 `main_trade` 하위인지 검증. 위반 시 해당 필드 폐기(설정하지 않음). LLM은 프롬프트에 계층 표를 명시하되, 코드에서 최종 검증하여 위반값은 무시.
 
-## 기술 세부 사항
+## 8. 파일 변경 요약
 
-- 탭 상태 동기화:
-  ```ts
-  const { tab } = Route.useSearch();
-  const navigate = Route.useNavigate();
-  <Tabs value={tab ?? "task"} onValueChange={(v) => navigate({ search: { tab: v } })}>
-  ```
-- `validateSearch`: 리터럴 유니온 파서, 기본값 `"task"`.
-- 리다이렉트 라우트는 `component` 없이 `beforeLoad`에서 `throw redirect(...)`.
-- `src/routeTree.gen.ts`는 플러그인이 재생성 — 직접 편집하지 않음.
+- 신규: `src/lib/defect-management/classifier/rules.ts`
+- 신규: `src/lib/defect-management/classifier/rule-classify.ts`
+- 신규: `src/lib/defect-management/classifier/apply-classification.ts`
+- 신규: `src/lib/defect-management/classifier/llm-classify.functions.ts` (서버 fn)
+- 신규 or 재사용: `src/lib/ai-gateway.server.ts` (Lovable AI Gateway helper — 없으면 신규)
+- 수정: `src/contexts/DefectManagementImportContext.tsx` (자동 분류 단계 삽입, 진행 표시)
+- 수정: `src/components/defect-management/raw-data/DefectRawDataPage.tsx` (툴바 버튼)
+- 수정 없음: parser, columns, DB 스키마 (모두 이전 턴/기존 상태 활용)
 
-## 검증
-- `bunx tsgo --noEmit` 통과.
-- 사이드바 새 섹션 노출(editor/admin) 및 이동 확인.
-- 각 탭 전환이 URL `?tab=` 파라미터에 반영.
-- ABD/Snag Raw Data의 Import 바로가기가 새 통합 페이지 해당 탭으로 진입.
-- 기존 URL(`/closure/abd/import` 등)이 새 라우트로 리다이렉트.
+## 9. 비기능
+
+- **모델**: `google/gemini-2.5-flash-lite` (분류·대량·저비용). 크레딧 부족(402)·레이트리밋(429) 시 사용자 토스트로 명시.
+- **비용 관리**: 규칙으로 대다수 채움 → LLM은 폴백에만. 배치 30~50건/요청.
+- **동시성**: 임포트 파이프라인은 순차, Raw Data 재실행은 최대 5,000행 캡, 배치 병렬 3 이하.
+- **보안**: 서버 fn 모두 `requireSupabaseAuth`, Raw Data 재실행은 admin/superuser 체크.
+- **로그**: 실패 배치는 콘솔 warn + 임포트 로그 warnings 배열에 기록.
+
+## 10. 후속(계획 외)
+
+- Main/Sub Trade 계층을 관리자 페이지에서 편집 가능하도록 하는 UI는 이 계획에서 제외 (현재는 코드 상수). 필요 시 별도 요청.
+- Warranty 등 향후 확장 모듈에 동일 분류기를 재사용할 수 있게 `classifier/` 는 defect 전용이 아닌 범용 구조로 확장 가능하도록 설계.
