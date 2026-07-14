@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Columns3, GripVertical, Pin } from "lucide-react";
+import { Columns3, GripVertical, Pencil, Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DEFECT_COLUMNS } from "@/lib/defect-management/columns";
 import { useDefectFieldHelpers } from "@/hooks/useDefectFieldConfig";
@@ -22,6 +22,7 @@ interface Props {
   isAdmin?: boolean;
   onServerReorder?: (patches: Array<{ field_name: string; sort_order: number }>) => void;
   onServerVisibility?: (field_name: string, is_visible: boolean) => void;
+  onServerLabel?: (field_name: string, display_name: string) => void;
 }
 
 export function DefectColumnOrderMenu({
@@ -34,8 +35,11 @@ export function DefectColumnOrderMenu({
   isAdmin,
   onServerReorder,
   onServerVisibility,
+  onServerLabel,
 }: Props) {
   const [dragKey, setDragKey] = useState<string | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState<string>("");
   const { getLabel } = useDefectFieldHelpers();
 
   const resolveLabel = (k: string): string => SYSTEM_LABEL[k] ?? getLabel(k) ?? k;
@@ -81,6 +85,22 @@ export function DefectColumnOrderMenu({
     onVisibilityChange({ ...visibility, [k]: checked });
     // is_critical / stage_progress 는 field_config에 없어 persist helper가 스킵.
     if (isAdmin && onServerVisibility) onServerVisibility(k, checked);
+  };
+
+  const startRename = (k: string) => {
+    if (!isAdmin || !onServerLabel) return;
+    if (k === "stage_progress") return; // 파생 가상 컬럼 — DB 없음
+    setEditingKey(k);
+    setEditingValue(resolveLabel(k));
+  };
+  const commitRename = () => {
+    if (!editingKey) return;
+    const next = editingValue.trim();
+    const prev = resolveLabel(editingKey);
+    if (next && next !== prev && onServerLabel) {
+      onServerLabel(editingKey, next);
+    }
+    setEditingKey(null);
   };
 
   return (
@@ -148,9 +168,32 @@ export function DefectColumnOrderMenu({
                   onCheckedChange={(c) => changeVisibility(k, !!c)}
                   className="h-3 w-3"
                 />
-                <span className={cn("flex-1 truncate", hidden && "text-muted-foreground/50")}>
-                  {resolveLabel(k)}
-                </span>
+                {editingKey === k ? (
+                  <input
+                    autoFocus
+                    value={editingValue}
+                    onChange={(e) => setEditingValue(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); commitRename(); }
+                      if (e.key === "Escape") { e.preventDefault(); setEditingKey(null); }
+                    }}
+                    className="flex-1 min-w-0 rounded border border-input bg-background px-1 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+                  />
+                ) : (
+                  <span className={cn("flex-1 truncate", hidden && "text-muted-foreground/50")}>
+                    {resolveLabel(k)}
+                  </span>
+                )}
+                {isAdmin && onServerLabel && editingKey !== k && k !== "stage_progress" && (
+                  <button
+                    className="text-muted-foreground/60 hover:text-foreground"
+                    onClick={() => startRename(k)}
+                    title="라벨 이름 변경 (전체 사용자에 반영)"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
                 <button
                   className={cn(
                     "text-[10px] hover:underline",

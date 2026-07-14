@@ -125,11 +125,12 @@ export function useDefectDefaults() {
 
 /** Admin 전용: defect_field_config UPDATE. RLS로 비관리자는 실패. */
 export async function persistDefectFieldConfig(
-  patches: Array<{ field_name: string; sort_order?: number; is_visible?: boolean }>,
+  patches: Array<{ field_name: string; sort_order?: number; is_visible?: boolean; display_name?: string }>,
 ) {
   if (!patches.length) return;
-  // is_critical / stage_progress 는 파생 컬럼이라 field_config에 없음 → 스킵
-  const skip = new Set(["is_critical", "stage_progress"]);
+  // stage_progress 는 파생 가상 컬럼 (field_config에 없음) → 스킵.
+  // is_critical 은 field_config에 존재하므로 유지 (라벨/노출 반영).
+  const skip = new Set(["stage_progress"]);
   const filtered = patches.filter((p) => !skip.has(p.field_name));
   if (!filtered.length) return;
   const results = await Promise.all(

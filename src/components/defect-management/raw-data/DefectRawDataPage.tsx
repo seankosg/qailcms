@@ -45,6 +45,7 @@ import {
   useDefectFieldHelpers,
   DEFECT_FIELD_CONFIG_QK,
   persistDefectFieldConfig,
+  useDefectColumnLabel,
 } from "@/hooks/useDefectFieldConfig";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -268,6 +269,7 @@ export function DefectRawDataPage() {
   const { data: user } = useCurrentUser();
   const { data: fieldConfig = [] } = useDefectFieldConfig();
   const helpers = useDefectFieldHelpers();
+  const labelOf = useDefectColumnLabel();
   const isAdmin = !!user?.isAdmin;
   const invalidateDefects = useInvalidateDefects();
   const qc = useQueryClient();
@@ -290,6 +292,17 @@ export function DefectRawDataPage() {
         qc.invalidateQueries({ queryKey: DEFECT_FIELD_CONFIG_QK });
       } catch (e: any) {
         toast.error("컬럼 노출 저장 실패", { description: e?.message ?? String(e) });
+      }
+    },
+    [qc],
+  );
+  const onServerLabel = useCallback(
+    async (field_name: string, display_name: string) => {
+      try {
+        await persistDefectFieldConfig([{ field_name, display_name }]);
+        qc.invalidateQueries({ queryKey: DEFECT_FIELD_CONFIG_QK });
+      } catch (e: any) {
+        toast.error("컬럼 라벨 저장 실패", { description: e?.message ?? String(e) });
       }
     },
     [qc],
@@ -487,7 +500,7 @@ export function DefectRawDataPage() {
 
     // Critical column
     const criticalCol: ColumnDef<DefectItem> = {
-      id: "is_critical", accessorKey: "is_critical", header: "Critical", size: 72, enableSorting: true, enableColumnFilter: true,
+      id: "is_critical", accessorKey: "is_critical", header: labelOf("is_critical"), size: 72, enableSorting: true, enableColumnFilter: true,
       meta: { filterType: "multi-select", filterOptions: [{ value: "true", label: "Critical" }, { value: "false", label: "Non-critical" }] },
       accessorFn: (r) => ((r as any).is_critical ? "true" : "false"),
       cell: ({ row }) => {
@@ -541,10 +554,10 @@ export function DefectRawDataPage() {
       if (hiddenByTab.has(id)) continue;
       const c = byKey.get(id);
       if (!c) continue;
-      cols.push(buildDataColumn(c, tab, includeInactive, dataDate, isAdmin, patchLocalItem, () => refetch()));
+      cols.push(buildDataColumn(c, tab, includeInactive, dataDate, isAdmin, patchLocalItem, () => refetch(), labelOf(c.key)));
     }
     return cols;
-  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, isAdmin, patchLocalItem, refetch]);
+  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, isAdmin, patchLocalItem, refetch, labelOf]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = { __select: true };
@@ -707,6 +720,7 @@ export function DefectRawDataPage() {
             isAdmin={isAdmin}
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
+            onServerLabel={onServerLabel}
           />
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
@@ -846,6 +860,7 @@ function buildDataColumn(
   isAdmin: boolean,
   patchLocal: (id: string, patch: Record<string, any>) => void,
   refetch: () => void,
+  headerLabel?: string,
 ): ColumnDef<DefectItem> {
   const filterType =
     DATE_FILTER_FIELDS.has(c.key) ? "date-range" :
@@ -858,7 +873,7 @@ function buildDataColumn(
   return {
     id: c.key,
     accessorKey: c.key,
-    header: c.label,
+    header: headerLabel ?? c.label,
     size: c.width,
     // manualFiltering=true 상태이므로 filterFn 불필요
     enableSorting: !isDerived && (!PROGRESS_FIELDS.has(c.key) || c.type === "percent"),
