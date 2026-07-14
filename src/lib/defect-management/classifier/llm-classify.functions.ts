@@ -97,9 +97,9 @@ export const classifyDefectsWithLlm = createServerFn({ method: "POST" })
     const userPrompt = JSON.stringify({ items: data.items });
 
     try {
-      const { experimental_output: output } = await generateText({
+      const { output } = await generateText({
         model,
-        experimental_output: Output.object({ schema: ResponseSchema }),
+        output: Output.object({ schema: ResponseSchema }),
         system: SYSTEM_PROMPT,
         prompt: `다음 항목들을 분류하세요. 각 항목의 targets 에 있는 필드만 실제 값으로 채우고 나머지는 null. JSON입니다:\n\n${userPrompt}`,
       });
