@@ -1,0 +1,1 @@
+ALTER TABLE public.defect_items_raw ADD COLUMN IF NOT EXISTS defect_location text;
