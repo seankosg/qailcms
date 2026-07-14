@@ -184,12 +184,10 @@ export function SparePartRawDataPage() {
       });
     }
 
-    // frozenExtras: 유효 키만 유지, 저장된 값이 없을 때만 default 로 보충 (개수 상한 없음)
-    const savedRaw = s.frozenExtras;
-    const savedFrozen = (savedRaw ?? []).filter((k) => validKeys.has(k));
-    const mergedFrozen = savedRaw !== undefined
-      ? savedFrozen
-      : [...savedFrozen, ...DEFAULT_FROZEN_EXTRAS.filter((k) => !savedFrozen.includes(k))];
+    // frozenExtras: 유효 키만 유지, default 로 보충 (개수 상한 없음)
+    const savedFrozen = (s.frozenExtras ?? []).filter((k) => validKeys.has(k));
+    const frozenFill = DEFAULT_FROZEN_EXTRAS.filter((k) => !savedFrozen.includes(k));
+    const mergedFrozen = [...savedFrozen, ...frozenFill];
 
     // visibility: 유효 키만 유지
     const cleanedVisibility: VisibilityState = {};
