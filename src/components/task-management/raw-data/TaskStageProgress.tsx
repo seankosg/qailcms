@@ -56,7 +56,7 @@ export function classifyAlarm(row: Row): AlarmState {
   return "empty";
 }
 
-const STATE_STYLES: Record<StageState, string> = {
+export const STATE_STYLES: Record<StageState, string> = {
   completed: "bg-emerald-600 border-emerald-600 text-white",
   wip: "bg-amber-400 border-amber-500 text-white",
   delay: "bg-destructive border-destructive text-destructive-foreground",
@@ -64,7 +64,7 @@ const STATE_STYLES: Record<StageState, string> = {
   empty: "bg-transparent border-muted-foreground/20 text-muted-foreground/40",
 };
 
-const STATE_GLYPH: Record<StageState, string> = {
+export const STATE_GLYPH: Record<StageState, string> = {
   completed: "●",
   wip: "◐",
   delay: "⊘",
@@ -72,7 +72,7 @@ const STATE_GLYPH: Record<StageState, string> = {
   empty: "○",
 };
 
-const STATE_LABEL: Record<StageState, string> = {
+export const STATE_LABEL: Record<StageState, string> = {
   completed: "Completed",
   wip: "WIP",
   delay: "Delay",
@@ -80,7 +80,7 @@ const STATE_LABEL: Record<StageState, string> = {
   empty: "—",
 };
 
-const ALARM_STYLES: Record<AlarmState, string> = {
+export const ALARM_STYLES: Record<AlarmState, string> = {
   done: "bg-emerald-600 border-emerald-600 text-white",
   ok: "bg-sky-500 border-sky-500 text-white",
   caution: "bg-amber-400 border-amber-500 text-white",
@@ -89,7 +89,7 @@ const ALARM_STYLES: Record<AlarmState, string> = {
   empty: "bg-transparent border-muted-foreground/20 text-muted-foreground/40",
 };
 
-const ALARM_GLYPH: Record<AlarmState, string> = {
+export const ALARM_GLYPH: Record<AlarmState, string> = {
   done: "●",
   ok: "●",
   caution: "◐",
@@ -98,7 +98,7 @@ const ALARM_GLYPH: Record<AlarmState, string> = {
   empty: "○",
 };
 
-const ALARM_LABEL: Record<AlarmState, string> = {
+export const ALARM_LABEL: Record<AlarmState, string> = {
   done: "완료",
   ok: "정상",
   caution: "주의",
@@ -107,7 +107,7 @@ const ALARM_LABEL: Record<AlarmState, string> = {
   empty: "—",
 };
 
-function Pip({ className, glyph, label }: { className: string; glyph: string; label: string }) {
+export function Pip({ className, glyph, label }: { className: string; glyph: string; label: string }) {
   return (
     <span
       className={cn(
