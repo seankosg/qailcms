@@ -59,11 +59,18 @@ import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { EditCellPopover } from "./EditCellPopover";
 import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
+import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
 import { todayIso } from "@/lib/defect-management/stage-utils";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 
-const SYSTEM_FROZEN_IDS = ["__select", "is_critical", "stage_progress"];
-const DEFAULT_ORDER = DEFECT_COLUMNS.map((c) => c.key).filter((k) => k !== "is_critical");
+const SYSTEM_FROZEN_IDS = ["__select"];
+// is_critical / stage_progress 는 사용자 드래그/pin/hide 가능한 일반 컬럼으로 취급.
+// stage_progress 는 DEFECT_COLUMNS에 없는 가상 컬럼이므로 명시적으로 순서에 포함.
+const DEFAULT_ORDER = [
+  "is_critical",
+  "stage_progress",
+  ...DEFECT_COLUMNS.map((c) => c.key).filter((k) => k !== "is_critical"),
+];
 const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
 
 // ── URL <-> table state helpers ────────────────────────────────────────────
