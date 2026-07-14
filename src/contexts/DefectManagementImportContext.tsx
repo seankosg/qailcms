@@ -20,7 +20,7 @@ import { deriveCompletionStatus, deriveClosureStatus } from "@/lib/defect-manage
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
-import { classifyDefectsWithLlm } from "@/lib/defect-management/classifier/llm-classify.functions";
+import { bulkClassifyDefects } from "@/lib/defect-management/classifier/bulk-classify.functions";
 import { CLASSIFIER_FIELDS } from "@/lib/defect-management/classifier/rules";
 
 export type DefectFileStatus =
@@ -824,15 +824,18 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         return base;
       });
 
-      // ============ AI 자동 분류 (Defect Location / Main·Sub Trade / Work Type) ============
-      // 각 payload 에서 4개 필드 중 "빈 필드" 만 계산 대상. 이미 값이 있으면 절대 덮어쓰지 않음.
+      // ============ 규칙 기반 자동 분류 (인라인, LLM 은 임포트 후 백그라운드) ============
+      // 4개 필드 중 "빈 필드" 만 대상. 규칙으로 매칭되는 것만 즉시 채우고,
+      // 규칙 미매칭 필드는 그대로 두어 임포트 후 서버 측 bulkClassifyDefects 가 LLM 으로 채움.
+      // 사유: 39k행 × LLM 배치를 인라인으로 돌리면 upsert 가 시작되기 전에 수 분간 블로킹.
+      const rowsNeedingBackgroundClassify: string[] = [];
       try {
+        const t0 = performance.now();
         const classifyQueue: ClassifyRequestItem[] = [];
         const targetsByKey = new Map<string, string[]>();
         for (let i = 0; i < workingRows.length; i++) {
           const p = workingRows[i];
           const base = payloads[i];
-          // 원본 파싱값 + extra + base 에 이미 설정된 값 종합
           const incoming = {
             defect_location: (base.defect_location as string | null | undefined) ?? p.defect_location ?? null,
             main_trade: (base.main_trade as string | null | undefined) ?? (p.extra?.main_trade as string | undefined) ?? null,
@@ -854,91 +857,33 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         }
 
         if (classifyQueue.length > 0) {
-          setFiles((cur) =>
-            cur.map((x) => (x.id === f.id ? { ...x, status: "processing", progress: 0 } : x)),
-          );
-          const t0 = performance.now();
           const { ruleResults, needsLlm } = runRuleStage(classifyQueue);
-
-          // LLM 배치 처리
-          const llmResults = new Map<string, Record<string, string | null>>();
-          const LLM_BATCH = 50;
-          const LLM_CONCURRENCY = 3;
-          const llmBatches: ClassifyRequestItem[][] = [];
-          for (let i = 0; i < needsLlm.length; i += LLM_BATCH) {
-            llmBatches.push(needsLlm.slice(i, i + LLM_BATCH));
-          }
-          let llmFailedBatches = 0;
-          if (llmBatches.length > 0) {
-            await runWithConcurrency(llmBatches, LLM_CONCURRENCY, async (batch) => {
-              try {
-                const res = await classifyDefectsWithLlm({
-                  data: {
-                    items: batch.map((b) => ({
-                      source_issue_no: b.source_issue_no,
-                      category: b.category ?? null,
-                      type: b.type ?? null,
-                      item: b.item ?? null,
-                      description: b.description ?? null,
-                      targets: b.targets,
-                    })),
-                  },
-                });
-                for (const r of res.items) {
-                  llmResults.set(r.source_issue_no, {
-                    defect_location: r.defect_location,
-                    main_trade: r.main_trade,
-                    sub_trade: r.sub_trade,
-                    work_type: r.work_type,
-                  });
-                }
-              } catch (err) {
-                llmFailedBatches++;
-                console.warn("[defect-import] llm-classify batch failed", err);
-              }
-            });
-          }
-
-          // 결과 병합 → payload 에 반영
+          // 규칙 결과만 payload 에 반영 (매칭된 필드만). 규칙 미매칭 필드는 null 유지.
+          const payloadByKey = new Map<string, Record<string, unknown>>();
           for (let i = 0; i < workingRows.length; i++) {
-            const p = workingRows[i];
-            const targets = targetsByKey.get(p.source_issue_no);
-            if (!targets || targets.length === 0) continue;
-            const rr = ruleResults.get(p.source_issue_no) ?? {};
-            const lr = llmResults.get(p.source_issue_no);
-            const merged = mergeClassification({
-              input: {
-                source_issue_no: p.source_issue_no,
-                category: p.category,
-                type: p.defect_type,
-                item: p.item,
-                description: p.description,
-              },
-              targets: targets as any,
-              ruleResult: rr,
-              llmResult: lr as any,
-            });
-            for (const [k, v] of Object.entries(merged)) {
+            payloadByKey.set(workingRows[i].source_issue_no, payloads[i]);
+          }
+          for (const [key, rr] of ruleResults) {
+            const pl = payloadByKey.get(key);
+            if (!pl) continue;
+            for (const [k, v] of Object.entries(rr)) {
               if (v == null) continue;
-              put(payloads[i], k, v);
+              put(pl, k, v);
             }
           }
+          // 규칙으로 못 채운 필드가 남은 행은 임포트 후 백그라운드 LLM 분류 대상
+          for (const it of needsLlm) rowsNeedingBackgroundClassify.push(it.source_issue_no);
           const ms = Math.round(performance.now() - t0);
           const skippedRows = workingRows.length - classifyQueue.length;
           const ruleOnlyRows = classifyQueue.length - needsLlm.length;
           console.log(
-            `[defect-import] AI 분류 완료 total=${workingRows.length} 스킵=${skippedRows} 규칙=${ruleOnlyRows} LLM=${needsLlm.length}(배치${llmBatches.length},실패${llmFailedBatches}) ${ms}ms`,
+            `[defect-import] 규칙 분류 완료 total=${workingRows.length} 스킵=${skippedRows} 규칙매칭=${ruleOnlyRows} LLM대기=${needsLlm.length} ${ms}ms`,
           );
-          if (needsLlm.length > 0 || classifyQueue.length > 0) {
-            toast.info(
-              `${f.name} AI 분류: 스킵 ${skippedRows} · 규칙 ${ruleOnlyRows} · LLM ${needsLlm.length}${llmFailedBatches > 0 ? ` (실패 배치 ${llmFailedBatches})` : ""}`,
-            );
-          }
         }
       } catch (err) {
-        console.warn("[defect-import] AI 분류 단계 실패 (임포트는 계속)", err);
+        console.warn("[defect-import] 규칙 분류 실패 (임포트는 계속)", err);
       }
-      // ============ /AI 자동 분류 ============
+      // ============ /규칙 기반 자동 분류 ============
 
       let inserted = 0;
       let updated = 0;
@@ -1093,6 +1038,50 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           toast.info(
             `${f.name}: Re-import 매칭 실패 ${skippedReimportNoMatch}행 건너뜀 (신규 생성 안 함).`,
           );
+
+        // 백그라운드 LLM 분류 트리거 (임포트 완료 후, UI 는 이미 반환)
+        if (finalStatus !== "failed" && rowsNeedingBackgroundClassify.length > 0) {
+          void (async () => {
+            try {
+              // source_issue_no → id 조회
+              const idsToClassify: string[] = [];
+              const KEY_CHUNK = 500;
+              for (let i = 0; i < rowsNeedingBackgroundClassify.length; i += KEY_CHUNK) {
+                const keys = rowsNeedingBackgroundClassify.slice(i, i + KEY_CHUNK);
+                const { data } = await (supabase as any)
+                  .from("defect_items_raw")
+                  .select("id")
+                  .in("source_issue_no", keys);
+                for (const r of (data ?? []) as Array<{ id: string }>) {
+                  idsToClassify.push(r.id);
+                }
+              }
+              if (idsToClassify.length === 0) return;
+              toast.info(`${f.name}: AI 분류 백그라운드 실행 중 (${idsToClassify.length}행)...`);
+              const CLASSIFY_CHUNK = 2000;
+              let totalUpdated = 0;
+              let totalFailed = 0;
+              for (let i = 0; i < idsToClassify.length; i += CLASSIFY_CHUNK) {
+                const chunk = idsToClassify.slice(i, i + CLASSIFY_CHUNK);
+                try {
+                  const res = await bulkClassifyDefects({ data: { ids: chunk } });
+                  totalUpdated += (res as any).updated ?? 0;
+                  totalFailed += (res as any).failed ?? 0;
+                } catch (err) {
+                  console.warn("[defect-import] background classify chunk failed", err);
+                  totalFailed += chunk.length;
+                }
+              }
+              try { qc.invalidateQueries({ queryKey: ["defect"] }); } catch { /* ignore */ }
+              toast.success(
+                `${f.name}: AI 분류 완료 · 업데이트 ${totalUpdated}${totalFailed ? ` · 실패 ${totalFailed}` : ""}`,
+              );
+            } catch (err) {
+              console.warn("[defect-import] background classify failed", err);
+              toast.warning(`${f.name}: AI 분류 백그라운드 실행 실패. Raw Data 재분류 버튼을 사용하세요.`);
+            }
+          })();
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error("[defect-import] fatal", e);
