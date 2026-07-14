@@ -5,12 +5,18 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeSnagToolbar } from "./DeSnagToolbar";
 import { DeSnagMatrixBlock } from "./DeSnagMatrixBlock";
 import { DeSnagGrandTotalCards } from "./DeSnagGrandTotalCards";
+import { DeSnagRoomGroupCards } from "./DeSnagRoomGroupCards";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
 import {
   ALL_TEAMS,
   buildMatrix,
+  mergeStats,
+  newStats,
   planGroupsForPlot,
+  ROOM_GROUP_ORDER,
   type PlotKey,
+  type RoomGroupCol,
+  type Stats,
   type TeamKey,
 } from "@/lib/defect-management/dashboard-shape";
 
@@ -53,6 +59,22 @@ export function DeSnagDashboardPage() {
     return Array.from(new Set(b.rows.map((r) => r.building)));
   }, [matrix]);
 
+  const roomGroupEntries = useMemo(() => {
+    const totals: Record<RoomGroupCol, Stats> = ROOM_GROUP_ORDER.reduce(
+      (acc, rg) => {
+        acc[rg] = newStats();
+        return acc;
+      },
+      {} as Record<RoomGroupCol, Stats>,
+    );
+    for (const block of matrix.blocks) {
+      for (const rg of ROOM_GROUP_ORDER) {
+        mergeStats(totals[rg], block.colTotals[rg]);
+      }
+    }
+    return ROOM_GROUP_ORDER.map((col) => ({ col, stats: totals[col] }));
+  }, [matrix]);
+
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -86,6 +108,8 @@ export function DeSnagDashboardPage() {
           goRaw(p);
         }}
       />
+
+      <DeSnagRoomGroupCards entries={roomGroupEntries} onNavigate={goRaw} />
 
       {isLoading && <p className="text-sm text-muted-foreground">불러오는 중…</p>}
       {error && <p className="text-sm text-destructive">오류: {(error as Error).message}</p>}
