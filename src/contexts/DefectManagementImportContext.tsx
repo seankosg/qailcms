@@ -495,6 +495,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, dataDateOverride: date } : f)));
   }, []);
 
+  const setFileAiClassifyEnabled = useCallback((id: string, enabled: boolean) => {
+    setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, aiClassifyEnabled: enabled } : f)));
+  }, []);
+
   const setFileSheet = useCallback(
     async (id: string, sheetName: string) => {
       let target: DefectImportFile | undefined;
@@ -1208,6 +1212,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         setFileDuplicateSelection,
         resolveDuplicates,
         startImport,
+        setFileAiClassifyEnabled,
       }}
     >
       {children}
