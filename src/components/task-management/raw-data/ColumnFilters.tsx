@@ -7,6 +7,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { EMPTY_TOKEN } from "@/lib/task-management/filters";
 import type { TmFilterType } from "@/lib/task-management/columns";
+import {
+  ALARM_GLYPH,
+  ALARM_LABEL,
+  ALARM_STYLES,
+  Pip,
+  STATE_GLYPH,
+  STATE_LABEL,
+  STATE_STYLES,
+  classifyAlarm,
+  classifyFinish,
+  classifyStart,
+  type AlarmState,
+  type StageState,
+} from "./TaskStageProgress";
+import type { StageProgressFilterValue } from "@/lib/task-management/filters";
 
 const TriggerButton = ({
   isActive,
@@ -267,5 +282,145 @@ export function ColumnFilterDropdown({
   if (filterType === "text") return <TextDropdown column={column} />;
   if (filterType === "date-range") return <DateRangeDropdown column={column} />;
   if (filterType === "number-range") return <NumberRangeDropdown column={column} />;
+  if (filterType === "stage-progress") return <StageProgressDropdown column={column} />;
   return null;
+}
+
+const START_OPTS: StageState[] = ["completed", "delay", "plan", "empty"];
+const FINISH_OPTS: StageState[] = ["completed", "wip", "delay", "plan", "empty"];
+const ALARM_OPTS: AlarmState[] = ["done", "ok", "caution", "late", "risk", "empty"];
+
+function StageProgressDropdown({ column }: { column: Column<any, unknown> }) {
+  const val = (column.getFilterValue() as StageProgressFilterValue | undefined) ?? {};
+  const start = val.start ?? [];
+  const alarm = val.alarm ?? [];
+  const finish = val.finish ?? [];
+  const isActive = start.length + alarm.length + finish.length > 0;
+
+  const facetRows = column.getFacetedRowModel?.().rows ?? [];
+  const counts = useMemo(() => {
+    const s: Record<string, number> = {};
+    const a: Record<string, number> = {};
+    const f: Record<string, number> = {};
+    for (const r of facetRows) {
+      const orig = r.original as Record<string, unknown>;
+      const dd = (orig as any).data_date ?? null;
+      const sv = classifyStart(orig, dd);
+      const av = classifyAlarm(orig);
+      const fv = classifyFinish(orig, dd);
+      s[sv] = (s[sv] ?? 0) + 1;
+      a[av] = (a[av] ?? 0) + 1;
+      f[fv] = (f[fv] ?? 0) + 1;
+    }
+    return { s, a, f };
+  }, [facetRows]);
+
+  const commit = (next: StageProgressFilterValue) => {
+    const hasAny = (next.start?.length ?? 0) + (next.alarm?.length ?? 0) + (next.finish?.length ?? 0) > 0;
+    column.setFilterValue(hasAny ? next : undefined);
+  };
+
+  const toggleStage = (group: "start" | "finish", v: StageState) => {
+    const cur = new Set<StageState>((group === "start" ? start : finish) as StageState[]);
+    if (cur.has(v)) cur.delete(v); else cur.add(v);
+    commit({ ...val, [group]: Array.from(cur) });
+  };
+  const toggleAlarm = (v: AlarmState) => {
+    const cur = new Set<AlarmState>(alarm as AlarmState[]);
+    if (cur.has(v)) cur.delete(v); else cur.add(v);
+    commit({ ...val, alarm: Array.from(cur) });
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <TriggerButton isActive={isActive} />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 space-y-2 p-2">
+        <StageSection
+          title="Start"
+          options={START_OPTS}
+          selected={start}
+          onToggle={(v) => toggleStage("start", v)}
+          styles={STATE_STYLES}
+          glyphs={STATE_GLYPH}
+          labels={STATE_LABEL}
+          counts={counts.s}
+        />
+        <StageSection
+          title="Alarm"
+          options={ALARM_OPTS}
+          selected={alarm}
+          onToggle={(v) => toggleAlarm(v as AlarmState)}
+          styles={ALARM_STYLES}
+          glyphs={ALARM_GLYPH}
+          labels={ALARM_LABEL}
+          counts={counts.a}
+        />
+        <StageSection
+          title="Finish"
+          options={FINISH_OPTS}
+          selected={finish}
+          onToggle={(v) => toggleStage("finish", v)}
+          styles={STATE_STYLES}
+          glyphs={STATE_GLYPH}
+          labels={STATE_LABEL}
+          counts={counts.f}
+        />
+        {isActive && (
+          <button
+            className="w-full text-xs text-muted-foreground hover:underline"
+            onClick={() => column.setFilterValue(undefined)}
+          >
+            Clear
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function StageSection<T extends string>({
+  title,
+  options,
+  selected,
+  onToggle,
+  styles,
+  glyphs,
+  labels,
+  counts,
+}: {
+  title: string;
+  options: T[];
+  selected: T[];
+  onToggle: (v: T) => void;
+  styles: Record<string, string>;
+  glyphs: Record<string, string>;
+  labels: Record<string, string>;
+  counts: Record<string, number>;
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </div>
+      <div className="space-y-0.5">
+        {options.map((opt) => (
+          <label
+            key={opt}
+            className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-0.5 text-xs hover:bg-accent/50"
+          >
+            <Checkbox
+              checked={selected.includes(opt)}
+              onCheckedChange={() => onToggle(opt)}
+              className="h-3.5 w-3.5"
+            />
+            <Pip className={styles[opt]} glyph={glyphs[opt]} label={labels[opt]} />
+            <span className="flex-1">{labels[opt]}</span>
+            <span className="text-[10px] text-muted-foreground">{counts[opt] ?? 0}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
 }

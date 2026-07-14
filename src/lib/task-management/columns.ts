@@ -12,7 +12,8 @@ export type TmFilterType =
   | "multi-select"
   | "text"
   | "date-range"
-  | "number-range";
+  | "number-range"
+  | "stage-progress";
 
 export interface TmColumnDef {
   key: string;

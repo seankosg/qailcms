@@ -1,5 +1,12 @@
 import type { Row } from "@tanstack/react-table";
 import { TM_SEARCH_FIELDS } from "./columns";
+import {
+  classifyAlarm,
+  classifyFinish,
+  classifyStart,
+  type AlarmState,
+  type StageState,
+} from "@/components/task-management/raw-data/TaskStageProgress";
 
 export const EMPTY_TOKEN = "__EMPTY__";
 
@@ -61,6 +68,41 @@ export const numberRangeFilterFn = (row: Row<any>, columnId: string, filterValue
   if (Number.isNaN(num)) return false;
   if (min != null && num < min) return false;
   if (max != null && num > max) return false;
+  return true;
+};
+
+export interface StageProgressFilterValue {
+  start?: StageState[];
+  alarm?: AlarmState[];
+  finish?: StageState[];
+}
+
+export const stageProgressFilterFn = (
+  row: Row<any>,
+  _columnId: string,
+  filterValue: StageProgressFilterValue | undefined,
+) => {
+  if (!filterValue) return true;
+  const { start, alarm, finish } = filterValue;
+  const anySelected =
+    (start && start.length > 0) ||
+    (alarm && alarm.length > 0) ||
+    (finish && finish.length > 0);
+  if (!anySelected) return true;
+  const r = row.original as Record<string, unknown>;
+  const dd = (r as any).data_date ?? null;
+  if (start && start.length > 0) {
+    const s = classifyStart(r, dd);
+    if (!start.includes(s)) return false;
+  }
+  if (alarm && alarm.length > 0) {
+    const a = classifyAlarm(r);
+    if (!alarm.includes(a)) return false;
+  }
+  if (finish && finish.length > 0) {
+    const f = classifyFinish(r, dd);
+    if (!finish.includes(f)) return false;
+  }
   return true;
 };
 
