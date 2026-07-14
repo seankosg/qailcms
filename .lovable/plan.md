@@ -1,61 +1,104 @@
-# Header Mapping 관리자 편집 확장
 
-Admin Mapping 탭의 3개 Header Mapping 테이블 (Spare Part / Task Management / Snag List) 에 관리자 편집 권한을 확장합니다.
+## 목표
+사이드바에 최상위 섹션 **Import & Log**를 신설하고, 각 모듈(Task Management / Snag List / Spare Part / ABD)에 흩어져 있는 Import 및 Import Logs 화면을 각 페이지 내부의 **탭**으로 통합합니다. Export 페이지는 만들지 않습니다. 각 Raw Data 페이지의 기존 바로가기 버튼은 유지하되, 새 통합 라우트로 연결합니다.
 
-## 범위 (사용자 승인)
+## 사이드바 구조 (`src/components/layout/AppLayout.tsx`)
 
-1. **Target Field 인라인 편집** — 현재 읽기 전용 → 드롭다운 선택으로 변경
-2. **System 매핑 삭제 허용** — 관리자에게만 (Custom 은 기존대로)
-3. **비관리자 편집 UI 숨김** — admin/superuser 가 아니면 읽기 전용
-4. **3개 탭 모두 동일 적용** — Spare Part, Task Management, Snag List
+```text
+Outstanding Work
+  Dashboard
+  Task Management …
+  Snag List Management …
+Close-Out Doc
+  Dashboard
+  ABD / Spare Part / Warranty …
+Import & Log           ← 신규 최상위 섹션
+  Import               (/import-log/import)
+  Import Logs          (/import-log/logs)
+Admin …
+```
 
-## 구현
+- 아이콘: `Upload`(Import), `FileClock`(Import Logs). 섹션 자체는 라벨만.
+- `editorOnly: true`로 노출 제한(기존 각 모듈의 import/logs 링크와 동일 정책).
+- Warranty & License 모듈 내부 링크는 변경 없음.
 
-### 1) 공용 컴포넌트 신규
-`src/components/admin/EditableTargetFieldCell.tsx`
-- Props: `row`, `fields` (선택 가능한 field_config 목록), `onSave(target_field)`
-- 표시: `field_name` (mono) + `— display_name`
-- 편집 모드: `Select` 로 대상 필드 변경
-- 저장 시 동일 (source_header) row 가 이미 다른 target 으로 존재하면 경고 후 차단
-- 비활성 field 선택 시 warning toast (매칭 후 Import 시 무시될 수 있음)
+## 신규 라우트
 
-### 2) 권한 게이트
-- `useCurrentUser` 의 `roles` 로 `canEdit = roles.includes('admin' | 'superuser')` 산출
-- `canEdit` false → Add 버튼, Switch, 편집 아이콘, 삭제 버튼 모두 숨김/disabled
-- Row hover 편집 아이콘은 `canEdit` 일 때만 렌더
+- `src/routes/_authenticated/import-log/import.tsx`
+  - `createFileRoute("/_authenticated/import-log/import")`
+  - `validateSearch`로 `tab` 파라미터: `task | snag | spare-part | abd | warranty`, 기본 `task`.
+  - `head`: "Import — QAIL CMS".
+- `src/routes/_authenticated/import-log/logs.tsx`
+  - `createFileRoute("/_authenticated/import-log/logs")`
+  - 동일한 `tab` 검색 파라미터.
+  - `head`: "Import Logs — QAIL CMS".
 
-### 3) System 삭제 정책
-- `removeRow(r)`:
-  - `canEdit` 필수
-  - `!r.is_custom` 인 경우 confirm 문구를 `"System 매핑입니다. 시드 재배포 시 되돌아갈 수 있습니다. 정말 삭제할까요?"` 로 강화
-  - 그 외 흐름 동일 (delete → invalidate)
+## 신규 컨테이너 컴포넌트
 
-### 4) 저장 로직
-- `saveTargetField(r, next)`:
-  - 동일 `(module, normalize(source_header), target_field=next)` 중복이면 실패
-  - `update({ target_field: next, updated_by })` → invalidate → 관련 field_config 캐시도 무효화(선택 필드가 활성 field 목록에 있는지 확인)
+### `src/components/import-log/ImportHubPage.tsx`
+- 상단 제목 + 설명.
+- `Tabs` (shadcn) — 값: `task`, `snag`, `spare-part`, `abd`, `warranty`.
+- `useSearch`/`useNavigate`로 현재 탭을 URL과 양방향 동기화(모듈별 딥링크 유지).
+- 탭 컨텐츠:
+  - **Task Management**: 기존 `TaskManagementImportPage` 그대로 렌더.
+  - **Snag List**: 기존 `DefectManagementImportPage` 그대로 렌더.
+  - **Spare Part**: 현재 `src/routes/_authenticated/closure/spare-part/import.tsx` 내부에 인라인 정의된 Spare Part 임포트 UI(`SparePartImportProvider` + `ImportPage` + `FileRow` + `ColumnSelectDialog`)를 그대로 `src/components/spare-part/import/SparePartImportPage.tsx`로 이전 후 이 파일에서 import. 로직/문구/파라미터 변경 없음.
+  - **ABD**: 기존 `AbdImportPage` 그대로 렌더.
+  - **Warranty**: "Coming soon" placeholder 카드(비활성).
 
-### 5) 편집 대상 3개 컴포넌트
-- `src/components/admin/HeaderMappingTable.tsx` (Spare Part)
-- `src/components/admin/TmHeaderMappingTable.tsx` (Task)
-- `src/components/admin/DefectHeaderMappingTable.tsx` (Snag)
+### `src/components/import-log/ImportLogsHubPage.tsx`
+- 동일한 5개 탭 구조.
+- 각 탭에서 기존 `ImportLogsPage` 컴포넌트를 모듈별 props로 재사용 — 현재 `closure/*/import.logs.tsx`가 넘기는 props를 그대로 복제.
+- Warranty 탭은 placeholder.
 
-모두 동일 패턴:
-- `const canEdit = !!me?.roles?.includes('admin') || !!me?.roles?.includes('superuser')`
-- Target Field 셀 → `<EditableTargetFieldCell>` (canEdit 일 때 편집 가능, 아니면 read-only 표시)
-- Add 버튼, Switch, Actions(삭제) → `canEdit` 로 게이트
+## 기존 모듈별 Import/Logs 라우트 처리
 
-## 기술적 세부
+기존 URL은 유지하며 새 통합 페이지로 연결하기 위해 **리다이렉트 라우트**로 축소:
 
-- RLS 는 이미 `*_header_mappings_admin_write` 로 관리자 제한 → 서버 정책은 변경 없음
-- 마이그레이션 불필요
-- 3개 hook (`useSparePartHeaderMappings`, `useTaskManagementHeaderMappings`, `useDefectHeaderMappings`) 및 QK 재사용
-- `EditableSourceHeaderCell` 도 `canEdit` prop 추가하여 비관리자에게는 편집 아이콘 렌더 안 함
-- `validateSourceHeaderEdit` 로직을 참고해 `validateTargetFieldEdit` 유틸을 `src/lib/admin/header-mapping-validation.ts` 에 추가 (동일 source_header 중복 검사)
+- `closure/abd/import.tsx` → `/import-log/import?tab=abd`
+- `closure/abd/import.logs.tsx` → `/import-log/logs?tab=abd`
+- `closure/snag-management/import.index.tsx` → `?tab=snag`
+- `closure/snag-management/import.logs.tsx` → `?tab=snag`
+- `closure/spare-part/import.tsx` → `?tab=spare-part`
+- `closure/spare-part/import.logs.tsx` → `?tab=spare-part`
+- `closure/task-management/import.logs.tsx` → `?tab=task`
+
+구현: `createFileRoute(...)({ beforeLoad: () => { throw redirect({ to: "/import-log/import", search: { tab: "…" } }) } })`.
+
+## Raw Data 바로가기 버튼
+
+현재 존재하는 것만 유지하고 새 통합 라우트로 target만 갱신:
+
+| 파일 | 현재 링크 | 변경 후 |
+|---|---|---|
+| `AbdRawDataPage.tsx` | `/closure/abd/import` | `/import-log/import` + `search={{ tab: "abd" }}` |
+| `DefectRawDataPage.tsx` | `/closure/snag-management/import` | `/import-log/import` + `search={{ tab: "snag" }}` |
+| `SparePartRawDataPage.tsx` | 없음(Export 버튼만 존재) | 변경 없음 |
+| `TaskManagementRawDataPage.tsx` | 없음(admin 링크만) | 변경 없음 |
+
+Export 버튼/다이얼로그(각 Raw Data 내부)는 그대로 유지.
+
+## 미변경 항목
+- 각 Raw Data 페이지의 `ExportDialog`, `AbdExportDialog` 및 export 로직.
+- 각 모듈의 Import 컴포넌트 내부 파싱/저장 로직.
+- Aconex Sync(`closure/spare-part/aconex-sync`).
+- Admin 관련 페이지.
+
+## 기술 세부 사항
+
+- 탭 상태 동기화:
+  ```ts
+  const { tab } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  <Tabs value={tab ?? "task"} onValueChange={(v) => navigate({ search: { tab: v } })}>
+  ```
+- `validateSearch`: 리터럴 유니온 파서, 기본값 `"task"`.
+- 리다이렉트 라우트는 `component` 없이 `beforeLoad`에서 `throw redirect(...)`.
+- `src/routeTree.gen.ts`는 플러그인이 재생성 — 직접 편집하지 않음.
 
 ## 검증
-
-- `bunx tsgo --noEmit` 통과
-- 관리자 계정: Target Field 드롭다운으로 변경 → DB 반영 → 재조회 후 반영 확인
-- 일반 계정: 편집 UI 미노출, 표만 표시
-- System 매핑: 관리자만 삭제 가능, 경고 문구 표시
+- `bunx tsgo --noEmit` 통과.
+- 사이드바 새 섹션 노출(editor/admin) 및 이동 확인.
+- 각 탭 전환이 URL `?tab=` 파라미터에 반영.
+- ABD/Snag Raw Data의 Import 바로가기가 새 통합 페이지 해당 탭으로 진입.
+- 기존 URL(`/closure/abd/import` 등)이 새 라우트로 리다이렉트.

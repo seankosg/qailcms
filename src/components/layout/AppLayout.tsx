@@ -98,6 +98,13 @@ const NAV: NavSection[] = [
     ],
   },
   {
+    label: "Import & Log",
+    items: [
+      { to: "/import-log/import", label: "Import", icon: Upload, editorOnly: true },
+      { to: "/import-log/logs", label: "Import Logs", icon: FileClock, editorOnly: true },
+    ],
+  },
+  {
     label: "Admin",
     items: [
       { to: "/admin", label: "Overview", icon: LayoutDashboard, adminOnly: true },

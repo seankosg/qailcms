@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AbdImportPage } from "@/components/abd/import/AbdImportPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/closure/abd/import")({
-  head: () => ({ meta: [{ title: "ABD Import — QAIL CMS" }] }),
-  component: AbdImportPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/import-log/import", search: { tab: "abd" } });
+  },
 });
