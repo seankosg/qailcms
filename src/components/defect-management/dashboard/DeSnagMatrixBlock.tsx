@@ -48,18 +48,25 @@ function MetricCells({
   dim,
   groupIndex,
   isTotal,
+  stickyTop,
 }: {
   stats: Stats;
   onMetric: (m: MetricSlot) => void;
   dim?: boolean;
   groupIndex: number;
   isTotal?: boolean;
+  stickyTop?: number;
 }) {
   const groupBg = isTotal
     ? "bg-primary/5"
     : groupIndex % 2 === 0
       ? "bg-transparent"
       : "bg-muted/20";
+  const stickyBg = isTotal
+    ? "color-mix(in oklab, var(--primary) 12%, var(--card))"
+    : groupIndex % 2 === 0
+      ? "var(--card)"
+      : "color-mix(in oklab, var(--muted) 25%, var(--card))";
   return (
     <>
       {METRIC_COLS.map((mc, i) => {
@@ -90,12 +97,14 @@ function MetricCells({
             key={mc.slot}
             className={cn(
               "h-7 border-b p-0 tabular-nums",
-              groupBg,
+              stickyTop === undefined && groupBg,
+              stickyTop !== undefined && "sticky z-20",
               isFirst && "border-l-2 border-l-border",
               !isFirst && "border-r border-r-border/40",
               pctBg,
               dim && "opacity-50",
             )}
+            style={stickyTop !== undefined ? { top: stickyTop, background: stickyBg } : undefined}
           >
             <button
               type="button"
@@ -323,21 +332,13 @@ export function DeSnagMatrixBlock({
             onNavigate={onNavigate}
           />
           <tbody>
-            {groups.map((grp) => (
-              <FragmentRows
-                key={grp.building}
-                group={grp}
-                block={block}
-                buildingParam={buildingParam}
-                basementParam={basementParam}
-                onNavigate={onNavigate}
-                goCell={goCell}
-              />
-            ))}
-
-            {/* Column Total 행 */}
-            <tr className="bg-primary/5 font-medium">
-              <td className="sticky left-0 z-10 border-r border-t-2 border-t-border bg-primary/10 px-2 py-1 text-[11px]" colSpan={2}>
+            {/* Column Total 행 — 헤더 바로 아래 고정 */}
+            <tr className="font-medium">
+              <td
+                className="sticky left-0 top-[58px] z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
+                colSpan={2}
+                style={{ background: "color-mix(in oklab, var(--primary) 14%, var(--card))" }}
+              >
                 <button
                   type="button"
                   onClick={() => onNavigate({ ...buildingParam, ...basementParam })}
@@ -352,6 +353,7 @@ export function DeSnagMatrixBlock({
                   stats={block.colTotals[rg]}
                   onMetric={(m) => goCell(null, null, rg, m)}
                   groupIndex={idx}
+                  stickyTop={58}
                 />
               ))}
               <MetricCells
@@ -359,8 +361,20 @@ export function DeSnagMatrixBlock({
                 onMetric={(m) => goCell(null, null, "__ROW_TOTAL__", m)}
                 groupIndex={ROOM_GROUP_ORDER.length}
                 isTotal
+                stickyTop={58}
               />
             </tr>
+            {groups.map((grp) => (
+              <FragmentRows
+                key={grp.building}
+                group={grp}
+                block={block}
+                buildingParam={buildingParam}
+                basementParam={basementParam}
+                onNavigate={onNavigate}
+                goCell={goCell}
+              />
+            ))}
           </tbody>
         </table>
       </div>
