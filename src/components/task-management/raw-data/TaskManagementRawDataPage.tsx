@@ -923,7 +923,7 @@ export function TaskManagementRawDataPage() {
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border bg-card">
         <div ref={scrollRef} className="h-full overflow-auto">
           <div style={{ width: totalWidth }} className="relative">
-            <div className="sticky top-0 z-10 flex border-b bg-muted/70 backdrop-blur">
+            <div className="sticky top-0 z-10 flex border-b bg-muted">
               {table.getHeaderGroups().map((hg) =>
                 hg.headers.map((h) => {
                   const sort = h.column.getIsSorted();
@@ -946,8 +946,7 @@ export function TaskManagementRawDataPage() {
                       }}
                       className={cn(
                         "relative flex select-none items-center gap-1 border-r px-2 py-1.5 text-xs font-medium",
-                        bg,
-                        isFrozen && "bg-muted",
+                        isFrozen ? "bg-muted" : bg,
                       )}
                     >
                       {h.column.id === "task_no" && <Pin className="h-3 w-3 text-primary" />}
