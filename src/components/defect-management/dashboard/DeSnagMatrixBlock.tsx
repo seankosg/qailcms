@@ -332,21 +332,13 @@ export function DeSnagMatrixBlock({
             onNavigate={onNavigate}
           />
           <tbody>
-            {groups.map((grp) => (
-              <FragmentRows
-                key={grp.building}
-                group={grp}
-                block={block}
-                buildingParam={buildingParam}
-                basementParam={basementParam}
-                onNavigate={onNavigate}
-                goCell={goCell}
-              />
-            ))}
-
-            {/* Column Total 행 */}
-            <tr className="bg-primary/5 font-medium">
-              <td className="sticky left-0 z-10 border-r border-t-2 border-t-border bg-primary/10 px-2 py-1 text-[11px]" colSpan={2}>
+            {/* Column Total 행 — 헤더 바로 아래 고정 */}
+            <tr className="font-medium">
+              <td
+                className="sticky left-0 top-[58px] z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
+                colSpan={2}
+                style={{ background: "color-mix(in oklab, var(--primary) 14%, var(--card))" }}
+              >
                 <button
                   type="button"
                   onClick={() => onNavigate({ ...buildingParam, ...basementParam })}
@@ -361,6 +353,7 @@ export function DeSnagMatrixBlock({
                   stats={block.colTotals[rg]}
                   onMetric={(m) => goCell(null, null, rg, m)}
                   groupIndex={idx}
+                  stickyTop={58}
                 />
               ))}
               <MetricCells
@@ -368,8 +361,20 @@ export function DeSnagMatrixBlock({
                 onMetric={(m) => goCell(null, null, "__ROW_TOTAL__", m)}
                 groupIndex={ROOM_GROUP_ORDER.length}
                 isTotal
+                stickyTop={58}
               />
             </tr>
+            {groups.map((grp) => (
+              <FragmentRows
+                key={grp.building}
+                group={grp}
+                block={block}
+                buildingParam={buildingParam}
+                basementParam={basementParam}
+                onNavigate={onNavigate}
+                goCell={goCell}
+              />
+            ))}
           </tbody>
         </table>
       </div>
