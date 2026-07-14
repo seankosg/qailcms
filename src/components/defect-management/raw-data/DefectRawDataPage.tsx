@@ -45,6 +45,7 @@ import {
   useDefectFieldHelpers,
   DEFECT_FIELD_CONFIG_QK,
   persistDefectFieldConfig,
+  useDefectColumnLabel,
 } from "@/hooks/useDefectFieldConfig";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
