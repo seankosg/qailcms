@@ -1,105 +1,60 @@
-# Snag 하자 자동 분류 엔진 반영 계획
+# Snag 임포트 속도 최적화 계획
 
-첨부 마크다운(`Snag_Trade_Classification_Prompt.md`)의 규칙을 Snag 임포트/Raw Data 파이프라인에 반영합니다. **하이브리드(규칙+LLM)** 방식, **컬럼 단위 빈 값만 계산**, **임포트 자동 실행 + Raw Data 수동 재실행** 두 경로 모두 지원.
+현재 임포트 파이프라인이 느린 원인은 **분류가 필요 없는 행/필드까지 규칙·LLM을 통과**하고, LLM 배치가 **순차 30건**으로 처리되기 때문입니다. 이를 "빈 셀 사전감지 게이트" + "LLM 배치 튜닝" + "가시성" 3축으로 개선합니다.
 
-## 1. 대상 컬럼 및 계층
+## 1. 빈 셀 사전감지 게이트 (핵심)
 
-4개 대상 필드 (DB `defect_items_raw`):
-- `defect_location` (신규, 지난 턴에 추가 완료)
-- `main_trade`, `sub_trade`, `work_type` (기존 컬럼, 현재는 re-import 시에만 채워짐)
-
-계층 정합성:
+`src/contexts/DefectManagementImportContext.tsx` 분류 단계 앞에 게이트 추가:
 
 ```text
-Team ⊃ Category ⊃ Main Trade ⊃ Sub Trade   (엄격 4단계)
-Defect Location, Work Type                  (독립 2축)
+파싱 → base 조립 → [게이트] targets 계산 → 규칙(only=targets) → [남은 필드 有?] → LLM(대상 필드만) → 병합 → upsert
 ```
 
-Category → Team 매핑은 이미 `defect_category_team_map` 테이블로 관리 중 → 재사용. Main/Sub Trade 계층은 마크다운의 1.1~1.4 표를 코드 상수로 이식.
+- 행별 `targets: ClassifierField[]` 를 base 조립 직후 한 번만 계산
+  - 판정: 파싱된 원본 필드값과 DB `existing` 값이 **모두** null/빈/`To Be Confirmed` 인 컬럼만 포함
+  - `targets.length === 0` → 분류 파이프라인 **전면 스킵** (규칙·LLM 모두 미실행)
+- `classifyByRules(input, targets)` 호출로 규칙도 대상 필드만 매칭 (기존 `only` 인자 활용 — 현재 임포트 경로에서 전달 누락되어 있는지 확인 후 전달)
+- 각 행별로 규칙이 채운 필드를 제외한 나머지만 `llmTargets` 로 남기고, `llmTargets.length > 0` 인 행만 LLM 큐 적재
+- LLM 프롬프트에도 `targets` 필드만 스키마에 포함해 토큰·응답 크기 절감
 
-## 2. 아키텍처 (하이브리드)
+## 2. LLM 배치 튜닝
 
-새 모듈 `src/lib/defect-management/classifier/`:
+`src/lib/defect-management/classifier/llm-classify.functions.ts` + Import 컨텍스트 호출부:
 
-- `rules.ts` — 마크다운 표를 그대로 옮긴 키워드 사전 및 계층 정의
-  - `TRADE_FAMILIES`: Category → family(Electrical/Mechanical/Facade/Architectural)
-  - `TRADE_RULES[family]`: `[keywords, mainTrade, subTrade]` 순서 배열
-  - `LOCATION_RULES`, `WORK_TYPE_RULES`
-- `rule-classify.ts` — `classifyByRules({ type, item, description, category }) → { defect_location?, main_trade?, sub_trade?, work_type? }`
-  - Type → Item → Description 순으로 키워드 매칭
-  - 매칭 실패 시 undefined (LLM 폴백 대상). 마크다운 규정상 최종 "판별 불가"는 `To Be Confirmed` 문자열.
-- `llm-classify.functions.ts` (server function, `createServerFn` + `requireSupabaseAuth`)
-  - 규칙으로 채우지 못한 필드가 있는 항목만 배치로 LLM에 위임
-  - Lovable AI Gateway + AI SDK, `google/gemini-2.5-flash-lite` (대량·저비용 분류)
-  - `Output.object` 구조화 출력: `{ items: [{ id, defect_location?, main_trade?, sub_trade?, work_type? }] }` — 스키마 필드는 `.nullable()`, 프롬프트에 판별 불가 시 `To Be Confirmed` 지시
-  - 배치 크기 30~50, 실패 시 개별 재시도 없이 `To Be Confirmed` 처리 후 진행
-- `apply-classification.ts` — 규칙+LLM 결과 결합, 계층 검증(Sub∈Main∈Family), 위반 값은 폐기
+- 배치 크기 **30 → 50** (gemini-2.5-flash-lite 안정 범위)
+- 임포트 경로 배치 처리를 **병렬 3** 으로 변경 (현재 순차). `bulk-classify.functions.ts`와 동일한 워커풀 패턴 재사용
+- 실패 배치는 개별 재시도 없이 `To Be Confirmed` 처리 (기존 정책 유지)
 
-## 3. "빈 값" 판정 (증분 처리)
+## 3. Raw Data 재분류 동일 최적화
 
-각 4개 컬럼을 독립적으로 판별. 계산 대상 조건:
-- 임포트 경로: 파싱된 원본 행에서 `p.<field>`가 null/빈 문자열 **그리고** DB 기존 행의 `<field>` 도 null/빈 문자열/`"To Be Confirmed"`
-- Raw Data 수동 재실행: DB 행의 `<field>` 가 null/빈 문자열/`"To Be Confirmed"` 인 컬럼만
-- 이미 값이 있으면 절대 덮어쓰지 않음 (마크다운 0.1·5.1 엄수)
+`src/lib/defect-management/classifier/bulk-classify.functions.ts`:
 
-## 4. 임포트 자동 실행 통합
+- `computeTargets` 는 이미 사용 중이므로 로직 유지
+- 배치 크기 30 → 50 통일
+- 규칙 매칭만으로 완결된 행은 LLM 큐에 넣지 않는 현행 로직 유지·검증
 
-`src/contexts/DefectManagementImportContext.tsx`의 upsert 파이프라인 중간에 자동 분류 단계 삽입:
+## 4. 진행 UI 가시성
 
-1. 기존: 파싱 → dedup → base 행 조립 → upsert
-2. 신규 삽입 지점: base 행 조립 직후, upsert 직전
-   - 각 행마다 4개 필드의 "빈 여부" 계산 (DB 기존값도 이미 `existing` Map으로 조회 중)
-   - 빈 필드가 하나라도 있는 행만 분류 큐에 적재
-   - `classifyByRules` 로 규칙 채움 → 남은 빈 필드 있는 행은 LLM 서버 fn 호출
-   - 결과를 `put(base, field, value)` 로 병합 (계층 검증 통과분만)
-3. 진행 상황을 기존 임포트 진행 UI에 "AI 분류 중 (n/총)" 로 표시
-4. LLM 실패해도 임포트 자체는 계속 (실패 필드는 `To Be Confirmed` 로 채움)
+`DefectManagementImportContext` 진행 상태에 카운터 추가:
 
-## 5. Raw Data 수동 재실행
+- `분류 스킵 n건 (이미 값 있음)` / `규칙 매칭 n건` / `LLM 처리 n건` / `실패 n건`
+- 완료 토스트에 동일 요약 노출 → 이후 규칙 사전 튜닝의 근거 데이터로 활용
 
-- `src/components/defect-management/raw-data/DefectRawDataPage.tsx` 툴바에 신규 버튼 `AI 하자 분류` (admin/superuser만 노출)
-- 현재 필터/선택 상태 기반:
-  - 선택 행이 있으면 그 행들만
-  - 없으면 현재 필터 조건 전체 (확인 다이얼로그 필수, 최대 5,000행 캡)
-- 서버 함수 `classifyDefectsBulk` (`createServerFn`, `requireSupabaseAuth` + admin 체크):
-  - 입력: `{ ids: string[] }` 또는 `{ filter: {...} }`
-  - 대상 행을 DB에서 로드 (`type`, `item`, `description`, `category` + 현재 4개 필드값 + `defect_type`/`priority_locked` 등 필요한 최소 컬럼)
-  - 규칙+LLM 분류 (동일 로직 재사용)
-  - 빈 필드만 UPDATE, 결과 통계 반환 `{ processed, filled: { field: count }, failed }`
-  - 완료 후 진행 토스트, TanStack Query invalidate
+## 5. 변경 파일
 
-## 6. UI/UX 세부
+- 수정: `src/contexts/DefectManagementImportContext.tsx` — 게이트 삽입, `targets` 전달, LLM 병렬화, 카운터
+- 수정: `src/lib/defect-management/classifier/llm-classify.functions.ts` — 배치 크기 상수, 대상 필드만 스키마화
+- 수정: `src/lib/defect-management/classifier/bulk-classify.functions.ts` — 배치 크기 상수 통일
+- 수정 없음: `rule-classify.ts` (이미 `only` 지원), `apply-classification.ts`, `rules.ts`, DB 스키마, parser, columns
 
-- 임포트 진행 스텝 라벨에 "AI 분류" 추가 (기존 "저장 중" 앞)
-- Raw Data 툴바 버튼: 확인 다이얼로그에 대상 행 수 + 예상 크레딧 소비(대략치) 표시, `Confirm` 후 실행
-- 결과 토스트: `n건 분류: Defect Location m, Main Trade m, Sub Trade m, Work Type m 채움`
-- `To Be Confirmed` 값도 컬럼에 실제로 저장 → 사용자가 필터로 골라 수동 편집 가능
-  - `columns.ts`의 `main_trade`/`sub_trade`/`work_type`/`defect_location` 은 이미 editable text 이므로 편집 UX 그대로 사용
+## 6. 기대 효과
 
-## 7. 계층 검증
+- 원본 엑셀에 4개 필드가 이미 채워진 대량 임포트: **분류 파이프라인 전체 스킵** → 사실상 이전(분류 도입 전) 속도로 회귀
+- Defect Location만 비어있는 전형적 케이스: 규칙 매칭 커버리지가 높아 LLM 호출 대폭 감소, 남은 LLM 호출도 병렬 3·배치 50으로 처리 시간 5~10배 단축 예상
+- LLM 크레딧 소모도 동일 비율로 감소
 
-`main_trade`가 후보로 나왔을 때 그 값이 해당 행의 `category` family 아래인지 검증. `sub_trade` 는 채택된 `main_trade` 하위인지 검증. 위반 시 해당 필드 폐기(설정하지 않음). LLM은 프롬프트에 계층 표를 명시하되, 코드에서 최종 검증하여 위반값은 무시.
+## 7. 비기능
 
-## 8. 파일 변경 요약
-
-- 신규: `src/lib/defect-management/classifier/rules.ts`
-- 신규: `src/lib/defect-management/classifier/rule-classify.ts`
-- 신규: `src/lib/defect-management/classifier/apply-classification.ts`
-- 신규: `src/lib/defect-management/classifier/llm-classify.functions.ts` (서버 fn)
-- 신규 or 재사용: `src/lib/ai-gateway.server.ts` (Lovable AI Gateway helper — 없으면 신규)
-- 수정: `src/contexts/DefectManagementImportContext.tsx` (자동 분류 단계 삽입, 진행 표시)
-- 수정: `src/components/defect-management/raw-data/DefectRawDataPage.tsx` (툴바 버튼)
-- 수정 없음: parser, columns, DB 스키마 (모두 이전 턴/기존 상태 활용)
-
-## 9. 비기능
-
-- **모델**: `google/gemini-2.5-flash-lite` (분류·대량·저비용). 크레딧 부족(402)·레이트리밋(429) 시 사용자 토스트로 명시.
-- **비용 관리**: 규칙으로 대다수 채움 → LLM은 폴백에만. 배치 30~50건/요청.
-- **동시성**: 임포트 파이프라인은 순차, Raw Data 재실행은 최대 5,000행 캡, 배치 병렬 3 이하.
-- **보안**: 서버 fn 모두 `requireSupabaseAuth`, Raw Data 재실행은 admin/superuser 체크.
-- **로그**: 실패 배치는 콘솔 warn + 임포트 로그 warnings 배열에 기록.
-
-## 10. 후속(계획 외)
-
-- Main/Sub Trade 계층을 관리자 페이지에서 편집 가능하도록 하는 UI는 이 계획에서 제외 (현재는 코드 상수). 필요 시 별도 요청.
-- Warranty 등 향후 확장 모듈에 동일 분류기를 재사용할 수 있게 `classifier/` 는 defect 전용이 아닌 범용 구조로 확장 가능하도록 설계.
+- 계층 검증(`isSubTradeInMain` 등)·`To Be Confirmed` 정책·권한 체크는 모두 그대로 유지
+- 이미 값 있는 필드는 **절대 덮어쓰지 않음** 원칙 유지 (마크다운 0.1·5.1)
+- 실패는 임포트 자체를 중단하지 않고 로그·토스트로 노출

@@ -95,7 +95,7 @@ export const bulkClassifyDefects = createServerFn({ method: "POST" })
     const llmMap = new Map<string, Record<string, string | null>>();
     if (needsLlm.length > 0) {
       const { classifyDefectsWithLlm } = await import("./llm-classify.functions");
-      const LLM_BATCH = 30;
+      const LLM_BATCH = 50;
       const batches: typeof needsLlm[] = [];
       for (let i = 0; i < needsLlm.length; i += LLM_BATCH) batches.push(needsLlm.slice(i, i + LLM_BATCH));
       // 병렬 3
