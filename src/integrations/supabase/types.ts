@@ -660,6 +660,7 @@ export type Database = {
           critical_marked_by: string | null
           custom_payload: Json
           data_date: string | null
+          defect_location: string | null
           defect_type: string | null
           description: string | null
           due_by: string | null
@@ -742,6 +743,7 @@ export type Database = {
           critical_marked_by?: string | null
           custom_payload?: Json
           data_date?: string | null
+          defect_location?: string | null
           defect_type?: string | null
           description?: string | null
           due_by?: string | null
@@ -824,6 +826,7 @@ export type Database = {
           critical_marked_by?: string | null
           custom_payload?: Json
           data_date?: string | null
+          defect_location?: string | null
           defect_type?: string | null
           description?: string | null
           due_by?: string | null
