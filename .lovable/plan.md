@@ -1,30 +1,67 @@
 ## 목표
-파일 내 동일 부모 하위에 `task_no`가 중복될 때 파서가 자동으로 다음 사용 가능한 마지막 세그먼트로 재번호를 부여하고, 경고 목록에 남긴다.
+Task Raw Data에 Defect의 `DefectStageProgress`와 동일한 스타일의 2단계 Progress 아이콘 컬럼을 추가. Task No 바로 오른쪽에 위치. Data Date를 기준으로 Plan/Actual을 비교하여 Start·Finish 각각을 Plan / WIP / Delay / Completed 4상태로 색상 표시.
 
-## 현재 상태
-`src/lib/task-management/parser.ts` 의 행 순회 루프는 중복 검사를 하지 않아, 같은 `task_no` 두 개(예: `EL-D-04-03` × 2)가 그대로 parsed rows에 들어가고 이후 DB unique key 충돌/중복 점검 다이얼로그가 뜬다.
+## 상태 판정 규칙 (Data Date = `data_date`, 없으면 오늘)
 
-## 변경 (파일 1개: `src/lib/task-management/parser.ts`)
+### Start pip
+- **Completed** (녹색 ●): `actual_start` 존재
+- **Delay** (빨강 ⊘): `actual_start` 없음 AND `plan_start` ≤ Data Date
+- **Plan** (회색 ○): `actual_start` 없음 AND `plan_start` > Data Date
+- **WIP** (황색 ◐): 사용 안 함 (Start는 이분값). 단, 예외적으로 `plan_start == Data Date` 이며 아직 시작 안 한 경우 Delay 처리.
 
-1. 행 순회 루프(416~491) 바깥에 `seenTaskNos = new Set<string>()`, 그리고 부모별 카운터 `usedByParent = new Map<string, Set<string>>()` 준비.
-2. 각 행에서 `taskNo`(교정 후) 확정 직전에 중복 여부 검사:
-   - `seenTaskNos.has(taskNo)` 이면 재번호 필요.
-   - 재번호 규칙:
-     - 부모(parent)인 경우: `${parent-of-current}-${nextSeq}` 형태로 다음 미사용 2자리 시퀀스를 찾음. parent에도 접두어(예: `EL-D-04`)가 있으므로 그 접두어 기준으로 tail 후보를 `01..99`까지 순회.
-     - 자식인 경우: `${structParent}-${nextSeq}` 로 부모 하위에서 안 쓰인 2자리 시퀀스를 찾음.
-   - 시퀀스 산정은 `allTaskNos` + `seenTaskNos` 양쪽을 모두 봐서 파일 다른 곳/이미 방출된 것과 겹치지 않도록 함.
-   - 확정된 새 값을 `taskNo`에 대입, `warnings.push` 로 `행 ${r}: task_no '${원본}' 중복 → '${새값}' 로 자동 재번호` 기록.
-3. 매 행 마지막에 `seenTaskNos.add(taskNo)` 로 추가.
+### Finish pip
+- **Completed** (녹색 ●): `actual_finish` 존재
+- **WIP** (황색 ◐): `actual_start` 존재 AND `actual_finish` 없음 AND `plan_end` > Data Date (또는 진행 중)
+- **Delay** (빨강 ⊘): `actual_finish` 없음 AND `plan_end` ≤ Data Date
+- **Plan** (회색 ○): 그 외 (아직 시작 전이며 계획도 미래)
 
-## 유의점
-- 재번호 규칙은 "부모 접두어 유지 + 마지막 세그먼트 재할당" 이므로 계층은 변하지 않음. 즉 부모/자식 관계는 그대로.
-- 접두어 mismatch 자동 교정(451행) 이후에 중복 검사가 오도록 순서 유지. 두 교정이 모두 발생하면 경고 두 줄 나옴.
-- 시퀀스 폭은 원래 tail 자리수를 참고: 대부분 2자리(`01`)지만 `01-01` 처럼 3세그먼트 tail도 존재. 안전을 위해 우선 2자리로 시도, 실패 시 3자리까지 폴백.
-- 100개까지 순회해도 빈 자리가 없으면(비현실적) 원본 유지 + 강한 경고.
-
-## 검증
-- 업로드하신 `Task_Management_전기_260713.xlsx` 로 다시 임포트 → `EL-D-04-03` 두 번째 행이 `EL-D-04-05`(또는 그 다음 미사용 번호)로 자동 재번호되고 경고 1줄 표시, 중복 점검 다이얼로그는 뜨지 않음.
-- `bunx tsgo --noEmit` 통과.
+빈 값은 empty(옅은 회색). Tooltip에 `Start: <상태> · <실제/계획 날짜>`, `Finish: <상태> · <날짜>`, `Data Date: <date>` 표시.
 
 ## 변경 파일
-- `src/lib/task-management/parser.ts` (약 25~35줄 추가)
+
+### 1. 신규 `src/components/task-management/raw-data/TaskStageProgress.tsx`
+- `DefectStageProgress` 스타일 그대로 (색상/글리프/`Pip` 컴포넌트 재사용 형태). Defect 파일을 직접 재사용하지 않고 별도 파일로 만드는 이유: 단계 이름(Start/Finish)과 판정 로직이 다름.
+- 색상 매핑:
+  - completed → `bg-emerald-600 border-emerald-600 text-white` (●)
+  - wip → `bg-amber-400 border-amber-500 text-white` (◐)
+  - delay → `bg-destructive border-destructive text-destructive-foreground` (⊘)
+  - plan → `bg-transparent border-muted-foreground/40 text-muted-foreground/60` (○)
+- `classifyStart(row, dataDate)`, `classifyFinish(row, dataDate)` 순수 함수 export.
+- 두 pip 사이 짧은 연결선(`h-px w-2 bg-muted-foreground/30`) 유지.
+
+### 2. `src/lib/task-management/columns.ts`
+`TM_COLUMNS` 배열의 `task_no` 항목(줄 100) 바로 아래에 신규 컬럼 삽입:
+```ts
+{ key: "stage_progress", label: "Progress", type: "text", width: 80, group: "status" },
+```
+- `type: "text"` 로 두되 실제 렌더링은 페이지 쪽에서 특수 처리 (셀 값은 없음, 아이콘만).
+- editable 없음, filter 대상 아님 (기존 `TM_SEARCH_FIELDS` 미포함).
+
+### 3. `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`
+- 컬럼 렌더링 스위치(약 518행 근처)에 `stage_progress` 케이스 추가:
+  ```tsx
+  if (c.key === "stage_progress") {
+    return <TaskStageProgress row={rr} dataDate={rr.data_date ?? null} />;
+  }
+  ```
+- 헤더는 짧게 "Progress" 표기. 정렬/편집 비활성.
+- `DEFAULT_ORDER`가 `task_no`를 제외하고 나머지를 순서대로 넣으므로 `TM_COLUMNS`에서 `task_no` 다음에 두면 자동으로 좌측 첫 데이터 컬럼이 됨. Frozen 여부는 사용자 요구가 "옆에 위치" 정도라 프로즌은 하지 않음(스크롤 시 함께 이동).
+- 컬럼 헤더 필터 UI에서 `stage_progress`가 필터 옵션에 나오지 않도록: `type: "text"` 자체는 필터 가능하지만, `editable=false`이며 값이 비어 있어 실제로 필터로 잡히지 않음. 필요 시 별도 옵트아웃 처리는 후속으로 미룸.
+
+### 4. 컬럼 순서 저장(user_view_preferences) 호환
+- 신규 키 `stage_progress` 는 기존 저장된 순서에 없을 수 있음. `TaskManagementRawDataPage.tsx` 의 순서 병합 로직(230~235행)에서 새 키는 기본 위치(=`TM_COLUMNS` 정의 순서)로 끼워 넣도록 확인. 이미 `validKeys` set으로 필터링하고 있으므로 새 키는 저장된 순서 뒤에 오게 되어 원하는 "Task No 옆" 위치가 아닐 수 있음.
+- 대응: 저장된 order에 `stage_progress` 없으면 `frozenExtras` 뒤 첫 위치에 강제 삽입 (약 384~385행 근처의 최종 배열 구성 시).
+
+## 검증
+- `bunx tsgo --noEmit`
+- 미리보기에서 `/closure/task-management/raw-data` 접근 → Task No 오른쪽에 두 원형 아이콘이 보이고, 다음 케이스 각각 눈으로 확인:
+  - `actual_start`/`actual_finish` 모두 있음 → 녹·녹
+  - `actual_start`만 있음, `plan_end` 미래 → 녹·황
+  - `plan_start` 과거, actual 없음 → 빨·빨(또는 빨·빨/plan)
+  - 계획만 있고 아직 미래 → 회·회
+- Tooltip이 각 pip의 상태와 날짜를 보여주는지 확인.
+
+## 변경 파일 요약
+- 신규: `src/components/task-management/raw-data/TaskStageProgress.tsx`
+- 수정: `src/lib/task-management/columns.ts`
+- 수정: `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`

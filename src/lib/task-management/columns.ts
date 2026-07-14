@@ -98,6 +98,7 @@ export const GROUP_HEADER_BG: Record<TmColumnDef["group"], string> = {
 
 export const TM_COLUMNS: TmColumnDef[] = [
   { key: "task_no", label: "Task No", type: "text", width: 140, group: "id" },
+  { key: "stage_progress", label: "Progress", type: "text", width: 80, group: "status" },
   { key: "level", label: "Tier", type: "badge", width: 90, group: "id" },
   { key: "discipline", label: "Discipline", type: "badge", width: 90, group: "id" },
   { key: "team", label: "Team", type: "badge", width: 100, group: "id" },
