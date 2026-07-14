@@ -77,6 +77,7 @@ import { HistoryDrawer } from "./HistoryDrawer";
 import { TopHorizontalScrollbar } from "@/components/spare-part/raw-data/TopHorizontalScrollbar";
 import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
 import { AlarmBadge } from "./AlarmBadge";
+import { TaskStageProgress } from "./TaskStageProgress";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import {
@@ -424,6 +425,29 @@ export function TaskManagementRawDataPage() {
       }
       const c = TM_COLUMNS.find((x) => x.key === key);
       if (!c) continue;
+      // Stage progress 아이콘 컬럼 (파생, 편집·필터·정렬 없음)
+      if (c.key === "stage_progress") {
+        cols.push({
+          id: c.key,
+          size: c.width,
+          minSize: 60,
+          maxSize: 120,
+          enableSorting: false,
+          enableColumnFilter: false,
+          header: labelOverrides[c.key] ?? c.label,
+          meta: { group: c.group },
+          cell: ({ row }) => {
+            const rr = row.original as Row;
+            const dd = (rr as any).data_date ?? null;
+            return (
+              <span className="flex w-full items-center justify-center">
+                <TaskStageProgress row={rr as any} dataDate={dd} />
+              </span>
+            );
+          },
+        });
+        continue;
+      }
       // 파생 컬럼(오늘 계획/오늘 차이) — 실제 DB 값이 없으므로 accessorFn으로 계산
       if (c.key === "expected_progress_today" || c.key === "today_gap") {
         cols.push({
