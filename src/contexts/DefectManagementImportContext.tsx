@@ -862,12 +862,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
           // LLM 배치 처리
           const llmResults = new Map<string, Record<string, string | null>>();
-          const LLM_BATCH = 30;
+          const LLM_BATCH = 50;
           const LLM_CONCURRENCY = 3;
           const llmBatches: ClassifyRequestItem[][] = [];
           for (let i = 0; i < needsLlm.length; i += LLM_BATCH) {
             llmBatches.push(needsLlm.slice(i, i + LLM_BATCH));
           }
+          let llmFailedBatches = 0;
           if (llmBatches.length > 0) {
             await runWithConcurrency(llmBatches, LLM_CONCURRENCY, async (batch) => {
               try {
@@ -892,6 +893,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                   });
                 }
               } catch (err) {
+                llmFailedBatches++;
                 console.warn("[defect-import] llm-classify batch failed", err);
               }
             });
@@ -922,7 +924,16 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             }
           }
           const ms = Math.round(performance.now() - t0);
-          console.log(`[defect-import] AI 분류 완료 rows=${classifyQueue.length} llmBatches=${llmBatches.length} ${ms}ms`);
+          const skippedRows = workingRows.length - classifyQueue.length;
+          const ruleOnlyRows = classifyQueue.length - needsLlm.length;
+          console.log(
+            `[defect-import] AI 분류 완료 total=${workingRows.length} 스킵=${skippedRows} 규칙=${ruleOnlyRows} LLM=${needsLlm.length}(배치${llmBatches.length},실패${llmFailedBatches}) ${ms}ms`,
+          );
+          if (needsLlm.length > 0 || classifyQueue.length > 0) {
+            toast.info(
+              `${f.name} AI 분류: 스킵 ${skippedRows} · 규칙 ${ruleOnlyRows} · LLM ${needsLlm.length}${llmFailedBatches > 0 ? ` (실패 배치 ${llmFailedBatches})` : ""}`,
+            );
+          }
         }
       } catch (err) {
         console.warn("[defect-import] AI 분류 단계 실패 (임포트는 계속)", err);
