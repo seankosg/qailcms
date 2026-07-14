@@ -413,6 +413,24 @@ export async function parseTaskManagementExcel(
     risk: string | null;
   } | null = null;
 
+  // 중복 재번호용: 이미 방출된 task_no 집합. `allTaskNos`와 합쳐 미사용 시퀀스를 찾음.
+  const seenTaskNos = new Set<string>();
+  const isUsed = (t: string) => seenTaskNos.has(t) || allTaskNos.has(t);
+  const findNextTail = (parentPrefix: string): string | null => {
+    // 2자리 시퀀스 우선 (01..99), 없으면 3자리(001..999) 폴백
+    for (let i = 1; i <= 99; i++) {
+      const seq = String(i).padStart(2, "0");
+      const cand = `${parentPrefix}-${seq}`;
+      if (!isUsed(cand)) return seq;
+    }
+    for (let i = 1; i <= 999; i++) {
+      const seq = String(i).padStart(3, "0");
+      const cand = `${parentPrefix}-${seq}`;
+      if (!isUsed(cand)) return seq;
+    }
+    return null;
+  };
+
   for (let r = 7; r <= rowEnd; r++) {
     const a = toStr(getCell(sheet, r, cols.no));
     const f = toStr(getCell(sheet, r, cols.sub_task_desc));
@@ -459,6 +477,25 @@ export async function parseTaskManagementExcel(
         parentNo = derivedParent ?? structParent;
       }
     }
+
+    // 중복 감지 시 자동 재번호. parent/child 모두 동일 접두어 하위에서 미사용 시퀀스 부여.
+    if (seenTaskNos.has(taskNo)) {
+      const parts = taskNo.split("-");
+      const prefix = parts.slice(0, Math.max(1, parts.length - 1)).join("-");
+      const next = findNextTail(prefix);
+      if (next) {
+        const renumbered = `${prefix}-${next}`;
+        warnings.push(
+          `행 ${r}: task_no '${taskNo}' 중복 → '${renumbered}'로 자동 재번호`,
+        );
+        taskNo = renumbered;
+      } else {
+        warnings.push(
+          `행 ${r}: task_no '${taskNo}' 중복이나 대체 시퀀스를 찾지 못함 (원본 유지)`,
+        );
+      }
+    }
+    seenTaskNos.add(taskNo);
 
     rows.push({
       rawRowNo: r,
