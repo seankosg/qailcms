@@ -168,9 +168,32 @@ export function DefectColumnOrderMenu({
                   onCheckedChange={(c) => changeVisibility(k, !!c)}
                   className="h-3 w-3"
                 />
-                <span className={cn("flex-1 truncate", hidden && "text-muted-foreground/50")}>
-                  {resolveLabel(k)}
-                </span>
+                {editingKey === k ? (
+                  <input
+                    autoFocus
+                    value={editingValue}
+                    onChange={(e) => setEditingValue(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); commitRename(); }
+                      if (e.key === "Escape") { e.preventDefault(); setEditingKey(null); }
+                    }}
+                    className="flex-1 min-w-0 rounded border border-input bg-background px-1 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+                  />
+                ) : (
+                  <span className={cn("flex-1 truncate", hidden && "text-muted-foreground/50")}>
+                    {resolveLabel(k)}
+                  </span>
+                )}
+                {isAdmin && onServerLabel && editingKey !== k && k !== "stage_progress" && (
+                  <button
+                    className="text-muted-foreground/60 hover:text-foreground"
+                    onClick={() => startRename(k)}
+                    title="라벨 이름 변경 (전체 사용자에 반영)"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
                 <button
                   className={cn(
                     "text-[10px] hover:underline",
