@@ -139,13 +139,15 @@ function MatrixHeader({
       <tr className="bg-muted/50">
         <th
           rowSpan={2}
-          className="sticky left-0 z-20 min-w-[100px] border-b-2 border-r bg-muted/70 px-2 py-1.5 text-left text-[11px] font-semibold"
+          className="sticky left-0 top-0 z-40 min-w-[100px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
+          style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
           Building
         </th>
         <th
           rowSpan={2}
-          className="sticky left-[100px] z-20 min-w-[80px] border-b-2 border-r bg-muted/70 px-2 py-1.5 text-left text-[11px] font-semibold"
+          className="sticky left-[100px] top-0 z-40 min-w-[80px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
+          style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
           Level
         </th>
@@ -154,11 +156,20 @@ function MatrixHeader({
             key={g.key}
             colSpan={6}
             className={cn(
-              "border-b border-l-2 border-l-border px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide",
+              "sticky top-0 z-30 border-b border-l-2 border-l-border px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide",
               g.isTotal && "bg-primary/10",
               g.isNa && "bg-muted/50 text-muted-foreground",
               !g.isTotal && !g.isNa && idx % 2 === 1 && "bg-muted/30",
             )}
+            style={{
+              background: g.isTotal
+                ? "color-mix(in oklab, var(--primary) 10%, var(--card))"
+                : g.isNa
+                  ? "color-mix(in oklab, var(--muted) 50%, var(--card))"
+                  : idx % 2 === 1
+                    ? "color-mix(in oklab, var(--muted) 30%, var(--card))"
+                    : "color-mix(in oklab, var(--muted) 50%, var(--card))",
+            }}
           >
             {g.isTotal ? (
               <span>{g.label}</span>
@@ -180,7 +191,7 @@ function MatrixHeader({
         ))}
       </tr>
       {/* Row 2: metric subheaders repeating per group */}
-      <tr className="bg-muted/30">
+      <tr>
         {groups.map((g, idx) => (
           <SubHeaderCells
             key={g.key}
@@ -203,26 +214,26 @@ function SubHeaderCells({
   isTotal?: boolean;
   isNa?: boolean;
 }) {
-  const groupBg = isTotal
-    ? "bg-primary/10"
+  const bgColor = isTotal
+    ? "color-mix(in oklab, var(--primary) 10%, var(--card))"
     : isNa
-      ? "bg-muted/40"
+      ? "color-mix(in oklab, var(--muted) 40%, var(--card))"
       : groupIndex % 2 === 1
-        ? "bg-muted/30"
-        : "bg-muted/10";
+        ? "color-mix(in oklab, var(--muted) 30%, var(--card))"
+        : "color-mix(in oklab, var(--muted) 10%, var(--card))";
   return (
     <>
       {METRIC_COLS.map((mc, i) => (
         <th
           key={mc.slot}
           className={cn(
-            "h-7 border-b px-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
-            groupBg,
+            "sticky top-[30px] z-30 h-7 border-b px-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
             i === 0 && "border-l-2 border-l-border",
             i !== 0 && "border-r border-r-border/40",
             mc.slot === "issued" && "min-w-[46px]",
             mc.slot !== "issued" && "min-w-[40px]",
           )}
+          style={{ background: bgColor }}
           title={mc.label}
         >
           {mc.label}
@@ -303,7 +314,7 @@ export function DeSnagMatrixBlock({
           블록 전체 보기 →
         </button>
       </div>
-      <div className="overflow-x-auto">
+      <div className="relative max-h-[calc(100vh-260px)] overflow-auto">
         <table className="w-full border-collapse text-xs">
           <MatrixHeader
             block={block}
