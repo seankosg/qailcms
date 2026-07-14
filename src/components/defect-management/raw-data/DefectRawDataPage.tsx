@@ -1004,18 +1004,19 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
   const stickyBgFor = (row: DefectItem, index: number): string => {
     const closed = Boolean((row as any).actual_closure_date) || /closed|complete|done/i.test(`${(row as any).closure_status ?? ""} ${(row as any).status_raw ?? ""}`);
     const overdue = isOverdueDefect(row as any, dataDate);
-    // 스티키 컬럼은 항상 불투명이어야 스크롤 시 뒤 컬럼이 비쳐 보이지 않는다.
-    // 기존에 hsl(var(--background)) 로 감쌌으나 이 프로젝트의 컬러 토큰은 oklch(...) 이므로
-    // hsl() 래핑이 유효하지 않아 배경이 실제로 painting 되지 않았다. 토큰을 그대로 사용한다.
-    const base = "var(--background)";
-    const opaque = `linear-gradient(${base}, ${base})`;
+    // 스티키 컬럼은 항상 완전 불투명이어야 스크롤 시 뒤 컬럼이 비쳐 보이지 않는다.
+    // 주의:
+    //  - 프로젝트 컬러 토큰은 oklch(...) 리터럴이므로 hsl(var(--token)) 래핑은 무효값이 되어 painting 되지 않는다. var(--token) 을 그대로 사용.
+    //  - `background: <color>, linear-gradient(...)` 다중 레이어 문법은 첫 레이어가 <bg-image> 여야 유효하므로,
+    //    color-mix() 결과를 그냥 나열하면 declaration 전체가 무효가 된다. 단일 색상 값으로 반환한다.
+    //  - 두 operand 모두 완전 불투명이므로 color-mix 결과도 완전 불투명이다.
     if (hoveredIndex === index)
-      return `color-mix(in oklab, var(--muted) 95%, var(--background)), ${opaque}`;
+      return "color-mix(in oklab, var(--muted) 95%, var(--background))";
     if (overdue && !closed)
-      return `color-mix(in oklab, var(--destructive) 6%, var(--background)), ${opaque}`;
+      return "color-mix(in oklab, var(--destructive) 6%, var(--background))";
     if (closed)
-      return `color-mix(in oklab, var(--muted) 45%, var(--background)), ${opaque}`;
-    return base;
+      return "color-mix(in oklab, var(--muted) 45%, var(--background))";
+    return "var(--background)";
   };
 
   return (
