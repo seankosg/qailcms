@@ -98,20 +98,13 @@ function ImportPage() {
   const activeDialogFile = files.find((f) => f.id === colDialogFileId) ?? null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">
-            Spare Part — Import
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Excel 파일을 업로드하여 Spare Parts Raw Data에 upsert합니다. `Doc Ref`
-            컬럼이 키이며, 동일 키는 자동 갱신됩니다.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/import-log/logs" search={{ tab: "spare-part" }}>View Import Logs</Link>
-        </Button>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold">Spare Part — Import</h1>
+        <p className="text-sm text-muted-foreground">
+          Excel 파일을 업로드하여 Spare Parts Raw Data에 upsert합니다. `Doc Ref`
+          컬럼이 키이며, 동일 키는 자동 갱신됩니다.
+        </p>
       </div>
 
       <Card>
