@@ -892,7 +892,7 @@ function buildDataColumn(
 ): ColumnDef<DefectItem> {
   const filterType =
     DATE_FILTER_FIELDS.has(c.key) ? "date-range" :
-    (TEXT_FILTER_FIELDS.has(c.key) || PROGRESS_FIELDS.has(c.key)) ? "text" :
+    PROGRESS_FIELDS.has(c.key) ? "text" :
     "multi-select";
   // multi-select 컬럼은 서버 facet 사용
   const serverFacet = filterType === "multi-select" ? c.key : null;
