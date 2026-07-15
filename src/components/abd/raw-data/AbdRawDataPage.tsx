@@ -157,6 +157,8 @@ export function AbdRawDataPage() {
   const matchedTeam = teamOptions.find((t) => t.code.toUpperCase() === rawTab);
   const team: AbdTeam = ((matchedTeam?.code ?? teamOptions[0]?.code ?? "MECH") as unknown) as AbdTeam;
   const statusGroup: AbdStatusGroup = (["all", "approved", "in_progress", "not_started"].includes(urlSearch.status ?? "") ? urlSearch.status : "all") as AbdStatusGroup;
+  const plotSel: "all" | "C" | "D" = (["all", "C", "D"].includes(String(urlSearch.plot ?? "")) ? (urlSearch.plot as any) : "all");
+  const plotFilter: "C" | "D" | null = plotSel === "all" ? null : plotSel;
   // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
   const includeInactive = false;
   const page = Math.max(1, Number(urlSearch.page) || 1);
@@ -221,13 +223,13 @@ export function AbdRawDataPage() {
   const q = (urlSearch.q ?? "").trim();
 
   const { data: itemsData, isFetching, refetch } = useAbdItemsQuery({
-    team, statusGroup, includeInactive, q, filters: serverFilters, sort: serverSort, page, pageSize,
+    team, statusGroup, includeInactive, plot: plotFilter, q, filters: serverFilters, sort: serverSort, page, pageSize,
   });
   const rows = itemsData?.rows ?? [];
   const total = itemsData?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
-  const { data: counts } = useAbdCounts({ team, includeInactive });
+  const { data: counts } = useAbdCounts({ team, includeInactive, plot: plotFilter });
   const dataDate = counts?.latest_data_date ?? null;
 
   // Restore view preferences
