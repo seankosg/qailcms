@@ -11,6 +11,7 @@ export function AbdMultiSelectDropdown({ column, options }: { column: any; optio
   const selected: string[] = (column.getFilterValue() as string[]) ?? [];
   const isActive = selected.length > 0;
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const meta = (column.columnDef.meta ?? {}) as any;
   const serverFacetCol: string | null = meta.serverFacet ?? null;
   const team: AbdTeam = (meta.team as AbdTeam) ?? "MECH";
@@ -27,6 +28,11 @@ export function AbdMultiSelectDropdown({ column, options }: { column: any; optio
     list.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
     return [{ value: EMPTY_TOKEN, label: "(Empty)", count: 0 }, ...list];
   }, [serverFacet, options, labelMap, selected]);
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((it) => it.label.toLowerCase().includes(q));
+  }, [items, query]);
   const toggle = (v: string) => {
     const next = selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v];
     column.setFilterValue(next.length ? next : undefined);
@@ -39,18 +45,22 @@ export function AbdMultiSelectDropdown({ column, options }: { column: any; optio
           <Filter className="h-3 w-3" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="max-h-72 w-56 overflow-auto p-2" align="start" onClick={(e) => e.stopPropagation()}>
+      <PopoverContent className="w-64 p-2" align="start" onClick={(e) => e.stopPropagation()}>
+        <Input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="검색..." className="mb-1 h-7 text-xs" />
         <div className="mb-1 flex items-center gap-2 px-1">
-          <button className="text-[11px] text-muted-foreground hover:underline" onClick={() => column.setFilterValue(items.map((o) => o.value))}>Select all</button>
+          <button className="text-[11px] text-muted-foreground hover:underline" onClick={() => column.setFilterValue(filteredItems.map((o) => o.value))}>Select all</button>
           <button className="text-[11px] text-muted-foreground hover:underline" onClick={() => column.setFilterValue(undefined)}>Clear all</button>
         </div>
-        {items.map((option) => (
+        <div className="max-h-64 overflow-auto">
+        {filteredItems.length === 0 && (<div className="py-4 text-center text-[11px] text-muted-foreground">일치하는 값 없음</div>)}
+        {filteredItems.map((option) => (
           <label key={option.value} className={cn("flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/50", option.count === 0 && !selected.includes(option.value) && "text-muted-foreground/60")}>
             <Checkbox checked={selected.includes(option.value)} onCheckedChange={() => toggle(option.value)} className="h-3.5 w-3.5" />
             <span className="flex-1 truncate">{option.label}</span>
             <span className="text-[10px] text-muted-foreground tabular-nums">{option.count}</span>
           </label>
         ))}
+        </div>
       </PopoverContent>
     </Popover>
   );
