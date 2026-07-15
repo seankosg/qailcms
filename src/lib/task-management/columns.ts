@@ -171,7 +171,7 @@ export function inferTmFilterType(t: TmFieldType): TmFilterType {
   if (t === "badge") return "multi-select";
   if (t === "date") return "date-range";
   if (t === "number" || t === "percent") return "number-range";
-  return "text";
+  return "multi-select";
 }
 
 /** 편집 가능 필드 목록 (부모의 actual_progress는 UI 레벨에서 차단) */

@@ -39,7 +39,7 @@ import {
   type AbdTeam,
 } from "@/hooks/useAbdItems";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { EMPTY_TOKEN, TEXT_FILTER_FIELDS, DATE_FILTER_FIELDS, FACET_FIELDS } from "@/lib/abd/filter-fns";
+import { EMPTY_TOKEN, DATE_FILTER_FIELDS } from "@/lib/abd/filter-fns";
 import { getOriginHeaderStyle } from "@/lib/abd/origin-header-style";
 import { AbdColumnFilterDropdown } from "./AbdColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "@/components/defect-management/raw-data/TopHorizontalScrollbar";
@@ -512,10 +512,8 @@ function buildDataColumn(
 ): ColumnDef<AbdItem> {
   const filterType =
     DATE_FILTER_FIELDS.has(c.key) ? "date-range" :
-    TEXT_FILTER_FIELDS.has(c.key) ? "text" :
-    FACET_FIELDS.has(c.key) || c.type === "badge" ? "multi-select" :
-    "text";
-  const serverFacet = filterType === "multi-select" ? c.key : null;
+    "multi-select";
+  const serverFacet = c.key;
   const filterOptions = c.key === "latest_status" ? ABD_STATUSES.map((s) => ({ value: s, label: s })) :
     c.key === "plot" ? [{ value: "C", label: "C" }, { value: "D", label: "D" }] :
     c.key === "is_active" ? [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] :
