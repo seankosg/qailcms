@@ -316,10 +316,10 @@ export function AbdRawDataPage() {
     for (const id of orderedKeys) {
       const c = byKey.get(id);
       if (!c) continue;
-      cols.push(buildDataColumn(c, team, statusGroup, includeInactive, isAdmin, () => refetch()));
+      cols.push(buildDataColumn(c, team, statusGroup, includeInactive, canEditRow, () => refetch()));
     }
     return cols;
-  }, [orderedKeys, team, statusGroup, includeInactive, isAdmin, refetch]);
+  }, [orderedKeys, team, statusGroup, includeInactive, canEditRow, refetch]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = {};
