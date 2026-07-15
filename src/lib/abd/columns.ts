@@ -116,7 +116,6 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "doc_nn2", label: "NN2", type: "text", width: 70, group: "segments", origin: "identity" },
 
   // Flags & audit
-  { key: "field_mismatch", label: "Mismatch", type: "badge", width: 90, group: "flags", origin: "system" },
   { key: "is_active", label: "Active", type: "badge", width: 80, group: "flags", origin: "system" },
   { key: "data_date", label: "Data Date", type: "date", width: 110, group: "audit", origin: "system" },
   { key: "updated_at", label: "Updated", type: "date", width: 130, group: "audit", origin: "system" },

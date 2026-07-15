@@ -64,9 +64,9 @@ const ImportRowSchema = z.object({
   r3_drafting_plan: z.string().nullable().optional(),   r3_drafting_actual: z.string().nullable().optional(),
   r3_submission_plan: z.string().nullable().optional(), r3_submission_actual: z.string().nullable().optional(),
   r3_dar_plan: z.string().nullable().optional(),        r3_dar_actual: z.string().nullable().optional(),
-  field_mismatch: z.boolean().optional(),
-  mismatch_fields: z.record(z.string(), z.any()).optional(),
   raw_payload: z.record(z.string(), z.any()).optional(),
+  excel_row: z.number().optional(),
+  sheet_name: z.string().optional(),
 });
 
 const ImportBatchSchema = z.object({
@@ -86,6 +86,21 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     await assertEditor(context);
     const supa = context.supabase as any;
 
+    // 파일 내 중복 방어 (UI 에서 이미 차단하지만 이중 안전장치)
+    {
+      const seen = new Set<string>();
+      const dups = new Set<string>();
+      for (const r of data.rows) {
+        if (seen.has(r.abd_number)) dups.add(r.abd_number);
+        else seen.add(r.abd_number);
+      }
+      if (dups.size > 0) {
+        throw new Error(
+          `파일 내 ABD_NUMBER 중복이 있어 임포트를 진행할 수 없습니다: ${Array.from(dups).slice(0, 5).join(", ")}${dups.size > 5 ? " …" : ""}`,
+        );
+      }
+    }
+
     // 1) create import log
     const { data: logRow, error: logErr } = await supa
       .from("abd_import_logs")
@@ -104,7 +119,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     const batchId = logRow.id as string;
 
     // 2) upsert rows in chunks
-    let inserted = 0, updated = 0, mismatched = 0;
+    let inserted = 0, updated = 0;
     const seenNumbers = new Set<string>();
     const CHUNK = 500;
     const rowLogs: any[] = [];
@@ -113,7 +128,6 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       const chunk = data.rows.slice(i, i + CHUNK);
       const payload = chunk.map((r) => {
         seenNumbers.add(r.abd_number);
-        if (r.field_mismatch) mismatched++;
         return {
           team: data.team,
           abd_number: r.abd_number,
@@ -141,8 +155,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           r3_drafting_plan: r.r3_drafting_plan ?? null,   r3_drafting_actual: r.r3_drafting_actual ?? null,
           r3_submission_plan: r.r3_submission_plan ?? null, r3_submission_actual: r.r3_submission_actual ?? null,
           r3_dar_plan: r.r3_dar_plan ?? null,             r3_dar_actual: r.r3_dar_actual ?? null,
-          field_mismatch: !!r.field_mismatch,
-          mismatch_fields: r.mismatch_fields ?? {},
+          field_mismatch: false,
+          mismatch_fields: {},
           raw_payload: r.raw_payload ?? {},
           is_active: true,
           inactive_reason: null,
@@ -177,10 +191,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           team: data.team,
           abd_number: r.abd_number,
           action_taken: wasExisting ? "updated" : "inserted",
-          reason_code: r.field_mismatch ? "field_mismatch" : null,
-          reason_detail: r.field_mismatch
-            ? `Parsed vs source mismatch: ${Object.keys(r.mismatch_fields ?? {}).join(", ")}`
-            : null,
+          reason_code: null,
+          reason_detail: null,
         });
       }
     }
@@ -230,11 +242,11 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     await supa
       .from("abd_import_logs")
       .update({
-        inserted, updated, inactivated, mismatched,
+        inserted, updated, inactivated, mismatched: 0,
         status: "success",
         finished_at: new Date().toISOString(),
       })
       .eq("id", batchId);
 
-    return { batch_id: batchId, inserted, updated, inactivated, mismatched, total: data.rows.length };
+    return { batch_id: batchId, inserted, updated, inactivated, total: data.rows.length };
   });
