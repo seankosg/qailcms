@@ -508,7 +508,7 @@ function buildDataColumn(
   team: AbdTeam,
   statusGroup: AbdStatusGroup,
   includeInactive: boolean,
-  isAdmin: boolean,
+  canEditRow: (row: AbdItem) => boolean,
   refetch: () => void,
 ): ColumnDef<AbdItem> {
   const filterType =
@@ -529,7 +529,7 @@ function buildDataColumn(
     cell: ({ row, getValue }) => {
       const v: any = getValue();
       const display = renderAbdCell(c, v, row.original);
-      if (c.editable && isAdmin && c.editorType) {
+      if (c.editable && c.editorType && canEditRow(row.original)) {
         return (
           <AbdEditCellPopover
             id={row.original.id}
