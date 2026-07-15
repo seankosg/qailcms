@@ -382,11 +382,11 @@ function FileRow({
                 <div className="flex-1">
                   <div className="font-medium">
                     중복 {dupGroups.length}건 ({dupRowCount}행){" "}
-                    {e.allowDuplicates ? "— 허용됨 (마지막 행 우선)" : "— 임포트 차단"}
+                    {e.allowDuplicates ? "— 허용됨 (2번째부터 -02, -03…)" : "— 임포트 차단"}
                   </div>
                   <div className="mt-0.5 text-[11px]">
                     {e.allowDuplicates
-                      ? "동일 ABD_NUMBER 는 파일의 마지막 등장 행으로 저장됩니다."
+                      ? "첫 행은 원본 번호, 2번째 이후는 뒤에 -02, -03 … 접미사를 붙여 모두 저장됩니다."
                       : "동일 ABD_NUMBER 가 반복됩니다. 상세를 확인 후 원본을 수정하거나 중복 허용을 선택하세요."}
                   </div>
                   <button

@@ -84,8 +84,9 @@ export function AbdDuplicateReviewDialog({ open, onOpenChange, fileName, duplica
           <DialogDescription className="text-xs">
             {fileName} 파일 내에 동일한 <code>ABD_NUMBER</code> 가 2회 이상 등장합니다.
             아래 상세 목록을 확인한 뒤, <b>원본 엑셀을 수정하고 재업로드</b>하거나
-            <b> 중복을 허용하고 그대로 임포트</b>할 수 있습니다.
-            중복 허용 시 동일 <code>ABD_NUMBER</code> 는 파일의 <b>마지막 등장 행</b>으로 저장됩니다.
+            <b>중복을 허용하고 그대로 임포트</b>할 수 있습니다.
+            중복 허용 시 첫 행은 원본 <code>ABD_NUMBER</code> 로 저장되고,
+            2번째 이후 행은 뒤에 <code>-02</code>, <code>-03</code> … 접미사가 붙어 <b>모두 별도 행으로 저장</b>됩니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -147,7 +148,7 @@ export function AbdDuplicateReviewDialog({ open, onOpenChange, fileName, duplica
                 }}
                 disabled={!onAllow}
               >
-                중복 허용하고 진행 (마지막 행 우선)
+                중복 허용하고 진행 (2번째부터 -02, -03… 부여)
               </Button>
             )}
             <Button size="sm" onClick={() => onOpenChange(false)}>닫기</Button>
