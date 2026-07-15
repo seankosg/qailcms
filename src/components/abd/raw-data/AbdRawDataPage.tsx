@@ -546,10 +546,16 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick }:
 
   const stickyBg = (row: AbdItem, index: number): string => {
     const inactive = !row.is_active;
+    // 스티키 컬럼은 항상 완전 불투명. 상태 오버레이는 2겹 gradient로 스택하여
+    // 반투명이어도 아래 불투명 베이스가 뒤 컬럼을 확실히 가림.
     const base = "hsl(var(--background))";
-    const opaque = `linear-gradient(${base}, ${base})`;
-    if (hoveredIndex === index) return `${opaque}, hsl(var(--muted) / 0.95)`;
-    if (inactive) return `${opaque}, hsl(var(--muted) / 0.45)`;
+    const baseLayer = `linear-gradient(${base}, ${base})`;
+    if (hoveredIndex === index) {
+      return `linear-gradient(hsl(var(--muted) / 0.5), hsl(var(--muted) / 0.5)), ${baseLayer}`;
+    }
+    if (inactive) {
+      return `linear-gradient(hsl(var(--muted) / 0.3), hsl(var(--muted) / 0.3)), ${baseLayer}`;
+    }
     return base;
   };
 
