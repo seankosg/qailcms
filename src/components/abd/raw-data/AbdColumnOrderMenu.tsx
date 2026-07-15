@@ -13,7 +13,6 @@ interface Props {
   frozenExtras: string[]; // 사용자 pin (__select 등 시스템 고정 뒤에 고정)
   defaultOrder?: string[];
   defaultVisibility?: Record<string, boolean>;
-  systemFrozen?: string[]; // 항상 좌측 고정되어 pin/unpin 불가한 시스템 컬럼
   onOrderChange: (next: string[]) => void;
   onVisibilityChange: (next: Record<string, boolean>) => void;
   onFrozenChange: (next: string[]) => void;
@@ -29,7 +28,6 @@ export function AbdColumnOrderMenu({
   frozenExtras,
   defaultOrder,
   defaultVisibility,
-  systemFrozen = [],
   onOrderChange,
   onVisibilityChange,
   onFrozenChange,
@@ -56,11 +54,10 @@ export function AbdColumnOrderMenu({
   useEffect(() => () => { if (reorderTimer.current) clearTimeout(reorderTimer.current); }, []);
 
   const toggleFrozen = (k: string) => {
-    if (systemFrozen.includes(k)) return; // 시스템 고정은 사용자 조작 금지
     if (frozenExtras.includes(k)) {
       onFrozenChange(frozenExtras.filter((x) => x !== k));
     } else {
-      onFrozenChange([...frozenExtras.filter((x) => !systemFrozen.includes(x)), k]);
+      onFrozenChange([...frozenExtras, k]);
     }
   };
 
@@ -131,14 +128,7 @@ export function AbdColumnOrderMenu({
           <div className="mb-1 rounded bg-muted/50 px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
             Frozen · Select (고정)
           </div>
-          {systemFrozen.map((k) => (
-            <div key={`sys-${k}`} className="flex items-center gap-1 rounded px-1 py-1 text-xs opacity-70">
-              <Pin className="h-3 w-3 text-muted-foreground" />
-              <span className="flex-1 truncate">{resolveLabel(k)}</span>
-              <span className="text-[10px] text-muted-foreground">system</span>
-            </div>
-          ))}
-          {frozenExtras.filter((k) => !systemFrozen.includes(k)).map((k) => (
+          {frozenExtras.map((k) => (
             <div key={k} className="flex items-center gap-1 rounded px-1 py-1 text-xs">
               <Pin className="h-3 w-3 text-primary" />
               <span className="flex-1 truncate">{resolveLabel(k)}</span>
@@ -155,7 +145,6 @@ export function AbdColumnOrderMenu({
           </div>
           {order.map((k) => {
             if (frozenExtras.includes(k)) return null;
-            if (systemFrozen.includes(k)) return null;
             const hidden = visibility[k] === false;
             return (
               <div
