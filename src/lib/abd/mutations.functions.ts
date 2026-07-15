@@ -87,25 +87,43 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     await assertEditor(context);
     const supa = context.supabase as any;
 
-    // 파일 내 중복 처리: 허용 시 마지막 행이 우선(last-wins), 불허 시 차단.
-    let rowsToImport = data.rows;
+    // 파일 내 중복 처리:
+    //  - 불허(default): 즉시 차단
+    //  - 허용: 2번째 등장부터 ABD_NUMBER 뒤에 -02, -03 … 접미사를 붙여 모두 저장
+    let rowsToImport: Array<typeof data.rows[number] & { original_abd_number?: string }> = data.rows;
     {
-      const seen = new Set<string>();
-      const dups = new Set<string>();
+      const counts = new Map<string, number>();
+      const dupSet = new Set<string>();
       for (const r of data.rows) {
-        if (seen.has(r.abd_number)) dups.add(r.abd_number);
-        else seen.add(r.abd_number);
+        const n = (counts.get(r.abd_number) ?? 0) + 1;
+        counts.set(r.abd_number, n);
+        if (n > 1) dupSet.add(r.abd_number);
       }
-      if (dups.size > 0) {
+      if (dupSet.size > 0) {
         if (!data.allow_duplicates) {
           throw new Error(
-            `파일 내 ABD_NUMBER 중복이 있어 임포트를 진행할 수 없습니다: ${Array.from(dups).slice(0, 5).join(", ")}${dups.size > 5 ? " …" : ""}`,
+            `파일 내 ABD_NUMBER 중복이 있어 임포트를 진행할 수 없습니다: ${Array.from(dupSet).slice(0, 5).join(", ")}${dupSet.size > 5 ? " …" : ""}`,
           );
         }
-        // last-wins dedup
-        const byNum = new Map<string, typeof data.rows[number]>();
-        for (const r of data.rows) byNum.set(r.abd_number, r);
-        rowsToImport = Array.from(byNum.values());
+        // suffix rename: 2번째부터 -02, -03 … (첫 번째는 원본 유지)
+        const seq = new Map<string, number>();
+        rowsToImport = data.rows.map((r) => {
+          const cur = (seq.get(r.abd_number) ?? 0) + 1;
+          seq.set(r.abd_number, cur);
+          if (cur === 1) return r;
+          const suffix = String(cur).padStart(2, "0");
+          const newNum = `${r.abd_number}-${suffix}`;
+          return {
+            ...r,
+            original_abd_number: r.abd_number,
+            abd_number: newNum,
+            raw_payload: {
+              ...(r.raw_payload ?? {}),
+              _original_abd_number: r.abd_number,
+              _duplicate_suffix: suffix,
+            },
+          };
+        });
       }
     }
 
