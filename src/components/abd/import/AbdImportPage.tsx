@@ -207,7 +207,8 @@ export function AbdImportPage() {
         <AlertDescription className="text-xs">
           · 시트명이 <code>Bar chart</code>/<code>Subcon</code>/<code>Sheet*</code> 이거나 헤더(Sl.No + ABD NUMBER)가 없으면 자동 제외됩니다.<br />
           · 엑셀 원본의 <code>ABD_NUMBER</code> 및 세그먼트 셀값을 그대로 저장합니다.<br />
-          · 동일 <code>ABD_NUMBER</code> 가 파일 내에 2회 이상 있으면 <b>임포트가 차단</b>됩니다. 원본에서 수정 후 재업로드하세요.<br />
+          · 동일 <code>ABD_NUMBER</code> 가 파일 내에 2회 이상 있으면 기본적으로 <b>임포트가 차단</b>됩니다. 상세를 확인해 원본을 수정하거나, 중복 허용을 선택할 수 있습니다.<br />
+          · 중복을 허용하면 첫 행은 원본 <code>ABD_NUMBER</code> 로 저장되고, 2번째 이후 행은 뒤에 <code>-02</code>, <code>-03</code> … 접미사를 붙여 <b>모두 별도 행으로 저장</b>됩니다.<br />
           · 재업로드 시 동일 <code>ABD_NUMBER</code> 는 업데이트, 새 번호는 삽입, 이번 파일에 없는 도면은 자동으로 <b>비활성(Inactive)</b> 표시됩니다.
         </AlertDescription>
       </Alert>
