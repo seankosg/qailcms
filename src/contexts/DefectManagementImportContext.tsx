@@ -492,6 +492,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
   );
   const clearAll = useCallback(() => setFiles([]), []);
 
+  const setFileParsedRows = useCallback(
+    (id: string, next: ParsedDefectRow[]) => {
+      setFiles((cur) =>
+        cur.map((f) => (f.id === id ? { ...f, parsed: next } : f)),
+      );
+    },
+    [],
+  );
+
   const setFileDataDateOverride = useCallback((id: string, date: string | null) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, dataDateOverride: date } : f)));
   }, []);
@@ -1216,6 +1225,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         resolveDuplicates,
         startImport,
         setFileAiClassifyEnabled,
+        setFileParsedRows,
       }}
     >
       {children}
