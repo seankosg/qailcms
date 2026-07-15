@@ -602,6 +602,7 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick }:
 
   const stickyBg = (row: AbdItem, index: number): string => {
     const inactive = !row.is_active;
+    const approved = row.status_group === "approved" || String(row.latest_status ?? "").toUpperCase() === "A";
     // 스티키 컬럼은 항상 완전 불투명이어야 스크롤 시 뒤 컬럼이 비쳐 보이지 않는다.
     // 주의:
     //  - 프로젝트 컬러 토큰은 oklch(...) 리터럴이므로 hsl(var(--token)) 래핑은 무효값이 되어 painting 되지 않는다. var(--token) 을 그대로 사용.
@@ -612,6 +613,8 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick }:
       return "color-mix(in oklab, var(--muted) 95%, var(--background))";
     if (inactive)
       return "color-mix(in oklab, var(--muted) 45%, var(--background))";
+    if (approved)
+      return "color-mix(in oklab, var(--muted) 55%, var(--background))";
     return "var(--background)";
   };
 
@@ -675,11 +678,17 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick }:
                 {vRows.map((vr) => {
                   const row = rowsModel[vr.index];
                   const r = row.original;
+                  const approved = r.status_group === "approved" || String(r.latest_status ?? "").toUpperCase() === "A";
                   return (
                     <TableRow
                       key={row.id}
                       style={{ height: 34 }}
-                      className={cn("cursor-default", !r.is_active && "bg-muted/30 text-muted-foreground", "hover:bg-muted/50")}
+                      className={cn(
+                        "cursor-default",
+                        !r.is_active && "bg-muted/30 text-muted-foreground",
+                        approved && r.is_active && "bg-muted/40 text-muted-foreground/70",
+                        "hover:bg-muted/50",
+                      )}
                       onMouseEnter={() => setHoveredIndex(vr.index)}
                       onMouseLeave={() => setHoveredIndex(null)}
                       onClick={(e) => {
