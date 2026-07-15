@@ -78,6 +78,7 @@ const ImportBatchSchema = z.object({
   rows: z.array(ImportRowSchema).max(10000),
   inactivate_missing: z.boolean().default(true),
   allow_duplicates: z.boolean().default(false),
+  note: z.string().nullable().optional(),
 });
 
 export const importAbdBatch = createServerFn({ method: "POST" })
@@ -139,6 +140,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         status: "in_progress",
         started_at: new Date().toISOString(),
         imported_by: context.userId,
+        note: data.note ?? null,
       })
       .select("id").single();
     if (logErr) throw new Error(logErr.message);
