@@ -41,6 +41,7 @@ import { MasterMappingSection } from "@/components/import/MasterMappingSection";
 import {
   applyNameDecisions,
   collectUnresolvedNames,
+  formatUnresolvedNamesNote,
   type NameFieldSpec,
 } from "@/lib/import/master-name-validation";
 import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks/useMasterOptions";
@@ -96,6 +97,7 @@ function Inner() {
     startImport,
     setFileAiClassifyEnabled,
     setFileParsedRows,
+    setFileMasterMappingNote,
   } = useDefectImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [columnDialogFileId, setColumnDialogFileId] = useState<string | null>(null);
@@ -124,6 +126,15 @@ function Inner() {
     .filter((f) => f.status === "ready" && !!f.parsed)
     .flatMap((f) => f.parsed!);
   const unresolvedNames = collectUnresolvedNames(allReadyRows, nameSpecs, optionsByKind);
+  const masterMappingNote = formatUnresolvedNamesNote(unresolvedNames);
+  const runStartImport = () => {
+    for (const f of files) {
+      if (f.status === "ready" && !f.validationError) {
+        setFileMasterMappingNote(f.id, masterMappingNote);
+      }
+    }
+    return startImport();
+  };
   const applyMasterDecisions = (decisions: Map<string, any>) => {
     for (const f of files) {
       if (f.status !== "ready" || !f.parsed) continue;
