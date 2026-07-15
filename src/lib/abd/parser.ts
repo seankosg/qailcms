@@ -265,6 +265,7 @@ export async function parseAbdFile(file: File, teamOverride?: AbdTeam | null): P
     team_from_filename: teamFromFilename,
     sheets: [],
     ignored_sheets: [],
+    duplicates_in_file: [],
   };
 
   for (const name of wb.SheetNames) {
@@ -291,31 +292,14 @@ export async function parseAbdFile(file: File, teamOverride?: AbdTeam | null): P
       if (!abd) { skippedNoKey++; continue; }
 
       // Source values
-      const src_dis = getVal("dis") ? String(getVal("dis")) : null;
-      const src_ax = getVal("doc_ax") ? String(getVal("doc_ax")) : null;
-      const src_axx = getVal("doc_axx") ? String(getVal("doc_axx")) : null;
-      const src_nn1 = getVal("doc_nn1") != null ? String(getVal("doc_nn1")) : null;
-      const src_n = getVal("doc_n") != null ? String(getVal("doc_n")) : null;
-      const src_nn2 = getVal("doc_nn2") != null ? String(getVal("doc_nn2")) : null;
-
-      // Parsed from ABD number
-      const parsed = parseAbdNumber(abd);
-      const plot = parsed.plot ?? plotFromSheet;
-
-      // Detect mismatches
-      const mismatch: Record<string, { source: any; parsed: any }> = {};
-      const cmp = (field: string, s: any, p: any) => {
-        if (s == null || s === "") return;
-        if (String(s).trim().toUpperCase() !== String(p ?? "").trim().toUpperCase()) {
-          mismatch[field] = { source: s, parsed: p };
-        }
-      };
-      cmp("dis", src_dis, parsed.dis);
-      cmp("doc_ax", src_ax, parsed.doc_ax);
-      cmp("doc_axx", src_axx, parsed.doc_axx);
-      cmp("doc_nn1", src_nn1, parsed.doc_nn1);
-      cmp("doc_n", src_n, parsed.doc_n);
-      cmp("doc_nn2", src_nn2, parsed.doc_nn2);
+      // 엑셀 원본 셀값을 그대로 사용 (ABD_NUMBER 재파싱으로 덮어쓰지 않음)
+      const src_dis = getVal("dis") != null ? String(getVal("dis")).trim() || null : null;
+      const src_ax = getVal("doc_ax") != null ? String(getVal("doc_ax")).trim() || null : null;
+      const src_axx = getVal("doc_axx") != null ? String(getVal("doc_axx")).trim() || null : null;
+      const src_nn1 = getVal("doc_nn1") != null ? String(getVal("doc_nn1")).trim() || null : null;
+      const src_n = getVal("doc_n") != null ? String(getVal("doc_n")).trim() || null : null;
+      const src_nn2 = getVal("doc_nn2") != null ? String(getVal("doc_nn2")).trim() || null : null;
+      const plot = plotFromSheet;
 
       const raw_payload: Record<string, any> = {};
       for (const key of Object.keys(hdr.colIndex)) raw_payload[key] = getVal(key);
@@ -323,13 +307,13 @@ export async function parseAbdFile(file: File, teamOverride?: AbdTeam | null): P
       const row: ParsedAbdRow = {
         sl_no: getVal("sl_no") != null ? Number(getVal("sl_no")) : null,
         plot,
-        dis: parsed.dis,
+        dis: src_dis,
         service: getVal("service") ? String(getVal("service")) : null,
-        doc_ax: parsed.doc_ax,
-        doc_axx: parsed.doc_axx,
-        doc_nn1: parsed.doc_nn1,
-        doc_n: parsed.doc_n,
-        doc_nn2: parsed.doc_nn2,
+        doc_ax: src_ax,
+        doc_axx: src_axx,
+        doc_nn1: src_nn1,
+        doc_n: src_n,
+        doc_nn2: src_nn2,
         document_title: getVal("document_title") ? String(getVal("document_title")) : null,
         abd_number: abd,
         abd_ocs_no: getVal("abd_ocs_no") ? String(getVal("abd_ocs_no")).trim() : null,
@@ -355,9 +339,9 @@ export async function parseAbdFile(file: File, teamOverride?: AbdTeam | null): P
         r3_submission_actual: toIsoDate(getVal("r3_submission_actual")),
         r3_dar_plan: toIsoDate(getVal("r3_dar_plan")),
         r3_dar_actual: toIsoDate(getVal("r3_dar_actual")),
-        field_mismatch: Object.keys(mismatch).length > 0,
-        mismatch_fields: mismatch,
         raw_payload,
+        excel_row: r + 1,
+        sheet_name: name,
       };
       rows.push(row);
     }
@@ -371,6 +355,28 @@ export async function parseAbdFile(file: File, teamOverride?: AbdTeam | null): P
       rows,
       skipped_no_key: skippedNoKey,
       warnings: [],
+    });
+  }
+
+  // 파일 전체 중복 검출
+  const seen = new Map<string, ParsedAbdRow[]>();
+  for (const sh of result.sheets) {
+    for (const row of sh.rows) {
+      const arr = seen.get(row.abd_number);
+      if (arr) arr.push(row);
+      else seen.set(row.abd_number, [row]);
+    }
+  }
+  for (const [abd_number, rows] of seen) {
+    if (rows.length < 2) continue;
+    result.duplicates_in_file.push({
+      abd_number,
+      occurrences: rows.map((r) => ({
+        sheet_name: r.sheet_name,
+        excel_row: r.excel_row,
+        sl_no: r.sl_no,
+        document_title: r.document_title,
+      })),
     });
   }
 
