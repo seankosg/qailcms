@@ -322,10 +322,10 @@ export function AbdRawDataPage() {
     for (const id of orderedKeys) {
       const c = byKey.get(id);
       if (!c) continue;
-      cols.push(buildDataColumn(c, team, statusGroup, includeInactive, canEditRow, () => refetch()));
+      cols.push(buildDataColumn(c, team, statusGroup, includeInactive, plotFilter, canEditRow, () => refetch()));
     }
     return cols;
-  }, [orderedKeys, team, statusGroup, includeInactive, canEditRow, refetch]);
+  }, [orderedKeys, team, statusGroup, includeInactive, plotFilter, canEditRow, refetch]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = {};
@@ -520,6 +520,7 @@ function buildDataColumn(
   team: AbdTeam,
   statusGroup: AbdStatusGroup,
   includeInactive: boolean,
+  plot: "C" | "D" | null,
   canEditRow: (row: AbdItem) => boolean,
   refetch: () => void,
 ): ColumnDef<AbdItem> {
@@ -537,7 +538,7 @@ function buildDataColumn(
     header: c.label,
     size: c.width,
     enableSorting: true,
-    meta: { filterType, filterOptions, serverFacet, team, statusGroup, includeInactive, origin: c.origin ?? "system" },
+    meta: { filterType, filterOptions, serverFacet, team, statusGroup, includeInactive, plot, origin: c.origin ?? "system" },
     cell: ({ row, getValue }) => {
       const v: any = getValue();
       const display = renderAbdCell(c, v, row.original);
