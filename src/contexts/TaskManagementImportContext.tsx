@@ -68,6 +68,7 @@ export interface TmImportFileItem {
   preflight?: PreflightSummary | null;
   preflightLoading?: boolean;
   preflightError?: string | null;
+  masterMappingNote?: string;
   result?: {
     inserted: number;
     updated: number;
@@ -101,6 +102,7 @@ interface CtxValue {
   runPreflight: (id: string) => Promise<void>;
   startImport: () => Promise<void>;
   setFileParsedRows: (id: string, next: ParsedTaskRow[]) => void;
+  setFileMasterMappingNote: (id: string, note: string) => void;
 }
 
 const Ctx = createContext<CtxValue | null>(null);
@@ -202,6 +204,13 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
   const setFileParsedRows = useCallback(
     (id: string, next: ParsedTaskRow[]) => {
       setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, parsed: next } : f)));
+    },
+    [],
+  );
+
+  const setFileMasterMappingNote = useCallback(
+    (id: string, note: string) => {
+      setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, masterMappingNote: note } : f)));
     },
     [],
   );
@@ -387,6 +396,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           status: "processing",
           imported_by: userId,
           started_at: startedAtIso,
+          note: f.masterMappingNote || null,
         })
         .select("id")
         .single();
@@ -765,6 +775,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         runPreflight,
         startImport,
         setFileParsedRows,
+        setFileMasterMappingNote,
       }}
     >
       {children}
