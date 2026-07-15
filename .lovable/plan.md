@@ -97,3 +97,12 @@ Phase 5: 각 Raw Data 화면(ABD, Snag, SP, Task)의 Team 필터/편집 UI를 `u
 - **SP(Spare Part)**: Raw Data 페이지에 per-row 인라인 편집 UI 부재. Team 필터 탭도 없음 (도메인 스키마상 필요 없음). Bulk 편집·ColumnOrderMenu는 기존 `isAdmin` 유지. UI 변경 없음.
 
 **서버 재검증**은 각 도메인 mutation의 `assertCanEdit`에서 이미 처리 (사용자 선택: UI-only).
+
+## Phase 5 마무리
+
+- 4개 도메인(Snag/ABD/Task/SP) 모두 `useTeamOptions()` 치환 및 `canEditRawRow` per-row 게이트 반영 완료.
+- `tsgo --noEmit` 통과 (에러 0건).
+- 서버 mutation 측 권한 재검증(`assertCanEdit`)이 이미 존재하므로 UI-only 치환으로 스코프 종료.
+- 하드코딩 team 상수(`DEFECT_TEAMS`, `TEAM_TABS`, `TAB_TO_TEAM`) 참조 제거 확인.
+
+**Phase 5 종료.** 다음 Phase는 사용자 요청 시 정의.
