@@ -26,7 +26,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { bulkClassifyDefects } from "@/lib/defect-management/classifier/bulk-classify.functions";
 import {
   DEFECT_COLUMNS,
-  DEFECT_TEAMS,
   TEAM_COLORS,
   TEAM_FALLBACK_COLOR,
   PRIORITY_COLORS,
