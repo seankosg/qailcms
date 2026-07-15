@@ -504,7 +504,7 @@ export function AbdRawDataPage() {
         onOpenChange={setExportOpen}
         getRows={() => rows}
         columnHeaders={ABD_COLUMNS.map((c) => ({ key: c.key, label: c.label }))}
-        filenamePrefix={`abd-${team}`}
+        filenamePrefix={plotFilter ? `abd-${team}-plot${plotFilter}` : `abd-${team}`}
       />
       <AbdDetailSheet
         id={(urlSearch.detail as string) || null}
