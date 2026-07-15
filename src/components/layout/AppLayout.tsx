@@ -102,6 +102,7 @@ const NAV: NavSection[] = [
     items: [
       { to: "/admin", label: "Overview", icon: LayoutDashboard, adminOnly: true },
       { to: "/admin/users", label: "사용자", icon: Users, adminOnly: true },
+      { to: "/admin/masters", label: "마스터", icon: Users, adminOnly: true },
       { to: "/admin/mapping", label: "Mapping", icon: Settings2, adminOnly: true },
       { to: "/admin/task-thresholds", label: "Task 임계값", icon: Sliders, adminOnly: true },
     ],
