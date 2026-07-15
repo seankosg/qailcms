@@ -37,6 +37,7 @@ import { MasterMappingSection } from "@/components/import/MasterMappingSection";
 import {
   applyNameDecisions,
   collectUnresolvedNames,
+  formatUnresolvedNamesNote,
   type NameFieldSpec,
 } from "@/lib/import/master-name-validation";
 import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks/useMasterOptions";
@@ -224,6 +225,7 @@ export function AbdImportPage() {
               rows,
               inactivate_missing: true,
               allow_duplicates: !!e.allowDuplicates,
+              note: formatUnresolvedNamesNote(unresolvedNames) || null,
             } as any,
           });
           agg.inserted += res.inserted;
