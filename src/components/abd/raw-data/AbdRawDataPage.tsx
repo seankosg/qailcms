@@ -39,7 +39,7 @@ import {
   type AbdTeam,
 } from "@/hooks/useAbdItems";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { EMPTY_TOKEN, TEXT_FILTER_FIELDS, DATE_FILTER_FIELDS, FACET_FIELDS } from "@/lib/abd/filter-fns";
+import { EMPTY_TOKEN, DATE_FILTER_FIELDS } from "@/lib/abd/filter-fns";
 import { getOriginHeaderStyle } from "@/lib/abd/origin-header-style";
 import { AbdColumnFilterDropdown } from "./AbdColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "@/components/defect-management/raw-data/TopHorizontalScrollbar";
