@@ -33,6 +33,8 @@ type LocalChoice = {
   action: "map" | "register" | "skip";
   candidateId?: string;
   candidateName?: string;
+  /** subsub register 시 상위 협력사 id */
+  parentSubId?: string;
 };
 
 const MASTER_LABEL: Record<MasterKind, string> = {
@@ -57,6 +59,7 @@ export function MasterMappingDialog({
   onClose,
   entries,
   canRegister,
+  optionsByKind,
   onApply,
 }: MasterMappingDialogProps) {
   const qc = useQueryClient();
@@ -113,8 +116,25 @@ export function MasterMappingDialog({
         return c?.action === "register";
       });
       for (const e of toRegister) {
+        const c = choices.get(e.key);
         if (e.masterKind === "subsub") {
-          toast.error(`${e.rawName}: Sub-Sub 신규 등록은 상위 협력사 지정이 필요하여 이 다이얼로그에서 지원되지 않습니다. 마스터 관리 화면에서 등록해 주세요.`);
+          if (!c?.parentSubId) {
+            toast.error(`${e.rawName}: 상위 협력사를 선택하세요.`);
+            continue;
+          }
+          try {
+            await addMaster({
+              data: {
+                kind: "subsub",
+                name: e.rawName,
+                parent_id: c.parentSubId,
+              },
+            });
+            await qc.invalidateQueries({ queryKey: MASTER_OPTIONS_QK("subsub") });
+            toast.success(`Sub-Sub "${e.rawName}" 등록`);
+          } catch (err: any) {
+            toast.error(`${e.rawName} 등록 실패: ${err?.message ?? err}`);
+          }
           continue;
         }
         try {
@@ -241,6 +261,24 @@ export function MasterMappingDialog({
                               신규 등록 "{e.rawName}"
                             </button>
                           )}
+                          {canRegister && e.masterKind === "subsub" && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setChoice(e.key, {
+                                  action: "register",
+                                  parentSubId: c.parentSubId,
+                                })
+                              }
+                              className={`rounded border px-2 py-1 text-xs transition ${
+                                c.action === "register"
+                                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                  : "hover:bg-accent"
+                              }`}
+                            >
+                              신규 등록 "{e.rawName}"
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() =>
@@ -255,6 +293,28 @@ export function MasterMappingDialog({
                             건너뛰기(원본 유지)
                           </button>
                         </div>
+                        {e.masterKind === "subsub" && c.action === "register" && (
+                          <div className="mt-2 flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">상위 협력사:</span>
+                            <select
+                              className="rounded border bg-background px-2 py-1 text-xs"
+                              value={c.parentSubId ?? ""}
+                              onChange={(ev) =>
+                                setChoice(e.key, {
+                                  action: "register",
+                                  parentSubId: ev.target.value || undefined,
+                                })
+                              }
+                            >
+                              <option value="">선택…</option>
+                              {optionsByKind.subcontractor.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
