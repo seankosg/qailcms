@@ -78,8 +78,8 @@ export function AbdImportPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dupOpenId, setDupOpenId] = useState<string | null>(null);
   const { data: teamOptions = [] } = useTeamOptions();
-  const { isAdmin, isSuperUser } = useCurrentUser();
-  const canRegisterTeam = isAdmin || isSuperUser;
+  const currentUserQ = useCurrentUser();
+  const canRegisterTeam = !!(currentUserQ.data?.isAdmin || currentUserQ.data?.isSuperUser);
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
 
   const handleFiles = useCallback(async (files: File[]) => {
