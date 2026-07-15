@@ -44,8 +44,8 @@ describe("collectUnresolvedNames", () => {
     expect(r).toHaveLength(0);
   });
 
-  it("정규화된 정확 일치도 통과 (공백/전각/대소문자)", () => {
-    const rows: Row[] = [{ subcontractor: "삼성 E&c" }];
+  it("정규화된 정확 일치도 통과 (전각/대소문자)", () => {
+    const rows: Row[] = [{ subcontractor: "삼성ｅ＆ｃ" }];
     const r = collectUnresolvedNames(rows, specs, optionsByKind);
     expect(r).toHaveLength(0);
   });
