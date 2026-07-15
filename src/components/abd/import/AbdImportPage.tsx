@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { parseAbdFile, type ParsedFileResult, detectTeamFromFilename } from "@/lib/abd/parser";
 import { importAbdBatch } from "@/lib/abd/mutations.functions";
 import { ABD_TEAMS, type AbdTeam } from "@/lib/abd/columns";
+import { AbdDuplicateReviewDialog } from "./AbdDuplicateReviewDialog";
 
 type Status = "queued" | "parsing" | "ready" | "importing" | "done" | "error";
 
@@ -44,7 +45,6 @@ interface FileEntry {
     inserted: number;
     updated: number;
     inactivated: number;
-    mismatched: number;
     total: number;
   };
   progress?: number;
@@ -72,6 +72,7 @@ export function AbdImportPage() {
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [dupOpenId, setDupOpenId] = useState<string | null>(null);
 
   const handleFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -133,18 +134,20 @@ export function AbdImportPage() {
     setEntries((p) => p.map((x) => (x.id === id ? { ...x, team } : x)));
   const clearAll = () => setEntries([]);
 
-  const readyCount = entries.filter((e) => e.status === "ready" && e.team).length;
+  const isReady = (e: FileEntry) =>
+    e.status === "ready" && !!e.team && (e.parsed?.duplicates_in_file.length ?? 0) === 0;
+  const readyCount = entries.filter(isReady).length;
   const isRunning = busy;
 
   const startImport = async () => {
     setBusy(true);
     for (const e of entries) {
-      if (e.status !== "ready" || !e.parsed || !e.team) continue;
+      if (!isReady(e) || !e.parsed || !e.team) continue;
       setEntries((p) =>
         p.map((x) => (x.id === e.id ? { ...x, status: "importing", progress: 20 } : x)),
       );
       try {
-        const agg = { inserted: 0, updated: 0, inactivated: 0, mismatched: 0, total: 0 };
+        const agg = { inserted: 0, updated: 0, inactivated: 0, total: 0 };
         for (const sheet of e.parsed.sheets) {
           const rows = sheet.rows.map((r) => ({ ...r, plot: r.plot ?? sheet.plot ?? null }));
           const res = await importAbdBatch({
@@ -161,7 +164,6 @@ export function AbdImportPage() {
           agg.inserted += res.inserted;
           agg.updated += res.updated;
           agg.inactivated += res.inactivated;
-          agg.mismatched += res.mismatched;
           agg.total += res.total;
         }
         setEntries((p) =>
@@ -170,7 +172,7 @@ export function AbdImportPage() {
           ),
         );
         toast.success(
-          `${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성 / ${agg.mismatched} 필드 mismatch`,
+          `${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성`,
         );
       } catch (err: any) {
         setEntries((p) =>
@@ -200,7 +202,8 @@ export function AbdImportPage() {
         <AlertTitle>임포트 규칙</AlertTitle>
         <AlertDescription className="text-xs">
           · 시트명이 <code>Bar chart</code>/<code>Subcon</code>/<code>Sheet*</code> 이거나 헤더(Sl.No + ABD NUMBER)가 없으면 자동 제외됩니다.<br />
-          · ABD_NUMBER 로부터 <code>plot / dis / doc_ax..doc_nn2</code> 를 재파싱하며, 원본 셀값과 다르면 <b>field_mismatch</b> 로 저장됩니다.<br />
+          · 엑셀 원본의 <code>ABD_NUMBER</code> 및 세그먼트 셀값을 그대로 저장합니다.<br />
+          · 동일 <code>ABD_NUMBER</code> 가 파일 내에 2회 이상 있으면 <b>임포트가 차단</b>됩니다. 원본에서 수정 후 재업로드하세요.<br />
           · 재업로드 시 동일 <code>ABD_NUMBER</code> 는 업데이트, 새 번호는 삽입, 이번 파일에 없는 도면은 자동으로 <b>비활성(Inactive)</b> 표시됩니다.
         </AlertDescription>
       </Alert>
@@ -266,11 +269,22 @@ export function AbdImportPage() {
                 isRunning={isRunning}
                 onRemove={() => removeEntry(e.id)}
                 onTeamChange={(t) => setTeam(e.id, t)}
+                onOpenDuplicates={() => setDupOpenId(e.id)}
               />
             ))}
           </CardContent>
         </Card>
       )}
+
+      {entries.map((e) => (
+        <AbdDuplicateReviewDialog
+          key={`dup-${e.id}`}
+          open={dupOpenId === e.id}
+          onOpenChange={(o) => setDupOpenId(o ? e.id : null)}
+          fileName={e.file.name}
+          duplicates={e.parsed?.duplicates_in_file ?? []}
+        />
+      ))}
     </div>
   );
 }
@@ -280,21 +294,21 @@ function FileRow({
   isRunning,
   onRemove,
   onTeamChange,
+  onOpenDuplicates,
 }: {
   entry: FileEntry;
   isRunning: boolean;
   onRemove: () => void;
   onTeamChange: (t: AbdTeam) => void;
+  onOpenDuplicates: () => void;
 }) {
   const badge = statusBadge[e.status];
   const disabled = isRunning || e.status === "done" || e.status === "importing";
   const sheetCount = e.parsed?.sheets.length ?? 0;
   const ignoredCount = e.parsed?.ignored_sheets.length ?? 0;
   const totalRows = (e.parsed?.sheets ?? []).reduce((s, sh) => s + sh.rows.length, 0);
-  const mismatchCount = (e.parsed?.sheets ?? []).reduce(
-    (s, sh) => s + sh.rows.filter((r) => r.field_mismatch).length,
-    0,
-  );
+  const dupGroups = e.parsed?.duplicates_in_file ?? [];
+  const dupRowCount = dupGroups.reduce((s, g) => s + g.occurrences.length, 0);
   return (
     <div className="rounded border p-3">
       <div className="flex items-start justify-between gap-3">
@@ -343,10 +357,25 @@ function FileRow({
                 제외 시트: {e.parsed.ignored_sheets.join(", ")}
               </p>
             )}
-            {mismatchCount > 0 && (
-              <p className="mt-1 text-xs text-amber-600">
-                ⚠ 필드 mismatch {mismatchCount}행 (ABD_NUMBER 재파싱 결과가 원본 셀과 상이)
-              </p>
+            {dupGroups.length > 0 && (
+              <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium">
+                    중복 {dupGroups.length}건 ({dupRowCount}행) — 임포트 차단
+                  </div>
+                  <div className="mt-0.5 text-[11px]">
+                    동일 ABD_NUMBER 가 반복됩니다. 원본을 수정한 뒤 다시 업로드하세요.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onOpenDuplicates}
+                    className="mt-1 text-[11px] font-medium underline hover:no-underline"
+                  >
+                    중복 상세 보기
+                  </button>
+                </div>
+              </div>
             )}
             {e.error && (
               <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -383,11 +412,6 @@ function FileRow({
           {e.result.inactivated > 0 && (
             <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">
               Inactivated: {e.result.inactivated}
-            </Badge>
-          )}
-          {e.result.mismatched > 0 && (
-            <Badge variant="outline" className="border-amber-300 text-amber-700">
-              Mismatch: {e.result.mismatched}
             </Badge>
           )}
         </div>
