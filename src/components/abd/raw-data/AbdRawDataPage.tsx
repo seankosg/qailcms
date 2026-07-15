@@ -142,6 +142,10 @@ export function AbdRawDataPage() {
   const { data: user } = useCurrentUser();
   const isAdmin = !!user?.isAdmin;
   const { data: teamOptions = [] } = useTeamOptions();
+  const canEditRow = useCallback(
+    (row: AbdItem) => canEditRawRow(user ?? null, "abd_items_raw", row as unknown as Record<string, any>),
+    [user],
+  );
   const invalidate = useInvalidateAbd();
 
   // team_master 기반 동적 탭. 미매칭 시 첫 옵션 폴백.
