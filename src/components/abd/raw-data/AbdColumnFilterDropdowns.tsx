@@ -17,7 +17,8 @@ export function AbdMultiSelectDropdown({ column, options }: { column: any; optio
   const team: AbdTeam = (meta.team as AbdTeam) ?? "MECH";
   const statusGroup: AbdStatusGroup = (meta.statusGroup as AbdStatusGroup) ?? "all";
   const includeInactive: boolean = !!meta.includeInactive;
-  const { data: serverFacet } = useAbdFacet(open ? serverFacetCol : null, { team, statusGroup, includeInactive, enabled: open && !!serverFacetCol });
+  const plot: "C" | "D" | null = (meta.plot as "C" | "D" | null) ?? null;
+  const { data: serverFacet } = useAbdFacet(open ? serverFacetCol : null, { team, statusGroup, includeInactive, plot, enabled: open && !!serverFacetCol });
   const labelMap = useMemo(() => new Map(options.map((o) => [o.value, o.label])), [options]);
   const items = useMemo(() => {
     const counts = new Map<string, number>();
