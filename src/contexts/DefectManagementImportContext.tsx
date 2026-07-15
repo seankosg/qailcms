@@ -504,6 +504,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     [],
   );
 
+  const setFileMasterMappingNote = useCallback(
+    (id: string, note: string) => {
+      setFiles((cur) =>
+        cur.map((f) => (f.id === id ? { ...f, masterMappingNote: note } : f)),
+      );
+    },
+    [],
+  );
+
   const setFileDataDateOverride = useCallback((id: string, date: string | null) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, dataDateOverride: date } : f)));
   }, []);
@@ -707,6 +716,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               : null,
             `duplicate_strategy=${duplicateStrategy}`,
             duplicatesAuto > 0 ? `duplicates_auto=${duplicatesAuto}` : null,
+            f.masterMappingNote ? f.masterMappingNote : null,
           ]
             .filter(Boolean)
             .join(" | ") || null,
@@ -1229,6 +1239,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         startImport,
         setFileAiClassifyEnabled,
         setFileParsedRows,
+        setFileMasterMappingNote,
       }}
     >
       {children}
