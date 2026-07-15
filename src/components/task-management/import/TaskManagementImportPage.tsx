@@ -174,6 +174,13 @@ function ImportInner() {
         </p>
       </div>
 
+      <MasterMappingSection
+        entries={unresolvedNames}
+        canRegister={canImport}
+        optionsByKind={optionsByKind}
+        onApply={applyMasterDecisions}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">1. Upload Files</CardTitle>
