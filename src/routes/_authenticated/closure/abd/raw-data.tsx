@@ -5,6 +5,7 @@ import { AbdRawDataPage } from "@/components/abd/raw-data/AbdRawDataPage";
 
 const abdRawDataSearchSchema = z.object({
   tab: fallback(z.string(), "MECH").default("MECH"),
+  plot: fallback(z.enum(["all", "C", "D"]), "all").default("all"),
   status: fallback(z.string(), "all").default("all"),
   page: fallback(z.number().int(), 1).default(1),
   pageSize: fallback(z.number().int(), 100).default(100),
