@@ -1,5 +1,7 @@
 import * as XLSX from "xlsx";
 import type { AbdTeam } from "./columns";
+import type { TeamOption } from "@/lib/team/team-master";
+import { detectTeamFromText } from "@/lib/team/team-master";
 
 export interface ParsedAbdRow {
   sl_no: number | null;
@@ -36,7 +38,7 @@ export interface ParsedAbdRow {
 
 export interface ParsedSheetResult {
   sheet_name: string;
-  team: AbdTeam;
+  team: string | null;
   plot: "C" | "D" | null;
   rows: ParsedAbdRow[];
   skipped_no_key: number;
@@ -45,7 +47,7 @@ export interface ParsedSheetResult {
 
 export interface ParsedFileResult {
   file_name: string;
-  team_from_filename: AbdTeam | null;
+  team_from_filename: string | null;
   sheets: ParsedSheetResult[];
   ignored_sheets: string[];
   /** ABD_NUMBER 가 파일 내에서 2회 이상 등장하는 그룹들 */
@@ -101,7 +103,19 @@ function toIsoDate(v: any): string | null {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function detectTeamFromFilename(name: string): AbdTeam | null {
+/**
+ * 파일명에서 team 코드를 감지.
+ * teamOptions가 주어지면 team_master의 code/aliases 기반으로 동적 매칭,
+ * 없으면 legacy 하드코딩(MECH/ELEC/ARCH)에 fallback.
+ */
+export function detectTeamFromFilename(
+  name: string,
+  teamOptions?: TeamOption[],
+): string | null {
+  if (teamOptions && teamOptions.length > 0) {
+    const match = detectTeamFromText(name, teamOptions);
+    return match?.code ?? null;
+  }
   const n = name.toUpperCase();
   if (n.includes("MECH") || n.includes("설비") || n.includes("MECHANICAL")) return "MECH";
   if (n.includes("ELEC") || n.includes("전기") || n.includes("ELECTRICAL")) return "ELEC";
@@ -256,10 +270,14 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
   return { headerRow: anchorRow, colIndex };
 }
 
-export async function parseAbdFile(file: File, teamOverride?: AbdTeam | null): Promise<ParsedFileResult> {
+export async function parseAbdFile(
+  file: File,
+  teamOverride?: string | null,
+  teamOptions?: TeamOption[],
+): Promise<ParsedFileResult> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { cellDates: true });
-  const teamFromFilename = teamOverride ?? detectTeamFromFilename(file.name);
+  const teamFromFilename = teamOverride ?? detectTeamFromFilename(file.name, teamOptions);
   const result: ParsedFileResult = {
     file_name: file.name,
     team_from_filename: teamFromFilename,
@@ -350,7 +368,7 @@ export async function parseAbdFile(file: File, teamOverride?: AbdTeam | null): P
 
     result.sheets.push({
       sheet_name: name,
-      team: teamFromFilename ?? "MECH",
+      team: teamFromFilename,
       plot: plotFromSheet,
       rows,
       skipped_no_key: skippedNoKey,

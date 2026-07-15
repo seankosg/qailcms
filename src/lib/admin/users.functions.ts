@@ -227,6 +227,7 @@ export const addMasterName = createServerFn({ method: "POST" })
     // team-only
     code?: string;
     sort_order?: number;
+    aliases?: string[];
     // subcontractor / subsub
     parent_id?: string | null;
     owner_code?: string | null;
@@ -240,7 +241,12 @@ export const addMasterName = createServerFn({ method: "POST" })
     if (data.kind === "team") {
       const code = (data.code ?? name).trim().toUpperCase();
       if (!code) throw new Error("Team 코드를 입력하세요.");
-      payload = { code, name: name.toUpperCase(), sort_order: data.sort_order ?? 0 };
+      const aliases = Array.from(new Set(
+        (data.aliases ?? [])
+          .map((a) => String(a).trim())
+          .filter((a) => a && a.toUpperCase() !== code),
+      ));
+      payload = { code, name: name.toUpperCase(), sort_order: data.sort_order ?? 0, aliases };
     } else if (data.kind === "subcontractor") {
       payload = { name, type: "sub", owner_code: data.owner_code ?? null };
     } else if (data.kind === "subsub") {
@@ -285,6 +291,7 @@ export const updateMasterFields = createServerFn({ method: "POST" })
     name?: string;
     code?: string;
     sort_order?: number;
+    aliases?: string[];
     parent_id?: string | null;
     owner_code?: string | null;
   }) => input)
@@ -295,6 +302,14 @@ export const updateMasterFields = createServerFn({ method: "POST" })
     if (data.name !== undefined) patch.name = data.kind === "team" ? data.name.trim().toUpperCase() : data.name.trim();
     if (data.code !== undefined && data.kind === "team") patch.code = data.code.trim().toUpperCase();
     if (data.sort_order !== undefined && data.kind === "team") patch.sort_order = data.sort_order;
+    if (data.aliases !== undefined && data.kind === "team") {
+      const selfCode = (data.code ?? "").trim().toUpperCase();
+      patch.aliases = Array.from(new Set(
+        data.aliases
+          .map((a) => String(a).trim())
+          .filter((a) => a && (!selfCode || a.toUpperCase() !== selfCode)),
+      ));
+    }
     if (data.parent_id !== undefined && (data.kind === "subcontractor" || data.kind === "subsub")) {
       patch.parent_subcontractor_id = data.parent_id;
     }

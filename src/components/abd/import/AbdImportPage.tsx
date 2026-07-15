@@ -29,8 +29,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { parseAbdFile, type ParsedFileResult, detectTeamFromFilename } from "@/lib/abd/parser";
 import { importAbdBatch } from "@/lib/abd/mutations.functions";
-import { ABD_TEAMS, type AbdTeam } from "@/lib/abd/columns";
 import { AbdDuplicateReviewDialog } from "./AbdDuplicateReviewDialog";
+import { useTeamOptions } from "@/lib/team/team-master";
+import { collectUnknownTeamCodes } from "@/lib/import/team-validation";
+import { TeamRegisterDialog } from "@/components/import/TeamRegisterDialog";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 type Status = "queued" | "parsing" | "ready" | "importing" | "done" | "error";
 
@@ -38,7 +41,7 @@ interface FileEntry {
   id: string;
   file: File;
   status: Status;
-  team: AbdTeam | null;
+  team: string | null;
   parsed?: ParsedFileResult;
   error?: string;
   result?: {
@@ -74,6 +77,10 @@ export function AbdImportPage() {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dupOpenId, setDupOpenId] = useState<string | null>(null);
+  const { data: teamOptions = [] } = useTeamOptions();
+  const currentUserQ = useCurrentUser();
+  const canRegisterTeam = !!(currentUserQ.data?.isAdmin || currentUserQ.data?.isSuperUser);
+  const [teamDialogOpen, setTeamDialogOpen] = useState(false);
 
   const handleFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -81,7 +88,7 @@ export function AbdImportPage() {
       id: crypto.randomUUID(),
       file: f,
       status: "queued",
-      team: detectTeamFromFilename(f.name),
+      team: detectTeamFromFilename(f.name, teamOptions),
     }));
     setEntries((prev) => [...prev, ...newEntries]);
     for (const e of newEntries) {
@@ -89,7 +96,7 @@ export function AbdImportPage() {
         setEntries((prev) =>
           prev.map((x) => (x.id === e.id ? { ...x, status: "parsing" } : x)),
         );
-        const parsed = await parseAbdFile(e.file, e.team ?? undefined);
+        const parsed = await parseAbdFile(e.file, e.team ?? undefined, teamOptions);
         setEntries((prev) =>
           prev.map((x) =>
             x.id === e.id
@@ -112,7 +119,7 @@ export function AbdImportPage() {
         );
       }
     }
-  }, []);
+  }, [teamOptions]);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -131,13 +138,20 @@ export function AbdImportPage() {
 
   const removeEntry = (id: string) =>
     setEntries((p) => p.filter((x) => x.id !== id));
-  const setTeam = (id: string, team: AbdTeam) =>
+  const setTeam = (id: string, team: string) =>
     setEntries((p) => p.map((x) => (x.id === id ? { ...x, team } : x)));
   const clearAll = () => setEntries([]);
+
+  // 파싱 완료된 파일 중 미등록 team 코드 수집
+  const unknownTeamCodes = collectUnknownTeamCodes(
+    entries.filter((e) => e.status === "ready").map((e) => e.team),
+    teamOptions,
+  );
 
   const isReady = (e: FileEntry) =>
     e.status === "ready" &&
     !!e.team &&
+    !!teamOptions.find((o) => o.code === e.team) &&
     ((e.parsed?.duplicates_in_file.length ?? 0) === 0 || !!e.allowDuplicates);
   const readyCount = entries.filter(isReady).length;
   const isRunning = busy;
@@ -200,6 +214,26 @@ export function AbdImportPage() {
           원본 엑셀(다단 헤더)을 그대로 업로드하면 자동으로 파싱 · 평탄화 저장합니다. 재업로드 시 ABD_NUMBER 기준 upsert.
         </p>
       </div>
+
+      {unknownTeamCodes.length > 0 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>미등록 Team 코드 감지</AlertTitle>
+          <AlertDescription className="text-xs">
+            {unknownTeamCodes.map((c) => (
+              <span key={c} className="mr-2 rounded bg-destructive/20 px-2 py-0.5 font-mono">{c}</span>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-2"
+              onClick={() => setTeamDialogOpen(true)}
+            >
+              {canRegisterTeam ? "등록하기" : "확인"}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Alert>
         <AlertTriangle className="h-4 w-4" />
@@ -301,6 +335,13 @@ export function AbdImportPage() {
           }
         />
       ))}
+      <TeamRegisterDialog
+        open={teamDialogOpen}
+        unknownCodes={unknownTeamCodes}
+        canRegister={canRegisterTeam}
+        onClose={() => setTeamDialogOpen(false)}
+        onRegistered={() => { /* team_master invalidation via qc; entries의 team 문자열은 유지 */ }}
+      />
     </div>
   );
 }
@@ -315,9 +356,10 @@ function FileRow({
   entry: FileEntry;
   isRunning: boolean;
   onRemove: () => void;
-  onTeamChange: (t: AbdTeam) => void;
+  onTeamChange: (t: string) => void;
   onOpenDuplicates: () => void;
 }) {
+  const { data: teamOptions = [] } = useTeamOptions();
   const badge = statusBadge[e.status];
   const disabled = isRunning || e.status === "done" || e.status === "importing";
   const sheetCount = e.parsed?.sheets.length ?? 0;
@@ -342,16 +384,16 @@ function FileRow({
               <span className="text-xs text-muted-foreground">팀</span>
               <Select
                 value={e.team ?? ""}
-                onValueChange={(v) => onTeamChange(v as AbdTeam)}
+                onValueChange={(v) => onTeamChange(v)}
                 disabled={disabled}
               >
                 <SelectTrigger className="h-7 w-[140px] text-xs">
                   <SelectValue placeholder="선택" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ABD_TEAMS.map((t) => (
-                    <SelectItem key={t.value} value={t.value} className="text-xs">
-                      {t.label}
+                  {teamOptions.map((t) => (
+                    <SelectItem key={t.id} value={t.code} className="text-xs">
+                      {t.code}
                     </SelectItem>
                   ))}
                 </SelectContent>

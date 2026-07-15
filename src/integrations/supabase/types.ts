@@ -2221,6 +2221,7 @@ export type Database = {
       }
       team_master: {
         Row: {
+          aliases: string[]
           code: string
           created_at: string
           id: string
@@ -2230,6 +2231,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          aliases?: string[]
           code: string
           created_at?: string
           id?: string
@@ -2239,6 +2241,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          aliases?: string[]
           code?: string
           created_at?: string
           id?: string

@@ -324,6 +324,7 @@ function TeamMasterTab() {
                 <TableHead className="w-32">Code</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead className="w-24">Sort</TableHead>
+                <TableHead>별칭 (쉼표)</TableHead>
                 <TableHead className="w-24">활성</TableHead>
                 <TableHead className="w-20 text-right">삭제</TableHead>
               </TableRow>
@@ -354,6 +355,23 @@ function TeamMasterTab() {
                         if (v === (t.sort_order ?? 0)) return;
                         try { await upd({ data: { kind: "team", id: t.id, sort_order: v } }); invalidate(); }
                         catch (err: any) { toast.error(err.message); }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      defaultValue={(t.aliases ?? []).join(", ")}
+                      className="h-8"
+                      placeholder="예: 설비, MECHANICAL"
+                      onBlur={async (e) => {
+                        const raw = e.target.value;
+                        const arr = raw.split(",").map((s) => s.trim()).filter(Boolean);
+                        const prev = ((t.aliases ?? []) as string[]).join("|");
+                        if (arr.join("|") === prev) return;
+                        try {
+                          await upd({ data: { kind: "team", id: t.id, code: t.code, aliases: arr } });
+                          invalidate();
+                        } catch (err: any) { toast.error(err.message); }
                       }}
                     />
                   </TableCell>
