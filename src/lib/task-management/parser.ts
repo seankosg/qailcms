@@ -13,6 +13,8 @@ export interface ParsedTaskRow {
   sub_task_desc: string | null;
   pic: string | null;
   row_type: string | null;
+  /** 원본 파일의 Team/TEAM 컬럼 값 (없으면 null; import 시 discipline 폴백) */
+  team: string | null;
   status_manual: string | null;
   plan_start: string | null;
   plan_end: string | null;
