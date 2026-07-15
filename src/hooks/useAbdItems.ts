@@ -52,6 +52,7 @@ export interface AbdItemsQueryParams {
   team: AbdTeam;
   statusGroup: AbdStatusGroup;
   includeInactive: boolean;
+  plot?: "C" | "D" | null;
   q?: string;
   filters?: AbdServerFilter[];
   sort?: AbdServerSort[];
@@ -73,6 +74,7 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
         _sort: p.sort ?? [],
         _offset: offset,
         _limit: p.pageSize,
+        _plot: p.plot ?? null,
       });
       if (error) throw new Error(error.message);
       const arr = (data ?? []) as { rows: any; total_count: number | string }[];
@@ -89,7 +91,7 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
 
 export interface AbdFacetItem { value: string; cnt: number }
 
-export function useAbdFacet(column: string | null, opts: { team: AbdTeam; statusGroup: AbdStatusGroup; includeInactive: boolean; enabled?: boolean }) {
+export function useAbdFacet(column: string | null, opts: { team: AbdTeam; statusGroup: AbdStatusGroup; includeInactive: boolean; plot?: "C" | "D" | null; enabled?: boolean }) {
   return useQuery<AbdFacetItem[]>({
     queryKey: ["abd", "facet", column, opts],
     queryFn: async () => {
@@ -99,6 +101,7 @@ export function useAbdFacet(column: string | null, opts: { team: AbdTeam; status
         _team: opts.team,
         _status_group: opts.statusGroup === "all" ? null : opts.statusGroup,
         _include_inactive: opts.includeInactive,
+        _plot: opts.plot ?? null,
       });
       if (error) throw new Error(error.message);
       return ((data ?? []) as any[]).map((r) => ({ value: String(r.value), cnt: Number(r.cnt) }));
@@ -116,13 +119,14 @@ export interface AbdCounts {
   latest_data_date: string | null;
 }
 
-export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean }) {
+export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean; plot?: "C" | "D" | null }) {
   return useQuery<AbdCounts>({
     queryKey: ["abd", "counts", opts],
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("abd_items_counts", {
         _team: opts.team,
         _include_inactive: opts.includeInactive,
+        _plot: opts.plot ?? null,
       });
       if (error) throw new Error(error.message);
       const r = (data ?? [])[0] ?? {};
