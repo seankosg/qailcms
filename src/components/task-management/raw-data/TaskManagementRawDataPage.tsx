@@ -79,6 +79,7 @@ import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
 import { AlarmBadge } from "./AlarmBadge";
 import { TaskStageProgress } from "./TaskStageProgress";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { canEditRawRow } from "@/lib/auth/roles";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import {
   runRollupAllParents,
@@ -175,6 +176,11 @@ export function TaskManagementRawDataPage() {
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const canEdit = !!currentUser?.isAdmin;
+  const canEditRow = useCallback(
+    (row: Record<string, unknown>) =>
+      canEditRawRow(currentUser ?? null, "task_management_raw", row as Record<string, any>),
+    [currentUser],
+  );
   const { data: fieldConfig } = useTaskManagementFieldConfig();
   const labelOverrides = useMemo(() => buildTmLabelOverrides(fieldConfig), [fieldConfig]);
   const viewPref = useUserViewPreference("task-management.raw-data.v1");
