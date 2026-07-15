@@ -48,6 +48,7 @@ interface FileEntry {
     total: number;
   };
   progress?: number;
+  allowDuplicates?: boolean;
 }
 
 const statusBadge: Record<Status, { label: string; cls: string }> = {
@@ -135,7 +136,9 @@ export function AbdImportPage() {
   const clearAll = () => setEntries([]);
 
   const isReady = (e: FileEntry) =>
-    e.status === "ready" && !!e.team && (e.parsed?.duplicates_in_file.length ?? 0) === 0;
+    e.status === "ready" &&
+    !!e.team &&
+    ((e.parsed?.duplicates_in_file.length ?? 0) === 0 || !!e.allowDuplicates);
   const readyCount = entries.filter(isReady).length;
   const isRunning = busy;
 
@@ -159,6 +162,7 @@ export function AbdImportPage() {
               data_date: new Date().toISOString().slice(0, 10),
               rows,
               inactivate_missing: true,
+              allow_duplicates: !!e.allowDuplicates,
             } as any,
           });
           agg.inserted += res.inserted;
@@ -283,6 +287,17 @@ export function AbdImportPage() {
           onOpenChange={(o) => setDupOpenId(o ? e.id : null)}
           fileName={e.file.name}
           duplicates={e.parsed?.duplicates_in_file ?? []}
+          allowed={!!e.allowDuplicates}
+          onAllow={() =>
+            setEntries((p) =>
+              p.map((x) => (x.id === e.id ? { ...x, allowDuplicates: true } : x)),
+            )
+          }
+          onRevoke={() =>
+            setEntries((p) =>
+              p.map((x) => (x.id === e.id ? { ...x, allowDuplicates: false } : x)),
+            )
+          }
         />
       ))}
     </div>
