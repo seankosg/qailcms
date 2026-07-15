@@ -55,6 +55,7 @@ import { MasterMappingSection } from "@/components/import/MasterMappingSection";
 import {
   applyNameDecisions,
   collectUnresolvedNames,
+  formatUnresolvedNamesNote,
   type NameFieldSpec,
 } from "@/lib/import/master-name-validation";
 import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks/useMasterOptions";
@@ -103,6 +104,7 @@ function ImportInner() {
     runPreflight,
     startImport,
     setFileParsedRows,
+    setFileMasterMappingNote,
   } = useTaskManagementImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
@@ -133,6 +135,15 @@ function ImportInner() {
     .flatMap((f) => f.parsed!);
 
   const unresolvedNames = collectUnresolvedNames(allReadyRows, nameSpecs, optionsByKind);
+  const masterMappingNote = formatUnresolvedNamesNote(unresolvedNames);
+  const runStartImport = () => {
+    for (const f of files) {
+      if (f.status === "ready" && !f.validationError) {
+        setFileMasterMappingNote(f.id, masterMappingNote);
+      }
+    }
+    return startImport();
+  };
 
   const applyMasterDecisions = (decisions: Map<string, any>) => {
     for (const f of files) {
@@ -278,7 +289,7 @@ function ImportInner() {
               </Button>
               <Button
                 size="sm"
-                onClick={startImport}
+                onClick={runStartImport}
                 disabled={isRunning || readyCount === 0 || !canImport}
                 title={!canImport ? "관리자 권한이 필요합니다" : ""}
               >
