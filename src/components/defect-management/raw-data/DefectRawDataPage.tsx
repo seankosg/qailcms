@@ -53,6 +53,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useTeamOptions } from "@/lib/team/team-master";
+import { canEditRawRow } from "@/lib/auth/roles";
 import {
   EMPTY_TOKEN,
   TEXT_FILTER_FIELDS,
@@ -271,6 +273,12 @@ export function DefectRawDataPage() {
   const navigate = useNavigate();
   const urlSearch = RawDataRoute.useSearch();
   const { data: user } = useCurrentUser();
+  const { data: teamOptions = [] } = useTeamOptions();
+  const teamCodesForEdit = useMemo(() => teamOptions.map((t) => t.code), [teamOptions]);
+  const canEditRow = useCallback(
+    (row: DefectItem) => canEditRawRow(user ?? null, "defect_items_raw", row as unknown as Record<string, any>),
+    [user],
+  );
   const { data: fieldConfig = [] } = useDefectFieldConfig();
   const helpers = useDefectFieldHelpers();
   const labelOf = useDefectColumnLabel();
@@ -565,10 +573,10 @@ export function DefectRawDataPage() {
       if (hiddenByTab.has(id)) continue;
       const c = byKey.get(id);
       if (!c) continue;
-      cols.push(buildDataColumn(c, tab, includeInactive, dataDate, isAdmin, patchLocalItem, () => refetch(), labelOf(c.key)));
+      cols.push(buildDataColumn(c, tab, includeInactive, dataDate, canEditRow, teamCodesForEdit, patchLocalItem, () => refetch(), labelOf(c.key)));
     }
     return cols;
-  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, isAdmin, patchLocalItem, refetch, labelOf]);
+  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, canEditRow, teamCodesForEdit, patchLocalItem, refetch, labelOf]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = { __select: true };
@@ -617,7 +625,7 @@ export function DefectRawDataPage() {
   const selectedRows = useMemo(() => table.getSelectedRowModel().rows.map((r) => r.original), [table, rowSelection, rows]);
   const bulkFields = useMemo(() => {
     const optionMap: Record<string, { value: string; label: string }[]> = {
-      team: DEFECT_TEAMS.map((value) => ({ value, label: value })),
+      team: teamCodesForEdit.map((value) => ({ value, label: value })),
       status_raw: uniqueOptions(rows, "status_raw"),
       completion_status: uniqueOptions(rows, "completion_status"),
       closure_status: uniqueOptions(rows, "closure_status"),
@@ -637,10 +645,12 @@ export function DefectRawDataPage() {
       field: c.key,
       label: helpers.getLabel(c.key),
       inputType: c.editorType!,
-      options: (c.options?.map((value) => ({ value, label: value })) ?? optionMap[c.key]) as any,
+      options: (c.key === "team"
+        ? optionMap.team
+        : c.options?.map((value) => ({ value, label: value })) ?? optionMap[c.key]) as any,
       group: normalizeGroupLabel(c.group),
     }));
-  }, [rows, helpers]);
+  }, [rows, helpers, teamCodesForEdit]);
   const exportColumns = useMemo(() => DEFECT_COLUMNS.map((c) => ({ key: c.key, label: helpers.getLabel(c.key) })), [helpers]);
   const criticalPendingCount = summary?.critical_pending ?? 0;
   const unclosedCount = counts?.unclosed_count ?? 0;
