@@ -47,6 +47,14 @@ import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { AbdExportDialog } from "./AbdExportDialog";
 import { AbdDetailSheet } from "./AbdDetailSheet";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
+import { AbdColumnOrderMenu } from "./AbdColumnOrderMenu";
+import {
+  useAbdDefaults,
+  useAbdFieldHelpers,
+  useInvalidateAbdFieldConfig,
+  persistAbdFieldConfig,
+} from "@/hooks/useAbdFieldConfig";
+import { toast } from "sonner";
 
 const SYSTEM_FROZEN_IDS = ["sl_no", "abd_number"];
 const DEFAULT_ORDER = ABD_COLUMNS.map((c) => c.key);
@@ -150,6 +158,40 @@ export function AbdRawDataPage() {
   const pageSize = PAGE_SIZE_OPTIONS.includes(Number(urlSearch.pageSize)) ? Number(urlSearch.pageSize) : 100;
 
   const viewPref = useUserViewPreference(`abd.raw-data.${team}.v1`);
+  const { defaultOrder: cfgDefaultOrder, defaultVisibility: cfgDefaultVisibility } = useAbdDefaults();
+  const { getLabel: labelOf } = useAbdFieldHelpers();
+  const invalidateFieldConfig = useInvalidateAbdFieldConfig();
+
+  const onServerReorder = useCallback(async (patches: Array<{ field_key: string; sort_order: number }>) => {
+    if (!isAdmin) return;
+    try {
+      await persistAbdFieldConfig(patches);
+      invalidateFieldConfig();
+    } catch (e: any) {
+      toast.error(`컬럼 순서 저장 실패: ${e?.message ?? e}`);
+    }
+  }, [isAdmin, invalidateFieldConfig]);
+
+  const onServerVisibility = useCallback(async (field_key: string, visible: boolean) => {
+    if (!isAdmin) return;
+    try {
+      await persistAbdFieldConfig([{ field_key, visible }]);
+      invalidateFieldConfig();
+    } catch (e: any) {
+      toast.error(`컬럼 노출 저장 실패: ${e?.message ?? e}`);
+    }
+  }, [isAdmin, invalidateFieldConfig]);
+
+  const onServerLabel = useCallback(async (field_key: string, label: string) => {
+    if (!isAdmin) return;
+    try {
+      await persistAbdFieldConfig([{ field_key, label }]);
+      invalidateFieldConfig();
+      toast.success(`라벨 저장됨: ${label}`);
+    } catch (e: any) {
+      toast.error(`라벨 저장 실패: ${e?.message ?? e}`);
+    }
+  }, [isAdmin, invalidateFieldConfig]);
 
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
@@ -344,6 +386,20 @@ export function AbdRawDataPage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "abd" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
+          <AbdColumnOrderMenu
+            order={order}
+            visibility={visibility as Record<string, boolean>}
+            frozenExtras={frozenExtras}
+            defaultOrder={cfgDefaultOrder}
+            defaultVisibility={cfgDefaultVisibility}
+            onOrderChange={setOrder}
+            onVisibilityChange={(v) => setVisibility(v)}
+            onFrozenChange={setFrozenExtras}
+            isAdmin={isAdmin}
+            onServerReorder={onServerReorder}
+            onServerVisibility={onServerVisibility}
+            onServerLabel={onServerLabel}
+          />
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           <Button variant="outline" size="sm" onClick={() => { invalidate(); refetch(); }} disabled={isFetching}>
             <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
