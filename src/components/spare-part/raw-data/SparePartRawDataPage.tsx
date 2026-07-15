@@ -445,7 +445,6 @@ export function SparePartRawDataPage() {
     setSearchInput("");
     setOrder(DEFAULT_ORDER);
     setFrozenExtras(DEFAULT_FROZEN_EXTRAS);
-    setIncludeInactive(false);
     setRowSelection({});
     navigate({ to: "/closure/spare-part/raw-data", search: {} });
   };
@@ -460,7 +459,7 @@ export function SparePartRawDataPage() {
     [rowModel.rows],
   );
 
-  const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0) + (includeInactive ? 0 : 1);
+  const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
 
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col gap-2">
