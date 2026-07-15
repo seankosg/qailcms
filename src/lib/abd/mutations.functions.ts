@@ -77,6 +77,7 @@ const ImportBatchSchema = z.object({
   data_date: z.string().nullable().optional(),
   rows: z.array(ImportRowSchema).max(10000),
   inactivate_missing: z.boolean().default(true),
+  allow_duplicates: z.boolean().default(false),
 });
 
 export const importAbdBatch = createServerFn({ method: "POST" })
@@ -86,7 +87,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     await assertEditor(context);
     const supa = context.supabase as any;
 
-    // 파일 내 중복 방어 (UI 에서 이미 차단하지만 이중 안전장치)
+    // 파일 내 중복 처리: 허용 시 마지막 행이 우선(last-wins), 불허 시 차단.
+    let rowsToImport = data.rows;
     {
       const seen = new Set<string>();
       const dups = new Set<string>();
@@ -95,9 +97,15 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         else seen.add(r.abd_number);
       }
       if (dups.size > 0) {
-        throw new Error(
-          `파일 내 ABD_NUMBER 중복이 있어 임포트를 진행할 수 없습니다: ${Array.from(dups).slice(0, 5).join(", ")}${dups.size > 5 ? " …" : ""}`,
-        );
+        if (!data.allow_duplicates) {
+          throw new Error(
+            `파일 내 ABD_NUMBER 중복이 있어 임포트를 진행할 수 없습니다: ${Array.from(dups).slice(0, 5).join(", ")}${dups.size > 5 ? " …" : ""}`,
+          );
+        }
+        // last-wins dedup
+        const byNum = new Map<string, typeof data.rows[number]>();
+        for (const r of data.rows) byNum.set(r.abd_number, r);
+        rowsToImport = Array.from(byNum.values());
       }
     }
 
@@ -124,8 +132,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     const CHUNK = 500;
     const rowLogs: any[] = [];
     let rowIndex = 0;
-    for (let i = 0; i < data.rows.length; i += CHUNK) {
-      const chunk = data.rows.slice(i, i + CHUNK);
+    for (let i = 0; i < rowsToImport.length; i += CHUNK) {
+      const chunk = rowsToImport.slice(i, i + CHUNK);
       const payload = chunk.map((r) => {
         seenNumbers.add(r.abd_number);
         return {
@@ -248,5 +256,5 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       })
       .eq("id", batchId);
 
-    return { batch_id: batchId, inserted, updated, inactivated, total: data.rows.length };
+    return { batch_id: batchId, inserted, updated, inactivated, total: rowsToImport.length };
   });
