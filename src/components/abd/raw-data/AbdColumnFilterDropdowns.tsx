@@ -13,7 +13,7 @@ export function AbdMultiSelectDropdown({ column, options }: { column: any; optio
   const [open, setOpen] = useState(false);
   const meta = (column.columnDef.meta ?? {}) as any;
   const serverFacetCol: string | null = meta.serverFacet ?? null;
-  const team: AbdTeam = (meta.team as AbdTeam) ?? "mech";
+  const team: AbdTeam = (meta.team as AbdTeam) ?? "MECH";
   const statusGroup: AbdStatusGroup = (meta.statusGroup as AbdStatusGroup) ?? "all";
   const includeInactive: boolean = !!meta.includeInactive;
   const { data: serverFacet } = useAbdFacet(open ? serverFacetCol : null, { team, statusGroup, includeInactive, enabled: open && !!serverFacetCol });

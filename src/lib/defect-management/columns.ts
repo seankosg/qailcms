@@ -44,20 +44,23 @@ export interface DefectColumnDef {
   derived?: boolean;
 }
 
-export const DEFECT_TEAMS = ["Arch", "Mech", "Elec"] as const;
+export const DEFECT_TEAMS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC"] as const;
 export type DefectTeam = (typeof DEFECT_TEAMS)[number];
 
 /**
- * 레거시 DB 데이터의 팀 라벨('건축'/'설비'/'전기')을 현재 UI 표시용
- * ('Arch'/'Mech'/'Elec')로 정규화합니다. DB 값은 손대지 않음.
+ * 레거시 DB 데이터의 팀 라벨(한글 · PascalCase)을 현재 UI 표시용
+ * 대문자 코드(ARCH/MECH/ELEC/DESN/PRJC)로 정규화합니다.
  */
 const LEGACY_TEAM_NORMALIZE: Record<string, DefectTeam> = {
-  "건축": "Arch",
-  "설비": "Mech",
-  "전기": "Elec",
-  Arch: "Arch",
-  Mech: "Mech",
-  Elec: "Elec",
+  "건축": "ARCH", "설비": "MECH", "전기": "ELEC", "설계": "DESN", "공무": "PRJC",
+  Arch: "ARCH", Mech: "MECH", Elec: "ELEC", Desn: "DESN", Prjc: "PRJC",
+  arch: "ARCH", mech: "MECH", elec: "ELEC", desn: "DESN", prjc: "PRJC",
+  ARCH: "ARCH", MECH: "MECH", ELEC: "ELEC", DESN: "DESN", PRJC: "PRJC",
+};
+
+/** 코드 → 한글 표시 라벨 (툴팁/부가 설명용). */
+export const DEFECT_TEAM_LABEL_KO: Record<DefectTeam, string> = {
+  ARCH: "건축", MECH: "설비", ELEC: "전기", DESN: "설계", PRJC: "공무",
 };
 
 export function normalizeTeam(v: string | null | undefined): DefectTeam | null {
@@ -75,11 +78,16 @@ export const COMPLETION_STATUSES = ["Not Started", "In Progress", "Complete"] as
 export const CLOSURE_STATUSES = ["Not Closed", "Closed", "InD"] as const;
 
 export const TEAM_COLORS: Record<string, string> = {
-  // 신규 라벨
+  // 신규 대문자 코드
+  ARCH: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  ELEC: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  MECH: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  DESN: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  PRJC: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  // 레거시 라벨 호환
   Arch: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   Elec: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   Mech: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  // 레거시 라벨 호환
   "건축": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   "전기": "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   "설비": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",

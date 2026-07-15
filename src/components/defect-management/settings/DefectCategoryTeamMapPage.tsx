@@ -25,7 +25,7 @@ export function DefectCategoryTeamMapPage() {
 
   const [search, setSearch] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  const [newTeam, setNewTeam] = useState<DefectTeam>("Arch");
+  const [newTeam, setNewTeam] = useState<DefectTeam>("ARCH");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -34,8 +34,11 @@ export function DefectCategoryTeamMapPage() {
   }, [rows, search]);
 
   const grouped = useMemo(() => {
-    const g: Record<DefectTeam, number> = { Arch: 0, Mech: 0, Elec: 0 };
-    for (const r of rows) g[r.team] = (g[r.team] ?? 0) + 1;
+    const g: Record<DefectTeam, number> = { ARCH: 0, MECH: 0, ELEC: 0, DESN: 0, PRJC: 0 };
+    for (const r of rows) {
+      const k = (r.team as DefectTeam) in g ? (r.team as DefectTeam) : null;
+      if (k) g[k] = (g[k] ?? 0) + 1;
+    }
     return g;
   }, [rows]);
 

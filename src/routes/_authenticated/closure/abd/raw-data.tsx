@@ -4,7 +4,7 @@ import { z } from "zod";
 import { AbdRawDataPage } from "@/components/abd/raw-data/AbdRawDataPage";
 
 const abdRawDataSearchSchema = z.object({
-  tab: fallback(z.string(), "mech").default("mech"),
+  tab: fallback(z.string(), "MECH").default("MECH"),
   status: fallback(z.string(), "all").default("all"),
   page: fallback(z.number().int(), 1).default(1),
   pageSize: fallback(z.number().int(), 100).default(100),

@@ -159,9 +159,9 @@ function toStr(v: unknown): string | null {
 export function inferDiscipline(taskNo: string | null | undefined): Discipline | null {
   if (!taskNo) return null;
   const c = taskNo.trim().charAt(0).toUpperCase();
-  if (c === "A") return "건축";
-  if (c === "E") return "전기";
-  if (c === "M") return "설비";
+  if (c === "A") return "ARCH";
+  if (c === "E") return "ELEC";
+  if (c === "M") return "MECH";
   return null;
 }
 

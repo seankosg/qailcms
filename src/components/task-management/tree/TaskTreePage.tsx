@@ -62,7 +62,7 @@ function GapCell({ gap }: { gap: number }) {
 }
 
 export function TaskTreePage() {
-  const [discipline, setDiscipline] = useState<Discipline>("건축");
+  const [discipline, setDiscipline] = useState<Discipline>("ARCH");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [behindOnly, setBehindOnly] = useState(false);

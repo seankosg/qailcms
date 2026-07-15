@@ -730,9 +730,9 @@ export function TaskManagementRawDataPage() {
     setRollupBusy("rollup");
     try {
       const res = await Promise.all([
-        rollupFn({ data: { discipline: "건축" } }),
-        rollupFn({ data: { discipline: "전기" } }),
-        rollupFn({ data: { discipline: "설비" } }),
+        rollupFn({ data: { discipline: "ARCH" } }),
+        rollupFn({ data: { discipline: "ELEC" } }),
+        rollupFn({ data: { discipline: "MECH" } }),
       ]);
       const total = res.reduce((s, r) => s + r.rolledUp, 0);
       toast.success(`Summary 재계산 완료: ${total}개 parent`);

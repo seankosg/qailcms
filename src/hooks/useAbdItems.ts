@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export type AbdStatusGroup = "approved" | "in_progress" | "not_started" | "all";
-export type AbdTeam = "mech" | "elec" | "arch";
+export type AbdTeam = "MECH" | "ELEC" | "ARCH" | "DESN" | "PRJC";
 
 export type AbdServerFilterOp = "in" | "in_or_empty" | "text" | "empty" | "date_range" | "num_range" | "bool";
 

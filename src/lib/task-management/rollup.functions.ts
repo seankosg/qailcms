@@ -2,8 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
+const DISCIPLINE_VALUES = ["ARCH", "ELEC", "MECH", "DESN", "PRJC"] as const;
 const DisciplineSchema = z.object({
-  discipline: z.enum(["건축", "전기", "설비"]),
+  discipline: z.enum(DISCIPLINE_VALUES),
 });
 
 async function assertAdmin(context: { supabase: any; userId: string }) {
@@ -34,12 +35,12 @@ export const runRollupAllParents = createServerFn({ method: "POST" })
 export const runRollupSingle = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) =>
-    z
-      .object({
-        discipline: z.enum(["건축", "전기", "설비"]),
-        parent_task_no: z.string().min(1),
-      })
-      .parse(v),
+      z
+        .object({
+          discipline: z.enum(DISCIPLINE_VALUES),
+          parent_task_no: z.string().min(1),
+        })
+        .parse(v),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
@@ -56,11 +57,11 @@ export const runRollupSingle = createServerFn({ method: "POST" })
 export const runRecalcAutoJudgment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) =>
-    z
-      .object({
-        discipline: z.enum(["건축", "전기", "설비"]).nullable().optional(),
-      })
-      .parse(v ?? {}),
+      z
+        .object({
+          discipline: z.enum(DISCIPLINE_VALUES).nullable().optional(),
+        })
+        .parse(v ?? {}),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);

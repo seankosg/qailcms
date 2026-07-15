@@ -71,7 +71,7 @@ const ImportRowSchema = z.object({
 
 const ImportBatchSchema = z.object({
   file_name: z.string(),
-  team: z.enum(["mech", "elec", "arch"]),
+  team: z.enum(["MECH", "ELEC", "ARCH", "DESN", "PRJC"]),
   plot: z.string().nullable().optional(),
   sheet_name: z.string().nullable().optional(),
   data_date: z.string().nullable().optional(),

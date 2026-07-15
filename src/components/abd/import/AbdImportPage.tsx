@@ -208,7 +208,7 @@ export function AbdImportPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">1. Upload Files</CardTitle>
-          <CardDescription>.xlsx 여러 개 가능 (설비/전기/건축). 팀은 파일명으로 자동 감지 후 수정 가능.</CardDescription>
+          <CardDescription>.xlsx 여러 개 가능 (MECH/ELEC/ARCH). 팀은 파일명(설비/전기/건축 또는 MECH/ELEC/ARCH)으로 자동 감지 후 수정 가능.</CardDescription>
         </CardHeader>
         <CardContent>
           <div

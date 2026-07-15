@@ -169,7 +169,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               warnings: parsed.warnings,
               sheetName: parsed.sheetName,
               disciplineHint: parsed.disciplineHint,
-              discipline: parsed.disciplineHint ?? "건축",
+              discipline: parsed.disciplineHint ?? "ARCH",
               sheetHeaders: parsed.sheetHeaders,
               columnMap: parsed.columnMap,
               validationError: validation,
@@ -326,7 +326,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       return;
     }
     try {
-      const discipline = target.discipline ?? "건축";
+      const discipline = target.discipline ?? "ARCH";
       const rows = target.parsed.map((p) => ({
         task_no: p.task_no,
         parent_task_no: p.parent_task_no,
@@ -363,7 +363,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
     for (const f of ready) {
       const parsed = f.parsed ?? [];
-      const discipline = f.discipline ?? "건축";
+      const discipline = f.discipline ?? "ARCH";
       const startTime = Date.now();
       const startedAtIso = new Date().toISOString();
 
