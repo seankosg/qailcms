@@ -69,6 +69,7 @@ export type Database = {
           created_at: string
           data_type: string
           editable: boolean
+          editable_to_roles: Database["public"]["Enums"]["app_role"][]
           field_key: string
           group: string | null
           id: string
@@ -77,11 +78,13 @@ export type Database = {
           sort_order: number
           updated_at: string
           visible: boolean
+          visible_to_roles: Database["public"]["Enums"]["app_role"][]
         }
         Insert: {
           created_at?: string
           data_type?: string
           editable?: boolean
+          editable_to_roles?: Database["public"]["Enums"]["app_role"][]
           field_key: string
           group?: string | null
           id?: string
@@ -90,11 +93,13 @@ export type Database = {
           sort_order?: number
           updated_at?: string
           visible?: boolean
+          visible_to_roles?: Database["public"]["Enums"]["app_role"][]
         }
         Update: {
           created_at?: string
           data_type?: string
           editable?: boolean
+          editable_to_roles?: Database["public"]["Enums"]["app_role"][]
           field_key?: string
           group?: string | null
           id?: string
@@ -103,6 +108,7 @@ export type Database = {
           sort_order?: number
           updated_at?: string
           visible?: boolean
+          visible_to_roles?: Database["public"]["Enums"]["app_role"][]
         }
         Relationships: []
       }
@@ -445,6 +451,7 @@ export type Database = {
         Row: {
           created_at: string
           display_name: string
+          editable_to_roles: Database["public"]["Enums"]["app_role"][]
           field_name: string
           group_key: string | null
           id: string
@@ -455,10 +462,12 @@ export type Database = {
           source_label: string | null
           updated_at: string
           updated_by: string | null
+          visible_to_roles: Database["public"]["Enums"]["app_role"][]
         }
         Insert: {
           created_at?: string
           display_name: string
+          editable_to_roles?: Database["public"]["Enums"]["app_role"][]
           field_name: string
           group_key?: string | null
           id?: string
@@ -469,10 +478,12 @@ export type Database = {
           source_label?: string | null
           updated_at?: string
           updated_by?: string | null
+          visible_to_roles?: Database["public"]["Enums"]["app_role"][]
         }
         Update: {
           created_at?: string
           display_name?: string
+          editable_to_roles?: Database["public"]["Enums"]["app_role"][]
           field_name?: string
           group_key?: string | null
           id?: string
@@ -483,6 +494,7 @@ export type Database = {
           source_label?: string | null
           updated_at?: string
           updated_by?: string | null
+          visible_to_roles?: Database["public"]["Enums"]["app_role"][]
         }
         Relationships: []
       }
@@ -927,6 +939,30 @@ export type Database = {
         }
         Relationships: []
       }
+      hdec_eng_master: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hdec_pic_master: {
         Row: {
           created_at: string
@@ -953,12 +989,16 @@ export type Database = {
           created_at: string
           display_name: string | null
           email: string | null
+          hdec_eng_name: string | null
           hdec_pic_name: string | null
           id: string
           is_active: boolean
           login_id: string
           must_change_password: boolean
+          name: string | null
           subcontractor_name: string | null
+          subsub_name: string | null
+          team: string | null
           updated_at: string
           user_type: Database["public"]["Enums"]["user_type"]
         }
@@ -966,12 +1006,16 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          hdec_eng_name?: string | null
           hdec_pic_name?: string | null
           id: string
           is_active?: boolean
           login_id: string
           must_change_password?: boolean
+          name?: string | null
           subcontractor_name?: string | null
+          subsub_name?: string | null
+          team?: string | null
           updated_at?: string
           user_type?: Database["public"]["Enums"]["user_type"]
         }
@@ -979,12 +1023,16 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          hdec_eng_name?: string | null
           hdec_pic_name?: string | null
           id?: string
           is_active?: boolean
           login_id?: string
           must_change_password?: boolean
+          name?: string | null
           subcontractor_name?: string | null
+          subsub_name?: string | null
+          team?: string | null
           updated_at?: string
           user_type?: Database["public"]["Enums"]["user_type"]
         }
@@ -1111,6 +1159,7 @@ export type Database = {
       spare_part_field_config: {
         Row: {
           display_name: string
+          editable_to_roles: Database["public"]["Enums"]["app_role"][]
           field_name: string
           group_key: string | null
           id: string
@@ -1119,9 +1168,11 @@ export type Database = {
           sort_order: number
           updated_at: string
           updated_by: string | null
+          visible_to_roles: Database["public"]["Enums"]["app_role"][]
         }
         Insert: {
           display_name: string
+          editable_to_roles?: Database["public"]["Enums"]["app_role"][]
           field_name: string
           group_key?: string | null
           id?: string
@@ -1130,9 +1181,11 @@ export type Database = {
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
+          visible_to_roles?: Database["public"]["Enums"]["app_role"][]
         }
         Update: {
           display_name?: string
+          editable_to_roles?: Database["public"]["Enums"]["app_role"][]
           field_name?: string
           group_key?: string | null
           id?: string
@@ -1141,6 +1194,7 @@ export type Database = {
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
+          visible_to_roles?: Database["public"]["Enums"]["app_role"][]
         }
         Relationships: []
       }
@@ -1706,25 +1760,46 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          owner_code: string | null
+          parent_subcontractor_id: string | null
+          type: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           is_active?: boolean
           name: string
+          owner_code?: string | null
+          parent_subcontractor_id?: string | null
+          type?: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
+          owner_code?: string | null
+          parent_subcontractor_id?: string | null
+          type?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subcontractor_master_parent_subcontractor_id_fkey"
+            columns: ["parent_subcontractor_id"]
+            isOneToOne: false
+            referencedRelation: "subcontractor_master"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_management_field_config: {
         Row: {
           created_at: string
           display_name: string
+          editable_to_roles: Database["public"]["Enums"]["app_role"][]
           field_name: string
           group_key: string | null
           id: string
@@ -1733,10 +1808,12 @@ export type Database = {
           sort_order: number
           updated_at: string
           updated_by: string | null
+          visible_to_roles: Database["public"]["Enums"]["app_role"][]
         }
         Insert: {
           created_at?: string
           display_name: string
+          editable_to_roles?: Database["public"]["Enums"]["app_role"][]
           field_name: string
           group_key?: string | null
           id?: string
@@ -1745,10 +1822,12 @@ export type Database = {
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
+          visible_to_roles?: Database["public"]["Enums"]["app_role"][]
         }
         Update: {
           created_at?: string
           display_name?: string
+          editable_to_roles?: Database["public"]["Enums"]["app_role"][]
           field_name?: string
           group_key?: string | null
           id?: string
@@ -1757,6 +1836,7 @@ export type Database = {
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
+          visible_to_roles?: Database["public"]["Enums"]["app_role"][]
         }
         Relationships: []
       }
@@ -2136,6 +2216,36 @@ export type Database = {
           },
         ]
       }
+      team_master: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2236,6 +2346,14 @@ export type Database = {
           _slip_days: number
         }
         Returns: string
+      }
+      can_edit_row: {
+        Args: { _row_id: string; _table_name: string; _user_id: string }
+        Returns: boolean
+      }
+      can_view_row: {
+        Args: { _row_id: string; _table_name: string; _user_id: string }
+        Returns: boolean
       }
       defect_items_counts: {
         Args: { _include_inactive?: boolean }
