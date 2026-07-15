@@ -511,6 +511,10 @@ export async function parseTaskManagementExcel(
       sub_task_desc: toStr(getCell(sheet, r, cols.sub_task_desc)),
       pic: toStr(getCell(sheet, r, cols.pic)),
       row_type: toStr(getCell(sheet, r, cols.row_type)),
+      team: (() => {
+        const idx = headerMap["team"] ?? headerMap["팀"];
+        return idx ? toStr(getCell(sheet, r, idx)) : null;
+      })(),
       status_manual: toStr(getCell(sheet, r, cols.status_manual)),
       plan_start: toIsoDate(getCell(sheet, r, cols.plan_start)),
       plan_end: toIsoDate(getCell(sheet, r, cols.plan_end)),
