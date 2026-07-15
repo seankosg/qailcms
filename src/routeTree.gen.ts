@@ -21,6 +21,7 @@ import { Route as AuthenticatedImportLogImportRouteImport } from './routes/_auth
 import { Route as AuthenticatedCloseoutDashboardRouteImport } from './routes/_authenticated/closeout/dashboard'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminTaskThresholdsRouteImport } from './routes/_authenticated/admin/task-thresholds'
+import { Route as AuthenticatedAdminMastersRouteImport } from './routes/_authenticated/admin/masters'
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
 import { Route as AuthenticatedClosureDashboardIndexRouteImport } from './routes/_authenticated/closure/dashboard/index'
 import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './routes/_authenticated/closure/task-management/tree'
@@ -109,6 +110,12 @@ const AuthenticatedAdminTaskThresholdsRoute =
   AuthenticatedAdminTaskThresholdsRouteImport.update({
     id: '/task-thresholds',
     path: '/task-thresholds',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminMastersRoute =
+  AuthenticatedAdminMastersRouteImport.update({
+    id: '/masters',
+    path: '/masters',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
 const AuthenticatedAdminMappingRoute =
@@ -268,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/change-password': typeof ChangePasswordRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
+  '/admin/masters': typeof AuthenticatedAdminMastersRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
@@ -305,6 +313,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
+  '/admin/masters': typeof AuthenticatedAdminMastersRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
@@ -345,6 +354,7 @@ export interface FileRoutesById {
   '/change-password': typeof ChangePasswordRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/admin/mapping': typeof AuthenticatedAdminMappingRoute
+  '/_authenticated/admin/masters': typeof AuthenticatedAdminMastersRoute
   '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
@@ -385,6 +395,7 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/admin'
     | '/admin/mapping'
+    | '/admin/masters'
     | '/admin/task-thresholds'
     | '/admin/users'
     | '/closeout/dashboard'
@@ -422,6 +433,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/admin/mapping'
+    | '/admin/masters'
     | '/admin/task-thresholds'
     | '/admin/users'
     | '/closeout/dashboard'
@@ -461,6 +473,7 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/_authenticated/admin'
     | '/_authenticated/admin/mapping'
+    | '/_authenticated/admin/masters'
     | '/_authenticated/admin/task-thresholds'
     | '/_authenticated/admin/users'
     | '/_authenticated/closeout/dashboard'
@@ -585,6 +598,13 @@ declare module '@tanstack/react-router' {
       path: '/task-thresholds'
       fullPath: '/admin/task-thresholds'
       preLoaderRoute: typeof AuthenticatedAdminTaskThresholdsRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/masters': {
+      id: '/_authenticated/admin/masters'
+      path: '/masters'
+      fullPath: '/admin/masters'
+      preLoaderRoute: typeof AuthenticatedAdminMastersRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/admin/mapping': {
@@ -767,6 +787,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminMappingRoute: typeof AuthenticatedAdminMappingRoute
+  AuthenticatedAdminMastersRoute: typeof AuthenticatedAdminMastersRoute
   AuthenticatedAdminTaskThresholdsRoute: typeof AuthenticatedAdminTaskThresholdsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -775,6 +796,7 @@ interface AuthenticatedAdminRouteRouteChildren {
 const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
   {
     AuthenticatedAdminMappingRoute: AuthenticatedAdminMappingRoute,
+    AuthenticatedAdminMastersRoute: AuthenticatedAdminMastersRoute,
     AuthenticatedAdminTaskThresholdsRoute:
       AuthenticatedAdminTaskThresholdsRoute,
     AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
