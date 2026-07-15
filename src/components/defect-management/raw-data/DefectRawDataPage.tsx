@@ -69,6 +69,7 @@ import { CriticalPendingBar } from "./CriticalPendingBar";
 import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
+import { exportAllUnclosed } from "./exportAllUnclosed";
 import { EditCellPopover } from "./EditCellPopover";
 import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
@@ -747,6 +748,29 @@ export function DefectRawDataPage() {
           />
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
+          {tab === "unclosed" && (
+            <Button
+              variant="default"
+              size="sm"
+              disabled={downloadingAll}
+              onClick={async () => {
+                setDownloadingAll(true);
+                const toastId = toast.loading("Unclosed 전체 다운로드 준비 중...");
+                try {
+                  const { count } = await exportAllUnclosed((fetched, total) => {
+                    toast.loading(`Unclosed 다운로드 ${fetched.toLocaleString()} / ${total.toLocaleString()}`, { id: toastId });
+                  });
+                  toast.success(`${count.toLocaleString()}건 XLSX 다운로드 완료`, { id: toastId });
+                } catch (e: any) {
+                  toast.error(`다운로드 실패: ${e?.message ?? e}`, { id: toastId });
+                } finally {
+                  setDownloadingAll(false);
+                }
+              }}
+            >
+              <Download className="mr-1.5 h-3.5 w-3.5" /> {downloadingAll ? "다운로드 중..." : "Unclosed 전체 XLSX"}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => { invalidateDefects(); refetch(); }} disabled={isFetching}>
             <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
           </Button>
