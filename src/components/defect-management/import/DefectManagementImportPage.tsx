@@ -37,6 +37,14 @@ import {
 } from "@/contexts/DefectManagementImportContext";
 import { DefectColumnSelect } from "./DefectColumnSelect";
 import { DuplicateReviewDialog } from "./DuplicateReviewDialog";
+import { MasterMappingSection } from "@/components/import/MasterMappingSection";
+import {
+  applyNameDecisions,
+  collectUnresolvedNames,
+  type NameFieldSpec,
+} from "@/lib/import/master-name-validation";
+import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks/useMasterOptions";
+import type { ParsedDefectRow } from "@/lib/defect-management/parser";
 
 const statusBadge: Record<DefectFileStatus, { label: string; cls: string }> = {
   parsing: { label: "Parsing", cls: "bg-muted text-muted-foreground" },
@@ -87,10 +95,43 @@ function Inner() {
     resolveDuplicates,
     startImport,
     setFileAiClassifyEnabled,
+    setFileParsedRows,
   } = useDefectImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [columnDialogFileId, setColumnDialogFileId] = useState<string | null>(null);
   const [dupDialogFileId, setDupDialogFileId] = useState<string | null>(null);
+  const masterOptions = useAllMasterOptions();
+
+  const readExtra = (key: string) => (r: ParsedDefectRow) =>
+    (r.extra?.[key] as string | null | undefined) ?? null;
+  const writeExtra = (key: string) => (r: ParsedDefectRow, v: string) => {
+    if (!r.extra) r.extra = {};
+    r.extra[key] = v;
+  };
+  const nameSpecs: NameFieldSpec<ParsedDefectRow>[] = [
+    { fieldLabel: "Subcontractor", masterKind: "subcontractor", read: readExtra("subcontractor_name"), write: writeExtra("subcontractor_name") },
+    { fieldLabel: "Sub-Sub", masterKind: "subsub", read: readExtra("subsub_name"), write: writeExtra("subsub_name") },
+    { fieldLabel: "HDEC PIC", masterKind: "hdec_pic", read: readExtra("hdec_pic_name"), write: writeExtra("hdec_pic_name") },
+    { fieldLabel: "HDEC Eng", masterKind: "hdec_eng", read: readExtra("hdec_eng_name"), write: writeExtra("hdec_eng_name") },
+  ];
+  const optionsByKind: Record<MasterKind, readonly MasterOption[]> = {
+    subcontractor: masterOptions.subcontractor,
+    subsub: masterOptions.subsub,
+    hdec_pic: masterOptions.hdec_pic,
+    hdec_eng: masterOptions.hdec_eng,
+  };
+  const allReadyRows: ParsedDefectRow[] = files
+    .filter((f) => f.status === "ready" && !!f.parsed)
+    .flatMap((f) => f.parsed!);
+  const unresolvedNames = collectUnresolvedNames(allReadyRows, nameSpecs, optionsByKind);
+  const applyMasterDecisions = (decisions: Map<string, any>) => {
+    for (const f of files) {
+      if (f.status !== "ready" || !f.parsed) continue;
+      const rows = f.parsed.map((r) => ({ ...r, extra: r.extra ? { ...r.extra } : undefined }));
+      applyNameDecisions(rows, nameSpecs, decisions);
+      setFileParsedRows(f.id, rows);
+    }
+  };
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -124,6 +165,13 @@ function Inner() {
           (매핑 관리: <code>Snag List Settings</code>).
         </p>
       </div>
+
+      <MasterMappingSection
+        entries={unresolvedNames}
+        canRegister={canImport}
+        optionsByKind={optionsByKind}
+        onApply={applyMasterDecisions}
+      />
 
       <Card>
         <CardHeader>

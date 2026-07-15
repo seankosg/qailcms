@@ -51,6 +51,14 @@ import { ConflictReviewDialog } from "./ConflictReviewDialog";
 import { Input } from "@/components/ui/input";
 import type { ConflictPolicy } from "@/contexts/TaskManagementImportContext";
 import { AlertTriangle, ScanSearch } from "lucide-react";
+import { MasterMappingSection } from "@/components/import/MasterMappingSection";
+import {
+  applyNameDecisions,
+  collectUnresolvedNames,
+  type NameFieldSpec,
+} from "@/lib/import/master-name-validation";
+import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks/useMasterOptions";
+import type { ParsedTaskRow } from "@/lib/task-management/parser";
 
 const statusBadge: Record<TmFileStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
@@ -94,11 +102,46 @@ function ImportInner() {
     setFileConflictPolicy,
     runPreflight,
     startImport,
+    setFileParsedRows,
   } = useTaskManagementImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [mappingFileId, setMappingFileId] = useState<string | null>(null);
   const [conflictFileId, setConflictFileId] = useState<string | null>(null);
+  const masterOptions = useAllMasterOptions();
+
+  const nameSpecs: NameFieldSpec<ParsedTaskRow>[] = [
+    {
+      fieldLabel: "HDEC PIC",
+      masterKind: "hdec_pic",
+      read: (r) => r.pic,
+      write: (r, v) => {
+        r.pic = v;
+      },
+    },
+  ];
+
+  const optionsByKind: Record<MasterKind, readonly MasterOption[]> = {
+    subcontractor: masterOptions.subcontractor,
+    subsub: masterOptions.subsub,
+    hdec_pic: masterOptions.hdec_pic,
+    hdec_eng: masterOptions.hdec_eng,
+  };
+
+  const allReadyRows: ParsedTaskRow[] = files
+    .filter((f) => f.status === "ready" && !!f.parsed)
+    .flatMap((f) => f.parsed!);
+
+  const unresolvedNames = collectUnresolvedNames(allReadyRows, nameSpecs, optionsByKind);
+
+  const applyMasterDecisions = (decisions: Map<string, any>) => {
+    for (const f of files) {
+      if (f.status !== "ready" || !f.parsed) continue;
+      const rows = f.parsed.map((r) => ({ ...r }));
+      applyNameDecisions(rows, nameSpecs, decisions);
+      setFileParsedRows(f.id, rows);
+    }
+  };
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -130,6 +173,13 @@ function ImportInner() {
           <code>(discipline, task_no)</code>.
         </p>
       </div>
+
+      <MasterMappingSection
+        entries={unresolvedNames}
+        canRegister={canImport}
+        optionsByKind={optionsByKind}
+        onApply={applyMasterDecisions}
+      />
 
       <Card>
         <CardHeader>

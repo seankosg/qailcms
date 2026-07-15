@@ -100,6 +100,7 @@ interface CtxValue {
   setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
   runPreflight: (id: string) => Promise<void>;
   startImport: () => Promise<void>;
+  setFileParsedRows: (id: string, next: ParsedTaskRow[]) => void;
 }
 
 const Ctx = createContext<CtxValue | null>(null);
@@ -197,6 +198,13 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     [],
   );
   const clearAll = useCallback(() => setFiles([]), []);
+
+  const setFileParsedRows = useCallback(
+    (id: string, next: ParsedTaskRow[]) => {
+      setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, parsed: next } : f)));
+    },
+    [],
+  );
 
   const setFileDiscipline = useCallback((id: string, d: Discipline) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, discipline: d } : f)));
@@ -756,6 +764,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setFileConflictPolicy,
         runPreflight,
         startImport,
+        setFileParsedRows,
       }}
     >
       {children}

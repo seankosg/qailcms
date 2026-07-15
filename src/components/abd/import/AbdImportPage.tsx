@@ -33,6 +33,14 @@ import { AbdDuplicateReviewDialog } from "./AbdDuplicateReviewDialog";
 import { useTeamOptions } from "@/lib/team/team-master";
 import { collectUnknownTeamCodes } from "@/lib/import/team-validation";
 import { TeamRegisterDialog } from "@/components/import/TeamRegisterDialog";
+import { MasterMappingSection } from "@/components/import/MasterMappingSection";
+import {
+  applyNameDecisions,
+  collectUnresolvedNames,
+  type NameFieldSpec,
+} from "@/lib/import/master-name-validation";
+import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks/useMasterOptions";
+import type { ParsedAbdRow } from "@/lib/abd/parser";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 type Status = "queued" | "parsing" | "ready" | "importing" | "done" | "error";
@@ -81,6 +89,45 @@ export function AbdImportPage() {
   const currentUserQ = useCurrentUser();
   const canRegisterTeam = !!(currentUserQ.data?.isAdmin || currentUserQ.data?.isSuperUser);
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
+  const masterOptions = useAllMasterOptions();
+
+  const nameSpecs: NameFieldSpec<ParsedAbdRow>[] = [
+    {
+      fieldLabel: "HDEC PIC",
+      masterKind: "hdec_pic",
+      read: (r) => r.pic,
+      write: (r, v) => {
+        r.pic = v;
+      },
+    },
+  ];
+
+  const allReadyRows: ParsedAbdRow[] = entries
+    .filter((e) => e.status === "ready" && e.parsed)
+    .flatMap((e) => e.parsed!.sheets.flatMap((s) => s.rows));
+
+  const optionsByKind: Record<MasterKind, readonly MasterOption[]> = {
+    subcontractor: masterOptions.subcontractor,
+    subsub: masterOptions.subsub,
+    hdec_pic: masterOptions.hdec_pic,
+    hdec_eng: masterOptions.hdec_eng,
+  };
+
+  const unresolvedNames = collectUnresolvedNames(allReadyRows, nameSpecs, optionsByKind);
+
+  const applyMasterDecisions = (decisions: Map<string, any>) => {
+    setEntries((prev) =>
+      prev.map((e) => {
+        if (!e.parsed) return e;
+        const nextSheets = e.parsed.sheets.map((s) => {
+          const rows = s.rows.map((r) => ({ ...r }));
+          applyNameDecisions(rows, nameSpecs, decisions);
+          return { ...s, rows };
+        });
+        return { ...e, parsed: { ...e.parsed, sheets: nextSheets } };
+      }),
+    );
+  };
 
   const handleFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -234,6 +281,13 @@ export function AbdImportPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      <MasterMappingSection
+        entries={unresolvedNames}
+        canRegister={canRegisterTeam}
+        optionsByKind={optionsByKind}
+        onApply={applyMasterDecisions}
+      />
 
       <Alert>
         <AlertTriangle className="h-4 w-4" />
