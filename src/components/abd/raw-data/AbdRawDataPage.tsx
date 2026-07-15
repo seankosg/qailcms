@@ -410,7 +410,7 @@ export function AbdRawDataPage() {
 
       <Tabs value={team} onValueChange={(v) => setUrl({ tab: v, page: 1 })}>
         <TabsList className="h-9">
-          {TEAM_TABS.map((t) => (
+          {teamTabs.map((t) => (
             <TabsTrigger key={t.value} value={t.value} className="text-xs">
               {t.label}
             </TabsTrigger>
