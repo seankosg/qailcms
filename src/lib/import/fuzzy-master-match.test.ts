@@ -37,8 +37,8 @@ describe("matchMasterName", () => {
     { id: "3", name: "GS건설" },
   ];
 
-  it("정규화 후 정확 일치 (전각·대소문자·공백)", () => {
-    const r = matchMasterName("삼성 E&C", options);
+  it("정규화 후 정확 일치 (전각→반각·대소문자)", () => {
+    const r = matchMasterName("삼성Ｅ＆Ｃ", options);
     expect(r.exact?.id).toBe("1");
     expect(r.candidates).toHaveLength(0);
   });
