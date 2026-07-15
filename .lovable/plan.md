@@ -86,3 +86,14 @@
 ## 다음 단계 예고
 
 Phase 5: 각 Raw Data 화면(ABD, Snag, SP, Task)의 Team 필터/편집 UI를 `useTeamOptions()`로 치환 및 `canEditRawRow` 적용.
+
+---
+
+# Phase 5 진행 기록 (Snag → ABD → Task → SP)
+
+- **Snag(Defect)**: `useTeamOptions()`로 편집용 team 옵션 동적화 (bulk edit + EditCellPopover). `canEditRawRow(user, "defect_items_raw", row)`로 셀 편집 가시성 결정. `DEFECT_TEAMS` import 제거.
+- **ABD**: 상단 Team 탭을 `useTeamOptions()`로 동적화 (`TEAM_TABS`/`TAB_TO_TEAM` 하드코딩 제거). `canEditRawRow(user, "abd_items_raw", row)`로 `AbdEditCellPopover` 렌더링 게이트 치환.
+- **Task**: 파생/집계 위주 페이지로 셀 인라인 편집 없음. 부모 행의 "하위 태스크 추가" 버튼을 `canEditRawRow(user, "task_management_raw", row)`로 per-row 게이트 적용. 전역 admin 버튼(Rollup/Judgment/임계값 링크)은 기존 `isAdmin` 유지.
+- **SP(Spare Part)**: Raw Data 페이지에 per-row 인라인 편집 UI 부재. Team 필터 탭도 없음 (도메인 스키마상 필요 없음). Bulk 편집·ColumnOrderMenu는 기존 `isAdmin` 유지. UI 변경 없음.
+
+**서버 재검증**은 각 도메인 mutation의 `assertCanEdit`에서 이미 처리 (사용자 선택: UI-only).

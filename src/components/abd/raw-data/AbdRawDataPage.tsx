@@ -39,6 +39,8 @@ import {
   type AbdTeam,
 } from "@/hooks/useAbdItems";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useTeamOptions } from "@/lib/team/team-master";
+import { canEditRawRow } from "@/lib/auth/roles";
 import { EMPTY_TOKEN, DATE_FILTER_FIELDS } from "@/lib/abd/filter-fns";
 import { getOriginHeaderStyle } from "@/lib/abd/origin-header-style";
 import { AbdColumnFilterDropdown } from "./AbdColumnFilterDropdowns";
@@ -126,16 +128,6 @@ function formatDdMmm(v: any): string {
   return `${String(d.getDate()).padStart(2, "0")}-${d.toLocaleString("en", { month: "short" })}-${String(d.getFullYear()).slice(2)}`;
 }
 
-const TAB_TO_TEAM: Record<string, AbdTeam> = {
-  MECH: "MECH", ELEC: "ELEC", ARCH: "ARCH",
-  // 레거시 URL(소문자)도 인식
-  mech: "MECH", elec: "ELEC", arch: "ARCH",
-};
-const TEAM_TABS = [
-  { value: "MECH", label: "MECH" },
-  { value: "ELEC", label: "ELEC" },
-  { value: "ARCH", label: "ARCH" },
-] as const;
 
 const STATUS_TABS: { value: AbdStatusGroup; label: string }[] = [
   { value: "all", label: "All" },
@@ -149,9 +141,21 @@ export function AbdRawDataPage() {
   const urlSearch = AbdRawDataRoute.useSearch();
   const { data: user } = useCurrentUser();
   const isAdmin = !!user?.isAdmin;
+  const { data: teamOptions = [] } = useTeamOptions();
+  const canEditRow = useCallback(
+    (row: AbdItem) => canEditRawRow(user ?? null, "abd_items_raw", row as unknown as Record<string, any>),
+    [user],
+  );
   const invalidate = useInvalidateAbd();
 
-  const team: AbdTeam = (TAB_TO_TEAM[urlSearch.tab as string] ?? "MECH") as AbdTeam;
+  // team_master 기반 동적 탭. 미매칭 시 첫 옵션 폴백.
+  const teamTabs = useMemo(
+    () => teamOptions.map((t) => ({ value: t.code, label: t.code })),
+    [teamOptions],
+  );
+  const rawTab = String(urlSearch.tab ?? "").toUpperCase();
+  const matchedTeam = teamOptions.find((t) => t.code.toUpperCase() === rawTab);
+  const team: AbdTeam = ((matchedTeam?.code ?? teamOptions[0]?.code ?? "MECH") as unknown) as AbdTeam;
   const statusGroup: AbdStatusGroup = (["all", "approved", "in_progress", "not_started"].includes(urlSearch.status ?? "") ? urlSearch.status : "all") as AbdStatusGroup;
   // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
   const includeInactive = false;
@@ -316,10 +320,10 @@ export function AbdRawDataPage() {
     for (const id of orderedKeys) {
       const c = byKey.get(id);
       if (!c) continue;
-      cols.push(buildDataColumn(c, team, statusGroup, includeInactive, isAdmin, () => refetch()));
+      cols.push(buildDataColumn(c, team, statusGroup, includeInactive, canEditRow, () => refetch()));
     }
     return cols;
-  }, [orderedKeys, team, statusGroup, includeInactive, isAdmin, refetch]);
+  }, [orderedKeys, team, statusGroup, includeInactive, canEditRow, refetch]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = {};
@@ -410,7 +414,7 @@ export function AbdRawDataPage() {
 
       <Tabs value={team} onValueChange={(v) => setUrl({ tab: v, page: 1 })}>
         <TabsList className="h-9">
-          {TEAM_TABS.map((t) => (
+          {teamTabs.map((t) => (
             <TabsTrigger key={t.value} value={t.value} className="text-xs">
               {t.label}
             </TabsTrigger>
@@ -504,7 +508,7 @@ function buildDataColumn(
   team: AbdTeam,
   statusGroup: AbdStatusGroup,
   includeInactive: boolean,
-  isAdmin: boolean,
+  canEditRow: (row: AbdItem) => boolean,
   refetch: () => void,
 ): ColumnDef<AbdItem> {
   const filterType =
@@ -525,7 +529,7 @@ function buildDataColumn(
     cell: ({ row, getValue }) => {
       const v: any = getValue();
       const display = renderAbdCell(c, v, row.original);
-      if (c.editable && isAdmin && c.editorType) {
+      if (c.editable && c.editorType && canEditRow(row.original)) {
         return (
           <AbdEditCellPopover
             id={row.original.id}
