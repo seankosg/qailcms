@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const DISCIPLINES = ["건축", "전기", "설비"] as const;
+const DISCIPLINES = ["ARCH", "ELEC", "MECH", "DESN", "PRJC"] as const;
 
 const AddChildSchema = z.object({
   discipline: z.enum(DISCIPLINES),
