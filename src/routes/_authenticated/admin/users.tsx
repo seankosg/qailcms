@@ -545,5 +545,3 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
     </Dialog>
   );
 }
-
-}
