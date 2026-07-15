@@ -100,6 +100,7 @@ interface CtxValue {
   setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
   runPreflight: (id: string) => Promise<void>;
   startImport: () => Promise<void>;
+  setFileParsedRows: (id: string, next: ParsedTaskRow[]) => void;
 }
 
 const Ctx = createContext<CtxValue | null>(null);
