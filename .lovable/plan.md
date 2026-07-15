@@ -1,26 +1,42 @@
-# 스티키 컬럼 불투명 정책 저장 및 ABD Raw Data 적용
+## 원인
 
-## 배경
-현재 `src/components/abd/raw-data/AbdRawDataPage.tsx`의 스티키 셀 배경은 `stickyBg()` 함수가 `linear-gradient(base,base), hsl(var(--muted)/0.95)` 처럼 반환합니다. CSS `background` shorthand의 다중 레이어 문법에서 마지막 레이어를 제외하면 각 레이어는 `background-image` 여야 하는데, 뒤쪽 `hsl(... / 0.95)` 는 이미지가 아닌 색 값이라 문법이 어긋나 브라우저에 따라 레이어가 무시되거나 뒤 컬럼이 비쳐 보일 수 있습니다. 또 `inactive` 행은 반투명 `bg-muted/30` 이 TableRow에 적용돼 스티키 셀만 배경이 어긋나 보입니다.
+DOM을 조사한 결과, ABD Raw Data 테이블에 컬럼이 37개가 아니라 39개가 렌더링되고 있습니다. `sl_no`, `abd_number`가 헤더에 두 번씩 등장합니다.
 
-## 변경 사항
+로컬 저장된 뷰 프리퍼런스에서 `frozenExtras: ["plot", "sl_no", "abd_number"]` 처럼 사용자 핀 목록에 이미 시스템 고정 컬럼(`SYSTEM_FROZEN_IDS = ["sl_no", "abd_number"]`)이 포함되어 있는데, `AbdRawDataPage`의 `orderedKeys`가 다음과 같이 계산됩니다:
 
-### 1) 메모리 저장 (프로젝트 전역 규칙)
-- `mem://design/sticky-columns-opaque` 를 새로 만들고, `mem://index.md` Core 섹션에 한 줄 요약 추가.
-- 요약: "모든 Raw Data 테이블의 스티키(고정) 컬럼은 항상 100% 불투명 배경을 사용한다. 뒤쪽 컬럼이 비쳐 보이지 않도록 반투명 배경/오버레이는 두 개의 `linear-gradient()` 레이어로 쌓아 완전 불투명을 보장한다."
+```
+[...SYSTEM_FROZEN_IDS, ...frozenExtras, ...rest]
+```
 
-### 2) `src/components/abd/raw-data/AbdRawDataPage.tsx` 수정
-`stickyBg(row, index)` 를 다음 규칙으로 재작성:
+`rest`는 SYSTEM/frozen을 걸러내지만 `frozenExtras` 자체는 그대로 프리펜드되므로 `sl_no`, `abd_number`가 두 번씩 붙어 총 39개가 됩니다.
 
-- 기본 불투명 베이스: `hsl(var(--background))`
-- 상태별 오버레이(전부 gradient 레이어로 감싸 불투명 스택 구성):
-  - hover: `linear-gradient(hsl(var(--muted)/0.5), hsl(var(--muted)/0.5)), linear-gradient(hsl(var(--background)), hsl(var(--background)))`
-  - inactive (그리고 hover 아님): `linear-gradient(hsl(var(--muted)/0.3), hsl(var(--muted)/0.3)), linear-gradient(hsl(var(--background)), hsl(var(--background)))`
-  - 그 외: `hsl(var(--background))`
-- 이렇게 하면 오버레이가 반투명이어도 밑에 완전 불투명 베이스 레이어가 깔려 뒤 컬럼이 절대 비치지 않습니다. 시각적으로는 기존 TableRow의 `hover:bg-muted/50`, `bg-muted/30` (inactive) 톤과 일치합니다.
+이어서 `stickyLefts` 맵은 컬럼 ID를 키로 하므로 나중에 나타난 중복 항목이 앞선 좌표를 덮어씁니다. 그 결과 첫 번째 sl_no/abd_number 셀도 `left: 400px` / `470px`로 sticky되어, 원래 있어야 할 0~330px 영역이 완전히 비게 됩니다. 사용자가 본 "맨 왼쪽의 헤더/값 없는 빈 컬럼"의 실체입니다.
 
-헤더 쪽 스티키 (`originStyle.stickyBg`)는 이미 알파 없는 hsl 색을 쓰므로 그대로 두되, 코멘트로 "불투명 유지 필수" 명시.
+## 수정 범위
 
-### 3) 검증
-- `bunx tsgo --noEmit` 타입 체크
-- 프리뷰에서 ABD Raw Data 화면을 가로 스크롤해 스티키 컬럼(체크박스/ABD_NUMBER 등)이 뒤 컬럼과 겹치지 않는지 확인
+### 1. `src/components/abd/raw-data/AbdRawDataPage.tsx`
+
+- `orderedKeys` 계산 시 `frozenExtras`에서 `SYSTEM_FROZEN_IDS`를 제거해 중복 방지.
+  ```
+  const frozenExtrasClean = frozenExtras.filter(k => !SYSTEM_FROZEN_IDS.includes(k));
+  const rest = order.filter(k => !new Set(frozenExtrasClean).has(k) && !SYSTEM_FROZEN_IDS.includes(k));
+  return [...SYSTEM_FROZEN_IDS, ...frozenExtrasClean, ...rest];
+  ```
+- 뷰 프리퍼런스 복원 시(`useEffect` 안 `baseFrozen`) `SYSTEM_FROZEN_IDS` 항목을 걸러 저장 상태도 자연 치유되도록 처리.
+- `setFrozenExtras` 호출 시(즉 `AbdColumnOrderMenu`의 `onFrozenChange`) 시스템 고정 키를 사전에 제거하는 래퍼로 감쌈.
+
+### 2. `src/components/abd/raw-data/AbdColumnOrderMenu.tsx`
+
+- `toggleFrozen`에서 `SYSTEM_FROZEN_IDS`(또는 상위에서 내려주는 금지 키 목록)에 해당하는 키는 추가 자체를 금지 — 이미 시스템에 의해 고정되어 있으므로 pin 버튼을 눌러도 무시.
+- 화면상 시스템 고정 컬럼(`sl_no`, `abd_number`)은 "Frozen · Select (고정)" 섹션에 항상 표시되고 pin/unpin 버튼은 노출되지 않도록 정리(이미 사용자가 실수로 넣은 항목을 자연 제거).
+
+### 3. Snag(Defect) Raw Data 동일 패턴 점검
+
+같은 로직이 `DefectRawDataPage`에도 있는지 확인해 동일 버그가 재현되지 않도록 필요 시 같은 방어 로직을 적용. 원본 정책과 동일 방향으로 유지.
+
+## 검증
+
+- 저장된 프리퍼런스에 `frozenExtras: ["plot","sl_no","abd_number"]` 상태에서 페이지 진입 시 헤더 컬럼 수가 37개가 되는지 DOM 확인.
+- 맨 왼쪽 sticky 컬럼이 `sl_no`(width 70) → `abd_number`(width 260) 순서로 정상 렌더되고, 사용자 pin(`plot`)은 그 다음 sticky로 붙는지 확인.
+- 스크롤 시 빈 영역 없이 프리즌 컬럼이 컨테이너 좌측에 붙는지 확인.
+- Columns 메뉴에서 시스템 고정 컬럼은 unpin/제거되지 않는지, 일반 pin/unpin은 정상 동작하는지 확인.

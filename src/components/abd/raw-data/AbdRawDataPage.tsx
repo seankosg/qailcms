@@ -256,7 +256,11 @@ export function AbdRawDataPage() {
       if (s.visibility && typeof s.visibility === "object") {
         for (const [k, v] of Object.entries(s.visibility)) if (valid.has(k)) baseVisibility[k] = !!v;
       }
-      if (Array.isArray(s.frozenExtras)) baseFrozen = s.frozenExtras.filter((k: any) => typeof k === "string" && valid.has(k));
+      if (Array.isArray(s.frozenExtras)) {
+        baseFrozen = s.frozenExtras.filter(
+          (k: any) => typeof k === "string" && valid.has(k) && !SYSTEM_FROZEN_IDS.includes(k),
+        );
+      }
     }
     setColumnSizing(baseSizing);
     setOrder(baseOrder);
@@ -302,9 +306,10 @@ export function AbdRawDataPage() {
   }, [sorting, columnFilters, stateLoaded]);
 
   const orderedKeys = useMemo(() => {
-    const frozenSet = new Set(frozenExtras);
+    const cleanFrozen = frozenExtras.filter((k) => !SYSTEM_FROZEN_IDS.includes(k));
+    const frozenSet = new Set(cleanFrozen);
     const rest = order.filter((k) => !frozenSet.has(k) && !SYSTEM_FROZEN_IDS.includes(k));
-    return [...SYSTEM_FROZEN_IDS, ...frozenExtras, ...rest];
+    return [...SYSTEM_FROZEN_IDS, ...cleanFrozen, ...rest];
   }, [order, frozenExtras]);
 
   const columns = useMemo<ColumnDef<AbdItem>[]>(() => {
@@ -392,9 +397,10 @@ export function AbdRawDataPage() {
             frozenExtras={frozenExtras}
             defaultOrder={cfgDefaultOrder}
             defaultVisibility={cfgDefaultVisibility}
+            systemFrozen={SYSTEM_FROZEN_IDS}
             onOrderChange={setOrder}
             onVisibilityChange={(v) => setVisibility(v)}
-            onFrozenChange={setFrozenExtras}
+            onFrozenChange={(next) => setFrozenExtras(next.filter((k) => !SYSTEM_FROZEN_IDS.includes(k)))}
             isAdmin={isAdmin}
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
