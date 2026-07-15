@@ -512,10 +512,8 @@ function buildDataColumn(
 ): ColumnDef<AbdItem> {
   const filterType =
     DATE_FILTER_FIELDS.has(c.key) ? "date-range" :
-    TEXT_FILTER_FIELDS.has(c.key) ? "text" :
-    FACET_FIELDS.has(c.key) || c.type === "badge" ? "multi-select" :
-    "text";
-  const serverFacet = filterType === "multi-select" ? c.key : null;
+    "multi-select";
+  const serverFacet = c.key;
   const filterOptions = c.key === "latest_status" ? ABD_STATUSES.map((s) => ({ value: s, label: s })) :
     c.key === "plot" ? [{ value: "C", label: "C" }, { value: "D", label: "D" }] :
     c.key === "is_active" ? [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] :
