@@ -1,42 +1,36 @@
-## 원인
+## 요구
 
-DOM을 조사한 결과, ABD Raw Data 테이블에 컬럼이 37개가 아니라 39개가 렌더링되고 있습니다. `sl_no`, `abd_number`가 헤더에 두 번씩 등장합니다.
-
-로컬 저장된 뷰 프리퍼런스에서 `frozenExtras: ["plot", "sl_no", "abd_number"]` 처럼 사용자 핀 목록에 이미 시스템 고정 컬럼(`SYSTEM_FROZEN_IDS = ["sl_no", "abd_number"]`)이 포함되어 있는데, `AbdRawDataPage`의 `orderedKeys`가 다음과 같이 계산됩니다:
-
-```
-[...SYSTEM_FROZEN_IDS, ...frozenExtras, ...rest]
-```
-
-`rest`는 SYSTEM/frozen을 걸러내지만 `frozenExtras` 자체는 그대로 프리펜드되므로 `sl_no`, `abd_number`가 두 번씩 붙어 총 39개가 됩니다.
-
-이어서 `stickyLefts` 맵은 컬럼 ID를 키로 하므로 나중에 나타난 중복 항목이 앞선 좌표를 덮어씁니다. 그 결과 첫 번째 sl_no/abd_number 셀도 `left: 400px` / `470px`로 sticky되어, 원래 있어야 할 0~330px 영역이 완전히 비게 됩니다. 사용자가 본 "맨 왼쪽의 헤더/값 없는 빈 컬럼"의 실체입니다.
+ABD Raw Data에서 `sl_no`, `abd_number`를 시스템으로 강제 고정하지 않고, 다른 컬럼과 동일하게 사용자가 pin/unpin 할 수 있게 한다.
 
 ## 수정 범위
 
 ### 1. `src/components/abd/raw-data/AbdRawDataPage.tsx`
 
-- `orderedKeys` 계산 시 `frozenExtras`에서 `SYSTEM_FROZEN_IDS`를 제거해 중복 방지.
+- `SYSTEM_FROZEN_IDS = ["sl_no", "abd_number"]` → `SYSTEM_FROZEN_IDS = []` (또는 상수 제거하고 관련 참조 모두 `[]`로 대체).
+- `orderedKeys`: 시스템 프리펜드 없이 `frozenExtras` + 나머지로만 구성.
   ```
-  const frozenExtrasClean = frozenExtras.filter(k => !SYSTEM_FROZEN_IDS.includes(k));
-  const rest = order.filter(k => !new Set(frozenExtrasClean).has(k) && !SYSTEM_FROZEN_IDS.includes(k));
-  return [...SYSTEM_FROZEN_IDS, ...frozenExtrasClean, ...rest];
+  const frozenSet = new Set(frozenExtras);
+  const rest = order.filter(k => !frozenSet.has(k));
+  return [...frozenExtras, ...rest];
   ```
-- 뷰 프리퍼런스 복원 시(`useEffect` 안 `baseFrozen`) `SYSTEM_FROZEN_IDS` 항목을 걸러 저장 상태도 자연 치유되도록 처리.
-- `setFrozenExtras` 호출 시(즉 `AbdColumnOrderMenu`의 `onFrozenChange`) 시스템 고정 키를 사전에 제거하는 래퍼로 감쌈.
+- `columnVisibility` 계산에서 "SYSTEM_FROZEN이면 강제 true" 로직 제거. 일반 컬럼과 동일하게 `visibility` 상태를 그대로 반영.
+- `AbdRawTableView`에 넘기는 `frozenColIds` → `frozenExtras` 만 사용.
+- 뷰 프리퍼런스 복원 시 `baseFrozen`에서 SYSTEM 필터 제거(방어 로직 삭제 or 무해).
+- `AbdColumnOrderMenu` 호출부의 `systemFrozen` 프롭 제거, `onFrozenChange`도 그대로 `setFrozenExtras`.
 
 ### 2. `src/components/abd/raw-data/AbdColumnOrderMenu.tsx`
 
-- `toggleFrozen`에서 `SYSTEM_FROZEN_IDS`(또는 상위에서 내려주는 금지 키 목록)에 해당하는 키는 추가 자체를 금지 — 이미 시스템에 의해 고정되어 있으므로 pin 버튼을 눌러도 무시.
-- 화면상 시스템 고정 컬럼(`sl_no`, `abd_number`)은 "Frozen · Select (고정)" 섹션에 항상 표시되고 pin/unpin 버튼은 노출되지 않도록 정리(이미 사용자가 실수로 넣은 항목을 자연 제거).
+- `systemFrozen` 프롭과 관련 렌더 분기(시스템 pin 표시, `toggleFrozen` 시스템 차단)를 제거. `sl_no`, `abd_number`도 다른 컬럼처럼 Columns 목록에서 pin/unpin 가능.
 
-### 3. Snag(Defect) Raw Data 동일 패턴 점검
+### 3. 기본값(defaultOrder / defaultVisibility) 유지
 
-같은 로직이 `DefectRawDataPage`에도 있는지 확인해 동일 버그가 재현되지 않도록 필요 시 같은 방어 로직을 적용. 원본 정책과 동일 방향으로 유지.
+- 처음 진입 사용자에게 여전히 sl_no/abd_number를 왼쪽에 고정된 상태로 보여주려면 `abd_field_config`의 `sort_order`가 이미 낮게 설정되어 있어 컬럼 순서상 앞쪽에 위치. 사용자가 원하면 언제든 pin해서 sticky 고정 가능.
+- 기존 사용자의 저장된 `frozenExtras`에 이미 이 두 키가 들어 있으면 그대로 사용자 pin으로 취급되어 동작.
 
 ## 검증
 
-- 저장된 프리퍼런스에 `frozenExtras: ["plot","sl_no","abd_number"]` 상태에서 페이지 진입 시 헤더 컬럼 수가 37개가 되는지 DOM 확인.
-- 맨 왼쪽 sticky 컬럼이 `sl_no`(width 70) → `abd_number`(width 260) 순서로 정상 렌더되고, 사용자 pin(`plot`)은 그 다음 sticky로 붙는지 확인.
-- 스크롤 시 빈 영역 없이 프리즌 컬럼이 컨테이너 좌측에 붙는지 확인.
-- Columns 메뉴에서 시스템 고정 컬럼은 unpin/제거되지 않는지, 일반 pin/unpin은 정상 동작하는지 확인.
+- 페이지 진입 시 헤더 컬럼 수가 정확히 ABD_COLUMNS 길이(37)와 일치.
+- Columns 메뉴에서 `sl_no`, `abd_number`가 일반 컬럼 목록에 pin 버튼과 함께 나타남.
+- 아무 것도 pin하지 않은 상태에서 좌측 sticky 컬럼이 없고 모든 컬럼이 함께 가로 스크롤됨.
+- `sl_no`를 pin 하면 좌측에 sticky 고정되고, unpin 하면 해제됨(다른 컬럼과 동일 동작).
+- 체크박스 해제로 `sl_no`/`abd_number` 노출도 자유롭게 제어 가능.
