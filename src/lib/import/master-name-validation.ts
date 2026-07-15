@@ -108,3 +108,28 @@ export function applyNameDecisions<Row>(
     }
   }
 }
+
+/**
+ * 미해결 이름 목록을 Import Log note 컬럼에 저장할 수 있는 요약 문자열로 변환.
+ * 형식: `[master-mapping] Subcontractor(3)={A;B;C}; HDEC PIC(1)={D}`
+ * 항목이 없으면 빈 문자열.
+ */
+export function formatUnresolvedNamesNote(
+  entries: readonly UnresolvedNameEntry[],
+  maxPerKind = 10,
+): string {
+  if (entries.length === 0) return "";
+  const byLabel = new Map<string, UnresolvedNameEntry[]>();
+  for (const e of entries) {
+    const arr = byLabel.get(e.fieldLabel) ?? [];
+    arr.push(e);
+    byLabel.set(e.fieldLabel, arr);
+  }
+  const parts: string[] = [];
+  for (const [label, arr] of byLabel) {
+    const names = arr.slice(0, maxPerKind).map((e) => e.rawName).join(";");
+    const overflow = arr.length > maxPerKind ? `;…+${arr.length - maxPerKind}` : "";
+    parts.push(`${label}(${arr.length})={${names}${overflow}}`);
+  }
+  return `[master-mapping] ${parts.join("; ")}`;
+}

@@ -107,6 +107,8 @@ export interface DefectImportFile {
   duplicateGroups?: DuplicateGroup[];
   autoDedupedIdenticalCount?: number;
   aiClassifyEnabled?: boolean;
+  /** 임포트 로그 note 에 추가할 미해결 마스터 이름 요약. */
+  masterMappingNote?: string;
 }
 
 interface CtxValue {
@@ -124,6 +126,7 @@ interface CtxValue {
   startImport: () => Promise<void>;
   setFileAiClassifyEnabled: (id: string, enabled: boolean) => void;
   setFileParsedRows: (id: string, next: ParsedDefectRow[]) => void;
+  setFileMasterMappingNote: (id: string, note: string) => void;
 }
 
 const Ctx = createContext<CtxValue | null>(null);
@@ -501,6 +504,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     [],
   );
 
+  const setFileMasterMappingNote = useCallback(
+    (id: string, note: string) => {
+      setFiles((cur) =>
+        cur.map((f) => (f.id === id ? { ...f, masterMappingNote: note } : f)),
+      );
+    },
+    [],
+  );
+
   const setFileDataDateOverride = useCallback((id: string, date: string | null) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, dataDateOverride: date } : f)));
   }, []);
@@ -704,6 +716,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               : null,
             `duplicate_strategy=${duplicateStrategy}`,
             duplicatesAuto > 0 ? `duplicates_auto=${duplicatesAuto}` : null,
+            f.masterMappingNote ? f.masterMappingNote : null,
           ]
             .filter(Boolean)
             .join(" | ") || null,
@@ -1226,6 +1239,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         startImport,
         setFileAiClassifyEnabled,
         setFileParsedRows,
+        setFileMasterMappingNote,
       }}
     >
       {children}
