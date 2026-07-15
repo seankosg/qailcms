@@ -36,7 +36,7 @@ export function planGroupsForPlot(plot: PlotKey): string[] {
 }
 
 // ── Teams ─────────────────────────────────────────────────────────────
-export const ALL_TEAMS = ["Arch", "Mech", "Elec"] as const;
+export const ALL_TEAMS = ["ARCH", "MECH", "ELEC"] as const;
 export type TeamKey = (typeof ALL_TEAMS)[number];
 
 // ── Room Group (열) ──────────────────────────────────────────────────

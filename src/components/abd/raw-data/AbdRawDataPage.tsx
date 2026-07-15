@@ -118,11 +118,15 @@ function formatDdMmm(v: any): string {
   return `${String(d.getDate()).padStart(2, "0")}-${d.toLocaleString("en", { month: "short" })}-${String(d.getFullYear()).slice(2)}`;
 }
 
-const TAB_TO_TEAM: Record<string, AbdTeam> = { mech: "mech", elec: "elec", arch: "arch" };
+const TAB_TO_TEAM: Record<string, AbdTeam> = {
+  MECH: "MECH", ELEC: "ELEC", ARCH: "ARCH",
+  // 레거시 URL(소문자)도 인식
+  mech: "MECH", elec: "ELEC", arch: "ARCH",
+};
 const TEAM_TABS = [
-  { value: "mech", label: "설비" },
-  { value: "elec", label: "전기" },
-  { value: "arch", label: "건축" },
+  { value: "MECH", label: "MECH" },
+  { value: "ELEC", label: "ELEC" },
+  { value: "ARCH", label: "ARCH" },
 ] as const;
 
 const STATUS_TABS: { value: AbdStatusGroup; label: string }[] = [
@@ -139,7 +143,7 @@ export function AbdRawDataPage() {
   const isAdmin = !!user?.isAdmin;
   const invalidate = useInvalidateAbd();
 
-  const team: AbdTeam = (TAB_TO_TEAM[urlSearch.tab as string] ?? "mech") as AbdTeam;
+  const team: AbdTeam = (TAB_TO_TEAM[urlSearch.tab as string] ?? "MECH") as AbdTeam;
   const statusGroup: AbdStatusGroup = (["all", "approved", "in_progress", "not_started"].includes(urlSearch.status ?? "") ? urlSearch.status : "all") as AbdStatusGroup;
   const includeInactive = !!urlSearch.includeInactive;
   const page = Math.max(1, Number(urlSearch.page) || 1);

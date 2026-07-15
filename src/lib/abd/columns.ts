@@ -26,14 +26,26 @@ export interface AbdColumnDef {
 }
 
 export const ABD_TEAMS = [
-  { value: "mech", label: "설비" },
-  { value: "elec", label: "전기" },
-  { value: "arch", label: "건축" },
+  { value: "MECH", label: "MECH" },
+  { value: "ELEC", label: "ELEC" },
+  { value: "ARCH", label: "ARCH" },
 ] as const;
 export type AbdTeam = (typeof ABD_TEAMS)[number]["value"];
 
-export const TEAM_LABEL: Record<string, string> = { mech: "설비", elec: "전기", arch: "건축" };
+/** UI 표시용 라벨(코드 자체). 한글 라벨은 TEAM_LABEL_KO에서 조회. */
+export const TEAM_LABEL: Record<string, string> = {
+  MECH: "MECH", ELEC: "ELEC", ARCH: "ARCH",
+  // 레거시 호환 (DB에 남아있을 수 있는 소문자)
+  mech: "MECH", elec: "ELEC", arch: "ARCH",
+};
+export const TEAM_LABEL_KO: Record<string, string> = {
+  MECH: "설비", ELEC: "전기", ARCH: "건축",
+};
 export const TEAM_COLORS: Record<string, string> = {
+  MECH: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  ELEC: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  ARCH: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  // 레거시 호환
   mech: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   elec: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   arch: "bg-amber-500/15 text-amber-700 dark:text-amber-300",

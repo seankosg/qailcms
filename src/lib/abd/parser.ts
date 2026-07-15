@@ -91,9 +91,9 @@ function toIsoDate(v: any): string | null {
 
 export function detectTeamFromFilename(name: string): AbdTeam | null {
   const n = name.toUpperCase();
-  if (n.includes("MECH") || n.includes("설비") || n.includes("MECHANICAL")) return "mech";
-  if (n.includes("ELEC") || n.includes("전기") || n.includes("ELECTRICAL")) return "elec";
-  if (n.includes("ARCH") || n.includes("건축") || n.includes("ARCHITECT")) return "arch";
+  if (n.includes("MECH") || n.includes("설비") || n.includes("MECHANICAL")) return "MECH";
+  if (n.includes("ELEC") || n.includes("전기") || n.includes("ELECTRICAL")) return "ELEC";
+  if (n.includes("ARCH") || n.includes("건축") || n.includes("ARCHITECT")) return "ARCH";
   return null;
 }
 
@@ -354,7 +354,7 @@ export async function parseAbdFile(file: File, teamOverride?: AbdTeam | null): P
 
     result.sheets.push({
       sheet_name: name,
-      team: teamFromFilename ?? "mech",
+      team: teamFromFilename ?? "MECH",
       plot: plotFromSheet,
       rows,
       skipped_no_key: skippedNoKey,

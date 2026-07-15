@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-type Team = "mech" | "elec" | "arch";
+type Team = "MECH" | "ELEC" | "ARCH";
 
 interface HeaderMapping {
   id: string;
@@ -108,9 +108,9 @@ function HeaderMappingsTable() {
               <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Teams</SelectItem>
-                <SelectItem value="mech">Mech</SelectItem>
-                <SelectItem value="elec">Elec</SelectItem>
-                <SelectItem value="arch">Arch</SelectItem>
+                <SelectItem value="MECH">MECH</SelectItem>
+                <SelectItem value="ELEC">ELEC</SelectItem>
+                <SelectItem value="ARCH">ARCH</SelectItem>
               </SelectContent>
             </Select>
             <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-56 text-xs" />
@@ -160,7 +160,7 @@ function HeaderMappingsTable() {
 }
 
 function AddMappingDialog({ open, onOpenChange, onAdded }: { open: boolean; onOpenChange: (v: boolean) => void; onAdded: () => void }) {
-  const [team, setTeam] = useState<Team>("mech");
+  const [team, setTeam] = useState<Team>("MECH");
   const [sourceHeader, setSourceHeader] = useState("");
   const [targetField, setTargetField] = useState("");
   const [saving, setSaving] = useState(false);
@@ -186,9 +186,9 @@ function AddMappingDialog({ open, onOpenChange, onAdded }: { open: boolean; onOp
             <Select value={team} onValueChange={(v) => setTeam(v as Team)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="mech">Mech</SelectItem>
-                <SelectItem value="elec">Elec</SelectItem>
-                <SelectItem value="arch">Arch</SelectItem>
+                <SelectItem value="MECH">MECH</SelectItem>
+                <SelectItem value="ELEC">ELEC</SelectItem>
+                <SelectItem value="ARCH">ARCH</SelectItem>
               </SelectContent>
             </Select>
           </div>
