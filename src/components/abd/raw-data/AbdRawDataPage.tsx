@@ -153,7 +153,8 @@ export function AbdRawDataPage() {
 
   const team: AbdTeam = (TAB_TO_TEAM[urlSearch.tab as string] ?? "MECH") as AbdTeam;
   const statusGroup: AbdStatusGroup = (["all", "approved", "in_progress", "not_started"].includes(urlSearch.status ?? "") ? urlSearch.status : "all") as AbdStatusGroup;
-  const includeInactive = !!urlSearch.includeInactive;
+  // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
+  const includeInactive = false;
   const page = Math.max(1, Number(urlSearch.page) || 1);
   const pageSize = PAGE_SIZE_OPTIONS.includes(Number(urlSearch.pageSize)) ? Number(urlSearch.pageSize) : 100;
 
@@ -454,10 +455,6 @@ export function AbdRawDataPage() {
           <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => setSorting([{ id: "sl_no", desc: false }])}>Clear sort ({sorting.length})</Button>
         )}
         <span className="hidden self-center text-xs text-muted-foreground md:inline">Tip: Shift+Click 다중 정렬 · <Filter className="inline h-3 w-3" /> 컬럼 필터</span>
-        <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Checkbox checked={includeInactive} onCheckedChange={(v) => setUrl({ includeInactive: !!v, page: 1 })} className="h-3.5 w-3.5" />
-          비활성 포함
-        </label>
       </div>
 
       <AbdRawTableView
