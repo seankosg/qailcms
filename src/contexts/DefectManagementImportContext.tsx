@@ -818,7 +818,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         // Re-import 확장 필드
         if (p.extra) {
           for (const [k, v] of Object.entries(p.extra)) {
-            // team은 category 자동 매핑이 절대적으로 우선한다. 파일의 team 컬럼은 무시.
+            // team은 위 pickTeam에서 이미 결정되었으므로 여기서 덮어쓰지 않는다.
             if (k === "team") continue;
             if (k === "hdec_verification" && skipVerification) continue;
             put(base, k, v);

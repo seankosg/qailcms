@@ -113,6 +113,8 @@ const FALLBACK_ALIASES: Record<string, string | "skip"> = {
   // Plot / category
   "plot": "plot",
   "plot no": "plot",
+  "team": "team",
+  "팀": "team",
   "category": "category",
   "system type": "system_type",
   "system": "system_type",
@@ -197,7 +199,7 @@ const FALLBACK_ALIASES: Record<string, string | "skip"> = {
 // snake_case DB 컬럼을 그대로 헤더로 사용하는 파일용 identity 매핑.
 // spare_parts_raw 실제 컬럼과 1:1 대응.
 const SNAKE_IDENTITY_FIELDS = [
-  "doc_ref", "plot", "category", "subject", "system_type",
+  "doc_ref", "plot", "team", "category", "subject", "system_type",
   "discipline",
   "approval_code", "approval_status", "revision",
   "supplier", "manufacturer",
