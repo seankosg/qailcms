@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ROLE_RANK, type AppRole, type UserType } from "@/types/enums";
 
 export function useCurrentUser() {
   return useQuery({
@@ -11,22 +12,44 @@ export function useCurrentUser() {
         supabase.from("profiles").select("*").eq("id", authData.user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", authData.user.id),
       ]);
-      const roleSet = new Set((roles ?? []).map((r) => r.role));
+      const roleList = (roles ?? []).map((r) => r.role as string);
+      const roleSet = new Set(roleList);
+      const appRoles = roleList.filter((r): r is AppRole => r in ROLE_RANK);
+      const rank = appRoles.reduce((m, r) => Math.max(m, ROLE_RANK[r] ?? 0), 0);
       const isAdmin = roleSet.has("admin") || roleSet.has("superuser");
-      const isEditor = isAdmin || roleSet.has("user");
+      const isSuperUser = roleSet.has("superuser");
+      const isSeniorUser = roleSet.has("senior_user");
+      const isUser = roleSet.has("user");
+      const isSuperGuest = roleSet.has("super_guest");
+      const isDSuperUser = roleSet.has("d_superuser");
+      const isEditor = isAdmin || isSeniorUser || isUser;
+      const canEdit = rank >= ROLE_RANK.senior_user;
+      const p = (profile ?? {}) as any;
       return {
         id: authData.user.id,
         email: authData.user.email,
         profile,
-        roles: Array.from(roleSet),
+        roles: Array.from(roleSet) as (AppRole | string)[],
+        appRoles,
+        rank,
         isAdmin,
-        isSuperUser: roleSet.has("superuser"),
+        isSuperUser,
+        isSeniorUser,
+        isUser,
+        isSuperGuest,
+        isDSuperUser,
         isEditor,
         isGuest: !isEditor,
-        mustChangePassword: (profile as any)?.must_change_password === true,
-        userType: (profile as any)?.user_type as
-          | "subcontractor" | "hdec" | "pm_pd" | "admin" | undefined,
-        loginId: (profile as any)?.login_id as string | undefined,
+        canEdit,
+        mustChangePassword: p.must_change_password === true,
+        userType: p.user_type as UserType | undefined,
+        loginId: p.login_id as string | undefined,
+        name: (p.name ?? p.display_name ?? null) as string | null,
+        team: (p.team ?? null) as string | null,
+        subcontractor_name: (p.subcontractor_name ?? null) as string | null,
+        subsub_name: (p.subsub_name ?? null) as string | null,
+        hdec_pic_name: (p.hdec_pic_name ?? null) as string | null,
+        hdec_eng_name: (p.hdec_eng_name ?? null) as string | null,
       };
     },
     staleTime: 60_000,
