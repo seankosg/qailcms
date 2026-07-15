@@ -97,7 +97,7 @@ export const createAppUser = createServerFn({ method: "POST" })
       if (data.subsub_name !== undefined) patch.subsub_name = data.subsub_name;
       if (data.hdec_eng_name !== undefined) patch.hdec_eng_name = data.hdec_eng_name;
       if (Object.keys(patch).length) {
-        await supabaseAdmin.from("profiles").update(patch).eq("id", created.user.id);
+        await supabaseAdmin.from("profiles").update(patch as any).eq("id", created.user.id);
       }
     }
     return { id: created?.user?.id };
