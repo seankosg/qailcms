@@ -33,8 +33,29 @@ export interface TmColumnDef {
   options?: string[];
 }
 
-export const DISCIPLINES = ["건축", "전기", "설비"] as const;
+export const DISCIPLINES = ["ARCH", "ELEC", "MECH", "DESN", "PRJC"] as const;
 export type Discipline = (typeof DISCIPLINES)[number];
+
+/** 코드 → 한글 표시 라벨 (툴팁/부가 설명용). UI 기본 표시는 코드 자체. */
+export const DISCIPLINE_LABEL_KO: Record<Discipline, string> = {
+  ARCH: "건축",
+  MECH: "설비",
+  ELEC: "전기",
+  DESN: "설계",
+  PRJC: "공무",
+};
+
+/** 레거시 값(한글/PascalCase/소문자) → 대문자 코드로 정규화. */
+const DISCIPLINE_NORMALIZE: Record<string, Discipline> = {
+  "건축": "ARCH", "설비": "MECH", "전기": "ELEC", "설계": "DESN", "공무": "PRJC",
+  Arch: "ARCH", Mech: "MECH", Elec: "ELEC", Desn: "DESN", Prjc: "PRJC",
+  arch: "ARCH", mech: "MECH", elec: "ELEC", desn: "DESN", prjc: "PRJC",
+  ARCH: "ARCH", MECH: "MECH", ELEC: "ELEC", DESN: "DESN", PRJC: "PRJC",
+};
+export function normalizeDiscipline(v: string | null | undefined): Discipline | null {
+  if (!v) return null;
+  return DISCIPLINE_NORMALIZE[String(v).trim()] ?? null;
+}
 
 export const ROW_TYPES = ["항목", "실행", "승인", "대기"] as const;
 export const STATUS_MANUAL = ["예정", "진행", "완료"] as const;
@@ -77,6 +98,12 @@ export const PLOT_COLORS: Record<string, string> = {
 };
 
 export const DISCIPLINE_COLORS: Record<string, string> = {
+  ARCH: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  ELEC: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  MECH: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  DESN: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  PRJC: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  // 레거시 호환
   "건축": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   "전기": "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   "설비": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
