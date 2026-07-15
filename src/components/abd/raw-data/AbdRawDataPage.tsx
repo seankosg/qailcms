@@ -157,6 +157,8 @@ export function AbdRawDataPage() {
   const matchedTeam = teamOptions.find((t) => t.code.toUpperCase() === rawTab);
   const team: AbdTeam = ((matchedTeam?.code ?? teamOptions[0]?.code ?? "MECH") as unknown) as AbdTeam;
   const statusGroup: AbdStatusGroup = (["all", "approved", "in_progress", "not_started"].includes(urlSearch.status ?? "") ? urlSearch.status : "all") as AbdStatusGroup;
+  const plotSel: "all" | "C" | "D" = (["all", "C", "D"].includes(String(urlSearch.plot ?? "")) ? (urlSearch.plot as any) : "all");
+  const plotFilter: "C" | "D" | null = plotSel === "all" ? null : plotSel;
   // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
   const includeInactive = false;
   const page = Math.max(1, Number(urlSearch.page) || 1);
@@ -221,13 +223,13 @@ export function AbdRawDataPage() {
   const q = (urlSearch.q ?? "").trim();
 
   const { data: itemsData, isFetching, refetch } = useAbdItemsQuery({
-    team, statusGroup, includeInactive, q, filters: serverFilters, sort: serverSort, page, pageSize,
+    team, statusGroup, includeInactive, plot: plotFilter, q, filters: serverFilters, sort: serverSort, page, pageSize,
   });
   const rows = itemsData?.rows ?? [];
   const total = itemsData?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
-  const { data: counts } = useAbdCounts({ team, includeInactive });
+  const { data: counts } = useAbdCounts({ team, includeInactive, plot: plotFilter });
   const dataDate = counts?.latest_data_date ?? null;
 
   // Restore view preferences
@@ -320,10 +322,10 @@ export function AbdRawDataPage() {
     for (const id of orderedKeys) {
       const c = byKey.get(id);
       if (!c) continue;
-      cols.push(buildDataColumn(c, team, statusGroup, includeInactive, canEditRow, () => refetch()));
+      cols.push(buildDataColumn(c, team, statusGroup, includeInactive, plotFilter, canEditRow, () => refetch()));
     }
     return cols;
-  }, [orderedKeys, team, statusGroup, includeInactive, canEditRow, refetch]);
+  }, [orderedKeys, team, statusGroup, includeInactive, plotFilter, canEditRow, refetch]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = {};
@@ -412,15 +414,25 @@ export function AbdRawDataPage() {
         </div>
       </header>
 
-      <Tabs value={team} onValueChange={(v) => setUrl({ tab: v, page: 1 })}>
-        <TabsList className="h-9">
-          {teamTabs.map((t) => (
-            <TabsTrigger key={t.value} value={t.value} className="text-xs">
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center gap-3">
+        <Tabs value={plotSel} onValueChange={(v) => setUrl({ plot: v, page: 1 })}>
+          <TabsList className="h-9">
+            <TabsTrigger value="all" className="text-xs">All Plots</TabsTrigger>
+            <TabsTrigger value="C" className="text-xs">PLOT C</TabsTrigger>
+            <TabsTrigger value="D" className="text-xs">PLOT D</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="h-6 w-px bg-border" aria-hidden />
+        <Tabs value={team} onValueChange={(v) => setUrl({ tab: v, page: 1 })}>
+          <TabsList className="h-9">
+            {teamTabs.map((t) => (
+              <TabsTrigger key={t.value} value={t.value} className="text-xs">
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Tabs value={statusGroup} onValueChange={(v) => setUrl({ status: v, page: 1 })}>
@@ -492,7 +504,7 @@ export function AbdRawDataPage() {
         onOpenChange={setExportOpen}
         getRows={() => rows}
         columnHeaders={ABD_COLUMNS.map((c) => ({ key: c.key, label: c.label }))}
-        filenamePrefix={`abd-${team}`}
+        filenamePrefix={plotFilter ? `abd-${team}-plot${plotFilter}` : `abd-${team}`}
       />
       <AbdDetailSheet
         id={(urlSearch.detail as string) || null}
@@ -508,6 +520,7 @@ function buildDataColumn(
   team: AbdTeam,
   statusGroup: AbdStatusGroup,
   includeInactive: boolean,
+  plot: "C" | "D" | null,
   canEditRow: (row: AbdItem) => boolean,
   refetch: () => void,
 ): ColumnDef<AbdItem> {
@@ -525,7 +538,7 @@ function buildDataColumn(
     header: c.label,
     size: c.width,
     enableSorting: true,
-    meta: { filterType, filterOptions, serverFacet, team, statusGroup, includeInactive, origin: c.origin ?? "system" },
+    meta: { filterType, filterOptions, serverFacet, team, statusGroup, includeInactive, plot, origin: c.origin ?? "system" },
     cell: ({ row, getValue }) => {
       const v: any = getValue();
       const display = renderAbdCell(c, v, row.original);

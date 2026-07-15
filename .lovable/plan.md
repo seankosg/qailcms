@@ -1,108 +1,65 @@
-# Phase 4 계획 (확정): Import 파이프라인 Team 정합성 · 유사 매칭 · 신규 Team 등록
+# ABD Raw Data — PLOT C/D 필터 토글 추가
 
-사용자 선택 반영: **Q1=B (별칭 DB화), Q2=A (임계값 0.85 + 개별 승인), Q3=A (spare_parts_raw도 파서에 team 감지 포함)**
+Team 탭(MECH/ELEC/ARCH…) 왼쪽에 PLOT C / PLOT D 토글을 배치하고, 선택 상태에 따라 하부 상태별 통계(All/Approved/In-progress/Not-started) 카운트와 테이블 행이 모두 연동되도록 합니다.
 
-## 1. DB 마이그레이션 — team_master 별칭 컬럼 추가
+## 동작 사양
 
-- `alter table public.team_master add column aliases text[] not null default '{}'`
-- `create index idx_team_master_aliases on public.team_master using gin (aliases)`
-- 기존 시딩 데이터 보정 (data 마이그레이션): `MECH → {설비, MECHANICAL}`, `ELEC → {전기, ELECTRICAL}`, `ARCH → {건축, ARCHITECT, ARCHITECTURAL}`
-- `validate_team_code` 트리거는 그대로 (code 컬럼만 검증하며 별칭과는 무관).
+- 초기값: **All Plots**(전체). URL `plot` 파라미터 부재 시 필터 미적용.
+- 토글 옵션: `All` / `C` / `D` — 하나만 선택 가능한 세그먼트 탭.
+- URL 상태 반영: `?plot=C|D` (All이면 파라미터 생략). 페이지 이동/공유 시 상태 유지.
+- Team 탭 · Status 탭 · 서버 필터 · 검색어와 AND로 결합.
+- Team 전환 시 plot 선택은 유지 (사용자가 직접 해제할 때까지).
 
-## 2. Master UI 확장 — 별칭 편집
+## 변경 범위
 
-- `src/routes/_authenticated/admin/masters.tsx` Team 탭에 **별칭(aliases)** 인라인 편집 컬럼 추가
-  - 쉼표 구분 문자열 ↔ `text[]` 변환
-  - 저장 시 대문자 canonicalize + 중복 제거 + 자기 자신 코드 제외
-- `src/lib/admin/users.functions.ts`의 `updateMasterFields`("team")에서 `aliases` 필드 처리 지원
+### 1) DB 마이그레이션 — 3개 RPC에 `_plot` 파라미터 추가
 
-## 3. 신규 유틸리티
+신규 마이그레이션 1개로 아래 3개 함수를 `CREATE OR REPLACE`:
 
-- `src/lib/team/team-master.ts`에 확장
-  - `TeamOption` 인터페이스에 `aliases: string[]` 추가
-  - `matchTeamCode(raw, options)` — 코드 정확 일치 → 별칭 일치(대소문자 무관) 순서로 매칭
-  - `detectTeamFromText(text, options)` — 파일명/시트값에서 옵션의 code나 aliases가 포함되는지 검사
-- `src/lib/import/fuzzy-master-match.ts` **신규**
-  - `normalizeName(s)` — trim, 다중 공백 축약, 전각→반각, casefold
-  - `levenshtein(a, b)` — 순수 함수
-  - `similarity(a, b) → 0..1` — 편집거리 기반
-  - `matchMasterName(raw, options, {threshold=0.85})` → `{ exact: MasterOption | null, candidates: Array<{option, score}> }` (상위 3개)
-- `src/lib/import/team-validation.ts` **신규**
-  - `collectUnknownTeamCodes(rows, teamOptions)`
-  - `canonicalizeTeamOnRows(rows, teamOptions)` — 정규화 결과와 unknown 목록 동시 반환
+- `abd_items_search(..., _plot text DEFAULT NULL, ...)` — `_where`에 `plot = _plot` 조건 추가
+- `abd_items_counts(_team, _include_inactive, _plot text DEFAULT NULL)` — WHERE에 `(_plot IS NULL OR plot = _plot)` 추가
+- `abd_items_facets(_column, _team, _status_group, _include_inactive, _plot text DEFAULT NULL)` — `_where`에 동일 조건 추가
 
-## 4. 파서 동적화
+`_plot`은 `'C' | 'D' | NULL`만 유효. NULL이면 필터 미적용.
 
-**4종 모두** `TeamOption[]`을 파라미터로 받도록 서명 변경:
+### 2) 클라이언트 훅 — `src/hooks/useAbdItems.ts`
 
-- `src/lib/abd/parser.ts`
-  - `detectTeamFromFilename(name, teamOptions)` — 하드코딩된 MECH/ELEC/ARCH 검사 제거, `detectTeamFromText` 위임
-  - `parseAbdFile(file, teamOptions, teamOverride?)`
-  - `?? "MECH"` fallback 제거 → team=null 허용 후 검증 단계에서 처리
-- `src/lib/defect-management/parser.ts` — team 감지에 옵션 주입, 하드코딩 제거
-- `src/lib/task-management/parser.ts` — 동일
-- `src/lib/spare-part-import-parser.ts` — 헤더에 team 컬럼이 있으면 감지·정규화 (컬럼 부재 시 무시)
+- `AbdItemsQueryParams` / `useAbdCounts` opts / `useAbdFacet` opts에 `plot?: "C" | "D" | null` 추가
+- 각 RPC 호출에 `_plot: p.plot ?? null` 전달
+- `queryKey`에 자동 포함(객체 통째로 사용 중이라 자동 반영됨)
 
-## 5. Import 화면 확장
+### 3) 라우트 검색 스키마 — `src/routes/_authenticated/closure/abd/raw-data.tsx`
 
-`/import-log/import` (또는 각 도메인별 import 진입점):
+`abdRawDataSearchSchema`에 다음 추가:
 
-- `useTeamOptions()` 훅 사용해 파서 호출 시점에 옵션 주입
-- 파싱 후 파이프라인:
-  1. **team 검증**: 미등록 코드 목록 계산 → 있으면 `TeamRegisterDialog` 표시
-     - admin/superuser: 신규 등록 폼(code, name, sort_order, aliases) → `addMasterName("team", ...)` → invalidate → 재계산
-     - 비관리자: "관리자에게 문의" 배너 표시 후 Import 차단
-  2. **마스터 이름 정합성**: Subcontractor / Sub-Sub / HDEC PIC / Eng 대상으로 `matchMasterName` 실행
-     - 정확 일치는 자동 통과
-     - 유사 후보(score ≥ 0.85)가 있으면 `MasterMappingDialog`에서 사용자가 개별 승인
-       - "이 후보로 매핑" / "신규 등록"(admin) / "건너뛰기(원본 유지)"
-     - 후보 없으면 admin은 신규 등록, 비관리자는 원본 유지 경고
-  3. rows 재작성 후 서버 upsert 호출
-- `Import Logs`(각 도메인의 `*_import_logs`) 사유 필드에 미해결 team/master 목록 기록
+```ts
+plot: fallback(z.enum(["all","C","D"]), "all").default("all"),
+```
 
-**신규 컴포넌트**
-- `src/components/import/TeamRegisterDialog.tsx`
-- `src/components/import/MasterMappingDialog.tsx`
+### 4) 페이지 UI — `src/components/abd/raw-data/AbdRawDataPage.tsx`
 
-## 6. 검증
+- `urlSearch.plot`를 읽어 `plotFilter: "C" | "D" | null` 계산 (`"all"` → null)
+- `useAbdItemsQuery` / `useAbdCounts` / `useAbdFacet` 호출에 `plot: plotFilter` 전달
+- Team `<Tabs>` 바로 왼쪽에 새로운 `<Tabs value={urlSearch.plot} onValueChange={(v)=>setUrl({plot:v, page:1})}>` 배치:
+  - `All Plots` / `PLOT C` / `PLOT D`
+  - 기존 Team 탭과 같은 `h-9` 높이의 `TabsList`, 시각적 구분을 위해 오른쪽에 얇은 세로 구분선(`border-l`)
+- 레이아웃: Team Tabs 라인을 `flex items-center gap-3`로 감싸 왼쪽=Plot, 오른쪽=Team 순 배치 (기존 Team 탭 순서/스타일은 유지)
+- `viewPref` 키는 그대로 유지 (팀 단위 저장, plot은 세션 필터로만 취급)
+- `filenamePrefix`: plot 선택 시 `abd-${team}-plot${plot}` 로 확장
 
-- 타입체크: `tsgo`
+### 5) 검증
+
+- `tsgo --noEmit` 통과
 - 스모크:
-  1. 파일명에 `PLUMB` 포함된 ABD 파일 → 다이얼로그에서 신규 team `PLUMB` (별칭 `배관`) 등록 → 재시도 성공
-  2. 별칭 `설비` 포함 파일 → team=MECH로 자동 매칭
-  3. 오타 Subcontractor(`삼성이앤씨` vs `삼성E&C`) → 유사 후보 표시 → 사용자 승인 → 정상 저장
-  4. 비관리자가 미등록 team 감지 파일 Import → 차단 및 안내
-  5. 기존 `MECH/ELEC/ARCH` 파일 회귀 없음
+  1. All Plots → 카운트/테이블 = 기존 값 그대로 (회귀 없음)
+  2. PLOT C 선택 → All/Approved/In-progress/Not-started 카운트가 C 한정으로 감소, 테이블도 C만 표시
+  3. PLOT D 선택 → 마찬가지로 D 한정
+  4. Team 전환 시 plot 유지, URL에 반영
+  5. 컬럼 filter dropdown facet(plot 컬럼 제외한 서비스/PIC 등)도 plot 필터 적용된 값으로 표시
 
-## 실행 순서
+## 비변경 사항
 
-1. **마이그레이션**: `team_master.aliases` 컬럼 + 인덱스 + 기존 3건 데이터 보정
-2. `team-master.ts` 확장, `fuzzy-master-match.ts`/`team-validation.ts` 신규
-3. Master UI(Team 탭) 별칭 편집 추가
-4. 4종 파서 서명 및 감지 로직 동적화
-5. Import 화면 파이프라인 + 2종 다이얼로그
-6. 타입체크·스모크
+- ABD 이외 도메인(Snag/Task/SP) UI 변경 없음
+- `abd_items_raw` 스키마·컬럼 변경 없음
+- 기존 Team 탭·Status 탭·검색/필터/정렬 동작은 그대로
 
-## 다음 단계 예고
-
-Phase 5: 각 Raw Data 화면(ABD, Snag, SP, Task)의 Team 필터/편집 UI를 `useTeamOptions()`로 치환 및 `canEditRawRow` 적용.
-
----
-
-# Phase 5 진행 기록 (Snag → ABD → Task → SP)
-
-- **Snag(Defect)**: `useTeamOptions()`로 편집용 team 옵션 동적화 (bulk edit + EditCellPopover). `canEditRawRow(user, "defect_items_raw", row)`로 셀 편집 가시성 결정. `DEFECT_TEAMS` import 제거.
-- **ABD**: 상단 Team 탭을 `useTeamOptions()`로 동적화 (`TEAM_TABS`/`TAB_TO_TEAM` 하드코딩 제거). `canEditRawRow(user, "abd_items_raw", row)`로 `AbdEditCellPopover` 렌더링 게이트 치환.
-- **Task**: 파생/집계 위주 페이지로 셀 인라인 편집 없음. 부모 행의 "하위 태스크 추가" 버튼을 `canEditRawRow(user, "task_management_raw", row)`로 per-row 게이트 적용. 전역 admin 버튼(Rollup/Judgment/임계값 링크)은 기존 `isAdmin` 유지.
-- **SP(Spare Part)**: Raw Data 페이지에 per-row 인라인 편집 UI 부재. Team 필터 탭도 없음 (도메인 스키마상 필요 없음). Bulk 편집·ColumnOrderMenu는 기존 `isAdmin` 유지. UI 변경 없음.
-
-**서버 재검증**은 각 도메인 mutation의 `assertCanEdit`에서 이미 처리 (사용자 선택: UI-only).
-
-## Phase 5 마무리
-
-- 4개 도메인(Snag/ABD/Task/SP) 모두 `useTeamOptions()` 치환 및 `canEditRawRow` per-row 게이트 반영 완료.
-- `tsgo --noEmit` 통과 (에러 0건).
-- 서버 mutation 측 권한 재검증(`assertCanEdit`)이 이미 존재하므로 UI-only 치환으로 스코프 종료.
-- 하드코딩 team 상수(`DEFECT_TEAMS`, `TEAM_TABS`, `TAB_TO_TEAM`) 참조 제거 확인.
-
-**Phase 5 종료.** 다음 Phase는 사용자 요청 시 정의.

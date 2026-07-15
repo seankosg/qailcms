@@ -2302,44 +2302,91 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      abd_items_counts: {
-        Args: { _include_inactive?: boolean; _team?: string }
-        Returns: {
-          approved_count: number
-          in_progress_count: number
-          latest_data_date: string
-          not_started_count: number
-          total_count: number
-        }[]
-      }
-      abd_items_facets: {
-        Args: {
-          _column: string
-          _include_inactive?: boolean
-          _status_group?: string
-          _team?: string
-        }
-        Returns: {
-          cnt: number
-          value: string
-        }[]
-      }
-      abd_items_search: {
-        Args: {
-          _filters?: Json
-          _include_inactive?: boolean
-          _limit?: number
-          _offset?: number
-          _q?: string
-          _sort?: Json
-          _status_group?: string
-          _team?: string
-        }
-        Returns: {
-          rows: Json
-          total_count: number
-        }[]
-      }
+      abd_items_counts:
+        | {
+            Args: { _include_inactive?: boolean; _team?: string }
+            Returns: {
+              approved_count: number
+              in_progress_count: number
+              latest_data_date: string
+              not_started_count: number
+              total_count: number
+            }[]
+          }
+        | {
+            Args: {
+              _include_inactive?: boolean
+              _plot?: string
+              _team?: string
+            }
+            Returns: {
+              approved_count: number
+              in_progress_count: number
+              latest_data_date: string
+              not_started_count: number
+              total_count: number
+            }[]
+          }
+      abd_items_facets:
+        | {
+            Args: {
+              _column: string
+              _include_inactive?: boolean
+              _status_group?: string
+              _team?: string
+            }
+            Returns: {
+              cnt: number
+              value: string
+            }[]
+          }
+        | {
+            Args: {
+              _column: string
+              _include_inactive?: boolean
+              _plot?: string
+              _status_group?: string
+              _team?: string
+            }
+            Returns: {
+              cnt: number
+              value: string
+            }[]
+          }
+      abd_items_search:
+        | {
+            Args: {
+              _filters?: Json
+              _include_inactive?: boolean
+              _limit?: number
+              _offset?: number
+              _q?: string
+              _sort?: Json
+              _status_group?: string
+              _team?: string
+            }
+            Returns: {
+              rows: Json
+              total_count: number
+            }[]
+          }
+        | {
+            Args: {
+              _filters?: Json
+              _include_inactive?: boolean
+              _limit?: number
+              _offset?: number
+              _plot?: string
+              _q?: string
+              _sort?: Json
+              _status_group?: string
+              _team?: string
+            }
+            Returns: {
+              rows: Json
+              total_count: number
+            }[]
+          }
       allocate_task_no: {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: string
