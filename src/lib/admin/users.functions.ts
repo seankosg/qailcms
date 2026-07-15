@@ -2,7 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const DUMMY_EMAIL_DOMAIN = "qail.local";
-export const DEFAULT_INITIAL_PASSWORD = "qail2026";
+/** @deprecated Phase 2 이후 DEFAULT_PASSWORD 사용. 하위호환용 유지. */
+export const DEFAULT_INITIAL_PASSWORD = "Qail@2026!";
 
 async function assertAdmin(supabase: any, userId: string) {
   const { data, error } = await supabase.rpc("has_any_role", {
@@ -13,8 +14,15 @@ async function assertAdmin(supabase: any, userId: string) {
   if (!data) throw new Error("관리자 권한이 필요합니다.");
 }
 
-type UserType = "subcontractor" | "hdec" | "pm_pd" | "admin";
-type AppRole = "guest" | "user" | "superuser" | "admin";
+type UserType = "subcontractor" | "hdec" | "pm_pd" | "admin" | "subsub" | "guest";
+type AppRole =
+  | "admin"
+  | "superuser"
+  | "senior_user"
+  | "user"
+  | "super_guest"
+  | "guest"
+  | "d_superuser";
 
 export const listAppUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -23,7 +31,7 @@ export const listAppUsers = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profiles, error } = await supabaseAdmin
       .from("profiles")
-      .select("id,email,display_name,login_id,user_type,subcontractor_name,hdec_pic_name,must_change_password,is_active,created_at")
+      .select("id,email,display_name,name,login_id,user_type,team,subcontractor_name,subsub_name,hdec_pic_name,hdec_eng_name,must_change_password,is_active,created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id,role");
@@ -44,8 +52,12 @@ export const createAppUser = createServerFn({ method: "POST" })
     user_type: UserType;
     role: AppRole;
     temp_password: string;
+    name?: string | null;
+    team?: string | null;
     subcontractor_name?: string | null;
+    subsub_name?: string | null;
     hdec_pic_name?: string | null;
+    hdec_eng_name?: string | null;
   }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
@@ -62,9 +74,13 @@ export const createAppUser = createServerFn({ method: "POST" })
       user_metadata: {
         login_id: loginId,
         display_name: data.display_name,
+        name: data.name ?? data.display_name ?? null,
         user_type: data.user_type,
+        team: data.team ?? null,
         subcontractor_name: data.subcontractor_name ?? null,
+        subsub_name: data.subsub_name ?? null,
         hdec_pic_name: data.hdec_pic_name ?? null,
+        hdec_eng_name: data.hdec_eng_name ?? null,
         role: data.role,
         must_change_password: true,
       },
@@ -74,6 +90,15 @@ export const createAppUser = createServerFn({ method: "POST" })
     if (created?.user) {
       await supabaseAdmin.from("user_roles").delete().eq("user_id", created.user.id);
       await supabaseAdmin.from("user_roles").insert({ user_id: created.user.id, role: data.role });
+      // metadata → profiles 반영이 신규 컬럼을 커버하지 않을 수 있어 명시적으로 보강.
+      const patch: Record<string, any> = {};
+      if (data.name !== undefined) patch.name = data.name;
+      if (data.team !== undefined) patch.team = data.team;
+      if (data.subsub_name !== undefined) patch.subsub_name = data.subsub_name;
+      if (data.hdec_eng_name !== undefined) patch.hdec_eng_name = data.hdec_eng_name;
+      if (Object.keys(patch).length) {
+        await supabaseAdmin.from("profiles").update(patch as any).eq("id", created.user.id);
+      }
     }
     return { id: created?.user?.id };
   });
@@ -111,9 +136,13 @@ export const updateUserProfileFields = createServerFn({ method: "POST" })
   .inputValidator((input: {
     user_id: string;
     display_name?: string;
+    name?: string | null;
     user_type?: UserType;
+    team?: string | null;
     subcontractor_name?: string | null;
+    subsub_name?: string | null;
     hdec_pic_name?: string | null;
+    hdec_eng_name?: string | null;
     is_active?: boolean;
   }) => input)
   .handler(async ({ data, context }) => {

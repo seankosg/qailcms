@@ -1518,6 +1518,7 @@ export type Database = {
           subject: string | null
           supplier: string | null
           system_type: string | null
+          team: string | null
           updated_at: string
           updated_by: string | null
           warranty_available: boolean | null
@@ -1602,6 +1603,7 @@ export type Database = {
           subject?: string | null
           supplier?: string | null
           system_type?: string | null
+          team?: string | null
           updated_at?: string
           updated_by?: string | null
           warranty_available?: boolean | null
@@ -1686,6 +1688,7 @@ export type Database = {
           subject?: string | null
           supplier?: string | null
           system_type?: string | null
+          team?: string | null
           updated_at?: string
           updated_by?: string | null
           warranty_available?: boolean | null
