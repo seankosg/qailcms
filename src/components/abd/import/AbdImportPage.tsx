@@ -48,6 +48,7 @@ interface FileEntry {
     total: number;
   };
   progress?: number;
+  allowDuplicates?: boolean;
 }
 
 const statusBadge: Record<Status, { label: string; cls: string }> = {
@@ -135,7 +136,9 @@ export function AbdImportPage() {
   const clearAll = () => setEntries([]);
 
   const isReady = (e: FileEntry) =>
-    e.status === "ready" && !!e.team && (e.parsed?.duplicates_in_file.length ?? 0) === 0;
+    e.status === "ready" &&
+    !!e.team &&
+    ((e.parsed?.duplicates_in_file.length ?? 0) === 0 || !!e.allowDuplicates);
   const readyCount = entries.filter(isReady).length;
   const isRunning = busy;
 
@@ -159,6 +162,7 @@ export function AbdImportPage() {
               data_date: new Date().toISOString().slice(0, 10),
               rows,
               inactivate_missing: true,
+              allow_duplicates: !!e.allowDuplicates,
             } as any,
           });
           agg.inserted += res.inserted;
@@ -283,6 +287,17 @@ export function AbdImportPage() {
           onOpenChange={(o) => setDupOpenId(o ? e.id : null)}
           fileName={e.file.name}
           duplicates={e.parsed?.duplicates_in_file ?? []}
+          allowed={!!e.allowDuplicates}
+          onAllow={() =>
+            setEntries((p) =>
+              p.map((x) => (x.id === e.id ? { ...x, allowDuplicates: true } : x)),
+            )
+          }
+          onRevoke={() =>
+            setEntries((p) =>
+              p.map((x) => (x.id === e.id ? { ...x, allowDuplicates: false } : x)),
+            )
+          }
         />
       ))}
     </div>
@@ -358,21 +373,28 @@ function FileRow({
               </p>
             )}
             {dupGroups.length > 0 && (
-              <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+              <div className={`mt-2 flex items-start gap-2 rounded border p-2 text-xs ${
+                e.allowDuplicates
+                  ? "border-amber-400/60 bg-amber-100/40 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+                  : "border-destructive/40 bg-destructive/10 text-destructive"
+              }`}>
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <div className="flex-1">
                   <div className="font-medium">
-                    중복 {dupGroups.length}건 ({dupRowCount}행) — 임포트 차단
+                    중복 {dupGroups.length}건 ({dupRowCount}행){" "}
+                    {e.allowDuplicates ? "— 허용됨 (마지막 행 우선)" : "— 임포트 차단"}
                   </div>
                   <div className="mt-0.5 text-[11px]">
-                    동일 ABD_NUMBER 가 반복됩니다. 원본을 수정한 뒤 다시 업로드하세요.
+                    {e.allowDuplicates
+                      ? "동일 ABD_NUMBER 는 파일의 마지막 등장 행으로 저장됩니다."
+                      : "동일 ABD_NUMBER 가 반복됩니다. 상세를 확인 후 원본을 수정하거나 중복 허용을 선택하세요."}
                   </div>
                   <button
                     type="button"
                     onClick={onOpenDuplicates}
                     className="mt-1 text-[11px] font-medium underline hover:no-underline"
                   >
-                    중복 상세 보기
+                    중복 상세 보기 / 처리 방식 선택
                   </button>
                 </div>
               </div>

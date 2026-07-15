@@ -21,6 +21,9 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   fileName: string;
   duplicates: DuplicateGroup[];
+  allowed?: boolean;
+  onAllow?: () => void;
+  onRevoke?: () => void;
 }
 
 function toTsv(dups: DuplicateGroup[]): string {
@@ -49,7 +52,7 @@ function toCsv(dups: DuplicateGroup[]): string {
   return lines.join("\n");
 }
 
-export function AbdDuplicateReviewDialog({ open, onOpenChange, fileName, duplicates }: Props) {
+export function AbdDuplicateReviewDialog({ open, onOpenChange, fileName, duplicates, allowed, onAllow, onRevoke }: Props) {
   const totalRows = useMemo(() => duplicates.reduce((s, g) => s + g.occurrences.length, 0), [duplicates]);
 
   const copyTsv = async () => {
@@ -80,7 +83,9 @@ export function AbdDuplicateReviewDialog({ open, onOpenChange, fileName, duplica
           <DialogTitle className="text-base">중복된 ABD_NUMBER — {duplicates.length}건 ({totalRows}행)</DialogTitle>
           <DialogDescription className="text-xs">
             {fileName} 파일 내에 동일한 <code>ABD_NUMBER</code> 가 2회 이상 등장합니다.
-            원본 엑셀에서 중복 행을 수정한 뒤 다시 업로드하세요.
+            아래 상세 목록을 확인한 뒤, <b>원본 엑셀을 수정하고 재업로드</b>하거나
+            <b> 중복을 허용하고 그대로 임포트</b>할 수 있습니다.
+            중복 허용 시 동일 <code>ABD_NUMBER</code> 는 파일의 <b>마지막 등장 행</b>으로 저장됩니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -120,7 +125,33 @@ export function AbdDuplicateReviewDialog({ open, onOpenChange, fileName, duplica
               <Download className="mr-1 h-3.5 w-3.5" /> CSV 다운로드
             </Button>
           </div>
-          <Button size="sm" onClick={() => onOpenChange(false)}>닫기</Button>
+          <div className="flex gap-2">
+            {allowed ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onRevoke?.();
+                  onOpenChange(false);
+                }}
+              >
+                중복 허용 취소
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  onAllow?.();
+                  onOpenChange(false);
+                }}
+                disabled={!onAllow}
+              >
+                중복 허용하고 진행 (마지막 행 우선)
+              </Button>
+            )}
+            <Button size="sm" onClick={() => onOpenChange(false)}>닫기</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
