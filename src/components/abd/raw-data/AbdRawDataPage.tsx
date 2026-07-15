@@ -602,17 +602,17 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick }:
 
   const stickyBg = (row: AbdItem, index: number): string => {
     const inactive = !row.is_active;
-    // 스티키 컬럼은 항상 완전 불투명. 상태 오버레이는 2겹 gradient로 스택하여
-    // 반투명이어도 아래 불투명 베이스가 뒤 컬럼을 확실히 가림.
-    const base = "hsl(var(--background))";
-    const baseLayer = `linear-gradient(${base}, ${base})`;
-    if (hoveredIndex === index) {
-      return `linear-gradient(hsl(var(--muted) / 0.5), hsl(var(--muted) / 0.5)), ${baseLayer}`;
-    }
-    if (inactive) {
-      return `linear-gradient(hsl(var(--muted) / 0.3), hsl(var(--muted) / 0.3)), ${baseLayer}`;
-    }
-    return base;
+    // 스티키 컬럼은 항상 완전 불투명이어야 스크롤 시 뒤 컬럼이 비쳐 보이지 않는다.
+    // 주의:
+    //  - 프로젝트 컬러 토큰은 oklch(...) 리터럴이므로 hsl(var(--token)) 래핑은 무효값이 되어 painting 되지 않는다. var(--token) 을 그대로 사용.
+    //  - `background: <color>, linear-gradient(...)` 다중 레이어 문법은 첫 레이어가 <bg-image> 여야 유효하므로,
+    //    color-mix() 결과를 그냥 나열하면 declaration 전체가 무효가 된다. 단일 색상 값으로 반환한다.
+    //  - 두 operand 모두 완전 불투명이므로 color-mix 결과도 완전 불투명이다.
+    if (hoveredIndex === index)
+      return "color-mix(in oklab, var(--muted) 95%, var(--background))";
+    if (inactive)
+      return "color-mix(in oklab, var(--muted) 45%, var(--background))";
+    return "var(--background)";
   };
 
   return (
