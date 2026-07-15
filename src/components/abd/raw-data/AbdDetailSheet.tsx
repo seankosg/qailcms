@@ -19,8 +19,6 @@ interface AbdItemRow {
   latest_status: string | null;
   approval_date: string | null;
   is_active: boolean;
-  field_mismatch: boolean;
-  mismatch_fields: Record<string, any> | null;
   raw_payload: Record<string, any> | null;
   [k: string]: any;
 }
@@ -87,8 +85,6 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
     return () => { cancel = true; };
   }, [id]);
 
-  const mismatchEntries = item?.mismatch_fields ? Object.entries(item.mismatch_fields as Record<string, any>) : [];
-
   return (
     <Sheet open={!!id} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
@@ -98,7 +94,6 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
               <div className="flex items-center gap-2">
                 <span className="font-mono">{item.abd_number}</span>
                 {!item.is_active && <Badge variant="secondary">Inactive</Badge>}
-                {item.field_mismatch && <Badge variant="destructive" className="text-[10px]">Mismatch</Badge>}
               </div>
             ) : "Loading..."}
           </SheetTitle>
@@ -158,29 +153,6 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
                 </table>
               </div>
             </section>
-
-            {/* Mismatch */}
-            {mismatchEntries.length > 0 && (
-              <section>
-                <h3 className="font-semibold text-sm mb-2 text-destructive">Field Mismatch</h3>
-                <div className="rounded-md border overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50">
-                      <tr><th className="text-left px-2 py-1.5">Field</th><th className="text-left px-2 py-1.5">Source</th><th className="text-left px-2 py-1.5">Parsed</th></tr>
-                    </thead>
-                    <tbody>
-                      {mismatchEntries.map(([field, v]: any) => (
-                        <tr key={field} className="border-t">
-                          <td className="px-2 py-1 font-mono">{field}</td>
-                          <td className="px-2 py-1">{String(v?.source ?? v?.original ?? "—")}</td>
-                          <td className="px-2 py-1">{String(v?.parsed ?? "—")}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
 
             {/* Change Log */}
             <section>

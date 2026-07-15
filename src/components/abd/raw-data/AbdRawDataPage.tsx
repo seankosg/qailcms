@@ -463,7 +463,6 @@ function buildDataColumn(
   const filterOptions = c.key === "latest_status" ? ABD_STATUSES.map((s) => ({ value: s, label: s })) :
     c.key === "plot" ? [{ value: "C", label: "C" }, { value: "D", label: "D" }] :
     c.key === "is_active" ? [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] :
-    c.key === "field_mismatch" ? [{ value: "true", label: "Mismatch" }, { value: "false", label: "OK" }] :
     [];
   return {
     id: c.key,
@@ -501,15 +500,6 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
     return <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold", STATUS_COLORS[key] ?? "bg-zinc-500/15 text-zinc-700")}>{v}</span>;
   }
   if (c.key === "is_active") return v ? <Badge variant="secondary" className="text-[10px]">Active</Badge> : <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>;
-  if (c.key === "field_mismatch") {
-    if (!v) return <span className="text-muted-foreground/50">—</span>;
-    const fields = Object.keys((row as any).mismatch_fields ?? {});
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300" title={`Source ≠ Parsed: ${fields.join(", ")}`}>
-        <AlertTriangle className="h-3 w-3" /> {fields.length}
-      </span>
-    );
-  }
   if (c.type === "date") return <span className="tabular-nums text-xs">{formatDdMmm(v)}</span>;
   if (c.type === "number") return <span className="tabular-nums text-xs">{String(v)}</span>;
   return <span className="text-xs">{String(v)}</span>;

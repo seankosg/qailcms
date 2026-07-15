@@ -20,7 +20,7 @@ export const DATE_FILTER_FIELDS = new Set<string>([
 
 export const NUMBER_FILTER_FIELDS = new Set<string>(["sl_no"]);
 
-export const BOOL_FILTER_FIELDS = new Set<string>(["is_active", "field_mismatch"]);
+export const BOOL_FILTER_FIELDS = new Set<string>(["is_active"]);
 
 export const FACET_FIELDS = new Set<string>([
   "plot", "dis", "latest_rev", "latest_status", "pic", "doc_ax", "doc_axx",

@@ -42,8 +42,6 @@ export interface AbdItem {
   r3_submission_plan: string | null; r3_submission_actual: string | null;
   r3_dar_plan: string | null; r3_dar_actual: string | null;
   is_active: boolean;
-  field_mismatch: boolean;
-  mismatch_fields: Record<string, any>;
   status_group: "approved" | "in_progress" | "not_started";
   data_date: string | null;
   updated_at: string | null;
