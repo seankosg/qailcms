@@ -344,6 +344,7 @@ export function DefectRawDataPage() {
   const [searchInput, setSearchInput] = useState(urlSearch.q ?? "");
   const [criticalPending, setCriticalPending] = useState<Map<string, boolean>>(new Map());
   const [exportOpen, setExportOpen] = useState(false);
+  const [downloadingAll, setDownloadingAll] = useState(false);
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
