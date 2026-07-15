@@ -56,7 +56,7 @@ import {
 } from "@/hooks/useAbdFieldConfig";
 import { toast } from "sonner";
 
-const SYSTEM_FROZEN_IDS = ["sl_no", "abd_number"];
+const SYSTEM_FROZEN_IDS: string[] = [];
 const DEFAULT_ORDER = ABD_COLUMNS.map((c) => c.key);
 const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
 
@@ -257,9 +257,7 @@ export function AbdRawDataPage() {
         for (const [k, v] of Object.entries(s.visibility)) if (valid.has(k)) baseVisibility[k] = !!v;
       }
       if (Array.isArray(s.frozenExtras)) {
-        baseFrozen = s.frozenExtras.filter(
-          (k: any) => typeof k === "string" && valid.has(k) && !SYSTEM_FROZEN_IDS.includes(k),
-        );
+        baseFrozen = s.frozenExtras.filter((k: any) => typeof k === "string" && valid.has(k));
       }
     }
     setColumnSizing(baseSizing);
@@ -306,10 +304,9 @@ export function AbdRawDataPage() {
   }, [sorting, columnFilters, stateLoaded]);
 
   const orderedKeys = useMemo(() => {
-    const cleanFrozen = frozenExtras.filter((k) => !SYSTEM_FROZEN_IDS.includes(k));
-    const frozenSet = new Set(cleanFrozen);
-    const rest = order.filter((k) => !frozenSet.has(k) && !SYSTEM_FROZEN_IDS.includes(k));
-    return [...SYSTEM_FROZEN_IDS, ...cleanFrozen, ...rest];
+    const frozenSet = new Set(frozenExtras);
+    const rest = order.filter((k) => !frozenSet.has(k));
+    return [...frozenExtras, ...rest];
   }, [order, frozenExtras]);
 
   const columns = useMemo<ColumnDef<AbdItem>[]>(() => {
@@ -325,16 +322,14 @@ export function AbdRawDataPage() {
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = {};
-    const frozenSet = new Set(frozenExtras);
     for (const c of columns) {
       const id = (c as any).id ?? (c as any).accessorKey;
       if (!id || id in vis) continue;
-      if (SYSTEM_FROZEN_IDS.includes(id) || frozenSet.has(id)) { vis[id] = true; continue; }
       if (id in visibility) { vis[id] = visibility[id] !== false; continue; }
       vis[id] = true;
     }
     return vis;
-  }, [columns, visibility, frozenExtras]);
+  }, [columns, visibility]);
 
   const table = useReactTable<AbdItem>({
     data: rows,
@@ -397,10 +392,9 @@ export function AbdRawDataPage() {
             frozenExtras={frozenExtras}
             defaultOrder={cfgDefaultOrder}
             defaultVisibility={cfgDefaultVisibility}
-            systemFrozen={SYSTEM_FROZEN_IDS}
             onOrderChange={setOrder}
             onVisibilityChange={(v) => setVisibility(v)}
-            onFrozenChange={(next) => setFrozenExtras(next.filter((k) => !SYSTEM_FROZEN_IDS.includes(k)))}
+            onFrozenChange={setFrozenExtras}
             isAdmin={isAdmin}
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
@@ -470,7 +464,7 @@ export function AbdRawDataPage() {
         table={table}
         tableRef={tableRef}
         loading={!stateLoaded || isFetching}
-        frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
+        frozenColIds={frozenExtras}
         onRowClick={(id) => setUrl({ detail: id })}
       />
 
