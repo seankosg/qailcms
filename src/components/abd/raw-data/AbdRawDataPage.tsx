@@ -414,15 +414,25 @@ export function AbdRawDataPage() {
         </div>
       </header>
 
-      <Tabs value={team} onValueChange={(v) => setUrl({ tab: v, page: 1 })}>
-        <TabsList className="h-9">
-          {teamTabs.map((t) => (
-            <TabsTrigger key={t.value} value={t.value} className="text-xs">
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center gap-3">
+        <Tabs value={plotSel} onValueChange={(v) => setUrl({ plot: v, page: 1 })}>
+          <TabsList className="h-9">
+            <TabsTrigger value="all" className="text-xs">All Plots</TabsTrigger>
+            <TabsTrigger value="C" className="text-xs">PLOT C</TabsTrigger>
+            <TabsTrigger value="D" className="text-xs">PLOT D</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="h-6 w-px bg-border" aria-hidden />
+        <Tabs value={team} onValueChange={(v) => setUrl({ tab: v, page: 1 })}>
+          <TabsList className="h-9">
+            {teamTabs.map((t) => (
+              <TabsTrigger key={t.value} value={t.value} className="text-xs">
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Tabs value={statusGroup} onValueChange={(v) => setUrl({ status: v, page: 1 })}>
