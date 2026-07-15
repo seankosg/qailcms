@@ -224,7 +224,7 @@ function Inner() {
               </Button>
               <Button
                 size="sm"
-                onClick={startImport}
+                onClick={runStartImport}
                 disabled={isRunning || readyCount === 0 || !canImport}
                 title={!canImport ? "권한이 필요합니다" : ""}
               >
