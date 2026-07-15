@@ -892,7 +892,8 @@ function buildDataColumn(
   statusGroup: DefectStatusGroup,
   includeInactive: boolean,
   dataDate: string | null,
-  isAdmin: boolean,
+  canEditRow: (row: DefectItem) => boolean,
+  teamCodesForEdit: string[],
   patchLocal: (id: string, patch: Record<string, any>) => void,
   refetch: () => void,
   headerLabel?: string,
@@ -917,17 +918,18 @@ function buildDataColumn(
     cell: ({ row, getValue }) => {
       const v: any = getValue();
       const display = renderDefectCell(c, v, row.original, dataDate);
-      if (c.editable && isAdmin && c.editorType) {
+      if (c.editable && c.editorType && canEditRow(row.original)) {
         const locked =
           (c.key === "priority" && (row.original as any).priority_locked) ||
           (c.key === "hdec_verification" && (row.original as any).hdec_verification_locked);
+        const editorOptions = c.key === "team" ? teamCodesForEdit : c.options;
         return (
           <EditCellPopover
             id={row.original.id}
             field={c.key}
             label={c.label}
             editorType={c.editorType}
-            options={c.options}
+            options={editorOptions}
             currentValue={v}
             locked={locked}
             onSaved={(nv) => { patchLocal(row.original.id, { [c.key]: nv }); refetch(); }}
