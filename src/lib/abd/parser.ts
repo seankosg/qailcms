@@ -27,9 +27,11 @@ export interface ParsedAbdRow {
   r3_drafting_plan: string | null;   r3_drafting_actual: string | null;
   r3_submission_plan: string | null; r3_submission_actual: string | null;
   r3_dar_plan: string | null;        r3_dar_actual: string | null;
-  field_mismatch: boolean;
-  mismatch_fields: Record<string, { source: any; parsed: any }>;
   raw_payload: Record<string, any>;
+  /** Excel row index (1-based, matches Excel's row numbering) */
+  excel_row: number;
+  /** Sheet name this row came from */
+  sheet_name: string;
 }
 
 export interface ParsedSheetResult {
@@ -46,6 +48,16 @@ export interface ParsedFileResult {
   team_from_filename: AbdTeam | null;
   sheets: ParsedSheetResult[];
   ignored_sheets: string[];
+  /** ABD_NUMBER 가 파일 내에서 2회 이상 등장하는 그룹들 */
+  duplicates_in_file: Array<{
+    abd_number: string;
+    occurrences: Array<{
+      sheet_name: string;
+      excel_row: number;
+      sl_no: number | null;
+      document_title: string | null;
+    }>;
+  }>;
 }
 
 const STAGE_TO_KEY: Record<string, "drafting" | "submission" | "dar"> = {
