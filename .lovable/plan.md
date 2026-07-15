@@ -1,64 +1,198 @@
-# 전 Raw Data 컬럼 필터 통일 계획
 
-## 목표
-- 4개 Raw Data 페이지(ABD, Snag/Defect, Spare Part, Task Management)의 **모든 표시 컬럼**에 필터 아이콘/드롭다운을 노출한다.
-- 텍스트 형식 컬럼(예: `description`, `remarks`, `document_title`, `pic`, `location_raw`, `item` 등)의 필터를 **현재 Snag의 `Item` 컬럼 필터와 동일한 UX** — 컬럼에 실제 존재하는 값들의 체크박스 리스트에서 다중 선택 — 으로 바꾼다.
-- 날짜 컬럼은 기존 date-range 필터, 숫자/퍼센트 컬럼은 기존 number/text 필터를 유지한다. (요청 대상은 "텍스트 양식의 컬럼")
+# SHAW CMS 권한·사용자 시스템 이식 최종 계획 v2 (확정판)
 
-## 범위 (대상 파일)
+## Phase 0 최종 확정 사항
 
-| 페이지 | 라우트 | 컬럼/필터 파일 |
-| --- | --- | --- |
-| ABD | `/closure/abd/raw-data` | `src/components/abd/raw-data/AbdRawDataPage.tsx`, `AbdColumnFilterDropdowns.tsx`, `src/lib/abd/filter-fns.ts`, `useAbdItems.ts`(facet) |
-| Snag(Defect) | `/closure/snag-management/raw-data` | `DefectRawDataPage.tsx`, `ColumnFilterDropdowns.tsx`, `src/lib/defect-management/filter-fns.ts`, `useDefectItems.ts`(facet) |
-| Spare Part | `/closure/spare-part/raw-data` | `SparePartRawDataPage.tsx`, `ColumnFilters.tsx`, `src/lib/spare-part/filters.ts` |
-| Task Management | `/closure/task-management/raw-data` | `TaskManagementRawDataPage.tsx`, `ColumnFilters.tsx`, `src/lib/task-management/filters.ts` |
+1. **RLS 데이터 스코핑 적용** (Phase 7 필수)
+2. **비밀번호 정책 = SHAW 기준**: `/^(?=.*[A-Za-z])(?=.*\d).{6,}$/`, `DEFAULT_PASSWORD='Qail@2026!'`. 기존 사용자 강제 재설정 없음 (다음 변경 시부터 신 정책 적용)
+3. **Raw Data 편집 권한 = 하이브리드**: rank ≥ `senior_user` 전체 편집. `user` 는 PIC(hdec_pic_name / hdec_eng_name / subcontractor_name / subsub_name 중 profile 값과 일치) 행만 편집
+4. **Field-Level Role Gate 관리 UI 구현** (Phase 6, §7)
+5. **Team = team_master 테이블화** (Raw Data 4종 + profiles 와 연동, 향후 추가/편집 가능, 대소문자 무관 매칭)
+6. **Admin 접근 = admin/superuser 만** (`d_superuser` 는 admin 접근 불가 유지)
+7. **Team 마스터 초기 시딩 = 현재 DB 4개 Raw 테이블의 distinct team 값 자동 시딩** (대문자 canonicalize 후 upsert)
 
-## 통일 규칙
+---
 
-각 페이지의 `filterType` 판정 로직을 아래로 통일한다.
+## 1. DB 스키마 (Phase 1)
 
-```text
-date  형식 → "date-range"        (기존 유지)
-숫자/퍼센트 → "number-range" 또는 "text" (기존 유지)
-bool  형식 → 기존 boolean/multi-select 유지
-그 외(문자열/enum 전부) → "multi-select"  ← 텍스트도 여기로 이동
+**Enum 확장**
+- `app_role` : + `super_guest, senior_user, d_superuser` → 7단계 rank
+- `user_type` : + `subsub, guest`
+
+**신규 `team_master`**
+```sql
+create table public.team_master (
+  id uuid primary key default gen_random_uuid(),
+  code text not null,
+  name text not null,
+  sort_order int not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index team_master_code_lower_uk on public.team_master (lower(code));
+
+GRANT SELECT ON public.team_master TO authenticated;
+GRANT ALL ON public.team_master TO service_role;
+ALTER TABLE public.team_master ENABLE ROW LEVEL SECURITY;
+-- SELECT: authenticated 전원, INSERT/UPDATE/DELETE: admin/superuser
 ```
 
-즉 지금까지 `TEXT_FILTER_FIELDS`에 있던 컬럼(ABD의 `abd_number`, `abd_ocs_no`, `document_title`, `pic`, `service`, Snag의 `description`, `remarks`, `hdec_comments`, `aconex_comments`, `location_raw`, `item`, `plan_title`, `assigned_to` 등)을 모두 multi-select로 옮긴다. `TEXT_FILTER_FIELDS` 집합은 제거하거나 빈 값으로 축소한다.
+**초기 시딩 (자동)**
+```sql
+insert into public.team_master (code, name)
+select upper(trim(team)) as code, upper(trim(team)) as name
+  from (
+    select team from public.abd_items_raw where team is not null and team <> ''
+    union select team from public.defect_items_raw where team is not null and team <> ''
+    union select team from public.spare_parts_raw where team is not null and team <> ''
+    union select team from public.task_management_raw where team is not null and team <> ''
+  ) s
+ group by upper(trim(team))
+on conflict (lower(code)) do nothing;
+```
++ Raw 4개 테이블 및 profiles.team 값 대문자 canonicalize (`update ... set team = upper(trim(team))`).
 
-또한 현재 `enableColumnFilter`가 꺼져 있거나 헤더에 필터 드롭다운이 렌더되지 않는 컬럼(대표적으로 `sl_no`, stage-progress 파생 컬럼 등)이 있다면, 값이 있는 컬럼은 모두 필터 아이콘을 노출한다. 파생/계산 컬럼 중 서버 필터가 불가능한 것은 기존대로 유지하되(예: `derived`) 사용자에게 필터 미지원이 아니라 값 리스트를 보여주도록 client-side facet(현재 페이지 rows 기준)을 fallback으로 사용한다.
+**정합성 트리거** `validate_team_code()` — profiles + 4개 Raw 테이블 BEFORE INSERT/UPDATE OF team: 대문자 정규화 + team_master 존재 검증
 
-## 텍스트 컬럼 multi-select 상세 (Snag Item 스타일 확장)
+**profiles 컬럼 추가**: `name text`, `team text`, `subsub_name text`, `hdec_eng_name text`
 
-기존 `MultiSelectDropdown`(Snag) / `AbdMultiSelectDropdown`(ABD) 은 팝오버 안에 체크박스 목록만 있다. 텍스트 컬럼은 distinct 값 수가 수백~수천 개가 될 수 있으므로 다음 두 가지를 추가한다.
+**subcontractor_master 확장**: `type ('sub'|'subsub')`, `parent_subcontractor_id`, `owner_code`, 부모 검증 트리거
 
-1. **팝오버 상단 검색 입력**: 표시된 값들을 클라이언트에서 substring 필터링. 이미 `Select all` / `Clear all` 이 있는 줄에 `Input` 하나 추가.
-2. **facet 로딩 상한 확장**: 서버 facet 훅(`useDefectFacet`, `useAbdFacet`)의 반환 상한(현재 top-N)을 텍스트 컬럼일 때 더 큰 값(예: 500 → 2000) 또는 검색어 서버 필터 파라미터를 추가한다. 우선 단순히 상한만 늘리는 방향으로 시작하고, 실제로 응답 크기가 부담되면 후속으로 서버 side search 파라미터를 추가한다.
+**신규 `hdec_eng_master`** (hdec_pic_master 구조 복제)
 
-Spare Part / Task Management 페이지는 서버 facet이 없고 클라이언트에 rows 전체가 있으므로, 현재 로드된 `rows`에서 distinct 값을 계산해 옵션으로 넘긴다(`uniqueOptions` 유틸을 재사용/신설).
+**4개 field_config 테이블 role 배열**
+- `visible_to_roles app_role[] NOT NULL DEFAULT '{}'`
+- `editable_to_roles app_role[] NOT NULL DEFAULT '{}'`
 
-`(Empty)` 옵션과 카운트 표시, 다중 선택, 선택 시 URL 필터 파라미터 인코딩은 기존 multi-select 경로를 그대로 재사용한다 — 각 페이지의 필터 직렬화 로직은 이미 multi-select 배열을 지원한다.
+**신규 RPC** `can_edit_row(_user_id uuid, _table_name text, _row_id uuid)` — profile 조회 + rank + PIC 규칙 판정
 
-## 서버 필터/정렬 처리 (ABD, Snag)
+---
 
-두 페이지는 서버 필터링/정렬을 사용한다. 텍스트 컬럼이 multi-select로 넘어가면 서버 쿼리도 값 배열 IN 매칭으로 바뀌어야 한다. 각 페이지의 서버 필터 빌더(예: `useAbdItems`, `useDefectItems` 안의 필터 → Supabase 쿼리 변환부)에서:
+## 2. Auth / 라우팅 인프라 (Phase 2)
 
-- 필터 값이 문자열 → `ilike '%text%'` 로 처리하던 분기를 제거하거나 유지하되,
-- 배열이 오면 `in(values)` + `EMPTY_TOKEN` 포함 시 `or(is null, eq '')` 를 추가.
+**신규**
+- `src/types/enums.ts` — `AppRole, UserType, ROLE_LABELS, USER_TYPE_LABELS, PASSWORD_REGEX(SHAW), PASSWORD_HINT, DEFAULT_PASSWORD, FAKE_EMAIL_DOMAIN='qail.local', loginIdToEmail, ROLE_RANK`
+- `src/lib/team/team-master.ts` — `useTeamOptions()` (5분 캐시), `normalizeTeamCode(raw)`, `matchTeamCode(raw, options)`
+- `src/lib/auth/roles.ts` — `canAccessRoute, canEditRawRow, highestRank`
+- `src/lib/auth/field-role-gate.ts` — `isAllowedByRoles(allowedRoles, userRoles)` (빈 배열 = 제한없음, admin 항상 통과)
 
-이미 multi-select 컬럼에 사용하던 로직을 그대로 재활용한다.
+**수정**
+- `useCurrentUser` shape 확장 (rank flags + team + master 이름 필드 + canEdit)
+- `_authenticated/route.tsx` — rank 기반 route 체크
+- `AppLayout` nav rank 기반 통합
+- `change-password.tsx` — SHAW 정책
+- `admin/users.functions.ts` — profile 신규 필드 반영
 
-## 검증 항목
+**Team 셀렉트 통합**: Admin Users 편집, ABD tabs, Snag/SP/Task 필터 등 하드코딩된 팀 리스트 전부 `useTeamOptions()` 로 대체
 
-- 각 페이지의 모든 컬럼 헤더에 필터 아이콘이 표시된다.
-- 텍스트 컬럼 필터 클릭 시, 현재 데이터셋에 존재하는 값 리스트 + `(Empty)` 옵션 + 검색 입력이 나타난다.
-- 여러 값 체크 → 테이블은 선택한 값 중 하나에 해당하는 행만 표시.
-- URL 파라미터(`filters=`)에 다중값이 저장·복원된다.
-- 날짜/숫자 컬럼 필터 UX는 변경되지 않는다.
-- Sticky 컬럼 불투명 규칙, 기존 정렬/페이지네이션은 회귀 없음.
+---
 
-## 비변경
-- 데이터베이스 스키마, 마이그레이션 없음.
-- 컬럼 표시 순서/pin/visibility 관련 저장 로직 변경 없음.
-- 상세 Sheet, Export 다이얼로그 변경 없음.
+## 3. Admin UI (Phase 3)
+
+**`/admin/users`** — SHAW UsersTab 수준 재작성
+- 컬럼: Login ID / Name / User Type / Team / Linked Master / Owner Code / Role / Active / Actions
+- Login ID 인라인 편집, PW 재발급(신 정책), Excel Export, 완전 삭제
+- user_type 별 조건부 렌더
+
+**`/admin/masters`** — Sub / SubSub / HDEC PIC / HDEC Eng / **Team** 통합 UI
+- Team 탭: code/name/sort_order/is_active. 신규 등록 시 대문자 canonicalize. 사용중 team 비활성화 시 사용 건수 안내 후 확인.
+
+**신규 서버 함수**: `updateLoginId`, `addMasterName/toggleMasterActive/deleteMasterName` (`kind: 'subcontractor'|'subsub'|'hdec_pic'|'hdec_eng'|'team'`), `updateFieldConfigRoles`
+
+---
+
+## 4. Import 마스터 정합성 (Phase 4)
+
+- `src/lib/master/master-name-match.ts` (Levenshtein, normalize)
+- `src/lib/master/subcontractor-master-sync.ts`
+- `SimilarMasterDecisionDialog.tsx` — 4개 Import 파이프라인(ABD/Snag/SP/Task)
+- **Team 컬럼**: Import 시 `normalizeTeamCode` 로 대문자화 → team_master 미존재 시 관리자에게 "새 team 추가?" 다이얼로그 → 승인 시 team_master upsert
+
+---
+
+## 5. 컴포넌트 게이팅 정렬 (Phase 5)
+
+**canAccessRoute 매핑**
+- `/*/dashboard, /outstanding/dashboard, /closeout/dashboard` → guest+
+- `/closure/*/raw-data, /tree, /records/*, /detail/*` → super_guest+
+- `/import-log/*, /closure/*/import, aconex-sync` → user+
+- `/closure/*/settings, /admin/*` → superuser+ (d_superuser 불가)
+
+**편집 게이트**: 4개 Raw Data 의 `EditCellPopover, BulkEditBar, CriticalBulkBar, ColumnOrderMenu` 등에서 `me?.isAdmin` → `me?.canEdit || canEditRawRow(me, row)` 로 대체. Bulk selection 은 프론트 필터 + 서버 재검증
+
+---
+
+## 6. RLS 데이터 스코핑 (Phase 7)
+
+**Security Definer RPC** `can_view_row / can_edit_row`
+
+**4개 Raw 테이블 정책**
+- SELECT: admin/superuser/senior_user/user/super_guest/guest 전체 · d_superuser team 일치 · subcontractor 회사 일치 · subsub 일치
+- UPDATE/DELETE: admin/superuser/senior_user 전체 · d_superuser team 일치 · user PIC 일치 · 나머지 불가
+- INSERT: admin/superuser/senior_user
+
+**서버 함수 검증**: `updateDefectField/bulkUpdate*/updateAbdField/updateSparePartField/updateTaskField` 에서 `assertAdmin` → `assertCanEdit(supabase, userId, table, rowId)`
+
+**사전 정규화**: subcontractor/hdec_pic/hdec_eng/subsub/team 값 canonicalize
+
+**성능 인덱스**: 각 Raw 테이블에 `(team), (subcontractor_name), (hdec_pic_name), (hdec_eng_name), (subsub_name)` 인덱스
+
+---
+
+## 7. Field-Level Role Gate 관리 UI (Phase 6)
+
+### 7-1. 저장 스키마
+각 `*_field_config` 테이블에 `visible_to_roles app_role[]`, `editable_to_roles app_role[]` (DEFAULT `'{}'`).
+빈 배열/NULL = 제한없음, 배열 값 있으면 배열 포함 role 만 통과, `admin` 은 항상 통과 (하드코딩).
+
+### 7-2. 위치
+기존 `/admin/mapping` 하위 4개 Field Config 테이블(`FieldConfigTable, DefectFieldConfigTable, SparePartFieldConfigTable, TmFieldConfigTable`) 을 확장. 새 라우트 없음.
+
+### 7-3. UI 컬럼
+Sort Order / Field Name(RO) / Display Name / Group / Visible / **Visible Roles** / **Editable Roles** / Note / Actions
+
+**RoleMultiSelect 컴포넌트**: Popover + Command 체크박스, 선택된 role Badge chip, `Clear all / Select all editors / Select all viewers` 프리셋, `admin` always allowed 회색+툴팁, 변경 시 debounce 500ms → `updateFieldConfigRoles`, optimistic + rollback
+
+**Preview as role**: admin 전용, 특정 role 시점에서 필드 상태(숨김/읽기/편집) 미리보기
+
+### 7-4. Raw Data 연동
+- `buildColumns` 시 visible gate 실패 → 컬럼 제거 (ColumnOrderMenu 에서도 숨김)
+- editable gate 실패 → EditCellPopover 진입 차단, BulkEditBar field 옵션 제외
+
+### 7-5. Detail Sheet / Export
+동일 gate 적용. Admin 은 항상 전체 export 가능.
+
+### 7-6. 초기 시딩
+모든 필드 두 컬럼 빈 배열 → 기존 동작 100% 후방호환. 이후 관리자가 점진적으로 좁힘.
+
+---
+
+## 8. Raw Data 기존 로직 영향
+
+| 영역 | 조치 |
+|---|---|
+| Team 하드코딩 목록 | `useTeamOptions()` 로 대체 |
+| Nav / route guard | rank 통합 + fallback |
+| 4개 Raw Data 편집 게이트 | `canEditRow` 대체, 서버 `assertCanEdit` |
+| Bulk 편집/삭제 | selection 필터 + 서버 재검증 |
+| Import | 마스터+team canonicalize, 유사이름/신규team 다이얼로그 |
+| RLS | 4개 Raw 정책 재작성, 사전 데이터 정규화 필수 |
+| Field Config UI | Roles 컬럼 2개 추가 |
+| Detail Sheet / Export | field gate 연동 |
+| Change Password | 정책 통일 (강제 재설정 없음) |
+| Admin Users/Masters | SHAW 수준 재작성 + Team 탭 |
+
+---
+
+## 9. 실행 순서
+
+1. **Phase 1** DB: enum + team_master + profile 컬럼 + subcontractor 확장 + hdec_eng_master + field_config roles + validate 트리거 → types.ts 재생성 → team/master 자동 시딩
+2. **Phase 2** enums.ts / roles.ts / field-role-gate.ts / team-master hook / useCurrentUser / route guard / change-password
+3. **Phase 3** Admin Users 재작성 + Masters(Team 포함) UI
+4. **Phase 4** Master + Team canonicalize 라이브러리 → Import 다이얼로그 통합
+5. **Phase 5** 편집 게이트 정렬
+6. **Phase 6** Field-Level Role Gate UI
+7. **Phase 7** 데이터 정규화 → RLS 정책 재작성 → assertCanEdit → 회귀 테스트
+
+각 Phase 독립 커밋. 매 단계마다 4개 Raw Data + Detail + Import + Admin 회귀 검증.
