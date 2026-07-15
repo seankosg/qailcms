@@ -199,6 +199,13 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
   );
   const clearAll = useCallback(() => setFiles([]), []);
 
+  const setFileParsedRows = useCallback(
+    (id: string, next: ParsedTaskRow[]) => {
+      setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, parsed: next } : f)));
+    },
+    [],
+  );
+
   const setFileDiscipline = useCallback((id: string, d: Discipline) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, discipline: d } : f)));
   }, []);
@@ -757,6 +764,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setFileConflictPolicy,
         runPreflight,
         startImport,
+        setFileParsedRows,
       }}
     >
       {children}
