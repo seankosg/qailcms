@@ -138,7 +138,8 @@ export function SparePartRawDataPage() {
   const [searchInput, setSearchInput] = useState("");
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [frozenExtras, setFrozenExtras] = useState<string[]>(DEFAULT_FROZEN_EXTRAS);
-  const [includeInactive, setIncludeInactive] = useState(false);
+  // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
+  const includeInactive = false;
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -211,7 +212,7 @@ export function SparePartRawDataPage() {
     setVisibility(cleanedVisibility);
     setOrder(mergedOrder);
     setFrozenExtras(mergedFrozen.length ? mergedFrozen : DEFAULT_FROZEN_EXTRAS);
-    setIncludeInactive(!!s.includeInactive);
+    // includeInactive는 더 이상 UI에서 토글하지 않음 (항상 false)
 
     // URL 드릴다운
     const urlFilters: ColumnFiltersState = [];
@@ -487,15 +488,6 @@ export function SparePartRawDataPage() {
             />
           </div>
 
-          <Button
-            variant={includeInactive ? "default" : "outline"}
-            size="sm"
-            className="h-8"
-            onClick={() => setIncludeInactive((v) => !v)}
-          >
-            Include inactive
-          </Button>
-
           <ColumnOrderMenu
             order={order}
             visibility={visibility as Record<string, boolean>}
@@ -556,7 +548,6 @@ export function SparePartRawDataPage() {
               }}
             />
           )}
-          {!includeInactive && <FilterChip label="Active only" onClear={() => setIncludeInactive(true)} />}
           {columnFilters.map((f) => (
             <FilterChip
               key={f.id}

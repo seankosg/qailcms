@@ -314,7 +314,8 @@ export function DefectRawDataPage() {
   );
 
   const tab: DefectStatusGroup = (urlSearch.tab === "closed" ? "closed" : "unclosed") as DefectStatusGroup;
-  const includeInactive = !!urlSearch.includeInactive;
+  // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
+  const includeInactive = false;
   const isAllPage = urlSearch.pageSize === "all";
   const pageSize = isAllPage
     ? ALL_PAGE_LIMIT
@@ -794,10 +795,6 @@ export function DefectRawDataPage() {
         )}
         <span className="hidden self-center text-xs text-muted-foreground md:inline">Tip: Shift+Click headers for multi-sort · Click <Filter className="inline h-3 w-3" /> to filter columns</span>
         <div className="ml-auto"><DefectStageProgressLegend /></div>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Checkbox checked={includeInactive} onCheckedChange={(v) => setUrl({ includeInactive: !!v, page: 1 })} className="h-3.5 w-3.5" />
-          비활성 포함
-        </label>
       </div>
 
       <CriticalBulkBar isAdmin={isAdmin} selectedRows={selectedRows as any} pending={criticalPending} setPending={setCriticalPending} />
