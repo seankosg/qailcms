@@ -5,6 +5,22 @@ const DUMMY_EMAIL_DOMAIN = "qail.local";
 /** @deprecated Phase 2 이후 DEFAULT_PASSWORD 사용. 하위호환용 유지. */
 export const DEFAULT_INITIAL_PASSWORD = "Qail@2026!";
 
+type MasterKind = "subcontractor" | "subsub" | "hdec_pic" | "hdec_eng" | "team";
+
+function tableForKind(kind: MasterKind): string {
+  switch (kind) {
+    case "subcontractor":
+    case "subsub":
+      return "subcontractor_master";
+    case "hdec_pic":
+      return "hdec_pic_master";
+    case "hdec_eng":
+      return "hdec_eng_master";
+    case "team":
+      return "team_master";
+  }
+}
+
 async function assertAdmin(supabase: any, userId: string) {
   const { data, error } = await supabase.rpc("has_any_role", {
     _user_id: userId,
@@ -131,6 +147,28 @@ export const updateUserRole = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const updateLoginId = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { user_id: string; login_id: string }) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const loginId = data.login_id.trim().toLowerCase();
+    if (!/^[a-z0-9._-]+$/.test(loginId)) {
+      throw new Error("Login ID는 영문 소문자, 숫자, . _ - 만 사용할 수 있습니다.");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const email = `${loginId}@${DUMMY_EMAIL_DOMAIN}`;
+    // 이메일과 login_id 를 동시에 갱신
+    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, { email });
+    if (authErr) throw new Error(authErr.message);
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({ login_id: loginId, email } as any)
+      .eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const updateUserProfileFields = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: {
@@ -183,33 +221,88 @@ export const markPasswordChanged = createServerFn({ method: "POST" })
 // ---- Master 관리 ----
 export const addMasterName = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { kind: "subcontractor" | "hdec_pic"; name: string }) => input)
+  .inputValidator((input: {
+    kind: MasterKind;
+    name: string;
+    // team-only
+    code?: string;
+    sort_order?: number;
+    // subcontractor / subsub
+    parent_id?: string | null;
+    owner_code?: string | null;
+  }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const table = data.kind === "subcontractor" ? "subcontractor_master" : "hdec_pic_master";
-    const { error } = await context.supabase.from(table).insert({ name: data.name });
+    const table = tableForKind(data.kind);
+    const name = data.name.trim();
+    if (!name) throw new Error("이름을 입력하세요.");
+    let payload: any = { name };
+    if (data.kind === "team") {
+      const code = (data.code ?? name).trim().toUpperCase();
+      if (!code) throw new Error("Team 코드를 입력하세요.");
+      payload = { code, name: name.toUpperCase(), sort_order: data.sort_order ?? 0 };
+    } else if (data.kind === "subcontractor") {
+      payload = { name, type: "sub", owner_code: data.owner_code ?? null };
+    } else if (data.kind === "subsub") {
+      if (!data.parent_id) throw new Error("상위 협력사를 선택하세요.");
+      payload = { name, type: "subsub", parent_subcontractor_id: data.parent_id, owner_code: data.owner_code ?? null };
+    }
+    const { error } = await (context.supabase as any).from(table).insert(payload);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const toggleMasterActive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { kind: "subcontractor" | "hdec_pic"; id: string; is_active: boolean }) => input)
+  .inputValidator((input: { kind: MasterKind; id: string; is_active: boolean }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const table = data.kind === "subcontractor" ? "subcontractor_master" : "hdec_pic_master";
-    const { error } = await context.supabase.from(table).update({ is_active: data.is_active }).eq("id", data.id);
+    const table = tableForKind(data.kind);
+    const { error } = await (context.supabase as any)
+      .from(table)
+      .update({ is_active: data.is_active })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const deleteMasterName = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { kind: "subcontractor" | "hdec_pic"; id: string }) => input)
+  .inputValidator((input: { kind: MasterKind; id: string }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const table = data.kind === "subcontractor" ? "subcontractor_master" : "hdec_pic_master";
-    const { error } = await context.supabase.from(table).delete().eq("id", data.id);
+    const table = tableForKind(data.kind);
+    const { error } = await (context.supabase as any).from(table).delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const updateMasterFields = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    kind: MasterKind;
+    id: string;
+    name?: string;
+    code?: string;
+    sort_order?: number;
+    parent_id?: string | null;
+    owner_code?: string | null;
+  }) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const table = tableForKind(data.kind);
+    const patch: any = {};
+    if (data.name !== undefined) patch.name = data.kind === "team" ? data.name.trim().toUpperCase() : data.name.trim();
+    if (data.code !== undefined && data.kind === "team") patch.code = data.code.trim().toUpperCase();
+    if (data.sort_order !== undefined && data.kind === "team") patch.sort_order = data.sort_order;
+    if (data.parent_id !== undefined && (data.kind === "subcontractor" || data.kind === "subsub")) {
+      patch.parent_subcontractor_id = data.parent_id;
+    }
+    if (data.owner_code !== undefined && (data.kind === "subcontractor" || data.kind === "subsub")) {
+      patch.owner_code = data.owner_code;
+    }
+    if (Object.keys(patch).length === 0) return { ok: true };
+    const { error } = await (context.supabase as any).from(table).update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
