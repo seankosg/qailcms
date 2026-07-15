@@ -397,9 +397,10 @@ export function AbdRawDataPage() {
             frozenExtras={frozenExtras}
             defaultOrder={cfgDefaultOrder}
             defaultVisibility={cfgDefaultVisibility}
+            systemFrozen={SYSTEM_FROZEN_IDS}
             onOrderChange={setOrder}
             onVisibilityChange={(v) => setVisibility(v)}
-            onFrozenChange={setFrozenExtras}
+            onFrozenChange={(next) => setFrozenExtras(next.filter((k) => !SYSTEM_FROZEN_IDS.includes(k)))}
             isAdmin={isAdmin}
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
