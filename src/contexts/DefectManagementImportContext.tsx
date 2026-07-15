@@ -123,6 +123,7 @@ interface CtxValue {
   resolveDuplicates: (id: string) => void;
   startImport: () => Promise<void>;
   setFileAiClassifyEnabled: (id: string, enabled: boolean) => void;
+  setFileParsedRows: (id: string, next: ParsedDefectRow[]) => void;
 }
 
 const Ctx = createContext<CtxValue | null>(null);
