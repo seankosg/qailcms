@@ -612,7 +612,7 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, refetch, orderedKeys, labelOverrides, collapsedParents]);
+  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents]);
 
   const table = useReactTable({
     data: visibleRows,
