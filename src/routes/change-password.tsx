@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { PASSWORD_REGEX, PASSWORD_HINT } from "@/types/enums";
 
 export const Route = createFileRoute("/change-password")({
   ssr: false,
@@ -33,7 +34,7 @@ function ChangePasswordPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pw1.length < 8) return toast.error("비밀번호는 8자 이상이어야 합니다");
+    if (!PASSWORD_REGEX.test(pw1)) return toast.error(PASSWORD_HINT);
     if (pw1 !== pw2) return toast.error("비밀번호가 일치하지 않습니다");
     setLoading(true);
     try {
@@ -60,12 +61,13 @@ function ChangePasswordPage() {
         <CardContent>
           <form onSubmit={submit} className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="p1">새 비밀번호 (8자 이상)</Label>
-              <Input id="p1" type="password" value={pw1} onChange={(e) => setPw1(e.target.value)} required minLength={8} />
+              <Label htmlFor="p1">새 비밀번호</Label>
+              <Input id="p1" type="password" value={pw1} onChange={(e) => setPw1(e.target.value)} required minLength={6} />
+              <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="p2">새 비밀번호 확인</Label>
-              <Input id="p2" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} />
+              <Input id="p2" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={6} />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
