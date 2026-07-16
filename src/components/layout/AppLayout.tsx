@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2,
 } from "lucide-react";
-import { ListTree, Sliders } from "lucide-react";
+import { ListTree, Sliders, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,6 +52,7 @@ const NAV: NavSection[] = [
         matchPrefix: "/closure/snag-management",
         items: [
           { to: "/closure/snag-management/dashboard", label: "Dashboard", icon: LayoutDashboard },
+          { to: "/closure/snag-management/progress", label: "Progress", icon: TrendingUp },
           { to: "/closure/snag-management/raw-data", label: "Raw Data", icon: Database },
           { to: "/closure/snag-management/settings", label: "Settings", icon: Settings2, adminOnly: true },
         ],
