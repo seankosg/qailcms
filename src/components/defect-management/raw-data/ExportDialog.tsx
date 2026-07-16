@@ -11,20 +11,29 @@ interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   getRows: () => Record<string, any>[];
+  fetchAllRows?: (onProgress?: (fetched: number, total: number) => void) => Promise<Record<string, any>[]>;
   columnHeaders: { key: string; label: string }[];
 }
 
-export function ExportDialog({ open, onOpenChange, getRows, columnHeaders }: Props) {
+export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, columnHeaders }: Props) {
   const [format, setFormat] = useState<"view" | "reimport">("view");
   const [mode, setMode] = useState<"single" | "per-subcon">("single");
   const [busy, setBusy] = useState(false);
 
   const exportNow = async () => {
     setBusy(true);
+    const toastId = toast.loading("현재 필터 전체 행 수집 중...");
     try {
-      const rows = getRows();
+      let rows: Record<string, any>[];
+      if (fetchAllRows) {
+        rows = await fetchAllRows((fetched, total) => {
+          toast.loading(`수집 중 ${fetched.toLocaleString()} / ${total.toLocaleString()}`, { id: toastId });
+        });
+      } else {
+        rows = getRows();
+      }
       if (rows.length === 0) {
-        toast.error("내보낼 행이 없습니다.");
+        toast.error("내보낼 행이 없습니다.", { id: toastId });
         setBusy(false);
         return;
       }
@@ -36,7 +45,7 @@ export function ExportDialog({ open, onOpenChange, getRows, columnHeaders }: Pro
         if (format === "reimport") ws["!marker" as any] = "QAIL_DEFECT_REIMPORT_V1";
         XLSX.utils.book_append_sheet(wb, ws, "Snags");
         XLSX.writeFile(wb, `defect-raw-${stamp}-${timestamp}.xlsx`);
-        toast.success(`${rows.length}건 내보내기 완료`);
+        toast.success(`${rows.length.toLocaleString()}건 내보내기 완료`, { id: toastId });
       } else {
         // Group by subcontractor
         const groups = new Map<string, Record<string, any>[]>();
@@ -57,19 +66,19 @@ export function ExportDialog({ open, onOpenChange, getRows, columnHeaders }: Pro
           }
           const blob = await zip.generateAsync({ type: "blob" });
           downloadBlob(blob, `defect-raw-per-subcon-${timestamp}.zip`);
-          toast.success(`${groups.size}개 서브콘 → ZIP 다운로드`);
+          toast.success(`${groups.size}개 서브콘 → ZIP 다운로드`, { id: toastId });
         } else {
           for (const [key, rs] of groups.entries()) {
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, buildSheet(rs, columnHeaders, format), "Snags");
             XLSX.writeFile(wb, `defect-raw-${sanitize(key)}-${stamp}-${timestamp}.xlsx`);
           }
-          toast.success(`${groups.size}개 파일 다운로드`);
+          toast.success(`${groups.size}개 파일 다운로드`, { id: toastId });
         }
       }
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(`내보내기 실패: ${e?.message ?? e}`);
+      toast.error(`내보내기 실패: ${e?.message ?? e}`, { id: toastId });
     } finally { setBusy(false); }
   };
 

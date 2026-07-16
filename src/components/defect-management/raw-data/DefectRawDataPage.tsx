@@ -894,6 +894,33 @@ export function DefectRawDataPage() {
         open={exportOpen}
         onOpenChange={setExportOpen}
         getRows={() => rows}
+        fetchAllRows={async (onProgress) => {
+          const { supabase } = await import("@/integrations/supabase/client");
+          const CHUNK = 1000;
+          const all: Record<string, any>[] = [];
+          let offset = 0;
+          let total = Infinity;
+          while (offset < total) {
+            const { data, error } = await (supabase as any).rpc("defect_items_search", {
+              _status_group: tab,
+              _include_inactive: includeInactive,
+              _q: q && q.trim() ? q.trim() : null,
+              _filters: serverFilters,
+              _sort: serverSort,
+              _offset: offset,
+              _limit: CHUNK,
+            });
+            if (error) throw new Error(error.message);
+            const arr = (data ?? []) as { rows: any; total_count: number | string }[];
+            if (arr.length === 0) break;
+            total = Number(arr[0]?.total_count ?? all.length);
+            for (const r of arr) all.push(r.rows as Record<string, any>);
+            offset += arr.length;
+            onProgress?.(all.length, total);
+            if (all.length >= total) break;
+          }
+          return all;
+        }}
         columnHeaders={DEFECT_COLUMNS.map((c) => ({ key: c.key, label: helpers.getLabel(c.key) }))}
       />
 
