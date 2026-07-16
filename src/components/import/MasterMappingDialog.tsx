@@ -117,6 +117,12 @@ export function MasterMappingDialog({
       });
       for (const e of toRegister) {
         const c = choices.get(e.key);
+        if (e.masterKind === "hdec_pic" || e.masterKind === "hdec_eng") {
+          toast.error(
+            `${e.rawName}: HDEC PIC/ENG는 사용자관리에서만 등록됩니다. skip 또는 map을 선택하세요.`,
+          );
+          continue;
+        }
         if (e.masterKind === "subsub") {
           if (!c?.parentSubId) {
             toast.error(`${e.rawName}: 상위 협력사를 선택하세요.`);
@@ -139,7 +145,7 @@ export function MasterMappingDialog({
         }
         try {
           await addMaster({
-            data: { kind: e.masterKind, name: e.rawName },
+            data: { kind: "subcontractor", name: e.rawName },
           });
           await qc.invalidateQueries({ queryKey: MASTER_OPTIONS_QK(e.masterKind) });
           toast.success(`${MASTER_LABEL[e.masterKind]} "${e.rawName}" 등록`);

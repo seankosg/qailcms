@@ -24,25 +24,24 @@ export const Route = createFileRoute("/_authenticated/admin/masters")({
   component: MastersAdminPage,
 });
 
-type MasterKind = "subcontractor" | "subsub" | "hdec_pic" | "hdec_eng" | "team";
+type MasterKind = "subcontractor" | "subsub" | "team";
 
 function MastersAdminPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">마스터 관리</h1>
+      <p className="text-sm text-muted-foreground">
+        HDEC PIC / HDEC ENG 명단은 <b>사용자관리</b>에서 관리됩니다. (user_type 이 <code>hdec</code>/<code>pm_pd</code>이고 활성 상태인 사용자가 자동으로 드롭다운에 표시됩니다.)
+      </p>
       <Tabs defaultValue="team">
         <TabsList>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="subcontractor">Subcontractor</TabsTrigger>
           <TabsTrigger value="subsub">Sub-Sub</TabsTrigger>
-          <TabsTrigger value="hdec_pic">HDEC PIC</TabsTrigger>
-          <TabsTrigger value="hdec_eng">HDEC Eng</TabsTrigger>
         </TabsList>
         <TabsContent value="team"><TeamMasterTab /></TabsContent>
         <TabsContent value="subcontractor"><SubcontractorTab kind="subcontractor" /></TabsContent>
         <TabsContent value="subsub"><SubcontractorTab kind="subsub" /></TabsContent>
-        <TabsContent value="hdec_pic"><SimpleMasterTab kind="hdec_pic" title="HDEC PIC" /></TabsContent>
-        <TabsContent value="hdec_eng"><SimpleMasterTab kind="hdec_eng" title="HDEC Eng" /></TabsContent>
       </Tabs>
     </div>
   );
@@ -58,16 +57,6 @@ function useMasterList(kind: MasterKind) {
           .select("*")
           .order("sort_order", { ascending: true })
           .order("code");
-        if (error) throw error;
-        return data ?? [];
-      }
-      if (kind === "hdec_pic") {
-        const { data, error } = await supabase.from("hdec_pic_master").select("*").order("name");
-        if (error) throw error;
-        return data ?? [];
-      }
-      if (kind === "hdec_eng") {
-        const { data, error } = await (supabase as any).from("hdec_eng_master").select("*").order("name");
         if (error) throw error;
         return data ?? [];
       }
@@ -98,58 +87,6 @@ function useSubParentOptions() {
       return (data ?? []) as { id: string; name: string; is_active: boolean }[];
     },
   });
-}
-
-/** 단순 이름-only 마스터 (HDEC PIC / HDEC Eng) */
-function SimpleMasterTab({ kind, title }: { kind: "hdec_pic" | "hdec_eng"; title: string }) {
-  const { data, isLoading } = useMasterList(kind);
-  const qc = useQueryClient();
-  const add = useServerFn(addMasterName);
-  const toggle = useServerFn(toggleMasterActive);
-  const del = useServerFn(deleteMasterName);
-  const [name, setName] = useState("");
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["master", kind] });
-
-  return (
-    <Card>
-      <CardHeader><CardTitle>{title} 마스터</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex gap-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${title} 이름`} />
-          <Button onClick={async () => {
-            if (!name.trim()) return;
-            try { await add({ data: { kind, name: name.trim() } }); setName(""); invalidate(); }
-            catch (e: any) { toast.error(e.message); }
-          }}><Plus className="mr-1 h-4 w-4" />추가</Button>
-        </div>
-        {isLoading ? <div className="text-sm text-muted-foreground">불러오는 중…</div> : (
-          <Table>
-            <TableHeader><TableRow><TableHead>이름</TableHead><TableHead className="w-24">활성</TableHead><TableHead className="w-20 text-right">삭제</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {(data ?? []).map((m: any) => (
-                <TableRow key={m.id}>
-                  <TableCell>{m.name}</TableCell>
-                  <TableCell>
-                    <Switch checked={m.is_active} onCheckedChange={async (v) => {
-                      try { await toggle({ data: { kind, id: m.id, is_active: v } }); invalidate(); }
-                      catch (e: any) { toast.error(e.message); }
-                    }} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={async () => {
-                      if (!confirm(`${m.name} 을(를) 삭제하시겠습니까?`)) return;
-                      try { await del({ data: { kind, id: m.id } }); invalidate(); }
-                      catch (e: any) { toast.error(e.message); }
-                    }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
-  );
 }
 
 function SubcontractorTab({ kind }: { kind: "subcontractor" | "subsub" }) {
