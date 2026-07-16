@@ -6,16 +6,22 @@ import { Label } from "@/components/ui/label";
 import { Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { streamXlsxExport } from "@/lib/excel/stream-export";
 
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   getRows: () => Record<string, any>[];
   fetchAllRows?: (onProgress?: (fetched: number, total: number) => void) => Promise<Record<string, any>[]>;
+  /** Paged fetcher used for memory-efficient single-file streaming exports. */
+  fetchPage?: (
+    offset: number,
+    limit: number,
+  ) => Promise<{ rows: Record<string, any>[]; total: number }>;
   columnHeaders: { key: string; label: string }[];
 }
 
-export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, columnHeaders }: Props) {
+export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, fetchPage, columnHeaders }: Props) {
   const [format, setFormat] = useState<"view" | "reimport">("view");
   const [mode, setMode] = useState<"single" | "per-subcon">("single");
   const [busy, setBusy] = useState(false);
@@ -24,6 +30,31 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, column
     setBusy(true);
     const toastId = toast.loading("현재 필터 전체 행 수집 중...");
     try {
+      const timestamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+      const stamp = format === "reimport" ? "REIMPORT" : "VIEW";
+
+      // ── Fast path: single-file + paged fetcher → true streaming (low memory) ──
+      if (mode === "single" && fetchPage) {
+        const cols = columnHeaders.map((h) => ({
+          key: h.key,
+          label: format === "reimport" ? h.key : h.label,
+        }));
+        const { count } = await streamXlsxExport({
+          filename: `defect-raw-${stamp}-${timestamp}.xlsx`,
+          sheetName: "Snags",
+          columns: cols,
+          chunkSize: 1000,
+          fetchPage,
+          transformRow: (r) => transformRow(r, columnHeaders, format),
+          onProgress: (fetched, total) => {
+            toast.loading(`내보내는 중 ${fetched.toLocaleString()} / ${total.toLocaleString()}`, { id: toastId });
+          },
+        });
+        toast.success(`${count.toLocaleString()}건 내보내기 완료`, { id: toastId });
+        onOpenChange(false);
+        return;
+      }
+
       let rows: Record<string, any>[];
       if (fetchAllRows) {
         rows = await fetchAllRows((fetched, total) => {
@@ -37,8 +68,6 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, column
         setBusy(false);
         return;
       }
-      const timestamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
-      const stamp = format === "reimport" ? "REIMPORT" : "VIEW";
       if (mode === "single") {
         const wb = XLSX.utils.book_new();
         const ws = buildSheet(rows, columnHeaders, format);
@@ -54,6 +83,8 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, column
           if (!groups.has(key)) groups.set(key, []);
           groups.get(key)!.push(r);
         }
+        // Release the flat array now that we've grouped
+        rows = [] as any;
         if (groups.size >= 7) {
           // Use jszip
           const JSZip = (await import("jszip")).default;
@@ -63,6 +94,9 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, column
             XLSX.utils.book_append_sheet(wb, buildSheet(rs, columnHeaders, format), "Snags");
             const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
             zip.file(`${sanitize(key)}-${stamp}.xlsx`, buf);
+            // free the group's rows after writing this sheet
+            groups.set(key, []);
+            await new Promise((r) => setTimeout(r, 0));
           }
           const blob = await zip.generateAsync({ type: "blob" });
           downloadBlob(blob, `defect-raw-per-subcon-${timestamp}.zip`);
@@ -72,6 +106,8 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, column
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, buildSheet(rs, columnHeaders, format), "Snags");
             XLSX.writeFile(wb, `defect-raw-${sanitize(key)}-${stamp}-${timestamp}.xlsx`);
+            groups.set(key, []);
+            await new Promise((r) => setTimeout(r, 0));
           }
           toast.success(`${groups.size}개 파일 다운로드`, { id: toastId });
         }
@@ -140,6 +176,25 @@ function buildSheet(rows: Record<string, any>[], headers: { key: string; label: 
     }));
   }
   return XLSX.utils.aoa_to_sheet(aoa);
+}
+
+function transformRow(
+  r: Record<string, any>,
+  headers: { key: string; label: string }[],
+  format: "view" | "reimport",
+): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const h of headers) {
+    const v = r[h.key];
+    if (v == null) { out[h.key] = ""; continue; }
+    if (format === "reimport") { out[h.key] = v; continue; }
+    if (typeof v === "number" && h.key.endsWith("_pct")) {
+      out[h.key] = v > 1 ? `${v.toFixed(1)}%` : `${(v * 100).toFixed(1)}%`;
+    } else {
+      out[h.key] = v;
+    }
+  }
+  return out;
 }
 
 function sanitize(name: string): string {
