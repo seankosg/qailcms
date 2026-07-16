@@ -249,7 +249,7 @@ function scanHeaders(sheet: XLSX.WorkSheet): { map: Record<string, number>; entr
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:Z2");
   const map: Record<string, number> = {};
   const entries: DefectSheetHeader[] = [];
-  for (let c = range.s.c; c <= Math.min(range.e.c, 60); c++) {
+  for (let c = range.s.c; c <= range.e.c; c++) {
     const headerCell = sheet[XLSX.utils.encode_cell({ r: 0, c })];
     const raw = headerCell?.v;
     const header = raw == null ? "" : String(raw).replace(/\s+/g, " ").trim();
