@@ -141,7 +141,7 @@ const INSERT_CHUNK = 100;
 // 대량 upsert는 DB 트리거/인덱스 갱신과 맞물리면 500행×고병렬에서 statement timeout이 난다.
 // 작은 배치와 낮은 병렬성으로 안정성을 우선 확보한다.
 const BATCH_CONCURRENCY = 2;
-const EXISTING_FETCH_CHUNK = 1000;
+const EXISTING_FETCH_CHUNK = 100;
 const EXISTING_FETCH_CONCURRENCY = 4;
 const ROW_LOG_CHUNK = 500;
 const RETRY_DELAYS_MS = [300, 800, 2000];
@@ -738,6 +738,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       const duplicates = duplicatesAuto + duplicatesDefensive;
 
       // 기존 행 조회 (id + lock flags) — 청크를 병렬로 조회
+      setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: 2 } : x)));
       const ids = deduped.map((p) => p.source_issue_no);
       const existing = new Map<
         string,
@@ -756,10 +757,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         idChunks.push(ids.slice(i, i + EXISTING_FETCH_CHUNK));
       }
       await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
-        const { data } = await (supabase as any)
+        const { data, error } = await (supabase as any)
           .from("defect_items_raw")
           .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, defect_location, main_trade, sub_trade, work_type")
           .in("source_issue_no", chunk);
+        if (error) {
+          throw new Error(
+            `기존 Snag 조회 실패: ${error.message}${error.details ? ` (${error.details})` : ""}`,
+          );
+        }
         for (const r of (data ?? []) as any[]) {
           existing.set(r.source_issue_no, {
             priority_locked: !!r.priority_locked,
