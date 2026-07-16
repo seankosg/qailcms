@@ -14,21 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _defect_reimport_staging: {
-        Row: {
-          data: Json
-          source_issue_no: string
-        }
-        Insert: {
-          data: Json
-          source_issue_no: string
-        }
-        Update: {
-          data?: Json
-          source_issue_no?: string
-        }
-        Relationships: []
-      }
       abd_change_log: {
         Row: {
           abd_item_id: string | null

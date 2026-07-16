@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public._defect_reimport_staging;
