@@ -89,58 +89,6 @@ function useSubParentOptions() {
   });
 }
 
-/** 단순 이름-only 마스터 (HDEC PIC / HDEC Eng) */
-function SimpleMasterTab({ kind, title }: { kind: "hdec_pic" | "hdec_eng"; title: string }) {
-  const { data, isLoading } = useMasterList(kind);
-  const qc = useQueryClient();
-  const add = useServerFn(addMasterName);
-  const toggle = useServerFn(toggleMasterActive);
-  const del = useServerFn(deleteMasterName);
-  const [name, setName] = useState("");
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["master", kind] });
-
-  return (
-    <Card>
-      <CardHeader><CardTitle>{title} 마스터</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex gap-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${title} 이름`} />
-          <Button onClick={async () => {
-            if (!name.trim()) return;
-            try { await add({ data: { kind, name: name.trim() } }); setName(""); invalidate(); }
-            catch (e: any) { toast.error(e.message); }
-          }}><Plus className="mr-1 h-4 w-4" />추가</Button>
-        </div>
-        {isLoading ? <div className="text-sm text-muted-foreground">불러오는 중…</div> : (
-          <Table>
-            <TableHeader><TableRow><TableHead>이름</TableHead><TableHead className="w-24">활성</TableHead><TableHead className="w-20 text-right">삭제</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {(data ?? []).map((m: any) => (
-                <TableRow key={m.id}>
-                  <TableCell>{m.name}</TableCell>
-                  <TableCell>
-                    <Switch checked={m.is_active} onCheckedChange={async (v) => {
-                      try { await toggle({ data: { kind, id: m.id, is_active: v } }); invalidate(); }
-                      catch (e: any) { toast.error(e.message); }
-                    }} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={async () => {
-                      if (!confirm(`${m.name} 을(를) 삭제하시겠습니까?`)) return;
-                      try { await del({ data: { kind, id: m.id } }); invalidate(); }
-                      catch (e: any) { toast.error(e.message); }
-                    }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 function SubcontractorTab({ kind }: { kind: "subcontractor" | "subsub" }) {
   const title = kind === "subsub" ? "Sub-Sub" : "Subcontractor";
   const { data, isLoading } = useMasterList(kind);
