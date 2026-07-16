@@ -738,6 +738,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       const duplicates = duplicatesAuto + duplicatesDefensive;
 
       // 기존 행 조회 (id + lock flags) — 청크를 병렬로 조회
+      setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: 2 } : x)));
       const ids = deduped.map((p) => p.source_issue_no);
       const existing = new Map<
         string,
