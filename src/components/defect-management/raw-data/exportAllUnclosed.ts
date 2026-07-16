@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 
-const CHUNK = 2000;
+const CHUNK = 1000;
 
 export async function exportAllUnclosed(onProgress?: (fetched: number, total: number) => void): Promise<{ count: number }> {
   const all: Record<string, any>[] = [];
@@ -25,7 +25,7 @@ export async function exportAllUnclosed(onProgress?: (fetched: number, total: nu
     for (const r of arr) all.push(r.rows as Record<string, any>);
     offset += arr.length;
     onProgress?.(all.length, total);
-    if (arr.length < CHUNK) break;
+    if (all.length >= total) break;
   }
 
   const headers = collectHeaders(all);
