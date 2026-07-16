@@ -1,5 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
+import {
+  buildDefectHeaderBlock,
+  DEFECT_DATE_FIELDS,
+  DEFECT_DATETIME_FIELDS,
+} from "@/lib/defect-management/export-meta";
 
 const CHUNK = 1000;
 const PRIORITY = [
@@ -39,6 +44,15 @@ export async function exportAllUnclosed(
   const columns = keys.map((k) => ({ key: k, label: k }));
   onProgress?.(first.rows.length, first.total);
 
+  const header = buildDefectHeaderBlock({
+    format: "view",
+    meta: { userName: "system", userType: "" },
+    sourceLabel: "Snag Raw Data → Tab: unclosed · Full export",
+    search: "",
+    filterSummary: "(none)",
+    sortSummary: "source_issue_no ↑",
+  });
+
   // Stream: reuse first page, then continue from CHUNK
   let served = false;
   return streamXlsxExport({
@@ -46,6 +60,9 @@ export async function exportAllUnclosed(
     sheetName: "Unclosed",
     columns,
     chunkSize: CHUNK,
+    header: { title: header.title, metaRows: header.metaRows, freezeCols: 3 },
+    dateFields: DEFECT_DATE_FIELDS,
+    datetimeFields: DEFECT_DATETIME_FIELDS,
     fetchPage: async (offset, limit) => {
       if (!served) { served = true; return first; }
       return fetchPage(offset, limit);
