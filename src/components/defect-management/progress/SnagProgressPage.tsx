@@ -190,7 +190,7 @@ export function SnagProgressPage() {
 
   const setSearch = (patch: Partial<typeof search>) => {
     navigate({
-      search: (prev) => ({ ...prev, ...patch }),
+      search: (prev: typeof search) => ({ ...prev, ...patch }),
       replace: true,
     });
   };
