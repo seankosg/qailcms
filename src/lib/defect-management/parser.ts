@@ -293,6 +293,12 @@ export function toDefectFieldName(
 ): string {
   const norm = normalizeHeader(rawHeader);
   if (!norm) return "";
+  // Re-import 파일은 raw 헤더가 곧 target field 이름 (예: "source_issue_no", "plan_group",
+  // "status_raw", "planned_start_date" …). id 는 시스템 컬럼이라 매핑 제외.
+  if (norm === "id") return "";
+  for (const t of DEFECT_TARGET_FIELDS) {
+    if (normalizeHeader(t) === norm) return t;
+  }
   // 원본 헤더가 그대로 확장 필드명인 경우 (re-import 파일)
   const asIs = norm; // note: normalizeHeader lowercases & strips ws
   for (const f of EXTRA_REIMPORT_FIELDS) {
