@@ -4,9 +4,18 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Download } from "lucide-react";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { streamXlsxExport } from "@/lib/excel/stream-export";
+import {
+  streamXlsxExport,
+  type StyledHeaderBlock,
+} from "@/lib/excel/stream-export";
+import {
+  buildDefectHeaderBlock,
+  DEFECT_DATE_FIELDS,
+  DEFECT_DATETIME_FIELDS,
+  REIMPORT_MARKER,
+  type DefectExportMeta,
+} from "@/lib/defect-management/export-meta";
 
 interface Props {
   open: boolean;
@@ -19,9 +28,27 @@ interface Props {
     limit: number,
   ) => Promise<{ rows: Record<string, any>[]; total: number }>;
   columnHeaders: { key: string; label: string }[];
+  /** Metadata used to build the SHAW-style styled header block. */
+  meta: DefectExportMeta;
+  sourceLabel: string;
+  search: string;
+  filterSummary: string;
+  sortSummary: string;
 }
 
-export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, fetchPage, columnHeaders }: Props) {
+export function ExportDialog({
+  open,
+  onOpenChange,
+  getRows,
+  fetchAllRows,
+  fetchPage,
+  columnHeaders,
+  meta,
+  sourceLabel,
+  search,
+  filterSummary,
+  sortSummary,
+}: Props) {
   const [format, setFormat] = useState<"view" | "reimport">("view");
   const [mode, setMode] = useState<"single" | "per-subcon">("single");
   const [busy, setBusy] = useState(false);
@@ -32,6 +59,19 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, fetchP
     try {
       const timestamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
       const stamp = format === "reimport" ? "REIMPORT" : "VIEW";
+
+      const buildHeader = (sourceSuffix?: string): StyledHeaderBlock => {
+        const b = buildDefectHeaderBlock({
+          format,
+          meta,
+          sourceLabel,
+          search,
+          filterSummary,
+          sortSummary,
+          sourceSuffix,
+        });
+        return { title: b.title, metaRows: b.metaRows, freezeCols: 3 };
+      };
 
       // ── Fast path: single-file + paged fetcher → true streaming (low memory) ──
       if (mode === "single" && fetchPage) {
@@ -46,6 +86,9 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, fetchP
           chunkSize: 1000,
           fetchPage,
           transformRow: (r) => transformRow(r, columnHeaders, format),
+          header: buildHeader(),
+          dateFields: DEFECT_DATE_FIELDS,
+          datetimeFields: DEFECT_DATETIME_FIELDS,
           onProgress: (fetched, total) => {
             toast.loading(`내보내는 중 ${fetched.toLocaleString()} / ${total.toLocaleString()}`, { id: toastId });
           },
@@ -69,11 +112,23 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, fetchP
         return;
       }
       if (mode === "single") {
-        const wb = XLSX.utils.book_new();
-        const ws = buildSheet(rows, columnHeaders, format);
-        if (format === "reimport") ws["!marker" as any] = "QAIL_DEFECT_REIMPORT_V1";
-        XLSX.utils.book_append_sheet(wb, ws, "Snags");
-        XLSX.writeFile(wb, `defect-raw-${stamp}-${timestamp}.xlsx`);
+        // Fallback single-file path: reuse the streaming writer with an
+        // in-memory pager so we get the same SHAW-style header block.
+        const cols = columnHeaders.map((h) => ({
+          key: h.key,
+          label: format === "reimport" ? h.key : h.label,
+        }));
+        await streamXlsxExport({
+          filename: `defect-raw-${stamp}-${timestamp}.xlsx`,
+          sheetName: "Snags",
+          columns: cols,
+          chunkSize: 1000,
+          fetchPage: singleShotPager(rows),
+          transformRow: (r) => transformRow(r, columnHeaders, format),
+          header: buildHeader(),
+          dateFields: DEFECT_DATE_FIELDS,
+          datetimeFields: DEFECT_DATETIME_FIELDS,
+        });
         toast.success(`${rows.length.toLocaleString()}건 내보내기 완료`, { id: toastId });
       } else {
         // Group by subcontractor
@@ -85,14 +140,24 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, fetchP
         }
         // Release the flat array now that we've grouped
         rows = [] as any;
+        const cols = columnHeaders.map((h) => ({
+          key: h.key,
+          label: format === "reimport" ? h.key : h.label,
+        }));
         if (groups.size >= 7) {
-          // Use jszip
+          // Use jszip — write each subcon workbook via streamXlsxExport into a buffer.
           const JSZip = (await import("jszip")).default;
+          const ExcelJS = (await import("exceljs")).default;
           const zip = new JSZip();
           for (const [key, rs] of groups.entries()) {
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, buildSheet(rs, columnHeaders, format), "Snags");
-            const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+            const buf = await buildStyledWorkbookBuffer(ExcelJS, {
+              sheetName: "Snags",
+              columns: cols,
+              rows: rs.map((r) => transformRow(r, columnHeaders, format)),
+              header: buildHeader(`Subcontractor: ${key}`),
+              dateFields: DEFECT_DATE_FIELDS,
+              datetimeFields: DEFECT_DATETIME_FIELDS,
+            });
             zip.file(`${sanitize(key)}-${stamp}.xlsx`, buf);
             // free the group's rows after writing this sheet
             groups.set(key, []);
@@ -103,9 +168,17 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, fetchP
           toast.success(`${groups.size}개 서브콘 → ZIP 다운로드`, { id: toastId });
         } else {
           for (const [key, rs] of groups.entries()) {
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, buildSheet(rs, columnHeaders, format), "Snags");
-            XLSX.writeFile(wb, `defect-raw-${sanitize(key)}-${stamp}-${timestamp}.xlsx`);
+            await streamXlsxExport({
+              filename: `defect-raw-${sanitize(key)}-${stamp}-${timestamp}.xlsx`,
+              sheetName: "Snags",
+              columns: cols,
+              chunkSize: 1000,
+              fetchPage: singleShotPager(rs),
+              transformRow: (r) => transformRow(r, columnHeaders, format),
+              header: buildHeader(`Subcontractor: ${key}`),
+              dateFields: DEFECT_DATE_FIELDS,
+              datetimeFields: DEFECT_DATETIME_FIELDS,
+            });
             groups.set(key, []);
             await new Promise((r) => setTimeout(r, 0));
           }
@@ -162,20 +235,123 @@ export function ExportDialog({ open, onOpenChange, getRows, fetchAllRows, fetchP
   );
 }
 
-function buildSheet(rows: Record<string, any>[], headers: { key: string; label: string }[], format: "view" | "reimport") {
-  const aoa: any[][] = [];
-  aoa.push(headers.map((h) => (format === "reimport" ? h.key : h.label)));
-  for (const r of rows) {
-    aoa.push(headers.map((h) => {
-      const v = r[h.key];
-      if (v == null) return "";
-      if (format === "reimport") return v;
-      // view-friendly: keep ISO for dates, pct for percents
-      if (typeof v === "number" && (h.key.endsWith("_pct"))) return v > 1 ? `${v.toFixed(1)}%` : `${(v * 100).toFixed(1)}%`;
-      return v;
-    }));
+/** In-memory paged fetcher used by fallback paths. */
+function singleShotPager(rows: Record<string, any>[]) {
+  let served = false;
+  return async (_offset: number, _limit: number) => {
+    if (served) return { rows: [] as Record<string, any>[], total: rows.length };
+    served = true;
+    return { rows, total: rows.length };
+  };
+}
+
+/** Build a fully-styled workbook buffer for ZIP packaging. Mirrors
+ *  streamXlsxExport's writer but returns bytes instead of triggering a download. */
+async function buildStyledWorkbookBuffer(
+  ExcelJS: typeof import("exceljs"),
+  args: {
+    sheetName: string;
+    columns: { key: string; label: string }[];
+    rows: Record<string, any>[];
+    header: StyledHeaderBlock;
+    dateFields: string[];
+    datetimeFields: string[];
+  },
+): Promise<Uint8Array> {
+  // Round-trip through streamXlsxExport-style logic. We inline it here rather
+  // than exporting a second variant to keep the writer's memory profile.
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(args.sheetName);
+  const colCount = Math.max(args.columns.length, 2);
+  const freezeCols = Math.min(args.header.freezeCols ?? 3, args.columns.length);
+  const FONT = "Calibri";
+
+  // Title
+  const titleCell = ws.getCell(1, 1);
+  titleCell.value = args.header.title;
+  titleCell.font = { name: FONT, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+  titleCell.alignment = { vertical: "middle", horizontal: "left" };
+  ws.mergeCells(1, 1, 1, colCount);
+  ws.getRow(1).height = 24;
+
+  for (let i = 0; i < 5; i++) {
+    const r = 2 + i;
+    const cell = ws.getCell(r, 1);
+    cell.value = args.header.metaRows[i] ?? "";
+    cell.font = {
+      name: FONT,
+      size: 10,
+      bold: i === 0,
+      color: { argb: i === 0 ? "FF374151" : "FF111827" },
+    };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+    cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+    ws.mergeCells(r, 1, r, colCount);
+    ws.getRow(r).height = 16;
   }
-  return XLSX.utils.aoa_to_sheet(aoa);
+  ws.getRow(7).height = 6;
+
+  for (let c = 0; c < args.columns.length; c++) {
+    const cell = ws.getCell(8, c + 1);
+    cell.value = args.columns[c].label;
+    cell.font = { name: FONT, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF334155" } };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.border = {
+      top: { style: "thin", color: { argb: "FF1F2937" } },
+      bottom: { style: "thin", color: { argb: "FF1F2937" } },
+      left: { style: "thin", color: { argb: "FF1F2937" } },
+      right: { style: "thin", color: { argb: "FF1F2937" } },
+    };
+    ws.getColumn(c + 1).width = 18;
+  }
+  ws.getRow(8).height = 28;
+  ws.views = [
+    {
+      state: "frozen",
+      xSplit: freezeCols,
+      ySplit: 8,
+      topLeftCell: ws.getCell(9, freezeCols + 1).address,
+      activeCell: ws.getCell(9, freezeCols + 1).address,
+    },
+  ];
+
+  const dateSet = new Set(args.dateFields);
+  const dtSet = new Set(args.datetimeFields);
+  const dataBorder = {
+    top: { style: "thin" as const, color: { argb: "FFE5E7EB" } },
+    bottom: { style: "thin" as const, color: { argb: "FFE5E7EB" } },
+    left: { style: "thin" as const, color: { argb: "FFE5E7EB" } },
+    right: { style: "thin" as const, color: { argb: "FFE5E7EB" } },
+  };
+  for (let i = 0; i < args.rows.length; i++) {
+    const src = args.rows[i];
+    const row = ws.getRow(9 + i);
+    for (let c = 0; c < args.columns.length; c++) {
+      const key = args.columns[c].key;
+      const raw = src[key];
+      const cell = row.getCell(c + 1);
+      if (dateSet.has(key) && typeof raw === "string" && /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+        cell.value = new Date(raw.slice(0, 10) + "T00:00:00Z");
+        cell.numFmt = "yyyy-mm-dd";
+      } else if (dtSet.has(key) && typeof raw === "string" && raw) {
+        const d = new Date(raw);
+        if (!isNaN(d.getTime())) {
+          cell.value = d;
+          cell.numFmt = "yyyy-mm-dd hh:mm";
+        } else cell.value = String(raw);
+      } else if (raw == null) cell.value = "";
+      else if (typeof raw === "object") cell.value = JSON.stringify(raw);
+      else cell.value = raw as any;
+      cell.font = { name: FONT, size: 10, color: { argb: "FF111827" } };
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+      cell.border = dataBorder;
+    }
+    row.height = 20;
+  }
+  const buf = await wb.xlsx.writeBuffer();
+  return new Uint8Array(buf as ArrayBuffer);
 }
 
 function transformRow(
@@ -196,6 +372,9 @@ function transformRow(
   }
   return out;
 }
+
+// keep `REIMPORT_MARKER` reachable for downstream code paths that read it.
+void REIMPORT_MARKER;
 
 function sanitize(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
