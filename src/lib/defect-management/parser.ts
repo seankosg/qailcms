@@ -268,12 +268,21 @@ function resolveColumn(
   target: DefectTargetField,
   extraAliases: string[],
 ): number | null {
-  // canonical
+  // 1) 헤더 이름이 target field 이름과 정확히 같은 경우 최우선.
+  //    Re-import(재수출) 파일에서 항상 정답이며, 애매한 별칭(예: "ID" → source_issue_no)
+  //    을 이긴다.
+  const targetNorm = normalizeHeader(target);
+  if (headerMap[targetNorm]) return headerMap[targetNorm];
+  // 2) canonical
   for (const [h, t] of Object.entries(CANONICAL_HEADERS)) {
     if (t === target && headerMap[h]) return headerMap[h];
   }
+  // 3) DB 별칭. 단, target=source_issue_no 에 대한 "id" 별칭은 무시한다.
+  //    엑셀의 id 컬럼은 시스템 UUID 이며 LetsBuild Issue No. 가 아니다.
   for (const a of extraAliases) {
     const key = normalizeHeader(a);
+    if (!key) continue;
+    if (target === "source_issue_no" && key === "id") continue;
     if (headerMap[key]) return headerMap[key];
   }
   return null;
