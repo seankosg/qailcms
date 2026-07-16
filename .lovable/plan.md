@@ -1,117 +1,52 @@
-## 목적
-코드는 수정하지 않고, 업로드된 `snag-raw-data-unclosed-202607160530-planned-dates-v5-2.xlsx` (44,510 행, 81 컬럼, 재수출 형식) 로 **DB를 1회 직접 업데이트**한다. 앱 임포트에서 statement timeout으로 실패했던 700행을 포함, 파일의 전체 44,510행을 서버측 단일 `UPDATE ... FROM staging` 문으로 반영한다.
+## 목표
+`hdec_pic_master` / `hdec_eng_master` 두 마스터 테이블을 제거하고, `profiles`를 단일 원천으로 삼아 세 곳을 하나로 통합합니다. 모든 HDEC PIC / HDEC ENG는 반드시 시스템 사용자(profiles + auth.users)로만 존재합니다.
 
-Data API(PostgREST)의 8초 타임아웃과 달리 psql/마이그레이션은 훨씬 여유가 있어 44,510행 서버측 UPDATE도 안정적으로 통과한다.
+## 최종 구조
 
----
-
-## 실행 단계
-
-### 1) 스테이징 테이블 생성 (migration)
-```sql
-CREATE UNLOGGED TABLE public._defect_reimport_staging (
-  source_issue_no text PRIMARY KEY,
-  data jsonb NOT NULL
-);
-GRANT ALL ON public._defect_reimport_staging TO service_role;
-```
-`data` 하나에 파일 한 행의 모든 필드를 JSON으로 담아 컬럼 매핑 문제를 없앤다.
-
-### 2) 파일 → 스테이징 적재 (psql INSERT, 1,000행 배치)
-로컬에서 xlsx 파싱 → `(source_issue_no, data_jsonb)` 형태로 45 배치 × 1,000행 psql INSERT.
-- `id` 컬럼(UUID)은 스테이징에 넣지 않음. `source_issue_no` 만 키로 사용.
-- 재수출 파일이므로 헤더 = 시스템 필드명. Excel 날짜/시리얼은 ISO 문자열로 정규화.
-
-### 3) 서버측 단일 UPDATE (supabase--insert 로 UPDATE 실행)
-```sql
-UPDATE public.defect_items_raw d
-SET
-  source_issue_no          = s.data->>'source_issue_no',
-  team                     = s.data->>'team',
-  status_raw               = s.data->>'status_raw',
-  priority                 = s.data->>'priority',
-  hdec_verification        = s.data->>'hdec_verification',
-  location_raw             = s.data->>'location_raw',
-  subcontractor_name       = s.data->>'subcontractor_name',
-  category                 = s.data->>'category',
-  defect_type              = s.data->>'defect_type',
-  description              = s.data->>'description',
-  assigned_to              = s.data->>'assigned_to',
-  ir                       = s.data->>'ir',
-  item                     = s.data->>'item',
-  room                     = s.data->>'room',
-  forms                    = s.data->>'forms',
-  due_by                   = (s.data->>'due_by')::date,
-  remarks                  = s.data->>'remarks',
-  building                 = s.data->>'building',
-  area_type                = s.data->>'area_type',
-  sub_trade                = s.data->>'sub_trade',
-  work_type                = s.data->>'work_type',
-  area_level               = s.data->>'area_level',
-  level_name               = s.data->>'level_name',
-  main_trade               = s.data->>'main_trade',
-  plan_group               = s.data->>'plan_group',
-  plan_title               = s.data->>'plan_title',
-  room_group               = s.data->>'room_group',
-  hdec_reason              = s.data->>'hdec_reason',
-  podium_area              = s.data->>'podium_area',
-  review_flag              = s.data->>'review_flag',
-  subsub_name              = s.data->>'subsub_name',
-  created_date             = (s.data->>'created_date')::timestamptz,
-  trade_detail             = s.data->>'trade_detail',
-  area_location            = s.data->>'area_location',
-  hdec_comments            = s.data->>'hdec_comments',
-  hdec_eng_name            = s.data->>'hdec_eng_name',
-  hdec_pic_name            = s.data->>'hdec_pic_name',
-  classification           = s.data->>'classification',
-  completion_status        = s.data->>'completion_status',
-  closure_status           = s.data->>'closure_status',
-  updated_status           = s.data->>'updated_status',
-  created_by_name          = s.data->>'created_by_name',
-  defect_location          = s.data->>'defect_location',
-  last_updated_at          = (s.data->>'last_updated_at')::timestamptz,
-  updated_by_name          = s.data->>'updated_by_name',
-  captured_by_name         = s.data->>'captured_by_name',
-  updated_date_raw         = s.data->>'updated_date_raw',
-  actual_start_date        = (s.data->>'actual_start_date')::date,
-  location_reference       = s.data->>'location_reference',
-  planned_start_date       = (s.data->>'planned_start_date')::date,
-  actual_closure_date      = (s.data->>'actual_closure_date')::date,
-  actual_progress_pct      = NULLIF(s.data->>'actual_progress_pct','')::numeric,
-  updated_description      = s.data->>'updated_description',
-  created_by_team_name     = s.data->>'created_by_team_name',
-  planned_closure_date     = (s.data->>'planned_closure_date')::date,
-  planned_progress_pct     = NULLIF(s.data->>'planned_progress_pct','')::numeric,
-  actual_completion_date   = (s.data->>'actual_completion_date')::date,
-  subcontractor_issue_no   = s.data->>'subcontractor_issue_no',
-  planned_completion_date  = (s.data->>'planned_completion_date')::date,
-  updated_at               = now()
-FROM public._defect_reimport_staging s
-WHERE d.source_issue_no = s.source_issue_no;
+```text
+                 profiles (단일 원천)
+                     │
+      ┌──────────────┼──────────────┐
+      ▼              ▼              ▼
+ 사용자관리 UI   HDEC PIC 뷰    HDEC ENG 뷰
+                (user_type=hdec) (user_type=pm_pd)
+                     │              │
+                     └──── 드롭다운 옵션 공급 ────┘
 ```
 
-**제외 컬럼** (덮어쓰지 않음):
-- `id`, `created_at`, `row_version` — DB 관리
-- `is_active`, `is_critical`, `status_group`, `data_date`, `status_manual`, `priority_locked`, `hdec_verification_locked` — 락/파생/앱 관리 필드
-- `raw_payload`, `custom_payload`, `source_import_log_id`, `classified_at`, `classification_source`, `critical_marked_at`, `critical_marked_by`, `aconex_comments`, `subcontractor_issue_source`, `issue_no` — 시스템/외부 소스 관리
+## 변경 사항
 
-### 4) 정리 (migration)
-```sql
-DROP TABLE public._defect_reimport_staging;
-```
+### 1. 데이터베이스 마이그레이션
+- 기존 `hdec_pic_master`, `hdec_eng_master` 참조 정리 후 두 테이블 **DROP**.
+- 대체 뷰 2개 생성 (기존 이름 그대로 → 앱 코드 최소 수정):
+  - `hdec_pic_master` 뷰 = `SELECT id, name, is_active, created_at, updated_at FROM profiles WHERE user_type='hdec' AND is_active=true`
+  - `hdec_eng_master` 뷰 = `SELECT id, name, is_active, created_at, updated_at FROM profiles WHERE user_type='pm_pd' AND is_active=true`
+  - `name`은 `COALESCE(name, display_name, login_id)`로 안전 처리.
+- 뷰에 `authenticated`용 `GRANT SELECT` 부여 (RLS는 profiles 정책이 이미 통제).
+- `profiles.hdec_pic_name` / `hdec_eng_name` 컬럼은 현재 사용자 자기 참조가 아니라 "담당 PIC/ENG 지정" 용도이므로 **유지** (다른 user_type에서 담당자 지정에 사용).
 
-### 5) 검증
-- 업데이트된 행수 확인 (`UPDATE` 반환 rowcount)
-- `defect_items_raw` 에서 스테이징 키와 매칭되지 않은 행 수 확인 (파일에 없는 소스 이슈 개수)
-- 샘플 5행 spot check (`updated_at` 최신화 여부)
+### 2. 관리자 UI 정리 (`src/routes/_authenticated/admin/masters.tsx`)
+- **HDEC PIC / HDEC Eng 탭 제거**. Subcontractor / Sub-Sub / Team 탭만 유지.
+- 사용자관리 화면 상단 안내 문구 추가: "HDEC PIC / HDEC ENG 명단은 [사용자관리]에서 관리됩니다."
+- `SimpleMasterTab`, 관련 mutation 코드 제거.
 
----
+### 3. 옵션 훅 (`src/hooks/useMasterOptions.ts`)
+- 뷰 이름이 그대로여서 쿼리 코드는 변경 없이 동작. 타입만 확인.
 
-## 리스크
-- 단일 트랜잭션 UPDATE 44,510행 + status_history 트리거가 무거우면 마이그레이션 자체가 느려질 수 있음. 필요 시 `d.source_issue_no` 범위를 4~5 청크로 나눠 순차 실행.
-- 스테이징 적재 45배치 psql INSERT는 인터랙티브하지만 각 배치는 작아 timeout 걱정 없음.
-- 락/파생 필드는 절대 덮어쓰지 않음. 앱에서 사용자가 잠근 값은 유지됨.
+### 4. 서버 함수 (`src/lib/admin/users.functions.ts`)
+- `MasterKind`에서 `hdec_pic` / `hdec_eng` 케이스 제거 (마스터 CRUD 서버 함수가 이들을 다루지 않도록).
+- 사용자관리 화면의 PIC/ENG 드롭다운은 뷰(`hdec_pic_master`, `hdec_eng_master`)를 그대로 읽음 → 사용자 저장 시 마스터가 자동 갱신됨.
 
-## 예상 결과
-- `defect_items_raw` 44,510행이 파일 값으로 갱신 (700 failed 포함).
-- 앱 임포트 로그에는 반영 안 됨 (직접 DB 조작이므로). 필요 시 별도 로그 삽입은 요청 시 추가.
+### 5. 사용자관리 화면 (`src/routes/_authenticated/admin/users.tsx`)
+- `useMasterList("hdec_pic" | "hdec_eng")`는 뷰를 읽으므로 그대로 동작. 코드 변경 최소.
+
+## 마이그레이션 시 리스크 / 사전 처리
+- 두 마스터 테이블은 현재 **0건**이므로 데이터 손실 없음.
+- 앱의 defect/task 임포트 매핑에서 마스터 테이블을 **INSERT/UPDATE** 하는 경로가 있는지 확인 필요 (뷰는 write 불가). 검색 결과상 이미 profiles 이름을 문자열 저장 방식이라 write 경로 없음 — 마이그레이션 전에 grep으로 최종 확인 후 진행.
+- Supabase 타입(`types.ts`)이 자동 재생성되므로 컴파일 오류 여부를 마이그레이션 승인 후 재점검.
+
+## 결과
+- 관리 화면에서 "HDEC PIC/ENG 마스터" 탭 사라짐.
+- 사용자관리에서 hdec/pm_pd 사용자를 만들면 즉시 PIC/ENG 드롭다운에 나타남.
+- 사용자를 비활성화하면 드롭다운에서 자동 제외.
+- 세 항목이 하나의 원천(profiles)으로 통합 완료.
