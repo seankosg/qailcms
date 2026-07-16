@@ -70,6 +70,11 @@ import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { ExportDialog } from "./ExportDialog";
 import { exportAllUnclosed } from "./exportAllUnclosed";
+import {
+  inferSourceLabel,
+  summarizeServerFilters,
+  summarizeServerSort,
+} from "@/lib/defect-management/export-meta";
 import { EditCellPopover } from "./EditCellPopover";
 import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
@@ -939,6 +944,14 @@ export function DefectRawDataPage() {
           return all;
         }}
         columnHeaders={DEFECT_COLUMNS.map((c) => ({ key: c.key, label: helpers.getLabel(c.key) }))}
+        meta={{
+          userName: user?.name ?? user?.email ?? "unknown",
+          userType: (user as any)?.userType ?? (user?.isAdmin ? "admin" : ""),
+        }}
+        sourceLabel={inferSourceLabel(urlSearch as Record<string, unknown>, tab, includeInactive)}
+        search={q}
+        filterSummary={summarizeServerFilters(serverFilters)}
+        sortSummary={summarizeServerSort(serverSort)}
       />
 
       <CriticalPendingBar
