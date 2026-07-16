@@ -5,17 +5,13 @@ const DUMMY_EMAIL_DOMAIN = "qail.local";
 /** @deprecated Phase 2 이후 DEFAULT_PASSWORD 사용. 하위호환용 유지. */
 export const DEFAULT_INITIAL_PASSWORD = "Qail@2026!";
 
-type MasterKind = "subcontractor" | "subsub" | "hdec_pic" | "hdec_eng" | "team";
+type MasterKind = "subcontractor" | "subsub" | "team";
 
 function tableForKind(kind: MasterKind): string {
   switch (kind) {
     case "subcontractor":
     case "subsub":
       return "subcontractor_master";
-    case "hdec_pic":
-      return "hdec_pic_master";
-    case "hdec_eng":
-      return "hdec_eng_master";
     case "team":
       return "team_master";
   }
