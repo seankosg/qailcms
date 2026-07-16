@@ -24,25 +24,24 @@ export const Route = createFileRoute("/_authenticated/admin/masters")({
   component: MastersAdminPage,
 });
 
-type MasterKind = "subcontractor" | "subsub" | "hdec_pic" | "hdec_eng" | "team";
+type MasterKind = "subcontractor" | "subsub" | "team";
 
 function MastersAdminPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">마스터 관리</h1>
+      <p className="text-sm text-muted-foreground">
+        HDEC PIC / HDEC ENG 명단은 <b>사용자관리</b>에서 관리됩니다. (user_type 이 <code>hdec</code>/<code>pm_pd</code>이고 활성 상태인 사용자가 자동으로 드롭다운에 표시됩니다.)
+      </p>
       <Tabs defaultValue="team">
         <TabsList>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="subcontractor">Subcontractor</TabsTrigger>
           <TabsTrigger value="subsub">Sub-Sub</TabsTrigger>
-          <TabsTrigger value="hdec_pic">HDEC PIC</TabsTrigger>
-          <TabsTrigger value="hdec_eng">HDEC Eng</TabsTrigger>
         </TabsList>
         <TabsContent value="team"><TeamMasterTab /></TabsContent>
         <TabsContent value="subcontractor"><SubcontractorTab kind="subcontractor" /></TabsContent>
         <TabsContent value="subsub"><SubcontractorTab kind="subsub" /></TabsContent>
-        <TabsContent value="hdec_pic"><SimpleMasterTab kind="hdec_pic" title="HDEC PIC" /></TabsContent>
-        <TabsContent value="hdec_eng"><SimpleMasterTab kind="hdec_eng" title="HDEC Eng" /></TabsContent>
       </Tabs>
     </div>
   );
@@ -58,16 +57,6 @@ function useMasterList(kind: MasterKind) {
           .select("*")
           .order("sort_order", { ascending: true })
           .order("code");
-        if (error) throw error;
-        return data ?? [];
-      }
-      if (kind === "hdec_pic") {
-        const { data, error } = await supabase.from("hdec_pic_master").select("*").order("name");
-        if (error) throw error;
-        return data ?? [];
-      }
-      if (kind === "hdec_eng") {
-        const { data, error } = await (supabase as any).from("hdec_eng_master").select("*").order("name");
         if (error) throw error;
         return data ?? [];
       }
