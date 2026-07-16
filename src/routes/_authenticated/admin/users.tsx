@@ -394,12 +394,8 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
   const [team, setTeam] = useState<string>("__none__");
   const [subName, setSubName] = useState<string>("");
   const [subsubName, setSubsubName] = useState<string>("");
-  const [picName, setPicName] = useState<string>("");
-  const [engName, setEngName] = useState<string>("");
   const subList = useMasterList("subcontractor");
   const subsubList = useMasterList("subsub");
-  const picList = useMasterList("hdec_pic");
-  const engList = useMasterList("hdec_eng");
 
   const submit = async () => {
     const cleanId = loginId.trim().toLowerCase();
@@ -420,14 +416,14 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
           team: team === "__none__" ? null : team,
           subcontractor_name: userType === "subcontractor" ? (subName || null) : null,
           subsub_name: userType === "subsub" ? (subsubName || null) : null,
-          hdec_pic_name: userType === "hdec" ? (picName || null) : null,
-          hdec_eng_name: userType === "pm_pd" ? (engName || null) : null,
+          hdec_pic_name: userType === "hdec" ? (displayName.trim() || null) : null,
+          hdec_eng_name: userType === "pm_pd" ? (displayName.trim() || null) : null,
         },
       });
       toast.success("계정이 생성되었습니다", { description: `초기 비밀번호: ${tempPw}` });
       setOpen(false);
       setLoginId(""); setDisplayName(""); setTempPw(DEFAULT_PASSWORD);
-      setSubName(""); setSubsubName(""); setPicName(""); setEngName(""); setTeam("__none__");
+      setSubName(""); setSubsubName(""); setTeam("__none__");
       onCreated();
     } catch (e: any) { toast.error(e.message); }
   };
@@ -458,7 +454,14 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
               <Label>User Type</Label>
               <Select value={userType} onValueChange={(v) => setUserType(v as any)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{USER_TYPES.map((t) => <SelectItem key={t} value={t}>{USER_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  <SelectItem value="hdec">HDEC PIC</SelectItem>
+                  <SelectItem value="pm_pd">HDEC ENG</SelectItem>
+                  <SelectItem value="subcontractor">{USER_TYPE_LABELS["subcontractor"]}</SelectItem>
+                  <SelectItem value="subsub">{USER_TYPE_LABELS["subsub"]}</SelectItem>
+                  <SelectItem value="admin">{USER_TYPE_LABELS["admin"]}</SelectItem>
+                  <SelectItem value="guest">{USER_TYPE_LABELS["guest"]}</SelectItem>
+                </SelectContent>
               </Select>
             </div>
             <div>
@@ -505,30 +508,9 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
               </Select>
             </div>
           )}
-          {userType === "hdec" && (
-            <div>
-              <Label>HDEC PIC</Label>
-              <Select value={picName} onValueChange={setPicName}>
-                <SelectTrigger><SelectValue placeholder="PIC 선택" /></SelectTrigger>
-                <SelectContent>
-                  {(picList.data ?? []).filter((m: any) => m.is_active).map((m: any) => (
-                    <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {userType === "pm_pd" && (
-            <div>
-              <Label>HDEC Eng</Label>
-              <Select value={engName} onValueChange={setEngName}>
-                <SelectTrigger><SelectValue placeholder="Eng 선택" /></SelectTrigger>
-                <SelectContent>
-                  {(engList.data ?? []).filter((m: any) => m.is_active).map((m: any) => (
-                    <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {(userType === "hdec" || userType === "pm_pd") && (
+            <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
+              {userType === "hdec" ? "HDEC PIC" : "HDEC ENG"} 명단에는 위 <b>이름</b> 필드 값이 자동으로 등록됩니다.
             </div>
           )}
           <div>
