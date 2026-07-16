@@ -42,7 +42,6 @@ export type DefectTargetField = (typeof DEFECT_TARGET_FIELDS)[number];
 
 /** 원본 헤더 텍스트 → target field (canonical, case-insensitive). */
 const CANONICAL_HEADERS: Record<string, DefectTargetField> = {
-  id: "source_issue_no",
   location: "location_raw",
   plantitle: "plan_title",
   plangroup: "plan_group",
