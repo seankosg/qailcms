@@ -2304,6 +2304,35 @@ export type Database = {
       }
     }
     Functions: {
+      _snag_group_val: {
+        Args: {
+          _dim: string
+          _row: Database["public"]["Tables"]["defect_items_raw"]["Row"]
+        }
+        Returns: string
+      }
+      _snag_progress_norm: { Args: { _v: number }; Returns: number }
+      _snag_stage_actual_date: {
+        Args: {
+          _row: Database["public"]["Tables"]["defect_items_raw"]["Row"]
+          _stage: string
+        }
+        Returns: string
+      }
+      _snag_stage_done: {
+        Args: {
+          _row: Database["public"]["Tables"]["defect_items_raw"]["Row"]
+          _stage: string
+        }
+        Returns: boolean
+      }
+      _snag_stage_planned_date: {
+        Args: {
+          _row: Database["public"]["Tables"]["defect_items_raw"]["Row"]
+          _stage: string
+        }
+        Returns: string
+      }
       abd_items_counts:
         | {
             Args: { _include_inactive?: boolean; _team?: string }
@@ -2457,6 +2486,44 @@ export type Database = {
           plan_group: string
           room_group: string
           status_raw: string
+        }[]
+      }
+      defect_snag_progress_cells: {
+        Args: {
+          _as_of_date: string
+          _bucket: string
+          _group_by: string[]
+          _plan_groups: string[]
+          _plan_mode: string
+          _range_end: string
+          _range_start: string
+          _room_groups: string[]
+          _teams: string[]
+        }
+        Returns: {
+          actual_cnt: number
+          bucket_iso: string
+          group_key: string[]
+          plan_cnt: number
+          stage: string
+        }[]
+      }
+      defect_snag_progress_totals: {
+        Args: {
+          _as_of_date: string
+          _group_by: string[]
+          _plan_groups: string[]
+          _plan_mode: string
+          _room_groups: string[]
+          _teams: string[]
+        }
+        Returns: {
+          actual_upto: number
+          done_upto: number
+          group_key: string[]
+          plan_upto: number
+          stage: string
+          total: number
         }[]
       }
       delete_abd_import_batch: { Args: { _batch_id: string }; Returns: Json }

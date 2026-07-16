@@ -1,0 +1,66 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+const InputSchema = z.object({
+  planGroups: z.array(z.string()).default([]),
+  teams: z.array(z.string()).default([]),
+  roomGroups: z.array(z.string()).default([]),
+  groupBy: z.array(z.string()).min(1),
+  asOfDate: z.string(),
+  planMode: z.enum(["baseline", "remaining"]).default("baseline"),
+});
+
+const CellsInputSchema = InputSchema.extend({
+  bucket: z.enum(["day", "week"]).default("day"),
+  rangeStart: z.string(),
+  rangeEnd: z.string(),
+});
+
+export const getSnagProgressCells = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => CellsInputSchema.parse(v))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await (context.supabase as any).rpc("defect_snag_progress_cells", {
+      _plan_groups: data.planGroups.length ? data.planGroups : null,
+      _teams: data.teams.length ? data.teams : null,
+      _room_groups: data.roomGroups.length ? data.roomGroups : null,
+      _group_by: data.groupBy,
+      _bucket: data.bucket,
+      _range_start: data.rangeStart,
+      _range_end: data.rangeEnd,
+      _as_of_date: data.asOfDate,
+      _plan_mode: data.planMode,
+    });
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map((r: any) => ({
+      group_key: (r.group_key ?? []) as string[],
+      bucket_iso: r.bucket_iso ? String(r.bucket_iso).slice(0, 10) : null,
+      stage: r.stage as "start" | "completion" | "closure",
+      plan_cnt: Number(r.plan_cnt) || 0,
+      actual_cnt: Number(r.actual_cnt) || 0,
+    }));
+  });
+
+export const getSnagProgressTotals = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => InputSchema.parse(v))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await (context.supabase as any).rpc("defect_snag_progress_totals", {
+      _plan_groups: data.planGroups.length ? data.planGroups : null,
+      _teams: data.teams.length ? data.teams : null,
+      _room_groups: data.roomGroups.length ? data.roomGroups : null,
+      _group_by: data.groupBy,
+      _as_of_date: data.asOfDate,
+      _plan_mode: data.planMode,
+    });
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map((r: any) => ({
+      group_key: (r.group_key ?? []) as string[],
+      stage: r.stage as "start" | "completion" | "closure",
+      total: Number(r.total) || 0,
+      done_upto: Number(r.done_upto) || 0,
+      plan_upto: Number(r.plan_upto) || 0,
+      actual_upto: Number(r.actual_upto) || 0,
+    }));
+  });
