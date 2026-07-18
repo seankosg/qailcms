@@ -291,6 +291,7 @@ export type Database = {
           latest_rev: string | null
           latest_status: string | null
           mismatch_fields: Json
+          owner_user_id: string | null
           pic: string | null
           plot: string | null
           r1_dar_actual: string | null
@@ -341,6 +342,7 @@ export type Database = {
           latest_rev?: string | null
           latest_status?: string | null
           mismatch_fields?: Json
+          owner_user_id?: string | null
           pic?: string | null
           plot?: string | null
           r1_dar_actual?: string | null
@@ -391,6 +393,7 @@ export type Database = {
           latest_rev?: string | null
           latest_status?: string | null
           mismatch_fields?: Json
+          owner_user_id?: string | null
           pic?: string | null
           plot?: string | null
           r1_dar_actual?: string | null
@@ -693,6 +696,7 @@ export type Database = {
           location_raw: string | null
           location_reference: string | null
           main_trade: string | null
+          owner_user_id: string | null
           plan_group: string | null
           plan_title: string | null
           planned_closure_date: string | null
@@ -776,6 +780,7 @@ export type Database = {
           location_raw?: string | null
           location_reference?: string | null
           main_trade?: string | null
+          owner_user_id?: string | null
           plan_group?: string | null
           plan_title?: string | null
           planned_closure_date?: string | null
@@ -859,6 +864,7 @@ export type Database = {
           location_raw?: string | null
           location_reference?: string | null
           main_trade?: string | null
+          owner_user_id?: string | null
           plan_group?: string | null
           plan_title?: string | null
           planned_closure_date?: string | null
@@ -1424,6 +1430,7 @@ export type Database = {
           issue_owner: string | null
           manual_available: boolean | null
           manufacturer: string | null
+          owner_user_id: string | null
           phy: boolean | null
           physical_list_agreed: boolean | null
           physical_remarks: string | null
@@ -1509,6 +1516,7 @@ export type Database = {
           issue_owner?: string | null
           manual_available?: boolean | null
           manufacturer?: string | null
+          owner_user_id?: string | null
           phy?: boolean | null
           physical_list_agreed?: boolean | null
           physical_remarks?: string | null
@@ -1594,6 +1602,7 @@ export type Database = {
           issue_owner?: string | null
           manual_available?: boolean | null
           manufacturer?: string | null
+          owner_user_id?: string | null
           phy?: boolean | null
           physical_list_agreed?: boolean | null
           physical_remarks?: string | null
@@ -1974,6 +1983,7 @@ export type Database = {
           is_rollup: boolean
           level: string
           location: string | null
+          owner_user_id: string | null
           parent_task_no: string | null
           pic: string | null
           plan_days: number | null
@@ -2015,6 +2025,7 @@ export type Database = {
           is_rollup?: boolean
           level: string
           location?: string | null
+          owner_user_id?: string | null
           parent_task_no?: string | null
           pic?: string | null
           plan_days?: number | null
@@ -2056,6 +2067,7 @@ export type Database = {
           is_rollup?: boolean
           level?: string
           location?: string | null
+          owner_user_id?: string | null
           parent_task_no?: string | null
           pic?: string | null
           plan_days?: number | null
@@ -2604,6 +2616,18 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }
+      is_full_access: { Args: { _user_id: string }; Returns: boolean }
+      is_row_owner: {
+        Args: {
+          _hdec_eng: string
+          _hdec_pic: string
+          _owner_user_id: string
+          _subcon: string
+          _subsub: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       preview_rollback_abd_import: {
         Args: { _batch_id: string }
         Returns: Json
@@ -2668,6 +2692,8 @@ export type Database = {
         | "admin"
         | "subsub"
         | "guest"
+        | "hdec_pic"
+        | "hdec_eng"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2804,7 +2830,16 @@ export const Constants = {
         "senior_user",
         "d_superuser",
       ],
-      user_type: ["subcontractor", "hdec", "pm_pd", "admin", "subsub", "guest"],
+      user_type: [
+        "subcontractor",
+        "hdec",
+        "pm_pd",
+        "admin",
+        "subsub",
+        "guest",
+        "hdec_pic",
+        "hdec_eng",
+      ],
     },
   },
 } as const
