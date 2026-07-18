@@ -384,29 +384,22 @@ function ImportInner() {
           onConfirm={(decisions) => {
             setFileConflictDecisions(conflictFile.id, decisions);
             setConflictFileId(null);
-            // 연속으로 다음 미결정 파일이 있으면 열고, 없으면 import 실행
-            setTimeout(() => {
-              const nextReady = files.filter(
-                (f) =>
-                  f.status === "ready" &&
-                  f.parsed &&
-                  f.parsed.length > 0 &&
-                  !f.validationError &&
-                  !!(f.dataDateOverride ?? f.dataDate),
-              );
-              const nextUnresolved = nextReady.find((f) => {
-                const conflicts = f.preflight?.conflicts ?? [];
-                if (conflicts.length === 0) return false;
-                const d = f.conflictDecisions ?? {};
-                return conflicts.some((c) => !d[c.task_no]);
-              });
-              if (nextUnresolved) {
-                setConflictFileId(nextUnresolved.id);
-              } else if (pendingImportAfterConflicts) {
-                setPendingImportAfterConflicts(false);
-                void startImport();
-              }
-            }, 0);
+            // 가상 상태로 다음 미결정 파일을 검색
+            const projectedFiles = files.map((ff) =>
+              ff.id === conflictFile.id ? { ...ff, conflictDecisions: decisions } : ff,
+            );
+            const nextUnresolved = projectedFiles.find((ff) => {
+              const conflicts = ff.preflight?.conflicts ?? [];
+              if (conflicts.length === 0) return false;
+              const d = ff.id === conflictFile.id ? decisions : (ff.conflictDecisions ?? {});
+              return conflicts.some((c) => !d[c.task_no]);
+            });
+            if (nextUnresolved) {
+              setConflictFileId(nextUnresolved.id);
+            } else if (pendingImportAfterConflicts) {
+              setPendingImportAfterConflicts(false);
+              void startImport();
+            }
           }}
         />
       )}
