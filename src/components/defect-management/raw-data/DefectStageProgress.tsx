@@ -8,7 +8,7 @@ import {
   todayIso,
 } from "@/lib/defect-management/stage-utils";
 
-export type StageName = "start" | "completion" | "closure";
+export type StageName = "start" | "rectified" | "closure";
 export type StageState = "done" | "wip" | "planned" | "hold" | "empty";
 type Row = Record<string, any>;
 
@@ -19,7 +19,7 @@ export function classifyStage(item: Row, stage: StageName, asOfDate: string): St
   const completionStatus = String(item.rectified_status ?? "").toLowerCase();
   const closureStatus = String(item.closure_status ?? "").toLowerCase();
   if (stage === "start" && item.actual_start_date) return "wip";
-  if (stage === "completion") {
+  if (stage === "rectified") {
     const pct = Number(item.actual_progress_pct ?? 0);
     const normalized = pct > 1 ? pct : pct * 100;
     if (completionStatus === "wip" || (normalized > 0 && normalized < 100)) return "wip";
@@ -31,7 +31,7 @@ export function classifyStage(item: Row, stage: StageName, asOfDate: string): St
   const plan =
     stage === "start"
       ? item.planned_start_date
-      : stage === "completion"
+      : stage === "rectified"
         ? item.planned_rectified_date
         : item.planned_closure_date;
   return plan ? "planned" : "empty";
@@ -72,7 +72,7 @@ const stateLabel = (state: StageState) =>
 export function DefectStageProgress({ item, asOfDate = null }: { item: Row; asOfDate?: string | null }) {
   const delayAsOfDate = asOfDate ?? todayIso();
   const start = classifyStage(item, "start", delayAsOfDate);
-  const completion = classifyStage(item, "completion", delayAsOfDate);
+  const completion = classifyStage(item, "rectified", delayAsOfDate);
   const closure = classifyStage(item, "closure", delayAsOfDate);
   const title = [
     `Delay as of ${formatDdMmm(delayAsOfDate)}`,

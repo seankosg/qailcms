@@ -6,9 +6,9 @@ export function todayIso(): string {
 
 type Row = Record<string, any>;
 
-export function isStageDone(row: Row, stage: "start" | "completion" | "closure"): boolean {
+export function isStageDone(row: Row, stage: "start" | "rectified" | "closure"): boolean {
   if (stage === "closure") return Boolean(row.actual_closure_date);
-  if (stage === "completion") {
+  if (stage === "rectified") {
     if (row.actual_rectified_date) return true;
     const p = Number(row.actual_progress_pct ?? 0);
     if ((p > 1 ? p : p * 100) >= 100) return true;
@@ -21,11 +21,11 @@ export function isStageDone(row: Row, stage: "start" | "completion" | "closure")
   return Boolean(row.actual_rectified_date || row.actual_closure_date);
 }
 
-export function isStageDelayedAsOf(row: Row, stage: "start" | "completion" | "closure", asOf: string | null | undefined): boolean {
+export function isStageDelayedAsOf(row: Row, stage: "start" | "rectified" | "closure", asOf: string | null | undefined): boolean {
   if (!asOf) return false;
   const planned =
     stage === "start" ? row.planned_start_date :
-    stage === "completion" ? row.planned_rectified_date :
+    stage === "rectified" ? row.planned_rectified_date :
     row.planned_closure_date;
   if (!planned) return false;
   if (String(planned).slice(0, 10) > asOf) return false;
@@ -33,7 +33,7 @@ export function isStageDelayedAsOf(row: Row, stage: "start" | "completion" | "cl
 }
 
 export function isActualComplete(row: Row): boolean {
-  return isStageDone(row, "completion");
+  return isStageDone(row, "rectified");
 }
 
 export function isClosureComplete(row: Row): boolean {
@@ -44,16 +44,16 @@ export function isOverdueDefect(row: Row, asOf: string | null | undefined): bool
   if (!asOf) return false;
   return (
     isStageDelayedAsOf(row, "start", asOf) ||
-    isStageDelayedAsOf(row, "completion", asOf) ||
+    isStageDelayedAsOf(row, "rectified", asOf) ||
     isStageDelayedAsOf(row, "closure", asOf)
   );
 }
 
 export function classifyDefectStage(row: Row, asOf: string | null | undefined): "Not Started" | "In Progress" | "Completed" | "Closed" | "Delayed" {
   const d = asOf ?? todayIso();
-  if (isStageDelayedAsOf(row, "start", d) || isStageDelayedAsOf(row, "completion", d) || isStageDelayedAsOf(row, "closure", d)) return "Delayed";
+  if (isStageDelayedAsOf(row, "start", d) || isStageDelayedAsOf(row, "rectified", d) || isStageDelayedAsOf(row, "closure", d)) return "Delayed";
   if (isStageDone(row, "closure")) return "Closed";
-  if (isStageDone(row, "completion")) return "Completed";
+  if (isStageDone(row, "rectified")) return "Completed";
   if (isStageDone(row, "start")) return "In Progress";
   return "Not Started";
 }

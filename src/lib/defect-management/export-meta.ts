@@ -28,7 +28,7 @@ const URL_PARAM_LABELS: Record<string, string> = {
 const FLAG_LABELS: Record<string, string> = {
   overdue: "Overdue",
   atRisk: "At-Risk",
-  actualComplete: "Actual Completion",
+  actualComplete: "Actual Rectified",
   closureComplete: "Closure Done",
   stage: "Stage",
   critical: "Critical",

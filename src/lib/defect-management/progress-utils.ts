@@ -1,11 +1,11 @@
 // Snag Progress 매트릭스 클라이언트 유틸.
 // DB 사전 집계(RPC) 결과를 UI 매트릭스 형태로 조립하는 순수 함수 모음.
 
-export type Stage = "start" | "completion" | "closure";
-export const ALL_STAGES: Stage[] = ["start", "completion", "closure"];
+export type Stage = "start" | "rectified" | "closure";
+export const ALL_STAGES: Stage[] = ["start", "rectified", "closure"];
 export const STAGE_LABELS: Record<Stage, string> = {
   start: "Start",
-  completion: "Comp",
+  rectified: "Comp",
   closure: "Close",
 };
 
@@ -219,7 +219,7 @@ export function assembleMatrix(opts: {
         cumActual: 0,
         stages: {
           start: emptyStageRow(buckets, "start", 0),
-          completion: emptyStageRow(buckets, "completion", 0),
+          rectified: emptyStageRow(buckets, "rectified", 0),
           closure: emptyStageRow(buckets, "closure", 0),
         },
         combined: buckets.map((b) => ({ bucket: b, plan: 0, actual: 0 })),
@@ -302,7 +302,7 @@ export function stageDateField(stage: Stage | "all", field: "planned" | "actual"
   }
   const map: Record<Stage, { planned: string; actual: string }> = {
     start: { planned: "planned_start_date", actual: "actual_start_date" },
-    completion: { planned: "planned_rectified_date", actual: "actual_rectified_date" },
+    rectified: { planned: "planned_rectified_date", actual: "actual_rectified_date" },
     closure: { planned: "planned_closure_date", actual: "actual_closure_date" },
   };
   return map[stage][field];

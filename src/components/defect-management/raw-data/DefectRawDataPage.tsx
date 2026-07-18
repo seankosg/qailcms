@@ -695,7 +695,7 @@ export function DefectRawDataPage() {
     if (urlSearch.unplannedActualOn) chips.push({ label: `${urlSearch.stage || "Stage"} actual ${urlSearch.unplannedActualOn} (unplanned)`, clears: ["unplannedActualOn", "stage"] });
     if (urlSearch.actualComplete === "true" && urlSearch.closureComplete === "false") chips.push({ label: "Remain Inspection", clears: ["actualComplete", "closureComplete"] });
     else {
-      if (urlSearch.actualComplete === "true" || urlSearch.actualComplete === "false") chips.push({ label: `Completion: ${urlSearch.actualComplete === "true" ? "Done" : "Open"}`, clears: ["actualComplete"] });
+      if (urlSearch.actualComplete === "true" || urlSearch.actualComplete === "false") chips.push({ label: `Rectified: ${urlSearch.actualComplete === "true" ? "Done" : "Open"}`, clears: ["actualComplete"] });
       if (urlSearch.closureComplete === "true" || urlSearch.closureComplete === "false") chips.push({ label: `Closure: ${urlSearch.closureComplete === "true" ? "Done" : "Open"}`, clears: ["closureComplete"] });
     }
     if (urlSearch.overdue === "true") chips.push({ label: urlSearch.stage ? `Overdue — ${urlSearch.stage}` : "Overdue", clears: ["overdue", "stage", "asOf"] });

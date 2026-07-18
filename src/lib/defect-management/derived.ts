@@ -1,4 +1,4 @@
-/** Defect 상태 파생 로직 (LetsBuild status_raw → completion/closure). */
+/** Defect 상태 파생 로직 (LetsBuild status_raw → rectified/closure). */
 
 const CLOSED_STATUSES = new Set(["closed", "verified", "complete", "completed"]);
 const IN_PROGRESS_STATUSES = new Set(["in progress", "inprogress", "under review", "reopened"]);

@@ -162,7 +162,7 @@ export function SnagProgressPage() {
       combined: r.combined.slice(startIdx),
       stages: {
         start: { ...r.stages.start, cells: r.stages.start.cells.slice(startIdx) },
-        completion: { ...r.stages.completion, cells: r.stages.completion.cells.slice(startIdx) },
+        completion: { ...r.stages.rectified, cells: r.stages.rectified.cells.slice(startIdx) },
         closure: { ...r.stages.closure, cells: r.stages.closure.cells.slice(startIdx) },
       },
     }));
@@ -309,7 +309,7 @@ export function SnagProgressPage() {
             <ToolbarGroup label="Stage">
               <ToggleGroup
                 type="multiple"
-                value={isAllStages ? ["start", "completion", "closure"] : effectiveStages}
+                value={isAllStages ? ["start", "rectified", "closure"] : effectiveStages}
                 onValueChange={(v) => {
                   const next = (v as Stage[]).filter((x) => (ALL_STAGES as string[]).includes(x));
                   if (next.length === 0) return;
