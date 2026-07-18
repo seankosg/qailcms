@@ -365,7 +365,7 @@ export async function parseTaskManagementExcel(
   };
 
   const cols = {
-    no: pick("task_no", ["No", "no"], 1),
+    no: pick("task_no", ["No", "no", "Task No", "Task No.", "Task Number", "Task_No", "TaskNo", "번호", "작업번호", "업무번호"], 1),
     category: pick("category", ["Category"], 2),
     plot: pick("plot", ["Plot"], 3),
     task_name: pick("task_name", ["항목"], 4),
