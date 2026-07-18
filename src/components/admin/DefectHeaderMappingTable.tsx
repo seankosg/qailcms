@@ -21,7 +21,10 @@ import { useDefectFieldConfig } from "@/hooks/useDefectFieldConfig";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { EditableSourceHeaderCell } from "@/components/admin/EditableSourceHeaderCell";
 import { EditableTargetFieldCell } from "@/components/admin/EditableTargetFieldCell";
-import { normalizeHeader } from "@/lib/admin/header-mapping-validation";
+import {
+  normalizeHeader,
+  validateSourceIssueNoMapping,
+} from "@/lib/admin/header-mapping-validation";
 
 export function DefectHeaderMappingTable() {
   const { data: rows = [], isLoading, refetch } = useDefectHeaderMappings();
@@ -97,6 +100,10 @@ export function DefectHeaderMappingTable() {
 
   const submitNew = async () => {
     if (!newSource.trim() || !newTarget) return toast.error("필수 입력", { description: "원본 헤더와 대상 필드를 입력하세요." });
+    if (newTarget === "source_issue_no") {
+      const v = validateSourceIssueNoMapping(newSource);
+      if (!v.ok) return toast.error("허용되지 않는 매핑", { description: v.error });
+    }
     const { error } = await (supabase as any).from("defect_header_mappings").insert({
       module: "defect",
       source_header: newSource.trim(),
