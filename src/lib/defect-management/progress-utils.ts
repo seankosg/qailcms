@@ -5,7 +5,7 @@ export type Stage = "start" | "rectified" | "closure";
 export const ALL_STAGES: Stage[] = ["start", "rectified", "closure"];
 export const STAGE_LABELS: Record<Stage, string> = {
   start: "Start",
-  rectified: "Comp",
+  rectified: "Rect",
   closure: "Close",
 };
 
