@@ -65,6 +65,7 @@ export interface TmImportFileItem {
   columnMap?: Record<string, number>;
   columnOverrides?: Partial<Record<TaskTargetField, number>> | null;
   conflictPolicy?: ConflictPolicy;
+  conflictDecisions?: Record<string, ConflictPolicy>;
   preflight?: PreflightSummary | null;
   preflightLoading?: boolean;
   preflightError?: string | null;
