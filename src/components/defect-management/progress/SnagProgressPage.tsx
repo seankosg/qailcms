@@ -162,7 +162,7 @@ export function SnagProgressPage() {
       combined: r.combined.slice(startIdx),
       stages: {
         start: { ...r.stages.start, cells: r.stages.start.cells.slice(startIdx) },
-        completion: { ...r.stages.rectified, cells: r.stages.rectified.cells.slice(startIdx) },
+        rectified: { ...r.stages.rectified, cells: r.stages.rectified.cells.slice(startIdx) },
         closure: { ...r.stages.closure, cells: r.stages.closure.cells.slice(startIdx) },
       },
     }));
