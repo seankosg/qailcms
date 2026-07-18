@@ -34,11 +34,11 @@ export interface DefectItem {
   is_critical: boolean;
   data_date: string | null;
   actual_closure_date: string | null;
-  actual_completion_date: string | null;
+  actual_rectified_date: string | null;
   closure_status: string | null;
   due_by: string | null;
   planned_start_date: string | null;
-  planned_completion_date: string | null;
+  planned_rectified_date: string | null;
   planned_closure_date: string | null;
   actual_start_date: string | null;
   planned_progress_pct: number | null;
