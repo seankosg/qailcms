@@ -168,6 +168,17 @@ export interface ParseDefectResult {
   excludedFields: Set<string>;
   /** REIMPORT 마커 감지 여부 */
   isReimport: boolean;
+  /**
+   * source_issue_no(유니크 키)가 어떤 원본 컬럼에서 유래했는지.
+   * - "source_issue_no": 재수출 파일의 source_issue_no 헤더 사용
+   * - "letsbuild_id": LetsBuild 원본의 ID 헤더를 승격하여 사용
+   * - "override": columnOverrides 로 명시 지정
+   * - "alias": defect_header_mappings 별칭으로 매칭
+   * - null: 미매칭
+   */
+  sourceKeyOrigin: "source_issue_no" | "letsbuild_id" | "override" | "alias" | null;
+  /** UUID 값이 source_issue_no로 감지되어 파싱에서 제외된 행 수 */
+  uuidKeyRejectedRows: number;
 }
 
 export interface ParseDefectOptions {
