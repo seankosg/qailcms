@@ -210,16 +210,20 @@ export function AbdProgressPage() {
     params.set("source", "progress");
     params.set("tab", teams[0] ?? "MECH");
     params.set("plot", plot);
-    params.set("filters", JSON.stringify(filterObj));
-    params.set("dateStart", dateFrom);
-    params.set("dateEnd", dateTo);
-    params.set("dateField", dateField);
+    // Raw Data 페이지에서 JSON 파싱 문제를 피하고자 필터는 개별 파라미터로 전달
+    for (const [k, v] of Object.entries(filterObj)) {
+      if (v == null) continue;
+      if (typeof v === "object" && v.from && v.to) {
+        params.set("dateStart", v.from);
+        params.set("dateEnd", v.to);
+        params.set("dateField", k);
+      } else if (Array.isArray(v)) {
+        params.set(k, v.join(","));
+      }
+    }
     params.set("round", round);
     if (stage !== "all") params.set("stage", stage);
-    const url = `/closure/abd/raw-data?${params.toString()}`;
-    // eslint-disable-next-line no-console
-    console.log("[ABD click] filterObj", filterObj, "url", url);
-    window.location.assign(url);
+    window.location.assign(`/closure/abd/raw-data?${params.toString()}`);
   };
 
   const isAllGroups = effectiveGroupBy.length === ALL_GROUP_BY.length;
