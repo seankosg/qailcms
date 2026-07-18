@@ -327,6 +327,26 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, conflictPolicy: policy } : f)));
   }, []);
 
+  const setFileConflictDecisions = useCallback(
+    (id: string, decisions: Record<string, ConflictPolicy>) => {
+      setFiles((cur) =>
+        cur.map((f) => (f.id === id ? { ...f, conflictDecisions: decisions } : f)),
+      );
+    },
+    [],
+  );
+
+  const clearFileConflictDecisions = useCallback((id: string) => {
+    setFiles((cur) =>
+      cur.map((f) => {
+        if (f.id !== id) return f;
+        const { conflictDecisions: _unused, ...rest } = f;
+        void _unused;
+        return rest;
+      }),
+    );
+  }, []);
+
   const runPreflight = useCallback(async (id: string) => {
     let target: TmImportFileItem | undefined;
     setFiles((cur) => {
