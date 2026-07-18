@@ -2316,6 +2316,13 @@ export type Database = {
       }
     }
     Functions: {
+      _snag_dim_val: {
+        Args: {
+          _dim: string
+          _row: Database["public"]["Tables"]["defect_items_raw"]["Row"]
+        }
+        Returns: string
+      }
       _snag_group_val: {
         Args: {
           _dim: string
