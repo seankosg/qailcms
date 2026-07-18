@@ -100,6 +100,8 @@ interface CtxValue {
     overrides: Partial<Record<TaskTargetField, number>> | null,
   ) => Promise<void>;
   setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
+  setFileConflictDecisions: (id: string, decisions: Record<string, ConflictPolicy>) => void;
+  clearFileConflictDecisions: (id: string) => void;
   runPreflight: (id: string) => Promise<void>;
   startImport: () => Promise<void>;
   setFileParsedRows: (id: string, next: ParsedTaskRow[]) => void;
