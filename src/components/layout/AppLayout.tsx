@@ -70,6 +70,7 @@ const NAV: NavSection[] = [
         matchPrefix: "/closure/abd",
         items: [
           { to: "/closure/abd/raw-data", label: "Raw Data", icon: Database },
+          { to: "/closure/abd/progress", label: "Progress", icon: TrendingUp },
           { to: "/closure/abd/settings", label: "Settings", icon: Settings2, adminOnly: true },
         ],
       },
