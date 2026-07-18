@@ -86,6 +86,7 @@ export interface TmImportFileItem {
 
 interface CtxValue {
   files: TmImportFileItem[];
+  getFiles: () => TmImportFileItem[];
   isRunning: boolean;
   rollupMode: RollupMode;
   setRollupMode: (m: RollupMode) => void;
