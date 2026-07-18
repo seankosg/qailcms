@@ -230,11 +230,31 @@ export function AbdRawDataPage() {
   const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log("[RAW team effect] team", team, "urlSearch.filters", urlSearch.filters, "parsed", parseFiltersFromUrl(urlSearch.filters), "current columnFilters", columnFilters);
-    setSorting(parseSortFromUrl(urlSearch.sort));
-    setColumnFilters(parseFiltersFromUrl(urlSearch.filters));
-    setSearchInput(urlSearch.q ?? "");
+    if (urlSearch.source === "progress") {
+      const built = buildFiltersFromProgressContext(urlSearch);
+      setSorting(parseSortFromUrl(urlSearch.sort));
+      setColumnFilters(built);
+      setSearchInput(urlSearch.q ?? "");
+      setUrl({
+        source: "",
+        team: "",
+        dis: "",
+        service: "",
+        pic: "",
+        docAx: "",
+        docAxx: "",
+        dateStart: "",
+        dateEnd: "",
+        dateField: "",
+        stage: "",
+        round: "",
+        filters: serializeFilters(built),
+      });
+    } else {
+      setSorting(parseSortFromUrl(urlSearch.sort));
+      setColumnFilters(parseFiltersFromUrl(urlSearch.filters));
+      setSearchInput(urlSearch.q ?? "");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team]);
 
