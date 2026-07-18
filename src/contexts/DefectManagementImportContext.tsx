@@ -1055,21 +1055,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
           if (!error) {
             successRows = slice;
-          } else if (isNetworkError(error) || isStatementTimeout(error)) {
-            // 재시도 다 소진 → 배치 자체 실패로 기록
-            console.error("[defect-import] batch upsert transient error", { batchIndex, error });
-            importErrors.push({
-              batch: batchIndex,
-              message: error.message,
-              code: (error as any).code,
-              details: (error as any).details,
-              hint: (error as any).hint,
-              sampleId: slice[0]?.source_issue_no as string,
-            });
-            failRows = slice;
           } else {
-            // 데이터 오류 → 이분 탐색으로 성공/실패 분리
-            console.error("[defect-import] batch upsert error, splitting", { batchIndex, error });
+            // 데이터 오류 또는 문장 타임아웃 → 이분 탐색으로 작은 배치 재시도 & 성공/실패 분리
+            console.error("[defect-import] batch upsert error, splitting", {
+              batchIndex,
+              transient: isNetworkError(error) || isStatementTimeout(error),
+              error,
+            });
             importErrors.push({
               batch: batchIndex,
               message: error.message,
