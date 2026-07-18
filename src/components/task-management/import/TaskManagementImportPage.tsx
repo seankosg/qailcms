@@ -147,7 +147,7 @@ function ImportInner() {
       }
     }
 
-    const candidates = files.filter(
+    const candidates = getFiles().filter(
       (f) =>
         f.status === "ready" &&
         f.parsed &&
@@ -166,8 +166,8 @@ function ImportInner() {
       await Promise.all(withoutPreflight.map((f) => runPreflight(f.id)));
     }
 
-    // 다시 상태를 읽어 미결정 충돌이 있는 파일 확인
-    const stillReady = files.filter(
+    // 최신 상태를 읽어 미결정 충돌이 있는 파일 확인
+    const stillReady = getFiles().filter(
       (f) =>
         f.status === "ready" &&
         f.parsed &&
