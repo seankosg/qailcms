@@ -188,7 +188,7 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
   const range = XLSX.utils.decode_range(ref);
   // Find row 0..8 containing "Sl.No" and "ABD NUMBER"
   let anchorRow = -1;
-  for (let r = range.s.r; r <= Math.min(range.s.r + 10, range.e.r); r++) {
+  for (let r = range.s.r; r <= Math.min(range.s.r + 29, range.e.r); r++) {
     let hasSlNo = false, hasAbd = false;
     for (let c = range.s.c; c <= range.e.c; c++) {
       const cell = ws[XLSX.utils.encode_cell({ r, c })];
