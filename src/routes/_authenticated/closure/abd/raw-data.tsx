@@ -14,6 +14,19 @@ const abdRawDataSearchSchema = z.object({
   filters: fallback(z.string(), "").default(""),
   includeInactive: fallback(z.boolean(), false).default(false),
   detail: fallback(z.string(), "").default(""),
+  // Progress 페이지에서 전달하는 셀 클릭 컨텍스트
+  source: fallback(z.string(), "").default(""),
+  team: fallback(z.string(), "").default(""),
+  dis: fallback(z.string(), "").default(""),
+  service: fallback(z.string(), "").default(""),
+  pic: fallback(z.string(), "").default(""),
+  docAx: fallback(z.string(), "").default(""),
+  docAxx: fallback(z.string(), "").default(""),
+  dateStart: fallback(z.string(), "").default(""),
+  dateEnd: fallback(z.string(), "").default(""),
+  dateField: fallback(z.string(), "").default(""),
+  stage: fallback(z.string(), "").default(""),
+  round: fallback(z.enum(["R1", "R2", "R3", "all"]), "all").default("all"),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/abd/raw-data")({
