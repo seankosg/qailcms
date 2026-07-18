@@ -30,7 +30,7 @@ export const Route = createFileRoute("/_authenticated/admin/users")({
   component: UsersAdminPage,
 });
 
-const USER_TYPES: UserType[] = ["admin", "pm_pd", "hdec", "subcontractor", "subsub", "guest"];
+const USER_TYPES: UserType[] = ["admin", "hdec_pic", "hdec_eng", "pm_pd", "hdec", "subcontractor", "subsub", "guest"];
 const ROLES: AppRole[] = ["admin", "superuser", "senior_user", "user", "super_guest", "guest", "d_superuser"];
 
 function UsersAdminPage() {
@@ -323,13 +323,13 @@ function LinkedMasterCell({ user, onSaved, updProfile }: { user: any; onSaved: (
   const list =
     user.user_type === "subcontractor" ? sub :
     user.user_type === "subsub" ? subsub :
-    user.user_type === "hdec" ? pic :
-    user.user_type === "pm_pd" ? eng : null;
+    (user.user_type === "hdec" || user.user_type === "hdec_pic") ? pic :
+    (user.user_type === "pm_pd" || user.user_type === "hdec_eng") ? eng : null;
   const field =
     user.user_type === "subcontractor" ? "subcontractor_name" :
     user.user_type === "subsub" ? "subsub_name" :
-    user.user_type === "hdec" ? "hdec_pic_name" :
-    user.user_type === "pm_pd" ? "hdec_eng_name" : null;
+    (user.user_type === "hdec" || user.user_type === "hdec_pic") ? "hdec_pic_name" :
+    (user.user_type === "pm_pd" || user.user_type === "hdec_eng") ? "hdec_eng_name" : null;
   if (!list || !field) return <span>—</span>;
   const current = user[field] ?? "__none__";
   return (
