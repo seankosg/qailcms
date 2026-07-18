@@ -1,114 +1,155 @@
-# Snag Import 유니크 키(ID/source_issue_no) 시스템 수정 + 관리자 매핑/설정 반영
+# HDEC/Subcontractor/Sub-Sub Owner 통합 권한 로직 (확정본 v2)
 
 ## 배경
 
-- `defect_items_raw`의 유니크 키는 `source_issue_no` 하나뿐입니다 (`defect_items_raw_source_issue_no_key`).
-- 두 원본 파일에서 `ID`/`id`의 의미가 다릅니다.
-  - LetsBuild 원본(`7days_snagging_6333.xlsx`): 첫 컬럼 `ID`(예: 113663) → LetsBuild Issue No., 즉 `source_issue_no`
-  - 시스템 재수출(`snag-raw-data-...v5-3.xlsx`): 첫 컬럼 `id`(UUID), 두 번째 컬럼 `source_issue_no`. `id`는 절대 유니크 키가 아님
-- 현재 `defect_header_mappings`는 `ID → source_issue_no`, `source_issue_no → source_issue_no` 두 매핑이 활성 상태.
-- 현재 파서(`src/lib/defect-management/parser.ts`)는 안전을 위해 `source_issue_no` 대상에 대해 `id` alias를 무조건 무시. 그 결과 LetsBuild 원본 `ID`가 매핑되지 않아 `필수 헤더 누락: ID` 및 "행을 찾지 못했습니다" 오류 발생.
-- 이번에는 도움말/문구가 아니라 파서·업서트·관리자 매핑까지 전 계층에서 시스템적으로 UUID 오염을 차단하고 LetsBuild `ID`만 키로 인식하도록 수정합니다.
+- `profiles.name`, `hdec_pic_name`, `hdec_eng_name`, `subcontractor_name`, `subsub_name` 이미 존재.
+- 4개 Raw 테이블(`abd_items_raw`, `defect_items_raw`, `spare_parts_raw`, `task_management_raw`)에 대응 이름 컬럼 존재.
+- 서버 mutation은 `assertAdmin`만 사용 → 클라 UI와 서버 정책 불일치.
+- Import는 현재 admin/superuser 전용.
 
-## 수정 원칙
+## 확정된 결정사항
 
-`ID`/`id` 텍스트만 보고 판단하지 않고, 파일 형태 + 헤더 조합 + 값 형식으로 판정.
+1. 업로드 owner 밖 행: **자동 스킵 + rejected 로그**.
+2. 레거시 `user_type='hdec'`: 즉시 `hdec_pic`/`hdec_eng`로 자동 분류. 사용자 편집 화면에서 재편집 가능.
+3. 상위 rank(admin/superuser/d_superuser)가 HDEC/Sub 계정을 겸직하면 **rank 우선, owner 제한 미적용**.
+4. `d_superuser` 전체 편집 승격, `senior_user`의 전체 편집 회수.
+5. **`owner_user_id` FK 도입** (이름 문자열 매칭 병행 유지).
+6. **Subcontractor / Sub-Sub owner 규칙 포함** (하부 포함).
 
-1. `source_issue_no` 헤더가 있으면 항상 그것을 유니크 키로 사용.
-2. `source_issue_no`가 없고 LetsBuild 원본 25컬럼 형태이면 `ID`를 `source_issue_no`로 승격.
-3. 재수출 파일(`QAIL_DEFECT_REIMPORT_V1` 마커 존재 또는 `source_issue_no` 헤더 존재)에서는 `id`/`ID` alias를 완전 무시.
-4. 사용자가 UUID `id`를 `source_issue_no`로 강제 매핑해도 파서 단계에서 차단.
-5. 업서트 직전에도 `source_issue_no` 값이 UUID 형식이면 해당 행을 reject.
-6. 관리자 매핑/설정 화면에서도 동일 규칙이 눈에 보이고, 잘못된 매핑을 저장하지 못하도록 검증.
+## 역할 서열 재정의 (`src/types/enums.ts`)
+
+| Role | 기존 | 신규 |
+|---|---|---|
+| admin | 100 | 100 |
+| superuser | 90 | 90 |
+| **d_superuser** | **0** | **80** |
+| senior_user | 70 | 70 |
+| user | 50 | 50 |
+| super_guest | 30 | 30 |
+| guest | 10 | 10 |
+
+`UserType` enum: `hdec_pic`, `hdec_eng`, `subcontractor`(기존 유지), `subsub`(기존 유지) 유지. `hdec_pic`, `hdec_eng` 신규 추가.
+
+## Owner 정의 (단일 소스)
+
+행 owner ≡ 다음 중 하나 (OR):
+
+- `owner_user_id = auth.uid()` (신규 FK — 우선 매칭)
+- `user_type='hdec_pic'` AND `profile.name = row.hdec_pic_name`
+- `user_type='hdec_eng'` AND `profile.name = row.hdec_eng_name`
+- `user_type='subcontractor'` AND `profile.subcontractor_name = row.subcontractor_name`
+- `user_type='subsub'` AND `profile.subsub_name = row.subsub_name`
+- (하위호환 — 마이그레이션 후 잔여) `user_type='hdec'` AND (`profile.hdec_pic_name` 또는 `hdec_eng_name` 매칭)
+
+## 권한 매트릭스
+
+| 역할 | 편집/삭제 | 업로드 |
+|---|---|---|
+| admin / superuser / d_superuser | 전체 | 전체 |
+| senior_user (HDEC/Sub 겸직) | owner 행만 | owner 행만, 그 외 자동 스킵 |
+| user (HDEC/Sub 겸직) | owner 행만 | **불가** |
+| super_guest / guest | 불가 | 불가 |
 
 ## 구현 계획
 
-### 1. 파서 유니크 키 전용 resolver 추가
+### 1. 타입/enum
 
-수정 파일: `src/lib/defect-management/parser.ts`
+- `src/types/enums.ts`
+  - `ROLE_RANK.d_superuser = 80`.
+  - `UserType`에 `"hdec_pic" | "hdec_eng"` 추가.
 
-- `resolveSourceIssueNoColumn()`을 신설해 `source_issue_no` 대상에는 이것만 사용.
-  - 우선순위: `source_issue_no` 헤더 → LetsBuild 원본 형태 검증 후 `ID`/`id` 헤더 → 없음.
-  - LetsBuild 원본 형태 검증: `source_issue_no` 헤더 부재 + `QAIL_DEFECT_REIMPORT_V1` 마커 부재 + 원본 시그니처 헤더 다수 존재(`Location`, `PlanTitle`, `PlanGroup`, `Category`, `CreatedDate` 등 중 3개 이상).
-  - 후보 컬럼의 첫 데이터 샘플이 UUID 형식이면 후보에서 제외.
-- 일반 `resolveColumn()`은 `source_issue_no`에 대해 호출하지 않음(전용 resolver로 대체).
-- `columnOverrides.source_issue_no`가 넘어와도 위 검증(재수출 파일에서 `id` UUID 컬럼 지정 여부, 샘플 UUID 여부)을 통과할 때만 허용.
-- 파서 반환 결과에 `sourceKeyOrigin: "source_issue_no" | "letsbuild_id" | null` 를 추가하여 UI/로그에서 어떤 컬럼이 키로 쓰였는지 명확히 노출.
+### 2. DB 마이그레이션 (`supabase--migration`, 단일 파일)
 
-### 2. `toDefectFieldName` 확장
+**Step A. enum 확장**
+- `user_type`에 `hdec_pic`, `hdec_eng` 값 추가.
 
-수정 파일: `src/lib/defect-management/parser.ts`
+**Step B. `owner_user_id` FK 컬럼 추가 (4개 Raw 테이블)**
+- `abd_items_raw`, `defect_items_raw`, `spare_parts_raw`, `task_management_raw` 각각:
+  - `owner_user_id uuid NULL REFERENCES auth.users(id) ON DELETE SET NULL`
+  - `CREATE INDEX idx_<table>_owner_user_id ON public.<table>(owner_user_id)`
 
-- 정규화된 헤더가 `id`일 때 무조건 빈 문자열을 반환하지 않고, 파일 컨텍스트가 LetsBuild 원본이면 `source_issue_no`로 반환하도록 옵션 인자 추가.
-- 재수출 파일 컨텍스트에서는 기존 동작 유지(빈 문자열).
+**Step C. 백필**
+- 각 Raw 테이블에서 이름 컬럼으로 `profiles`와 조인해 `owner_user_id` 채움.
+  - 우선순위: `hdec_pic_name` → `hdec_eng_name` → `subcontractor_name` → `subsub_name`.
+  - 매칭 다중이면 (동명이인) `owner_user_id` NULL 유지, 이름 매칭 fallback 사용.
 
-### 3. 업서트 직전 UUID reject 방어선
+**Step D. 레거시 `hdec` 재분류 (profiles UPDATE)**
+- `hdec_pic_name` 유효 → `hdec_pic`.
+- `hdec_eng_name`만 유효 → `hdec_eng`.
+- 둘 다 유효 → `hdec_pic` 통일(관리자 목록에 배지 노출용 플래그는 미도입, `admin/users`에서 편집 유도).
+- 둘 다 무효 → `hdec_pic` 유지(name 매칭 fallback).
 
-수정 파일: `src/contexts/DefectManagementImportContext.tsx`
+**Step E. SQL 헬퍼 함수**
+- `is_full_access(_user_id uuid) returns boolean` — admin/superuser/d_superuser 판정 (SECURITY DEFINER, search_path=public, EXECUTE TO authenticated).
+- `is_row_owner(_user_id uuid, _owner_user_id uuid, _hdec_pic text, _hdec_eng text, _subcon text, _subsub text) returns boolean` — 위 owner 정의 구현.
+- `has_any_role(_user_id uuid, _roles app_role[]) returns boolean` — 이미 있으면 재사용, 없으면 생성.
 
-- `deduped` → `workingRows` 사이에 `source_issue_no`가 UUID 형식인 행을 걸러 별도 배열로 이동.
-- 걸러진 행은 `defect_import_row_logs`에 `action_taken: "rejected"`와 사유("UUID key detected")로 기록.
-- 파일 카드 결과에 "UUID 키 감지로 제외된 행 수" 표시.
+**Step F. `owner_user_id` 자동 유지 트리거 (INSERT/UPDATE)**
+- 4개 테이블 각각 BEFORE INSERT/UPDATE 트리거:
+  - `owner_user_id`가 명시적으로 세팅되지 않았거나 관련 이름 컬럼이 변경된 경우, `profiles`에서 유일하게 매칭되는 사용자를 찾아 자동 세팅. 다중 매칭 시 NULL.
 
-### 4. 관리자 Header Mapping 반영
+### 3. 서버 헬퍼
 
-수정 파일: `src/components/admin/DefectHeaderMappingTable.tsx`, `src/hooks/useDefectHeaderMappings.ts`
+`src/lib/auth/roles.ts`:
+- `isFullAccess(user)` — admin/superuser/d_superuser.
+- `isOwnerOfRow(user, row)` — `owner_user_id === user.id` 우선, 이후 user_type별 이름 매칭 (HDEC PIC/ENG/Subcon/Subsub 포함).
+- `canEditRawRow(user, table, row)`: full-access true, senior/user는 owner, 그 외 false.
+- `canDeleteRawRow` 동일.
+- `canImportOwnRow(user, incomingRow)`: full-access true, senior_user는 owner, user 이하 false.
 
-- `target_field === "source_issue_no"`인 매핑에 대해 다음을 강제.
-  - 허용 `source_header`: `ID`, `source_issue_no`.
-  - 그 외 텍스트(예: 그냥 `id` 소문자만 등록해도 UUID와 혼동 여지가 있으므로) 저장 시 확인 다이얼로그 표시 후 저장.
-  - 시스템 시드 매핑(`ID → source_issue_no`, `source_issue_no → source_issue_no`)은 UI에서 "시스템 필수"로 표시하고 삭제 시 확인 강화.
-- 저장 API 호출 전 클라이언트 측 검증 함수 `validateSourceIssueNoMapping(sourceHeader)`를 `src/lib/admin/header-mapping-validation.ts`(기존 파일)에 추가.
-- 잘못된 저장이 되지 않도록 UI 오류 메시지: "source_issue_no에는 LetsBuild의 ID 또는 source_issue_no 헤더만 매핑할 수 있습니다."
+`src/lib/auth/roles.server.ts` (신규 또는 확장):
+- `assertCanEditRow(ctx, table, rowId)` — 행 조회 후 full-access/owner 판정. RPC `is_row_owner` 사용.
+- `assertCanEditRowsBulk(ctx, table, ids)` — 대량 시 owner 필터 SQL로 처리, 스킵 id 반환.
 
-### 5. Header Mapping DB 정합성 마이그레이션
+### 4. 서버 mutation 재검증
 
-`supabase--migration` 사용.
+`assertAdmin` → `assertCanEditRow`/`assertCanEditRowsBulk`로 교체:
+- `src/lib/defect-management/mutations.functions.ts`
+- `src/lib/abd/mutations.functions.ts`
+- Spare Part / Task Management 동등 함수
 
-- 활성 매핑 중 `target_field='source_issue_no'`인데 `source_header`의 정규화값이 `id`/`sourceissueno` 외인 항목을 비활성화.
-- LetsBuild 원본 시그니처를 안정적으로 지원하기 위한 시드 보강.
-  - `('ID','source_issue_no', active)` 존재 보장.
-  - `('source_issue_no','source_issue_no', active)` 존재 보장.
-- 부작용 방지: 이번 마이그레이션은 데이터 삭제 없이 활성화 플래그만 조정(비활성). 필요 시 사용자가 관리자 화면에서 재활성 가능.
+대량 UPDATE/DELETE는:
+```sql
+UPDATE ... WHERE id = ANY($ids) AND (is_full_access($uid) OR is_row_owner(...))
+```
+로 owner 필터를 SQL 레벨에서 적용하고 실제 반영된 id / 스킵 id를 반환.
 
-### 6. Field Config 반영
+### 5. Import Context 4종
 
-수정 파일: `src/components/admin/DefectFieldConfigTable.tsx`, `src/hooks/useDefectFieldConfig.ts`
+- 시작 시 `useCurrentUser()`로 판단:
+  - `user` 단독 → 업로드 버튼 비활성.
+  - `guest/super_guest` → 차단.
+- 배치 upsert 직전 각 행에 `canImportOwnRow` 판정. false 행은 rejected 배열로 이동 + `*_import_row_logs`에 `action_taken='rejected'`, `reason='ownership_mismatch'` 로그.
+- 파일 카드에 "권한 밖 스킵" 카운트 표시.
 
-- `source_issue_no`가 이미 "시스템 필수"로 처리되고 있으므로 라벨/툴팁을 명확화:
-  - 라벨 옆에 뱃지 "Unique Key (LetsBuild ID)" 표시.
-  - 숨김 토글/삭제 UI 비활성.
-- 시스템 UUID `id` 컬럼은 Raw Data용 시스템 컬럼이므로 Field Config 편집 대상에서 제외되도록 목록 필터를 명시적으로 추가(현재 존재하지 않으면 no-op).
+### 6. Raw Data UI (4개 도메인)
 
-### 7. Column Select 다이얼로그 반영
+- 인라인 편집/벌크 편집/삭제: `canEditRawRow` 반영. 비owner 셀은 비활성 + 툴팁("본인이 HDEC PIC/ENG 또는 Subcontractor/Sub-Sub로 지정된 행만 편집 가능합니다.").
+- 벌크 선택 시 비owner 행 안내 배너("선택 N건 중 M건 권한 없음, 자동 제외").
 
-수정 파일: `src/components/defect-management/import/DefectColumnSelect.tsx`
+### 7. 관리자 사용자 편집 (`admin/users.tsx`)
 
-- 파서에서 넘어온 `sourceKeyOrigin`과 후보 UUID 감지 결과를 이용해:
-  - `source_issue_no`로 매핑될 컬럼을 상단에 강조 표시.
-  - 사용자가 재수출 파일의 UUID `id`를 강제로 `source_issue_no`에 지정하려 하면 disable + 이유 툴팁 표시.
-  - LetsBuild 원본에서는 `ID` 컬럼이 자동으로 `source_issue_no`에 배정된 상태로 표시.
+- `user_type` 옵션에 `hdec_pic`, `hdec_eng` 추가.
+- 편집 폼에 `hdec_pic_name`, `hdec_eng_name`, `subcontractor_name`, `subsub_name` 노출/저장.
+- `user_type` 선택에 따라 관련 이름 필드만 필수/강조 표시.
+- 레거시 `hdec` 계정: 리스트 배지 "재분류 필요", 편집 저장 시 `user_type`을 신규 값으로 강제.
 
-### 8. 검증
+### 8. useCurrentUser 확장
 
-- `7days_snagging_6333.xlsx` 업로드 → `필수 헤더 누락: ID` 사라짐, 첫 행 키 `113663`.
-- `snag-raw-data-...v5-3.xlsx` 업로드 → `id`(UUID) 무시, 키는 `100000`.
-- 두 파일 병행 업로드 시 `source_issue_no` 기준 dedupe 정상.
-- 관리자 Header Mapping에서 `source_issue_no` 타겟에 임의 문자열 저장 시도 시 오류.
-- Header Mapping DB 마이그레이션 후 잘못된 활성 매핑 없음 재확인.
-- `tsgo` 통과 및 Playwright로 Import 화면 회귀.
+- 반환값에 `isFullAccess` 추가.
 
-## 변경 파일 요약
+### 9. 검증
 
-- `src/lib/defect-management/parser.ts`: 전용 resolver, UUID 감지, sourceKeyOrigin 반환.
-- `src/contexts/DefectManagementImportContext.tsx`: 업서트 직전 UUID reject.
-- `src/lib/admin/header-mapping-validation.ts`: `source_issue_no` 매핑 검증.
-- `src/components/admin/DefectHeaderMappingTable.tsx`: 저장 전 검증 + 시스템 필수 표시.
-- `src/components/admin/DefectFieldConfigTable.tsx`, `src/hooks/useDefectFieldConfig.ts`: `source_issue_no` 뱃지 및 편집 잠금 강화.
-- `src/components/defect-management/import/DefectColumnSelect.tsx`: UUID 컬럼 지정 차단 UI.
-- 마이그레이션 1건: `defect_header_mappings` 잘못된 `source_issue_no` 매핑 비활성 + 표준 시드 보강.
+- admin/superuser/d_superuser: 전체 편집/삭제/업로드 통과.
+- senior_user + hdec_pic(`name='홍길동'`): `hdec_pic_name='홍길동'` OR `owner_user_id=본인` 행만 접근 가능.
+- senior_user + subcontractor: `subcontractor_name` 일치 또는 owner_user_id 일치 행만.
+- user + subsub: 편집/삭제만, 업로드 불가.
+- 대량 편집에서 스킵 id 결과 확인.
+- 백필 후 `owner_user_id` NOT NULL 비율 스팟체크(SELECT count(*) FILTER (WHERE owner_user_id IS NOT NULL)).
+- `tsgo` 통과.
 
-## 하지 않는 것
+## 스코프 밖
 
-- `defect_items_raw`의 기존 데이터 자동 수정 없음. UUID로 저장된 오염 행이 발견되면 별도 승인 후 처리.
-- ABD/Task/Spare Part 임포트에는 변경 없음(이번 요청은 Snag 범위).
+- RLS 정책 재작성(현 단계는 서버 함수 재검증 + `owner_user_id` FK 도입까지. RLS 강화는 후속).
+- Cat A / HDEC Verification lock 필드 규칙(현행 유지).
+- 동명이인 owner 자동 매칭 UI 툴(다중 매칭 시 NULL, 관리자가 사용자 편집 화면에서 명시적으로 이름 정정).
