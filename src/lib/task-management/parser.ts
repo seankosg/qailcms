@@ -408,7 +408,7 @@ export async function parseTaskManagementExcel(
     auto_judgment: cols.auto_judgment,
   };
 
-  // Iterate rows 7~
+  // Iterate data rows (dataStart~)
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S1000");
   const rows: ParsedTaskRow[] = [];
   let sort = 0;
@@ -416,7 +416,7 @@ export async function parseTaskManagementExcel(
   // 1-pass: task_no 집합 수집 (prefix 기반 parent 판정 및 parent 검증용)
   const rowEnd = Math.min(range.e.r + 1, 5000);
   const allTaskNos = new Set<string>();
-  for (let r = 7; r <= rowEnd; r++) {
+  for (let r = dataStart; r <= rowEnd; r++) {
     const a = toStr(getCell(sheet, r, cols.no));
     const f = toStr(getCell(sheet, r, cols.sub_task_desc));
     if (!a && !f) break;
@@ -460,7 +460,7 @@ export async function parseTaskManagementExcel(
     return null;
   };
 
-  for (let r = 7; r <= rowEnd; r++) {
+  for (let r = dataStart; r <= rowEnd; r++) {
     const a = toStr(getCell(sheet, r, cols.no));
     const f = toStr(getCell(sheet, r, cols.sub_task_desc));
     if (!a && !f) break;
