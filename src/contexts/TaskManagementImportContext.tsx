@@ -473,20 +473,31 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const deduped = Array.from(dedupMap.values());
 
       // ---- 충돌 정책 적용 (skip / renumber / overwrite) ----
+      // 개별 충돌 결정이 있으면 우선, 없으면 파일 기본 conflictPolicy 적용
       const conflictPolicy: ConflictPolicy = f.conflictPolicy ?? "overwrite";
       const conflictSet = new Set<string>(
         (f.preflight?.conflicts ?? []).map((c) => c.task_no),
       );
+      const decisions = f.conflictDecisions ?? {};
       let skippedByPolicy = 0;
       let renumbered = 0;
+      let resolvedByDecision = 0;
       const renumberMap = new Map<string, string>();
       const applied: typeof deduped = [];
       for (const p of deduped) {
-        if (!conflictSet.has(p.task_no) || conflictPolicy === "overwrite") {
+        if (!conflictSet.has(p.task_no)) {
           applied.push(p);
           continue;
         }
-        if (conflictPolicy === "skip") {
+        const decision = decisions[p.task_no] ?? conflictPolicy;
+        if (decision !== conflictPolicy) {
+          resolvedByDecision++;
+        }
+        if (decision === "overwrite") {
+          applied.push(p);
+          continue;
+        }
+        if (decision === "skip") {
           skippedByPolicy++;
           continue;
         }
@@ -514,10 +525,13 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
             applied[i] = { ...p, parent_task_no: renumberMap.get(p.parent_task_no)! };
           }
         }
-        toast.info(`${f.name}: 충돌 ${renumberMap.size}건 자동 재번호 발급`);
+        toast.info(`${f.name}: 충돌 ${renumberMap.size}건 재번호 발급`);
       }
       if (skippedByPolicy > 0) {
         toast.info(`${f.name}: 충돌 ${skippedByPolicy}건 건너뜀`);
+      }
+      if (resolvedByDecision > 0) {
+        toast.info(`${f.name}: 개별 결정 ${resolvedByDecision}건 적용`);
       }
 
       const payloads = applied.map((p) => {
