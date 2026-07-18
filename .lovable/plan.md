@@ -1,42 +1,90 @@
-## 우선 조치 — HDEC PIC 마스터 채우기
 
-겸직(hdec_eng) 결정은 뒤로 미루고, 먼저 **현재 27명 사용자 이름을 `hdec_pic_master`에 등록**하는 작업만 실행합니다. 이 조치로 관리자 UI의 Linked Master 셀렉트에 실제 옵션이 노출되어 매핑 편집이 가능해집니다.
+## 목표
 
-### 대상 데이터 (실측)
+Spare Part 상세페이지의 `SparePartStatusHistory` 컴포넌트가 제공하는 **카테고리 태그 + 스레드형 댓글/답글 + 인라인 수정/삭제 + Realtime 반영** 기능을, 세 Raw Data 도메인의 상세창에 동일하게 이식한다.
 
-`profiles`에서 `user_type IN ('hdec','hdec_pic')` 이고 `hdec_pic_name`이 채워진 27명 전부:
+- ABD: `AbdDetailSheet` (Sheet)
+- SM(Defect): `DefectDetailPage`
+- TM(Task): `TaskDetailPage`
 
-```
-BH PARK_박복현, BM SEO_서봉문, CH SEO_서창훈, DH LIM_임대현, DS KIM_김대수,
-HT AHN_안형태, HW CHAE_채홍욱, HY KIM_김홍엽, JH BAEK_백주호, JH CHO_조준혁,
-JH LEE_이주한, JS SUNG_성종수, JYLEE(이준용), KD PARK_박기덕, KH JUNG_정경호,
-KR NA_나경락, MC PARK_박명천, MH SHIN_신민호, MS CHOI_최민수, NK LEE_이남길,
-SC LEE_이세철, SEOK LEE_이석, TW YOO_유태완, WJ SHIN_신원재, YH HAN_한영훈,
-YK SUNG_성영광, YS KIM_김영서
-```
+기존 `defect_status_history` / `task_management_status_history` / `abd_change_log` 은 **필드 변경 감사 로그**로서 유지하고, **새 댓글 테이블을 도메인별로 별도 신설**한다(스키마/RLS 격리, Spare Part와 완전 대칭).
 
-현재 `hdec_pic_master`에는 `Admin` 1건만 있어서 사실상 선택 불가 상태입니다.
+## 데이터 모델 (신설 3개 테이블)
 
-### 실행 내용 (`supabase--insert` 1회)
+Spare Part의 `spare_part_status_history` 컬럼 형태를 그대로 재사용:
 
-`hdec_pic_master`에 아래 SQL로 27건 upsert 수행:
-
-```sql
-INSERT INTO public.hdec_pic_master (name, is_active)
-SELECT DISTINCT hdec_pic_name, true
-FROM public.profiles
-WHERE user_type IN ('hdec','hdec_pic')
-  AND hdec_pic_name IS NOT NULL
-ON CONFLICT (name) DO UPDATE SET is_active = true;
+```text
+{abd|defect|task}_comments
+- id uuid PK
+- {abd_item_id | defect_raw_id | task_raw_id} uuid FK  ← 도메인 부모행
+- parent_comment_id uuid null  ← 답글 지원
+- category text ('technical'|'supplier'|'internal'|'general')
+- message text (<=2000)
+- source text default 'app_manual'
+- author_user_id uuid null (auth.users)
+- edited boolean default false
+- created_at / updated_at timestamptz
+- GRANT authenticated / service_role, RLS on
 ```
 
-- `name` 컬럼의 unique 제약을 활용한 upsert이므로 기존 `Admin` 항목은 유지됩니다.
-- 완료 후 `SELECT count(*) FROM hdec_pic_master WHERE is_active` 로 28건(27 신규 + Admin) 확인.
+### RLS 정책 (Spare Part와 동일 규칙)
+- SELECT: 로그인 사용자 전체
+- INSERT: `author_user_id = auth.uid()`
+- UPDATE/DELETE: 본인 작성분 또는 admin/superuser (`has_role`)
 
-### 이후(별도 진행)
+### 카테고리 옵션 (도메인별 조정)
+- ABD: `drafting`, `submission`, `dar`, `general`
+- SM: `defect`, `rectification`, `inspection`, `general`
+- TM: `plan`, `execution`, `handover`, `general`
+- (카테고리 라벨/색상은 상수 맵으로 각 컴포넌트에 정의)
 
-- `hdec_eng_master` 채우기 및 26명 겸직 개별 검토 → 사용자가 유지/삭제 리스트를 알려주시면 별도 단계로 처리.
-- `profiles → hdec_pic_master/hdec_eng_master` 자동 동기화 트리거 도입.
-- 관리자 UI `LinkedMasterCell` 겸직 편집 UI, 미등록 배지, `admin` 계정 레거시 user_type 정리 등 Phase B 항목.
+## 컴포넌트 구조
 
-**이 마이그레이션(정확히는 데이터 삽입)만 우선 실행할까요? 승인해 주시면 바로 진행합니다.**
+### 1. 공용 훅 (도메인별 3종)
+`src/hooks/useAbdComments.ts`, `useDefectComments.ts`, `useTaskComments.ts`
+- `useSparePartStatusHistory` 와 동일한 구조: `useQuery` + Realtime `postgres_changes` 구독 → `invalidateQueries`.
+
+### 2. 프레젠테이션 컴포넌트 (도메인별 3종)
+`src/components/abd/detail/AbdCommentsThread.tsx`
+`src/components/defect-management/detail/DefectCommentsThread.tsx`
+`src/components/task-management/detail/TaskCommentsThread.tsx`
+
+- 각각 `SparePartStatusHistory.tsx` 를 템플릿으로 복제:
+  - 카테고리 셀렉트 / Textarea / Send / Reply / Edit / Delete / 시간표시(`formatDistanceToNow`) / 작성자 이름(`profiles.display_name`)
+  - `useCurrentUser` 로 편집권한 판정 (`isAdmin` 또는 본인)
+- **중복 로직이 크므로**, 초기 구현은 3개 파일로 복제하되 카테고리/훅/부모키 필드명만 파라미터화 가능한 형태로 정리(추후 필요 시 하나로 통합).
+
+### 3. 상세창 통합
+- `AbdDetailSheet.tsx`: 하단 "Raw Payload" 위에 `<h3>Comments</h3>` 섹션 추가 후 `<AbdCommentsThread abdItemId={item.id} />`
+- `DefectDetailPage.tsx`: Status History 카드 아래에 Comments 카드 추가
+- `TaskDetailPage.tsx`: Status History 카드 아래에 Comments 카드 추가
+
+## 마이그레이션 순서
+
+1. 3개 테이블 생성 + GRANT + RLS + 정책 + `updated_at` 트리거 + `parent_comment_id` / 부모FK 인덱스.
+2. 훅 3개 신설.
+3. 스레드 컴포넌트 3개 신설.
+4. 각 상세창에 삽입.
+
+## Spare Part와 다른 점 (질문 필요 없음, 아래대로 진행)
+
+- 부모행 키가 도메인별 상이(`abd_item_id` / `defect_raw_id` / `task_raw_id`) → 각 훅·컴포넌트 시그니처가 다름.
+- 카테고리 값이 도메인 특성에 맞게 다름(위 목록).
+- `source_file_hash` 는 Spare Part 전용(엑셀 임포트 마이그레이션 대비)이므로 신규 테이블에서는 제외.
+- 나머지 UI(색상 팔레트, 답글 트리, 편집 UX, Realtime)는 100% 동일.
+
+## 변경/유지 파일 요약
+
+Add:
+- migration: 3 tables + policies
+- `src/hooks/useAbdComments.ts`, `useDefectComments.ts`, `useTaskComments.ts`
+- `src/components/abd/detail/AbdCommentsThread.tsx`
+- `src/components/defect-management/detail/DefectCommentsThread.tsx`
+- `src/components/task-management/detail/TaskCommentsThread.tsx`
+
+Modify:
+- `src/components/abd/raw-data/AbdDetailSheet.tsx`
+- `src/components/defect-management/detail/DefectDetailPage.tsx`
+- `src/components/task-management/detail/TaskDetailPage.tsx`
+
+기존 `*_status_history` / `abd_change_log` 는 변경 없음(감사로그로 유지).

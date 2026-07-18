@@ -24,6 +24,7 @@ import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
 import { getTaskHistory } from "@/lib/task-management/history.functions";
 import { formatDdMmm } from "@/lib/defect-management/stage-utils";
 import { cn } from "@/lib/utils";
+import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThread";
 
 const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   id: "Identification",
@@ -205,6 +206,18 @@ export function TaskDetailPage() {
                 ))}
               </ul>
             )}
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Comments
+            </div>
+            <CommentsThread
+              table="task_comments"
+              parentKey="task_raw_id"
+              parentValue={String(row.id)}
+              categories={TASK_CATEGORIES}
+              defaultCategory="general"
+            />
           </div>
         </div>
       </div>

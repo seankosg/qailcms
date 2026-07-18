@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { formatDdMmm } from "@/lib/defect-management/stage-utils";
 import { updateDefectField } from "@/lib/defect-management/mutations.functions";
 import { toast } from "sonner";
+import { CommentsThread, DEFECT_CATEGORIES } from "@/components/shared/CommentsThread";
 
 const GROUP_LABELS: Record<string, string> = {
   identity: "Identity", status: "Status", classification: "Classification",
@@ -175,6 +176,16 @@ export function DefectDetailPage() {
                 ))}
               </ul>
             )}
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Comments</div>
+            <CommentsThread
+              table="defect_comments"
+              parentKey="defect_raw_id"
+              parentValue={row.id}
+              categories={DEFECT_CATEGORIES}
+              defaultCategory="general"
+            />
           </div>
         </div>
       </div>
