@@ -590,6 +590,7 @@ export async function parseDefectExcel(
   const rowEnd = range.e.r + 1;
   const rows: ParsedDefectRow[] = [];
   const categoryCounts = new Map<string, number>();
+  let uuidKeyRejectedRows = 0;
 
   for (let r = 2; r <= rowEnd; r++) {
     const idRaw = cols.source_issue_no ? getCell(sheet, r, cols.source_issue_no) : null;
@@ -667,6 +668,12 @@ export async function parseDefectExcel(
       raw_payload,
       extra,
     });
+  }
+
+  if (uuidKeyRejectedRows > 0) {
+    warnings.push(
+      `UUID 형식 유니크 키가 감지된 ${uuidKeyRejectedRows}개 행을 폐기했습니다. 시스템 재수출 파일의 id 컬럼이 잘못 매핑된 것으로 추정됩니다.`,
+    );
   }
 
   const categorySummary = Array.from(categoryCounts.entries())
