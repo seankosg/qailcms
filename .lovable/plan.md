@@ -1,38 +1,71 @@
 ## 목표
-캡쳐 이미지 최상단의 "현대건설 로고 + 앱 이름 + 우측 액션" 헤더를 그대로 이식하되, 라벨은 **"QAIL PROJECT COMPLETION MANAGEMENT SYSTEM"** 으로 표시. 데스크톱/모바일 모두 노출.
+Task Management 임포트 시 같은 `task_no`가 DB에 이미 존재하면, 현재는 파일 단위 `충돌 정책(overwrite/skip/renumber)`만 일괄 적용됩니다. 사용자가 **충돌 항목별로 개별 처리 방식**을 선택할 수 있도록 팝업을 추가합니다.
 
-## 작업 범위
+## 현재 동작 확인 (이미 읽음)
+- `src/contexts/TaskManagementImportContext.tsx`
+  - `ConflictPolicy = "overwrite" | "skip" | "renumber"`
+  - `runPreflight()` → `previewTaskImport` server fn으로 `new/update/unchanged/conflict` 계산
+  - `executeImport()` 내에서 `conflictPolicy` 기본값 `overwrite`로 충돌 행 일괄 처리
+- `src/lib/task-management/import-preflight.functions.ts`
+  - `PreflightConflict`에 `task_no`, `reason`, DB/파일 비교 정보 포함
+- `src/components/task-management/import/TaskManagementImportPage.tsx`
+  - `ConflictReviewDialog`가 충돌 목록을 보여주기만 함 (선택 불가)
+- `src/components/task-management/import/ConflictReviewDialog.tsx`
+  - 읽기 전용 충돌 상세 테이블
 
-### 1. 로고 자산 등록
-- `user-uploads://hyundai-logo-poeB6Ayj.png` → `lovable-assets create` 로 CDN 업로드
-- 포인터: `src/assets/hyundai-logo.png.asset.json`
+## 구현 내용
 
-### 2. `TopBrandHeader.tsx` 신설 (`src/components/layout/`)
-구성 (좌 → 우):
-- **모바일 전용**: 햄버거 버튼(`Menu`) — `lg:hidden`, `onMobileMenu` prop
-- **로고**: `<img>` height 28px (모바일 24px)
-- **시스템 이름**: `QAIL PROJECT COMPLETION MANAGEMENT SYSTEM`
-  - 데스크톱: 전체 표시, `text-sm font-medium tracking-wide text-muted-foreground`
-  - 모바일(<sm): `QAIL CMS` 로 축약 표시 (`sm:hidden` / `hidden sm:inline` 스위칭)
-- `flex-1` 스페이서
-- **우측 영역**:
-  - `New Version` 버튼 (`Button variant="outline" size="sm"`, `Sparkles` 아이콘) — 클릭 시 현재는 no-op (추후 릴리즈 노트 연결 여지)
-  - 저작권 텍스트: `© 2026 QAIL CMS. All rights reserved.` — `hidden md:inline text-xs text-muted-foreground`
-  - 알림 벨 아이콘 버튼 (`Bell`, `Button variant="ghost" size="icon"`) — no-op
+### 1. Context 상태 확장 (`src/contexts/TaskManagementImportContext.tsx`)
+- 파일별 `conflictDecisions?: Map<string, ConflictPolicy>` 추가
+  - key: `task_no`, value: `"overwrite" | "skip" | "renumber"`
+- `setConflictDecision(fileId, taskNo, policy)` / `clearConflictDecisions(fileId)` 추가
+- `executeImport` 변경:
+  - `conflictSet` 대신, **개별 결정이 있으면 해당 결정 우선** 적용
+  - 결정이 없는 행은 파일 기본 `conflictPolicy` 적용
+  - `renumber` 결정 시에만 `allocateTaskNo` 호출
+- `startImport` 흐름 변경:
+  - 충돌이 남아 있고 개별 결정이 없으면 import를 시작하지 않고 팝업을 띄움
+  - 또는 "중복 점검" 후 충돌 팝업에서 사용자 확인 → import 시작
 
-전체 컨테이너: `sticky top-0 z-20 h-14 border-b bg-card px-4 flex items-center gap-3`
+### 2. 충돌 선택 팝업 신규
+- `src/components/task-management/import/ConflictDecisionDialog.tsx` 생성
+- 목록:
+  - `task_no` 컬럼
+  - 사유 (`task_name_mismatch`, `parent_mismatch`, `plot_mismatch` 라벨)
+  - DB 값 / 파일 값 비교
+  - 각 행별 RadioGroup: `덮어쓰기` / `건너뛰기` / `재번호`
+- 상단 일괄 선택 버튼: `전체 덮어쓰기`, `전체 건너뛰기`, `전체 재번호`
+- 확인 클릭 시 개별 결정을 Context에 저장하고 import 진행
+- 취소/닫기 시 import 중단
 
-### 3. `AppLayout.tsx` 통합
-- 기존 사이드바 상단 브랜드 블록(`Wrench + QAIL CMS`) 유지 (사이드바 자체 브랜딩)
-- 메인 컬럼 최상단의 기존 모바일 전용 `<header>`(햄버거 + QAIL CMS)를 **삭제**
-- 그 자리에 `<TopBrandHeader onMobileMenu={() => setMobileOpen(true)} />` 삽입 → 데스크톱·모바일 모두 노출
-- 기존 sign-out/유저 정보 사이드바 푸터는 그대로
+### 3. 기존 `ConflictReviewDialog` 연동
+- "충돌 상세" 버튼을 누르면 기존 읽기 전용 대화상자 대신 새 `ConflictDecisionDialog`를 열도록 변경
+- 또는 `ConflictReviewDialog`에 "이 충돌 처리하기" 버튼을 추가해 새 팝업으로 전환
 
-### 4. 검증
-- `tsgo --noEmit`
-- Playwright로 데스크톱(1280) / 모바일(390) 캡쳐하여 정렬·축약·햄버거 동작 확인
+### 4. Import 페이지 흐름 수정 (`TaskManagementImportPage.tsx`)
+- "Start import" 버튼 클릭 시:
+  1. 아직 `preflight`가 없는 파일은 자동으로 `runPreflight` 실행
+  2. `conflictCount > 0`이고 개별 결정이 미완료인 파일이 있으면 `ConflictDecisionDialog`를 띄움
+  3. 모든 충돌에 결정이 있으면 `executeImport` 실행
+- 이미 `done`/`processing` 상태 파일은 제외
 
-## 스코프 외
-- New Version 버튼과 벨 아이콘의 실제 기능(릴리즈 모달, 알림 센터)은 이번 범위 아님 — 시각적 배치만 원본과 동일하게 재현하고 클릭은 no-op으로 둠. 이후 별도 요청 시 연결.
+### 5. UI 피드백 강화
+- 파일 카드에 다음 배지 추가:
+  - `개별 결정 N건` (decisions가 있을 때)
+  - `충돌 N건 미결정` (conflict가 있지만 decisions가 없을 때)
+- Import 결과에 `resolvedByDecision`/`renumberedByDecision` 등 구분하여 노출
 
-승인해 주시면 바로 구현하겠습니다.
+### 6. DB/스키마 변경
+- 없음. 기존 `task_management_raw` upsert onConflict `(discipline, task_no)`만 사용.
+
+## 기술 세부
+- `Map<string, ConflictPolicy>`는 직렬화가 어려우므로 Context state에서는 `Record<string, ConflictPolicy>` 형태로 저장.
+- `ConflictDecisionDialog`는 `TmImportFileItem` 1개를 받아 작동.
+- `executeImport`의 충돌 처리 블록에서 `conflictSet`과 `renumberMap` 계산 시 개별 결정을 먼저 참조.
+- `renumber` 후 parent_task_no가 바뀐 자식 행의 연결을 복구하는 기존 로직은 그대로 유지.
+
+## 완료 기준
+- 충돌이 있는 파일 import 시 사용자가 개별 행별로 처리 방식을 선택할 수 있다.
+- 선택한 방식이 실제 insert/update/renumber/skip 집계에 정확히 반영된다.
+- 파일 기본 충돌 정책은 개별 결정이 없는 행에 대한 fallback로 계속 작동한다.
+- 타입스크립트 빌드 및 lint 통과.
