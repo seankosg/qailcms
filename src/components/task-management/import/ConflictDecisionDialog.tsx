@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import type { PreflightConflict, PreflightSummary } from "@/lib/task-management/import-preflight.functions";
+import type { PreflightSummary } from "@/lib/task-management/import-preflight.functions";
 import type { ConflictPolicy } from "@/contexts/TaskManagementImportContext";
 
 const REASON_LABEL: Record<string, string> = {
