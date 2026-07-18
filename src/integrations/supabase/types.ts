@@ -649,8 +649,8 @@ export type Database = {
         Row: {
           aconex_comments: string | null
           actual_closure_date: string | null
-          actual_completion_date: string | null
           actual_progress_pct: number | null
+          actual_rectified_date: string | null
           actual_start_date: string | null
           area_level: string | null
           area_location: string | null
@@ -663,7 +663,6 @@ export type Database = {
           classification_source: string | null
           classified_at: string | null
           closure_status: string | null
-          completion_status: string | null
           created_at: string
           created_by_name: string | null
           created_by_team_name: string | null
@@ -697,13 +696,14 @@ export type Database = {
           plan_group: string | null
           plan_title: string | null
           planned_closure_date: string | null
-          planned_completion_date: string | null
           planned_progress_pct: number | null
+          planned_rectified_date: string | null
           planned_start_date: string | null
           podium_area: string | null
           priority: string | null
           priority_locked: boolean
           raw_payload: Json
+          rectified_status: string | null
           remarks: string | null
           review_flag: string | null
           room: string | null
@@ -732,8 +732,8 @@ export type Database = {
         Insert: {
           aconex_comments?: string | null
           actual_closure_date?: string | null
-          actual_completion_date?: string | null
           actual_progress_pct?: number | null
+          actual_rectified_date?: string | null
           actual_start_date?: string | null
           area_level?: string | null
           area_location?: string | null
@@ -746,7 +746,6 @@ export type Database = {
           classification_source?: string | null
           classified_at?: string | null
           closure_status?: string | null
-          completion_status?: string | null
           created_at?: string
           created_by_name?: string | null
           created_by_team_name?: string | null
@@ -780,13 +779,14 @@ export type Database = {
           plan_group?: string | null
           plan_title?: string | null
           planned_closure_date?: string | null
-          planned_completion_date?: string | null
           planned_progress_pct?: number | null
+          planned_rectified_date?: string | null
           planned_start_date?: string | null
           podium_area?: string | null
           priority?: string | null
           priority_locked?: boolean
           raw_payload?: Json
+          rectified_status?: string | null
           remarks?: string | null
           review_flag?: string | null
           room?: string | null
@@ -815,8 +815,8 @@ export type Database = {
         Update: {
           aconex_comments?: string | null
           actual_closure_date?: string | null
-          actual_completion_date?: string | null
           actual_progress_pct?: number | null
+          actual_rectified_date?: string | null
           actual_start_date?: string | null
           area_level?: string | null
           area_location?: string | null
@@ -829,7 +829,6 @@ export type Database = {
           classification_source?: string | null
           classified_at?: string | null
           closure_status?: string | null
-          completion_status?: string | null
           created_at?: string
           created_by_name?: string | null
           created_by_team_name?: string | null
@@ -863,13 +862,14 @@ export type Database = {
           plan_group?: string | null
           plan_title?: string | null
           planned_closure_date?: string | null
-          planned_completion_date?: string | null
           planned_progress_pct?: number | null
+          planned_rectified_date?: string | null
           planned_start_date?: string | null
           podium_area?: string | null
           priority?: string | null
           priority_locked?: boolean
           raw_payload?: Json
+          rectified_status?: string | null
           remarks?: string | null
           review_flag?: string | null
           room?: string | null
