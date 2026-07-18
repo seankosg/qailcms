@@ -804,6 +804,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     <Ctx.Provider
       value={{
         files,
+        getFiles,
         isRunning,
         rollupMode,
         setRollupMode,
