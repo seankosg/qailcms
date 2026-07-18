@@ -47,7 +47,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { RollupMode } from "@/contexts/TaskManagementImportContext";
 import { ColumnMappingDialog } from "./ColumnMappingDialog";
-import { ConflictReviewDialog } from "./ConflictReviewDialog";
+import { ConflictDecisionDialog } from "./ConflictDecisionDialog";
 import { Input } from "@/components/ui/input";
 import type { ConflictPolicy } from "@/contexts/TaskManagementImportContext";
 import { AlertTriangle, ScanSearch } from "lucide-react";
