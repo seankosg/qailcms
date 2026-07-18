@@ -74,6 +74,17 @@ const CANONICAL_HEADERS: Record<string, DefectTargetField> = {
   reviewflag: "review_flag",
 };
 
+const SOURCE_ISSUE_NO_DISPLAY_HEADER_KEYS = new Set([
+  "idno",
+  "idnumber",
+  "issueno",
+  "issuenumber",
+  "sourceissueno",
+  "sourceissuenumber",
+  "snagno",
+  "snagnumber",
+]);
+
 /** Re-import 파일에서 등장 가능한 확장 필드(원본 헤더가 그대로 필드명이라 매핑 필요). */
 const EXTRA_REIMPORT_FIELDS = new Set<string>([
   "team",
@@ -381,7 +392,8 @@ function resolveColumn(
  *  1) columnOverrides.source_issue_no (샘플 UUID이면 거부)
  *  2) 헤더 "source_issue_no" 정확 매칭
  *  3) LetsBuild 원본 파일이고 헤더 "ID"/"id" 존재 (샘플 UUID이면 거부)
- *  4) extraAliases (샘플 UUID이면 거부)
+ *  4) View-friendly export 표시 헤더(ID No/Issue No 등, 샘플 UUID이면 거부)
+ *  5) extraAliases (샘플 UUID이면 거부)
  */
 function resolveSourceIssueNoColumn(
   headerMap: Record<string, number>,
@@ -426,7 +438,20 @@ function resolveSourceIssueNoColumn(
     }
   }
 
-  // (4) 별칭 매칭. 단, "id" 별칭은 재수출 파일에서 UUID 위험이 있으므로 형식 검사 필수.
+  // (4) SM Raw Data View-friendly export: 화면 표시용 "ID No" 등을 source_issue_no로 허용
+  for (const key of SOURCE_ISSUE_NO_DISPLAY_HEADER_KEYS) {
+    const col = headerMap[key];
+    if (!col) continue;
+    if (columnSampleIsUuid(entries, col)) {
+      warnings.push(
+        `표시 헤더 "${entries.find((e) => e.col === col)?.header ?? key}" 컬럼의 첫 값이 UUID 형식이라 source_issue_no 매핑에서 제외했습니다.`,
+      );
+      continue;
+    }
+    return { col, origin: "alias" };
+  }
+
+  // (5) 별칭 매칭. 단, "id" 별칭은 재수출 파일에서 UUID 위험이 있으므로 형식 검사 필수.
   for (const a of extraAliases) {
     const key = normalizeHeader(a);
     if (!key) continue;
@@ -463,6 +488,7 @@ export function toDefectFieldName(
   // Re-import 파일은 raw 헤더가 곧 target field 이름 (예: "source_issue_no", "plan_group",
   // "status_raw", "planned_start_date" …). id 는 시스템 컬럼이라 매핑 제외.
   if (norm === "id") return "";
+  if (SOURCE_ISSUE_NO_DISPLAY_HEADER_KEYS.has(norm)) return "source_issue_no";
   for (const t of DEFECT_TARGET_FIELDS) {
     if (normalizeHeader(t) === norm) return t;
   }
