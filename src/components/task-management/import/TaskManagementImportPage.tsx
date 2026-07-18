@@ -581,13 +581,35 @@ function FileRow({
                     <Badge variant="outline" className="border-destructive text-destructive gap-1">
                       <AlertTriangle className="h-3 w-3" /> 충돌 {f.preflight.conflictCount}
                     </Badge>
+                    {(() => {
+                      const conflicts = f.preflight.conflicts;
+                      const decisions = f.conflictDecisions ?? {};
+                      const resolved = conflicts.filter((c) => decisions[c.task_no]).length;
+                      const unresolved = conflicts.length - resolved;
+                      return (
+                        <>
+                          {resolved > 0 && (
+                            <Badge variant="outline" className="border-violet-300 text-violet-700">
+                              개별 결정 {resolved}건
+                            </Badge>
+                          )}
+                          {unresolved > 0 && (
+                            <Badge variant="outline" className="border-amber-300 text-amber-700">
+                              미결정 {unresolved}건
+                            </Badge>
+                          )}
+                        </>
+                      );
+                    })()}
                     <Button
                       variant="link"
                       size="sm"
                       className="h-6 px-1 text-xs"
                       onClick={onOpenConflict}
                     >
-                      상세 보기
+                      {f.conflictDecisions && Object.keys(f.conflictDecisions).length > 0
+                        ? "결정 수정"
+                        : "충돌 처리"}
                     </Button>
                   </>
                 ) : (
