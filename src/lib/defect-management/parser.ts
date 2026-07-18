@@ -307,23 +307,46 @@ function getCell(sheet: XLSX.WorkSheet, row: number, col: number): unknown {
   return sheet[addr]?.v;
 }
 
-/** Row 1 헤더 스캔 → { canonical map, sheetHeaders }. */
-function scanHeaders(sheet: XLSX.WorkSheet): { map: Record<string, number>; entries: DefectSheetHeader[] } {
+/** 헤더 행 자동 탐지 후 { canonical map, sheetHeaders, headerRow(0-based) }. 상단 30행 이내 스캔. */
+function scanHeaders(sheet: XLSX.WorkSheet): {
+  map: Record<string, number>;
+  entries: DefectSheetHeader[];
+  headerRow: number;
+} {
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:Z2");
+  const MAX_SCAN = Math.min(range.s.r + 29, range.e.r);
+  const MIN_HEADER_CELLS = 3;
+
+  // 가장 많은 정규화 헤더 셀을 가진 행을 헤더로 채택 (동수면 상단 우선)
+  let bestRow = 0;
+  let bestScore = -1;
+  for (let r = range.s.r; r <= MAX_SCAN; r++) {
+    let score = 0;
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const v = sheet[XLSX.utils.encode_cell({ r, c })]?.v;
+      if (normalizeHeader(v)) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestRow = r;
+    }
+  }
+  const headerRow = bestScore >= MIN_HEADER_CELLS ? bestRow : 0;
+
   const map: Record<string, number> = {};
   const entries: DefectSheetHeader[] = [];
   for (let c = range.s.c; c <= range.e.c; c++) {
-    const headerCell = sheet[XLSX.utils.encode_cell({ r: 0, c })];
+    const headerCell = sheet[XLSX.utils.encode_cell({ r: headerRow, c })];
     const raw = headerCell?.v;
     const header = raw == null ? "" : String(raw).replace(/\s+/g, " ").trim();
     const norm = normalizeHeader(raw);
-    const sampleCell = sheet[XLSX.utils.encode_cell({ r: 1, c })];
+    const sampleCell = sheet[XLSX.utils.encode_cell({ r: headerRow + 1, c })];
     const sampleV = sampleCell?.v;
     const sample = sampleV == null || sampleV === "" ? null : String(sampleV).trim();
     entries.push({ col: c + 1, letter: XLSX.utils.encode_col(c), header, sample });
     if (norm) map[norm] = c + 1;
   }
-  return { map, entries };
+  return { map, entries, headerRow };
 }
 
 function resolveColumn(
@@ -506,7 +529,10 @@ export async function parseDefectExcel(
   if (!sheet) throw new Error("시트를 찾을 수 없습니다");
 
   const warnings: string[] = [];
-  const { map: headerMap, entries } = scanHeaders(sheet);
+  const { map: headerMap, entries, headerRow } = scanHeaders(sheet);
+  if (headerRow > 0) {
+    warnings.push(`헤더 행 자동 감지: ${headerRow + 1}행부터 읽습니다.`);
+  }
 
   const excludedHeadersInput = opts.excludedHeaders ?? [];
   const excludedHeadersSet = new Set(excludedHeadersInput);
@@ -588,11 +614,12 @@ export async function parseDefectExcel(
 
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:Z2");
   const rowEnd = range.e.r + 1;
+  const dataStart = headerRow + 2; // 1-based 데이터 시작 행
   const rows: ParsedDefectRow[] = [];
   const categoryCounts = new Map<string, number>();
   let uuidKeyRejectedRows = 0;
 
-  for (let r = 2; r <= rowEnd; r++) {
+  for (let r = dataStart; r <= rowEnd; r++) {
     const idRaw = cols.source_issue_no ? getCell(sheet, r, cols.source_issue_no) : null;
     const id = toStr(idRaw);
     if (!id) continue;

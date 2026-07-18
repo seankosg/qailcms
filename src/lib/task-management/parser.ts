@@ -171,21 +171,45 @@ export function inferDiscipline(taskNo: string | null | undefined): Discipline |
 function buildHeaderMap(sheet: XLSX.WorkSheet): {
   map: Record<string, number>;
   warnings: string[];
+  headerRow: number; // 1-based
 } {
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S5");
-  const map: Record<string, number> = {};
   const warnings: string[] = [];
-  const HEADER_ROW = 5; // 1-based
-  for (let col = range.s.c; col <= Math.min(range.e.c, 25); col++) {
-    const addr = XLSX.utils.encode_cell({ r: HEADER_ROW - 1, c: col });
-    const cell = sheet[addr];
+  const maxCol = Math.min(range.e.c, 25);
+  const DEFAULT_HEADER_ROW = 5; // 1-based fallback
+  const MIN_HEADER_CELLS = 3;
+  const MAX_SCAN_ROWS = 30; // 상단 30행 스캔
+
+  // 가장 많은 정규화 헤더 셀을 가진 행을 헤더로 채택
+  let bestRow0 = DEFAULT_HEADER_ROW - 1;
+  let bestScore = -1;
+  const scanEnd = Math.min(range.s.r + MAX_SCAN_ROWS - 1, range.e.r);
+  for (let r = range.s.r; r <= scanEnd; r++) {
+    let score = 0;
+    for (let c = range.s.c; c <= maxCol; c++) {
+      const v = sheet[XLSX.utils.encode_cell({ r, c })]?.v;
+      if (normalizeHeader(v)) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestRow0 = r;
+    }
+  }
+  if (bestScore < MIN_HEADER_CELLS) {
+    bestRow0 = DEFAULT_HEADER_ROW - 1;
+    warnings.push(`헤더 행을 찾지 못해 기본 ${DEFAULT_HEADER_ROW}행을 사용합니다.`);
+  } else if (bestRow0 !== DEFAULT_HEADER_ROW - 1) {
+    warnings.push(`헤더 행 자동 감지: ${bestRow0 + 1}행부터 읽습니다.`);
+  }
+
+  const map: Record<string, number> = {};
+  for (let col = range.s.c; col <= maxCol; col++) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: bestRow0, c: col })];
     const norm = normalizeHeader(cell?.v);
     if (!norm) continue;
-    // 정규 헤더 dictionary와 매칭
-    const idx = col + 1;
-    map[norm] = idx;
+    map[norm] = col + 1;
   }
-  return { map, warnings };
+  return { map, warnings, headerRow: bestRow0 + 1 };
 }
 
 function resolveColumn(
@@ -302,20 +326,23 @@ export async function parseTaskManagementExcel(
     warnings.push("Data Date를 자동으로 읽지 못했습니다. 파일 카드에서 직접 입력하세요.");
   }
 
-  // Header map (row 5)
-  const { map: headerMap } = buildHeaderMap(sheet);
+  // Header map — 상단 30행 이내 자동 감지
+  const { map: headerMap, warnings: headerWarnings, headerRow } = buildHeaderMap(sheet);
+  warnings.push(...headerWarnings);
+  const headerRow0 = headerRow - 1;
+  const dataStart = headerRow + 2; // 1-based 데이터 시작 (헤더 아래 한 줄 건너뜀)
 
-  // 행 5 헤더 목록 수집 (컬럼 매핑 다이얼로그용)
+  // 헤더 행 목록 수집 (컬럼 매핑 다이얼로그용)
   const sheetHeaders: SheetHeaderEntry[] = [];
   {
     const rangeAll = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S7");
     const maxCol = Math.min(rangeAll.e.c, 25);
     for (let c = 0; c <= maxCol; c++) {
-      const headerCell = sheet[XLSX.utils.encode_cell({ r: 4, c })];
+      const headerCell = sheet[XLSX.utils.encode_cell({ r: headerRow0, c })];
       const raw = headerCell?.v;
       const header = raw == null ? "" : String(raw).replace(/\s+/g, " ").trim();
-      // 데이터 샘플: 7행 (첫 데이터 행)
-      const sampleCell = sheet[XLSX.utils.encode_cell({ r: 6, c })];
+      // 데이터 샘플: 데이터 시작 행
+      const sampleCell = sheet[XLSX.utils.encode_cell({ r: dataStart - 1, c })];
       const sampleV = sampleCell?.v;
       const sample = sampleV == null || sampleV === "" ? null : String(sampleV).trim();
       sheetHeaders.push({
@@ -381,7 +408,7 @@ export async function parseTaskManagementExcel(
     auto_judgment: cols.auto_judgment,
   };
 
-  // Iterate rows 7~
+  // Iterate data rows (dataStart~)
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S1000");
   const rows: ParsedTaskRow[] = [];
   let sort = 0;
@@ -389,7 +416,7 @@ export async function parseTaskManagementExcel(
   // 1-pass: task_no 집합 수집 (prefix 기반 parent 판정 및 parent 검증용)
   const rowEnd = Math.min(range.e.r + 1, 5000);
   const allTaskNos = new Set<string>();
-  for (let r = 7; r <= rowEnd; r++) {
+  for (let r = dataStart; r <= rowEnd; r++) {
     const a = toStr(getCell(sheet, r, cols.no));
     const f = toStr(getCell(sheet, r, cols.sub_task_desc));
     if (!a && !f) break;
@@ -433,7 +460,7 @@ export async function parseTaskManagementExcel(
     return null;
   };
 
-  for (let r = 7; r <= rowEnd; r++) {
+  for (let r = dataStart; r <= rowEnd; r++) {
     const a = toStr(getCell(sheet, r, cols.no));
     const f = toStr(getCell(sheet, r, cols.sub_task_desc));
     if (!a && !f) break;
