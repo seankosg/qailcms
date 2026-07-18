@@ -336,7 +336,7 @@ function ImportInner() {
               <Button
                 size="sm"
                 onClick={runStartImport}
-                disabled={isRunning || readyCount === 0 || !canImport}
+                disabled={isRunning || pendingImportAfterConflicts || readyCount === 0 || !canImport}
                 title={!canImport ? "관리자 권한이 필요합니다" : ""}
               >
                 {isRunning ? (
