@@ -561,7 +561,7 @@ export function DefectRawDataPage() {
         filterType: "multi-select",
         filterOptions: [
           { value: "Not Started", label: "Not Started" }, { value: "In Progress", label: "In Progress" },
-          { value: "Completed", label: "Completed" }, { value: "Closed", label: "Closed" }, { value: "Delayed", label: "Delayed" },
+          { value: "Completed", label: "Rectified" }, { value: "Closed", label: "Closed" }, { value: "Delayed", label: "Delayed" },
         ],
       },
       cell: ({ row }) => <DefectStageProgress item={row.original as any} asOfDate={dataDate} />,
