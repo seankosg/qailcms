@@ -326,20 +326,23 @@ export async function parseTaskManagementExcel(
     warnings.push("Data Date를 자동으로 읽지 못했습니다. 파일 카드에서 직접 입력하세요.");
   }
 
-  // Header map (row 5)
-  const { map: headerMap } = buildHeaderMap(sheet);
+  // Header map — 상단 30행 이내 자동 감지
+  const { map: headerMap, warnings: headerWarnings, headerRow } = buildHeaderMap(sheet);
+  warnings.push(...headerWarnings);
+  const headerRow0 = headerRow - 1;
+  const dataStart = headerRow + 2; // 1-based 데이터 시작 (헤더 아래 한 줄 건너뜀)
 
-  // 행 5 헤더 목록 수집 (컬럼 매핑 다이얼로그용)
+  // 헤더 행 목록 수집 (컬럼 매핑 다이얼로그용)
   const sheetHeaders: SheetHeaderEntry[] = [];
   {
     const rangeAll = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S7");
     const maxCol = Math.min(rangeAll.e.c, 25);
     for (let c = 0; c <= maxCol; c++) {
-      const headerCell = sheet[XLSX.utils.encode_cell({ r: 4, c })];
+      const headerCell = sheet[XLSX.utils.encode_cell({ r: headerRow0, c })];
       const raw = headerCell?.v;
       const header = raw == null ? "" : String(raw).replace(/\s+/g, " ").trim();
-      // 데이터 샘플: 7행 (첫 데이터 행)
-      const sampleCell = sheet[XLSX.utils.encode_cell({ r: 6, c })];
+      // 데이터 샘플: 데이터 시작 행
+      const sampleCell = sheet[XLSX.utils.encode_cell({ r: dataStart - 1, c })];
       const sampleV = sampleCell?.v;
       const sample = sampleV == null || sampleV === "" ? null : String(sampleV).trim();
       sheetHeaders.push({
