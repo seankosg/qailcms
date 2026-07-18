@@ -2649,6 +2649,7 @@ export type Database = {
         Returns: number
       }
       resolve_login_email: { Args: { _login_id: string }; Returns: string }
+      resolve_owner_by_name: { Args: { _name: string }; Returns: string }
       rollback_abd_import: {
         Args: { _batch_id: string; _force?: boolean }
         Returns: Json
