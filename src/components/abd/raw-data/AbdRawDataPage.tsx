@@ -501,19 +501,43 @@ export function AbdRawDataPage() {
         </Tabs>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Tabs value={statusGroup} onValueChange={(v) => setUrl({ status: v, page: 1 })}>
-          <TabsList className="h-8">
-            {STATUS_TABS.map((s) => (
-              <TabsTrigger key={s.value} value={s.value} className="text-[11px]">
-                {s.label}
-                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
-                  {s.value === "all" ? totalCount : s.value === "approved" ? approvedCount : s.value === "in_progress" ? inProgressCount : notStartedCount}
-                </Badge>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+      <div className="flex flex-wrap items-center gap-1 rounded-md border bg-muted/30 p-1">
+        <button
+          type="button"
+          onClick={() => setUrl({ status: "all", page: 1 })}
+          className={cn(
+            "inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] transition-colors",
+            selectedStatuses.length === 0
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-background/60",
+          )}
+          aria-pressed={selectedStatuses.length === 0}
+        >
+          All
+          <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{totalCount}</Badge>
+        </button>
+        {STATUS_TABS.map((s) => {
+          const active = selectedStatuses.includes(s.value);
+          const count = s.value === "approved" ? approvedCount : s.value === "in_progress" ? inProgressCount : notStartedCount;
+          return (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => toggleStatus(s.value)}
+              className={cn(
+                "inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] transition-colors",
+                active
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-background/60",
+              )}
+              aria-pressed={active}
+              title="다중 선택 가능"
+            >
+              {s.label}
+              <Badge variant={active ? "outline" : "secondary"} className="ml-1 h-4 px-1 text-[10px]">{count}</Badge>
+            </button>
+          );
+        })}
       </div>
 
       {activeChips.length > 0 && (
