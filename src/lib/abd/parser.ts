@@ -186,6 +186,21 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
   const ref = ws["!ref"];
   if (!ref) return null;
   const range = XLSX.utils.decode_range(ref);
+  // ABD NUMBER 컬럼의 표시용 별칭 (view-friendly export 대응)
+  const isAbdNumberLabel = (v: string): boolean => {
+    const n = v.replace(/[._\-\s]+/g, " ").trim();
+    if (!n) return false;
+    return (
+      n === "ABD NUMBER" ||
+      n === "ABD NO" ||
+      n === "ABD NUM" ||
+      n === "ABD DOC NO" ||
+      n === "ABD DOCUMENT NO" ||
+      n === "ABD DOCUMENT NUMBER" ||
+      n === "DOCUMENT NO" ||
+      n === "DOC NO"
+    );
+  };
   // Find row 0..8 containing "Sl.No" and "ABD NUMBER"
   let anchorRow = -1;
   for (let r = range.s.r; r <= Math.min(range.s.r + 29, range.e.r); r++) {
@@ -194,7 +209,7 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
       const cell = ws[XLSX.utils.encode_cell({ r, c })];
       const v = normText(cell?.v);
       if (v === "SL.NO" || v === "SL NO") hasSlNo = true;
-      if (v === "ABD NUMBER") hasAbd = true;
+      if (isAbdNumberLabel(v)) hasAbd = true;
     }
     if (hasSlNo && hasAbd) { anchorRow = r; break; }
   }
@@ -250,7 +265,7 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
     else if (label === "N") colIndex.doc_n = c;
     else if (label === "NN") colIndex.doc_nn2 = c;
     else if (label === "DOCUMENT TITLE") colIndex.document_title = c;
-    else if (label === "ABD NUMBER") colIndex.abd_number = c;
+    else if (isAbdNumberLabel(label) && !("abd_number" in colIndex)) colIndex.abd_number = c;
     else if (label === "ABD OCS NO." || label === "ABD OCS NO" || label === "OCS NO.") colIndex.abd_ocs_no = c;
     else if (label === "PIC") colIndex.pic = c;
     else if (label === "REV") colIndex.latest_rev = c;
