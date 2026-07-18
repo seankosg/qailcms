@@ -39,6 +39,7 @@ import { Route as AuthenticatedClosureDashboardSparePartRouteImport } from './ro
 import { Route as AuthenticatedClosureDashboardAsBuiltRouteImport } from './routes/_authenticated/closure/dashboard/as-built'
 import { Route as AuthenticatedClosureAbdSettingsRouteImport } from './routes/_authenticated/closure/abd/settings'
 import { Route as AuthenticatedClosureAbdRawDataRouteImport } from './routes/_authenticated/closure/abd/raw-data'
+import { Route as AuthenticatedClosureAbdProgressRouteImport } from './routes/_authenticated/closure/abd/progress'
 import { Route as AuthenticatedClosureAbdImportRouteImport } from './routes/_authenticated/closure/abd/import'
 import { Route as AuthenticatedClosureSnagManagementImportIndexRouteImport } from './routes/_authenticated/closure/snag-management/import.index'
 import { Route as AuthenticatedClosureTaskManagementImportLogsRouteImport } from './routes/_authenticated/closure/task-management/import.logs'
@@ -221,6 +222,12 @@ const AuthenticatedClosureAbdRawDataRoute =
     path: '/closure/abd/raw-data',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureAbdProgressRoute =
+  AuthenticatedClosureAbdProgressRouteImport.update({
+    id: '/closure/abd/progress',
+    path: '/closure/abd/progress',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureAbdImportRoute =
   AuthenticatedClosureAbdImportRouteImport.update({
     id: '/closure/abd/import',
@@ -291,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
+  '/closure/abd/progress': typeof AuthenticatedClosureAbdProgressRoute
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
   '/closure/abd/settings': typeof AuthenticatedClosureAbdSettingsRoute
   '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
@@ -330,6 +338,7 @@ export interface FileRoutesByTo {
   '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
+  '/closure/abd/progress': typeof AuthenticatedClosureAbdProgressRoute
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
   '/closure/abd/settings': typeof AuthenticatedClosureAbdSettingsRoute
   '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
@@ -372,6 +381,7 @@ export interface FileRoutesById {
   '/_authenticated/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
+  '/_authenticated/closure/abd/progress': typeof AuthenticatedClosureAbdProgressRoute
   '/_authenticated/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
   '/_authenticated/closure/abd/settings': typeof AuthenticatedClosureAbdSettingsRoute
   '/_authenticated/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
     | '/outstanding/dashboard'
     | '/admin/'
     | '/closure/abd/import'
+    | '/closure/abd/progress'
     | '/closure/abd/raw-data'
     | '/closure/abd/settings'
     | '/closure/dashboard/as-built'
@@ -453,6 +464,7 @@ export interface FileRouteTypes {
     | '/outstanding/dashboard'
     | '/admin'
     | '/closure/abd/import'
+    | '/closure/abd/progress'
     | '/closure/abd/raw-data'
     | '/closure/abd/settings'
     | '/closure/dashboard/as-built'
@@ -494,6 +506,7 @@ export interface FileRouteTypes {
     | '/_authenticated/outstanding/dashboard'
     | '/_authenticated/admin/'
     | '/_authenticated/closure/abd/import'
+    | '/_authenticated/closure/abd/progress'
     | '/_authenticated/closure/abd/raw-data'
     | '/_authenticated/closure/abd/settings'
     | '/_authenticated/closure/dashboard/as-built'
@@ -739,6 +752,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureAbdRawDataRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/abd/progress': {
+      id: '/_authenticated/closure/abd/progress'
+      path: '/closure/abd/progress'
+      fullPath: '/closure/abd/progress'
+      preLoaderRoute: typeof AuthenticatedClosureAbdProgressRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/abd/import': {
       id: '/_authenticated/closure/abd/import'
       path: '/closure/abd/import'
@@ -865,6 +885,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedImportLogLogsRoute: typeof AuthenticatedImportLogLogsRoute
   AuthenticatedOutstandingDashboardRoute: typeof AuthenticatedOutstandingDashboardRoute
   AuthenticatedClosureAbdImportRoute: typeof AuthenticatedClosureAbdImportRouteWithChildren
+  AuthenticatedClosureAbdProgressRoute: typeof AuthenticatedClosureAbdProgressRoute
   AuthenticatedClosureAbdRawDataRoute: typeof AuthenticatedClosureAbdRawDataRoute
   AuthenticatedClosureAbdSettingsRoute: typeof AuthenticatedClosureAbdSettingsRoute
   AuthenticatedClosureDashboardAsBuiltRoute: typeof AuthenticatedClosureDashboardAsBuiltRoute
@@ -898,6 +919,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedOutstandingDashboardRoute,
   AuthenticatedClosureAbdImportRoute:
     AuthenticatedClosureAbdImportRouteWithChildren,
+  AuthenticatedClosureAbdProgressRoute: AuthenticatedClosureAbdProgressRoute,
   AuthenticatedClosureAbdRawDataRoute: AuthenticatedClosureAbdRawDataRoute,
   AuthenticatedClosureAbdSettingsRoute: AuthenticatedClosureAbdSettingsRoute,
   AuthenticatedClosureDashboardAsBuiltRoute:
