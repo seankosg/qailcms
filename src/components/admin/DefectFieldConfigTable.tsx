@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { RotateCcw, Save, GripVertical } from "lucide-react";
+import { RotateCcw, Save, GripVertical, KeyRound } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   useDefectFieldConfig,
   DEFECT_FIELD_CONFIG_QK,
@@ -184,6 +185,7 @@ export function DefectFieldConfigTable() {
               )}
               {filtered.map((r) => {
                 const dirty = !!drafts[r.id];
+                const isUniqueKey = r.field_name === "source_issue_no";
                 return (
                   <TableRow
                     key={r.id}
@@ -197,7 +199,20 @@ export function DefectFieldConfigTable() {
                     <TableCell>
                       <Input type="number" value={r.sort_order} onChange={(e) => setDraft(r.id, { sort_order: Number(e.target.value) || 0 })} className="h-8 w-20" />
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{r.field_name}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span>{r.field_name}</span>
+                        {isUniqueKey && (
+                          <Badge
+                            variant="outline"
+                            className="gap-1 border-primary/40 bg-primary/10 text-[10px] text-primary"
+                            title="유니크 키: 삭제/숨김 불가. 시스템 UUID 오염 방지."
+                          >
+                            <KeyRound className="h-3 w-3" /> Unique Key
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Input value={r.display_name} onChange={(e) => setDraft(r.id, { display_name: e.target.value })} className="h-8" />
                     </TableCell>
@@ -236,7 +251,14 @@ export function DefectFieldConfigTable() {
                         placeholder="HDEC / Aconex …"
                       />
                     </TableCell>
-                    <TableCell className="text-center"><Switch checked={r.is_visible} onCheckedChange={(v) => setDraft(r.id, { is_visible: v })} /></TableCell>
+                    <TableCell className="text-center">
+                      <Switch
+                        checked={r.is_visible}
+                        onCheckedChange={(v) => setDraft(r.id, { is_visible: v })}
+                        disabled={isUniqueKey}
+                        title={isUniqueKey ? "유니크 키는 숨길 수 없습니다" : undefined}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Input value={r.note ?? ""} onChange={(e) => setDraft(r.id, { note: e.target.value })} className="h-8 text-xs" placeholder="메모" />
                     </TableCell>
