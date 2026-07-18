@@ -533,7 +533,24 @@ export async function parseDefectExcel(
   }
 
   const cols: Partial<Record<DefectTargetField, number>> = {};
+  // source_issue_no 는 UUID 오염 방어를 위해 전용 resolver 사용.
+  let sourceKeyOrigin: ParseDefectResult["sourceKeyOrigin"] = null;
+  if (!excludedFields.has("source_issue_no")) {
+    const sk = resolveSourceIssueNoColumn(
+      headerMap,
+      entries,
+      opts.extraAliases?.["source_issue_no"] ?? [],
+      isReimport,
+      opts.columnOverrides?.source_issue_no,
+      warnings,
+    );
+    if (sk.col) {
+      cols.source_issue_no = sk.col;
+      sourceKeyOrigin = sk.origin;
+    }
+  }
   for (const target of DEFECT_TARGET_FIELDS) {
+    if (target === "source_issue_no") continue;
     if (excludedFields.has(target)) continue;
     const ov = opts.columnOverrides?.[target];
     if (typeof ov === "number" && ov > 0) {
@@ -578,6 +595,11 @@ export async function parseDefectExcel(
     const idRaw = cols.source_issue_no ? getCell(sheet, r, cols.source_issue_no) : null;
     const id = toStr(idRaw);
     if (!id) continue;
+    // 방어: 어떤 이유로든 유니크 키에 UUID가 들어오면 해당 행은 폐기한다.
+    if (isUuidLike(id)) {
+      uuidKeyRejectedRows++;
+      continue;
+    }
 
     const raw_payload: Record<string, unknown> = {};
     for (const e of entries) {
@@ -665,5 +687,7 @@ export async function parseDefectExcel(
     excludedHeaders: excludedHeadersInput,
     excludedFields,
     isReimport,
+    sourceKeyOrigin,
+    uuidKeyRejectedRows,
   };
 }
