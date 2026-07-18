@@ -1,90 +1,42 @@
-
 ## 목표
+ABD / SM / TM 임포트에서 헤더 행 탐색 범위를 **상단 30행**까지 확장하여, 파일 상단에 제목·설명·빈 행 등이 있어도 헤더를 자동으로 찾도록 개선합니다.
 
-Spare Part 상세페이지의 `SparePartStatusHistory` 컴포넌트가 제공하는 **카테고리 태그 + 스레드형 댓글/답글 + 인라인 수정/삭제 + Realtime 반영** 기능을, 세 Raw Data 도메인의 상세창에 동일하게 이식한다.
+## 현재 상태 (확인 완료)
 
-- ABD: `AbdDetailSheet` (Sheet)
-- SM(Defect): `DefectDetailPage`
-- TM(Task): `TaskDetailPage`
+| 도메인 | 파일 | 현재 로직 | 문제 |
+|---|---|---|---|
+| ABD | `src/lib/abd/parser.ts` L191 | 0~10행 스캔 (`Math.min(range.s.r + 10, ...)`) 하며 `SL.NO` + `ABD NUMBER` 앵커 탐색 | 11행 이후에 헤더가 있으면 실패 |
+| SM (Defect) | `src/lib/defect-management/parser.ts` L311 `scanHeaders` | **1행 고정** (`r: 0`) — 스캔 없음 | 상단에 빈 행/제목이 있으면 전부 실패 |
+| TM (Task) | `src/lib/task-management/parser.ts` L178 `buildHeaderMap` | **5행 고정** (`HEADER_ROW = 5`) — 스캔 없음 | 파일 구조가 조금만 밀려도 실패 |
 
-기존 `defect_status_history` / `task_management_status_history` / `abd_change_log` 은 **필드 변경 감사 로그**로서 유지하고, **새 댓글 테이블을 도메인별로 별도 신설**한다(스키마/RLS 격리, Spare Part와 완전 대칭).
+## 변경 사항
 
-## 데이터 모델 (신설 3개 테이블)
+### 1. ABD (`src/lib/abd/parser.ts`)
+- `findHeader`의 스캔 상한을 `range.s.r + 10` → `range.s.r + 29`로 변경 (총 30행 후보).
+- 기존 앵커 판정 로직(`SL.NO` + `ABD NUMBER` 동시 존재)은 유지 → 오탐 없음.
 
-Spare Part의 `spare_part_status_history` 컬럼 형태를 그대로 재사용:
+### 2. SM/Defect (`src/lib/defect-management/parser.ts`)
+- `scanHeaders(sheet)`에 헤더 행 자동 탐지 추가:
+  - 0~29행을 순회하며, **정규화된 헤더가 가장 많이 매칭되는 행**을 헤더 행으로 선택 (임계값: 최소 3개 이상 헤더 셀).
+  - 매칭 기준: `normalizeHeader` 결과가 비어있지 않은 셀 개수. 필요 시 필수 후보(`id`, `plot`, `location`, `description`, `source_issue_no` 등) 가중치 부여.
+  - 헤더 행이 결정되면 sample 은 `headerRow + 1` 에서 읽음.
+- 반환 타입에 `headerRow: number` 추가 → 이후 데이터 행 반복 시 `headerRow + 1`부터 시작하도록 호출부 조정 (`parseDefectFile` 내 data loop 시작 인덱스).
 
-```text
-{abd|defect|task}_comments
-- id uuid PK
-- {abd_item_id | defect_raw_id | task_raw_id} uuid FK  ← 도메인 부모행
-- parent_comment_id uuid null  ← 답글 지원
-- category text ('technical'|'supplier'|'internal'|'general')
-- message text (<=2000)
-- source text default 'app_manual'
-- author_user_id uuid null (auth.users)
-- edited boolean default false
-- created_at / updated_at timestamptz
-- GRANT authenticated / service_role, RLS on
-```
+### 3. TM/Task (`src/lib/task-management/parser.ts`)
+- `buildHeaderMap`에 자동 탐지 추가:
+  - 1~30행(0-based 0~29)을 순회하며, 정규화 헤더가 최다 매칭되는 행을 선택 (fallback: 기존 5행 고정).
+  - 열 범위 상한 `Math.min(range.e.c, 25)`는 유지하되 필요 시 40까지 확장 검토 (이번 스코프에서는 유지, 필요 시 별도 요청).
+- 반환값에 `headerRow` 추가하고 `parseTmSheet` 내 데이터 행 시작 인덱스를 `HEADER_ROW` 하드코딩 대신 동적 값으로 대체.
 
-### RLS 정책 (Spare Part와 동일 규칙)
-- SELECT: 로그인 사용자 전체
-- INSERT: `author_user_id = auth.uid()`
-- UPDATE/DELETE: 본인 작성분 또는 admin/superuser (`has_role`)
+### 4. 로그/경고
+- 각 파서에서 자동 탐지된 실제 헤더 행(1-based)을 `warnings` 또는 파싱 결과 메타에 기록 → 임포트 로그에서 확인 가능.
+- 매칭 헤더가 임계값 미만이면 기존 동작(SM=1행, TM=5행)으로 폴백하고 경고 메시지 남김.
 
-### 카테고리 옵션 (도메인별 조정)
-- ABD: `drafting`, `submission`, `dar`, `general`
-- SM: `defect`, `rectification`, `inspection`, `general`
-- TM: `plan`, `execution`, `handover`, `general`
-- (카테고리 라벨/색상은 상수 맵으로 각 컴포넌트에 정의)
+## 영향 범위
+- 파서 3개 파일만 수정. UI/DB/스키마 변경 없음.
+- 기존 정상 파일(헤더가 지정 행에 있는 파일)은 자동 탐지 시에도 동일 행을 선택하므로 회귀 위험 낮음.
 
-## 컴포넌트 구조
-
-### 1. 공용 훅 (도메인별 3종)
-`src/hooks/useAbdComments.ts`, `useDefectComments.ts`, `useTaskComments.ts`
-- `useSparePartStatusHistory` 와 동일한 구조: `useQuery` + Realtime `postgres_changes` 구독 → `invalidateQueries`.
-
-### 2. 프레젠테이션 컴포넌트 (도메인별 3종)
-`src/components/abd/detail/AbdCommentsThread.tsx`
-`src/components/defect-management/detail/DefectCommentsThread.tsx`
-`src/components/task-management/detail/TaskCommentsThread.tsx`
-
-- 각각 `SparePartStatusHistory.tsx` 를 템플릿으로 복제:
-  - 카테고리 셀렉트 / Textarea / Send / Reply / Edit / Delete / 시간표시(`formatDistanceToNow`) / 작성자 이름(`profiles.display_name`)
-  - `useCurrentUser` 로 편집권한 판정 (`isAdmin` 또는 본인)
-- **중복 로직이 크므로**, 초기 구현은 3개 파일로 복제하되 카테고리/훅/부모키 필드명만 파라미터화 가능한 형태로 정리(추후 필요 시 하나로 통합).
-
-### 3. 상세창 통합
-- `AbdDetailSheet.tsx`: 하단 "Raw Payload" 위에 `<h3>Comments</h3>` 섹션 추가 후 `<AbdCommentsThread abdItemId={item.id} />`
-- `DefectDetailPage.tsx`: Status History 카드 아래에 Comments 카드 추가
-- `TaskDetailPage.tsx`: Status History 카드 아래에 Comments 카드 추가
-
-## 마이그레이션 순서
-
-1. 3개 테이블 생성 + GRANT + RLS + 정책 + `updated_at` 트리거 + `parent_comment_id` / 부모FK 인덱스.
-2. 훅 3개 신설.
-3. 스레드 컴포넌트 3개 신설.
-4. 각 상세창에 삽입.
-
-## Spare Part와 다른 점 (질문 필요 없음, 아래대로 진행)
-
-- 부모행 키가 도메인별 상이(`abd_item_id` / `defect_raw_id` / `task_raw_id`) → 각 훅·컴포넌트 시그니처가 다름.
-- 카테고리 값이 도메인 특성에 맞게 다름(위 목록).
-- `source_file_hash` 는 Spare Part 전용(엑셀 임포트 마이그레이션 대비)이므로 신규 테이블에서는 제외.
-- 나머지 UI(색상 팔레트, 답글 트리, 편집 UX, Realtime)는 100% 동일.
-
-## 변경/유지 파일 요약
-
-Add:
-- migration: 3 tables + policies
-- `src/hooks/useAbdComments.ts`, `useDefectComments.ts`, `useTaskComments.ts`
-- `src/components/abd/detail/AbdCommentsThread.tsx`
-- `src/components/defect-management/detail/DefectCommentsThread.tsx`
-- `src/components/task-management/detail/TaskCommentsThread.tsx`
-
-Modify:
-- `src/components/abd/raw-data/AbdDetailSheet.tsx`
-- `src/components/defect-management/detail/DefectDetailPage.tsx`
-- `src/components/task-management/detail/TaskDetailPage.tsx`
-
-기존 `*_status_history` / `abd_change_log` 는 변경 없음(감사로그로 유지).
+## 검증
+- 기존 정상 파일 재임포트 → 동일 결과 확인.
+- 상단에 빈 행 몇 개를 추가한 샘플 파일 → 헤더 자동 인식 확인.
+- 헤더가 완전히 다른 파일 → 임계값 미달로 폴백 + 경고 노출 확인.
