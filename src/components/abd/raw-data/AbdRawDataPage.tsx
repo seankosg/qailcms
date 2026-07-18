@@ -212,6 +212,8 @@ export function AbdRawDataPage() {
   const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
 
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("[RAW team effect] team", team, "urlSearch.filters", urlSearch.filters, "parsed", parseFiltersFromUrl(urlSearch.filters), "current columnFilters", columnFilters);
     setSorting(parseSortFromUrl(urlSearch.sort));
     setColumnFilters(parseFiltersFromUrl(urlSearch.filters));
     setSearchInput(urlSearch.q ?? "");
