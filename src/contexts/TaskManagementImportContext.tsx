@@ -79,6 +79,7 @@ export interface TmImportFileItem {
     rolledUp?: number;
     judgmentRecalculated?: number;
     renumbered?: number;
+    resolvedByDecision?: number;
     errors?: ImportErrorEntry[];
   };
 }
