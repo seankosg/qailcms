@@ -739,6 +739,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     rolledUp,
                     judgmentRecalculated,
                     renumbered,
+                    resolvedByDecision,
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
