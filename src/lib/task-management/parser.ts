@@ -171,21 +171,45 @@ export function inferDiscipline(taskNo: string | null | undefined): Discipline |
 function buildHeaderMap(sheet: XLSX.WorkSheet): {
   map: Record<string, number>;
   warnings: string[];
+  headerRow: number; // 1-based
 } {
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S5");
-  const map: Record<string, number> = {};
   const warnings: string[] = [];
-  const HEADER_ROW = 5; // 1-based
-  for (let col = range.s.c; col <= Math.min(range.e.c, 25); col++) {
-    const addr = XLSX.utils.encode_cell({ r: HEADER_ROW - 1, c: col });
-    const cell = sheet[addr];
+  const maxCol = Math.min(range.e.c, 25);
+  const DEFAULT_HEADER_ROW = 5; // 1-based fallback
+  const MIN_HEADER_CELLS = 3;
+  const MAX_SCAN_ROWS = 30; // 상단 30행 스캔
+
+  // 가장 많은 정규화 헤더 셀을 가진 행을 헤더로 채택
+  let bestRow0 = DEFAULT_HEADER_ROW - 1;
+  let bestScore = -1;
+  const scanEnd = Math.min(range.s.r + MAX_SCAN_ROWS - 1, range.e.r);
+  for (let r = range.s.r; r <= scanEnd; r++) {
+    let score = 0;
+    for (let c = range.s.c; c <= maxCol; c++) {
+      const v = sheet[XLSX.utils.encode_cell({ r, c })]?.v;
+      if (normalizeHeader(v)) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestRow0 = r;
+    }
+  }
+  if (bestScore < MIN_HEADER_CELLS) {
+    bestRow0 = DEFAULT_HEADER_ROW - 1;
+    warnings.push(`헤더 행을 찾지 못해 기본 ${DEFAULT_HEADER_ROW}행을 사용합니다.`);
+  } else if (bestRow0 !== DEFAULT_HEADER_ROW - 1) {
+    warnings.push(`헤더 행 자동 감지: ${bestRow0 + 1}행부터 읽습니다.`);
+  }
+
+  const map: Record<string, number> = {};
+  for (let col = range.s.c; col <= maxCol; col++) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: bestRow0, c: col })];
     const norm = normalizeHeader(cell?.v);
     if (!norm) continue;
-    // 정규 헤더 dictionary와 매칭
-    const idx = col + 1;
-    map[norm] = idx;
+    map[norm] = col + 1;
   }
-  return { map, warnings };
+  return { map, warnings, headerRow: bestRow0 + 1 };
 }
 
 function resolveColumn(
