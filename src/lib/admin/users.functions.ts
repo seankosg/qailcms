@@ -26,7 +26,7 @@ async function assertAdmin(supabase: any, userId: string) {
   if (!data) throw new Error("관리자 권한이 필요합니다.");
 }
 
-type UserType = "subcontractor" | "hdec" | "pm_pd" | "admin" | "subsub" | "guest";
+type UserType = "subcontractor" | "hdec" | "hdec_pic" | "hdec_eng" | "pm_pd" | "admin" | "subsub" | "guest";
 type AppRole =
   | "admin"
   | "superuser"

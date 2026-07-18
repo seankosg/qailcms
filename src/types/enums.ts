@@ -11,23 +11,24 @@ export type UserType =
   | "admin"
   | "pm_pd"
   | "hdec"
+  | "hdec_pic"
+  | "hdec_eng"
   | "subcontractor"
   | "subsub"
   | "guest";
 
 /**
- * 권한 rank. admin=100, superuser=90, senior_user=70, user=50,
- * super_guest=30, guest=10.  d_superuser 는 별도 축(team 스코프)이라
- * rank 0 으로 두고 hasRank 비교에서 제외한다.
+ * 권한 rank. admin=100, superuser=90, d_superuser=80(전체 편집 승격),
+ * senior_user=70, user=50, super_guest=30, guest=10.
  */
 export const ROLE_RANK: Record<AppRole, number> = {
   admin: 100,
   superuser: 90,
+  d_superuser: 80,
   senior_user: 70,
   user: 50,
   super_guest: 30,
   guest: 10,
-  d_superuser: 0,
 };
 
 export const ROLE_LABELS: Record<AppRole, string> = {
@@ -43,7 +44,9 @@ export const ROLE_LABELS: Record<AppRole, string> = {
 export const USER_TYPE_LABELS: Record<UserType, string> = {
   admin: "Admin",
   pm_pd: "PM/PD",
-  hdec: "HDEC",
+  hdec: "HDEC (Legacy)",
+  hdec_pic: "HDEC PIC",
+  hdec_eng: "HDEC ENG",
   subcontractor: "Subcontractor",
   subsub: "Sub-Sub",
   guest: "Guest",

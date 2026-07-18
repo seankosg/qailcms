@@ -30,7 +30,7 @@ export const Route = createFileRoute("/_authenticated/admin/users")({
   component: UsersAdminPage,
 });
 
-const USER_TYPES: UserType[] = ["admin", "pm_pd", "hdec", "subcontractor", "subsub", "guest"];
+const USER_TYPES: UserType[] = ["admin", "hdec_pic", "hdec_eng", "pm_pd", "hdec", "subcontractor", "subsub", "guest"];
 const ROLES: AppRole[] = ["admin", "superuser", "senior_user", "user", "super_guest", "guest", "d_superuser"];
 
 function UsersAdminPage() {
@@ -323,13 +323,13 @@ function LinkedMasterCell({ user, onSaved, updProfile }: { user: any; onSaved: (
   const list =
     user.user_type === "subcontractor" ? sub :
     user.user_type === "subsub" ? subsub :
-    user.user_type === "hdec" ? pic :
-    user.user_type === "pm_pd" ? eng : null;
+    (user.user_type === "hdec" || user.user_type === "hdec_pic") ? pic :
+    (user.user_type === "pm_pd" || user.user_type === "hdec_eng") ? eng : null;
   const field =
     user.user_type === "subcontractor" ? "subcontractor_name" :
     user.user_type === "subsub" ? "subsub_name" :
-    user.user_type === "hdec" ? "hdec_pic_name" :
-    user.user_type === "pm_pd" ? "hdec_eng_name" : null;
+    (user.user_type === "hdec" || user.user_type === "hdec_pic") ? "hdec_pic_name" :
+    (user.user_type === "pm_pd" || user.user_type === "hdec_eng") ? "hdec_eng_name" : null;
   if (!list || !field) return <span>—</span>;
   const current = user[field] ?? "__none__";
   return (
@@ -388,7 +388,7 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const [loginId, setLoginId] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [userType, setUserType] = useState<UserType>("hdec");
+  const [userType, setUserType] = useState<UserType>("hdec_pic");
   const [role, setRole] = useState<AppRole>("user");
   const [tempPw, setTempPw] = useState(DEFAULT_PASSWORD);
   const [team, setTeam] = useState<string>("__none__");
@@ -416,8 +416,8 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
           team: team === "__none__" ? null : team,
           subcontractor_name: userType === "subcontractor" ? (subName || null) : null,
           subsub_name: userType === "subsub" ? (subsubName || null) : null,
-          hdec_pic_name: userType === "hdec" ? (displayName.trim() || null) : null,
-          hdec_eng_name: userType === "pm_pd" ? (displayName.trim() || null) : null,
+          hdec_pic_name: (userType === "hdec" || userType === "hdec_pic") ? (displayName.trim() || null) : null,
+          hdec_eng_name: (userType === "pm_pd" || userType === "hdec_eng") ? (displayName.trim() || null) : null,
         },
       });
       toast.success("계정이 생성되었습니다", { description: `초기 비밀번호: ${tempPw}` });
@@ -455,8 +455,10 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
               <Select value={userType} onValueChange={(v) => setUserType(v as any)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="hdec">HDEC PIC</SelectItem>
-                  <SelectItem value="pm_pd">HDEC ENG</SelectItem>
+                  <SelectItem value="hdec_pic">HDEC PIC</SelectItem>
+                  <SelectItem value="hdec_eng">HDEC ENG</SelectItem>
+                  <SelectItem value="hdec">HDEC (Legacy PIC)</SelectItem>
+                  <SelectItem value="pm_pd">PM/PD (Legacy ENG)</SelectItem>
                   <SelectItem value="subcontractor">{USER_TYPE_LABELS["subcontractor"]}</SelectItem>
                   <SelectItem value="subsub">{USER_TYPE_LABELS["subsub"]}</SelectItem>
                   <SelectItem value="admin">{USER_TYPE_LABELS["admin"]}</SelectItem>
@@ -508,9 +510,9 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
               </Select>
             </div>
           )}
-          {(userType === "hdec" || userType === "pm_pd") && (
+          {(userType === "hdec" || userType === "pm_pd" || userType === "hdec_pic" || userType === "hdec_eng") && (
             <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
-              {userType === "hdec" ? "HDEC PIC" : "HDEC ENG"} 명단에는 위 <b>이름</b> 필드 값이 자동으로 등록됩니다.
+              {(userType === "hdec" || userType === "hdec_pic") ? "HDEC PIC" : "HDEC ENG"} 명단에는 위 <b>이름</b> 필드 값이 자동으로 등록됩니다.
             </div>
           )}
           <div>
