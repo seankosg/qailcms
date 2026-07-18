@@ -74,7 +74,7 @@ export const HDEC_VERIFICATIONS = [
   "Cat B - Minor Defect",
   "Review Needed",
 ] as const;
-export const RECTIFIED_STATUSES = ["Not Started", "In Progress", "Complete"] as const;
+export const RECTIFIED_STATUSES = ["Not Started", "In Progress", "Rectified"] as const;
 export const CLOSURE_STATUSES = ["Not Closed", "Closed", "InD"] as const;
 
 export const TEAM_COLORS: Record<string, string> = {
