@@ -320,36 +320,43 @@ function LinkedMasterCell({ user, onSaved, updProfile }: { user: any; onSaved: (
   const subsub = useMasterList("subsub");
   const pic = useMasterList("hdec_pic");
   const eng = useMasterList("hdec_eng");
-  const list =
-    user.user_type === "subcontractor" ? sub :
-    user.user_type === "subsub" ? subsub :
-    (user.user_type === "hdec" || user.user_type === "hdec_pic") ? pic :
-    (user.user_type === "pm_pd" || user.user_type === "hdec_eng") ? eng : null;
-  const field =
-    user.user_type === "subcontractor" ? "subcontractor_name" :
-    user.user_type === "subsub" ? "subsub_name" :
-    (user.user_type === "hdec" || user.user_type === "hdec_pic") ? "hdec_pic_name" :
-    (user.user_type === "pm_pd" || user.user_type === "hdec_eng") ? "hdec_eng_name" : null;
-  if (!list || !field) return <span>—</span>;
-  const current = user[field] ?? "__none__";
+
+  const save = async (field: string, v: string) => {
+    try {
+      await updProfile({ data: { user_id: user.id, [field]: v === "__none__" ? null : v } });
+      onSaved();
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const renderSelect = (
+    label: string,
+    field: string,
+    list: { data?: any[] } | null,
+  ) => (
+    <div className="flex items-center gap-1">
+      <span className="w-14 shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <Select value={user[field] ?? "__none__"} onValueChange={(v) => save(field, v)}>
+        <SelectTrigger className="h-7 w-40"><SelectValue placeholder="—" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">—</SelectItem>
+          {(list?.data ?? []).filter((m: any) => m.is_active).map((m: any) => (
+            <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const showSub = user.user_type === "subcontractor";
+  const showSubSub = user.user_type === "subsub";
+
   return (
-    <Select
-      value={current}
-      onValueChange={async (v) => {
-        try {
-          await updProfile({ data: { user_id: user.id, [field]: v === "__none__" ? null : v } });
-          onSaved();
-        } catch (e: any) { toast.error(e.message); }
-      }}
-    >
-      <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value="__none__">—</SelectItem>
-        {(list.data ?? []).filter((m: any) => m.is_active).map((m: any) => (
-          <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="flex flex-col gap-1">
+      {renderSelect("HDEC PIC", "hdec_pic_name", pic)}
+      {renderSelect("HDEC Eng", "hdec_eng_name", eng)}
+      {showSub && renderSelect("Sub", "subcontractor_name", sub)}
+      {showSubSub && renderSelect("Sub-Sub", "subsub_name", subsub)}
+    </div>
   );
 }
 
