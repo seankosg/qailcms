@@ -147,12 +147,12 @@ function formatDdMmm(v: any): string {
 }
 
 
-const STATUS_TABS: { value: AbdStatusGroup; label: string }[] = [
-  { value: "all", label: "All" },
+const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = [
   { value: "approved", label: "Approved (A)" },
   { value: "in_progress", label: "In Progress" },
   { value: "not_started", label: "Not Started" },
 ];
+const ALL_STATUS_VALUES = STATUS_TABS.map((s) => s.value);
 
 export function AbdRawDataPage() {
   const navigate = useNavigate();
@@ -174,7 +174,27 @@ export function AbdRawDataPage() {
   const rawTab = String(urlSearch.tab ?? "").toUpperCase();
   const matchedTeam = teamOptions.find((t) => t.code.toUpperCase() === rawTab);
   const team: AbdTeam = ((matchedTeam?.code ?? teamOptions[0]?.code ?? "MECH") as unknown) as AbdTeam;
-  const statusGroup: AbdStatusGroup = (["all", "approved", "in_progress", "not_started"].includes(urlSearch.status ?? "") ? urlSearch.status : "all") as AbdStatusGroup;
+  // 다중 선택 지원: 콤마로 구분된 status 문자열. "all" | "" → 전체
+  const selectedStatuses: Array<Exclude<AbdStatusGroup, "all">> = useMemo(() => {
+    const raw = String(urlSearch.status ?? "").trim();
+    if (!raw || raw === "all") return [];
+    const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    const valid = parts.filter((p): p is Exclude<AbdStatusGroup, "all"> =>
+      (ALL_STATUS_VALUES as string[]).includes(p),
+    );
+    return valid;
+  }, [urlSearch.status]);
+  // 하위 쿼리(facets 등)에 넘길 단일값: 정확히 1개 선택 시에만 그 값을, 그 외는 "all"
+  const statusGroup: AbdStatusGroup = selectedStatuses.length === 1 ? selectedStatuses[0] : "all";
+  const toggleStatus = useCallback((v: Exclude<AbdStatusGroup, "all">) => {
+    const set = new Set(selectedStatuses);
+    if (set.has(v)) set.delete(v);
+    else set.add(v);
+    // 전체 선택/미선택은 "all"로 정규화
+    const next = [...set];
+    const value = next.length === 0 || next.length === ALL_STATUS_VALUES.length ? "all" : next.join(",");
+    setUrl({ status: value, page: 1 });
+  }, [selectedStatuses]);
   const plotSel: "all" | "C" | "D" = (["all", "C", "D"].includes(String(urlSearch.plot ?? "")) ? (urlSearch.plot as any) : "all");
   const plotFilter: "C" | "D" | null = plotSel === "all" ? null : plotSel;
   // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
@@ -258,7 +278,14 @@ export function AbdRawDataPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team]);
 
-  const serverFilters = useMemo(() => toServerFilters(columnFilters), [columnFilters]);
+  const serverFilters = useMemo(() => {
+    const base = toServerFilters(columnFilters);
+    // 2개 선택된 경우에만 서버측 필터로 in-절 주입. (1개는 _status_group, 0/3개는 all)
+    if (selectedStatuses.length >= 2 && selectedStatuses.length < ALL_STATUS_VALUES.length) {
+      return [{ column: "status_group", op: "in" as const, value: selectedStatuses }, ...base];
+    }
+    return base;
+  }, [columnFilters, selectedStatuses]);
   const serverSort = useMemo(() => toServerSort(sorting), [sorting]);
   const q = (urlSearch.q ?? "").trim();
 
