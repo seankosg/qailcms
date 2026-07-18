@@ -64,6 +64,60 @@ export type Database = {
           },
         ]
       }
+      abd_comments: {
+        Row: {
+          abd_item_id: string
+          author_user_id: string | null
+          category: string
+          created_at: string
+          edited: boolean
+          id: string
+          message: string
+          parent_comment_id: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          abd_item_id: string
+          author_user_id?: string | null
+          category?: string
+          created_at?: string
+          edited?: boolean
+          id?: string
+          message: string
+          parent_comment_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          abd_item_id?: string
+          author_user_id?: string | null
+          category?: string
+          created_at?: string
+          edited?: boolean
+          id?: string
+          message?: string
+          parent_comment_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_comments_abd_item_id_fkey"
+            columns: ["abd_item_id"]
+            isOneToOne: false
+            referencedRelation: "abd_items_raw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abd_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "abd_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       abd_field_config: {
         Row: {
           created_at: string
@@ -449,6 +503,60 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      defect_comments: {
+        Row: {
+          author_user_id: string | null
+          category: string
+          created_at: string
+          defect_raw_id: string
+          edited: boolean
+          id: string
+          message: string
+          parent_comment_id: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          author_user_id?: string | null
+          category?: string
+          created_at?: string
+          defect_raw_id: string
+          edited?: boolean
+          id?: string
+          message: string
+          parent_comment_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string | null
+          category?: string
+          created_at?: string
+          defect_raw_id?: string
+          edited?: boolean
+          id?: string
+          message?: string
+          parent_comment_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "defect_comments_defect_raw_id_fkey"
+            columns: ["defect_raw_id"]
+            isOneToOne: false
+            referencedRelation: "defect_items_raw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "defect_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "defect_comments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       defect_field_config: {
         Row: {
@@ -1758,6 +1866,60 @@ export type Database = {
             columns: ["parent_subcontractor_id"]
             isOneToOne: false
             referencedRelation: "subcontractor_master"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_comments: {
+        Row: {
+          author_user_id: string | null
+          category: string
+          created_at: string
+          edited: boolean
+          id: string
+          message: string
+          parent_comment_id: string | null
+          source: string
+          task_raw_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_user_id?: string | null
+          category?: string
+          created_at?: string
+          edited?: boolean
+          id?: string
+          message: string
+          parent_comment_id?: string | null
+          source?: string
+          task_raw_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string | null
+          category?: string
+          created_at?: string
+          edited?: boolean
+          id?: string
+          message?: string
+          parent_comment_id?: string | null
+          source?: string
+          task_raw_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "task_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_comments_task_raw_id_fkey"
+            columns: ["task_raw_id"]
+            isOneToOne: false
+            referencedRelation: "task_management_raw"
             referencedColumns: ["id"]
           },
         ]
