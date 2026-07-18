@@ -139,13 +139,56 @@ function ImportInner() {
 
   const unresolvedNames = collectUnresolvedNames(allReadyRows, nameSpecs, optionsByKind);
   const masterMappingNote = formatUnresolvedNamesNote(unresolvedNames);
-  const runStartImport = () => {
+  const runStartImport = async () => {
     for (const f of files) {
       if (f.status === "ready" && !f.validationError) {
         setFileMasterMappingNote(f.id, masterMappingNote);
       }
     }
-    return startImport();
+
+    const candidates = files.filter(
+      (f) =>
+        f.status === "ready" &&
+        f.parsed &&
+        f.parsed.length > 0 &&
+        !f.validationError &&
+        !!(f.dataDateOverride ?? f.dataDate),
+    );
+    if (candidates.length === 0) {
+      await startImport();
+      return;
+    }
+
+    // preflight가 없는 후보는 먼저 점검
+    const withoutPreflight = candidates.filter((f) => !f.preflight);
+    if (withoutPreflight.length > 0) {
+      await Promise.all(withoutPreflight.map((f) => runPreflight(f.id)));
+    }
+
+    // 다시 상태를 읽어 미결정 충돌이 있는 파일 확인
+    const stillReady = files.filter(
+      (f) =>
+        f.status === "ready" &&
+        f.parsed &&
+        f.parsed.length > 0 &&
+        !f.validationError &&
+        !!(f.dataDateOverride ?? f.dataDate),
+    );
+    const filesWithUnresolvedConflicts = stillReady.filter((f) => {
+      const conflicts = f.preflight?.conflicts ?? [];
+      if (conflicts.length === 0) return false;
+      const decisions = f.conflictDecisions ?? {};
+      return conflicts.some((c) => !decisions[c.task_no]);
+    });
+
+    if (filesWithUnresolvedConflicts.length > 0) {
+      // 첫 번째 미결정 파일의 충돌 처리 팝업 열기
+      setConflictFileId(filesWithUnresolvedConflicts[0].id);
+      setPendingImportAfterConflicts(true);
+      return;
+    }
+
+    await startImport();
   };
 
   const applyMasterDecisions = (decisions: Map<string, any>) => {
