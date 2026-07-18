@@ -676,6 +676,11 @@ function FileRow({
               Renumbered: {f.result.renumbered}
             </Badge>
           )}
+          {typeof f.result.resolvedByDecision === "number" && f.result.resolvedByDecision > 0 && (
+            <Badge variant="outline" className="border-violet-300 text-violet-700">
+              개별 결정: {f.result.resolvedByDecision}
+            </Badge>
+          )}
           {f.result.skipped > 0 && (
             <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">
               Skipped: {f.result.skipped}
