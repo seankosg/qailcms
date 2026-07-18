@@ -89,6 +89,7 @@ function ImportInner() {
   const canImport = !!me?.isAdmin;
   const {
     files,
+    getFiles,
     isRunning,
     rollupMode,
     setRollupMode,
