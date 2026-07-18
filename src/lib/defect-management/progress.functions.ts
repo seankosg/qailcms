@@ -36,7 +36,7 @@ export const getSnagProgressCells = createServerFn({ method: "POST" })
     return (rows ?? []).map((r: any) => ({
       group_key: (r.group_key ?? []) as string[],
       bucket_iso: r.bucket_iso ? String(r.bucket_iso).slice(0, 10) : null,
-      stage: r.stage as "start" | "completion" | "closure",
+      stage: r.stage as "start" | "rectified" | "closure",
       plan_cnt: Number(r.plan_cnt) || 0,
       actual_cnt: Number(r.actual_cnt) || 0,
     }));
@@ -57,7 +57,7 @@ export const getSnagProgressTotals = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return (rows ?? []).map((r: any) => ({
       group_key: (r.group_key ?? []) as string[],
-      stage: r.stage as "start" | "completion" | "closure",
+      stage: r.stage as "start" | "rectified" | "closure",
       total: Number(r.total) || 0,
       done_upto: Number(r.done_upto) || 0,
       plan_upto: Number(r.plan_upto) || 0,

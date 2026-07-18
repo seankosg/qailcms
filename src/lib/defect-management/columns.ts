@@ -74,7 +74,7 @@ export const HDEC_VERIFICATIONS = [
   "Cat B - Minor Defect",
   "Review Needed",
 ] as const;
-export const COMPLETION_STATUSES = ["Not Started", "In Progress", "Complete"] as const;
+export const RECTIFIED_STATUSES = ["Not Started", "In Progress", "Rectified"] as const;
 export const CLOSURE_STATUSES = ["Not Closed", "Closed", "InD"] as const;
 
 export const TEAM_COLORS: Record<string, string> = {
@@ -176,9 +176,9 @@ export const DEFECT_COLUMNS: DefectColumnDef[] = [
   { key: "planned_start_date", label: "P.Start", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
   { key: "actual_start_date", label: "A.Start", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
   { key: "start_status", label: "Start Status", type: "badge", width: 110, group: "progress", derived: true },
-  { key: "planned_completion_date", label: "P.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
-  { key: "actual_completion_date", label: "A.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
-  { key: "completion_status", label: "Rectified Status", type: "badge", width: 130, group: "progress", editable: true, editorType: "select", options: [...COMPLETION_STATUSES] },
+  { key: "planned_rectified_date", label: "P.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
+  { key: "actual_rectified_date", label: "A.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
+  { key: "rectified_status", label: "Rectified Status", type: "badge", width: 130, group: "progress", editable: true, editorType: "select", options: [...RECTIFIED_STATUSES] },
   { key: "planned_closure_date", label: "P.Closure", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
   { key: "actual_closure_date", label: "A.Closure", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
   { key: "closure_status", label: "Closure Status", type: "badge", width: 120, group: "progress", editable: true, editorType: "select", options: [...CLOSURE_STATUSES] },

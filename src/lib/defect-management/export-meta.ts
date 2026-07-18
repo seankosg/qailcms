@@ -28,7 +28,7 @@ const URL_PARAM_LABELS: Record<string, string> = {
 const FLAG_LABELS: Record<string, string> = {
   overdue: "Overdue",
   atRisk: "At-Risk",
-  actualComplete: "Actual Completion",
+  actualComplete: "Actual Rectified",
   closureComplete: "Closure Done",
   stage: "Stage",
   critical: "Critical",
@@ -145,10 +145,10 @@ export function buildDefectHeaderBlock(input: BuildHeaderBlockInput): {
 export const DEFECT_DATE_FIELDS = [
   "data_date",
   "planned_start_date",
-  "planned_completion_date",
+  "planned_rectified_date",
   "planned_closure_date",
   "actual_start_date",
-  "actual_completion_date",
+  "actual_rectified_date",
   "actual_closure_date",
   "classified_at",
 ];

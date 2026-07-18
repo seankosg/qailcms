@@ -36,10 +36,10 @@ const HDEC_FIELDS = new Set([
   "hdec_pic_name",
   "hdec_eng_name",
   "planned_start_date",
-  "planned_completion_date",
+  "planned_rectified_date",
   "planned_closure_date",
   "actual_start_date",
-  "actual_completion_date",
+  "actual_rectified_date",
   "actual_closure_date",
 ]);
 const CAT_CHECK_FIELDS = new Set([

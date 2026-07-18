@@ -16,7 +16,7 @@ import {
   type DefectTargetField,
   type ParsedDefectRow,
 } from "@/lib/defect-management/parser";
-import { deriveCompletionStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
+import { deriveRectifiedStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
@@ -746,6 +746,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           priority_locked: boolean;
           hdec_verification_locked: boolean;
           actual_closure_date: string | null;
+          actual_rectified_date: string | null;
+          actual_start_date: string | null;
+          rectified_status: string | null;
+          closure_status: string | null;
           defect_location: string | null;
           main_trade: string | null;
           sub_trade: string | null;
@@ -759,7 +763,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
         const { data, error } = await (supabase as any)
           .from("defect_items_raw")
-          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, defect_location, main_trade, sub_trade, work_type")
+          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, actual_rectified_date, actual_start_date, rectified_status, closure_status, defect_location, main_trade, sub_trade, work_type")
           .in("source_issue_no", chunk);
         if (error) {
           throw new Error(
@@ -771,6 +775,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             priority_locked: !!r.priority_locked,
             hdec_verification_locked: !!r.hdec_verification_locked,
             actual_closure_date: r.actual_closure_date ?? null,
+            actual_rectified_date: r.actual_rectified_date ?? null,
+            actual_start_date: r.actual_start_date ?? null,
+            rectified_status: r.rectified_status ?? null,
+            closure_status: r.closure_status ?? null,
             defect_location: r.defect_location ?? null,
             main_trade: r.main_trade ?? null,
             sub_trade: r.sub_trade ?? null,
@@ -840,7 +848,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         put(base, "room_group", p.room_group);
         put(base, "level_name", p.level_name);
         put(base, "review_flag", p.review_flag);
-        put(base, "completion_status", deriveCompletionStatus(p.status_raw));
+        put(base, "rectified_status", deriveRectifiedStatus(p.status_raw));
         put(base, "closure_status", deriveClosureStatus(p.status_raw));
         if (!skipPriority) put(base, "priority", p.priority);
 
@@ -853,16 +861,80 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             put(base, k, v);
           }
         }
-        // Status가 Closed로 파생되었을 때 A.Closure 날짜가 파일/DB 모두 비어있으면
-        // last_updated_at (없으면 data_date) 으로 자동 채움.
-        if (
-          base.closure_status === "Closed" &&
-          !excludedFields.has("actual_closure_date") &&
-          !base.actual_closure_date &&
-          !prev?.actual_closure_date
-        ) {
-          const fallback = (p.last_updated_at ? String(p.last_updated_at).slice(0, 10) : null) ?? dataDate;
-          if (fallback) base.actual_closure_date = fallback;
+        // ── Status 전이 기반 Actual Date 자동 채움 ────────────────────────────
+        // last_updated_at (없으면 data_date) 을 fallback 날짜로 사용.
+        const transitionDate =
+          (p.last_updated_at ? String(p.last_updated_at).slice(0, 10) : null) ?? dataDate ?? null;
+        const newRS = base.rectified_status as string | undefined;
+        const newCS = base.closure_status as string | undefined;
+        const prevRS = prev?.rectified_status ?? null;
+        const prevCS = prev?.closure_status ?? null;
+        const fileHasActualStart = !!base.actual_start_date;
+        const fileHasActualRect = !!base.actual_rectified_date;
+        const fileHasActualClose = !!base.actual_closure_date;
+
+        if (transitionDate) {
+          // Closed 진입: closure/rectified/start 모두 없으면 채움 + rectified_status 강제
+          if (
+            newCS === "Closed" &&
+            prevCS !== "Closed"
+          ) {
+            if (
+              !excludedFields.has("actual_closure_date") &&
+              !fileHasActualClose &&
+              !prev?.actual_closure_date
+            ) {
+              base.actual_closure_date = transitionDate;
+            }
+            if (
+              !excludedFields.has("actual_rectified_date") &&
+              !fileHasActualRect &&
+              !prev?.actual_rectified_date
+            ) {
+              base.actual_rectified_date = transitionDate;
+            }
+            // Closed는 Rectified 후행이므로 rectified_status 강제
+            if (!excludedFields.has("rectified_status")) {
+              base.rectified_status = "Rectified";
+            }
+          }
+          // Rectified 진입 (Closed가 아닌 경우에만 별도 처리; Closed는 위에서 커버)
+          else if (
+            newRS === "Rectified" &&
+            prevRS !== "Rectified"
+          ) {
+            if (
+              !excludedFields.has("actual_rectified_date") &&
+              !fileHasActualRect &&
+              !prev?.actual_rectified_date
+            ) {
+              base.actual_rectified_date = transitionDate;
+            }
+            if (
+              !excludedFields.has("actual_start_date") &&
+              !fileHasActualStart &&
+              !prev?.actual_start_date
+            ) {
+              base.actual_start_date = transitionDate;
+            }
+          }
+          // In Progress 진입: start만 채움
+          else if (
+            newRS === "In Progress" &&
+            prevRS !== "In Progress"
+          ) {
+            if (
+              !excludedFields.has("actual_start_date") &&
+              !fileHasActualStart &&
+              !prev?.actual_start_date
+            ) {
+              base.actual_start_date = transitionDate;
+            }
+          }
+        }
+        // closure_status = 'Closed' 이면 rectified_status는 항상 Rectified 로 강제 (인과)
+        if (base.closure_status === "Closed" && !excludedFields.has("rectified_status")) {
+          base.rectified_status = "Rectified";
         }
         return base;
       });
