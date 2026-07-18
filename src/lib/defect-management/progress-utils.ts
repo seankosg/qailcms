@@ -298,11 +298,11 @@ export function groupKeyToRawParams(groupBy: GroupBy[], groupKeyRaw: string[]): 
 /** 스테이지 → dateField 매핑 */
 export function stageDateField(stage: Stage | "all", field: "planned" | "actual"): string {
   if (stage === "all") {
-    return field === "planned" ? "planned_completion_date" : "actual_completion_date";
+    return field === "planned" ? "planned_rectified_date" : "actual_rectified_date";
   }
   const map: Record<Stage, { planned: string; actual: string }> = {
     start: { planned: "planned_start_date", actual: "actual_start_date" },
-    completion: { planned: "planned_completion_date", actual: "actual_completion_date" },
+    completion: { planned: "planned_rectified_date", actual: "actual_rectified_date" },
     closure: { planned: "planned_closure_date", actual: "actual_closure_date" },
   };
   return map[stage][field];

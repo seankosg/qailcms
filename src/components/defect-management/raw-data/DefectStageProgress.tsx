@@ -16,7 +16,7 @@ export function classifyStage(item: Row, stage: StageName, asOfDate: string): St
   if (isStageDone(item, stage)) return "done";
   if (isStageDelayedAsOf(item, stage, asOfDate)) return "hold";
 
-  const completionStatus = String(item.completion_status ?? "").toLowerCase();
+  const completionStatus = String(item.rectified_status ?? "").toLowerCase();
   const closureStatus = String(item.closure_status ?? "").toLowerCase();
   if (stage === "start" && item.actual_start_date) return "wip";
   if (stage === "completion") {
@@ -32,7 +32,7 @@ export function classifyStage(item: Row, stage: StageName, asOfDate: string): St
     stage === "start"
       ? item.planned_start_date
       : stage === "completion"
-        ? item.planned_completion_date
+        ? item.planned_rectified_date
         : item.planned_closure_date;
   return plan ? "planned" : "empty";
 }
@@ -77,7 +77,7 @@ export function DefectStageProgress({ item, asOfDate = null }: { item: Row; asOf
   const title = [
     `Delay as of ${formatDdMmm(delayAsOfDate)}`,
     `Start: ${stateLabel(start)}${item.actual_start_date ? ` · ${formatDdMmm(item.actual_start_date)}` : item.planned_start_date ? ` (plan ${formatDdMmm(item.planned_start_date)})` : ""}`,
-    `Rectified: ${stateLabel(completion)}${item.actual_completion_date ? ` · ${formatDdMmm(item.actual_completion_date)}` : item.planned_completion_date ? ` (plan ${formatDdMmm(item.planned_completion_date)})` : ""}`,
+    `Rectified: ${stateLabel(completion)}${item.actual_rectified_date ? ` · ${formatDdMmm(item.actual_rectified_date)}` : item.planned_rectified_date ? ` (plan ${formatDdMmm(item.planned_rectified_date)})` : ""}`,
     `Closure: ${stateLabel(closure)}${item.actual_closure_date ? ` · ${formatDdMmm(item.actual_closure_date)}` : item.planned_closure_date ? ` (plan ${formatDdMmm(item.planned_closure_date)})` : ""}`,
   ].join("\n");
 

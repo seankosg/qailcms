@@ -16,7 +16,7 @@ import {
   type DefectTargetField,
   type ParsedDefectRow,
 } from "@/lib/defect-management/parser";
-import { deriveCompletionStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
+import { deriveRectifiedStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
@@ -840,7 +840,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         put(base, "room_group", p.room_group);
         put(base, "level_name", p.level_name);
         put(base, "review_flag", p.review_flag);
-        put(base, "completion_status", deriveCompletionStatus(p.status_raw));
+        put(base, "rectified_status", deriveRectifiedStatus(p.status_raw));
         put(base, "closure_status", deriveClosureStatus(p.status_raw));
         if (!skipPriority) put(base, "priority", p.priority);
 

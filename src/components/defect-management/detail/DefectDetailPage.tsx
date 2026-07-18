@@ -186,7 +186,7 @@ function renderFieldValue(c: typeof DEFECT_COLUMNS[number], v: any, _row: any) {
   if (v == null || v === "") return <span className="text-muted-foreground/50">—</span>;
   if (c.key === "team") return <Badge className={cn("text-[10px]", TEAM_COLORS[String(v)] ?? TEAM_FALLBACK_COLOR)}>{String(v)}</Badge>;
   if (c.key === "priority" || c.key === "hdec_verification") return <Badge className={cn("text-[10px]", PRIORITY_COLORS[String(v)] ?? TEAM_FALLBACK_COLOR)}>{String(v)}</Badge>;
-  if (c.key === "status_raw" || c.key === "completion_status" || c.key === "closure_status" || c.key === "start_status") return <DefectStatusBadge status={v} />;
+  if (c.key === "status_raw" || c.key === "rectified_status" || c.key === "closure_status" || c.key === "start_status") return <DefectStatusBadge status={v} />;
   if (c.type === "date") return <span className="tabular-nums">{formatDdMmm(v)}</span>;
   if (c.type === "datetime") return <span className="tabular-nums">{new Date(v).toLocaleString()}</span>;
   if (c.type === "percent") {

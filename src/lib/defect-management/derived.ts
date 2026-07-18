@@ -3,7 +3,7 @@
 const CLOSED_STATUSES = new Set(["closed", "verified", "complete", "completed"]);
 const IN_PROGRESS_STATUSES = new Set(["in progress", "inprogress", "under review", "reopened"]);
 
-export function deriveCompletionStatus(statusRaw: string | null | undefined): string {
+export function deriveRectifiedStatus(statusRaw: string | null | undefined): string {
   if (!statusRaw) return "Not Started";
   const s = statusRaw.trim().toLowerCase();
   if (CLOSED_STATUSES.has(s)) return "Complete";

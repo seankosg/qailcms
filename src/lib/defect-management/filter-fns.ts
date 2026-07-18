@@ -25,10 +25,10 @@ export const TEXT_FILTER_FIELDS = new Set<string>([
 
 export const DATE_FILTER_FIELDS = new Set<string>([
   "planned_start_date",
-  "planned_completion_date",
+  "planned_rectified_date",
   "planned_closure_date",
   "actual_start_date",
-  "actual_completion_date",
+  "actual_rectified_date",
   "actual_closure_date",
   "classified_at",
   "created_date",
@@ -126,7 +126,7 @@ export const RAW_SEARCH_FIELDS = [
   "defect_type",
   "status_raw",
   "status",
-  "completion_status",
+  "rectified_status",
   "priority",
   "subcontractor_name",
   "subsub_name",

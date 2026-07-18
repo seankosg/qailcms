@@ -633,7 +633,7 @@ export function DefectRawDataPage() {
     const optionMap: Record<string, { value: string; label: string }[]> = {
       team: teamCodesForEdit.map((value) => ({ value, label: value })),
       status_raw: uniqueOptions(rows, "status_raw"),
-      completion_status: uniqueOptions(rows, "completion_status"),
+      rectified_status: uniqueOptions(rows, "rectified_status"),
       closure_status: uniqueOptions(rows, "closure_status"),
       area_level: uniqueOptions(rows, "area_level"),
       area_location: uniqueOptions(rows, "area_location"),
@@ -1029,7 +1029,7 @@ function renderDefectCell(c: DefectColumnDef, v: any, row: DefectItem, _dataDate
     const cls = PRIORITY_COLORS[String(v)] ?? TEAM_FALLBACK_COLOR;
     return <Badge className={cn("text-[10px]", cls)}>{String(v)}</Badge>;
   }
-  if (c.key === "status_raw" || c.key === "completion_status" || c.key === "closure_status") return <DefectStatusBadge status={v} />;
+  if (c.key === "status_raw" || c.key === "rectified_status" || c.key === "closure_status") return <DefectStatusBadge status={v} />;
   if (c.key === "start_status") return <DefectStatusBadge status={v} />;
   if (c.key === "classification_source") {
     const src = String(v).toLowerCase();

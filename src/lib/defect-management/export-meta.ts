@@ -145,10 +145,10 @@ export function buildDefectHeaderBlock(input: BuildHeaderBlockInput): {
 export const DEFECT_DATE_FIELDS = [
   "data_date",
   "planned_start_date",
-  "planned_completion_date",
+  "planned_rectified_date",
   "planned_closure_date",
   "actual_start_date",
-  "actual_completion_date",
+  "actual_rectified_date",
   "actual_closure_date",
   "classified_at",
 ];

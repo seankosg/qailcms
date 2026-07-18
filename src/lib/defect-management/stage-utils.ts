@@ -9,7 +9,7 @@ type Row = Record<string, any>;
 export function isStageDone(row: Row, stage: "start" | "completion" | "closure"): boolean {
   if (stage === "closure") return Boolean(row.actual_closure_date);
   if (stage === "completion") {
-    if (row.actual_completion_date) return true;
+    if (row.actual_rectified_date) return true;
     const p = Number(row.actual_progress_pct ?? 0);
     if ((p > 1 ? p : p * 100) >= 100) return true;
     return Boolean(row.actual_closure_date);
@@ -18,14 +18,14 @@ export function isStageDone(row: Row, stage: "start" | "completion" | "closure")
   if (row.actual_start_date) return true;
   const p = Number(row.actual_progress_pct ?? 0);
   if (p > 0) return true;
-  return Boolean(row.actual_completion_date || row.actual_closure_date);
+  return Boolean(row.actual_rectified_date || row.actual_closure_date);
 }
 
 export function isStageDelayedAsOf(row: Row, stage: "start" | "completion" | "closure", asOf: string | null | undefined): boolean {
   if (!asOf) return false;
   const planned =
     stage === "start" ? row.planned_start_date :
-    stage === "completion" ? row.planned_completion_date :
+    stage === "completion" ? row.planned_rectified_date :
     row.planned_closure_date;
   if (!planned) return false;
   if (String(planned).slice(0, 10) > asOf) return false;
