@@ -1,76 +1,114 @@
-## ABD Progress 페이지 구현 계획
+# Snag Import 유니크 키(ID/source_issue_no) 시스템 수정 + 관리자 매핑/설정 반영
 
-Snag Progress(SM Progress)의 UI/로직을 최대한 그대로 이식하여 `/closure/abd/progress` 페이지를 신규 생성하고, ABD Raw Data(`abd_items_raw`)를 기반으로 화면 캡쳐와 동일한 형태의 Progress Matrix 테이블을 렌더링합니다. S-curve/곡선 차트는 현재 범위에서 제외합니다.
+## 배경
 
-### 사용자가 제안한 "라운드 무관, 최종 Draft/Submission/Approval 3-Stage" 방식의 문제점
+- `defect_items_raw`의 유니크 키는 `source_issue_no` 하나뿐입니다 (`defect_items_raw_source_issue_no_key`).
+- 두 원본 파일에서 `ID`/`id`의 의미가 다릅니다.
+  - LetsBuild 원본(`7days_snagging_6333.xlsx`): 첫 컬럼 `ID`(예: 113663) → LetsBuild Issue No., 즉 `source_issue_no`
+  - 시스템 재수출(`snag-raw-data-...v5-3.xlsx`): 첫 컬럼 `id`(UUID), 두 번째 컬럼 `source_issue_no`. `id`는 절대 유니크 키가 아님
+- 현재 `defect_header_mappings`는 `ID → source_issue_no`, `source_issue_no → source_issue_no` 두 매핑이 활성 상태.
+- 현재 파서(`src/lib/defect-management/parser.ts`)는 안전을 위해 `source_issue_no` 대상에 대해 `id` alias를 무조건 무시. 그 결과 LetsBuild 원본 `ID`가 매핑되지 않아 `필수 헤더 누락: ID` 및 "행을 찾지 못했습니다" 오류 발생.
+- 이번에는 도움말/문구가 아니라 파서·업서트·관리자 매핑까지 전 계층에서 시스템적으로 UUID 오염을 차단하고 LetsBuild `ID`만 키로 인식하도록 수정합니다.
 
-- **히스토리 손실**: R1이 종료되고 R2가 시작되면 "최종 Draft"가 R2의 것으로 덮이면서 R1의 실적 카운트가 매트릭스에서 사라집니다.
-- **Plan/Actual 라운드 미스매치**: "최신 Draft plan"과 "최신 Submission plan"이 서로 다른 라운드일 수 있어 같은 행에서 비교하면 Variance/누적 수치가 왜곡됩니다.
-- **"최신"의 정의 모호**: 여러 라운드가 동시 진행 중인 항목에서 카운트가 이중/누락됩니다.
-- **Approval 페어링 문제**: `Latest Status='A'`가 어떤 라운드의 승인인지 사라지며, 재작업(R1 승인 후 R2 진행) 시 카운트가 불가합니다.
-- **미래 라운드 미노출**: R2/R3의 미래 Plan이 별도 시점에 노출되지 않습니다.
+## 수정 원칙
 
-### 권장 방식 (이 계획의 기본)
-- **Stage = Draft / Submission / DAR** (SM의 Start/Rect/Close 자리에 대응).
-- **Round 토글 필터(R1/R2/R3/All)**로 어느 라운드 사이클을 볼지 결정.
-- **Latest Status='A' 항목**: DAR Stage의 Actual 날짜로 `approval_date`를 우선 사용, 없으면 해당 라운드 `rN_dar_actual` 사용.
-- 이렇게 하면 SM 매트릭스의 "Plan vs Actual 셀", "Total Scope", "Up To Data Date" 구조를 ABD에 그대로 적용하면서 라운드 반복 구조도 정확히 표현합니다.
+`ID`/`id` 텍스트만 보고 판단하지 않고, 파일 형태 + 헤더 조합 + 값 형식으로 판정.
 
-### 구현 범위
+1. `source_issue_no` 헤더가 있으면 항상 그것을 유니크 키로 사용.
+2. `source_issue_no`가 없고 LetsBuild 원본 25컬럼 형태이면 `ID`를 `source_issue_no`로 승격.
+3. 재수출 파일(`QAIL_DEFECT_REIMPORT_V1` 마커 존재 또는 `source_issue_no` 헤더 존재)에서는 `id`/`ID` alias를 완전 무시.
+4. 사용자가 UUID `id`를 `source_issue_no`로 강제 매핑해도 파서 단계에서 차단.
+5. 업서트 직전에도 `source_issue_no` 값이 UUID 형식이면 해당 행을 reject.
+6. 관리자 매핑/설정 화면에서도 동일 규칙이 눈에 보이고, 잘못된 매핑을 저장하지 못하도록 검증.
 
-#### 1. 페이지/라우트
-- 신규 파일: `src/routes/_authenticated/closure/abd/progress.tsx`
-  - `validateSearch`로 `plot`(C|D), `teams`(csv), `groupBy`(csv), `stageView`(csv), `bucket`(day|week), `range`(30/60/90/180), `hidePast`(0|1), `asofMode`(dataDate|today), `planMode`(baseline|remaining), `round`("R1"|"R2"|"R3"|"all") 정의.
-  - SM `progress.tsx`의 스키마 구조를 그대로 복제, `round`만 추가.
-- ABD 사이드바 메뉴에 "Progress" 링크 추가.
+## 구현 계획
 
-#### 2. 유틸
-- 신규: `src/lib/abd/progress-utils.ts` — `progress-utils.ts`를 복제 후 아래 조정.
-  - `Stage = "draft" | "submission" | "dar"`, 라벨 `Draft/Submission/DAR`.
-  - `ALL_GROUP_BY = ["team","dis","service","pic","doc_ax","doc_axx"]`, 라벨/URL 파라미터 매핑 재정의.
-  - `stageDateField(stage, field, round)` — 라운드 별 컬럼(`r{n}_drafting_plan/actual`, `r{n}_submission_plan/actual`, `r{n}_dar_plan/actual`) 반환. Approval 클릭 시 `approval_date` 이동.
-- `assembleMatrix`, 버킷/날짜 유틸은 그대로 재사용.
+### 1. 파서 유니크 키 전용 resolver 추가
 
-#### 3. 서버 함수 & DB RPC
-- 신규 서버 함수: `src/lib/abd/progress.functions.ts` — SM의 `progress.functions.ts` 구조 복제. `getAbdProgressCells`, `getAbdProgressTotals`.
-- 신규 RPC(마이그레이션): `abd_progress_cells`, `abd_progress_totals`.
-  - 입력: `_plots text[]`, `_teams text[]`, `_group_by text[]`, `_bucket`, `_range_start`, `_range_end`, `_as_of_date`, `_plan_mode`, `_round text`.
-  - 로직:
-    - Draft: `r{n}_drafting_plan` / `r{n}_drafting_actual`
-    - Submission: `r{n}_submission_plan` / `r{n}_submission_actual`
-    - DAR: `r{n}_dar_plan` / `COALESCE(approval_date WHEN latest_status='A' AND 해당 라운드가 최신 라운드, r{n}_dar_actual)`
-    - `_round='all'`이면 3개 라운드 합산, 특정 라운드면 해당 라운드만.
-    - `plan_mode='remaining'`: actual 존재 시 plan 무시(SM과 동일).
-  - `total/done_upto/plan_upto/actual_upto`는 SM RPC와 동일 산식으로 계산.
-- GRANT: `authenticated`, `service_role`.
+수정 파일: `src/lib/defect-management/parser.ts`
 
-#### 4. UI 컴포넌트
-- 신규: `src/components/abd/progress/AbdProgressPage.tsx` — `SnagProgressPage.tsx` 복제 후 아래 변경.
-  - 헤더 타이틀 "ABD Progress Status".
-  - `DeSnagRoomGroupFilterBar` 제거(ABD에는 Room Group 없음).
-  - 툴바 순서: Plot(C/D) → Team → **Round(R1/R2/R3/All)** → Group → Stage → Bucket → Range → HidePast → As-of → Plan.
-  - Stage 토글 라벨을 Draft/Submission/DAR로.
-  - 셀 클릭 이동 URL을 `/closure/abd/raw-data`로.
-- 신규: `src/components/abd/progress/AbdScheduleMatrix.tsx` — `SnagScheduleMatrix.tsx` 복제, Stage 라벨/색상만 조정. 스티키 컬럼은 100% 불투명 배경 유지(프로젝트 코어 규칙 준수).
-- ABD 팀 툴바는 `DeSnagToolbar` 재사용(팀 키 동일). 필요 시 `AbdTeamToolbar`를 얇게 신설.
+- `resolveSourceIssueNoColumn()`을 신설해 `source_issue_no` 대상에는 이것만 사용.
+  - 우선순위: `source_issue_no` 헤더 → LetsBuild 원본 형태 검증 후 `ID`/`id` 헤더 → 없음.
+  - LetsBuild 원본 형태 검증: `source_issue_no` 헤더 부재 + `QAIL_DEFECT_REIMPORT_V1` 마커 부재 + 원본 시그니처 헤더 다수 존재(`Location`, `PlanTitle`, `PlanGroup`, `Category`, `CreatedDate` 등 중 3개 이상).
+  - 후보 컬럼의 첫 데이터 샘플이 UUID 형식이면 후보에서 제외.
+- 일반 `resolveColumn()`은 `source_issue_no`에 대해 호출하지 않음(전용 resolver로 대체).
+- `columnOverrides.source_issue_no`가 넘어와도 위 검증(재수출 파일에서 `id` UUID 컬럼 지정 여부, 샘플 UUID 여부)을 통과할 때만 허용.
+- 파서 반환 결과에 `sourceKeyOrigin: "source_issue_no" | "letsbuild_id" | null` 를 추가하여 UI/로그에서 어떤 컬럼이 키로 쓰였는지 명확히 노출.
 
-#### 5. Raw Data 이동 규칙
-- 셀 클릭 시 파라미터: `plot`, `team`, `dis`, `service`, `pic`, `doc_ax`, `doc_axx`, `round`, `dateStart`, `dateEnd`, `dateField`(`r{n}_drafting_actual` 등), `stage`. ABD Raw Data 페이지의 URL 필터 스키마와 호환되도록 매핑. 필요 시 `raw-data.tsx`의 `validateSearch`에 `dateStart/dateEnd/dateField/stage/round` 파라미터 추가.
+### 2. `toDefectFieldName` 확장
 
-#### 6. 검증
-- `tsgo` 타입체크.
-- Playwright: `/closure/abd/progress`에서 Plot C, Round=R1, Bucket=Day, Range=90d 상태로 매트릭스가 렌더되고, 하나의 셀 클릭 시 Raw Data가 해당 필터로 이동함을 확인.
+수정 파일: `src/lib/defect-management/parser.ts`
 
-### 기술 노트
-- SM의 `planGroupsForPlot`은 ABD에 무관 → RPC 파라미터에서 제거하고 `_plots`(단일값 배열)로 전환.
-- `data_date` 개념이 ABD에도 별도로 없어 `asOfDate=today`로 동일하게 사용. 향후 `data_date` 컬럼 활용 시 확장 가능.
-- Latest Status='A'의 승인 앵커: 항목별 최신 라운드(가장 큰 n 중 `r{n}_dar_actual` 또는 계획 존재)에만 `approval_date`를 사용. 재작업(A 이후 새 라운드 시작)도 그대로 카운트.
+- 정규화된 헤더가 `id`일 때 무조건 빈 문자열을 반환하지 않고, 파일 컨텍스트가 LetsBuild 원본이면 `source_issue_no`로 반환하도록 옵션 인자 추가.
+- 재수출 파일 컨텍스트에서는 기존 동작 유지(빈 문자열).
 
-### 결과물 파일
-- 신규: `src/routes/_authenticated/closure/abd/progress.tsx`
-- 신규: `src/lib/abd/progress-utils.ts`
-- 신규: `src/lib/abd/progress.functions.ts`
-- 신규: `src/components/abd/progress/AbdProgressPage.tsx`
-- 신규: `src/components/abd/progress/AbdScheduleMatrix.tsx`
-- 신규: DB 마이그레이션(`abd_progress_cells`, `abd_progress_totals` RPC + GRANT)
-- 수정: ABD 사이드바 메뉴, ABD Raw Data 라우트 `validateSearch`
+### 3. 업서트 직전 UUID reject 방어선
+
+수정 파일: `src/contexts/DefectManagementImportContext.tsx`
+
+- `deduped` → `workingRows` 사이에 `source_issue_no`가 UUID 형식인 행을 걸러 별도 배열로 이동.
+- 걸러진 행은 `defect_import_row_logs`에 `action_taken: "rejected"`와 사유("UUID key detected")로 기록.
+- 파일 카드 결과에 "UUID 키 감지로 제외된 행 수" 표시.
+
+### 4. 관리자 Header Mapping 반영
+
+수정 파일: `src/components/admin/DefectHeaderMappingTable.tsx`, `src/hooks/useDefectHeaderMappings.ts`
+
+- `target_field === "source_issue_no"`인 매핑에 대해 다음을 강제.
+  - 허용 `source_header`: `ID`, `source_issue_no`.
+  - 그 외 텍스트(예: 그냥 `id` 소문자만 등록해도 UUID와 혼동 여지가 있으므로) 저장 시 확인 다이얼로그 표시 후 저장.
+  - 시스템 시드 매핑(`ID → source_issue_no`, `source_issue_no → source_issue_no`)은 UI에서 "시스템 필수"로 표시하고 삭제 시 확인 강화.
+- 저장 API 호출 전 클라이언트 측 검증 함수 `validateSourceIssueNoMapping(sourceHeader)`를 `src/lib/admin/header-mapping-validation.ts`(기존 파일)에 추가.
+- 잘못된 저장이 되지 않도록 UI 오류 메시지: "source_issue_no에는 LetsBuild의 ID 또는 source_issue_no 헤더만 매핑할 수 있습니다."
+
+### 5. Header Mapping DB 정합성 마이그레이션
+
+`supabase--migration` 사용.
+
+- 활성 매핑 중 `target_field='source_issue_no'`인데 `source_header`의 정규화값이 `id`/`sourceissueno` 외인 항목을 비활성화.
+- LetsBuild 원본 시그니처를 안정적으로 지원하기 위한 시드 보강.
+  - `('ID','source_issue_no', active)` 존재 보장.
+  - `('source_issue_no','source_issue_no', active)` 존재 보장.
+- 부작용 방지: 이번 마이그레이션은 데이터 삭제 없이 활성화 플래그만 조정(비활성). 필요 시 사용자가 관리자 화면에서 재활성 가능.
+
+### 6. Field Config 반영
+
+수정 파일: `src/components/admin/DefectFieldConfigTable.tsx`, `src/hooks/useDefectFieldConfig.ts`
+
+- `source_issue_no`가 이미 "시스템 필수"로 처리되고 있으므로 라벨/툴팁을 명확화:
+  - 라벨 옆에 뱃지 "Unique Key (LetsBuild ID)" 표시.
+  - 숨김 토글/삭제 UI 비활성.
+- 시스템 UUID `id` 컬럼은 Raw Data용 시스템 컬럼이므로 Field Config 편집 대상에서 제외되도록 목록 필터를 명시적으로 추가(현재 존재하지 않으면 no-op).
+
+### 7. Column Select 다이얼로그 반영
+
+수정 파일: `src/components/defect-management/import/DefectColumnSelect.tsx`
+
+- 파서에서 넘어온 `sourceKeyOrigin`과 후보 UUID 감지 결과를 이용해:
+  - `source_issue_no`로 매핑될 컬럼을 상단에 강조 표시.
+  - 사용자가 재수출 파일의 UUID `id`를 강제로 `source_issue_no`에 지정하려 하면 disable + 이유 툴팁 표시.
+  - LetsBuild 원본에서는 `ID` 컬럼이 자동으로 `source_issue_no`에 배정된 상태로 표시.
+
+### 8. 검증
+
+- `7days_snagging_6333.xlsx` 업로드 → `필수 헤더 누락: ID` 사라짐, 첫 행 키 `113663`.
+- `snag-raw-data-...v5-3.xlsx` 업로드 → `id`(UUID) 무시, 키는 `100000`.
+- 두 파일 병행 업로드 시 `source_issue_no` 기준 dedupe 정상.
+- 관리자 Header Mapping에서 `source_issue_no` 타겟에 임의 문자열 저장 시도 시 오류.
+- Header Mapping DB 마이그레이션 후 잘못된 활성 매핑 없음 재확인.
+- `tsgo` 통과 및 Playwright로 Import 화면 회귀.
+
+## 변경 파일 요약
+
+- `src/lib/defect-management/parser.ts`: 전용 resolver, UUID 감지, sourceKeyOrigin 반환.
+- `src/contexts/DefectManagementImportContext.tsx`: 업서트 직전 UUID reject.
+- `src/lib/admin/header-mapping-validation.ts`: `source_issue_no` 매핑 검증.
+- `src/components/admin/DefectHeaderMappingTable.tsx`: 저장 전 검증 + 시스템 필수 표시.
+- `src/components/admin/DefectFieldConfigTable.tsx`, `src/hooks/useDefectFieldConfig.ts`: `source_issue_no` 뱃지 및 편집 잠금 강화.
+- `src/components/defect-management/import/DefectColumnSelect.tsx`: UUID 컬럼 지정 차단 UI.
+- 마이그레이션 1건: `defect_header_mappings` 잘못된 `source_issue_no` 매핑 비활성 + 표준 시드 보강.
+
+## 하지 않는 것
+
+- `defect_items_raw`의 기존 데이터 자동 수정 없음. UUID로 저장된 오염 행이 발견되면 별도 승인 후 처리.
+- ABD/Task/Spare Part 임포트에는 변경 없음(이번 요청은 Snag 범위).
