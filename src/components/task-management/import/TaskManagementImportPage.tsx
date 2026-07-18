@@ -101,6 +101,8 @@ function ImportInner() {
     setFileDataDateOverride,
     setFileColumnOverrides,
     setFileConflictPolicy,
+    setFileConflictDecisions,
+    clearFileConflictDecisions,
     runPreflight,
     startImport,
     setFileParsedRows,
