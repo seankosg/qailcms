@@ -203,7 +203,12 @@ export function AbdRawDataPage() {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [sorting, setSorting] = useState<SortingState>(parseSortFromUrl(urlSearch.sort));
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(parseFiltersFromUrl(urlSearch.filters));
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
+    const parsed = parseFiltersFromUrl(urlSearch.filters);
+    // eslint-disable-next-line no-console
+    console.log("[RAW init state] urlSearch.filters", urlSearch.filters, "parsed", parsed);
+    return parsed;
+  });
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [searchInput, setSearchInput] = useState(urlSearch.q ?? "");
   const [exportOpen, setExportOpen] = useState(false);
