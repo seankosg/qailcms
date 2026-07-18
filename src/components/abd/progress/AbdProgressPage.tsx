@@ -216,6 +216,8 @@ export function AbdProgressPage() {
     params.set("dateField", dateField);
     params.set("round", round);
     if (stage !== "all") params.set("stage", stage);
+    // eslint-disable-next-line no-console
+    console.log("[ABD click] filterObj", filterObj, "params", params.toString());
     window.location.assign(`/closure/abd/raw-data?${params.toString()}`);
   };
 
