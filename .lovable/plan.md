@@ -1,17 +1,33 @@
-원인은 업로드하신 파일이 SM Raw Data에서 내보낸 `View-friendly` 형식이고, 실제 헤더가 8행의 `ID No`로 되어 있는데 현재 import 파서는 유니크 키로 `source_issue_no`, 원본 `ID`, 또는 등록 alias만 인정하기 때문입니다. 그래서 `ID No`를 `source_issue_no`로 연결하지 못해 `필수 헤더 누락: ID`가 나오고, 유니크 키 컬럼이 없으니 읽을 행도 0건으로 처리되어 `행을 찾지 못했습니다`가 같이 표시됩니다.
+# SM Progress: Room Group Group-By 추가
 
-구현 계획:
-1. `src/lib/defect-management/parser.ts`의 `source_issue_no` 전용 resolver에 `ID No`를 안전한 alias로 추가합니다.
-   - `ID No`, `Issue No`, `Source Issue No` 등 SM View-friendly export에서 나올 수 있는 표시명을 `source_issue_no`로 인식하게 합니다.
-   - 기존 UUID 방어 로직은 유지해서 시스템 내부 UUID 컬럼이 유니크 키로 잘못 들어가는 문제는 계속 차단합니다.
-2. `toDefectFieldName`에도 같은 표시명 매핑을 추가합니다.
-   - Column Select 화면에서 `ID No`가 필수 ID 필드로 표시되고, 사용자가 실수로 제외하지 않도록 기존 경고/필수 처리와 연동합니다.
-3. 가능하면 export 쪽도 재검토합니다.
-   - `Re-import ready`는 계속 내부 필드명 `source_issue_no`를 사용합니다.
-   - `View-friendly`는 사람이 보기 좋은 `ID`/`ID No`를 유지하되, import가 해당 헤더를 받아들일 수 있게만 고칩니다.
-4. 업로드된 `defect-raw-VIEW-설비_no_plan_R1.xlsx` 기준으로 파서가 8행 헤더를 감지하고, 9행부터 1,100여 행을 읽는지 확인합니다.
+## 목표
+SM Progress 매트릭스의 Group By 토글 목록에 **Room Group**을 추가하여, 사용자가 선택 시 좌측 컬럼에 Room Group(LDK, MBR, Kitchen 등) 단위 행이 나타나도록 한다. 상단 Room Group 탭필터와 자연스럽게 연동되어, 필터로 선택된 Room Group만 행으로 표시된다.
 
-수정 후 기대 결과:
-- 같은 파일 import 시 `필수 헤더 누락: ID`가 더 이상 나오지 않습니다.
-- `행을 찾지 못했습니다`도 유니크 키 미인식으로 인한 경우는 사라집니다.
-- 기존 `source_issue_no` / 원본 `ID` / Re-import 파일의 동작은 유지됩니다.
+## 변경 범위 (frontend + RPC)
+
+### 1) `src/lib/defect-management/progress-utils.ts`
+- `GroupBy` 유니온에 `"room_group"` 추가.
+- `ALL_GROUP_BY` 배열 선두에 `"room_group"` 삽입(사용 빈도 고려).
+- `GROUP_LABELS["room_group"] = "Room Group"`.
+- `GROUP_QUERY_PARAM["room_group"] = "roomGroup"` — 셀 클릭 시 Raw Data 이동 파라미터.
+
+### 2) `src/components/defect-management/progress/SnagProgressPage.tsx`
+- 별도 UI 변경 없음. `ALL_GROUP_BY`가 확장되면 기존 토글 렌더 루프가 자동으로 "Room Group" 버튼을 추가.
+- `handleCellClick`은 `groupKeyToRawParams`로 처리되므로 자동 반영.
+
+### 3) `src/lib/defect-management/progress.functions.ts` + RPC (`defect_snag_progress_cells`, `defect_snag_progress_totals`)
+- 서버 함수의 `groupBy` 파라미터 화이트리스트에 `room_group` 추가.
+- Postgres RPC의 그룹키(gk) CASE 분기에 `WHEN 'room_group' THEN COALESCE(room_group,'')` 추가. (기존 인라인 CASE 방식 그대로 유지, LATERAL 사용 안 함 — 성능 유지)
+
+### 4) Room Group 탭필터와의 상호작용
+- 기존 `roomGroups` 필터(WHERE 절)는 **행 필터**로 계속 작동. 여기서 `room_group`을 group-by로 추가하면:
+  - 필터가 비어 있으면 → 모든 Room Group이 행으로 나열.
+  - 필터가 [LDK, MBR]이면 → 두 행만 나타남.
+- 셀 클릭 시 Raw Data로 이동할 때 `roomGroup=<값>` 파라미터가 전달되어 상세 필터 유지.
+
+## 기술 상세
+- `handleCellClick`은 페이지 상단의 `roomGroups` 파라미터도 함께 넘기고 있어, group-by 로 사용될 때는 groupKeyRaw의 값이 덮어써 정확한 단일 Room Group으로 좁혀진다(기존 `groupKeyToRawParams` 동작). 별도 처리 불필요.
+- Task Management/ABD 도메인은 변경 없음 (SM 도메인 국한).
+
+## 마이그레이션
+`defect_snag_progress_cells`, `defect_snag_progress_totals` 두 RPC의 gk CASE에 room_group 분기 한 줄씩 추가하는 `CREATE OR REPLACE FUNCTION` 마이그레이션 1건.
