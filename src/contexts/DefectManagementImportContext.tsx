@@ -746,6 +746,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           priority_locked: boolean;
           hdec_verification_locked: boolean;
           actual_closure_date: string | null;
+          actual_rectified_date: string | null;
+          actual_start_date: string | null;
+          rectified_status: string | null;
+          closure_status: string | null;
           defect_location: string | null;
           main_trade: string | null;
           sub_trade: string | null;
@@ -759,7 +763,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
         const { data, error } = await (supabase as any)
           .from("defect_items_raw")
-          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, defect_location, main_trade, sub_trade, work_type")
+          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, actual_rectified_date, actual_start_date, rectified_status, closure_status, defect_location, main_trade, sub_trade, work_type")
           .in("source_issue_no", chunk);
         if (error) {
           throw new Error(
@@ -771,6 +775,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             priority_locked: !!r.priority_locked,
             hdec_verification_locked: !!r.hdec_verification_locked,
             actual_closure_date: r.actual_closure_date ?? null,
+            actual_rectified_date: r.actual_rectified_date ?? null,
+            actual_start_date: r.actual_start_date ?? null,
+            rectified_status: r.rectified_status ?? null,
+            closure_status: r.closure_status ?? null,
             defect_location: r.defect_location ?? null,
             main_trade: r.main_trade ?? null,
             sub_trade: r.sub_trade ?? null,
