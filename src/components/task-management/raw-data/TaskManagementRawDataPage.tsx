@@ -867,7 +867,7 @@ export function TaskManagementRawDataPage() {
             variant="outline"
             size="sm"
             className="h-8"
-            onClick={() => navigate({ to: "/closure/spare-part/import" })}
+            onClick={() => navigate({ to: "/import-log/import", search: { tab: "task" } })}
           >
             <Upload className="mr-1 h-3.5 w-3.5" /> Import
           </Button>
