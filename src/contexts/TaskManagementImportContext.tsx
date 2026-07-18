@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -65,6 +66,7 @@ export interface TmImportFileItem {
   columnMap?: Record<string, number>;
   columnOverrides?: Partial<Record<TaskTargetField, number>> | null;
   conflictPolicy?: ConflictPolicy;
+  conflictDecisions?: Record<string, ConflictPolicy>;
   preflight?: PreflightSummary | null;
   preflightLoading?: boolean;
   preflightError?: string | null;
@@ -78,12 +80,14 @@ export interface TmImportFileItem {
     rolledUp?: number;
     judgmentRecalculated?: number;
     renumbered?: number;
+    resolvedByDecision?: number;
     errors?: ImportErrorEntry[];
   };
 }
 
 interface CtxValue {
   files: TmImportFileItem[];
+  getFiles: () => TmImportFileItem[];
   isRunning: boolean;
   rollupMode: RollupMode;
   setRollupMode: (m: RollupMode) => void;
@@ -99,6 +103,8 @@ interface CtxValue {
     overrides: Partial<Record<TaskTargetField, number>> | null,
   ) => Promise<void>;
   setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
+  setFileConflictDecisions: (id: string, decisions: Record<string, ConflictPolicy>) => void;
+  clearFileConflictDecisions: (id: string) => void;
   runPreflight: (id: string) => Promise<void>;
   startImport: () => Promise<void>;
   setFileParsedRows: (id: string, next: ParsedTaskRow[]) => void;
@@ -117,6 +123,9 @@ const INSERT_CHUNK = 500;
 
 export function TaskManagementImportProvider({ children }: { children: ReactNode }) {
   const [files, setFiles] = useState<TmImportFileItem[]>([]);
+  const filesRef = useRef<TmImportFileItem[]>(files);
+  filesRef.current = files;
+  const getFiles = useCallback(() => filesRef.current, []);
   const [isRunning, setIsRunning] = useState(false);
   const [rollupMode, setRollupMode] = useState<RollupMode>("auto");
   const [recalcJudgment, setRecalcJudgment] = useState<boolean>(true);
@@ -324,6 +333,26 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, conflictPolicy: policy } : f)));
   }, []);
 
+  const setFileConflictDecisions = useCallback(
+    (id: string, decisions: Record<string, ConflictPolicy>) => {
+      setFiles((cur) =>
+        cur.map((f) => (f.id === id ? { ...f, conflictDecisions: decisions } : f)),
+      );
+    },
+    [],
+  );
+
+  const clearFileConflictDecisions = useCallback((id: string) => {
+    setFiles((cur) =>
+      cur.map((f) => {
+        if (f.id !== id) return f;
+        const { conflictDecisions: _unused, ...rest } = f;
+        void _unused;
+        return rest;
+      }),
+    );
+  }, []);
+
   const runPreflight = useCallback(async (id: string) => {
     let target: TmImportFileItem | undefined;
     setFiles((cur) => {
@@ -450,20 +479,31 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const deduped = Array.from(dedupMap.values());
 
       // ---- 충돌 정책 적용 (skip / renumber / overwrite) ----
+      // 개별 충돌 결정이 있으면 우선, 없으면 파일 기본 conflictPolicy 적용
       const conflictPolicy: ConflictPolicy = f.conflictPolicy ?? "overwrite";
       const conflictSet = new Set<string>(
         (f.preflight?.conflicts ?? []).map((c) => c.task_no),
       );
+      const decisions = f.conflictDecisions ?? {};
       let skippedByPolicy = 0;
       let renumbered = 0;
+      let resolvedByDecision = 0;
       const renumberMap = new Map<string, string>();
       const applied: typeof deduped = [];
       for (const p of deduped) {
-        if (!conflictSet.has(p.task_no) || conflictPolicy === "overwrite") {
+        if (!conflictSet.has(p.task_no)) {
           applied.push(p);
           continue;
         }
-        if (conflictPolicy === "skip") {
+        const decision = decisions[p.task_no] ?? conflictPolicy;
+        if (decision !== conflictPolicy) {
+          resolvedByDecision++;
+        }
+        if (decision === "overwrite") {
+          applied.push(p);
+          continue;
+        }
+        if (decision === "skip") {
           skippedByPolicy++;
           continue;
         }
@@ -491,10 +531,13 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
             applied[i] = { ...p, parent_task_no: renumberMap.get(p.parent_task_no)! };
           }
         }
-        toast.info(`${f.name}: 충돌 ${renumberMap.size}건 자동 재번호 발급`);
+        toast.info(`${f.name}: 충돌 ${renumberMap.size}건 재번호 발급`);
       }
       if (skippedByPolicy > 0) {
         toast.info(`${f.name}: 충돌 ${skippedByPolicy}건 건너뜀`);
+      }
+      if (resolvedByDecision > 0) {
+        toast.info(`${f.name}: 개별 결정 ${resolvedByDecision}건 적용`);
       }
 
       const payloads = applied.map((p) => {
@@ -701,6 +744,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     rolledUp,
                     judgmentRecalculated,
                     renumbered,
+                    resolvedByDecision,
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
@@ -760,6 +804,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     <Ctx.Provider
       value={{
         files,
+        getFiles,
         isRunning,
         rollupMode,
         setRollupMode,
@@ -772,6 +817,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setFileDataDateOverride,
         setFileColumnOverrides,
         setFileConflictPolicy,
+        setFileConflictDecisions,
+        clearFileConflictDecisions,
         runPreflight,
         startImport,
         setFileParsedRows,

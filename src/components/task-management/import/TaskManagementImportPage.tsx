@@ -47,7 +47,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { RollupMode } from "@/contexts/TaskManagementImportContext";
 import { ColumnMappingDialog } from "./ColumnMappingDialog";
-import { ConflictReviewDialog } from "./ConflictReviewDialog";
+import { ConflictDecisionDialog } from "./ConflictDecisionDialog";
 import { Input } from "@/components/ui/input";
 import type { ConflictPolicy } from "@/contexts/TaskManagementImportContext";
 import { AlertTriangle, ScanSearch } from "lucide-react";
@@ -89,6 +89,7 @@ function ImportInner() {
   const canImport = !!me?.isAdmin;
   const {
     files,
+    getFiles,
     isRunning,
     rollupMode,
     setRollupMode,
@@ -101,6 +102,8 @@ function ImportInner() {
     setFileDataDateOverride,
     setFileColumnOverrides,
     setFileConflictPolicy,
+    setFileConflictDecisions,
+    clearFileConflictDecisions,
     runPreflight,
     startImport,
     setFileParsedRows,
@@ -110,6 +113,7 @@ function ImportInner() {
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [mappingFileId, setMappingFileId] = useState<string | null>(null);
   const [conflictFileId, setConflictFileId] = useState<string | null>(null);
+  const [pendingImportAfterConflicts, setPendingImportAfterConflicts] = useState(false);
   const masterOptions = useAllMasterOptions();
 
   const nameSpecs: NameFieldSpec<ParsedTaskRow>[] = [
@@ -136,13 +140,56 @@ function ImportInner() {
 
   const unresolvedNames = collectUnresolvedNames(allReadyRows, nameSpecs, optionsByKind);
   const masterMappingNote = formatUnresolvedNamesNote(unresolvedNames);
-  const runStartImport = () => {
+  const runStartImport = async () => {
     for (const f of files) {
       if (f.status === "ready" && !f.validationError) {
         setFileMasterMappingNote(f.id, masterMappingNote);
       }
     }
-    return startImport();
+
+    const candidates = getFiles().filter(
+      (f) =>
+        f.status === "ready" &&
+        f.parsed &&
+        f.parsed.length > 0 &&
+        !f.validationError &&
+        !!(f.dataDateOverride ?? f.dataDate),
+    );
+    if (candidates.length === 0) {
+      await startImport();
+      return;
+    }
+
+    // preflight가 없는 후보는 먼저 점검
+    const withoutPreflight = candidates.filter((f) => !f.preflight);
+    if (withoutPreflight.length > 0) {
+      await Promise.all(withoutPreflight.map((f) => runPreflight(f.id)));
+    }
+
+    // 최신 상태를 읽어 미결정 충돌이 있는 파일 확인
+    const stillReady = getFiles().filter(
+      (f) =>
+        f.status === "ready" &&
+        f.parsed &&
+        f.parsed.length > 0 &&
+        !f.validationError &&
+        !!(f.dataDateOverride ?? f.dataDate),
+    );
+    const filesWithUnresolvedConflicts = stillReady.filter((f) => {
+      const conflicts = f.preflight?.conflicts ?? [];
+      if (conflicts.length === 0) return false;
+      const decisions = f.conflictDecisions ?? {};
+      return conflicts.some((c) => !decisions[c.task_no]);
+    });
+
+    if (filesWithUnresolvedConflicts.length > 0) {
+      // 첫 번째 미결정 파일의 충돌 처리 팝업 열기
+      setConflictFileId(filesWithUnresolvedConflicts[0].id);
+      setPendingImportAfterConflicts(true);
+      return;
+    }
+
+    await startImport();
   };
 
   const applyMasterDecisions = (decisions: Map<string, any>) => {
@@ -290,7 +337,7 @@ function ImportInner() {
               <Button
                 size="sm"
                 onClick={runStartImport}
-                disabled={isRunning || readyCount === 0 || !canImport}
+                disabled={isRunning || pendingImportAfterConflicts || readyCount === 0 || !canImport}
                 title={!canImport ? "관리자 권한이 필요합니다" : ""}
               >
                 {isRunning ? (
@@ -325,11 +372,36 @@ function ImportInner() {
 
       <PreviewDialog file={previewFile} onClose={() => setPreviewFileId(null)} />
       {conflictFile && (
-        <ConflictReviewDialog
+        <ConflictDecisionDialog
           open={!!conflictFile}
-          onClose={() => setConflictFileId(null)}
+          onClose={() => {
+            setConflictFileId(null);
+            setPendingImportAfterConflicts(false);
+          }}
           fileName={conflictFile.name}
           preflight={conflictFile.preflight ?? null}
+          defaultPolicy={conflictFile.conflictPolicy ?? "overwrite"}
+          initialDecisions={conflictFile.conflictDecisions}
+          onConfirm={(decisions) => {
+            setFileConflictDecisions(conflictFile.id, decisions);
+            setConflictFileId(null);
+            // 가상 상태로 다음 미결정 파일을 검색
+            const projectedFiles = files.map((ff) =>
+              ff.id === conflictFile.id ? { ...ff, conflictDecisions: decisions } : ff,
+            );
+            const nextUnresolved = projectedFiles.find((ff) => {
+              const conflicts = ff.preflight?.conflicts ?? [];
+              if (conflicts.length === 0) return false;
+              const d = ff.id === conflictFile.id ? decisions : (ff.conflictDecisions ?? {});
+              return conflicts.some((c) => !d[c.task_no]);
+            });
+            if (nextUnresolved) {
+              setConflictFileId(nextUnresolved.id);
+            } else if (pendingImportAfterConflicts) {
+              setPendingImportAfterConflicts(false);
+              void startImport();
+            }
+          }}
         />
       )}
       {mappingFile && mappingFile.sheetHeaders && mappingFile.columnMap && (
@@ -503,13 +575,35 @@ function FileRow({
                     <Badge variant="outline" className="border-destructive text-destructive gap-1">
                       <AlertTriangle className="h-3 w-3" /> 충돌 {f.preflight.conflictCount}
                     </Badge>
+                    {(() => {
+                      const conflicts = f.preflight.conflicts;
+                      const decisions = f.conflictDecisions ?? {};
+                      const resolved = conflicts.filter((c) => decisions[c.task_no]).length;
+                      const unresolved = conflicts.length - resolved;
+                      return (
+                        <>
+                          {resolved > 0 && (
+                            <Badge variant="outline" className="border-violet-300 text-violet-700">
+                              개별 결정 {resolved}건
+                            </Badge>
+                          )}
+                          {unresolved > 0 && (
+                            <Badge variant="outline" className="border-amber-300 text-amber-700">
+                              미결정 {unresolved}건
+                            </Badge>
+                          )}
+                        </>
+                      );
+                    })()}
                     <Button
                       variant="link"
                       size="sm"
                       className="h-6 px-1 text-xs"
                       onClick={onOpenConflict}
                     >
-                      상세 보기
+                      {f.conflictDecisions && Object.keys(f.conflictDecisions).length > 0
+                        ? "결정 수정"
+                        : "충돌 처리"}
                     </Button>
                   </>
                 ) : (
@@ -574,6 +668,11 @@ function FileRow({
           {typeof f.result.renumbered === "number" && f.result.renumbered > 0 && (
             <Badge variant="outline" className="border-sky-300 text-sky-700">
               Renumbered: {f.result.renumbered}
+            </Badge>
+          )}
+          {typeof f.result.resolvedByDecision === "number" && f.result.resolvedByDecision > 0 && (
+            <Badge variant="outline" className="border-violet-300 text-violet-700">
+              개별 결정: {f.result.resolvedByDecision}
             </Badge>
           )}
           {f.result.skipped > 0 && (
