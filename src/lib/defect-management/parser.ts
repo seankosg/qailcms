@@ -195,6 +195,58 @@ function normalizeHeader(v: unknown): string {
   return String(v).replace(/\s+/g, "").trim().toLowerCase();
 }
 
+/** RFC 4122 UUID v1~v5 형식 검사. 시스템 재수출 파일의 id 컬럼 방어용. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export function isUuidLike(v: unknown): boolean {
+  if (v == null) return false;
+  const s = String(v).trim();
+  if (!s) return false;
+  return UUID_RE.test(s);
+}
+
+/**
+ * LetsBuild 원본 형태(재수출이 아닌 최초 export)인지 판정.
+ *  - QAIL_DEFECT_REIMPORT_V1 마커 없음
+ *  - source_issue_no 헤더 없음
+ *  - 원본 시그니처 헤더 3개 이상 동시 존재
+ * 조건을 모두 만족하면 ID 컬럼을 source_issue_no 로 승격 가능.
+ */
+const LETSBUILD_SIGNATURE_HEADERS = [
+  "location",
+  "plantitle",
+  "plangroup",
+  "assignedto",
+  "category",
+  "createddate",
+  "lastupdated",
+  "locationreference",
+] as const;
+function looksLikeLetsBuildOriginal(
+  headerMap: Record<string, number>,
+  isReimport: boolean,
+): boolean {
+  if (isReimport) return false;
+  if (headerMap["source_issue_no"]) return false;
+  let matches = 0;
+  for (const key of LETSBUILD_SIGNATURE_HEADERS) {
+    if (headerMap[key]) matches++;
+    if (matches >= 3) return true;
+  }
+  return false;
+}
+
+/**
+ * 지정 컬럼의 첫 데이터 행 샘플이 UUID 형식이면 true.
+ * scanHeaders 에서 이미 e.sample 로 첫 행 값을 채워둠.
+ */
+function columnSampleIsUuid(
+  entries: DefectSheetHeader[],
+  col1based: number,
+): boolean {
+  const entry = entries.find((e) => e.col === col1based);
+  return isUuidLike(entry?.sample);
+}
+
 function toIsoDate(v: unknown): string | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
@@ -279,24 +331,96 @@ function resolveColumn(
   target: DefectTargetField,
   extraAliases: string[],
 ): number | null {
-  // 1) 헤더 이름이 target field 이름과 정확히 같은 경우 최우선.
-  //    Re-import(재수출) 파일에서 항상 정답이며, 애매한 별칭(예: "ID" → source_issue_no)
-  //    을 이긴다.
+  // 주의: source_issue_no 대상은 이 함수를 사용하지 않는다.
+  //  → resolveSourceIssueNoColumn 참고 (UUID 오염 방어 로직 포함).
   const targetNorm = normalizeHeader(target);
   if (headerMap[targetNorm]) return headerMap[targetNorm];
-  // 2) canonical
+  // canonical
   for (const [h, t] of Object.entries(CANONICAL_HEADERS)) {
     if (t === target && headerMap[h]) return headerMap[h];
   }
-  // 3) DB 별칭. 단, target=source_issue_no 에 대한 "id" 별칭은 무시한다.
-  //    엑셀의 id 컬럼은 시스템 UUID 이며 LetsBuild Issue No. 가 아니다.
+  // DB 별칭.
   for (const a of extraAliases) {
     const key = normalizeHeader(a);
     if (!key) continue;
-    if (target === "source_issue_no" && key === "id") continue;
     if (headerMap[key]) return headerMap[key];
   }
   return null;
+}
+
+/**
+ * source_issue_no 유니크 키 전용 resolver.
+ *
+ * 파일 형태와 값 형식을 함께 검사하여 시스템 UUID(id) 컬럼이 절대
+ * source_issue_no 로 승격되지 않도록 방어한다.
+ *
+ * 우선순위:
+ *  1) columnOverrides.source_issue_no (샘플 UUID이면 거부)
+ *  2) 헤더 "source_issue_no" 정확 매칭
+ *  3) LetsBuild 원본 파일이고 헤더 "ID"/"id" 존재 (샘플 UUID이면 거부)
+ *  4) extraAliases (샘플 UUID이면 거부)
+ */
+function resolveSourceIssueNoColumn(
+  headerMap: Record<string, number>,
+  entries: DefectSheetHeader[],
+  extraAliases: string[],
+  isReimport: boolean,
+  overrideCol: number | undefined,
+  warnings: string[],
+): { col: number | null; origin: ParseDefectResult["sourceKeyOrigin"] } {
+  // (1) override
+  if (typeof overrideCol === "number" && overrideCol > 0) {
+    if (columnSampleIsUuid(entries, overrideCol)) {
+      warnings.push(
+        "columnOverrides.source_issue_no 로 지정된 컬럼이 UUID 형식이라 무시했습니다. LetsBuild ID 또는 source_issue_no 컬럼을 지정하세요.",
+      );
+    } else {
+      return { col: overrideCol, origin: "override" };
+    }
+  }
+
+  // (2) source_issue_no 헤더 직접 매칭
+  const directCol = headerMap["source_issue_no"];
+  if (directCol) {
+    if (columnSampleIsUuid(entries, directCol)) {
+      warnings.push(
+        "source_issue_no 컬럼의 첫 값이 UUID 형식입니다. 파일이 손상되었거나 잘못된 export일 수 있습니다.",
+      );
+    }
+    return { col: directCol, origin: "source_issue_no" };
+  }
+
+  // (3) LetsBuild 원본 파일: ID 헤더를 승격
+  const looksOriginal = looksLikeLetsBuildOriginal(headerMap, isReimport);
+  const idCol = headerMap["id"];
+  if (looksOriginal && idCol) {
+    if (columnSampleIsUuid(entries, idCol)) {
+      warnings.push(
+        "ID 컬럼 첫 값이 UUID 형식이라 유니크 키 승격에서 제외했습니다.",
+      );
+    } else {
+      return { col: idCol, origin: "letsbuild_id" };
+    }
+  }
+
+  // (4) 별칭 매칭. 단, "id" 별칭은 재수출 파일에서 UUID 위험이 있으므로 형식 검사 필수.
+  for (const a of extraAliases) {
+    const key = normalizeHeader(a);
+    if (!key) continue;
+    const col = headerMap[key];
+    if (!col) continue;
+    if (columnSampleIsUuid(entries, col)) {
+      warnings.push(
+        `별칭 "${a}" 컬럼의 첫 값이 UUID 형식이라 source_issue_no 매핑에서 제외했습니다.`,
+      );
+      continue;
+    }
+    // id 별칭은 LetsBuild 원본에서만 허용
+    if (key === "id" && !looksOriginal) continue;
+    return { col, origin: "alias" };
+  }
+
+  return { col: null, origin: null };
 }
 
 /** 프로젝트 전역에서 canonical 필드셋. Column Select Dialog의 unmapped 판정 근거. */
