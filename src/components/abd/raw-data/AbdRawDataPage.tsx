@@ -89,6 +89,24 @@ function serializeFilters(f: ColumnFiltersState): string {
   return JSON.stringify(obj);
 }
 
+function buildFiltersFromProgressContext(urlSearch: any): ColumnFiltersState {
+  const filters: ColumnFiltersState = [];
+  const addMulti = (id: string, value: string) => {
+    if (!value) return;
+    const arr = value.split(",").map((x) => x.trim()).filter(Boolean);
+    if (arr.length) filters.push({ id, value: arr });
+  };
+  addMulti("dis", urlSearch.dis);
+  addMulti("service", urlSearch.service);
+  addMulti("pic", urlSearch.pic);
+  addMulti("doc_ax", urlSearch.docAx);
+  addMulti("doc_axx", urlSearch.docAxx);
+  if (urlSearch.dateStart && urlSearch.dateEnd && urlSearch.dateField) {
+    filters.push({ id: urlSearch.dateField, value: { from: urlSearch.dateStart, to: urlSearch.dateEnd } });
+  }
+  return filters;
+}
+
 function toServerFilters(f: ColumnFiltersState): AbdServerFilter[] {
   const out: AbdServerFilter[] = [];
   for (const cf of f) {
@@ -212,9 +230,31 @@ export function AbdRawDataPage() {
   const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
 
   useEffect(() => {
-    setSorting(parseSortFromUrl(urlSearch.sort));
-    setColumnFilters(parseFiltersFromUrl(urlSearch.filters));
-    setSearchInput(urlSearch.q ?? "");
+    if (urlSearch.source === "progress") {
+      const built = buildFiltersFromProgressContext(urlSearch);
+      setSorting(parseSortFromUrl(urlSearch.sort));
+      setColumnFilters(built);
+      setSearchInput(urlSearch.q ?? "");
+      setUrl({
+        source: "",
+        team: "",
+        dis: "",
+        service: "",
+        pic: "",
+        docAx: "",
+        docAxx: "",
+        dateStart: "",
+        dateEnd: "",
+        dateField: "",
+        stage: "",
+        round: "",
+        filters: serializeFilters(built),
+      });
+    } else {
+      setSorting(parseSortFromUrl(urlSearch.sort));
+      setColumnFilters(parseFiltersFromUrl(urlSearch.filters));
+      setSearchInput(urlSearch.q ?? "");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team]);
 
