@@ -112,6 +112,7 @@ function ImportInner() {
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [mappingFileId, setMappingFileId] = useState<string | null>(null);
   const [conflictFileId, setConflictFileId] = useState<string | null>(null);
+  const [pendingImportAfterConflicts, setPendingImportAfterConflicts] = useState(false);
   const masterOptions = useAllMasterOptions();
 
   const nameSpecs: NameFieldSpec<ParsedTaskRow>[] = [
