@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CommentsThread, ABD_CATEGORIES } from "@/components/shared/CommentsThread";
 
 interface AbdItemRow {
   id: string;
@@ -185,6 +186,18 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
                   </table>
                 </div>
               )}
+            </section>
+
+            {/* Comments */}
+            <section>
+              <h3 className="font-semibold text-sm mb-2">Comments</h3>
+              <CommentsThread
+                table="abd_comments"
+                parentKey="abd_item_id"
+                parentValue={item.id}
+                categories={ABD_CATEGORIES}
+                defaultCategory="general"
+              />
             </section>
 
             {/* Raw Payload */}
