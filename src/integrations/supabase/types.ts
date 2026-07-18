@@ -2333,6 +2333,10 @@ export type Database = {
         }
         Returns: string
       }
+      abd_approved_round: {
+        Args: { _row: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
+        Returns: number
+      }
       abd_items_counts:
         | {
             Args: { _include_inactive?: boolean; _team?: string }
@@ -2418,6 +2422,55 @@ export type Database = {
               total_count: number
             }[]
           }
+      abd_progress_cells: {
+        Args: {
+          _as_of_date: string
+          _bucket: string
+          _group_by: string[]
+          _plan_mode: string
+          _plots: string[]
+          _range_end: string
+          _range_start: string
+          _round: string
+          _teams: string[]
+        }
+        Returns: {
+          actual_cnt: number
+          bucket_iso: string
+          group_key: string[]
+          plan_cnt: number
+          stage: string
+        }[]
+      }
+      abd_progress_totals: {
+        Args: {
+          _as_of_date: string
+          _group_by: string[]
+          _plan_mode: string
+          _plots: string[]
+          _round: string
+          _teams: string[]
+        }
+        Returns: {
+          actual_upto: number
+          done_upto: number
+          group_key: string[]
+          plan_upto: number
+          stage: string
+          total: number
+        }[]
+      }
+      abd_round_stage_dates: {
+        Args: {
+          _round: number
+          _row: Database["public"]["Tables"]["abd_items_raw"]["Row"]
+          _stage: string
+        }
+        Returns: {
+          adate: string
+          pdate: string
+        }[]
+      }
       allocate_task_no: {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: string
