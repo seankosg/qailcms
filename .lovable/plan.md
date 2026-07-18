@@ -1,155 +1,78 @@
-# HDEC/Subcontractor/Sub-Sub Owner 통합 권한 로직 (확정본 v2)
 
-## 배경
+# 다음 작업 계획
 
-- `profiles.name`, `hdec_pic_name`, `hdec_eng_name`, `subcontractor_name`, `subsub_name` 이미 존재.
-- 4개 Raw 테이블(`abd_items_raw`, `defect_items_raw`, `spare_parts_raw`, `task_management_raw`)에 대응 이름 컬럼 존재.
-- 서버 mutation은 `assertAdmin`만 사용 → 클라 UI와 서버 정책 불일치.
-- Import는 현재 admin/superuser 전용.
+사용자 선택에 따라 **프로필 정비 → 코드 배포** 순서로 진행합니다.  
+현재 배포된 DB 스키마·트리거·헬퍼 함수(`owner_user_id`, `is_full_access`, `is_row_owner`, `resolve_owner_by_name`, 4개 도메인 트리거)는 그대로 유지합니다.
 
-## 확정된 결정사항
+---
 
-1. 업로드 owner 밖 행: **자동 스킵 + rejected 로그**.
-2. 레거시 `user_type='hdec'`: 즉시 `hdec_pic`/`hdec_eng`로 자동 분류. 사용자 편집 화면에서 재편집 가능.
-3. 상위 rank(admin/superuser/d_superuser)가 HDEC/Sub 계정을 겸직하면 **rank 우선, owner 제한 미적용**.
-4. `d_superuser` 전체 편집 승격, `senior_user`의 전체 편집 회수.
-5. **`owner_user_id` FK 도입** (이름 문자열 매칭 병행 유지).
-6. **Subcontractor / Sub-Sub owner 규칙 포함** (하부 포함).
+## Phase 1 — 프로필/마스터 데이터 정비 (사용자 주도 + 관리자 UI 지원)
 
-## 역할 서열 재정의 (`src/types/enums.ts`)
+### 1.1 관리자용 사용자 편집 UI 확장 — `src/routes/_authenticated/admin/users.tsx`
+- **user_type 옵션 확장**: `hdec_pic`, `hdec_eng`, `subcontractor`, `subsub` 노출 (superuser/d_superuser/admin/senior_user/user 포함)
+- **역할별 이름 필드**:
+  - `hdec_pic` 선택 시 → `hdec_pic_name` 입력 활성화 (예: `KR NA_나경락`)
+  - `hdec_eng` 선택 시 → `hdec_eng_name` 입력 활성화
+  - `subcontractor` 선택 시 → `subcontractor_name` 입력 (예: `ALUTEC`, `ASBL`, `FANAR` …)
+  - `subsub` 선택 시 → `subsub_name` 입력
+- **검증**: 이름 값 중복 등록 시 경고 (동일 이름 2명 이상이면 `resolve_owner_by_name`이 매칭 불가로 처리됨을 안내)
 
-| Role | 기존 | 신규 |
-|---|---|---|
-| admin | 100 | 100 |
-| superuser | 90 | 90 |
-| **d_superuser** | **0** | **80** |
-| senior_user | 70 | 70 |
-| user | 50 | 50 |
-| super_guest | 30 | 30 |
-| guest | 10 | 10 |
+### 1.2 프로필 백필 지원 도구 (선택적)
+- 관리자 페이지 상단에 "미등록 이름 후보" 섹션 추가
+  - Defect의 `subcontractor_name` 34개 중 프로필에 없는 회사코드 리스트업
+  - ABD의 `pic` 61개 인력명 리스트업 → (별도 필드 신설 예정, 우선 참고용)
 
-`UserType` enum: `hdec_pic`, `hdec_eng`, `subcontractor`(기존 유지), `subsub`(기존 유지) 유지. `hdec_pic`, `hdec_eng` 신규 추가.
+### 1.3 사용자가 프로필 등록 완료 후
+- 트리거는 이미 INSERT/UPDATE에 걸려 있으므로, `UPDATE raw SET updated_at = updated_at WHERE owner_user_id IS NULL` 같은 재계산 유틸 버튼 제공(관리자 페이지) 또는 별도 서버 fn 제공하여 owner_user_id 재백필 실행
 
-## Owner 정의 (단일 소스)
+---
 
-행 owner ≡ 다음 중 하나 (OR):
+## Phase 2 — ABD Raw Data에 HDEC PIC/ENG 컬럼 신설
 
-- `owner_user_id = auth.uid()` (신규 FK — 우선 매칭)
-- `user_type='hdec_pic'` AND `profile.name = row.hdec_pic_name`
-- `user_type='hdec_eng'` AND `profile.name = row.hdec_eng_name`
-- `user_type='subcontractor'` AND `profile.subcontractor_name = row.subcontractor_name`
-- `user_type='subsub'` AND `profile.subsub_name = row.subsub_name`
-- (하위호환 — 마이그레이션 후 잔여) `user_type='hdec'` AND (`profile.hdec_pic_name` 또는 `hdec_eng_name` 매칭)
+### 2.1 DB 스키마 변경 (`supabase--migration`)
+- `abd_items_raw` 테이블에 컬럼 추가:
+  - `hdec_pic_name text`
+  - `hdec_eng_name text`
+- 인덱스: `idx_abd_hdec_pic_name`, `idx_abd_hdec_eng_name`
+- ABD owner 트리거 재작성: `pic` 대신 `hdec_pic_name → hdec_eng_name → pic(fallback)` 우선순위
 
-## 권한 매트릭스
+### 2.2 임포트 파서/설정 확장
+- `src/lib/abd/parser.ts`: `HDEC PIC`, `HDEC ENG` 헤더 인식 추가
+- `abd_field_config` 및 `abd_header_mappings` 시드에 새 필드 등록
+- Raw Data 페이지 컬럼 빌더에 두 컬럼 추가 (기본 노출)
 
-| 역할 | 편집/삭제 | 업로드 |
-|---|---|---|
-| admin / superuser / d_superuser | 전체 | 전체 |
-| senior_user (HDEC/Sub 겸직) | owner 행만 | owner 행만, 그 외 자동 스킵 |
-| user (HDEC/Sub 겸직) | owner 행만 | **불가** |
-| super_guest / guest | 불가 | 불가 |
+---
 
-## 구현 계획
+## Phase 3 — 서버/클라이언트 권한 코드 구현 (이전 계획에서 이어짐)
 
-### 1. 타입/enum
+프로필 정비가 어느 정도 완료된 후 진행합니다.
 
-- `src/types/enums.ts`
-  - `ROLE_RANK.d_superuser = 80`.
-  - `UserType`에 `"hdec_pic" | "hdec_eng"` 추가.
+### 3.1 `src/types/enums.ts`
+- `UserType`에 `hdec_pic`, `hdec_eng` 추가
+- `ROLE_RANK`: `superuser(90) > d_superuser(80) > senior_user(70) > user(60) > hdec_pic/hdec_eng/subcontractor/subsub(50) > viewer(10)`
 
-### 2. DB 마이그레이션 (`supabase--migration`, 단일 파일)
+### 3.2 `src/lib/auth/roles.ts`
+- `isFullAccess(profile)`: `admin || superuser || d_superuser` (senior_user 제외)
+- `isOwnerOfRow(profile, row, tableKind)`: 
+  - 우선 `row.owner_user_id === profile.id`
+  - fallback: 테이블별 이름 컬럼과 프로필 이름 매칭
+- `canEditRawRow`, `canDeleteRawRow`, `canImportRow` 신규/재작성
 
-**Step A. enum 확장**
-- `user_type`에 `hdec_pic`, `hdec_eng` 값 추가.
+### 3.3 서버 fn 재검증
+- ABD/Defect/Spare Parts/Task 4개 도메인의 `mutations.functions.ts`:
+  - 기존 `assertAdmin`을 `assertCanEditRawRow` / `assertCanImportRow`로 교체
+  - `is_full_access(auth.uid())` 또는 `is_row_owner(...)` DB 함수 호출로 판정
+- Bulk update/delete: 각 행별 소유권 재검증, 위반 시 `403`
 
-**Step B. `owner_user_id` FK 컬럼 추가 (4개 Raw 테이블)**
-- `abd_items_raw`, `defect_items_raw`, `spare_parts_raw`, `task_management_raw` 각각:
-  - `owner_user_id uuid NULL REFERENCES auth.users(id) ON DELETE SET NULL`
-  - `CREATE INDEX idx_<table>_owner_user_id ON public.<table>(owner_user_id)`
+### 3.4 Import Context 4종
+- 업로드 시 owner 범위 밖 행 자동 스킵 + `rejected` 로그에 `"not_owner"` 사유 기록
+- `d_superuser/admin/superuser`는 전체 업로드 허용
 
-**Step C. 백필**
-- 각 Raw 테이블에서 이름 컬럼으로 `profiles`와 조인해 `owner_user_id` 채움.
-  - 우선순위: `hdec_pic_name` → `hdec_eng_name` → `subcontractor_name` → `subsub_name`.
-  - 매칭 다중이면 (동명이인) `owner_user_id` NULL 유지, 이름 매칭 fallback 사용.
+### 3.5 UI 비활성화 처리
+- Raw Data 페이지의 인라인 편집·행 삭제 버튼: 비소유 행일 때 비활성화 + 툴팁 "본인 소유 행만 편집 가능"
 
-**Step D. 레거시 `hdec` 재분류 (profiles UPDATE)**
-- `hdec_pic_name` 유효 → `hdec_pic`.
-- `hdec_eng_name`만 유효 → `hdec_eng`.
-- 둘 다 유효 → `hdec_pic` 통일(관리자 목록에 배지 노출용 플래그는 미도입, `admin/users`에서 편집 유도).
-- 둘 다 무효 → `hdec_pic` 유지(name 매칭 fallback).
+---
 
-**Step E. SQL 헬퍼 함수**
-- `is_full_access(_user_id uuid) returns boolean` — admin/superuser/d_superuser 판정 (SECURITY DEFINER, search_path=public, EXECUTE TO authenticated).
-- `is_row_owner(_user_id uuid, _owner_user_id uuid, _hdec_pic text, _hdec_eng text, _subcon text, _subsub text) returns boolean` — 위 owner 정의 구현.
-- `has_any_role(_user_id uuid, _roles app_role[]) returns boolean` — 이미 있으면 재사용, 없으면 생성.
+## 즉시 실행 여부
 
-**Step F. `owner_user_id` 자동 유지 트리거 (INSERT/UPDATE)**
-- 4개 테이블 각각 BEFORE INSERT/UPDATE 트리거:
-  - `owner_user_id`가 명시적으로 세팅되지 않았거나 관련 이름 컬럼이 변경된 경우, `profiles`에서 유일하게 매칭되는 사용자를 찾아 자동 세팅. 다중 매칭 시 NULL.
-
-### 3. 서버 헬퍼
-
-`src/lib/auth/roles.ts`:
-- `isFullAccess(user)` — admin/superuser/d_superuser.
-- `isOwnerOfRow(user, row)` — `owner_user_id === user.id` 우선, 이후 user_type별 이름 매칭 (HDEC PIC/ENG/Subcon/Subsub 포함).
-- `canEditRawRow(user, table, row)`: full-access true, senior/user는 owner, 그 외 false.
-- `canDeleteRawRow` 동일.
-- `canImportOwnRow(user, incomingRow)`: full-access true, senior_user는 owner, user 이하 false.
-
-`src/lib/auth/roles.server.ts` (신규 또는 확장):
-- `assertCanEditRow(ctx, table, rowId)` — 행 조회 후 full-access/owner 판정. RPC `is_row_owner` 사용.
-- `assertCanEditRowsBulk(ctx, table, ids)` — 대량 시 owner 필터 SQL로 처리, 스킵 id 반환.
-
-### 4. 서버 mutation 재검증
-
-`assertAdmin` → `assertCanEditRow`/`assertCanEditRowsBulk`로 교체:
-- `src/lib/defect-management/mutations.functions.ts`
-- `src/lib/abd/mutations.functions.ts`
-- Spare Part / Task Management 동등 함수
-
-대량 UPDATE/DELETE는:
-```sql
-UPDATE ... WHERE id = ANY($ids) AND (is_full_access($uid) OR is_row_owner(...))
-```
-로 owner 필터를 SQL 레벨에서 적용하고 실제 반영된 id / 스킵 id를 반환.
-
-### 5. Import Context 4종
-
-- 시작 시 `useCurrentUser()`로 판단:
-  - `user` 단독 → 업로드 버튼 비활성.
-  - `guest/super_guest` → 차단.
-- 배치 upsert 직전 각 행에 `canImportOwnRow` 판정. false 행은 rejected 배열로 이동 + `*_import_row_logs`에 `action_taken='rejected'`, `reason='ownership_mismatch'` 로그.
-- 파일 카드에 "권한 밖 스킵" 카운트 표시.
-
-### 6. Raw Data UI (4개 도메인)
-
-- 인라인 편집/벌크 편집/삭제: `canEditRawRow` 반영. 비owner 셀은 비활성 + 툴팁("본인이 HDEC PIC/ENG 또는 Subcontractor/Sub-Sub로 지정된 행만 편집 가능합니다.").
-- 벌크 선택 시 비owner 행 안내 배너("선택 N건 중 M건 권한 없음, 자동 제외").
-
-### 7. 관리자 사용자 편집 (`admin/users.tsx`)
-
-- `user_type` 옵션에 `hdec_pic`, `hdec_eng` 추가.
-- 편집 폼에 `hdec_pic_name`, `hdec_eng_name`, `subcontractor_name`, `subsub_name` 노출/저장.
-- `user_type` 선택에 따라 관련 이름 필드만 필수/강조 표시.
-- 레거시 `hdec` 계정: 리스트 배지 "재분류 필요", 편집 저장 시 `user_type`을 신규 값으로 강제.
-
-### 8. useCurrentUser 확장
-
-- 반환값에 `isFullAccess` 추가.
-
-### 9. 검증
-
-- admin/superuser/d_superuser: 전체 편집/삭제/업로드 통과.
-- senior_user + hdec_pic(`name='홍길동'`): `hdec_pic_name='홍길동'` OR `owner_user_id=본인` 행만 접근 가능.
-- senior_user + subcontractor: `subcontractor_name` 일치 또는 owner_user_id 일치 행만.
-- user + subsub: 편집/삭제만, 업로드 불가.
-- 대량 편집에서 스킵 id 결과 확인.
-- 백필 후 `owner_user_id` NOT NULL 비율 스팟체크(SELECT count(*) FILTER (WHERE owner_user_id IS NOT NULL)).
-- `tsgo` 통과.
-
-## 스코프 밖
-
-- RLS 정책 재작성(현 단계는 서버 함수 재검증 + `owner_user_id` FK 도입까지. RLS 강화는 후속).
-- Cat A / HDEC Verification lock 필드 규칙(현행 유지).
-- 동명이인 owner 자동 매칭 UI 툴(다중 매칭 시 NULL, 관리자가 사용자 편집 화면에서 명시적으로 이름 정정).
+`Phase 1.1`(관리자 UI 확장)부터 코드 작업에 착수합니다. 승인 시 진행합니다.
