@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useQueryClient } from "@tanstack/react-query";
+import { TopBrandHeader } from "@/components/layout/TopBrandHeader";
 
 type NavLeaf = {
   to?: string;
@@ -279,12 +280,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-card px-4 lg:hidden">
-          <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
-            <Menu className="h-5 w-5" />
-          </Button>
-          <span className="text-sm font-semibold">QAIL CMS</span>
-        </header>
+        <TopBrandHeader onMobileMenu={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-x-hidden p-4 lg:p-6">{children}</main>
       </div>
     </div>
