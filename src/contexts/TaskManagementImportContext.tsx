@@ -123,15 +123,9 @@ const INSERT_CHUNK = 500;
 
 export function TaskManagementImportProvider({ children }: { children: ReactNode }) {
   const [files, setFiles] = useState<TmImportFileItem[]>([]);
-  const filesRef = useRef<TmImportFileItem[]>([]);
-  // 상태와 ref 동기화
-  const syncFilesRef = useCallback((next: TmImportFileItem[] | ((prev: TmImportFileItem[]) => TmImportFileItem[])) => {
-    setFiles((prev) => {
-      const updated = typeof next === "function" ? next(prev) : next;
-      filesRef.current = updated;
-      return updated;
-    });
-  }, []);
+  const filesRef = useRef<TmImportFileItem[]>(files);
+  filesRef.current = files;
+  const getFiles = useCallback(() => filesRef.current, []);
   const [isRunning, setIsRunning] = useState(false);
   const [rollupMode, setRollupMode] = useState<RollupMode>("auto");
   const [recalcJudgment, setRecalcJudgment] = useState<boolean>(true);
