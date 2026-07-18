@@ -216,9 +216,10 @@ export function AbdProgressPage() {
     params.set("dateField", dateField);
     params.set("round", round);
     if (stage !== "all") params.set("stage", stage);
+    const url = `/closure/abd/raw-data?${params.toString()}`;
     // eslint-disable-next-line no-console
-    console.log("[ABD click] filterObj", filterObj, "params", params.toString());
-    window.location.assign(`/closure/abd/raw-data?${params.toString()}`);
+    console.log("[ABD click] filterObj", filterObj, "url", url);
+    window.location.assign(url);
   };
 
   const isAllGroups = effectiveGroupBy.length === ALL_GROUP_BY.length;
