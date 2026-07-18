@@ -811,6 +811,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setFileDataDateOverride,
         setFileColumnOverrides,
         setFileConflictPolicy,
+        setFileConflictDecisions,
+        clearFileConflictDecisions,
         runPreflight,
         startImport,
         setFileParsedRows,
