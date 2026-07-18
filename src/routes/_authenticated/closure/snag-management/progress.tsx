@@ -8,7 +8,7 @@ const searchSchema = z.object({
   teams: fallback(z.string(), "").default(""),
   roomGroups: fallback(z.string(), "").default(""),
   bucket: fallback(z.enum(["day", "week"]), "day").default("day"),
-  stageView: fallback(z.string(), "start,completion,closure").default("start,completion,closure"),
+  stageView: fallback(z.string(), "start,rectified,closure").default("start,rectified,closure"),
   groupBy: fallback(z.string(), "team").default("team"),
   range: fallback(z.number().int(), 60).default(60),
   hidePast: fallback(z.union([z.literal(0), z.literal(1)]), 0).default(0),
