@@ -13,6 +13,7 @@ export type Bucket = "day" | "week";
 
 export type GroupBy =
   | "team"
+  | "room_group"
   | "subcontractor_name"
   | "subsub_name"
   | "hdec_pic_name"
@@ -24,6 +25,7 @@ export type GroupBy =
 
 export const ALL_GROUP_BY: GroupBy[] = [
   "team",
+  "room_group",
   "subcontractor_name",
   "subsub_name",
   "hdec_pic_name",
@@ -36,6 +38,7 @@ export const ALL_GROUP_BY: GroupBy[] = [
 
 export const GROUP_LABELS: Record<GroupBy, string> = {
   team: "Team",
+  room_group: "Room Group",
   subcontractor_name: "Subcontractor",
   subsub_name: "Sub-Sub",
   hdec_pic_name: "HDEC PIC",
@@ -49,6 +52,7 @@ export const GROUP_LABELS: Record<GroupBy, string> = {
 /** Raw Data 검색 파라미터 키 매핑 — 셀 클릭 시 필터 이동에 사용 */
 export const GROUP_QUERY_PARAM: Record<GroupBy, string> = {
   team: "team",
+  room_group: "roomGroup",
   subcontractor_name: "subcontractor",
   subsub_name: "subsub",
   hdec_pic_name: "hdecPic",
