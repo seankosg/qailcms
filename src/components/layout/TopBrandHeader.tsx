@@ -6,6 +6,28 @@ interface Props {
   onMobileMenu?: () => void;
 }
 
+function NewVersionButton() {
+  const buildId = typeof __APP_BUILD_ID__ === "string" ? __APP_BUILD_ID__ : "";
+  if (!buildId || buildId.startsWith("__") || buildId === "development") {
+    return null;
+  }
+  const handleForceReload = () => {
+    window.location.replace(window.location.pathname + "?__reset=" + Date.now());
+  };
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleForceReload}
+      aria-label="New Version - 강제 새로고침"
+      className="hidden sm:inline-flex print:hidden"
+    >
+      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+      New Version
+    </Button>
+  );
+}
+
 export function TopBrandHeader({ onMobileMenu }: Props) {
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-card px-3 lg:px-4">
@@ -33,10 +55,7 @@ export function TopBrandHeader({ onMobileMenu }: Props) {
       </span>
 
       <div className="ml-auto flex items-center gap-2 shrink-0">
-        <Button variant="outline" size="sm" className="hidden sm:inline-flex">
-          <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-          New Version
-        </Button>
+        <NewVersionButton />
         <span className="hidden md:inline text-xs text-muted-foreground">
           © 2026 QAIL CMS. All rights reserved.
         </span>
