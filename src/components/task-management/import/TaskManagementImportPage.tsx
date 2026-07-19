@@ -120,9 +120,17 @@ function ImportInner() {
     {
       fieldLabel: "HDEC PIC",
       masterKind: "hdec_pic",
-      read: (r) => r.pic,
+      read: (r) => r.hdec_pic_name,
       write: (r, v) => {
-        r.pic = v;
+        r.hdec_pic_name = v;
+      },
+    },
+    {
+      fieldLabel: "HDEC ENG",
+      masterKind: "hdec_eng",
+      read: (r) => r.hdec_eng_name,
+      write: (r, v) => {
+        r.hdec_eng_name = v;
       },
     },
   ];
@@ -741,7 +749,8 @@ function PreviewDialog({
                   "항목",
                   "리스크",
                   "세부업무",
-                  "담당",
+                  "HDEC PIC",
+                  "HDEC ENG",
                   "유형",
                   "상태",
                   "계획 시작",
@@ -765,7 +774,8 @@ function PreviewDialog({
                   <td className="px-1.5 py-1">{r.task_name ?? ""}</td>
                   <td className="px-1.5 py-1">{r.risk ?? ""}</td>
                   <td className="px-1.5 py-1">{r.sub_task_desc ?? ""}</td>
-                  <td className="px-1.5 py-1">{r.pic ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.hdec_pic_name ?? ""}</td>
+                  <td className="px-1.5 py-1">{r.hdec_eng_name ?? ""}</td>
                   <td className="px-1.5 py-1">{r.row_type ?? ""}</td>
                   <td className="px-1.5 py-1">{r.status_manual ?? ""}</td>
                   <td className="px-1.5 py-1">{r.plan_start ?? ""}</td>
