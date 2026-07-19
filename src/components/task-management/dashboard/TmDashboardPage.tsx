@@ -69,6 +69,12 @@ export function TmDashboardPage() {
 
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
 
+  const [ownerDetail, setOwnerDetail] = useState<{
+    dim: OwnerDim;
+    key: string;
+    row: OwnerLeaderboardRow;
+  } | null>(null);
+
   // Facet options — derived from ALL loaded items (respect discipline/plot filter for owners).
   const teamOptions = useMemo(() => uniqSorted(items, "team"), [items]);
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
@@ -228,6 +234,7 @@ export function TmDashboardPage() {
               asOfDate={asOfDate}
               defaultDim={ownerDim}
               onDimChange={(dim) => patch({ ownerDim: dim })}
+              onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
             />
           </div>
 
@@ -238,6 +245,16 @@ export function TmDashboardPage() {
           <JudgmentStageBreakdown items={scopedItems} asOfDate={asOfDate} />
         </>
       )}
+
+      <OwnerDetailDialog
+        open={ownerDetail !== null}
+        onOpenChange={(o) => !o && setOwnerDetail(null)}
+        dim={ownerDetail?.dim ?? ownerDim}
+        ownerKey={ownerDetail?.key ?? ""}
+        row={ownerDetail?.row ?? null}
+        items={scopedItems}
+        asOfDate={asOfDate}
+      />
     </div>
   );
 }
