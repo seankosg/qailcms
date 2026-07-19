@@ -1,60 +1,43 @@
-## 개선 목표
-현재 사이드바 메뉴가 모두 비슷한 `text-sm` / `font-medium` / `text-foreground`로 출력되어, 섹션-모듈-메뉴 간 계층 구분이 모호합니다. **글자 크기, 굵기, 색상을 계층별로 다르게 적용**하여 한눈에 현재 위치와 메뉴 구조를 파악할 수 있도록 시인성을 높입니다.
+## 목표
 
-## 개선 대상 파일
-- `src/components/layout/AppLayout.tsx`
-- Tailwind v4 토큰만 사용 (`src/styles.css`의 `--muted-foreground`, `--foreground`, `--primary` 등)
+TM 임포트를 HDEC PIC 기준으로 필터링. Admin은 기존과 동일하게 전권(필터 없음, 스코프 UI 미노출). Super User(superuser/d_superuser)는 컬럼매핑 버튼 옆 스코프 셀렉트로 "본인 항목만"(기본) / "Super User: 전체 임포트" 선택 가능. 그 외 사용자는 항상 본인 HDEC PIC 항목만.
 
-## 세부 디자인 적용안
+## 사용자 등급별 동작
 
-### 1. Section Label (섹션 제목: "Outstanding Work", "Close-Out Doc", "Import & Log", "Admin")
-- 글자 크기: `text-[11px]`
-- 굵기: `font-bold`
-- 색상: `text-muted-foreground`
-- 자간: `tracking-wider`
-- 변환: `uppercase`
-- 위쪽 여백: `mt-4` → 섹션 간 그룹감 강화
+- **Admin (`isAdmin`)**: 기존과 동일. 스코프 UI 미노출, 필터 미적용, 전체 임포트.
+- **Super User (`isSuperUser` 또는 `isDSuperUser`, admin 아님)**: 스코프 Select 노출. 기본 "본인 HDEC PIC 항목만", 필요 시 "전체" 선택 가능.
+- **그 외 (senior_user, user 등)**: 스코프 고정 "본인 HDEC PIC 항목만"(읽기 전용 배지). 임포트 버튼 활성화 조건은 매칭 행이 1건 이상.
 
-### 2. Module Label (접을 수 있는 모듈: "Task Management", "Snag List Management", "As Built Drawing" 등)
-- 글자 크기: `text-sm`
-- 굵기: `font-semibold`
-- 색상: `text-foreground`
-- hover: `hover:text-primary`
-- 아이콘: 모듈 아이콘은 `text-muted-foreground`, hover 시 `text-primary`
+## 매칭 로직
 
-### 3. Dashboard / Flat Leaf (섹션 직속 메뉴: "Dashboard", "Import", "Import Logs", "Overview" 등)
-- 글자 크기: `text-sm`
-- 굵기: `font-medium`
-- 색상: `text-foreground`
-- hover: `hover:text-primary hover:bg-muted/50`
+- 사용자 키: `useCurrentUser().hdec_pic_name`
+- 행 키: `ParsedTaskRow.hdec_pic_name`
+- 비교: 양쪽 `trim().toLowerCase()` 완전일치
+- 사용자 `hdec_pic_name`이 비어 있고 스코프가 `mine`이면 매칭 0건 → Start 비활성 + 툴팁 안내
+- 마스터 매핑 미해결 상태에서는 필터에서 탈락할 수 있으므로 상단 MasterMappingSection 해결을 유도하는 안내 문구 추가
 
-### 4. Module Sub Leaf (모듈 하위 메뉴: "Task Summary", "Raw Data", "Progress" 등)
-- 글자 크기: `text-sm`
-- 굵기: `font-normal` (상위와의 대비를 위해 Dashboard보다 한 단계 얇게)
-- 색상: `text-foreground/80`
-- hover: `hover:text-foreground hover:bg-muted/50`
+## UI 변경 (`TaskManagementImportPage.tsx`)
 
-### 5. Active 상태 강조
-- active leaf: `text-primary font-semibold bg-primary/10`
-- 왼쪽 액센트 바 추가: `border-l-2 border-primary pl-[calc(0.5rem-2px)]` (기존 `px-2`에서 2px 보정)
-- active sub leaf: 상위와 동일, 배경색만 약하게
+- Files 카드 툴바(Clear all / Start import) 좌측 또는 컬럼매핑 다이얼로그 트리거 옆 영역에 스코프 선택 컨트롤 배치.
+  - Admin: 렌더 안 함.
+  - Super User: `Select` — `mine` / `all`.
+  - 일반 사용자: 뱃지 "본인 HDEC PIC 항목만".
+- 파일 행에 "임포트 대상 N / 파싱 M" 카운트 표시(스코프 반영).
+- Start 버튼 게이트를 `isEditor` 이상 + 총 매칭 행 ≥ 1 로 완화(Admin은 기존처럼 총행 ≥ 1).
 
-### 6. 모바일/미니 사이드바 호환
-- 접힌 상태에서도 아이콘만 노출되므로 텍스트 스타일 변경은 PC 사이드바에만 영향
-- 모바일 드로어에서도 동일한 계층 스타일 유지
+## 컨텍스트 변경 (`TaskManagementImportContext.tsx`)
 
-## 구현 범위
-- `renderLeaf()` 함수에 `level` 인자 추가 (`'dashboard' | 'sub'`)
-- `module` 버튼에 module-level 클래스 적용
-- `section` 라벨에 section-level 클래스 적용
-- 기존 shadcn 토큰만 사용, 새로운 CSS 변수는 추가하지 않음
+- 상태 추가: `importScope: "mine" | "all"`, 기본 `"mine"`, `setImportScope`.
+- Provider 마운트 시 현재 사용자 프로필의 `hdec_pic_name`, 역할 플래그(`isAdmin`, `isSuperUserLike`)를 로드해 캐시.
+- 효과적 스코프 계산: `isAdmin ? "all" : (isSuperUserLike ? importScope : "mine")`.
+- `executeImport` 진입 시 각 파일 `parsed`를 효과적 스코프로 필터링, 롤업/부모-자식 카운트를 재계산 후 진행.
+  - 필터로 인해 부모 없는 자식이 남을 경우 스킵하고 `skipped_orphan_after_scope` 집계.
+  - 필터 결과 카운트, 원본 카운트, 스코프를 import 로그 `note`에 요약 기록.
+- Preflight 대상도 필터링된 rows로 실행하여 충돌 판정을 일관되게 유지.
 
-## 검증
-- `bun run typecheck` 또는 `tsgo` 통과
-- 브라우저 프리뷰에서 사이드바 캡처로 각 계층의 크기/굵기/색상 차이 확인
-- active/hover 상태 정상 동작 확인
+## 산출물
 
-## 예상 결과
-- Section → Module → Leaf 간 명확한 시각적 계층
-- 현재 메뉴(primary + 배경)가 더 뚜렷하게 구분
-- 모듈과 하위 메뉴의 종속 관계가 한눈에 들어옴
+- `src/components/task-management/import/TaskManagementImportPage.tsx`
+- `src/contexts/TaskManagementImportContext.tsx`
+
+SM/ABD/Spare Part 임포트에는 영향 없음.

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -90,7 +90,9 @@ export function TaskManagementImportPage() {
 
 function ImportInner() {
   const { data: me } = useCurrentUser();
-  const canImport = !!me?.isAdmin;
+  const canImport = !!me?.isEditor;
+  const isAdmin = !!me?.isAdmin;
+  const isSuperUserLike = !!(me?.isSuperUser || me?.isDSuperUser);
   const {
     files,
     getFiles,
@@ -99,6 +101,11 @@ function ImportInner() {
     setRollupMode,
     recalcJudgment,
     setRecalcJudgment,
+    importScope,
+    setImportScope,
+    setImporterHdecPicName,
+    setIsImporterAdmin,
+    matchesHdecPic,
     addFiles,
     removeFile,
     clearAll,
@@ -120,6 +127,17 @@ function ImportInner() {
   const [conflictFileId, setConflictFileId] = useState<string | null>(null);
   const [pendingImportAfterConflicts, setPendingImportAfterConflicts] = useState(false);
   const masterOptions = useAllMasterOptions();
+
+  // Sync importer identity/scope to context whenever user info changes
+  const hdecPic = me?.hdec_pic_name ?? null;
+  const adminFlag = !!me?.isAdmin;
+  useEffect(() => {
+    setImporterHdecPicName(hdecPic);
+    setIsImporterAdmin(adminFlag);
+  }, [hdecPic, adminFlag, setImporterHdecPicName, setIsImporterAdmin]);
+
+  // Effective scope for display/counts
+  const effectiveScope: "mine" | "all" = isAdmin ? "all" : importScope;
 
   const nameSpecs: NameFieldSpec<ParsedTaskRow>[] = [
     {
@@ -229,9 +247,33 @@ function ImportInner() {
     [addFiles],
   );
 
-  const readyCount = files.filter(
+  // Matched-row count per file under the current scope
+  const matchedByFile = useMemo(() => {
+    const map: Record<string, { matched: number; total: number }> = {};
+    for (const f of files) {
+      const rows = f.parsed ?? [];
+      const matched =
+        effectiveScope === "all"
+          ? rows.length
+          : rows.filter((r) => matchesHdecPic(r)).length;
+      map[f.id] = { matched, total: rows.length };
+    }
+    return map;
+  }, [files, effectiveScope, matchesHdecPic]);
+
+  const readyFiles = files.filter(
     (f) => f.status === "ready" && !f.validationError && !!f.discipline,
-  ).length;
+  );
+  const readyCount = readyFiles.length;
+  const totalMatched = readyFiles.reduce(
+    (s, f) => s + (matchedByFile[f.id]?.matched ?? 0),
+    0,
+  );
+  const startDisabled =
+    isRunning ||
+    readyCount === 0 ||
+    !canImport ||
+    (!isAdmin && totalMatched === 0);
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
   const columnFile = files.find((f) => f.id === mappingFileId) ?? null;
   const conflictFile = files.find((f) => f.id === conflictFileId) ?? null;
@@ -343,24 +385,62 @@ function ImportInner() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base">2. Files ({files.length})</CardTitle>
-              <CardDescription>{readyCount} ready to import</CardDescription>
+              <CardDescription>
+                {readyCount} ready · 임포트 대상 {totalMatched}행
+                {!isAdmin && ` · 스코프: ${effectiveScope === "mine" ? "본인 HDEC PIC만" : "전체(Super User)"}`}
+              </CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {!isAdmin && (
+                isSuperUserLike ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">임포트 스코프</span>
+                    <Select
+                      value={importScope}
+                      onValueChange={(v) => setImportScope(v as "mine" | "all")}
+                      disabled={isRunning}
+                    >
+                      <SelectTrigger className="h-8 w-[220px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mine" className="text-xs">
+                          본인 HDEC PIC 항목만 (기본)
+                        </SelectItem>
+                        <SelectItem value="all" className="text-xs">
+                          Super User: 전체 임포트
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <Badge variant="outline" className="text-[11px]">
+                    본인 HDEC PIC 항목만
+                    {me?.hdec_pic_name ? ` (${me.hdec_pic_name})` : ""}
+                  </Badge>
+                )
+              )}
               <Button variant="outline" size="sm" onClick={clearAll} disabled={isRunning}>
                 Clear all
               </Button>
               <Button
                 size="sm"
                 onClick={runStartImport}
-                disabled={isRunning || pendingImportAfterConflicts || readyCount === 0 || !canImport}
-                title={!canImport ? "관리자 권한이 필요합니다" : ""}
+                disabled={startDisabled || pendingImportAfterConflicts}
+                title={
+                  !canImport
+                    ? "임포트 권한이 없습니다"
+                    : !isAdmin && totalMatched === 0
+                      ? "본인 HDEC PIC로 매칭되는 행이 없습니다"
+                      : ""
+                }
               >
                 {isRunning ? (
                   <>
                     <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Importing…
                   </>
                 ) : (
-                  `Start import (${readyCount})`
+                  `Start import (${totalMatched}행)`
                 )}
               </Button>
             </div>
@@ -371,6 +451,9 @@ function ImportInner() {
                 key={f.id}
                 file={f}
                 isRunning={isRunning}
+                matched={matchedByFile[f.id]?.matched ?? 0}
+                total={matchedByFile[f.id]?.total ?? 0}
+                scopeIsMine={!isAdmin && effectiveScope === "mine"}
                 onRemove={() => removeFile(f.id)}
                 onDisciplineChange={(d) => setFileDiscipline(f.id, d)}
                 onPreview={() => setPreviewFileId(f.id)}
@@ -439,6 +522,9 @@ function ImportInner() {
 function FileRow({
   file: f,
   isRunning,
+  matched,
+  total,
+  scopeIsMine,
   onRemove,
   onDisciplineChange,
   onPreview,
@@ -451,6 +537,9 @@ function FileRow({
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
+  matched: number;
+  total: number;
+  scopeIsMine: boolean;
   onRemove: () => void;
   onDisciplineChange: (d: Discipline | null) => void;
   onPreview: () => void;
@@ -475,6 +564,17 @@ function FileRow({
               {typeof f.parentCount === "number" &&
                 ` · Parent ${f.parentCount} / Child ${f.childCount}`}
             </p>
+            {total > 0 && (
+              <p className="mt-0.5 text-[11px]">
+                {scopeIsMine ? (
+                  <span className={matched === 0 ? "text-destructive" : "text-primary"}>
+                    임포트 대상 {matched} / 파싱 {total}행 (본인 HDEC PIC만)
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">전체 {total}행 임포트</span>
+                )}
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">공종</span>
               <Select
