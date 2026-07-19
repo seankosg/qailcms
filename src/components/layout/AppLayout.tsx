@@ -43,8 +43,8 @@ const NAV: NavSection[] = [
         icon: ClipboardList,
         matchPrefix: "/closure/task-management",
         items: [
+          { to: "/closure/task-management/tree", label: "Task Summary", icon: ListTree },
           { to: "/closure/task-management/raw-data", label: "Raw Data", icon: Database },
-          { to: "/closure/task-management/tree", label: "Tree View", icon: ListTree },
         ],
       },
       {
