@@ -385,24 +385,62 @@ function ImportInner() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base">2. Files ({files.length})</CardTitle>
-              <CardDescription>{readyCount} ready to import</CardDescription>
+              <CardDescription>
+                {readyCount} ready · 임포트 대상 {totalMatched}행
+                {!isAdmin && ` · 스코프: ${effectiveScope === "mine" ? "본인 HDEC PIC만" : "전체(Super User)"}`}
+              </CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {!isAdmin && (
+                isSuperUserLike ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">임포트 스코프</span>
+                    <Select
+                      value={importScope}
+                      onValueChange={(v) => setImportScope(v as "mine" | "all")}
+                      disabled={isRunning}
+                    >
+                      <SelectTrigger className="h-8 w-[220px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mine" className="text-xs">
+                          본인 HDEC PIC 항목만 (기본)
+                        </SelectItem>
+                        <SelectItem value="all" className="text-xs">
+                          Super User: 전체 임포트
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <Badge variant="outline" className="text-[11px]">
+                    본인 HDEC PIC 항목만
+                    {me?.hdec_pic_name ? ` (${me.hdec_pic_name})` : ""}
+                  </Badge>
+                )
+              )}
               <Button variant="outline" size="sm" onClick={clearAll} disabled={isRunning}>
                 Clear all
               </Button>
               <Button
                 size="sm"
                 onClick={runStartImport}
-                disabled={isRunning || pendingImportAfterConflicts || readyCount === 0 || !canImport}
-                title={!canImport ? "관리자 권한이 필요합니다" : ""}
+                disabled={startDisabled || pendingImportAfterConflicts}
+                title={
+                  !canImport
+                    ? "임포트 권한이 없습니다"
+                    : !isAdmin && totalMatched === 0
+                      ? "본인 HDEC PIC로 매칭되는 행이 없습니다"
+                      : ""
+                }
               >
                 {isRunning ? (
                   <>
                     <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Importing…
                   </>
                 ) : (
-                  `Start import (${readyCount})`
+                  `Start import (${totalMatched}행)`
                 )}
               </Button>
             </div>
@@ -413,6 +451,9 @@ function ImportInner() {
                 key={f.id}
                 file={f}
                 isRunning={isRunning}
+                matched={matchedByFile[f.id]?.matched ?? 0}
+                total={matchedByFile[f.id]?.total ?? 0}
+                scopeIsMine={!isAdmin && effectiveScope === "mine"}
                 onRemove={() => removeFile(f.id)}
                 onDisciplineChange={(d) => setFileDiscipline(f.id, d)}
                 onPreview={() => setPreviewFileId(f.id)}
