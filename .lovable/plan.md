@@ -1,35 +1,60 @@
-## 원인
+## 개선 목표
+현재 사이드바 메뉴가 모두 비슷한 `text-sm` / `font-medium` / `text-foreground`로 출력되어, 섹션-모듈-메뉴 간 계층 구분이 모호합니다. **글자 크기, 굵기, 색상을 계층별로 다르게 적용**하여 한눈에 현재 위치와 메뉴 구조를 파악할 수 있도록 시인성을 높입니다.
 
-SM 임포트 컬럼 선택 다이얼로그의 "매핑 필드" 컬럼은 `parseDefectExcel`이 반환하는 `headerToFieldMap`을 그대로 표시합니다. 이 맵은 `toDefectFieldName()`으로 채워지는데, `src/lib/defect-management/parser.ts:490` 에서 다음 규칙이 있습니다.
+## 개선 대상 파일
+- `src/components/layout/AppLayout.tsx`
+- Tailwind v4 토큰만 사용 (`src/styles.css`의 `--muted-foreground`, `--foreground`, `--primary` 등)
 
-```ts
-if (norm === "id") return "";  // "ID"/"id" 헤더는 시스템 컬럼으로 간주해 매핑 제거
-```
+## 세부 디자인 적용안
 
-반면 실제 파싱 시에는 별도 함수 `resolveSourceIssueNoColumn()`이 LetsBuild 원본 파일에서 `"ID"` 헤더를 **`source_issue_no`로 승격**해서 사용합니다 (parser.ts:394, 466-468). 즉:
+### 1. Section Label (섹션 제목: "Outstanding Work", "Close-Out Doc", "Import & Log", "Admin")
+- 글자 크기: `text-[11px]`
+- 굵기: `font-bold`
+- 색상: `text-muted-foreground`
+- 자간: `tracking-wider`
+- 변환: `uppercase`
+- 위쪽 여백: `mt-4` → 섹션 간 그룹감 강화
 
-- 실제 임포트 로직: `ID → source_issue_no` (정상 동작)
-- 다이얼로그 표시용 맵: `ID → ""` → UI에서 `(unmapped)` 로 표시
+### 2. Module Label (접을 수 있는 모듈: "Task Management", "Snag List Management", "As Built Drawing" 등)
+- 글자 크기: `text-sm`
+- 굵기: `font-semibold`
+- 색상: `text-foreground`
+- hover: `hover:text-primary`
+- 아이콘: 모듈 아이콘은 `text-muted-foreground`, hover 시 `text-primary`
 
-그래서 "매핑되어 있는데 언맵드로 보이는" 현상이 발생합니다.
+### 3. Dashboard / Flat Leaf (섹션 직속 메뉴: "Dashboard", "Import", "Import Logs", "Overview" 등)
+- 글자 크기: `text-sm`
+- 굵기: `font-medium`
+- 색상: `text-foreground`
+- hover: `hover:text-primary hover:bg-muted/50`
 
-부차적 문제: `DefectColumnSelect.getRequirement()`는 `field === "source_issue_no"`일 때만 필수 잠금을 거는데, `ID` 헤더는 field가 빈 문자열이라 **필수 컬럼 잠금이 걸리지 않습니다**. admin이 아닌 사용자도 ID를 체크 해제할 수 있어 임포트 실패로 이어질 수 있습니다.
+### 4. Module Sub Leaf (모듈 하위 메뉴: "Task Summary", "Raw Data", "Progress" 등)
+- 글자 크기: `text-sm`
+- 굵기: `font-normal` (상위와의 대비를 위해 Dashboard보다 한 단계 얇게)
+- 색상: `text-foreground/80`
+- hover: `hover:text-foreground hover:bg-muted/50`
 
-## 수정 방안
+### 5. Active 상태 강조
+- active leaf: `text-primary font-semibold bg-primary/10`
+- 왼쪽 액센트 바 추가: `border-l-2 border-primary pl-[calc(0.5rem-2px)]` (기존 `px-2`에서 2px 보정)
+- active sub leaf: 상위와 동일, 배경색만 약하게
 
-1. `parseDefectExcel`이 `headerToFieldMap`을 만들 때, `resolveSourceIssueNoColumn`이 실제로 채택한 컬럼(레터/헤더)을 알아내어 그 헤더의 매핑을 `"source_issue_no"`로 덮어씌운다.
-   - resolver는 이미 `{col, origin}`을 반환하므로, `entries`에서 해당 letter를 찾아 원본 헤더 문자열을 얻고 `headerToFieldMap[thatHeader] = "source_issue_no"`로 설정.
-   - 이렇게 하면 LetsBuild 원본의 "ID", View export의 "ID No", 별칭으로 지정된 헤더 모두 다이얼로그에서 `source_issue_no` (Aconex 배지 포함) 로 표시됨.
+### 6. 모바일/미니 사이드바 호환
+- 접힌 상태에서도 아이콘만 노출되므로 텍스트 스타일 변경은 PC 사이드바에만 영향
+- 모바일 드로어에서도 동일한 계층 스타일 유지
 
-2. 필수 잠금은 (1)이 반영되면 기존 `field === "source_issue_no"` 분기로 자동 잠금됨. 별도 코드 변경 불필요.
+## 구현 범위
+- `renderLeaf()` 함수에 `level` 인자 추가 (`'dashboard' | 'sub'`)
+- `module` 버튼에 module-level 클래스 적용
+- `section` 라벨에 section-level 클래스 적용
+- 기존 shadcn 토큰만 사용, 새로운 CSS 변수는 추가하지 않음
 
-3. 회귀 방지 확인 항목:
-   - Re-import 파일(헤더가 이미 `source_issue_no`인 경우) — resolver 경로 (2) 로 잡히므로 동일하게 정상 표시.
-   - UUID 오염으로 resolver가 컬럼을 거부한 경우 — `sk.col === null`, 덮어쓰기 스킵 → 기존과 동일하게 unmapped.
-   - `excludedFields`에 `source_issue_no`가 이미 있으면 resolver 자체를 건너뛰므로 그대로 unmapped(현재 동작 유지).
+## 검증
+- `bun run typecheck` 또는 `tsgo` 통과
+- 브라우저 프리뷰에서 사이드바 캡처로 각 계층의 크기/굵기/색상 차이 확인
+- active/hover 상태 정상 동작 확인
 
-## 변경 파일
-
-- `src/lib/defect-management/parser.ts` — `parseDefectExcel` 내부, resolver 호출 직후 `headerToFieldMap` 보정 블록 추가 (약 5줄).
-
-다른 파일은 수정하지 않습니다. TM/ABD 임포트는 이 경로를 사용하지 않으므로 영향 없음.
+## 예상 결과
+- Section → Module → Leaf 간 명확한 시각적 계층
+- 현재 메뉴(primary + 배경)가 더 뚜렷하게 구분
+- 모듈과 하위 메뉴의 종속 관계가 한눈에 들어옴
