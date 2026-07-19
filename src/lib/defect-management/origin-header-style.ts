@@ -20,6 +20,12 @@ export const ORIGIN_HEADER_STYLES: Record<Origin, OriginHeaderStyle> = {
     border: "border-b-emerald-300 dark:border-b-emerald-800",
     label: "Aconex",
   },
+  derived: {
+    bg: "bg-amber-50 dark:bg-amber-950/40",
+    stickyBg: "hsl(45 90% 96%)",
+    border: "border-b-amber-300 dark:border-b-amber-800",
+    label: "Derived",
+  },
   system: {
     bg: "",
     // 프로젝트 컬러 토큰은 oklch(...) 리터럴이라 hsl(var(--background)) 는 무효값이 되어
