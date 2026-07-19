@@ -332,15 +332,23 @@ function ColumnSelectDialog({
   onClose: () => void;
   onApply: (excluded: string[]) => void;
 }) {
+  const { data: currentUser } = useCurrentUser();
+  const isAdmin = currentUser?.isAdmin === true;
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const open = !!file;
+  const headers = file?.availableHeaders ?? [];
+  const isRequired = (h: string) => file?.fieldByHeader?.[h] === "doc_ref";
   useEffect(() => {
-    if (open) setExcluded(new Set(file?.excludedHeaders ?? []));
+    if (!open) return;
+    const next = new Set(file?.excludedHeaders ?? []);
+    if (!isAdmin) {
+      for (const h of headers) if (isRequired(h)) next.delete(h);
+    }
+    setExcluded(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, file?.id]);
+  }, [open, file?.id, isAdmin]);
 
   if (!file) return null;
-  const headers = file.availableHeaders ?? [];
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -364,7 +372,9 @@ function ColumnSelectDialog({
                 >
                   <Checkbox
                     checked={isIncluded}
+                    disabled={!isAdmin && isRequired(h)}
                     onCheckedChange={(checked) => {
+                      if (!isAdmin && isRequired(h) && !checked) return;
                       setExcluded((cur) => {
                         const next = new Set(cur);
                         if (checked) next.delete(h);
@@ -386,6 +396,14 @@ function ColumnSelectDialog({
                           className="border-amber-400 text-amber-600 text-[10px]"
                         >
                           unmapped
+                        </Badge>
+                      )}
+                      {isRequired(h) && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-400 text-amber-700 text-[10px]"
+                        >
+                          필수
                         </Badge>
                       )}
                     </div>
