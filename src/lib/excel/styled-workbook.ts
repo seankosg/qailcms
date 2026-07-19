@@ -1140,6 +1140,11 @@ async function applyCfViaExcelJs(
   spec: WorkbookCfSpec,
 ): Promise<ArrayBuffer> {
   const ExcelJS = (await import("exceljs")).default;
+  const colToNum = (letters: string): number => {
+    let n = 0;
+    for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
+    return n;
+  };
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(input);
   const ws = wb.getWorksheet(spec.sheetName);
