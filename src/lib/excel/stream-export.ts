@@ -48,6 +48,19 @@ export interface StreamExportOptions {
   /** Column keys whose ISO timestamp values should be written as Excel date
    *  serials with a yyyy-mm-dd hh:mm number format. */
   datetimeFields?: string[];
+  /** Optional per-column widths (Excel wch character units). */
+  columnWidths?: Record<string, number>;
+  /** Optional per-column numFmt overrides. Applied on top of date/datetime. */
+  numFmtByKey?: Record<string, string>;
+  /** Optional per-cell background fill (ARGB, e.g. "FFFFC7CE"). */
+  cellFillFor?: (
+    key: string,
+    value: unknown,
+    row: Record<string, any>,
+  ) => string | null | undefined;
+  /** Optional per-row background fill (ARGB). Applied to every cell in the row
+   *  unless the cell override returns a value. */
+  rowFillFor?: (row: Record<string, any>) => string | null | undefined;
 }
 
 // ── SHAW-style palette (Calibri) ────────────────────────────────────────────
@@ -163,7 +176,8 @@ export async function streamXlsxExport(opts: StreamExportOptions): Promise<{ cou
 
   // Column widths
   for (let c = 0; c < opts.columns.length; c++) {
-    ws.getColumn(c + 1).width = 18;
+    const k = opts.columns[c].key;
+    ws.getColumn(c + 1).width = opts.columnWidths?.[k] ?? 18;
   }
 
   let offset = 0;
@@ -180,6 +194,7 @@ export async function streamXlsxExport(opts: StreamExportOptions): Promise<{ cou
       const src = opts.transformRow ? opts.transformRow(r) : r;
       dataRowIdx += 1;
       const row = ws.getRow(dataRowIdx);
+      const rowFill = opts.rowFillFor?.(src) ?? null;
       for (let c = 0; c < opts.columns.length; c++) {
         const key = opts.columns[c].key;
         const raw = src[key];
@@ -189,7 +204,7 @@ export async function streamXlsxExport(opts: StreamExportOptions): Promise<{ cou
           const d = isoToDate(raw);
           if (d) {
             cell.value = d;
-            cell.numFmt = DATE_NUMFMT;
+            cell.numFmt = opts.numFmtByKey?.[key] ?? DATE_NUMFMT;
           } else {
             cell.value = normalizeCell(raw) as any;
           }
@@ -197,17 +212,28 @@ export async function streamXlsxExport(opts: StreamExportOptions): Promise<{ cou
           const d = isoTimestampToDate(raw);
           if (d) {
             cell.value = d;
-            cell.numFmt = DATETIME_NUMFMT;
+            cell.numFmt = opts.numFmtByKey?.[key] ?? DATETIME_NUMFMT;
           } else {
             cell.value = normalizeCell(raw) as any;
           }
         } else {
           cell.value = normalizeCell(raw) as any;
+          const fmt = opts.numFmtByKey?.[key];
+          if (fmt) cell.numFmt = fmt;
         }
         if (opts.header) {
           cell.font = { name: FONT_NAME, size: 10, color: { argb: "FF111827" } };
           cell.alignment = { vertical: "middle", horizontal: "left" };
           cell.border = BORDER_DATA;
+        }
+        const cellFill = opts.cellFillFor?.(key, raw, src);
+        const fillArgb = cellFill ?? rowFill;
+        if (fillArgb) {
+          cell.fill = {
+            type: "pattern" as const,
+            pattern: "solid" as const,
+            fgColor: { argb: fillArgb },
+          };
         }
       }
       row.height = 20;
