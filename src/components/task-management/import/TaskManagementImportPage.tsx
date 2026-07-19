@@ -522,6 +522,9 @@ function ImportInner() {
 function FileRow({
   file: f,
   isRunning,
+  matched,
+  total,
+  scopeIsMine,
   onRemove,
   onDisciplineChange,
   onPreview,
@@ -534,6 +537,9 @@ function FileRow({
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
+  matched: number;
+  total: number;
+  scopeIsMine: boolean;
   onRemove: () => void;
   onDisciplineChange: (d: Discipline | null) => void;
   onPreview: () => void;
