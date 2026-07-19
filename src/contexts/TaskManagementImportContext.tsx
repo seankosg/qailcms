@@ -14,7 +14,6 @@ import {
   getTaskExcelHeaders,
   type ParsedTaskRow,
   type SheetHeaderEntry,
-  type TaskTargetField,
 } from "@/lib/task-management/parser";
 import type { Discipline } from "@/lib/task-management/columns";
 import { runRollupAllMains, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
