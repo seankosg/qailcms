@@ -46,7 +46,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { RollupMode } from "@/contexts/TaskManagementImportContext";
-import { ColumnMappingDialog } from "./ColumnMappingDialog";
+import { TaskColumnSelect } from "./TaskColumnSelect";
 import { ConflictDecisionDialog } from "./ConflictDecisionDialog";
 import { Input } from "@/components/ui/input";
 import type { ConflictPolicy } from "@/contexts/TaskManagementImportContext";
@@ -64,6 +64,10 @@ import type { ParsedTaskRow } from "@/lib/task-management/parser";
 const statusBadge: Record<TmFileStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
   parsing: { label: "Parsing", cls: "bg-muted text-muted-foreground" },
+  pending_sheet_selection: {
+    label: "시트 선택 대기",
+    cls: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  },
   ready: { label: "Ready", cls: "bg-primary/10 text-primary" },
   processing: { label: "Processing", cls: "bg-muted text-muted-foreground" },
   done: { label: "Done", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" },
@@ -100,7 +104,8 @@ function ImportInner() {
     clearAll,
     setFileDiscipline,
     setFileDataDateOverride,
-    setFileColumnOverrides,
+    setFileSheet,
+    setFileExcludedHeaders,
     setFileConflictPolicy,
     setFileConflictDecisions,
     clearFileConflictDecisions,
@@ -224,9 +229,11 @@ function ImportInner() {
     [addFiles],
   );
 
-  const readyCount = files.filter((f) => f.status === "ready" && !f.validationError).length;
+  const readyCount = files.filter(
+    (f) => f.status === "ready" && !f.validationError && !!f.discipline,
+  ).length;
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
-  const mappingFile = files.find((f) => f.id === mappingFileId) ?? null;
+  const columnFile = files.find((f) => f.id === mappingFileId) ?? null;
   const conflictFile = files.find((f) => f.id === conflictFileId) ?? null;
 
   return (
@@ -367,7 +374,8 @@ function ImportInner() {
                 onRemove={() => removeFile(f.id)}
                 onDisciplineChange={(d) => setFileDiscipline(f.id, d)}
                 onPreview={() => setPreviewFileId(f.id)}
-                onOpenMapping={() => setMappingFileId(f.id)}
+                onOpenColumnSelect={() => setMappingFileId(f.id)}
+                onSheetChange={(s) => setFileSheet(f.id, s)}
                 onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
                 onPolicyChange={(p) => setFileConflictPolicy(f.id, p)}
                 onRunPreflight={() => runPreflight(f.id)}
@@ -412,15 +420,16 @@ function ImportInner() {
           }}
         />
       )}
-      {mappingFile && mappingFile.sheetHeaders && mappingFile.columnMap && (
-        <ColumnMappingDialog
-          open={!!mappingFile}
+      {columnFile && columnFile.availableHeaders && columnFile.headerToFieldMap && (
+        <TaskColumnSelect
+          fileName={columnFile.name}
+          headers={columnFile.availableHeaders}
+          samples={columnFile.headerSamples ?? {}}
+          headerToFieldMap={columnFile.headerToFieldMap}
+          defaultExcluded={columnFile.excludedHeaders ?? []}
+          open={!!columnFile}
           onClose={() => setMappingFileId(null)}
-          fileName={mappingFile.name}
-          sheetHeaders={mappingFile.sheetHeaders}
-          currentMap={mappingFile.columnMap}
-          defaultMap={mappingFile.columnMap}
-          onApply={(overrides) => setFileColumnOverrides(mappingFile.id, overrides)}
+          onApply={(excluded) => setFileExcludedHeaders(columnFile.id, excluded)}
         />
       )}
     </div>
@@ -433,7 +442,8 @@ function FileRow({
   onRemove,
   onDisciplineChange,
   onPreview,
-  onOpenMapping,
+  onOpenColumnSelect,
+  onSheetChange,
   onDataDateChange,
   onPolicyChange,
   onRunPreflight,
@@ -442,9 +452,10 @@ function FileRow({
   file: TmImportFileItem;
   isRunning: boolean;
   onRemove: () => void;
-  onDisciplineChange: (d: Discipline) => void;
+  onDisciplineChange: (d: Discipline | null) => void;
   onPreview: () => void;
-  onOpenMapping: () => void;
+  onOpenColumnSelect: () => void;
+  onSheetChange: (sheet: string) => void;
   onDataDateChange: (v: string | null) => void;
   onPolicyChange: (p: ConflictPolicy) => void;
   onRunPreflight: () => void;
@@ -467,14 +478,19 @@ function FileRow({
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">공종</span>
               <Select
-                value={f.discipline ?? ""}
-                onValueChange={(v) => onDisciplineChange(v as Discipline)}
+                value={f.discipline ?? "__none"}
+                onValueChange={(v) =>
+                  onDisciplineChange(v === "__none" ? null : (v as Discipline))
+                }
                 disabled={isRunning || f.status === "done" || f.status === "processing"}
               >
                 <SelectTrigger className="h-7 w-[120px] text-xs">
-                  <SelectValue placeholder="선택" />
+                  <SelectValue placeholder="공종 선택" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none" className="text-xs">
+                    선택없음
+                  </SelectItem>
                   {DISCIPLINES.map((d) => (
                     <SelectItem key={d} value={d} className="text-xs">
                       {d}
@@ -483,6 +499,27 @@ function FileRow({
                   ))}
                 </SelectContent>
               </Select>
+              {f.sheetNames && f.sheetNames.length > 1 && (
+                <>
+                  <span className="ml-2 text-xs text-muted-foreground">시트</span>
+                  <Select
+                    value={f.sheetName ?? ""}
+                    onValueChange={(v) => onSheetChange(v)}
+                    disabled={isRunning || f.status === "done" || f.status === "processing"}
+                  >
+                    <SelectTrigger className="h-7 w-[160px] text-xs">
+                      <SelectValue placeholder="시트 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {f.sheetNames.map((s) => (
+                        <SelectItem key={s} value={s} className="text-xs">
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
               <span className="ml-2 text-xs text-muted-foreground">Data Date</span>
               <Input
                 type="date"
@@ -513,12 +550,12 @@ function FileRow({
                   <Eye className="h-3.5 w-3.5" /> Preview
                 </Button>
               )}
-              {f.sheetHeaders && f.columnMap && (
+              {f.availableHeaders && f.availableHeaders.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-7 gap-1.5 text-xs"
-                  onClick={onOpenMapping}
+                  onClick={onOpenColumnSelect}
                   disabled={
                     isRunning ||
                     f.status === "done" ||
@@ -526,13 +563,12 @@ function FileRow({
                     f.status === "parsing"
                   }
                 >
-                  <Columns3 className="h-3.5 w-3.5" /> 컬럼 매핑
-                  {f.columnOverrides &&
-                    Object.keys(f.columnOverrides).length > 0 && (
-                      <span className="text-amber-600">
-                        ({Object.keys(f.columnOverrides).length})
-                      </span>
-                    )}
+                  <Columns3 className="h-3.5 w-3.5" /> 컬럼 선택
+                  {f.excludedHeaders && f.excludedHeaders.length > 0 && (
+                    <span className="text-amber-600">
+                      (제외 {f.excludedHeaders.length})
+                    </span>
+                  )}
                 </Button>
               )}
               <span className="ml-2 text-xs text-muted-foreground">충돌 정책</span>

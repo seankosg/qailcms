@@ -43,6 +43,16 @@ export interface ParseTaskManagementResult {
   columnMap: Record<string, number>;
   /** 시트 행 5 헤더 텍스트 요약 (컬럼 매핑 다이얼로그 표시용) */
   sheetHeaders: SheetHeaderEntry[];
+  /** SM 임포트 스타일: 실제 헤더 텍스트 리스트 (letter fallback 포함) */
+  availableHeaders: string[];
+  /** header 텍스트 → 첫 데이터 행 샘플 값 */
+  headerSamples: Record<string, unknown>;
+  /** header 텍스트 → canonical field key ("" if unmapped) */
+  headerToFieldMap: Record<string, string>;
+  /** 사용자가 제외한 header 리스트 (echo) */
+  excludedHeaders: string[];
+  /** 제외된 canonical field 집합 */
+  excludedFields: Set<string>;
 }
 
 export interface SheetHeaderEntry {
@@ -75,6 +85,53 @@ export const TASK_TARGET_FIELDS = [
   "auto_judgment",
 ] as const;
 export type TaskTargetField = (typeof TASK_TARGET_FIELDS)[number];
+
+/**
+ * canonical alias table. `pick()`가 이 표를 사용하며,
+ * `toTaskFieldName()`는 반대 방향(header text → field)에서 사용한다.
+ */
+const TASK_FIELD_ALIASES: Record<TaskTargetField, string[]> = {
+  task_no: ["No", "no", "Task No", "Task No.", "Task Number", "Task_No", "TaskNo", "번호", "작업번호", "업무번호"],
+  category: ["Category", "카테고리"],
+  plot: ["Plot"],
+  task_name: ["항목", "Item", "Task Name"],
+  risk: ["리스크", "Risk"],
+  sub_task_desc: ["단계별 세부 업무", "세부 업무", "Sub Task", "Subtask", "Sub-task"],
+  hdec_pic_name: ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"],
+  hdec_eng_name: ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"],
+  row_type: ["유형", "Type"],
+  status_manual: ["상태", "Status"],
+  plan_start: ["계획 시작", "Plan Start"],
+  plan_end: ["계획 완료", "Plan End"],
+  plan_days: ["계획 일수", "Plan Days"],
+  actual_start: ["실제 시작", "Actual Start"],
+  actual_progress: ["실적 진도율", "Actual %"],
+  plan_progress: ["계획 진도율", "Plan %"],
+  progress_variance: ["진도차 (%p)", "진도차(%p)"],
+  forecast_end: ["예상 완료", "Forecast End"],
+  slip_days: ["차이 (일)", "차이(일)", "Slip"],
+  auto_judgment: ["자동 판정", "Auto Judgment"],
+};
+
+export function isKnownTaskField(field: string): boolean {
+  return (TASK_TARGET_FIELDS as readonly string[]).includes(field);
+}
+
+/** header 텍스트를 canonical target field 로 매핑. 매치 없으면 "". */
+export function toTaskFieldName(
+  header: string,
+  extraAliases: Record<string, string[]> = {},
+): string {
+  const norm = normalizeHeader(header);
+  if (!norm) return "";
+  for (const field of TASK_TARGET_FIELDS) {
+    const aliases = [...(extraAliases[field] ?? []), ...TASK_FIELD_ALIASES[field]];
+    for (const a of aliases) {
+      if (normalizeHeader(a) === norm) return field;
+    }
+  }
+  return "";
+}
 
 /** Header text → 컬럼 인덱스 (1-based). */
 const CANONICAL_HEADERS: Record<string, number> = {
@@ -232,6 +289,7 @@ function resolveColumn(
 }
 
 function getCell(sheet: XLSX.WorkSheet, row: number, col: number): unknown {
+  if (!col || col < 1) return undefined;
   const addr = XLSX.utils.encode_cell({ r: row - 1, c: col - 1 });
   return sheet[addr]?.v;
 }
@@ -249,30 +307,93 @@ function parentCandidateOf(taskNo: string): string | null {
 
 export interface ParseTaskManagementOptions {
   extraAliases?: Record<string, string[]>;
-  columnOverrides?: Partial<Record<TaskTargetField, number>>;
+  /** 사용자가 체크 해제한 header 텍스트 리스트 */
+  excludedHeaders?: string[];
+  /** 다중 시트 파일에서 사용자가 선택한 시트명 */
+  sheetName?: string;
   /** 사용자가 직접 지정한 Data Date (override). ISO YYYY-MM-DD */
   dataDateOverride?: string | null;
+}
+
+/** 워크북의 시트 이름 리스트. */
+export async function getTaskExcelSheetNames(file: File): Promise<string[]> {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellDates: true, bookSheets: true });
+  return wb.SheetNames ?? [];
+}
+
+/** 지정된 시트(미지정 시 'Gantt' 또는 첫 시트)의 헤더/샘플 반환. */
+export async function getTaskExcelHeaders(
+  file: File,
+  sheetName?: string,
+): Promise<{
+  sheetName: string;
+  headers: string[];
+  entries: SheetHeaderEntry[];
+  sample: Record<string, unknown>;
+} | null> {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const name =
+    sheetName ??
+    wb.SheetNames.find((n) => n.trim().toLowerCase() === "gantt") ??
+    wb.SheetNames[0];
+  const sheet = wb.Sheets[name];
+  if (!sheet) return null;
+  const { headerRow } = buildHeaderMap(sheet);
+  const headerRow0 = headerRow - 1;
+  const dataStart = headerRow + 2;
+  const rangeAll = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S7");
+  const maxCol = Math.min(rangeAll.e.c, 25);
+  const entries: SheetHeaderEntry[] = [];
+  const sample: Record<string, unknown> = {};
+  for (let c = 0; c <= maxCol; c++) {
+    const headerCell = sheet[XLSX.utils.encode_cell({ r: headerRow0, c })];
+    const raw = headerCell?.v;
+    const header = raw == null ? "" : String(raw).replace(/\s+/g, " ").trim();
+    const sampleCell = sheet[XLSX.utils.encode_cell({ r: dataStart - 1, c })];
+    const sampleV = sampleCell?.v;
+    const s = sampleV == null || sampleV === "" ? null : String(sampleV).trim();
+    entries.push({
+      col: c + 1,
+      letter: XLSX.utils.encode_col(c),
+      header,
+      sample: s,
+    });
+    if (s != null) sample[header || XLSX.utils.encode_col(c)] = s;
+  }
+  const headers = entries.map((e) => e.header || e.letter);
+  return { sheetName: name, headers, entries, sample };
 }
 
 export async function parseTaskManagementExcel(
   file: File,
   optsOrAliases?: ParseTaskManagementOptions | Record<string, string[]>,
 ): Promise<ParseTaskManagementResult> {
-  // Backward compat: 두 번째 인자를 aliases 맵으로 넘기던 호출 지원
-  const opts: ParseTaskManagementOptions =
-    optsOrAliases && "extraAliases" in optsOrAliases
-      ? (optsOrAliases as ParseTaskManagementOptions)
-      : optsOrAliases && !("columnOverrides" in (optsOrAliases as any))
-        ? { extraAliases: optsOrAliases as Record<string, string[]> }
-        : {};
+  // 두 번째 인자를 옵션 객체 또는 aliases 맵으로 받는다.
+  const isOptions = (v: unknown): v is ParseTaskManagementOptions =>
+    !!v &&
+    typeof v === "object" &&
+    ("extraAliases" in (v as any) ||
+      "excludedHeaders" in (v as any) ||
+      "sheetName" in (v as any) ||
+      "dataDateOverride" in (v as any));
+  const opts: ParseTaskManagementOptions = isOptions(optsOrAliases)
+    ? (optsOrAliases as ParseTaskManagementOptions)
+    : optsOrAliases
+      ? { extraAliases: optsOrAliases as Record<string, string[]> }
+      : {};
   const extraAliases = opts.extraAliases;
-  const columnOverrides = opts.columnOverrides ?? {};
+  const excludedHeadersInput = opts.excludedHeaders ?? [];
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: true });
 
-  const sheetName = wb.SheetNames.find((n) => n.trim().toLowerCase() === "gantt") ?? wb.SheetNames[0];
+  const sheetName =
+    opts.sheetName ??
+    wb.SheetNames.find((n) => n.trim().toLowerCase() === "gantt") ??
+    wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
-  if (!sheet) throw new Error(`'Gantt' 시트를 찾을 수 없습니다`);
+  if (!sheet) throw new Error(`시트를 찾을 수 없습니다: ${sheetName}`);
 
   const warnings: string[] = [];
 
@@ -363,8 +484,6 @@ export async function parseTaskManagementExcel(
     return [...extra, ...names];
   };
   const pick = (target: TaskTargetField, names: string[], canonical: number): number => {
-    const ov = columnOverrides[target];
-    if (typeof ov === "number" && ov > 0) return ov;
     return resolveColumn(headerMap, withAlias(target, names), canonical, warnings);
   };
 
@@ -390,6 +509,48 @@ export async function parseTaskManagementExcel(
     slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 19),
     auto_judgment: pick("auto_judgment", ["자동 판정"], 20),
   };
+
+  // ---- 사용자가 체크 해제한 헤더 처리 ----
+  // headerToFieldMap: sheetHeaders의 실제 header 텍스트 → canonical field
+  const headerToFieldMap: Record<string, string> = {};
+  for (const e of sheetHeaders) {
+    const key = e.header || e.letter;
+    headerToFieldMap[key] = toTaskFieldName(e.header, extraAliases ?? {});
+  }
+  const availableHeaders = sheetHeaders.map((e) => e.header || e.letter);
+  const headerSamples: Record<string, unknown> = {};
+  for (const e of sheetHeaders) {
+    if (e.sample != null) headerSamples[e.header || e.letter] = e.sample;
+  }
+  const excludedFields = new Set<string>();
+  for (const h of excludedHeadersInput) {
+    const f = headerToFieldMap[h];
+    // task_no는 시스템 필수 — 절대 제외 불가
+    if (f && f !== "task_no") excludedFields.add(f);
+  }
+  // excludedFields에 해당하는 cols 를 0으로 클램프
+  const clampField = (field: TaskTargetField, key: keyof typeof cols) => {
+    if (excludedFields.has(field)) (cols as any)[key] = 0;
+  };
+  clampField("category", "category");
+  clampField("plot", "plot");
+  clampField("task_name", "task_name");
+  clampField("risk", "risk");
+  clampField("sub_task_desc", "sub_task_desc");
+  clampField("hdec_pic_name", "hdec_pic_name");
+  clampField("hdec_eng_name", "hdec_eng_name");
+  clampField("row_type", "row_type");
+  clampField("status_manual", "status_manual");
+  clampField("plan_start", "plan_start");
+  clampField("plan_end", "plan_end");
+  clampField("plan_days", "plan_days");
+  clampField("actual_start", "actual_start");
+  clampField("actual_progress", "actual_progress");
+  clampField("plan_progress", "plan_progress");
+  clampField("progress_variance", "progress_variance");
+  clampField("forecast_end", "forecast_end");
+  clampField("slip_days", "slip_days");
+  clampField("auto_judgment", "auto_judgment");
 
   // 단일 "담당" 컬럼만 있고 HDEC ENG가 별도로 매핑되지 않은 경우 자동 분배
   const singlePicColumn =
@@ -595,5 +756,10 @@ export async function parseTaskManagementExcel(
     disciplineHint,
     columnMap,
     sheetHeaders,
+    availableHeaders,
+    headerSamples,
+    headerToFieldMap,
+    excludedHeaders: excludedHeadersInput,
+    excludedFields,
   };
 }

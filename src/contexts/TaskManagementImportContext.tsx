@@ -10,9 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   parseTaskManagementExcel,
+  getTaskExcelSheetNames,
+  getTaskExcelHeaders,
   type ParsedTaskRow,
   type SheetHeaderEntry,
-  type TaskTargetField,
 } from "@/lib/task-management/parser";
 import type { Discipline } from "@/lib/task-management/columns";
 import { runRollupAllMains, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
@@ -38,6 +39,7 @@ export interface ImportErrorEntry {
 export type TmFileStatus =
   | "pending"
   | "parsing"
+  | "pending_sheet_selection"
   | "ready"
   | "processing"
   | "done"
@@ -58,13 +60,17 @@ export interface TmImportFileItem {
   childCount?: number;
   warnings?: string[];
   sheetName?: string;
-  discipline?: Discipline;
+  sheetNames?: string[];
+  discipline?: Discipline | null;
   disciplineHint?: Discipline | null;
   validationError?: string | null;
   error?: string;
   sheetHeaders?: SheetHeaderEntry[];
   columnMap?: Record<string, number>;
-  columnOverrides?: Partial<Record<TaskTargetField, number>> | null;
+  availableHeaders?: string[];
+  headerSamples?: Record<string, unknown>;
+  headerToFieldMap?: Record<string, string>;
+  excludedHeaders?: string[];
   conflictPolicy?: ConflictPolicy;
   conflictDecisions?: Record<string, ConflictPolicy>;
   preflight?: PreflightSummary | null;
@@ -96,12 +102,10 @@ interface CtxValue {
   addFiles: (files: File[]) => Promise<void>;
   removeFile: (id: string) => void;
   clearAll: () => void;
-  setFileDiscipline: (id: string, d: Discipline) => void;
+  setFileDiscipline: (id: string, d: Discipline | null) => void;
   setFileDataDateOverride: (id: string, date: string | null) => void;
-  setFileColumnOverrides: (
-    id: string,
-    overrides: Partial<Record<TaskTargetField, number>> | null,
-  ) => Promise<void>;
+  setFileSheet: (id: string, sheetName: string) => Promise<void>;
+  setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
   setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
   setFileConflictDecisions: (id: string, decisions: Record<string, ConflictPolicy>) => void;
   clearFileConflictDecisions: (id: string) => void;
@@ -130,20 +134,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
   const [rollupMode, setRollupMode] = useState<RollupMode>("auto");
   const [recalcJudgment, setRecalcJudgment] = useState<boolean>(true);
 
-  const addFiles = useCallback(async (selected: File[]) => {
-    const excel = selected.filter((f) => /\.(xlsx|xls|xlsm)$/i.test(f.name));
-    const next: TmImportFileItem[] = excel.map((file) => ({
-      id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
-      file,
-      name: file.name,
-      size: file.size,
-      status: "parsing",
-      progress: 0,
-    }));
-    setFiles((cur) => [...cur, ...next]);
-
-    // Fetch active header mappings once per batch
-    let extraAliases: Record<string, string[]> = {};
+  const fetchAliases = useCallback(async (): Promise<Record<string, string[]>> => {
+    const out: Record<string, string[]> = {};
     try {
       const { data: mappings } = await (supabase as any)
         .from("task_management_header_mappings")
@@ -152,22 +144,45 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         .eq("is_active", true);
       for (const m of (mappings ?? []) as Array<{ source_header: string; target_field: string }>) {
         if (!m.target_field || !m.source_header) continue;
-        (extraAliases[m.target_field] ||= []).push(m.source_header);
+        (out[m.target_field] ||= []).push(m.source_header);
       }
     } catch {
-      // ignore — fall back to canonical headers
+      // ignore
     }
+    return out;
+  }, []);
 
-    for (const item of next) {
+  const parseAndApply = useCallback(
+    async (
+      id: string,
+      file: File,
+      sheetName?: string,
+      excludedHeaders?: string[],
+    ) => {
+      const extraAliases = await fetchAliases();
+      let currentOverride: string | null = null;
+      setFiles((cur) => {
+        const t = cur.find((f) => f.id === id);
+        currentOverride = t?.dataDateOverride ?? null;
+        return cur.map((f) =>
+          f.id === id ? { ...f, status: "parsing" } : f,
+        );
+      });
       try {
-        const parsed = await parseTaskManagementExcel(item.file, { extraAliases });
+        const parsed = await parseTaskManagementExcel(file, {
+          extraAliases,
+          sheetName,
+          excludedHeaders,
+          dataDateOverride: currentOverride,
+        });
         setFiles((cur) =>
           cur.map((f) => {
-            if (f.id !== item.id) return f;
+            if (f.id !== id) return f;
+            const effective = f.dataDateOverride ?? parsed.dataDate ?? null;
             const validation =
               parsed.rows.length === 0
-                ? "행을 찾지 못했습니다. 'Gantt' 시트와 헤더 위치를 확인하세요."
-                : !parsed.dataDate
+                ? "행을 찾지 못했습니다. 헤더 위치를 확인하세요."
+                : !effective
                   ? "Data Date를 읽지 못했습니다. 아래에서 직접 입력하세요."
                   : null;
             return {
@@ -181,13 +196,81 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               warnings: parsed.warnings,
               sheetName: parsed.sheetName,
               disciplineHint: parsed.disciplineHint,
-              discipline: parsed.disciplineHint ?? "ARCH",
               sheetHeaders: parsed.sheetHeaders,
               columnMap: parsed.columnMap,
+              availableHeaders: parsed.availableHeaders,
+              headerSamples: parsed.headerSamples,
+              headerToFieldMap: parsed.headerToFieldMap,
+              excludedHeaders: parsed.excludedHeaders,
+              // preflight 재실행 필요 — 결과 초기화
+              preflight: null,
+              preflightError: null,
               validationError: validation,
             };
           }),
         );
+      } catch (e) {
+        setFiles((cur) =>
+          cur.map((f) =>
+            f.id === id
+              ? {
+                  ...f,
+                  status: "failed",
+                  error: e instanceof Error ? e.message : "Parse failed",
+                }
+              : f,
+          ),
+        );
+      }
+    },
+    [fetchAliases],
+  );
+
+  const addFiles = useCallback(async (selected: File[]) => {
+    const excel = selected.filter((f) => /\.(xlsx|xls|xlsm)$/i.test(f.name));
+    const next: TmImportFileItem[] = excel.map((file) => ({
+      id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+      file,
+      name: file.name,
+      size: file.size,
+      status: "parsing",
+      progress: 0,
+      discipline: null,
+    }));
+    setFiles((cur) => [...cur, ...next]);
+
+    for (const item of next) {
+      try {
+        const sheetNames = await getTaskExcelSheetNames(item.file);
+        setFiles((cur) =>
+          cur.map((f) => (f.id === item.id ? { ...f, sheetNames } : f)),
+        );
+        if (sheetNames.length > 1) {
+          setFiles((cur) =>
+            cur.map((f) =>
+              f.id === item.id ? { ...f, status: "pending_sheet_selection" } : f,
+            ),
+          );
+          continue;
+        }
+        // 헤더 프리뷰 캡처
+        const headerInfo = await getTaskExcelHeaders(item.file);
+        if (headerInfo) {
+          setFiles((cur) =>
+            cur.map((f) =>
+              f.id === item.id
+                ? {
+                    ...f,
+                    availableHeaders: headerInfo.headers,
+                    headerSamples: headerInfo.sample,
+                    excludedHeaders: [],
+                    sheetName: headerInfo.sheetName,
+                  }
+                : f,
+            ),
+          );
+        }
+        await parseAndApply(item.id, item.file);
       } catch (e) {
         setFiles((cur) =>
           cur.map((f) =>
@@ -202,7 +285,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         );
       }
     }
-  }, []);
+  }, [parseAndApply]);
 
   const removeFile = useCallback(
     (id: string) => setFiles((cur) => cur.filter((f) => f.id !== id)),
@@ -224,7 +307,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     [],
   );
 
-  const setFileDiscipline = useCallback((id: string, d: Discipline) => {
+  const setFileDiscipline = useCallback((id: string, d: Discipline | null) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, discipline: d } : f)));
   }, []);
 
@@ -244,74 +327,41 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     );
   }, []);
 
-  const setFileColumnOverrides = useCallback(
-    async (id: string, overrides: Partial<Record<TaskTargetField, number>> | null) => {
-      // 컬럼 매핑 override 적용 → 재파싱
-      const current = await new Promise<TmImportFileItem | undefined>((resolve) => {
-        setFiles((cur) => {
-          resolve(cur.find((f) => f.id === id));
-          return cur;
-        });
-      });
-      if (!current) return;
-
-      setFiles((cur) =>
-        cur.map((f) =>
-          f.id === id ? { ...f, status: "parsing", columnOverrides: overrides } : f,
-        ),
-      );
-
-      // aliases 재수집
-      let extraAliases: Record<string, string[]> = {};
-      try {
-        const { data: mappings } = await (supabase as any)
-          .from("task_management_header_mappings")
-          .select("source_header, target_field, is_active")
-          .eq("module", "task_management")
-          .eq("is_active", true);
-        for (const m of (mappings ?? []) as Array<{
-          source_header: string;
-          target_field: string;
-        }>) {
-          if (!m.target_field || !m.source_header) continue;
-          (extraAliases[m.target_field] ||= []).push(m.source_header);
-        }
-      } catch {
-        // ignore
-      }
-
-      try {
-        const parsed = await parseTaskManagementExcel(current.file, {
-          extraAliases,
-          columnOverrides: overrides ?? undefined,
-          dataDateOverride: current.dataDateOverride ?? null,
-        });
-        setFiles((cur) =>
-          cur.map((f) => {
-            if (f.id !== id) return f;
-            const effective = f.dataDateOverride ?? parsed.dataDate ?? null;
-            const validation =
-              parsed.rows.length === 0
-                ? "행을 찾지 못했습니다."
-                : !effective
-                  ? "Data Date를 입력하세요."
-                  : null;
-            return {
-              ...f,
-              status: "ready",
-              parsed: parsed.rows,
-              dataDate: parsed.dataDate,
-              dataDateCell: parsed.dataDateCell,
-              parentCount: parsed.parentCount,
-              childCount: parsed.childCount,
-              warnings: parsed.warnings,
-              sheetName: parsed.sheetName,
-              sheetHeaders: parsed.sheetHeaders,
-              columnMap: parsed.columnMap,
-              validationError: validation,
-            };
-          }),
+  const setFileSheet = useCallback(
+    async (id: string, sheetName: string) => {
+      let target: TmImportFileItem | undefined;
+      setFiles((cur) => {
+        target = cur.find((f) => f.id === id);
+        return cur.map((f) =>
+          f.id === id
+            ? {
+                ...f,
+                status: "parsing",
+                sheetName,
+                excludedHeaders: [],
+                availableHeaders: undefined,
+                headerSamples: undefined,
+              }
+            : f,
         );
+      });
+      if (!target) return;
+      try {
+        const headerInfo = await getTaskExcelHeaders(target.file, sheetName);
+        if (headerInfo) {
+          setFiles((cur) =>
+            cur.map((f) =>
+              f.id === id
+                ? {
+                    ...f,
+                    availableHeaders: headerInfo.headers,
+                    headerSamples: headerInfo.sample,
+                  }
+                : f,
+            ),
+          );
+        }
+        await parseAndApply(id, target.file, sheetName);
       } catch (e) {
         setFiles((cur) =>
           cur.map((f) =>
@@ -319,14 +369,29 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               ? {
                   ...f,
                   status: "failed",
-                  error: e instanceof Error ? e.message : "Re-parse failed",
+                  error: e instanceof Error ? e.message : "Sheet parse failed",
                 }
               : f,
           ),
         );
       }
     },
-    [],
+    [parseAndApply],
+  );
+
+  const setFileExcludedHeaders = useCallback(
+    async (id: string, excluded: string[]) => {
+      let target: TmImportFileItem | undefined;
+      setFiles((cur) => {
+        target = cur.find((f) => f.id === id);
+        return cur.map((f) =>
+          f.id === id ? { ...f, status: "parsing", excludedHeaders: excluded } : f,
+        );
+      });
+      if (!target) return;
+      await parseAndApply(id, target.file, target.sheetName, excluded);
+    },
+    [parseAndApply],
   );
 
   const setFileConflictPolicy = useCallback((id: string, policy: ConflictPolicy) => {
@@ -787,12 +852,20 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
   const startImport = useCallback(async () => {
     if (isRunning) return;
+    const missingDiscipline = files.some(
+      (f) => f.status === "ready" && !f.validationError && !f.discipline,
+    );
+    if (missingDiscipline) {
+      toast.error("공종을 선택하세요 (선택없음 상태에서는 임포트할 수 없습니다)");
+      return;
+    }
     const ready = files.filter(
       (f) =>
         f.status === "ready" &&
         f.parsed &&
         f.parsed.length > 0 &&
         !f.validationError &&
+        !!f.discipline &&
         !!(f.dataDateOverride ?? f.dataDate),
     );
     if (ready.length === 0) {
@@ -817,7 +890,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         clearAll,
         setFileDiscipline,
         setFileDataDateOverride,
-        setFileColumnOverrides,
+        setFileSheet,
+        setFileExcludedHeaders,
         setFileConflictPolicy,
         setFileConflictDecisions,
         clearFileConflictDecisions,
