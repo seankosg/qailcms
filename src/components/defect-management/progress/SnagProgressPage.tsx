@@ -441,14 +441,6 @@ export function SnagProgressPage() {
         <Skeleton className="h-96 w-full" />
       ) : (
         <>
-          <SnagPlanVsActualCard
-            cells={cellsQ.data ?? []}
-            buckets={buckets}
-            stages={effectiveStages}
-            today={today}
-            open={scurveOpen}
-            onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
-          />
           <Card>
             <Collapsible open={matrixOpen} onOpenChange={(v) => setSearch({ matrixOpen: v ? 1 : 0 })}>
               <CardHeader className="pb-2">
@@ -479,6 +471,14 @@ export function SnagProgressPage() {
               </CollapsibleContent>
             </Collapsible>
           </Card>
+          <SnagPlanVsActualCard
+            cells={cellsQ.data ?? []}
+            buckets={buckets}
+            stages={effectiveStages}
+            today={today}
+            open={scurveOpen}
+            onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
+          />
         </>
       )}
     </div>
