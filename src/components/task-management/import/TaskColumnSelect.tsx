@@ -5,6 +5,7 @@ import {
 } from "@/components/import/ColumnSelectDialog";
 import { isKnownTaskField } from "@/lib/task-management/parser";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface TaskColumnSelectProps {
   fileName: string;
@@ -44,6 +45,8 @@ export function TaskColumnSelect({
   onApply,
 }: TaskColumnSelectProps) {
   const getLabel = useTmColumnLabel();
+  const { data: currentUser } = useCurrentUser();
+  const isAdmin = currentUser?.isAdmin === true;
 
   const helpers = useMemo<ColumnSelectHelpers>(() => {
     const toField = (h: string) => headerToFieldMap[h] ?? "";
@@ -95,6 +98,7 @@ export function TaskColumnSelect({
       onApply={onApply}
       helpers={helpers}
       presets={presets}
+      lockRequired={!isAdmin}
     />
   );
 }
