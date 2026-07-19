@@ -13,12 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, ChevronRight, History, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, History, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DISCIPLINES, AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
 import type { Discipline } from "@/lib/task-management/columns";
 import { computeJudgment, expectedProgressToday, todayGap, worstJudgment } from "@/lib/task-management/derived";
 import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDrawer";
+import { exportTaskSummary } from "./exportTaskSummary";
+import { toast } from "sonner";
 
 interface Row {
   id: string;
@@ -76,6 +78,7 @@ export function TaskTreePage() {
   const [delayFilter, setDelayFilter] = useState<"off" | "all" | "main" | "sub">("off");
   const [picFilter, setPicFilter] = useState<string>("__all__");
   const [historyTask, setHistoryTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["task-tree", discipline],
@@ -175,6 +178,50 @@ export function TaskTreePage() {
     setExpanded(new Set());
   }
 
+  async function handleExport() {
+    if (filtered.length === 0) {
+      toast.info("내보낼 데이터가 없습니다.");
+      return;
+    }
+    // 현재 필터가 적용된 Main + 그 하위 Sub 로만 sub 맵을 구성해 넘긴다.
+    const filteredSubs = new Map<string, Row[]>();
+    for (const p of filtered) {
+      filteredSubs.set(p.task_no, subsByMain.get(p.task_no) ?? []);
+    }
+    const filtersLabel = [
+      `Discipline=${discipline}`,
+      picFilter === "__all__"
+        ? null
+        : picFilter === "__unassigned__"
+          ? "PIC=(미지정)"
+          : `PIC=${picFilter}`,
+      delayFilter === "off"
+        ? null
+        : delayFilter === "all"
+          ? "지연=All"
+          : delayFilter === "main"
+            ? "지연=Main"
+            : "지연=Sub",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    setExporting(true);
+    try {
+      const n = await exportTaskSummary({
+        discipline,
+        mainTasks: filtered,
+        subsByMain: filteredSubs,
+        filtersLabel,
+        searchLabel: search.trim(),
+      });
+      toast.success(`엑셀 내보내기 완료 — ${n.toLocaleString()} rows`);
+    } catch (e) {
+      toast.error(`내보내기 실패: ${(e as Error).message}`);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -233,6 +280,19 @@ export function TaskTreePage() {
           </Button>
           <Button size="sm" variant="outline" className="h-8" onClick={collapseAll}>
             접기
+          </Button>
+          <Button
+            size="sm"
+            className="h-8"
+            onClick={handleExport}
+            disabled={exporting || isLoading}
+          >
+            {exporting ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="mr-1 h-3.5 w-3.5" />
+            )}
+            Excel
           </Button>
         </div>
       </div>
