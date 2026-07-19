@@ -229,7 +229,9 @@ function ImportInner() {
     [addFiles],
   );
 
-  const readyCount = files.filter((f) => f.status === "ready" && !f.validationError).length;
+  const readyCount = files.filter(
+    (f) => f.status === "ready" && !f.validationError && !!f.discipline,
+  ).length;
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
   const columnFile = files.find((f) => f.id === mappingFileId) ?? null;
   const conflictFile = files.find((f) => f.id === conflictFileId) ?? null;
