@@ -6,7 +6,7 @@ export interface TaskDashboardFilters {
   disciplines: string[];
   plots: string[];
   teams: string[];
-  level: "child" | "parent" | "all";
+  level: "sub" | "main" | "all";
   q: string;
 }
 
