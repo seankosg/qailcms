@@ -1144,15 +1144,46 @@ async function applyCfViaExcelJs(
   await wb.xlsx.load(input);
   const ws = wb.getWorksheet(spec.sheetName);
   if (!ws) return input;
-  // Force Excel to recalculate on open. Our formulas are written without
-  // cached `<v>` values (xlsx-js-style doesn't evaluate). Without this flag,
-  // recent Excel versions show the "we found a problem with some content"
-  // XML load dialog and offer to repair before displaying any values.
+  // Excel의 "일부 콘텐츠에 문제가 있습니다" 복구 대화상자를 방지하기 위한 후처리.
+  // xlsx-js-style 이 병합 영역의 비-좌상단 셀에도 스타일 엔트리를 남기고,
+  // 모든 수식에 캐시값(<v>)이 없는 상태로 fullCalcOnLoad 를 켜면 Excel 이
+  // 스키마 위반으로 판단하고 파일을 자동 복구하려 시도한다.
+  //
+  // 1) 병합 마스킹: 각 병합 영역에서 좌상단이 아닌 셀들의 값/스타일을 제거.
+  //    ExcelJS 는 병합 영역 안쪽 셀도 개별 셀로 유지하므로 명시적으로 정리한다.
+  {
+    const mergesMap = (ws as unknown as {
+      _merges?: Record<string, { model: { top: number; left: number; bottom: number; right: number } }>;
+    })._merges ?? {};
+    for (const key of Object.keys(mergesMap)) {
+      const mm = mergesMap[key]?.model;
+      if (!mm) continue;
+      for (let r = mm.top; r <= mm.bottom; r++) {
+        for (let c = mm.left; c <= mm.right; c++) {
+          if (r === mm.top && c === mm.left) continue;
+          const cell = ws.getCell(r, c);
+          cell.value = null;
+          (cell as unknown as { style: Record<string, unknown> }).style = {};
+        }
+      }
+    }
+  }
+
+  // 2) fullCalcOnLoad 해제. 캐시된 <v> 값이 없어도 Excel 이 조용히
+  //    첫 렌더 후 재계산하도록 두면 복구 다이얼로그가 나오지 않는다.
   try {
     (wb as unknown as { calcProperties: { fullCalcOnLoad: boolean } })
-      .calcProperties.fullCalcOnLoad = true;
+      .calcProperties.fullCalcOnLoad = false;
   } catch {
     /* older exceljs — ignore */
+  }
+
+  // 3) 시트별 defaultRowHeight 명시 (customHeight="1" 짝 맞춤)
+  try {
+    (ws as unknown as { properties: { defaultRowHeight: number } })
+      .properties.defaultRowHeight = 15;
+  } catch {
+    /* ignore */
   }
   spec.rules.forEach((r, idx) => {
     const style: Record<string, unknown> = {};
