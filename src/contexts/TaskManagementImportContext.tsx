@@ -27,6 +27,8 @@ export type RollupMode = "auto" | "keep" | "blank";
 
 export type ConflictPolicy = "overwrite" | "skip" | "renumber";
 
+export type ImportScope = "mine" | "all";
+
 export interface ImportErrorEntry {
   message: string;
   code?: string;
@@ -99,6 +101,13 @@ interface CtxValue {
   setRollupMode: (m: RollupMode) => void;
   recalcJudgment: boolean;
   setRecalcJudgment: (v: boolean) => void;
+  importScope: ImportScope;
+  setImportScope: (s: ImportScope) => void;
+  importerHdecPicName: string | null;
+  setImporterHdecPicName: (v: string | null) => void;
+  isImporterAdmin: boolean;
+  setIsImporterAdmin: (v: boolean) => void;
+  matchesHdecPic: (row: { hdec_pic_name?: string | null }) => boolean;
   addFiles: (files: File[]) => Promise<void>;
   removeFile: (id: string) => void;
   clearAll: () => void;
@@ -133,6 +142,28 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
   const [isRunning, setIsRunning] = useState(false);
   const [rollupMode, setRollupMode] = useState<RollupMode>("auto");
   const [recalcJudgment, setRecalcJudgment] = useState<boolean>(true);
+  const [importScope, setImportScope] = useState<ImportScope>("mine");
+  const [importerHdecPicName, setImporterHdecPicName] = useState<string | null>(null);
+  const [isImporterAdmin, setIsImporterAdmin] = useState<boolean>(false);
+
+  const importerHdecPicRef = useRef<string | null>(null);
+  importerHdecPicRef.current = importerHdecPicName;
+  const importScopeRef = useRef<ImportScope>(importScope);
+  importScopeRef.current = importScope;
+  const isImporterAdminRef = useRef<boolean>(isImporterAdmin);
+  isImporterAdminRef.current = isImporterAdmin;
+
+  const normalizePic = (v?: string | null) => (v ?? "").trim().toLowerCase();
+  const matchesHdecPic = useCallback(
+    (row: { hdec_pic_name?: string | null }) => {
+      const effective = isImporterAdminRef.current ? "all" : importScopeRef.current;
+      if (effective === "all") return true;
+      const me = normalizePic(importerHdecPicRef.current);
+      if (!me) return false;
+      return normalizePic(row.hdec_pic_name) === me;
+    },
+    [],
+  );
 
   const fetchAliases = useCallback(async (): Promise<Record<string, string[]>> => {
     const out: Record<string, string[]> = {};
