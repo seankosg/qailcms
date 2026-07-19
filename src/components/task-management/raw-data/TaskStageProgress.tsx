@@ -196,6 +196,7 @@ export function TaskStageProgressLegend() {
     <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
       <span className="font-medium text-foreground">Legend:</span>
       <span className="inline-flex items-center gap-1"><Pip className={STATE_STYLES.completed} glyph={STATE_GLYPH.completed} label="Completed" /> Completed</span>
+      <span className="inline-flex items-center gap-1"><Pip className={STATE_STYLES.completed_late} glyph={STATE_GLYPH.completed_late} label="Completed (Late)" /> Completed (Late)</span>
       <span className="inline-flex items-center gap-1"><Pip className={STATE_STYLES.wip} glyph={STATE_GLYPH.wip} label="WIP" /> WIP</span>
       <span className="inline-flex items-center gap-1"><Pip className={STATE_STYLES.delay} glyph={STATE_GLYPH.delay} label="Delay" /> Delay</span>
       <span className="inline-flex items-center gap-1"><Pip className={STATE_STYLES.plan} glyph={STATE_GLYPH.plan} label="Plan" /> Plan</span>
