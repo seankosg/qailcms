@@ -1,119 +1,48 @@
-# TM Parent/Child → Main Task / Sub Task 전면 개편
+# TM Raw Data — PIC → HDEC PIC / HDEC ENG 분리 (확정안)
 
-Task Management 도메인 전반에서 사용되는 `parent`/`child`, `부모`/`자식` 표현을 UI·코드·DB 모두에서 **Main Task / Sub Task**로 통일합니다. 한글 UI도 영문 그대로 노출합니다.
+## 확정된 결정
+1. 한 셀에는 한글 또는 영문 하나만 존재 (혼재 없음).
+2. 기존 `pic` 컬럼은 **즉시 제거**.
+3. Gantt export 원본 H열 → 두 컬럼(H `hdec_pic_name`, I `hdec_eng_name`)으로 확장, 이후 letter 재정렬.
 
----
+## 1. DB 마이그레이션
+- `task_management_raw`에 `hdec_pic_name text`, `hdec_eng_name text` 컬럼 추가.
+- 기존 `pic` 값 백필: 한글 정규식(`[가-힣]`) 매칭 → `hdec_pic_name`, 그 외 Latin → `hdec_eng_name`.
+- 인덱스 추가: `idx_tm_raw_hdec_pic (hdec_pic_name)`, `idx_tm_raw_hdec_eng (hdec_eng_name)`.
+- 기존 `idx_task_management_raw_pic` 및 `pic` 컬럼 DROP.
+- `trg_profiles_propagate_to_raw` 트리거 확장: profiles의 `hdec_pic_name` / `hdec_eng_name` 변경 시 `task_management_raw`도 동기화.
 
-## 1. DB 마이그레이션 (supabase--migration)
+## 2. 파서 (`src/lib/task-management/parser.ts`)
+- `ParsedTaskRow.pic` 제거, `hdec_pic_name`, `hdec_eng_name` 추가.
+- `TASK_TARGET_FIELDS` 갱신 (`pic` 제거, 두 필드 추가).
+- 헤더 인식:
+  - `hdec_pic_name` ← "담당", "담당자", "HDEC PIC", "PIC(한글)", "PIC 한글"
+  - `hdec_eng_name` ← "HDEC ENG", "PIC(영문)", "ENG", "Engineer", "PIC (Eng)"
+- 레거시 파일(단일 "담당" 컬럼)의 셀 값에 한글이 있으면 `hdec_pic_name`, 아니면 `hdec_eng_name`로 라우팅.
+- 두 컬럼이 모두 존재하면 각각 그대로 채움.
 
-한 트랜잭션으로 처리하여 앱 다운타임을 최소화합니다.
+## 3. 컬럼/UI
+- `src/lib/task-management/columns.ts`:
+  - `TM_COLUMNS`의 `pic` 항목을 두 개로 교체 (HDEC PIC / HDEC ENG, editable, select 에디터).
+  - `TM_SEARCH_FIELDS`, `TM_EDITABLE_FIELDS`에서 `pic` → 두 신규 필드.
+  - `TM_GANTT_ORIGINAL_ORDER` H→I 이후 letter 전면 재부여(H=hdec_pic_name, I=hdec_eng_name, 이후 J..U로 밀림).
+- `EditCellPopover`: 두 필드는 select editor로 각각 `useMasterOptions("hdec_pic")` / `"hdec_eng"` 옵션 사용.
+- Detail 시트(`TaskDetailPage`), BulkEditBar, ColumnFilters, RawDataPage 등에서 `pic` 참조를 두 필드로 교체.
 
-### 1-1. 컬럼/값 rename
-- `task_management_raw.parent_task_no` → `main_task_no` (컬럼 rename)
-- `task_management_raw.level`의 값 마이그레이션:
-  - `'parent'` → `'main'`
-  - `'child'` → `'sub'`
-- 관련 인덱스가 있으면 새 이름으로 재생성
+## 4. Header Mapping / Field Config 어드민
+- 마이그레이션에서 `task_management_header_mappings`의 기존 `pic` 대상 레코드를 헤더 텍스트에 따라 분리 이관(한글/영문 판별 후 각 필드로 재바인딩).
+- `task_management_field_config`에서 `pic` 항목 삭제, 신규 두 필드 등록(라벨/노출/정렬).
 
-### 1-2. RPC 재작성
-- `allocate_task_no(_discipline, _parent_task_no)` → `allocate_task_no(_discipline, _main_task_no)` (내부 로직에서 참조하는 컬럼명/level 값 갱신)
-- `rollup_task_all_parents(_discipline)` → `rollup_task_all_mains(_discipline)`
-- 개별 롤업 함수(`rollup_task_parent` 존재 여부 확인 후) → `rollup_task_main`
-- 함수 내부의 `level='parent'`/`'child'` 리터럴 및 `parent_task_no` 참조 모두 신규 명칭으로 교체
-- 이전 함수는 DROP (호출부는 이번 릴리스에서 모두 교체됨)
+## 5. Import Preflight & 마스터 매칭
+- `src/lib/task-management/import-preflight.functions.ts` 및 fuzzy master match: `pic` 검증을 두 필드로 분리 — 한글은 `hdec_pic_master`와, 영문은 `hdec_eng_master`와 유사 매칭.
+- `MasterMappingSection` UI에 HDEC PIC / HDEC ENG 두 카테고리 표시.
 
-### 1-3. 타 도메인 영향 없음
-`abd_*`, `defect_*`, `spare_*` 는 이 개편과 무관.
+## 6. Rollup / Derived / 기타
+- `rollup.functions.ts`, `derived.ts`, filters, bulk-actions 등에서 `pic` 참조 전면 교체.
+- Export/Excel 생성기(`stream-export.ts`, `styled-workbook.ts`): 헤더 라벨 및 셀 매핑 갱신(H "담당(한글)", I "담당(영문)").
+- Task Tree, Dashboard 위젯(BehindScheduleTable, CriticalWatchlist 등)의 담당자 표시는 `hdec_pic_name ?? hdec_eng_name`로 폴백.
 
----
-
-## 2. TypeScript 코드 개편
-
-### 2-1. 타입/인터페이스
-- `src/lib/task-management/parser.ts`
-  - `ParsedRow.parent_task_no` → `main_task_no`
-  - `ParsedRow.level: "parent" | "child"` → `"main" | "sub"`
-  - `parentCount` / `childCount` → `mainTaskCount` / `subTaskCount`
-  - 관련 함수(`parentCandidate*`) 이름/주석 정리
-- `src/lib/task-management/columns.ts` — level enum 관련 상수/헬퍼 갱신
-- `src/lib/task-management/derived.ts` — level 분기 재검토
-
-### 2-2. Server functions
-- `src/lib/task-management/rollup.functions.ts`
-  - `runRollupAllParents` → `runRollupAllMains` (RPC 이름 함께 변경)
-  - `runRollupParent` → `runRollupMain`
-  - 입력 스키마의 `parent_task_no` → `main_task_no`
-- `src/lib/task-management/hierarchy.functions.ts`
-  - `addChildTask` → `addSubTask` (파일명 및 export 명칭)
-  - Zod 스키마: `parent_task_no` → `main_task_no`
-  - `allocate_task_no` RPC 인자 `_parent_task_no` → `_main_task_no`
-  - `level: "parent"` / `"child"` 리터럴 → `"main"` / `"sub"`
-  - 에러 메시지 한글 문구: "부모/자식/하위" → "Main Task/Sub Task"
-- `src/lib/task-management/import-preflight.functions.ts`
-  - 스키마·응답 필드의 `parent_task_no` → `main_task_no`
-  - `parent_mismatch` conflict reason은 **DB에 저장되지 않으므로** `main_task_mismatch`로 변경
-
-### 2-3. Import context
-- `src/contexts/TaskManagementImportContext.tsx`
-  - `parentCount`/`childCount` → `mainTaskCount`/`subTaskCount`
-  - level 비교 리터럴 전면 교체
-  - 페이로드의 `parent_task_no` → `main_task_no`
-  - 주석의 "parent/child" 표현 정리
-
-### 2-4. Hooks
-- `src/hooks/useTaskDashboardData.ts` — level 리터럴, 컬럼명 교체
-
-### 2-5. UI 컴포넌트 (영문 라벨 사용)
-- `src/components/task-management/raw-data/AddChildTaskDialog.tsx`
-  - 파일명: `AddSubTaskDialog.tsx`로 rename
-  - 컴포넌트/타입/props: `AddChildTaskDialog`→`AddSubTaskDialog`, `ParentSeed`→`MainTaskSeed`
-  - 다이얼로그 제목/라벨/토스트: "하위 Task 추가"→"Add Sub Task", "→ {parent_task_no}"→"→ Main Task: {…}" 등 영문화
-  - import 사이트 갱신
-- `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`
-  - 트리 표시 배지·툴팁 "P/C" → "Main/Sub"
-  - 열 헤더의 "Parent" 표기 → "Main Task No"
-- `src/components/task-management/tree/TaskTreePage.tsx`
-  - `parents`/`childrenByParent` → `mainTasks`/`subTasksByMain`
-  - "자식 N", "표시할 parent가 없습니다" → "Sub Task N", "No Main Task to display"
-- `src/components/task-management/detail/TaskDetailPage.tsx`
-  - `isParent` → `isMain`; 표시 라벨 영문화
-- `src/components/task-management/dashboard/TaskDashboardPage.tsx`
-  - `level: "child"` 리터럴 → `"sub"`
-- `src/components/task-management/import/TaskManagementImportPage.tsx`
-  - "Parent 행 진도율 처리", "Parent(요약) 행 …", "P/C" 표기 → **Main Task 행 진도율 처리 / Sub Task 요약 …** 등 UI 문구 전면 교체 (rollup 모드 선택 카피 포함)
-  - `Parent ${count} / Child ${count}` → `Main ${mainTaskCount} / Sub ${subTaskCount}`
-- `src/components/task-management/import/ConflictDecisionDialog.tsx`, `ConflictReviewDialog.tsx`
-  - "상위 태스크 불일치"·"DB parent"·"파일 parent" → "Main Task 불일치"·"DB Main Task"·"파일 Main Task"
-  - `parent_mismatch` 매핑 키를 `main_task_mismatch`로 교체
-- `src/routes/_authenticated/admin/task-thresholds.tsx` — 문구 정리
-
-### 2-6. 라우트
-- Add Sub Task 다이얼로그 rename에 맞춰 lazy import 경로만 조정 (라우트 URL 변경 없음)
-
----
-
-## 3. Rollup 옵션 문구 (Import Page)
-
-기존 3가지 옵션 카피를 영문 용어로 재작성:
-- "Auto: Sub Task duration 가중평균으로 Main Task 진도율/기간 자동 재계산"
-- "Manual: 엑셀의 Main Task 값 유지, 이후 롤업 함수로 재계산"
-- "Ignore: 엑셀 Main Task 값 그대로 저장, 롤업 미실행"
-
----
-
-## 4. 검증
-
-1. `bun tsgo` — 타입 에러 0
-2. `TaskManagementImportPage`에서 임포트 → Preflight 요약 표기 확인
-3. Raw Data에서 Add Sub Task 다이얼로그 → `allocate_task_no` 호출 성공, 신규 행 `level='sub'`, `main_task_no` 채워짐 확인
-4. `runRollupAllMains` 호출 → RPC 성공
-5. Tree 페이지에서 Main/Sub 그룹핑 정상 확인
-6. 화면상 "Parent"/"Child"/"부모"/"자식" 텍스트가 TM 전 페이지에서 0건
-
----
-
-## 기술 세부 (참고)
-
-- DB 마이그레이션 순서: (a) 신규 RPC 생성 → (b) 앱 배포 (없음, 하나의 릴리스에서 처리) → 이번엔 앱과 DB를 같은 릴리스에서 교체하므로, migration 후 즉시 코드 반영 필요. `types.ts`는 마이그레이션 승인 후 자동 재생성됨.
-- `parent_mismatch` reason은 DB 저장 값이 아니라 서버 응답 문자열이므로 자유롭게 rename 가능.
-- 다른 도메인(SM, ABD, Spare Part)의 `parent`/`child` 용어(예: `React.ReactNode` children props, 함수 파라미터 `children`)는 **React 표준 용어**이므로 손대지 않음.
+## 7. 검증
+- 마이그레이션 후 백필 결과 카운트 확인.
+- 샘플 파일 재임포트 → 두 컬럼에 올바르게 분배되는지 확인.
+- Raw Data 페이지, Detail, BulkEdit, Export 각각 회귀 테스트.
