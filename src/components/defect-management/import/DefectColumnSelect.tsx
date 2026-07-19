@@ -5,6 +5,7 @@ import {
 } from "@/components/import/ColumnSelectDialog";
 import { useDefectFieldHelpers } from "@/hooks/useDefectFieldConfig";
 import { isKnownDefectField } from "@/lib/defect-management/parser";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface DefectColumnSelectProps {
   fileName: string;
@@ -66,6 +67,8 @@ export function DefectColumnSelect({
 }: DefectColumnSelectProps) {
   const { isFieldRequired, getLabel, getSourceLabel, getSourceOrigin } =
     useDefectFieldHelpers();
+  const { data: currentUser } = useCurrentUser();
+  const isAdmin = currentUser?.isAdmin === true;
 
   const helpers = useMemo<ColumnSelectHelpers>(() => {
     const toField = (h: string) => headerToFieldMap[h] ?? "";
@@ -181,6 +184,7 @@ export function DefectColumnSelect({
       onApply={onApply}
       helpers={helpers}
       presets={presets}
+      lockRequired={!isAdmin}
     />
   );
 }
