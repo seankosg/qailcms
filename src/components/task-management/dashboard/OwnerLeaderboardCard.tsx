@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,6 +16,7 @@ interface Props {
   asOfDate: string;
   defaultDim?: OwnerDim;
   onDimChange?: (dim: OwnerDim) => void;
+  onOwnerClick?: (dim: OwnerDim, key: string, row: OwnerLeaderboardRow) => void;
 }
 
 const DIM_LABEL: Record<OwnerDim, string> = {
@@ -25,16 +25,9 @@ const DIM_LABEL: Record<OwnerDim, string> = {
   hdec_eng_name: "HDEC ENG",
 };
 
-const DIM_PARAM: Record<OwnerDim, string> = {
-  team: "team",
-  hdec_pic_name: "hdec_pic_name",
-  hdec_eng_name: "hdec_eng_name",
-};
-
-export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_name", onDimChange }: Props) {
+export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_name", onDimChange, onOwnerClick }: Props) {
   const [dim, setDim] = useState<OwnerDim>(defaultDim);
   const [q, setQ] = useState("");
-  const navigate = useNavigate();
 
   const rows = useMemo(() => computeOwnerLeaderboard(items, asOfDate, dim), [items, asOfDate, dim]);
   const filtered = useMemo(() => {
@@ -52,10 +45,7 @@ export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_n
 
   const clickRow = (r: OwnerLeaderboardRow) => {
     if (r.key === "(미지정)") return;
-    navigate({
-      to: "/closure/task-management/raw-data",
-      search: { [DIM_PARAM[dim]]: r.key, source: "dashboard" } as any,
-    });
+    onOwnerClick?.(dim, r.key, r);
   };
 
   return (

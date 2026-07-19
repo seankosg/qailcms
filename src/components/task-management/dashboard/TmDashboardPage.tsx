@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft, Gauge, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,13 +14,18 @@ import {
   todayIso,
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
-import { computeDelayTopN, type OwnerDim } from "@/lib/task-management/delay-utils";
+import {
+  computeDelayTopN,
+  type OwnerDim,
+  type OwnerLeaderboardRow,
+} from "@/lib/task-management/delay-utils";
 import { KpiStrip } from "./KpiStrip";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { DelayTopTable } from "./DelayTopTable";
 import { OwnerLeaderboardCard } from "./OwnerLeaderboardCard";
 import { WeeklyDelayTrend } from "./WeeklyDelayTrend";
 import { JudgmentStageBreakdown } from "./JudgmentStageBreakdown";
+import { OwnerDetailDialog } from "./OwnerDetailDialog";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/dashboard");
 
@@ -63,6 +68,12 @@ export function TmDashboardPage() {
   const asOfLabel = search.asofMode === "dataDate" ? "Data Date" : "Today";
 
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
+
+  const [ownerDetail, setOwnerDetail] = useState<{
+    dim: OwnerDim;
+    key: string;
+    row: OwnerLeaderboardRow;
+  } | null>(null);
 
   // Facet options — derived from ALL loaded items (respect discipline/plot filter for owners).
   const teamOptions = useMemo(() => uniqSorted(items, "team"), [items]);
@@ -223,6 +234,7 @@ export function TmDashboardPage() {
               asOfDate={asOfDate}
               defaultDim={ownerDim}
               onDimChange={(dim) => patch({ ownerDim: dim })}
+              onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
             />
           </div>
 
@@ -233,6 +245,16 @@ export function TmDashboardPage() {
           <JudgmentStageBreakdown items={scopedItems} asOfDate={asOfDate} />
         </>
       )}
+
+      <OwnerDetailDialog
+        open={ownerDetail !== null}
+        onOpenChange={(o) => !o && setOwnerDetail(null)}
+        dim={ownerDetail?.dim ?? ownerDim}
+        ownerKey={ownerDetail?.key ?? ""}
+        row={ownerDetail?.row ?? null}
+        items={scopedItems}
+        asOfDate={asOfDate}
+      />
     </div>
   );
 }
