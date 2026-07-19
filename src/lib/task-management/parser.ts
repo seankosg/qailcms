@@ -11,7 +11,8 @@ export interface ParsedTaskRow {
   task_name: string | null;
   risk: string | null;
   sub_task_desc: string | null;
-  pic: string | null;
+  hdec_pic_name: string | null;
+  hdec_eng_name: string | null;
   row_type: string | null;
   /** 원본 파일의 Team/TEAM 컬럼 값 (없으면 null; import 시 discipline 폴백) */
   team: string | null;
@@ -58,7 +59,8 @@ export const TASK_TARGET_FIELDS = [
   "task_name",
   "risk",
   "sub_task_desc",
-  "pic",
+  "hdec_pic_name",
+  "hdec_eng_name",
   "row_type",
   "status_manual",
   "plan_start",
@@ -83,20 +85,22 @@ const CANONICAL_HEADERS: Record<string, number> = {
   "리스크": 5,
   "단계별 세부 업무": 6,
   "담당": 7,
-  "유형": 8,
-  "상태": 9,
-  "계획 시작": 10,
-  "계획 완료": 11,
-  "계획 일수": 12,
-  "실제 시작": 13,
-  "실적 진도율": 14,
-  "계획 진도율": 15,
-  "진도차 (%p)": 16,
-  "진도차(%p)": 16,
-  "예상 완료": 17,
-  "차이 (일)": 18,
-  "차이(일)": 18,
-  "자동 판정": 19,
+  "hdec pic": 7,
+  "hdec eng": 8,
+  "유형": 9,
+  "상태": 10,
+  "계획 시작": 11,
+  "계획 완료": 12,
+  "계획 일수": 13,
+  "실제 시작": 14,
+  "실적 진도율": 15,
+  "계획 진도율": 16,
+  "진도차 (%p)": 17,
+  "진도차(%p)": 17,
+  "예상 완료": 18,
+  "차이 (일)": 19,
+  "차이(일)": 19,
+  "자동 판정": 20,
 };
 
 function normalizeHeader(v: unknown): string {
