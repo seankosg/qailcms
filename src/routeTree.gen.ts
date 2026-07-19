@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
 import { Route as AuthenticatedOutstandingDashboardRouteImport } from './routes/_authenticated/outstanding/dashboard'
 import { Route as AuthenticatedImportLogLogsRouteImport } from './routes/_authenticated/import-log/logs'
 import { Route as AuthenticatedImportLogImportRouteImport } from './routes/_authenticated/import-log/import'
@@ -79,6 +80,11 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
+} as any)
+const ApiPublicVersionRoute = ApiPublicVersionRouteImport.update({
+  id: '/api/public/version',
+  path: '/api/public/version',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedOutstandingDashboardRoute =
   AuthenticatedOutstandingDashboardRouteImport.update({
@@ -303,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
   '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
+  '/api/public/version': typeof ApiPublicVersionRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/closure/abd/dashboard': typeof AuthenticatedClosureAbdDashboardRoute
   '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
@@ -344,6 +351,7 @@ export interface FileRoutesByTo {
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
   '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
+  '/api/public/version': typeof ApiPublicVersionRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/closure/abd/dashboard': typeof AuthenticatedClosureAbdDashboardRoute
   '/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
@@ -388,6 +396,7 @@ export interface FileRoutesById {
   '/_authenticated/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/_authenticated/import-log/logs': typeof AuthenticatedImportLogLogsRoute
   '/_authenticated/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
+  '/api/public/version': typeof ApiPublicVersionRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/closure/abd/dashboard': typeof AuthenticatedClosureAbdDashboardRoute
   '/_authenticated/closure/abd/import': typeof AuthenticatedClosureAbdImportRouteWithChildren
@@ -432,6 +441,7 @@ export interface FileRouteTypes {
     | '/import-log/import'
     | '/import-log/logs'
     | '/outstanding/dashboard'
+    | '/api/public/version'
     | '/admin/'
     | '/closure/abd/dashboard'
     | '/closure/abd/import'
@@ -473,6 +483,7 @@ export interface FileRouteTypes {
     | '/import-log/import'
     | '/import-log/logs'
     | '/outstanding/dashboard'
+    | '/api/public/version'
     | '/admin'
     | '/closure/abd/dashboard'
     | '/closure/abd/import'
@@ -516,6 +527,7 @@ export interface FileRouteTypes {
     | '/_authenticated/import-log/import'
     | '/_authenticated/import-log/logs'
     | '/_authenticated/outstanding/dashboard'
+    | '/api/public/version'
     | '/_authenticated/admin/'
     | '/_authenticated/closure/abd/dashboard'
     | '/_authenticated/closure/abd/import'
@@ -551,6 +563,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
+  ApiPublicVersionRoute: typeof ApiPublicVersionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -596,6 +609,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/api/public/version': {
+      id: '/api/public/version'
+      path: '/api/public/version'
+      fullPath: '/api/public/version'
+      preLoaderRoute: typeof ApiPublicVersionRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/outstanding/dashboard': {
       id: '/_authenticated/outstanding/dashboard'
@@ -994,17 +1014,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ChangePasswordRoute: ChangePasswordRoute,
+  ApiPublicVersionRoute: ApiPublicVersionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

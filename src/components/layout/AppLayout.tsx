@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useQueryClient } from "@tanstack/react-query";
 import { TopBrandHeader } from "@/components/layout/TopBrandHeader";
+import { UpdateAvailableBanner } from "@/components/layout/UpdateAvailableBanner";
 
 type NavLeaf = {
   to?: string;
@@ -295,6 +296,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBrandHeader onMobileMenu={() => setMobileOpen(true)} />
+        <UpdateAvailableBanner />
         <main className="flex-1 overflow-x-hidden p-4 lg:p-6">{children}</main>
       </div>
     </div>
