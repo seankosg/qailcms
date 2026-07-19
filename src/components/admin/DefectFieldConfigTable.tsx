@@ -35,10 +35,11 @@ type DraftMap = Record<
 >;
 
 const GROUP_OPTIONS = Object.keys(GROUP_HEADER_BG);
-const ORIGIN_OPTIONS: Array<"hdec" | "aconex" | "system"> = [
+const ORIGIN_OPTIONS: Array<"hdec" | "aconex" | "system" | "derived"> = [
   "hdec",
   "aconex",
   "system",
+  "derived",
 ];
 
 export function DefectFieldConfigTable() {
@@ -229,7 +230,7 @@ export function DefectFieldConfigTable() {
                         value={r.origin ?? ""}
                         onValueChange={(v) =>
                           setDraft(r.id, {
-                            origin: v as "hdec" | "aconex" | "system",
+                            origin: v as "hdec" | "aconex" | "system" | "derived",
                           })
                         }
                       >

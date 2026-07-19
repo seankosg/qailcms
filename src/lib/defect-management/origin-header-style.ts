@@ -1,4 +1,4 @@
-export type Origin = "hdec" | "aconex" | "system";
+export type Origin = "hdec" | "aconex" | "system" | "derived";
 
 export interface OriginHeaderStyle {
   bg: string;
@@ -19,6 +19,12 @@ export const ORIGIN_HEADER_STYLES: Record<Origin, OriginHeaderStyle> = {
     stickyBg: "hsl(150 80% 96%)",
     border: "border-b-emerald-300 dark:border-b-emerald-800",
     label: "Aconex",
+  },
+  derived: {
+    bg: "bg-amber-50 dark:bg-amber-950/40",
+    stickyBg: "hsl(45 90% 96%)",
+    border: "border-b-amber-300 dark:border-b-amber-800",
+    label: "Derived",
   },
   system: {
     bg: "",
