@@ -18,6 +18,7 @@ import {
   type TaskManagementHeaderMappingRow,
 } from "@/hooks/useTaskManagementHeaderMappings";
 import { useTaskManagementFieldConfig } from "@/hooks/useTaskManagementFieldConfig";
+import { TM_AUTO_CALCULATED } from "@/lib/task-management/columns";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { EditableSourceHeaderCell } from "@/components/admin/EditableSourceHeaderCell";
 import { EditableTargetFieldCell } from "@/components/admin/EditableTargetFieldCell";
@@ -207,6 +208,7 @@ export function TmHeaderMappingTable() {
                     />
                   </TableCell>
                   <TableCell className="text-xs">
+                    <div className="flex items-center gap-2">
                     <EditableTargetFieldCell
                       row={r}
                       rows={rows}
@@ -215,6 +217,12 @@ export function TmHeaderMappingTable() {
                       onSave={(v) => saveTargetField(r, v)}
                       canEdit={canEdit}
                     />
+                    {TM_AUTO_CALCULATED.includes(r.target_field) && (
+                      <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-300 whitespace-nowrap">
+                        자동계산(무시됨)
+                      </Badge>
+                    )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {r.is_custom ? (
