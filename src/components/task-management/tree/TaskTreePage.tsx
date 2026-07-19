@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ChevronDown, ChevronRight, History, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DISCIPLINES, AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
@@ -66,7 +73,8 @@ export function TaskTreePage() {
   const [discipline, setDiscipline] = useState<Discipline>("ARCH");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [behindOnly, setBehindOnly] = useState(false);
+  const [delayFilter, setDelayFilter] = useState<"off" | "all" | "main" | "sub">("off");
+  const [picFilter, setPicFilter] = useState<string>("__all__");
   const [historyTask, setHistoryTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
 
   const { data = [], isLoading } = useQuery({
@@ -99,13 +107,48 @@ export function TaskTreePage() {
     return { mainTasks, subsByMain };
   }, [data]);
 
+  const picOptions = useMemo(() => {
+    const names = new Set<string>();
+    let hasUnassigned = false;
+    for (const r of data) {
+      const v = (r.hdec_pic_name ?? "").trim();
+      if (v) names.add(v);
+      else hasUnassigned = true;
+    }
+    return {
+      names: Array.from(names).sort((a, b) => a.localeCompare(b, "ko")),
+      hasUnassigned,
+    };
+  }, [data]);
+
+  useEffect(() => {
+    if (picFilter === "__all__" || picFilter === "__unassigned__") return;
+    if (!picOptions.names.includes(picFilter)) setPicFilter("__all__");
+  }, [picFilter, picOptions.names]);
+
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
-      if (behindOnly) {
-        const anyBehind = [p, ...kids].some((r) => todayGap(r) < -0.05);
-        if (!anyBehind) return false;
+      if (delayFilter !== "off") {
+        const mainBehind = todayGap(p) < -0.05;
+        const subBehind = kids.some((r) => todayGap(r) < -0.05);
+        if (delayFilter === "all" && !(mainBehind || subBehind)) return false;
+        if (delayFilter === "main" && !mainBehind) return false;
+        if (delayFilter === "sub" && !subBehind) return false;
+      }
+      if (picFilter !== "__all__") {
+        if (picFilter === "__unassigned__") {
+          const anyUnassigned = [p, ...kids].some(
+            (r) => !((r.hdec_pic_name ?? "").trim()),
+          );
+          if (!anyUnassigned) return false;
+        } else {
+          const anyMatch = [p, ...kids].some(
+            (r) => (r.hdec_pic_name ?? "").trim() === picFilter,
+          );
+          if (!anyMatch) return false;
+        }
       }
       if (!q) return true;
       const hay = [p.task_no, p.task_name, ...kids.flatMap((k) => [k.task_no, k.task_name, k.sub_task_desc, k.hdec_pic_name, k.hdec_eng_name])]
@@ -114,7 +157,7 @@ export function TaskTreePage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [mainTasks, subsByMain, q, behindOnly]);
+  }, [mainTasks, subsByMain, q, delayFilter, picFilter]);
 
   function toggle(taskNo: string) {
     setExpanded((cur) => {
@@ -145,7 +188,37 @@ export function TaskTreePage() {
             ))}
           </TabsList>
         </Tabs>
+        <Select value={picFilter} onValueChange={setPicFilter}>
+          <SelectTrigger className="h-8 w-40">
+            <SelectValue placeholder="HDEC PIC" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">모든 HDEC PIC</SelectItem>
+            {picOptions.hasUnassigned && (
+              <SelectItem value="__unassigned__">(미지정)</SelectItem>
+            )}
+            {picOptions.names.map((n) => (
+              <SelectItem key={n} value={n}>
+                {n}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Select
+            value={delayFilter}
+            onValueChange={(v) => setDelayFilter(v as typeof delayFilter)}
+          >
+            <SelectTrigger className="h-8 w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="off">지연 필터 없음</SelectItem>
+              <SelectItem value="all">All 지연</SelectItem>
+              <SelectItem value="main">Main Task 지연</SelectItem>
+              <SelectItem value="sub">Sub Task 지연</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -155,14 +228,6 @@ export function TaskTreePage() {
               className="h-8 w-56 pl-7"
             />
           </div>
-          <Button
-            size="sm"
-            variant={behindOnly ? "default" : "outline"}
-            className="h-8"
-            onClick={() => setBehindOnly((v) => !v)}
-          >
-            지연만
-          </Button>
           <Button size="sm" variant="outline" className="h-8" onClick={expandAll}>
             펴기
           </Button>
