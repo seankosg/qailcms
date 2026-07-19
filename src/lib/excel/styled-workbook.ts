@@ -1144,15 +1144,50 @@ async function applyCfViaExcelJs(
   await wb.xlsx.load(input);
   const ws = wb.getWorksheet(spec.sheetName);
   if (!ws) return input;
-  // Force Excel to recalculate on open. Our formulas are written without
-  // cached `<v>` values (xlsx-js-style doesn't evaluate). Without this flag,
-  // recent Excel versions show the "we found a problem with some content"
-  // XML load dialog and offer to repair before displaying any values.
+  // Excel의 "일부 콘텐츠에 문제가 있습니다" 복구 대화상자를 방지하기 위한 후처리.
+  // xlsx-js-style 이 병합 영역의 비-좌상단 셀에도 스타일 엔트리를 남기고,
+  // 모든 수식에 캐시값(<v>)이 없는 상태로 fullCalcOnLoad 를 켜면 Excel 이
+  // 스키마 위반으로 판단하고 파일을 자동 복구하려 시도한다.
+  //
+  // 1) 병합 마스킹: 각 병합 영역에서 좌상단이 아닌 셀들의 값/스타일을 제거.
+  //    ExcelJS 는 병합 영역 안쪽 셀도 개별 셀로 유지하므로 명시적으로 정리한다.
+  for (const rangeRef of Object.keys(
+    (ws as unknown as { _merges?: Record<string, unknown> })._merges ?? {},
+  )) {
+    // rangeRef 는 "A1:ABW1" 같은 A1 문자열. ExcelJS 내부 형식 대응.
+    const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(rangeRef);
+    if (!m) continue;
+    const c1 = colToNum(m[1]);
+    const r1 = Number(m[2]);
+    const c2 = colToNum(m[3]);
+    const r2 = Number(m[4]);
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        if (r === r1 && c === c1) continue;
+        const cell = ws.getCell(r, c);
+        // value 를 null 로 두고 style 도 초기화 → 병합 안쪽은 완전 비움
+        cell.value = null;
+        // ExcelJS 는 style 을 얕은 프록시로 관리. 개별 속성만 리셋.
+        (cell as unknown as { style: Record<string, unknown> }).style = {};
+      }
+    }
+  }
+
+  // 2) fullCalcOnLoad 해제. 캐시된 <v> 값이 없어도 Excel 이 조용히
+  //    첫 렌더 후 재계산하도록 두면 복구 다이얼로그가 나오지 않는다.
   try {
     (wb as unknown as { calcProperties: { fullCalcOnLoad: boolean } })
-      .calcProperties.fullCalcOnLoad = true;
+      .calcProperties.fullCalcOnLoad = false;
   } catch {
     /* older exceljs — ignore */
+  }
+
+  // 3) 시트별 defaultRowHeight 명시 (customHeight="1" 짝 맞춤)
+  try {
+    (ws as unknown as { properties: { defaultRowHeight: number } })
+      .properties.defaultRowHeight = 15;
+  } catch {
+    /* ignore */
   }
   spec.rules.forEach((r, idx) => {
     const style: Record<string, unknown> = {};
