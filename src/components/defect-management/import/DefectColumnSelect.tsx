@@ -109,6 +109,21 @@ export function DefectColumnSelect({
             'Location 헤더를 제외하면 이번 임포트에서는 Area Type/Level/Location 파생 필드도 갱신되지 않습니다.',
           );
         }
+        // Category/Team 헤더가 전부 제외되면 team이 결정되지 않아 임포트가 전량 실패한다.
+        const excludedSet = excluded instanceof Set ? excluded : new Set(excluded);
+        const teamCandidateHeaders = headers.filter((h) => {
+          const field = headerToFieldMap[h];
+          return field === "team" || field === "category";
+        });
+        const anyTeamHeaderKept =
+          teamCandidateHeaders.length === 0
+            ? false
+            : teamCandidateHeaders.some((h) => !excludedSet.has(h));
+        if (teamCandidateHeaders.length > 0 && !anyTeamHeaderKept) {
+          lines.push(
+            '⚠ Category/Team 헤더가 모두 제외되었습니다. 팀(team) 결정이 불가하여 모든 행이 임포트되지 않고 거부됩니다. 최소 하나는 포함하세요.',
+          );
+        }
         return lines;
       },
     };
@@ -119,6 +134,7 @@ export function DefectColumnSelect({
     getLabel,
     getSourceLabel,
     getSourceOrigin,
+    headers,
   ]);
 
   const presets = useMemo(() => {
