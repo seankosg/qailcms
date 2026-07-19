@@ -59,7 +59,7 @@ export function BehindScheduleTable({ items, limit = 20 }: Props) {
                         {r.task_name ?? ""}
                       </div>
                     </td>
-                    <td className="px-2 py-1">{r.pic ?? "-"}</td>
+                    <td className="px-2 py-1">{r.hdec_pic_name ?? r.hdec_eng_name ?? "-"}</td>
                     <td className="px-2 py-1 text-right tabular-nums">
                       {((r.gap + Number(r.actual_progress ?? 0)) * 100).toFixed(0)}
                     </td>
