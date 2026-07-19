@@ -247,9 +247,33 @@ function ImportInner() {
     [addFiles],
   );
 
-  const readyCount = files.filter(
+  // Matched-row count per file under the current scope
+  const matchedByFile = useMemo(() => {
+    const map: Record<string, { matched: number; total: number }> = {};
+    for (const f of files) {
+      const rows = f.parsed ?? [];
+      const matched =
+        effectiveScope === "all"
+          ? rows.length
+          : rows.filter((r) => matchesHdecPic(r)).length;
+      map[f.id] = { matched, total: rows.length };
+    }
+    return map;
+  }, [files, effectiveScope, matchesHdecPic]);
+
+  const readyFiles = files.filter(
     (f) => f.status === "ready" && !f.validationError && !!f.discipline,
-  ).length;
+  );
+  const readyCount = readyFiles.length;
+  const totalMatched = readyFiles.reduce(
+    (s, f) => s + (matchedByFile[f.id]?.matched ?? 0),
+    0,
+  );
+  const startDisabled =
+    isRunning ||
+    readyCount === 0 ||
+    !canImport ||
+    (!isAdmin && totalMatched === 0);
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
   const columnFile = files.find((f) => f.id === mappingFileId) ?? null;
   const conflictFile = files.find((f) => f.id === conflictFileId) ?? null;
