@@ -1,32 +1,8 @@
-// Shared styled Excel workbook builder — supports both the default SHAW
-// Raw Data style and a Gantt-flavored theme (column-group coloring, Data
-// Date banner, and an optional right-side day-by-day Gantt calendar).
+// Shared styled Excel workbook builder — SHAW-style Raw Data theme only.
+// (Gantt template / conditional-formatting / settings-sheet 은 폐기됨.
+//  TM 도메인은 이제 stream-export.ts 를 사용한다.)
 
 import XLSX from "xlsx-js-style";
-
-// ---------------------------------------------------------------------------
-// Conditional-formatting spec (applied post-build via exceljs in
-// saveStyledWorkbook when the workbook was tagged with a spec).
-// ---------------------------------------------------------------------------
-
-export interface CfRule {
-  /** Cell range in A1 notation, e.g. "U8:XX181" */
-  ref: string;
-  /** Excel formula (no leading '='). Uses top-left-of-range relative refs. */
-  formula: string;
-  fillRgb?: string;
-  fontColorRgb?: string;
-  bold?: boolean;
-  /** Left/right vertical borders (medium). Used for Today/Data Date lines. */
-  borderRgb?: string;
-}
-
-export interface WorkbookCfSpec {
-  sheetName: string;
-  rules: CfRule[];
-}
-
-const cfBySheet = new WeakMap<XLSX.WorkBook, WorkbookCfSpec>();
 
 // ---------------------------------------------------------------------------
 // Date helpers
@@ -34,7 +10,6 @@ const cfBySheet = new WeakMap<XLSX.WorkBook, WorkbookCfSpec>();
 
 export const DATE_NUMFMT = "dd-mmm";
 export const DATETIME_NUMFMT = "dd-mmm-yyyy hh:mm";
-export const GANTT_DATE_NUMFMT = "mm-dd-yy";
 
 export function isoToExcelSerial(iso: string | null | undefined): number | null {
   if (iso == null) return null;
@@ -65,29 +40,11 @@ export function isoTimestampToExcelSerial(iso: string | null | undefined): numbe
   return v;
 }
 
-function daysBetween(startIso: string, endIso: string): string[] {
-  const s = new Date(startIso + "T00:00:00Z");
-  const e = new Date(endIso + "T00:00:00Z");
-  const out: string[] = [];
-  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return out;
-  const cur = new Date(s);
-  while (cur.getTime() <= e.getTime()) {
-    out.push(cur.toISOString().slice(0, 10));
-    cur.setUTCDate(cur.getUTCDate() + 1);
-  }
-  return out;
-}
-
-function isoInRange(iso: string, from: string, to: string): boolean {
-  return iso >= from && iso <= to;
-}
-
 // ---------------------------------------------------------------------------
-// Style presets — default (SHAW) theme
+// Style presets (default SHAW theme)
 // ---------------------------------------------------------------------------
 
 const FONT_NAME = "Calibri";
-const FONT_KO = "Malgun Gothic";
 
 export const STYLE_TITLE = {
   font: { name: FONT_NAME, sz: 14, bold: true, color: { rgb: "FFFFFFFF" } },
@@ -131,93 +88,6 @@ export const STYLE_DATA = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Style presets — Gantt theme (matches upload template)
-// ---------------------------------------------------------------------------
-
-export type ColumnGroupTag = "basic" | "plan" | "actual" | "progress";
-
-const GANTT_TITLE = {
-  font: { name: FONT_KO, sz: 14, bold: true, color: { rgb: "FF1F4E79" } },
-  alignment: { vertical: "center", horizontal: "left" },
-} as const;
-
-const GANTT_DATA_DATE = {
-  font: { name: FONT_KO, sz: 11, bold: true, color: { rgb: "FF0000FF" } },
-  fill: { fgColor: { rgb: "FFFFF2CC" } },
-  alignment: { vertical: "center", horizontal: "center" },
-} as const;
-
-const GANTT_HEADER_FILL: Record<ColumnGroupTag, string> = {
-  basic: "FF1F4E79",
-  plan: "FF1F4E79",
-  actual: "FF548235",
-  progress: "FF2E75B6",
-};
-
-const GANTT_DATA_FILL: Record<ColumnGroupTag, string | null> = {
-  basic: null,
-  plan: "FFF2F2F2",
-  actual: "FFEBF6EB",
-  progress: "FFDEEBF7",
-};
-
-const GANTT_BAR = {
-  plan: "FFBDD7EE",
-  actual: "FF548235",
-  slip: "FFFFC7CE",
-  weekend: "FFF2F2F2",
-} as const;
-
-function gHeaderStyle(group: ColumnGroupTag) {
-  return {
-    font: { name: FONT_KO, sz: 8.5, bold: true, color: { rgb: "FFFFFFFF" } },
-    fill: { fgColor: { rgb: GANTT_HEADER_FILL[group] } },
-    alignment: { vertical: "center", horizontal: "center", wrapText: true },
-    border: {
-      top: { style: "thin", color: { rgb: "FF1F2937" } },
-      bottom: { style: "thin", color: { rgb: "FF1F2937" } },
-      left: { style: "thin", color: { rgb: "FF1F2937" } },
-      right: { style: "thin", color: { rgb: "FF1F2937" } },
-    },
-  } as Record<string, unknown>;
-}
-
-function gDataStyle(group: ColumnGroupTag, overrideFill?: string | null) {
-  const bg = overrideFill ?? GANTT_DATA_FILL[group] ?? null;
-  const style: Record<string, unknown> = {
-    font: { name: FONT_KO, sz: 8.5, color: { rgb: "FF000000" } },
-    alignment: { vertical: "center", horizontal: "center", wrapText: true },
-    border: {
-      top: { style: "thin", color: { rgb: "FFE5E7EB" } },
-      bottom: { style: "thin", color: { rgb: "FFE5E7EB" } },
-      left: { style: "thin", color: { rgb: "FFE5E7EB" } },
-      right: { style: "thin", color: { rgb: "FFE5E7EB" } },
-    },
-  };
-  if (bg) style.fill = { fgColor: { rgb: bg } };
-  return style;
-}
-
-function gGanttCellStyle(fillRgb: string | null, todayCol: boolean) {
-  const style: Record<string, unknown> = {
-    font: { name: FONT_KO, sz: 7, color: { rgb: "FF444444" } },
-    alignment: { vertical: "center", horizontal: "center" },
-    border: {
-      top: { style: "hair", color: { rgb: "FFE5E7EB" } },
-      bottom: { style: "hair", color: { rgb: "FFE5E7EB" } },
-      left: todayCol
-        ? { style: "medium", color: { rgb: "FFC00000" } }
-        : { style: "hair", color: { rgb: "FFE5E7EB" } },
-      right: todayCol
-        ? { style: "medium", color: { rgb: "FFC00000" } }
-        : { style: "hair", color: { rgb: "FFE5E7EB" } },
-    },
-  };
-  if (fillRgb) style.fill = { fgColor: { rgb: fillRgb } };
-  return style;
-}
-
-// ---------------------------------------------------------------------------
 // Cell writers
 // ---------------------------------------------------------------------------
 
@@ -251,20 +121,6 @@ function setDateCell(
   ws[addr] = { t: "n", v: serial, z: numFmt, s: { ...style, numFmt } };
 }
 
-function maskMergedInnerCells(ws: XLSX.WorkSheet) {
-  const merges = (ws["!merges"] ?? []) as XLSX.Range[];
-  if (merges.length === 0) return;
-  const sheet = ws as Record<string, unknown>;
-  for (const merge of merges) {
-    for (let r = merge.s.r; r <= merge.e.r; r++) {
-      for (let c = merge.s.c; c <= merge.e.c; c++) {
-        if (r === merge.s.r && c === merge.s.c) continue;
-        delete sheet[XLSX.utils.encode_cell({ r, c })];
-      }
-    }
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Column type/width descriptor
 // ---------------------------------------------------------------------------
@@ -296,57 +152,8 @@ export interface StyledSheetOptions {
   sheetName?: string;
   freezeCols?: number;
   meta?: { userName?: string; note?: string };
-
-  /** Gantt theme swaps title/header styles and colors data rows by column group. */
-  theme?: "default" | "gantt";
-  /** Maps a column key to its Gantt group (drives header + data-fill color). */
-  columnGroup?: (key: string) => ColumnGroupTag;
-  /** ISO date shown in the "Data Date ▶" banner and used as Today marker. */
-  dataDate?: string;
-  /** Per-column numFmt override (e.g. plan_days → "0;-0;-"). */
+  /** Per-column numFmt override (e.g. "0.0%"). */
   numFmtByKey?: Record<string, string>;
-  /** Per-cell fill override (RGB without '#') — e.g. Risk=High → orange. */
-  cellFillOverride?: (
-    key: string,
-    value: unknown,
-    row: Record<string, unknown>,
-  ) => string | null;
-  /** Per-row style override — applied to all data columns (and Gantt cell background when no bar). */
-  rowStyleOverride?: (row: Record<string, unknown>) => {
-    fillRgb?: string;
-    fontColorRgb?: string;
-    bold?: boolean;
-  } | null;
-  /** Right-side day-by-day Gantt calendar. */
-  gantt?: {
-    startDate: string;
-    endDate: string;
-    rowDates: (row: Record<string, unknown>) => {
-      planStart?: string | null;
-      planEnd?: string | null;
-      actualStart?: string | null;
-      actualFinish?: string | null;
-      forecastEnd?: string | null;
-      done?: boolean;
-    };
-  };
-  /**
-   * When "template", the gantt sheet is upgraded to a live template:
-   *   • adds a `설정` sheet with start date / alarm threshold
-   *   • D4 becomes `=설정!$B$3` (date), calendar row5/row6 become month/day formulas
-   *   • derived columns (plan_days, plan_progress, progress_variance, slip_days,
-   *     auto_judgment) are written as formulas
-   *   • calendar bar fills are skipped (rendering happens via conditional formatting)
-   *   • judgment / delta / bar / weekend / today CF rules are attached to the workbook
-   *     (applied by `saveStyledWorkbook` via exceljs).
-   * Requires `theme === "gantt"` and a `gantt` calendar range.
-   */
-  formulaMode?: "template";
-  /** Optional settings sheet inputs. */
-  settingsSheet?: {
-    alarmThreshold?: number;
-    deadlines?: Array<{ label: string; date: string }>;
-  };
 }
 
 export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
@@ -357,15 +164,8 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
     sheetName = "Sheet1",
     freezeCols = 1,
     meta,
-    theme = "default",
-    columnGroup,
-    dataDate,
     numFmtByKey,
-    cellFillOverride,
-    rowStyleOverride,
-    gantt,
   } = opts;
-  const isGantt = theme === "gantt";
 
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -378,57 +178,42 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
   if (meta?.note) banner.push(meta.note);
   const metaAll = [...banner, ...(opts.metaLines ?? [])];
 
-  const ganttDays = gantt ? daysBetween(gantt.startDate, gantt.endDate) : [];
-  const ganttCount = ganttDays.length;
-  const dataDateIso = dataDate ?? null;
-
   const headerRow = columns.map((c) => c.label);
   const dataRows = rows.map((r) => columns.map((c) => r[c.key] ?? ""));
 
-  const totalCols = headerRow.length + ganttCount;
-  const colCount = Math.max(totalCols, 2);
-  const lastColLetter = XLSX.utils.encode_col(colCount - 1);
+  const colCount = Math.max(headerRow.length, 2);
 
   // Layout
   const metaStart = 1;
   const metaEnd = metaStart + metaAll.length - 1;
-  const dataDateRow = isGantt && dataDateIso ? metaEnd + 1 : -1;
-  const spacerRow = (dataDateRow >= 0 ? dataDateRow : metaEnd) + 1;
-  const monthRowIdx = isGantt ? spacerRow + 1 : -1;
-  const headerRowIdx = (monthRowIdx >= 0 ? monthRowIdx : spacerRow) + 1;
+  const spacerRow = metaEnd + 1;
+  const headerRowIdx = spacerRow + 1;
   const dataStart = headerRowIdx + 1;
 
   const aoa: unknown[][] = [];
   aoa[0] = [title];
   for (let i = 0; i < metaAll.length; i++) aoa[metaStart + i] = [metaAll[i]];
-  if (dataDateRow >= 0) aoa[dataDateRow] = [`Data Date ▶  ${dataDateIso}`];
   aoa[spacerRow] = [];
-  if (monthRowIdx >= 0) aoa[monthRowIdx] = [];
   aoa[headerRowIdx] = headerRow;
   for (let i = 0; i < dataRows.length; i++) aoa[dataStart + i] = dataRows[i];
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
   const merges: XLSX.Range[] = [];
-  for (let r = 0; r <= metaEnd; r++) {
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } });
+  for (let r = metaStart; r <= metaEnd; r++) {
     merges.push({ s: { r, c: 0 }, e: { r, c: colCount - 1 } });
-  }
-  if (dataDateRow >= 0) {
-    merges.push({ s: { r: dataDateRow, c: 0 }, e: { r: dataDateRow, c: colCount - 1 } });
   }
 
   const cols: XLSX.ColInfo[] = columns.map((c) => ({ wch: pxToWch(c.widthPx, c.label) }));
-  for (let i = 0; i < ganttCount; i++) cols.push({ wch: 2.3 });
   ws["!cols"] = cols;
 
   const rowsInfo: XLSX.RowInfo[] = [];
   rowsInfo[0] = { hpt: 24 };
   for (let i = metaStart; i <= metaEnd; i++) rowsInfo[i] = { hpt: 16 };
-  if (dataDateRow >= 0) rowsInfo[dataDateRow] = { hpt: 20 };
   rowsInfo[spacerRow] = { hpt: 6 };
-  if (monthRowIdx >= 0) rowsInfo[monthRowIdx] = { hpt: 16 };
-  rowsInfo[headerRowIdx] = { hpt: isGantt ? 32 : 28 };
-  for (let i = 0; i < dataRows.length; i++) rowsInfo[dataStart + i] = { hpt: isGantt ? 22 : 20 };
+  rowsInfo[headerRowIdx] = { hpt: 28 };
+  for (let i = 0; i < dataRows.length; i++) rowsInfo[dataStart + i] = { hpt: 20 };
   ws["!rows"] = rowsInfo;
 
   const xSplit = Math.min(Math.max(0, freezeCols), colCount);
@@ -444,97 +229,22 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
   ];
 
   // Title + meta
-  setCell(ws, 0, 0, title, isGantt ? (GANTT_TITLE as Record<string, unknown>) : STYLE_TITLE);
+  setCell(ws, 0, 0, title, STYLE_TITLE);
   for (let i = 0; i < metaAll.length; i++) {
     setCell(ws, metaStart + i, 0, metaAll[i], i === 0 ? STYLE_META_LABEL : STYLE_META_VALUE);
   }
-  if (dataDateRow >= 0 && dataDateIso) {
-    setCell(ws, dataDateRow, 0, `Data Date ▶  ${dataDateIso}`, GANTT_DATA_DATE as Record<string, unknown>);
-  }
 
-  // Data column headers
+  // Column headers
   for (let c = 0; c < headerRow.length; c++) {
-    if (isGantt && columnGroup) {
-      const g = columnGroup(columns[c].key);
-      setCell(ws, headerRowIdx, c, headerRow[c], gHeaderStyle(g));
-      if (monthRowIdx >= 0) {
-        setCell(ws, monthRowIdx, c, "", gHeaderStyle(g));
-        merges.push({ s: { r: monthRowIdx, c }, e: { r: headerRowIdx, c } });
-      }
-    } else {
-      setCell(ws, headerRowIdx, c, headerRow[c], STYLE_HEADER);
-    }
+    setCell(ws, headerRowIdx, c, headerRow[c], STYLE_HEADER);
   }
 
-  // Gantt calendar header
-  if (ganttCount > 0) {
-    const monNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    for (let i = 0; i < ganttCount; i++) {
-      const iso = ganttDays[i];
-      const c = headerRow.length + i;
-      const serial = isoToExcelSerial(iso);
-      if (serial == null) continue;
-      const dt = new Date(iso + "T00:00:00Z");
-      const dom = dt.getUTCDate();
-      const isMonthStart = dom === 1 || i === 0;
-      const isToday = dataDateIso === iso;
-
-      if (monthRowIdx >= 0) {
-        if (isMonthStart || isToday) {
-          setCell(ws, monthRowIdx, c, monNames[dt.getUTCMonth()], {
-            font: { name: FONT_KO, sz: 8, bold: true, color: { rgb: "FF1F4E79" } },
-            fill: { fgColor: { rgb: "FFFFFFFF" } },
-            alignment: { vertical: "center", horizontal: "center" },
-          });
-        } else {
-          setCell(ws, monthRowIdx, c, "", {
-            fill: { fgColor: { rgb: "FFFFFFFF" } },
-          });
-        }
-      }
-      const addr = XLSX.utils.encode_cell({ r: headerRowIdx, c });
-      ws[addr] = {
-        t: "n",
-        v: serial,
-        z: "d",
-        s: {
-          font: { name: FONT_KO, sz: 7, bold: isToday, color: { rgb: isToday ? "FFC00000" : "FF444444" } },
-          fill: { fgColor: { rgb: isToday ? "FFFFF2CC" : "FFFFFFFF" } },
-          alignment: { vertical: "center", horizontal: "center" },
-          numFmt: "d",
-        },
-      };
-    }
-  }
-
-  // Data + gantt bars
+  // Data rows
   for (let r = 0; r < dataRows.length; r++) {
-    const rowObj = rows[r];
-    const rowOv = rowStyleOverride?.(rowObj) ?? null;
-
     for (let c = 0; c < columns.length; c++) {
       const col = columns[c];
       const raw = dataRows[r][c];
-      const group = isGantt && columnGroup ? columnGroup(col.key) : null;
-      const overrideFill = cellFillOverride?.(col.key, raw, rowObj) ?? null;
-      let style: Record<string, unknown>;
-      if (isGantt && group) {
-        style = gDataStyle(group, overrideFill);
-      } else if (overrideFill) {
-        style = { ...STYLE_DATA, fill: { fgColor: { rgb: overrideFill } } };
-      } else {
-        style = STYLE_DATA;
-      }
-      if (rowOv) {
-        style = { ...style };
-        if (rowOv.fillRgb) style.fill = { fgColor: { rgb: rowOv.fillRgb } };
-        const baseFont = (style.font as Record<string, unknown>) ?? {};
-        style.font = {
-          ...baseFont,
-          ...(rowOv.fontColorRgb ? { color: { rgb: rowOv.fontColorRgb } } : {}),
-          ...(rowOv.bold ? { bold: true } : {}),
-        };
-      }
+      const style: Record<string, unknown> = STYLE_DATA;
       const explicitFmt = numFmtByKey?.[col.key];
 
       if (raw === "" || raw == null) {
@@ -544,14 +254,7 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
       if (col.kind === "date") {
         const serial = isoToExcelSerial(String(raw));
         if (serial != null) {
-          setDateCell(
-            ws,
-            dataStart + r,
-            c,
-            serial,
-            style,
-            explicitFmt ?? (isGantt ? GANTT_DATE_NUMFMT : DATE_NUMFMT),
-          );
+          setDateCell(ws, dataStart + r, c, serial, style, explicitFmt ?? DATE_NUMFMT);
           continue;
         }
       } else if (col.kind === "datetime") {
@@ -574,688 +277,23 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
       }
       setCell(ws, dataStart + r, c, raw, style);
     }
-
-    if (ganttCount > 0 && gantt) {
-      const d = gantt.rowDates(rowObj) ?? {};
-      const done = !!d.done;
-      const inProgressEnd = !d.actualFinish && d.actualStart ? dataDateIso : null;
-      for (let i = 0; i < ganttCount; i++) {
-        const iso = ganttDays[i];
-        const cc = headerRow.length + i;
-        const isToday = dataDateIso === iso;
-        const dow = new Date(iso + "T00:00:00Z").getUTCDay();
-
-        let fill: string | null = null;
-        if (
-          !done &&
-          d.planEnd &&
-          d.forecastEnd &&
-          iso > d.planEnd &&
-          iso <= d.forecastEnd
-        ) {
-          fill = GANTT_BAR.slip;
-        }
-        if (!fill && d.actualStart) {
-          const actEnd = d.actualFinish ?? inProgressEnd ?? null;
-          if (actEnd && isoInRange(iso, d.actualStart, actEnd)) {
-            fill = GANTT_BAR.actual;
-          }
-        }
-        if (!fill && d.planStart && d.planEnd && isoInRange(iso, d.planStart, d.planEnd)) {
-          fill = GANTT_BAR.plan;
-        }
-        if (!fill && dow === 5) {
-          fill = GANTT_BAR.weekend;
-        }
-        if (!fill && rowOv?.fillRgb) {
-          fill = rowOv.fillRgb;
-        }
-        setCell(ws, dataStart + r, cc, "", gGanttCellStyle(fill, isToday));
-      }
-    }
   }
 
   ws["!merges"] = merges;
-  maskMergedInnerCells(ws);
 
+  const lastColLetter = XLSX.utils.encode_col(colCount - 1);
   const lastRow = dataStart + dataRows.length - 1;
   ws["!ref"] = `A1:${lastColLetter}${Math.max(lastRow + 1, headerRowIdx + 1)}`;
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
-
-  if (opts.formulaMode === "template" && isGantt && gantt && ganttCount > 0) {
-    applyGanttTemplate(wb, ws, {
-      columns,
-      rowCount: dataRows.length,
-      rowsData: rows,
-      ganttCount,
-      dataDateRow,
-      headerRowIdx,
-      monthRowIdx,
-      dataStart,
-      startDateIso: gantt.startDate,
-      dataDateIso: dataDateIso ?? gantt.startDate,
-      settingsSheet: opts.settingsSheet,
-    });
-  }
-
   return wb;
 }
 
-export async function saveStyledWorkbook(
-  wb: XLSX.WorkBook,
-  fileName: string,
-): Promise<void> {
-  const cf = cfBySheet.get(wb);
-  if (!cf) {
-    XLSX.writeFile(wb, fileName);
-    return;
-  }
-  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-  const outBuf = await applyCfViaExcelJs(buf, cf);
-  const blob = new Blob([outBuf], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+export function saveStyledWorkbook(wb: XLSX.WorkBook, fileName: string): void {
+  XLSX.writeFile(wb, fileName);
 }
 
 export async function styledWorkbookToBuffer(wb: XLSX.WorkBook): Promise<ArrayBuffer> {
-  const cf = cfBySheet.get(wb);
-  const base = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-  if (!cf) return base;
-  return applyCfViaExcelJs(base, cf);
-}
-
-// ===========================================================================
-// Gantt template upgrade helpers
-// ===========================================================================
-
-function colLetter(cIdx0: number): string {
-  return XLSX.utils.encode_col(cIdx0);
-}
-
-function setFormulaCell(
-  ws: XLSX.WorkSheet,
-  r0: number,
-  c0: number,
-  formula: string,
-  numFmt?: string,
-) {
-  const addr = XLSX.utils.encode_cell({ r: r0, c: c0 });
-  const prev = (ws as Record<string, unknown>)[addr] as
-    | { s?: Record<string, unknown> }
-    | undefined;
-  const prevStyle = (prev?.s as Record<string, unknown>) ?? {};
-  const style = numFmt ? { ...prevStyle, numFmt } : prevStyle;
-  (ws as Record<string, unknown>)[addr] = {
-    t: "n",
-    f: formula.startsWith("=") ? formula.slice(1) : formula,
-    ...(numFmt ? { z: numFmt } : {}),
-    s: style,
-  };
-}
-
-function setFormulaCellText(
-  ws: XLSX.WorkSheet,
-  r0: number,
-  c0: number,
-  formula: string,
-) {
-  const addr = XLSX.utils.encode_cell({ r: r0, c: c0 });
-  const prev = (ws as Record<string, unknown>)[addr] as
-    | { s?: Record<string, unknown> }
-    | undefined;
-  const style = (prev?.s as Record<string, unknown>) ?? {};
-  (ws as Record<string, unknown>)[addr] = {
-    t: "s",
-    f: formula.startsWith("=") ? formula.slice(1) : formula,
-    v: "",
-    s: style,
-  };
-}
-
-function stripCellFill(ws: XLSX.WorkSheet, r0: number, c0: number) {
-  const addr = XLSX.utils.encode_cell({ r: r0, c: c0 });
-  const cell = (ws as Record<string, unknown>)[addr] as
-    | { s?: Record<string, unknown> }
-    | undefined;
-  if (!cell?.s) return;
-  const s = { ...(cell.s as Record<string, unknown>) };
-  if ("fill" in s) delete s.fill;
-  cell.s = s;
-}
-
-function applyGanttTemplate(
-  wb: XLSX.WorkBook,
-  ws: XLSX.WorkSheet,
-  ctx: {
-    columns: StyledColumn[];
-    rowCount: number;
-    rowsData: Record<string, unknown>[];
-    ganttCount: number;
-    dataDateRow: number;
-    headerRowIdx: number;
-    monthRowIdx: number;
-    dataStart: number;
-    startDateIso: string;
-    dataDateIso: string;
-    settingsSheet?: StyledSheetOptions["settingsSheet"];
-  },
-) {
-  const {
-    columns,
-    rowCount,
-    rowsData,
-    ganttCount,
-    dataDateRow,
-    headerRowIdx,
-    monthRowIdx,
-    dataStart,
-  } = ctx;
-  if (rowCount === 0 || ganttCount === 0) return;
-
-  const settingsWs = buildSettingsSheet(
-    ctx.dataDateIso,
-    ctx.startDateIso,
-    ganttCount,
-    ctx.settingsSheet,
-  );
-  XLSX.utils.book_append_sheet(wb, settingsWs, "설정");
-
-  // Data Date banner: 원본 xlsx 와 동일하게 B4=라벨, D4=하드 날짜(수식 아님)
-  const merges = (ws["!merges"] ?? []) as XLSX.Range[];
-  const filteredMerges = merges.filter(
-    (m) => !(m.s.r === dataDateRow && m.e.r === dataDateRow),
-  );
-  const bannerLabelAddr = XLSX.utils.encode_cell({ r: dataDateRow, c: 0 });
-  delete (ws as Record<string, unknown>)[bannerLabelAddr];
-  setCell(ws, dataDateRow, 1, "Data Date ▶", {
-    font: { name: FONT_KO, sz: 11, bold: true, color: { rgb: "FF1F4E79" } },
-    alignment: { vertical: "center", horizontal: "right" },
-  });
-  {
-    // D4 = 실제 Data Date (원본: 하드 날짜값)
-    const addr = XLSX.utils.encode_cell({ r: dataDateRow, c: 3 });
-    const serial = isoToExcelSerial(ctx.dataDateIso);
-    if (serial != null) {
-      (ws as Record<string, unknown>)[addr] = {
-        t: "n",
-        v: serial,
-        z: "yyyy-mm-dd",
-        s: {
-          font: { name: FONT_KO, sz: 11, bold: true, color: { rgb: "FF0000FF" } },
-          fill: { fgColor: { rgb: "FFFFF2CC" } },
-          alignment: { vertical: "center", horizontal: "center" },
-          numFmt: "yyyy-mm-dd",
-        },
-      };
-    }
-  }
-  filteredMerges.push({ s: { r: dataDateRow, c: 3 }, e: { r: dataDateRow, c: 5 } });
-  ws["!merges"] = filteredMerges;
-  maskMergedInnerCells(ws);
-
-  const dRow1 = dataDateRow + 1;
-  const D4 = `$D$${dRow1}`;
-  const dayRow1 = headerRowIdx + 1;
-  const firstDataRow1 = dataStart + 1;
-  const lastDataRow1 = dataStart + rowCount;
-
-  // Calendar header formulas (day + month rows)
-  const firstCalCol0 = columns.length;
-  const firstCalLetter = colLetter(firstCalCol0);
-  const lastCalCol0 = columns.length + ganttCount - 1;
-  const lastCalLetter = colLetter(lastCalCol0);
-
-  for (let i = 0; i < ganttCount; i++) {
-    const c = firstCalCol0 + i;
-    const cL = colLetter(c);
-    // 원본: U6 = 설정!$B$3 (차트 시작일). 이후 V6 = U6+1 …
-    const dayFormula =
-      i === 0 ? `=설정!$B$3` : `=${colLetter(c - 1)}${dayRow1}+1`;
-    setFormulaCell(ws, headerRowIdx, c, dayFormula, "d");
-    if (monthRowIdx >= 0) {
-      const monthFormula = `=IF(OR(DAY(${cL}${dayRow1})=1,${cL}${dayRow1}=설정!$B$3),TEXT(${cL}${dayRow1},"m월"),"")`;
-      setFormulaCellText(ws, monthRowIdx, c, monthFormula);
-    }
-  }
-
-  // Derived column formulas
-  const letters: Record<string, string> = {};
-  columns.forEach((col, idx) => {
-    letters[col.key] = colLetter(idx);
-  });
-  const K = letters.plan_start;
-  const L = letters.plan_end;
-  const M = letters.plan_days;
-  const O = letters.actual_progress;
-  const R = letters.forecast_end;
-  const J = letters.status_manual;
-  const I = letters.row_type;
-  const Q = letters.progress_variance;
-  const T = letters.auto_judgment;
-  const alarm = "설정!$B$8";
-
-  const idxOf = (key: string) => columns.findIndex((c) => c.key === key);
-
-  // 부모(항목) 그룹 판별: level === "parent" 인 행이 부모, 다음 부모 직전까지가 자식 범위.
-  const parentGroups = new Map<number, { cs: number; ce: number }>();
-  for (let ri = 0; ri < rowCount; ri++) {
-    if (rowsData[ri]?.level !== "parent") continue;
-    let ce = ri;
-    for (let rj = ri + 1; rj < rowCount; rj++) {
-      if (rowsData[rj]?.level === "parent") break;
-      ce = rj;
-    }
-    if (ce > ri) parentGroups.set(ri, { cs: ri + 1, ce });
-  }
-
-  for (let ri = 0; ri < rowCount; ri++) {
-    const r0 = dataStart + ri;
-    const r1 = r0 + 1;
-    const group = parentGroups.get(ri);
-    if (group) {
-      // 부모 행: 자식 범위 집계 (원본 xlsx 수식 그대로)
-      const cs1 = dataStart + group.cs + 1;
-      const ce1 = dataStart + group.ce + 1;
-      if (K) setFormulaCell(ws, r0, idxOf("plan_start"), `=MIN(${K}${cs1}:${K}${ce1})`, "yyyy-mm-dd");
-      if (L) setFormulaCell(ws, r0, idxOf("plan_end"), `=MAX(${L}${cs1}:${L}${ce1})`, "yyyy-mm-dd");
-      if (M && K && L)
-        setFormulaCell(ws, r0, idxOf("plan_days"), `=${L}${r1}-${K}${r1}+1`, "0;-0;-");
-      if (letters.actual_start)
-        setFormulaCell(
-          ws,
-          r0,
-          idxOf("actual_start"),
-          `=IF(COUNT(${letters.actual_start}${cs1}:${letters.actual_start}${ce1})=0,"",MIN(${letters.actual_start}${cs1}:${letters.actual_start}${ce1}))`,
-          "yyyy-mm-dd",
-        );
-      if (O && M)
-        setFormulaCell(
-          ws,
-          r0,
-          idxOf("actual_progress"),
-          `=IFERROR(SUMPRODUCT(${O}${cs1}:${O}${ce1},${M}${cs1}:${M}${ce1})/SUM(${M}${cs1}:${M}${ce1}),0)`,
-          "0.0%",
-        );
-      if (letters.plan_progress && K && M)
-        setFormulaCell(
-          ws,
-          r0,
-          idxOf("plan_progress"),
-          `=IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/${M}${r1}))`,
-          "0.0%",
-        );
-      if (Q && O && letters.plan_progress)
-        setFormulaCell(ws, r0, idxOf("progress_variance"), `=${O}${r1}-${letters.plan_progress}${r1}`, "+0.0%;-0.0%;0.0%");
-      if (R)
-        setFormulaCell(
-          ws,
-          r0,
-          idxOf("forecast_end"),
-          `=IF(COUNT(${R}${cs1}:${R}${ce1})=0,"",MAX(${R}${cs1}:${R}${ce1}))`,
-          "yyyy-mm-dd",
-        );
-      if (letters.slip_days && R && L)
-        setFormulaCell(
-          ws,
-          r0,
-          idxOf("slip_days"),
-          `=IF(ISNUMBER(${R}${r1}),${R}${r1}-${L}${r1},"")`,
-          "+0;-0;-",
-        );
-      if (T && K && L && O) {
-        const jRef = J ? `$${J}${r1}` : `""`;
-        const rRef = R ? `$${R}${r1}` : `""`;
-        const qRef = Q ? `$${Q}${r1}` : `0`;
-        const f = `=IF(OR(${jRef}="완료",$${O}${r1}>=1),"완료",IF(AND(ISNUMBER(${rRef}),${rRef}>$${L}${r1}),"지연",IF(${D4}>$${L}${r1},"지연",IF(${qRef}<=${alarm},"지연",IF(AND(${D4}>=$${K}${r1},$${O}${r1}=0),"주의(미착수)",IF(${D4}>=$${K}${r1},"진행","예정"))))))`;
-        setFormulaCellText(ws, r0, idxOf("auto_judgment"), f);
-      }
-      continue;
-    }
-
-    // 자식 행 (원본과 동일한 수식)
-    if (letters.plan_days && K && L) {
-      setFormulaCell(ws, r0, idxOf("plan_days"), `=${L}${r1}-${K}${r1}+1`, "0;-0;-");
-    }
-    if (letters.plan_progress && K && L) {
-      const f = `=IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1)))`;
-      setFormulaCell(ws, r0, idxOf("plan_progress"), f, "0.0%");
-    }
-    if (letters.progress_variance && O && K && L) {
-      const planProg = letters.plan_progress
-        ? `${letters.plan_progress}${r1}`
-        : `IF(${D4}<${K}${r1},0,MIN(1,(${D4}-${K}${r1}+1)/(${L}${r1}-${K}${r1}+1)))`;
-      setFormulaCell(ws, r0, idxOf("progress_variance"), `=${O}${r1}-${planProg}`, "+0.0%;-0.0%;0.0%");
-    }
-    if (letters.slip_days && R && L) {
-      setFormulaCell(ws, r0, idxOf("slip_days"), `=IF(ISNUMBER(${R}${r1}),${R}${r1}-${L}${r1},"")`, "+0;-0;-");
-    }
-    if (letters.auto_judgment && K && L && O) {
-      const jRef = J ? `$${J}${r1}` : `""`;
-      const rRef = R ? `$${R}${r1}` : `""`;
-      const qRef = Q ? `$${Q}${r1}` : `0`;
-      const f = `=IF(OR(${jRef}="완료",$${O}${r1}>=1),"완료",IF(AND(ISNUMBER(${rRef}),${rRef}>$${L}${r1}),"지연",IF(${D4}>$${L}${r1},"지연",IF(${qRef}<=${alarm},"지연",IF(AND(${D4}>=$${K}${r1},$${O}${r1}=0),"주의(미착수)",IF(${D4}>=$${K}${r1},"진행","예정"))))))`;
-      setFormulaCellText(ws, r0, idxOf("auto_judgment"), f);
-    }
-  }
-
-  // Strip static fills on calendar body so CF can render
-  for (let ri = 0; ri < rowCount; ri++) {
-    for (let i = 0; i < ganttCount; i++) {
-      stripCellFill(ws, dataStart + ri, firstCalCol0 + i);
-    }
-  }
-
-  // Build CF rules
-  const calRange = `${firstCalLetter}${firstDataRow1}:${lastCalLetter}${lastDataRow1}`;
-  const dayCellRel = `${firstCalLetter}$${dayRow1}`;
-  const Krel = K ? `$${K}${firstDataRow1}` : "";
-  const Lrel = L ? `$${L}${firstDataRow1}` : "";
-  const Orel = O ? `$${O}${firstDataRow1}` : "";
-  const Rrel = R ? `$${R}${firstDataRow1}` : "";
-  const Irel = I ? `$${I}${firstDataRow1}` : "";
-
-  const rules: CfRule[] = [];
-  // 원본 xlsx CF 규칙(14종) 재현. 계획일수 컬럼 letter (M) 를 직접 참조.
-  const Mrel = M ? `$${M}${firstDataRow1}` : "";
-  if (K && L && M && O && I && R) {
-    // 1) 지연 갭 (실적 이후~계획완료 이전, Data Date 미만)
-    rules.push({
-      ref: calRange,
-      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel}+${Orel}*${Mrel},${dayCellRel}<=${Lrel},${dayCellRel}<${D4})`,
-      fillRgb: "FFE06666",
-    });
-    // 2) 실적 진척 구간
-    rules.push({
-      ref: calRange,
-      formula: `AND(${Irel}<>"항목",ISNUMBER(${Krel}),${dayCellRel}>=${Krel},${dayCellRel}<${Krel}+${Orel}*${Mrel})`,
-      fillRgb: "FF548235",
-    });
-    // 3) 예상 완료일
-    rules.push({
-      ref: calRange,
-      formula: `AND(${Irel}<>"항목",ISNUMBER(${Rrel}),${dayCellRel}=${Rrel})`,
-      fillRgb: "FF7030A0",
-    });
-  }
-  if (K && L && I) {
-    // 4~7) 계획 완료일 (유형별)
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="실행")`, fillRgb: "FF2E75B6" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="승인")`, fillRgb: "FFC55A11" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="대기")`, fillRgb: "FF7F7F7F" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}=${Lrel},${Irel}="항목")`, fillRgb: "FF1F4E79" });
-    // 8~11) 계획 구간 (유형별)
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="실행")`, fillRgb: "FFBDD7EE" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="승인")`, fillRgb: "FFFCE4D6" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="대기")`, fillRgb: "FFD9D9D9" });
-    rules.push({ ref: calRange, formula: `AND(${dayCellRel}>=${Krel},${dayCellRel}<=${Lrel},${Irel}="항목")`, fillRgb: "FFD6DCE4" });
-  }
-  // 12) Data Date 열
-  rules.push({ ref: calRange, formula: `${dayCellRel}=${D4}`, fillRgb: "FFFFC000" });
-  // 13) 오늘 열
-  rules.push({ ref: calRange, formula: `${dayCellRel}=TODAY()`, fillRgb: "FFFFE699" });
-  // 14) 금요일 (WEEKDAY 기본 return_type=1 → 금=6)
-  rules.push({ ref: calRange, formula: `WEEKDAY(${dayCellRel})=6`, fillRgb: "FFE7E6E6" });
-
-  // T열 자동판정 색상
-  if (T) {
-    const tRange = `${T}${firstDataRow1}:${T}${lastDataRow1}`;
-    const tRef = `$${T}${firstDataRow1}`;
-    rules.push({ ref: tRange, formula: `${tRef}="지연"`, fillRgb: "FFC00000", fontColorRgb: "FFFFFFFF", bold: true });
-    rules.push({ ref: tRange, formula: `${tRef}="주의(미착수)"`, fillRgb: "FFED7D31", fontColorRgb: "FFFFFFFF", bold: true });
-    rules.push({ ref: tRange, formula: `${tRef}="완료"`, fillRgb: "FF548235", fontColorRgb: "FFFFFFFF", bold: true });
-  }
-  // Q열 진도차 색상 (fill only, 원본과 동일)
-  if (Q && O && I) {
-    const qRange = `${Q}${firstDataRow1}:${Q}${lastDataRow1}`;
-    const qRef = `$${Q}${firstDataRow1}`;
-    const oRef = `$${O}${firstDataRow1}`;
-    const iRef = `$${I}${firstDataRow1}`;
-    rules.push({
-      ref: qRange,
-      formula: `AND(ISNUMBER(${qRef}),${qRef}<0,${iRef}<>"항목")`,
-      fillRgb: "FFFCE4D6",
-    });
-    rules.push({
-      ref: qRange,
-      formula: `AND(ISNUMBER(${qRef}),${qRef}>=0,${oRef}>0,${iRef}<>"항목")`,
-      fillRgb: "FFE2EFDA",
-    });
-  }
-  // B열 No: 지연 행 배경
-  if (T) {
-    const nCol = letters.task_no;
-    if (nCol) {
-      rules.push({
-        ref: `${nCol}${firstDataRow1}:${nCol}${lastDataRow1}`,
-        formula: `$${T}${firstDataRow1}="지연"`,
-        fillRgb: "FFFCE4E4",
-      });
-    }
-  }
-
-  maskMergedInnerCells(ws);
-  cfBySheet.set(wb, { sheetName: (wb.SheetNames[0] as string) ?? "Sheet1", rules });
-}
-
-function buildSettingsSheet(
-  dataDateIso: string,
-  startDateIso: string,
-  ganttDays: number,
-  cfg: StyledSheetOptions["settingsSheet"],
-): XLSX.WorkSheet {
-  const ws = XLSX.utils.aoa_to_sheet([[]]);
-  const dataDateSerial = isoToExcelSerial(dataDateIso);
-  const startSerial = isoToExcelSerial(startDateIso);
-  const titleStyle = {
-    font: { name: FONT_KO, sz: 14, bold: true, color: { rgb: "FF1F4E79" } },
-  };
-  const labelStyle = {
-    font: { name: FONT_KO, sz: 10, bold: true, color: { rgb: "FF374151" } },
-    fill: { fgColor: { rgb: "FFF3F4F6" } },
-  };
-  const valueStyle = {
-    font: { name: FONT_KO, sz: 10, color: { rgb: "FF111827" } },
-  };
-  const noteStyle = {
-    font: { name: FONT_KO, sz: 9, italic: true, color: { rgb: "FF6B7280" } },
-  };
-  setCell(ws, 0, 0, "Gantt 차트 설정", titleStyle);
-
-  // 원본 xlsx `설정` 시트 배치:
-  //   B3 = 차트 시작일, B4 = 차트 일수, B5..B7 = 데드라인 1~3, B8 = 진도차 알람 기준
-  //   (Data Date 는 설정 시트에 없음 — Gantt!D4 에 직접 값)
-
-  // B3 = 차트 시작일
-  setCell(ws, 2, 0, "차트 시작일", labelStyle);
-  if (startSerial != null) {
-    const addr = XLSX.utils.encode_cell({ r: 2, c: 1 });
-    (ws as Record<string, unknown>)[addr] = {
-      t: "n",
-      v: startSerial,
-      z: "yyyy-mm-dd",
-      s: {
-        ...valueStyle,
-        numFmt: "yyyy-mm-dd",
-        font: { ...(valueStyle.font as Record<string, unknown>), bold: true },
-        fill: { fgColor: { rgb: "FFFFF2CC" } },
-      },
-    };
-  }
-  setCell(ws, 2, 2, "타임라인 첫 칸 날짜. 변경 시 타임라인 전체 이동", noteStyle);
-
-  // B4 = 차트 일수
-  setCell(ws, 3, 0, "차트 일수", labelStyle);
-  setCell(ws, 3, 1, ganttDays, { ...valueStyle, fill: { fgColor: { rgb: "FFFFF2CC" } } });
-  setCell(ws, 3, 2, `${ganttDays}일 = 타임라인 총 일수`, noteStyle);
-
-  // B5..B7 = 데드라인 1..3
-  const dls = cfg?.deadlines ?? [];
-  for (let i = 0; i < 3; i++) {
-    setCell(ws, 4 + i, 0, `데드라인 ${i + 1}`, labelStyle);
-    const dl = dls[i];
-    if (dl) {
-      const serial = isoToExcelSerial(dl.date);
-      if (serial != null) {
-        const addr = XLSX.utils.encode_cell({ r: 4 + i, c: 1 });
-        (ws as Record<string, unknown>)[addr] = {
-          t: "n",
-          v: serial,
-          z: "yyyy-mm-dd",
-          s: { ...valueStyle, numFmt: "yyyy-mm-dd" },
-        };
-      }
-      setCell(ws, 4 + i, 2, dl.label, noteStyle);
-    }
-  }
-
-  // B8 = 진도차 알람 임계값
-  setCell(ws, 7, 0, "진도차 알람 기준", labelStyle);
-  setCell(ws, 7, 1, cfg?.alarmThreshold ?? -0.05, {
-    ...valueStyle,
-    numFmt: "0.0%",
-    fill: { fgColor: { rgb: "FFFFF2CC" } },
-  });
-  setCell(ws, 7, 2, "실적-계획 진도차가 이 값 이하이면 '지연' 판정·알람 (기본 -5%p)", noteStyle);
-
-  // dataDateSerial 은 이 시트에서 사용하지 않음 (Gantt!D4 에 직접 값으로 기입)
-  void dataDateSerial;
-
-  setCell(ws, 10, 0, "범례 (타임라인)", labelStyle);
-  const legend: Array<[string, string]> = [
-    ["계획 구간 — 실행", "FFBDD7EE"],
-    ["계획 구간 — 승인·협의", "FFD9C1F0"],
-    ["계획 구간 — 외부 대기", "FFE7E6E6"],
-    ["실적 진척 (실적진도율만큼)", "FF548235"],
-    ["지연 갭 (Data Date까지 미진척)", "FFFFC7CE"],
-    ["계획 완료일 (실행)", "FF1F4E79"],
-    ["예상 완료일 (슬립)", "FFFF6600"],
-    ["Data Date", "FFFFF2CC"],
-    ["금요일 (KSA 휴일)", "FFF2F2F2"],
-  ];
-  legend.forEach(([text, rgb], i) => {
-    setCell(ws, 11 + i, 0, text, valueStyle);
-    setCell(ws, 11 + i, 1, "", { fill: { fgColor: { rgb } } });
-  });
-
-  ws["!cols"] = [{ wch: 26 }, { wch: 18 }, { wch: 60 }];
-  ws["!ref"] = `A1:C${11 + legend.length}`;
-  return ws;
-}
-
-async function applyCfViaExcelJs(
-  input: ArrayBuffer,
-  spec: WorkbookCfSpec,
-): Promise<ArrayBuffer> {
-  const ExcelJS = (await import("exceljs")).default;
-  const JSZip = (await import("jszip")).default;
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(input);
-  const ws = wb.getWorksheet(spec.sheetName);
-  if (!ws) return input;
-  // Excel의 "일부 콘텐츠에 문제가 있습니다" 복구 대화상자를 방지하기 위한 후처리.
-  // 병합 내부 셀 마스킹은 ExcelJS 로딩 전에 워크시트 객체에서 처리한다.
-  // ExcelJS에서 병합 내부 셀 값을 지우면 master 셀 값까지 같이 지워질 수 있다.
-  //
-  // 1) fullCalcOnLoad 해제. 캐시된 <v> 값이 없어도 Excel 이 조용히
-  //    첫 렌더 후 재계산하도록 두면 복구 다이얼로그가 나오지 않는다.
-  try {
-    (wb as unknown as { calcProperties: { fullCalcOnLoad: boolean } })
-      .calcProperties.fullCalcOnLoad = false;
-  } catch {
-    /* older exceljs — ignore */
-  }
-
-  // 2) 시트별 defaultRowHeight 명시 (customHeight="1" 짝 맞춤)
-  try {
-    (ws as unknown as { properties: { defaultRowHeight: number } })
-      .properties.defaultRowHeight = 15;
-  } catch {
-    /* ignore */
-  }
-  spec.rules.forEach((r, idx) => {
-    const style: Record<string, unknown> = {};
-    if (r.fillRgb) {
-      style.fill = {
-        type: "pattern",
-        pattern: "solid",
-        bgColor: { argb: r.fillRgb },
-        fgColor: { argb: r.fillRgb },
-      };
-    }
-    if (r.fontColorRgb || r.bold) {
-      style.font = {
-        ...(r.fontColorRgb ? { color: { argb: r.fontColorRgb } } : {}),
-        ...(r.bold ? { bold: true } : {}),
-      };
-    }
-    if (r.borderRgb) {
-      const side = { style: "medium", color: { argb: r.borderRgb } };
-      style.border = { left: side, right: side };
-    }
-    ws.addConditionalFormatting({
-      ref: r.ref,
-      rules: [
-        {
-          type: "expression",
-          formulae: [r.formula],
-          priority: idx + 1,
-          style,
-        },
-      ],
-    });
-  });
-  const out = await wb.xlsx.writeBuffer();
-  return sanitizeMergedCellXml(out as ArrayBuffer, JSZip);
-}
-
-type ZipFileLike = { async: (type: "string") => Promise<string> };
-type ZipLike = {
-  files: Record<string, unknown>;
-  file: {
-    (name: string): ZipFileLike | null;
-    (name: string, data: string): ZipLike;
-  };
-  generateAsync: (options: { type: "arraybuffer"; compression: "DEFLATE" }) => Promise<ArrayBuffer>;
-};
-type JSZipLike = { loadAsync: (data: ArrayBuffer) => Promise<ZipLike> };
-
-async function sanitizeMergedCellXml(input: ArrayBuffer, JSZipCtor: JSZipLike): Promise<ArrayBuffer> {
-  const zip = await JSZipCtor.loadAsync(input);
-  const sheetNames = Object.keys(zip.files).filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name));
-  await Promise.all(
-    sheetNames.map(async (name) => {
-      const file = zip.file(name);
-      if (!file) return;
-      const xml = await file.async("string");
-      if (!xml.includes("<mergeCells")) return;
-      const innerRefs = new Set<string>();
-      for (const match of xml.matchAll(/<mergeCell ref="([A-Z]+\d+):([A-Z]+\d+)"\s*\/>/g)) {
-        const start = XLSX.utils.decode_cell(match[1]);
-        const end = XLSX.utils.decode_cell(match[2]);
-        for (let r = start.r; r <= end.r; r++) {
-          for (let c = start.c; c <= end.c; c++) {
-            if (r === start.r && c === start.c) continue;
-            innerRefs.add(XLSX.utils.encode_cell({ r, c }));
-          }
-        }
-      }
-      if (innerRefs.size === 0) return;
-      const cleaned = xml.replace(/<c r="([A-Z]+\d+)"(?:\s+[^>]*)?(?:\/>|><\/c>)/g, (cellXml: string, ref: string) => {
-        return innerRefs.has(ref) ? "" : cellXml;
-      });
-      zip.file(name, cleaned);
-    }),
-  );
-  const out = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
-  return out;
+  return XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
 }

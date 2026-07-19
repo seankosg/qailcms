@@ -11,88 +11,9 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Download, Loader2 } from "lucide-react";
-import { TM_COLUMNS, TM_GANTT_ORIGINAL_ORDER } from "@/lib/task-management/columns";
-import {
-  buildStyledWorkbook,
-  saveStyledWorkbook,
-  type ColumnKind,
-  type ColumnGroupTag,
-} from "@/lib/excel/styled-workbook";
+import { TM_COLUMNS } from "@/lib/task-management/columns";
+import { streamXlsxExport } from "@/lib/excel/stream-export";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
-// -- Column → Gantt group mapping (matches upload template Gantt sheet) ------
-const GROUP_BY_KEY: Record<string, ColumnGroupTag> = {
-  __sno: "basic",
-  plan_start: "plan",
-  plan_end: "plan",
-  plan_days: "plan",
-  actual_start: "actual",
-  actual_finish: "actual",
-  actual_duration: "actual",
-  actual_progress: "actual",
-  forecast_end: "progress",
-  plan_progress: "progress",
-  progress_variance: "progress",
-  expected_progress_today: "progress",
-  today_gap: "progress",
-  slip_days: "progress",
-  auto_judgment: "progress",
-};
-function ganttGroup(key: string): ColumnGroupTag {
-  return GROUP_BY_KEY[key] ?? "basic";
-}
-
-const NUMFMT_BY_KEY: Record<string, string> = {
-  // 원본 템플릿과 동일한 yyyy-mm-dd 날짜 표기
-  plan_start: "yyyy-mm-dd",
-  plan_end: "yyyy-mm-dd",
-  actual_start: "yyyy-mm-dd",
-  actual_finish: "yyyy-mm-dd",
-  forecast_end: "yyyy-mm-dd",
-  data_date: "yyyy-mm-dd",
-  actual_progress: "0.0%",
-  plan_progress: "0.0%",
-  expected_progress_today: "0%",
-  progress_variance: "+0.0%;-0.0%;0.0%",
-  today_gap: "+0%;-0%;0%",
-  plan_days: "0;-0;-",
-  actual_duration: "0;-0;-",
-  slip_days: "+0;-0;-",
-};
-
-function toIso(v: unknown): string | null {
-  if (v == null || v === "") return null;
-  const s = String(v).trim();
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  if (!m) return null;
-  const y = Number(m[1]);
-  if (y < 2000 || y > 2100) return null;
-  return m[0];
-}
-
-function computeGanttRange(rows: Record<string, unknown>[], dataDateIso: string) {
-  const dates: string[] = [];
-  for (const r of rows) {
-    for (const k of ["plan_start", "plan_end", "actual_start", "actual_finish", "forecast_end"]) {
-      const iso = toIso(r[k]);
-      if (iso) dates.push(iso);
-    }
-  }
-  if (dates.length === 0) return null;
-  dates.push(dataDateIso);
-  dates.sort();
-  const start = dates[0];
-  const endActual = dates[dates.length - 1];
-  const startMs = Date.parse(start + "T00:00:00Z");
-  const endActualMs = Date.parse(endActual + "T00:00:00Z");
-  if (!Number.isFinite(startMs) || !Number.isFinite(endActualMs)) return null;
-  // 원본 템플릿 기본 153일. 데이터가 더 짧으면 최소 153일 확보, 더 길면 730일 캡.
-  const DEFAULT_DAYS = 153;
-  const MAX_DAYS = 730;
-  const actualDays = Math.round((endActualMs - startMs) / 86400000);
-  const days = Math.min(MAX_DAYS, Math.max(DEFAULT_DAYS, actualDays));
-  const capped = new Date(startMs + days * 86400000).toISOString().slice(0, 10);
-  return { startDate: start, endDate: capped };
-}
 
 type ExportFormat = "view" | "reimport";
 
@@ -109,55 +30,29 @@ function timestamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
-function styledCols(
-  keys: string[],
-  format: ExportFormat,
-  resolveLabel: (key: string) => string,
-) {
-  return keys.map((k) => {
-    const def = TM_COLUMNS.find((c) => c.key === k);
-    let kind: ColumnKind = "text";
-    if (def) {
-      if (def.type === "date") kind = "date";
-      else if (def.type === "number" || def.type === "percent") kind = "number";
-      else if (def.type === "boolean") kind = "boolean";
-    }
-    return {
-      key: k,
-      label: format === "reimport" ? k : resolveLabel(k),
-      kind,
-      widthPx: def?.width,
-    };
-  });
-}
+// 자동판정/색상용 정적 numFmt (수식 없음 — 값은 이미 서버에서 계산됨)
+const NUMFMT_BY_KEY: Record<string, string> = {
+  plan_start: "yyyy-mm-dd",
+  plan_end: "yyyy-mm-dd",
+  actual_start: "yyyy-mm-dd",
+  actual_finish: "yyyy-mm-dd",
+  forecast_end: "yyyy-mm-dd",
+  data_date: "yyyy-mm-dd",
+  actual_progress: "0.0%",
+  plan_progress: "0.0%",
+  progress_variance: "+0.0%;-0.0%;0.0%",
+  plan_days: "0;-0;-",
+  actual_duration: "0;-0;-",
+  slip_days: "+0;-0;-",
+};
 
-/**
- * 원본 xlsx `Gantt` 시트 A..T 순서를 재현하는 컬럼 스펙.
- * View 모드에서만 사용 — user visibility와 무관하게 원본 순서/한글 라벨을 강제.
- */
-function ganttOriginalCols() {
-  return TM_GANTT_ORIGINAL_ORDER.map((c) => {
-    const def = c.key ? TM_COLUMNS.find((d) => d.key === c.key) : undefined;
-    let kind: ColumnKind = "text";
-    if (def) {
-      if (def.type === "date") kind = "date";
-      else if (def.type === "number" || def.type === "percent") kind = "number";
-      else if (def.type === "boolean") kind = "boolean";
-    }
-    // 원본 컬럼별 너비 (엑셀 wch → 대략적인 px 환산: wch * 7)
-    const WIDTHS_WCH: Record<string, number> = {
-      A: 5, B: 9, C: 15, D: 6, E: 37, F: 9, G: 34, H: 13, I: 7, J: 8,
-      K: 10, L: 11, M: 5, N: 11, O: 7, P: 8, Q: 9, R: 9, S: 6, T: 11,
-    };
-    const widthPx = (WIDTHS_WCH[c.letter] ?? 10) * 7;
-    return {
-      key: c.key ?? `__blank_${c.letter}`,
-      label: c.label,
-      kind,
-      widthPx,
-    };
-  });
-}
+// 자동판정 값별 정적 fill (ARGB)
+const JUDGMENT_FILL: Record<string, string> = {
+  Delayed: "FFFFC7CE",       // 지연 — 빨강
+  "At Risk": "FFFFE699",     // 위험 — 노랑
+  "On Track": "FFC6EFCE",    // 정상 — 초록
+  Completed: "FFD9E1F2",     // 완료 — 파랑
+};
 
 export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
   const [format, setFormat] = useState<ExportFormat>("view");
@@ -168,61 +63,61 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
     setBusy(true);
     try {
       const isView = format === "view";
-      const keys = format === "reimport" ? TM_COLUMNS.map((c) => c.key) : visibleKeys;
-      const dataDateIso = new Date().toISOString().slice(0, 10);
-      const ganttRange = isView ? computeGanttRange(rows, dataDateIso) : null;
+      const keys = isView ? visibleKeys : TM_COLUMNS.map((c) => c.key);
 
-      // View 모드: 원본 A열(Sno) 자동 순번 주입
-      const exportRows = isView
-        ? rows.map((r, i) => ({ ...r, __sno: i + 1 }))
-        : rows;
+      const columns = keys.map((k) => ({
+        key: k,
+        label: isView ? resolveLabel(k) : k,
+      }));
 
-      // View: 원본 A..T 순서 강제. 프리즈는 I열(상태)까지 = 9.
-      // Re-import: 첫 컬럼만.
-      const viewCols = ganttOriginalCols();
-      const freezeCols = isView ? 9 : 1;
+      const columnWidths: Record<string, number> = {};
+      for (const k of keys) {
+        const def = TM_COLUMNS.find((c) => c.key === k);
+        columnWidths[k] = def?.width ? Math.max(8, Math.min(60, Math.round(def.width / 7))) : 18;
+      }
 
-      const wb = buildStyledWorkbook({
-        title: `Task Management Raw Data  (${format === "reimport" ? "Re-import" : "View"})`,
-        columns: isView ? viewCols : styledCols(keys, format, resolveLabel),
-        rows: exportRows,
-        sheetName: isView ? "Gantt" : "Task Management",
-        freezeCols,
-        theme: isView ? "gantt" : "default",
-        columnGroup: isView ? ganttGroup : undefined,
-        dataDate: isView ? dataDateIso : undefined,
-        numFmtByKey: isView ? NUMFMT_BY_KEY : undefined,
-        cellFillOverride: isView
-          ? (key, value) => (key === "risk" && value === "High" ? "FFED7D31" : null)
-          : undefined,
-        rowStyleOverride: isView
-          ? (row) =>
-              row["level"] === "parent"
-                ? { fillRgb: "FF305496", fontColorRgb: "FFFFFFFF", bold: true }
-                : null
-          : undefined,
-        gantt:
-          isView && ganttRange
-            ? {
-                startDate: ganttRange.startDate,
-                endDate: ganttRange.endDate,
-                rowDates: (row) => {
-                  const ap = Number(row["actual_progress"] ?? 0);
-                  return {
-                    planStart: toIso(row["plan_start"]),
-                    planEnd: toIso(row["plan_end"]),
-                    actualStart: toIso(row["actual_start"]),
-                    actualFinish: toIso(row["actual_finish"]),
-                    forecastEnd: toIso(row["forecast_end"]),
-                    done: Number.isFinite(ap) && ap >= 1,
-                  };
-                },
-              }
-            : undefined,
-        formulaMode: isView ? "template" : undefined,
-        settingsSheet: isView ? { alarmThreshold: -0.05 } : undefined,
+      const dateFields = TM_COLUMNS.filter((c) => c.type === "date").map((c) => c.key);
+
+      const now = new Date();
+      const exportedTs = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+      const rowsSnapshot = rows;
+      await streamXlsxExport({
+        filename: `task-management_${format}_${timestamp()}.xlsx`,
+        sheetName: "Task Management",
+        columns,
+        columnWidths,
+        dateFields,
+        numFmtByKey: NUMFMT_BY_KEY,
+        header: {
+          title: `Task Management Raw Data  (${isView ? "View" : "Re-import"})`,
+          metaRows: [
+            `Exported: ${exportedTs}`,
+            `Rows: ${rows.length.toLocaleString()}   Columns: ${columns.length}`,
+            "",
+            "",
+            "",
+          ],
+          freezeCols: isView ? 3 : 1,
+        },
+        cellFillFor: (key, value) => {
+          if (key === "auto_judgment" && typeof value === "string") {
+            return JUDGMENT_FILL[value] ?? null;
+          }
+          if (key === "risk" && value === "High") return "FFED7D31";
+          return null;
+        },
+        rowFillFor: (row) => {
+          const j = row["auto_judgment"];
+          if (j === "Delayed") return "FFFDECEA";
+          return null;
+        },
+        fetchPage: async (offset) => {
+          if (offset >= rowsSnapshot.length) return { rows: [], total: rowsSnapshot.length };
+          const slice = rowsSnapshot.slice(offset, offset + 1000);
+          return { rows: slice as Record<string, unknown>[], total: rowsSnapshot.length };
+        },
       });
-      await saveStyledWorkbook(wb, `task-management_${format}_${timestamp()}.xlsx`);
       onOpenChange(false);
     } finally {
       setBusy(false);
@@ -259,6 +154,9 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
               </label>
             </RadioGroup>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Gantt 캘린더/파생 수식은 폐기되어 값은 정적으로 기록됩니다. 지연/위험 행은 셀 배경색으로 표시됩니다.
+          </p>
         </div>
 
         <DialogFooter>
