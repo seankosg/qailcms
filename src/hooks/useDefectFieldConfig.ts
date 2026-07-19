@@ -11,7 +11,7 @@ export interface DefectFieldConfigRow {
   sort_order: number;
   group_key: string | null;
   note: string | null;
-  origin: "hdec" | "aconex" | "system" | null;
+  origin: "hdec" | "aconex" | "system" | "derived" | null;
   source_label: string | null;
   updated_at: string;
   updated_by: string | null;
@@ -81,7 +81,7 @@ export function useDefectFieldHelpers() {
       return "System";
     };
 
-    const getSourceOrigin = (field: string): "hdec" | "aconex" | "system" => {
+    const getSourceOrigin = (field: string): "hdec" | "aconex" | "system" | "derived" => {
       const row = byField.get(field);
       if (row?.origin) return row.origin;
       if (field.startsWith("hdec_")) return "hdec";
