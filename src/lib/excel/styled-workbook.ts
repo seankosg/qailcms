@@ -1157,6 +1157,7 @@ async function applyCfViaExcelJs(
   spec: WorkbookCfSpec,
 ): Promise<ArrayBuffer> {
   const ExcelJS = (await import("exceljs")).default;
+  const JSZip = (await import("jszip")).default;
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(input);
   const ws = wb.getWorksheet(spec.sheetName);
@@ -1214,5 +1215,39 @@ async function applyCfViaExcelJs(
     });
   });
   const out = await wb.xlsx.writeBuffer();
-  return out as ArrayBuffer;
+  return sanitizeMergedCellXml(out as ArrayBuffer, JSZip);
+}
+
+async function sanitizeMergedCellXml(
+  input: ArrayBuffer,
+  JSZipCtor: typeof import("jszip").default,
+): Promise<ArrayBuffer> {
+  const zip = await JSZipCtor.loadAsync(input);
+  const sheetNames = Object.keys(zip.files).filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name));
+  await Promise.all(
+    sheetNames.map(async (name) => {
+      const file = zip.file(name);
+      if (!file) return;
+      const xml = await file.async("string");
+      if (!xml.includes("<mergeCells")) return;
+      const innerRefs = new Set<string>();
+      for (const match of xml.matchAll(/<mergeCell ref="([A-Z]+\d+):([A-Z]+\d+)"\s*\/>/g)) {
+        const start = XLSX.utils.decode_cell(match[1]);
+        const end = XLSX.utils.decode_cell(match[2]);
+        for (let r = start.r; r <= end.r; r++) {
+          for (let c = start.c; c <= end.c; c++) {
+            if (r === start.r && c === start.c) continue;
+            innerRefs.add(XLSX.utils.encode_cell({ r, c }));
+          }
+        }
+      }
+      if (innerRefs.size === 0) return;
+      const cleaned = xml.replace(/<c r="([A-Z]+\d+)"(?:\s+[^>]*)?(?:\/>|><\/c>)/g, (cellXml, ref) => {
+        return innerRefs.has(ref) ? "" : cellXml;
+      });
+      zip.file(name, cleaned);
+    }),
+  );
+  const out = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+  return out;
 }
