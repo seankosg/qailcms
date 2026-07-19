@@ -302,10 +302,10 @@ export function AbdPlanVsActualCard({
                         const v = row.variance as number | null;
                         const fill =
                           v == null
-                            ? "hsl(var(--muted))"
+                            ? "var(--color-muted)"
                             : v < 0
-                              ? "hsl(var(--destructive))"
-                              : "hsl(160 60% 45%)";
+                              ? "var(--color-destructive)"
+                              : "var(--color-emerald-600)";
                         return <Cell key={i} fill={fill} />;
                       })}
                     </Bar>
