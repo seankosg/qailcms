@@ -599,6 +599,10 @@ export async function parseDefectExcel(
     if (sk.col) {
       cols.source_issue_no = sk.col;
       sourceKeyOrigin = sk.origin;
+      // resolver가 채택한 실제 헤더를 headerToFieldMap에 반영해 다이얼로그가 매핑됨으로 표시.
+      const chosen = entries.find((e) => e.col === sk.col);
+      const chosenHeader = chosen ? (chosen.header || chosen.letter) : null;
+      if (chosenHeader) headerToFieldMap[chosenHeader] = "source_issue_no";
     }
   }
   for (const target of DEFECT_TARGET_FIELDS) {

@@ -1,77 +1,35 @@
-# Import Preset 관리 기능 (SM 우선)
+## 원인
 
-Admin → Mapping 화면의 Snag List Management 도메인에 **Preset** 탭을 추가하고, DB로 관리되는 프리셋이 SM Import의 Column Select 다이얼로그의 프리셋 버튼 목록에 실시간 연동되도록 구현합니다. 이번 단계는 SM만 대상이며, 이후 Task Management → ABD 순서로 동일 패턴으로 확장합니다.
+SM 임포트 컬럼 선택 다이얼로그의 "매핑 필드" 컬럼은 `parseDefectExcel`이 반환하는 `headerToFieldMap`을 그대로 표시합니다. 이 맵은 `toDefectFieldName()`으로 채워지는데, `src/lib/defect-management/parser.ts:490` 에서 다음 규칙이 있습니다.
 
-## 범위 (확정된 요구사항)
+```ts
+if (norm === "id") return "";  // "ID"/"id" 헤더는 시스템 컬럼으로 간주해 매핑 제거
+```
 
-- 전체 공유(글로벌) 프리셋 — 모든 사용자가 동일한 버튼 목록을 봅니다.
-- 기존 3개(`Update from Aconex`, `HDEC's Update`, `Cat Check`)는 초기 시드로 DB에 삽입되고 편집 가능. `New Upload`는 항상 첫 번째로 표시되는 고정 프리셋(DB 미저장)으로 유지.
-- 프리셋 관리 속성: 라벨(버튼 이름), 포함할 canonical field 목록, 표시 순서.
-- **프리셋 추가 / 편집(라벨·필드·순서) / 삭제 전부 지원**.
-- 색상, 소유자, 개인 프리셋은 이번 범위 제외.
+반면 실제 파싱 시에는 별도 함수 `resolveSourceIssueNoColumn()`이 LetsBuild 원본 파일에서 `"ID"` 헤더를 **`source_issue_no`로 승격**해서 사용합니다 (parser.ts:394, 466-468). 즉:
 
-## 1. DB 스키마
+- 실제 임포트 로직: `ID → source_issue_no` (정상 동작)
+- 다이얼로그 표시용 맵: `ID → ""` → UI에서 `(unmapped)` 로 표시
 
-새 테이블 `public.defect_import_presets`:
+그래서 "매핑되어 있는데 언맵드로 보이는" 현상이 발생합니다.
 
-| 컬럼 | 타입 | 설명 |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `label` | text NOT NULL | 버튼에 표시되는 이름 (편집 가능) |
-| `fields` | text[] NOT NULL DEFAULT '{}' | canonical field 슬러그 배열 |
-| `sort_order` | int NOT NULL DEFAULT 0 | 오름차순 표시 |
-| `created_at`, `updated_at` | timestamptz | 표준 |
+부차적 문제: `DefectColumnSelect.getRequirement()`는 `field === "source_issue_no"`일 때만 필수 잠금을 거는데, `ID` 헤더는 field가 빈 문자열이라 **필수 컬럼 잠금이 걸리지 않습니다**. admin이 아닌 사용자도 ID를 체크 해제할 수 있어 임포트 실패로 이어질 수 있습니다.
 
-- `GRANT SELECT` → `anon, authenticated` (프리셋 목록은 Import 화면에서 항상 읽기 가능).
-- `GRANT INSERT/UPDATE/DELETE` → `authenticated`, `GRANT ALL` → `service_role`.
-- RLS: `SELECT` 는 모두 허용. `INSERT/UPDATE/DELETE` 는 `has_role(auth.uid(),'admin') OR has_role(auth.uid(),'d_superuser')`.
-- `updated_at` 자동 갱신 트리거.
-- 같은 마이그레이션에서 기존 3개 프리셋 시드 INSERT.
+## 수정 방안
 
-## 2. Admin UI — 신규 Preset 탭
+1. `parseDefectExcel`이 `headerToFieldMap`을 만들 때, `resolveSourceIssueNoColumn`이 실제로 채택한 컬럼(레터/헤더)을 알아내어 그 헤더의 매핑을 `"source_issue_no"`로 덮어씌운다.
+   - resolver는 이미 `{col, origin}`을 반환하므로, `entries`에서 해당 letter를 찾아 원본 헤더 문자열을 얻고 `headerToFieldMap[thatHeader] = "source_issue_no"`로 설정.
+   - 이렇게 하면 LetsBuild 원본의 "ID", View export의 "ID No", 별칭으로 지정된 헤더 모두 다이얼로그에서 `source_issue_no` (Aconex 배지 포함) 로 표시됨.
 
-`src/routes/_authenticated/admin/mapping.tsx` 의 Snag List Management 도메인 `Tabs` 에 `<TabsTrigger value="preset">Preset</TabsTrigger>` 추가. 콘텐츠는 신규 컴포넌트 `src/components/admin/DefectImportPresetTable.tsx`.
+2. 필수 잠금은 (1)이 반영되면 기존 `field === "source_issue_no"` 분기로 자동 잠금됨. 별도 코드 변경 불필요.
 
-기능:
-- **목록**: sort_order 오름차순 표시. 각 행에 라벨, 필드 chip 리스트, 순서 이동(↑/↓), 편집·삭제 버튼.
-- **추가**: 상단 우측 "+ Preset 추가" 버튼 → 빈 라벨/빈 필드 로우 즉시 생성 후 편집 모드 진입. 라벨은 UNIQUE 제약 없이 자유롭게(중복 허용).
-- **라벨 편집**: 인라인 입력, Enter/blur 저장.
-- **필드 편집**: 팝오버 내 체크박스 리스트. 옵션 소스는 `useDefectFieldHelpers()` 의 canonical field 목록(라벨은 Field Config 라벨 표시, 검색 입력 포함).
-- **순서 변경**: ↑/↓ 버튼으로 인접 행과 sort_order swap.
-- **삭제**: 확인 다이얼로그.
-- 데이터 계층: `supabase` 클라이언트 + React Query (`queryKey: ['defect-import-presets']`). 각 mutation 후 `invalidateQueries`.
-- 비-admin 은 읽기 전용(버튼 disable).
+3. 회귀 방지 확인 항목:
+   - Re-import 파일(헤더가 이미 `source_issue_no`인 경우) — resolver 경로 (2) 로 잡히므로 동일하게 정상 표시.
+   - UUID 오염으로 resolver가 컬럼을 거부한 경우 — `sk.col === null`, 덮어쓰기 스킵 → 기존과 동일하게 unmapped.
+   - `excludedFields`에 `source_issue_no`가 이미 있으면 resolver 자체를 건너뛰므로 그대로 unmapped(현재 동작 유지).
 
-## 3. Import 다이얼로그 연동
+## 변경 파일
 
-`src/components/defect-management/import/DefectColumnSelect.tsx`:
-- 하드코딩된 `ACONEX_FIELDS`, `HDEC_FIELDS`, `CAT_CHECK_FIELDS` 상수 및 3개 프리셋 정의 제거.
-- `useQuery(['defect-import-presets'])` 로 DB 프리셋 로드.
-- 최종 presets 배열:
-  ```
-  [
-    { id: 'new-upload', label: 'New Upload' },
-    ...dbPresets.map(p => ({
-      id: p.id,
-      label: p.label,
-      matchedHeaders: headers.filter(h => p.fields.includes(headerToFieldMap[h])),
-    })),
-  ]
-  ```
-- 색상 `className` 은 이번 범위에서 제거.
-- 로딩 중에는 `New Upload` 만 노출.
+- `src/lib/defect-management/parser.ts` — `parseDefectExcel` 내부, resolver 호출 직후 `headerToFieldMap` 보정 블록 추가 (약 5줄).
 
-## 4. 사이드 이펙트 / 후속
-
-- Admin 이 프리셋을 저장·수정·추가·삭제·재정렬 하면 다음 SM Import 세션의 프리셋 버튼에 즉시 반영.
-- 파서/헤더 매핑/필수 필드 로직은 변경 없음.
-- Task / ABD 는 이번 범위 밖. 이후 요청 시 `task_management_import_presets`, `abd_import_presets` 를 동일 패턴으로 순차 추가.
-
-## 산출물
-
-1. Supabase 마이그레이션 — 테이블 + GRANT + RLS + 트리거 + 3개 시드 INSERT.
-2. `src/components/admin/DefectImportPresetTable.tsx` 신규 (추가/편집/순서/삭제 지원).
-3. `src/routes/_authenticated/admin/mapping.tsx` — SM 섹션에 Preset 탭 추가.
-4. `src/components/defect-management/import/DefectColumnSelect.tsx` — DB 프리셋 소비로 교체.
-
-승인해주시면 위 순서로 진행하겠습니다.
+다른 파일은 수정하지 않습니다. TM/ABD 임포트는 이 경로를 사용하지 않으므로 영향 없음.
