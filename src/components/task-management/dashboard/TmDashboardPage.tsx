@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft, Gauge, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,13 +14,18 @@ import {
   todayIso,
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
-import { computeDelayTopN, type OwnerDim } from "@/lib/task-management/delay-utils";
+import {
+  computeDelayTopN,
+  type OwnerDim,
+  type OwnerLeaderboardRow,
+} from "@/lib/task-management/delay-utils";
 import { KpiStrip } from "./KpiStrip";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { DelayTopTable } from "./DelayTopTable";
 import { OwnerLeaderboardCard } from "./OwnerLeaderboardCard";
 import { WeeklyDelayTrend } from "./WeeklyDelayTrend";
 import { JudgmentStageBreakdown } from "./JudgmentStageBreakdown";
+import { OwnerDetailDialog } from "./OwnerDetailDialog";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/dashboard");
 
