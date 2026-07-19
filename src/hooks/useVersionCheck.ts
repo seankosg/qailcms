@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 
 const POLL_INTERVAL_MS = 60_000;
@@ -16,6 +16,10 @@ let toastShown = false;
 
 export function useVersionCheck() {
   const [latestBuildId, setLatestBuildId] = useState<string | null>(null);
+  const [dismissedBuildId, setDismissedBuildId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return window.sessionStorage.getItem(SESSION_DISMISS_KEY);
+  });
 
   useEffect(() => {
     const current = getCurrentBuildId();
@@ -73,27 +77,20 @@ export function useVersionCheck() {
     };
   }, []);
 
-  const dismissedBuildId =
-    typeof window !== "undefined"
-      ? window.sessionStorage.getItem(SESSION_DISMISS_KEY)
-      : null;
-
   const updateAvailable =
     !!latestBuildId && latestBuildId !== dismissedBuildId;
 
-  const dismiss = () => {
-    if (latestBuildId && typeof window !== "undefined") {
-      window.sessionStorage.setItem(SESSION_DISMISS_KEY, latestBuildId);
-      // force re-render by resetting state to same value with dismiss reflected via reload of consumer
-      setLatestBuildId((v) => (v ? v + "" : v));
-    }
-  };
+  const dismiss = useCallback(() => {
+    if (!latestBuildId || typeof window === "undefined") return;
+    window.sessionStorage.setItem(SESSION_DISMISS_KEY, latestBuildId);
+    setDismissedBuildId(latestBuildId);
+  }, [latestBuildId]);
 
-  const reloadNow = () => {
+  const reloadNow = useCallback(() => {
     window.location.replace(
       window.location.pathname + "?__reset=" + Date.now(),
     );
-  };
+  }, []);
 
   return { updateAvailable, latestBuildId, dismiss, reloadNow };
 }
