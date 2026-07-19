@@ -33,7 +33,8 @@ export interface ParentSeed {
   discipline: Discipline;
   task_name?: string | null;
   category?: string | null;
-  pic?: string | null;
+  hdec_pic_name?: string | null;
+  hdec_eng_name?: string | null;
   floor_level?: string | null;
   location?: string | null;
   risk?: string | null;
@@ -53,7 +54,8 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
   const [taskName, setTaskName] = useState("");
   const [subTaskDesc, setSubTaskDesc] = useState("");
   const [category, setCategory] = useState("");
-  const [pic, setPic] = useState("");
+  const [hdecPic, setHdecPic] = useState("");
+  const [hdecEng, setHdecEng] = useState("");
   const [floorLevel, setFloorLevel] = useState("");
   const [location, setLocation] = useState("");
   const [rowType, setRowType] = useState<string>("");
@@ -69,7 +71,8 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
     setTaskName(parent.task_name ?? "");
     setSubTaskDesc("");
     setCategory(parent.category ?? "");
-    setPic(parent.pic ?? "");
+    setHdecPic(parent.hdec_pic_name ?? "");
+    setHdecEng(parent.hdec_eng_name ?? "");
     setFloorLevel(parent.floor_level ?? "");
     setLocation(parent.location ?? "");
     setRowType("");
@@ -94,7 +97,8 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
           task_name: taskName.trim(),
           sub_task_desc: subTaskDesc.trim() || null,
           category: category.trim() || null,
-          pic: pic.trim() || null,
+          hdec_pic_name: hdecPic.trim() || null,
+          hdec_eng_name: hdecEng.trim() || null,
           floor_level: floorLevel.trim() || null,
           location: location.trim() || null,
           row_type: rowType || null,
@@ -153,8 +157,12 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
               <Input value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1" />
             </div>
             <div>
-              <Label className="text-xs">PIC</Label>
-              <Input value={pic} onChange={(e) => setPic(e.target.value)} className="mt-1" />
+              <Label className="text-xs">HDEC PIC (한글)</Label>
+              <Input value={hdecPic} onChange={(e) => setHdecPic(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">HDEC ENG (영문)</Label>
+              <Input value={hdecEng} onChange={(e) => setHdecEng(e.target.value)} className="mt-1" />
             </div>
             <div>
               <Label className="text-xs">Level (층)</Label>

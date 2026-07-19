@@ -11,7 +11,7 @@ export interface TaskDashboardFilters {
 }
 
 const SELECT_COLS =
-  "id, task_no, task_name, discipline, team, plot, pic, category, floor_level, risk, level, status_manual, auto_judgment, plan_start, plan_end, actual_start, actual_progress, slip_days, data_date";
+  "id, task_no, task_name, discipline, team, plot, hdec_pic_name, hdec_eng_name, category, floor_level, risk, level, status_manual, auto_judgment, plan_start, plan_end, actual_start, actual_progress, slip_days, data_date";
 
 async function fetchAll(filters: TaskDashboardFilters): Promise<TaskItem[]> {
   const pageSize = 1000;
@@ -33,7 +33,7 @@ async function fetchAll(filters: TaskDashboardFilters): Promise<TaskItem[]> {
     if (filters.q.trim()) {
       const q = filters.q.trim().replace(/[%,]/g, "");
       query = query.or(
-        `task_no.ilike.%${q}%,task_name.ilike.%${q}%,pic.ilike.%${q}%,category.ilike.%${q}%`,
+        `task_no.ilike.%${q}%,task_name.ilike.%${q}%,hdec_pic_name.ilike.%${q}%,hdec_eng_name.ilike.%${q}%,category.ilike.%${q}%`,
       );
     }
 

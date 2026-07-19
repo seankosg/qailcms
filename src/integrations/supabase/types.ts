@@ -2138,6 +2138,8 @@ export type Database = {
           discipline: string
           floor_level: string | null
           forecast_end: string | null
+          hdec_eng_name: string | null
+          hdec_pic_name: string | null
           id: string
           imported_at: string
           imported_by: string | null
@@ -2147,7 +2149,6 @@ export type Database = {
           location: string | null
           main_task_no: string | null
           owner_user_id: string | null
-          pic: string | null
           plan_days: number | null
           plan_end: string | null
           plan_progress: number | null
@@ -2180,6 +2181,8 @@ export type Database = {
           discipline: string
           floor_level?: string | null
           forecast_end?: string | null
+          hdec_eng_name?: string | null
+          hdec_pic_name?: string | null
           id?: string
           imported_at?: string
           imported_by?: string | null
@@ -2189,7 +2192,6 @@ export type Database = {
           location?: string | null
           main_task_no?: string | null
           owner_user_id?: string | null
-          pic?: string | null
           plan_days?: number | null
           plan_end?: string | null
           plan_progress?: number | null
@@ -2222,6 +2224,8 @@ export type Database = {
           discipline?: string
           floor_level?: string | null
           forecast_end?: string | null
+          hdec_eng_name?: string | null
+          hdec_pic_name?: string | null
           id?: string
           imported_at?: string
           imported_by?: string | null
@@ -2231,7 +2235,6 @@ export type Database = {
           location?: string | null
           main_task_no?: string | null
           owner_user_id?: string | null
-          pic?: string | null
           plan_days?: number | null
           plan_end?: string | null
           plan_progress?: number | null
