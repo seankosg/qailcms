@@ -1140,11 +1140,6 @@ async function applyCfViaExcelJs(
   spec: WorkbookCfSpec,
 ): Promise<ArrayBuffer> {
   const ExcelJS = (await import("exceljs")).default;
-  const colToNum = (letters: string): number => {
-    let n = 0;
-    for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
-    return n;
-  };
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(input);
   const ws = wb.getWorksheet(spec.sheetName);
@@ -1156,24 +1151,20 @@ async function applyCfViaExcelJs(
   //
   // 1) 병합 마스킹: 각 병합 영역에서 좌상단이 아닌 셀들의 값/스타일을 제거.
   //    ExcelJS 는 병합 영역 안쪽 셀도 개별 셀로 유지하므로 명시적으로 정리한다.
-  for (const rangeRef of Object.keys(
-    (ws as unknown as { _merges?: Record<string, unknown> })._merges ?? {},
-  )) {
-    // rangeRef 는 "A1:ABW1" 같은 A1 문자열. ExcelJS 내부 형식 대응.
-    const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(rangeRef);
-    if (!m) continue;
-    const c1 = colToNum(m[1]);
-    const r1 = Number(m[2]);
-    const c2 = colToNum(m[3]);
-    const r2 = Number(m[4]);
-    for (let r = r1; r <= r2; r++) {
-      for (let c = c1; c <= c2; c++) {
-        if (r === r1 && c === c1) continue;
-        const cell = ws.getCell(r, c);
-        // value 를 null 로 두고 style 도 초기화 → 병합 안쪽은 완전 비움
-        cell.value = null;
-        // ExcelJS 는 style 을 얕은 프록시로 관리. 개별 속성만 리셋.
-        (cell as unknown as { style: Record<string, unknown> }).style = {};
+  {
+    const mergesMap = (ws as unknown as {
+      _merges?: Record<string, { model: { top: number; left: number; bottom: number; right: number } }>;
+    })._merges ?? {};
+    for (const key of Object.keys(mergesMap)) {
+      const mm = mergesMap[key]?.model;
+      if (!mm) continue;
+      for (let r = mm.top; r <= mm.bottom; r++) {
+        for (let c = mm.left; c <= mm.right; c++) {
+          if (r === mm.top && c === mm.left) continue;
+          const cell = ws.getCell(r, c);
+          cell.value = null;
+          (cell as unknown as { style: Record<string, unknown> }).style = {};
+        }
       }
     }
   }
