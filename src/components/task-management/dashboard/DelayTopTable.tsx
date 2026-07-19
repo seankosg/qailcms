@@ -54,8 +54,8 @@ export function DelayTopTable({ items, limit = 20 }: Props) {
                     className="cursor-pointer border-t hover:bg-accent/30"
                     onClick={() =>
                       navigate({
-                        to: "/closure/task-management/raw-data",
-                        search: { q: r.taskNo, source: "dashboard" } as any,
+                        to: "/closure/task-management/detail/$id",
+                        params: { id: String(r.id) },
                       })
                     }
                   >
