@@ -26,7 +26,8 @@ interface Row {
   plan_end: string | null;
   slip_days: number | null;
   auto_judgment: string | null;
-  pic: string | null;
+  hdec_pic_name: string | null;
+  hdec_eng_name: string | null;
   sub_task_desc: string | null;
   sort_order: number | null;
 }
@@ -74,7 +75,7 @@ export function TaskTreePage() {
       const { data, error } = await (supabase as any)
         .from("task_management_raw")
         .select(
-          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, pic, sub_task_desc, sort_order",
+          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order",
         )
         .eq("discipline", discipline)
         .order("sort_order", { ascending: true })
@@ -107,7 +108,7 @@ export function TaskTreePage() {
         if (!anyBehind) return false;
       }
       if (!q) return true;
-      const hay = [p.task_no, p.task_name, ...kids.flatMap((k) => [k.task_no, k.task_name, k.sub_task_desc, k.pic])]
+      const hay = [p.task_no, p.task_name, ...kids.flatMap((k) => [k.task_no, k.task_name, k.sub_task_desc, k.hdec_pic_name, k.hdec_eng_name])]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -244,7 +245,7 @@ export function TaskTreePage() {
                           <tr key={k.id} className="border-t hover:bg-accent/30">
                             <td className="px-2 py-1 font-mono">{k.task_no}</td>
                             <td className="px-2 py-1">{k.sub_task_desc ?? "-"}</td>
-                            <td className="px-2 py-1">{k.pic ?? "-"}</td>
+                            <td className="px-2 py-1">{k.hdec_pic_name ?? k.hdec_eng_name ?? "-"}</td>
                             <td className="px-2 py-1 text-[10px] tabular-nums">
                               {k.plan_start ?? "-"} ~ {k.plan_end ?? "-"}
                             </td>
