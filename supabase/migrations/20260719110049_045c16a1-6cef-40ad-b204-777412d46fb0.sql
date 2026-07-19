@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.resolve_login_email(text) TO anon;
