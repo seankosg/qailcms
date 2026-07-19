@@ -492,6 +492,19 @@ export function DefectRawDataPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sorting, columnFilters, stateLoaded]);
 
+  // Progress 매트릭스에서 진입 시 URL 정리: source 및 drilldown 파라미터 제거하고
+  // 적용된 필터를 filters= JSON으로 흡수시킴
+  const progressCleanupDone = useRef(false);
+  useEffect(() => {
+    if (progressCleanupDone.current) return;
+    if (urlSearch.source !== "progress") return;
+    progressCleanupDone.current = true;
+    const patch: Record<string, any> = { filters: serializeFilters(columnFilters), page: 1 };
+    for (const key of DRILLDOWN_PARAMS) patch[key] = "";
+    setUrl(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearch.source]);
+
   // ── Local optimistic patch (for edit popover) ───────────────────────────
   const patchLocalItem = useCallback((_id: string, _patch: Record<string, any>) => {
     // 낙관적 갱신은 refetch로 대체 — 서버 페이지네이션 특성상 갱신 반영이 명확함.
