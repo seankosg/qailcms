@@ -852,12 +852,20 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
   const startImport = useCallback(async () => {
     if (isRunning) return;
+    const missingDiscipline = files.some(
+      (f) => f.status === "ready" && !f.validationError && !f.discipline,
+    );
+    if (missingDiscipline) {
+      toast.error("공종을 선택하세요 (선택없음 상태에서는 임포트할 수 없습니다)");
+      return;
+    }
     const ready = files.filter(
       (f) =>
         f.status === "ready" &&
         f.parsed &&
         f.parsed.length > 0 &&
         !f.validationError &&
+        !!f.discipline &&
         !!(f.dataDateOverride ?? f.dataDate),
     );
     if (ready.length === 0) {
