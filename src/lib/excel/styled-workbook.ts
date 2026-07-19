@@ -251,6 +251,20 @@ function setDateCell(
   ws[addr] = { t: "n", v: serial, z: numFmt, s: { ...style, numFmt } };
 }
 
+function maskMergedInnerCells(ws: XLSX.WorkSheet) {
+  const merges = (ws["!merges"] ?? []) as XLSX.Range[];
+  if (merges.length === 0) return;
+  const sheet = ws as Record<string, unknown>;
+  for (const merge of merges) {
+    for (let r = merge.s.r; r <= merge.e.r; r++) {
+      for (let c = merge.s.c; c <= merge.e.c; c++) {
+        if (r === merge.s.r && c === merge.s.c) continue;
+        delete sheet[XLSX.utils.encode_cell({ r, c })];
+      }
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Column type/width descriptor
 // ---------------------------------------------------------------------------
@@ -602,6 +616,7 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
   }
 
   ws["!merges"] = merges;
+  maskMergedInnerCells(ws);
 
   const lastRow = dataStart + dataRows.length - 1;
   ws["!ref"] = `A1:${lastColLetter}${Math.max(lastRow + 1, headerRowIdx + 1)}`;
@@ -786,6 +801,7 @@ function applyGanttTemplate(
   }
   filteredMerges.push({ s: { r: dataDateRow, c: 3 }, e: { r: dataDateRow, c: 5 } });
   ws["!merges"] = filteredMerges;
+  maskMergedInnerCells(ws);
 
   const dRow1 = dataDateRow + 1;
   const D4 = `$D$${dRow1}`;
@@ -1027,6 +1043,7 @@ function applyGanttTemplate(
     }
   }
 
+  maskMergedInnerCells(ws);
   cfBySheet.set(wb, { sheetName: (wb.SheetNames[0] as string) ?? "Sheet1", rules });
 }
 
@@ -1140,36 +1157,16 @@ async function applyCfViaExcelJs(
   spec: WorkbookCfSpec,
 ): Promise<ArrayBuffer> {
   const ExcelJS = (await import("exceljs")).default;
+  const JSZip = (await import("jszip")).default;
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(input);
   const ws = wb.getWorksheet(spec.sheetName);
   if (!ws) return input;
   // Excel의 "일부 콘텐츠에 문제가 있습니다" 복구 대화상자를 방지하기 위한 후처리.
-  // xlsx-js-style 이 병합 영역의 비-좌상단 셀에도 스타일 엔트리를 남기고,
-  // 모든 수식에 캐시값(<v>)이 없는 상태로 fullCalcOnLoad 를 켜면 Excel 이
-  // 스키마 위반으로 판단하고 파일을 자동 복구하려 시도한다.
+  // 병합 내부 셀 마스킹은 ExcelJS 로딩 전에 워크시트 객체에서 처리한다.
+  // ExcelJS에서 병합 내부 셀 값을 지우면 master 셀 값까지 같이 지워질 수 있다.
   //
-  // 1) 병합 마스킹: 각 병합 영역에서 좌상단이 아닌 셀들의 값/스타일을 제거.
-  //    ExcelJS 는 병합 영역 안쪽 셀도 개별 셀로 유지하므로 명시적으로 정리한다.
-  {
-    const mergesMap = (ws as unknown as {
-      _merges?: Record<string, { model: { top: number; left: number; bottom: number; right: number } }>;
-    })._merges ?? {};
-    for (const key of Object.keys(mergesMap)) {
-      const mm = mergesMap[key]?.model;
-      if (!mm) continue;
-      for (let r = mm.top; r <= mm.bottom; r++) {
-        for (let c = mm.left; c <= mm.right; c++) {
-          if (r === mm.top && c === mm.left) continue;
-          const cell = ws.getCell(r, c);
-          cell.value = null;
-          (cell as unknown as { style: Record<string, unknown> }).style = {};
-        }
-      }
-    }
-  }
-
-  // 2) fullCalcOnLoad 해제. 캐시된 <v> 값이 없어도 Excel 이 조용히
+  // 1) fullCalcOnLoad 해제. 캐시된 <v> 값이 없어도 Excel 이 조용히
   //    첫 렌더 후 재계산하도록 두면 복구 다이얼로그가 나오지 않는다.
   try {
     (wb as unknown as { calcProperties: { fullCalcOnLoad: boolean } })
@@ -1178,7 +1175,7 @@ async function applyCfViaExcelJs(
     /* older exceljs — ignore */
   }
 
-  // 3) 시트별 defaultRowHeight 명시 (customHeight="1" 짝 맞춤)
+  // 2) 시트별 defaultRowHeight 명시 (customHeight="1" 짝 맞춤)
   try {
     (ws as unknown as { properties: { defaultRowHeight: number } })
       .properties.defaultRowHeight = 15;
@@ -1218,5 +1215,47 @@ async function applyCfViaExcelJs(
     });
   });
   const out = await wb.xlsx.writeBuffer();
-  return out as ArrayBuffer;
+  return sanitizeMergedCellXml(out as ArrayBuffer, JSZip);
+}
+
+type ZipFileLike = { async: (type: "string") => Promise<string> };
+type ZipLike = {
+  files: Record<string, unknown>;
+  file: {
+    (name: string): ZipFileLike | null;
+    (name: string, data: string): ZipLike;
+  };
+  generateAsync: (options: { type: "arraybuffer"; compression: "DEFLATE" }) => Promise<ArrayBuffer>;
+};
+type JSZipLike = { loadAsync: (data: ArrayBuffer) => Promise<ZipLike> };
+
+async function sanitizeMergedCellXml(input: ArrayBuffer, JSZipCtor: JSZipLike): Promise<ArrayBuffer> {
+  const zip = await JSZipCtor.loadAsync(input);
+  const sheetNames = Object.keys(zip.files).filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name));
+  await Promise.all(
+    sheetNames.map(async (name) => {
+      const file = zip.file(name);
+      if (!file) return;
+      const xml = await file.async("string");
+      if (!xml.includes("<mergeCells")) return;
+      const innerRefs = new Set<string>();
+      for (const match of xml.matchAll(/<mergeCell ref="([A-Z]+\d+):([A-Z]+\d+)"\s*\/>/g)) {
+        const start = XLSX.utils.decode_cell(match[1]);
+        const end = XLSX.utils.decode_cell(match[2]);
+        for (let r = start.r; r <= end.r; r++) {
+          for (let c = start.c; c <= end.c; c++) {
+            if (r === start.r && c === start.c) continue;
+            innerRefs.add(XLSX.utils.encode_cell({ r, c }));
+          }
+        }
+      }
+      if (innerRefs.size === 0) return;
+      const cleaned = xml.replace(/<c r="([A-Z]+\d+)"(?:\s+[^>]*)?(?:\/>|><\/c>)/g, (cellXml: string, ref: string) => {
+        return innerRefs.has(ref) ? "" : cellXml;
+      });
+      zip.file(name, cleaned);
+    }),
+  );
+  const out = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+  return out;
 }
