@@ -343,7 +343,12 @@ export function DefectRawDataPage() {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [sorting, setSorting] = useState<SortingState>(parseSortFromUrl(urlSearch.sort));
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(parseFiltersFromUrl(urlSearch.filters));
+  // source=progress로 진입 시엔 기존 filters= JSON을 무시하고 progress 파라미터만으로 재구성
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
+    urlSearch.source === "progress"
+      ? mergeUrlFilters(urlSearch as any, [])
+      : parseFiltersFromUrl(urlSearch.filters),
+  );
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [searchInput, setSearchInput] = useState(urlSearch.q ?? "");
@@ -357,11 +362,13 @@ export function DefectRawDataPage() {
   // Sync URL → local (탭 전환 시 URL의 sort/filters를 초기화 반영)
   useEffect(() => {
     setSorting(parseSortFromUrl(urlSearch.sort));
-    setColumnFilters(mergeUrlFilters(urlSearch as any, parseFiltersFromUrl(urlSearch.filters)));
+    // Progress 매트릭스에서 진입한 경우 기존 필터를 완전히 리셋하고 progress 파라미터만 적용
+    const base = urlSearch.source === "progress" ? [] : parseFiltersFromUrl(urlSearch.filters);
+    setColumnFilters(mergeUrlFilters(urlSearch as any, base));
     setSearchInput(urlSearch.q ?? "");
     setRowSelection({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [tab, urlSearch.source]);
 
   // ── Server data ─────────────────────────────────────────────────────────
   const serverFilters = useMemo(() => toServerFilters(columnFilters), [columnFilters]);
