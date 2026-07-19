@@ -1,43 +1,45 @@
+# 앱 업데이트 알림 구현 계획 (v2)
+
 ## 목표
+새 버전 배포 감지 시, **사용자가 명시적으로 확인(닫기/새로고침)하기 전까지는 절대 사라지지 않는** 알림을 표시합니다.
 
-TM 임포트를 HDEC PIC 기준으로 필터링. Admin은 기존과 동일하게 전권(필터 없음, 스코프 UI 미노출). Super User(superuser/d_superuser)는 컬럼매핑 버튼 옆 스코프 셀렉트로 "본인 항목만"(기본) / "Super User: 전체 임포트" 선택 가능. 그 외 사용자는 항상 본인 HDEC PIC 항목만.
+## 알림 UX (핵심 변경)
 
-## 사용자 등급별 동작
+토스트는 자동으로 사라지는 특성이 있어 요구사항에 부적합합니다. 대신 **비-모달 고정 배너(dismissible sticky banner)** 를 사용합니다.
 
-- **Admin (`isAdmin`)**: 기존과 동일. 스코프 UI 미노출, 필터 미적용, 전체 임포트.
-- **Super User (`isSuperUser` 또는 `isDSuperUser`, admin 아님)**: 스코프 Select 노출. 기본 "본인 HDEC PIC 항목만", 필요 시 "전체" 선택 가능.
-- **그 외 (senior_user, user 등)**: 스코프 고정 "본인 HDEC PIC 항목만"(읽기 전용 배지). 임포트 버튼 활성화 조건은 매칭 행이 1건 이상.
+- 위치: 화면 상단 `TopBrandHeader` 바로 아래, `sticky top-14`로 고정.
+- 스타일: primary 색상 배경 + 좌측 아이콘(Sparkles), 우측에 두 개의 버튼.
+  - **"지금 새로고침"** — `window.location.replace(pathname + "?__reset=" + Date.now())` 실행.
+  - **"나중에"** (X 아이콘) — 배너를 이번 세션에서만 숨김(`sessionStorage`에 감지된 buildId 저장). 이후 **더 새로운 buildId**가 감지되면 다시 표시.
+- 모든 페이지에서 항상 노출 (AppLayout 하위).
+- 접근성: `role="status"`, `aria-live="polite"`, 포커스 이동 없음.
+- 보조 알림: 최초 감지 순간 1회 sonner 토스트(`duration: Infinity`, 닫기 버튼 포함)를 함께 띄워 즉시 인지시키되, **주 알림은 배너**. 토스트가 닫혀도 배너는 유지.
+- 기존 `NewVersionButton`도 감지 시 pulse 강조 스타일 적용.
 
-## 매칭 로직
+## 감지 방식
 
-- 사용자 키: `useCurrentUser().hdec_pic_name`
-- 행 키: `ParsedTaskRow.hdec_pic_name`
-- 비교: 양쪽 `trim().toLowerCase()` 완전일치
-- 사용자 `hdec_pic_name`이 비어 있고 스코프가 `mine`이면 매칭 0건 → Start 비활성 + 툴팁 안내
-- 마스터 매핑 미해결 상태에서는 필터에서 탈락할 수 있으므로 상단 MasterMappingSection 해결을 유도하는 안내 문구 추가
+- 클라이언트 현재 버전: 번들에 주입된 `__APP_BUILD_ID__`.
+- 최신 버전: 신규 공개 엔드포인트 `GET /api/public/version` → `{ buildId }`, `Cache-Control: no-store`.
+- 두 값이 다르면 업데이트 감지 상태로 전환.
 
-## UI 변경 (`TaskManagementImportPage.tsx`)
+## 폴링
 
-- Files 카드 툴바(Clear all / Start import) 좌측 또는 컬럼매핑 다이얼로그 트리거 옆 영역에 스코프 선택 컨트롤 배치.
-  - Admin: 렌더 안 함.
-  - Super User: `Select` — `mine` / `all`.
-  - 일반 사용자: 뱃지 "본인 HDEC PIC 항목만".
-- 파일 행에 "임포트 대상 N / 파싱 M" 카운트 표시(스코프 반영).
-- Start 버튼 게이트를 `isEditor` 이상 + 총 매칭 행 ≥ 1 로 완화(Admin은 기존처럼 총행 ≥ 1).
+- 훅 `useVersionCheck()` (`src/hooks/useVersionCheck.ts`).
+- 주기: **60초**, `visibilitychange`로 창 재활성화 시 즉시 1회 재조회.
+- 개발 모드(`__APP_BUILD_ID__`가 `development` 또는 빈 값)에서는 비활성화.
+- 네트워크 오류는 조용히 무시 후 다음 주기 재시도.
 
-## 컨텍스트 변경 (`TaskManagementImportContext.tsx`)
+## 파일 변경
 
-- 상태 추가: `importScope: "mine" | "all"`, 기본 `"mine"`, `setImportScope`.
-- Provider 마운트 시 현재 사용자 프로필의 `hdec_pic_name`, 역할 플래그(`isAdmin`, `isSuperUserLike`)를 로드해 캐시.
-- 효과적 스코프 계산: `isAdmin ? "all" : (isSuperUserLike ? importScope : "mine")`.
-- `executeImport` 진입 시 각 파일 `parsed`를 효과적 스코프로 필터링, 롤업/부모-자식 카운트를 재계산 후 진행.
-  - 필터로 인해 부모 없는 자식이 남을 경우 스킵하고 `skipped_orphan_after_scope` 집계.
-  - 필터 결과 카운트, 원본 카운트, 스코프를 import 로그 `note`에 요약 기록.
-- Preflight 대상도 필터링된 rows로 실행하여 충돌 판정을 일관되게 유지.
+- 신규
+  - `src/routes/api/public/version.ts` — GET 핸들러
+  - `src/hooks/useVersionCheck.ts` — 폴링/상태 관리, 최신 감지 buildId 반환
+  - `src/components/layout/UpdateAvailableBanner.tsx` — 고정 배너 UI
+- 수정
+  - `src/components/layout/AppLayout.tsx` — 훅 호출 + 배너 렌더링
+  - `src/components/layout/TopBrandHeader.tsx` — `NewVersionButton` 강조 상태 연동
 
-## 산출물
+## 한계
+- 폴링 방식이라 감지까지 최대 60초 지연 가능. 실시간 push가 꼭 필요하면 Supabase Realtime으로 확장 가능하나 현 요구엔 과함.
 
-- `src/components/task-management/import/TaskManagementImportPage.tsx`
-- `src/contexts/TaskManagementImportContext.tsx`
-
-SM/ABD/Spare Part 임포트에는 영향 없음.
+승인해 주시면 위 구조로 구현하겠습니다.
