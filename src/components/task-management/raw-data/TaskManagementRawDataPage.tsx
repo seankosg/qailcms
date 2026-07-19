@@ -751,8 +751,8 @@ export function TaskManagementRawDataPage() {
         rollupFn({ data: { discipline: "ELEC" } }),
         rollupFn({ data: { discipline: "MECH" } }),
       ]);
-      const total = res.reduce((s, r) => s + r.rolledUp, 0);
-      toast.success(`Summary 재계산 완료: ${total}개 parent`);
+      const total = res.reduce((s: number, r: { rolledUp: number }) => s + r.rolledUp, 0);
+      toast.success(`Summary 재계산 완료: ${total}개 Main Task`);
       refetch();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "재계산 실패");
