@@ -159,15 +159,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
     navigate({ to: "/auth", replace: true });
   };
 
-  const renderLeaf = (it: NavLeaf) => {
+  type LeafLevel = "dashboard" | "sub";
+
+  const renderLeaf = (it: NavLeaf, level: LeafLevel = "dashboard") => {
     const active = it.to ? location.pathname === it.to || location.pathname.startsWith(it.to + "/") : false;
+    const isSub = level === "sub";
     if (it.disabled || !it.to) {
       return (
         <div
           key={it.label}
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground/60 cursor-not-allowed"
+          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-normal text-muted-foreground/60 cursor-not-allowed"
         >
-          <it.icon className="h-4 w-4" />
+          <it.icon className="h-4 w-4 shrink-0 text-muted-foreground/60" />
           <span className="flex-1">{it.label}</span>
           {it.badge && (
             <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">{it.badge}</span>
@@ -175,17 +178,22 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       );
     }
+    const activeClasses =
+      "border-l-2 border-primary bg-primary/10 pl-[calc(0.5rem-2px)] pr-2 font-semibold text-primary";
+    const inactiveClasses = isSub
+      ? "px-2 font-normal text-foreground/80 hover:bg-muted/50 hover:text-foreground"
+      : "px-2 font-medium text-foreground hover:bg-muted/50 hover:text-primary";
     return (
       <Link
         key={it.to}
         to={it.to}
         onClick={() => setMobileOpen(false)}
         className={cn(
-          "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-          active ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground",
+          "group flex items-center gap-2 rounded-md py-1.5 transition-colors",
+          active ? activeClasses : inactiveClasses,
         )}
       >
-        <it.icon className="h-4 w-4" />
+        <it.icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "text-current")} />
         <span className="flex-1">{it.label}</span>
         {it.badge && (
           <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">{it.badge}</span>
