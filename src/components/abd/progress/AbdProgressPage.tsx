@@ -44,6 +44,16 @@ import {
 } from "@/lib/abd/progress.functions";
 import { AbdScheduleMatrix } from "./AbdScheduleMatrix";
 import { Route } from "@/routes/_authenticated/closure/abd/progress";
+import { AbdPlanVsActualCard } from "./AbdPlanVsActualCard";
+import type { CellRaw } from "@/lib/abd/progress-utils";
+import { ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { CardHeader, CardTitle } from "@/components/ui/card";
+import { useQueries } from "@tanstack/react-query";
 
 const TEAM_VALUES = ABD_TEAMS.map((t) => t.value);
 
@@ -71,6 +81,8 @@ export function AbdProgressPage() {
   const hidePast = search.hidePast === 1;
   const asofMode = search.asofMode;
   const planMode: PlanMode = search.planMode;
+  const matrixOpen = search.matrixOpen === 1;
+  const scurveOpen = search.scurveOpen === 1;
 
   const today = todayIso();
   const asOfDate = today;
@@ -137,6 +149,55 @@ export function AbdProgressPage() {
   });
 
   const buckets = useMemo(() => buildBucketRange(rpcStart, rpcEnd, bucket), [rpcStart, rpcEnd, bucket]);
+
+  // S-Curve: round==='all' 이면 R1/R2/R3 각각의 cells 를 별도로 로드.
+  // 단일 라운드일 때는 cellsQ 재사용.
+  const activeRounds: Array<Exclude<RoundKey, "all">> =
+    round === "all" ? ["R1", "R2", "R3"] : [round];
+  const perRoundQueries = useQueries({
+    queries: (round === "all" ? (["R1", "R2", "R3"] as const) : []).map((r) => ({
+      queryKey: [
+        "abd-progress-cells",
+        plot,
+        teamsKey,
+        r,
+        groupKey,
+        bucket,
+        rpcStart,
+        rpcEnd,
+        asOfDate,
+        planMode,
+      ],
+      queryFn: () =>
+        cellsFn({
+          data: {
+            plots: plot === "all" ? [] : [plot],
+            teams,
+            groupBy: effectiveGroupBy,
+            bucket,
+            rangeStart: rpcStart,
+            rangeEnd: rpcEnd,
+            asOfDate,
+            planMode,
+            round: r,
+          },
+        }),
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+      enabled: scurveOpen,
+    })),
+  });
+  const cellsByRound: Partial<Record<Exclude<RoundKey, "all">, CellRaw[]>> = useMemo(() => {
+    if (round !== "all") {
+      return { [round]: cellsQ.data ?? [] } as Partial<Record<Exclude<RoundKey, "all">, CellRaw[]>>;
+    }
+    const rounds: Array<Exclude<RoundKey, "all">> = ["R1", "R2", "R3"];
+    const out: Partial<Record<Exclude<RoundKey, "all">, CellRaw[]>> = {};
+    rounds.forEach((r, i) => {
+      out[r] = (perRoundQueries[i]?.data ?? []) as CellRaw[];
+    });
+    return out;
+  }, [round, cellsQ.data, perRoundQueries]);
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
@@ -478,15 +539,47 @@ export function AbdProgressPage() {
       ) : loading ? (
         <Skeleton className="h-96 w-full" />
       ) : (
-        <AbdScheduleMatrix
-          data={matrix}
-          bucket={bucket}
-          stagesToShow={effectiveStages}
-          today={today}
-          asOfLabel={asOfLabel}
-          groupHeader={groupHeader}
-          onCellClick={handleCellClick}
-        />
+        <>
+          <AbdPlanVsActualCard
+            cellsByRound={cellsByRound}
+            activeRounds={activeRounds}
+            buckets={buckets}
+            stages={effectiveStages}
+            today={today}
+            open={scurveOpen}
+            onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
+          />
+          <Card>
+            <Collapsible open={matrixOpen} onOpenChange={(v) => setSearch({ matrixOpen: v ? 1 : 0 })}>
+              <CardHeader className="pb-2">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 text-left hover:opacity-80"
+                    aria-expanded={matrixOpen}
+                  >
+                    {matrixOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <LayoutGrid className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-sm">Progress Matrix</CardTitle>
+                  </button>
+                </CollapsibleTrigger>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="pt-0">
+                  <AbdScheduleMatrix
+                    data={matrix}
+                    bucket={bucket}
+                    stagesToShow={effectiveStages}
+                    today={today}
+                    asOfLabel={asOfLabel}
+                    groupHeader={groupHeader}
+                    onCellClick={handleCellClick}
+                  />
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+        </>
       )}
     </div>
   );
