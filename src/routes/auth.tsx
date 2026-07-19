@@ -20,6 +20,7 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const resolve = useServerFn(resolveLoginEmail);
 
   useEffect(() => {
