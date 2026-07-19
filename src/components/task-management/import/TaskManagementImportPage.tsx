@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -131,7 +131,7 @@ function ImportInner() {
   // Sync importer identity/scope to context whenever user info changes
   const hdecPic = me?.hdec_pic_name ?? null;
   const adminFlag = !!me?.isAdmin;
-  useEffectSync(() => {
+  useEffect(() => {
     setImporterHdecPicName(hdecPic);
     setIsImporterAdmin(adminFlag);
   }, [hdecPic, adminFlag, setImporterHdecPicName, setIsImporterAdmin]);
