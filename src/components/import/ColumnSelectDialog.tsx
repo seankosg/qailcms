@@ -52,6 +52,8 @@ interface ColumnSelectDialogProps {
     matchedHeaders?: string[];
     className?: string;
   }>;
+  /** true면 required 컬럼은 항상 선택 상태로 잠기며 해제 불가. admin은 false로 넘겨 잠금 해제. */
+  lockRequired?: boolean;
 }
 
 function previewValue(v: unknown): string {
@@ -71,6 +73,7 @@ export function ColumnSelectDialog({
   onApply,
   helpers,
   presets,
+  lockRequired = false,
 }: ColumnSelectDialogProps) {
   const {
     toFieldName,
@@ -82,8 +85,19 @@ export function ColumnSelectDialog({
   } = helpers;
   const [excluded, setExcluded] = useState<Set<string>>(new Set(defaultExcluded));
 
+  const isRequiredHeader = (h: string) => getRequirement(h).required;
+  const stripRequired = (set: Set<string>) => {
+    if (!lockRequired) return set;
+    const next = new Set(set);
+    for (const h of headers) {
+      if (isRequiredHeader(h)) next.delete(h);
+    }
+    return next;
+  };
+
   useEffect(() => {
-    if (open) setExcluded(new Set(defaultExcluded));
+    if (open) setExcluded(stripRequired(new Set(defaultExcluded)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultExcluded]);
 
   const requiredHeaders = useMemo(
@@ -106,6 +120,13 @@ export function ColumnSelectDialog({
 
   const toggle = (header: string, nextChecked: boolean) => {
     const req = getRequirement(header);
+    if (lockRequired && req.required && !nextChecked) {
+      toast.warning(
+        req.message ??
+          `"${header}"은(는) 임포트 필수 컬럼입니다. 관리자만 해제할 수 있습니다.`,
+      );
+      return;
+    }
     if (req.required && !nextChecked && req.message) {
       toast.warning(req.message);
     }
@@ -118,16 +139,16 @@ export function ColumnSelectDialog({
   };
 
   const selectAll = () => setExcluded(new Set());
-  const deselectAll = () => setExcluded(new Set(headers));
+  const deselectAll = () => setExcluded(stripRequired(new Set(headers)));
   const applyPreset = (matched?: string[]) => {
     if (!matched || matched.length === 0) {
       setExcluded(new Set());
       return;
     }
     const allow = new Set(matched);
-    setExcluded(new Set(headers.filter((h) => !allow.has(h))));
+    setExcluded(stripRequired(new Set(headers.filter((h) => !allow.has(h)))));
   };
-  const reset = () => setExcluded(new Set(defaultExcluded));
+  const reset = () => setExcluded(stripRequired(new Set(defaultExcluded)));
 
   const handleApply = () => {
     onApply(Array.from(excluded));
@@ -226,6 +247,7 @@ export function ColumnSelectDialog({
                 <Checkbox
                   checked={checked}
                   onCheckedChange={(v) => toggle(header, v === true)}
+                  disabled={lockRequired && req.required}
                   aria-label={`Include ${header}`}
                 />
                 <div className="min-w-0 flex items-center gap-1.5">
