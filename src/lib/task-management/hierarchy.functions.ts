@@ -35,7 +35,7 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
 /**
  * 부모 task 아래에 새 자식 task를 추가한다.
  * - task_no: main_task_no + "-NN" (자동 채번, 2자리)
- * - 부모가 leaf였다면 level='parent'로 승격
+ * - 부모가 leaf였다면 level='main'로 승격
  * - sort_order는 부모 가족(부모 + 자식들)의 max 다음으로 삽입, 이후 행은 +1 shift
  */
 export const addChildTask = createServerFn({ method: "POST" })
@@ -94,10 +94,10 @@ export const addChildTask = createServerFn({ method: "POST" })
     }
 
     // 4) 부모 level 승격
-    if (parent.level !== "parent") {
+    if (parent.level !== "main") {
       const { error: upErr } = await admin
         .from("task_management_raw")
-        .update({ level: "parent" })
+        .update({ level: "main" })
         .eq("id", parent.id);
       if (upErr) throw new Error(upErr.message);
     }
@@ -107,7 +107,7 @@ export const addChildTask = createServerFn({ method: "POST" })
       discipline: data.discipline,
       task_no: newTaskNo,
       main_task_no: parent.task_no,
-      level: "child",
+      level: "sub",
       sort_order: insertSort,
       task_name: data.task_name,
       sub_task_desc: data.sub_task_desc ?? null,

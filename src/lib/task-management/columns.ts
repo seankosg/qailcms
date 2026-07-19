@@ -62,7 +62,7 @@ export const STATUS_MANUAL = ["예정", "진행", "완료"] as const;
 export const RISK_LEVELS = ["Critical", "High", "Med", "Low"] as const;
 export const AUTO_JUDGMENTS = ["완료", "정상", "주의", "지연", "위험"] as const;
 export const PLOTS = ["C", "D"] as const;
-export const LEVELS = ["parent", "child"] as const;
+export const LEVELS = ["main", "sub"] as const;
 
 export const RISK_COLORS: Record<string, string> = {
   Critical: "bg-rose-500/15 text-rose-700 dark:text-rose-300",

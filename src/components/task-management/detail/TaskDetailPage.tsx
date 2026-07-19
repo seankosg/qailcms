@@ -88,7 +88,7 @@ export function TaskDetailPage() {
     );
   }
 
-  const isParent = row.level === "parent";
+  const isParent = row.level === "main";
 
   const onFieldSaved = () => {
     refetch();

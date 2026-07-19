@@ -460,7 +460,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         } else {
           dupDetail.set(key, (dupDetail.get(key) ?? 1) + 1);
           // child 우선, 같은 level이면 나중 것 우선
-          if (prev.level === "parent" && p.level === "child") {
+          if (prev.level === "main" && p.level === "sub") {
             dedupMap.set(key, p);
           } else if (prev.level === p.level) {
             dedupMap.set(key, p);
@@ -541,7 +541,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       }
 
       const payloads = applied.map((p) => {
-        const isParent = p.level === "parent";
+        const isParent = p.level === "main";
         const stripParent = isParent && rollupMode === "auto";
         return {
         task_no: p.task_no,

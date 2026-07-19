@@ -17,7 +17,7 @@ interface Row {
   id: string;
   task_no: string;
   main_task_no: string | null;
-  level: "parent" | "child";
+  level: "main" | "sub";
   discipline: string;
   task_name: string | null;
   actual_progress: number | null;
@@ -88,7 +88,7 @@ export function TaskTreePage() {
     const parents: Row[] = [];
     const childrenByParent = new Map<string, Row[]>();
     for (const r of data) {
-      if (r.level === "parent") parents.push(r);
+      if (r.level === "main") parents.push(r);
       else if (r.main_task_no) {
         const arr = childrenByParent.get(r.main_task_no) ?? [];
         arr.push(r);

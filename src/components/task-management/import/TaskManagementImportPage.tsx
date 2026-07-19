@@ -759,7 +759,7 @@ function PreviewDialog({
               {rows.map((r) => (
                 <tr key={r.rawRowNo} className="border-b hover:bg-accent/30">
                   <td className="px-1.5 py-1 font-mono">{r.task_no}</td>
-                  <td className="px-1.5 py-1">{r.level === "parent" ? "P" : "C"}</td>
+                  <td className="px-1.5 py-1">{r.level === "main" ? "P" : "C"}</td>
                   <td className="px-1.5 py-1">{r.category ?? ""}</td>
                   <td className="px-1.5 py-1">{r.plot ?? ""}</td>
                   <td className="px-1.5 py-1">{r.task_name ?? ""}</td>

@@ -7,7 +7,7 @@ const DISCIPLINES = ["ARCH", "ELEC", "MECH", "DESN", "PRJC"] as const;
 const PreflightRowSchema = z.object({
   task_no: z.string(),
   main_task_no: z.string().nullable().optional(),
-  level: z.enum(["parent", "child"]),
+  level: z.enum(["main", "sub"]),
   task_name: z.string().nullable().optional(),
   plot: z.string().nullable().optional(),
   category: z.string().nullable().optional(),

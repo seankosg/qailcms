@@ -365,7 +365,7 @@ export function TaskManagementRawDataPage() {
   const parentKeys = useMemo(() => {
     const keys: string[] = [];
     for (const r of rows) {
-      if ((r as any).level === "parent") {
+      if ((r as any).level === "main") {
         keys.push(`${(r as any).discipline}::${(r as any).task_no}`);
       }
     }
@@ -560,7 +560,7 @@ export function TaskManagementRawDataPage() {
           }
           if (c.key === "task_no") {
             const rr = row.original as Row;
-            const isParent = rr.level === "parent";
+            const isParent = rr.level === "main";
             const isChild = !!(rr as any).main_task_no;
             const disc = String(rr.discipline);
             const collapseKey = `${disc}::${rr.task_no}`;
@@ -1007,7 +1007,7 @@ export function TaskManagementRawDataPage() {
               {virtualizer.getVirtualItems().map((v) => {
                 const row = rowModel.rows[v.index];
                 if (!row) return null;
-                const isParent = (row.original as Row).level === "parent";
+                const isParent = (row.original as Row).level === "main";
                 return (
                   <div
                     key={row.id}
