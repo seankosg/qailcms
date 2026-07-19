@@ -1053,6 +1053,34 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       let lastProgressPct = -1;
 
       try {
+        // ── 프리플라이트: team NOT NULL 검증 ─────────────────────────────
+        // Category/Team 컬럼이 선택에서 제외되면 pickTeam이 null을 반환하여
+        // DB에서 23502로 전량 거부된다. 배치를 보내기 전에 미리 필터링하여
+        // 무의미한 왕복(수백~수천 회)을 차단한다.
+        const teamNullCount = payloads.filter((p) => p.team == null).length;
+        if (teamNullCount > 0) {
+          const validPayloads = payloads.filter((p) => p.team != null);
+          const invalidPayloads = payloads.filter((p) => p.team == null);
+          rejected += invalidPayloads.length;
+          const sample = invalidPayloads[0]?.source_issue_no as string | undefined;
+          importErrors.push({
+            batch: -1,
+            message: `${invalidPayloads.length}건 팀(team) 미결정 — Category/Team 컬럼이 제외되었거나 매핑되지 않았습니다. 컬럼 선택에서 Category 헤더를 포함해 재시도하세요.`,
+            code: "PREFLIGHT_TEAM_NULL",
+            sampleId: sample,
+          });
+          console.warn(
+            `[defect-import] 프리플라이트: team=null 행 ${invalidPayloads.length}건 제외 (전체 ${payloads.length})`,
+          );
+          payloads.length = 0;
+          payloads.push(...validPayloads);
+          if (payloads.length === 0) {
+            throw new Error(
+              "선택한 컬럼만으로는 팀(Team)을 결정할 수 없습니다. 컬럼 선택 다이얼로그에서 Category(또는 Team) 컬럼을 포함하여 다시 시도해 주세요.",
+            );
+          }
+        }
+
         // 배치 슬라이스 준비
         const importStartedAt = performance.now();
         console.log(
