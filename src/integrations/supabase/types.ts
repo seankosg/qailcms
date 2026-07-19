@@ -2145,8 +2145,8 @@ export type Database = {
           is_rollup: boolean
           level: string
           location: string | null
+          main_task_no: string | null
           owner_user_id: string | null
-          parent_task_no: string | null
           pic: string | null
           plan_days: number | null
           plan_end: string | null
@@ -2187,8 +2187,8 @@ export type Database = {
           is_rollup?: boolean
           level: string
           location?: string | null
+          main_task_no?: string | null
           owner_user_id?: string | null
-          parent_task_no?: string | null
           pic?: string | null
           plan_days?: number | null
           plan_end?: string | null
@@ -2229,8 +2229,8 @@ export type Database = {
           is_rollup?: boolean
           level?: string
           location?: string | null
+          main_task_no?: string | null
           owner_user_id?: string | null
-          parent_task_no?: string | null
           pic?: string | null
           plan_days?: number | null
           plan_end?: string | null
@@ -2653,7 +2653,7 @@ export type Database = {
         }[]
       }
       allocate_task_no: {
-        Args: { _discipline: string; _parent_task_no: string }
+        Args: { _discipline: string; _main_task_no: string }
         Returns: string
       }
       calc_auto_judgment_value: {
@@ -2835,14 +2835,11 @@ export type Database = {
         Args: { _batch_id: string; _force?: boolean }
         Returns: Json
       }
-      rollup_task_all_parents: {
-        Args: { _discipline: string }
-        Returns: number
-      }
+      rollup_task_all_mains: { Args: { _discipline: string }; Returns: number }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       update_task_summary: {
-        Args: { _discipline: string; _parent_task_no: string }
+        Args: { _discipline: string; _main_task_no: string }
         Returns: undefined
       }
     }
