@@ -540,15 +540,6 @@ export function AbdProgressPage() {
         <Skeleton className="h-96 w-full" />
       ) : (
         <>
-          <AbdPlanVsActualCard
-            cellsByRound={cellsByRound}
-            activeRounds={activeRounds}
-            buckets={buckets}
-            stages={effectiveStages}
-            today={today}
-            open={scurveOpen}
-            onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
-          />
           <Card>
             <Collapsible open={matrixOpen} onOpenChange={(v) => setSearch({ matrixOpen: v ? 1 : 0 })}>
               <CardHeader className="pb-2">
@@ -579,6 +570,15 @@ export function AbdProgressPage() {
               </CollapsibleContent>
             </Collapsible>
           </Card>
+          <AbdPlanVsActualCard
+            cellsByRound={cellsByRound}
+            activeRounds={activeRounds}
+            buckets={buckets}
+            stages={effectiveStages}
+            today={today}
+            open={scurveOpen}
+            onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
+          />
         </>
       )}
     </div>
