@@ -1009,6 +1009,7 @@ export function TaskManagementRawDataPage() {
                 const row = rowModel.rows[v.index];
                 if (!row) return null;
                 const isParent = (row.original as Row).level === "main";
+                const isDone = Number((row.original as any).actual_progress ?? 0) >= 100;
                 return (
                   <div
                     key={row.id}
@@ -1027,6 +1028,7 @@ export function TaskManagementRawDataPage() {
                       "group absolute left-0 top-0 flex cursor-pointer border-b text-xs hover:bg-accent/40",
                       row.getIsSelected() && "bg-primary/5",
                       isParent && "bg-muted/30 font-medium",
+                      isDone && "opacity-60 text-muted-foreground",
                     )}
                   >
                     {row.getVisibleCells().map((cell) => {
@@ -1047,7 +1049,7 @@ export function TaskManagementRawDataPage() {
                           }}
                           className={cn(
                             "flex items-center overflow-hidden truncate border-r px-2",
-                            isFrozen && (isParent ? "bg-muted" : "bg-card"),
+                            isFrozen && (isDone ? "bg-muted" : isParent ? "bg-muted" : "bg-card"),
                           )}
                           title={stringifyForTitle(cell.getValue())}
                         >
