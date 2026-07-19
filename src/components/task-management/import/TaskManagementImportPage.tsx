@@ -564,6 +564,17 @@ function FileRow({
               {typeof f.parentCount === "number" &&
                 ` · Parent ${f.parentCount} / Child ${f.childCount}`}
             </p>
+            {total > 0 && (
+              <p className="mt-0.5 text-[11px]">
+                {scopeIsMine ? (
+                  <span className={matched === 0 ? "text-destructive" : "text-primary"}>
+                    임포트 대상 {matched} / 파싱 {total}행 (본인 HDEC PIC만)
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">전체 {total}행 임포트</span>
+                )}
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">공종</span>
               <Select
