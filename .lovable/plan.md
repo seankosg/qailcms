@@ -1,45 +1,83 @@
-# 앱 업데이트 알림 구현 계획 (v2)
+# TM 일정/지연 관리 대시보드 계획
 
-## 목표
-새 버전 배포 감지 시, **사용자가 명시적으로 확인(닫기/새로고침)하기 전까지는 절대 사라지지 않는** 알림을 표시합니다.
+## 배치 및 라우팅
 
-## 알림 UX (핵심 변경)
+- 신규 라우트 `src/routes/_authenticated/closure/task-management/dashboard.tsx` → 경로 `/closure/task-management/dashboard`.
+- 사이드바 `Task Management` 모듈 최상단(Task Summary 위)에 `Dashboard` 링크 추가 (`AppLayout.tsx`).
+- 기존 `/closure/dashboard/task`(전사 개요 축약)는 그대로 유지. 신규 페이지는 TM 전용 상세 대시보드.
 
-토스트는 자동으로 사라지는 특성이 있어 요구사항에 부적합합니다. 대신 **비-모달 고정 배너(dismissible sticky banner)** 를 사용합니다.
+## 화면 구조 (SHAW T&C DashboardPage 참조)
 
-- 위치: 화면 상단 `TopBrandHeader` 바로 아래, `sticky top-14`로 고정.
-- 스타일: primary 색상 배경 + 좌측 아이콘(Sparkles), 우측에 두 개의 버튼.
-  - **"지금 새로고침"** — `window.location.replace(pathname + "?__reset=" + Date.now())` 실행.
-  - **"나중에"** (X 아이콘) — 배너를 이번 세션에서만 숨김(`sessionStorage`에 감지된 buildId 저장). 이후 **더 새로운 buildId**가 감지되면 다시 표시.
-- 모든 페이지에서 항상 노출 (AppLayout 하위).
-- 접근성: `role="status"`, `aria-live="polite"`, 포커스 이동 없음.
-- 보조 알림: 최초 감지 순간 1회 sonner 토스트(`duration: Infinity`, 닫기 버튼 포함)를 함께 띄워 즉시 인지시키되, **주 알림은 배너**. 토스트가 닫혀도 배너는 유지.
-- 기존 `NewVersionButton`도 감지 시 pulse 강조 스타일 적용.
+```
+[Header]  Task Progress & Delay Dashboard   |   As-of Today · Data Date · Rows N
+[Quick Filter Pills]  Team ▾  ·  HDEC PIC ▾  ·  HDEC ENG ▾   (다중선택 pill)
+[Toolbar]  Group(다중) · 공종 · Plot · Bucket(Day/Week) · Stage · As-of · Range · Plan(Baseline/Remaining) · 검색
+[KPI Strip]  누적 계획 · 누적 실적 · Variance% · 진도% · 지연 스테이지 수 · 이번주 예정 · Critical
+[Row A]  좌: Plan vs Actual S-Curve (Cumulative + Weekly Variance Bar)
+         우: Judgment Donut (완료/정상/주의/지연/위험)  +  스테이지별 스택바(Start/Comp × 판정)
+[Row B]  주간 신규 지연 vs 회복 트렌드 라인 (12주)
+[Row C]  Plan vs Actual Matrix (기존 컴포넌트 재사용, 그룹 축·버킷 반응)
+[Row D]  좌: Delay Top N 태스크 테이블 (지연일수 desc, 20건, 클릭→Raw Data 필터)
+         우: Owner Leaderboard (Team | HDEC PIC | HDEC ENG 탭 전환) — 계획 진도 vs 실적 진도 + 차이 + 지연 태스크 수
+```
 
-## 감지 방식
+## 상단 축(빠른 필터 pill)
 
-- 클라이언트 현재 버전: 번들에 주입된 `__APP_BUILD_ID__`.
-- 최신 버전: 신규 공개 엔드포인트 `GET /api/public/version` → `{ buildId }`, `Cache-Control: no-store`.
-- 두 값이 다르면 업데이트 감지 상태로 전환.
+기존 다중 선택 Group 축은 유지하면서, 상단에 담당자 축 빠른 필터를 별도 pill 그룹으로 추가:
+- Team, HDEC PIC, HDEC ENG 각각 풀다운 다중 선택 pill.
+- 값은 프로필 마스터가 아닌 실제 `task_management_raw` 값에서 distinct 도출(팀 필터에 연동됨).
+- 선택값은 URL search param에 반영되어 모든 위젯에 적용.
 
-## 폴링
+## 데이터 흐름
 
-- 훅 `useVersionCheck()` (`src/hooks/useVersionCheck.ts`).
-- 주기: **60초**, `visibilitychange`로 창 재활성화 시 즉시 1회 재조회.
-- 개발 모드(`__APP_BUILD_ID__`가 `development` 또는 빈 값)에서는 비활성화.
-- 네트워크 오류는 조용히 무시 후 다음 주기 재시도.
+- 기존 `useTaskDashboardData` 훅 확장: `hdecPic?: string[]`, `hdecEng?: string[]` 인자 추가. 클라이언트 측 필터로 처리(현재 훅과 동일 패턴).
+- 기존 `aggregateTaskSchedule`, `isTaskStageDelayedAsOf`, `findTaskCritical` 재사용.
+- 신규 유틸(`src/lib/task-management/delay-utils.ts`):
+  - `computeDelayTopN(items, asOfDate, limit)` — 스테이지 지연일수 기준 Top N.
+  - `computeOwnerLeaderboard(items, asOfDate, dim)` — dim ∈ `team | hdec_pic_name | hdec_eng_name`. 각 오너별 총/완료/지연 스테이지 수, 계획진도율, 실적진도율, 차이.
+  - `computeWeeklyDelayTrend(items, weeks=12, today)` — 주별 신규 지연(해당 주에 처음 지연 진입) vs 회복(지연 상태에서 완료) 카운트.
+  - `computeJudgmentStageBreakdown(items, asOfDate)` — 판정 × 스테이지(Start/Comp) 카운트.
 
-## 파일 변경
+## 신규 컴포넌트
 
-- 신규
-  - `src/routes/api/public/version.ts` — GET 핸들러
-  - `src/hooks/useVersionCheck.ts` — 폴링/상태 관리, 최신 감지 buildId 반환
-  - `src/components/layout/UpdateAvailableBanner.tsx` — 고정 배너 UI
-- 수정
-  - `src/components/layout/AppLayout.tsx` — 훅 호출 + 배너 렌더링
-  - `src/components/layout/TopBrandHeader.tsx` — `NewVersionButton` 강조 상태 연동
+- `src/components/task-management/dashboard/TmDashboardPage.tsx` — 라우트 컴포넌트, 툴바+레이아웃 오케스트레이션.
+- `src/components/task-management/dashboard/OwnerQuickFilterPills.tsx` — Team/HDEC PIC/HDEC ENG 다중 선택 pill.
+- `src/components/task-management/dashboard/TaskPlanVsActualCurve.tsx` — Recharts 기반 S-Curve + Variance 바(SM `SnagPlanVsActualCard`와 동일한 시각 언어, 양수 초록/음수 빨강).
+- `src/components/task-management/dashboard/DelayTopTable.tsx` — 지연 Top N 표.
+- `src/components/task-management/dashboard/OwnerLeaderboardCard.tsx` — 내부 Team/HDEC PIC/HDEC ENG 탭 전환. 각 행: 이름, 스테이지 수, 지연 수, Plan% Bar, Actual% Bar, Diff(음수 빨강 뱃지).
+- `src/components/task-management/dashboard/WeeklyDelayTrend.tsx` — 신규 지연 vs 회복 라인 차트.
+- `src/components/task-management/dashboard/JudgmentStageBreakdown.tsx` — 도넛(전체) + 우측 스테이지 스택바.
 
-## 한계
-- 폴링 방식이라 감지까지 최대 60초 지연 가능. 실시간 push가 꼭 필요하면 Supabase Realtime으로 확장 가능하나 현 요구엔 과함.
+## 재사용 컴포넌트
 
-승인해 주시면 위 구조로 구현하겠습니다.
+- `PlanVsActualMatrix`, `KpiStrip`, `ScheduleLegend`, `CriticalWatchlist`, `BehindScheduleTable`(원하면 Row C 아래 접이식으로).
+
+## URL 상태 (validateSearch, zod)
+
+```
+group[] (기본 ["discipline"])
+discipline[] plot[] team[] hdecPic[] hdecEng[]
+bucket=day|week
+stageView[]  asofMode=today|dataDate  planMode=baseline|remaining
+range=14|30|60|90|180  hidePast=bool  q=string
+leaderboardDim=team|hdec_pic|hdec_eng
+```
+
+## 인터랙션
+
+- Delay Top N 행 클릭 → `/closure/task-management/raw-data`로 이동, `source=dashboard`, `taskNo` 또는 `q`로 필터, 기존 필터 리셋(SM/ABD Progress 매트릭스 로직과 동일).
+- Owner Leaderboard 행 클릭 → 해당 dim 값으로 Raw Data 필터.
+- Matrix 셀 클릭 → 기존 로직 유지.
+
+## 접근성/성능
+
+- 모든 위젯은 `useMemo`로 aggregate 재사용, Matrix는 기존대로 가상화.
+- 12주 트렌드는 미리 정렬된 배열만 계산 후 Recharts에 전달.
+- 색상은 모두 semantic token (primary/success/warning/destructive), 다크 모드 안전.
+
+## 파일 변경 요약
+
+- 신규: 라우트 1, 페이지 1, 위젯 5, 유틸 1
+- 수정: `AppLayout.tsx`(사이드바 항목), `useTaskDashboardData.ts`(hdecPic/hdecEng 인자), 기존 KPI/Matrix는 재사용
+
+승인해 주시면 이 구성대로 구현하겠습니다.
