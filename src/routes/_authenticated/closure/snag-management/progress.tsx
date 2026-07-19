@@ -14,6 +14,8 @@ const searchSchema = z.object({
   hidePast: fallback(z.union([z.literal(0), z.literal(1)]), 0).default(0),
   asofMode: fallback(z.enum(["dataDate", "today"]), "dataDate").default("dataDate"),
   planMode: fallback(z.enum(["baseline", "remaining"]), "baseline").default("baseline"),
+  matrixOpen: fallback(z.union([z.literal(0), z.literal(1)]), 1).default(1),
+  scurveOpen: fallback(z.union([z.literal(0), z.literal(1)]), 1).default(1),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/snag-management/progress")({
