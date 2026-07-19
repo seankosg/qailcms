@@ -1056,7 +1056,7 @@ interface TableViewProps {
   loading: boolean;
   dataDate: string | null;
   frozenColIds: string[];
-  getSourceOrigin: (field: string) => "hdec" | "aconex" | "system";
+  getSourceOrigin: (field: string) => "hdec" | "aconex" | "system" | "derived";
   onRowClick: (row: DefectItem) => void;
 }
 

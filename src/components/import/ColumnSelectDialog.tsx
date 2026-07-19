@@ -29,7 +29,7 @@ export interface ColumnSelectHelpers {
   /** origin 배지 라벨 */
   getSourceLabel?: (field: string) => string;
   /** origin 배지 색상용 */
-  getSourceOrigin?: (field: string) => "hdec" | "aconex" | "system";
+  getSourceOrigin?: (field: string) => "hdec" | "aconex" | "system" | "derived";
   /** 알려진 필드인지 (unmapped 표시 판단) */
   isKnownField?: (field: string) => boolean;
   /** 추가 경고 라인 */

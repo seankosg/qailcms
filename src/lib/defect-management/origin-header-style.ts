@@ -1,4 +1,4 @@
-export type Origin = "hdec" | "aconex" | "system";
+export type Origin = "hdec" | "aconex" | "system" | "derived";
 
 export interface OriginHeaderStyle {
   bg: string;
