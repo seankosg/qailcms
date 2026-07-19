@@ -504,7 +504,43 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     const userId = userData.user?.id ?? null;
 
     for (const f of ready) {
-      const parsed = f.parsed ?? [];
+      const parsedAll = f.parsed ?? [];
+      const effectiveScope: ImportScope = isImporterAdminRef.current
+        ? "all"
+        : importScopeRef.current;
+      const meNorm = normalizePic(importerHdecPicRef.current);
+      const parsed =
+        effectiveScope === "all"
+          ? parsedAll
+          : parsedAll.filter((p) => normalizePic(p.hdec_pic_name) === meNorm);
+      const filteredOut = parsedAll.length - parsed.length;
+      if (effectiveScope === "mine" && parsed.length === 0) {
+        toast.warning(
+          `${f.name}: 본인(HDEC PIC: ${importerHdecPicRef.current ?? "-"}) 담당 행이 없어 임포트를 건너뜁니다`,
+        );
+        setFiles((cur) =>
+          cur.map((x) =>
+            x.id === f.id
+              ? {
+                  ...x,
+                  status: "done",
+                  progress: 100,
+                  result: {
+                    inserted: 0,
+                    updated: 0,
+                    skipped: filteredOut,
+                    rejected: 0,
+                  },
+                }
+              : x,
+          ),
+        );
+        continue;
+      }
+      const scopeNote =
+        effectiveScope === "mine"
+          ? `Import scope: mine (HDEC PIC=${importerHdecPicRef.current ?? "-"}); matched ${parsed.length}/${parsedAll.length}`
+          : `Import scope: all; rows=${parsed.length}`;
       const discipline = f.discipline ?? "ARCH";
       const startTime = Date.now();
       const startedAtIso = new Date().toISOString();
@@ -521,7 +557,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           status: "processing",
           imported_by: userId,
           started_at: startedAtIso,
-          note: f.masterMappingNote || null,
+          note: [f.masterMappingNote, scopeNote].filter(Boolean).join(" | ") || null,
         })
         .select("id")
         .single();
