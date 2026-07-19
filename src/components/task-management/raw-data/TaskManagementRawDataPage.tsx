@@ -327,14 +327,25 @@ export function TaskManagementRawDataPage() {
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["task-management-raw"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("task_management_raw")
-        .select("*")
-        .order("discipline", { ascending: true })
-        .order("sort_order", { ascending: true })
-        .limit(10000);
-      if (error) throw error;
-      return (data ?? []) as Row[];
+      const pageSize = 1000;
+      const out: Row[] = [];
+      let from = 0;
+      // Paged fetch to bypass PostgREST default 1000-row cap
+      while (true) {
+        const { data, error } = await (supabase as any)
+          .from("task_management_raw")
+          .select("*")
+          .order("discipline", { ascending: true })
+          .order("sort_order", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const rows = (data ?? []) as Row[];
+        out.push(...rows);
+        if (rows.length < pageSize) break;
+        from += pageSize;
+        if (from > 200000) break; // safety
+      }
+      return out;
     },
   });
 
