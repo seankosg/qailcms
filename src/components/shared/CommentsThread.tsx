@@ -61,7 +61,7 @@ export function CommentsThread({
         .from(table)
         .select("*")
         .eq(parentKey, parentValue)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as CommentRow[];
     },
