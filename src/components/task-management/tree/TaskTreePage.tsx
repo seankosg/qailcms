@@ -16,8 +16,8 @@ import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDraw
 interface Row {
   id: string;
   task_no: string;
-  parent_task_no: string | null;
-  level: "parent" | "child";
+  main_task_no: string | null;
+  level: "main" | "sub";
   discipline: string;
   task_name: string | null;
   actual_progress: number | null;
@@ -74,7 +74,7 @@ export function TaskTreePage() {
       const { data, error } = await (supabase as any)
         .from("task_management_raw")
         .select(
-          "id, task_no, parent_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, pic, sub_task_desc, sort_order",
+          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, pic, sub_task_desc, sort_order",
         )
         .eq("discipline", discipline)
         .order("sort_order", { ascending: true })
@@ -88,11 +88,11 @@ export function TaskTreePage() {
     const parents: Row[] = [];
     const childrenByParent = new Map<string, Row[]>();
     for (const r of data) {
-      if (r.level === "parent") parents.push(r);
-      else if (r.parent_task_no) {
-        const arr = childrenByParent.get(r.parent_task_no) ?? [];
+      if (r.level === "main") parents.push(r);
+      else if (r.main_task_no) {
+        const arr = childrenByParent.get(r.main_task_no) ?? [];
         arr.push(r);
-        childrenByParent.set(r.parent_task_no, arr);
+        childrenByParent.set(r.main_task_no, arr);
       }
     }
     return { parents, childrenByParent };
@@ -197,7 +197,7 @@ export function TaskTreePage() {
                 <span className="font-mono text-xs">{p.task_no}</span>
                 <CardTitle className="text-sm">{p.task_name ?? "-"}</CardTitle>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">자식 {kids.length}</Badge>
+                  <Badge variant="outline">Sub {kids.length}</Badge>
                   {behindCount > 0 && (
                     <Badge className="bg-rose-500/15 text-rose-700">지연 {behindCount}</Badge>
                   )}

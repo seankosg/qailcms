@@ -4,8 +4,8 @@ import type { Discipline } from "./columns";
 export interface ParsedTaskRow {
   rawRowNo: number;
   task_no: string;
-  parent_task_no: string | null;
-  level: "parent" | "child";
+  main_task_no: string | null;
+  level: "main" | "sub";
   category: string | null;
   plot: string | null;
   task_name: string | null;
@@ -467,7 +467,7 @@ export async function parseTaskManagementExcel(
     if (!a) continue; // task_no is required
 
     const isParent = parentSet.has(a);
-    const level: "parent" | "child" = isParent ? "parent" : "child";
+    const level: "main" | "sub" = isParent ? "main" : "sub";
 
     const cat = toStr(getCell(sheet, r, cols.category));
     const plot = toStr(getCell(sheet, r, cols.plot));
@@ -529,7 +529,7 @@ export async function parseTaskManagementExcel(
     rows.push({
       rawRowNo: r,
       task_no: taskNo,
-      parent_task_no: parentNo,
+      main_task_no: parentNo,
       level,
       category: cat ?? propagate?.category ?? null,
       plot: plot ?? propagate?.plot ?? null,
@@ -560,7 +560,7 @@ export async function parseTaskManagementExcel(
     });
   }
 
-  const parentCount = rows.filter((r) => r.level === "parent").length;
+  const parentCount = rows.filter((r) => r.level === "main").length;
   const childCount = rows.length - parentCount;
   const disciplineHint = rows.length > 0 ? inferDiscipline(rows[0].task_no) : null;
 

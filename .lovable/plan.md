@@ -1,92 +1,119 @@
-## 확정된 결정 요약
+# TM Parent/Child → Main Task / Sub Task 전면 개편
 
-1. Gantt 타임라인(오른쪽 일자별 캘린더) — 완전 폐기
-2. 파생 컬럼 수식 — 폐기, 정적 값으로 기록
-3. 자동판정 / 진도차 / 지연행 색상 — export 시점 정적 fill로 대체
-4. `설정` 시트 + Data Date 배너 D4 — 폐기
-5. Import 시 자동판정/자동계산 컬럼은 원본 엑셀 값 무시하고 앱 DB에서 재계산
+Task Management 도메인 전반에서 사용되는 `parent`/`child`, `부모`/`자식` 표현을 UI·코드·DB 모두에서 **Main Task / Sub Task**로 통일합니다. 한글 UI도 영문 그대로 노출합니다.
 
-## 대상 자동계산 컬럼 (import 시 원본값 무시)
+---
 
-`src/lib/task-management/derived.ts` 및 `rollup.functions.ts` 기준.
+## 1. DB 마이그레이션 (supabase--migration)
 
-- `plan_days` = `plan_end - plan_start + 1`
-- `plan_progress` = Data Date 대비 계획 진척률
-- `actual_progress` (부모행) = 자식 가중평균 (자식은 원본 유지)
-- `progress_variance` = `actual_progress - plan_progress`
-- `expected_progress_today`, `today_gap`
-- `slip_days` = `forecast_end - plan_end`
-- `auto_judgment` = 완료/지연/주의(미착수)/진행/예정
-- 부모행의 `plan_start`, `plan_end`, `actual_start`, `forecast_end` 롤업값
+한 트랜잭션으로 처리하여 앱 다운타임을 최소화합니다.
 
-Import parser(`src/lib/task-management/parser.ts`)와 upsert 경로에서 위 필드를 원본에서 읽지 않도록 하고, 저장 직후 rollup/derived 재계산을 강제합니다.
+### 1-1. 컬럼/값 rename
+- `task_management_raw.parent_task_no` → `main_task_no` (컬럼 rename)
+- `task_management_raw.level`의 값 마이그레이션:
+  - `'parent'` → `'main'`
+  - `'child'` → `'sub'`
+- 관련 인덱스가 있으면 새 이름으로 재생성
 
-## Export 재작성 (`View` 포맷)
+### 1-2. RPC 재작성
+- `allocate_task_no(_discipline, _parent_task_no)` → `allocate_task_no(_discipline, _main_task_no)` (내부 로직에서 참조하는 컬럼명/level 값 갱신)
+- `rollup_task_all_parents(_discipline)` → `rollup_task_all_mains(_discipline)`
+- 개별 롤업 함수(`rollup_task_parent` 존재 여부 확인 후) → `rollup_task_main`
+- 함수 내부의 `level='parent'`/`'child'` 리터럴 및 `parent_task_no` 참조 모두 신규 명칭으로 교체
+- 이전 함수는 DROP (호출부는 이번 릴리스에서 모두 교체됨)
 
-### 파이프라인 교체
-- `xlsx-js-style` + ExcelJS + JSZip 3단 파이프라인 폐기
-- SM과 동일한 `streamXlsxExport` (`src/lib/excel/stream-export.ts`) 사용
-- Gantt 시트 개념 폐기 → 단일 시트 `Task Management`
+### 1-3. 타 도메인 영향 없음
+`abd_*`, `defect_*`, `spare_*` 는 이 개편과 무관.
 
-### `stream-export.ts`에 추가할 훅
-현재 SM에는 없는 3가지만 최소 추가:
+---
 
-1. `columnWidths?: Record<string, number>` — 컬럼별 wch
-2. `numFmtByKey?: Record<string, string>` — 퍼센트/음수부호 numFmt
-3. `cellStyleOverride?: (key, value, row) => { fillRgb?, fontColorRgb?, bold? } | null` — 정적 색상 적용용
-4. `rowStyleOverride?: (row) => { fillRgb?, fontColorRgb?, bold? } | null` — 부모 행 강조용
+## 2. TypeScript 코드 개편
 
-### 정적 색상 규칙 (조건부서식 대체)
-export 시점에 JS로 판정해 셀 fill로 기록:
+### 2-1. 타입/인터페이스
+- `src/lib/task-management/parser.ts`
+  - `ParsedRow.parent_task_no` → `main_task_no`
+  - `ParsedRow.level: "parent" | "child"` → `"main" | "sub"`
+  - `parentCount` / `childCount` → `mainTaskCount` / `subTaskCount`
+  - 관련 함수(`parentCandidate*`) 이름/주석 정리
+- `src/lib/task-management/columns.ts` — level enum 관련 상수/헬퍼 갱신
+- `src/lib/task-management/derived.ts` — level 분기 재검토
 
-- `auto_judgment === "지연"` → `#C00000` + 흰색 볼드
-- `auto_judgment === "주의(미착수)"` → `#ED7D31` + 흰색 볼드
-- `auto_judgment === "완료"` → `#548235` + 흰색 볼드
-- `progress_variance < 0` (항목 제외) → `#FCE4D6`
-- `progress_variance >= 0` AND `actual_progress > 0` (항목 제외) → `#E2EFDA`
-- `auto_judgment === "지연"` 인 행의 `task_no` 셀 → `#FCE4E4`
-- `risk === "High"` → `#ED7D31`
-- `level === "parent"` 행 → `#305496` + 흰색 볼드
+### 2-2. Server functions
+- `src/lib/task-management/rollup.functions.ts`
+  - `runRollupAllParents` → `runRollupAllMains` (RPC 이름 함께 변경)
+  - `runRollupParent` → `runRollupMain`
+  - 입력 스키마의 `parent_task_no` → `main_task_no`
+- `src/lib/task-management/hierarchy.functions.ts`
+  - `addChildTask` → `addSubTask` (파일명 및 export 명칭)
+  - Zod 스키마: `parent_task_no` → `main_task_no`
+  - `allocate_task_no` RPC 인자 `_parent_task_no` → `_main_task_no`
+  - `level: "parent"` / `"child"` 리터럴 → `"main"` / `"sub"`
+  - 에러 메시지 한글 문구: "부모/자식/하위" → "Main Task/Sub Task"
+- `src/lib/task-management/import-preflight.functions.ts`
+  - 스키마·응답 필드의 `parent_task_no` → `main_task_no`
+  - `parent_mismatch` conflict reason은 **DB에 저장되지 않으므로** `main_task_mismatch`로 변경
 
-### 폐기 대상 (파일에서 완전 제거)
-`src/lib/excel/styled-workbook.ts`:
-- `applyGanttTemplate`, `buildSettingsSheet`, `applyCfViaExcelJs`, `sanitizeMergedCellXml`
-- `CfRule`, `WorkbookCfSpec`, `cfBySheet`, `maskMergedInnerCells`
-- Gantt 관련 상수(`GANTT_BAR`, `GANTT_HEADER_FILL`, `GANTT_DATA_FILL`, `GANTT_TITLE`, `GANTT_DATA_DATE`, `gGanttCellStyle`, `daysBetween`, `isoInRange`)
-- `StyledSheetOptions`의 `gantt`, `formulaMode`, `settingsSheet`, `dataDate`, `columnGroup`, `theme="gantt"` 분기
+### 2-3. Import context
+- `src/contexts/TaskManagementImportContext.tsx`
+  - `parentCount`/`childCount` → `mainTaskCount`/`subTaskCount`
+  - level 비교 리터럴 전면 교체
+  - 페이로드의 `parent_task_no` → `main_task_no`
+  - 주석의 "parent/child" 표현 정리
 
-파일이 사용되는 다른 곳은 `src/lib/defect-management/bulk-actions.ts` 뿐이며 `theme` 기본값(default)만 쓰므로 영향 없음. Gantt 브랜치만 제거하고 default 브랜치는 유지합니다.
+### 2-4. Hooks
+- `src/hooks/useTaskDashboardData.ts` — level 리터럴, 컬럼명 교체
 
-`src/components/task-management/raw-data/ExportDialog.tsx`:
-- `ganttOriginalCols`, `TM_GANTT_ORIGINAL_ORDER` 참조, `computeGanttRange`, `GROUP_BY_KEY`, `ganttGroup`, `NUMFMT_BY_KEY` (streamExport로 이관)
-- `buildStyledWorkbook` import 및 View 분기 전체 삭제
-- View/Re-import 둘 다 `streamXlsxExport`로 처리
+### 2-5. UI 컴포넌트 (영문 라벨 사용)
+- `src/components/task-management/raw-data/AddChildTaskDialog.tsx`
+  - 파일명: `AddSubTaskDialog.tsx`로 rename
+  - 컴포넌트/타입/props: `AddChildTaskDialog`→`AddSubTaskDialog`, `ParentSeed`→`MainTaskSeed`
+  - 다이얼로그 제목/라벨/토스트: "하위 Task 추가"→"Add Sub Task", "→ {parent_task_no}"→"→ Main Task: {…}" 등 영문화
+  - import 사이트 갱신
+- `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`
+  - 트리 표시 배지·툴팁 "P/C" → "Main/Sub"
+  - 열 헤더의 "Parent" 표기 → "Main Task No"
+- `src/components/task-management/tree/TaskTreePage.tsx`
+  - `parents`/`childrenByParent` → `mainTasks`/`subTasksByMain`
+  - "자식 N", "표시할 parent가 없습니다" → "Sub Task N", "No Main Task to display"
+- `src/components/task-management/detail/TaskDetailPage.tsx`
+  - `isParent` → `isMain`; 표시 라벨 영문화
+- `src/components/task-management/dashboard/TaskDashboardPage.tsx`
+  - `level: "child"` 리터럴 → `"sub"`
+- `src/components/task-management/import/TaskManagementImportPage.tsx`
+  - "Parent 행 진도율 처리", "Parent(요약) 행 …", "P/C" 표기 → **Main Task 행 진도율 처리 / Sub Task 요약 …** 등 UI 문구 전면 교체 (rollup 모드 선택 카피 포함)
+  - `Parent ${count} / Child ${count}` → `Main ${mainTaskCount} / Sub ${subTaskCount}`
+- `src/components/task-management/import/ConflictDecisionDialog.tsx`, `ConflictReviewDialog.tsx`
+  - "상위 태스크 불일치"·"DB parent"·"파일 parent" → "Main Task 불일치"·"DB Main Task"·"파일 Main Task"
+  - `parent_mismatch` 매핑 키를 `main_task_mismatch`로 교체
+- `src/routes/_authenticated/admin/task-thresholds.tsx` — 문구 정리
 
-`src/lib/task-management/columns.ts`의 `TM_GANTT_ORIGINAL_ORDER` 도 export만 남기고 사용처가 없으면 제거.
+### 2-6. 라우트
+- Add Sub Task 다이얼로그 rename에 맞춰 lazy import 경로만 조정 (라우트 URL 변경 없음)
 
-## 컬럼 순서 (View 포맷)
-기존 원본 xlsx Gantt A..T 순서 대신, 현재 화면 `visibleKeys` 순서 그대로 사용 (SM과 동일 정책). 원본 xlsx 순서 재현 요구가 있으면 별도 확인 후 반영.
+---
 
-## Import 자동계산 강제 재계산
+## 3. Rollup 옵션 문구 (Import Page)
 
-`src/contexts/TaskManagementImportContext.tsx` 및 `src/lib/task-management/parser.ts`:
-- 원본 헤더가 위 자동계산 컬럼과 매핑되어도 값을 버리고 `null` 로 upsert
-- upsert 완료 후 `rollup.functions.ts`의 재계산 서버 함수 호출을 강제 (이미 존재 여부 확인 후 없으면 추가)
-- 관련 admin의 header mapping UI에서 해당 필드는 "자동계산(무시됨)" 뱃지 표시
+기존 3가지 옵션 카피를 영문 용어로 재작성:
+- "Auto: Sub Task duration 가중평균으로 Main Task 진도율/기간 자동 재계산"
+- "Manual: 엑셀의 Main Task 값 유지, 이후 롤업 함수로 재계산"
+- "Ignore: 엑셀 Main Task 값 그대로 저장, 롤업 미실행"
 
-## 검증
+---
 
-수정 후 다음을 스크립트로 확인:
-1. XML 파싱 오류 0
-2. 병합 내부 셀 잔여 0
-3. `<f>` 태그 0 (수식 완전 제거)
-4. `<mergeCells>` 는 상단 헤더 블록에만 존재
-5. `fullCalcOnLoad` 미설정
+## 4. 검증
 
-실제 MS Excel 오픈 확인은 사용자 로컬.
+1. `bun tsgo` — 타입 에러 0
+2. `TaskManagementImportPage`에서 임포트 → Preflight 요약 표기 확인
+3. Raw Data에서 Add Sub Task 다이얼로그 → `allocate_task_no` 호출 성공, 신규 행 `level='sub'`, `main_task_no` 채워짐 확인
+4. `runRollupAllMains` 호출 → RPC 성공
+5. Tree 페이지에서 Main/Sub 그룹핑 정상 확인
+6. 화면상 "Parent"/"Child"/"부모"/"자식" 텍스트가 TM 전 페이지에서 0건
 
-## 이번에는 하지 않을 것
+---
 
-- Re-import 포맷 변경 안 함 (이미 문제 없음, 다만 파이프라인 통일을 위해 `streamXlsxExport`로 옮김)
-- SM/ABD/Spare Part의 export 로직 변경 안 함
-- `defect-management/bulk-actions.ts`의 styled-workbook 사용은 default 테마이므로 그대로 유지
+## 기술 세부 (참고)
+
+- DB 마이그레이션 순서: (a) 신규 RPC 생성 → (b) 앱 배포 (없음, 하나의 릴리스에서 처리) → 이번엔 앱과 DB를 같은 릴리스에서 교체하므로, migration 후 즉시 코드 반영 필요. `types.ts`는 마이그레이션 승인 후 자동 재생성됨.
+- `parent_mismatch` reason은 DB 저장 값이 아니라 서버 응답 문자열이므로 자유롭게 rename 가능.
+- 다른 도메인(SM, ABD, Spare Part)의 `parent`/`child` 용어(예: `React.ReactNode` children props, 함수 파라미터 `children`)는 **React 표준 용어**이므로 손대지 않음.

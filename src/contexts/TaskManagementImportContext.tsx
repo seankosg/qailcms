@@ -15,7 +15,7 @@ import {
   type TaskTargetField,
 } from "@/lib/task-management/parser";
 import type { Discipline } from "@/lib/task-management/columns";
-import { runRollupAllParents, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
+import { runRollupAllMains, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
 import {
   previewTaskImport,
   allocateTaskNo,
@@ -375,7 +375,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const discipline = target.discipline ?? "ARCH";
       const rows = target.parsed.map((p) => ({
         task_no: p.task_no,
-        parent_task_no: p.parent_task_no,
+        main_task_no: p.main_task_no,
         level: p.level,
         task_name: p.task_name,
         plot: p.plot,
@@ -460,7 +460,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         } else {
           dupDetail.set(key, (dupDetail.get(key) ?? 1) + 1);
           // child 우선, 같은 level이면 나중 것 우선
-          if (prev.level === "parent" && p.level === "child") {
+          if (prev.level === "main" && p.level === "sub") {
             dedupMap.set(key, p);
           } else if (prev.level === p.level) {
             dedupMap.set(key, p);
@@ -512,7 +512,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           const { task_no: newTaskNo } = await allocateTaskNo({
             data: {
               discipline,
-              parent_task_no: p.parent_task_no ?? null,
+              main_task_no: p.main_task_no ?? null,
             },
           });
           renumberMap.set(p.task_no, newTaskNo);
@@ -524,11 +524,11 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         }
       }
       if (renumberMap.size > 0) {
-        // parent_task_no가 renumber 대상을 가리키던 자식들도 함께 교체
+        // main_task_no가 renumber 대상을 가리키던 자식들도 함께 교체
         for (let i = 0; i < applied.length; i++) {
           const p = applied[i];
-          if (p.parent_task_no && renumberMap.has(p.parent_task_no)) {
-            applied[i] = { ...p, parent_task_no: renumberMap.get(p.parent_task_no)! };
+          if (p.main_task_no && renumberMap.has(p.main_task_no)) {
+            applied[i] = { ...p, main_task_no: renumberMap.get(p.main_task_no)! };
           }
         }
         toast.info(`${f.name}: 충돌 ${renumberMap.size}건 재번호 발급`);
@@ -541,11 +541,11 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       }
 
       const payloads = applied.map((p) => {
-        const isParent = p.level === "parent";
+        const isParent = p.level === "main";
         const stripParent = isParent && rollupMode === "auto";
         return {
         task_no: p.task_no,
-        parent_task_no: p.parent_task_no,
+        main_task_no: p.main_task_no,
         level: p.level,
         discipline,
         team: (p.team && p.team.trim()) ? p.team.trim() : discipline,
@@ -681,7 +681,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         let judgmentRecalculated = 0;
         try {
           if (rollupMode !== "keep") {
-            const res = await runRollupAllParents({
+            const res = await runRollupAllMains({
               data: { discipline },
             });
             rolledUp = res.rolledUp;

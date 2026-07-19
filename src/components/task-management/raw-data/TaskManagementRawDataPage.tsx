@@ -82,7 +82,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { canEditRawRow } from "@/lib/auth/roles";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import {
-  runRollupAllParents,
+  runRollupAllMains,
   runRecalcAutoJudgment,
 } from "@/lib/task-management/rollup.functions";
 import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
@@ -225,7 +225,7 @@ export function TaskManagementRawDataPage() {
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [addChildParent, setAddChildParent] = useState<ParentSeed | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const rollupFn = useServerFn(runRollupAllParents);
+  const rollupFn = useServerFn(runRollupAllMains);
   const judgmentFn = useServerFn(runRecalcAutoJudgment);
 
   // initial load from server-backed view preference (with local cache fallback)
@@ -355,7 +355,7 @@ export function TaskManagementRawDataPage() {
   const visibleRows = useMemo(() => {
     if (collapsedParents.size === 0) return rows;
     return rows.filter((r) => {
-      const parent = (r as any).parent_task_no as string | null;
+      const parent = (r as any).main_task_no as string | null;
       const disc = (r as any).discipline as string;
       if (!parent) return true;
       return !collapsedParents.has(`${disc}::${parent}`);
@@ -365,7 +365,7 @@ export function TaskManagementRawDataPage() {
   const parentKeys = useMemo(() => {
     const keys: string[] = [];
     for (const r of rows) {
-      if ((r as any).level === "parent") {
+      if ((r as any).level === "main") {
         keys.push(`${(r as any).discipline}::${(r as any).task_no}`);
       }
     }
@@ -560,8 +560,8 @@ export function TaskManagementRawDataPage() {
           }
           if (c.key === "task_no") {
             const rr = row.original as Row;
-            const isParent = rr.level === "parent";
-            const isChild = !!(rr as any).parent_task_no;
+            const isParent = rr.level === "main";
+            const isChild = !!(rr as any).main_task_no;
             const disc = String(rr.discipline);
             const collapseKey = `${disc}::${rr.task_no}`;
             const isCollapsed = collapsedParents.has(collapseKey);
@@ -610,7 +610,7 @@ export function TaskManagementRawDataPage() {
                       });
                     }}
                     className="rounded p-0.5 text-muted-foreground opacity-0 hover:bg-primary/10 hover:text-primary group-hover:opacity-100"
-                    title="하위 태스크 추가"
+                    title="Sub Task 추가"
                   >
                     <Plus className="h-3 w-3" />
                   </button>
@@ -751,8 +751,8 @@ export function TaskManagementRawDataPage() {
         rollupFn({ data: { discipline: "ELEC" } }),
         rollupFn({ data: { discipline: "MECH" } }),
       ]);
-      const total = res.reduce((s, r) => s + r.rolledUp, 0);
-      toast.success(`Summary 재계산 완료: ${total}개 parent`);
+      const total = res.reduce((s: number, r: { rolledUp: number }) => s + r.rolledUp, 0);
+      toast.success(`Summary 재계산 완료: ${total}개 Main Task`);
       refetch();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "재계산 실패");
@@ -843,7 +843,7 @@ export function TaskManagementRawDataPage() {
                 className="h-8"
                 onClick={handleRollup}
                 disabled={!!rollupBusy}
-                title="자식 진도로 parent 자동 재계산"
+                title="Sub Task 진도로 Main Task 자동 재계산"
               >
                 {rollupBusy === "rollup" ? (
                   <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -1007,7 +1007,7 @@ export function TaskManagementRawDataPage() {
               {virtualizer.getVirtualItems().map((v) => {
                 const row = rowModel.rows[v.index];
                 if (!row) return null;
-                const isParent = (row.original as Row).level === "parent";
+                const isParent = (row.original as Row).level === "main";
                 return (
                   <div
                     key={row.id}

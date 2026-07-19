@@ -6,7 +6,7 @@ const DISCIPLINES = ["ARCH", "ELEC", "MECH", "DESN", "PRJC"] as const;
 
 const AddChildSchema = z.object({
   discipline: z.enum(DISCIPLINES),
-  parent_task_no: z.string().min(1),
+  main_task_no: z.string().min(1),
   task_name: z.string().min(1).max(500),
   sub_task_desc: z.string().max(2000).nullable().optional(),
   category: z.string().max(200).nullable().optional(),
@@ -29,13 +29,13 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
     _user_id: context.userId,
     _role: "superuser",
   });
-  if (!isAdmin && !isSuper) throw new Error("권한 없음: 관리자만 하위 태스크를 추가할 수 있습니다");
+  if (!isAdmin && !isSuper) throw new Error("권한 없음: 관리자만 Sub Task를 추가할 수 있습니다");
 }
 
 /**
  * 부모 task 아래에 새 자식 task를 추가한다.
- * - task_no: parent_task_no + "-NN" (자동 채번, 2자리)
- * - 부모가 leaf였다면 level='parent'로 승격
+ * - task_no: main_task_no + "-NN" (자동 채번, 2자리)
+ * - 부모가 leaf였다면 level='main'로 승격
  * - sort_order는 부모 가족(부모 + 자식들)의 max 다음으로 삽입, 이후 행은 +1 shift
  */
 export const addChildTask = createServerFn({ method: "POST" })
@@ -51,15 +51,15 @@ export const addChildTask = createServerFn({ method: "POST" })
       .from("task_management_raw")
       .select("id, task_no, discipline, level, sort_order, category, plot, task_name, risk, data_date, source_file, team")
       .eq("discipline", data.discipline)
-      .eq("task_no", data.parent_task_no)
+      .eq("task_no", data.main_task_no)
       .maybeSingle();
     if (pErr) throw new Error(pErr.message);
-    if (!parent) throw new Error(`부모 태스크 '${data.parent_task_no}'을(를) 찾을 수 없습니다`);
+    if (!parent) throw new Error(`Main Task '${data.main_task_no}'을(를) 찾을 수 없습니다`);
 
     // 2) 채번: DB advisory lock 기반 RPC (경합 안전)
     const { data: allocated, error: allocErr } = await admin.rpc("allocate_task_no", {
       _discipline: data.discipline,
-      _parent_task_no: parent.task_no,
+      _main_task_no: parent.task_no,
     });
     if (allocErr) throw new Error(allocErr.message);
     const newTaskNo = String(allocated);
@@ -94,10 +94,10 @@ export const addChildTask = createServerFn({ method: "POST" })
     }
 
     // 4) 부모 level 승격
-    if (parent.level !== "parent") {
+    if (parent.level !== "main") {
       const { error: upErr } = await admin
         .from("task_management_raw")
-        .update({ level: "parent" })
+        .update({ level: "main" })
         .eq("id", parent.id);
       if (upErr) throw new Error(upErr.message);
     }
@@ -106,8 +106,8 @@ export const addChildTask = createServerFn({ method: "POST" })
     const payload: Record<string, unknown> = {
       discipline: data.discipline,
       task_no: newTaskNo,
-      parent_task_no: parent.task_no,
-      level: "child",
+      main_task_no: parent.task_no,
+      level: "sub",
       sort_order: insertSort,
       task_name: data.task_name,
       sub_task_desc: data.sub_task_desc ?? null,

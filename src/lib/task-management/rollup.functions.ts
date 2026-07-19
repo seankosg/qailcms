@@ -16,29 +16,29 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("관리자 권한이 필요합니다");
 }
 
-/** 전체 parent 롤업 (특정 공종) */
-export const runRollupAllParents = createServerFn({ method: "POST" })
+/** 전체 Main Task 롤업 (특정 공종) */
+export const runRollupAllMains = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => DisciplineSchema.parse(v))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: n, error } = await supabaseAdmin.rpc(
-      "rollup_task_all_parents",
+      "rollup_task_all_mains",
       { _discipline: data.discipline },
     );
     if (error) throw new Error(error.message);
     return { rolledUp: Number(n ?? 0) };
   });
 
-/** 특정 parent 하나만 롤업 */
+/** 특정 Main Task 하나만 롤업 */
 export const runRollupSingle = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) =>
       z
         .object({
           discipline: z.enum(DISCIPLINE_VALUES),
-          parent_task_no: z.string().min(1),
+          main_task_no: z.string().min(1),
         })
         .parse(v),
   )
@@ -47,7 +47,7 @@ export const runRollupSingle = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.rpc("update_task_summary", {
       _discipline: data.discipline,
-      _parent_task_no: data.parent_task_no,
+      _main_task_no: data.main_task_no,
     });
     if (error) throw new Error(error.message);
     return { ok: true };

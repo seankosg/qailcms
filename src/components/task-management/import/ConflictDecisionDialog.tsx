@@ -17,7 +17,7 @@ import type { ConflictPolicy } from "@/contexts/TaskManagementImportContext";
 
 const REASON_LABEL: Record<string, string> = {
   task_name_mismatch: "이름 불일치",
-  parent_mismatch: "상위 태스크 불일치",
+  parent_mismatch: "Main Task 불일치",
   plot_mismatch: "Plot 불일치",
 };
 
@@ -156,8 +156,8 @@ export function ConflictDecisionDialog({
                     </td>
                     <td className="px-2 py-1.5">{c.db.task_name ?? "—"}</td>
                     <td className="px-2 py-1.5 text-primary">{c.file.task_name ?? "—"}</td>
-                    <td className="px-2 py-1.5">{c.db.parent_task_no ?? "—"}</td>
-                    <td className="px-2 py-1.5 text-primary">{c.file.parent_task_no ?? "—"}</td>
+                    <td className="px-2 py-1.5">{c.db.main_task_no ?? "—"}</td>
+                    <td className="px-2 py-1.5 text-primary">{c.file.main_task_no ?? "—"}</td>
                     <td className="px-2 py-1.5">{c.db.plot ?? "—"}</td>
                     <td className="px-2 py-1.5 text-primary">{c.file.plot ?? "—"}</td>
                     <td className="px-2 py-1.5">

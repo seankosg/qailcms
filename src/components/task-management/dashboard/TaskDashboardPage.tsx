@@ -74,7 +74,7 @@ export function TaskDashboardPage({ compact = false }: Props) {
     disciplines: search.discipline,
     plots: search.plot,
     teams: search.team,
-    level: "child",
+    level: "sub",
     q: search.q,
   });
 
