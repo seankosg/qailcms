@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   parseTaskManagementExcel,
+  getTaskExcelSheetNames,
+  getTaskExcelHeaders,
   type ParsedTaskRow,
   type SheetHeaderEntry,
   type TaskTargetField,
@@ -38,6 +40,7 @@ export interface ImportErrorEntry {
 export type TmFileStatus =
   | "pending"
   | "parsing"
+  | "pending_sheet_selection"
   | "ready"
   | "processing"
   | "done"
@@ -58,13 +61,17 @@ export interface TmImportFileItem {
   childCount?: number;
   warnings?: string[];
   sheetName?: string;
-  discipline?: Discipline;
+  sheetNames?: string[];
+  discipline?: Discipline | null;
   disciplineHint?: Discipline | null;
   validationError?: string | null;
   error?: string;
   sheetHeaders?: SheetHeaderEntry[];
   columnMap?: Record<string, number>;
-  columnOverrides?: Partial<Record<TaskTargetField, number>> | null;
+  availableHeaders?: string[];
+  headerSamples?: Record<string, unknown>;
+  headerToFieldMap?: Record<string, string>;
+  excludedHeaders?: string[];
   conflictPolicy?: ConflictPolicy;
   conflictDecisions?: Record<string, ConflictPolicy>;
   preflight?: PreflightSummary | null;
@@ -96,12 +103,10 @@ interface CtxValue {
   addFiles: (files: File[]) => Promise<void>;
   removeFile: (id: string) => void;
   clearAll: () => void;
-  setFileDiscipline: (id: string, d: Discipline) => void;
+  setFileDiscipline: (id: string, d: Discipline | null) => void;
   setFileDataDateOverride: (id: string, date: string | null) => void;
-  setFileColumnOverrides: (
-    id: string,
-    overrides: Partial<Record<TaskTargetField, number>> | null,
-  ) => Promise<void>;
+  setFileSheet: (id: string, sheetName: string) => Promise<void>;
+  setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
   setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
   setFileConflictDecisions: (id: string, decisions: Record<string, ConflictPolicy>) => void;
   clearFileConflictDecisions: (id: string) => void;
