@@ -41,7 +41,7 @@ export function DefectImportPresetTable() {
   const qc = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const canEdit =
-    currentUser?.isAdmin === true || currentUser?.role === "d_superuser";
+    currentUser?.isAdmin === true || currentUser?.isDSuperUser === true;
 
   const { data: fieldConfig = [] } = useDefectFieldConfig();
   const { getLabel } = useDefectFieldHelpers();
