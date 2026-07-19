@@ -6,6 +6,7 @@ import { TmFieldConfigTable } from "@/components/admin/TmFieldConfigTable";
 import { TmHeaderMappingTable } from "@/components/admin/TmHeaderMappingTable";
 import { DefectFieldConfigTable } from "@/components/admin/DefectFieldConfigTable";
 import { DefectHeaderMappingTable } from "@/components/admin/DefectHeaderMappingTable";
+import { DefectImportPresetTable } from "@/components/admin/DefectImportPresetTable";
 
 export const Route = createFileRoute("/_authenticated/admin/mapping")({
   component: MappingPage,
@@ -51,9 +52,11 @@ function MappingPage() {
             <TabsList>
               <TabsTrigger value="field-config">Field Config</TabsTrigger>
               <TabsTrigger value="header-mapping">Header Mapping</TabsTrigger>
+              <TabsTrigger value="preset">Preset</TabsTrigger>
             </TabsList>
             <TabsContent value="field-config"><DefectFieldConfigTable /></TabsContent>
             <TabsContent value="header-mapping"><DefectHeaderMappingTable /></TabsContent>
+            <TabsContent value="preset"><DefectImportPresetTable /></TabsContent>
           </Tabs>
         </TabsContent>
       </Tabs>
