@@ -156,8 +156,8 @@ export function ConflictDecisionDialog({
                     </td>
                     <td className="px-2 py-1.5">{c.db.task_name ?? "—"}</td>
                     <td className="px-2 py-1.5 text-primary">{c.file.task_name ?? "—"}</td>
-                    <td className="px-2 py-1.5">{c.db.parent_task_no ?? "—"}</td>
-                    <td className="px-2 py-1.5 text-primary">{c.file.parent_task_no ?? "—"}</td>
+                    <td className="px-2 py-1.5">{c.db.main_task_no ?? "—"}</td>
+                    <td className="px-2 py-1.5 text-primary">{c.file.main_task_no ?? "—"}</td>
                     <td className="px-2 py-1.5">{c.db.plot ?? "—"}</td>
                     <td className="px-2 py-1.5 text-primary">{c.file.plot ?? "—"}</td>
                     <td className="px-2 py-1.5">

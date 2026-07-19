@@ -82,7 +82,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { canEditRawRow } from "@/lib/auth/roles";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import {
-  runRollupAllParents,
+  runRollupAllMains,
   runRecalcAutoJudgment,
 } from "@/lib/task-management/rollup.functions";
 import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
@@ -225,7 +225,7 @@ export function TaskManagementRawDataPage() {
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [addChildParent, setAddChildParent] = useState<ParentSeed | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const rollupFn = useServerFn(runRollupAllParents);
+  const rollupFn = useServerFn(runRollupAllMains);
   const judgmentFn = useServerFn(runRecalcAutoJudgment);
 
   // initial load from server-backed view preference (with local cache fallback)
@@ -355,7 +355,7 @@ export function TaskManagementRawDataPage() {
   const visibleRows = useMemo(() => {
     if (collapsedParents.size === 0) return rows;
     return rows.filter((r) => {
-      const parent = (r as any).parent_task_no as string | null;
+      const parent = (r as any).main_task_no as string | null;
       const disc = (r as any).discipline as string;
       if (!parent) return true;
       return !collapsedParents.has(`${disc}::${parent}`);
@@ -561,7 +561,7 @@ export function TaskManagementRawDataPage() {
           if (c.key === "task_no") {
             const rr = row.original as Row;
             const isParent = rr.level === "parent";
-            const isChild = !!(rr as any).parent_task_no;
+            const isChild = !!(rr as any).main_task_no;
             const disc = String(rr.discipline);
             const collapseKey = `${disc}::${rr.task_no}`;
             const isCollapsed = collapsedParents.has(collapseKey);

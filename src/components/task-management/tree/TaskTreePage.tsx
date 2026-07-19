@@ -16,7 +16,7 @@ import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDraw
 interface Row {
   id: string;
   task_no: string;
-  parent_task_no: string | null;
+  main_task_no: string | null;
   level: "parent" | "child";
   discipline: string;
   task_name: string | null;
@@ -74,7 +74,7 @@ export function TaskTreePage() {
       const { data, error } = await (supabase as any)
         .from("task_management_raw")
         .select(
-          "id, task_no, parent_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, pic, sub_task_desc, sort_order",
+          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, pic, sub_task_desc, sort_order",
         )
         .eq("discipline", discipline)
         .order("sort_order", { ascending: true })
@@ -89,10 +89,10 @@ export function TaskTreePage() {
     const childrenByParent = new Map<string, Row[]>();
     for (const r of data) {
       if (r.level === "parent") parents.push(r);
-      else if (r.parent_task_no) {
-        const arr = childrenByParent.get(r.parent_task_no) ?? [];
+      else if (r.main_task_no) {
+        const arr = childrenByParent.get(r.main_task_no) ?? [];
         arr.push(r);
-        childrenByParent.set(r.parent_task_no, arr);
+        childrenByParent.set(r.main_task_no, arr);
       }
     }
     return { parents, childrenByParent };

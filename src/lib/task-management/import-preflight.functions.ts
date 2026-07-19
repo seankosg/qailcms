@@ -6,7 +6,7 @@ const DISCIPLINES = ["ARCH", "ELEC", "MECH", "DESN", "PRJC"] as const;
 
 const PreflightRowSchema = z.object({
   task_no: z.string(),
-  parent_task_no: z.string().nullable().optional(),
+  main_task_no: z.string().nullable().optional(),
   level: z.enum(["parent", "child"]),
   task_name: z.string().nullable().optional(),
   plot: z.string().nullable().optional(),
@@ -26,12 +26,12 @@ export type PreflightConflict = {
   reason: string; // "task_name_mismatch" | "parent_mismatch" | "plot_mismatch"
   db: {
     task_name: string | null;
-    parent_task_no: string | null;
+    main_task_no: string | null;
     plot: string | null;
   };
   file: {
     task_name: string | null;
-    parent_task_no: string | null;
+    main_task_no: string | null;
     plot: string | null;
   };
 };
@@ -92,7 +92,7 @@ export const previewTaskImport = createServerFn({ method: "POST" })
     const taskNos = rows.map((r) => r.task_no);
     const dbMap = new Map<string, {
       task_no: string;
-      parent_task_no: string | null;
+      main_task_no: string | null;
       task_name: string | null;
       plot: string | null;
       plan_start: string | null;
@@ -104,7 +104,7 @@ export const previewTaskImport = createServerFn({ method: "POST" })
       const chunk = taskNos.slice(i, i + 500);
       const { data: dbRows, error } = await supabase
         .from("task_management_raw")
-        .select("task_no, parent_task_no, task_name, plot, plan_start, plan_end, actual_progress")
+        .select("task_no, main_task_no, task_name, plot, plan_start, plan_end, actual_progress")
         .eq("discipline", data.discipline)
         .in("task_no", chunk);
       if (error) throw new Error(error.message);
@@ -127,9 +127,9 @@ export const previewTaskImport = createServerFn({ method: "POST" })
 
       // Conflict detection
       const parentMismatch =
-        (r.parent_task_no ?? null) &&
-        (db.parent_task_no ?? null) &&
-        r.parent_task_no !== db.parent_task_no;
+        (r.main_task_no ?? null) &&
+        (db.main_task_no ?? null) &&
+        r.main_task_no !== db.main_task_no;
       const plotMismatch =
         !!r.plot && !!db.plot && normalizeName(r.plot) !== normalizeName(db.plot);
       const nameConflict =
@@ -145,12 +145,12 @@ export const previewTaskImport = createServerFn({ method: "POST" })
               : "task_name_mismatch",
           db: {
             task_name: db.task_name,
-            parent_task_no: db.parent_task_no,
+            main_task_no: db.main_task_no,
             plot: db.plot,
           },
           file: {
             task_name: r.task_name ?? null,
-            parent_task_no: r.parent_task_no ?? null,
+            main_task_no: r.main_task_no ?? null,
             plot: r.plot ?? null,
           },
         });
@@ -180,7 +180,7 @@ export const previewTaskImport = createServerFn({ method: "POST" })
  */
 const AllocateSchema = z.object({
   discipline: z.enum(DISCIPLINES),
-  parent_task_no: z.string().nullable().optional(),
+  main_task_no: z.string().nullable().optional(),
 });
 
 export const allocateTaskNo = createServerFn({ method: "POST" })
@@ -189,7 +189,7 @@ export const allocateTaskNo = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: next, error } = await (context.supabase as any).rpc("allocate_task_no", {
       _discipline: data.discipline,
-      _parent_task_no: data.parent_task_no ?? null,
+      _main_task_no: data.main_task_no ?? null,
     });
     if (error) throw new Error(error.message);
     return { task_no: String(next ?? "") };

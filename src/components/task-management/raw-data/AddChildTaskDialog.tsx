@@ -90,7 +90,7 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
       const res = await submit({
         data: {
           discipline: parent.discipline,
-          parent_task_no: parent.task_no,
+          main_task_no: parent.task_no,
           task_name: taskName.trim(),
           sub_task_desc: subTaskDesc.trim() || null,
           category: category.trim() || null,

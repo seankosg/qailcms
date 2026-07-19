@@ -4,7 +4,7 @@ import type { Discipline } from "./columns";
 export interface ParsedTaskRow {
   rawRowNo: number;
   task_no: string;
-  parent_task_no: string | null;
+  main_task_no: string | null;
   level: "parent" | "child";
   category: string | null;
   plot: string | null;
@@ -529,7 +529,7 @@ export async function parseTaskManagementExcel(
     rows.push({
       rawRowNo: r,
       task_no: taskNo,
-      parent_task_no: parentNo,
+      main_task_no: parentNo,
       level,
       category: cat ?? propagate?.category ?? null,
       plot: plot ?? propagate?.plot ?? null,
