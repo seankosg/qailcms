@@ -90,7 +90,9 @@ export function TaskManagementImportPage() {
 
 function ImportInner() {
   const { data: me } = useCurrentUser();
-  const canImport = !!me?.isAdmin;
+  const canImport = !!me?.isEditor;
+  const isAdmin = !!me?.isAdmin;
+  const isSuperUserLike = !!(me?.isSuperUser || me?.isDSuperUser);
   const {
     files,
     getFiles,
@@ -99,6 +101,11 @@ function ImportInner() {
     setRollupMode,
     recalcJudgment,
     setRecalcJudgment,
+    importScope,
+    setImportScope,
+    setImporterHdecPicName,
+    setIsImporterAdmin,
+    matchesHdecPic,
     addFiles,
     removeFile,
     clearAll,
@@ -120,6 +127,17 @@ function ImportInner() {
   const [conflictFileId, setConflictFileId] = useState<string | null>(null);
   const [pendingImportAfterConflicts, setPendingImportAfterConflicts] = useState(false);
   const masterOptions = useAllMasterOptions();
+
+  // Sync importer identity/scope to context whenever user info changes
+  const hdecPic = me?.hdec_pic_name ?? null;
+  const adminFlag = !!me?.isAdmin;
+  useEffectSync(() => {
+    setImporterHdecPicName(hdecPic);
+    setIsImporterAdmin(adminFlag);
+  }, [hdecPic, adminFlag, setImporterHdecPicName, setIsImporterAdmin]);
+
+  // Effective scope for display/counts
+  const effectiveScope: "mine" | "all" = isAdmin ? "all" : importScope;
 
   const nameSpecs: NameFieldSpec<ParsedTaskRow>[] = [
     {
