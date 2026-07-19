@@ -197,7 +197,7 @@ export function TaskTreePage() {
                 <span className="font-mono text-xs">{p.task_no}</span>
                 <CardTitle className="text-sm">{p.task_name ?? "-"}</CardTitle>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">자식 {kids.length}</Badge>
+                  <Badge variant="outline">Sub {kids.length}</Badge>
                   {behindCount > 0 && (
                     <Badge className="bg-rose-500/15 text-rose-700">지연 {behindCount}</Badge>
                   )}

@@ -119,7 +119,7 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
       <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
           <DialogTitle>
-            하위 Task 추가{" "}
+            Sub Task 추가{" "}
             <span className="text-xs font-normal text-muted-foreground">
               → {parent?.task_no}
             </span>
@@ -132,7 +132,7 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
             <Input
               value={taskName}
               onChange={(e) => setTaskName(e.target.value)}
-              placeholder="상위 Task와 동일 or 새 이름"
+              placeholder="Main Task와 동일 or 새 이름"
               className="mt-1"
               maxLength={500}
             />

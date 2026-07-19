@@ -610,7 +610,7 @@ export function TaskManagementRawDataPage() {
                       });
                     }}
                     className="rounded p-0.5 text-muted-foreground opacity-0 hover:bg-primary/10 hover:text-primary group-hover:opacity-100"
-                    title="하위 태스크 추가"
+                    title="Sub Task 추가"
                   >
                     <Plus className="h-3 w-3" />
                   </button>
@@ -843,7 +843,7 @@ export function TaskManagementRawDataPage() {
                 className="h-8"
                 onClick={handleRollup}
                 disabled={!!rollupBusy}
-                title="자식 진도로 parent 자동 재계산"
+                title="Sub Task 진도로 Main Task 자동 재계산"
               >
                 {rollupBusy === "rollup" ? (
                   <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />

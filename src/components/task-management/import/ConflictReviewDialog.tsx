@@ -11,7 +11,7 @@ import type { PreflightSummary } from "@/lib/task-management/import-preflight.fu
 
 const REASON_LABEL: Record<string, string> = {
   task_name_mismatch: "이름 불일치",
-  parent_mismatch: "상위 태스크 불일치",
+  parent_mismatch: "Main Task 불일치",
   plot_mismatch: "Plot 불일치",
 };
 

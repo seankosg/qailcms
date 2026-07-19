@@ -29,7 +29,7 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
     _user_id: context.userId,
     _role: "superuser",
   });
-  if (!isAdmin && !isSuper) throw new Error("권한 없음: 관리자만 하위 태스크를 추가할 수 있습니다");
+  if (!isAdmin && !isSuper) throw new Error("권한 없음: 관리자만 Sub Task를 추가할 수 있습니다");
 }
 
 /**
@@ -54,7 +54,7 @@ export const addChildTask = createServerFn({ method: "POST" })
       .eq("task_no", data.main_task_no)
       .maybeSingle();
     if (pErr) throw new Error(pErr.message);
-    if (!parent) throw new Error(`부모 태스크 '${data.main_task_no}'을(를) 찾을 수 없습니다`);
+    if (!parent) throw new Error(`Main Task '${data.main_task_no}'을(를) 찾을 수 없습니다`);
 
     // 2) 채번: DB advisory lock 기반 RPC (경합 안전)
     const { data: allocated, error: allocErr } = await admin.rpc("allocate_task_no", {

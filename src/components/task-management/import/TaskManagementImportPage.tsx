@@ -269,11 +269,11 @@ function ImportInner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Import 옵션</CardTitle>
-          <CardDescription>Parent(요약) 행 처리 방식과 판정 재계산 여부를 선택합니다.</CardDescription>
+          <CardDescription>Main Task(요약) 행 처리 방식과 판정 재계산 여부를 선택합니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label className="mb-2 block text-sm font-medium">Parent 행 진도율 처리</Label>
+            <Label className="mb-2 block text-sm font-medium">Main Task 행 진도율 처리</Label>
             <RadioGroup
               value={rollupMode}
               onValueChange={(v) => setRollupMode(v as RollupMode)}
@@ -284,7 +284,7 @@ function ImportInner() {
                 <div>
                   <div className="font-medium">자동 롤업 (권장, 기본)</div>
                   <div className="text-xs text-muted-foreground">
-                    엑셀의 parent 진도율/기간을 무시하고, 자식 행의 duration 가중평균으로 자동 재계산합니다.
+                    엑셀의 Main Task 진도율/기간을 무시하고, Sub Task 행의 duration 가중평균으로 자동 재계산합니다.
                   </div>
                 </div>
               </label>
@@ -759,7 +759,7 @@ function PreviewDialog({
               {rows.map((r) => (
                 <tr key={r.rawRowNo} className="border-b hover:bg-accent/30">
                   <td className="px-1.5 py-1 font-mono">{r.task_no}</td>
-                  <td className="px-1.5 py-1">{r.level === "main" ? "P" : "C"}</td>
+                  <td className="px-1.5 py-1">{r.level === "main" ? "M" : "S"}</td>
                   <td className="px-1.5 py-1">{r.category ?? ""}</td>
                   <td className="px-1.5 py-1">{r.plot ?? ""}</td>
                   <td className="px-1.5 py-1">{r.task_name ?? ""}</td>
