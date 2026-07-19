@@ -6,6 +6,8 @@ export interface TaskDashboardFilters {
   disciplines: string[];
   plots: string[];
   teams: string[];
+  hdecPic?: string[];
+  hdecEng?: string[];
   level: "sub" | "main" | "all";
   q: string;
 }
@@ -30,6 +32,8 @@ async function fetchAll(filters: TaskDashboardFilters): Promise<TaskItem[]> {
     if (filters.disciplines.length) query = query.in("discipline", filters.disciplines);
     if (filters.plots.length) query = query.in("plot", filters.plots);
     if (filters.teams.length) query = query.in("team", filters.teams);
+    if (filters.hdecPic && filters.hdecPic.length) query = query.in("hdec_pic_name", filters.hdecPic);
+    if (filters.hdecEng && filters.hdecEng.length) query = query.in("hdec_eng_name", filters.hdecEng);
     if (filters.q.trim()) {
       const q = filters.q.trim().replace(/[%,]/g, "");
       query = query.or(
