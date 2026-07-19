@@ -167,13 +167,18 @@ export function AbdRawDataPage() {
   const invalidate = useInvalidateAbd();
 
   // team_master 기반 동적 탭. 미매칭 시 첫 옵션 폴백.
-  const teamTabs = useMemo(
-    () => teamOptions.map((t) => ({ value: t.code, label: t.code })),
+  // ABD는 도면 관련 팀만 노출: PRJC/SUPP 제외
+  const abdTeamOptions = useMemo(
+    () => teamOptions.filter((t) => !["PRJC", "SUPP"].includes(t.code.toUpperCase())),
     [teamOptions],
   );
+  const teamTabs = useMemo(
+    () => abdTeamOptions.map((t) => ({ value: t.code, label: t.code })),
+    [abdTeamOptions],
+  );
   const rawTab = String(urlSearch.tab ?? "").toUpperCase();
-  const matchedTeam = teamOptions.find((t) => t.code.toUpperCase() === rawTab);
-  const team: AbdTeam = ((matchedTeam?.code ?? teamOptions[0]?.code ?? "MECH") as unknown) as AbdTeam;
+  const matchedTeam = abdTeamOptions.find((t) => t.code.toUpperCase() === rawTab);
+  const team: AbdTeam = ((matchedTeam?.code ?? abdTeamOptions[0]?.code ?? "MECH") as unknown) as AbdTeam;
   // 다중 선택 지원: 콤마로 구분된 status 문자열. "all" | "" → 전체
   const selectedStatuses: Array<Exclude<AbdStatusGroup, "all">> = useMemo(() => {
     const raw = String(urlSearch.status ?? "").trim();
