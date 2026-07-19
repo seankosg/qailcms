@@ -375,20 +375,26 @@ export async function parseTaskManagementExcel(
     task_name: pick("task_name", ["항목"], 4),
     risk: pick("risk", ["리스크"], 5),
     sub_task_desc: pick("sub_task_desc", ["단계별 세부 업무"], 6),
-    pic: pick("pic", ["담당"], 7),
-    row_type: pick("row_type", ["유형"], 8),
-    status_manual: pick("status_manual", ["상태"], 9),
-    plan_start: pick("plan_start", ["계획 시작"], 10),
-    plan_end: pick("plan_end", ["계획 완료"], 11),
-    plan_days: pick("plan_days", ["계획 일수"], 12),
-    actual_start: pick("actual_start", ["실제 시작"], 13),
-    actual_progress: pick("actual_progress", ["실적 진도율"], 14),
-    plan_progress: pick("plan_progress", ["계획 진도율"], 15),
-    progress_variance: pick("progress_variance", ["진도차 (%p)", "진도차(%p)"], 16),
-    forecast_end: pick("forecast_end", ["예상 완료"], 17),
-    slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 18),
-    auto_judgment: pick("auto_judgment", ["자동 판정"], 19),
+    hdec_pic_name: pick("hdec_pic_name", ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"], 7),
+    hdec_eng_name: pick("hdec_eng_name", ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"], 8),
+    row_type: pick("row_type", ["유형"], 9),
+    status_manual: pick("status_manual", ["상태"], 10),
+    plan_start: pick("plan_start", ["계획 시작"], 11),
+    plan_end: pick("plan_end", ["계획 완료"], 12),
+    plan_days: pick("plan_days", ["계획 일수"], 13),
+    actual_start: pick("actual_start", ["실제 시작"], 14),
+    actual_progress: pick("actual_progress", ["실적 진도율"], 15),
+    plan_progress: pick("plan_progress", ["계획 진도율"], 16),
+    progress_variance: pick("progress_variance", ["진도차 (%p)", "진도차(%p)"], 17),
+    forecast_end: pick("forecast_end", ["예상 완료"], 18),
+    slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 19),
+    auto_judgment: pick("auto_judgment", ["자동 판정"], 20),
   };
+
+  // 단일 "담당" 컬럼만 있고 HDEC ENG가 별도로 매핑되지 않은 경우 자동 분배
+  const singlePicColumn =
+    cols.hdec_pic_name > 0 && cols.hdec_pic_name === cols.hdec_eng_name;
+  const hasHangul = (s: string) => /[\uAC00-\uD7A3]/.test(s);
 
   const columnMap: Record<string, number> = {
     task_no: cols.no,
@@ -397,7 +403,8 @@ export async function parseTaskManagementExcel(
     task_name: cols.task_name,
     risk: cols.risk,
     sub_task_desc: cols.sub_task_desc,
-    pic: cols.pic,
+    hdec_pic_name: cols.hdec_pic_name,
+    hdec_eng_name: cols.hdec_eng_name,
     row_type: cols.row_type,
     status_manual: cols.status_manual,
     plan_start: cols.plan_start,
@@ -540,7 +547,16 @@ export async function parseTaskManagementExcel(
       task_name: taskName ?? propagate?.task_name ?? null,
       risk: risk ?? propagate?.risk ?? null,
       sub_task_desc: toStr(getCell(sheet, r, cols.sub_task_desc)),
-      pic: toStr(getCell(sheet, r, cols.pic)),
+      ...(() => {
+        const picRaw = toStr(getCell(sheet, r, cols.hdec_pic_name));
+        const engRaw = singlePicColumn ? null : toStr(getCell(sheet, r, cols.hdec_eng_name));
+        if (singlePicColumn) {
+          const v = picRaw;
+          if (v && hasHangul(v)) return { hdec_pic_name: v, hdec_eng_name: null };
+          return { hdec_pic_name: null, hdec_eng_name: v };
+        }
+        return { hdec_pic_name: picRaw, hdec_eng_name: engRaw };
+      })(),
       row_type: toStr(getCell(sheet, r, cols.row_type)),
       team: (() => {
         const idx = headerMap["team"] ?? headerMap["팀"];
