@@ -50,6 +50,14 @@ import {
 } from "@/lib/defect-management/progress.functions";
 import { SnagScheduleMatrix } from "./SnagScheduleMatrix";
 import { Route } from "@/routes/_authenticated/closure/snag-management/progress";
+import { SnagPlanVsActualCard } from "./SnagPlanVsActualCard";
+import { ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { CardHeader, CardTitle } from "@/components/ui/card";
 
 function parseCsv<T extends string>(v: string, allowed: readonly T[]): T[] {
   if (!v) return [];
@@ -75,6 +83,8 @@ export function SnagProgressPage() {
   const hidePast = search.hidePast === 1;
   const asofMode = search.asofMode;
   const planMode: PlanMode = search.planMode;
+  const matrixOpen = search.matrixOpen === 1;
+  const scurveOpen = search.scurveOpen === 1;
 
   const today = todayIso();
   const asOfDate = today; // Data Date 개념이 미도입 상태이므로 today 로 통일
@@ -430,15 +440,46 @@ export function SnagProgressPage() {
       ) : loading ? (
         <Skeleton className="h-96 w-full" />
       ) : (
-        <SnagScheduleMatrix
-          data={matrix}
-          bucket={bucket}
-          stagesToShow={effectiveStages}
-          today={today}
-          asOfLabel={asOfLabel}
-          groupHeader={groupHeader}
-          onCellClick={handleCellClick}
-        />
+        <>
+          <SnagPlanVsActualCard
+            cells={cellsQ.data ?? []}
+            buckets={buckets}
+            stages={effectiveStages}
+            today={today}
+            open={scurveOpen}
+            onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
+          />
+          <Card>
+            <Collapsible open={matrixOpen} onOpenChange={(v) => setSearch({ matrixOpen: v ? 1 : 0 })}>
+              <CardHeader className="pb-2">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 text-left hover:opacity-80"
+                    aria-expanded={matrixOpen}
+                  >
+                    {matrixOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <LayoutGrid className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-sm">Progress Matrix</CardTitle>
+                  </button>
+                </CollapsibleTrigger>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="pt-0">
+                  <SnagScheduleMatrix
+                    data={matrix}
+                    bucket={bucket}
+                    stagesToShow={effectiveStages}
+                    today={today}
+                    asOfLabel={asOfLabel}
+                    groupHeader={groupHeader}
+                    onCellClick={handleCellClick}
+                  />
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+        </>
       )}
     </div>
   );
