@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ColumnSelectDialog,
   type ColumnSelectHelpers,
@@ -19,40 +21,12 @@ interface DefectColumnSelectProps {
   onApply: (excluded: string[]) => void;
 }
 
-/** 프리셋별 유지할 canonical field 집합 (SHAW와 등가). */
-const ACONEX_FIELDS = new Set([
-  "source_issue_no",
-  "status_raw",
-  "updated_status",
-  "updated_date_raw",
-  "priority",
-  "classification",
-  "category",
-]);
-const HDEC_FIELDS = new Set([
-  "source_issue_no",
-  "team",
-  "subcontractor_name",
-  "subsub_name",
-  "hdec_pic_name",
-  "hdec_eng_name",
-  "planned_start_date",
-  "planned_rectified_date",
-  "planned_closure_date",
-  "actual_start_date",
-  "actual_rectified_date",
-  "actual_closure_date",
-]);
-const CAT_CHECK_FIELDS = new Set([
-  "source_issue_no",
-  "description",
-  "priority",
-  "hdec_verification",
-  "hdec_reason",
-  "closure_status",
-  "actual_closure_date",
-  "status_raw",
-]);
+interface DbPreset {
+  id: string;
+  label: string;
+  fields: string[];
+  sort_order: number;
+}
 
 export function DefectColumnSelect({
   fileName,
@@ -69,6 +43,19 @@ export function DefectColumnSelect({
     useDefectFieldHelpers();
   const { data: currentUser } = useCurrentUser();
   const isAdmin = currentUser?.isAdmin === true;
+
+  const { data: dbPresets = [] } = useQuery({
+    queryKey: ["defect-import-presets"],
+    queryFn: async (): Promise<DbPreset[]> => {
+      const { data, error } = await (supabase as any)
+        .from("defect_import_presets")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as DbPreset[];
+    },
+    staleTime: 10_000,
+  });
 
   const helpers = useMemo<ColumnSelectHelpers>(() => {
     const toField = (h: string) => headerToFieldMap[h] ?? "";
@@ -141,35 +128,20 @@ export function DefectColumnSelect({
   ]);
 
   const presets = useMemo(() => {
-    const aconexHeaders = headers.filter((h) => ACONEX_FIELDS.has(headerToFieldMap[h]));
-    const hdecHeaders = headers.filter((h) => HDEC_FIELDS.has(headerToFieldMap[h]));
-    const catCheckHeaders = headers.filter((h) => CAT_CHECK_FIELDS.has(headerToFieldMap[h]));
-
+    const fromDb = dbPresets.map((p) => {
+      const fieldSet = new Set(p.fields);
+      const matched = headers.filter((h) => fieldSet.has(headerToFieldMap[h]));
+      return {
+        id: p.id,
+        label: p.label,
+        matchedHeaders: matched,
+      };
+    });
     return [
       { id: "new-upload", label: "New Upload", matchedHeaders: undefined },
-      {
-        id: "update-aconex",
-        label: "Update from Aconex",
-        matchedHeaders: aconexHeaders,
-        className:
-          "border-emerald-300 text-emerald-900 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-100 dark:hover:bg-emerald-950",
-      },
-      {
-        id: "update-hdec",
-        label: "HDEC's Update",
-        matchedHeaders: hdecHeaders,
-        className:
-          "border-blue-300 text-blue-900 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-100 dark:hover:bg-blue-950",
-      },
-      {
-        id: "cat-check",
-        label: "Cat Check",
-        matchedHeaders: catCheckHeaders,
-        className:
-          "border-rose-300 text-rose-900 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-100 dark:hover:bg-rose-950",
-      },
+      ...fromDb,
     ];
-  }, [headers, headerToFieldMap]);
+  }, [headers, headerToFieldMap, dbPresets]);
 
   return (
     <ColumnSelectDialog

@@ -720,6 +720,33 @@ export type Database = {
         }
         Relationships: []
       }
+      defect_import_presets: {
+        Row: {
+          created_at: string
+          fields: string[]
+          id: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fields?: string[]
+          id?: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fields?: string[]
+          id?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       defect_import_row_logs: {
         Row: {
           action_taken: string | null
