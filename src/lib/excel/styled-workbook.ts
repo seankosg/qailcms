@@ -1,32 +1,8 @@
-// Shared styled Excel workbook builder — supports both the default SHAW
-// Raw Data style and a Gantt-flavored theme (column-group coloring, Data
-// Date banner, and an optional right-side day-by-day Gantt calendar).
+// Shared styled Excel workbook builder — SHAW-style Raw Data theme only.
+// Gantt template / conditional-formatting / settings-sheet 관련 로직은 폐기됨.
+// TM 도메인은 이제 stream-export.ts (ExcelJS 단일 파이프라인)를 사용한다.
 
 import XLSX from "xlsx-js-style";
-
-// ---------------------------------------------------------------------------
-// Conditional-formatting spec (applied post-build via exceljs in
-// saveStyledWorkbook when the workbook was tagged with a spec).
-// ---------------------------------------------------------------------------
-
-export interface CfRule {
-  /** Cell range in A1 notation, e.g. "U8:XX181" */
-  ref: string;
-  /** Excel formula (no leading '='). Uses top-left-of-range relative refs. */
-  formula: string;
-  fillRgb?: string;
-  fontColorRgb?: string;
-  bold?: boolean;
-  /** Left/right vertical borders (medium). Used for Today/Data Date lines. */
-  borderRgb?: string;
-}
-
-export interface WorkbookCfSpec {
-  sheetName: string;
-  rules: CfRule[];
-}
-
-const cfBySheet = new WeakMap<XLSX.WorkBook, WorkbookCfSpec>();
 
 // ---------------------------------------------------------------------------
 // Date helpers
@@ -34,7 +10,6 @@ const cfBySheet = new WeakMap<XLSX.WorkBook, WorkbookCfSpec>();
 
 export const DATE_NUMFMT = "dd-mmm";
 export const DATETIME_NUMFMT = "dd-mmm-yyyy hh:mm";
-export const GANTT_DATE_NUMFMT = "mm-dd-yy";
 
 export function isoToExcelSerial(iso: string | null | undefined): number | null {
   if (iso == null) return null;
@@ -65,29 +40,11 @@ export function isoTimestampToExcelSerial(iso: string | null | undefined): numbe
   return v;
 }
 
-function daysBetween(startIso: string, endIso: string): string[] {
-  const s = new Date(startIso + "T00:00:00Z");
-  const e = new Date(endIso + "T00:00:00Z");
-  const out: string[] = [];
-  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return out;
-  const cur = new Date(s);
-  while (cur.getTime() <= e.getTime()) {
-    out.push(cur.toISOString().slice(0, 10));
-    cur.setUTCDate(cur.getUTCDate() + 1);
-  }
-  return out;
-}
-
-function isoInRange(iso: string, from: string, to: string): boolean {
-  return iso >= from && iso <= to;
-}
-
 // ---------------------------------------------------------------------------
 // Style presets — default (SHAW) theme
 // ---------------------------------------------------------------------------
 
 const FONT_NAME = "Calibri";
-const FONT_KO = "Malgun Gothic";
 
 export const STYLE_TITLE = {
   font: { name: FONT_NAME, sz: 14, bold: true, color: { rgb: "FFFFFFFF" } },
