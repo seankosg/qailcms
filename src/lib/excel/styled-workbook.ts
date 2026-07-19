@@ -1218,10 +1218,18 @@ async function applyCfViaExcelJs(
   return sanitizeMergedCellXml(out as ArrayBuffer, JSZip);
 }
 
-async function sanitizeMergedCellXml(
-  input: ArrayBuffer,
-  JSZipCtor: typeof import("jszip").default,
-): Promise<ArrayBuffer> {
+type ZipFileLike = { async: (type: "string") => Promise<string> };
+type ZipLike = {
+  files: Record<string, unknown>;
+  file: {
+    (name: string): ZipFileLike | null;
+    (name: string, data: string): ZipLike;
+  };
+  generateAsync: (options: { type: "arraybuffer"; compression: "DEFLATE" }) => Promise<ArrayBuffer>;
+};
+type JSZipLike = { loadAsync: (data: ArrayBuffer) => Promise<ZipLike> };
+
+async function sanitizeMergedCellXml(input: ArrayBuffer, JSZipCtor: JSZipLike): Promise<ArrayBuffer> {
   const zip = await JSZipCtor.loadAsync(input);
   const sheetNames = Object.keys(zip.files).filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name));
   await Promise.all(
@@ -1242,7 +1250,7 @@ async function sanitizeMergedCellXml(
         }
       }
       if (innerRefs.size === 0) return;
-      const cleaned = xml.replace(/<c r="([A-Z]+\d+)"(?:\s+[^>]*)?(?:\/>|><\/c>)/g, (cellXml, ref) => {
+      const cleaned = xml.replace(/<c r="([A-Z]+\d+)"(?:\s+[^>]*)?(?:\/>|><\/c>)/g, (cellXml: string, ref: string) => {
         return innerRefs.has(ref) ? "" : cellXml;
       });
       zip.file(name, cleaned);
