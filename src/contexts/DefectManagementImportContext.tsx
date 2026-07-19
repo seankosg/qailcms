@@ -346,6 +346,25 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           continue;
         }
         if (!firstError) firstError = error;
+        // 결정적 데이터 오류(NOT NULL / CHECK / FK 등)는 분할해도 결과가 바뀌지 않으므로
+        // 즉시 개별 실패로 처리하여 O(N) 왕복 폭발을 방지한다.
+        const code = (error as any)?.code as string | undefined;
+        const isDeterministic =
+          code === "23502" || code === "23514" || code === "23503" || code === "22P02";
+        if (current.length === 1 || isDeterministic) {
+          for (const row of current) {
+            rejectedRows.push(row);
+            rowErrors.push({
+              batch: batchIndex,
+              message: error.message,
+              code: (error as any).code,
+              details: (error as any).details,
+              hint: (error as any).hint,
+              sampleId: row.source_issue_no as string,
+            });
+          }
+          continue;
+        }
         if (current.length === 1) {
           rejectedRows.push(current[0]);
           rowErrors.push({
