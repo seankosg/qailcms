@@ -85,24 +85,24 @@ export function TaskTreePage() {
     },
   });
 
-  const { parents, childrenByParent } = useMemo(() => {
-    const parents: Row[] = [];
-    const childrenByParent = new Map<string, Row[]>();
+  const { mainTasks, subsByMain } = useMemo(() => {
+    const mainTasks: Row[] = [];
+    const subsByMain = new Map<string, Row[]>();
     for (const r of data) {
-      if (r.level === "main") parents.push(r);
+      if (r.level === "main") mainTasks.push(r);
       else if (r.main_task_no) {
-        const arr = childrenByParent.get(r.main_task_no) ?? [];
+        const arr = subsByMain.get(r.main_task_no) ?? [];
         arr.push(r);
-        childrenByParent.set(r.main_task_no, arr);
+        subsByMain.set(r.main_task_no, arr);
       }
     }
-    return { parents, childrenByParent };
+    return { mainTasks, subsByMain };
   }, [data]);
 
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
-    return parents.filter((p) => {
-      const kids = childrenByParent.get(p.task_no) ?? [];
+    return mainTasks.filter((p) => {
+      const kids = subsByMain.get(p.task_no) ?? [];
       if (behindOnly) {
         const anyBehind = [p, ...kids].some((r) => todayGap(r) < -0.05);
         if (!anyBehind) return false;
@@ -114,7 +114,7 @@ export function TaskTreePage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [parents, childrenByParent, q, behindOnly]);
+  }, [mainTasks, subsByMain, q, behindOnly]);
 
   function toggle(taskNo: string) {
     setExpanded((cur) => {
@@ -176,7 +176,7 @@ export function TaskTreePage() {
 
       <div className="space-y-2">
         {filtered.map((p) => {
-          const kids = childrenByParent.get(p.task_no) ?? [];
+          const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
           const worst = worstJudgment(kids.map((k) => k.auto_judgment)) ?? p.auto_judgment;
           const behindCount = kids.filter((k) => todayGap(k) < -0.05).length;
@@ -198,7 +198,7 @@ export function TaskTreePage() {
                 <span className="font-mono text-xs">{p.task_no}</span>
                 <CardTitle className="text-sm">{p.task_name ?? "-"}</CardTitle>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">Sub {kids.length}</Badge>
+                  <Badge variant="outline">Sub Task {kids.length}</Badge>
                   {behindCount > 0 && (
                     <Badge className="bg-rose-500/15 text-rose-700">지연 {behindCount}</Badge>
                   )}
@@ -227,7 +227,7 @@ export function TaskTreePage() {
                     <thead className="bg-muted/40">
                       <tr>
                         <th className="px-2 py-1 text-left">Task No</th>
-                        <th className="px-2 py-1 text-left">세부 업무</th>
+                       <th className="px-2 py-1 text-left">Sub Task 설명</th>
                         <th className="px-2 py-1 text-left">담당</th>
                         <th className="px-2 py-1 text-left">계획</th>
                         <th className="px-2 py-1 text-left">실적</th>
@@ -291,7 +291,7 @@ export function TaskTreePage() {
 
       {filtered.length === 0 && !isLoading && (
         <div className="rounded border p-6 text-center text-sm text-muted-foreground">
-          표시할 parent가 없습니다.
+          표시할 Main Task가 없습니다.
         </div>
       )}
 
