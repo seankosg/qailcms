@@ -12,7 +12,8 @@ export type TaskScheduleGroupBy =
   | "discipline"
   | "team"
   | "plot"
-  | "pic"
+  | "hdec_pic_name"
+  | "hdec_eng_name"
   | "category"
   | "floor_level";
 
@@ -22,7 +23,8 @@ export const ALL_TASK_GROUP_KEYS: TaskScheduleGroupBy[] = [
   "discipline",
   "team",
   "plot",
-  "pic",
+  "hdec_pic_name",
+  "hdec_eng_name",
   "category",
   "floor_level",
 ];
@@ -49,7 +51,8 @@ export const TASK_GROUP_LABELS: Record<TaskScheduleGroupBy, string> = {
   discipline: "공종",
   team: "Team",
   plot: "Plot",
-  pic: "담당",
+  hdec_pic_name: "HDEC PIC",
+  hdec_eng_name: "HDEC ENG",
   category: "Category",
   floor_level: "층",
 };
@@ -59,7 +62,8 @@ export const TASK_GROUP_QUERY_PARAM: Record<TaskScheduleGroupBy, string> = {
   discipline: "discipline",
   team: "team",
   plot: "plot",
-  pic: "pic",
+  hdec_pic_name: "hdec_pic_name",
+  hdec_eng_name: "hdec_eng_name",
   category: "category",
   floor_level: "floor_level",
 };
@@ -71,7 +75,8 @@ export interface TaskItem {
   discipline: string | null;
   team: string | null;
   plot: string | null;
-  pic: string | null;
+  hdec_pic_name: string | null;
+  hdec_eng_name: string | null;
   category: string | null;
   floor_level: string | null;
   risk: string | null;
