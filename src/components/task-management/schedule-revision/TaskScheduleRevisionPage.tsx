@@ -632,7 +632,7 @@ export function TaskScheduleRevisionPage() {
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     {visibleFlatCols.map((c) => (
-                      <SortableHeader key={c.id} column={table.getColumn(c.id)} label={c.label} rowSpan={2} pinnable />
+                      <SortableHeader key={c.id} column={table.getColumn(c.id)} label={c.label} rowSpan={2} pinnable table={table} />
                     ))}
                     {stageGroups.map((stage, idx) => {
                       const span = stageVisibleLeaves[idx].length;
@@ -652,6 +652,7 @@ export function TaskScheduleRevisionPage() {
                           column={table.getColumn(leaf.id)}
                           label={leaf.label}
                           className={leafIdx === 0 ? "border-l" : ""}
+                          table={table}
                         />
                       )),
                     )}
