@@ -11,7 +11,7 @@ interface Props {
   onChange: (next: DmrParsedSection) => void;
 }
 
-const METRICS: DmrMetric[] = ['target', 'today', 'yesterday'];
+const METRICS: DmrMetric[] = ['plan', 'actual'];
 const PLOTS: DmrPlot[] = ['C', 'D', 'TOTAL'];
 
 export function DmrPreviewTable({ section, onChange }: Props) {
@@ -68,7 +68,7 @@ export function DmrPreviewTable({ section, onChange }: Props) {
           <tbody>
             {section.rows.map((row, idx) => {
               const rw = validateRow(row);
-              const d = diff(row.values.today.TOTAL, row.values.yesterday.TOTAL);
+              const d = diff(row.values.actual.TOTAL, row.values.plan.TOTAL);
               return (
                 <tr key={idx} className={cn('border-t hover:bg-muted/30', rw.length > 0 && 'bg-amber-500/5')}>
                   <td className="sticky left-0 z-[5] bg-background px-1 py-0.5">
