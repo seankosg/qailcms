@@ -64,20 +64,7 @@ export function BackupHelpDialog({ triggerLabel = "도움말 / Help", variant = 
           </div>
         </DialogHeader>
         <div className="overflow-y-auto px-6 py-5">
-          <article
-            ref={contentRef}
-            className="prose prose-sm dark:prose-invert max-w-none
-              prose-headings:scroll-mt-4
-              prose-h1:text-2xl prose-h1:font-bold prose-h1:mt-0
-              prose-h2:text-lg prose-h2:mt-8 prose-h2:border-b prose-h2:pb-1
-              prose-h3:text-base prose-h3:mt-5
-              prose-table:text-xs prose-th:bg-muted prose-th:px-2 prose-th:py-1
-              prose-td:px-2 prose-td:py-1
-              prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none
-              prose-pre:bg-muted prose-pre:text-foreground prose-pre:text-xs
-              prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 dark:prose-blockquote:bg-amber-950/30 prose-blockquote:py-1 prose-blockquote:pl-3 prose-blockquote:not-italic
-              prose-a:text-primary"
-          >
+          <article ref={contentRef} className="backup-guide-doc text-sm leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {BACKUP_GUIDE_MARKDOWN.replace(/^---[\s\S]*?---\n/, "")}
             </ReactMarkdown>
