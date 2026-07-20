@@ -86,12 +86,21 @@ export function DmrDashboardPage() {
     enabled: !!currentAsOf,
     queryKey: ['dmr_entries_window_raw', currentAsOf, rangeDays],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dmr_entries')
-        .select('report_date, discipline, contractor_name, system_name, plot, plan_manpower, actual_manpower')
-        .gte('report_date', fromDate).lte('report_date', currentAsOf)
-        .in('plot', ['C', 'D']);
-      if (error) throw error;
-      return data ?? [];
+      const pageSize = 1000;
+      const all: any[] = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase.from('dmr_entries')
+          .select('report_date, discipline, contractor_name, system_name, plot, plan_manpower, actual_manpower')
+          .gte('report_date', fromDate).lte('report_date', currentAsOf)
+          .in('plot', ['C', 'D'])
+          .order('report_date', { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const chunk = data ?? [];
+        all.push(...chunk);
+        if (chunk.length < pageSize) break;
+      }
+      return all;
     },
   });
 
