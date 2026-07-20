@@ -70,7 +70,7 @@ export function TmDashboardPage() {
     q: search.q,
   });
 
-  const latestDataDate = getLatestDataDate(items) ?? today;
+  const latestDataDate = getLatestDataDate(items) ?? todayIso();
 
   // items에 존재하는 고유 data_date 목록 (최신순)
   const dataDateOptions = useMemo(() => {
