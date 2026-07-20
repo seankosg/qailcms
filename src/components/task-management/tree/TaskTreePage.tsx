@@ -254,6 +254,27 @@ export function TaskTreePage() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Task Tree</h1>
+        {latestDataDate && (
+          <DataDatePicker
+            value={routeSearch.dataDate}
+            latest={latestDataDate}
+            options={dataDateOptions}
+            onChange={(v) =>
+              navigate({
+                to: "/closure/task-management/tree",
+                search: (prev: Record<string, unknown>) =>
+                  ({ ...prev, dataDate: v === latestDataDate ? "" : v }) as any,
+              })
+            }
+            onReset={() =>
+              navigate({
+                to: "/closure/task-management/tree",
+                search: (prev: Record<string, unknown>) =>
+                  ({ ...prev, dataDate: "" }) as any,
+              })
+            }
+          />
+        )}
         <Tabs value={discipline} onValueChange={(v) => setDiscipline(v as Discipline)}>
           <TabsList>
             {DISCIPLINES.map((d) => (
