@@ -24,7 +24,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DMR_DISCIPLINES, DMR_PLOTS, DMR_METRICS } from '@/lib/dmr/types';
+import { DMR_DISCIPLINES, DMR_PLOTS } from '@/lib/dmr/types';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { DmrBulkEditBar } from './DmrBulkEditBar';
 import { fetchDmrFilteredIds } from '@/lib/dmr-mutations.functions';
@@ -37,8 +37,9 @@ type SortField =
   | 'system_name'
   | 'contractor_name'
   | 'plot'
-  | 'metric'
-  | 'manpower';
+  | 'plan_manpower'
+  | 'actual_manpower'
+  | 'diff_manpower';
 
 interface SortSpec {
   field: SortField;
@@ -59,7 +60,6 @@ export function DmrRawDataPage() {
 
   const [discipline, setDiscipline] = useState<string>('all');
   const [plot, setPlot] = useState<string>('all');
-  const [metric, setMetric] = useState<string>('all');
   const [systems, setSystems] = useState<string[]>([]);
   const [contractors, setContractors] = useState<string[]>([]);
   const [directOnly, setDirectOnly] = useState<string[]>([]);
@@ -72,7 +72,6 @@ export function DmrRawDataPage() {
   const anyFilterActive =
     discipline !== 'all' ||
     plot !== 'all' ||
-    metric !== 'all' ||
     systems.length > 0 ||
     contractors.length > 0 ||
     directOnly.length > 0 ||
@@ -83,7 +82,6 @@ export function DmrRawDataPage() {
   const resetFilters = () => {
     setDiscipline('all');
     setPlot('all');
-    setMetric('all');
     setSystems([]);
     setContractors([]);
     setDirectOnly([]);
@@ -140,7 +138,6 @@ export function DmrRawDataPage() {
   const filterKey = {
     discipline,
     plot,
-    metric,
     systems,
     effectiveContractors,
     q: q.trim(),
@@ -158,7 +155,6 @@ export function DmrRawDataPage() {
       sq = sq.limit(PAGE_SIZE);
       if (discipline !== 'all') sq = sq.eq('discipline', discipline);
       if (plot !== 'all') sq = sq.eq('plot', plot);
-      if (metric !== 'all') sq = sq.eq('metric', metric);
       if (systems.length) sq = sq.in('system_name', systems);
       if (effectiveContractors.length) sq = sq.in('contractor_name', effectiveContractors);
       if (fromDate) sq = sq.gte('report_date', fromDate);
@@ -175,7 +171,9 @@ export function DmrRawDataPage() {
 
   const rows = query.data?.rows ?? [];
   const total = query.data?.count ?? 0;
-  const sumManpower = rows.reduce((a, r: any) => a + (r.manpower ?? 0), 0);
+  const sumPlan = rows.reduce((a, r: any) => a + (r.plan_manpower ?? 0), 0);
+  const sumActual = rows.reduce((a, r: any) => a + (r.actual_manpower ?? 0), 0);
+  const sumDiff = sumActual - sumPlan;
 
   const selectedIds = useMemo(
     () => Object.entries(selection).filter(([, v]) => v).map(([k]) => k),
@@ -205,7 +203,6 @@ export function DmrRawDataPage() {
         data: {
           discipline,
           plot,
-          metric,
           systems,
           contractors: effectiveContractors,
           fromDate: fromDate || null,
