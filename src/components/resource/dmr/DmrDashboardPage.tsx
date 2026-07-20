@@ -215,8 +215,21 @@ export function DmrDashboardPage() {
         max = Math.max(max, (row as any)[g] ?? 0, (row as any)[g + '_plan'] ?? 0);
       }
     }
-    return niceMax(max);
-  }, [trendSeries]);
+  return niceMax(max);
+}, [trendSeries]);
+
+  const activeFilterSummary = useMemo(() => {
+    const parts: string[] = [];
+    parts.push(`Period: ${rangeDays}d`);
+    if (teams.length > 0) parts.push(`Team: ${teams.join(', ')}`);
+    else parts.push('Team: All');
+    if (plots.length > 0) parts.push(`Plot: ${plots.join(', ')}`);
+    else parts.push('Plot: All');
+    if (contractorType !== 'all') parts.push(`Type: ${contractorType === 'direct' ? '직영' : '협력사'}`);
+    if (workDescriptions.length > 0) parts.push(`Work Description: ${workDescriptions.length} selected`);
+    if (subContractors.length > 0) parts.push(`Sub Contractor: ${subContractors.length} selected`);
+    return parts.join(' · ');
+  }, [rangeDays, teams, plots, contractorType, workDescriptions, subContractors]);
 
   const todaysManpower = useMemo(() => {
     if (!currentAsOf) return 0;
@@ -345,11 +358,52 @@ export function DmrDashboardPage() {
         ))}
       </div>
 
+      {/* Sub Contractor × Date Matrix */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Sub Contractor × 일자 매트릭스 (Actual)</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px] text-xs">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Sub Contractor</th>
+                  {matrix.dates.map((d) => (
+                    <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{d.slice(5)}</th>
+                  ))}
+                  <th className="px-2 py-1 text-right">합계</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matrix.contractors.map((c) => {
+                  const sum = matrix.dates.reduce((a, d) => a + matrix.cell(c, d), 0);
+                  return (
+                    <tr key={c} className="border-t hover:bg-muted/30">
+                      <td className="sticky left-0 z-[5] bg-background px-2 py-1 font-medium">{c}{directNames.has(c) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
+                      {matrix.dates.map((d) => {
+                        const v = matrix.cell(c, d);
+                        return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
+                      })}
+                      <td className="px-2 py-1 text-right font-semibold">{sum}</td>
+                    </tr>
+                  );
+                })}
+                {matrix.contractors.length === 0 && (
+                  <tr><td colSpan={matrix.dates.length + 2} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Trend chart */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-sm">일자별 총원 추이 (Actual vs Plan, by {GROUP_BY_OPTIONS.find((g) => g.value === groupBy)?.label})</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-sm">Daily Manpower Trend(Plan vs Actual)</CardTitle>
+              <span className="text-[11px] text-muted-foreground">{activeFilterSummary}</span>
+            </div>
             <div className="flex gap-1">
               {GROUP_BY_OPTIONS.map((o) => (
                 <FilterToggleButton
@@ -408,44 +462,6 @@ export function DmrDashboardPage() {
                 </LineChart>
               </ResponsiveContainer>
             )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Contractor × Date Matrix */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Sub Contractor × 일자 매트릭스 (Actual)</CardTitle></CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-xs">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Sub Contractor</th>
-                  {matrix.dates.map((d) => (
-                    <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{d.slice(5)}</th>
-                  ))}
-                  <th className="px-2 py-1 text-right">합계</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matrix.contractors.map((c) => {
-                  const sum = matrix.dates.reduce((a, d) => a + matrix.cell(c, d), 0);
-                  return (
-                    <tr key={c} className="border-t hover:bg-muted/30">
-                      <td className="sticky left-0 z-[5] bg-background px-2 py-1 font-medium">{c}{directNames.has(c) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
-                      {matrix.dates.map((d) => {
-                        const v = matrix.cell(c, d);
-                        return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
-                      })}
-                      <td className="px-2 py-1 text-right font-semibold">{sum}</td>
-                    </tr>
-                  );
-                })}
-                {matrix.contractors.length === 0 && (
-                  <tr><td colSpan={matrix.dates.length + 2} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
-                )}
-              </tbody>
-            </table>
           </div>
         </CardContent>
       </Card>
