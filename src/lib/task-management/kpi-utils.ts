@@ -188,3 +188,67 @@ export type TmKpiMode =
   | "completion_overdue"
   | "critical"
   | "behind";
+
+/** 팀별 breakdown 계산 결과 항목 */
+export interface KpiTeamBreakdownEntry {
+  team: string;
+  isNull: boolean;
+  count: number;
+}
+
+export interface KpiTeamBreakdown {
+  inDelay: KpiTeamBreakdownEntry[];
+  startDelayed: KpiTeamBreakdownEntry[];
+  completionOverdue: KpiTeamBreakdownEntry[];
+  criticalDelay: KpiTeamBreakdownEntry[];
+  behindSchedule: KpiTeamBreakdownEntry[];
+}
+
+function teamKey(row: TaskItem): { key: string; isNull: boolean } {
+  const raw = String((row as any).team ?? "").trim();
+  if (!raw) return { key: "미지정", isNull: true };
+  return { key: raw, isNull: false };
+}
+
+function bumpTeam(
+  map: Map<string, KpiTeamBreakdownEntry>,
+  row: TaskItem,
+): void {
+  const { key, isNull } = teamKey(row);
+  const cur = map.get(key);
+  if (cur) cur.count += 1;
+  else map.set(key, { team: key, isNull, count: 1 });
+}
+
+function sortEntries(map: Map<string, KpiTeamBreakdownEntry>): KpiTeamBreakdownEntry[] {
+  return Array.from(map.values()).sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.team.localeCompare(b.team);
+  });
+}
+
+export function computeKpiBreakdownByTeam(
+  rows: TaskItem[],
+  asOf: string,
+  thresholds: TaskThresholds,
+): KpiTeamBreakdown {
+  const inDelay = new Map<string, KpiTeamBreakdownEntry>();
+  const startDelayed = new Map<string, KpiTeamBreakdownEntry>();
+  const completionOverdue = new Map<string, KpiTeamBreakdownEntry>();
+  const criticalDelay = new Map<string, KpiTeamBreakdownEntry>();
+  const behindSchedule = new Map<string, KpiTeamBreakdownEntry>();
+  for (const r of rows) {
+    if (isInDelay(r, asOf)) bumpTeam(inDelay, r);
+    if (isStartDelayed(r, asOf)) bumpTeam(startDelayed, r);
+    if (isCompletionOverdue(r, asOf)) bumpTeam(completionOverdue, r);
+    if (isCriticalDelay(r, asOf, thresholds)) bumpTeam(criticalDelay, r);
+    if (isBehindSchedule(r, asOf)) bumpTeam(behindSchedule, r);
+  }
+  return {
+    inDelay: sortEntries(inDelay),
+    startDelayed: sortEntries(startDelayed),
+    completionOverdue: sortEntries(completionOverdue),
+    criticalDelay: sortEntries(criticalDelay),
+    behindSchedule: sortEntries(behindSchedule),
+  };
+}
