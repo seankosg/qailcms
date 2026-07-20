@@ -446,6 +446,44 @@ export function TaskManagementRawDataPage() {
     });
   }, [rows, delayMode]);
 
+  // KPI 카드 딥링크 모드: 대시보드 상단 카드 클릭 시 조건
+  const kpiFilteredRows = useMemo(() => {
+    if (!kpiMode) return delayFilteredRows;
+    const t = kpiThresholds ?? DEFAULT_THRESHOLDS;
+    const asOf = kpiMode.asOf;
+    const scoped = scopeItems(
+      delayFilteredRows as unknown as TaskItem[],
+      kpiMode.scope,
+    ) as unknown as Row[];
+    return scoped.filter((r) => {
+      const it = r as unknown as TaskItem;
+      switch (kpiMode.mode) {
+        case "completed":
+          return kpiIsCompleted(it);
+        case "not_started":
+          return !kpiIsStarted(it);
+        case "wip":
+          return kpiIsStarted(it) && !kpiIsCompleted(it);
+        case "planned_started":
+          return kpiIsPlannedStartedBy(it, asOf);
+        case "actual_started":
+          return kpiIsStarted(it);
+        case "in_delay":
+          return kpiIsInDelay(it, asOf);
+        case "start_delayed":
+          return kpiIsStartDelayed(it, asOf);
+        case "completion_overdue":
+          return kpiIsCompletionOverdue(it, asOf);
+        case "critical":
+          return kpiIsCriticalDelay(it, asOf, t);
+        case "behind":
+          return kpiIsBehindSchedule(it, asOf, t);
+        default:
+          return true;
+      }
+    });
+  }, [delayFilteredRows, kpiMode, kpiThresholds]);
+
   // discipline-task_no 단위 collapse 키 유지 — 접힌 부모의 자식 행 숨김
   const visibleRows = useMemo(() => {
     const src = delayFilteredRows;
