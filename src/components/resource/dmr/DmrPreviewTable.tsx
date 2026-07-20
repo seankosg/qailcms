@@ -49,7 +49,7 @@ export function DmrPreviewTable({ section, onChange }: Props) {
         <table className="w-full min-w-[1100px] text-xs">
           <thead className="bg-muted/50">
             <tr>
-              <th rowSpan={2} className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">System</th>
+              <th rowSpan={2} className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Work Description</th>
               <th rowSpan={2} className="px-2 py-1 text-left">Sub Contractor</th>
               {METRICS.map((m) => (
                 <th key={m} colSpan={3} className="border-l px-2 py-1 text-center capitalize">{m}</th>

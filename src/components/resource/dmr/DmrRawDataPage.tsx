@@ -482,7 +482,7 @@ export function DmrRawDataPage() {
           onChange={(e) => setQInput(e.target.value)}
           onBlur={() => qInput !== search.q && setQ(qInput)}
           onKeyDown={(e) => { if (e.key === 'Enter') setQ(qInput); }}
-          placeholder="System / Contractor 검색…"
+          placeholder="Work Description / Sub Contractor 검색…"
           className="h-8 w-64 text-xs"
         />
         {anyFilterActive && (

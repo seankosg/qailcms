@@ -43,7 +43,7 @@ type FieldDef = {
 const FIELDS: FieldDef[] = [
   { field: 'report_date', label: 'Date', input: 'date' },
   { field: 'discipline', label: 'TEAM', input: 'select', options: [...DMR_DISCIPLINES] },
-  { field: 'system_name', label: 'System', input: 'text' },
+  { field: 'system_name', label: 'Work Description', input: 'text' },
   { field: 'contractor_name', label: 'Sub Contractor', input: 'text' },
   { field: 'plot', label: 'Plot', input: 'select', options: [...DMR_PLOTS] },
   { field: 'plan_manpower', label: 'Plan (계획)', input: 'number' },
@@ -311,7 +311,7 @@ export function DmrBulkEditBar({ selectedIds, sampleRows, canEdit, onClearSelect
               <thead className="bg-muted">
                 <tr>
                   <th className="px-2 py-1 text-left">Date</th>
-                  <th className="px-2 py-1 text-left">System</th>
+                  <th className="px-2 py-1 text-left">Work Description</th>
                   <th className="px-2 py-1 text-left">이전</th>
                   <th className="px-2 py-1 text-left">이후</th>
                 </tr>
