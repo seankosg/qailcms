@@ -371,14 +371,14 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                     <TableHead className="text-xs text-right">Updated</TableHead>
                     <TableHead className="text-xs text-right">Skipped</TableHead>
                     <TableHead className="text-xs text-right">Rejected</TableHead>
-                    {isAdmin && <TableHead className="text-xs w-24">Actions</TableHead>}
+                    <TableHead className="text-xs w-24">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(isAdmin ? 11 : 10) + (hasExtra ? 1 : 0)}
+                        colSpan={11 + (hasExtra ? 1 : 0)}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Loading…
@@ -387,7 +387,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   ) : batches.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(isAdmin ? 11 : 10) + (hasExtra ? 1 : 0)}
+                        colSpan={11 + (hasExtra ? 1 : 0)}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Import 이력이 없습니다
@@ -396,6 +396,8 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   ) : (
                     batches.map((b) => {
                       const uploader = b.imported_by ? uploaderNames[b.imported_by] || "—" : "—";
+                      const isOwner = !!me?.id && b.imported_by === me.id;
+                      const canRollback = isAdmin || isOwner;
                       return (
                         <TableRow key={b.id} className="hover:bg-muted/50">
                           <TableCell
@@ -465,17 +467,17 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                           >
                             {b.rejected}
                           </TableCell>
-                          {isAdmin && (
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-0.5">
-                                {b.status !== "rolled_back" && (
-                                  <RollbackDialog
-                                    kind={kind}
-                                    batchId={b.id}
-                                    fileName={b.file_name}
-                                    onDone={fetchBatches}
-                                  />
-                                )}
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-0.5">
+                              {canRollback && b.status !== "rolled_back" && (
+                                <RollbackDialog
+                                  kind={kind}
+                                  batchId={b.id}
+                                  fileName={b.file_name}
+                                  onDone={fetchBatches}
+                                />
+                              )}
+                              {isAdmin && (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button
@@ -512,9 +514,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
-                              </div>
-                            </TableCell>
-                          )}
+                              )}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       );
                     })
