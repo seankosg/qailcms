@@ -21,7 +21,7 @@ Return ONLY JSON via the report_dmr tool. Do not include narration.`;
 export const DMR_TOOL_SCHEMA = {
   type: 'object' as const,
   properties: {
-    discipline: { type: 'string' as const, enum: ['ARCH', 'ELEC', 'ELECT', 'MECH'] },
+    discipline: { type: 'string' as const, enum: ['ARCH', 'ELEC', 'MECH'] },
     report_date: { type: 'string' as const, description: 'YYYY-MM-DD' },
     rows: {
       type: 'array' as const,
