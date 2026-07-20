@@ -358,18 +358,32 @@ export function DmrDashboardPage() {
                   <YAxis tick={{ fontSize: 11 }} domain={[0, yMax]} allowDecimals={false} />
                   <Tooltip labelFormatter={fmtDate} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  {trendSeries.groups.map((g, i) => (
-                    <Line
-                      key={g}
-                      type="linear"
-                      dataKey={g}
-                      stroke={LINE_COLORS[i % LINE_COLORS.length]}
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                      name={g}
-                    />
-                  ))}
+                  {trendSeries.groups.flatMap((g, i) => {
+                    const color = LINE_COLORS[i % LINE_COLORS.length];
+                    return [
+                      <Line
+                        key={`${g}-actual`}
+                        type="linear"
+                        dataKey={g}
+                        stroke={color}
+                        strokeWidth={4}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                        name={g}
+                      />,
+                      <Line
+                        key={`${g}-plan`}
+                        type="linear"
+                        dataKey={`${g}_plan`}
+                        stroke={color}
+                        strokeWidth={4}
+                        strokeDasharray="6 4"
+                        dot={false}
+                        activeDot={false}
+                        name={`${g} (Plan)`}
+                      />,
+                    ];
+                  })}
                 </LineChart>
               </ResponsiveContainer>
             )}
