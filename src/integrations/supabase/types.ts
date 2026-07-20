@@ -2825,6 +2825,10 @@ export type Database = {
         Args: { _row_id: string; _table_name: string; _user_id: string }
         Returns: boolean
       }
+      can_rollback_import_batch: {
+        Args: { _batch_id: string; _kind: string }
+        Returns: boolean
+      }
       can_view_row: {
         Args: { _row_id: string; _table_name: string; _user_id: string }
         Returns: boolean
