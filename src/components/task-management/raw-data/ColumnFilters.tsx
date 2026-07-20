@@ -118,14 +118,20 @@ function MultiSelectDropdown({ column }: { column: Column<any, unknown> }) {
             </label>
           ))}
         </div>
-        {isActive && (
+        <div className="mt-1 flex items-center justify-end gap-2 border-t pt-1 px-1">
           <button
-            className="mt-1 w-full text-xs text-muted-foreground hover:underline"
+            className="text-[11px] text-muted-foreground hover:underline"
+            onClick={() => column.setFilterValue(filtered.map((o) => o.value))}
+          >
+            Select all
+          </button>
+          <button
+            className="text-[11px] text-muted-foreground hover:underline"
             onClick={() => column.setFilterValue(undefined)}
           >
             Clear
           </button>
-        )}
+        </div>
       </PopoverContent>
     </Popover>
   );
