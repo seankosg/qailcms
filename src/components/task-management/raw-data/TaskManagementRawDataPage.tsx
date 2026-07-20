@@ -804,6 +804,7 @@ export function TaskManagementRawDataPage() {
     setOrder(DEFAULT_ORDER);
     setFrozenExtras(DEFAULT_FROZEN_EXTRAS);
     setRowSelection({});
+    setDelayMode(null);
   }
 
   const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
