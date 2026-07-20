@@ -47,7 +47,7 @@ export const DMR_COLUMNS: DmrColumnDef[] = [
   },
   {
     key: 'contractor_name',
-    label: 'Contractor',
+    label: 'Sub Contractor',
     type: 'text',
     width: 220,
     filterType: 'multi-select',

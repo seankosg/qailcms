@@ -50,7 +50,7 @@ export function DmrPreviewTable({ section, onChange }: Props) {
           <thead className="bg-muted/50">
             <tr>
               <th rowSpan={2} className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">System</th>
-              <th rowSpan={2} className="px-2 py-1 text-left">Contractor</th>
+              <th rowSpan={2} className="px-2 py-1 text-left">Sub Contractor</th>
               {METRICS.map((m) => (
                 <th key={m} colSpan={3} className="border-l px-2 py-1 text-center capitalize">{m}</th>
               ))}
@@ -78,16 +78,24 @@ export function DmrPreviewTable({ section, onChange }: Props) {
                     <Input value={row.contractor} onChange={(e) => setRow(idx, { contractor: e.target.value })} className="h-7 text-xs" />
                   </td>
                   {METRICS.flatMap((m) =>
-                    PLOTS.map((p) => (
-                      <td key={`${m}-${p}`} className="border-l px-1 py-0.5">
-                        <Input
-                          type="number"
-                          value={row.values[m][p]}
-                          onChange={(e) => setValue(idx, m, p, Number(e.target.value))}
-                          className="h-7 w-14 text-right text-xs"
-                        />
-                      </td>
-                    )),
+                    PLOTS.map((p) => {
+                      const isTotal = p === 'TOTAL';
+                      const totalVal = (row.values[m].C ?? 0) + (row.values[m].D ?? 0);
+                      const shown = isTotal ? totalVal : row.values[m][p];
+                      return (
+                        <td key={`${m}-${p}`} className="border-l px-1 py-0.5">
+                          <Input
+                            type="number"
+                            value={shown}
+                            readOnly={isTotal}
+                            disabled={isTotal}
+                            title={isTotal ? '자동계산 (C + D)' : undefined}
+                            onChange={(e) => !isTotal && setValue(idx, m, p, Number(e.target.value))}
+                            className={cn('h-7 w-14 text-right text-xs', isTotal && 'bg-muted/60 text-muted-foreground')}
+                          />
+                        </td>
+                      );
+                    }),
                   )}
                   <td className={cn('border-l px-2 py-0.5 text-center font-medium', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-600' : 'text-muted-foreground')}>
                     {d > 0 ? `+${d}` : d}
