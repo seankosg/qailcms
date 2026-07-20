@@ -48,16 +48,17 @@ export async function createSnapshot(
   supabaseAdmin: SupabaseClient<Database>,
   opts: CreateSnapshotOptions,
 ): Promise<CreateSnapshotResult> {
-  const { snapshotId, name, triggeredBy, triggerMetadata } = opts;
+  const { snapshotId, name, triggeredBy, triggerMetadata, tables } = opts;
   const startedAt = new Date().toISOString();
   const folder = `snapshots/${snapshotId}/`;
+  const tablesToBackup = tables && tables.length > 0 ? tables : BACKUP_TABLES;
 
   const tableManifests: SnapshotManifest["tables"] = [];
   let totalRows = 0;
   let totalSize = 0;
   const overallHasher = new Hasher();
 
-  for (const tableName of BACKUP_TABLES) {
+  for (const tableName of tablesToBackup) {
     const rows = await readAllRows(supabaseAdmin, tableName);
     const json = JSON.stringify(rows);
     const encoder = new TextEncoder();
@@ -105,7 +106,7 @@ export async function createSnapshot(
     name,
     size_bytes: totalSize,
     sha256_hash: manifest.sha256,
-    tables_included: BACKUP_TABLES,
+    tables_included: tablesToBackup as any,
     storage_path: folder,
     triggered_by: triggeredBy,
     trigger_metadata: (triggerMetadata ?? null) as any,
@@ -119,7 +120,7 @@ export async function createSnapshot(
     created_at: startedAt,
     size_bytes: totalSize,
     sha256_hash: manifest.sha256,
-    tables_included: BACKUP_TABLES,
+    tables_included: tablesToBackup,
     storage_path: folder,
     triggered_by: triggeredBy,
     total_rows: totalRows,
