@@ -7,6 +7,8 @@ import { TmHeaderMappingTable } from "@/components/admin/TmHeaderMappingTable";
 import { DefectFieldConfigTable } from "@/components/admin/DefectFieldConfigTable";
 import { DefectHeaderMappingTable } from "@/components/admin/DefectHeaderMappingTable";
 import { DefectImportPresetTable } from "@/components/admin/DefectImportPresetTable";
+import { AbdFieldConfigTable } from "@/components/admin/AbdFieldConfigTable";
+import { AbdHeaderMappingTable } from "@/components/admin/AbdHeaderMappingTable";
 
 export const Route = createFileRoute("/_authenticated/admin/mapping")({
   component: MappingPage,
@@ -21,12 +23,23 @@ function MappingPage() {
           Field Config — Raw Data 컬럼 헤더 라벨/정렬/노출. Header Mapping — Excel Import 시 원본 헤더 → 시스템 필드 별칭.
         </p>
       </div>
-      <Tabs defaultValue="spare-part" className="space-y-4">
+      <Tabs defaultValue="as-built" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="as-built">As Built Drawing</TabsTrigger>
           <TabsTrigger value="spare-part">Spare Part</TabsTrigger>
           <TabsTrigger value="task-management">Task Management</TabsTrigger>
           <TabsTrigger value="defect-management">Snag List Management</TabsTrigger>
         </TabsList>
+        <TabsContent value="as-built" className="space-y-4">
+          <Tabs defaultValue="field-config" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="field-config">Field Config</TabsTrigger>
+              <TabsTrigger value="header-mapping">Header Mapping</TabsTrigger>
+            </TabsList>
+            <TabsContent value="field-config"><AbdFieldConfigTable /></TabsContent>
+            <TabsContent value="header-mapping"><AbdHeaderMappingTable /></TabsContent>
+          </Tabs>
+        </TabsContent>
         <TabsContent value="spare-part" className="space-y-4">
           <Tabs defaultValue="field-config" className="space-y-4">
             <TabsList>

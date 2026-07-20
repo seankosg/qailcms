@@ -75,7 +75,6 @@ const NAV: NavSection[] = [
           { to: "/closure/abd/dashboard", label: "Dashboard", icon: LayoutDashboard },
           { to: "/closure/abd/progress", label: "Progress", icon: TrendingUp },
           { to: "/closure/abd/raw-data", label: "Raw Data", icon: Database },
-          { to: "/closure/abd/settings", label: "Settings", icon: Settings2, adminOnly: true },
         ],
       },
       {
