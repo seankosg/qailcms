@@ -6,6 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ChevronDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar } from 'recharts';
 import { DMR_DISCIPLINES, DISCIPLINE_LABEL, type DmrDiscipline } from '@/lib/dmr/types';
 import { cn } from '@/lib/utils';
@@ -17,7 +21,10 @@ function subDays(iso: string, n: number) {
 }
 
 export function DmrDashboardPage() {
-  const [discipline, setDiscipline] = useState<'all' | DmrDiscipline>('all');
+  const [teams, setTeams] = useState<DmrDiscipline[]>([]);
+  const [plots, setPlots] = useState<Array<'C' | 'D'>>([]);
+  const [workDescriptions, setWorkDescriptions] = useState<string[]>([]);
+  const [subContractors, setSubContractors] = useState<string[]>([]);
   const [contractorType, setContractorType] = useState<'all' | 'direct' | 'sub'>('all');
   const [asOf, setAsOf] = useState<string>('');
   const [rangeDays, setRangeDays] = useState<7 | 14 | 30>(14);
@@ -47,23 +54,44 @@ export function DmrDashboardPage() {
   const fromDate = currentAsOf ? subDays(currentAsOf, rangeDays - 1) : '';
   const entriesQuery = useQuery({
     enabled: !!currentAsOf,
-    queryKey: ['dmr_entries_window', currentAsOf, rangeDays, discipline],
+    queryKey: ['dmr_entries_window_raw', currentAsOf, rangeDays],
     queryFn: async () => {
-      let sq = supabase.from('dmr_entries').select('report_date, discipline, contractor_name, system_name, plot, plan_manpower, actual_manpower')
+      const { data, error } = await supabase.from('dmr_entries')
+        .select('report_date, discipline, contractor_name, system_name, plot, plan_manpower, actual_manpower')
         .gte('report_date', fromDate).lte('report_date', currentAsOf)
-        .eq('plot', 'TOTAL');
-      if (discipline !== 'all') sq = sq.eq('discipline', discipline);
-      const { data, error } = await sq;
+        .in('plot', ['C', 'D']);
       if (error) throw error;
       return data ?? [];
     },
   });
 
+  const src = entriesQuery.data ?? [];
+
+  // Distinct options for pulldown filters (from loaded window)
+  const workDescOptions = useMemo(
+    () => Array.from(new Set(src.map((r) => r.system_name).filter(Boolean) as string[])).sort(),
+    [src],
+  );
+  const subContractorOptions = useMemo(
+    () => Array.from(new Set(src.map((r) => r.contractor_name).filter(Boolean) as string[])).sort(),
+    [src],
+  );
+
   const rows = useMemo(() => {
-    const src = entriesQuery.data ?? [];
-    if (contractorType === 'all') return src;
-    return src.filter((r) => contractorType === 'direct' ? directNames.has(r.contractor_name) : !directNames.has(r.contractor_name));
-  }, [entriesQuery.data, contractorType, directNames]);
+    const teamSet = new Set(teams);
+    const plotSet = new Set(plots);
+    const wdSet = new Set(workDescriptions);
+    const scSet = new Set(subContractors);
+    return src.filter((r) => {
+      if (teamSet.size > 0 && !teamSet.has(r.discipline as DmrDiscipline)) return false;
+      if (plotSet.size > 0 && !plotSet.has(r.plot as 'C' | 'D')) return false;
+      if (wdSet.size > 0 && !wdSet.has(r.system_name ?? '')) return false;
+      if (scSet.size > 0 && !scSet.has(r.contractor_name ?? '')) return false;
+      if (contractorType === 'direct' && !directNames.has(r.contractor_name)) return false;
+      if (contractorType === 'sub' && directNames.has(r.contractor_name)) return false;
+      return true;
+    });
+  }, [src, teams, plots, workDescriptions, subContractors, contractorType, directNames]);
 
   // Aggregations
   const kpi = useMemo(() => {
@@ -121,13 +149,37 @@ export function DmrDashboardPage() {
         </div>
         <div>
           <div className="mb-1 text-[11px] text-muted-foreground">TEAM</div>
-          <Select value={discipline} onValueChange={(v) => setDiscipline(v as any)}>
-            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              {DMR_DISCIPLINES.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <ToggleGroup type="multiple" value={teams} onValueChange={(v) => setTeams(v as DmrDiscipline[])} className="flex flex-wrap gap-1">
+            {DMR_DISCIPLINES.map((d) => (
+              <ToggleGroupItem key={d} value={d} className="h-8 px-2 text-xs">{d}</ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+        <div>
+          <div className="mb-1 text-[11px] text-muted-foreground">Plot</div>
+          <ToggleGroup type="multiple" value={plots} onValueChange={(v) => setPlots(v as Array<'C' | 'D'>)} className="flex gap-1">
+            {(['C', 'D'] as const).map((p) => (
+              <ToggleGroupItem key={p} value={p} className="h-8 w-10 text-xs">{p}</ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+        <div>
+          <div className="mb-1 text-[11px] text-muted-foreground">Work Description</div>
+          <MultiSelectPopover
+            label="Work Description"
+            options={workDescOptions}
+            value={workDescriptions}
+            onChange={setWorkDescriptions}
+          />
+        </div>
+        <div>
+          <div className="mb-1 text-[11px] text-muted-foreground">Sub Contractor</div>
+          <MultiSelectPopover
+            label="Sub Contractor"
+            options={subContractorOptions}
+            value={subContractors}
+            onChange={setSubContractors}
+          />
         </div>
         <div>
           <div className="mb-1 text-[11px] text-muted-foreground">유형</div>
