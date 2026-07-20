@@ -1,3 +1,4 @@
+import { dohaStampCompact } from "@/lib/time/doha";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
 import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
 
