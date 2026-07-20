@@ -26,6 +26,7 @@ type NavModule = {
   icon: typeof Package;
   matchPrefix: string;
   items: NavLeaf[];
+  adminOnly?: boolean;
 };
 type NavSection = {
   label: string;
@@ -81,6 +82,7 @@ const NAV: NavSection[] = [
         label: "Spare Part",
         icon: Package,
         matchPrefix: "/closure/spare-part",
+        adminOnly: true,
         items: [
           { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: Database },
           { to: "/closure/spare-part/aconex-sync", label: "Aconex Sync", icon: RefreshCw, editorOnly: true },
@@ -90,6 +92,7 @@ const NAV: NavSection[] = [
         label: "Warranty & License",
         icon: FileCheck2,
         matchPrefix: "/closure/warranty",
+        adminOnly: true,
         items: [
           { label: "Coming soon", icon: FileCheck2, disabled: true, badge: "Soon" },
         ],
@@ -222,7 +225,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
             // Admin section gate
             if (section.label === "Admin" && !me?.isAdmin) return null;
 
-            const modules = (section.modules ?? []).filter((m) => m.items.some(isVisible));
+            const modules = (section.modules ?? [])
+              .filter((m) => !m.adminOnly || me?.isAdmin)
+              .filter((m) => m.items.some(isVisible));
             const flatItems = (section.items ?? []).filter(isVisible);
             const hasContent = !!section.dashboard || modules.length > 0 || flatItems.length > 0;
             if (!hasContent) return null;

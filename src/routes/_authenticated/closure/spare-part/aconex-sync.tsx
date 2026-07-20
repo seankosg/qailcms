@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { assertAdminOrRedirect } from "@/lib/auth/route-guards";
 
 export const Route = createFileRoute("/_authenticated/closure/spare-part/aconex-sync")({
+  beforeLoad: () => assertAdminOrRedirect(),
   head: () => ({ meta: [{ title: "Spare Part — Aconex Sync" }] }),
   component: () => (
     <div className="space-y-4">
