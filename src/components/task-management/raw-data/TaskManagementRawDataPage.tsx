@@ -873,6 +873,20 @@ export function TaskManagementRawDataPage() {
     return latest;
   }, [rows]);
 
+  const dataDateOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      const d = (r as any).data_date as string | null | undefined;
+      if (d) set.add(String(d).slice(0, 10));
+    }
+    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
+  }, [rows]);
+
+  const selectedDataDate =
+    search.dataDate && search.dataDate.length
+      ? search.dataDate
+      : (latestDataDate ?? "");
+
   function resetAll() {
     setSorting(DEFAULT_SORTING);
     setSizing({});
