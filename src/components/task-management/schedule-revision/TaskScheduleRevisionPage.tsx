@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   getCoreRowModel,
   getFilteredRowModel,
@@ -7,9 +7,12 @@ import {
   type Column,
   type ColumnDef,
   type ColumnFiltersState,
+  type ColumnPinningState,
+  type ColumnSizingState,
   type SortingState,
+  type VisibilityState,
 } from "@tanstack/react-table";
-import { CalendarClock, Filter, X } from "lucide-react";
+import { CalendarClock, Columns3, Filter, Pin, PinOff, RotateCcw, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,6 +76,34 @@ const stageHasSuccessor: Record<Stage, boolean> = {
   forecast_end: false,
 };
 const EMPTY_TOKEN = "__EMPTY__";
+const STORAGE_KEY = "tm.schedule-revision.view.v1";
+
+// 좌측 flat 컬럼 (핀 가능)
+const FLAT_COLUMNS: { id: string; label: string; size: number }[] = [
+  { id: "created_at", label: "Changed At", size: 140 },
+  { id: "source_file", label: "Source File", size: 220 },
+  { id: "discipline", label: "Discipline", size: 110 },
+  { id: "team", label: "Team", size: 90 },
+  { id: "plot", label: "Plot", size: 90 },
+  { id: "task_no", label: "Task No", size: 130 },
+  { id: "main_task_no", label: "Main Task", size: 130 },
+  { id: "task_name", label: "Task Name", size: 260 },
+  { id: "hdec_pic_name", label: "HDEC PIC", size: 110 },
+  { id: "hdec_eng_name", label: "HDEC ENG", size: 110 },
+];
+
+function stageLeafIds(stage: Stage): { id: string; label: string; size: number }[] {
+  const base = [
+    { id: `${stage}_old_date`, label: "Old", size: 90 },
+    { id: `${stage}_new_date`, label: "New", size: 90 },
+    { id: `${stage}_diff_days`, label: "Diff", size: 70 },
+    { id: `${stage}_prev_gap_days`, label: "Prev.Gap", size: 80 },
+  ];
+  if (stageHasSuccessor[stage]) {
+    base.push({ id: `${stage}_cur_gap_days`, label: "Cur.Gap", size: 80 });
+  }
+  return base;
+}
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function formatDdMmm(v: string | null | undefined): string {
@@ -133,21 +164,74 @@ const multiSelectFilterFn = (row: any, columnId: string, filterValue: string[] |
   return filterValue.includes(String(value));
 };
 
-function StageCells({ row, stage }: { row: Row; stage: Stage }) {
-  const oldDate = row[`${stage}_old_date` as keyof Row] as string | null;
-  const newDate = row[`${stage}_new_date` as keyof Row] as string | null;
-  const diff = row[`${stage}_diff_days` as keyof Row] as number | null;
-  const prevGap = row[`${stage}_prev_gap_days` as keyof Row] as number | null;
-  const curGap = stageHasSuccessor[stage]
-    ? (row[`${stage}_cur_gap_days` as keyof Row] as number | null)
-    : null;
+// ── Pin/size 유틸 ─────────────────────────────
+function pinStyle(column: Column<Row>, isHeader = false): CSSProperties {
+  const isPinned = column.getIsPinned() === "left";
+  if (!isPinned) return { width: column.getSize(), minWidth: column.getSize() };
+  return {
+    position: "sticky",
+    left: column.getStart("left"),
+    zIndex: isHeader ? 30 : 20,
+    width: column.getSize(),
+    minWidth: column.getSize(),
+    background: "hsl(var(--background))",
+    boxShadow: "inset -1px 0 0 hsl(var(--border))",
+  };
+}
+
+function ResizeHandle({ column, table }: { column: Column<Row>; table: ReturnType<typeof useReactTable<Row>> }) {
+  const onDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = column.getSize();
+    const id = column.id;
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.max(50, startW + ev.clientX - startX);
+      table.setColumnSizing((prev) => ({ ...prev, [id]: w }));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+  return (
+    <span
+      onMouseDown={onDown}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize select-none bg-transparent hover:bg-primary/50"
+    />
+  );
+}
+
+function StageCells({ row, stage, table }: { row: Row; stage: Stage; table: ReturnType<typeof useReactTable<Row>> }) {
+  const leaves = stageLeafIds(stage);
   return (
     <>
-      <TableCell className="text-xs whitespace-nowrap border-l">{formatDdMmm(oldDate)}</TableCell>
-      <TableCell className="text-xs whitespace-nowrap">{formatDdMmm(newDate)}</TableCell>
-      <TableCell className={cn("text-xs text-right", diffClass(diff))}>{formatSignedDays(diff)}</TableCell>
-      <TableCell className="text-xs text-right">{formatGap(prevGap)}</TableCell>
-      {stageHasSuccessor[stage] && <TableCell className="text-xs text-right">{formatGap(curGap)}</TableCell>}
+      {leaves.map((leaf, idx) => {
+        const column = table.getColumn(leaf.id);
+        if (!column || !column.getIsVisible()) return null;
+        const value = row[leaf.id as keyof Row];
+        let content: React.ReactNode = "—";
+        let cls = "text-xs whitespace-nowrap";
+        if (leaf.id.endsWith("_old_date") || leaf.id.endsWith("_new_date")) {
+          content = formatDdMmm(value as string | null);
+        } else if (leaf.id.endsWith("_diff_days")) {
+          const v = value as number | null;
+          content = formatSignedDays(v);
+          cls = cn("text-xs text-right", diffClass(v));
+        } else {
+          content = formatGap(value as number | null);
+          cls = "text-xs text-right";
+        }
+        return (
+          <TableCell key={leaf.id} className={cn(cls, idx === 0 && "border-l")} style={{ width: column.getSize(), minWidth: column.getSize() }}>
+            {content}
+          </TableCell>
+        );
+      })}
     </>
   );
 }
@@ -273,19 +357,119 @@ function ColumnFilterDropdown({ column }: { column: Column<Row> }) {
   return <TextFilterDropdown column={column} />;
 }
 
-function SortableHeader({ column, label, className, rowSpan }: { column: Column<Row> | undefined; label: string; className?: string; rowSpan?: number }) {
-  if (!column) return <TableHead rowSpan={rowSpan} className={cn("text-xs whitespace-nowrap", className)}>{label}</TableHead>;
+function SortableHeader({
+  column, label, className, rowSpan, pinnable = false, table,
+}: {
+  column: Column<Row> | undefined;
+  label: string;
+  className?: string;
+  rowSpan?: number;
+  pinnable?: boolean;
+  table: ReturnType<typeof useReactTable<Row>>;
+}) {
+  if (!column) {
+    return <TableHead rowSpan={rowSpan} className={cn("relative text-xs whitespace-nowrap", className)}>{label}</TableHead>;
+  }
   const sorted = column.getIsSorted();
+  const style = pinStyle(column, true);
+  const isPinned = column.getIsPinned() === "left";
   return (
-    <TableHead rowSpan={rowSpan} className={cn("text-xs whitespace-nowrap", className)}>
-      <div className="flex items-center gap-1">
+    <TableHead
+      rowSpan={rowSpan}
+      className={cn("relative text-xs whitespace-nowrap bg-background", className)}
+      style={style}
+    >
+      <div className="flex items-center gap-1 pr-2">
         <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={column.getToggleSortingHandler()}>
           <span>{label}</span>
           <span className="w-2 text-[10px] text-muted-foreground">{sorted === "asc" ? "▲" : sorted === "desc" ? "▼" : ""}</span>
         </button>
         {column.getCanFilter() && <ColumnFilterDropdown column={column} />}
+        {pinnable && (
+          <button
+            className={cn("inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/80", isPinned ? "text-primary" : "text-muted-foreground/40")}
+            title={isPinned ? "Unpin" : "Pin left"}
+            onClick={(e) => {
+              e.stopPropagation();
+              column.pin(isPinned ? false : "left");
+            }}
+          >
+            {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+          </button>
+        )}
       </div>
+      <ResizeHandle column={column} table={table} />
     </TableHead>
+  );
+}
+
+function ColumnsMenu({ table }: { table: ReturnType<typeof useReactTable<Row>> }) {
+  const allLeafFlat = FLAT_COLUMNS;
+  const stageLeaves = stageGroups.map((s) => ({ stage: s, leaves: stageLeafIds(s) }));
+  const resetAll = () => {
+    table.resetColumnVisibility();
+    table.resetColumnSizing();
+    table.setColumnPinning({ left: [], right: [] });
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  };
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Columns3 className="h-3.5 w-3.5" />
+          Columns
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-2" align="end">
+        <div className="mb-2 flex items-center justify-between px-1">
+          <span className="text-xs font-medium">컬럼 표시 / 고정</span>
+          <button className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground" onClick={resetAll}>
+            <RotateCcw className="h-3 w-3" /> Reset
+          </button>
+        </div>
+        <div className="max-h-[420px] space-y-3 overflow-auto">
+          <div>
+            <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Left · Pinnable</div>
+            {allLeafFlat.map((c) => {
+              const col = table.getColumn(c.id);
+              if (!col) return null;
+              const visible = col.getIsVisible();
+              const pinned = col.getIsPinned() === "left";
+              return (
+                <div key={c.id} className="flex items-center justify-between gap-2 rounded px-1 py-1 hover:bg-muted/50">
+                  <label className="flex flex-1 cursor-pointer items-center gap-2 text-xs">
+                    <Checkbox checked={visible} onCheckedChange={(v) => col.toggleVisibility(!!v)} className="h-3.5 w-3.5" />
+                    {c.label}
+                  </label>
+                  <button
+                    className={cn("inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted", pinned ? "text-primary" : "text-muted-foreground/50")}
+                    onClick={() => col.pin(pinned ? false : "left")}
+                    title={pinned ? "Unpin" : "Pin left"}
+                  >
+                    {pinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {stageLeaves.map(({ stage, leaves }) => (
+            <div key={stage}>
+              <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{stageLabels[stage]}</div>
+              {leaves.map((c) => {
+                const col = table.getColumn(c.id);
+                if (!col) return null;
+                return (
+                  <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/50">
+                    <Checkbox checked={col.getIsVisible()} onCheckedChange={(v) => col.toggleVisibility(!!v)} className="h-3.5 w-3.5" />
+                    {c.label}
+                  </label>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -296,6 +480,35 @@ export function TaskScheduleRevisionPage() {
   const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([{ id: "created_at", desc: true }]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [], right: [] });
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+
+  // Load prefs
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.columnSizing) setColumnSizing(parsed.columnSizing);
+        if (parsed.columnVisibility) setColumnVisibility(parsed.columnVisibility);
+        if (parsed.columnPinning) setColumnPinning(parsed.columnPinning);
+      }
+    } catch {}
+    setPrefsLoaded(true);
+  }, []);
+
+  // Persist prefs
+  useEffect(() => {
+    if (!prefsLoaded) return;
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ columnSizing, columnVisibility, columnPinning }),
+      );
+    } catch {}
+  }, [prefsLoaded, columnSizing, columnVisibility, columnPinning]);
 
   useEffect(() => {
     let cancelled = false;
@@ -331,37 +544,42 @@ export function TaskScheduleRevisionPage() {
     return Array.from(set).sort().map((v) => ({ value: v, label: v }));
   }, [rows]);
 
-  const columns = useMemo<ColumnDef<Row>[]>(() => [
-    { accessorKey: "created_at", header: "Changed At", filterFn: dateRangeFilterFn, meta: { filterType: "date-range" } },
-    { accessorKey: "source_file", header: "Source File", filterFn: textFilterFn },
-    { accessorKey: "discipline", header: "Discipline", filterFn: multiSelectFilterFn, meta: { filterType: "multi-select", filterOptions: disciplineOptions } },
-    { accessorKey: "team", header: "Team", filterFn: multiSelectFilterFn, meta: { filterType: "multi-select", filterOptions: teamOptions } },
-    { accessorKey: "plot", header: "Plot", filterFn: textFilterFn },
-    { accessorKey: "task_no", header: "Task No", filterFn: textFilterFn },
-    { accessorKey: "main_task_no", header: "Main Task", filterFn: textFilterFn },
-    { accessorKey: "task_name", header: "Task Name", filterFn: textFilterFn },
-    { accessorKey: "hdec_pic_name", header: "HDEC PIC", filterFn: multiSelectFilterFn, meta: { filterType: "multi-select", filterOptions: picOptions } },
-    { accessorKey: "hdec_eng_name", header: "HDEC ENG", filterFn: textFilterFn },
-    ...stageGroups.flatMap((stage) => {
-      const cols: ColumnDef<Row>[] = [
-        { accessorKey: `${stage}_old_date`, header: `${stageLabels[stage]} Old`, filterFn: dateRangeFilterFn, meta: { filterType: "date-range" } },
-        { accessorKey: `${stage}_new_date`, header: `${stageLabels[stage]} New`, filterFn: dateRangeFilterFn, meta: { filterType: "date-range" } },
-        { accessorKey: `${stage}_diff_days`, header: `${stageLabels[stage]} Diff`, filterFn: textFilterFn },
-        { accessorKey: `${stage}_prev_gap_days`, header: `${stageLabels[stage]} Prev.Gap`, filterFn: textFilterFn },
-      ];
-      if (stageHasSuccessor[stage]) {
-        cols.push({ accessorKey: `${stage}_cur_gap_days`, header: `${stageLabels[stage]} Cur.Gap`, filterFn: textFilterFn });
-      }
-      return cols;
-    }),
-  ], [disciplineOptions, teamOptions, picOptions]);
+  const columns = useMemo<ColumnDef<Row>[]>(() => {
+    const flatDefs: ColumnDef<Row>[] = FLAT_COLUMNS.map((c) => {
+      const base: ColumnDef<Row> = { accessorKey: c.id, header: c.label, size: c.size, enableResizing: true };
+      if (c.id === "created_at") return { ...base, filterFn: dateRangeFilterFn, meta: { filterType: "date-range" } };
+      if (c.id === "discipline") return { ...base, filterFn: multiSelectFilterFn, meta: { filterType: "multi-select", filterOptions: disciplineOptions } };
+      if (c.id === "team") return { ...base, filterFn: multiSelectFilterFn, meta: { filterType: "multi-select", filterOptions: teamOptions } };
+      if (c.id === "hdec_pic_name") return { ...base, filterFn: multiSelectFilterFn, meta: { filterType: "multi-select", filterOptions: picOptions } };
+      return { ...base, filterFn: textFilterFn };
+    });
+    const stageDefs: ColumnDef<Row>[] = stageGroups.flatMap((stage) =>
+      stageLeafIds(stage).map((leaf) => {
+        const isDate = leaf.id.endsWith("_old_date") || leaf.id.endsWith("_new_date");
+        return {
+          accessorKey: leaf.id,
+          header: leaf.label,
+          size: leaf.size,
+          enableResizing: true,
+          filterFn: isDate ? dateRangeFilterFn : textFilterFn,
+          meta: isDate ? { filterType: "date-range" as const } : undefined,
+        };
+      }),
+    );
+    return [...flatDefs, ...stageDefs];
+  }, [disciplineOptions, teamOptions, picOptions]);
 
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting, columnFilters },
+    state: { sorting, columnFilters, columnSizing, columnVisibility, columnPinning },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnPinningChange: setColumnPinning,
+    enableColumnResizing: true,
+    columnResizeMode: "onChange",
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -369,7 +587,10 @@ export function TaskScheduleRevisionPage() {
 
   const visibleRows = table.getRowModel().rows;
   const countLabel = `${visibleRows.length.toLocaleString()} of ${rows.length.toLocaleString()} revisions`;
-  const totalColSpan = 10 + stageGroups.reduce((n, s) => n + (stageHasSuccessor[s] ? 5 : 4), 0);
+
+  const visibleFlatCols = FLAT_COLUMNS.filter((c) => table.getColumn(c.id)?.getIsVisible());
+  const stageVisibleLeaves = stageGroups.map((s) => stageLeafIds(s).filter((l) => table.getColumn(l.id)?.getIsVisible()));
+  const totalColSpan = visibleFlatCols.length + stageVisibleLeaves.reduce((n, arr) => n + arr.length, 0);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -395,6 +616,7 @@ export function TaskScheduleRevisionPage() {
               Clear sort
             </Button>
           )}
+          <ColumnsMenu table={table} />
         </div>
       </div>
 
@@ -406,40 +628,34 @@ export function TaskScheduleRevisionPage() {
             </div>
           ) : (
             <div className="max-h-[680px] overflow-auto rounded-md border-0">
-              <Table className="min-w-[2400px]">
+              <Table style={{ width: table.getTotalSize(), minWidth: "100%" }}>
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
-                    <SortableHeader column={table.getColumn("created_at")} label="Changed At" rowSpan={2} />
-                    <SortableHeader column={table.getColumn("source_file")} label="Source File" rowSpan={2} />
-                    <SortableHeader column={table.getColumn("discipline")} label="Discipline" rowSpan={2} />
-                    <SortableHeader column={table.getColumn("team")} label="Team" rowSpan={2} />
-                    <SortableHeader column={table.getColumn("plot")} label="Plot" rowSpan={2} />
-                    <SortableHeader column={table.getColumn("task_no")} label="Task No" rowSpan={2} />
-                    <SortableHeader column={table.getColumn("main_task_no")} label="Main Task" rowSpan={2} />
-                    <SortableHeader column={table.getColumn("task_name")} label="Task Name" rowSpan={2} />
-                    <SortableHeader column={table.getColumn("hdec_pic_name")} label="HDEC PIC" rowSpan={2} />
-                    <SortableHeader column={table.getColumn("hdec_eng_name")} label="HDEC ENG" rowSpan={2} />
-                    {stageGroups.map((stage) => (
-                      <TableHead key={stage} colSpan={stageHasSuccessor[stage] ? 5 : 4} className="border-l text-center text-xs">
-                        {stageLabels[stage]}
-                      </TableHead>
+                    {visibleFlatCols.map((c) => (
+                      <SortableHeader key={c.id} column={table.getColumn(c.id)} label={c.label} rowSpan={2} pinnable table={table} />
                     ))}
+                    {stageGroups.map((stage, idx) => {
+                      const span = stageVisibleLeaves[idx].length;
+                      if (span === 0) return null;
+                      return (
+                        <TableHead key={stage} colSpan={span} className="border-l text-center text-xs">
+                          {stageLabels[stage]}
+                        </TableHead>
+                      );
+                    })}
                   </TableRow>
                   <TableRow>
-                    {stageGroups.flatMap((stage) => {
-                      const suffixes = stageHasSuccessor[stage]
-                        ? ["old_date", "new_date", "diff_days", "prev_gap_days", "cur_gap_days"]
-                        : ["old_date", "new_date", "diff_days", "prev_gap_days"];
-                      const labels = ["Old", "New", "Diff", "Prev.Gap", "Cur.Gap"];
-                      return suffixes.map((suffix, index) => (
+                    {stageGroups.flatMap((stage, sIdx) =>
+                      stageVisibleLeaves[sIdx].map((leaf, leafIdx) => (
                         <SortableHeader
-                          key={`${stage}-${suffix}`}
-                          column={table.getColumn(`${stage}_${suffix}`)}
-                          label={labels[index]}
-                          className="border-l first:border-l-0"
+                          key={`${stage}-${leaf.id}`}
+                          column={table.getColumn(leaf.id)}
+                          label={leaf.label}
+                          className={leafIdx === 0 ? "border-l" : ""}
+                          table={table}
                         />
-                      ));
-                    })}
+                      )),
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -454,18 +670,36 @@ export function TaskScheduleRevisionPage() {
                       const o = r.original;
                       return (
                         <TableRow key={o.id}>
-                          <TableCell className="text-xs whitespace-nowrap">{formatDateTimeDdMmmYyyy(o.created_at)}</TableCell>
-                          <TableCell className="text-xs whitespace-nowrap max-w-[220px] truncate" title={o.source_file ?? ""}>{o.source_file ?? "—"}</TableCell>
-                          <TableCell className="text-xs">{o.discipline ?? "—"}</TableCell>
-                          <TableCell className="text-xs">{o.team ?? "—"}</TableCell>
-                          <TableCell className="text-xs">{o.plot ?? "—"}</TableCell>
-                          <TableCell className="text-xs font-medium">{o.task_no}</TableCell>
-                          <TableCell className="text-xs">{o.main_task_no ?? "—"}</TableCell>
-                          <TableCell className="text-xs max-w-[260px] truncate" title={o.task_name ?? ""}>{o.task_name ?? "—"}</TableCell>
-                          <TableCell className="text-xs whitespace-nowrap">{o.hdec_pic_name ?? "—"}</TableCell>
-                          <TableCell className="text-xs whitespace-nowrap">{o.hdec_eng_name ?? "—"}</TableCell>
+                          {visibleFlatCols.map((c) => {
+                            const col = table.getColumn(c.id)!;
+                            const style = pinStyle(col, false);
+                            let content: React.ReactNode = "—";
+                            let cls = "text-xs";
+                            const value = (o as any)[c.id];
+                            if (c.id === "created_at") {
+                              content = formatDateTimeDdMmmYyyy(o.created_at);
+                              cls = "text-xs whitespace-nowrap";
+                            } else if (c.id === "source_file") {
+                              content = value ?? "—";
+                              cls = "text-xs whitespace-nowrap truncate";
+                            } else if (c.id === "task_no") {
+                              content = value ?? "—";
+                              cls = "text-xs font-medium";
+                            } else if (c.id === "task_name") {
+                              content = value ?? "—";
+                              cls = "text-xs truncate";
+                            } else {
+                              content = value ?? "—";
+                              cls = "text-xs whitespace-nowrap";
+                            }
+                            return (
+                              <TableCell key={c.id} className={cls} style={style} title={typeof value === "string" ? value : undefined}>
+                                {content}
+                              </TableCell>
+                            );
+                          })}
                           {stageGroups.map((stage) => (
-                            <StageCells key={stage} row={o} stage={stage} />
+                            <StageCells key={stage} row={o} stage={stage} table={table} />
                           ))}
                         </TableRow>
                       );
