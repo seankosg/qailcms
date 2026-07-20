@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { BACKUP_TABLES, type BackupTableName } from "./backup-shared";
+import { BACKUP_TABLES, MODULE_PRE_IMPORT_TABLES, type BackupTableName, type PreImportModule } from "./backup-shared";
 
 async function assertAdminOrSuper(supabase: any, userId: string) {
   const { data, error } = await supabase.rpc("has_any_role", {
