@@ -1,0 +1,88 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Columns3, GripVertical, Pin } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { DMR_COLUMN_BY_KEY, DMR_COLUMN_KEYS } from '@/lib/dmr/columns';
+
+interface Props {
+  order: string[];
+  visibility: Record<string, boolean>;
+  frozenExtras: string[];
+  onOrderChange: (next: string[]) => void;
+  onVisibilityChange: (next: Record<string, boolean>) => void;
+  onFrozenChange: (next: string[]) => void;
+}
+
+export function DmrColumnOrderMenu({ order, visibility, frozenExtras, onOrderChange, onVisibilityChange, onFrozenChange }: Props) {
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const label = (k: string) => DMR_COLUMN_BY_KEY[k]?.label ?? k;
+
+  const toggleFrozen = (k: string) => {
+    if (frozenExtras.includes(k)) onFrozenChange(frozenExtras.filter((x) => x !== k));
+    else onFrozenChange([...frozenExtras, k]);
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8">
+          <Columns3 className="mr-1 h-3.5 w-3.5" />
+          Columns
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-2">
+        <div className="mb-2 flex items-center justify-between px-1 text-[11px] text-muted-foreground">
+          <span>드래그로 순서 · 핀으로 좌측 고정({frozenExtras.length})</span>
+          <button className="text-primary hover:underline" onClick={() => {
+            onVisibilityChange({});
+            onFrozenChange([]);
+            onOrderChange(DMR_COLUMN_KEYS);
+          }}>Reset</button>
+        </div>
+        {frozenExtras.length > 0 && (
+          <>
+            <div className="mb-1 rounded bg-muted/50 px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Frozen (고정)</div>
+            {frozenExtras.map((k) => (
+              <div key={k} className="flex items-center gap-1 rounded px-1 py-1 text-xs">
+                <Pin className="h-3 w-3 text-primary" />
+                <span className="flex-1 truncate">{label(k)}</span>
+                <button className="text-[10px] text-muted-foreground hover:underline" onClick={() => toggleFrozen(k)}>unpin</button>
+              </div>
+            ))}
+          </>
+        )}
+        <div className="mb-1 mt-2 rounded bg-muted/50 px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Columns</div>
+        {order.map((k) => {
+          if (frozenExtras.includes(k)) return null;
+          const hidden = visibility[k] === false;
+          return (
+            <div
+              key={k}
+              draggable
+              onDragStart={(e) => { setDragKey(k); e.dataTransfer.effectAllowed = 'move'; }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (!dragKey || dragKey === k) return;
+                const next = [...order];
+                const from = next.indexOf(dragKey);
+                const to = next.indexOf(k);
+                if (from === -1 || to === -1) return;
+                next.splice(from, 1); next.splice(to, 0, dragKey);
+                onOrderChange(next);
+              }}
+              onDragEnd={() => setDragKey(null)}
+              className={cn('group flex cursor-move items-center gap-1 rounded px-1 py-1 text-xs hover:bg-muted/50', dragKey === k && 'opacity-50')}
+            >
+              <GripVertical className="h-3 w-3 text-muted-foreground/40" />
+              <Checkbox checked={!hidden} onCheckedChange={(c) => onVisibilityChange({ ...visibility, [k]: !!c })} className="h-3 w-3" />
+              <span className={cn('flex-1 truncate', hidden && 'text-muted-foreground/50')}>{label(k)}</span>
+              <button className="text-[10px] text-muted-foreground hover:underline" onClick={() => toggleFrozen(k)}>pin</button>
+            </div>
+          );
+        })}
+      </PopoverContent>
+    </Popover>
+  );
+}
