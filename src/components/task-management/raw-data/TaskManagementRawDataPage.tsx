@@ -93,6 +93,22 @@ import {
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
 import {
+  isCompleted as kpiIsCompleted,
+  isStarted as kpiIsStarted,
+  isPlannedStartedBy as kpiIsPlannedStartedBy,
+  isStartDelayed as kpiIsStartDelayed,
+  isCompletionOverdue as kpiIsCompletionOverdue,
+  isCriticalDelay as kpiIsCriticalDelay,
+  isBehindSchedule as kpiIsBehindSchedule,
+  isInDelay as kpiIsInDelay,
+  scopeItems,
+  type TmKpiMode,
+  type TaskScope,
+} from "@/lib/task-management/kpi-utils";
+import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
+import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
+import { CriticalThresholdPopover } from "@/components/task-management/shared/CriticalThresholdPopover";
+import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
   TASK_MANAGEMENT_FIELD_CONFIG_QK,
