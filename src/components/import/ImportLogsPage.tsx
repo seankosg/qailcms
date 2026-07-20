@@ -399,7 +399,10 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                       const isOwner = !!me?.id && b.imported_by === me.id;
                       const canRollback = isAdmin || isOwner;
                       return (
-                        <TableRow key={b.id} className="hover:bg-muted/50">
+                        <TableRow
+                          key={b.id}
+                          className={`hover:bg-muted/50 ${b.status === "rolled_back" ? "opacity-60 line-through decoration-slate-400" : ""}`}
+                        >
                           <TableCell
                             className="text-xs font-medium cursor-pointer"
                             onClick={() => loadDetail(b.id)}
@@ -433,9 +436,22 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                             {fmtDuration(b.started_at, b.finished_at)}
                           </TableCell>
                           <TableCell className="cursor-pointer" onClick={() => loadDetail(b.id)}>
-                            <Badge variant="outline" className={`text-xs ${statusColor[b.status] || ""}`}>
-                              {b.status}
-                            </Badge>
+                            <div className="flex flex-col gap-0.5 no-underline">
+                              <Badge
+                                variant="outline"
+                                className={`text-xs w-fit ${statusColor[b.status] || ""}`}
+                              >
+                                {b.status === "rolled_back" ? "rolled back" : b.status}
+                              </Badge>
+                              {b.status === "rolled_back" && b.rolled_back_at && (
+                                <span
+                                  className="text-[10px] text-muted-foreground whitespace-nowrap"
+                                  title={new Date(b.rolled_back_at).toLocaleString()}
+                                >
+                                  {fmtDateTime(b.rolled_back_at)}
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell
                             className="text-xs text-right cursor-pointer"
