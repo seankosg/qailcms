@@ -330,7 +330,7 @@ export function DmrDashboardPage() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-sm">일자별 총원 추이 (Actual, by {GROUP_BY_OPTIONS.find((g) => g.value === groupBy)?.label})</CardTitle>
+            <CardTitle className="text-sm">일자별 총원 추이 (Actual vs Plan, by {GROUP_BY_OPTIONS.find((g) => g.value === groupBy)?.label})</CardTitle>
             <ToggleGroup
               type="single"
               value={groupBy}
