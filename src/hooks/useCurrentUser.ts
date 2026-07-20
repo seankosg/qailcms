@@ -50,7 +50,7 @@ export function useCurrentUser() {
         isSuperGuest,
         isDSuperUser,
         isEditor,
-        isGuest: !isEditor,
+        isGuest: primaryRole === "guest" || !primaryRole,
         canEdit,
         mustChangePassword: p.must_change_password === true,
         userType: p.user_type as UserType | undefined,

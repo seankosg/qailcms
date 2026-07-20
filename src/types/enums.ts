@@ -38,7 +38,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   user: "User",
   super_guest: "Super Guest",
   guest: "Guest",
-  d_superuser: "D-Super User",
+  d_superuser: "D.Superuser",
 };
 
 export const USER_TYPE_LABELS: Record<UserType, string> = {
