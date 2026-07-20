@@ -44,7 +44,7 @@ const FIELDS: FieldDef[] = [
   { field: 'report_date', label: 'Date', input: 'date' },
   { field: 'discipline', label: 'TEAM', input: 'select', options: [...DMR_DISCIPLINES] },
   { field: 'system_name', label: 'System', input: 'text' },
-  { field: 'contractor_name', label: 'Contractor', input: 'text' },
+  { field: 'contractor_name', label: 'Sub Contractor', input: 'text' },
   { field: 'plot', label: 'Plot', input: 'select', options: [...DMR_PLOTS] },
   { field: 'plan_manpower', label: 'Plan (계획)', input: 'number' },
   { field: 'actual_manpower', label: 'Actual (실적)', input: 'number' },

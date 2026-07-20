@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Loader2, Upload, ImageIcon, CheckCircle2, XCircle, CloudUpload, Sparkles } from 'lucide-react';
 import { DmrPreviewTable } from './DmrPreviewTable';
-import { DISCIPLINE_LABEL, type DmrDiscipline, type DmrParsedSection } from '@/lib/dmr/types';
+import { DISCIPLINE_LABEL, normalizeDmrContractor, isDmrDirectContractor, type DmrDiscipline, type DmrParsedSection } from '@/lib/dmr/types';
 import { flattenSection } from '@/lib/dmr/utils';
 
 const SLOTS: DmrDiscipline[] = ['ARCH', 'ELEC', 'MECH'];
@@ -151,8 +151,8 @@ export function DmrImportPage() {
         for (const r of slots[d].section!.rows) {
           const sk = `${d}::${r.system.trim()}`;
           if (!sysSet.has(sk)) sysSet.set(sk, { discipline: d, name: r.system.trim() });
-          const ck = r.contractor.trim();
-          if (!conSet.has(ck)) conSet.set(ck, { name: ck, is_direct: !!r.is_direct || /^hdec/i.test(ck) });
+          const ck = normalizeDmrContractor(r.contractor);
+          if (!conSet.has(ck)) conSet.set(ck, { name: ck, is_direct: !!r.is_direct || isDmrDirectContractor(ck) });
         }
       }
 

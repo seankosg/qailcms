@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { z } from 'zod';
-import { normalizeDmrTeam } from './dmr/types';
+import { normalizeDmrTeam, normalizeDmrContractor, isDmrDirectContractor } from './dmr/types';
 
 const TeamSchema = z.preprocess((v) => normalizeDmrTeam(v), z.enum(['ARCH', 'ELEC', 'MECH']));
 
@@ -9,7 +9,7 @@ const EntrySchema = z.object({
   report_date: z.string(),
   discipline: TeamSchema,
   system_name: z.string().min(1),
-  contractor_name: z.string().min(1),
+  contractor_name: z.preprocess((v) => normalizeDmrContractor(v), z.string().min(1)),
   plot: z.enum(['C', 'D', 'TOTAL']),
   plan_manpower: z.coerce.number().int().min(0),
   actual_manpower: z.coerce.number().int().min(0),
@@ -20,7 +20,14 @@ const EntrySchema = z.object({
 const InputSchema = z.object({
   entries: z.array(EntrySchema).min(1),
   systemMasters: z.array(z.object({ discipline: TeamSchema, name: z.string().min(1) })).default([]),
-  contractorMasters: z.array(z.object({ name: z.string().min(1), is_direct: z.boolean().default(false) })).default([]),
+  contractorMasters: z
+    .array(
+      z.object({
+        name: z.preprocess((v) => normalizeDmrContractor(v), z.string().min(1)),
+        is_direct: z.boolean().default(false),
+      }),
+    )
+    .default([]),
   overwrite: z.boolean().default(false),
 });
 
@@ -39,7 +46,10 @@ export const saveDmrEntries = createServerFn({ method: 'POST' })
     }
     if (data.contractorMasters.length > 0) {
       await supabase.from('dmr_contractor_master').upsert(
-        data.contractorMasters.map((c) => ({ name: c.name, is_direct: c.is_direct })),
+        data.contractorMasters.map((c) => ({
+          name: c.name,
+          is_direct: c.is_direct || isDmrDirectContractor(c.name),
+        })),
         { onConflict: 'name', ignoreDuplicates: true },
       );
     }

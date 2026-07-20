@@ -51,3 +51,23 @@ export function normalizeDmrTeam(value: unknown): DmrTeam {
   if (normalized === 'ARCH' || normalized === 'MECH' || normalized === 'ELEC') return normalized;
   throw new Error(`잘못된 TEAM 값: ${String(value ?? '')}`);
 }
+
+/**
+ * Sub Contractor 이름 정규화 규칙.
+ * - "HDEC, Anel" / "HDEC,Anel" / "HDEC ,Anel" 등 → "HDEC_Anel"
+ * - "HDEC" (단독) → "HDEC_Direct"
+ * - 그 외에는 앞뒤 공백만 제거
+ */
+export function normalizeDmrContractor(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return raw;
+  // HDEC, X  형태
+  const m = raw.match(/^HDEC\s*[,\/]\s*(.+)$/i);
+  if (m) return `HDEC_${m[1].trim().replace(/\s+/g, '_')}`;
+  if (/^HDEC$/i.test(raw)) return 'HDEC_Direct';
+  return raw;
+}
+
+export function isDmrDirectContractor(name: string): boolean {
+  return /^hdec(_|$)/i.test(name);
+}
