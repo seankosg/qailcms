@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
-import { Users } from "lucide-react";
+import { ChevronDown, ChevronRight, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import {
@@ -28,6 +30,7 @@ const DIM_LABEL: Record<OwnerDim, string> = {
 export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_name", onDimChange, onOwnerClick }: Props) {
   const [dim, setDim] = useState<OwnerDim>(defaultDim);
   const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
 
   const rows = useMemo(() => computeOwnerLeaderboard(items, asOfDate, dim), [items, asOfDate, dim]);
   const filtered = useMemo(() => {
@@ -48,33 +51,54 @@ export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_n
     onOwnerClick?.(dim, r.key, r);
   };
 
+  const delayedOwnerCount = rows.filter((r) => r.delayedStages > 0).length;
+
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Users className="h-4 w-4 text-primary" />
-          담당자 Leaderboard
-          <div className="ml-auto flex items-center gap-2">
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="이름 검색"
-              className="h-7 w-32 text-xs"
-            />
-            <Tabs value={dim} onValueChange={handle}>
-              <TabsList className="h-7">
-                {(Object.keys(DIM_LABEL) as OwnerDim[]).map((k) => (
-                  <TabsTrigger key={k} value={k} className="h-5 px-2 text-[11px]">
-                    {DIM_LABEL[k]}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="max-h-[420px] overflow-auto">
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 rounded px-1 -mx-1 hover:bg-accent/40"
+                aria-label={open ? "접기" : "펼치기"}
+              >
+                {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <Users className="h-4 w-4 text-primary" />
+                <span>담당자 Leaderboard</span>
+              </button>
+            </CollapsibleTrigger>
+            <Badge variant="secondary" className="text-[10px]">
+              {DIM_LABEL[dim]}
+            </Badge>
+            <Badge variant="outline" className="text-[10px]">
+              지연 담당자 {delayedOwnerCount}명
+            </Badge>
+            {open && (
+              <div className="ml-auto flex items-center gap-2">
+                <Input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="이름 검색"
+                  className="h-7 w-32 text-xs"
+                />
+                <Tabs value={dim} onValueChange={handle}>
+                  <TabsList className="h-7">
+                    {(Object.keys(DIM_LABEL) as OwnerDim[]).map((k) => (
+                      <TabsTrigger key={k} value={k} className="h-5 px-2 text-[11px]">
+                        {DIM_LABEL[k]}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="p-0">
+            <div className="max-h-[420px] overflow-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-muted/60">
               <tr>
@@ -129,8 +153,10 @@ export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_n
               )}
             </tbody>
           </table>
-        </div>
-      </CardContent>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }
