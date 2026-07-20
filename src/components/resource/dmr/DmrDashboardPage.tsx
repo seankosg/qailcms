@@ -186,7 +186,7 @@ export function DmrDashboardPage() {
       ? [...selected]
       : Array.from(new Set(rows.map(groupKey).filter(Boolean))).sort();
     const dates = Array.from(new Set(rows.map((r) => r.report_date))).sort();
-    // Build per-date bucket
+    // Build per-date bucket (Actual + Plan for each group)
     const perDate = new Map<string, Record<string, number>>();
     for (const d of dates) perDate.set(d, {});
     for (const r of rows) {
@@ -196,6 +196,7 @@ export function DmrDashboardPage() {
       const bucket = perDate.get(r.report_date);
       if (!bucket) continue;
       bucket[g] = (bucket[g] ?? 0) + (r.actual_manpower ?? 0);
+      bucket[g + '_plan'] = (bucket[g + '_plan'] ?? 0) + (r.plan_manpower ?? 0);
     }
     const data = dates.map((d) => ({ date: d, ...(perDate.get(d) ?? {}) }));
     return { data, groups };
@@ -205,9 +206,9 @@ export function DmrDashboardPage() {
   const yMax = useMemo(() => {
     let max = 0;
     for (const row of trendSeries.data) {
-      let sum = 0;
-      for (const g of trendSeries.groups) sum = Math.max(sum, (row as any)[g] ?? 0);
-      if (sum > max) max = sum;
+      for (const g of trendSeries.groups) {
+        max = Math.max(max, (row as any)[g] ?? 0, (row as any)[g + '_plan'] ?? 0);
+      }
     }
     return niceMax(max);
   }, [trendSeries]);
