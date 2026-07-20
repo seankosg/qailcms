@@ -1,27 +1,67 @@
-## 현황 확인
-- `ABD → Settings` 페이지는 `abd_header_mappings`(Header Mapping)와 `abd_field_config`(Field Config) 두 탭으로 구성 — Admin의 `Mapping` 페이지가 Spare Part / Task Management / Snag List Management에 제공하는 것과 동일한 성격의 관리 화면입니다.
-- 다만 현재 Admin > Mapping 페이지에는 ABD 탭이 아직 없어서 "완전한 중복"은 아니고, ABD만 사이드바 별도 진입점(`/closure/abd/settings`)으로 분리되어 있는 상태입니다.
+## 목적
+TM 대시보드의 담당자 Leaderboard와 그 팝업(OwnerDetailDialog)의 UX를 다음처럼 개선한다.
 
-## 목표
-ABD Settings를 폐기하고, 동등한 관리 UI를 Admin > Mapping 페이지의 신규 탭으로 통합해 관리 진입점을 Admin 한 곳으로 일원화합니다.
+1. Leaderboard 카드 자체를 Collapsible로 감싸 접기/펼치기 가능, **기본값=접힘**.
+2. 팝업의 "Raw Data 열기" 버튼이 지연 항목만 정확히 필터링해 Raw Data 페이지로 이동. 이동 시 기존 Raw Data 필터는 리셋되고 새 필터만 적용(SM/ABD의 `source=progress` 패턴을 TM에 이식).
+3. 팝업의 "지연 Top 50" 테이블 컬럼을 다음으로 확장:
+   `공종 · Team · Task · Stage · HDEC PIC · 계획일 · 지연일 · 계획진도율 · 실제진도율 · 차이 · 판정`
+   - Team 컬럼은 sticky-left로 스크롤해도 항상 표시.
+4. 위 테이블의 모든 헤더에 정렬 아이콘 추가, **Shift+클릭으로 다중정렬** 지원.
 
-## 변경 사항
+## 변경 파일
 
-### 1) Admin > Mapping에 `As Built Drawing` 탭 추가
-- `src/routes/_authenticated/admin/mapping.tsx`의 최상위 `TabsList`에 `as-built` 탭 추가.
-- 하위에 `Field Config` / `Header Mapping` 두 하위 탭 구성 (기존 다른 모듈과 동일 패턴).
-- 내용물은 기존 `AbdSettingsPage.tsx`의 `HeaderMappingsTable`, `FieldConfigTable`을 각각 `src/components/admin/AbdFieldConfigTable.tsx`, `src/components/admin/AbdHeaderMappingTable.tsx`로 추출하여 재사용.
+### 1. `src/components/task-management/dashboard/OwnerLeaderboardCard.tsx`
+- `@/components/ui/collapsible`의 Collapsible/CollapsibleTrigger/CollapsibleContent 로 카드 본문 감싸기.
+- 내부 상태 `open` (기본 `false`) + 트리거에 ChevronDown/Right 아이콘, "N명"의 표시 유지.
+- 헤더 우측의 검색/탭 컨트롤은 열림 상태에서만 표시(접힘일 때는 요약만).
 
-### 2) ABD Settings 사이드바 항목 및 라우트 제거
-- `src/components/layout/AppLayout.tsx`의 As Built Drawing 모듈 items에서 `Settings` 항목 삭제.
-- `src/routes/_authenticated/closure/abd/settings.tsx` 파일 삭제.
-- `src/components/abd/settings/AbdSettingsPage.tsx` 파일 삭제(내용은 위 1)에서 admin 컴포넌트로 이관됨).
+### 2. `src/lib/task-management/delay-utils.ts` — `DelayTopItem` 확장
+현재:
+```
+id, taskNo, taskName, discipline, team, hdecPic, hdecEng, stage, plannedDate, daysLate, judgment, actualProgress
+```
+추가 필드:
+- `planPct: number` — 해당 태스크의 스테이지 기준 계획진도율(asOfDate까지 계획상 완료돼야 하는 스테이지 수 / 전체 스테이지 수 × 100).
+- `actualPct: number` — 실제 완료 스테이지 수 / 전체 스테이지 수 × 100 (= `actual_progress`가 있으면 그 값을 우선).
+- `diffPp: number` — `actualPct − planPct`.
 
-### 3) 잔여 참조 정리
-- 프로젝트 내 `AbdSettingsPage`, `/closure/abd/settings` 문자열 참조를 검색해 남아있으면 제거 또는 Admin > Mapping(ABD 탭)으로 링크 교체.
+`computeDelayTopN`에서 각 항목별로 `ALL_TASK_STAGE_KEYS` 순회하며 planned/done 카운트 산출해 세 필드 채움. 기존 필드는 그대로 유지.
 
-## 검증
-- 관리자 계정 로그인 → 사이드바 As Built Drawing 하위에 `Settings` 항목이 사라졌는지 확인.
-- `/admin/mapping` 접근 → `As Built Drawing` 탭에서 기존 ABD Header Mapping / Field Config가 동일하게 동작(로드·추가·수정·삭제)하는지 확인.
-- 기존 URL `/closure/abd/settings`가 라우트 매치 실패(또는 not-found)로 처리되는지 확인.
-- 빌드/타입체크에서 삭제 파일 참조 오류가 없는지 확인.
+### 3. `src/components/task-management/dashboard/DelayTopTable.tsx` — 컬럼 확장 + 정렬
+- 컬럼 스키마: 공종, Team(sticky), Task, Stage, HDEC PIC, 계획일, 지연일, 계획진도율, 실제진도율, 차이(pp), 판정.
+- Team 헤더/셀에 `sticky left-0 z-10` + 불투명 배경(mem 규칙: `bg-card` 두 겹 gradient로 뒷 컬럼 비침 방지).
+- 다중정렬 상태: `const [sortKeys, setSortKeys] = useState<Array<{key, dir}>>([])`.
+  - 헤더 클릭: 단일 정렬로 대체(같은 키면 asc→desc→해제 순환).
+  - Shift+클릭: 기존 배열에 추가/토글.
+  - 헤더에 우선순위 번호(1,2,3…)와 방향 화살표(ChevronUp/Down) 표시.
+- 정렬은 클라이언트 정렬(useMemo). `limit` prop은 정렬 후 slice.
+
+### 4. `src/components/task-management/dashboard/OwnerDetailDialog.tsx`
+- `goRawData()` 로직 교체:
+  - 담당자 dim/키 + `source: "dashboard"` + `mode: "delay"` 를 search에 세팅.
+  - asOfDate도 함께 전달(`asOf: asOfDate`)해 Raw Data에서 동일 기준 지연 판정.
+- DelayTopTable에 확장된 items 그대로 전달(computeDelayTopN 결과에 새 필드 포함됨).
+
+### 5. `src/routes/_authenticated/closure/task-management/raw-data.tsx`
+- `validateSearch`(zod) 추가: `source`, `mode`, `team`, `hdec_pic_name`, `hdec_eng_name`, `asOf` 옵션.
+
+### 6. `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx` — 대시보드 진입 시 필터 리셋+적용
+- `Route.useSearch()`로 search 읽기.
+- 마운트 후 1회, `search.source === "dashboard"`이면:
+  - `setColumnFilters([])`, `setGlobalFilter("")`, `setSearchInput("")` 로 저장된 필터 리셋.
+  - 이후 다음 필터를 강제 세팅:
+    - dim 파라미터에 따라 team/hdec_pic_name/hdec_eng_name 중 하나에 대해 `columnFilters`에 `{id, value: [key]}` 추가.
+    - `search.mode === "delay"`이면 파생: 각 행의 스테이지 중 하나라도 `isTaskStageDelayedAsOf(item, st, asOf)` 인 항목만 통과하도록 필터 적용.
+  - 안전을 위해 `useRef` 가드로 최초 1회만 수행(그 후 사용자가 필터를 변경할 수 있게 함).
+- 리셋+적용이 저장 프리퍼런스로 덮여 쓰이지 않도록 `stateLoaded` 이후 실행하고, 저장을 다음 tick으로 지연.
+
+## 기술 상세
+
+- 다중정렬 비교기: `sortKeys`를 순회하며 최초 non-zero 결과 반환. 문자열은 `localeCompare("ko")`, 숫자는 산술 비교, 날짜는 문자열 ISO 그대로 비교.
+- Team sticky 컬럼: `<th class="sticky left-0 z-20 bg-muted">` / `<td class="sticky left-0 z-10 bg-card">` — 스티키 반투명 이슈 방지 위해 `bg-card` + `before:absolute before:inset-0 before:bg-card` 이중 배경(mem://design/sticky-columns-opaque 규칙).
+- Collapsible 접힘 상태에서도 카드 헤더에는 dim 뱃지(현재 선택된 dim) + "지연 태스크 N개" 요약 표시.
+- Raw Data 지연 필터: 스테이지별 지연 판정은 클라이언트에서 이미 계산 가능(`computeDelayTopN` 로직과 동일한 `isTaskStageDelayedAsOf`). 서버 페이징이므로 리소스 절감 위해 대시보드 진입 시 페이지 크기를 max로 하지 않고, 클라이언트 필터 함수(filter-fns.ts)에 delay-mode 훅을 추가.
+
+## 미포함(기존 유지)
+- 서버 스키마, RLS, 대시보드의 다른 카드/차트, KPI, 주간 트렌드는 손대지 않음.
+- `computeOwnerLeaderboard` 인터페이스 유지.
