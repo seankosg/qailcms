@@ -874,7 +874,8 @@ function PreviewDialog({
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh]">
-          <table className="w-full text-[11px]">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-[11px]">
             <thead className="sticky top-0 bg-muted">
               <tr>
                 {[
@@ -926,6 +927,7 @@ function PreviewDialog({
               ))}
             </tbody>
           </table>
+          </div>
         </ScrollArea>
       </DialogContent>
     </Dialog>
