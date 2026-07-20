@@ -170,7 +170,7 @@ export function BulkEditBar({
 
   async function handleExportXlsx() {
     try {
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = todayInDoha();
       exportSelectedToXlsx({
         rows: selectedRows,
         columns: exportColumns,
