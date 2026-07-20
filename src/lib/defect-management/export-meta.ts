@@ -1,3 +1,4 @@
+import { dohaDateTime } from "@/lib/time/doha";
 import type { DefectServerFilter, DefectServerSort } from "@/hooks/useDefectItems";
 import { DEFECT_COLUMNS } from "./columns";
 
@@ -119,9 +120,7 @@ export function buildDefectHeaderBlock(input: BuildHeaderBlockInput): {
   title: string;
   metaRows: [string, string, string, string, string];
 } {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const exportedTs = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const exportedTs = dohaDateTime();
   const formatLabel =
     input.format === "reimport" ? `Re-import ready  ${REIMPORT_MARKER}` : "View-friendly";
   const source = input.sourceSuffix

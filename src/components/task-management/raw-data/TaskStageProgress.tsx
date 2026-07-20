@@ -20,8 +20,9 @@ function fmtDdMmm(v: unknown): string {
   return `${day} ${mon}`;
 }
 
+import { todayInDoha } from "@/lib/time/doha";
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayInDoha();
 }
 
 export function classifyStart(row: Row, dataDate: string | null): StageState {

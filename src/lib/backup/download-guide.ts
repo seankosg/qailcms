@@ -1,13 +1,10 @@
+import { todayInDoha } from "@/lib/time/doha";
 import guideMarkdown from "@/content/backup-user-guide.md?raw";
 
 export const BACKUP_GUIDE_MARKDOWN = guideMarkdown;
 
 function timestamp() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}${mm}${dd}`;
+  return todayInDoha().replace(/-/g, "");
 }
 
 export function downloadGuideMarkdown() {

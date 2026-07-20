@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { dohaStampCompact } from "@/lib/time/doha";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
 import {
   buildDefectHeaderBlock,
@@ -56,7 +57,7 @@ export async function exportAllUnclosed(
   // Stream: reuse first page, then continue from CHUNK
   let served = false;
   return streamXlsxExport({
-    filename: `snag-raw-data-unclosed-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}.xlsx`,
+    filename: `snag-raw-data-unclosed-${dohaStampCompact()}.xlsx`,
     sheetName: "Unclosed",
     columns,
     chunkSize: CHUNK,

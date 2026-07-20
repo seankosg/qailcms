@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { todayInDoha } from "@/lib/time/doha";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -711,7 +712,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
     for (const f of ready) {
       const parsed = f.parsed ?? [];
-      const dataDate = f.dataDateOverride ?? new Date().toISOString().slice(0, 10);
+      const dataDate = f.dataDateOverride ?? todayInDoha();
       const startedAtIso = new Date().toISOString();
       const excludedFields = f.excludedFields ?? new Set<string>();
       const isReimport = !!f.isReimport;

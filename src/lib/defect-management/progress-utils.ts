@@ -66,8 +66,9 @@ export function toIso(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+import { todayInDoha } from "@/lib/time/doha";
 export function todayIso(): string {
-  return toIso(new Date());
+  return todayInDoha();
 }
 
 export function addDays(iso: string, n: number): string {

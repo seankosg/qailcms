@@ -1,3 +1,4 @@
+import { todayInDoha } from "@/lib/time/doha";
 export function formatDdMmm(v: string | null | undefined): string {
   if (!v) return "";
   const d = new Date(v);
@@ -24,7 +25,7 @@ export function formatPct(v: unknown): string {
 
 export function isOverdue(deliveryDate: string | null | undefined, asOfIso?: string): boolean {
   if (!deliveryDate) return false;
-  const asOf = asOfIso ?? new Date().toISOString().slice(0, 10);
+  const asOf = asOfIso ?? todayInDoha();
   const iso = String(deliveryDate).slice(0, 10);
   return iso < asOf;
 }

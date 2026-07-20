@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { dohaStamp } from "@/lib/time/doha";
 
 interface PicUser {
   id: string;
@@ -55,9 +56,9 @@ export async function exportTmImportRecord(opts: {
 
   // Rows 2–6 meta
   const meta = [
-    `Exported by: ${exportedBy} @ ${new Date().toISOString().slice(0, 19).replace("T", " ")}`,
+    `Exported by: ${exportedBy} @ ${dohaStamp()} (Doha)`,
     `Source: task_management_import_logs`,
-    `Range: ${from} ~ ${to} (KST)`,
+    `Range: ${from} ~ ${to} (Doha)`,
     `Team filter: ${teamFilter === "__all" ? "전체" : teamFilter}`,
     `기준: imported_by = 사용자 id 인 로그가 하루 1건 이상 존재`,
   ];

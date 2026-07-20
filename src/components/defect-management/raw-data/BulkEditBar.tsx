@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { todayInDoha } from "@/lib/time/doha";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -100,7 +101,7 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
 
   function handleExportXlsx() {
     try {
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = todayInDoha();
       exportSelectedToXlsx({ rows: selectedRows, columns: exportColumns, fileName: `defect-selected-${stamp}.xlsx` });
       toast.success("Export ready", { description: `${count} rows exported.` });
     } catch (e: any) {

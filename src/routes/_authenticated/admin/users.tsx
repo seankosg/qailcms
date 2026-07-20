@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { todayInDoha } from "@/lib/time/doha";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
@@ -86,7 +87,7 @@ function exportUsersXlsx(rows: any[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `users_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `users_${todayInDoha()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

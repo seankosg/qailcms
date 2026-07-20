@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { todayInDoha } from "@/lib/time/doha";
 import {
   ChevronDown,
   ClipboardCopy,
@@ -152,7 +153,7 @@ export function BulkEditBar({
 
   function handleExportXlsx() {
     try {
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = todayInDoha();
       exportRowsToXlsx({
         rows: selectedRows,
         columns: exportColumns,

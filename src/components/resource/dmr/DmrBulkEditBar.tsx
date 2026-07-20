@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { todayInDoha } from '@/lib/time/doha';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -116,7 +117,7 @@ export function DmrBulkEditBar({ selectedIds, sampleRows, canEdit, onClearSelect
 
   function handleExportXlsx() {
     try {
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = todayInDoha();
       exportDmrToXlsx({
         rows: sampleRows,
         columns: DMR_EXPORT_COLUMNS,

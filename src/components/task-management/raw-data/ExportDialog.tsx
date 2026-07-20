@@ -24,10 +24,11 @@ interface Props {
   visibleKeys: string[];
 }
 
+import { dohaStampCompact, dohaDateTime } from "@/lib/time/doha";
 function timestamp() {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  // Doha (Asia/Qatar) — YYYYMMDD_HHmm
+  const s = dohaStampCompact(); // YYYYMMDDHHmm
+  return `${s.slice(0, 8)}_${s.slice(8)}`;
 }
 
 // 자동판정/색상용 정적 numFmt (수식 없음 — 값은 이미 서버에서 계산됨)
@@ -78,8 +79,7 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
 
       const dateFields = TM_COLUMNS.filter((c) => c.type === "date").map((c) => c.key);
 
-      const now = new Date();
-      const exportedTs = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const exportedTs = dohaDateTime();
 
       const rowsSnapshot = rows;
       await streamXlsxExport({

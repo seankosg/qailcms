@@ -36,7 +36,9 @@ function parseDate(v: unknown): Date | null {
 }
 
 function todayUtc(): Date {
-  const now = new Date();
+  // Doha (Asia/Qatar, UTC+3) calendar day, expressed as a UTC-midnight Date
+  // so subsequent arithmetic (daysDiff) works consistently.
+  const now = new Date(Date.now() + 3 * 60 * 60_000);
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 

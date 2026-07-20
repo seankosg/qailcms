@@ -1,3 +1,4 @@
+import { nowInDoha } from "@/lib/time/doha";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -40,7 +41,7 @@ import {
 } from "@/lib/abd/dashboard-data";
 
 export function AbdDashboardPage() {
-  const [asOf, setAsOf] = useState<Date>(() => new Date());
+  const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
   const navigate = useNavigate();
 
   const {

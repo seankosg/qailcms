@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { todayInDoha } from "@/lib/time/doha";
 import {
   AlertCircle,
   AlertTriangle,
@@ -227,7 +228,7 @@ export function AbdImportPage() {
               team: e.team,
               plot: sheet.plot,
               sheet_name: sheet.sheet_name,
-              data_date: new Date().toISOString().slice(0, 10),
+              data_date: todayInDoha(),
               rows,
               inactivate_missing: true,
               allow_duplicates: !!e.allowDuplicates,

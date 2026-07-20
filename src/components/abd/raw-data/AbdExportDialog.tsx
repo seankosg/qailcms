@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { dohaStampCompact } from "@/lib/time/doha";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
@@ -20,7 +21,7 @@ export function AbdExportDialog({ open, onOpenChange, getRows, columnHeaders, fi
     try {
       const rows = getRows();
       if (rows.length === 0) { toast.error("내보낼 행이 없습니다."); setBusy(false); return; }
-      const timestamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+      const timestamp = dohaStampCompact();
       const aoa: any[][] = [columnHeaders.map((h) => h.label)];
       for (const r of rows) aoa.push(columnHeaders.map((h) => r[h.key] ?? ""));
       const ws = XLSX.utils.aoa_to_sheet(aoa);

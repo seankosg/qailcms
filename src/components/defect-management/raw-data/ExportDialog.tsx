@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { dohaStampCompact } from "@/lib/time/doha";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -57,7 +58,7 @@ export function ExportDialog({
     setBusy(true);
     const toastId = toast.loading("현재 필터 전체 행 수집 중...");
     try {
-      const timestamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+      const timestamp = dohaStampCompact();
       const stamp = format === "reimport" ? "REIMPORT" : "VIEW";
 
       const buildHeader = (sourceSuffix?: string): StyledHeaderBlock => {
