@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2, HardHat,
+  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2, HardHat,
 } from "lucide-react";
 import { ListTree, Sliders, TrendingUp, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
