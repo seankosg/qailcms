@@ -25,6 +25,8 @@ export interface ParsedTaskRow {
   plan_progress: number | null;
   progress_variance: number | null;
   forecast_end: string | null;
+  /** actual_progress===1 이면 forecast_end(=Revise Finish) → dataDate 폴백으로 자동 채움. 그 외 null. */
+  actual_finish: string | null;
   slip_days: number | null;
   auto_judgment: string | null;
   sort_order: number;
