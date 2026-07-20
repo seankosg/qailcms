@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +20,35 @@ function subDays(iso: string, n: number) {
   return d.toISOString().slice(0, 10);
 }
 
+function fmtDate(iso: string) {
+  // 20-Jul
+  if (!iso || iso.length < 10) return iso;
+  const [, m, d] = iso.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d}-${months[Number(m) - 1] ?? m}`;
+}
+
+function niceMax(n: number) {
+  if (n <= 0) return 10;
+  const pow = Math.pow(10, Math.floor(Math.log10(n)));
+  const rel = n / pow;
+  const nice = rel <= 1 ? 1 : rel <= 2 ? 2 : rel <= 5 ? 5 : 10;
+  return nice * pow;
+}
+
+const LINE_COLORS = [
+  '#2563eb', '#ef4444', '#f59e0b', '#10b981', '#06b6d4',
+  '#8b5cf6', '#ec4899', '#84cc16', '#f97316', '#6366f1',
+];
+
+type GroupBy = 'team' | 'plot' | 'sub' | 'wd';
+const GROUP_BY_OPTIONS: Array<{ value: GroupBy; label: string }> = [
+  { value: 'team', label: 'Team' },
+  { value: 'plot', label: 'Plot' },
+  { value: 'sub', label: 'Sub Contractor' },
+  { value: 'wd', label: 'Work Description' },
+];
+
 export function DmrDashboardPage() {
   const [teams, setTeams] = useState<DmrDiscipline[]>([]);
   const [plots, setPlots] = useState<Array<'C' | 'D'>>([]);
@@ -28,6 +57,7 @@ export function DmrDashboardPage() {
   const [contractorType, setContractorType] = useState<'all' | 'direct' | 'sub'>('all');
   const [asOf, setAsOf] = useState<string>('');
   const [rangeDays, setRangeDays] = useState<7 | 14 | 30>(14);
+  const [groupBy, setGroupBy] = useState<GroupBy>('team');
 
   // Latest date
   const latestQuery = useQuery({
@@ -67,15 +97,36 @@ export function DmrDashboardPage() {
 
   const src = entriesQuery.data ?? [];
 
-  // Distinct options for pulldown filters (from loaded window)
+  // Scope-dependent options — Team/Plot narrow both dropdowns; each dropdown
+  // is independent from the other's selection so users can freely combine.
+  const teamPlotScoped = useMemo(() => {
+    const teamSet = new Set(teams);
+    const plotSet = new Set(plots);
+    return src.filter((r) => {
+      if (teamSet.size > 0 && !teamSet.has(r.discipline as DmrDiscipline)) return false;
+      if (plotSet.size > 0 && !plotSet.has(r.plot as 'C' | 'D')) return false;
+      if (contractorType === 'direct' && !directNames.has(r.contractor_name)) return false;
+      if (contractorType === 'sub' && directNames.has(r.contractor_name)) return false;
+      return true;
+    });
+  }, [src, teams, plots, contractorType, directNames]);
+
   const workDescOptions = useMemo(
-    () => Array.from(new Set(src.map((r) => r.system_name).filter(Boolean) as string[])).sort(),
-    [src],
+    () => Array.from(new Set(teamPlotScoped.map((r) => r.system_name).filter(Boolean) as string[])).sort(),
+    [teamPlotScoped],
   );
   const subContractorOptions = useMemo(
-    () => Array.from(new Set(src.map((r) => r.contractor_name).filter(Boolean) as string[])).sort(),
-    [src],
+    () => Array.from(new Set(teamPlotScoped.map((r) => r.contractor_name).filter(Boolean) as string[])).sort(),
+    [teamPlotScoped],
   );
+
+  // Prune selections that fall out of scope when upstream filters change.
+  useEffect(() => {
+    setWorkDescriptions((prev) => prev.filter((v) => workDescOptions.includes(v)));
+  }, [workDescOptions]);
+  useEffect(() => {
+    setSubContractors((prev) => prev.filter((v) => subContractorOptions.includes(v)));
+  }, [subContractorOptions]);
 
   const rows = useMemo(() => {
     const teamSet = new Set(teams);
@@ -112,17 +163,61 @@ export function DmrDashboardPage() {
     });
   }, [rows, currentAsOf]);
 
-  // Trend: actual vs plan per day
-  const trend = useMemo(() => {
-    const map = new Map<string, { date: string; actual: number; plan: number }>();
-    for (const r of rows) {
-      const cur = map.get(r.report_date) ?? { date: r.report_date, actual: 0, plan: 0 };
-      cur.actual += r.actual_manpower ?? 0;
-      cur.plan += r.plan_manpower ?? 0;
-      map.set(r.report_date, cur);
+  // Trend: multi-line per group value (Actual manpower)
+  const groupKey = (r: (typeof rows)[number]): string => {
+    switch (groupBy) {
+      case 'team': return (r.discipline as string) ?? '';
+      case 'plot': return (r.plot as string) ?? '';
+      case 'sub': return r.contractor_name ?? '';
+      case 'wd': return r.system_name ?? '';
     }
-    return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
-  }, [rows]);
+  };
+
+  const trendSeries = useMemo(() => {
+    // Collect group values from selected filters where meaningful, otherwise from rows
+    const selectedFor: Record<GroupBy, string[]> = {
+      team: teams,
+      plot: plots,
+      sub: subContractors,
+      wd: workDescriptions,
+    };
+    const selected = selectedFor[groupBy];
+    const groups = selected.length > 0
+      ? [...selected]
+      : Array.from(new Set(rows.map(groupKey).filter(Boolean))).sort();
+    const dates = Array.from(new Set(rows.map((r) => r.report_date))).sort();
+    // Build per-date bucket
+    const perDate = new Map<string, Record<string, number>>();
+    for (const d of dates) perDate.set(d, {});
+    for (const r of rows) {
+      const g = groupKey(r);
+      if (!g) continue;
+      if (selected.length > 0 && !selected.includes(g)) continue;
+      const bucket = perDate.get(r.report_date);
+      if (!bucket) continue;
+      bucket[g] = (bucket[g] ?? 0) + (r.actual_manpower ?? 0);
+    }
+    const data = dates.map((d) => ({ date: d, ...(perDate.get(d) ?? {}) }));
+    return { data, groups };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, groupBy, teams, plots, subContractors, workDescriptions]);
+
+  const yMax = useMemo(() => {
+    let max = 0;
+    for (const row of trendSeries.data) {
+      let sum = 0;
+      for (const g of trendSeries.groups) sum = Math.max(sum, (row as any)[g] ?? 0);
+      if (sum > max) max = sum;
+    }
+    return niceMax(max);
+  }, [trendSeries]);
+
+  const todaysManpower = useMemo(() => {
+    if (!currentAsOf) return 0;
+    return rows
+      .filter((r) => r.report_date === currentAsOf)
+      .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
+  }, [rows, currentAsOf]);
 
   // Contractor × date matrix (actual)
   const matrix = useMemo(() => {
@@ -232,20 +327,51 @@ export function DmrDashboardPage() {
 
       {/* Trend chart */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">일자별 총원 추이 (Actual vs Plan)</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-sm">일자별 총원 추이 (Actual, by {GROUP_BY_OPTIONS.find((g) => g.value === groupBy)?.label})</CardTitle>
+            <ToggleGroup
+              type="single"
+              value={groupBy}
+              onValueChange={(v) => v && setGroupBy(v as GroupBy)}
+              className="flex gap-1"
+            >
+              {GROUP_BY_OPTIONS.map((o) => (
+                <ToggleGroupItem key={o.value} value={o.value} className="h-7 px-2 text-[11px]">{o.label}</ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+          <div className="mt-2 text-[22px] font-bold text-red-500 truncate">
+            Today's Manpower: {todaysManpower.toLocaleString()}
+          </div>
+        </CardHeader>
         <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="actual" stroke="#2563eb" strokeWidth={2} name="Actual" dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="plan" stroke="#9ca3af" strokeDasharray="4 4" strokeWidth={2} name="Plan" dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="h-[320px]">
+            {trendSeries.groups.length === 0 || trendSeries.data.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No data for current selection</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendSeries.data} margin={{ top: 10, right: 20, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={fmtDate} />
+                  <YAxis tick={{ fontSize: 11 }} domain={[0, yMax]} allowDecimals={false} />
+                  <Tooltip labelFormatter={fmtDate} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {trendSeries.groups.map((g, i) => (
+                    <Line
+                      key={g}
+                      type="monotone"
+                      dataKey={g}
+                      stroke={LINE_COLORS[i % LINE_COLORS.length]}
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                      name={g}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </CardContent>
       </Card>
