@@ -23,7 +23,7 @@ import {
   allocateTaskNo,
   type PreflightSummary,
 } from "@/lib/task-management/import-preflight.functions";
-import { takePreImportSnapshot } from "@/lib/backup/pre-import-snapshot";
+import { takePreImportSnapshotWithFeedback } from "@/lib/backup/pre-import-snapshot";
 
 export type RollupMode = "auto" | "keep" | "blank";
 
@@ -1092,12 +1092,21 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       toast.error("Import 가능한 파일이 없습니다");
       return;
     }
+    setIsRunning(true);
     try {
-      await takePreImportSnapshot("tm");
-    } catch (err) {
-      toast.warning(`사전 백업 실패: ${(err as Error).message}. 임포트를 계속합니다.`);
+      await takePreImportSnapshotWithFeedback("tm");
+    } catch {
+      // toast 메시지는 takePreImportSnapshotWithFeedback 내부에서 처리
     }
-    await executeImport(ready);
+    try {
+      await executeImport(ready);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[tm-import] start failed", e);
+      toast.error(`Task Management import 실패: ${msg}`);
+    } finally {
+      setIsRunning(false);
+    }
   }, [files, isRunning, executeImport]);
 
   return (
