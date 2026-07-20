@@ -14,6 +14,32 @@ function isDevBuild(id: string) {
 
 let toastShown = false;
 
+export async function forceFreshAppLoad() {
+  if (typeof window === "undefined") return;
+
+  try {
+    if ("caches" in window) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.map((key) => window.caches.delete(key)));
+    }
+  } catch {
+    // ignore cache API failures and still navigate with a cache-busting URL
+  }
+
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+  } catch {
+    // ignore service worker failures and still navigate with a cache-busting URL
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("__reset", String(Date.now()));
+  window.location.replace(url.toString());
+}
+
 export function useVersionCheck() {
   const [latestBuildId, setLatestBuildId] = useState<string | null>(null);
   const [dismissedBuildId, setDismissedBuildId] = useState<string | null>(() => {
@@ -49,11 +75,7 @@ export function useVersionCheck() {
               closeButton: true,
               action: {
                 label: "지금 새로고침",
-                onClick: () => {
-                  window.location.replace(
-                    window.location.pathname + "?__reset=" + Date.now(),
-                  );
-                },
+                onClick: () => void forceFreshAppLoad(),
               },
             });
           }
@@ -87,9 +109,7 @@ export function useVersionCheck() {
   }, [latestBuildId]);
 
   const reloadNow = useCallback(() => {
-    window.location.replace(
-      window.location.pathname + "?__reset=" + Date.now(),
-    );
+    void forceFreshAppLoad();
   }, []);
 
   return { updateAvailable, latestBuildId, dismiss, reloadNow };
