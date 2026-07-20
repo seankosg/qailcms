@@ -16,9 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
 import {
   ALL_TASK_STAGE_KEYS,
-  isTaskStageActualUpTo,
   isTaskStageDelayedAsOf,
-  isTaskStagePlannedUpTo,
   todayIso,
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
@@ -27,7 +25,8 @@ import {
   type OwnerDim,
   type OwnerLeaderboardRow,
 } from "@/lib/task-management/delay-utils";
-import { KpiStrip } from "./KpiStrip";
+import { TmKpiCards } from "./TmKpiCards";
+import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { DelayTopTable } from "./DelayTopTable";
 import { OwnerLeaderboardCard } from "./OwnerLeaderboardCard";
@@ -66,7 +65,7 @@ export function TmDashboardPage() {
     teams: search.team,
     hdecPic: search.hdecPic,
     hdecEng: search.hdecEng,
-    level: "sub",
+    level: "all",
     q: search.q,
   });
 
@@ -89,6 +88,11 @@ export function TmDashboardPage() {
 
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
 
+  const taskScope: TaskScope =
+    search.taskScope === "main" || search.taskScope === "sub" ? search.taskScope : "all";
+
+  const scopedByTaskScope = useMemo(() => scopeItems(items, taskScope), [items, taskScope]);
+
   const [ownerDetail, setOwnerDetail] = useState<{
     dim: OwnerDim;
     key: string;
@@ -100,52 +104,18 @@ export function TmDashboardPage() {
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
-  // Filter items to only "delayed" / "risk" scoped view for widgets when requested.
   const scopedItems = useMemo(() => {
-    if (search.delayFilter === "all") return items;
-    return items.filter((it) => {
+    const base = scopedByTaskScope;
+    if (search.delayFilter === "all") return base;
+    return base.filter((it) => {
       if (search.delayFilter === "risk") return it.auto_judgment === "위험";
-      // delayed: has at least one delayed stage or 지연/위험 판정
       if (it.auto_judgment === "지연" || it.auto_judgment === "위험") return true;
       for (const st of ALL_TASK_STAGE_KEYS) {
         if (isTaskStageDelayedAsOf(it, st, asOfDate)) return true;
       }
       return false;
     });
-  }, [items, search.delayFilter, asOfDate]);
-
-  // KPI
-  const kpis = useMemo(() => {
-    let cumPlan = 0;
-    let cumActual = 0;
-    let doneStages = 0;
-    let totalStages = 0;
-    let overdue = 0;
-    for (const it of items) {
-      for (const st of ALL_TASK_STAGE_KEYS) {
-        totalStages++;
-        if (isTaskStagePlannedUpTo(it, st, asOfDate)) cumPlan++;
-        if (isTaskStageActualUpTo(it, st, asOfDate)) {
-          cumActual++;
-          doneStages++;
-        }
-        if (isTaskStageDelayedAsOf(it, st, asOfDate)) overdue++;
-      }
-    }
-    const variance = cumPlan ? ((cumActual - cumPlan) / cumPlan) * 100 : 0;
-    const progressPct = totalStages ? (doneStages / totalStages) * 100 : 0;
-    return {
-      cumPlan,
-      cumActual,
-      variance,
-      progressPct,
-      doneStages,
-      totalStages,
-      overdue,
-      criticalCount: items.filter((i) => i.auto_judgment === "위험").length,
-      upcoming7Plan: 0,
-    };
-  }, [items, asOfDate]);
+  }, [scopedByTaskScope, search.delayFilter, asOfDate]);
 
   const delayTop = useMemo(() => computeDelayTopN(scopedItems, asOfDate, 20), [scopedItems, asOfDate]);
 
@@ -247,8 +217,23 @@ export function TmDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* KPI */}
-      {isLoading ? <Skeleton className="h-20 w-full" /> : <KpiStrip values={kpis} asOfLabel={asOfLabel} />}
+      {/* KPI Cards (SHAW Punch style) */}
+      {isLoading ? (
+        <Skeleton className="h-64 w-full" />
+      ) : (
+        <TmKpiCards
+          items={items}
+          asOfDate={asOfDate}
+          taskScope={taskScope}
+          onScopeChange={(v) => patch({ taskScope: v })}
+          ownerContext={{
+            team: search.team,
+            hdec_pic_name: search.hdecPic,
+            hdec_eng_name: search.hdecEng,
+            discipline: search.discipline,
+          }}
+        />
+      )}
 
       {isLoading ? (
         <Skeleton className="h-[600px] w-full" />
