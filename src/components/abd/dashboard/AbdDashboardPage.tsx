@@ -40,7 +40,7 @@ import {
 } from "@/lib/abd/dashboard-data";
 
 export function AbdDashboardPage() {
-  const [asOf, setAsOf] = useState<Date>(() => new Date());
+  const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
   const navigate = useNavigate();
 
   const {

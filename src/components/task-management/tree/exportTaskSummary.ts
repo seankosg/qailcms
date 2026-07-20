@@ -94,12 +94,12 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
     auto_judgment: 10,
   };
 
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mi = String(now.getMinutes()).padStart(2, "0");
+  const stamp = dohaStampCompact(); // Doha YYYYMMDDHHmm
+  const yyyy = stamp.slice(0, 4);
+  const mm = stamp.slice(4, 6);
+  const dd = stamp.slice(6, 8);
+  const hh = stamp.slice(8, 10);
+  const mi = stamp.slice(10, 12);
 
   const total = flat.length;
   const mainCount = opts.mainTasks.length;
