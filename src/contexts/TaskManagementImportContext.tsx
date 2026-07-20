@@ -851,6 +851,117 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           }
         }
 
+        // Schedule Revision audit — Plan Start / Plan End / Forecast End 변경 이력 기록
+        try {
+          const norm = (v: unknown): string | null => {
+            if (v == null || v === "") return null;
+            const s = String(v).slice(0, 10);
+            return s || null;
+          };
+          const daysBetween = (a: string | null, b: string | null): number | null => {
+            if (!a || !b) return null;
+            const da = new Date(a + "T00:00:00Z").getTime();
+            const db = new Date(b + "T00:00:00Z").getTime();
+            if (Number.isNaN(da) || Number.isNaN(db)) return null;
+            return Math.round((db - da) / 86_400_000);
+          };
+          // 신규 삽입 행의 id를 확보하기 위해 재조회
+          const idByTaskNo = new Map<string, string>();
+          for (const [k, v] of existingSchedule.entries()) idByTaskNo.set(k, v.id);
+          const missingIdTaskNos = applied
+            .map((p) => p.task_no)
+            .filter((t) => !idByTaskNo.has(t));
+          for (let i = 0; i < missingIdTaskNos.length; i += 500) {
+            const chunk = missingIdTaskNos.slice(i, i + 500);
+            const { data } = await (supabase as any)
+              .from("task_management_raw")
+              .select("id, task_no")
+              .eq("discipline", discipline)
+              .in("task_no", chunk);
+            for (const r of data ?? []) idByTaskNo.set(r.task_no, r.id);
+          }
+          // 이전 audit 최신 diff를 stage별로 조회 (prev_gap_days)
+          const auditIds = Array.from(idByTaskNo.values());
+          const prevGap = new Map<string, { ps: number | null; pe: number | null; fe: number | null }>();
+          for (let i = 0; i < auditIds.length; i += 500) {
+            const chunk = auditIds.slice(i, i + 500);
+            const { data } = await (supabase as any)
+              .from("task_schedule_change_audit")
+              .select(
+                "task_raw_id, plan_start_diff_days, plan_end_diff_days, forecast_end_diff_days, created_at",
+              )
+              .in("task_raw_id", chunk)
+              .order("created_at", { ascending: false });
+            for (const r of data ?? []) {
+              const key = r.task_raw_id as string;
+              const cur = prevGap.get(key) ?? { ps: null, pe: null, fe: null };
+              if (cur.ps == null && r.plan_start_diff_days != null) cur.ps = r.plan_start_diff_days;
+              if (cur.pe == null && r.plan_end_diff_days != null) cur.pe = r.plan_end_diff_days;
+              if (cur.fe == null && r.forecast_end_diff_days != null) cur.fe = r.forecast_end_diff_days;
+              prevGap.set(key, cur);
+            }
+          }
+          const auditRows: any[] = [];
+          for (const p of applied) {
+            const taskRawId = idByTaskNo.get(p.task_no);
+            if (!taskRawId) continue;
+            const prev = existingSchedule.get(p.task_no);
+            const psOld = norm(prev?.plan_start ?? null);
+            const peOld = norm(prev?.plan_end ?? null);
+            const feOld = norm(prev?.forecast_end ?? null);
+            const psNew = norm(p.plan_start);
+            const peNew = norm(p.plan_end);
+            const feNew = norm(p.forecast_end);
+            const psChanged = psOld !== psNew;
+            const peChanged = peOld !== peNew;
+            const feChanged = feOld !== feNew;
+            if (!psChanged && !peChanged && !feChanged) continue;
+            const gaps = prevGap.get(taskRawId) ?? { ps: null, pe: null, fe: null };
+            auditRows.push({
+              created_by: userId,
+              import_log_id: logId ?? null,
+              task_raw_id: taskRawId,
+              task_no: p.task_no,
+              main_task_no: p.main_task_no ?? null,
+              discipline,
+              team: (p.team && p.team.trim()) ? p.team.trim() : discipline,
+              plot: p.plot ?? null,
+              task_name: p.task_name ?? null,
+              hdec_pic_name: p.hdec_pic_name ?? null,
+              hdec_eng_name: p.hdec_eng_name ?? null,
+              source_file: f.name,
+              raw_row_no: null,
+              plan_start_old_date: psChanged ? psOld : null,
+              plan_start_new_date: psChanged ? psNew : null,
+              plan_start_diff_days: psChanged ? daysBetween(psOld, psNew) : null,
+              plan_start_prev_gap_days: psChanged ? gaps.ps : null,
+              plan_start_cur_gap_days: daysBetween(psNew, peNew),
+              plan_end_old_date: peChanged ? peOld : null,
+              plan_end_new_date: peChanged ? peNew : null,
+              plan_end_diff_days: peChanged ? daysBetween(peOld, peNew) : null,
+              plan_end_prev_gap_days: peChanged ? gaps.pe : null,
+              plan_end_cur_gap_days: daysBetween(peNew, feNew),
+              forecast_end_old_date: feChanged ? feOld : null,
+              forecast_end_new_date: feChanged ? feNew : null,
+              forecast_end_diff_days: feChanged ? daysBetween(feOld, feNew) : null,
+              forecast_end_prev_gap_days: feChanged ? gaps.fe : null,
+            });
+          }
+          for (let i = 0; i < auditRows.length; i += 500) {
+            const { error } = await (supabase as any)
+              .from("task_schedule_change_audit")
+              .insert(auditRows.slice(i, i + 500));
+            if (error) {
+              console.warn("[task-import] schedule audit insert failed", error);
+            }
+          }
+          if (auditRows.length > 0) {
+            console.info(`[task-import] schedule-revision audit rows=${auditRows.length}`);
+          }
+        } catch (e) {
+          console.warn("[task-import] schedule audit build failed", e);
+        }
+
         // Post-import: rollup + judgment recalc
         let rolledUp = 0;
         let judgmentRecalculated = 0;
