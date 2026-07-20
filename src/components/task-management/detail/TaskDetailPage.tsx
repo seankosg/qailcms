@@ -49,6 +49,8 @@ export function TaskDetailPage() {
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const isAdmin = !!(user as any)?.isAdmin;
+  const isDSuperUser = !!(user as any)?.isDSuperUser;
+  const canEditTaskNo = isAdmin || isDSuperUser;
   const resolveLabel = useTmColumnLabel();
   const fetchHistory = useServerFn(getTaskHistory);
 
@@ -144,9 +146,15 @@ export function TaskDetailPage() {
                 {cols.map((c) => {
                   const v = row[c.key];
                   const display = renderFieldValue(c, v);
+                  // task_no는 컬럼 정의상 non-editable이지만 Admin/Super User(d_superuser)는 상세페이지에서 편집 허용
+                  const isTaskNoOverride = c.key === "task_no" && canEditTaskNo;
+                  const effectiveColumn: TmColumnDef = isTaskNoOverride
+                    ? { ...c, editable: true, editorType: "text" }
+                    : c;
+                  const effectiveCanEdit = isTaskNoOverride ? canEditTaskNo : isAdmin;
                   const editable =
-                    !!c.editable &&
-                    !!c.editorType &&
+                    !!effectiveColumn.editable &&
+                    !!effectiveColumn.editorType &&
                     !(c.key === "actual_progress" && isParent);
                   return (
                     <div key={c.key} className="flex items-baseline gap-2">
@@ -157,9 +165,9 @@ export function TaskDetailPage() {
                         {editable ? (
                           <EditCellPopover
                             rowId={String(row.id)}
-                            column={c}
+                            column={effectiveColumn}
                             currentValue={v}
-                            canEdit={isAdmin}
+                            canEdit={effectiveCanEdit}
                             onSaved={onFieldSaved}
                           >
                             {display}
