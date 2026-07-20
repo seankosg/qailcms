@@ -36,7 +36,7 @@ export const runRollupSingle = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.rpc("update_task_summary", {
       _discipline: data.discipline,
-      _main_task_no: data.main_task_no,
+      _parent_task_no: data.main_task_no,
     });
     if (error) throw new Error(error.message);
     return { ok: true };
