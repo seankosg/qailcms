@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { stripNullExcept } from "@/lib/import/strip-null";
 
 const UpdateFieldSchema = z.object({
   id: z.string().uuid(),
@@ -152,11 +153,24 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     const CHUNK = 500;
     const rowLogs: any[] = [];
     let rowIndex = 0;
+    const ABD_FORCE_KEYS = [
+      "team",
+      "abd_number",
+      "is_active",
+      "inactive_reason",
+      "field_mismatch",
+      "mismatch_fields",
+      "raw_payload",
+      "source_import_log_id",
+      "data_date",
+      "updated_at",
+      "updated_by",
+    ] as const;
     for (let i = 0; i < rowsToImport.length; i += CHUNK) {
       const chunk = rowsToImport.slice(i, i + CHUNK);
       const payload = chunk.map((r) => {
         seenNumbers.add(r.abd_number);
-        return {
+        const row = {
           team: data.team,
           abd_number: r.abd_number,
           plot: r.plot ?? null,
@@ -193,6 +207,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           updated_at: new Date().toISOString(),
           updated_by: context.userId,
         };
+        return stripNullExcept(row, ABD_FORCE_KEYS);
       });
 
       // Which existed before?

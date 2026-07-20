@@ -814,9 +814,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         ? deduped.filter((p) => existing.has(p.source_issue_no))
         : deduped;
 
-      /** 필드가 excludedFields에 있으면 payload에서 제외 (기존 DB 값 보존). */
+      /**
+       * 필드가 excludedFields에 있거나 값이 null/undefined이면 payload에서 제외
+       * (기존 DB 값 보존). 임포트로는 값을 null로 덮어쓸 수 없다.
+       */
       const put = (base: Record<string, unknown>, field: string, value: unknown) => {
         if (excludedFields.has(field)) return;
+        if (value === null || value === undefined) return;
         base[field] = value;
       };
 
