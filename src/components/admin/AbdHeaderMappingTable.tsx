@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -27,38 +26,7 @@ interface HeaderMapping {
   updated_at: string;
 }
 
-interface FieldConfig {
-  id: string;
-  field_key: string;
-  label: string;
-  group: string | null;
-  data_type: string;
-  editable: boolean;
-  visible: boolean;
-  sort_order: number;
-}
-
-export function AbdSettingsPage() {
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">ABD Settings</h1>
-        <p className="text-xs text-muted-foreground">헤더 매핑과 필드 설정을 관리합니다. 관리자만 수정할 수 있습니다.</p>
-      </div>
-      <Tabs defaultValue="mappings">
-        <TabsList>
-          <TabsTrigger value="mappings">Header Mappings</TabsTrigger>
-          <TabsTrigger value="fields">Field Config</TabsTrigger>
-        </TabsList>
-        <TabsContent value="mappings" className="mt-4"><HeaderMappingsTable /></TabsContent>
-        <TabsContent value="fields" className="mt-4"><FieldConfigTable /></TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-// ─── Header Mappings ────────────────────────────────────────────────────────
-function HeaderMappingsTable() {
+export function AbdHeaderMappingTable() {
   const [rows, setRows] = useState<HeaderMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -201,80 +169,5 @@ function AddMappingDialog({ open, onOpenChange, onAdded }: { open: boolean; onOp
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// ─── Field Config ───────────────────────────────────────────────────────────
-function FieldConfigTable() {
-  const [rows, setRows] = useState<FieldConfig[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-
-  const load = async () => {
-    setLoading(true);
-    const { data } = await (supabase as any).from("abd_field_config").select("*").order("sort_order", { ascending: true });
-    setRows((data ?? []) as any);
-    setLoading(false);
-  };
-  useEffect(() => { void load(); }, []);
-
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter((r) => r.field_key.toLowerCase().includes(s) || r.label.toLowerCase().includes(s));
-  }, [rows, search]);
-
-  const patch = async (r: FieldConfig, changes: Partial<FieldConfig>) => {
-    const { error } = await (supabase as any).from("abd_field_config").update(changes).eq("id", r.id);
-    if (error) { toast.error("저장 실패", { description: error.message }); return; }
-    setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, ...changes } : x)));
-  };
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2 justify-between">
-          <CardTitle className="text-sm">Field Config ({rows.length})</CardTitle>
-          <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-56 text-xs" />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-md border overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs w-16">#</TableHead>
-                <TableHead className="text-xs">Field Key</TableHead>
-                <TableHead className="text-xs">Label</TableHead>
-                <TableHead className="text-xs">Group</TableHead>
-                <TableHead className="text-xs">Type</TableHead>
-                <TableHead className="text-xs">Visible</TableHead>
-                <TableHead className="text-xs">Editable</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-2" />Loading...</TableCell></TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">필드 설정이 없습니다.</TableCell></TableRow>
-              ) : filtered.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-xs tabular-nums">{r.sort_order}</TableCell>
-                  <TableCell className="text-xs font-mono">{r.field_key}</TableCell>
-                  <TableCell className="text-xs">
-                    <Input defaultValue={r.label} className="h-7 text-xs"
-                      onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== r.label) void patch(r, { label: v }); }} />
-                  </TableCell>
-                  <TableCell className="text-xs">{r.group ?? "—"}</TableCell>
-                  <TableCell className="text-xs">{r.data_type}</TableCell>
-                  <TableCell><Switch checked={r.visible} onCheckedChange={(v) => patch(r, { visible: v })} /></TableCell>
-                  <TableCell><Switch checked={r.editable} onCheckedChange={(v) => patch(r, { editable: v })} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
