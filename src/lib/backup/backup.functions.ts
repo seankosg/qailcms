@@ -131,7 +131,7 @@ export const createManualSnapshot = createServerFn({ method: "POST" })
     const { error: logError } = await supabaseAdmin.from("backup_run_log").insert({
       id: runId,
       status: "running",
-      snapshot_id: snapshotId,
+      snapshot_id: null,
     });
     if (logError) throw new Error(logError.message);
 
@@ -147,6 +147,7 @@ export const createManualSnapshot = createServerFn({ method: "POST" })
         .from("backup_run_log")
         .update({
           status: "success",
+          snapshot_id: snapshotId,
           finished_at: new Date().toISOString(),
           duration_ms: Date.now() - started,
         })
