@@ -233,9 +233,32 @@ export function AppLayout({ children }: { children: ReactNode }) {
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-14 items-center gap-2 border-b px-4">
-          <Wrench className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold">QAIL CMS</span>
+        <div className="flex h-14 items-center justify-between gap-2 border-b px-4">
+          <div className="flex items-center gap-2">
+            <Wrench className="h-5 w-5 text-primary" />
+            <span className="text-sm font-semibold">QAIL CMS</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="hidden flex-col items-end sm:flex">
+              <span className="max-w-[140px] truncate text-sm font-medium">{me?.name ?? me?.email}</span>
+              <span className="text-[10px] leading-none text-muted-foreground">{displayRoleLabel}</span>
+            </div>
+            {me?.primaryRole === "guest" || me?.isGuest ? (
+              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Guest (읽기)</span>
+            ) : me?.isAdmin || me?.isDSuperUser ? (
+              <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                <ShieldCheck className="h-3 w-3" />
+                {displayRoleLabel}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium">
+                {displayRoleLabel}
+              </span>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSignOut} title="Sign out">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
           {NAV.map((section) => {
@@ -290,27 +313,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <div className="border-t p-3">
-          <div className="mb-2 truncate text-xs text-muted-foreground">{me?.email}</div>
-          <div className="mb-2 flex flex-wrap gap-1">
-            {me?.primaryRole === "guest" || me?.isGuest ? (
-              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Guest (읽기)</span>
-            ) : me?.isAdmin || me?.isDSuperUser ? (
-              <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                <ShieldCheck className="h-3 w-3" />
-                {displayRoleLabel}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium">
-                {displayRoleLabel}
-              </span>
-            )}
-          </div>
-          <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut}>
-            <LogOut className="mr-2 h-3.5 w-3.5" />
-            Sign out
-          </Button>
-        </div>
       </aside>
 
       {/* Mobile overlay */}
