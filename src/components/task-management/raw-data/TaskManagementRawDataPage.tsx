@@ -237,6 +237,12 @@ export function TaskManagementRawDataPage() {
   const search = routeApi.useSearch();
   const dashboardAppliedRef = useRef(false);
   const [delayMode, setDelayMode] = useState<{ asOf: string } | null>(null);
+  const [kpiMode, setKpiMode] = useState<{
+    mode: TmKpiMode;
+    asOf: string;
+    scope: TaskScope;
+  } | null>(null);
+  const { data: kpiThresholds } = useTaskManagementSettings();
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
   const [sizing, setSizing] = useState<ColumnSizingState>({});
   const [visibility, setVisibility] = useState<VisibilityState>({});
