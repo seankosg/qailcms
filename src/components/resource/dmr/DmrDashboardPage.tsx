@@ -242,8 +242,8 @@ export function DmrDashboardPage() {
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="actual" stroke="hsl(var(--primary))" strokeWidth={2} name="Actual" />
-                <Line type="monotone" dataKey="plan" stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" name="Plan" />
+                <Line type="monotone" dataKey="actual" stroke="#2563eb" strokeWidth={2} name="Actual" dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="plan" stroke="#9ca3af" strokeDasharray="4 4" strokeWidth={2} name="Plan" dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
