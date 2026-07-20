@@ -1,251 +1,72 @@
-# 백업/저장 기능 최종 실행 계획
+## 배경
+현재 `src/components/resource/dmr/DmrRawDataPage.tsx`는 커스텀 `<table>` + 간단한 툴바 필터로 구현되어 있어, "SM의 Raw Data UI 및 기능과 동일하게 구현" 지시가 부분적으로만 반영된 상태입니다. 아래 스코프로 SM `DefectRawDataPage`의 구조를 그대로 이식합니다.
 
-## 1. 사용자 최종 선택 요약
-- **실행 방식**: D-변형 = **A + 로컬 아카이브 버튼**  
-  - 자동 백업: Supabase Edge Functions (`auto-snapshot`) 사용
-  - 수동 로컬 저장: TanStack API Route로 `zip` 파일 스트리밍 다운로드
-- **개선 사항 채택**: 2번, 9번 제외, 나머지 모두 구현
-- **7번 수정**: 파괴적 복원은 **Admin 전용**으로 제한
-- **기본 스케줄**: 카타르 도하시간(AST, UTC+3) **23:50 daily**
+## 확정 스코프 (사용자 승인)
 
-## 2. 채택 개선 사항 상세
+포함:
+- TanStack Table + `useVirtualizer` 가상 스크롤
+- 컬럼 리사이즈 / 순서 변경 / 숨김 / 고정(sticky)
+- 컬럼 헤더별 필터 드롭다운 (Column Filter)
+- Export Excel + URL 상태 동기화 + 페이지네이션 UI + 뷰 프리퍼런스 저장
 
-| 번호 | 개선 내용 | 적용 방식 |
-|------|-----------|-----------|
-| 1 | **SHA-256 해시 검증** | 스냅샷 생성 후 SQL/JSON 데이터에 대해 해시 계산, 메타 테이블에 저장 |
-| 3 | **선택적 복원 (Selective Restore)** | 복원 대상 테이블/스키마를 체크박스로 선택 가능 |
-| 4 | **RLS/트리거 제어 복원** | 복원 전 `session_replication_role = replica` 또는 트리거 일괄 비활성화 후 복원 완료 시 복구 |
-| 5 | **임포트 직전 자동 스냅샷 훅** | ABD/SM/TM/Spare Part 임포트 성공 직전에 자동으로 스냅샷 생성 |
-| 6 | **Retention 정책 UI** | Admin 페이지에서 보관 기간(일) 설정 및 수동 정리 버튼 |
-| 7 | **파괴적 복원 권한 제한** | `restore-snapshot`은 `d_superuser` 또는 `admin` 역할만 실행 가능 |
-| 8 | **백업 실행 로그 테이블** | `backup_run_log`, `restore_run_log`로 성공/실패/소요시간 기록 |
-| 10 | **로컬 zip 다운로드 버튼** | `/admin/backup` 페이지에서 "로컬에 아카이브 저장" 버튼 제공 |
+제외 (DMR 성격상 불필요):
+- Stage Progress 가상 컬럼 / 상태 카운트 탭
+- Critical / Critical Bulk Bar
+- Origin 헤더 스타일 / `defect_field_config` 동적 컬럼 (DMR은 8개 고정 컬럼)
 
-## 3. 아키텍처 구성
+## 구현 계획
 
-### 3.1 백업 데이터 흐름
+### 1. 라우트 search 스키마
+`src/routes/_authenticated/resource/dmr/raw-data.tsx`
+- `validateSearch`에 `zodValidator` 적용: `q, page, pageSize, sort, filters(JSON), discipline, plot, directOnly, from, to, cols(hidden), colOrder, colSizes, pinned`.
+- SM과 동일한 `fallback()` 패턴 사용.
 
-````text
-[자동] pg_cron (AST 23:50)
-        │
-        ▼
-[Supabase Edge Function] auto-snapshot
-        │
-        ├─ SQL dump (pg_dump 스타일 SELECT JSON)
-        ├─ Auth users 메타데이터 추출
-        ├─ Storage 객체 목록 메타데이터
-        ├─ SHA-256 해시 계산
-        │
-        ▼
-[Storage] db-backups/snapshots/{timestamp}.zip
-        │
-        ▼
-[메타 테이블] database_snapshots
+### 2. 컬럼 정의
+`src/lib/dmr/columns.ts` (신규)
+- 8개 고정 컬럼: `report_date, discipline, system_name, contractor_name, direct_flag(파생), plot, plan_manpower, actual_manpower, diff_manpower`.
+- 각 컬럼: `key, label, type('text'|'number'|'date'|'enum'), enumOptions?, align, defaultWidth`.
+- SM `DEFECT_COLUMNS` 스타일 유지.
 
-[수동] /admin/backup 페이지
-        │
-        ├─ "지금 백업" 버튼 → auto-snapshot 호출
-        ├─ "로컬에 아카이브 저장" 버튼 → TanStack API Route → zip 다운로드
-        └─ "복원" 버튼 → restore-snapshot 호출
-````
+### 3. 서버 필터/정렬 훅
+`src/hooks/useDmrItems.ts` (신규)
+- `useDmrItemsQuery({ filters, sort, page, pageSize })` — `supabase.from('dmr_entries')` 서버 페이징/정렬.
+- `useDmrColumnFacet(field)` — Column Filter 드롭다운용 distinct 목록 (System/Contractor/Discipline/Plot 등). 대량 시 서버 RPC 신규 `dmr_column_facet(field, filters)`로 상위 N개 + 검색.
+- 필터 연산자: `in`, `equals`, `range(number/date)`, `contains(text)`, `is_null`.
 
-### 3.2 복원 데이터 흐름
+### 4. 필요한 RPC 마이그레이션
+- `dmr_column_facet(field text, filters jsonb) returns table(value text, count bigint)` — SM `defect_items_facets`와 동형.
+- 인덱스 점검: `(discipline, report_date)`, `(contractor_name)`, `(system_name)` 등 기존 여부 확인 후 부족한 부분 추가.
+- 기존 GRANT/RLS 패턴 유지, `authenticated` 실행 권한 부여.
 
-````text
-[Admin만] 복원 대상 스냅샷 선택
-        │
-        ▼
-[Supabase Edge Function] restore-snapshot
-        │
-        ├─ RLS 비활성화 / 트리거 비활성화
-        ├─ 선택된 테이블만 TRUNCATE + INSERT
-        ├─ 해시 재검증
-        ├─ RLS/트리거 복구
-        │
-        ▼
-[restore_run_log] 결과 기록
-````
+### 5. 페이지 컴포넌트 재작성
+`src/components/resource/dmr/DmrRawDataPage.tsx` (전면 재작성)
+- SM `DefectRawDataPage` 구조 복제:
+  - `useReactTable` + `useVirtualizer`
+  - 서버 정렬/필터/페이지네이션 (URL sync)
+  - `ColumnFilterDropdown`을 DMR용으로 파생 (`DmrColumnFilterDropdown` 또는 재사용 여부는 SM 컴포넌트가 defect 전용 훅에 의존하는지 확인 후 결정 — 결합도 높으면 fork).
+  - `TopHorizontalScrollbar` 재사용.
+  - `ExportDialog` DMR용으로 신규 (`exportDmr.ts`) — 현재 화면의 필터/정렬/컬럼 순서를 반영.
+  - Sticky 컬럼: `report_date` 기본 고정, 사용자 pin/unpin 가능. 스티키 배경은 Core 규칙(불투명 + 두겹 오버레이) 준수.
+  - `useUserViewPreference('dmr_raw_data')`로 컬럼 순서/폭/숨김/고정/pageSize 저장.
+- 기존 상단 툴바는 유지하되 컬럼 필터와 중복되는 System/Contractor는 헤더 드롭다운으로 이관, 상단에는 검색·기간·유형(직영/협력사) 토글만 남김.
+- BulkEditBar 및 필터 전체 선택 로직은 그대로 유지.
 
-## 4. 데이터베이스 마이그레이션
+### 6. Export
+`src/components/resource/dmr/ExportDmrDialog.tsx` + `exportDmr.ts`
+- 현재 필터/정렬을 서버에서 재조회하여 전체 결과 export (SM `exportAllUnclosed` 패턴).
+- 컬럼 순서/숨김 반영, `xlsx` 스킬 준수(zero formula error, header bold).
 
-### 4.1 생성 테이블
+### 7. 정리 및 검증
+- 기존 `DmrBulkEditBar`, `fetchDmrFilteredIds`는 새로운 필터 형식(JSON)에 맞춰 시그니처 조정.
+- `tsgo` 타입 체크 통과.
+- Playwright로 대량 데이터에서 스크롤/필터/정렬/Export 스모크 테스트.
 
-```sql
-CREATE TABLE public.database_snapshots (
-  id uuid primary key default gen_random_uuid(),
-  name text,
-  created_at timestamptz default now(),
-  size_bytes bigint,
-  sha256_hash text,
-  tables_included text[],
-  storage_path text,
-  triggered_by text, -- 'manual' | 'scheduled' | 'pre-import'
-  metadata jsonb
-);
+## 파일 변경 요약
+- 신규: `src/lib/dmr/columns.ts`, `src/hooks/useDmrItems.ts`, `src/components/resource/dmr/DmrColumnFilterDropdown.tsx`, `src/components/resource/dmr/ExportDmrDialog.tsx`, `src/components/resource/dmr/exportDmr.ts`, RPC 마이그레이션(`dmr_column_facet`).
+- 수정: `src/routes/_authenticated/resource/dmr/raw-data.tsx`, `src/components/resource/dmr/DmrRawDataPage.tsx`, `src/lib/dmr-mutations.functions.ts`, `src/components/resource/dmr/DmrBulkEditBar.tsx` (필터 시그니처 변경분).
 
-CREATE TABLE public.backup_run_log (
-  id uuid primary key default gen_random_uuid(),
-  started_at timestamptz default now(),
-  finished_at timestamptz,
-  status text, -- 'running' | 'success' | 'failed'
-  snapshot_id uuid references public.database_snapshots(id),
-  error_message text,
-  duration_ms bigint
-);
-
-CREATE TABLE public.restore_run_log (
-  id uuid primary key default gen_random_uuid(),
-  started_at timestamptz default now(),
-  finished_at timestamptz,
-  status text,
-  snapshot_id uuid references public.database_snapshots(id),
-  restored_tables text[],
-  error_message text,
-  duration_ms bigint,
-  initiated_by uuid references auth.users(id)
-);
-```
-
-### 4.2 GRANT 및 RLS
-
-- `database_snapshots`, `backup_run_log`, `restore_run_log` → `service_role` ALL
-- `authenticated` 에는 SELECT만 허용 (Admin/Super User 정책에 따라)
-- `anon` 에는 접근 불가
-
-### 4.3 Storage 버킷
-
-- `db-backups` 버킷 생성 (비공개, 서비스 롤만 쓰기)
-
-## 5. Edge Functions
-
-### 5.1 `auto-snapshot`
-- **입력**: `{ schedule?: string, trigger?: string }`
-- **동작**:
-  1. 백업 대상 테이블 목록에서 JSON 집계
-  2. `auth.users` 메타데이터 추출 (민감값 제외)
-  3. Storage 객체 목록 메타데이터 추출
-  4. zip 압축 및 SHA-256 해시 계산
-  5. `db-backups/snapshots/{timestamp}.zip` 업로드
-  6. `database_snapshots`에 메타데이터 기록
-  7. `backup_run_log`에 성공/실패 기록
-
-### 5.2 `restore-snapshot`
-- **입력**: `{ snapshot_id: uuid, tables?: string[], destructive: boolean }`
-- **보안**: `Authorization` 헤더에서 토큰 추출 → `public.user_roles` 조회로 admin 확인
-- **동작**:
-  1. 스냅샷 다운로드 및 해시 검증
-  2. 선택된 테이블에 대해 `TRUNCATE` 또는 `INSERT ON CONFLICT` 전략 선택
-  3. RLS/트리거 일시 비활성화
-  4. 데이터 복원
-  5. RLS/트리거 복구
-  6. `restore_run_log` 기록
-
-## 6. TanStack API Routes
-
-### 6.1 `/api/public/backup/archive-download` (또는 `/api/backup/archive-download`)
-- **메서드**: `POST`
-- **입력**: `{ snapshot_id?: uuid }` (미지정 시 최신 스냅샷)
-- **출력**: `Response` with `Content-Type: application/zip`, `Content-Disposition: attachment`
-- **보안**: `requireSupabaseAuth` middleware + admin 역할 확인
-- **동작**: Supabase Storage에서 zip 다운로드 → 클라이언트로 스트리밍
-
-## 7. UI 구성 (`/admin/backup`)
-
-### 7.1 페이지 레이아웃
-- 상단: 페이지 제목 + **도움말/Help 버튼** (사용자 가이드 다이얼로그)
-- 좌측 카드:
-  - **다음 자동 백업**: AST 23:50 다음 실행 시간
-  - **마지막 백업**: 상태 + 소요시간 + 해시
-  - **보관 개수 / 총 용량**: Retention 기준 초과 항목 표시
-- 우측 버튼 그룹:
-  - **지금 백업** (모든 역할은 조회만, Admin/Super User만 실행)
-  - **로컬에 아카이브 저장** (zip 다운로드)
-  - **복원** (Admin만)
-- 하단 테이블:
-  - 스냅샷 목록 (이름, 생성일, 테이블 수, 크기, 해시, 트리거)
-  - 각 행: 다운로드 / 복원 / 삭제
-
-### 7.2 복원 다이얼로그
-- 스냅샷 선택
-- 복원할 테이블 체크리스트 (기본값: 전체)
-- **파괴적 복원** 토글 (Admin만 활성화)
-- 경고 메시지: "복원 시 현재 데이터가 덮어쓰여질 수 있습니다."
-
-### 7.3 Retention 설정
-- 입력: 보관 일수 (기본 30)
-- "오래된 백업 정리" 버튼
-- 정리 전 확인 다이얼로그
-
-## 8. 임포트 훅 연동
-
-ABD/SM/TM/Spare Part 임포트 완료 후, 다음 순서로 호출:
-
-```ts
-await createPreImportSnapshot({
-  trigger: 'pre-import',
-  module: 'sm' | 'abd' | 'tm' | 'spare-part',
-  import_log_id
-});
-```
-
-이는 실제 데이터 덮어쓰기 직전에 실행되어 롤백 지점을 보장합니다.
-
-## 9. 스케줄 설정
-
-```sql
-SELECT cron.schedule(
-  'auto-snapshot-daily',
-  '50 20 * * *', -- UTC 20:50 = AST 23:50
-  $$
-    SELECT net.http_post(
-      url := 'https://project--{id}.lovable.app/functions/v1/auto-snapshot',
-      headers := '{"Authorization": "Bearer {anon-key}", "Content-Type": "application/json"}'::jsonb,
-      body := '{"trigger":"scheduled"}'::jsonb
-    ) AS request_id;
-  $$
-);
-```
-
-- 카타르 도하시간(AST) 23:50 = UTC 20:50
-- `pg_cron` 및 `pg_net` 확장 필요
-
-## 10. 보안/권한 규칙
-
-| 기능 | 허용 역할 |
-|------|-----------|
-| 스냅샷 목록 조회 | Admin, Super User, Senior User |
-| 수동 백업 실행 | Admin, Super User |
-| 로컬 아카이브 다운로드 | Admin, Super User |
-| 복원 (비파괴) | Admin, Super User |
-| 복원 (파괴적) | Admin only |
-| Retention 정리 | Admin only |
-| Edge Function 호출 | service_role 또는 인증된 Admin 토큰 |
-
-## 11. 구현 단계
-
-1. **마이그레이션**: `database_snapshots`, `backup_run_log`, `restore_run_log`, `db-backups` 버킷 생성
-2. **Edge Functions**: `auto-snapshot`, `restore-snapshot` 구현 및 배포
-3. **TanStack Route**: `/api/public/backup/archive-download` 구현
-4. **UI**: `/admin/backup` 페이지 구현 및 `/admin` 인덱스 카드 추가
-5. **임포트 훅**: 4개 모듈 임포트 성공 후 pre-import 스냅샷 호출 연동
-6. **스케줄**: `pg_cron` AST 23:50 작업 등록
-7. **테스트**: 해시 검증, 선택적 복원, 권한 분기, 로컬 다운로드 테스트
-8. **문서**: 사용자 가이드 (`src/content/backup-user-guide.md`) 및 UI 도움말 버튼 연동
-
-## 12. 제외된 개선 사항
-
-- **2번**: 다중 백업 복사본異地 저장 (이 예산/외부 스토리지 연동 필요)
-- **9번**: 백업 암호화 (현재 단계에서 적용하지 않음, 추후 검토)
-
-## 13. 위험 및 완화
-
-| 위험 | 완화 |
-|------|------|
-| 복원 중 RLS/트리거 미복구 | `restore_run_log` 상태와 복구 스크립트를 별도 저장, 실패 시 알림 |
-| 대용량 백업 타임아웃 | 테이블 단위 chunk 처리, Storage multipart upload |
-| Auth 복원 시 외래키 충돌 | `auth.users`는 메타데이터만 백업, 실제 계정은 복원하지 않음 |
-| 임포트 훅 실패로 인한 데이터 무결성 손상 | 임포트 트랜잭션과 별도로 pre-import 스냅샷 실패 시 임포트 중단 |
-
----
-
-이 계획은 기존 앱 스택(TanStack Start + Lovable Cloud + Cloudflare Worker)에서 실행 가능하며, SHAW 프로젝트의 백업/복원 패턴을 유지하면서도 현재 프로젝트의 인프라에 맞게 조정한 버전입니다. 승인 시 즉시 구현을 시작합니다.
+## 기술 세부
+- SM의 `ColumnFilterDropdown`은 `useDefectFieldConfig` 등 SM 전용 훅에 강결합되어 있어 그대로 재사용은 어렵고, 동일 UI/로직을 DMR용으로 파생하는 편이 안전.
+- URL sort 포맷: `field:asc,field2:desc` (SM과 동일).
+- URL filters 포맷: JSON stringified `{ field: { op, value } }` (SM과 동일).
+- 페이지 사이즈 옵션: `50 / 100 / 200 / 500 / All` (SM과 동일, All은 100만 상한).

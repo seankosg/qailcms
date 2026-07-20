@@ -3115,6 +3115,13 @@ export type Database = {
         Args: { _batch_id: string }
         Returns: Json
       }
+      dmr_facets: {
+        Args: { _column: string; _filters?: Json }
+        Returns: {
+          cnt: number
+          value: string
+        }[]
+      }
       get_backup_tables: { Args: never; Returns: string[] }
       has_any_role: {
         Args: {
