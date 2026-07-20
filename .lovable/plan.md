@@ -1,41 +1,61 @@
-## 확인된 현재 상태
 
-- DB 기준으로 `서창훈` 사용자(`chseo@qail.local`)의 역할은 `user_roles.role = d_superuser`로 정상 저장되어 있습니다.
-- 사용자 관리 페이지도 `user_roles`를 읽고 있으므로, 사용자 관리의 역할 저장 자체가 원인은 아닙니다.
-- `useCurrentUser.ts`의 현재 계산은 `d_superuser`를 `isEditor`에 포함하고 있지만, `isAdmin`에는 포함하지 않습니다.
-- 사이드바 로그인 정보창(`AppLayout.tsx`)은 현재 3단계만 표시합니다.
-  - `me.isAdmin`이면 `Admin` 또는 `Superuser`
-  - `me.isGuest`이면 `Guest (읽기)`
-  - 그 외는 모두 `User`
-- 따라서 `d_superuser`는 실제 역할이 있어도 `isAdmin=false`, `isGuest=false`라서 최종 fallback인 `User`로 표시됩니다.
+## 배경
+파서(`toIsoDate`) 타임존 버그로 KST/Doha 환경에서 임포트된 TM 날짜 필드가 원본보다 -1일 앞당겨져 저장되었습니다. 이미 저장된 데이터를 원본 기준으로 일괄 보정합니다.
 
-## 수정 계획
+## 대상 (DB 실측, 총 1,298행)
 
-1. `useCurrentUser.ts` 역할 판정 전면 정리
-   - `d_superuser` 전용 플래그(`isDSuperUser`)를 계속 유지합니다.
-   - `isAdmin`은 기존 의미를 유지할지, 또는 관리자 메뉴 접근까지 포함할지 명확히 분리합니다.
-   - 표시용 대표 역할(`primaryRole`)과 표시 라벨(`roleLabel`)을 rank 기준으로 계산하도록 추가합니다.
-   - 다중 역할이 있어도 `admin > superuser > d_superuser > senior_user > user > super_guest > guest` 우선순위로 대표 역할을 안정적으로 선택합니다.
+**Step 1 — 원본 확보 파일: 셀 단위 대조 후 정밀 보정 (912행)**
 
-2. 사이드바 로그인 정보창 표시 수정
-   - 현재의 `isAdmin / isGuest / else User` 단순 분기를 제거합니다.
-   - `me.primaryRole` 또는 `me.roleLabel` 기반으로 실제 역할을 표시합니다.
-   - `d_superuser`는 `D-Super User` 또는 사용자가 보는 명칭 기준 `D.Superuser`로 표시되게 합니다.
-   - `guest`만 `Guest (읽기)`로 표시하고, `super_guest`, `senior_user`, `user`도 각각 실제 역할 라벨로 표시합니다.
+| source_file (DB) | 행수 | 매칭 원본 |
+|---|---:|---|
+| Task Management_전기_260720.xlsx | 582 | `Task_Management_전기_260720_서창훈.xlsx` (유사본) |
+| 20260719_Task Management_건축_REV03.xlsx | 331 | 없음 → Step 2로 이동 |
+| Task Management_전기_260720_서창훈.xlsx | 34 | ✅ |
+| Task Management_전기_260718 (1).xlsx | 6 | `Task_Management_전기_260713.xlsx` (유사본) |
 
-3. 권한 로직 재검토
-   - 메뉴 노출에서 사용하는 `isEditor`, `isAdmin` 의미를 점검합니다.
-   - `d_superuser`가 “전체 편집 승격” 역할이라는 기존 정의에 맞게 `editorOnly` 메뉴 접근은 유지합니다.
-   - 관리자 메뉴 접근이 `admin/superuser` 전용이어야 하는 기존 정책은 유지하고, 별도 지시 없이 `d_superuser`에게 Admin 메뉴를 열지는 않습니다.
+원본이 확실히 확보된 것은 34행뿐이며, "유사본"은 시점이 다를 수 있어 부정확합니다. → **실질적으로 Step 1 정밀 대조는 불확실 → 사용자 지시(A안)에 따라 전체를 Step 2 방식으로 통일**하는 것이 오히려 일관적입니다.
 
-4. 검증
-   - DB에서 `서창훈`의 `d_superuser` 역할이 유지되는지 재확인합니다.
-   - 브라우저에서 로그인 정보창 표시가 `User`가 아닌 `D.Superuser` 계열로 표시되는지 확인합니다.
-   - `isEditor` 기반 메뉴가 계속 정상 노출되는지 확인합니다.
+## 확정 방침 (사용자 승인: A안)
 
-## 기술 세부사항
+**모든 1,298행에 대해 5개 날짜 컬럼을 `+ interval '1 day'` 일괄 shift**  
+- 대상 컬럼: `plan_start`, `plan_end`, `actual_start`, `actual_finish`, `forecast_end`
+- NULL 값은 NULL 유지 (COALESCE로 방어)
+- 파서 버그 시점 이전/이후를 구분하지 않음: 현재까지의 모든 임포트가 동일 버그 하에 있었음
 
-- 수정 대상 파일:
-  - `src/hooks/useCurrentUser.ts`
-  - `src/components/layout/AppLayout.tsx`
-- DB 마이그레이션은 필요하지 않습니다. 현재 문제는 DB 저장 문제가 아니라 프론트엔드 표시 분기 문제입니다.
+## 실행 단계
+
+### 1. 사전 백업
+`create_database_snapshot('pre_tm_date_shift_fix')` 호출로 `task_management_raw` 스냅샷 생성
+
+### 2. 마이그레이션 실행
+```sql
+UPDATE public.task_management_raw
+SET
+  plan_start     = plan_start     + INTERVAL '1 day',
+  plan_end       = plan_end       + INTERVAL '1 day',
+  actual_start   = actual_start   + INTERVAL '1 day',
+  actual_finish  = actual_finish  + INTERVAL '1 day',
+  forecast_end   = forecast_end   + INTERVAL '1 day';
+```
+`date` 타입에 `INTERVAL '1 day'` 더하면 결과도 `date` 유지, NULL은 NULL 유지.
+
+### 3. 파생 필드 재계산 강제
+Sub Task 파생 트리거(`calc_sub_task_derived_fn`)는 원본 컬럼 변경 시 자동 발화하지만, 대량 UPDATE라 확실하게 하기 위해:
+- `SELECT update_task_summary(id) FROM task_management_raw WHERE is_rollup = true;` 전 Main 롤업 재계산
+- `SELECT recalc_task_auto_judgment(id) FROM task_management_raw;` 전 행 자동 판정 재계산
+
+### 4. 검증
+- 랜덤 샘플 20행 before/after 로그 (별도 임시 테이블 `_tm_date_shift_log`에 백업 후 대조)
+- `plan_days`, `plan_progress`, `slip_days` 정합성 스팟체크
+
+### 5. 파서 버그 자체 수정 (이번 계획 범위 외 · 알림용)
+`src/lib/task-management/parser.ts`의 `toIsoDate`를 UTC 컴포넌트 기반으로 별도 계획서에서 처리 (이번 데이터 보정과 분리). 이 수정이 되기 전 재임포트하면 다시 -1일 문제가 재현됩니다 — 파서 수정 계획을 이어서 진행할지 별도 확인 부탁드립니다.
+
+## 롤백 시 안전 장치
+- 스냅샷 복원으로 즉시 원복 가능
+- `_tm_date_shift_log` 임시 테이블에 UPDATE 전 상태 저장
+
+## 산출물
+- 스냅샷 ID
+- 영향 행수 요약 (컬럼별 non-null 카운트)
+- 샘플 검증 로그
