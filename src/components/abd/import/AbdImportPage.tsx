@@ -208,9 +208,9 @@ export function AbdImportPage() {
   const startImport = async () => {
     setBusy(true);
     try {
-      await takePreImportSnapshot("abd");
-    } catch (err) {
-      toast.warning(`사전 백업 실패: ${(err as Error).message}. 임포트를 계속합니다.`);
+      await takePreImportSnapshotWithFeedback("abd");
+    } catch {
+      // toast 메시지는 takePreImportSnapshotWithFeedback 내부에서 처리
     }
     for (const e of entries) {
       if (!isReady(e) || !e.parsed || !e.team) continue;
