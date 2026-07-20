@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2, HardHat,
+  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2, HardHat,
 } from "lucide-react";
 import { ListTree, Sliders, TrendingUp, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -236,7 +236,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
       >
         <div className="flex h-14 items-center justify-between gap-2 border-b px-4">
           <div className="flex items-center gap-2">
-            <Wrench className="h-5 w-5 text-primary" />
             <span className="text-sm font-semibold">QAIL CMS</span>
           </div>
           <div className="flex items-center gap-2">
