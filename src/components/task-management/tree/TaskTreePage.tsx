@@ -161,8 +161,8 @@ export function TaskTreePage() {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
       if (delayFilter !== "off") {
-        const mainBehind = todayGap(p) < -0.05;
-        const subBehind = kids.some((r) => todayGap(r) < -0.05);
+        const mainBehind = todayGap(p, asOfDate) < -0.05;
+        const subBehind = kids.some((r) => todayGap(r, asOfDate) < -0.05);
         if (delayFilter === "all" && !(mainBehind || subBehind)) return false;
         if (delayFilter === "main" && !mainBehind) return false;
         if (delayFilter === "sub" && !subBehind) return false;
@@ -187,7 +187,7 @@ export function TaskTreePage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [mainTasks, subsByMain, q, delayFilter, picFilter]);
+  }, [mainTasks, subsByMain, q, delayFilter, picFilter, asOfDate]);
 
   function toggle(taskNo: string) {
     setExpanded((cur) => {
@@ -240,6 +240,7 @@ export function TaskTreePage() {
         subsByMain: filteredSubs,
         filtersLabel,
         searchLabel: search.trim(),
+        asOfDate,
       });
       toast.success(`엑셀 내보내기 완료 — ${n.toLocaleString()} rows`);
     } catch (e) {
@@ -331,8 +332,8 @@ export function TaskTreePage() {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
           const worst = worstJudgment(kids.map((k) => k.auto_judgment)) ?? p.auto_judgment;
-          const behindCount = kids.filter((k) => todayGap(k) < -0.05).length;
-          const pGap = todayGap(p);
+          const behindCount = kids.filter((k) => todayGap(k, asOfDate) < -0.05).length;
+          const pGap = todayGap(p, asOfDate);
           return (
             <Card key={p.id} className="overflow-hidden">
               <CardHeader
@@ -391,8 +392,8 @@ export function TaskTreePage() {
                     </thead>
                     <tbody>
                       {kids.map((k) => {
-                        const gap = todayGap(k);
-                        const j = k.auto_judgment ?? computeJudgment(k);
+                        const gap = todayGap(k, asOfDate);
+                        const j = k.auto_judgment ?? computeJudgment(k, undefined, asOfDate);
                         return (
                           <tr key={k.id} className="border-t hover:bg-accent/30">
                             <td className="px-2 py-1 font-mono">{k.task_no}</td>
@@ -405,7 +406,7 @@ export function TaskTreePage() {
                               <ProgressBar v={k.actual_progress} />
                             </td>
                             <td className="px-2 py-1 tabular-nums text-[10px]">
-                              {(expectedProgressToday(k) * 100).toFixed(0)}%
+                              {(expectedProgressToday(k, asOfDate) * 100).toFixed(0)}%
                             </td>
                             <td className="px-2 py-1">
                               <GapCell gap={gap} />
