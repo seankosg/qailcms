@@ -115,7 +115,8 @@ export function TaskDashboardPage({ compact = false }: Props) {
       combined: r.combined.slice(startIdx),
       stages: {
         start: { ...r.stages.start, cells: r.stages.start.cells.slice(startIdx) },
-        completion: { ...r.stages.completion, cells: r.stages.completion.cells.slice(startIdx) },
+        wip: { ...r.stages.wip, cells: r.stages.wip.cells.slice(startIdx) },
+        finish: { ...r.stages.finish, cells: r.stages.finish.cells.slice(startIdx) },
       },
     }));
     return { ...aggregate, buckets, rows };
@@ -355,10 +356,10 @@ export function TaskDashboardPage({ compact = false }: Props) {
                   Start
                 </ToggleGroupItem>
                 <ToggleGroupItem
-                  value="completion"
+                  value="finish"
                   className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                 >
-                  Comp
+                  Finish
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>

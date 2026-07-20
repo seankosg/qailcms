@@ -268,7 +268,7 @@ export function PlanVsActualMatrix({
                             className={cn(
                               "inline-flex h-4 min-w-7 px-1 items-center justify-center rounded text-[9px] font-semibold",
                               st === "start" && "bg-secondary text-secondary-foreground",
-                              st === "completion" && "bg-primary/20 text-primary",
+                              st === "finish" && "bg-primary/20 text-primary",
                             )}
                           >
                             {TASK_STAGE_LABELS[st]}

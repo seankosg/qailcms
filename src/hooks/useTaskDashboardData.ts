@@ -13,7 +13,7 @@ export interface TaskDashboardFilters {
 }
 
 const SELECT_COLS =
-  "id, task_no, task_name, discipline, team, plot, hdec_pic_name, hdec_eng_name, category, floor_level, risk, level, status_manual, auto_judgment, plan_start, plan_end, actual_start, actual_progress, slip_days, data_date";
+  "id, task_no, task_name, discipline, team, plot, hdec_pic_name, hdec_eng_name, category, floor_level, risk, level, status_manual, auto_judgment, plan_start, plan_end, plan_days, actual_start, actual_finish, actual_progress, slip_days, data_date";
 
 async function fetchAll(filters: TaskDashboardFilters): Promise<TaskItem[]> {
   const pageSize = 1000;

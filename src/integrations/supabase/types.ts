@@ -2999,7 +2999,11 @@ export type Database = {
       }
       calc_auto_judgment_value: {
         Args: {
+          _actual_finish: string
           _actual_progress: number
+          _actual_start: string
+          _data_date: string
+          _plan_days: number
           _plan_end: string
           _plan_start: string
           _slip_days: number

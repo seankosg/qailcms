@@ -15,7 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
 import {
-  ALL_TASK_STAGE_KEYS,
+  ALL_TASK_TIMELINE_STAGE_KEYS,
   isTaskStageDelayedAsOf,
   todayIso,
   type TaskItem,
@@ -110,7 +110,7 @@ export function TmDashboardPage() {
     return base.filter((it) => {
       if (search.delayFilter === "risk") return it.auto_judgment === "위험";
       if (it.auto_judgment === "지연" || it.auto_judgment === "위험") return true;
-      for (const st of ALL_TASK_STAGE_KEYS) {
+      for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
         if (isTaskStageDelayedAsOf(it, st, asOfDate)) return true;
       }
       return false;

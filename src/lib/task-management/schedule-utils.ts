@@ -5,7 +5,9 @@ import type { TaskThresholds } from "./derived";
 import { DEFAULT_THRESHOLDS } from "./derived";
 
 // ───── types ─────
-export type TaskScheduleStage = "start" | "completion";
+// 3-스테이지 판정: Start / WIP / Finish.
+// (기존 "completion" 참조는 "finish" 로 리네임 — TIMELINE 집계에서는 wip 를 제외한다.)
+export type TaskScheduleStage = "start" | "wip" | "finish";
 export type TaskScheduleStageFilter = "all" | TaskScheduleStage | TaskScheduleStage[];
 export type TaskScheduleBucket = "day" | "week";
 export type TaskScheduleGroupBy =
@@ -17,7 +19,10 @@ export type TaskScheduleGroupBy =
   | "category"
   | "floor_level";
 
-export const ALL_TASK_STAGE_KEYS: TaskScheduleStage[] = ["start", "completion"];
+/** 판정용 3-스테이지 키. */
+export const ALL_TASK_STAGE_KEYS: TaskScheduleStage[] = ["start", "wip", "finish"];
+/** 타임라인 집계(스케줄 매트릭스/크리티컬)에서 사용하는 날짜 스테이지 키. WIP 는 시점 개념이 없어 제외. */
+export const ALL_TASK_TIMELINE_STAGE_KEYS: Array<"start" | "finish"> = ["start", "finish"];
 
 export const ALL_TASK_GROUP_KEYS: TaskScheduleGroupBy[] = [
   "discipline",
@@ -44,7 +49,8 @@ export function getPrimaryTaskGroup(by: TaskGroupBySpec): TaskScheduleGroupBy {
 
 export const TASK_STAGE_LABELS: Record<TaskScheduleStage, string> = {
   start: "Start",
-  completion: "Comp",
+  wip: "WIP",
+  finish: "Finish",
 };
 
 export const TASK_GROUP_LABELS: Record<TaskScheduleGroupBy, string> = {
@@ -85,9 +91,12 @@ export interface TaskItem {
   auto_judgment: string | null;
   plan_start: string | null;
   plan_end: string | null;
+  plan_days: number | null;
   actual_start: string | null;
+  actual_finish: string | null;
   actual_progress: number | null;
   slip_days: number | null;
+  data_date: string | null;
 }
 
 export interface BucketCell {
@@ -220,22 +229,26 @@ export function formatBucketLabel(
 // ───── stage accessors ─────
 export function getTaskStagePlannedDate(item: TaskItem, stage: TaskScheduleStage): string | null {
   if (stage === "start") return item.plan_start ? item.plan_start.slice(0, 10) : null;
-  return item.plan_end ? item.plan_end.slice(0, 10) : null;
+  if (stage === "finish") return item.plan_end ? item.plan_end.slice(0, 10) : null;
+  // wip 스테이지는 날짜 시점이 없음
+  return null;
 }
 
 export function getTaskStageActualDate(item: TaskItem, stage: TaskScheduleStage): string | null {
   if (stage === "start") return item.actual_start ? item.actual_start.slice(0, 10) : null;
-  // Task 도메인은 실제 완료 날짜 컬럼이 없음. actual_progress==1 인 경우
-  // "언제 완료됐는지"는 이력 테이블에 있지만 v1 에서는 plan_end 로 근사.
-  const done = Number(item.actual_progress ?? 0) >= 1;
-  if (!done) return null;
-  // 완료된 시점 근사: plan_end (없으면 오늘)
-  return item.plan_end ? item.plan_end.slice(0, 10) : todayIso();
+  if (stage === "finish") {
+    if (item.actual_finish) return item.actual_finish.slice(0, 10);
+    const done = Number(item.actual_progress ?? 0) >= 1;
+    if (!done) return null;
+    return item.plan_end ? item.plan_end.slice(0, 10) : todayIso();
+  }
+  return null;
 }
 
 export function isTaskStageDone(item: TaskItem, stage: TaskScheduleStage): boolean {
   const completed = Number(item.actual_progress ?? 0) >= 1;
-  if (stage === "completion") return completed;
+  if (stage === "finish") return completed;
+  if (stage === "wip") return completed;
   // start
   if (item.actual_start) return true;
   if (completed) return true;
@@ -352,11 +365,13 @@ export function aggregateTaskSchedule(
   for (const [key, groupItems] of groupMap) {
     const stageData: Record<TaskScheduleStage, TaskStageRow> = {
       start: emptyStageRow("start", buckets, groupItems.length),
-      completion: emptyStageRow("completion", buckets, groupItems.length),
+      wip: emptyStageRow("wip", buckets, groupItems.length),
+      finish: emptyStageRow("finish", buckets, groupItems.length),
     };
 
     for (const it of groupItems) {
-      for (const st of ALL_TASK_STAGE_KEYS) {
+      // 타임라인 집계는 날짜 시점이 있는 start/finish 만.
+      for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
         const plan = getTaskStagePlannedDate(it, st);
         const actual = getTaskStageActualDate(it, st);
         const stageDoneAsOf = isTaskStageActualUpTo(it, st, opts.asOfDate);
@@ -385,6 +400,7 @@ export function aggregateTaskSchedule(
 
     const combined: BucketCell[] = buckets.map((b) => ({ bucket: b, plan: 0, actual: 0 }));
     for (const st of stagesToShow) {
+      if (st === "wip") continue;
       stageData[st].cells.forEach((c, i) => {
         combined[i].plan += c.plan;
         combined[i].actual += c.actual;
@@ -395,12 +411,14 @@ export function aggregateTaskSchedule(
     let cumActual = 0;
     let doneCount = 0;
     for (const st of stagesToShow) {
+      if (st === "wip") continue;
       cumPlan += stageData[st].cumPlan;
       cumActual += stageData[st].cumActual;
       doneCount += stageData[st].totalDone;
     }
 
-    const total = groupItems.length * stagesToShow.length;
+    const timelineCount = stagesToShow.filter((s) => s !== "wip").length;
+    const total = groupItems.length * (timelineCount || 1);
 
     rows.push({
       key,
@@ -447,7 +465,7 @@ export function findTaskCritical(
   for (const it of items) {
     const groupLabel = getTaskGroupLabel(groupBy, getTaskGroupKey(it, groupBy));
 
-    for (const stage of ALL_TASK_STAGE_KEYS) {
+    for (const stage of ALL_TASK_TIMELINE_STAGE_KEYS) {
       const planned = getTaskStagePlannedDate(it, stage);
       if (!planned || planned > horizon) continue;
       if (isTaskStageDone(it, stage)) continue;
@@ -467,18 +485,18 @@ export function findTaskCritical(
     }
 
     // Bottleneck: 완료 예정일이 지났는데 진도율 미완료 && 진도차 큼
-    const completionPlanned = getTaskStagePlannedDate(it, "completion");
+    const completionPlanned = getTaskStagePlannedDate(it, "finish");
     if (
       completionPlanned &&
       completionPlanned <= today &&
-      !isTaskStageDone(it, "completion")
+      !isTaskStageDone(it, "finish")
     ) {
       bottleneck.push({
         id: it.id,
         taskNo: it.task_no ?? "",
         taskName: it.task_name ?? "",
         discipline: it.discipline ?? "",
-        stage: "completion",
+        stage: "finish",
         daysLeft: daysBetween(today, completionPlanned),
         plannedDate: completionPlanned,
         status: it.auto_judgment ?? null,
