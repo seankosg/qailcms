@@ -93,6 +93,22 @@ import {
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
 import {
+  isCompleted as kpiIsCompleted,
+  isStarted as kpiIsStarted,
+  isPlannedStartedBy as kpiIsPlannedStartedBy,
+  isStartDelayed as kpiIsStartDelayed,
+  isCompletionOverdue as kpiIsCompletionOverdue,
+  isCriticalDelay as kpiIsCriticalDelay,
+  isBehindSchedule as kpiIsBehindSchedule,
+  isInDelay as kpiIsInDelay,
+  scopeItems,
+  type TmKpiMode,
+  type TaskScope,
+} from "@/lib/task-management/kpi-utils";
+import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
+import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
+import { CriticalThresholdPopover } from "@/components/task-management/shared/CriticalThresholdPopover";
+import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
   TASK_MANAGEMENT_FIELD_CONFIG_QK,
@@ -221,6 +237,12 @@ export function TaskManagementRawDataPage() {
   const search = routeApi.useSearch();
   const dashboardAppliedRef = useRef(false);
   const [delayMode, setDelayMode] = useState<{ asOf: string } | null>(null);
+  const [kpiMode, setKpiMode] = useState<{
+    mode: TmKpiMode;
+    asOf: string;
+    scope: TaskScope;
+  } | null>(null);
+  const { data: kpiThresholds } = useTaskManagementSettings();
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
   const [sizing, setSizing] = useState<ColumnSizingState>({});
   const [visibility, setVisibility] = useState<VisibilityState>({});
@@ -314,6 +336,7 @@ export function TaskManagementRawDataPage() {
       source?: string;
       mode?: string;
       asOf?: string;
+      taskScope?: string;
       team?: string;
       hdec_pic_name?: string;
       hdec_eng_name?: string;
@@ -338,10 +361,18 @@ export function TaskManagementRawDataPage() {
     setSearchInput("");
     setColumnFilters(next);
     setCollapsedParents(new Set());
+    const asOf = s.asOf && s.asOf.length ? s.asOf : todayIso();
+    const scope: TaskScope =
+      s.taskScope === "main" || s.taskScope === "sub" ? s.taskScope : "all";
     if (s.mode === "delay") {
-      setDelayMode({ asOf: s.asOf && s.asOf.length ? s.asOf : todayIso() });
+      setDelayMode({ asOf });
+      setKpiMode(null);
+    } else if (s.mode) {
+      setDelayMode(null);
+      setKpiMode({ mode: s.mode as TmKpiMode, asOf, scope });
     } else {
       setDelayMode(null);
+      setKpiMode(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateLoaded, search]);
@@ -415,9 +446,47 @@ export function TaskManagementRawDataPage() {
     });
   }, [rows, delayMode]);
 
+  // KPI 카드 딥링크 모드: 대시보드 상단 카드 클릭 시 조건
+  const kpiFilteredRows = useMemo(() => {
+    if (!kpiMode) return delayFilteredRows;
+    const t = kpiThresholds ?? DEFAULT_THRESHOLDS;
+    const asOf = kpiMode.asOf;
+    const scoped = scopeItems(
+      delayFilteredRows as unknown as TaskItem[],
+      kpiMode.scope,
+    ) as unknown as Row[];
+    return scoped.filter((r) => {
+      const it = r as unknown as TaskItem;
+      switch (kpiMode.mode) {
+        case "completed":
+          return kpiIsCompleted(it);
+        case "not_started":
+          return !kpiIsStarted(it);
+        case "wip":
+          return kpiIsStarted(it) && !kpiIsCompleted(it);
+        case "planned_started":
+          return kpiIsPlannedStartedBy(it, asOf);
+        case "actual_started":
+          return kpiIsStarted(it);
+        case "in_delay":
+          return kpiIsInDelay(it, asOf);
+        case "start_delayed":
+          return kpiIsStartDelayed(it, asOf);
+        case "completion_overdue":
+          return kpiIsCompletionOverdue(it, asOf);
+        case "critical":
+          return kpiIsCriticalDelay(it, asOf, t);
+        case "behind":
+          return kpiIsBehindSchedule(it, asOf);
+        default:
+          return true;
+      }
+    });
+  }, [delayFilteredRows, kpiMode, kpiThresholds]);
+
   // discipline-task_no 단위 collapse 키 유지 — 접힌 부모의 자식 행 숨김
   const visibleRows = useMemo(() => {
-    const src = delayFilteredRows;
+    const src = kpiFilteredRows;
     if (collapsedParents.size === 0) return src;
     return src.filter((r) => {
       const parent = (r as any).main_task_no as string | null;
@@ -425,7 +494,7 @@ export function TaskManagementRawDataPage() {
       if (!parent) return true;
       return !collapsedParents.has(`${disc}::${parent}`);
     });
-  }, [delayFilteredRows, collapsedParents]);
+  }, [kpiFilteredRows, collapsedParents]);
 
   const parentKeys = useMemo(() => {
     const keys: string[] = [];
@@ -934,11 +1003,7 @@ export function TaskManagementRawDataPage() {
                 )}
                 Judgment
               </Button>
-              <Button variant="outline" size="sm" className="h-8" asChild>
-                <Link to="/admin/task-thresholds">
-                  <Sliders className="mr-1 h-3.5 w-3.5" /> 임계값
-                </Link>
-              </Button>
+              <CriticalThresholdPopover />
             </>
           )}
           <Button
@@ -966,13 +1031,19 @@ export function TaskManagementRawDataPage() {
         }}
       />
 
-      {(activeFilterCount > 0 || delayMode) && (
+      {(activeFilterCount > 0 || delayMode || kpiMode) && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <Filter className="h-3 w-3 text-muted-foreground" />
           {delayMode && (
             <FilterChip
               label={`지연 모드 · asOf ${delayMode.asOf}`}
               onClear={() => setDelayMode(null)}
+            />
+          )}
+          {kpiMode && (
+            <FilterChip
+              label={`KPI: ${kpiMode.mode} · ${kpiMode.scope} · asOf ${kpiMode.asOf}`}
+              onClear={() => setKpiMode(null)}
             />
           )}
           {globalFilter && (
