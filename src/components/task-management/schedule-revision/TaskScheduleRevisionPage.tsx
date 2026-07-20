@@ -179,15 +179,16 @@ function pinStyle(column: Column<Row>, isHeader = false): CSSProperties {
   };
 }
 
-function ResizeHandle({ column }: { column: Column<Row> }) {
+function ResizeHandle({ column, table }: { column: Column<Row>; table: ReturnType<typeof useReactTable<Row>> }) {
   const onDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     const startX = e.clientX;
     const startW = column.getSize();
+    const id = column.id;
     const onMove = (ev: MouseEvent) => {
       const w = Math.max(50, startW + ev.clientX - startX);
-      (column as any).setSize?.(w);
+      table.setColumnSizing((prev) => ({ ...prev, [id]: w }));
     };
     const onUp = () => {
       document.removeEventListener("mousemove", onMove);
@@ -357,13 +358,14 @@ function ColumnFilterDropdown({ column }: { column: Column<Row> }) {
 }
 
 function SortableHeader({
-  column, label, className, rowSpan, pinnable = false,
+  column, label, className, rowSpan, pinnable = false, table,
 }: {
   column: Column<Row> | undefined;
   label: string;
   className?: string;
   rowSpan?: number;
   pinnable?: boolean;
+  table: ReturnType<typeof useReactTable<Row>>;
 }) {
   if (!column) {
     return <TableHead rowSpan={rowSpan} className={cn("relative text-xs whitespace-nowrap", className)}>{label}</TableHead>;
@@ -396,7 +398,7 @@ function SortableHeader({
           </button>
         )}
       </div>
-      <ResizeHandle column={column} />
+      <ResizeHandle column={column} table={table} />
     </TableHead>
   );
 }
