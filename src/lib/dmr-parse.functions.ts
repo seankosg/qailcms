@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { z } from 'zod';
-import { normalizeDmrTeam } from './dmr/types';
+import { normalizeDmrTeam, normalizeDmrContractor, isDmrDirectContractor } from './dmr/types';
 
 const InputSchema = z.object({
   storagePaths: z.array(z.string().min(1)).min(1).max(3),
@@ -10,7 +10,7 @@ const InputSchema = z.object({
 const ValuesSchema = z.object({
   C: z.coerce.number().int().default(0),
   D: z.coerce.number().int().default(0),
-  TOTAL: z.coerce.number().int().default(0),
+  TOTAL: z.coerce.number().int().optional(),
 });
 const RowSchema = z.object({
   system: z.string().min(1),
@@ -100,6 +100,23 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
       const parsed = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
       const section = SectionSchema.parse(parsed);
       section.report_date = normalizeDate(section.report_date);
+      // Normalize contractor names + force TOTAL = C + D (ignore any TOTAL the AI returned)
+      section.rows = section.rows.map((r) => {
+        const contractor = normalizeDmrContractor(r.contractor);
+        const planC = r.values.plan.C ?? 0;
+        const planD = r.values.plan.D ?? 0;
+        const actC = r.values.actual.C ?? 0;
+        const actD = r.values.actual.D ?? 0;
+        return {
+          ...r,
+          contractor,
+          is_direct: r.is_direct ?? isDmrDirectContractor(contractor),
+          values: {
+            plan: { C: planC, D: planD, TOTAL: planC + planD },
+            actual: { C: actC, D: actD, TOTAL: actC + actD },
+          },
+        };
+      });
       return section;
     }
 
