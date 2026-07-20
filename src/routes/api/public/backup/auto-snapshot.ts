@@ -31,7 +31,7 @@ export const Route = createFileRoute("/api/public/backup/auto-snapshot")({
         const { error: logError } = await supabaseAdmin.from("backup_run_log").insert({
           id: runId,
           status: "running",
-          snapshot_id: snapshotId,
+          snapshot_id: null,
         });
         if (logError) {
           return new Response(JSON.stringify({ error: logError.message }), { status: 500 });
@@ -50,6 +50,7 @@ export const Route = createFileRoute("/api/public/backup/auto-snapshot")({
             .from("backup_run_log")
             .update({
               status: "success",
+              snapshot_id: snapshotId,
               finished_at: new Date().toISOString(),
               duration_ms: Date.now() - started,
             })
