@@ -215,8 +215,21 @@ export function DmrDashboardPage() {
         max = Math.max(max, (row as any)[g] ?? 0, (row as any)[g + '_plan'] ?? 0);
       }
     }
-    return niceMax(max);
-  }, [trendSeries]);
+  return niceMax(max);
+}, [trendSeries]);
+
+  const activeFilterSummary = useMemo(() => {
+    const parts: string[] = [];
+    parts.push(`Period: ${rangeDays}d`);
+    if (teams.length > 0) parts.push(`Team: ${teams.join(', ')}`);
+    else parts.push('Team: All');
+    if (plots.length > 0) parts.push(`Plot: ${plots.join(', ')}`);
+    else parts.push('Plot: All');
+    if (contractorType !== 'all') parts.push(`Type: ${contractorType === 'direct' ? '직영' : '협력사'}`);
+    if (workDescriptions.length > 0) parts.push(`Work Description: ${workDescriptions.length} selected`);
+    if (subContractors.length > 0) parts.push(`Sub Contractor: ${subContractors.length} selected`);
+    return parts.join(' · ');
+  }, [rangeDays, teams, plots, contractorType, workDescriptions, subContractors]);
 
   const todaysManpower = useMemo(() => {
     if (!currentAsOf) return 0;
