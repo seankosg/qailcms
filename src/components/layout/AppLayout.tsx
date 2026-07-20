@@ -236,7 +236,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
       >
         <div className="flex h-14 items-center justify-between gap-2 border-b px-4">
           <div className="flex items-center gap-2">
-            <Wrench className="h-5 w-5 text-primary" />
             <span className="text-sm font-semibold">QAIL CMS</span>
           </div>
           <div className="flex items-center gap-2">
