@@ -10,6 +10,13 @@ const TONE_CLASSES: Record<Tone, string> = {
   neutral: "",
 };
 
+export interface RiskKpiBreakdownRow {
+  label: string;
+  count: number;
+  onClick?: () => void;
+  disabled?: boolean;
+}
+
 interface Props {
   label: string;
   count: number;
@@ -19,6 +26,7 @@ interface Props {
   showPercentFirst?: boolean;
   onClick?: () => void;
   action?: React.ReactNode;
+  breakdown?: RiskKpiBreakdownRow[];
 }
 
 export function RiskKpiCard({
@@ -30,6 +38,7 @@ export function RiskKpiCard({
   showPercentFirst = false,
   onClick,
   action,
+  breakdown,
 }: Props) {
   const primary =
     showPercentFirst && percent != null ? `${percent.toFixed(1)}%` : count.toLocaleString();
@@ -39,25 +48,66 @@ export function RiskKpiCard({
       : percent != null
         ? `${percent.toFixed(1)}%`
         : undefined;
+  const hasBreakdown = !!breakdown && breakdown.length > 0;
   return (
     <Card
       onClick={onClick}
       className={cn(onClick && "cursor-pointer transition-colors hover:bg-accent/40")}
     >
-      <CardContent className="flex flex-col gap-1 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {label}
+      <CardContent className="p-3">
+        <div className="flex items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {label}
+              </div>
+              {action ? <div onClick={(e) => e.stopPropagation()}>{action}</div> : null}
+            </div>
+            <div
+              className={cn(
+                "text-2xl font-semibold tabular-nums leading-tight",
+                TONE_CLASSES[tone],
+              )}
+            >
+              {primary}
+            </div>
+            {secondary && (
+              <div className="text-[11px] text-muted-foreground tabular-nums">{secondary}</div>
+            )}
+            {sub && <div className="text-[11px] text-muted-foreground tabular-nums">{sub}</div>}
           </div>
-          {action ? <div onClick={(e) => e.stopPropagation()}>{action}</div> : null}
+          {hasBreakdown && (
+            <div
+              className="flex max-h-28 min-w-[104px] flex-col gap-0.5 overflow-y-auto border-l pl-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {breakdown!.map((row, idx) =>
+                row.disabled || !row.onClick ? (
+                  <div
+                    key={`${row.label}-${idx}`}
+                    className="flex h-5 items-center justify-between gap-2 px-1 text-[11px] tabular-nums text-muted-foreground"
+                  >
+                    <span className="truncate">{row.label}</span>
+                    <span>{row.count.toLocaleString()}</span>
+                  </div>
+                ) : (
+                  <button
+                    key={`${row.label}-${idx}`}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      row.onClick?.();
+                    }}
+                    className="flex h-5 items-center justify-between gap-2 rounded px-1 text-[11px] tabular-nums transition-colors hover:bg-accent/60"
+                  >
+                    <span className="truncate">{row.label}</span>
+                    <span className="font-medium">{row.count.toLocaleString()}</span>
+                  </button>
+                ),
+              )}
+            </div>
+          )}
         </div>
-        <div className={cn("text-2xl font-semibold tabular-nums leading-tight", TONE_CLASSES[tone])}>
-          {primary}
-        </div>
-        {secondary && (
-          <div className="text-[11px] text-muted-foreground tabular-nums">{secondary}</div>
-        )}
-        {sub && <div className="text-[11px] text-muted-foreground tabular-nums">{sub}</div>}
       </CardContent>
     </Card>
   );
