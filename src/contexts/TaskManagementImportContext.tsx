@@ -776,11 +776,11 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                   code: r.error.code,
                   details: r.error.details,
                   hint: r.error.hint,
-                  sampleTaskNo: row.task_no,
+                  sampleTaskNo: row.task_no as string | undefined,
                 });
               } else {
                 recovered++;
-                if (existingSet.has(row.task_no)) updated++;
+                if (existingSet.has(row.task_no as string)) updated++;
                 else inserted++;
               }
             }
