@@ -288,22 +288,6 @@ export function DmrRawDataPage() {
           </Select>
         </div>
         <div>
-          <div className="mb-1 text-[11px] text-muted-foreground">Metric</div>
-          <Select value={metric} onValueChange={setMetric}>
-            <SelectTrigger className="h-8 w-32 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              {DMR_METRICS.map((m) => (
-                <SelectItem key={m} value={m} className="capitalize">
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
           <div className="mb-1 text-[11px] text-muted-foreground">From</div>
           <Input
             type="date"
@@ -395,11 +379,15 @@ export function DmrRawDataPage() {
         )}
 
         <div className="ml-auto flex flex-col text-right">
-          <span className="text-[11px] text-muted-foreground">Rows / Manpower</span>
+          <span className="text-[11px] text-muted-foreground">Rows · Plan / Actual / Δ</span>
           <span className="text-sm font-semibold">
             {rows.length.toLocaleString()}
             {total > rows.length && ` / ${total.toLocaleString()}`} ·{' '}
-            {sumManpower.toLocaleString()}명
+            <span className="text-muted-foreground">{sumPlan.toLocaleString()}</span> /{' '}
+            <span>{sumActual.toLocaleString()}</span> /{' '}
+            <span className={sumDiff > 0 ? 'text-emerald-600' : sumDiff < 0 ? 'text-red-600' : 'text-muted-foreground'}>
+              {sumDiff > 0 ? '+' : ''}{sumDiff.toLocaleString()}
+            </span>
           </span>
         </div>
       </div>
@@ -436,21 +424,22 @@ export function DmrRawDataPage() {
               <SortHeader label="Contractor" field="contractor_name" sortOf={sortOf} onClick={toggleSort} />
               <th className="px-2 py-1 text-left">유형</th>
               <SortHeader label="Plot" field="plot" sortOf={sortOf} onClick={toggleSort} />
-              <SortHeader label="Metric" field="metric" sortOf={sortOf} onClick={toggleSort} />
-              <SortHeader label="Manpower" field="manpower" sortOf={sortOf} onClick={toggleSort} align="right" />
+              <SortHeader label="Plan" field="plan_manpower" sortOf={sortOf} onClick={toggleSort} align="right" />
+              <SortHeader label="Actual" field="actual_manpower" sortOf={sortOf} onClick={toggleSort} align="right" />
+              <SortHeader label="Δ (Actual−Plan)" field="diff_manpower" sortOf={sortOf} onClick={toggleSort} align="right" />
             </tr>
           </thead>
           <tbody>
             {query.isLoading && (
               <tr>
-                <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                <td colSpan={10} className="p-4 text-center text-muted-foreground">
                   로딩 중…
                 </td>
               </tr>
             )}
             {!query.isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                <td colSpan={10} className="p-4 text-center text-muted-foreground">
                   데이터가 없습니다
                 </td>
               </tr>
@@ -458,6 +447,7 @@ export function DmrRawDataPage() {
             {rows.map((r: any) => {
               const direct = directSet.get(r.contractor_name);
               const checked = !!selection[r.id];
+              const diffV = Number(r.diff_manpower ?? ((r.actual_manpower ?? 0) - (r.plan_manpower ?? 0)));
               return (
                 <tr
                   key={r.id}
@@ -491,9 +481,14 @@ export function DmrRawDataPage() {
                     )}
                   </td>
                   <td className="px-2 py-1">{r.plot}</td>
-                  <td className="px-2 py-1 capitalize">{r.metric}</td>
+                  <td className="px-2 py-1 text-right text-muted-foreground">
+                    {Number(r.plan_manpower ?? 0).toLocaleString()}
+                  </td>
                   <td className="px-2 py-1 text-right font-medium">
-                    {Number(r.manpower ?? 0).toLocaleString()}
+                    {Number(r.actual_manpower ?? 0).toLocaleString()}
+                  </td>
+                  <td className={`px-2 py-1 text-right font-medium ${diffV > 0 ? 'text-emerald-600' : diffV < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    {diffV > 0 ? '+' : ''}{diffV.toLocaleString()}
                   </td>
                 </tr>
               );
