@@ -34,6 +34,7 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string> = {
   abd_import_logs: "id",
   defect_import_logs: "id",
   task_management_import_logs: "id",
+  task_schedule_change_audit: "id",
   spare_parts_import_logs: "id",
 };
 
