@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useParams, useRouter } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +20,6 @@ import {
 import { EditCellPopover } from "../raw-data/EditCellPopover";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
-import { getTaskHistory } from "@/lib/task-management/history.functions";
 import { formatDdMmm } from "@/lib/defect-management/stage-utils";
 import { cn } from "@/lib/utils";
 import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThread";
@@ -36,23 +34,14 @@ const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   system: "System",
 };
 
-const SOURCE_COLORS: Record<string, string> = {
-  manual: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
-  import: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  rollup: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  system: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
-};
-
 export function TaskDetailPage() {
   const { id } = useParams({ from: "/_authenticated/closure/task-management/detail/$id" });
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const isAdmin = !!(user as any)?.isAdmin;
   const isDSuperUser = !!(user as any)?.isDSuperUser;
   const canEditTaskNo = isAdmin || isDSuperUser;
   const resolveLabel = useTmColumnLabel();
-  const fetchHistory = useServerFn(getTaskHistory);
 
   const { data: row, refetch, isFetching } = useQuery({
     queryKey: ["task-detail", id],
@@ -65,15 +54,6 @@ export function TaskDetailPage() {
       if (error) throw error;
       return data as Record<string, any> | null;
     },
-  });
-
-  const { data: history } = useQuery({
-    queryKey: ["task-detail-history", row?.discipline, row?.task_no],
-    queryFn: async () => {
-      if (!row?.discipline || !row?.task_no) return { rows: [] as any[] };
-      return await fetchHistory({ data: { discipline: String(row.discipline), task_no: String(row.task_no), limit: 100 } });
-    },
-    enabled: !!row?.discipline && !!row?.task_no,
   });
 
   const grouped = useMemo(() => {
@@ -94,7 +74,6 @@ export function TaskDetailPage() {
 
   const onFieldSaved = () => {
     refetch();
-    queryClient.invalidateQueries({ queryKey: ["task-detail-history", row.discipline, row.task_no] });
   };
 
   return (
@@ -185,36 +164,6 @@ export function TaskDetailPage() {
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-lg border bg-card p-3">
-            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Status History
-            </div>
-            {(history?.rows ?? []).length === 0 ? (
-              <div className="text-xs text-muted-foreground">이력 없음</div>
-            ) : (
-              <ul className="space-y-2 text-xs">
-                {(history?.rows ?? []).map((h: any) => (
-                  <li key={h.id} className="rounded border-l-2 border-primary/40 bg-muted/30 px-2 py-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-medium">{resolveLabel(h.field) ?? h.field}</span>
-                      {h.source && (
-                        <Badge className={cn("text-[10px]", SOURCE_COLORS[h.source] ?? "bg-muted")}>
-                          {h.source}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {h.old_value ?? "—"} →{" "}
-                      <span className="font-medium text-foreground">{h.new_value ?? "—"}</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {h.changed_at ? new Date(h.changed_at).toLocaleString() : ""}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
           <div className="rounded-lg border bg-card p-3">
             <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Comments
