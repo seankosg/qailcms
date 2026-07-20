@@ -731,6 +731,10 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           "level",
           "discipline",
           "team",
+          // Schedule fields — 원본 파일 값으로 항상 덮어쓰기 (빈 값이면 NULL로 클리어)
+          "plan_start",
+          "plan_end",
+          "forecast_end",
           // 자동계산 리셋 (서버 rollup에서 재계산)
           "plan_days",
           "plan_progress",
@@ -738,7 +742,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           "slip_days",
           "auto_judgment",
           // Main + auto rollup에서 강제 null인 케이스 유지
-          ...(stripParent ? (["plan_start", "plan_end", "actual_progress"] as const) : []),
+          ...(stripParent ? (["actual_progress"] as const) : []),
           // 메타
           "data_date",
           "sort_order",
