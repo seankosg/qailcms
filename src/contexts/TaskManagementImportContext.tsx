@@ -701,6 +701,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         plan_progress: null as number | null,
         progress_variance: null as number | null,
         forecast_end: p.forecast_end,
+        // A.Finish: 파서에서 100% 완료 시 forecast_end → dataDate 폴백으로 채움. null이면 기존 DB값 유지.
+        actual_finish: stripParent ? null : p.actual_finish,
         slip_days: null as number | null,
         auto_judgment: null as string | null,
         auto_judgment_import: p.auto_judgment,
