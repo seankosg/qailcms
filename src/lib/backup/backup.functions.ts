@@ -252,3 +252,54 @@ export const cleanupOldSnapshots = createServerFn({ method: "POST" })
     const core = await import("./backup-core.server");
     return await core.cleanupOldSnapshots(supabaseAdmin);
   });
+
+export const createPreImportSnapshot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { module: PreImportModule; import_log_id?: string }) => input)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const core = await import("./backup-core.server");
+
+    const runId = crypto.randomUUID();
+    const snapshotId = crypto.randomUUID();
+    const tables = MODULE_PRE_IMPORT_TABLES[data.module] ?? BACKUP_TABLES;
+    const name = `pre-import-${data.module}-${new Date().toISOString()}`;
+
+    const { error: logError } = await supabaseAdmin.from("backup_run_log").insert({
+      id: runId,
+      status: "running",
+      snapshot_id: snapshotId,
+    });
+    if (logError) throw new Error(logError.message);
+
+    const started = Date.now();
+    try {
+      const result = await core.createSnapshot(supabaseAdmin, {
+        snapshotId,
+        name,
+        triggeredBy: "pre-import",
+        triggerMetadata: { module: data.module, import_log_id: data.import_log_id ?? null },
+        tables,
+      });
+      await supabaseAdmin
+        .from("backup_run_log")
+        .update({
+          status: "success",
+          finished_at: new Date().toISOString(),
+          duration_ms: Date.now() - started,
+        })
+        .eq("id", runId);
+      return result;
+    } catch (err) {
+      await supabaseAdmin
+        .from("backup_run_log")
+        .update({
+          status: "failed",
+          finished_at: new Date().toISOString(),
+          duration_ms: Date.now() - started,
+          error_message: (err as Error).message,
+        })
+        .eq("id", runId);
+      throw err;
+    }
+  });
