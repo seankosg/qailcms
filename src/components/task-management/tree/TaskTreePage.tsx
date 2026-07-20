@@ -43,6 +43,7 @@ interface Row {
   hdec_eng_name: string | null;
   sub_task_desc: string | null;
   sort_order: number | null;
+  data_date: string | null;
 }
 
 function ProgressBar({ v }: { v: number | null | undefined }) {
@@ -76,6 +77,8 @@ function GapCell({ gap }: { gap: number }) {
 }
 
 export function TaskTreePage() {
+  const routeSearch = routeApi.useSearch();
+  const navigate = useNavigate();
   const [discipline, setDiscipline] = useState<Discipline>("ARCH");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -90,7 +93,7 @@ export function TaskTreePage() {
       const { data, error } = await (supabase as any)
         .from("task_management_raw")
         .select(
-          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order",
+          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
         )
         .eq("discipline", discipline)
         .order("sort_order", { ascending: true })
@@ -99,6 +102,26 @@ export function TaskTreePage() {
       return (data ?? []) as Row[];
     },
   });
+
+  const latestDataDate = useMemo(() => {
+    let latest = "";
+    for (const r of data) {
+      const d = r.data_date ? String(r.data_date).slice(0, 10) : "";
+      if (d && d > latest) latest = d;
+    }
+    return latest;
+  }, [data]);
+
+  const dataDateOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of data) {
+      const d = r.data_date ? String(r.data_date).slice(0, 10) : "";
+      if (d) set.add(d);
+    }
+    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
+  }, [data]);
+
+  const asOfDate = routeSearch.dataDate || latestDataDate || undefined;
 
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
