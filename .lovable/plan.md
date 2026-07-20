@@ -1,43 +1,51 @@
+# DMR Dashboard 추이 차트 필터 개편
+
 ## 목표
-TM 대시보드처럼 Task Summary와 Raw Data 페이지 최상단에도 **Data Date 선택기**를 추가하여, 각 페이지의 "오늘 기준" 계산을 사용자가 고른 날짜로 연동한다. 기본값은 DB에 있는 최신 `data_date`.
+- "일자별 총원 추이 (Actual vs Plan)" 차트의 데이터 소스를 `plot='TOTAL'` 집계 행에서 **Raw Data(C, D 개별 행) 합산**으로 변경
+- 차트 상단에 4종 다중선택 필터 배치: Team(토글), Plot(토글), Work Description(풀다운), Sub Contractor(풀다운)
 
-## 현재 상태 (확인 완료)
-- `TmDashboardPage.tsx`: 이미 `search.dataDate` URL 파라미터 + Select 드롭다운으로 Data Date 선택 UI 보유. `dataDateOptions`는 `task_management_raw` 전체에서 distinct 추출.
-- `TaskManagementRawDataPage.tsx`: `latestDataDate`를 계산해 Badge로 "Data Date {값}"만 표시. `TaskStageProgress`에 이 값을 `dataDate` prop으로 전달만 함. 선택 UI 없음.
-- `TaskTreePage.tsx` (Task Summary): `todayGap` / `expectedProgressToday`를 호출하는데, 이 함수들은 내부적으로 오늘 날짜(또는 `computeTPlan` 기본값)를 사용. Data Date 인자를 받지 않음.
-- `derived.ts`: `computeTPlan(row, asOf?)`는 이미 asOf 인자 지원. `expectedProgressToday(row)`와 `todayGap(row)`는 asOf 인자 미지원 → 확장 필요.
+## 대상 파일
+- `src/components/resource/dmr/DmrDashboardPage.tsx`
 
-## 구현 범위
+## 구현 상세
 
-### 1. 공용 훅/컴포넌트
-- `src/components/task-management/shared/DataDatePicker.tsx` 신설
-  - props: `value`, `onChange`, `options`(distinct data_date 목록), 기본 라벨/리셋 버튼.
-  - Dashboard의 기존 UI(Select + 리셋)와 동일 스타일 재사용.
-- 데이터 소스는 각 페이지가 이미 가지고 있는 rows에서 distinct 추출(추가 쿼리 없음).
+### 1) 데이터 소스 변경
+- `entriesQuery`에서 `.eq('plot', 'TOTAL')` 제거
+- `plot IN ('C','D')`로 조회하여 Raw Data 행 그대로 합산
+- 이로써 하위 필터(Plot 개별 선택 시 C만/D만 등)가 의미를 갖게 됨
+- `kpi`, `byDiscipline`, `trend`, `matrix` 계산 모두 새 소스 사용
 
-### 2. Raw Data 페이지
-- 상단 헤더 라인에 DataDatePicker 배치(기존 "Data Date {값}" Badge 자리 교체).
-- 상태: `selectedDataDate` (URL search param `dataDate`; 미지정 시 latestDataDate).
-- `TaskStageProgress`로 넘기는 `dataDate` prop을 `selectedDataDate`로 교체.
-- **완료 회색 스타일** 및 `auto_judgment` 값은 DB 저장값을 그대로 사용(서버 계산이라 Data Date와 무관) → 시각적 stage progress에만 영향.
+### 2) 필터 상태 (모두 다중선택, 빈 배열 = 전체)
+- `teams: string[]` — 기존 단일 `discipline` 대체
+- `plots: ('C'|'D')[]` — 신규
+- `workDescriptions: string[]` — `system_name` 컬럼 기준
+- `subContractors: string[]` — `contractor_name` 컬럼 기준
+- 기존 `유형(직영/협력사)` 필터는 유지 (별도 축)
 
-### 3. Task Summary 페이지
-- 상단에 DataDatePicker 배치.
-- 상태: URL search param `dataDate`; 기본값 = rows의 max `data_date`.
-- `derived.ts`에 확장:
-  - `expectedProgressToday(row, asOf?)` → `computeTPlan(row, asOf) ?? 0`
-  - `todayGap(row, asOf?)` → `actual - expectedProgressToday(row, asOf)`
-  - 기존 호출부(인자 없이 쓰던 곳)는 그대로 동작(옵셔널).
-- `TaskTreePage.tsx` 내 모든 `todayGap(row)` / `expectedProgressToday(row)` 호출을 `todayGap(row, selectedDataDate)`로 교체.
-- `exportTaskSummary.ts`에도 동일 asOf 전달(export가 현재 화면 기준을 반영하도록).
+### 3) 필터 UI (차트 상단, 기존 필터 바 확장)
+- **Team, Plot**: `ToggleGroup type="multiple"` 형태 버튼 그룹
+  - Team 옵션: `DMR_DISCIPLINES` (CIVIL/ELEC/MECH 등)
+  - Plot 옵션: `C`, `D`
+- **Work Description, Sub Contractor**: 체크박스 리스트가 있는 `Popover` 풀다운
+  - "Select all / Clear" 버튼 포함 (앱 전반 관례)
+  - 선택 개수 배지 표시 (예: "Work Desc (3)")
+  - 옵션은 현재 로드된 window 데이터에서 distinct 추출 (report_date, contractor_name, system_name 셀렉트에 이미 포함)
 
-### 4. URL 파라미터
-- Raw Data / Task Summary 각각 `validateSearch`에 `dataDate: fallback(z.string(), "").default("")` 추가.
-- 페이지 진입 시 값이 비어있으면 latestDataDate로 표시(URL은 그대로 비워두어 "최신" 자동 추종 동작 유지).
+### 4) 필터 적용 순서
+1. 서버 쿼리: `report_date` 범위 + `plot IN ('C','D')`
+   (Team/Work Desc/Sub Contractor는 옵션 목록 유지를 위해 클라이언트 필터)
+2. 클라이언트 필터: teams / plots / workDescriptions / subContractors / 직영·협력사
 
-## 비범위
-- `auto_judgment` 서버 재계산은 별도 버튼(이미 존재)으로만 실행. Data Date 변경으로 자동 재계산 트리거하지 않음.
-- Dashboard의 Data Date와 페이지 간 자동 동기화는 하지 않음(각 페이지 독립 URL 상태). 필요 시 별도 요청.
+### 5) 기존 요소 처리
+- KPI Strip, Discipline 카드, Contractor 매트릭스: 동일한 `rows` 파생을 사용하므로 필터 자동 반영
+- Data Date, 기간(7/14/30d): 유지
 
-## 확인 필요
-없음. 위 방식대로 진행합니다.
+## 기술 노트
+- 새 UI 컴포넌트는 기존 `@/components/ui/toggle-group`, `popover`, `checkbox`, `command` 사용 (앱 내 이미 활용 중)
+- DB 스키마 변경 없음, 마이그레이션 없음
+- 서버 함수 추가 없음 (창 크기가 작아 클라이언트 필터로 충분)
+
+## 검증
+- Plot=C만 선택 → 차트 값이 Raw Data의 C행 합계와 일치
+- Team 2개 토글 → 해당 팀 합산만 표기
+- Work Desc / Sub Contractor 다중 선택 시 차트, KPI, 매트릭스 모두 갱신
