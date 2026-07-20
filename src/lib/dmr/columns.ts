@@ -37,7 +37,7 @@ export const DMR_COLUMNS: DmrColumnDef[] = [
   },
   {
     key: 'system_name',
-    label: 'System',
+    label: 'Work Description',
     type: 'text',
     width: 220,
     filterType: 'multi-select',
