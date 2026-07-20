@@ -25,7 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DatabaseBackup, Download, RotateCcw, Trash2, Lock, Unlock, CalendarClock, Play, AlertTriangle, Loader2, HardDrive } from "lucide-react";
-import { BACKUP_TABLES, type BackupTableName } from "@/lib/backup/backup-core.server";
+import { BACKUP_TABLES, type BackupTableName } from "@/lib/backup/backup-shared";
 import { formatDateTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin/backup")({
