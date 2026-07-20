@@ -7,11 +7,13 @@ const InputSchema = z.object({
   storagePaths: z.array(z.string().min(1)).min(1).max(3),
 });
 
-const ValuesSchema = z.object({
-  C: z.coerce.number().int().default(0),
-  D: z.coerce.number().int().default(0),
-  TOTAL: z.coerce.number().int().optional(),
-});
+const ValuesSchema = z
+  .object({
+    C: z.coerce.number().int().default(0),
+    D: z.coerce.number().int().default(0),
+    TOTAL: z.coerce.number().int().optional(),
+  })
+  .transform((v) => ({ C: v.C ?? 0, D: v.D ?? 0, TOTAL: (v.C ?? 0) + (v.D ?? 0) }));
 const RowSchema = z.object({
   system: z.string().min(1),
   contractor: z.string().min(1),
