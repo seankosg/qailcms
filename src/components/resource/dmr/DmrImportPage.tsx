@@ -16,7 +16,7 @@ import { DmrPreviewTable } from './DmrPreviewTable';
 import { DISCIPLINE_LABEL, type DmrDiscipline, type DmrParsedSection } from '@/lib/dmr/types';
 import { flattenSection } from '@/lib/dmr/utils';
 
-const SLOTS: DmrDiscipline[] = ['ARCH', 'ELECT', 'MECH'];
+const SLOTS: DmrDiscipline[] = ['ARCH', 'ELEC', 'MECH'];
 
 type SlotStage = 'idle' | 'uploading' | 'parsing' | 'done' | 'error';
 
@@ -43,7 +43,7 @@ export function DmrImportPage() {
 
   const [slots, setSlots] = useState<Record<DmrDiscipline, Slot>>({
     ARCH: emptySlot(),
-    ELECT: emptySlot(),
+    ELEC: emptySlot(),
     MECH: emptySlot(),
   });
   const [reportDate, setReportDate] = useState<string>('');
@@ -188,7 +188,7 @@ export function DmrImportPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold">DMR Import</h1>
-        <p className="text-xs text-muted-foreground">Daily Manpower Report 이미지 최대 3장(ARCH / ELECT / MECH)을 업로드하면 AI가 자동 추출합니다.</p>
+        <p className="text-xs text-muted-foreground">Daily Manpower Report 이미지 최대 3장(ARCH / ELEC / MECH)을 업로드하면 AI가 자동 추출합니다.</p>
       </div>
 
       {/* Slots */}

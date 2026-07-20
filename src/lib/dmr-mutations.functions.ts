@@ -28,7 +28,7 @@ async function assertCanEdit(ctx: any) {
 }
 
 function validatePatchValue(field: string, value: unknown): unknown {
-  if (field === 'discipline' && !DISCIPLINE_VALS.has(String(value))) {
+  if (field === 'discipline') {
     return normalizeDmrTeam(value);
   }
   if (field === 'plot' && !PLOT_VALS.has(String(value))) {
