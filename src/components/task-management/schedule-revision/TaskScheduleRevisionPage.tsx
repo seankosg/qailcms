@@ -7,9 +7,12 @@ import {
   type Column,
   type ColumnDef,
   type ColumnFiltersState,
+  type ColumnPinningState,
+  type ColumnSizingState,
   type SortingState,
+  type VisibilityState,
 } from "@tanstack/react-table";
-import { CalendarClock, Filter, X } from "lucide-react";
+import { CalendarClock, Columns3, Filter, Pin, PinOff, RotateCcw, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
