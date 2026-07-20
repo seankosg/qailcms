@@ -22,7 +22,7 @@ export function useCurrentUser() {
       const isUser = roleSet.has("user");
       const isSuperGuest = roleSet.has("super_guest");
       const isDSuperUser = roleSet.has("d_superuser");
-      const isEditor = isAdmin || isSeniorUser || isUser;
+      const isEditor = isAdmin || isDSuperUser || isSeniorUser || isUser;
       const canEdit = rank >= ROLE_RANK.senior_user;
       const p = (profile ?? {}) as any;
       return {
