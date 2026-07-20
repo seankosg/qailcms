@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2,
+  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2, HardHat,
 } from "lucide-react";
 import { ListTree, Sliders, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -94,6 +94,22 @@ const NAV: NavSection[] = [
         adminOnly: true,
         items: [
           { label: "Coming soon", icon: FileCheck2, disabled: true, badge: "Soon" },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Resource",
+    dashboard: { to: "/resource/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    modules: [
+      {
+        label: "DMR (Daily Manpower)",
+        icon: HardHat,
+        matchPrefix: "/resource/dmr",
+        items: [
+          { to: "/resource/dmr/dashboard", label: "Dashboard", icon: LayoutDashboard },
+          { to: "/resource/dmr/raw-data", label: "Raw Data", icon: Database },
+          { to: "/resource/dmr/import", label: "Import", icon: Upload, editorOnly: true },
         ],
       },
     ],

@@ -1,0 +1,234 @@
+import { useState } from 'react';
+import { useServerFn } from '@tanstack/react-start';
+import { useNavigate } from '@tanstack/react-router';
+import { supabase } from '@/integrations/supabase/client';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { parseDmrImages } from '@/lib/dmr-parse.functions';
+import { saveDmrEntries } from '@/lib/dmr-import.functions';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
+import { Loader2, Upload, ImageIcon } from 'lucide-react';
+import { DmrPreviewTable } from './DmrPreviewTable';
+import { DISCIPLINE_LABEL, type DmrDiscipline, type DmrParsedSection } from '@/lib/dmr/types';
+import { flattenSection } from '@/lib/dmr/utils';
+
+const SLOTS: DmrDiscipline[] = ['ARCH', 'ELECT', 'MECH'];
+
+interface Slot {
+  file: File | null;
+  previewUrl: string | null;
+  storagePath: string | null;
+  section: DmrParsedSection | null;
+  error: string | null;
+}
+
+function emptySlot(): Slot {
+  return { file: null, previewUrl: null, storagePath: null, section: null, error: null };
+}
+
+export function DmrImportPage() {
+  const { data: me } = useCurrentUser();
+  const canEdit = !!me?.canEdit || !!me?.isAdmin;
+  const navigate = useNavigate();
+  const parseFn = useServerFn(parseDmrImages);
+  const saveFn = useServerFn(saveDmrEntries);
+
+  const [slots, setSlots] = useState<Record<DmrDiscipline, Slot>>({
+    ARCH: emptySlot(),
+    ELECT: emptySlot(),
+    MECH: emptySlot(),
+  });
+  const [reportDate, setReportDate] = useState<string>('');
+  const [overwrite, setOverwrite] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  function setSlot(d: DmrDiscipline, patch: Partial<Slot>) {
+    setSlots((prev) => ({ ...prev, [d]: { ...prev[d], ...patch } }));
+  }
+
+  function pickFile(d: DmrDiscipline, f: File | null) {
+    const prev = slots[d];
+    if (prev.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+    setSlot(d, {
+      file: f,
+      previewUrl: f ? URL.createObjectURL(f) : null,
+      storagePath: null,
+      section: null,
+      error: null,
+    });
+  }
+
+  async function uploadAndParse() {
+    if (!me?.id) { toast.error('로그인이 필요합니다'); return; }
+    const active = SLOTS.filter((d) => slots[d].file);
+    if (active.length === 0) { toast.error('이미지를 최소 1장 업로드하세요'); return; }
+
+    setParsing(true);
+    try {
+      // Upload each file to storage
+      const uploaded: Array<{ discipline: DmrDiscipline; path: string }> = [];
+      for (const d of active) {
+        const s = slots[d];
+        const file = s.file!;
+        const ext = file.name.split('.').pop() || 'png';
+        const path = `${me.id}/${Date.now()}-${d}.${ext}`;
+        const up = await supabase.storage.from('dmr-uploads').upload(path, file, { upsert: false });
+        if (up.error) throw new Error(`${d} upload: ${up.error.message}`);
+        uploaded.push({ discipline: d, path });
+        setSlot(d, { storagePath: path });
+      }
+
+      const { results } = await parseFn({ data: { storagePaths: uploaded.map((u) => u.path) } });
+
+      // Match parsed results back to slots. AI returns discipline in section; prefer slot label.
+      results.forEach((r, i) => {
+        const target = uploaded[i].discipline;
+        if (r.error || !r.section) {
+          setSlot(target, { error: r.error ?? 'parse failed' });
+          return;
+        }
+        const section: DmrParsedSection = { ...r.section, discipline: target };
+        setSlot(target, { section, error: null });
+        if (!reportDate) setReportDate(section.report_date);
+      });
+
+      toast.success(`파싱 완료: ${results.filter((r) => r.section).length}장`);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  async function saveAll() {
+    const active = SLOTS.filter((d) => slots[d].section && slots[d].section!.rows.length > 0);
+    if (active.length === 0) { toast.error('저장할 데이터가 없습니다'); return; }
+    if (!reportDate) { toast.error('Report Date를 입력하세요'); return; }
+
+    setSaving(true);
+    try {
+      const entries = active.flatMap((d) => {
+        const s = slots[d].section!;
+        const withDate: DmrParsedSection = { ...s, report_date: reportDate, discipline: d };
+        return flattenSection(withDate, slots[d].storagePath ?? undefined);
+      });
+
+      // Build master upserts
+      const sysSet = new Map<string, { discipline: DmrDiscipline; name: string }>();
+      const conSet = new Map<string, { name: string; is_direct: boolean }>();
+      for (const d of active) {
+        for (const r of slots[d].section!.rows) {
+          const sk = `${d}::${r.system.trim()}`;
+          if (!sysSet.has(sk)) sysSet.set(sk, { discipline: d, name: r.system.trim() });
+          const ck = r.contractor.trim();
+          if (!conSet.has(ck)) conSet.set(ck, { name: ck, is_direct: !!r.is_direct || /^hdec/i.test(ck) });
+        }
+      }
+
+      const res = await saveFn({
+        data: {
+          entries,
+          systemMasters: [...sysSet.values()],
+          contractorMasters: [...conSet.values()],
+          overwrite,
+        },
+      });
+
+      toast.success(`저장 완료: ${res.inserted}/${res.total} 행`);
+      navigate({ to: '/resource/dmr/raw-data' });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!canEdit) {
+    return <div className="rounded-md border p-6 text-sm text-muted-foreground">임포트 권한이 없습니다 (senior_user 이상).</div>;
+  }
+
+  const anySection = SLOTS.some((d) => slots[d].section);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold">DMR Import</h1>
+        <p className="text-xs text-muted-foreground">Daily Manpower Report 이미지 최대 3장(ARCH / ELECT / MECH)을 업로드하면 AI가 자동 추출합니다.</p>
+      </div>
+
+      {/* Slots */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        {SLOTS.map((d) => {
+          const s = slots[d];
+          return (
+            <div key={d} className="space-y-2 rounded-md border p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">{d}</div>
+                  <div className="text-[11px] text-muted-foreground">{DISCIPLINE_LABEL[d]}</div>
+                </div>
+                {s.section && <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">Parsed · {s.section.rows.length}행</span>}
+              </div>
+              <Input type="file" accept="image/*" onChange={(e) => pickFile(d, e.target.files?.[0] ?? null)} className="text-xs" />
+              {s.previewUrl ? (
+                <div className="relative aspect-video overflow-hidden rounded border bg-muted/40">
+                  <img src={s.previewUrl} alt={d} className="h-full w-full object-contain" />
+                </div>
+              ) : (
+                <div className="flex aspect-video items-center justify-center rounded border border-dashed bg-muted/20 text-muted-foreground">
+                  <ImageIcon className="h-6 w-6" />
+                </div>
+              )}
+              {s.error && <div className="rounded bg-destructive/10 p-2 text-[11px] text-destructive">{s.error}</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
+        <Button onClick={uploadAndParse} disabled={parsing}>
+          {parsing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+          업로드 & AI 파싱
+        </Button>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Report Date</Label>
+          <Input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="w-40 text-xs" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={overwrite} onCheckedChange={setOverwrite} id="overwrite" />
+          <Label htmlFor="overwrite" className="text-xs">기존 값 덮어쓰기</Label>
+        </div>
+        <div className="ml-auto">
+          <Button onClick={saveAll} disabled={saving || !anySection}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            DB에 저장
+          </Button>
+        </div>
+      </div>
+
+      {/* Preview tables */}
+      {anySection && (
+        <div className="space-y-4">
+          {SLOTS.map((d) => {
+            const s = slots[d];
+            if (!s.section) return null;
+            return (
+              <div key={d} className="space-y-2 rounded-md border p-3">
+                <div className="text-sm font-semibold">{d} · {s.section.rows.length}행 · {s.section.report_date}</div>
+                <DmrPreviewTable
+                  section={s.section}
+                  onChange={(next) => setSlot(d, { section: next })}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

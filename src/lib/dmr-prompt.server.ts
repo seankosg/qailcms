@@ -1,0 +1,72 @@
+export const DMR_SYSTEM_PROMPT = `You parse a construction "SUMMARY OF DAILY MANPOWER MOBILIZATION STATUS" image into strict JSON.
+
+Image layout:
+- Title contains the discipline: "ARCH", "ELECT" (Electrical), or "MECH"/"Mechanical".
+- Report date is shown on the header, often as YYYY.MM.DD or YYYY-MM-DD or DD/MM/YYYY.
+- Table has one row per (System, Contractor Subcon.) combination.
+- Columns (grouped): Target | Today | Yesterday | Difference. Each group is further split into Plot C / Plot D / Total.
+- Ignore the "Difference" columns entirely — they are computed downstream.
+
+Extraction rules:
+- Empty cells, dashes ("-"), or blanks -> 0 (integer).
+- Strip commas from numbers. Never return decimals.
+- Skip any "Sub Total", "Grand Total", or summary rows.
+- If a cell shows only a Total (no C/D breakdown), put the value in TOTAL and set C=0, D=0.
+- Contractor names starting with "HDEC" (e.g. "HDEC", "HDEC,Anel") should be marked as is_direct=true.
+- Preserve System and Contractor text as printed (trim whitespace only).
+
+Return ONLY JSON via the report_dmr tool. Do not include narration.`;
+
+export const DMR_TOOL_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    discipline: { type: 'string' as const, enum: ['ARCH', 'ELECT', 'MECH'] },
+    report_date: { type: 'string' as const, description: 'YYYY-MM-DD' },
+    rows: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          system: { type: 'string' as const },
+          contractor: { type: 'string' as const },
+          is_direct: { type: 'boolean' as const },
+          values: {
+            type: 'object' as const,
+            properties: {
+              target: {
+                type: 'object' as const,
+                properties: {
+                  C: { type: 'integer' as const },
+                  D: { type: 'integer' as const },
+                  TOTAL: { type: 'integer' as const },
+                },
+                required: ['C', 'D', 'TOTAL'],
+              },
+              today: {
+                type: 'object' as const,
+                properties: {
+                  C: { type: 'integer' as const },
+                  D: { type: 'integer' as const },
+                  TOTAL: { type: 'integer' as const },
+                },
+                required: ['C', 'D', 'TOTAL'],
+              },
+              yesterday: {
+                type: 'object' as const,
+                properties: {
+                  C: { type: 'integer' as const },
+                  D: { type: 'integer' as const },
+                  TOTAL: { type: 'integer' as const },
+                },
+                required: ['C', 'D', 'TOTAL'],
+              },
+            },
+            required: ['target', 'today', 'yesterday'],
+          },
+        },
+        required: ['system', 'contractor', 'values'],
+      },
+    },
+  },
+  required: ['discipline', 'report_date', 'rows'],
+};
