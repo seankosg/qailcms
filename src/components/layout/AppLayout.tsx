@@ -152,6 +152,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [moduleOpen, setModuleOpen] = useState<Record<string, boolean>>(() => loadModuleOpen());
+  const displayRoleLabel = me?.roleLabel
+    ?? (me?.isDSuperUser ? "D.Superuser" : me?.isSuperUser ? "Superuser" : me?.isAdmin ? "Admin" : me?.isSeniorUser ? "Senior User" : me?.isUser ? "User" : me?.isSuperGuest ? "Super Guest" : "Guest");
 
   const isVisible = (it: NavLeaf) => {
     if (it.adminOnly && !me?.isAdmin) return false;
@@ -296,11 +298,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
             ) : me?.isAdmin || me?.isDSuperUser ? (
               <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                 <ShieldCheck className="h-3 w-3" />
-                {me?.roleLabel ?? "Admin"}
+                {displayRoleLabel}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium">
-                {me?.roleLabel ?? "User"}
+                {displayRoleLabel}
               </span>
             )}
           </div>
