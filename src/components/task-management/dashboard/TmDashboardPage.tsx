@@ -1,9 +1,17 @@
 import { useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, Gauge, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CalendarDays, Gauge, RotateCcw, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
 import {
@@ -51,7 +59,6 @@ function uniqSorted(items: TaskItem[], field: keyof TaskItem): string[] {
 export function TmDashboardPage() {
   const search = routeApi.useSearch();
   const navigate = useNavigate();
-  const today = useMemo(() => todayIso(), []);
 
   const { data: items = [], isLoading } = useTaskDashboardData({
     disciplines: search.discipline,
@@ -63,9 +70,22 @@ export function TmDashboardPage() {
     q: search.q,
   });
 
-  const latestDataDate = getLatestDataDate(items) ?? today;
-  const asOfDate = search.asofMode === "dataDate" ? latestDataDate : today;
-  const asOfLabel = search.asofMode === "dataDate" ? "Data Date" : "Today";
+  const latestDataDate = getLatestDataDate(items) ?? todayIso();
+
+  // items에 존재하는 고유 data_date 목록 (최신순)
+  const dataDateOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) {
+      const d = (it as unknown as { data_date?: string | null }).data_date;
+      if (d) set.add(String(d).slice(0, 10));
+    }
+    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
+  }, [items]);
+
+  const selectedDataDate =
+    search.dataDate && search.dataDate.length ? search.dataDate : latestDataDate;
+  const asOfDate = selectedDataDate;
+  const asOfLabel = "Data Date";
 
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
 
@@ -146,13 +166,44 @@ export function TmDashboardPage() {
             </Link>
             <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
               <Gauge className="h-5 w-5 text-primary" />
-              TM 일정/지연 관리 대시보드
+              Task Management Dashboard
             </h1>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Data Date {latestDataDate} · Today {today} · As-of {asOfLabel} · 표시 대상{" "}
-            {scopedItems.length.toLocaleString()} / 전체 {items.length.toLocaleString()}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <CalendarDays className="h-3 w-3" />
+              Data Date
+            </span>
+            <Select
+              value={selectedDataDate}
+              onValueChange={(v) => patch({ dataDate: v })}
+            >
+              <SelectTrigger className="h-7 w-[160px] text-xs">
+                <SelectValue placeholder={latestDataDate} />
+              </SelectTrigger>
+              <SelectContent>
+                {(dataDateOptions.length ? dataDateOptions : [latestDataDate]).map((d) => (
+                  <SelectItem key={d} value={d} className="text-xs">
+                    {d}
+                    {d === latestDataDate && (
+                      <span className="ml-1 text-[10px] text-muted-foreground">(최신)</span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedDataDate !== latestDataDate && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => patch({ dataDate: "" })}
+              >
+                <RotateCcw className="mr-1 h-3 w-3" />
+                최신
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -180,22 +231,6 @@ export function TmDashboardPage() {
                     {o.label}
                   </TabsTrigger>
                 ))}
-              </TabsList>
-            </Tabs>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              As-of
-            </span>
-            <Tabs value={search.asofMode} onValueChange={(v) => patch({ asofMode: v })}>
-              <TabsList className="h-8">
-                <TabsTrigger value="dataDate" className="h-6 px-2 text-xs">
-                  Data Date
-                </TabsTrigger>
-                <TabsTrigger value="today" className="h-6 px-2 text-xs">
-                  Today
-                </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
