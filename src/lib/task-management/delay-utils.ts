@@ -27,6 +27,9 @@ export interface DelayTopItem {
   daysLate: number;
   judgment: string | null;
   actualProgress: number;
+  planPct: number;
+  actualPct: number;
+  diffPp: number;
 }
 
 export function computeDelayTopN(
@@ -36,9 +39,26 @@ export function computeDelayTopN(
 ): DelayTopItem[] {
   const out: DelayTopItem[] = [];
   for (const it of items) {
+    // task-level plan/actual percentage across all stages
+    let planned = 0;
+    let done = 0;
+    for (const s of ALL_TASK_STAGE_KEYS) {
+      if (isTaskStagePlannedUpTo(it, s, asOfDate)) planned++;
+      if (isTaskStageActualUpTo(it, s, asOfDate)) done++;
+    }
+    const total = ALL_TASK_STAGE_KEYS.length;
+    const planPct = total > 0 ? (planned / total) * 100 : 0;
+    const rawActualPct =
+      it.actual_progress != null && !Number.isNaN(Number(it.actual_progress))
+        ? Number(it.actual_progress)
+        : total > 0
+          ? (done / total) * 100
+          : 0;
+    const actualPct = Math.max(0, Math.min(100, rawActualPct));
+    const diffPp = actualPct - planPct;
     for (const st of ALL_TASK_STAGE_KEYS) {
       if (!isTaskStageDelayedAsOf(it, st, asOfDate)) continue;
-      const planned = getTaskStagePlannedDate(it, st)!;
+      const plannedDate = getTaskStagePlannedDate(it, st)!;
       out.push({
         id: it.id,
         taskNo: it.task_no ?? "",
@@ -48,10 +68,13 @@ export function computeDelayTopN(
         hdecPic: it.hdec_pic_name ?? "",
         hdecEng: it.hdec_eng_name ?? "",
         stage: st,
-        plannedDate: planned,
-        daysLate: daysBetween(planned, asOfDate),
+        plannedDate,
+        daysLate: daysBetween(plannedDate, asOfDate),
         judgment: it.auto_judgment ?? it.status_manual ?? null,
         actualProgress: Number(it.actual_progress ?? 0),
+        planPct,
+        actualPct,
+        diffPp,
       });
     }
   }
