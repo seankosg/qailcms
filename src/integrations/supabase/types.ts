@@ -480,6 +480,116 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_config: {
+        Row: {
+          id: string
+          keep_minimum_count: number
+          retention_days: number
+          schedule_cron: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          keep_minimum_count?: number
+          retention_days?: number
+          schedule_cron?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          keep_minimum_count?: number
+          retention_days?: number
+          schedule_cron?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      backup_run_log: {
+        Row: {
+          duration_ms: number | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          metadata: Json | null
+          snapshot_id: string | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          snapshot_id?: string | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          snapshot_id?: string | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backup_run_log_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "database_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      database_snapshots: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_locked: boolean
+          metadata: Json | null
+          name: string | null
+          sha256_hash: string | null
+          size_bytes: number | null
+          storage_path: string | null
+          tables_included: string[] | null
+          trigger_metadata: Json | null
+          triggered_by: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_locked?: boolean
+          metadata?: Json | null
+          name?: string | null
+          sha256_hash?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          tables_included?: string[] | null
+          trigger_metadata?: Json | null
+          triggered_by?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_locked?: boolean
+          metadata?: Json | null
+          name?: string | null
+          sha256_hash?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          tables_included?: string[] | null
+          trigger_metadata?: Json | null
+          triggered_by?: string
+        }
+        Relationships: []
+      }
       defect_category_team_map: {
         Row: {
           category: string
@@ -1268,6 +1378,56 @@ export type Database = {
           user_type?: Database["public"]["Enums"]["user_type"]
         }
         Relationships: []
+      }
+      restore_run_log: {
+        Row: {
+          destructive: boolean
+          duration_ms: number | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          initiated_by: string | null
+          metadata: Json | null
+          restored_tables: string[] | null
+          snapshot_id: string | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          destructive?: boolean
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          initiated_by?: string | null
+          metadata?: Json | null
+          restored_tables?: string[] | null
+          snapshot_id?: string | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          destructive?: boolean
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          initiated_by?: string | null
+          metadata?: Json | null
+          restored_tables?: string[] | null
+          snapshot_id?: string | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restore_run_log_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "database_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spare_part_change_log: {
         Row: {
@@ -2821,6 +2981,22 @@ export type Database = {
         Args: { _discipline: string; _main_task_no: string }
         Returns: string
       }
+      backup_disable_triggers: {
+        Args: { _table_name: string }
+        Returns: undefined
+      }
+      backup_enable_triggers: {
+        Args: { _table_name: string }
+        Returns: undefined
+      }
+      backup_insert_rows_from_json: {
+        Args: { _rows_json: Json; _table_name: string }
+        Returns: number
+      }
+      backup_truncate_table: {
+        Args: { _table_name: string }
+        Returns: undefined
+      }
       calc_auto_judgment_value: {
         Args: {
           _actual_progress: number
@@ -2939,6 +3115,7 @@ export type Database = {
         Args: { _batch_id: string }
         Returns: Json
       }
+      get_backup_tables: { Args: never; Returns: string[] }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -2951,6 +3128,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      has_role_backup: {
+        Args: { _role: string; _user_id: string }
         Returns: boolean
       }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }

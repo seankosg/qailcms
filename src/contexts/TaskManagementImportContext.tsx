@@ -23,6 +23,7 @@ import {
   allocateTaskNo,
   type PreflightSummary,
 } from "@/lib/task-management/import-preflight.functions";
+import { takePreImportSnapshot } from "@/lib/backup/pre-import-snapshot";
 
 export type RollupMode = "auto" | "keep" | "blank";
 
@@ -961,6 +962,11 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     if (ready.length === 0) {
       toast.error("Import 가능한 파일이 없습니다");
       return;
+    }
+    try {
+      await takePreImportSnapshot("tm");
+    } catch (err) {
+      toast.warning(`사전 백업 실패: ${(err as Error).message}. 임포트를 계속합니다.`);
     }
     await executeImport(ready);
   }, [files, isRunning, executeImport]);

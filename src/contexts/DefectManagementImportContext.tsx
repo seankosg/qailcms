@@ -22,6 +22,7 @@ import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
 import { bulkClassifyDefects } from "@/lib/defect-management/classifier/bulk-classify.functions";
 import { CLASSIFIER_FIELDS } from "@/lib/defect-management/classifier/rules";
+import { takePreImportSnapshot } from "@/lib/backup/pre-import-snapshot";
 
 export type DefectFileStatus =
   | "parsing"
@@ -1332,6 +1333,11 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     if (ready.length === 0) {
       toast.error("Import 가능한 파일이 없습니다.");
       return;
+    }
+    try {
+      await takePreImportSnapshot("sm");
+    } catch (err) {
+      toast.warning(`사전 백업 실패: ${(err as Error).message}. 임포트를 계속합니다.`);
     }
     try {
       await executeImport(ready);

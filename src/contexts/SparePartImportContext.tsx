@@ -16,6 +16,7 @@ import {
   type ParsedSparePartRow,
 } from "@/lib/spare-part-import-parser";
 import { stripNullExcept } from "@/lib/import/strip-null";
+import { takePreImportSnapshot } from "@/lib/backup/pre-import-snapshot";
 
 export type FileStatus =
   | "pending"
@@ -533,6 +534,11 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
     if (ready.length === 0) {
       toast.error("No files ready to import");
       return;
+    }
+    try {
+      await takePreImportSnapshot("spare-part");
+    } catch (err) {
+      toast.warning(`사전 백업 실패: ${(err as Error).message}. 임포트를 계속합니다.`);
     }
     await executeImport(ready);
   }, [files, isRunning, executeImport]);
