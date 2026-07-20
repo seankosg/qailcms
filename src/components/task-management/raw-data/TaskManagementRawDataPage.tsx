@@ -1003,11 +1003,7 @@ export function TaskManagementRawDataPage() {
                 )}
                 Judgment
               </Button>
-              <Button variant="outline" size="sm" className="h-8" asChild>
-                <Link to="/admin/task-thresholds">
-                  <Sliders className="mr-1 h-3.5 w-3.5" /> 임계값
-                </Link>
-              </Button>
+              <CriticalThresholdPopover />
             </>
           )}
           <Button
@@ -1035,13 +1031,19 @@ export function TaskManagementRawDataPage() {
         }}
       />
 
-      {(activeFilterCount > 0 || delayMode) && (
+      {(activeFilterCount > 0 || delayMode || kpiMode) && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <Filter className="h-3 w-3 text-muted-foreground" />
           {delayMode && (
             <FilterChip
               label={`지연 모드 · asOf ${delayMode.asOf}`}
               onClear={() => setDelayMode(null)}
+            />
+          )}
+          {kpiMode && (
+            <FilterChip
+              label={`KPI: ${kpiMode.mode} · ${kpiMode.scope} · asOf ${kpiMode.asOf}`}
+              onClear={() => setKpiMode(null)}
             />
           )}
           {globalFilter && (
