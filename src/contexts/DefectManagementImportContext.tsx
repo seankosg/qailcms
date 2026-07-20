@@ -711,7 +711,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
     for (const f of ready) {
       const parsed = f.parsed ?? [];
-      const dataDate = f.dataDateOverride ?? new Date().toISOString().slice(0, 10);
+      const dataDate = f.dataDateOverride ?? todayInDoha();
       const startedAtIso = new Date().toISOString();
       const excludedFields = f.excludedFields ?? new Set<string>();
       const isReimport = !!f.isReimport;

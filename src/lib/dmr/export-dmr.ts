@@ -19,14 +19,14 @@ export async function exportDmrRawData(opts: DmrExportOptions) {
   const dateFields = cols.filter((c) => c.type === 'date').map((c) => c.key);
 
   await streamXlsxExport({
-    filename: opts.filename ?? `DMR-RawData-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    filename: opts.filename ?? `DMR-RawData-${todayInDoha()}.xlsx`,
     sheetName: 'DMR',
     columns: cols.map((c) => ({ key: c.key, label: c.label })),
     dateFields,
     header: {
       title: 'DMR — Raw Data',
       metaRows: [
-        `Exported at: ${new Date().toISOString()}`,
+        `Exported at: ${dohaStamp()} (Doha)`,
         'Source: dmr_entries',
         'Search: —',
         `Filters: ${opts.summary?.filters ?? '—'}`,

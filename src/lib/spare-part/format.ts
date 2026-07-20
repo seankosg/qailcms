@@ -24,7 +24,7 @@ export function formatPct(v: unknown): string {
 
 export function isOverdue(deliveryDate: string | null | undefined, asOfIso?: string): boolean {
   if (!deliveryDate) return false;
-  const asOf = asOfIso ?? new Date().toISOString().slice(0, 10);
+  const asOf = asOfIso ?? todayInDoha();
   const iso = String(deliveryDate).slice(0, 10);
   return iso < asOf;
 }
