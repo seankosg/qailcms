@@ -7,21 +7,11 @@ const DisciplineSchema = z.object({
   discipline: z.enum(DISCIPLINE_VALUES),
 });
 
-async function assertAdmin(context: { supabase: any; userId: string }) {
-  const { data, error } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
-  });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("관리자 권한이 필요합니다");
-}
-
 /** 전체 Main Task 롤업 (특정 공종) */
 export const runRollupAllMains = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => DisciplineSchema.parse(v))
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+  .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: n, error } = await supabaseAdmin.rpc(
       "rollup_task_all_mains",
@@ -42,8 +32,7 @@ export const runRollupSingle = createServerFn({ method: "POST" })
         })
         .parse(v),
   )
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+  .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.rpc("update_task_summary", {
       _discipline: data.discipline,
@@ -63,8 +52,7 @@ export const runRecalcAutoJudgment = createServerFn({ method: "POST" })
         })
         .parse(v ?? {}),
   )
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+  .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: n, error } = await supabaseAdmin.rpc(
       "recalc_task_auto_judgment",
