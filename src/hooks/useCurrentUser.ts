@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ROLE_RANK, type AppRole, type UserType } from "@/types/enums";
+import { ROLE_LABELS, ROLE_RANK, type AppRole, type UserType } from "@/types/enums";
 
 export function useCurrentUser() {
   return useQuery({
@@ -16,6 +16,15 @@ export function useCurrentUser() {
       const roleSet = new Set(roleList);
       const appRoles = roleList.filter((r): r is AppRole => r in ROLE_RANK);
       const rank = appRoles.reduce((m, r) => Math.max(m, ROLE_RANK[r] ?? 0), 0);
+      const primaryRole = appRoles.reduce<AppRole | null>((best, role) => {
+        if (!best) return role;
+        return ROLE_RANK[role] > ROLE_RANK[best] ? role : best;
+      }, null);
+      const roleLabel = primaryRole
+        ? primaryRole === "d_superuser"
+          ? "D.Superuser"
+          : ROLE_LABELS[primaryRole]
+        : "Guest";
       const isAdmin = roleSet.has("admin") || roleSet.has("superuser");
       const isSuperUser = roleSet.has("superuser");
       const isSeniorUser = roleSet.has("senior_user");
@@ -31,6 +40,8 @@ export function useCurrentUser() {
         profile,
         roles: Array.from(roleSet) as (AppRole | string)[],
         appRoles,
+        primaryRole,
+        roleLabel,
         rank,
         isAdmin,
         isSuperUser,
@@ -39,7 +50,7 @@ export function useCurrentUser() {
         isSuperGuest,
         isDSuperUser,
         isEditor,
-        isGuest: !isEditor,
+        isGuest: primaryRole === "guest" || !primaryRole,
         canEdit,
         mustChangePassword: p.must_change_password === true,
         userType: p.user_type as UserType | undefined,

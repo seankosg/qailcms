@@ -1,42 +1,41 @@
-## 목표
-TM 임포트 시 Sub Task의 `plan_days`, `plan_progress`, `progress_variance`, `slip_days`를 서버에서 즉시 계산하여 DB에 저장한다. 기존 Sub 데이터도 동일 기준으로 1회 일괄 재계산한다.
+## 확인된 현재 상태
 
-## 계산 정의 (Sub 태스크 기준)
-- `plan_days = plan_end - plan_start + 1` (둘 다 있을 때, 없으면 NULL)
-- `plan_progress = T.Plan` = `clamp((data_date - plan_start + 1) / plan_days, 0, 1)`
-  - `data_date < plan_start` → 0
-  - `data_date >= plan_end` → 1
-- `progress_variance = actual_progress - plan_progress`
-- `slip_days`:
-  - 완료(`actual_progress >= 0.999`): `max(0, actual_finish - plan_end)`
-  - 미완료: `max(0, data_date - plan_end)` (아직 plan_end 이전이면 0)
+- DB 기준으로 `서창훈` 사용자(`chseo@qail.local`)의 역할은 `user_roles.role = d_superuser`로 정상 저장되어 있습니다.
+- 사용자 관리 페이지도 `user_roles`를 읽고 있으므로, 사용자 관리의 역할 저장 자체가 원인은 아닙니다.
+- `useCurrentUser.ts`의 현재 계산은 `d_superuser`를 `isEditor`에 포함하고 있지만, `isAdmin`에는 포함하지 않습니다.
+- 사이드바 로그인 정보창(`AppLayout.tsx`)은 현재 3단계만 표시합니다.
+  - `me.isAdmin`이면 `Admin` 또는 `Superuser`
+  - `me.isGuest`이면 `Guest (읽기)`
+  - 그 외는 모두 `User`
+- 따라서 `d_superuser`는 실제 역할이 있어도 `isAdmin=false`, `isGuest=false`라서 최종 fallback인 `User`로 표시됩니다.
 
-## 실행 순서
+## 수정 계획
 
-### 1. DB 함수/트리거 (마이그레이션)
-- `calc_sub_task_derived(row)` SQL 함수 신설: 위 4개 필드 계산 반환
-- `BEFORE INSERT/UPDATE` 트리거를 `task_management_raw`에 부착하여 `level='sub'`이고 관련 원본 컬럼(`plan_start`, `plan_end`, `data_date`, `actual_progress`, `actual_finish`)이 바뀔 때 자동 채움
-- 트리거 순서: Sub 파생 계산 → 기존 `actual_duration` 트리거 → 저장 → AFTER 트리거로 Main 롤업(`update_task_summary`) 유지
-- Main 롤업은 Sub의 새로 채워진 값을 그대로 가중 평균하도록 확인/조정
+1. `useCurrentUser.ts` 역할 판정 전면 정리
+   - `d_superuser` 전용 플래그(`isDSuperUser`)를 계속 유지합니다.
+   - `isAdmin`은 기존 의미를 유지할지, 또는 관리자 메뉴 접근까지 포함할지 명확히 분리합니다.
+   - 표시용 대표 역할(`primaryRole`)과 표시 라벨(`roleLabel`)을 rank 기준으로 계산하도록 추가합니다.
+   - 다중 역할이 있어도 `admin > superuser > d_superuser > senior_user > user > super_guest > guest` 우선순위로 대표 역할을 안정적으로 선택합니다.
 
-### 2. 임포트 파이프라인
-- `TaskManagementImportContext.tsx`에서 Sub의 위 4개 필드에 대한 `null` 강제 초기화 제거 → DB 트리거가 계산하도록 위임
-- 파서(`parser.ts`)에서는 원본 엑셀 값이 있어도 무시하고 계산값이 우선되도록 유지 (수동 값 덮어쓰기 방지 옵션은 없음, 1-(a) 정책에 따름)
+2. 사이드바 로그인 정보창 표시 수정
+   - 현재의 `isAdmin / isGuest / else User` 단순 분기를 제거합니다.
+   - `me.primaryRole` 또는 `me.roleLabel` 기반으로 실제 역할을 표시합니다.
+   - `d_superuser`는 `D-Super User` 또는 사용자가 보는 명칭 기준 `D.Superuser`로 표시되게 합니다.
+   - `guest`만 `Guest (읽기)`로 표시하고, `super_guest`, `senior_user`, `user`도 각각 실제 역할 라벨로 표시합니다.
 
-### 3. 기존 데이터 1회 재계산
-- 마이그레이션 말미에 `UPDATE task_management_raw SET plan_start = plan_start WHERE level='sub'` 형태로 트리거 강제 재실행, 또는 전용 `recalc_all_sub_derived()` 함수 실행
-- 이후 Main 롤업 `update_task_summary` 전체 재실행하여 상위 값 재정렬
+3. 권한 로직 재검토
+   - 메뉴 노출에서 사용하는 `isEditor`, `isAdmin` 의미를 점검합니다.
+   - `d_superuser`가 “전체 편집 승격” 역할이라는 기존 정의에 맞게 `editorOnly` 메뉴 접근은 유지합니다.
+   - 관리자 메뉴 접근이 `admin/superuser` 전용이어야 하는 기존 정책은 유지하고, 별도 지시 없이 `d_superuser`에게 Admin 메뉴를 열지는 않습니다.
 
-### 4. 검증
-- 랜덤 20건 Sub Task 샘플링하여 계산식 수동 검증
-- Main Task 5건에서 Sub 값 가중 평균이 Main의 `plan_progress`/`progress_variance`와 일치하는지 확인
-- 기존 대시보드/S-Curve/지연 리더보드 수치가 재계산 전후로 큰 왜곡 없는지 스팟체크
+4. 검증
+   - DB에서 `서창훈`의 `d_superuser` 역할이 유지되는지 재확인합니다.
+   - 브라우저에서 로그인 정보창 표시가 `User`가 아닌 `D.Superuser` 계열로 표시되는지 확인합니다.
+   - `isEditor` 기반 메뉴가 계속 정상 노출되는지 확인합니다.
 
-## 알려진 트레이드오프 (1-(a) 채택 결과)
-- 임포트 시간 증가 (Sub 1,100+ 건 트리거 실행)
-- Sub의 수동 편집값이 원본 컬럼 변경 시 자동 재계산으로 덮임 → 정책상 허용
-- Main 롤업이 Sub 저장마다 실행되어 부하 증가 (기존 구조 유지, 배치 완료 후 일괄 롤업 최적화는 별도 이슈)
+## 기술 세부사항
 
-## 롤백 계획
-- 트리거/함수 DROP 마이그레이션 준비
-- 임포트 컨텍스트의 `null` 초기화 라인은 주석 처리 형태로 복원 가능하게 커밋 분리
+- 수정 대상 파일:
+  - `src/hooks/useCurrentUser.ts`
+  - `src/components/layout/AppLayout.tsx`
+- DB 마이그레이션은 필요하지 않습니다. 현재 문제는 DB 저장 문제가 아니라 프론트엔드 표시 분기 문제입니다.
