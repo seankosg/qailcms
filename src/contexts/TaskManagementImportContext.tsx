@@ -23,7 +23,7 @@ import {
   allocateTaskNo,
   type PreflightSummary,
 } from "@/lib/task-management/import-preflight.functions";
-import { takePreImportSnapshot } from "@/lib/backup/pre-import-snapshot";
+import { takePreImportSnapshotWithFeedback } from "@/lib/backup/pre-import-snapshot";
 
 export type RollupMode = "auto" | "keep" | "blank";
 

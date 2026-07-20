@@ -29,7 +29,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { parseAbdFile, type ParsedFileResult, detectTeamFromFilename } from "@/lib/abd/parser";
 import { importAbdBatch } from "@/lib/abd/mutations.functions";
-import { takePreImportSnapshot } from "@/lib/backup/pre-import-snapshot";
+import { takePreImportSnapshotWithFeedback } from "@/lib/backup/pre-import-snapshot";
 import { AbdDuplicateReviewDialog } from "./AbdDuplicateReviewDialog";
 import { useTeamOptions } from "@/lib/team/team-master";
 import { collectUnknownTeamCodes } from "@/lib/import/team-validation";

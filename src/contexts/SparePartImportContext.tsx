@@ -16,7 +16,7 @@ import {
   type ParsedSparePartRow,
 } from "@/lib/spare-part-import-parser";
 import { stripNullExcept } from "@/lib/import/strip-null";
-import { takePreImportSnapshot } from "@/lib/backup/pre-import-snapshot";
+import { takePreImportSnapshotWithFeedback } from "@/lib/backup/pre-import-snapshot";
 
 export type FileStatus =
   | "pending"
