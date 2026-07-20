@@ -116,7 +116,8 @@ export function DmrBulkEditBar({ selectedIds, sampleRows, canEdit, onClearSelect
 
   function handleExportXlsx() {
     try {
-      const stamp = new Date().toISOString().slice(0, 10);
+      const { todayInDoha } = await import("@/lib/time/doha");
+      const stamp = todayInDoha();
       exportDmrToXlsx({
         rows: sampleRows,
         columns: DMR_EXPORT_COLUMNS,
