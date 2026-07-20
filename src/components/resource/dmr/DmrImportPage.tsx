@@ -9,13 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Loader2, Upload, ImageIcon } from 'lucide-react';
+import { Loader2, Upload, ImageIcon, CheckCircle2, XCircle, CloudUpload, Sparkles } from 'lucide-react';
 import { DmrPreviewTable } from './DmrPreviewTable';
 import { DISCIPLINE_LABEL, type DmrDiscipline, type DmrParsedSection } from '@/lib/dmr/types';
 import { flattenSection } from '@/lib/dmr/utils';
 
 const SLOTS: DmrDiscipline[] = ['ARCH', 'ELECT', 'MECH'];
+
+type SlotStage = 'idle' | 'uploading' | 'parsing' | 'done' | 'error';
 
 interface Slot {
   file: File | null;
@@ -23,10 +26,12 @@ interface Slot {
   storagePath: string | null;
   section: DmrParsedSection | null;
   error: string | null;
+  stage: SlotStage;
+  progress: number; // 0..100
 }
 
 function emptySlot(): Slot {
-  return { file: null, previewUrl: null, storagePath: null, section: null, error: null };
+  return { file: null, previewUrl: null, storagePath: null, section: null, error: null, stage: 'idle', progress: 0 };
 }
 
 export function DmrImportPage() {
@@ -59,6 +64,8 @@ export function DmrImportPage() {
       storagePath: null,
       section: null,
       error: null,
+      stage: 'idle',
+      progress: 0,
     });
   }
 
@@ -69,34 +76,54 @@ export function DmrImportPage() {
 
     setParsing(true);
     try {
-      // Upload each file to storage
+      // Reset stages for active slots
+      for (const d of active) setSlot(d, { stage: 'uploading', progress: 5, error: null, section: null });
+
+      // 1) Upload each file to storage sequentially, updating per-slot progress
       const uploaded: Array<{ discipline: DmrDiscipline; path: string }> = [];
       for (const d of active) {
-        const s = slots[d];
-        const file = s.file!;
-        const ext = file.name.split('.').pop() || 'png';
-        const path = `${me.id}/${Date.now()}-${d}.${ext}`;
-        const up = await supabase.storage.from('dmr-uploads').upload(path, file, { upsert: false });
-        if (up.error) throw new Error(`${d} upload: ${up.error.message}`);
-        uploaded.push({ discipline: d, path });
-        setSlot(d, { storagePath: path });
+        try {
+          const s = slots[d];
+          const file = s.file!;
+          const ext = file.name.split('.').pop() || 'png';
+          const path = `${me.id}/${Date.now()}-${d}.${ext}`;
+          setSlot(d, { stage: 'uploading', progress: 30 });
+          const up = await supabase.storage.from('dmr-uploads').upload(path, file, { upsert: false });
+          if (up.error) throw new Error(up.error.message);
+          uploaded.push({ discipline: d, path });
+          setSlot(d, { storagePath: path, stage: 'uploading', progress: 55 });
+        } catch (e: unknown) {
+          setSlot(d, { stage: 'error', progress: 100, error: `upload: ${e instanceof Error ? e.message : String(e)}` });
+        }
       }
 
-      const { results } = await parseFn({ data: { storagePaths: uploaded.map((u) => u.path) } });
+      if (uploaded.length === 0) throw new Error('모든 파일 업로드에 실패했습니다');
 
-      // Match parsed results back to slots. AI returns discipline in section; prefer slot label.
-      results.forEach((r, i) => {
-        const target = uploaded[i].discipline;
-        if (r.error || !r.section) {
-          setSlot(target, { error: r.error ?? 'parse failed' });
-          return;
-        }
-        const section: DmrParsedSection = { ...r.section, discipline: target };
-        setSlot(target, { section, error: null });
-        if (!reportDate) setReportDate(section.report_date);
-      });
+      // 2) Parse each uploaded image individually so we can update per-slot progress
+      for (const d of uploaded.map((u) => u.discipline)) setSlot(d, { stage: 'parsing', progress: 70 });
 
-      toast.success(`파싱 완료: ${results.filter((r) => r.section).length}장`);
+      let ok = 0;
+      await Promise.all(
+        uploaded.map(async (u) => {
+          try {
+            const { results } = await parseFn({ data: { storagePaths: [u.path] } });
+            const r = results[0];
+            if (r.error || !r.section) throw new Error(r.error ?? 'parse failed');
+            const section: DmrParsedSection = { ...r.section, discipline: u.discipline };
+            setSlot(u.discipline, { section, error: null, stage: 'done', progress: 100 });
+            if (!reportDate) setReportDate(section.report_date);
+            ok += 1;
+          } catch (e: unknown) {
+            setSlot(u.discipline, {
+              stage: 'error',
+              progress: 100,
+              error: `parse: ${e instanceof Error ? e.message : String(e)}`,
+            });
+          }
+        }),
+      );
+
+      toast.success(`파싱 완료: ${ok}/${uploaded.length}장`);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
@@ -152,6 +179,10 @@ export function DmrImportPage() {
   }
 
   const anySection = SLOTS.some((d) => slots[d].section);
+  const activeCount = SLOTS.filter((d) => slots[d].file).length;
+  const overallProgress = activeCount
+    ? Math.round(SLOTS.reduce((sum, d) => sum + (slots[d].file ? slots[d].progress : 0), 0) / activeCount)
+    : 0;
 
   return (
     <div className="space-y-4">
@@ -171,7 +202,7 @@ export function DmrImportPage() {
                   <div className="text-sm font-semibold">{d}</div>
                   <div className="text-[11px] text-muted-foreground">{DISCIPLINE_LABEL[d]}</div>
                 </div>
-                {s.section && <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">Parsed · {s.section.rows.length}행</span>}
+                <SlotBadge slot={s} />
               </div>
               <Input type="file" accept="image/*" onChange={(e) => pickFile(d, e.target.files?.[0] ?? null)} className="text-xs" />
               {s.previewUrl ? (
@@ -181,6 +212,20 @@ export function DmrImportPage() {
               ) : (
                 <div className="flex aspect-video items-center justify-center rounded border border-dashed bg-muted/20 text-muted-foreground">
                   <ImageIcon className="h-6 w-6" />
+                </div>
+              )}
+              {(s.stage === 'uploading' || s.stage === 'parsing' || s.stage === 'done' || s.stage === 'error') && s.file && (
+                <div className="space-y-1">
+                  <Progress value={s.progress} className="h-1.5" />
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      {s.stage === 'uploading' && <><CloudUpload className="h-3 w-3" /> 업로드 중…</>}
+                      {s.stage === 'parsing' && <><Sparkles className="h-3 w-3 animate-pulse" /> AI 파싱 중…</>}
+                      {s.stage === 'done' && <><CheckCircle2 className="h-3 w-3 text-emerald-600" /> 완료</>}
+                      {s.stage === 'error' && <><XCircle className="h-3 w-3 text-destructive" /> 실패</>}
+                    </span>
+                    <span>{s.progress}%</span>
+                  </div>
                 </div>
               )}
               {s.error && <div className="rounded bg-destructive/10 p-2 text-[11px] text-destructive">{s.error}</div>}
@@ -195,6 +240,15 @@ export function DmrImportPage() {
           {parsing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
           업로드 & AI 파싱
         </Button>
+        {activeCount > 0 && (parsing || overallProgress > 0) && (
+          <div className="flex min-w-[220px] flex-1 flex-col gap-1">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>전체 진행률</span>
+              <span>{overallProgress}%</span>
+            </div>
+            <Progress value={overallProgress} className="h-2" />
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <Label className="text-xs">Report Date</Label>
           <Input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="w-40 text-xs" />
@@ -231,4 +285,24 @@ export function DmrImportPage() {
       )}
     </div>
   );
+}
+
+function SlotBadge({ slot }: { slot: Slot }) {
+  if (slot.stage === 'done' && slot.section) {
+    return (
+      <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+        Parsed · {slot.section.rows.length}행
+      </span>
+    );
+  }
+  if (slot.stage === 'uploading') {
+    return <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">Uploading…</span>;
+  }
+  if (slot.stage === 'parsing') {
+    return <span className="rounded bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300">Parsing…</span>;
+  }
+  if (slot.stage === 'error') {
+    return <span className="rounded bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">Failed</span>;
+  }
+  return null;
 }
