@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { zodValidator, fallback } from '@tanstack/zod-adapter';
 import { z } from 'zod';
-import { AppLayout } from '@/components/layout/AppLayout';
 import { DmrRawDataPage } from '@/components/resource/dmr/DmrRawDataPage';
 
 const searchSchema = z.object({
@@ -15,9 +14,5 @@ const searchSchema = z.object({
 export const Route = createFileRoute('/_authenticated/resource/dmr/raw-data')({
   head: () => ({ meta: [{ title: 'DMR Raw Data · QAIL CMS' }] }),
   validateSearch: zodValidator(searchSchema),
-  component: () => (
-    <AppLayout>
-      <DmrRawDataPage />
-    </AppLayout>
-  ),
+  component: () => <DmrRawDataPage />,
 });
