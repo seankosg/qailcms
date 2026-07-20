@@ -33,7 +33,8 @@ export function CriticalThresholdPopover({
   const { data: settings } = useTaskManagementSettings();
   const save = useServerFn(saveTaskThresholds);
   const recalc = useServerFn(runRecalcAutoJudgment);
-  const { isAdmin } = useCurrentUser();
+  const { data: currentUser } = useCurrentUser();
+  const isAdmin = currentUser?.isAdmin ?? false;
 
   const [open, setOpen] = useState(false);
   const [t, setT] = useState<TaskThresholds>(DEFAULT_THRESHOLDS);
