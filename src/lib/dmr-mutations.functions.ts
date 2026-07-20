@@ -8,13 +8,12 @@ const ALLOWED_FIELDS = new Set<string>([
   'system_name',
   'contractor_name',
   'plot',
-  'metric',
-  'manpower',
+  'plan_manpower',
+  'actual_manpower',
 ]);
 
 const DISCIPLINE_VALS = new Set(['ARCH', 'ELECT', 'MECH']);
 const PLOT_VALS = new Set(['C', 'D', 'TOTAL']);
-const METRIC_VALS = new Set(['target', 'today', 'yesterday']);
 
 async function assertCanEdit(ctx: any) {
   const checks = await Promise.all([
@@ -35,10 +34,7 @@ function validatePatchValue(field: string, value: unknown): unknown {
   if (field === 'plot' && !PLOT_VALS.has(String(value))) {
     throw new Error(`잘못된 Plot 값: ${value}`);
   }
-  if (field === 'metric' && !METRIC_VALS.has(String(value))) {
-    throw new Error(`잘못된 Metric 값: ${value}`);
-  }
-  if (field === 'manpower') {
+  if (field === 'plan_manpower' || field === 'actual_manpower') {
     const n = Number(value);
     if (!Number.isFinite(n) || n < 0) throw new Error('인원은 0 이상 정수여야 합니다');
     return Math.round(n);
@@ -119,7 +115,6 @@ export const bulkDeleteDmrEntries = createServerFn({ method: 'POST' })
 const FilterIdsSchema = z.object({
   discipline: z.string().optional().nullable(),
   plot: z.string().optional().nullable(),
-  metric: z.string().optional().nullable(),
   systems: z.array(z.string()).optional().default([]),
   contractors: z.array(z.string()).optional().default([]),
   fromDate: z.string().optional().nullable(),
@@ -135,7 +130,6 @@ export const fetchDmrFilteredIds = createServerFn({ method: 'POST' })
     let sq = (context.supabase as any).from('dmr_entries').select('id').limit(10000);
     if (data.discipline && data.discipline !== 'all') sq = sq.eq('discipline', data.discipline);
     if (data.plot && data.plot !== 'all') sq = sq.eq('plot', data.plot);
-    if (data.metric && data.metric !== 'all') sq = sq.eq('metric', data.metric);
     if (data.systems.length) sq = sq.in('system_name', data.systems);
     if (data.contractors.length) sq = sq.in('contractor_name', data.contractors);
     if (data.fromDate) sq = sq.gte('report_date', data.fromDate);
