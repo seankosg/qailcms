@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      _tm_date_shift_log_20260720: {
+        Row: {
+          actual_finish: string | null
+          actual_start: string | null
+          forecast_end: string | null
+          id: string | null
+          logged_at: string | null
+          plan_end: string | null
+          plan_start: string | null
+          source_file: string | null
+          task_no: string | null
+        }
+        Insert: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          forecast_end?: string | null
+          id?: string | null
+          logged_at?: string | null
+          plan_end?: string | null
+          plan_start?: string | null
+          source_file?: string | null
+          task_no?: string | null
+        }
+        Update: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          forecast_end?: string | null
+          id?: string | null
+          logged_at?: string | null
+          plan_end?: string | null
+          plan_start?: string | null
+          source_file?: string | null
+          task_no?: string | null
+        }
+        Relationships: []
+      }
       abd_change_log: {
         Row: {
           abd_item_id: string | null
