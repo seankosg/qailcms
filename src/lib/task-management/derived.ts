@@ -1,4 +1,5 @@
 // 파생 계산 유틸리티 — DB에 저장하지 않고 클라이언트에서 계산되는 값들
+// 3-스테이지(Start/WIP/Finish) 판정 로직. T.Plan = Data Date 당일의 일할 계획진도율.
 
 export interface TaskThresholds {
   behind_warn_gap: number; // -0.05
@@ -14,57 +15,70 @@ export const DEFAULT_THRESHOLDS: TaskThresholds = {
   slip_late_days: 14,
 };
 
+export type JudgmentStageKey = "start" | "wip" | "finish";
+
+export interface JudgmentRow {
+  plan_start?: string | null;
+  plan_end?: string | null;
+  plan_days?: number | null;
+  actual_start?: string | null;
+  actual_finish?: string | null;
+  actual_progress?: number | null;
+  slip_days?: number | null;
+  data_date?: string | null;
+}
+
 function parseDate(v: unknown): Date | null {
-  if (!v) return null;
+  if (v == null || v === "") return null;
   const s = String(v).slice(0, 10);
   const d = new Date(`${s}T00:00:00Z`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** 오늘 기준 계획 진도율. 계획 기간이 없거나 0 이하이면 완료여부로 판단. */
-export function expectedProgressToday(row: {
-  plan_start?: string | null;
-  plan_end?: string | null;
-}): number {
-  const start = parseDate(row.plan_start);
-  const end = parseDate(row.plan_end);
-  if (!start || !end) return 0;
+function todayUtc(): Date {
   const now = new Date();
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const total = end.getTime() - start.getTime();
-  if (total <= 0) return today >= end.getTime() ? 1 : 0;
-  const elapsed = today - start.getTime();
-  return Math.max(0, Math.min(1, elapsed / total));
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-export function todayGap(row: {
-  actual_progress?: number | null;
-  plan_start?: string | null;
-  plan_end?: string | null;
-}): number {
-  const actual = Number(row.actual_progress ?? 0);
-  const expected = expectedProgressToday(row);
-  return actual - expected;
+function resolveAsOf(row: JudgmentRow, asOf?: string): Date {
+  return parseDate(asOf) ?? parseDate(row.data_date ?? null) ?? todayUtc();
 }
 
-/** 임계값 기반 판정 (DB의 calc_auto_judgment_value 와 동일한 규칙) */
-export function computeJudgment(
-  row: {
-    actual_progress?: number | null;
-    plan_start?: string | null;
-    plan_end?: string | null;
-    slip_days?: number | null;
-  },
-  t: TaskThresholds = DEFAULT_THRESHOLDS,
-): string {
+function daysDiff(a: Date, b: Date): number {
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+/** T.Plan — Data Date(또는 asOf) 당일의 계획 진도율 (0..1).
+ *  기본식: (asOf - plan_start) / plan_days.
+ *  plan_days 가 없으면 (plan_end - plan_start) 로 대체.
+ *  계산 불가 시 null 반환.
+ */
+export function computeTPlan(row: JudgmentRow, asOf?: string): number | null {
+  const start = parseDate(row.plan_start);
+  if (!start) return null;
+  const asOfD = resolveAsOf(row, asOf);
+  let durationDays: number | null = null;
+  const pd = row.plan_days == null ? null : Number(row.plan_days);
+  if (pd != null && !Number.isNaN(pd) && pd > 0) {
+    durationDays = pd;
+  } else {
+    const end = parseDate(row.plan_end);
+    if (end) durationDays = Math.max(1, daysDiff(start, end));
+  }
+  if (!durationDays) return null;
+  const elapsed = daysDiff(start, asOfD);
+  return Math.max(0, Math.min(1, elapsed / durationDays));
+}
+
+/** 하위 호환: 오늘 기준 T.Plan. */
+export function expectedProgressToday(row: JudgmentRow): number {
+  return computeTPlan(row) ?? 0;
+}
+
+/** 하위 호환: 오늘 기준 Actual% - T.Plan. */
+export function todayGap(row: JudgmentRow): number {
   const actual = Number(row.actual_progress ?? 0);
-  if (actual >= 1) return "완료";
-  const gap = todayGap(row);
-  const slip = Number(row.slip_days ?? 0);
-  if (gap < t.behind_late_gap || slip > t.slip_late_days) return "위험";
-  if (gap < t.behind_warn_gap || slip > t.slip_warn_days) return "지연";
-  if (gap < 0) return "주의";
-  return "정상";
+  return actual - expectedProgressToday(row);
 }
 
 export const JUDGMENT_ORDER: Record<string, number> = {
@@ -75,7 +89,7 @@ export const JUDGMENT_ORDER: Record<string, number> = {
   완료: 4,
 };
 
-/** 판정 우선순위 비교 (worst 우선) */
+/** 판정 우선순위 비교 (worst 우선). */
 export function worstJudgment(list: (string | null | undefined)[]): string | null {
   let best: string | null = null;
   let bestRank = Infinity;
@@ -88,6 +102,89 @@ export function worstJudgment(list: (string | null | undefined)[]): string | nul
     }
   }
   return best;
+}
+
+/** 스테이지별 판정. */
+export function getStageJudgment(
+  row: JudgmentRow,
+  stage: JudgmentStageKey,
+  t: TaskThresholds = DEFAULT_THRESHOLDS,
+  asOf?: string,
+): string {
+  const asOfD = resolveAsOf(row, asOf);
+
+  if (stage === "start") {
+    if (row.actual_start) return "완료";
+    const ps = parseDate(row.plan_start);
+    if (!ps || ps.getTime() > asOfD.getTime()) return "정상";
+    const d = daysDiff(ps, asOfD);
+    if (d > t.slip_late_days) return "위험";
+    if (d > t.slip_warn_days) return "지연";
+    if (d > 0) return "주의";
+    return "정상";
+  }
+
+  if (stage === "wip") {
+    const actual = Number(row.actual_progress ?? 0);
+    if (actual >= 1) return "완료";
+    const tPlan = computeTPlan(row, asOf);
+    if (tPlan == null) return "정상";
+    const gap = actual - tPlan;
+    if (gap < t.behind_late_gap) return "위험";
+    if (gap < t.behind_warn_gap) return "지연";
+    if (gap < 0) return "주의";
+    return "정상";
+  }
+
+  // finish
+  const actual = Number(row.actual_progress ?? 0);
+  if (actual >= 1 && row.actual_finish) return "완료";
+  const pe = parseDate(row.plan_end);
+  if (!pe || pe.getTime() > asOfD.getTime()) return "정상";
+  const slipCol = Number(row.slip_days ?? 0);
+  const slip = Number.isFinite(slipCol) && slipCol > 0 ? slipCol : daysDiff(pe, asOfD);
+  if (slip > t.slip_late_days) return "위험";
+  if (slip > t.slip_warn_days) return "지연";
+  if (slip > 0) return "주의";
+  return "정상";
+}
+
+/** 3-스테이지 worstOf. 착수 완료 시 Start 스테이지는 후보에서 제외. */
+export function computeJudgment(
+  row: JudgmentRow,
+  t: TaskThresholds = DEFAULT_THRESHOLDS,
+  asOf?: string,
+): string {
+  const jStart = getStageJudgment(row, "start", t, asOf);
+  const jWip = getStageJudgment(row, "wip", t, asOf);
+  const jFinish = getStageJudgment(row, "finish", t, asOf);
+  if (jWip === "완료" && jFinish === "완료") return "완료";
+  const candidates: string[] = [];
+  if (!row.actual_start) candidates.push(jStart);
+  candidates.push(jWip, jFinish);
+  return worstJudgment(candidates) ?? "정상";
+}
+
+/** 행 단위 지연 판정 = 판정이 지연 또는 위험. */
+export function isTaskDelayed(
+  row: JudgmentRow,
+  t: TaskThresholds = DEFAULT_THRESHOLDS,
+  asOf?: string,
+): boolean {
+  const j = computeJudgment(row, t, asOf);
+  return j === "지연" || j === "위험";
+}
+
+/** Start 는 완료됐지만 계획보다 늦게 시작한 마커. */
+export function isStartedLate(row: JudgmentRow): boolean {
+  if (!row.actual_start || !row.plan_start) return false;
+  return String(row.actual_start).slice(0, 10) > String(row.plan_start).slice(0, 10);
+}
+
+/** Finish 완료됐지만 계획보다 늦게 완료된 마커. */
+export function isFinishedLate(row: JudgmentRow): boolean {
+  if (!row.actual_finish || !row.plan_end) return false;
+  return String(row.actual_finish).slice(0, 10) > String(row.plan_end).slice(0, 10);
 }
 
 export function formatPercent(v: number | null | undefined, digits = 1): string {
