@@ -434,6 +434,29 @@ export function TaskManagementRawDataPage() {
 
   const rows = useMemo(() => data ?? [], [data]);
 
+  const latestDataDate = useMemo(() => {
+    let latest: string | null = null;
+    for (const r of rows) {
+      const d = (r as any).data_date as string | null | undefined;
+      if (d && (!latest || d > latest)) latest = d;
+    }
+    return latest;
+  }, [rows]);
+
+  const dataDateOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      const d = (r as any).data_date as string | null | undefined;
+      if (d) set.add(String(d).slice(0, 10));
+    }
+    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
+  }, [rows]);
+
+  const selectedDataDate =
+    search.dataDate && search.dataDate.length
+      ? search.dataDate
+      : (latestDataDate ?? "");
+
   // 지연 모드: 대시보드에서 넘어온 스테이지 지연 조건에 해당하는 행만 노출
   const delayFilteredRows = useMemo(() => {
     if (!delayMode) return rows;
