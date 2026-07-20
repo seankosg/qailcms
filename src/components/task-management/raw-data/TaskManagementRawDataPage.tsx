@@ -87,7 +87,7 @@ import {
 } from "@/lib/task-management/rollup.functions";
 import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
 import {
-  ALL_TASK_STAGE_KEYS,
+  ALL_TASK_TIMELINE_STAGE_KEYS,
   isTaskStageDelayedAsOf,
   todayIso,
   type TaskItem,
@@ -439,7 +439,7 @@ export function TaskManagementRawDataPage() {
     const asOf = delayMode.asOf;
     return rows.filter((r) => {
       const it = r as unknown as TaskItem;
-      for (const st of ALL_TASK_STAGE_KEYS) {
+      for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
         if (isTaskStageDelayedAsOf(it, st, asOf)) return true;
       }
       return false;
