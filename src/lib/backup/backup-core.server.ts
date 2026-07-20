@@ -29,6 +29,7 @@ export type CreateSnapshotOptions = {
   name: string;
   triggeredBy: "manual" | "scheduled" | "pre-import";
   triggerMetadata?: Record<string, unknown> | null;
+  tables?: BackupTableName[];
 };
 
 export type CreateSnapshotResult = {
