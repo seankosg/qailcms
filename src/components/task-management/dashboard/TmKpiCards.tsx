@@ -21,6 +21,8 @@ interface Props {
   asOfDate: string;
   taskScope: TaskScope;
   onScopeChange: (v: TaskScope) => void;
+  disciplines: string[];
+  onDisciplinesChange: (v: string[]) => void;
   ownerContext?: {
     team?: string[];
     hdec_pic_name?: string[];
@@ -35,7 +37,17 @@ const SCOPE_LABEL: Record<TaskScope, string> = {
   sub: "Sub Task",
 };
 
-export function TmKpiCards({ items, asOfDate, taskScope, onScopeChange, ownerContext }: Props) {
+const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
+
+export function TmKpiCards({
+  items,
+  asOfDate,
+  taskScope,
+  onScopeChange,
+  disciplines,
+  onDisciplinesChange,
+  ownerContext,
+}: Props) {
   const navigate = useNavigate();
   const { data: thresholds } = useTaskManagementSettings();
   const t = thresholds ?? DEFAULT_THRESHOLDS;
@@ -59,9 +71,9 @@ export function TmKpiCards({ items, asOfDate, taskScope, onScopeChange, ownerCon
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Task Scope
+          Task Filter
         </span>
         <ToggleGroup
           type="single"
@@ -78,6 +90,23 @@ export function TmKpiCards({ items, asOfDate, taskScope, onScopeChange, ownerCon
               className="h-8 px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             >
               {SCOPE_LABEL[k]}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+        <ToggleGroup
+          type="multiple"
+          value={disciplines}
+          onValueChange={(v) => onDisciplinesChange(v)}
+          className="gap-1"
+        >
+          {DISCIPLINE_KEYS.map((k) => (
+            <ToggleGroupItem
+              key={k}
+              value={k}
+              className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            >
+              {k}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
