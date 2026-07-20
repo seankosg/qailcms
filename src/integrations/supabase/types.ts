@@ -3347,7 +3347,7 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       update_task_summary: {
-        Args: { _discipline: string; _main_task_no: string }
+        Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
       }
     }
