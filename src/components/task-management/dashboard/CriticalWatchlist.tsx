@@ -167,7 +167,7 @@ function RiskRow({
           className={cn(
             "inline-flex h-4 min-w-7 items-center justify-center rounded px-1 text-[9px] font-bold",
             item.stage === "start" && "bg-secondary text-secondary-foreground",
-            item.stage === "completion" && "bg-primary/20 text-primary",
+            item.stage === "finish" && "bg-primary/20 text-primary",
           )}
         >
           {TASK_STAGE_LABELS[item.stage]}
