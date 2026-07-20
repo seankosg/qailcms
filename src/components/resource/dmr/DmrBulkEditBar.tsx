@@ -51,13 +51,14 @@ const FIELDS: FieldDef[] = [
 ];
 
 interface Props {
-  selectedRows: Record<string, any>[];
+  selectedIds: string[];
+  sampleRows: Record<string, any>[];
   canEdit: boolean;
   onClearSelection: () => void;
   onApplied: () => void;
 }
 
-export function DmrBulkEditBar({ selectedRows, canEdit, onClearSelection, onApplied }: Props) {
+export function DmrBulkEditBar({ selectedIds, sampleRows, canEdit, onClearSelection, onApplied }: Props) {
   const [fieldName, setFieldName] = useState<string>('');
   const [rawValue, setRawValue] = useState<string>('');
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -66,11 +67,8 @@ export function DmrBulkEditBar({ selectedRows, canEdit, onClearSelection, onAppl
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  const count = selectedRows.length;
-  const ids = useMemo(
-    () => selectedRows.map((r) => String(r.id ?? '')).filter(Boolean),
-    [selectedRows],
-  );
+  const ids = useMemo(() => selectedIds.filter(Boolean), [selectedIds]);
+  const count = ids.length;
   const field = useMemo(() => FIELDS.find((f) => f.field === fieldName) ?? null, [fieldName]);
   const chunkCount = Math.max(1, Math.ceil(count / CHUNK));
 
@@ -120,11 +118,11 @@ export function DmrBulkEditBar({ selectedRows, canEdit, onClearSelection, onAppl
     try {
       const stamp = new Date().toISOString().slice(0, 10);
       exportDmrToXlsx({
-        rows: selectedRows,
+        rows: sampleRows,
         columns: DMR_EXPORT_COLUMNS,
         fileName: `dmr-selected-${stamp}.xlsx`,
       });
-      toast.success('엑셀 다운로드', { description: `${count}건 내보내기 완료` });
+      toast.success('엑셀 다운로드', { description: `${sampleRows.length}건 내보내기 완료 (현재 페이지)` });
     } catch (e: any) {
       toast.error('내보내기 실패', { description: e?.message ?? String(e) });
     }
@@ -132,7 +130,7 @@ export function DmrBulkEditBar({ selectedRows, canEdit, onClearSelection, onAppl
 
   async function handleCopyTsv() {
     try {
-      const r = await copyDmrAsTsv({ rows: selectedRows, columns: DMR_EXPORT_COLUMNS });
+      const r = await copyDmrAsTsv({ rows: sampleRows, columns: DMR_EXPORT_COLUMNS });
       toast.success('클립보드 복사', { description: `${r.rowCount}행 × ${r.colCount}열` });
     } catch (e: any) {
       toast.error('복사 실패', { description: e?.message ?? String(e) });
@@ -171,6 +169,11 @@ export function DmrBulkEditBar({ selectedRows, canEdit, onClearSelection, onAppl
             {count > CHUNK && (
               <span className="text-xs text-muted-foreground">
                 · {chunkCount} 배치 (배치당 {CHUNK}건)
+              </span>
+            )}
+            {sampleRows.length < count && (
+              <span className="text-xs text-muted-foreground">
+                · 현재 페이지 미리보기 {sampleRows.length}건
               </span>
             )}
           </div>
@@ -314,7 +317,7 @@ export function DmrBulkEditBar({ selectedRows, canEdit, onClearSelection, onAppl
                 </tr>
               </thead>
               <tbody>
-                {selectedRows.slice(0, 5).map((r, i) => (
+                {sampleRows.slice(0, 5).map((r, i) => (
                   <tr key={String(r.id ?? i)} className="border-t">
                     <td className="px-2 py-1">{String(r.report_date ?? '')}</td>
                     <td className="px-2 py-1">{String(r.system_name ?? '')}</td>
@@ -324,8 +327,10 @@ export function DmrBulkEditBar({ selectedRows, canEdit, onClearSelection, onAppl
                 ))}
               </tbody>
             </table>
-            {count > 5 && (
-              <p className="px-2 py-1 text-[11px] text-muted-foreground">…외 {count - 5}건</p>
+            {count > sampleRows.slice(0, 5).length && (
+              <p className="px-2 py-1 text-[11px] text-muted-foreground">
+                …외 {(count - Math.min(sampleRows.length, 5)).toLocaleString()}건 (총 {count.toLocaleString()}건 적용)
+              </p>
             )}
           </div>
           <DialogFooter>
