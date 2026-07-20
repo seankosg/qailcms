@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,9 @@ import { computeJudgment, expectedProgressToday, todayGap, worstJudgment } from 
 import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDrawer";
 import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
+import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+
+const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
 
 interface Row {
   id: string;
