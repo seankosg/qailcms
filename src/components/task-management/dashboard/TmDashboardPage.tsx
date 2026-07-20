@@ -59,7 +59,6 @@ function uniqSorted(items: TaskItem[], field: keyof TaskItem): string[] {
 export function TmDashboardPage() {
   const search = routeApi.useSearch();
   const navigate = useNavigate();
-  const today = useMemo(() => todayIso(), []);
 
   const { data: items = [], isLoading } = useTaskDashboardData({
     disciplines: search.discipline,
