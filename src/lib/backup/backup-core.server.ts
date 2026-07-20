@@ -349,12 +349,13 @@ async function readAllRows<T extends Record<string, unknown>>(
   const rows: T[] = [];
   let from = 0;
   const pageSize = 1000;
+  const sortKey = (TABLE_SORT_KEYS as Record<string, string>)[tableName] ?? "id";
 
   while (true) {
     const { data, error } = await supabaseAdmin
       .from(tableName as any)
       .select("*")
-      .order("id", { ascending: true })
+      .order(sortKey, { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) throw new Error(`Failed to read ${tableName}: ${error.message}`);
     if (!data || data.length === 0) break;
