@@ -676,7 +676,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const payloads = applied.map((p) => {
         const isParent = p.level === "main";
         const stripParent = isParent && rollupMode === "auto";
-        return {
+        const row = {
         task_no: p.task_no,
         main_task_no: p.main_task_no,
         level: p.level,
@@ -709,6 +709,28 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         imported_at: startedAtIso,
         imported_by: userId,
         };
+        // 임포트값이 null이면 기존 DB 값을 유지. 자동계산 리셋 필드 및 키/메타는 강제 유지.
+        return stripNullExcept(row, [
+          "task_no",
+          "main_task_no",
+          "level",
+          "discipline",
+          "team",
+          // 자동계산 리셋 (서버 rollup에서 재계산)
+          "plan_days",
+          "plan_progress",
+          "progress_variance",
+          "slip_days",
+          "auto_judgment",
+          // Main + auto rollup에서 강제 null인 케이스 유지
+          ...(stripParent ? (["plan_start", "plan_end", "actual_progress"] as const) : []),
+          // 메타
+          "data_date",
+          "sort_order",
+          "source_file",
+          "imported_at",
+          "imported_by",
+        ]);
       });
 
       let inserted = 0;
