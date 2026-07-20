@@ -3,12 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar } from 'recharts';
 import { DMR_DISCIPLINES, DISCIPLINE_LABEL, type DmrDiscipline } from '@/lib/dmr/types';
@@ -254,19 +250,32 @@ export function DmrDashboardPage() {
         </div>
         <div>
           <div className="mb-1 text-[11px] text-muted-foreground">TEAM</div>
-          <ToggleGroup type="multiple" value={teams} onValueChange={(v) => setTeams(v as DmrDiscipline[])} className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1">
             {DMR_DISCIPLINES.map((d) => (
-              <ToggleGroupItem key={d} value={d} className="h-8 px-2 text-xs">{d}</ToggleGroupItem>
+              <FilterToggleButton
+                key={d}
+                active={teams.includes(d)}
+                onClick={() => setTeams((prev) => prev.includes(d) ? prev.filter((v) => v !== d) : [...prev, d])}
+              >
+                {d}
+              </FilterToggleButton>
             ))}
-          </ToggleGroup>
+          </div>
         </div>
         <div>
           <div className="mb-1 text-[11px] text-muted-foreground">Plot</div>
-          <ToggleGroup type="multiple" value={plots} onValueChange={(v) => setPlots(v as Array<'C' | 'D'>)} className="flex gap-1">
+          <div className="flex gap-1">
             {(['C', 'D'] as const).map((p) => (
-              <ToggleGroupItem key={p} value={p} className="h-8 w-10 text-xs">{p}</ToggleGroupItem>
+              <FilterToggleButton
+                key={p}
+                active={plots.includes(p)}
+                className="w-10 px-0"
+                onClick={() => setPlots((prev) => prev.includes(p) ? prev.filter((v) => v !== p) : [...prev, p])}
+              >
+                {p}
+              </FilterToggleButton>
             ))}
-          </ToggleGroup>
+          </div>
         </div>
         <div>
           <div className="mb-1 text-[11px] text-muted-foreground">Work Description</div>
@@ -288,14 +297,15 @@ export function DmrDashboardPage() {
         </div>
         <div>
           <div className="mb-1 text-[11px] text-muted-foreground">유형</div>
-          <Select value={contractorType} onValueChange={(v) => setContractorType(v as any)}>
-            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="direct">직영</SelectItem>
-              <SelectItem value="sub">협력사</SelectItem>
-            </SelectContent>
-          </Select>
+          <select
+            value={contractorType}
+            onChange={(e) => setContractorType(e.target.value as 'all' | 'direct' | 'sub')}
+            className="h-8 w-32 rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <option value="all">All</option>
+            <option value="direct">직영</option>
+            <option value="sub">협력사</option>
+          </select>
         </div>
         <div>
           <div className="mb-1 text-[11px] text-muted-foreground">기간</div>
@@ -340,16 +350,18 @@ export function DmrDashboardPage() {
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-sm">일자별 총원 추이 (Actual vs Plan, by {GROUP_BY_OPTIONS.find((g) => g.value === groupBy)?.label})</CardTitle>
-            <ToggleGroup
-              type="single"
-              value={groupBy}
-              onValueChange={(v) => v && setGroupBy(v as GroupBy)}
-              className="flex gap-1"
-            >
+            <div className="flex gap-1">
               {GROUP_BY_OPTIONS.map((o) => (
-                <ToggleGroupItem key={o.value} value={o.value} className="h-7 px-2 text-[11px]">{o.label}</ToggleGroupItem>
+                <FilterToggleButton
+                  key={o.value}
+                  active={groupBy === o.value}
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => setGroupBy(o.value)}
+                >
+                  {o.label}
+                </FilterToggleButton>
               ))}
-            </ToggleGroup>
+            </div>
           </div>
           <div className="mt-2 text-[22px] font-bold text-red-500 truncate">
             Today's Manpower: {todaysManpower.toLocaleString()}
@@ -439,9 +451,43 @@ export function DmrDashboardPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button asChild variant="outline" size="sm"><Link to="/resource/dmr/raw-data">Raw Data 열기 →</Link></Button>
+        <Link
+          to="/resource/dmr/raw-data"
+          className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          Raw Data 열기 →
+        </Link>
       </div>
     </div>
+  );
+}
+
+function FilterToggleButton({
+  active,
+  className,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  className?: string;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-8 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        active
+          ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+          : 'border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
+        className,
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -490,14 +536,20 @@ function MultiSelectPopover({
   };
   const btnLabel = value.length === 0 ? `All ${label}` : `${value.length} selected`;
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 min-w-[10rem] justify-between text-xs">
-          <span className="truncate">{btnLabel}</span>
-          <ChevronDown className="ml-1 h-3 w-3 opacity-60" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-2">
+    <div className="relative">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className="h-8 min-w-[10rem] justify-between text-xs"
+      >
+        <span className="truncate">{btnLabel}</span>
+        <ChevronDown className="ml-1 h-3 w-3 opacity-60" />
+      </Button>
+      {open && (
+        <div className="absolute left-0 top-9 z-50 w-64 rounded-md border bg-popover p-2 text-popover-foreground shadow-md">
         <Input
           placeholder="Search..."
           value={query}
@@ -512,12 +564,18 @@ function MultiSelectPopover({
           {filtered.length === 0 && <div className="p-2 text-center text-xs text-muted-foreground">No options</div>}
           {filtered.map((o) => (
             <label key={o} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/50">
-              <Checkbox checked={value.includes(o)} onCheckedChange={() => toggle(o)} />
+              <input
+                type="checkbox"
+                checked={value.includes(o)}
+                onChange={() => toggle(o)}
+                className="h-3.5 w-3.5 accent-primary"
+              />
               <span className="truncate">{o}</span>
             </label>
           ))}
         </div>
-      </PopoverContent>
-    </Popover>
+        </div>
+      )}
+    </div>
   );
 }
