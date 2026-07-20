@@ -1,34 +1,27 @@
+## 현황 확인
+- `ABD → Settings` 페이지는 `abd_header_mappings`(Header Mapping)와 `abd_field_config`(Field Config) 두 탭으로 구성 — Admin의 `Mapping` 페이지가 Spare Part / Task Management / Snag List Management에 제공하는 것과 동일한 성격의 관리 화면입니다.
+- 다만 현재 Admin > Mapping 페이지에는 ABD 탭이 아직 없어서 "완전한 중복"은 아니고, ABD만 사이드바 별도 진입점(`/closure/abd/settings`)으로 분리되어 있는 상태입니다.
+
 ## 목표
-Close-Out Doc 섹션의 `Spare Part`, `Warranty & License` 모듈을 Admin(및 Super User) 외 사용자에게는 사이드바에서 숨기고, 라우트로 직접 접근해도 차단합니다.
+ABD Settings를 폐기하고, 동등한 관리 UI를 Admin > Mapping 페이지의 신규 탭으로 통합해 관리 진입점을 Admin 한 곳으로 일원화합니다.
 
 ## 변경 사항
 
-### 1) `src/components/layout/AppLayout.tsx` — 사이드바 노출 제어
-- `NavModule` 타입에 `adminOnly?: boolean` 필드 추가.
-- `Spare Part` 모듈, `Warranty & License` 모듈에 `adminOnly: true` 지정.
-- 렌더링 필터 로직에서 `mod.adminOnly && !me?.isAdmin`인 경우 해당 모듈을 목록에서 제외.
-- `CloseOutDashboardPage`의 카드도 동일하게 admin 아닌 사용자에게는 두 카드 숨김 처리 (`useCurrentUser`로 판정).
+### 1) Admin > Mapping에 `As Built Drawing` 탭 추가
+- `src/routes/_authenticated/admin/mapping.tsx`의 최상위 `TabsList`에 `as-built` 탭 추가.
+- 하위에 `Field Config` / `Header Mapping` 두 하위 탭 구성 (기존 다른 모듈과 동일 패턴).
+- 내용물은 기존 `AbdSettingsPage.tsx`의 `HeaderMappingsTable`, `FieldConfigTable`을 각각 `src/components/admin/AbdFieldConfigTable.tsx`, `src/components/admin/AbdHeaderMappingTable.tsx`로 추출하여 재사용.
 
-### 2) 라우트 가드 (직접 URL 접근 차단)
-`_authenticated` 하위에 얇은 admin 가드를 재사용해 아래 라우트들에 `beforeLoad`로 관리자 체크를 추가하고, 비관리자는 `/closeout/dashboard`로 리다이렉트:
-- `src/routes/_authenticated/closure/spare-part/raw-data.tsx`
-- `src/routes/_authenticated/closure/spare-part/import.tsx`
-- `src/routes/_authenticated/closure/spare-part/import.logs.tsx`
-- `src/routes/_authenticated/closure/spare-part/aconex-sync.tsx`
-- `src/routes/_authenticated/closure/spare-part/records.$docRef.tsx`
-- `src/routes/_authenticated/closure/dashboard/spare-part.tsx`
-- `src/routes/_authenticated/closure/dashboard/warranty.tsx`
+### 2) ABD Settings 사이드바 항목 및 라우트 제거
+- `src/components/layout/AppLayout.tsx`의 As Built Drawing 모듈 items에서 `Settings` 항목 삭제.
+- `src/routes/_authenticated/closure/abd/settings.tsx` 파일 삭제.
+- `src/components/abd/settings/AbdSettingsPage.tsx` 파일 삭제(내용은 위 1)에서 admin 컴포넌트로 이관됨).
 
-가드 로직은 기존 `src/routes/_authenticated/admin/route.tsx`와 동일한 패턴(user_roles 조회 → `admin` 또는 `superuser` 없으면 redirect)을 각 route 파일 `beforeLoad`에 적용하거나, 공용 헬퍼 `assertAdminOrRedirect(to)`를 `src/lib/auth/route-guards.ts`에 추가해 재사용.
-
-### 3) 기본 랜딩 확인
-`src/routes/_authenticated/admin/route.tsx`가 관리자 아닐 때 `/closure/spare-part/raw-data`로 리다이렉트하는 부분이 있으므로, 이 fallback을 `/outstanding/dashboard`로 교체 (일반 사용자가 이제 spare-part 접근 불가하므로).
-
-## 권한 정책
-- 노출/접근 가능: `isAdmin`(즉 `admin` 또는 `superuser` 롤). 기존 앱의 `adminOnly` 판정과 동일하게 처리.
-- 그 외(Senior User, User, D-Superuser, Guest 등) 모두 차단.
+### 3) 잔여 참조 정리
+- 프로젝트 내 `AbdSettingsPage`, `/closure/abd/settings` 문자열 참조를 검색해 남아있으면 제거 또는 Admin > Mapping(ABD 탭)으로 링크 교체.
 
 ## 검증
-- 비관리자 계정으로 로그인 시 사이드바에 두 모듈이 표시되지 않는지 확인.
-- 비관리자 계정에서 `/closure/spare-part/raw-data` 등 URL 직접 접근 시 리다이렉트되는지 확인.
-- 관리자 계정에서는 기존과 동일하게 접근 가능한지 확인.
+- 관리자 계정 로그인 → 사이드바 As Built Drawing 하위에 `Settings` 항목이 사라졌는지 확인.
+- `/admin/mapping` 접근 → `As Built Drawing` 탭에서 기존 ABD Header Mapping / Field Config가 동일하게 동작(로드·추가·수정·삭제)하는지 확인.
+- 기존 URL `/closure/abd/settings`가 라우트 매치 실패(또는 not-found)로 처리되는지 확인.
+- 빌드/타입체크에서 삭제 파일 참조 오류가 없는지 확인.
