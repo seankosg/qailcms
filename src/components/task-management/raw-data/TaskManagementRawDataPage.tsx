@@ -792,7 +792,7 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents]);
+  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate]);
 
   const table = useReactTable({
     data: visibleRows,
