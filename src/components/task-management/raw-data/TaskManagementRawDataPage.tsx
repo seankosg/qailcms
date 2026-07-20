@@ -699,6 +699,9 @@ export function TaskManagementRawDataPage() {
             const disc = String(rr.discipline);
             const collapseKey = `${disc}::${rr.task_no}`;
             const isCollapsed = collapsedParents.has(collapseKey);
+            const ap = Number((rr as any).actual_progress ?? 0);
+            const aj = (rr as any).auto_judgment;
+            const isDone = ap >= 0.999 || aj === "완료";
             return (
               <span className="flex w-full items-center gap-1">
                 {isParent ? (
@@ -708,7 +711,10 @@ export function TaskManagementRawDataPage() {
                       e.stopPropagation();
                       toggleCollapse(disc, String(rr.task_no));
                     }}
-                    className="rounded p-0.5 hover:bg-muted"
+                    className={cn(
+                      "rounded p-0.5 hover:bg-muted",
+                      isDone && "text-muted-foreground",
+                    )}
                     title={isCollapsed ? "펼치기" : "접기"}
                   >
                     {isCollapsed ? (
@@ -718,11 +724,14 @@ export function TaskManagementRawDataPage() {
                     )}
                   </button>
                 ) : isChild ? (
-                  <span className="ml-2 text-muted-foreground/60">└</span>
+                  <span className={cn("ml-2", isDone ? "text-muted-foreground/60" : "text-muted-foreground/60")}>└</span>
                 ) : (
                   <span className="w-4" />
                 )}
-                <span className="min-w-0 flex-1 truncate text-primary">
+                <span className={cn(
+                  "min-w-0 flex-1 truncate",
+                  isDone ? "text-muted-foreground" : "text-primary",
+                )}>
                   {rendered}
                 </span>
                 {isParent && canEditRow(rr as Record<string, unknown>) && (
