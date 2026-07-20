@@ -572,14 +572,26 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       // Get existing task_no set (for insert/update count)
       const taskNos = parsed.map((p) => p.task_no);
       const existingSet = new Set<string>();
+      const existingSchedule = new Map<
+        string,
+        { id: string; plan_start: string | null; plan_end: string | null; forecast_end: string | null }
+      >();
       for (let i = 0; i < taskNos.length; i += 500) {
         const chunk = taskNos.slice(i, i + 500);
         const { data } = await (supabase as any)
           .from("task_management_raw")
-          .select("task_no")
+          .select("id, task_no, plan_start, plan_end, forecast_end")
           .eq("discipline", discipline)
           .in("task_no", chunk);
-        for (const r of data ?? []) existingSet.add(r.task_no);
+        for (const r of data ?? []) {
+          existingSet.add(r.task_no);
+          existingSchedule.set(r.task_no, {
+            id: r.id,
+            plan_start: r.plan_start ?? null,
+            plan_end: r.plan_end ?? null,
+            forecast_end: r.forecast_end ?? null,
+          });
+        }
       }
 
       // Rollup 모드에 따라 parent 행의 진도 계열을 어떻게 보낼지 결정
