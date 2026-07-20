@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { ComingSoonWidget } from "@/components/dashboard/ComingSoonWidget";
+import { assertAdminOrRedirect } from "@/lib/auth/route-guards";
 
 export const Route = createFileRoute("/_authenticated/closure/dashboard/warranty")({
+  beforeLoad: () => assertAdminOrRedirect(),
   head: () => ({ meta: [{ title: "Warranty Dashboard — QAIL CMS" }] }),
   component: () => (
     <div className="p-4 space-y-4">

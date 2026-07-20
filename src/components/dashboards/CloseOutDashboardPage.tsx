@@ -1,7 +1,10 @@
 import { FileSpreadsheet, Package, ShieldCheck } from "lucide-react";
 import { SectionDashboardCard } from "./SectionDashboardCard";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export function CloseOutDashboardPage() {
+  const { data: me } = useCurrentUser();
+  const isAdmin = !!me?.isAdmin;
   return (
     <div className="flex flex-col gap-6 p-4">
       <div>
@@ -18,19 +21,23 @@ export function CloseOutDashboardPage() {
           to="/closure/abd/raw-data"
           cta="ABD 열기"
         />
-        <SectionDashboardCard
-          title="Spare Part"
-          description="예비품 목록 및 Aconex 동기화."
-          icon={Package}
-          to="/closure/spare-part/raw-data"
-          cta="Spare Part 열기"
-        />
-        <SectionDashboardCard
-          title="Warranty & License"
-          description="보증 및 라이선스 관리. 준비 중입니다."
-          icon={ShieldCheck}
-          status="coming-soon"
-        />
+        {isAdmin && (
+          <>
+            <SectionDashboardCard
+              title="Spare Part"
+              description="예비품 목록 및 Aconex 동기화."
+              icon={Package}
+              to="/closure/spare-part/raw-data"
+              cta="Spare Part 열기"
+            />
+            <SectionDashboardCard
+              title="Warranty & License"
+              description="보증 및 라이선스 관리. 준비 중입니다."
+              icon={ShieldCheck}
+              status="coming-soon"
+            />
+          </>
+        )}
       </div>
     </div>
   );
