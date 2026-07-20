@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
+import { Route as AuthenticatedResourceDashboardRouteImport } from './routes/_authenticated/resource/dashboard'
 import { Route as AuthenticatedOutstandingDashboardRouteImport } from './routes/_authenticated/outstanding/dashboard'
 import { Route as AuthenticatedImportLogLogsRouteImport } from './routes/_authenticated/import-log/logs'
 import { Route as AuthenticatedImportLogImportRouteImport } from './routes/_authenticated/import-log/import'
@@ -25,6 +26,9 @@ import { Route as AuthenticatedAdminTaskThresholdsRouteImport } from './routes/_
 import { Route as AuthenticatedAdminMastersRouteImport } from './routes/_authenticated/admin/masters'
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
 import { Route as AuthenticatedClosureDashboardIndexRouteImport } from './routes/_authenticated/closure/dashboard/index'
+import { Route as AuthenticatedResourceDmrRawDataRouteImport } from './routes/_authenticated/resource/dmr/raw-data'
+import { Route as AuthenticatedResourceDmrImportRouteImport } from './routes/_authenticated/resource/dmr/import'
+import { Route as AuthenticatedResourceDmrDashboardRouteImport } from './routes/_authenticated/resource/dmr/dashboard'
 import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './routes/_authenticated/closure/task-management/tree'
 import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from './routes/_authenticated/closure/task-management/raw-data'
 import { Route as AuthenticatedClosureTaskManagementDashboardRouteImport } from './routes/_authenticated/closure/task-management/dashboard'
@@ -86,6 +90,12 @@ const ApiPublicVersionRoute = ApiPublicVersionRouteImport.update({
   path: '/api/public/version',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedResourceDashboardRoute =
+  AuthenticatedResourceDashboardRouteImport.update({
+    id: '/resource/dashboard',
+    path: '/resource/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOutstandingDashboardRoute =
   AuthenticatedOutstandingDashboardRouteImport.update({
     id: '/outstanding/dashboard',
@@ -137,6 +147,24 @@ const AuthenticatedClosureDashboardIndexRoute =
   AuthenticatedClosureDashboardIndexRouteImport.update({
     id: '/closure/dashboard/',
     path: '/closure/dashboard/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedResourceDmrRawDataRoute =
+  AuthenticatedResourceDmrRawDataRouteImport.update({
+    id: '/resource/dmr/raw-data',
+    path: '/resource/dmr/raw-data',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedResourceDmrImportRoute =
+  AuthenticatedResourceDmrImportRouteImport.update({
+    id: '/resource/dmr/import',
+    path: '/resource/dmr/import',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedResourceDmrDashboardRoute =
+  AuthenticatedResourceDmrDashboardRouteImport.update({
+    id: '/resource/dmr/dashboard',
+    path: '/resource/dmr/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedClosureTaskManagementTreeRoute =
@@ -309,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
   '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
+  '/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/closure/abd/dashboard': typeof AuthenticatedClosureAbdDashboardRoute
@@ -329,6 +358,9 @@ export interface FileRoutesByFullPath {
   '/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
+  '/resource/dmr/import': typeof AuthenticatedResourceDmrImportRoute
+  '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
@@ -351,6 +383,7 @@ export interface FileRoutesByTo {
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
   '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
+  '/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/closure/abd/dashboard': typeof AuthenticatedClosureAbdDashboardRoute
@@ -371,6 +404,9 @@ export interface FileRoutesByTo {
   '/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
+  '/resource/dmr/import': typeof AuthenticatedResourceDmrImportRoute
+  '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
@@ -396,6 +432,7 @@ export interface FileRoutesById {
   '/_authenticated/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/_authenticated/import-log/logs': typeof AuthenticatedImportLogLogsRoute
   '/_authenticated/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
+  '/_authenticated/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/closure/abd/dashboard': typeof AuthenticatedClosureAbdDashboardRoute
@@ -416,6 +453,9 @@ export interface FileRoutesById {
   '/_authenticated/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/_authenticated/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
+  '/_authenticated/resource/dmr/import': typeof AuthenticatedResourceDmrImportRoute
+  '/_authenticated/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/_authenticated/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/_authenticated/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
@@ -441,6 +481,7 @@ export interface FileRouteTypes {
     | '/import-log/import'
     | '/import-log/logs'
     | '/outstanding/dashboard'
+    | '/resource/dashboard'
     | '/api/public/version'
     | '/admin/'
     | '/closure/abd/dashboard'
@@ -461,6 +502,9 @@ export interface FileRouteTypes {
     | '/closure/task-management/dashboard'
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
+    | '/resource/dmr/dashboard'
+    | '/resource/dmr/import'
+    | '/resource/dmr/raw-data'
     | '/closure/dashboard/'
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
@@ -483,6 +527,7 @@ export interface FileRouteTypes {
     | '/import-log/import'
     | '/import-log/logs'
     | '/outstanding/dashboard'
+    | '/resource/dashboard'
     | '/api/public/version'
     | '/admin'
     | '/closure/abd/dashboard'
@@ -503,6 +548,9 @@ export interface FileRouteTypes {
     | '/closure/task-management/dashboard'
     | '/closure/task-management/raw-data'
     | '/closure/task-management/tree'
+    | '/resource/dmr/dashboard'
+    | '/resource/dmr/import'
+    | '/resource/dmr/raw-data'
     | '/closure/dashboard'
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
@@ -527,6 +575,7 @@ export interface FileRouteTypes {
     | '/_authenticated/import-log/import'
     | '/_authenticated/import-log/logs'
     | '/_authenticated/outstanding/dashboard'
+    | '/_authenticated/resource/dashboard'
     | '/api/public/version'
     | '/_authenticated/admin/'
     | '/_authenticated/closure/abd/dashboard'
@@ -547,6 +596,9 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/task-management/dashboard'
     | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/task-management/tree'
+    | '/_authenticated/resource/dmr/dashboard'
+    | '/_authenticated/resource/dmr/import'
+    | '/_authenticated/resource/dmr/raw-data'
     | '/_authenticated/closure/dashboard/'
     | '/_authenticated/closure/abd/import/logs'
     | '/_authenticated/closure/snag-management/detail/$id'
@@ -617,6 +669,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/resource/dashboard': {
+      id: '/_authenticated/resource/dashboard'
+      path: '/resource/dashboard'
+      fullPath: '/resource/dashboard'
+      preLoaderRoute: typeof AuthenticatedResourceDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/outstanding/dashboard': {
       id: '/_authenticated/outstanding/dashboard'
       path: '/outstanding/dashboard'
@@ -678,6 +737,27 @@ declare module '@tanstack/react-router' {
       path: '/closure/dashboard'
       fullPath: '/closure/dashboard/'
       preLoaderRoute: typeof AuthenticatedClosureDashboardIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/resource/dmr/raw-data': {
+      id: '/_authenticated/resource/dmr/raw-data'
+      path: '/resource/dmr/raw-data'
+      fullPath: '/resource/dmr/raw-data'
+      preLoaderRoute: typeof AuthenticatedResourceDmrRawDataRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/resource/dmr/import': {
+      id: '/_authenticated/resource/dmr/import'
+      path: '/resource/dmr/import'
+      fullPath: '/resource/dmr/import'
+      preLoaderRoute: typeof AuthenticatedResourceDmrImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/resource/dmr/dashboard': {
+      id: '/_authenticated/resource/dmr/dashboard'
+      path: '/resource/dmr/dashboard'
+      fullPath: '/resource/dmr/dashboard'
+      preLoaderRoute: typeof AuthenticatedResourceDmrDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/closure/task-management/tree': {
@@ -924,6 +1004,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedImportLogImportRoute: typeof AuthenticatedImportLogImportRoute
   AuthenticatedImportLogLogsRoute: typeof AuthenticatedImportLogLogsRoute
   AuthenticatedOutstandingDashboardRoute: typeof AuthenticatedOutstandingDashboardRoute
+  AuthenticatedResourceDashboardRoute: typeof AuthenticatedResourceDashboardRoute
   AuthenticatedClosureAbdDashboardRoute: typeof AuthenticatedClosureAbdDashboardRoute
   AuthenticatedClosureAbdImportRoute: typeof AuthenticatedClosureAbdImportRouteWithChildren
   AuthenticatedClosureAbdProgressRoute: typeof AuthenticatedClosureAbdProgressRoute
@@ -942,6 +1023,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureTaskManagementDashboardRoute: typeof AuthenticatedClosureTaskManagementDashboardRoute
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
   AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
+  AuthenticatedResourceDmrDashboardRoute: typeof AuthenticatedResourceDmrDashboardRoute
+  AuthenticatedResourceDmrImportRoute: typeof AuthenticatedResourceDmrImportRoute
+  AuthenticatedResourceDmrRawDataRoute: typeof AuthenticatedResourceDmrRawDataRoute
   AuthenticatedClosureDashboardIndexRoute: typeof AuthenticatedClosureDashboardIndexRoute
   AuthenticatedClosureSnagManagementDetailIdRoute: typeof AuthenticatedClosureSnagManagementDetailIdRoute
   AuthenticatedClosureSnagManagementImportLogsRoute: typeof AuthenticatedClosureSnagManagementImportLogsRoute
@@ -958,6 +1042,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedImportLogLogsRoute: AuthenticatedImportLogLogsRoute,
   AuthenticatedOutstandingDashboardRoute:
     AuthenticatedOutstandingDashboardRoute,
+  AuthenticatedResourceDashboardRoute: AuthenticatedResourceDashboardRoute,
   AuthenticatedClosureAbdDashboardRoute: AuthenticatedClosureAbdDashboardRoute,
   AuthenticatedClosureAbdImportRoute:
     AuthenticatedClosureAbdImportRouteWithChildren,
@@ -991,6 +1076,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureTaskManagementRawDataRoute,
   AuthenticatedClosureTaskManagementTreeRoute:
     AuthenticatedClosureTaskManagementTreeRoute,
+  AuthenticatedResourceDmrDashboardRoute:
+    AuthenticatedResourceDmrDashboardRoute,
+  AuthenticatedResourceDmrImportRoute: AuthenticatedResourceDmrImportRoute,
+  AuthenticatedResourceDmrRawDataRoute: AuthenticatedResourceDmrRawDataRoute,
   AuthenticatedClosureDashboardIndexRoute:
     AuthenticatedClosureDashboardIndexRoute,
   AuthenticatedClosureSnagManagementDetailIdRoute:
