@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { stripNullExcept } from "@/lib/import/strip-null";
 
 const UpdateFieldSchema = z.object({
   id: z.string().uuid(),
