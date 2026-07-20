@@ -1,5 +1,6 @@
 import {
   ALL_TASK_STAGE_KEYS,
+  ALL_TASK_TIMELINE_STAGE_KEYS,
   addDays,
   daysBetween,
   getTaskStagePlannedDate,
@@ -11,6 +12,7 @@ import {
   type TaskItem,
   type TaskScheduleStage,
 } from "./schedule-utils";
+import { computeTPlan, getStageJudgment, isTaskDelayed } from "./derived";
 
 export type OwnerDim = "team" | "hdec_pic_name" | "hdec_eng_name";
 
@@ -40,25 +42,20 @@ export function computeDelayTopN(
   const out: DelayTopItem[] = [];
   for (const it of items) {
     // task-level plan/actual percentage across all stages
-    let planned = 0;
-    let done = 0;
-    for (const s of ALL_TASK_STAGE_KEYS) {
-      if (isTaskStagePlannedUpTo(it, s, asOfDate)) planned++;
-      if (isTaskStageActualUpTo(it, s, asOfDate)) done++;
-    }
-    const total = ALL_TASK_STAGE_KEYS.length;
-    const planPct = total > 0 ? (planned / total) * 100 : 0;
-    const rawActualPct =
-      it.actual_progress != null && !Number.isNaN(Number(it.actual_progress))
-        ? Number(it.actual_progress)
-        : total > 0
-          ? (done / total) * 100
-          : 0;
+    // Plan% = T.Plan (Data Date 당일 일할 계획진도율), Actual% = actual_progress 누계.
+    const tPlan = computeTPlan(it, asOfDate);
+    const planPct = tPlan != null ? tPlan * 100 : 0;
+    const rawActualPct = Number(it.actual_progress ?? 0) * 100;
     const actualPct = Math.max(0, Math.min(100, rawActualPct));
     const diffPp = actualPct - planPct;
+    // 스테이지별 지연 항목 나열. WIP 는 날짜가 없어 plannedDate 는 plan_start 로 대체.
     for (const st of ALL_TASK_STAGE_KEYS) {
-      if (!isTaskStageDelayedAsOf(it, st, asOfDate)) continue;
-      const plannedDate = getTaskStagePlannedDate(it, st)!;
+      const stageJ = getStageJudgment(it, st, undefined, asOfDate);
+      if (stageJ !== "지연" && stageJ !== "위험") continue;
+      const plannedDate =
+        st === "wip"
+          ? (it.plan_start ? it.plan_start.slice(0, 10) : asOfDate)
+          : getTaskStagePlannedDate(it, st) ?? asOfDate;
       out.push({
         id: it.id,
         taskNo: it.task_no ?? "",
@@ -70,7 +67,7 @@ export function computeDelayTopN(
         stage: st,
         plannedDate,
         daysLate: daysBetween(plannedDate, asOfDate),
-        judgment: it.auto_judgment ?? it.status_manual ?? null,
+        judgment: stageJ,
         actualProgress: Number(it.actual_progress ?? 0),
         planPct,
         actualPct,
@@ -122,22 +119,34 @@ export function computeOwnerLeaderboard(
       map.set(key, row);
     }
     row.taskCount++;
-    let delayed = false;
-    for (const st of ALL_TASK_STAGE_KEYS) {
+    // 타임라인 스테이지(Start/Finish) 도달률 기반 stage count.
+    for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
       row.totalStages++;
       if (isTaskStagePlannedUpTo(it, st, asOfDate)) row.plannedStages++;
       if (isTaskStageActualUpTo(it, st, asOfDate)) row.doneStages++;
-      if (isTaskStageDelayedAsOf(it, st, asOfDate)) {
-        row.delayedStages++;
-        delayed = true;
-      }
+      if (isTaskStageDelayedAsOf(it, st, asOfDate)) row.delayedStages++;
     }
-    if (delayed) row.delayedTaskIds.add(it.id);
+    if (isTaskDelayed(it, undefined, asOfDate)) row.delayedTaskIds.add(it.id);
   }
   const rows = Array.from(map.values());
+  // planPct/actualPct 는 T.Plan / Actual% 의 담당자 평균으로 계산 (스테이지 수 대비 아님).
+  const memberSum = new Map<string, { plan: number; actual: number; n: number }>();
+  for (const it of items) {
+    const raw = (it as any)[dim];
+    const key = raw ? String(raw).trim() || NONE : NONE;
+    const cur = memberSum.get(key) ?? { plan: 0, actual: 0, n: 0 };
+    const tp = computeTPlan(it, asOfDate);
+    cur.plan += tp ?? 0;
+    cur.actual += Math.max(0, Math.min(1, Number(it.actual_progress ?? 0)));
+    cur.n += 1;
+    memberSum.set(key, cur);
+  }
   for (const r of rows) {
-    r.planPct = r.totalStages > 0 ? (r.plannedStages / r.totalStages) * 100 : 0;
-    r.actualPct = r.totalStages > 0 ? (r.doneStages / r.totalStages) * 100 : 0;
+    const m = memberSum.get(r.key);
+    if (m && m.n > 0) {
+      r.planPct = (m.plan / m.n) * 100;
+      r.actualPct = (m.actual / m.n) * 100;
+    }
     r.diffPp = r.actualPct - r.planPct;
   }
   rows.sort((a, b) => a.diffPp - b.diffPp); // 가장 뒤처진 담당자 상단
@@ -176,18 +185,16 @@ export function computeWeeklyDelayTrend(
     let recovered = 0;
     let open = 0;
     for (const it of items) {
-      for (const st of ALL_TASK_STAGE_KEYS) {
-        const key = it.id + "::" + st;
-        const delayed = isTaskStageDelayedAsOf(it, st, asOf);
-        const done = isTaskStageActualUpTo(it, st, asOf);
-        const prevDelayed = stateBefore.get(key) ?? false;
-        const prevDone = stateBeforeDone.get(key) ?? false;
-        if (delayed && !prevDelayed) newDelays++;
-        if (!prevDone && done && prevDelayed) recovered++;
-        if (delayed) open++;
-        stateBefore.set(key, delayed);
-        stateBeforeDone.set(key, done);
-      }
+      const key = it.id;
+      const delayed = isTaskDelayed(it, undefined, asOf);
+      const done = Number(it.actual_progress ?? 0) >= 1;
+      const prevDelayed = stateBefore.get(key) ?? false;
+      const prevDone = stateBeforeDone.get(key) ?? false;
+      if (delayed && !prevDelayed) newDelays++;
+      if (!prevDone && done && prevDelayed) recovered++;
+      if (delayed) open++;
+      stateBefore.set(key, delayed);
+      stateBeforeDone.set(key, done);
     }
     points.push({
       weekStart: cursor,
@@ -237,17 +244,8 @@ export function computeJudgmentStageBreakdown(
     };
     let total = 0;
     for (const it of items) {
-      const planned = isTaskStagePlannedUpTo(it, stage, asOfDate);
-      const done = isTaskStageDone(it, stage);
-      const delayed = isTaskStageDelayedAsOf(it, stage, asOfDate);
-      if (done) counts["완료"]++;
-      else if (delayed) {
-        // Stage-level delay severity — use auto_judgment for row-level 위험/지연 색
-        const j = String(it.auto_judgment ?? "").trim();
-        if (j === "위험") counts["위험"]++;
-        else counts["지연"]++;
-      } else if (planned) counts["주의"]++;
-      else counts["정상"]++;
+      const j = getStageJudgment(it, stage, undefined, asOfDate);
+      if (j in counts) counts[j]++;
       total++;
     }
     return { stage, counts, total };
