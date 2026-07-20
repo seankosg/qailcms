@@ -2,13 +2,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ImportLogsPage } from "@/components/import/ImportLogsPage";
 import { getRouteApi } from "@tanstack/react-router";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { TmImportRecordTab } from "@/components/import-log/task-management/TmImportRecordTab";
 
 const routeApi = getRouteApi("/_authenticated/import-log/logs");
 
 export function ImportLogsHubPage() {
-  const { tab } = routeApi.useSearch();
+  const { tab, sub } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const current = tab ?? "task";
+  const currentSub = sub ?? "file";
+  const { data: me } = useCurrentUser();
+  const canRecord = !!(me?.isAdmin || me?.isSuperUser);
 
   return (
     <div className="space-y-4">
@@ -20,7 +25,9 @@ export function ImportLogsHubPage() {
       </div>
       <Tabs
         value={current}
-        onValueChange={(v) => navigate({ to: "/import-log/logs", search: { tab: v } })}
+        onValueChange={(v) =>
+          navigate({ to: "/import-log/logs", search: { tab: v, sub: currentSub } })
+        }
         className="w-full"
       >
         <TabsList>
@@ -31,7 +38,29 @@ export function ImportLogsHubPage() {
           <TabsTrigger value="warranty">Warranty</TabsTrigger>
         </TabsList>
         <TabsContent value="task" className="mt-4">
-          <ImportLogsPage kind="task_management" />
+          <Tabs
+            value={currentSub}
+            onValueChange={(v) =>
+              navigate({
+                to: "/import-log/logs",
+                search: { tab: "task", sub: v as "file" | "record" },
+              })
+            }
+            className="w-full"
+          >
+            <TabsList>
+              <TabsTrigger value="file">Import File</TabsTrigger>
+              {canRecord && <TabsTrigger value="record">Import Record</TabsTrigger>}
+            </TabsList>
+            <TabsContent value="file" className="mt-4">
+              <ImportLogsPage kind="task_management" />
+            </TabsContent>
+            {canRecord && (
+              <TabsContent value="record" className="mt-4">
+                <TmImportRecordTab />
+              </TabsContent>
+            )}
+          </Tabs>
         </TabsContent>
         <TabsContent value="snag" className="mt-4">
           <ImportLogsPage kind="defect_management" />

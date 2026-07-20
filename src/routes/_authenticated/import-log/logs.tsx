@@ -5,6 +5,7 @@ import { ImportLogsHubPage } from "@/components/import-log/ImportLogsHubPage";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "task").default("task"),
+  sub: fallback(z.enum(["file", "record"]), "file").default("file"),
 });
 
 export const Route = createFileRoute("/_authenticated/import-log/logs")({

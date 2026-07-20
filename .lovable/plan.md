@@ -1,83 +1,99 @@
-# TM 일정/지연 관리 대시보드 계획
+# TM Import Logs — 2탭 구조 및 HDEC PIC 일자별 업로드 매트릭스
 
-## 배치 및 라우팅
+## 개요
 
-- 신규 라우트 `src/routes/_authenticated/closure/task-management/dashboard.tsx` → 경로 `/closure/task-management/dashboard`.
-- 사이드바 `Task Management` 모듈 최상단(Task Summary 위)에 `Dashboard` 링크 추가 (`AppLayout.tsx`).
-- 기존 `/closure/dashboard/task`(전사 개요 축약)는 그대로 유지. 신규 페이지는 TM 전용 상세 대시보드.
+`/import-log/logs?tab=task` 화면을 두 개의 하위 탭으로 재구성합니다.
 
-## 화면 구조 (SHAW T&C DashboardPage 참조)
+1. **Import File** — 기존 `ImportLogsPage kind="task_management"` 그대로 유지 (파일 단위 실행 이력).
+2. **Import Record** — 활성 HDEC PIC × 최근 30일 매트릭스 (신규). Super User 이상만 접근, 팀별 그룹, Excel 내보내기 지원.
 
+## 스코프 요약 (답변 반영)
+
+- 날짜 범위: **최근 30일** (오늘 포함). 사용자가 종료일을 조정 가능.
+- 업로드 판정: 해당 사용자의 **`task_management_import_logs` 존재 여부** (성공/실패 무관, `imported_by = 사용자 id` AND `started_at` KST 날짜가 해당 일자와 일치).
+- 대상 사용자: `profiles.is_active = true` AND (`user_type = 'hdec_pic'` OR `hdec_pic_name` 이 채워진 계정) 전원.
+- 셀 표시: **O / X 아이콘**. 주말은 헤더/셀 배경을 흐리게. 오늘 열은 강조.
+- 접근 권한: `superuser`, `admin` 만 탭 노출 (Sidebar 링크는 유지하되 진입 시 권한 없으면 탭 숨김 + 안내).
+
+## UI 구조
+
+```text
+Import Logs 페이지
+  Tabs (기존): Task Management | Snag List | Spare Part | ABD | Warranty
+    └ Task Management 컨텐츠 내부에 하위 Tabs 추가
+        ├─ [Import File]  → 기존 <ImportLogsPage kind="task_management" />
+        └─ [Import Record] → 신규 컴포넌트 (superuser+ 만)
 ```
-[Header]  Task Progress & Delay Dashboard   |   As-of Today · Data Date · Rows N
-[Quick Filter Pills]  Team ▾  ·  HDEC PIC ▾  ·  HDEC ENG ▾   (다중선택 pill)
-[Toolbar]  Group(다중) · 공종 · Plot · Bucket(Day/Week) · Stage · As-of · Range · Plan(Baseline/Remaining) · 검색
-[KPI Strip]  누적 계획 · 누적 실적 · Variance% · 진도% · 지연 스테이지 수 · 이번주 예정 · Critical
-[Row A]  좌: Plan vs Actual S-Curve (Cumulative + Weekly Variance Bar)
-         우: Judgment Donut (완료/정상/주의/지연/위험)  +  스테이지별 스택바(Start/Comp × 판정)
-[Row B]  주간 신규 지연 vs 회복 트렌드 라인 (12주)
-[Row C]  Plan vs Actual Matrix (기존 컴포넌트 재사용, 그룹 축·버킷 반응)
-[Row D]  좌: Delay Top N 태스크 테이블 (지연일수 desc, 20건, 클릭→Raw Data 필터)
-         우: Owner Leaderboard (Team | HDEC PIC | HDEC ENG 탭 전환) — 계획 진도 vs 실적 진도 + 차이 + 지연 태스크 수
+
+Import Record 하위 탭 레이아웃:
+
+```text
+┌ Toolbar ────────────────────────────────────────────────────┐
+│ 기간: [2026-06-20] ~ [2026-07-20]  [최근 30일] [이번달]   │
+│ 팀 필터: [전체 ▼]   검색: [이름/로그인ID]                │
+│                                     [Excel 내보내기] 버튼 │
+└─────────────────────────────────────────────────────────────┘
+┌ 팀별 그룹 (Collapsible) ────────────────────────────────────┐
+│ ▼ Team A  (12명 / 오늘 업로드 8명 / 미업로드 4명)          │
+│  ┌──────┬─────┬─────┬───┬───┬───┬───┬───┬────────────┐   │
+│  │ 이름 │Team │ID   │D-29│…│D-1│Today│ 30일합계     │   │
+│  ├──────┼─────┼─────┼───┼───┼───┼───┼───┼────────────┤   │
+│  │ 홍길동│ A  │hgd  │ O │ X │ O │ … │ O │ 22 / 30    │   │
+│  └──────┴─────┴─────┴───┴───┴───┴───┴───┴────────────┘   │
+│ ▶ Team B ...                                              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## 상단 축(빠른 필터 pill)
-
-기존 다중 선택 Group 축은 유지하면서, 상단에 담당자 축 빠른 필터를 별도 pill 그룹으로 추가:
-- Team, HDEC PIC, HDEC ENG 각각 풀다운 다중 선택 pill.
-- 값은 프로필 마스터가 아닌 실제 `task_management_raw` 값에서 distinct 도출(팀 필터에 연동됨).
-- 선택값은 URL search param에 반영되어 모든 위젯에 적용.
+- 첫 3개 컬럼(이름/팀/로그인ID) sticky, 사용자 이름 클릭 시 admin 프로필 페이지로 이동.
+- 셀 hover 시 해당 날짜 업로드 건수 툴팁.
+- 팀 그룹 헤더에 "오늘 미업로드 N명" 뱃지 → 클릭 시 해당 팀 미업로드자만 필터.
 
 ## 데이터 흐름
 
-- 기존 `useTaskDashboardData` 훅 확장: `hdecPic?: string[]`, `hdecEng?: string[]` 인자 추가. 클라이언트 측 필터로 처리(현재 훅과 동일 패턴).
-- 기존 `aggregateTaskSchedule`, `isTaskStageDelayedAsOf`, `findTaskCritical` 재사용.
-- 신규 유틸(`src/lib/task-management/delay-utils.ts`):
-  - `computeDelayTopN(items, asOfDate, limit)` — 스테이지 지연일수 기준 Top N.
-  - `computeOwnerLeaderboard(items, asOfDate, dim)` — dim ∈ `team | hdec_pic_name | hdec_eng_name`. 각 오너별 총/완료/지연 스테이지 수, 계획진도율, 실적진도율, 차이.
-  - `computeWeeklyDelayTrend(items, weeks=12, today)` — 주별 신규 지연(해당 주에 처음 지연 진입) vs 회복(지연 상태에서 완료) 카운트.
-  - `computeJudgmentStageBreakdown(items, asOfDate)` — 판정 × 스테이지(Start/Comp) 카운트.
+1. **사용자 목록 조회 (client, Supabase)**
+   - `profiles` 에서 `is_active=true` AND (`user_type='hdec_pic'` OR `hdec_pic_name IS NOT NULL`) 인 행을 team 오름차순, name 오름차순으로 가져옴.
+2. **업로드 이력 집계 (server function)** — 신규 `getTmImportRecordMatrix`
+   - 입력: `from`, `to` (ISO date, KST 기준).
+   - 처리: `task_management_import_logs` 에서 `started_at >= from 00:00 KST AND started_at < to+1 00:00 KST` 인 행을 `imported_by`, `date_trunc('day', started_at AT TIME ZONE 'Asia/Seoul')` 로 GROUP BY 하여 `{ user_id, date, count }[]` 반환.
+   - `requireSupabaseAuth` 미들웨어 + 내부에서 `has_role(admin/superuser)` 체크. 그 외에는 401/403.
+3. **매트릭스 조립 (client)**
+   - 사용자 × 날짜 그리드 생성. 셀 count>=1 → O, 아니면 X.
 
-## 신규 컴포넌트
+## Excel 내보내기
 
-- `src/components/task-management/dashboard/TmDashboardPage.tsx` — 라우트 컴포넌트, 툴바+레이아웃 오케스트레이션.
-- `src/components/task-management/dashboard/OwnerQuickFilterPills.tsx` — Team/HDEC PIC/HDEC ENG 다중 선택 pill.
-- `src/components/task-management/dashboard/TaskPlanVsActualCurve.tsx` — Recharts 기반 S-Curve + Variance 바(SM `SnagPlanVsActualCard`와 동일한 시각 언어, 양수 초록/음수 빨강).
-- `src/components/task-management/dashboard/DelayTopTable.tsx` — 지연 Top N 표.
-- `src/components/task-management/dashboard/OwnerLeaderboardCard.tsx` — 내부 Team/HDEC PIC/HDEC ENG 탭 전환. 각 행: 이름, 스테이지 수, 지연 수, Plan% Bar, Actual% Bar, Diff(음수 빨강 뱃지).
-- `src/components/task-management/dashboard/WeeklyDelayTrend.tsx` — 신규 지연 vs 회복 라인 차트.
-- `src/components/task-management/dashboard/JudgmentStageBreakdown.tsx` — 도넛(전체) + 우측 스테이지 스택바.
+`src/lib/excel/stream-export.ts` 의 `streamXlsxExport` (SHAW 스타일 헤더) 재사용:
 
-## 재사용 컴포넌트
+- 파일명: `tm-import-record_{from}_{to}.xlsx`
+- 시트 컬럼: 팀 / 이름 / 로그인ID / (날짜 컬럼 30개) / 업로드일수 / 미업로드일수(주말제외) / 최근 업로드일
+- 셀 값: `O` / `X` (문자열). O는 초록 배경(`FFD1FAE5`), X는 빨강 배경(`FFFEE2E2`), 주말은 회색 배경.
+- Title: "TM Import Record — {from} ~ {to}"
+- MetaRows: Exported by / Source: task_management_import_logs / Search / Filters(팀) / Sort.
+- Freeze: 3열 + 상단 헤더 8행.
 
-- `PlanVsActualMatrix`, `KpiStrip`, `ScheduleLegend`, `CriticalWatchlist`, `BehindScheduleTable`(원하면 Row C 아래 접이식으로).
+## 권한 처리
 
-## URL 상태 (validateSearch, zod)
+- `Import Record` 서브탭 자체를 `useCurrentUser()` 결과 기준 `isAdmin || isSuperUser` 일 때만 `TabsTrigger` 렌더.
+- 직접 URL(`?tab=task&sub=record`) 진입해도 서버 함수가 role 재검증하므로 데이터 노출 없음.
+- URL 상태: `search.sub`(=`file`|`record`)를 zod로 추가, 기본값 `file`.
 
-```
-group[] (기본 ["discipline"])
-discipline[] plot[] team[] hdecPic[] hdecEng[]
-bucket=day|week
-stageView[]  asofMode=today|dataDate  planMode=baseline|remaining
-range=14|30|60|90|180  hidePast=bool  q=string
-leaderboardDim=team|hdec_pic|hdec_eng
-```
+## 파일 변경 목록
 
-## 인터랙션
+**신규**
+- `src/lib/task-management/import-record.functions.ts` — `getTmImportRecordMatrix` 서버 함수.
+- `src/lib/task-management/import-record-export.ts` — Excel 내보내기 헬퍼.
+- `src/components/import-log/task-management/TmImportRecordTab.tsx` — 매트릭스 UI, 필터, 팀 그룹.
+- `src/components/import-log/task-management/TmImportRecordMatrix.tsx` — 순수 렌더 컴포넌트.
 
-- Delay Top N 행 클릭 → `/closure/task-management/raw-data`로 이동, `source=dashboard`, `taskNo` 또는 `q`로 필터, 기존 필터 리셋(SM/ABD Progress 매트릭스 로직과 동일).
-- Owner Leaderboard 행 클릭 → 해당 dim 값으로 Raw Data 필터.
-- Matrix 셀 클릭 → 기존 로직 유지.
+**수정**
+- `src/components/import-log/ImportLogsHubPage.tsx` — Task Management TabsContent 내부에 하위 Tabs (Import File / Import Record) 추가, superuser+ 조건부 노출.
+- `src/routes/_authenticated/import-log/logs.tsx` — `searchSchema` 에 `sub` 필드 추가.
 
-## 접근성/성능
+**변경 없음**
+- `ImportLogsPage.tsx`, 기존 로그 컬럼/RLS. 조회는 `imported_by` 기반이며 현재 `task_management_import_logs` SELECT 정책이 이미 authenticated 에게 열려 있음(별도 마이그레이션 불필요, 배포 전 재확인).
 
-- 모든 위젯은 `useMemo`로 aggregate 재사용, Matrix는 기존대로 가상화.
-- 12주 트렌드는 미리 정렬된 배열만 계산 후 Recharts에 전달.
-- 색상은 모두 semantic token (primary/success/warning/destructive), 다크 모드 안전.
+## 검증
 
-## 파일 변경 요약
-
-- 신규: 라우트 1, 페이지 1, 위젯 5, 유틸 1
-- 수정: `AppLayout.tsx`(사이드바 항목), `useTaskDashboardData.ts`(hdecPic/hdecEng 인자), 기존 KPI/Matrix는 재사용
-
-승인해 주시면 이 구성대로 구현하겠습니다.
+1. Type check.
+2. 프리뷰: `superuser` 계정으로 Import Record 탭 노출 확인, 일반 user 계정으로 탭 미노출 확인.
+3. DB: `psql` 로 최근 30일 `task_management_import_logs` 샘플 카운트와 UI 매트릭스 O 개수가 일치하는지 스팟체크.
+4. Excel: 파일 다운로드 → 열어서 팀/사용자/O·X/총계 컬럼 정확성 확인.
