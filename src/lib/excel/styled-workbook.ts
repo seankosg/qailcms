@@ -167,9 +167,7 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
     numFmtByKey,
   } = opts;
 
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const exportedTs = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const exportedTs = dohaDateTime();
 
   const banner: string[] = [
     `Exported: ${exportedTs}${meta?.userName ? `  by  ${meta.userName}` : ""}`,
