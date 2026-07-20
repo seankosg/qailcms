@@ -15,6 +15,7 @@ import {
   sha256Hex,
   type ParsedSparePartRow,
 } from "@/lib/spare-part-import-parser";
+import { stripNullExcept } from "@/lib/import/strip-null";
 
 export type FileStatus =
   | "pending"
@@ -314,18 +315,30 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
           for (const r of data ?? []) existingSet.add(r.doc_ref);
         }
 
-        // Build payloads.
+        // Build payloads. 임포트값이 null이면 기존 DB 값을 유지 (키/메타/플롯은 강제).
         type Payload = { doc_ref: string; [k: string]: unknown };
-        const payloads: Payload[] = parsed.map((p) => ({
-          doc_ref: p.doc_ref,
-          plot: p.plot,
-          ...p.struct,
-          raw_payload: p.raw_payload,
-          custom_payload: p.custom_payload,
-          updated_by: userId,
-          is_active: true,
-          imported_at: new Date().toISOString(),
-        }));
+        const SP_FORCE_KEYS = [
+          "doc_ref",
+          "plot",
+          "raw_payload",
+          "custom_payload",
+          "updated_by",
+          "is_active",
+          "imported_at",
+        ] as const;
+        const payloads: Payload[] = parsed.map((p) => {
+          const row = {
+            doc_ref: p.doc_ref,
+            plot: p.plot,
+            ...p.struct,
+            raw_payload: p.raw_payload,
+            custom_payload: p.custom_payload,
+            updated_by: userId,
+            is_active: true,
+            imported_at: new Date().toISOString(),
+          };
+          return stripNullExcept(row, SP_FORCE_KEYS) as Payload;
+        });
 
         // Bulk upsert in chunks.
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
