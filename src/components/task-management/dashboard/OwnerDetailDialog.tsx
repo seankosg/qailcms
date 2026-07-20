@@ -53,7 +53,12 @@ export function OwnerDetailDialog({ open, onOpenChange, dim, ownerKey, row, item
   const goRawData = () => {
     navigate({
       to: "/closure/task-management/raw-data",
-      search: { [DIM_PARAM[dim]]: ownerKey, source: "dashboard" } as any,
+      search: {
+        [DIM_PARAM[dim]]: ownerKey,
+        source: "dashboard",
+        mode: "delay",
+        asOf: asOfDate,
+      } as any,
     });
   };
 
