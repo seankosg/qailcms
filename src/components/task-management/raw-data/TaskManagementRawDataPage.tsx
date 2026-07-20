@@ -486,7 +486,7 @@ export function TaskManagementRawDataPage() {
 
   // discipline-task_no 단위 collapse 키 유지 — 접힌 부모의 자식 행 숨김
   const visibleRows = useMemo(() => {
-    const src = delayFilteredRows;
+    const src = kpiFilteredRows;
     if (collapsedParents.size === 0) return src;
     return src.filter((r) => {
       const parent = (r as any).main_task_no as string | null;
@@ -494,7 +494,7 @@ export function TaskManagementRawDataPage() {
       if (!parent) return true;
       return !collapsedParents.has(`${disc}::${parent}`);
     });
-  }, [delayFilteredRows, collapsedParents]);
+  }, [kpiFilteredRows, collapsedParents]);
 
   const parentKeys = useMemo(() => {
     const keys: string[] = [];
