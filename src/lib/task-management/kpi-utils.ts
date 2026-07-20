@@ -1,6 +1,7 @@
 // TM Dashboard KPI 계산 유틸 — SHAW PunchDashboard 산식을 TM 컬럼에 매핑
 import type { TaskItem } from "./schedule-utils";
 import type { TaskThresholds } from "./derived";
+import { computeTPlan, isTaskDelayed, computeJudgment } from "./derived";
 
 function parseDate(v: unknown): number | null {
   if (!v) return null;
@@ -15,18 +16,8 @@ function asOfMs(asOf: string): number {
 }
 
 /** asOfDate 기준 계획 진도율 (0..1). derived.expectedProgressToday의 asOf 파라미터화 버전. */
-export function expectedProgressAt(
-  row: { plan_start?: string | null; plan_end?: string | null },
-  asOf: string,
-): number {
-  const start = parseDate(row.plan_start);
-  const end = parseDate(row.plan_end);
-  if (!start || !end) return 0;
-  const t = asOfMs(asOf);
-  const total = end - start;
-  if (total <= 0) return t >= end ? 1 : 0;
-  const elapsed = t - start;
-  return Math.max(0, Math.min(1, elapsed / total));
+export function expectedProgressAt(row: TaskItem, asOf: string): number {
+  return computeTPlan(row, asOf) ?? 0;
 }
 
 export function gapAt(row: TaskItem, asOf: string): number {
@@ -75,16 +66,12 @@ export function isCriticalDelay(
   thresholds: TaskThresholds,
 ): boolean {
   if (isCompleted(row)) return false;
-  const slip = Number(row.slip_days ?? 0);
-  if (slip > thresholds.slip_late_days) return true;
-  if (gapAt(row, asOf) < thresholds.behind_late_gap) return true;
-  return row.auto_judgment === "위험";
+  return computeJudgment(row, thresholds, asOf) === "위험";
 }
 
 export function isInDelay(row: TaskItem, asOf: string): boolean {
   if (isCompleted(row)) return false;
-  if (row.auto_judgment === "지연" || row.auto_judgment === "위험") return true;
-  return isStartDelayed(row, asOf) || isCompletionOverdue(row, asOf) || isBehindSchedule(row, asOf);
+  return isTaskDelayed(row, undefined, asOf);
 }
 
 export function statusOf(row: TaskItem): "completed" | "wip" | "not_started" {
