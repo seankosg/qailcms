@@ -1,6 +1,7 @@
 import { Bell, Menu, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import hyundaiLogo from "@/assets/hyundai-logo.png.asset.json";
+import { forceFreshAppLoad } from "@/hooks/useVersionCheck";
 
 interface Props {
   onMobileMenu?: () => void;
@@ -12,7 +13,7 @@ function NewVersionButton() {
     return null;
   }
   const handleForceReload = () => {
-    window.location.replace(window.location.pathname + "?__reset=" + Date.now());
+    void forceFreshAppLoad();
   };
   return (
     <Button
