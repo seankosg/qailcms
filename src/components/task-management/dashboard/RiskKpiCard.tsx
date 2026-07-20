@@ -52,7 +52,7 @@ export function RiskKpiCard({
   return (
     <Card
       onClick={onClick}
-      className={cn(onClick && "cursor-pointer transition-colors hover:bg-accent/40")}
+      className={cn(onClick && "cursor-pointer transition-colors hover:bg-primary/10")}
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-3">
@@ -65,7 +65,7 @@ export function RiskKpiCard({
             </div>
             <div
               className={cn(
-                "text-2xl font-semibold tabular-nums leading-tight",
+                "text-3xl font-bold tabular-nums leading-tight",
                 TONE_CLASSES[tone],
               )}
             >
@@ -88,7 +88,9 @@ export function RiskKpiCard({
                     className="flex h-5 items-center justify-between gap-2 px-1 text-[11px] tabular-nums text-muted-foreground"
                   >
                     <span className="truncate">{row.label}</span>
-                    <span>{row.count.toLocaleString()}</span>
+                    <span className={cn("font-medium", TONE_CLASSES[tone])}>
+                      {row.count.toLocaleString()}
+                    </span>
                   </div>
                 ) : (
                   <button
@@ -98,10 +100,12 @@ export function RiskKpiCard({
                       e.stopPropagation();
                       row.onClick?.();
                     }}
-                    className="flex h-5 items-center justify-between gap-2 rounded px-1 text-[11px] tabular-nums transition-colors hover:bg-accent/60"
+                    className="flex h-5 items-center justify-between gap-2 rounded px-1 text-[11px] tabular-nums transition-colors hover:bg-primary/10 cursor-pointer"
                   >
                     <span className="truncate">{row.label}</span>
-                    <span className="font-medium">{row.count.toLocaleString()}</span>
+                    <span className={cn("font-medium", TONE_CLASSES[tone])}>
+                      {row.count.toLocaleString()}
+                    </span>
                   </button>
                 ),
               )}

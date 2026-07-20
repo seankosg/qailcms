@@ -213,7 +213,7 @@ export function TmKpiCards({
           label="Start Delayed"
           count={kpi.startDelayed}
           percent={pctNum(kpi.startDelayed, kpi.total)}
-          tone="warn"
+          tone="danger"
           onClick={() => goRaw("start_delayed")}
           breakdown={toBreakdownRows("start_delayed", breakdown.startDelayed)}
         />
@@ -238,7 +238,7 @@ export function TmKpiCards({
           label="Behind Schedule"
           count={kpi.behindSchedule}
           percent={pctNum(kpi.behindSchedule, kpi.total)}
-          tone="warn"
+          tone="danger"
           onClick={() => goRaw("behind")}
           breakdown={toBreakdownRows("behind", breakdown.behindSchedule)}
         />

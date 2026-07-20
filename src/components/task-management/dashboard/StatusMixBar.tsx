@@ -71,9 +71,9 @@ function Segment({
       style={{ width: `${pct}%` }}
       onClick={onClick}
       className={cn(
-        "flex items-center justify-center px-1 text-[10px] font-medium text-white transition-opacity hover:opacity-80",
+        "flex items-center justify-center px-1 text-[10px] font-medium text-white transition-all hover:opacity-90 hover:ring-2 hover:ring-primary/30 hover:ring-inset",
         className,
-        !onClick && "cursor-default",
+        !onClick && "cursor-default hover:ring-0",
       )}
       title={`${label}: ${count.toLocaleString()} (${pct.toFixed(1)}%)`}
     >

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, CalendarDays, Gauge, RotateCcw, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CalendarDays, RotateCcw, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -134,8 +134,7 @@ export function TmDashboardPage() {
             <Link to="/closure/task-management/tree" className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-              <Gauge className="h-5 w-5 text-primary" />
+            <h1 className="text-xl font-semibold tracking-tight">
               Task Management Dashboard
             </h1>
           </div>
