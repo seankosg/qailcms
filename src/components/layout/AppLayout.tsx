@@ -291,15 +291,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="border-t p-3">
           <div className="mb-2 truncate text-xs text-muted-foreground">{me?.email}</div>
           <div className="mb-2 flex flex-wrap gap-1">
-            {me?.isAdmin ? (
+            {me?.primaryRole === "guest" || me?.isGuest ? (
+              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Guest (읽기)</span>
+            ) : me?.isAdmin || me?.isDSuperUser ? (
               <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                 <ShieldCheck className="h-3 w-3" />
-                {me.isSuperUser ? "Superuser" : "Admin"}
+                {me?.roleLabel ?? "Admin"}
               </span>
-            ) : me?.isGuest ? (
-              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Guest (읽기)</span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium">User</span>
+              <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium">
+                {me?.roleLabel ?? "User"}
+              </span>
             )}
           </div>
           <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut}>
