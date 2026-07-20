@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { dohaStampCompact } from "@/lib/time/doha";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
 import {
   buildDefectHeaderBlock,
