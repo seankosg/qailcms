@@ -615,7 +615,7 @@ export function TaskManagementRawDataPage() {
           meta: { group: c.group, filterType: "stage-progress" as const },
           cell: ({ row }) => {
             const rr = row.original as Row;
-            const dd = (rr as any).data_date ?? null;
+            const dd = selectedDataDate || ((rr as any).data_date ?? null);
             return (
               <span className="flex w-full items-center justify-center">
                 <TaskStageProgress row={rr as any} dataDate={dd} />
@@ -635,8 +635,9 @@ export function TaskManagementRawDataPage() {
           enableSorting: true,
           enableColumnFilter: false,
           accessorFn: (r: Row) => {
-            if (c.key === "expected_progress_today") return expectedProgressToday(r as any);
-            return todayGap(r as any);
+            if (c.key === "expected_progress_today")
+              return expectedProgressToday(r as any, selectedDataDate || undefined);
+            return todayGap(r as any, selectedDataDate || undefined);
           },
           header: labelOverrides[c.key] ?? c.label,
           meta: { group: c.group },
@@ -707,7 +708,7 @@ export function TaskManagementRawDataPage() {
                         actual_progress: rr.actual_progress,
                         plan_start: rr.plan_start,
                         plan_end: rr.plan_end,
-                      })
+                      }, selectedDataDate || undefined)
                 }
                 slipDays={rr.slip_days != null ? Number(rr.slip_days) : null}
                 actualProgress={
