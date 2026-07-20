@@ -8,8 +8,9 @@ const EntrySchema = z.object({
   system_name: z.string().min(1),
   contractor_name: z.string().min(1),
   plot: z.enum(['C', 'D', 'TOTAL']),
-  metric: z.enum(['target', 'today', 'yesterday']),
-  manpower: z.coerce.number().int().min(0),
+  plan_manpower: z.coerce.number().int().min(0),
+  actual_manpower: z.coerce.number().int().min(0),
+  diff_manpower: z.coerce.number().int().optional(),
   source_image_path: z.string().optional().nullable(),
 });
 
@@ -46,8 +47,8 @@ export const saveDmrEntries = createServerFn({ method: 'POST' })
       system_name: e.system_name,
       contractor_name: e.contractor_name,
       plot: e.plot,
-      metric: e.metric,
-      manpower: e.manpower,
+      plan_manpower: e.plan_manpower,
+      actual_manpower: e.actual_manpower,
       source_image_path: e.source_image_path ?? null,
       created_by: context.userId,
     }));
@@ -56,7 +57,7 @@ export const saveDmrEntries = createServerFn({ method: 'POST' })
     const { error, count } = await supabase
       .from('dmr_entries')
       .upsert(rows, {
-        onConflict: 'report_date,discipline,system_name,contractor_name,plot,metric',
+        onConflict: 'report_date,discipline,system_name,contractor_name,plot',
         count: 'exact',
         ignoreDuplicates: !data.overwrite,
       });

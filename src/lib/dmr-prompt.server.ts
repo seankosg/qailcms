@@ -5,7 +5,7 @@ Image layout:
 - Report date is shown on the header, often as YYYY.MM.DD or YYYY-MM-DD or DD/MM/YYYY.
 - Table has one row per (System, Contractor Subcon.) combination.
 - Columns (grouped): Target | Today | Yesterday | Difference. Each group is further split into Plot C / Plot D / Total.
-- Ignore the "Difference" columns entirely — they are computed downstream.
+- Map "Target" -> plan, "Today" -> actual. Ignore the "Yesterday" and "Difference" columns entirely — they are not needed.
 
 Extraction rules:
 - Empty cells, dashes ("-"), or blanks -> 0 (integer).
@@ -33,7 +33,7 @@ export const DMR_TOOL_SCHEMA = {
           values: {
             type: 'object' as const,
             properties: {
-              target: {
+              plan: {
                 type: 'object' as const,
                 properties: {
                   C: { type: 'integer' as const },
@@ -42,16 +42,7 @@ export const DMR_TOOL_SCHEMA = {
                 },
                 required: ['C', 'D', 'TOTAL'],
               },
-              today: {
-                type: 'object' as const,
-                properties: {
-                  C: { type: 'integer' as const },
-                  D: { type: 'integer' as const },
-                  TOTAL: { type: 'integer' as const },
-                },
-                required: ['C', 'D', 'TOTAL'],
-              },
-              yesterday: {
+              actual: {
                 type: 'object' as const,
                 properties: {
                   C: { type: 'integer' as const },
@@ -61,7 +52,7 @@ export const DMR_TOOL_SCHEMA = {
                 required: ['C', 'D', 'TOTAL'],
               },
             },
-            required: ['target', 'today', 'yesterday'],
+            required: ['plan', 'actual'],
           },
         },
         required: ['system', 'contractor', 'values'],

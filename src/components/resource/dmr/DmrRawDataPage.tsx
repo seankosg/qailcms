@@ -24,7 +24,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DMR_DISCIPLINES, DMR_PLOTS, DMR_METRICS } from '@/lib/dmr/types';
+import { DMR_DISCIPLINES, DMR_PLOTS } from '@/lib/dmr/types';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { DmrBulkEditBar } from './DmrBulkEditBar';
 import { fetchDmrFilteredIds } from '@/lib/dmr-mutations.functions';
@@ -37,8 +37,9 @@ type SortField =
   | 'system_name'
   | 'contractor_name'
   | 'plot'
-  | 'metric'
-  | 'manpower';
+  | 'plan_manpower'
+  | 'actual_manpower'
+  | 'diff_manpower';
 
 interface SortSpec {
   field: SortField;
@@ -59,7 +60,6 @@ export function DmrRawDataPage() {
 
   const [discipline, setDiscipline] = useState<string>('all');
   const [plot, setPlot] = useState<string>('all');
-  const [metric, setMetric] = useState<string>('all');
   const [systems, setSystems] = useState<string[]>([]);
   const [contractors, setContractors] = useState<string[]>([]);
   const [directOnly, setDirectOnly] = useState<string[]>([]);
@@ -72,7 +72,6 @@ export function DmrRawDataPage() {
   const anyFilterActive =
     discipline !== 'all' ||
     plot !== 'all' ||
-    metric !== 'all' ||
     systems.length > 0 ||
     contractors.length > 0 ||
     directOnly.length > 0 ||
@@ -83,7 +82,6 @@ export function DmrRawDataPage() {
   const resetFilters = () => {
     setDiscipline('all');
     setPlot('all');
-    setMetric('all');
     setSystems([]);
     setContractors([]);
     setDirectOnly([]);
@@ -140,7 +138,6 @@ export function DmrRawDataPage() {
   const filterKey = {
     discipline,
     plot,
-    metric,
     systems,
     effectiveContractors,
     q: q.trim(),
@@ -158,7 +155,6 @@ export function DmrRawDataPage() {
       sq = sq.limit(PAGE_SIZE);
       if (discipline !== 'all') sq = sq.eq('discipline', discipline);
       if (plot !== 'all') sq = sq.eq('plot', plot);
-      if (metric !== 'all') sq = sq.eq('metric', metric);
       if (systems.length) sq = sq.in('system_name', systems);
       if (effectiveContractors.length) sq = sq.in('contractor_name', effectiveContractors);
       if (fromDate) sq = sq.gte('report_date', fromDate);
@@ -175,7 +171,9 @@ export function DmrRawDataPage() {
 
   const rows = query.data?.rows ?? [];
   const total = query.data?.count ?? 0;
-  const sumManpower = rows.reduce((a, r: any) => a + (r.manpower ?? 0), 0);
+  const sumPlan = rows.reduce((a, r: any) => a + (r.plan_manpower ?? 0), 0);
+  const sumActual = rows.reduce((a, r: any) => a + (r.actual_manpower ?? 0), 0);
+  const sumDiff = sumActual - sumPlan;
 
   const selectedIds = useMemo(
     () => Object.entries(selection).filter(([, v]) => v).map(([k]) => k),
@@ -205,7 +203,6 @@ export function DmrRawDataPage() {
         data: {
           discipline,
           plot,
-          metric,
           systems,
           contractors: effectiveContractors,
           fromDate: fromDate || null,
@@ -285,22 +282,6 @@ export function DmrRawDataPage() {
               {DMR_PLOTS.map((p) => (
                 <SelectItem key={p} value={p}>
                   {p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <div className="mb-1 text-[11px] text-muted-foreground">Metric</div>
-          <Select value={metric} onValueChange={setMetric}>
-            <SelectTrigger className="h-8 w-32 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              {DMR_METRICS.map((m) => (
-                <SelectItem key={m} value={m} className="capitalize">
-                  {m}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -398,11 +379,15 @@ export function DmrRawDataPage() {
         )}
 
         <div className="ml-auto flex flex-col text-right">
-          <span className="text-[11px] text-muted-foreground">Rows / Manpower</span>
+          <span className="text-[11px] text-muted-foreground">Rows · Plan / Actual / Δ</span>
           <span className="text-sm font-semibold">
             {rows.length.toLocaleString()}
             {total > rows.length && ` / ${total.toLocaleString()}`} ·{' '}
-            {sumManpower.toLocaleString()}명
+            <span className="text-muted-foreground">{sumPlan.toLocaleString()}</span> /{' '}
+            <span>{sumActual.toLocaleString()}</span> /{' '}
+            <span className={sumDiff > 0 ? 'text-emerald-600' : sumDiff < 0 ? 'text-red-600' : 'text-muted-foreground'}>
+              {sumDiff > 0 ? '+' : ''}{sumDiff.toLocaleString()}
+            </span>
           </span>
         </div>
       </div>
@@ -439,21 +424,22 @@ export function DmrRawDataPage() {
               <SortHeader label="Contractor" field="contractor_name" sortOf={sortOf} onClick={toggleSort} />
               <th className="px-2 py-1 text-left">유형</th>
               <SortHeader label="Plot" field="plot" sortOf={sortOf} onClick={toggleSort} />
-              <SortHeader label="Metric" field="metric" sortOf={sortOf} onClick={toggleSort} />
-              <SortHeader label="Manpower" field="manpower" sortOf={sortOf} onClick={toggleSort} align="right" />
+              <SortHeader label="Plan" field="plan_manpower" sortOf={sortOf} onClick={toggleSort} align="right" />
+              <SortHeader label="Actual" field="actual_manpower" sortOf={sortOf} onClick={toggleSort} align="right" />
+              <SortHeader label="Δ (Actual−Plan)" field="diff_manpower" sortOf={sortOf} onClick={toggleSort} align="right" />
             </tr>
           </thead>
           <tbody>
             {query.isLoading && (
               <tr>
-                <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                <td colSpan={10} className="p-4 text-center text-muted-foreground">
                   로딩 중…
                 </td>
               </tr>
             )}
             {!query.isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                <td colSpan={10} className="p-4 text-center text-muted-foreground">
                   데이터가 없습니다
                 </td>
               </tr>
@@ -461,6 +447,7 @@ export function DmrRawDataPage() {
             {rows.map((r: any) => {
               const direct = directSet.get(r.contractor_name);
               const checked = !!selection[r.id];
+              const diffV = Number(r.diff_manpower ?? ((r.actual_manpower ?? 0) - (r.plan_manpower ?? 0)));
               return (
                 <tr
                   key={r.id}
@@ -494,9 +481,14 @@ export function DmrRawDataPage() {
                     )}
                   </td>
                   <td className="px-2 py-1">{r.plot}</td>
-                  <td className="px-2 py-1 capitalize">{r.metric}</td>
+                  <td className="px-2 py-1 text-right text-muted-foreground">
+                    {Number(r.plan_manpower ?? 0).toLocaleString()}
+                  </td>
                   <td className="px-2 py-1 text-right font-medium">
-                    {Number(r.manpower ?? 0).toLocaleString()}
+                    {Number(r.actual_manpower ?? 0).toLocaleString()}
+                  </td>
+                  <td className={`px-2 py-1 text-right font-medium ${diffV > 0 ? 'text-emerald-600' : diffV < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    {diffV > 0 ? '+' : ''}{diffV.toLocaleString()}
                   </td>
                 </tr>
               );

@@ -16,9 +16,8 @@ const RowSchema = z.object({
   contractor: z.string().min(1),
   is_direct: z.boolean().optional(),
   values: z.object({
-    target: ValuesSchema,
-    today: ValuesSchema,
-    yesterday: ValuesSchema,
+    plan: ValuesSchema,
+    actual: ValuesSchema,
   }),
 });
 const SectionSchema = z.object({

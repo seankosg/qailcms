@@ -13,8 +13,9 @@ export const DMR_EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'system_name', label: 'System', kind: 'text', widthPx: 220 },
   { key: 'contractor_name', label: 'Contractor', kind: 'text', widthPx: 220 },
   { key: 'plot', label: 'Plot', kind: 'text', widthPx: 60 },
-  { key: 'metric', label: 'Metric', kind: 'text', widthPx: 90 },
-  { key: 'manpower', label: 'Manpower', kind: 'number', widthPx: 100 },
+  { key: 'plan_manpower', label: 'Plan', kind: 'number', widthPx: 100 },
+  { key: 'actual_manpower', label: 'Actual', kind: 'number', widthPx: 100 },
+  { key: 'diff_manpower', label: 'Diff (Actual−Plan)', kind: 'number', widthPx: 130 },
 ];
 
 function cellToString(v: unknown): string {

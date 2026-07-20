@@ -1,15 +1,14 @@
 export type DmrDiscipline = 'ARCH' | 'ELECT' | 'MECH';
 export type DmrPlot = 'C' | 'D' | 'TOTAL';
-export type DmrMetric = 'target' | 'today' | 'yesterday';
+export type DmrMetric = 'plan' | 'actual';
 
 export interface DmrParsedRow {
   system: string;
   contractor: string;
   is_direct?: boolean;
   values: {
-    target: { C: number; D: number; TOTAL: number };
-    today: { C: number; D: number; TOTAL: number };
-    yesterday: { C: number; D: number; TOTAL: number };
+    plan: { C: number; D: number; TOTAL: number };
+    actual: { C: number; D: number; TOTAL: number };
   };
 }
 
@@ -27,13 +26,14 @@ export interface DmrEntryRow {
   system_name: string;
   contractor_name: string;
   plot: DmrPlot;
-  metric: DmrMetric;
-  manpower: number;
+  plan_manpower: number;
+  actual_manpower: number;
+  diff_manpower: number;
 }
 
 export const DMR_DISCIPLINES: DmrDiscipline[] = ['ARCH', 'ELECT', 'MECH'];
 export const DMR_PLOTS: DmrPlot[] = ['C', 'D', 'TOTAL'];
-export const DMR_METRICS: DmrMetric[] = ['target', 'today', 'yesterday'];
+export const DMR_METRICS: DmrMetric[] = ['plan', 'actual'];
 
 export const DISCIPLINE_LABEL: Record<DmrDiscipline, string> = {
   ARCH: 'Architecture',

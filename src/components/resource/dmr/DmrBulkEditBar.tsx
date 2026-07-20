@@ -29,12 +29,12 @@ import {
 } from 'lucide-react';
 import { bulkUpdateDmrEntries, bulkDeleteDmrEntries } from '@/lib/dmr-mutations.functions';
 import { copyDmrAsTsv, exportDmrToXlsx, DMR_EXPORT_COLUMNS } from '@/lib/dmr/bulk-actions';
-import { DMR_DISCIPLINES, DMR_PLOTS, DMR_METRICS } from '@/lib/dmr/types';
+import { DMR_DISCIPLINES, DMR_PLOTS } from '@/lib/dmr/types';
 
 const CHUNK = 500;
 
 type FieldDef = {
-  field: 'report_date' | 'discipline' | 'system_name' | 'contractor_name' | 'plot' | 'metric' | 'manpower';
+  field: 'report_date' | 'discipline' | 'system_name' | 'contractor_name' | 'plot' | 'plan_manpower' | 'actual_manpower';
   label: string;
   input: 'date' | 'select' | 'text' | 'number';
   options?: string[];
@@ -46,8 +46,8 @@ const FIELDS: FieldDef[] = [
   { field: 'system_name', label: 'System', input: 'text' },
   { field: 'contractor_name', label: 'Contractor', input: 'text' },
   { field: 'plot', label: 'Plot', input: 'select', options: [...DMR_PLOTS] },
-  { field: 'metric', label: 'Metric', input: 'select', options: [...DMR_METRICS] },
-  { field: 'manpower', label: 'Manpower', input: 'number' },
+  { field: 'plan_manpower', label: 'Plan (계획)', input: 'number' },
+  { field: 'actual_manpower', label: 'Actual (실적)', input: 'number' },
 ];
 
 interface Props {
