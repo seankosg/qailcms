@@ -27,6 +27,8 @@ import { Route as AuthenticatedAdminMastersRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
 import { Route as AuthenticatedAdminBackupRouteImport } from './routes/_authenticated/admin/backup'
 import { Route as AuthenticatedClosureDashboardIndexRouteImport } from './routes/_authenticated/closure/dashboard/index'
+import { Route as ApiPublicBackupAutoSnapshotRouteImport } from './routes/api/public/backup/auto-snapshot'
+import { Route as ApiPublicBackupArchiveDownloadRouteImport } from './routes/api/public/backup/archive-download'
 import { Route as AuthenticatedResourceDmrRawDataRouteImport } from './routes/_authenticated/resource/dmr/raw-data'
 import { Route as AuthenticatedResourceDmrImportRouteImport } from './routes/_authenticated/resource/dmr/import'
 import { Route as AuthenticatedResourceDmrDashboardRouteImport } from './routes/_authenticated/resource/dmr/dashboard'
@@ -155,6 +157,18 @@ const AuthenticatedClosureDashboardIndexRoute =
     id: '/closure/dashboard/',
     path: '/closure/dashboard/',
     getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiPublicBackupAutoSnapshotRoute =
+  ApiPublicBackupAutoSnapshotRouteImport.update({
+    id: '/api/public/backup/auto-snapshot',
+    path: '/api/public/backup/auto-snapshot',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicBackupArchiveDownloadRoute =
+  ApiPublicBackupArchiveDownloadRouteImport.update({
+    id: '/api/public/backup/archive-download',
+    path: '/api/public/backup/archive-download',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const AuthenticatedResourceDmrRawDataRoute =
   AuthenticatedResourceDmrRawDataRouteImport.update({
@@ -369,6 +383,8 @@ export interface FileRoutesByFullPath {
   '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
   '/resource/dmr/import': typeof AuthenticatedResourceDmrImportRoute
   '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
+  '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
+  '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
@@ -416,6 +432,8 @@ export interface FileRoutesByTo {
   '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
   '/resource/dmr/import': typeof AuthenticatedResourceDmrImportRoute
   '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
+  '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
+  '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
@@ -466,6 +484,8 @@ export interface FileRoutesById {
   '/_authenticated/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
   '/_authenticated/resource/dmr/import': typeof AuthenticatedResourceDmrImportRoute
   '/_authenticated/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
+  '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
+  '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/_authenticated/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/_authenticated/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
@@ -516,6 +536,8 @@ export interface FileRouteTypes {
     | '/resource/dmr/dashboard'
     | '/resource/dmr/import'
     | '/resource/dmr/raw-data'
+    | '/api/public/backup/archive-download'
+    | '/api/public/backup/auto-snapshot'
     | '/closure/dashboard/'
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
@@ -563,6 +585,8 @@ export interface FileRouteTypes {
     | '/resource/dmr/dashboard'
     | '/resource/dmr/import'
     | '/resource/dmr/raw-data'
+    | '/api/public/backup/archive-download'
+    | '/api/public/backup/auto-snapshot'
     | '/closure/dashboard'
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
@@ -612,6 +636,8 @@ export interface FileRouteTypes {
     | '/_authenticated/resource/dmr/dashboard'
     | '/_authenticated/resource/dmr/import'
     | '/_authenticated/resource/dmr/raw-data'
+    | '/api/public/backup/archive-download'
+    | '/api/public/backup/auto-snapshot'
     | '/_authenticated/closure/dashboard/'
     | '/_authenticated/closure/abd/import/logs'
     | '/_authenticated/closure/snag-management/detail/$id'
@@ -629,6 +655,8 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
   ApiPublicVersionRoute: typeof ApiPublicVersionRoute
+  ApiPublicBackupArchiveDownloadRoute: typeof ApiPublicBackupArchiveDownloadRoute
+  ApiPublicBackupAutoSnapshotRoute: typeof ApiPublicBackupAutoSnapshotRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -758,6 +786,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/closure/dashboard/'
       preLoaderRoute: typeof AuthenticatedClosureDashboardIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/backup/auto-snapshot': {
+      id: '/api/public/backup/auto-snapshot'
+      path: '/api/public/backup/auto-snapshot'
+      fullPath: '/api/public/backup/auto-snapshot'
+      preLoaderRoute: typeof ApiPublicBackupAutoSnapshotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/backup/archive-download': {
+      id: '/api/public/backup/archive-download'
+      path: '/api/public/backup/archive-download'
+      fullPath: '/api/public/backup/archive-download'
+      preLoaderRoute: typeof ApiPublicBackupArchiveDownloadRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/resource/dmr/raw-data': {
       id: '/_authenticated/resource/dmr/raw-data'
@@ -1127,6 +1169,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ChangePasswordRoute: ChangePasswordRoute,
   ApiPublicVersionRoute: ApiPublicVersionRoute,
+  ApiPublicBackupArchiveDownloadRoute: ApiPublicBackupArchiveDownloadRoute,
+  ApiPublicBackupAutoSnapshotRoute: ApiPublicBackupAutoSnapshotRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
