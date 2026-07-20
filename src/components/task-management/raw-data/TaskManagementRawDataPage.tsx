@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import {
   flexRender,
   getCoreRowModel,
@@ -87,6 +87,12 @@ import {
 } from "@/lib/task-management/rollup.functions";
 import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
 import {
+  ALL_TASK_STAGE_KEYS,
+  isTaskStageDelayedAsOf,
+  todayIso,
+  type TaskItem,
+} from "@/lib/task-management/schedule-utils";
+import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
   TASK_MANAGEMENT_FIELD_CONFIG_QK,
@@ -98,6 +104,8 @@ type Row = Record<string, unknown> & { id: string; task_no: string; discipline: 
 
 const DEFAULT_SORTING: SortingState = [{ id: "discipline", desc: false }];
 const DEFAULT_FROZEN_EXTRAS = ["discipline", "level", "task_name"];
+
+const routeApi = getRouteApi("/_authenticated/closure/task-management/raw-data");
 const DEFAULT_ORDER = TM_COLUMNS.map((c) => c.key).filter((k) => k !== "task_no");
 
 interface PersistedState {
@@ -210,6 +218,9 @@ export function TaskManagementRawDataPage() {
   );
 
   const [stateLoaded, setStateLoaded] = useState(false);
+  const search = routeApi.useSearch();
+  const dashboardAppliedRef = useRef(false);
+  const [delayMode, setDelayMode] = useState<{ asOf: string } | null>(null);
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
   const [sizing, setSizing] = useState<ColumnSizingState>({});
   const [visibility, setVisibility] = useState<VisibilityState>({});
@@ -295,6 +306,46 @@ export function TaskManagementRawDataPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewPref.ready, viewPref.state]);
 
+  // 대시보드에서 진입 시 (source=dashboard) 기존 필터 리셋 후 담당자/팀 필터 적용
+  useEffect(() => {
+    if (!stateLoaded) return;
+    if (dashboardAppliedRef.current) return;
+    const s = search as {
+      source?: string;
+      mode?: string;
+      asOf?: string;
+      team?: string;
+      hdec_pic_name?: string;
+      hdec_eng_name?: string;
+      discipline?: string;
+    };
+    if (s.source !== "dashboard") return;
+    dashboardAppliedRef.current = true;
+
+    const next: ColumnFiltersState = [];
+    const push = (id: string, v: string | undefined) => {
+      if (!v) return;
+      const arr = v.split(",").map((x) => x.trim()).filter(Boolean);
+      if (arr.length) next.push({ id, value: arr });
+    };
+    push("team", s.team);
+    push("hdec_pic_name", s.hdec_pic_name);
+    push("hdec_eng_name", s.hdec_eng_name);
+    push("discipline", s.discipline);
+
+    setSorting(DEFAULT_SORTING);
+    setGlobalFilter("");
+    setSearchInput("");
+    setColumnFilters(next);
+    setCollapsedParents(new Set());
+    if (s.mode === "delay") {
+      setDelayMode({ asOf: s.asOf && s.asOf.length ? s.asOf : todayIso() });
+    } else {
+      setDelayMode(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateLoaded, search]);
+
   useEffect(() => {
     const t = setTimeout(() => setGlobalFilter(searchInput.trim()), 250);
     return () => clearTimeout(t);
@@ -351,16 +402,30 @@ export function TaskManagementRawDataPage() {
 
   const rows = useMemo(() => data ?? [], [data]);
 
+  // 지연 모드: 대시보드에서 넘어온 스테이지 지연 조건에 해당하는 행만 노출
+  const delayFilteredRows = useMemo(() => {
+    if (!delayMode) return rows;
+    const asOf = delayMode.asOf;
+    return rows.filter((r) => {
+      const it = r as unknown as TaskItem;
+      for (const st of ALL_TASK_STAGE_KEYS) {
+        if (isTaskStageDelayedAsOf(it, st, asOf)) return true;
+      }
+      return false;
+    });
+  }, [rows, delayMode]);
+
   // discipline-task_no 단위 collapse 키 유지 — 접힌 부모의 자식 행 숨김
   const visibleRows = useMemo(() => {
-    if (collapsedParents.size === 0) return rows;
-    return rows.filter((r) => {
+    const src = delayFilteredRows;
+    if (collapsedParents.size === 0) return src;
+    return src.filter((r) => {
       const parent = (r as any).main_task_no as string | null;
       const disc = (r as any).discipline as string;
       if (!parent) return true;
       return !collapsedParents.has(`${disc}::${parent}`);
     });
-  }, [rows, collapsedParents]);
+  }, [delayFilteredRows, collapsedParents]);
 
   const parentKeys = useMemo(() => {
     const keys: string[] = [];
@@ -739,6 +804,7 @@ export function TaskManagementRawDataPage() {
     setOrder(DEFAULT_ORDER);
     setFrozenExtras(DEFAULT_FROZEN_EXTRAS);
     setRowSelection({});
+    setDelayMode(null);
   }
 
   const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
@@ -900,9 +966,15 @@ export function TaskManagementRawDataPage() {
         }}
       />
 
-      {activeFilterCount > 0 && (
+      {(activeFilterCount > 0 || delayMode) && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <Filter className="h-3 w-3 text-muted-foreground" />
+          {delayMode && (
+            <FilterChip
+              label={`지연 모드 · asOf ${delayMode.asOf}`}
+              onClear={() => setDelayMode(null)}
+            />
+          )}
           {globalFilter && (
             <FilterChip
               label={`Search: ${globalFilter}`}
