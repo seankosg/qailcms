@@ -1080,6 +1080,132 @@ export type Database = {
         }
         Relationships: []
       }
+      dmr_contractor_master: {
+        Row: {
+          created_at: string
+          discipline_hint: string[] | null
+          id: string
+          is_active: boolean
+          is_direct: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          discipline_hint?: string[] | null
+          id?: string
+          is_active?: boolean
+          is_direct?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          discipline_hint?: string[] | null
+          id?: string
+          is_active?: boolean
+          is_direct?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dmr_entries: {
+        Row: {
+          contractor_id: string | null
+          contractor_name: string
+          created_at: string
+          created_by: string | null
+          discipline: string
+          id: string
+          manpower: number
+          metric: string
+          plot: string
+          report_date: string
+          source_image_path: string | null
+          system_id: string | null
+          system_name: string
+          updated_at: string
+        }
+        Insert: {
+          contractor_id?: string | null
+          contractor_name: string
+          created_at?: string
+          created_by?: string | null
+          discipline: string
+          id?: string
+          manpower?: number
+          metric: string
+          plot: string
+          report_date: string
+          source_image_path?: string | null
+          system_id?: string | null
+          system_name: string
+          updated_at?: string
+        }
+        Update: {
+          contractor_id?: string | null
+          contractor_name?: string
+          created_at?: string
+          created_by?: string | null
+          discipline?: string
+          id?: string
+          manpower?: number
+          metric?: string
+          plot?: string
+          report_date?: string
+          source_image_path?: string | null
+          system_id?: string | null
+          system_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dmr_entries_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "dmr_contractor_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dmr_entries_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "dmr_system_master"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dmr_system_master: {
+        Row: {
+          created_at: string
+          discipline: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          discipline: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          discipline?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
