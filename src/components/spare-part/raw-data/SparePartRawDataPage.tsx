@@ -483,7 +483,7 @@ export function SparePartRawDataPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="전역 검색 (, 는 AND)"
-              className="h-8 w-64 pl-7"
+              className="h-8 w-full pl-7 sm:w-64"
             />
           </div>
 
