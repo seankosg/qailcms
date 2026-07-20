@@ -187,11 +187,7 @@ function ResizeHandle({ column }: { column: Column<Row> }) {
     const startW = column.getSize();
     const onMove = (ev: MouseEvent) => {
       const w = Math.max(50, startW + ev.clientX - startX);
-      column.getContext ? column.getContext() : null;
-      // @ts-expect-error runtime API
-      column.setSize?.(w);
-      // fallback via table state setter
-      // (setSize is present on Column instances in tanstack table)
+      (column as any).setSize?.(w);
     };
     const onUp = () => {
       document.removeEventListener("mousemove", onMove);
