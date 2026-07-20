@@ -1,66 +1,87 @@
+# TM 대시보드 KPI 카드 — 팀별 breakdown 표시 + 딥링크
+
 ## 목표
-DMR Raw Data 페이지를 SM Raw Data UI 관례에 맞춰 정렬·다중 필터·행 선택·Mass 수정/삭제 기능을 갖추도록 확장한다. 다만 DMR은 컬럼 8개, 값이 대부분 enum이므로 SM의 컬럼 매니저·뷰 프리셋·크리티컬 바 등 과잉 요소는 포함하지 않는다.
+`RiskKpiCard`를 확장하여 In Delay / Start Delayed / Completion Overdue / Critical Delay / Behind Schedule 5개 카드 우측에 **팀별 세부 카운트**를 표시. 팀별 합계 = 카드 총합. 팀별 숫자 클릭 시 해당 mode + 해당 팀만 필터된 Raw Data로 이동.
 
-## UI 구성 (SM Raw Data 참조)
+## 스코프 및 규칙
+- **집계 기준**: `TaskItem.team`. null/빈 값은 `"미지정"` 키로 묶음.
+- **범위 일치**: 상단 Task Filter(Scope + Discipline) 적용 후의 `scoped` 배열만 사용해 카드 총합과 정확히 일치시킴.
+- **정렬**: count 내림차순 → 팀명 오름차순.
+- **표시 개수**: 카드당 팀 리스트 최대 6행, 초과 시 마지막 행에 `기타 (n팀) · <합계>` 요약. `기타`는 클릭 비활성.
+- **`미지정`(team null/빈값)**: 정상 표시 및 클릭 가능(딥링크는 team 파라미터 대신 `teamNull=1` 플래그 사용).
+- **레이아웃**: 카드 내부를 좌(라벨/수치/보조텍스트)/우(팀 리스트) 2컬럼 flex. 우측은 `min-w-[112px] max-w-[180px]`, 각 행 `h-5 text-[11px] tabular-nums flex justify-between`. 컨테이너 `max-h-24 overflow-y-auto`. 카드 폭이 좁을 때 자연스럽게 아래로 wrap.
 
-### 1. 필터 툴바 (상단, 카드 안)
-- 기존 필터 유지: 공종·Plot·Metric·From·To·자유텍스트 검색
-- **`System` 다중선택 값 리스트 필터** 추가: 현재 데이터에 존재하는 `system_name` 유니크 값을 팝오버 체크리스트로 노출 (SM 텍스트 컬럼 필터와 동일 방식)
-- **`Contractor` 다중선택 값 리스트 필터** 추가: 마찬가지로 유니크 값 체크리스트, `is_direct` 뱃지 함께 표시
-- **`직영/협력사` 토글 그룹** 추가 (`ToggleGroup type="multiple"`, 두 값 다중선택 가능, 미선택=전체)
-- 우측 요약: 로드된 행수·전체 카운트·총 인원 합계
-- "필터 초기화" 버튼 (선택된 필터가 하나라도 있을 때만 노출)
+## 딥링크 로직
+- 팀 행 클릭 → `navigate('/closure/task-management/raw-data', { search })` 호출.
+- search 구성 규칙:
+  - 기본: `source=dashboard`, `mode=<모드>`, `asOf=<asOfDate>`, `taskScope=<현재 스코프>`.
+  - **team**: 클릭된 팀 코드 **단일값**으로 override(대시보드에 이미 걸린 `ownerContext.team`과 무관하게 단일 팀만 적용).
+  - `hdec_pic_name`, `hdec_eng_name`, `discipline`: 대시보드 컨텍스트 값 그대로 계승(사용자가 이미 좁혀둔 조건 유지).
+  - 클릭 팀이 `미지정`이면 `team`을 비우고 `teamNull=1`을 추가.
+- 카드 자체 onClick(전체 mode 이동)은 유지. 팀 행에는 `e.stopPropagation()`로 버블 차단.
 
-### 2. 테이블 헤더 정렬
-- 각 컬럼 헤더 클릭 시 asc → desc → 해제 3-state 토글, 아이콘 표시(`ArrowUpDown`/`ArrowUp`/`ArrowDown`)
-- 정렬 가능 컬럼: `report_date`, `discipline`, `system_name`, `contractor_name`, `plot`, `metric`, `manpower`
-- 정렬은 클라이언트 측(현재 로드된 행 대상)이 아닌 **서버 정렬**로 처리 — Supabase `.order(field, { ascending })` 사용, 페이지 제한(현재 200)이므로 서버 정렬이 정합성 유지에 필수
-- 기본 정렬: `report_date DESC, discipline, system_name, contractor_name` (현재 동작 유지)
+## Raw Data 페이지의 team 필터 수용
+- `src/routes/_authenticated/closure/task-management/raw-data.tsx` search schema에 `teamNull` 필드 추가(`fallback(z.string(), "").default("")`).
+- `TaskManagementRawDataPage`가 `source=dashboard` 진입 시 필터를 리셋하고 다음을 적용:
+  - `team` 검색 파라미터 → 팀 다중선택 필터에 단일 코드로 설정.
+  - `teamNull=1` → 팀 컬럼이 NULL/빈값인 행만 필터(기존 `team` 파라미터와 상호 배타). 페이지 내부 필터에 `team IS NULL` 옵션이 없다면 프리셋 로직에서 특수 처리(`team=""` OR NULL 매칭).
+  - 나머지 mode/asOf/taskScope/hdec_*·discipline 파라미터는 기존 대시보드 딥링크 규칙 그대로 적용.
 
-### 3. 행 선택 + Mass 편집 바
-- 좌측 체크박스 컬럼(고정) 추가
-  - 헤더 체크박스: 현재 페이지 전체 선택/해제
-  - "필터된 전체 선택" 링크: 총 카운트가 페이지 크기보다 클 때 노출 → 필터 조건에 매칭되는 모든 id를 서버에서 가져와 선택 (SM 관례)
-- 선택된 행이 1건 이상이면 하단 스티키 `BulkEditBar` 표시 (SM `BulkEditBar` 스타일 준수)
-  - **필드 선택**: `report_date`(date) / `discipline`(select) / `system_name`(text) / `contractor_name`(text) / `plot`(select) / `metric`(select) / `manpower`(number)
-  - **값 입력**: 필드 타입에 맞춘 위젯 (date input, select, text input, number input)
-  - **"빈 값으로 설정" 체크박스**: SM과 동일 — 단, DMR 스키마상 모든 필드가 NOT NULL이므로 이 옵션은 비활성화 (`disabled`) 처리
-  - **적용** 버튼 → 확인 다이얼로그 → 500건 단위 청크 업데이트
-  - **삭제 드롭다운 메뉴**: "선택 항목 삭제" → 확인 다이얼로그(`DELETE` 텍스트 입력) → 500건 단위 청크 삭제
-  - **엑셀 내보내기** / **TSV 복사**: SM `bulk-actions` 참고하여 DMR 8개 컬럼용 `exportColumns` 정의
-  - **X 버튼**: 선택 해제
-- 권한: `canEdit`(admin/superuser/d_superuser/senior_user) 이 아니면 편집·삭제 버튼 비활성화 + 툴팁 "권한 없음", 엑셀/TSV는 누구나 가능
+## 구현 파일
 
-### 4. Mass 수정 시 검증
-- `discipline`/`plot`/`metric`은 CHECK 제약이 있으므로 select 옵션에 스키마 상수만 노출
-- `manpower`는 음수 방지(0 이상만 허용)
-- `system_name`/`contractor_name` 값 변경 시 마스터 테이블 자동 upsert (기존 `dmr-import.functions.ts`의 마스터 등록 로직 재활용)
-- UNIQUE 제약 `(report_date, discipline, system_name, contractor_name, plot, metric)` 위반 가능성 → 청크별 결과에서 실패 건수를 토스트로 집계 보고
+### 1. `src/lib/task-management/kpi-utils.ts`
+- `computeKpiBreakdownByTeam(rows, asOf, thresholds)` 신규 추가.
+- 반환:
+  ```ts
+  {
+    inDelay: Array<{ team: string; isNull: boolean; count: number }>;
+    startDelayed: ...;
+    completionOverdue: ...;
+    criticalDelay: ...;
+    behindSchedule: ...;
+  }
+  ```
+- 팀 키 정규화: `String(row.team ?? '').trim()`; 빈문자열이면 `{ team: '미지정', isNull: true }`, 아니면 `{ team: code, isNull: false }`.
+- 각 지표별 판정 함수는 기존 `isInDelay`, `isStartDelayed`, `isCompletionOverdue`, `isCriticalDelay`, `isBehindSchedule` 재사용.
 
-## 신규/수정 파일
+### 2. `src/components/task-management/dashboard/RiskKpiCard.tsx`
+- prop 추가: `breakdown?: Array<{ label: string; count: number; onClick?: () => void; disabled?: boolean }>`.
+- CardContent를 flex row 2컬럼으로 변경. `breakdown` 미지정이면 기존 세로 레이아웃 유지(다른 페이지 호환).
+- 각 행 렌더:
+  - clickable: `<button>` + hover(bg-accent/40) + `stopPropagation` + `onClick` 호출.
+  - disabled(기타 행): 비클릭 `<div>`, `text-muted-foreground`.
+- 상단 6행 노출 후 초과분은 상위 컴포넌트에서 미리 합쳐서 전달(카드는 표시만 담당).
 
-### 신규
-- `src/components/resource/dmr/DmrBulkEditBar.tsx` — SM `BulkEditBar`를 DMR 필드에 맞춰 축약 이식 (탭·필드 그룹 없이 단일 필드 리스트)
-- `src/lib/dmr-mutations.functions.ts` — `bulkUpdateDmrEntries({ ids, patch })`, `bulkDeleteDmrEntries({ ids })` 서버 함수 (`requireSupabaseAuth` + 청크 처리 + system/contractor 마스터 upsert)
-- `src/lib/dmr/bulk-actions.ts` — TSV 복사, XLSX 내보내기 유틸 (SM `bulk-actions` 축약본)
+### 3. `src/components/task-management/dashboard/TmKpiCards.tsx`
+- `scoped` 기반으로 `computeKpiBreakdownByTeam` 결과 `useMemo`.
+- 헬퍼: `toBreakdownRows(list)` — 정렬 후 상위 6개 + 나머지 합산 `기타 (n팀)` 행 생성. 각 클릭 행의 `onClick`은 아래 `goRawWithTeam` 호출.
+- `goRawWithTeam(mode, entry: { team, isNull })`:
+  ```ts
+  const s: Record<string,string> = { source: 'dashboard', mode, asOf: asOfDate, taskScope };
+  if (entry.isNull) s.teamNull = '1'; else s.team = entry.team;
+  if (ownerContext?.hdec_pic_name?.length) s.hdec_pic_name = ...;
+  if (ownerContext?.hdec_eng_name?.length) s.hdec_eng_name = ...;
+  if (ownerContext?.discipline?.length) s.discipline = ...;
+  navigate({ to: '/closure/task-management/raw-data', search: s as any });
+  ```
+- 5개 카드에 `breakdown` prop 전달(In Delay / Start Delayed / Completion Overdue / Critical Delay / Behind Schedule).
 
-### 수정
-- `src/components/resource/dmr/DmrRawDataPage.tsx`
-  - 정렬 상태(`orderBy: {field, asc}`) + URL 반영 옵션 없이 로컬 상태로 우선 관리
-  - 필터 상태에 `systems: string[]`, `contractors: string[]`, `directOnly: ('direct'|'sub')[]` 추가
-  - 페이지 크기 200 유지, 총 카운트 표시
-  - `useQuery` — `.in()` / `.order()` 동적 적용
-  - 행 선택 상태(`Record<id, boolean>`), 헤더 체크박스, "필터된 전체 선택" 액션
-  - 유니크 값 옵션은 별도 `useQuery`로 `dmr_entries`에서 `system_name`, `contractor_name` DISTINCT 조회 (RPC 없이 `.select('field').limit(2000)` 후 클라이언트 dedupe — DMR은 규모가 작으므로 충분)
+### 4. `src/routes/_authenticated/closure/task-management/raw-data.tsx`
+- searchSchema에 `teamNull: fallback(z.string(), "").default("")` 추가.
 
-## 스코프 제외
-- 컬럼 순서 재배치·표시 여부·프리셋 저장 (SM 뷰 프리셋 시스템은 DMR 규모상 과잉)
-- 셀 인라인 편집 (Mass 수정 바로 대체)
-- URL 쿼리 반영 (다음 단계에서 필요 시 확장)
-- 무한 스크롤/커서 페이지네이션 (현재 페이지 크기 200 유지, 필요 시 별도 개선)
+### 5. `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`
+- `source=dashboard` 초기 진입 로직에서:
+  - `team` 파라미터 있으면 팀 필터를 그 단일값으로 세팅.
+  - `teamNull==='1'`이면 팀 필터를 "미지정/NULL" 상태로 세팅(내부 필터 구조에 맞춰 특수 sentinel `__null__` 또는 별도 boolean 상태 추가).
+  - 두 값이 모두 없으면 기존 동작 유지.
 
-## 검증
-- tsgo 타입 체크 통과
-- 대량 100건 이상 선택 시 500건 청크 로직 확인 (사용자가 대용량 케이스 없더라도 동일 로직 사용)
-- Mass 수정 후 dashboard/raw-data 캐시 무효화 (`queryClient.invalidateQueries`)
-- UNIQUE 제약 위반 케이스 토스트 문구 확인
+## 검증 체크리스트
+- 팀별 count 합 === 각 지표 총합(카드 대형 숫자)과 일치. dev 콘솔에서 3개 지표 spot-check.
+- 팀 행 클릭 → Raw Data가 해당 mode + 단일 팀 + (있으면) 기존 hdec/discipline만으로 필터되어 표시.
+- `미지정` 클릭 → team이 NULL/빈값인 행만 표시.
+- Task Filter Discipline 변경 시 breakdown이 즉시 재계산.
+- 카드 자체 onClick은 여전히 전체 mode 이동으로 동작(팀 행 클릭 시 버블 차단 확인).
+
+## 파일 편집 요약
+- 편집: `src/lib/task-management/kpi-utils.ts`, `src/components/task-management/dashboard/RiskKpiCard.tsx`, `src/components/task-management/dashboard/TmKpiCards.tsx`, `src/routes/_authenticated/closure/task-management/raw-data.tsx`, `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`
+- 신규/삭제 없음
