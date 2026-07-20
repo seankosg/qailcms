@@ -535,6 +535,11 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
       toast.error("No files ready to import");
       return;
     }
+    try {
+      await takePreImportSnapshot("spare-part");
+    } catch (err) {
+      toast.warning(`사전 백업 실패: ${(err as Error).message}. 임포트를 계속합니다.`);
+    }
     await executeImport(ready);
   }, [files, isRunning, executeImport]);
 

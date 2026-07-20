@@ -1335,6 +1335,11 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       return;
     }
     try {
+      await takePreImportSnapshot("sm");
+    } catch (err) {
+      toast.warning(`사전 백업 실패: ${(err as Error).message}. 임포트를 계속합니다.`);
+    }
+    try {
       await executeImport(ready);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

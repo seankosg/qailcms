@@ -963,6 +963,11 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       toast.error("Import 가능한 파일이 없습니다");
       return;
     }
+    try {
+      await takePreImportSnapshot("tm");
+    } catch (err) {
+      toast.warning(`사전 백업 실패: ${(err as Error).message}. 임포트를 계속합니다.`);
+    }
     await executeImport(ready);
   }, [files, isRunning, executeImport]);
 
