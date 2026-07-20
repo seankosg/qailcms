@@ -8,6 +8,35 @@ export { BACKUP_TABLES, type BackupTableName } from "./backup-shared";
 const BUCKET = "db-backups";
 const CHUNK_SIZE = 1000;
 
+const TABLE_SORT_KEYS: Record<BackupTableName, string> = {
+  abd_items_raw: "id",
+  defect_items_raw: "id",
+  task_management_raw: "id",
+  spare_parts_raw: "doc_ref",
+  dmr_entries: "id",
+  profiles: "id",
+  user_roles: "id",
+  team_master: "id",
+  subcontractor_master: "id",
+  dmr_contractor_master: "id",
+  dmr_system_master: "id",
+  defect_category_team_map: "category",
+  task_management_settings: "id",
+  spare_part_status_mapping: "source_status_raw",
+  abd_field_config: "id",
+  defect_field_config: "id",
+  task_management_field_config: "id",
+  spare_part_field_config: "id",
+  abd_header_mappings: "id",
+  defect_header_mappings: "id",
+  task_management_header_mappings: "id",
+  spare_part_header_mappings: "id",
+  abd_import_logs: "id",
+  defect_import_logs: "id",
+  task_management_import_logs: "id",
+  spare_parts_import_logs: "id",
+};
+
 export type SnapshotManifest = {
   id: string;
   name: string;
