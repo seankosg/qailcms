@@ -1287,6 +1287,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "dmr_entries_discipline_team_master_fkey"
+            columns: ["discipline"]
+            isOneToOne: false
+            referencedRelation: "team_master"
+            referencedColumns: ["code"]
+          },
+          {
             foreignKeyName: "dmr_entries_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
@@ -1323,7 +1330,15 @@ export type Database = {
           sort_order?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "dmr_system_master_discipline_team_master_fkey"
+            columns: ["discipline"]
+            isOneToOne: false
+            referencedRelation: "team_master"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       profiles: {
         Row: {
