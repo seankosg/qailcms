@@ -120,7 +120,7 @@ export function DmrDashboardPage() {
           <Input type="date" value={currentAsOf} onChange={(e) => setAsOf(e.target.value)} className="h-8 w-40 text-xs" />
         </div>
         <div>
-          <div className="mb-1 text-[11px] text-muted-foreground">공종</div>
+          <div className="mb-1 text-[11px] text-muted-foreground">TEAM</div>
           <Select value={discipline} onValueChange={(v) => setDiscipline(v as any)}>
             <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>

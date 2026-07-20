@@ -452,7 +452,7 @@ export function DmrRawDataPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">DMR Raw Data</h1>
-          <p className="text-xs text-muted-foreground">일자별·공종별·협력사별 인원 실적 (롱포맷)</p>
+          <p className="text-xs text-muted-foreground">일자별·TEAM별·협력사별 인원 실적 (롱포맷)</p>
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={doExport} disabled={exporting || total === 0}>

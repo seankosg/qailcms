@@ -42,7 +42,7 @@ type FieldDef = {
 
 const FIELDS: FieldDef[] = [
   { field: 'report_date', label: 'Date', input: 'date' },
-  { field: 'discipline', label: '공종', input: 'select', options: [...DMR_DISCIPLINES] },
+  { field: 'discipline', label: 'TEAM', input: 'select', options: [...DMR_DISCIPLINES] },
   { field: 'system_name', label: 'System', input: 'text' },
   { field: 'contractor_name', label: 'Contractor', input: 'text' },
   { field: 'plot', label: 'Plot', input: 'select', options: [...DMR_PLOTS] },
