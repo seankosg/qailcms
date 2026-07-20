@@ -512,6 +512,16 @@ export function DmrRawDataPage() {
         </div>
       )}
 
+      {selectedIds.length > 0 && (
+        <DmrBulkEditBar
+          selectedIds={selectedIds}
+          sampleRows={selectedRows}
+          canEdit={canEdit}
+          onClearSelection={() => setSelection({})}
+          onApplied={() => { setSelection({}); query.refetch(); }}
+        />
+      )}
+
       {/* Table */}
       <div ref={parentRef} className="relative flex-1 overflow-auto rounded-md border">
         <div style={{ width: totalWidth, minWidth: '100%' }} className="relative">
@@ -596,15 +606,6 @@ export function DmrRawDataPage() {
         </div>
       </div>
 
-      {selectedIds.length > 0 && (
-        <DmrBulkEditBar
-          selectedIds={selectedIds}
-          sampleRows={selectedRows}
-          canEdit={canEdit}
-          onClearSelection={() => setSelection({})}
-          onApplied={() => { setSelection({}); query.refetch(); }}
-        />
-      )}
     </div>
   );
 }
