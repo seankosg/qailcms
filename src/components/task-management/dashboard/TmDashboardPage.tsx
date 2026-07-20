@@ -15,7 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
 import {
-  ALL_TASK_STAGE_KEYS,
+  ALL_TASK_TIMELINE_STAGE_KEYS,
   isTaskStageDelayedAsOf,
   todayIso,
   type TaskItem,
