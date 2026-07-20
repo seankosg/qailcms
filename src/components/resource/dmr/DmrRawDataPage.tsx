@@ -598,7 +598,8 @@ export function DmrRawDataPage() {
 
       {selectedIds.length > 0 && (
         <DmrBulkEditBar
-          selectedRows={selectedRows}
+          selectedIds={selectedIds}
+          sampleRows={selectedRows}
           canEdit={canEdit}
           onClearSelection={() => setSelection({})}
           onApplied={() => { setSelection({}); query.refetch(); }}
