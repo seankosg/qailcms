@@ -2,12 +2,14 @@ import { useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ProgressKpiCard } from "./ProgressKpiCard";
-import { RiskKpiCard } from "./RiskKpiCard";
+import { RiskKpiCard, type RiskKpiBreakdownRow } from "./RiskKpiCard";
 import { StatusMixBar } from "./StatusMixBar";
 import { CriticalThresholdPopover } from "@/components/task-management/shared/CriticalThresholdPopover";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import {
   computeKpi,
+  computeKpiBreakdownByTeam,
+  type KpiTeamBreakdownEntry,
   pctNum,
   scopeItems,
   type TaskScope,
@@ -15,6 +17,7 @@ import {
 } from "@/lib/task-management/kpi-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
+import { EMPTY_TOKEN } from "@/lib/task-management/filters";
 
 interface Props {
   items: TaskItem[];
@@ -54,6 +57,10 @@ export function TmKpiCards({
 
   const scoped = useMemo(() => scopeItems(items, taskScope), [items, taskScope]);
   const kpi = useMemo(() => computeKpi(scoped, asOfDate, t), [scoped, asOfDate, t]);
+  const breakdown = useMemo(
+    () => computeKpiBreakdownByTeam(scoped, asOfDate, t),
+    [scoped, asOfDate, t],
+  );
 
   const goRaw = (mode: TmKpiMode) => {
     const s: Record<string, string> = {
@@ -67,6 +74,50 @@ export function TmKpiCards({
     if (ownerContext?.hdec_eng_name?.length) s.hdec_eng_name = ownerContext.hdec_eng_name.join(",");
     if (ownerContext?.discipline?.length) s.discipline = ownerContext.discipline.join(",");
     navigate({ to: "/closure/task-management/raw-data", search: s as any });
+  };
+
+  const goRawWithTeam = (mode: TmKpiMode, entry: KpiTeamBreakdownEntry) => {
+    const s: Record<string, string> = {
+      source: "dashboard",
+      mode,
+      asOf: asOfDate,
+      taskScope,
+    };
+    // 팀별 breakdown 클릭 시 팀 필터는 클릭한 단일 값으로 override
+    s.team = entry.isNull ? EMPTY_TOKEN : entry.team;
+    if (ownerContext?.hdec_pic_name?.length) s.hdec_pic_name = ownerContext.hdec_pic_name.join(",");
+    if (ownerContext?.hdec_eng_name?.length) s.hdec_eng_name = ownerContext.hdec_eng_name.join(",");
+    if (ownerContext?.discipline?.length) s.discipline = ownerContext.discipline.join(",");
+    navigate({ to: "/closure/task-management/raw-data", search: s as any });
+  };
+
+  const toBreakdownRows = (
+    mode: TmKpiMode,
+    list: KpiTeamBreakdownEntry[],
+  ): RiskKpiBreakdownRow[] => {
+    const MAX = 6;
+    if (list.length <= MAX) {
+      return list.map((e) => ({
+        label: e.team,
+        count: e.count,
+        onClick: () => goRawWithTeam(mode, e),
+      }));
+    }
+    const top = list.slice(0, MAX);
+    const rest = list.slice(MAX);
+    const restSum = rest.reduce((acc, r) => acc + r.count, 0);
+    return [
+      ...top.map((e) => ({
+        label: e.team,
+        count: e.count,
+        onClick: () => goRawWithTeam(mode, e),
+      })),
+      {
+        label: `기타 (${rest.length}팀)`,
+        count: restSum,
+        disabled: true,
+      },
+    ];
   };
 
   return (
@@ -145,6 +196,7 @@ export function TmKpiCards({
           tone="danger"
           showPercentFirst
           onClick={() => goRaw("in_delay")}
+          breakdown={toBreakdownRows("in_delay", breakdown.inDelay)}
         />
       </div>
 
@@ -163,6 +215,7 @@ export function TmKpiCards({
           percent={pctNum(kpi.startDelayed, kpi.total)}
           tone="warn"
           onClick={() => goRaw("start_delayed")}
+          breakdown={toBreakdownRows("start_delayed", breakdown.startDelayed)}
         />
         <RiskKpiCard
           label="Completion Overdue"
@@ -170,6 +223,7 @@ export function TmKpiCards({
           percent={pctNum(kpi.completionOverdue, kpi.total)}
           tone="danger"
           onClick={() => goRaw("completion_overdue")}
+          breakdown={toBreakdownRows("completion_overdue", breakdown.completionOverdue)}
         />
         <RiskKpiCard
           label="Critical Delay"
@@ -178,6 +232,7 @@ export function TmKpiCards({
           tone="danger"
           onClick={() => goRaw("critical")}
           action={<CriticalThresholdPopover compact triggerVariant="ghost" triggerLabel="설정" />}
+          breakdown={toBreakdownRows("critical", breakdown.criticalDelay)}
         />
         <RiskKpiCard
           label="Behind Schedule"
@@ -185,6 +240,7 @@ export function TmKpiCards({
           percent={pctNum(kpi.behindSchedule, kpi.total)}
           tone="warn"
           onClick={() => goRaw("behind")}
+          breakdown={toBreakdownRows("behind", breakdown.behindSchedule)}
         />
       </div>
     </div>
