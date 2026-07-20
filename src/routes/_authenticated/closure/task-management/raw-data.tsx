@@ -11,6 +11,7 @@ const searchSchema = z.object({
   hdec_pic_name: fallback(z.string(), "").default(""),
   hdec_eng_name: fallback(z.string(), "").default(""),
   discipline: fallback(z.string(), "").default(""),
+  dataDate: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/task-management/raw-data")({
