@@ -226,6 +226,8 @@ export function TmDashboardPage() {
           asOfDate={asOfDate}
           taskScope={taskScope}
           onScopeChange={(v) => patch({ taskScope: v })}
+          disciplines={search.discipline ?? []}
+          onDisciplinesChange={(v) => patch({ discipline: v })}
           ownerContext={{
             team: search.team,
             hdec_pic_name: search.hdecPic,
