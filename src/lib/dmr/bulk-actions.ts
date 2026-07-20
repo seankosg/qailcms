@@ -9,7 +9,7 @@ export interface ExportColumn {
 
 export const DMR_EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'report_date', label: 'Date', kind: 'date', widthPx: 100 },
-  { key: 'discipline', label: '공종', kind: 'text', widthPx: 70 },
+  { key: 'discipline', label: 'TEAM', kind: 'text', widthPx: 70 },
   { key: 'system_name', label: 'System', kind: 'text', widthPx: 220 },
   { key: 'contractor_name', label: 'Contractor', kind: 'text', widthPx: 220 },
   { key: 'plot', label: 'Plot', kind: 'text', widthPx: 60 },
