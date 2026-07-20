@@ -17,6 +17,7 @@ import {
 } from "@/lib/task-management/parser";
 import type { Discipline } from "@/lib/task-management/columns";
 import { runRollupAllMains, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
+import { stripNullExcept } from "@/lib/import/strip-null";
 import {
   previewTaskImport,
   allocateTaskNo,
