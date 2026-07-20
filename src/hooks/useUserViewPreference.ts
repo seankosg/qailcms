@@ -7,6 +7,16 @@ import {
   type ViewPreferenceState,
 } from "@/lib/task-management/user-view-preferences.functions";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { supabase } from "@/integrations/supabase/client";
+
+async function hasActiveSession(): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return !!data.session?.access_token;
+  } catch {
+    return false;
+  }
+}
 
 function localKey(userId: string, viewKey: string) {
   return `qail.view-pref:${viewKey}:${userId}`;
@@ -75,15 +85,24 @@ export function useUserViewPreference(viewKey: string) {
     const local = readLocal(userId, viewKey);
     if (local && Object.keys(local).length > 0) {
       migratedRef.current = true;
-      upsertFn({ data: { viewKey, state: local } }).catch(() => {
-        migratedRef.current = false;
-      });
+      (async () => {
+        if (!(await hasActiveSession())) {
+          migratedRef.current = false;
+          return;
+        }
+        upsertFn({ data: { viewKey, state: local } }).catch(() => {
+          migratedRef.current = false;
+        });
+      })();
     }
   }, [userId, viewKey, query.data, query.isPending, query.isError, upsertFn]);
 
   const mutation = useMutation({
     mutationFn: (state: ViewPreferenceState) =>
       upsertFn({ data: { viewKey, state } }),
+    onError: () => {
+      // 세션 만료/사인아웃 중 저장 시도는 조용히 무시 (로컬 캐시는 유지)
+    },
   });
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -94,7 +113,10 @@ export function useUserViewPreference(viewKey: string) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         if (!userId) return;
-        mutation.mutate(state);
+        void (async () => {
+          if (!(await hasActiveSession())) return;
+          mutation.mutate(state);
+        })();
       }, 400);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
