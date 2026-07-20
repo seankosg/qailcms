@@ -1,7 +1,8 @@
 // Lightweight stage helpers used by Defect Raw Data UI (overdue tinting, stage progress).
+import { todayInDoha } from "@/lib/time/doha";
 
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayInDoha();
 }
 
 type Row = Record<string, any>;
