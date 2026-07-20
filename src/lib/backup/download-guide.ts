@@ -1,3 +1,4 @@
+import { todayInDoha } from "@/lib/time/doha";
 import guideMarkdown from "@/content/backup-user-guide.md?raw";
 
 export const BACKUP_GUIDE_MARKDOWN = guideMarkdown;

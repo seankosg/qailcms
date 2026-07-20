@@ -1,3 +1,4 @@
+import { dohaStampCompact } from "@/lib/time/doha";
 import JSZip from "jszip";
 import { SPARE_PART_COLUMNS, type SparePartColumnDef } from "./columns";
 import {
