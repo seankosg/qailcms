@@ -1,34 +1,43 @@
-TMDB 대시보드 제목의 아이콘을 제거하고, 상단 KPI 카드의 메인 숫자 크기와 클릭 피드백, 지연/음수 숫자 색상을 통일합니다.
+## 배경
 
-### 1. 제목 아이콘 제거
-- 파일: `src/components/task-management/dashboard/TmDashboardPage.tsx`
-- `Task Management Dashboard` 앞의 `<Gauge ... />` 아이콘을 삭제하고 텍스트만 남깁니다.
-- 뒤로가기 화살표와 Data Date 선택 영역은 그대로 유지합니다.
+TMRD의 `task_management_raw`에서 `SN-C-*`, `SN-D-*`로 시작하는 Task No를 `AR-C-*`로 변경. 그러나 단순 접두어 치환 시 기존 `AR-C-*` Task No와 충돌하므로, 충돌하는 Main Task는 신규 일련번호를 부여하고 Subtask들도 동일 규칙으로 함께 재부여.
 
-### 2. KPI 카드 메인 숫자 크기 확대
-- 파일: `src/components/task-management/dashboard/ProgressKpiCard.tsx`
-  - 퍼센트 메인 숫자를 `text-2xl` → `text-3xl` 또는 `text-4xl`로 확대합니다.
-- 파일: `src/components/task-management/dashboard/RiskKpiCard.tsx`
-  - count / percent 메인 숫자를 `text-2xl` → `text-3xl` 또는 `text-4xl`로 확대합니다.
-  - breakdown 영역(우측 팀별 리스트)과 겹치지 않도록 레이아웃을 유지하며, 카드 높이가 너무 커지지 않게 조정합니다.
+## 현재 상태 (조회 완료)
 
-### 3. 클릭 가능한 항목 hover 피드백 강화
-- 파일: `src/components/task-management/dashboard/ProgressKpiCard.tsx`, `RiskKpiCard.tsx`
-  - `onClick`이 있는 카드 전체에 `cursor-pointer`와 눈에 띄는 hover 배경(`hover:bg-primary/10` 또는 `hover:bg-accent/80`)을 적용합니다.
-- 파일: `src/components/task-management/dashboard/RiskKpiCard.tsx`
-  - breakdown 행(팀별 숫자)에도 동일한 hover 스타일과 커서 변화를 적용합니다.
-- 파일: `src/components/task-management/dashboard/StatusMixBar.tsx`
-  - 세그먼트 hover 효과를 유지/보강하여 클릭 가능함을 명확히 합니다.
+- SN-C/SN-D 총 44행 (Main 8, Sub 36)
+- 기존 AR-C Main: `AR-C-P-01~05, 18`, `AR-C-T-01~12, 16~19`
+- 단순 치환 대상 Main 8개 모두 기존 AR-C와 **충돌**
 
-### 4. 지연 및 음수 숫자 색상 통일
-- 파일: `src/components/task-management/dashboard/TmKpiCards.tsx`
-  - `Start Delayed`, `Behind Schedule` 카드의 `tone`을 `warn`에서 `danger`로 변경하여 빨간색으로 통일합니다.
-  - `In Delay`, `Completion Overdue`, `Critical Delay`는 이미 danger로 유지합니다.
-- 파일: `src/components/task-management/dashboard/RiskKpiCard.tsx`
-  - breakdown 영역의 count에도 카드의 `tone` 색상을 적용하여 지연 카드는 팀별 숫자도 빨간색으로 보입니다.
-- 파일: `src/components/task-management/dashboard/ProgressKpiCard.tsx`
-  - 메인 퍼센트가 음수일 경우 `text-destructive`로 처리하는 예방 로직을 추가합니다.
+## 재번호 매핑 (Main Task, 8건)
 
-### 검증
-- `/closure/task-management/dashboard` 프리뷰에서 캡처로 확인합니다.
-- 제목 아이콘 제거, 메인 숫자 크기 확대, 카드 hover 시 배경/커서 변화, 지연 카드 및 breakdown 숫자의 빨간색 통일 여부를 확인합니다.
+기존 AR-C 최대값 이후 빈 번호를 순차 부여:
+
+| 기존 Task No | 신규 Task No | Subtask 수 |
+|---|---|---|
+| SN-C-P-03 | AR-C-P-06 | 4 |
+| SN-C-P-04 | AR-C-P-07 | 4 |
+| SN-D-P-03 | AR-C-P-08 | 4 |
+| SN-D-P-04 | AR-C-P-09 | 4 |
+| SN-C-T-01 | AR-C-T-13 | 5 |
+| SN-C-T-02 | AR-C-T-14 | 5 |
+| SN-D-T-01 | AR-C-T-15 | 5 |
+| SN-D-T-02 | AR-C-T-20 | 5 |
+
+- P계열: 기존 AR-C-P 최대 05(연속)/18 이후, 06/07/08/09 사용
+- T계열: 기존 AR-C-T 최대 12(연속)/16~19 이후, 13/14/15/20 사용
+
+## Subtask 재번호 규칙
+
+각 Main의 하위 `-01 ~ -0N` 접미어는 그대로 유지하고 접두어만 신규 Main Task No로 치환.
+
+예) `SN-C-P-03-01` → `AR-C-P-06-01`, `SN-D-T-02-05` → `AR-C-T-20-05`.
+
+총 재번호 대상: **44행** (Main 8 + Sub 36)
+
+## 확인 요청 사항
+
+1. 위 재번호 매핑(특히 T계열에서 SN-D-T-02를 `AR-C-T-20`으로 배정, 16~19는 기존 사용 중이므로 건너뜀)을 이대로 진행할지, 아니면 T계열도 반드시 연속(예: 13,14,15,20 대신 다른 규칙)으로 맞출지.
+2. Main Task No 변경 시 `main_task_no`(Subtask의 부모 참조 컬럼)도 함께 갱신 (당연 포함).
+3. 실행 방식: 단일 SQL 마이그레이션 1회 트랜잭션으로 UPDATE 실행 (Unique 제약 대비 안전을 위해 임시 접두어 → 최종값 2-Pass UPDATE 또는 CTE 사용).
+
+승인 시 위 매핑으로 마이그레이션 SQL을 작성해 실행합니다.
