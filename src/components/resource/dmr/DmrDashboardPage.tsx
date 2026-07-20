@@ -360,7 +360,7 @@ export function DmrDashboardPage() {
                   {trendSeries.groups.map((g, i) => (
                     <Line
                       key={g}
-                      type="monotone"
+                      type="linear"
                       dataKey={g}
                       stroke={LINE_COLORS[i % LINE_COLORS.length]}
                       strokeWidth={2}
