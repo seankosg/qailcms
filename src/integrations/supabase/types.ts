@@ -1112,14 +1112,17 @@ export type Database = {
       }
       dmr_entries: {
         Row: {
+          actual_manpower: number | null
           contractor_id: string | null
           contractor_name: string
           created_at: string
           created_by: string | null
+          diff_manpower: number | null
           discipline: string
           id: string
-          manpower: number
-          metric: string
+          manpower: number | null
+          metric: string | null
+          plan_manpower: number | null
           plot: string
           report_date: string
           source_image_path: string | null
@@ -1128,14 +1131,17 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          actual_manpower?: number | null
           contractor_id?: string | null
           contractor_name: string
           created_at?: string
           created_by?: string | null
+          diff_manpower?: number | null
           discipline: string
           id?: string
-          manpower?: number
-          metric: string
+          manpower?: number | null
+          metric?: string | null
+          plan_manpower?: number | null
           plot: string
           report_date: string
           source_image_path?: string | null
@@ -1144,14 +1150,17 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          actual_manpower?: number | null
           contractor_id?: string | null
           contractor_name?: string
           created_at?: string
           created_by?: string | null
+          diff_manpower?: number | null
           discipline?: string
           id?: string
-          manpower?: number
-          metric?: string
+          manpower?: number | null
+          metric?: string | null
+          plan_manpower?: number | null
           plot?: string
           report_date?: string
           source_image_path?: string | null
