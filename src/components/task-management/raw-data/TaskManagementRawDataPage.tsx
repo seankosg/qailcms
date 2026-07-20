@@ -477,7 +477,7 @@ export function TaskManagementRawDataPage() {
         case "critical":
           return kpiIsCriticalDelay(it, asOf, t);
         case "behind":
-          return kpiIsBehindSchedule(it, asOf, t);
+          return kpiIsBehindSchedule(it, asOf);
         default:
           return true;
       }
