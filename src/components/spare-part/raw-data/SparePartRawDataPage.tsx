@@ -591,24 +591,29 @@ export function SparePartRawDataPage() {
                       )}
                     >
                       {h.column.id === "doc_ref" && <Pin className="h-3 w-3 text-primary" />}
-                      <button
-                        type="button"
-                        onClick={h.column.getToggleSortingHandler()}
-                        className="flex flex-1 items-center gap-1 truncate text-left"
-                        title={String(h.column.columnDef.header ?? "")}
-                      >
-                        <span className="truncate">
+                      {h.column.id === "__select" || !h.column.getCanSort() ? (
+                        <span className="flex flex-1 items-center gap-1 truncate">
                           {flexRender(h.column.columnDef.header, h.getContext())}
                         </span>
-                        {h.column.getCanSort() &&
-                          (sort === "asc" ? (
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={h.column.getToggleSortingHandler()}
+                          className="flex flex-1 items-center gap-1 truncate text-left"
+                          title={typeof h.column.columnDef.header === "string" ? h.column.columnDef.header : ""}
+                        >
+                          <span className="truncate">
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                          </span>
+                          {sort === "asc" ? (
                             <ArrowUp className="h-3 w-3" />
                           ) : sort === "desc" ? (
                             <ArrowDown className="h-3 w-3" />
                           ) : (
                             <ArrowUpDown className="h-3 w-3 opacity-30" />
-                          ))}
-                      </button>
+                          )}
+                        </button>
+                      )}
                       {h.column.getCanFilter() && meta?.filterType && (
                         <ColumnFilterDropdown column={h.column} filterType={meta.filterType} />
                       )}
