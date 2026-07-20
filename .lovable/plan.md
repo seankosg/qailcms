@@ -1,63 +1,42 @@
-## 배경 및 원인
+## 목표
+TM 임포트 시 Sub Task의 `plan_days`, `plan_progress`, `progress_variance`, `slip_days`를 서버에서 즉시 계산하여 DB에 저장한다. 기존 Sub 데이터도 동일 기준으로 1회 일괄 재계산한다.
 
-사용자가 "DMR Raw Data 일괄수정을 SMRD와 동일하게" 지시했음에도, 이전 턴에서 레퍼런스(SMRD) 파일을 실제로 열어보지 않고 추론으로 "하단 floating bar" 방향을 제안했습니다. 실제 SMRD는 **상단 sticky 카드**로, 정반대 배치였습니다. 재발 방지 규칙과 DMR 수정안을 하나의 계획으로 통합합니다.
+## 계산 정의 (Sub 태스크 기준)
+- `plan_days = plan_end - plan_start + 1` (둘 다 있을 때, 없으면 NULL)
+- `plan_progress = T.Plan` = `clamp((data_date - plan_start + 1) / plan_days, 0, 1)`
+  - `data_date < plan_start` → 0
+  - `data_date >= plan_end` → 1
+- `progress_variance = actual_progress - plan_progress`
+- `slip_days`:
+  - 완료(`actual_progress >= 0.999`): `max(0, actual_finish - plan_end)`
+  - 미완료: `max(0, data_date - plan_end)` (아직 plan_end 이전이면 0)
 
----
+## 실행 순서
 
-## 파트 A. 재발 방지 프로토콜 (프로젝트 메모리 규칙)
+### 1. DB 함수/트리거 (마이그레이션)
+- `calc_sub_task_derived(row)` SQL 함수 신설: 위 4개 필드 계산 반환
+- `BEFORE INSERT/UPDATE` 트리거를 `task_management_raw`에 부착하여 `level='sub'`이고 관련 원본 컬럼(`plan_start`, `plan_end`, `data_date`, `actual_progress`, `actual_finish`)이 바뀔 때 자동 채움
+- 트리거 순서: Sub 파생 계산 → 기존 `actual_duration` 트리거 → 저장 → AFTER 트리거로 Main 롤업(`update_task_summary`) 유지
+- Main 롤업은 Sub의 새로 채워진 값을 그대로 가중 평균하도록 확인/조정
 
-`mem://index.md` Core 섹션에 아래 규칙 추가:
+### 2. 임포트 파이프라인
+- `TaskManagementImportContext.tsx`에서 Sub의 위 4개 필드에 대한 `null` 강제 초기화 제거 → DB 트리거가 계산하도록 위임
+- 파서(`parser.ts`)에서는 원본 엑셀 값이 있어도 무시하고 계산값이 우선되도록 유지 (수동 값 덮어쓰기 방지 옵션은 없음, 1-(a) 정책에 따름)
 
-> "X와 동일하게/이식/포팅" 유형 지시는 반드시 레퍼런스 원본 파일을 tool로 열어 파일:라인 인용 + 현재 vs 레퍼런스 항목별 diff 표를 계획에 포함한 뒤 제출한다. 파일 존재만으로 "구현 완료"로 판정 금지. UI·배치·클래스·문구까지 지시 범위에 포함.
+### 3. 기존 데이터 1회 재계산
+- 마이그레이션 말미에 `UPDATE task_management_raw SET plan_start = plan_start WHERE level='sub'` 형태로 트리거 강제 재실행, 또는 전용 `recalc_all_sub_derived()` 함수 실행
+- 이후 Main 롤업 `update_task_summary` 전체 재실행하여 상위 값 재정렬
 
-상세 규칙은 `mem://preferences/reference-first`에 저장(레퍼런스 우선 읽기 / Gap 표 필수 / 셀프 체크리스트).
+### 4. 검증
+- 랜덤 20건 Sub Task 샘플링하여 계산식 수동 검증
+- Main Task 5건에서 Sub 값 가중 평균이 Main의 `plan_progress`/`progress_variance`와 일치하는지 확인
+- 기존 대시보드/S-Curve/지연 리더보드 수치가 재계산 전후로 큰 왜곡 없는지 스팟체크
 
----
+## 알려진 트레이드오프 (1-(a) 채택 결과)
+- 임포트 시간 증가 (Sub 1,100+ 건 트리거 실행)
+- Sub의 수동 편집값이 원본 컬럼 변경 시 자동 재계산으로 덮임 → 정책상 허용
+- Main 롤업이 Sub 저장마다 실행되어 부하 증가 (기존 구조 유지, 배치 완료 후 일괄 롤업 최적화는 별도 이슈)
 
-## 파트 B. 레퍼런스 스냅샷 (SMRD 실측)
-
-- `src/components/defect-management/raw-data/DefectRawDataPage.tsx:861-868` — 툴바 아래·테이블 위에 `<BulkEditBar />` 렌더.
-- `src/components/defect-management/raw-data/BulkEditBar.tsx:145` — 래퍼 클래스:
-  `sticky top-0 z-30 rounded-lg border border-l-2 border-l-primary bg-card px-3 py-2 shadow-sm`
-- 내부 배치 순서: 선택 카운트(dot + "N selected" + 배치 안내) → 필드 Select → New value 입력 → (Set blank 체크) → Apply → Export 드롭다운(xlsx/TSV) → 더보기(영구삭제/Clear selection).
-
-## 파트 C. 현재 DMR과의 Gap 표
-
-| 항목 | SMRD (레퍼런스) | DMR 현재 | 조치 |
-|---|---|---|---|
-| 렌더 위치 | 툴바 아래·테이블 위 | 페이지네이션 아래(문서 흐름 최하단) | 툴바 아래·테이블 위로 이동 |
-| 컨테이너 스타일 | `sticky top-0 z-30 …` 카드 | 일반 블록, sticky 없음 | 동일 클래스 적용 |
-| 노출 조건 | 선택된 행이 있을 때 | 동일 | 유지 |
-| 좌측 강조 | `border-l-2 border-l-primary` + 파란 dot | 없음 | 추가 |
-| 카운트 문구 | "N selected · Will run in K batches of 500" | 다름 | 동일 문구로 통일 |
-| Apply/Export/삭제 배치 | flex 한 줄, 우측에 Export·더보기 | 순서 상이 | SMRD와 동일 순서 |
-| 필터 전체선택 버튼 | 상단 안내 우측 링크 | 있음(위치 상이) | SMRD와 동일 위치 |
-| 체크박스 시인성 | 명확한 border | 흐릿함 | 클래스 보강 |
-
-## 파트 D. 변경 파일 및 조치
-
-1. `src/components/resource/dmr/DmrRawDataPage.tsx`
-   - 599-607행의 `<DmrBulkEditBar />` 블록을 삭제.
-   - 툴바(검색/필터/컬럼) 렌더 직후, 테이블 컨테이너 **바로 위**로 이동.
-   - `__select` 컬럼 Checkbox에 `border-input` 등 시인성 클래스 보강.
-
-2. `src/components/resource/dmr/DmrBulkEditBar.tsx`
-   - 최상위 래퍼 클래스를 SMRD와 동일한 sticky 카드로 변경:
-     `sticky top-0 z-30 rounded-lg border border-l-2 border-l-primary bg-card px-3 py-2 shadow-sm`
-   - 내부 flex 배치를 SMRD 순서와 일치: 카운트 · 필드 Select · 값 입력 · Set blank · Apply · Export 드롭다운 · 더보기(삭제/Clear).
-   - 카운트 문구를 "N selected · Will run in K batches of 500"으로 통일.
-
-3. 기존 로직(선택 state, `bulkUpdateDmrEntries`, `bulkDeleteDmrEntries`, `exportDmrToXlsx`, `copyDmrAsTsv`, `selectAllFiltered`)은 그대로 재사용.
-
-## 파트 E. 검증
-
-- 빌드 통과 확인.
-- Playwright로 `/resource/dmr/raw-data` 진입 → 헤더 체크박스 클릭 → 상단 sticky BulkEditBar 노출 확인 → 세로 스크롤 시 상단에 붙어 유지되는지 스크린샷 캡처.
-- SMRD Raw Data 페이지 스크린샷과 나란히 비교하여 배치/클래스/문구 일치 확인.
-
-## 셀프 체크리스트 (본 계획 제출 전)
-
-- [x] SMRD 원본 파일을 tool로 실제 열람 (DefectRawDataPage.tsx:861, BulkEditBar.tsx:145)
-- [x] 파일:라인 인용 포함
-- [x] 항목별 diff 표 포함
-- [x] "동일하게"를 기능만으로 축소해석하지 않음 (UI/배치/클래스/문구 포함)
+## 롤백 계획
+- 트리거/함수 DROP 마이그레이션 준비
+- 임포트 컨텍스트의 `null` 초기화 라인은 주석 처리 형태로 복원 가능하게 커밋 분리
