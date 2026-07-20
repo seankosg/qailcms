@@ -49,7 +49,7 @@ export function DmrDashboardPage() {
     enabled: !!currentAsOf,
     queryKey: ['dmr_entries_window', currentAsOf, rangeDays, discipline],
     queryFn: async () => {
-      let sq = supabase.from('dmr_entries').select('report_date, discipline, contractor_name, system_name, plot, metric, manpower')
+      let sq = supabase.from('dmr_entries').select('report_date, discipline, contractor_name, system_name, plot, plan_manpower, actual_manpower')
         .gte('report_date', fromDate).lte('report_date', currentAsOf)
         .eq('plot', 'TOTAL');
       if (discipline !== 'all') sq = sq.eq('discipline', discipline);
@@ -67,10 +67,10 @@ export function DmrDashboardPage() {
 
   // Aggregations
   const kpi = useMemo(() => {
-    const today = rows.filter((r) => r.report_date === currentAsOf && r.metric === 'today').reduce((a, r) => a + (r.manpower ?? 0), 0);
-    const yest = rows.filter((r) => r.report_date === currentAsOf && r.metric === 'yesterday').reduce((a, r) => a + (r.manpower ?? 0), 0);
-    const target = rows.filter((r) => r.report_date === currentAsOf && r.metric === 'target').reduce((a, r) => a + (r.manpower ?? 0), 0);
-    return { today, yest, target, diff: today - yest, achievement: target > 0 ? (today / target) * 100 : 0 };
+    const same = rows.filter((r) => r.report_date === currentAsOf);
+    const actual = same.reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
+    const plan = same.reduce((a, r) => a + (r.plan_manpower ?? 0), 0);
+    return { actual, plan, diff: actual - plan, achievement: plan > 0 ? (actual / plan) * 100 : 0 };
   }, [rows, currentAsOf]);
 
   const byDiscipline = useMemo(() => {
@@ -78,32 +78,31 @@ export function DmrDashboardPage() {
       const r = rows.filter((x) => x.discipline === d && x.report_date === currentAsOf);
       return {
         discipline: d,
-        today: r.filter((x) => x.metric === 'today').reduce((a, x) => a + x.manpower, 0),
-        yest: r.filter((x) => x.metric === 'yesterday').reduce((a, x) => a + x.manpower, 0),
-        target: r.filter((x) => x.metric === 'target').reduce((a, x) => a + x.manpower, 0),
+        actual: r.reduce((a, x) => a + (x.actual_manpower ?? 0), 0),
+        plan: r.reduce((a, x) => a + (x.plan_manpower ?? 0), 0),
       };
     });
   }, [rows, currentAsOf]);
 
-  // Trend: today vs target per day
+  // Trend: actual vs plan per day
   const trend = useMemo(() => {
-    const map = new Map<string, { date: string; today: number; target: number }>();
+    const map = new Map<string, { date: string; actual: number; plan: number }>();
     for (const r of rows) {
-      const cur = map.get(r.report_date) ?? { date: r.report_date, today: 0, target: 0 };
-      if (r.metric === 'today') cur.today += r.manpower;
-      if (r.metric === 'target') cur.target += r.manpower;
+      const cur = map.get(r.report_date) ?? { date: r.report_date, actual: 0, plan: 0 };
+      cur.actual += r.actual_manpower ?? 0;
+      cur.plan += r.plan_manpower ?? 0;
       map.set(r.report_date, cur);
     }
     return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
   }, [rows]);
 
-  // Contractor × date matrix (today)
+  // Contractor × date matrix (actual)
   const matrix = useMemo(() => {
     const dates = Array.from(new Set(rows.map((r) => r.report_date))).sort();
     const contractors = Array.from(new Set(rows.map((r) => r.contractor_name))).sort();
     const cell = (c: string, d: string) => rows
-      .filter((r) => r.contractor_name === c && r.report_date === d && r.metric === 'today')
-      .reduce((a, r) => a + r.manpower, 0);
+      .filter((r) => r.contractor_name === c && r.report_date === d)
+      .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
     return { dates, contractors, cell };
   }, [rows]);
 
@@ -153,9 +152,9 @@ export function DmrDashboardPage() {
 
       {/* KPI Strip */}
       <div className="grid gap-3 md:grid-cols-4">
-        <KpiCard label="Today" value={kpi.today} />
-        <KpiCard label="Yesterday" value={kpi.yest} sub={kpi.diff !== 0 ? `${kpi.diff > 0 ? '+' : ''}${kpi.diff}` : '—'} subColor={kpi.diff > 0 ? 'emerald' : kpi.diff < 0 ? 'red' : 'muted'} />
-        <KpiCard label="Target" value={kpi.target} />
+        <KpiCard label="Actual" value={kpi.actual} />
+        <KpiCard label="Plan" value={kpi.plan} />
+        <KpiCard label="Δ (Actual−Plan)" value={kpi.diff} sub={kpi.diff !== 0 ? `${kpi.diff > 0 ? '+' : ''}${kpi.diff}` : '—'} subColor={kpi.diff > 0 ? 'emerald' : kpi.diff < 0 ? 'red' : 'muted'} />
         <KpiCard label="달성률" value={`${kpi.achievement.toFixed(1)}%`} />
       </div>
 
@@ -167,13 +166,12 @@ export function DmrDashboardPage() {
               <CardTitle className="text-sm">{d.discipline} · <span className="text-xs font-normal text-muted-foreground">{DISCIPLINE_LABEL[d.discipline]}</span></CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <MiniStat label="Today" value={d.today} />
-                <MiniStat label="Yest." value={d.yest} />
-                <MiniStat label="Target" value={d.target} />
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <MiniStat label="Actual" value={d.actual} />
+                <MiniStat label="Plan" value={d.plan} />
               </div>
-              <div className={cn('mt-2 text-center text-xs', d.today - d.yest > 0 ? 'text-emerald-600' : d.today - d.yest < 0 ? 'text-red-600' : 'text-muted-foreground')}>
-                Δ {d.today - d.yest > 0 ? '+' : ''}{d.today - d.yest}
+              <div className={cn('mt-2 text-center text-xs', d.actual - d.plan > 0 ? 'text-emerald-600' : d.actual - d.plan < 0 ? 'text-red-600' : 'text-muted-foreground')}>
+                Δ {d.actual - d.plan > 0 ? '+' : ''}{d.actual - d.plan}
               </div>
             </CardContent>
           </Card>
@@ -182,7 +180,7 @@ export function DmrDashboardPage() {
 
       {/* Trend chart */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">일자별 총원 추이 (Today vs Target)</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">일자별 총원 추이 (Actual vs Plan)</CardTitle></CardHeader>
         <CardContent>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -192,8 +190,8 @@ export function DmrDashboardPage() {
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="today" stroke="hsl(var(--primary))" strokeWidth={2} name="Today" />
-                <Line type="monotone" dataKey="target" stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" name="Target" />
+                <Line type="monotone" dataKey="actual" stroke="hsl(var(--primary))" strokeWidth={2} name="Actual" />
+                <Line type="monotone" dataKey="plan" stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" name="Plan" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -202,7 +200,7 @@ export function DmrDashboardPage() {
 
       {/* Contractor × Date Matrix */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Contractor × 일자 매트릭스 (Today)</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Contractor × 일자 매트릭스 (Actual)</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] text-xs">
