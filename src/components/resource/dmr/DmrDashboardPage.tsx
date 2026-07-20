@@ -358,74 +358,45 @@ export function DmrDashboardPage() {
         ))}
       </div>
 
-      {/* Trend chart */}
+      {/* Sub Contractor × Date Matrix */}
       <Card>
-        <CardHeader className="pb-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-sm">일자별 총원 추이 (Actual vs Plan, by {GROUP_BY_OPTIONS.find((g) => g.value === groupBy)?.label})</CardTitle>
-            <div className="flex gap-1">
-              {GROUP_BY_OPTIONS.map((o) => (
-                <FilterToggleButton
-                  key={o.value}
-                  active={groupBy === o.value}
-                  className="h-7 px-2 text-[11px]"
-                  onClick={() => setGroupBy(o.value)}
-                >
-                  {o.label}
-                </FilterToggleButton>
-              ))}
-            </div>
-          </div>
-          <div className="mt-2 text-[22px] font-bold text-red-500 truncate">
-            Today's Manpower: {todaysManpower.toLocaleString()}
-          </div>
-        </CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Sub Contractor × 일자 매트릭스 (Actual)</CardTitle></CardHeader>
         <CardContent>
-          <div className="h-[320px]">
-            {trendSeries.groups.length === 0 || trendSeries.data.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No data for current selection</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trendSeries.data} margin={{ top: 10, right: 20, left: 0, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={fmtDate} />
-                  <YAxis tick={{ fontSize: 11 }} domain={[0, yMax]} allowDecimals={false} />
-                  <Tooltip labelFormatter={fmtDate} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  {trendSeries.groups.flatMap((g, i) => {
-                    const color = LINE_COLORS[i % LINE_COLORS.length];
-                    return [
-                      <Line
-                        key={`${g}-actual`}
-                        type="linear"
-                        dataKey={g}
-                        stroke={color}
-                        strokeWidth={4}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
-                        name={g}
-                      />,
-                      <Line
-                        key={`${g}-plan`}
-                        type="linear"
-                        dataKey={`${g}_plan`}
-                        stroke={color}
-                        strokeWidth={4}
-                        strokeDasharray="6 4"
-                        dot={false}
-                        activeDot={false}
-                        name={`${g} (Plan)`}
-                      />,
-                    ];
-                  })}
-                </LineChart>
-              </ResponsiveContainer>
-            )}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px] text-xs">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Sub Contractor</th>
+                  {matrix.dates.map((d) => (
+                    <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{d.slice(5)}</th>
+                  ))}
+                  <th className="px-2 py-1 text-right">합계</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matrix.contractors.map((c) => {
+                  const sum = matrix.dates.reduce((a, d) => a + matrix.cell(c, d), 0);
+                  return (
+                    <tr key={c} className="border-t hover:bg-muted/30">
+                      <td className="sticky left-0 z-[5] bg-background px-2 py-1 font-medium">{c}{directNames.has(c) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
+                      {matrix.dates.map((d) => {
+                        const v = matrix.cell(c, d);
+                        return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
+                      })}
+                      <td className="px-2 py-1 text-right font-semibold">{sum}</td>
+                    </tr>
+                  );
+                })}
+                {matrix.contractors.length === 0 && (
+                  <tr><td colSpan={matrix.dates.length + 2} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
 
-      {/* Contractor × Date Matrix */}
+      {/* Trend chart */}
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Sub Contractor × 일자 매트릭스 (Actual)</CardTitle></CardHeader>
         <CardContent>
