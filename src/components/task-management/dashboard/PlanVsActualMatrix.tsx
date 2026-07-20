@@ -232,7 +232,7 @@ export function PlanVsActualMatrix({
       <div className="flex">
         <div
           ref={leftBodyRef}
-          className="max-h-[calc(100vh-320px)] shrink-0 overflow-hidden bg-card shadow-[2px_0_4px_-2px_hsl(var(--border))]"
+          className="max-h-[calc(100dvh-320px)] shrink-0 overflow-hidden bg-card shadow-[2px_0_4px_-2px_hsl(var(--border))]"
           style={{ width: STICKY_LEFT_WIDTH }}
         >
           {data.rows.map((row) => {
@@ -290,7 +290,7 @@ export function PlanVsActualMatrix({
 
         <div
           ref={bodyScrollRef}
-          className="max-h-[calc(100vh-320px)] min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]"
+          className="max-h-[calc(100dvh-320px)] min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]"
         >
           <div style={{ width: timelineGridWidth, minWidth: timelineGridWidth }}>
             {data.rows.length === 0 && (

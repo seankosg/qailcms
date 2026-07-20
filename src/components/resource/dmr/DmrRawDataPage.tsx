@@ -483,7 +483,7 @@ export function DmrRawDataPage() {
           onBlur={() => qInput !== search.q && setQ(qInput)}
           onKeyDown={(e) => { if (e.key === 'Enter') setQ(qInput); }}
           placeholder="Work Description / Sub Contractor 검색…"
-          className="h-8 w-64 text-xs"
+          className="h-8 w-full text-xs sm:w-64"
         />
         {anyFilterActive && (
           <Button size="sm" variant="ghost" className="h-8" onClick={resetFilters}>

@@ -226,7 +226,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <div className="flex min-h-dvh bg-muted/30">
       {/* Sidebar */}
       <aside
         className={cn(
@@ -240,8 +240,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <span className="text-sm font-semibold">QAIL CMS</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden flex-col items-end sm:flex">
-              <span className="max-w-[140px] truncate text-sm font-medium">{me?.name ?? me?.email}</span>
+            <div className="flex flex-col items-end">
+              <span className="max-w-[120px] truncate text-sm font-medium sm:max-w-[140px]">{me?.name ?? me?.email}</span>
               <span className="text-[10px] leading-none text-muted-foreground">{displayRoleLabel}</span>
             </div>
             {me?.primaryRole === "guest" || me?.isGuest ? (

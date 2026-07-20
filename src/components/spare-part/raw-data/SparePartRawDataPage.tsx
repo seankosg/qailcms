@@ -462,7 +462,7 @@ export function SparePartRawDataPage() {
   const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] flex-col gap-2">
+    <div className="flex h-[calc(100dvh-6rem)] flex-col gap-2">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">SPT-Raw Data</h1>
@@ -476,14 +476,14 @@ export function SparePartRawDataPage() {
         )}
         {isFetching && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="relative">
+        <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="relative w-full sm:w-auto">
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="전역 검색 (, 는 AND)"
-              className="h-8 w-64 pl-7"
+              className="h-8 w-full pl-7 sm:w-64"
             />
           </div>
 

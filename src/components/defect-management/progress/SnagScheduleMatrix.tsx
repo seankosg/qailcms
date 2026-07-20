@@ -263,7 +263,7 @@ export function SnagScheduleMatrix({
       <div className="flex">
         <div
           ref={leftBodyRef}
-          className="max-h-[calc(100vh-360px)] shrink-0 overflow-hidden shadow-[2px_0_4px_-2px_hsl(var(--border))]"
+          className="max-h-[calc(100dvh-360px)] shrink-0 overflow-hidden shadow-[2px_0_4px_-2px_hsl(var(--border))]"
           style={{ width: STICKY_LEFT_WIDTH, ...OPAQUE_STYLE }}
         >
           {data.rows.map((row) => {
@@ -330,7 +330,7 @@ export function SnagScheduleMatrix({
 
         <div
           ref={bodyScrollRef}
-          className="max-h-[calc(100vh-360px)] min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]"
+          className="max-h-[calc(100dvh-360px)] min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]"
         >
           <div style={{ width: timelineGridWidth, minWidth: timelineGridWidth }}>
             {data.rows.length === 0 && (

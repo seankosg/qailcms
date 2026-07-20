@@ -936,7 +936,7 @@ export function TaskManagementRawDataPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] flex-col gap-2">
+    <div className="flex h-[calc(100dvh-6rem)] flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Task-Raw Data</h1>
         <Badge variant="secondary" className="ml-1">
@@ -970,16 +970,17 @@ export function TaskManagementRawDataPage() {
         )}
         {isFetching && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="relative">
+        <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="relative w-full sm:w-auto">
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="전역 검색 (, 는 AND)"
-              className="h-8 w-64 pl-7"
+              className="h-8 w-full pl-7 sm:w-64"
             />
           </div>
+          <div className="hidden sm:contents">
           <ColumnOrderMenu
             order={order}
             visibility={visibility as Record<string, boolean>}
@@ -994,13 +995,14 @@ export function TaskManagementRawDataPage() {
           <Button variant="outline" size="sm" className="h-8" onClick={resetAll}>
             <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
           </Button>
+          </div>
           <Button variant="outline" size="sm" className="h-8" onClick={() => refetch()}>
             Refresh
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="h-8"
+            className="hidden h-8 sm:inline-flex"
             onClick={() => setAllCollapsed(!allCollapsed)}
             title={allCollapsed ? "모두 펼치기" : "모두 접기"}
             disabled={parentKeys.length === 0}
@@ -1013,7 +1015,7 @@ export function TaskManagementRawDataPage() {
             {allCollapsed ? "Expand All" : "Collapse All"}
           </Button>
           {canEdit && (
-            <>
+            <div className="hidden sm:contents">
               <Button
                 variant="outline"
                 size="sm"
@@ -1045,7 +1047,7 @@ export function TaskManagementRawDataPage() {
                 Judgment
               </Button>
               <CriticalThresholdPopover />
-            </>
+            </div>
           )}
           <Button
             variant="outline"
