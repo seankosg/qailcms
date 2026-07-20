@@ -336,6 +336,7 @@ export function TaskManagementRawDataPage() {
       source?: string;
       mode?: string;
       asOf?: string;
+      taskScope?: string;
       team?: string;
       hdec_pic_name?: string;
       hdec_eng_name?: string;
@@ -360,10 +361,18 @@ export function TaskManagementRawDataPage() {
     setSearchInput("");
     setColumnFilters(next);
     setCollapsedParents(new Set());
+    const asOf = s.asOf && s.asOf.length ? s.asOf : todayIso();
+    const scope: TaskScope =
+      s.taskScope === "main" || s.taskScope === "sub" ? s.taskScope : "all";
     if (s.mode === "delay") {
-      setDelayMode({ asOf: s.asOf && s.asOf.length ? s.asOf : todayIso() });
+      setDelayMode({ asOf });
+      setKpiMode(null);
+    } else if (s.mode) {
+      setDelayMode(null);
+      setKpiMode({ mode: s.mode as TmKpiMode, asOf, scope });
     } else {
       setDelayMode(null);
+      setKpiMode(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateLoaded, search]);
