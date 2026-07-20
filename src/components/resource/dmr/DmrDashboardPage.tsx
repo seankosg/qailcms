@@ -200,13 +200,13 @@ export function DmrDashboardPage() {
 
       {/* Contractor × Date Matrix */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Contractor × 일자 매트릭스 (Actual)</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Sub Contractor × 일자 매트릭스 (Actual)</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] text-xs">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Contractor</th>
+                  <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Sub Contractor</th>
                   {matrix.dates.map((d) => (
                     <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{d.slice(5)}</th>
                   ))}
