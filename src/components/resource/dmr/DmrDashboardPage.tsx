@@ -317,3 +317,57 @@ function MiniStat({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
+
+function MultiSelectPopover({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const filtered = useMemo(
+    () => (query ? options.filter((o) => o.toLowerCase().includes(query.toLowerCase())) : options),
+    [options, query],
+  );
+  const toggle = (o: string) => {
+    onChange(value.includes(o) ? value.filter((v) => v !== o) : [...value, o]);
+  };
+  const btnLabel = value.length === 0 ? `All ${label}` : `${value.length} selected`;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 min-w-[10rem] justify-between text-xs">
+          <span className="truncate">{btnLabel}</span>
+          <ChevronDown className="ml-1 h-3 w-3 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <Input
+          placeholder="Search..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="mb-2 h-8 text-xs"
+        />
+        <div className="mb-2 flex justify-between text-[11px]">
+          <button className="text-primary hover:underline" onClick={() => onChange(filtered)}>Select all</button>
+          <button className="text-muted-foreground hover:underline" onClick={() => onChange([])}>Clear</button>
+        </div>
+        <div className="max-h-64 overflow-y-auto">
+          {filtered.length === 0 && <div className="p-2 text-center text-xs text-muted-foreground">No options</div>}
+          {filtered.map((o) => (
+            <label key={o} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/50">
+              <Checkbox checked={value.includes(o)} onCheckedChange={() => toggle(o)} />
+              <span className="truncate">{o}</span>
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
