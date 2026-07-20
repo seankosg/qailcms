@@ -1152,7 +1152,9 @@ export function TaskManagementRawDataPage() {
                 const row = rowModel.rows[v.index];
                 if (!row) return null;
                 const isParent = (row.original as Row).level === "main";
-                const isDone = Number((row.original as any).actual_progress ?? 0) >= 100;
+                const ap = Number((row.original as any).actual_progress ?? 0);
+                const aj = (row.original as any).auto_judgment_value;
+                const isDone = ap >= 1 || aj === "완료";
                 return (
                   <div
                     key={row.id}
