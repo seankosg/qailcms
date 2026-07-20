@@ -25,6 +25,8 @@ export interface ParsedTaskRow {
   plan_progress: number | null;
   progress_variance: number | null;
   forecast_end: string | null;
+  /** actual_progress===1 이면 forecast_end(=Revise Finish) → dataDate 폴백으로 자동 채움. 그 외 null. */
+  actual_finish: string | null;
   slip_days: number | null;
   auto_judgment: string | null;
   sort_order: number;
@@ -732,6 +734,13 @@ export async function parseTaskManagementExcel(
       plan_progress: toPct4(getCell(sheet, r, cols.plan_progress)),
       progress_variance: toPct4(getCell(sheet, r, cols.progress_variance)),
       forecast_end: toIsoDate(getCell(sheet, r, cols.forecast_end)),
+      // A.Finish 자동 보정: 100% 완료면 Revise Finish(=forecast_end) → dataDate 폴백.
+      actual_finish: (() => {
+        const ap = toPct4(getCell(sheet, r, cols.actual_progress));
+        if (ap !== 1) return null;
+        const fe = toIsoDate(getCell(sheet, r, cols.forecast_end));
+        return fe ?? dataDate ?? null;
+      })(),
       slip_days: (() => {
         const n = toNumber(getCell(sheet, r, cols.slip_days));
         return n == null ? null : Math.round(n);
