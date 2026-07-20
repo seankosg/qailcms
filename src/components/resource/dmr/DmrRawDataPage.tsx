@@ -194,15 +194,15 @@ export function DmrRawDataPage() {
 
   const setColumnFilters = useCallback((updater: any) => {
     const next = typeof updater === 'function' ? updater(columnFilters) : updater;
-    navigate({ search: (prev) => ({ ...prev, filters: encodeState(next), page: 1 }) });
+    navigate({ to: '.', search: (prev: any) => ({ ...prev, filters: encodeState(next), page: 1 }) });
   }, [columnFilters, navigate]);
   const setSorting = useCallback((updater: any) => {
     const next = typeof updater === 'function' ? updater(sorting) : updater;
-    navigate({ search: (prev) => ({ ...prev, sort: encodeState(next) }) });
+    navigate({ to: '.', search: (prev: any) => ({ ...prev, sort: encodeState(next) }) });
   }, [sorting, navigate]);
-  const setPage = (page: number) => navigate({ search: (prev) => ({ ...prev, page }) });
-  const setPageSize = (pageSize: number) => navigate({ search: (prev) => ({ ...prev, pageSize, page: 1 }) });
-  const setQ = (q: string) => navigate({ search: (prev) => ({ ...prev, q, page: 1 }) });
+  const setPage = (page: number) => navigate({ to: '.', search: (prev: any) => ({ ...prev, page }) });
+  const setPageSize = (pageSize: number) => navigate({ to: '.', search: (prev: any) => ({ ...prev, pageSize, page: 1 }) });
+  const setQ = (q: string) => navigate({ to: '.', search: (prev: any) => ({ ...prev, q, page: 1 }) });
 
   // View preferences
   const { state: viewPref, ready: prefReady, save: savePref } = useUserViewPreference('dmr-raw-data');
