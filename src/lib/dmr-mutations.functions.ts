@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { normalizeDmrTeam } from './dmr/types';
 
 const ALLOWED_FIELDS = new Set<string>([
   'report_date',
@@ -12,7 +13,6 @@ const ALLOWED_FIELDS = new Set<string>([
   'actual_manpower',
 ]);
 
-const DISCIPLINE_VALS = new Set(['ARCH', 'ELECT', 'MECH']);
 const PLOT_VALS = new Set(['C', 'D', 'TOTAL']);
 
 async function assertCanEdit(ctx: any) {
@@ -28,8 +28,8 @@ async function assertCanEdit(ctx: any) {
 }
 
 function validatePatchValue(field: string, value: unknown): unknown {
-  if (field === 'discipline' && !DISCIPLINE_VALS.has(String(value))) {
-    throw new Error(`잘못된 공종 값: ${value}`);
+  if (field === 'discipline') {
+    return normalizeDmrTeam(value);
   }
   if (field === 'plot' && !PLOT_VALS.has(String(value))) {
     throw new Error(`잘못된 Plot 값: ${value}`);

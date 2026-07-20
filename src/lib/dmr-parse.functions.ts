@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { z } from 'zod';
+import { normalizeDmrTeam } from './dmr/types';
 
 const InputSchema = z.object({
   storagePaths: z.array(z.string().min(1)).min(1).max(3),
@@ -21,7 +22,7 @@ const RowSchema = z.object({
   }),
 });
 const SectionSchema = z.object({
-  discipline: z.enum(['ARCH', 'ELECT', 'MECH']),
+  discipline: z.preprocess((v) => normalizeDmrTeam(v), z.enum(['ARCH', 'ELEC', 'MECH'])),
   report_date: z.string(),
   rows: z.array(RowSchema),
   warnings: z.array(z.string()).optional(),

@@ -1,10 +1,13 @@
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { z } from 'zod';
+import { normalizeDmrTeam } from './dmr/types';
+
+const TeamSchema = z.preprocess((v) => normalizeDmrTeam(v), z.enum(['ARCH', 'ELEC', 'MECH']));
 
 const EntrySchema = z.object({
   report_date: z.string(),
-  discipline: z.enum(['ARCH', 'ELECT', 'MECH']),
+  discipline: TeamSchema,
   system_name: z.string().min(1),
   contractor_name: z.string().min(1),
   plot: z.enum(['C', 'D', 'TOTAL']),
@@ -16,7 +19,7 @@ const EntrySchema = z.object({
 
 const InputSchema = z.object({
   entries: z.array(EntrySchema).min(1),
-  systemMasters: z.array(z.object({ discipline: z.enum(['ARCH', 'ELECT', 'MECH']), name: z.string().min(1) })).default([]),
+  systemMasters: z.array(z.object({ discipline: TeamSchema, name: z.string().min(1) })).default([]),
   contractorMasters: z.array(z.object({ name: z.string().min(1), is_direct: z.boolean().default(false) })).default([]),
   overwrite: z.boolean().default(false),
 });
