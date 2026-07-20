@@ -948,9 +948,25 @@ export function TaskManagementRawDataPage() {
           </Badge>
         )}
         {latestDataDate && (
-          <Badge variant="outline" className="text-xs">
-            Data Date {latestDataDate}
-          </Badge>
+          <DataDatePicker
+            value={search.dataDate}
+            latest={latestDataDate}
+            options={dataDateOptions}
+            onChange={(v) =>
+              navigate({
+                to: "/closure/task-management/raw-data",
+                search: (prev: Record<string, unknown>) =>
+                  ({ ...prev, dataDate: v === latestDataDate ? "" : v }) as any,
+              })
+            }
+            onReset={() =>
+              navigate({
+                to: "/closure/task-management/raw-data",
+                search: (prev: Record<string, unknown>) =>
+                  ({ ...prev, dataDate: "" }) as any,
+              })
+            }
+          />
         )}
         {isFetching && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
 
