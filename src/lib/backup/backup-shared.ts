@@ -24,6 +24,7 @@ export type BackupTableName =
   | "abd_import_logs"
   | "defect_import_logs"
   | "task_management_import_logs"
+  | "task_schedule_change_audit"
   | "spare_parts_import_logs";
 
 export const BACKUP_TABLES: BackupTableName[] = [
@@ -52,6 +53,7 @@ export const BACKUP_TABLES: BackupTableName[] = [
   "abd_import_logs",
   "defect_import_logs",
   "task_management_import_logs",
+  "task_schedule_change_audit",
   "spare_parts_import_logs",
 ];
 
@@ -68,6 +70,6 @@ export type PreImportModule = "abd" | "sm" | "tm" | "spare-part";
 export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]> = {
   abd: ["abd_items_raw", "abd_import_logs"],
   sm: ["defect_items_raw", "defect_import_logs"],
-  tm: ["task_management_raw", "task_management_import_logs"],
+  tm: ["task_management_raw", "task_management_import_logs", "task_schedule_change_audit"],
   "spare-part": ["spare_parts_raw", "spare_parts_import_logs"],
 };
