@@ -15,6 +15,7 @@ import {
 import { Loader2, Check, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { exportTmImportRecord } from "./exportTmImportRecord";
+import { toDohaDateKey, todayInDoha } from "@/lib/time/doha";
 
 interface PicUser {
   id: string;
@@ -29,14 +30,12 @@ interface LogRow {
 }
 
 function toKstDateKey(iso: string): string {
-  // Convert UTC timestamp to KST date (YYYY-MM-DD)
-  const d = new Date(iso);
-  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 10);
+  // Doha (Asia/Qatar, UTC+3) calendar date key.
+  return toDohaDateKey(iso);
 }
 
 function todayKstKey(): string {
-  return toKstDateKey(new Date().toISOString());
+  return todayInDoha();
 }
 
 function addDays(key: string, delta: number): string {
@@ -104,9 +103,9 @@ export function TmImportRecordTab() {
     enabled: allowed,
     staleTime: 30_000,
     queryFn: async (): Promise<LogRow[]> => {
-      // Fetch KST [from 00:00, to+1 00:00) as UTC bounds
-      const startUtc = new Date(from + "T00:00:00+09:00").toISOString();
-      const endUtc = new Date(addDays(to, 1) + "T00:00:00+09:00").toISOString();
+      // Fetch Doha [from 00:00, to+1 00:00) as UTC bounds
+      const startUtc = new Date(from + "T00:00:00+03:00").toISOString();
+      const endUtc = new Date(addDays(to, 1) + "T00:00:00+03:00").toISOString();
       const all: LogRow[] = [];
       let offset = 0;
       const pageSize = 1000;
