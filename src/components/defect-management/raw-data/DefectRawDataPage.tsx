@@ -1151,7 +1151,7 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
   };
 
   return (
-    <div className="flex max-h-[calc(100vh-260px)] flex-col overflow-hidden rounded-md border bg-background">
+    <div className="flex max-h-[calc(100dvh-260px)] flex-col overflow-hidden rounded-md border bg-background">
       <TopHorizontalScrollbar targetRef={tableRef} width={totalWidth} frozenWidth={frozenWidth} />
       <div ref={tableRef} className="min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">
         <table className="w-full caption-bottom text-sm" style={{ width: totalWidth, tableLayout: "fixed" }}>

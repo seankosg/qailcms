@@ -52,7 +52,7 @@ export function HistoryDrawer({ open, onClose, discipline, taskNo, taskName }: P
             {taskName && ` · ${taskName}`}
           </SheetDescription>
         </SheetHeader>
-        <ScrollArea className="mt-4 h-[calc(100vh-8rem)] pr-3">
+        <ScrollArea className="mt-4 h-[calc(100dvh-8rem)] pr-3">
           {isLoading && <div className="text-sm text-muted-foreground">로딩 중…</div>}
           {!isLoading && (data?.rows ?? []).length === 0 && (
             <div className="text-sm text-muted-foreground">이력 없음</div>

@@ -323,7 +323,7 @@ export function DeSnagMatrixBlock({
           블록 전체 보기 →
         </button>
       </div>
-      <div className="relative max-h-[calc(100vh-260px)] overflow-auto">
+      <div className="relative max-h-[calc(100dvh-260px)] overflow-auto">
         <table className="w-full border-collapse text-xs">
           <MatrixHeader
             block={block}

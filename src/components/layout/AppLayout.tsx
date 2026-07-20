@@ -226,7 +226,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <div className="flex min-h-dvh bg-muted/30">
       {/* Sidebar */}
       <aside
         className={cn(

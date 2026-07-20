@@ -52,7 +52,7 @@ function ChangePasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>비밀번호 변경</CardTitle>

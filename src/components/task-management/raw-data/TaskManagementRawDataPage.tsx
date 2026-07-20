@@ -936,7 +936,7 @@ export function TaskManagementRawDataPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] flex-col gap-2">
+    <div className="flex h-[calc(100dvh-6rem)] flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Task-Raw Data</h1>
         <Badge variant="secondary" className="ml-1">
