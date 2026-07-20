@@ -535,12 +535,21 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
       toast.error("No files ready to import");
       return;
     }
+    setIsRunning(true);
     try {
-      await takePreImportSnapshot("spare-part");
-    } catch (err) {
-      toast.warning(`사전 백업 실패: ${(err as Error).message}. 임포트를 계속합니다.`);
+      await takePreImportSnapshotWithFeedback("spare-part");
+    } catch {
+      // toast 메시지는 takePreImportSnapshotWithFeedback 내부에서 처리
     }
-    await executeImport(ready);
+    try {
+      await executeImport(ready);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[spare-part-import] start failed", e);
+      toast.error(`Spare Part import 실패: ${msg}`);
+    } finally {
+      setIsRunning(false);
+    }
   }, [files, isRunning, executeImport]);
 
   return (
