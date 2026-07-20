@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import {
   flexRender,
   getCoreRowModel,
@@ -87,6 +87,12 @@ import {
 } from "@/lib/task-management/rollup.functions";
 import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
 import {
+  ALL_TASK_STAGE_KEYS,
+  isTaskStageDelayedAsOf,
+  todayIso,
+  type TaskItem,
+} from "@/lib/task-management/schedule-utils";
+import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
   TASK_MANAGEMENT_FIELD_CONFIG_QK,
@@ -98,6 +104,8 @@ type Row = Record<string, unknown> & { id: string; task_no: string; discipline: 
 
 const DEFAULT_SORTING: SortingState = [{ id: "discipline", desc: false }];
 const DEFAULT_FROZEN_EXTRAS = ["discipline", "level", "task_name"];
+
+const routeApi = getRouteApi("/_authenticated/closure/task-management/raw-data");
 const DEFAULT_ORDER = TM_COLUMNS.map((c) => c.key).filter((k) => k !== "task_no");
 
 interface PersistedState {
