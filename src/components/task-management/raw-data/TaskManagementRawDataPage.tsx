@@ -965,9 +965,15 @@ export function TaskManagementRawDataPage() {
         }}
       />
 
-      {activeFilterCount > 0 && (
+      {(activeFilterCount > 0 || delayMode) && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <Filter className="h-3 w-3 text-muted-foreground" />
+          {delayMode && (
+            <FilterChip
+              label={`지연 모드 · asOf ${delayMode.asOf}`}
+              onClear={() => setDelayMode(null)}
+            />
+          )}
           {globalFilter && (
             <FilterChip
               label={`Search: ${globalFilter}`}
