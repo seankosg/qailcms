@@ -2724,6 +2724,102 @@ export type Database = {
           },
         ]
       }
+      task_schedule_change_audit: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          discipline: string | null
+          forecast_end_diff_days: number | null
+          forecast_end_new_date: string | null
+          forecast_end_old_date: string | null
+          forecast_end_prev_gap_days: number | null
+          hdec_eng_name: string | null
+          hdec_pic_name: string | null
+          id: string
+          import_log_id: string | null
+          main_task_no: string | null
+          plan_end_cur_gap_days: number | null
+          plan_end_diff_days: number | null
+          plan_end_new_date: string | null
+          plan_end_old_date: string | null
+          plan_end_prev_gap_days: number | null
+          plan_start_cur_gap_days: number | null
+          plan_start_diff_days: number | null
+          plan_start_new_date: string | null
+          plan_start_old_date: string | null
+          plan_start_prev_gap_days: number | null
+          plot: string | null
+          raw_row_no: number | null
+          source_file: string | null
+          task_name: string | null
+          task_no: string
+          task_raw_id: string | null
+          team: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          discipline?: string | null
+          forecast_end_diff_days?: number | null
+          forecast_end_new_date?: string | null
+          forecast_end_old_date?: string | null
+          forecast_end_prev_gap_days?: number | null
+          hdec_eng_name?: string | null
+          hdec_pic_name?: string | null
+          id?: string
+          import_log_id?: string | null
+          main_task_no?: string | null
+          plan_end_cur_gap_days?: number | null
+          plan_end_diff_days?: number | null
+          plan_end_new_date?: string | null
+          plan_end_old_date?: string | null
+          plan_end_prev_gap_days?: number | null
+          plan_start_cur_gap_days?: number | null
+          plan_start_diff_days?: number | null
+          plan_start_new_date?: string | null
+          plan_start_old_date?: string | null
+          plan_start_prev_gap_days?: number | null
+          plot?: string | null
+          raw_row_no?: number | null
+          source_file?: string | null
+          task_name?: string | null
+          task_no: string
+          task_raw_id?: string | null
+          team?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          discipline?: string | null
+          forecast_end_diff_days?: number | null
+          forecast_end_new_date?: string | null
+          forecast_end_old_date?: string | null
+          forecast_end_prev_gap_days?: number | null
+          hdec_eng_name?: string | null
+          hdec_pic_name?: string | null
+          id?: string
+          import_log_id?: string | null
+          main_task_no?: string | null
+          plan_end_cur_gap_days?: number | null
+          plan_end_diff_days?: number | null
+          plan_end_new_date?: string | null
+          plan_end_old_date?: string | null
+          plan_end_prev_gap_days?: number | null
+          plan_start_cur_gap_days?: number | null
+          plan_start_diff_days?: number | null
+          plan_start_new_date?: string | null
+          plan_start_old_date?: string | null
+          plan_start_prev_gap_days?: number | null
+          plot?: string | null
+          raw_row_no?: number | null
+          source_file?: string | null
+          task_name?: string | null
+          task_no?: string
+          task_raw_id?: string | null
+          team?: string | null
+        }
+        Relationships: []
+      }
       team_master: {
         Row: {
           aliases: string[]

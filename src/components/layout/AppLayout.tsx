@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, Wrench, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2, HardHat,
 } from "lucide-react";
-import { ListTree, Sliders, TrendingUp } from "lucide-react";
+import { ListTree, Sliders, TrendingUp, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +48,7 @@ const NAV: NavSection[] = [
           { to: "/closure/task-management/dashboard", label: "Dashboard", icon: LayoutDashboard },
           { to: "/closure/task-management/tree", label: "Task Summary", icon: ListTree },
           { to: "/closure/task-management/raw-data", label: "Raw Data", icon: Database },
+          { to: "/closure/task-management/schedule-revision", label: "Schedule Revision", icon: CalendarClock },
         ],
       },
       {
