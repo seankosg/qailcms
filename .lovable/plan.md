@@ -1,28 +1,43 @@
-## 사전 스냅샷이 필요한 이유
+## 목표
+TM 대시보드처럼 Task Summary와 Raw Data 페이지 최상단에도 **Data Date 선택기**를 추가하여, 각 페이지의 "오늘 기준" 계산을 사용자가 고른 날짜로 연동한다. 기본값은 DB에 있는 최신 `data_date`.
 
-사전 스냅샷(`takePreImportSnapshot`)은 임포트가 시작되기 직전에 해당 모듈의 대상 테이블들을 전체 백업해두는 기능입니다. 본질적으로 "임포트 전 데이터 상태를 복원 지점"으로 저장하는 안전 장치입니다.
+## 현재 상태 (확인 완료)
+- `TmDashboardPage.tsx`: 이미 `search.dataDate` URL 파라미터 + Select 드롭다운으로 Data Date 선택 UI 보유. `dataDateOptions`는 `task_management_raw` 전체에서 distinct 추출.
+- `TaskManagementRawDataPage.tsx`: `latestDataDate`를 계산해 Badge로 "Data Date {값}"만 표시. `TaskStageProgress`에 이 값을 `dataDate` prop으로 전달만 함. 선택 UI 없음.
+- `TaskTreePage.tsx` (Task Summary): `todayGap` / `expectedProgressToday`를 호출하는데, 이 함수들은 내부적으로 오늘 날짜(또는 `computeTPlan` 기본값)를 사용. Data Date 인자를 받지 않음.
+- `derived.ts`: `computeTPlan(row, asOf?)`는 이미 asOf 인자 지원. `expectedProgressToday(row)`와 `todayGap(row)`는 asOf 인자 미지원 → 확장 필요.
 
-### 1. 임포트 실패 시 복구 가능
+## 구현 범위
 
-- 엑셀 파일에 잘못된 날짜, 잘못된 코드, 누락된 필수 값 등이 있을 수 있습니다.
-- 임포트가 진행되면 기존 데이터를 덮어쓰거나 UPDATE/DELETE됩니다.
-- 사전 스냅샷이 있으면 "임포트 전 상태"로 되돌릴 수 있습니다.
+### 1. 공용 훅/컴포넌트
+- `src/components/task-management/shared/DataDatePicker.tsx` 신설
+  - props: `value`, `onChange`, `options`(distinct data_date 목록), 기본 라벨/리셋 버튼.
+  - Dashboard의 기존 UI(Select + 리셋)와 동일 스타일 재사용.
+- 데이터 소스는 각 페이지가 이미 가지고 있는 rows에서 distinct 추출(추가 쿼리 없음).
 
-### 2. 사용자 롤백 기능과 직접 연결
+### 2. Raw Data 페이지
+- 상단 헤더 라인에 DataDatePicker 배치(기존 "Data Date {값}" Badge 자리 교체).
+- 상태: `selectedDataDate` (URL search param `dataDate`; 미지정 시 latestDataDate).
+- `TaskStageProgress`로 넘기는 `dataDate` prop을 `selectedDataDate`로 교체.
+- **완료 회색 스타일** 및 `auto_judgment` 값은 DB 저장값을 그대로 사용(서버 계산이라 Data Date와 무관) → 시각적 stage progress에만 영향.
 
-- `can_rollback_import_batch` RPC 및 백업/복원 시스템(`backup-core.server.ts`)과 연결되어 있습니다.
-- 본인이 업로드한 배치에 대해 임포트를 잘못했을 때 이전 상태로 되돌릴 수 있는 근거 자료입니다.
+### 3. Task Summary 페이지
+- 상단에 DataDatePicker 배치.
+- 상태: URL search param `dataDate`; 기본값 = rows의 max `data_date`.
+- `derived.ts`에 확장:
+  - `expectedProgressToday(row, asOf?)` → `computeTPlan(row, asOf) ?? 0`
+  - `todayGap(row, asOf?)` → `actual - expectedProgressToday(row, asOf)`
+  - 기존 호출부(인자 없이 쓰던 곳)는 그대로 동작(옵셔널).
+- `TaskTreePage.tsx` 내 모든 `todayGap(row)` / `expectedProgressToday(row)` 호출을 `todayGap(row, selectedDataDate)`로 교체.
+- `exportTaskSummary.ts`에도 동일 asOf 전달(export가 현재 화면 기준을 반영하도록).
 
-### 3. 대량 덮어쓰기 작업의 위험성 완화
+### 4. URL 파라미터
+- Raw Data / Task Summary 각각 `validateSearch`에 `dataDate: fallback(z.string(), "").default("")` 추가.
+- 페이지 진입 시 값이 비어있으면 latestDataDate로 표시(URL은 그대로 비워두어 "최신" 자동 추종 동작 유지).
 
-- SM, TM, ABD, DMR, Spare Part 등 대부분의 모듈은 임포트가 기존 수천~수만 행을 업데이트/대체하는 작업입니다.
-- 한 번의 실수로 데이터가 망가질 수 있으므로, 임포트 직전 스냅샷은 필수적인 안전망입니다.
+## 비범위
+- `auto_judgment` 서버 재계산은 별도 버튼(이미 존재)으로만 실행. Data Date 변경으로 자동 재계산 트리거하지 않음.
+- Dashboard의 Data Date와 페이지 간 자동 동기화는 하지 않음(각 페이지 독립 URL 상태). 필요 시 별도 요청.
 
-### 4. 현재 증상과의 관계
-
-- 현재 SM에서 버튼이 반응 없어 보이는 것은 사전 스냅샷이 느려서가 아니라, 스냅샷이 진행 중일 때 UI 피드백(버튼 비활성화, 진행 토스트)이 없어서입니다.
-- 스냅샷 자체는 필요한 기능이며, 수정 대상은 "스냅샷이 돌아가는 동안 사용자에게 진행 중임을 알려주는 UX"입니다.
-
-## 결론
-
-사전 스냅샷은 임포트 전 데이터 보호 장치이며, 제거하지 않고 진행 상태 표시를 개선하는 방향으로 수정합니다.
+## 확인 필요
+없음. 위 방식대로 진행합니다.

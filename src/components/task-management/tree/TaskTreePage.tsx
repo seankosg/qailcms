@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,9 @@ import { computeJudgment, expectedProgressToday, todayGap, worstJudgment } from 
 import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDrawer";
 import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
+import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+
+const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
 
 interface Row {
   id: string;
@@ -39,6 +43,7 @@ interface Row {
   hdec_eng_name: string | null;
   sub_task_desc: string | null;
   sort_order: number | null;
+  data_date: string | null;
 }
 
 function ProgressBar({ v }: { v: number | null | undefined }) {
@@ -72,6 +77,8 @@ function GapCell({ gap }: { gap: number }) {
 }
 
 export function TaskTreePage() {
+  const routeSearch = routeApi.useSearch();
+  const navigate = useNavigate();
   const [discipline, setDiscipline] = useState<Discipline>("ARCH");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -86,7 +93,7 @@ export function TaskTreePage() {
       const { data, error } = await (supabase as any)
         .from("task_management_raw")
         .select(
-          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order",
+          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
         )
         .eq("discipline", discipline)
         .order("sort_order", { ascending: true })
@@ -95,6 +102,26 @@ export function TaskTreePage() {
       return (data ?? []) as Row[];
     },
   });
+
+  const latestDataDate = useMemo(() => {
+    let latest = "";
+    for (const r of data) {
+      const d = r.data_date ? String(r.data_date).slice(0, 10) : "";
+      if (d && d > latest) latest = d;
+    }
+    return latest;
+  }, [data]);
+
+  const dataDateOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of data) {
+      const d = r.data_date ? String(r.data_date).slice(0, 10) : "";
+      if (d) set.add(d);
+    }
+    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
+  }, [data]);
+
+  const asOfDate = routeSearch.dataDate || latestDataDate || undefined;
 
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
@@ -134,8 +161,8 @@ export function TaskTreePage() {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
       if (delayFilter !== "off") {
-        const mainBehind = todayGap(p) < -0.05;
-        const subBehind = kids.some((r) => todayGap(r) < -0.05);
+        const mainBehind = todayGap(p, asOfDate) < -0.05;
+        const subBehind = kids.some((r) => todayGap(r, asOfDate) < -0.05);
         if (delayFilter === "all" && !(mainBehind || subBehind)) return false;
         if (delayFilter === "main" && !mainBehind) return false;
         if (delayFilter === "sub" && !subBehind) return false;
@@ -160,7 +187,7 @@ export function TaskTreePage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [mainTasks, subsByMain, q, delayFilter, picFilter]);
+  }, [mainTasks, subsByMain, q, delayFilter, picFilter, asOfDate]);
 
   function toggle(taskNo: string) {
     setExpanded((cur) => {
@@ -213,6 +240,7 @@ export function TaskTreePage() {
         subsByMain: filteredSubs,
         filtersLabel,
         searchLabel: search.trim(),
+        asOfDate,
       });
       toast.success(`엑셀 내보내기 완료 — ${n.toLocaleString()} rows`);
     } catch (e) {
@@ -226,6 +254,27 @@ export function TaskTreePage() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Task Tree</h1>
+        {latestDataDate && (
+          <DataDatePicker
+            value={routeSearch.dataDate}
+            latest={latestDataDate}
+            options={dataDateOptions}
+            onChange={(v) =>
+              navigate({
+                to: "/closure/task-management/tree",
+                search: (prev: Record<string, unknown>) =>
+                  ({ ...prev, dataDate: v === latestDataDate ? "" : v }) as any,
+              })
+            }
+            onReset={() =>
+              navigate({
+                to: "/closure/task-management/tree",
+                search: (prev: Record<string, unknown>) =>
+                  ({ ...prev, dataDate: "" }) as any,
+              })
+            }
+          />
+        )}
         <Tabs value={discipline} onValueChange={(v) => setDiscipline(v as Discipline)}>
           <TabsList>
             {DISCIPLINES.map((d) => (
@@ -304,8 +353,8 @@ export function TaskTreePage() {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
           const worst = worstJudgment(kids.map((k) => k.auto_judgment)) ?? p.auto_judgment;
-          const behindCount = kids.filter((k) => todayGap(k) < -0.05).length;
-          const pGap = todayGap(p);
+          const behindCount = kids.filter((k) => todayGap(k, asOfDate) < -0.05).length;
+          const pGap = todayGap(p, asOfDate);
           return (
             <Card key={p.id} className="overflow-hidden">
               <CardHeader
@@ -364,8 +413,8 @@ export function TaskTreePage() {
                     </thead>
                     <tbody>
                       {kids.map((k) => {
-                        const gap = todayGap(k);
-                        const j = k.auto_judgment ?? computeJudgment(k);
+                        const gap = todayGap(k, asOfDate);
+                        const j = k.auto_judgment ?? computeJudgment(k, undefined, asOfDate);
                         return (
                           <tr key={k.id} className="border-t hover:bg-accent/30">
                             <td className="px-2 py-1 font-mono">{k.task_no}</td>
@@ -378,7 +427,7 @@ export function TaskTreePage() {
                               <ProgressBar v={k.actual_progress} />
                             </td>
                             <td className="px-2 py-1 tabular-nums text-[10px]">
-                              {(expectedProgressToday(k) * 100).toFixed(0)}%
+                              {(expectedProgressToday(k, asOfDate) * 100).toFixed(0)}%
                             </td>
                             <td className="px-2 py-1">
                               <GapCell gap={gap} />

@@ -70,15 +70,15 @@ export function computeTPlan(row: JudgmentRow, asOf?: string): number | null {
   return Math.max(0, Math.min(1, elapsed / durationDays));
 }
 
-/** 하위 호환: 오늘 기준 T.Plan. */
-export function expectedProgressToday(row: JudgmentRow): number {
-  return computeTPlan(row) ?? 0;
+/** asOf(또는 오늘) 기준 T.Plan. asOf 미지정 시 row.data_date → today 순으로 폴백. */
+export function expectedProgressToday(row: JudgmentRow, asOf?: string): number {
+  return computeTPlan(row, asOf) ?? 0;
 }
 
-/** 하위 호환: 오늘 기준 Actual% - T.Plan. */
-export function todayGap(row: JudgmentRow): number {
+/** asOf(또는 오늘) 기준 Actual% - T.Plan. */
+export function todayGap(row: JudgmentRow, asOf?: string): number {
   const actual = Number(row.actual_progress ?? 0);
-  return actual - expectedProgressToday(row);
+  return actual - expectedProgressToday(row, asOf);
 }
 
 export const JUDGMENT_ORDER: Record<string, number> = {

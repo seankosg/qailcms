@@ -78,6 +78,7 @@ import { TopHorizontalScrollbar } from "@/components/spare-part/raw-data/TopHori
 import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
 import { AlarmBadge } from "./AlarmBadge";
 import { TaskStageProgress } from "./TaskStageProgress";
+import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { canEditRawRow } from "@/lib/auth/roles";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
@@ -433,6 +434,29 @@ export function TaskManagementRawDataPage() {
 
   const rows = useMemo(() => data ?? [], [data]);
 
+  const latestDataDate = useMemo(() => {
+    let latest: string | null = null;
+    for (const r of rows) {
+      const d = (r as any).data_date as string | null | undefined;
+      if (d && (!latest || d > latest)) latest = d;
+    }
+    return latest;
+  }, [rows]);
+
+  const dataDateOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      const d = (r as any).data_date as string | null | undefined;
+      if (d) set.add(String(d).slice(0, 10));
+    }
+    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
+  }, [rows]);
+
+  const selectedDataDate =
+    search.dataDate && search.dataDate.length
+      ? search.dataDate
+      : (latestDataDate ?? "");
+
   // 지연 모드: 대시보드에서 넘어온 스테이지 지연 조건에 해당하는 행만 노출
   const delayFilteredRows = useMemo(() => {
     if (!delayMode) return rows;
@@ -591,7 +615,7 @@ export function TaskManagementRawDataPage() {
           meta: { group: c.group, filterType: "stage-progress" as const },
           cell: ({ row }) => {
             const rr = row.original as Row;
-            const dd = (rr as any).data_date ?? null;
+            const dd = selectedDataDate || ((rr as any).data_date ?? null);
             return (
               <span className="flex w-full items-center justify-center">
                 <TaskStageProgress row={rr as any} dataDate={dd} />
@@ -611,8 +635,9 @@ export function TaskManagementRawDataPage() {
           enableSorting: true,
           enableColumnFilter: false,
           accessorFn: (r: Row) => {
-            if (c.key === "expected_progress_today") return expectedProgressToday(r as any);
-            return todayGap(r as any);
+            if (c.key === "expected_progress_today")
+              return expectedProgressToday(r as any, selectedDataDate || undefined);
+            return todayGap(r as any, selectedDataDate || undefined);
           },
           header: labelOverrides[c.key] ?? c.label,
           meta: { group: c.group },
@@ -683,7 +708,7 @@ export function TaskManagementRawDataPage() {
                         actual_progress: rr.actual_progress,
                         plan_start: rr.plan_start,
                         plan_end: rr.plan_end,
-                      })
+                      }, selectedDataDate || undefined)
                 }
                 slipDays={rr.slip_days != null ? Number(rr.slip_days) : null}
                 actualProgress={
@@ -767,7 +792,7 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents]);
+  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate]);
 
   const table = useReactTable({
     data: visibleRows,
@@ -863,15 +888,6 @@ export function TaskManagementRawDataPage() {
     [rowModel.rows],
   );
 
-  const latestDataDate = useMemo(() => {
-    let latest: string | null = null;
-    for (const r of rows) {
-      const d = r.data_date as string | null | undefined;
-      if (d && (!latest || d > latest)) latest = d;
-    }
-    return latest;
-  }, [rows]);
-
   function resetAll() {
     setSorting(DEFAULT_SORTING);
     setSizing({});
@@ -932,9 +948,25 @@ export function TaskManagementRawDataPage() {
           </Badge>
         )}
         {latestDataDate && (
-          <Badge variant="outline" className="text-xs">
-            Data Date {latestDataDate}
-          </Badge>
+          <DataDatePicker
+            value={search.dataDate}
+            latest={latestDataDate}
+            options={dataDateOptions}
+            onChange={(v) =>
+              navigate({
+                to: "/closure/task-management/raw-data",
+                search: (prev: Record<string, unknown>) =>
+                  ({ ...prev, dataDate: v === latestDataDate ? "" : v }) as any,
+              })
+            }
+            onReset={() =>
+              navigate({
+                to: "/closure/task-management/raw-data",
+                search: (prev: Record<string, unknown>) =>
+                  ({ ...prev, dataDate: "" }) as any,
+              })
+            }
+          />
         )}
         {isFetching && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
 

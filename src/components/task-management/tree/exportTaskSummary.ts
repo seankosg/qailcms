@@ -26,6 +26,7 @@ export interface ExportTaskSummaryOpts {
   filtersLabel: string;
   searchLabel: string;
   sortLabel?: string;
+  asOfDate?: string;
 }
 
 // SHAW/앱 통일 팔레트 (ARGB)
@@ -50,10 +51,10 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
   let zebra = false;
   for (const p of opts.mainTasks) {
     zebra = !zebra;
-    flat.push(buildRow(p, true, zebra));
+    flat.push(buildRow(p, true, zebra, opts.asOfDate));
     const kids = opts.subsByMain.get(p.task_no) ?? [];
     for (const k of kids) {
-      flat.push(buildRow(k, false, zebra));
+      flat.push(buildRow(k, false, zebra, opts.asOfDate));
     }
   }
 
@@ -154,9 +155,9 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
   return count;
 }
 
-function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean): Record<string, unknown> & { __isMain: boolean; __zebra: boolean } {
-  const gap = todayGap(r);
-  const expected = expectedProgressToday(r);
+function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean, asOf?: string): Record<string, unknown> & { __isMain: boolean; __zebra: boolean } {
+  const gap = todayGap(r, asOf);
+  const expected = expectedProgressToday(r, asOf);
   return {
     __isMain: isMain,
     __zebra: zebra,
