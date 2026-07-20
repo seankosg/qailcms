@@ -1153,8 +1153,8 @@ export function TaskManagementRawDataPage() {
                 if (!row) return null;
                 const isParent = (row.original as Row).level === "main";
                 const ap = Number((row.original as any).actual_progress ?? 0);
-                const aj = (row.original as any).auto_judgment_value;
-                const isDone = ap >= 1 || aj === "완료";
+                const aj = (row.original as any).auto_judgment;
+                const isDone = ap >= 0.999 || aj === "완료";
                 return (
                   <div
                     key={row.id}
@@ -1173,7 +1173,7 @@ export function TaskManagementRawDataPage() {
                       "group absolute left-0 top-0 flex cursor-pointer border-b text-xs hover:bg-accent/40",
                       row.getIsSelected() && "bg-primary/5",
                       isParent && "bg-muted/30 font-medium",
-                      isDone && "opacity-60 text-muted-foreground",
+                      isDone && "bg-muted/40 text-muted-foreground/70",
                     )}
                   >
                     {row.getVisibleCells().map((cell) => {
