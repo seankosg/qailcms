@@ -62,8 +62,11 @@ export function AbdDashboardPage() {
   const openRawData = (params: Record<string, string> = {}) => {
     const search: Record<string, string> = { ...params };
     if (batchFilter.length && !("batch" in search)) {
-      search.source = "progress";
       search.batch = batchFilter.join(",");
+    }
+    const progressKeys = ["team", "dis", "service", "pic", "docAx", "docAxx", "batch"];
+    if (progressKeys.some((k) => k in search) && !("source" in search)) {
+      search.source = "progress";
     }
     navigate({ to: "/closure/abd/raw-data", search: search as any });
   };
