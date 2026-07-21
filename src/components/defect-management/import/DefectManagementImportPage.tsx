@@ -6,7 +6,6 @@ import {
   Settings2,
   FileSpreadsheet,
   Loader2,
-  RefreshCw,
   Upload,
   X,
 } from "lucide-react";
