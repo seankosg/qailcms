@@ -74,6 +74,7 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "service", label: "Service", type: "text", width: 160, group: "identity", origin: "identity" },
   { key: "abd_number", label: "ABD Number", type: "text", width: 260, group: "identity", origin: "identity" },
   { key: "abd_ocs_no", label: "ABD OCS No.", type: "text", width: 240, group: "identity", origin: "identity" },
+  { key: "batch_no", label: "Batch No.", type: "text", width: 110, group: "identity", editable: true, editorType: "text", origin: "identity" },
 
   // Content
   { key: "document_title", label: "Document Title", type: "text", width: 340, group: "content", editable: true, editorType: "text", origin: "identity" },
