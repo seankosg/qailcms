@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   RefreshCw,
   TrendingUp,
+  Filter,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
@@ -42,6 +43,7 @@ import {
 
 export function AbdDashboardPage() {
   const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
+  const [batchFilter, setBatchFilter] = useState<string[]>([]);
   const navigate = useNavigate();
 
   const {
@@ -50,16 +52,28 @@ export function AbdDashboardPage() {
     isFetching,
     refetch,
   } = useQuery<AbdDashboardData>({
-    queryKey: ["abd-dashboard", format(asOf, "yyyy-MM-dd")],
-    queryFn: () => loadAbdDashboardData({ asOf }),
+    queryKey: ["abd-dashboard", format(asOf, "yyyy-MM-dd"), batchFilter.join(",")],
+    queryFn: () => loadAbdDashboardData({ asOf, batchNo: batchFilter.length ? batchFilter : undefined }),
     staleTime: 60_000,
   });
 
   const trend = useMemo(() => (data ? buildTrendSeries(data, 30) : []), [data]);
 
   const openRawData = (params: Record<string, string> = {}) => {
-    navigate({ to: "/closure/abd/raw-data", search: params as any });
+    const search: Record<string, string> = { ...params };
+    if (batchFilter.length && !("batch" in search)) {
+      search.source = "progress";
+      search.batch = batchFilter.join(",");
+    }
+    navigate({ to: "/closure/abd/raw-data", search: search as any });
   };
+
+  // 사용 가능한 batch 목록: data.byBatch에서 유래 (선택된 필터로 축소되지 않도록 별도 쿼리를 두지 않음).
+  const batchOptions = useMemo(() => {
+    const set = new Set<string>(batchFilter);
+    for (const c of data?.byBatch ?? []) if (c.key && c.key !== "— Unassigned") set.add(c.key);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [data, batchFilter]);
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -74,6 +88,54 @@ export function AbdDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 font-normal">
+                <Filter className="h-4 w-4" />
+                Batch: {batchFilter.length ? `${batchFilter.length} selected` : "All"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-2" align="end">
+              <div className="flex items-center justify-between px-1 pb-2">
+                <span className="text-xs font-medium text-muted-foreground">Filter by Batch No.</span>
+                {batchFilter.length > 0 && (
+                  <button
+                    className="text-[11px] text-primary hover:underline"
+                    onClick={() => setBatchFilter([])}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-0.5">
+                {batchOptions.length === 0 && (
+                  <div className="px-2 py-3 text-xs text-muted-foreground text-center">
+                    Batch 데이터 없음
+                  </div>
+                )}
+                {batchOptions.map((b) => {
+                  const checked = batchFilter.includes(b);
+                  return (
+                    <label
+                      key={b}
+                      className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setBatchFilter((prev) =>
+                            e.target.checked ? [...prev, b] : prev.filter((x) => x !== b),
+                          );
+                        }}
+                      />
+                      <span className="truncate">{b}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2 font-normal">
