@@ -3207,6 +3207,18 @@ export type Database = {
           total_count: number
         }[]
       }
+      defect_items_search_ids: {
+        Args: {
+          _filters?: Json
+          _include_inactive?: boolean
+          _limit?: number
+          _q?: string
+          _status_group?: string
+        }
+        Returns: {
+          id: string
+        }[]
+      }
       defect_snag_dashboard_matrix: {
         Args: { _plan_groups?: string[]; _teams?: string[] }
         Returns: {
