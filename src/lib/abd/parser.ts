@@ -268,6 +268,7 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
     else if (label === "DOCUMENT TITLE") colIndex.document_title = c;
     else if (isAbdNumberLabel(label) && !("abd_number" in colIndex)) colIndex.abd_number = c;
     else if (label === "ABD OCS NO." || label === "ABD OCS NO" || label === "OCS NO.") colIndex.abd_ocs_no = c;
+    else if (label === "BATCH NO." || label === "BATCH NO" || label === "BATCH NUMBER" || label === "BATCH") colIndex.batch_no = c;
     else if (label === "PIC") colIndex.pic = c;
     else if (label === "REV") colIndex.latest_rev = c;
     else if (label === "STATUS") colIndex.latest_status = c;
@@ -351,6 +352,7 @@ export async function parseAbdFile(
         document_title: getVal("document_title") ? String(getVal("document_title")) : null,
         abd_number: abd,
         abd_ocs_no: getVal("abd_ocs_no") ? String(getVal("abd_ocs_no")).trim() : null,
+        batch_no: getVal("batch_no") ? String(getVal("batch_no")).trim() : null,
         pic: getVal("pic") ? String(getVal("pic")) : null,
         latest_rev: getVal("latest_rev") ? String(getVal("latest_rev")) : null,
         latest_status: getVal("latest_status") ? String(getVal("latest_status")).toUpperCase() : null,
