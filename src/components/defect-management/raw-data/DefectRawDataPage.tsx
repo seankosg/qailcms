@@ -1352,3 +1352,68 @@ function AiClassifyButton({ selectedRows, onDone }: { selectedRows: Array<{ id: 
     </Button>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// "필터된 전체 N건 선택" 배너 — 현재 페이지 전체 선택 시 노출
+// ─────────────────────────────────────────────────────────────────────────────
+function SelectAllMatchingBanner({
+  pageSelectedCount,
+  pageRowCount,
+  total,
+  allMatchIds,
+  fetching,
+  onSelectAllMatching,
+  onClearMatching,
+}: {
+  pageSelectedCount: number;
+  pageRowCount: number;
+  total: number;
+  allMatchIds: string[] | null;
+  fetching: boolean;
+  onSelectAllMatching: () => void | Promise<void>;
+  onClearMatching: () => void;
+}) {
+  // 매칭 전체 선택이 활성인 경우: 상태 표시 + 취소 링크
+  if (allMatchIds && allMatchIds.length > 0) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs">
+        <span className="font-medium text-primary">
+          필터된 전체 {allMatchIds.length.toLocaleString()}건이 선택됨
+        </span>
+        <span className="text-muted-foreground">
+          · 이후 편집·삭제는 전체 매칭 행에 적용됩니다
+        </span>
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto px-1 py-0 text-xs"
+          onClick={onClearMatching}
+        >
+          이 페이지만 선택으로 돌아가기
+        </Button>
+      </div>
+    );
+  }
+
+  // 페이지 전체 선택 + 매칭 총량이 페이지보다 많을 때만 "전체 선택" 링크 노출
+  const showPrompt =
+    pageRowCount > 0 && pageSelectedCount === pageRowCount && total > pageRowCount;
+  if (!showPrompt) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5 text-xs">
+      <span>
+        이 페이지 <strong>{pageSelectedCount}</strong>건이 선택되었습니다.
+      </span>
+      <Button
+        variant="link"
+        size="sm"
+        className="h-auto px-1 py-0 text-xs"
+        disabled={fetching}
+        onClick={() => void onSelectAllMatching()}
+      >
+        {fetching ? "불러오는 중…" : `필터된 전체 ${total.toLocaleString()}건 선택`}
+      </Button>
+    </div>
+  );
+}
