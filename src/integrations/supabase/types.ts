@@ -3169,6 +3169,14 @@ export type Database = {
         Args: { _row_id: string; _table_name: string; _user_id: string }
         Returns: boolean
       }
+      claim_backup_run: { Args: { _run_id: string }; Returns: boolean }
+      claim_next_queued_backup_run: {
+        Args: never
+        Returns: {
+          id: string
+          metadata: Json
+        }[]
+      }
       defect_items_counts: {
         Args: { _include_inactive?: boolean }
         Returns: {
