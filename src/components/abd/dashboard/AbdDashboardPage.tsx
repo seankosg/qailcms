@@ -704,7 +704,7 @@ function CrossCutList({
   onOpen,
 }: {
   cells: CrossCutCell[];
-  keyName: "team" | "pic" | "dis";
+  keyName: "team" | "pic" | "dis" | "batch";
   onOpen: (params?: Record<string, string>) => void;
 }) {
   const rows = cells.slice(0, 12);
