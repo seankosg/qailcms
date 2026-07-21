@@ -757,6 +757,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       let rejected = 0;
       let processed = 0;
       const importErrors: ImportErrorEntry[] = [];
+      // 실패한 task_no와 사유. row_logs를 정확히 표시하기 위함.
+      const rejectedByTaskNo = new Map<string, { reason_code: string; reason_detail?: string }>();
 
       try {
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
@@ -789,6 +791,13 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 .select("task_no");
               if (r.error) {
                 rejected++;
+                const key = String(row.task_no ?? "");
+                if (key) {
+                  rejectedByTaskNo.set(key, {
+                    reason_code: (r.error as any).code || "UPSERT_FAILED",
+                    reason_detail: (r.error as any).details || r.error.message,
+                  });
+                }
                 importErrors.push({
                   batch: batchIndex,
                   message: r.error.message,
@@ -834,13 +843,23 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
           // Per-row import logs
           try {
-            const rowLogRows = applied.map((p, idx) => ({
-              upload_id: logId,
-              raw_row_no: idx + 1,
-              discipline,
-              task_no: p.task_no,
-              action_taken: existingSet.has(p.task_no) ? "updated" : "inserted",
-            }));
+            const rowLogRows = applied.map((p, idx) => {
+              const rej = rejectedByTaskNo.get(String(p.task_no ?? ""));
+              const action = rej
+                ? "rejected"
+                : existingSet.has(p.task_no)
+                  ? "updated"
+                  : "inserted";
+              return {
+                upload_id: logId,
+                raw_row_no: idx + 1,
+                discipline,
+                task_no: p.task_no,
+                action_taken: action,
+                reason_code: rej?.reason_code ?? null,
+                reason_detail: rej?.reason_detail ?? null,
+              };
+            });
             for (let i = 0; i < rowLogRows.length; i += 500) {
               await (supabase as any)
                 .from("task_management_import_row_logs")
