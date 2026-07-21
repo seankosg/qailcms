@@ -1,47 +1,83 @@
-## 문제
+# 임포트 로그 — 문제별 검토(Problem Review) 이식
 
-TM 임포트 지문 게이트가 한글 헤더로 구성된 정상 TM 원본(`Task_Management_Mech_260720_박기덕_책임.xlsx`)을 "필수 헤더(앵커) 없음"으로 하드 블록합니다.
+## 배경
 
-원인:
-1. `module-fingerprint.ts`의 TM `anchors`가 영문 헤더만 등록되어 있음. 실제 파일은 `항목 / 계획 시작 / 계획 완료 / 실제 시작 / HDEC PIC / HDEC ENG / 자동 판정 / 계획 진도율 / 실적 진도율` 등 한글 헤더 기반.
-2. TM 파서(`src/lib/task-management/parser.ts`)는 이미 위 한글 별칭을 인식하지만, 게이트가 그보다 앞단에서 차단.
-3. 헤더 행 자동 탐지가 "가장 non-empty가 많은 행"을 헤더로 삼는데, TM 원본 상단은 요약/설정 텍스트가 많고 데이터 행이 헤더 행보다 셀 수가 더 많아 데이터 행이 헤더로 오인될 수 있음.
+SHAW PROJECT CMS의 `DefectImportLogsPage`는 배치 상세에서 아래 기능으로 "문제별 검토"가 가능합니다 (src/pages/DefectImportLogsPage.tsx:365–526).
 
-## 수정 범위
+- 상단 요약 칩: `Total / inserted / updated / skipped / rejected` 카운트
+- **Action 필터** 드롭다운 (all / inserted / updated / skipped / rejected)
+- **Reason 필터** 드롭다운 — 배치 내 실제 발생한 `reason_code` 목록에서 동적으로 옵션 생성 (+ `(no reason)` 옵션)
+- **Row #** 검색 인풋
+- **Show 500 more** 방식 누적 렌더 (하드 컷 없음)
+- (필드 로그가 있을 경우) 행 확장 → 필드별 outcome 표
 
-`src/lib/import/module-fingerprint.ts` 한 파일만 수정. 파서/임포트 컨텍스트/UI 로직은 건드리지 않음 — 이 파일은 파서 앞단의 사전 게이트만 담당.
+QAIL CMS의 현재 `ImportLogsPage`(src/components/import/ImportLogsPage.tsx:545–599)는 SM/TM/ABD 모두 상세 화면이 단순 표 + 1000행 하드 컷이라 원인별 검토가 불가합니다. 반면 DB의 `*_import_row_logs` 3종 테이블은 이미 `action_taken / reason_code / reason_detail`을 저장하고 있어(확인 완료: `defect_import_row_logs`, `task_management_import_row_logs`, `abd_import_row_logs`) **UI만 이식하면 되는 상태**입니다.
 
-### 1) TM 앵커/시그니처 한글 확장
+## 목표
 
-`MODULE_FINGERPRINTS.tm.anchors` 에 아래 한글 앵커 추가(기존 영문은 그대로 유지):
-- `항목`, `계획 시작`, `계획 완료`, `계획 일수`, `실제 시작`, `실제 완료`, `실적 진도율`, `계획 진도율`, `자동 판정`, `HDEC PIC`, `HDEC ENG`, `Data Date`
+`ImportLogsPage`(공통 컴포넌트) 상세 뷰를 리팩터하여 SM/TM/ABD 3개 탭에 SHAW와 동등한 문제별 검토 UX를 제공합니다. Spare Part 탭도 동일 컴포넌트를 쓰므로 자동으로 함께 개선됩니다(사용자 요청 범위 외지만 부수 효과).
 
-`signature`에도 위 한글 헤더 + `단계별 세부 업무`, `유형`, `상태`, `Plot`, `Category`, `리스크` 등 실측 헤더 추가. 정규화가 `\s` 를 제거하므로 `계획\n시작` 같은 줄바꿈 헤더도 자동으로 `계획시작` 로 매칭됨.
+## 범위
 
-SM/ABD/Spare Part 앵커에도 실제 사용되는 한글 헤더가 있으면 같은 원칙으로 소폭 보강(부작용 없이 정확도만 상승). 이 항목은 확장 여부만 리스트업하고 최소 추가로 제한.
+### 대상
+- `src/components/import/ImportLogsPage.tsx` 상세 카드 부분 (kind = `defect_management` | `task_management` | `abd` | `spare_part`)
 
-### 2) 판정 규칙 완화
+### 비대상 (별도 확인 필요)
+- SHAW의 필드 단위 로그(`import_field_logs` 테이블 + `FieldLogTable` 확장/축소)는 QAIL DB에 존재하지 않아 이식하려면 3개 모듈 임포트 파이프라인에 필드 로그 기록을 추가해야 합니다. 스코프가 커서 본 계획에서는 제외합니다.
+- SHAW의 Schedule Changes(변경 감사) 탭 이식은 별개 이슈이며 이번 요청 범위 밖으로 판단합니다.
 
-`evaluateImport`:
-- 하드 블록 조건을 `targetAnchors === 0` 에서 **`targetAnchors === 0 && targetScore < 0.05 && (파일명 힌트도 없음)`** 로 완화. 즉 앵커 0이라도 시그니처 겹침이 유의미하거나 파일명이 `task/schedule/tm` 을 포함하면 `ambiguous` 로 강등.
-- Top 모듈이 target 이 아닐 때 격차 임계값을 `0.20 → 0.25` 로 상향(오탐 감소).
-- `ambiguous` 는 기존대로 사용자가 확인 후 진행 가능.
+## 구현 세부 (기술)
 
-### 3) 헤더 추출 견고화
+### `ImportLogsPage.tsx` 상세 뷰 개편
+현재 셀렉트된 배치 상세를 렌더링하는 라인 545~599 블록을 아래처럼 확장:
 
-`extractHeadersFromFile`:
-- 시트별 헤더 후보 선택 로직 개선. 현재는 non-empty 셀 수 최대인 행 하나만 선택 → 데이터 행이 헤더로 오인될 수 있음.
-- 개선: 상단 30행 각 행을 훑되, **행에 앵커(전 모듈 앵커 합집합) 매칭 셀이 하나라도 있으면 그 행을 우선 채택**. 앵커 매칭이 없는 시트에서만 non-empty 최대 행 fallback.
-- 여러 시트의 상위 헤더 후보를 모두 합쳐 지문 계산(현재 동작 유지, 커버리지만 향상).
+1. **상태 추가**
+   ```ts
+   const [actionFilter, setActionFilter] = useState<'all'|'inserted'|'updated'|'skipped'|'rejected'>('all');
+   const [reasonFilter, setReasonFilter] = useState<string>('all'); // 'all' | '__none__' | <code>
+   const [rowSearch, setRowSearch] = useState('');
+   const [renderLimit, setRenderLimit] = useState(500);
+   ```
+   배치가 바뀔 때(`loadDetail`) 4개 상태를 초기화.
 
-### 4) 검증
+2. **집계 (useMemo)**
+   - `actionCounts`: `rowLogs`에서 action별 카운트
+   - `reasonOptions`: `rowLogs`의 `reason_code` distinct 정렬 목록
+   - `filtered`: action / reason / rowSearch 필터 적용
 
-- 유첨 TM 파일 → `verdict: "ok"` 확인.
-- 기존 ABD/SM/Spare Part 원본 3종을 TM 게이트에 통과시켰을 때 여전히 `block` 판정되는지 회귀 확인(자동 테스트 파일 없이 수동 확인).
-- SM 페이지에 TM 파일 업로드 시 여전히 `block` 되는지 크로스 확인.
+3. **툴바 UI** (상세 카드 상단)
+   - 좌측: `Badge` 5개 — Total {n} / inserted / updated / skipped / rejected (색상은 기존 `actionColor` 재사용)
+   - 우측: `Select`(Action) · `Select`(Reason) · `Input`(Row #)
+   - 필터 변경 시 `setRenderLimit(500)`으로 리셋
 
-## 영향
+4. **행 렌더**
+   - `filtered.slice(0, renderLimit)`
+   - 하단에 `Showing X of Y (filtered from Z)` + `Show 500 more` 버튼
+   - 기존 1000행 하드 컷 제거
 
-- 파서/DB/임포트 파이프라인 무변경. 사전 게이트만 완화.
-- 지문 오탐(정상 파일을 잘못된 모듈로 판정)은 앵커 확장으로 오히려 감소.
-- 사용자는 유첨 파일로 정상 진행 가능.
+5. **접근성/스타일**
+   - SHAW와 동일하게 `TableHeader`에 `sticky top-0` + 스크롤 컨테이너 `max-h-[500px] overflow-auto`
+   - `text-xs` 타이포 유지, 셔드시엔 컴포넌트 그대로 사용
+
+### kind별 차이
+- 4개 kind 모두 이미 `rowLogs`에 `action_taken/reason_code/reason_detail/raw_row_no/key_value`가 정규화되어 들어와 있어 **분기 없이 동일 UI**로 동작.
+- SM 탭은 사용자가 명시한 3개 모듈 중 하나이며, TM/ABD도 동일 코드 경로로 이식 완료.
+- Spare Part는 요청 밖이지만 같은 컴포넌트라 자동 개선(호환성 문제 없음).
+
+### 라우팅/네비
+- 라우트/탭 구조 변경 없음. 현재 `/import-log/logs?tab=snag|task|abd` 그대로 사용.
+
+## 검증
+
+1. Build 통과 (`tsgo`).
+2. 각 탭(TM/SM/ABD)에서 배치 선택 → 상세 뷰에서:
+   - Action 필터 변경 시 행 수 변화 확인
+   - Reason 드롭다운에 실제 reason_code 목록이 뜨는지, `(no reason)` 선택 시 reason_code null 행만 남는지
+   - Row # 입력 시 해당 행만 표시
+   - 1000행 초과 배치에서 "Show 500 more" 누적 렌더 확인
+
+## 확인 필요
+
+계획을 확정하기 전에 한 가지만 확인 부탁드립니다.
+
+- **필드 단위 로그(FieldLogTable — 어떤 필드가 어떤 이유로 skipped/derived되었는지)** 도 함께 이식이 필요할까요? 이 기능은 3개 모듈의 임포트 파이프라인에 필드 로그를 새로 기록하도록 파이프라인 개편이 필요해 별도 계획으로 분리하는 편이 안전합니다. 이번엔 **행 단위 문제별 검토(위 계획)** 만 진행하고, 필드 로그는 별도 요청으로 다루어도 될지 알려주세요.
