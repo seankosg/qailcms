@@ -22,6 +22,7 @@ const abdRawDataSearchSchema = z.object({
   pic: fallback(z.string(), "").default(""),
   docAx: fallback(z.string(), "").default(""),
   docAxx: fallback(z.string(), "").default(""),
+  batch: fallback(z.string(), "").default(""),
   dateStart: fallback(z.string(), "").default(""),
   dateEnd: fallback(z.string(), "").default(""),
   dateField: fallback(z.string(), "").default(""),
