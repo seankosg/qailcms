@@ -875,13 +875,43 @@ export function DefectRawDataPage() {
 
       <CriticalBulkBar isAdmin={isAdmin} selectedRows={selectedRows as any} pending={criticalPending} setPending={setCriticalPending} />
 
+      <SelectAllMatchingBanner
+        pageSelectedCount={pageSelectedRows.length}
+        pageRowCount={rows.length}
+        total={total}
+        allMatchIds={allMatchIds}
+        fetching={fetchingAllMatch}
+        onSelectAllMatching={async () => {
+          setFetchingAllMatch(true);
+          try {
+            const ids = await fetchDefectItemIds({
+              statusGroup: tab,
+              includeInactive,
+              q,
+              filters: serverFilters,
+              limit: 200_000,
+            });
+            if (ids.length >= 200_000) {
+              toast.warning("상한(200,000)에 도달했습니다. 필터를 좁혀주세요.");
+            }
+            setAllMatchIds(ids);
+            toast.success(`${ids.length.toLocaleString()}건 선택됨`);
+          } catch (e: any) {
+            toast.error("전체 선택 실패", { description: e?.message ?? String(e) });
+          } finally {
+            setFetchingAllMatch(false);
+          }
+        }}
+        onClearMatching={() => setAllMatchIds(null)}
+      />
+
       <BulkEditBar
         selectedRows={selectedRows as any}
         fields={bulkFields}
         exportColumns={exportColumns}
         canEdit={isAdmin}
-        onClearSelection={() => setRowSelection({})}
-        onApplied={() => { setRowSelection({}); invalidateDefects(); }}
+        onClearSelection={() => { setRowSelection({}); setAllMatchIds(null); }}
+        onApplied={() => { setRowSelection({}); setAllMatchIds(null); invalidateDefects(); }}
       />
 
       <DefectRawTableView
