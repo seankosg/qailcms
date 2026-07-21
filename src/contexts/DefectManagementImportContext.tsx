@@ -13,6 +13,7 @@ import {
   getDefectExcelSheetNames,
   getDefectExcelHeaders,
   parseDefectExcel,
+  toDefectFieldName,
   type DefectSheetHeader,
   type DefectTargetField,
   type ParsedDefectRow,
@@ -129,6 +130,12 @@ interface CtxValue {
   setFileAiClassifyEnabled: (id: string, enabled: boolean) => void;
   setFileParsedRows: (id: string, next: ParsedDefectRow[]) => void;
   setFileMasterMappingNote: (id: string, note: string) => void;
+  /**
+   * 관리자 탭에서 헤더 매핑을 방금 수정한 경우, DB의 최신 alias를 다시 읽어
+   * 이미 파싱된 파일의 headerToFieldMap 만 재계산한다(원본 파일 재파싱 없음).
+   * 반환값은 갱신된 alias 개수.
+   */
+  refreshAliases: () => Promise<number>;
 }
 
 const Ctx = createContext<CtxValue | null>(null);
