@@ -650,9 +650,22 @@ export function DefectRawDataPage() {
 
   useEffect(() => {
     setRowSelection({});
+    setAllMatchIds(null);
   }, [columnFilters, q, tab]);
 
-  const selectedRows = useMemo(() => table.getSelectedRowModel().rows.map((r) => r.original), [table, rowSelection, rows]);
+  const pageSelectedRows = useMemo(
+    () => table.getSelectedRowModel().rows.map((r) => r.original),
+    [table, rowSelection, rows],
+  );
+  // 매칭 전체 선택이 활성이면 id만 담긴 경량 row 배열로 대체. BulkEditBar/삭제는 id만 사용.
+  const selectedRows = useMemo<Record<string, any>[]>(() => {
+    if (allMatchIds && allMatchIds.length > 0) {
+      const rowById = new Map<string, any>();
+      for (const r of rows) rowById.set(r.id, r);
+      return allMatchIds.map((id) => rowById.get(id) ?? { id });
+    }
+    return pageSelectedRows;
+  }, [allMatchIds, pageSelectedRows, rows]);
   const bulkFields = useMemo(() => {
     const optionMap: Record<string, { value: string; label: string }[]> = {
       team: teamCodesForEdit.map((value) => ({ value, label: value })),
