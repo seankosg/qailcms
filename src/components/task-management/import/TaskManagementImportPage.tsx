@@ -129,6 +129,7 @@ function ImportInner() {
   const [conflictFileId, setConflictFileId] = useState<string | null>(null);
   const [pendingImportAfterConflicts, setPendingImportAfterConflicts] = useState(false);
   const masterOptions = useAllMasterOptions();
+  const guard = useModuleGuard("tm", (fs) => addFiles(fs));
 
   // Sync importer identity/scope to context whenever user info changes
   const hdecPic = me?.hdec_pic_name ?? null;
@@ -237,16 +238,16 @@ function ImportInner() {
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      addFiles(Array.from(e.dataTransfer.files));
+      void guard.receive(Array.from(e.dataTransfer.files));
     },
-    [addFiles],
+    [guard],
   );
   const onSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      addFiles(e.target.files ? Array.from(e.target.files) : []);
+      void guard.receive(e.target.files ? Array.from(e.target.files) : []);
       if (inputRef.current) inputRef.current.value = "";
     },
-    [addFiles],
+    [guard],
   );
 
   // Matched-row count per file under the current scope
@@ -517,6 +518,7 @@ function ImportInner() {
           onApply={(excluded) => setFileExcludedHeaders(columnFile.id, excluded)}
         />
       )}
+      <ModuleGuardDialog {...guard.dialogProps} />
     </div>
   );
 }
