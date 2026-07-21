@@ -914,17 +914,6 @@ export function DefectRawDataPage() {
         onApplied={() => { setRowSelection({}); setAllMatchIds(null); invalidateDefects(); }}
       />
 
-      <DefectRawTableView
-        table={table}
-        tableRef={tableRef}
-        loading={!stateLoaded || isFetching}
-        dataDate={dataDate}
-        frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
-        getSourceOrigin={helpers.getSourceOrigin}
-        onRowClick={(r) => navigate({ to: "/closure/snag-management/detail/$id", params: { id: r.id } })}
-      />
-
-      {/* Pagination controls */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="text-muted-foreground">
           {total > 0
@@ -961,6 +950,16 @@ export function DefectRawDataPage() {
           )}
         </div>
       </div>
+
+      <DefectRawTableView
+        table={table}
+        tableRef={tableRef}
+        loading={!stateLoaded || isFetching}
+        dataDate={dataDate}
+        frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
+        getSourceOrigin={helpers.getSourceOrigin}
+        onRowClick={(r) => navigate({ to: "/closure/snag-management/detail/$id", params: { id: r.id } })}
+      />
 
       <ExportDialog
         open={exportOpen}

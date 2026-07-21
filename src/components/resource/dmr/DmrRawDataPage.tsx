@@ -522,6 +522,22 @@ export function DmrRawDataPage() {
         />
       )}
 
+      <div className="flex items-center justify-between rounded-md border p-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Rows per page:</span>
+          <select className="h-7 rounded border bg-background px-2" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+            {[50, 100, 200, 500, 1000].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Page {pageIndex} / {totalPages}</span>
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={pageIndex <= 1} onClick={() => setPage(1)}>«</Button>
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={pageIndex <= 1} onClick={() => setPage(pageIndex - 1)}>‹</Button>
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={pageIndex >= totalPages} onClick={() => setPage(pageIndex + 1)}>›</Button>
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={pageIndex >= totalPages} onClick={() => setPage(totalPages)}>»</Button>
+        </div>
+      </div>
+
       {/* Table */}
       <div ref={parentRef} className="relative flex-1 overflow-auto rounded-md border">
         <div style={{ width: totalWidth, minWidth: '100%' }} className="relative">
@@ -589,22 +605,6 @@ export function DmrRawDataPage() {
         </div>
       </div>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between rounded-md border p-2 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">Rows per page:</span>
-          <select className="h-7 rounded border bg-background px-2" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
-            {[50, 100, 200, 500, 1000].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">Page {pageIndex} / {totalPages}</span>
-          <Button size="sm" variant="outline" className="h-7 px-2" disabled={pageIndex <= 1} onClick={() => setPage(1)}>«</Button>
-          <Button size="sm" variant="outline" className="h-7 px-2" disabled={pageIndex <= 1} onClick={() => setPage(pageIndex - 1)}>‹</Button>
-          <Button size="sm" variant="outline" className="h-7 px-2" disabled={pageIndex >= totalPages} onClick={() => setPage(pageIndex + 1)}>›</Button>
-          <Button size="sm" variant="outline" className="h-7 px-2" disabled={pageIndex >= totalPages} onClick={() => setPage(totalPages)}>»</Button>
-        </div>
-      </div>
 
     </div>
   );

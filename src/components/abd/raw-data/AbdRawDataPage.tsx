@@ -571,14 +571,6 @@ export function AbdRawDataPage() {
         <span className="hidden self-center text-xs text-muted-foreground md:inline">Tip: Shift+Click 다중 정렬 · <Filter className="inline h-3 w-3" /> 컬럼 필터</span>
       </div>
 
-      <AbdRawTableView
-        table={table}
-        tableRef={tableRef}
-        loading={!stateLoaded || isFetching}
-        frozenColIds={frozenExtras}
-        onRowClick={(id) => setUrl({ detail: id })}
-      />
-
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="text-muted-foreground">
           {total > 0 ? `${((page - 1) * pageSize + 1).toLocaleString()}–${Math.min(page * pageSize, total).toLocaleString()} / ${total.toLocaleString()}` : "0 / 0"}
@@ -596,6 +588,14 @@ export function AbdRawDataPage() {
           <Button size="icon" variant="outline" className="h-7 w-7" disabled={page >= pageCount} onClick={() => setUrl({ page: pageCount })}><ChevronsRight className="h-3.5 w-3.5" /></Button>
         </div>
       </div>
+
+      <AbdRawTableView
+        table={table}
+        tableRef={tableRef}
+        loading={!stateLoaded || isFetching}
+        frozenColIds={frozenExtras}
+        onRowClick={(id) => setUrl({ detail: id })}
+      />
 
       <AbdExportDialog
         open={exportOpen}
