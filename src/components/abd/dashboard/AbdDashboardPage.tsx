@@ -678,6 +678,7 @@ function CrossCutSection({
             <TabsTrigger value="team">By Team</TabsTrigger>
             <TabsTrigger value="pic">By PIC</TabsTrigger>
             <TabsTrigger value="dis">By DIS</TabsTrigger>
+            <TabsTrigger value="batch">By Batch</TabsTrigger>
           </TabsList>
           <TabsContent value="team" className="mt-3">
             <CrossCutList cells={data.byTeam} keyName="team" onOpen={onOpen} />
@@ -687,6 +688,9 @@ function CrossCutSection({
           </TabsContent>
           <TabsContent value="dis" className="mt-3">
             <CrossCutList cells={data.byDis} keyName="dis" onOpen={onOpen} />
+          </TabsContent>
+          <TabsContent value="batch" className="mt-3">
+            <CrossCutList cells={data.byBatch} keyName="batch" onOpen={onOpen} />
           </TabsContent>
         </Tabs>
       </CardContent>
