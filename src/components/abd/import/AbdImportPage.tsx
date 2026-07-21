@@ -96,6 +96,10 @@ export function AbdImportPage() {
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const masterOptions = useAllMasterOptions();
 
+  const guard = useModuleGuard("abd", (fs) => {
+    void handleFiles(fs);
+  });
+
   const nameSpecs: NameFieldSpec<ParsedAbdRow>[] = [
     {
       fieldLabel: "HDEC PIC",
