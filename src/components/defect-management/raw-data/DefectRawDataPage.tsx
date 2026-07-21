@@ -36,6 +36,7 @@ import {
   useDefectStatusCounts,
   useDefectDashboardSummary,
   useInvalidateDefects,
+  fetchDefectItemIds,
   type DefectItem,
   type DefectServerFilter,
   type DefectServerSort,
