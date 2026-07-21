@@ -123,7 +123,7 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
 ];
 
 export const ABD_SEARCH_FIELDS = [
-  "abd_number", "abd_ocs_no", "document_title", "pic", "dis", "service",
+  "abd_number", "abd_ocs_no", "batch_no", "document_title", "pic", "dis", "service",
   "plot", "latest_rev", "latest_status", "doc_ax", "doc_axx", "doc_nn1", "doc_n", "doc_nn2",
 ] as const;
 
@@ -131,7 +131,7 @@ export function inferAbdFilterType(t: AbdFieldType, key?: string): AbdFilterType
   if (t === "badge") return "multi-select";
   if (t === "date") return "date-range";
   if (t === "number") return "number-range";
-  if (key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status") return "multi-select";
+  if (key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status" || key === "batch_no") return "multi-select";
   return "text";
 }
 
