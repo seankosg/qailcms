@@ -61,6 +61,8 @@ export interface StreamExportOptions {
   /** Optional per-row background fill (ARGB). Applied to every cell in the row
    *  unless the cell override returns a value. */
   rowFillFor?: (row: Record<string, any>) => string | null | undefined;
+  /** When "buffer", skip download and return the workbook bytes instead. */
+  output?: "download" | "buffer";
 }
 
 // ── SHAW-style palette (Calibri) ────────────────────────────────────────────
@@ -103,7 +105,9 @@ function isoTimestampToDate(v: unknown): Date | null {
  * - Drops each page after appending, keeping only the growing worksheet in memory.
  * - Yields to the event loop between chunks to keep the UI responsive.
  */
-export async function streamXlsxExport(opts: StreamExportOptions): Promise<{ count: number }> {
+export async function streamXlsxExport(
+  opts: StreamExportOptions,
+): Promise<{ count: number; buffer?: Uint8Array }> {
   const CHUNK = opts.chunkSize ?? 1000;
   const dateSet = new Set(opts.dateFields ?? []);
   const dtSet = new Set(opts.datetimeFields ?? []);
@@ -251,6 +255,9 @@ export async function streamXlsxExport(opts: StreamExportOptions): Promise<{ cou
   }
 
   const buf = await wb.xlsx.writeBuffer();
+  if (opts.output === "buffer") {
+    return { count: fetched, buffer: new Uint8Array(buf as ArrayBuffer) };
+  }
   const blob = new Blob([buf], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
