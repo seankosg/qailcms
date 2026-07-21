@@ -439,7 +439,7 @@ async function* iterRowsInParts(
       .order(sortKey, { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(`Failed to read ${tableName}: ${error.message}`);
-    const rows = (data ?? []) as Record<string, unknown>[];
+    const rows = ((data ?? []) as unknown) as Record<string, unknown>[];
     if (rows.length === 0) break;
     buffer.push(...rows);
 
