@@ -198,12 +198,6 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  const merges: XLSX.Range[] = [];
-  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } });
-  for (let r = metaStart; r <= metaEnd; r++) {
-    merges.push({ s: { r, c: 0 }, e: { r, c: colCount - 1 } });
-  }
-
   const cols: XLSX.ColInfo[] = columns.map((c) => ({ wch: pxToWch(c.widthPx, c.label) }));
   ws["!cols"] = cols;
 
@@ -227,10 +221,14 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
     },
   ];
 
-  // Title + meta
+  // Title + meta — no cell merging; apply the same style to every column of
+  // the title/meta rows so the block still reads as a continuous banner.
   setCell(ws, 0, 0, title, STYLE_TITLE);
+  for (let c = 1; c < colCount; c++) setCell(ws, 0, c, "", STYLE_TITLE);
   for (let i = 0; i < metaAll.length; i++) {
-    setCell(ws, metaStart + i, 0, metaAll[i], i === 0 ? STYLE_META_LABEL : STYLE_META_VALUE);
+    const rowStyle = i === 0 ? STYLE_META_LABEL : STYLE_META_VALUE;
+    setCell(ws, metaStart + i, 0, metaAll[i], rowStyle);
+    for (let c = 1; c < colCount; c++) setCell(ws, metaStart + i, c, "", rowStyle);
   }
 
   // Column headers
@@ -277,8 +275,6 @@ export function buildStyledWorkbook(opts: StyledSheetOptions): XLSX.WorkBook {
       setCell(ws, dataStart + r, c, raw, style);
     }
   }
-
-  ws["!merges"] = merges;
 
   const lastColLetter = XLSX.utils.encode_col(colCount - 1);
   const lastRow = dataStart + dataRows.length - 1;

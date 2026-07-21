@@ -267,28 +267,30 @@ async function buildStyledWorkbookBuffer(
   const freezeCols = Math.min(args.header.freezeCols ?? 3, args.columns.length);
   const FONT = "Calibri";
 
-  // Title
-  const titleCell = ws.getCell(1, 1);
-  titleCell.value = args.header.title;
-  titleCell.font = { name: FONT, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
-  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
-  titleCell.alignment = { vertical: "middle", horizontal: "left" };
-  ws.mergeCells(1, 1, 1, colCount);
+  // Title (no merge; style every column of the row)
+  for (let c = 1; c <= colCount; c++) {
+    const cell = ws.getCell(1, c);
+    cell.value = c === 1 ? args.header.title : "";
+    cell.font = { name: FONT, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+    cell.alignment = { vertical: "middle", horizontal: "left" };
+  }
   ws.getRow(1).height = 24;
 
   for (let i = 0; i < 5; i++) {
     const r = 2 + i;
-    const cell = ws.getCell(r, 1);
-    cell.value = args.header.metaRows[i] ?? "";
-    cell.font = {
-      name: FONT,
-      size: 10,
-      bold: i === 0,
-      color: { argb: i === 0 ? "FF374151" : "FF111827" },
-    };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
-    cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
-    ws.mergeCells(r, 1, r, colCount);
+    for (let c = 1; c <= colCount; c++) {
+      const cell = ws.getCell(r, c);
+      cell.value = c === 1 ? (args.header.metaRows[i] ?? "") : "";
+      cell.font = {
+        name: FONT,
+        size: 10,
+        bold: i === 0,
+        color: { argb: i === 0 ? "FF374151" : "FF111827" },
+      };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+      cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+    }
     ws.getRow(r).height = 16;
   }
   ws.getRow(7).height = 6;

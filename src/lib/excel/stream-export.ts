@@ -115,29 +115,31 @@ export async function streamXlsxExport(opts: StreamExportOptions): Promise<{ cou
   const freezeCols = Math.min(opts.header?.freezeCols ?? 3, opts.columns.length);
 
   if (opts.header) {
-    // Row 1 — Title
-    const titleCell = ws.getCell(1, 1);
-    titleCell.value = opts.header.title;
-    titleCell.font = { name: FONT_NAME, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
-    titleCell.fill = FILL_TITLE;
-    titleCell.alignment = { vertical: "middle", horizontal: "left" };
-    ws.mergeCells(1, 1, 1, colCount);
+    // Row 1 — Title (no merge; style every column so the banner still spans)
+    for (let c = 1; c <= colCount; c++) {
+      const cell = ws.getCell(1, c);
+      cell.value = c === 1 ? opts.header.title : "";
+      cell.font = { name: FONT_NAME, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = FILL_TITLE;
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+    }
     ws.getRow(1).height = 24;
 
-    // Rows 2..6 — meta lines
+    // Rows 2..6 — meta lines (no merge; style every column)
     for (let i = 0; i < 5; i++) {
       const r = 2 + i;
-      const cell = ws.getCell(r, 1);
-      cell.value = opts.header.metaRows[i] ?? "";
-      cell.font = {
-        name: FONT_NAME,
-        size: 10,
-        bold: i === 0,
-        color: { argb: i === 0 ? "FF374151" : "FF111827" },
-      };
-      cell.fill = FILL_META;
-      cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
-      ws.mergeCells(r, 1, r, colCount);
+      for (let c = 1; c <= colCount; c++) {
+        const cell = ws.getCell(r, c);
+        cell.value = c === 1 ? (opts.header.metaRows[i] ?? "") : "";
+        cell.font = {
+          name: FONT_NAME,
+          size: 10,
+          bold: i === 0,
+          color: { argb: i === 0 ? "FF374151" : "FF111827" },
+        };
+        cell.fill = FILL_META;
+        cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+      }
       ws.getRow(r).height = 16;
     }
 
