@@ -45,13 +45,14 @@ export async function exportTmImportRecord(opts: {
     right: { style: "thin", color: { argb: "FFE5E7EB" } },
   };
 
-  // Row 1 — Title
-  ws.mergeCells(1, 1, 1, totalCols);
-  const titleCell = ws.getCell(1, 1);
-  titleCell.value = `TM Import Record — ${from} ~ ${to}`;
-  titleCell.font = { name: FONT, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
-  titleCell.fill = FILL_TITLE;
-  titleCell.alignment = { vertical: "middle", horizontal: "left" };
+  // Row 1 — Title (no merge; style every column of the row)
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = ws.getCell(1, c);
+    cell.value = c === 1 ? `TM Import Record — ${from} ~ ${to}` : "";
+    cell.font = { name: FONT, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = FILL_TITLE;
+    cell.alignment = { vertical: "middle", horizontal: "left" };
+  }
   ws.getRow(1).height = 24;
 
   // Rows 2–6 meta
@@ -64,12 +65,13 @@ export async function exportTmImportRecord(opts: {
   ];
   for (let i = 0; i < 5; i++) {
     const r = 2 + i;
-    ws.mergeCells(r, 1, r, totalCols);
-    const c = ws.getCell(r, 1);
-    c.value = meta[i];
-    c.font = { name: FONT, size: 10, bold: i === 0, color: { argb: "FF111827" } };
-    c.fill = FILL_META;
-    c.alignment = { vertical: "middle", horizontal: "left" };
+    for (let col = 1; col <= totalCols; col++) {
+      const cell = ws.getCell(r, col);
+      cell.value = col === 1 ? meta[i] : "";
+      cell.font = { name: FONT, size: 10, bold: i === 0, color: { argb: "FF111827" } };
+      cell.fill = FILL_META;
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+    }
     ws.getRow(r).height = 16;
   }
   ws.getRow(7).height = 6;
@@ -102,13 +104,14 @@ export async function exportTmImportRecord(opts: {
 
   let rowIdx = headerRow + 1;
   for (const [team, users] of groups) {
-    // Team divider row
-    ws.mergeCells(rowIdx, 1, rowIdx, totalCols);
-    const teamCell = ws.getCell(rowIdx, 1);
-    teamCell.value = `▼ ${team}  (${users.length}명)`;
-    teamCell.font = { name: FONT, size: 11, bold: true, color: { argb: "FF1E3A5F" } };
-    teamCell.fill = FILL_TEAM;
-    teamCell.alignment = { vertical: "middle", horizontal: "left" };
+    // Team divider row (no merge; style every column of the row)
+    for (let col = 1; col <= totalCols; col++) {
+      const cell = ws.getCell(rowIdx, col);
+      cell.value = col === 1 ? `▼ ${team}  (${users.length}명)` : "";
+      cell.font = { name: FONT, size: 11, bold: true, color: { argb: "FF1E3A5F" } };
+      cell.fill = FILL_TEAM;
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+    }
     ws.getRow(rowIdx).height = 18;
     rowIdx++;
 
