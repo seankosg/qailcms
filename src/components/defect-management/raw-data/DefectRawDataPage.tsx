@@ -359,6 +359,9 @@ export function DefectRawDataPage() {
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
+  // 필터/검색 조건에 매칭되는 전체 ID 세트 (대량 선택용). null이면 미활성.
+  const [allMatchIds, setAllMatchIds] = useState<string[] | null>(null);
+  const [fetchingAllMatch, setFetchingAllMatch] = useState(false);
 
   // Sync URL → local (탭 전환 시 URL의 sort/filters를 초기화 반영)
   useEffect(() => {
