@@ -74,6 +74,7 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "service", label: "Service", type: "text", width: 160, group: "identity", origin: "identity" },
   { key: "abd_number", label: "ABD Number", type: "text", width: 260, group: "identity", origin: "identity" },
   { key: "abd_ocs_no", label: "ABD OCS No.", type: "text", width: 240, group: "identity", origin: "identity" },
+  { key: "batch_no", label: "Batch No.", type: "text", width: 110, group: "identity", editable: true, editorType: "text", origin: "identity" },
 
   // Content
   { key: "document_title", label: "Document Title", type: "text", width: 340, group: "content", editable: true, editorType: "text", origin: "identity" },
@@ -122,7 +123,7 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
 ];
 
 export const ABD_SEARCH_FIELDS = [
-  "abd_number", "abd_ocs_no", "document_title", "pic", "dis", "service",
+  "abd_number", "abd_ocs_no", "batch_no", "document_title", "pic", "dis", "service",
   "plot", "latest_rev", "latest_status", "doc_ax", "doc_axx", "doc_nn1", "doc_n", "doc_nn2",
 ] as const;
 
@@ -130,7 +131,7 @@ export function inferAbdFilterType(t: AbdFieldType, key?: string): AbdFilterType
   if (t === "badge") return "multi-select";
   if (t === "date") return "date-range";
   if (t === "number") return "number-range";
-  if (key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status") return "multi-select";
+  if (key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status" || key === "batch_no") return "multi-select";
   return "text";
 }
 

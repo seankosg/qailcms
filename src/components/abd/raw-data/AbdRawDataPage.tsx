@@ -101,6 +101,7 @@ function buildFiltersFromProgressContext(urlSearch: any): ColumnFiltersState {
   addMulti("pic", urlSearch.pic);
   addMulti("doc_ax", urlSearch.docAx);
   addMulti("doc_axx", urlSearch.docAxx);
+  addMulti("batch_no", urlSearch.batch);
   if (urlSearch.dateStart && urlSearch.dateEnd && urlSearch.dateField) {
     filters.push({ id: urlSearch.dateField, value: { from: urlSearch.dateStart, to: urlSearch.dateEnd } });
   }
@@ -268,6 +269,7 @@ export function AbdRawDataPage() {
         pic: "",
         docAx: "",
         docAxx: "",
+        batch: "",
         dateStart: "",
         dateEnd: "",
         dateField: "",

@@ -365,6 +365,7 @@ export type Database = {
           abd_number: string
           abd_ocs_no: string | null
           approval_date: string | null
+          batch_no: string | null
           created_at: string
           data_date: string | null
           dis: string | null
@@ -416,6 +417,7 @@ export type Database = {
           abd_number: string
           abd_ocs_no?: string | null
           approval_date?: string | null
+          batch_no?: string | null
           created_at?: string
           data_date?: string | null
           dis?: string | null
@@ -467,6 +469,7 @@ export type Database = {
           abd_number?: string
           abd_ocs_no?: string | null
           approval_date?: string | null
+          batch_no?: string | null
           created_at?: string
           data_date?: string | null
           dis?: string | null

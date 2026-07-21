@@ -1,64 +1,69 @@
-## 사전 스냅샷 대용량 임포트 대응 계획
+## 목표
+ABD "Batch No." 파싱·매핑을 추가하고, **대시보드에 Batch No. 필터 + 집계 위젯**을 이번 작업에 포함.
 
-### 목표
-큰 임포트에서 사전 스냅샷이 지연/타임아웃되거나 실패하는 문제를 해결. 사전 스냅샷을 **비동기(fire-and-forget) + 청크 분할 업로드**로 전환.
+## 1. DB 마이그레이션
+1. `abd_items_raw`
+   - `ADD COLUMN batch_no text NULL`.
+   - `CREATE INDEX abd_items_raw_batch_no_idx ON public.abd_items_raw (team, batch_no) WHERE batch_no IS NOT NULL;`
+2. `abd_field_config` 시드
+   - `batch_no` : label="Batch No.", group="identity", data_type="text", editable=true, visible=true, sort_order는 `abd_ocs_no` 다음.
+3. `abd_header_mappings` 시드
+   - MECH/ELEC/ARCH × source_header ∈ {`BATCH NO.`, `BATCH NO`, `BATCH NUMBER`, `BATCH`} → `target_field='batch_no'`, `active=true`.
 
-### 원인 요약
-- `createPreImportSnapshot`이 단일 요청에서 전체 테이블 페이지네이션 → 전량 메모리 → `JSON.stringify` → Storage 업로드 → SHA-256을 순차 처리 → Worker CPU/응답 한도 초과.
-- `Hasher`가 모든 청크를 메모리 보관 후 합쳐서 해시 → 메모리 상한 접근.
-- 클라이언트 `takePreImportSnapshotWithFeedback`은 15초 soft-timeout 후에도 서버 함수는 계속 실행 → Worker 종료로 반쪽 스냅샷 잔존 가능.
+기존 데이터 백필 없음(NULL 유지, 재임포트로 채움).
 
-### 변경 사항
+## 2. Parser / Server / 컬럼
 
-#### 1) 서버: 스냅샷 잡 큐 도입 (fire-and-forget)
-- 신규 서버 함수 `enqueuePreImportSnapshot` (`src/lib/backup/backup.functions.ts`)
-  - 인증 후 `backup_run_log`에 `status='queued'` 행 즉시 insert 하고 `{ run_id }` 반환. 실제 스냅샷 생성은 수행하지 않음.
-  - 응답은 1초 이내로 반환되어 임포트 UX가 블록되지 않음.
-- 신규 서버 라우트 `POST /api/public/backup/run-queued-snapshot` (`src/routes/api/public/backup/run-queued-snapshot.ts`)
-  - `apikey` 헤더로 인증(기존 auto-snapshot 라우트와 동일 패턴).
-  - 큐에서 `queued` 상태 1건을 `running`으로 원자적 전이(RPC `claim_backup_run`) 후 실제 스냅샷 생성.
-- 신규 DB 함수 `claim_backup_run(_run_id)` — 동시 실행 방지용 잠금 전이.
-- pg_cron: 매 분 `net.http_post`로 위 라우트를 호출해 큐 소진(기존 `db-backups` 스케줄 옆에 추가).
-- `enqueuePreImportSnapshot`은 동일한 라우트를 `fetch(..., { keepalive: false })`로 즉시 1회 트리거(불발되어도 pg_cron이 뒤이어 처리).
+### `src/lib/abd/parser.ts`
+- `ParsedAbdRow`에 `batch_no: string | null` 추가.
+- `findHeader()` anchor 라벨에 `BATCH NO.` / `BATCH NO` / `BATCH NUMBER` / `BATCH` 매칭 추가 → `colIndex.batch_no`.
+- 행 파싱에 `batch_no: getVal("batch_no") ? String(getVal("batch_no")).trim() : null` 대입.
 
-#### 2) 서버: 스냅샷 코어 청크 분할 (`src/lib/backup/backup-core.server.ts`)
-- `readAllRows` → 스트리밍 `for-await` 이터레이터 `iterRowsPaged(table, pageSize=1000)`로 교체.
-- 각 테이블을 **파트당 10,000행** 단위로 분할해 `snapshots/<id>/<table>.part-000.json`, `...part-001.json` 형태로 업로드.
-- 파트별로 즉시 `sha256` 계산 후 청크 폐기 → 상시 메모리 O(파트 크기).
-- 매니페스트 스키마 확장:
-  ```ts
-  tables: { name; rows; size_bytes; sha256; parts?: { path; rows; sha256; size_bytes }[] }[]
-  ```
-  `parts` 미존재 시 기존 단일 파일 경로 폴백(하위호환).
-- `Hasher`를 스트리밍 방식으로 교체: 각 파트 sha256 hex를 순차로 다시 해시해 최종 매니페스트 해시 산출.
-- `restoreSnapshot` / `buildSnapshotZip` / `deleteSnapshot`: `parts` 배열이 있으면 순회, 없으면 단일 파일 경로 사용.
+### `src/lib/abd/mutations.functions.ts`
+- `ImportRowSchema`에 `batch_no: z.string().nullable().optional()`.
+- upsert payload에 `batch_no: r.batch_no ?? null`.
 
-#### 3) 클라이언트: 사전 스냅샷 UX 전환 (`src/lib/backup/pre-import-snapshot.ts`)
-- `takePreImportSnapshotWithFeedback` 재작성:
-  - `enqueuePreImportSnapshot` 호출(짧은 응답).
-  - 성공 시 즉시 `toast.success("사전 스냅샷을 백그라운드에서 준비합니다")` 후 return `"queued"`.
-  - 실패 시 `toast.warning("사전 스냅샷 접수 실패 — 임포트는 계속 진행합니다")` 후 return `"failed"`.
-- 반환 타입에 `"queued"` 추가. 호출부(각 모듈 임포트 컨텍스트)는 `ok|timeout|queued` 모두 성공으로 취급하도록 처리(다수 파일은 이미 결과를 무시하고 계속 진행하므로 소폭 조정만 필요).
-- soft-timeout 코드 및 관련 백그라운드 재통지 로직 제거.
+### `src/lib/abd/columns.ts`
+- identity 그룹, `abd_ocs_no` 다음에:
+  `{ key: "batch_no", label: "Batch No.", type: "text", width: 110, group: "identity", editable: true, editorType: "text", origin: "identity" }`
 
-#### 4) 조회/복원 UI 하위호환
-- Backup 관리 화면·복원 흐름은 매니페스트의 `parts` 유무 자동 감지.
-- `queued`/`running` 상태 표시가 `backup_run_log` 목록에 이미 존재하므로 라벨만 확인.
+Raw Data · Detail Sheet · Column Filter · Export는 `ABD_COLUMNS` 기반이라 자동 반영.
 
-### 기술 세부
+## 3. Raw Data 라우트 검색 파라미터
+- `src/routes/_authenticated/closure/abd/raw-data.tsx`의 `abdRawDataSearchSchema`에 `batch: fallback(z.string(), "").default("")` 추가.
+- `AbdRawDataPage`에서 기존 컬럼 필터 파이프라인이 `ABD_COLUMNS.filter` 기반으로 batch_no 다중선택을 자동 노출(별도 UI 추가 불필요, 필요 시 원-클릭 링크만 dashboard에서 전달).
 
-- 파트 크기 기본값: 10,000행/파트(≈5~15MB). 필요 시 상수 1곳(`CHUNK_ROWS_PER_PART`)에서 조정 가능.
-- Storage 경로: `snapshots/<id>/<table>.part-<NNN>.json` + `manifest.json`.
-- 무결성: 매니페스트 최상위 `sha256` = `sha256( concat( 각 파트 sha256 hex ) )`. 파트별 sha256도 별도 저장 → 부분 검증 가능.
-- 동시성: `claim_backup_run`이 `UPDATE ... WHERE status='queued' RETURNING`으로 원자 전이. 실패 시 라우트는 200 no-op 반환.
-- 실패 처리: 라우트 내에서 예외 시 `backup_run_log.status='failed'`, `error_message` 기록. 큐에서 자동 재시도는 하지 않음(운영자 판단).
+## 4. 대시보드 데이터 계층 확장 (`src/lib/abd/dashboard-data.ts`)
+- `Row` 타입과 `SELECT_COLS`에 `batch_no` 추가.
+- `AbdDashboardData`에 다음 필드 추가:
+  - `byBatch: CrossCutCell[]` — batch_no별 total/approved/pending/overdue (batch_no IS NULL 은 `"— No Batch"` 키로 별도 표기).
+  - 집계 로직은 기존 `byTeam/byPic/byDis`와 동일 패턴 사용.
+- `loadAbdDashboardData({ asOf, batchNo? })` 파라미터 확장: `batchNo`가 주어지면 Supabase 쿼리 단계에서 `eq('batch_no', batchNo)` (또는 `is null` 옵션)로 서버측 필터 적용 후 나머지 KPI/Funnel/Trend/Attention/CrossCut 그대로 재계산.
+- 별도 `loadAbdBatchOptions()` 유틸:  batch_no distinct + row count 조회(RPC 없이 `select batch_no, count`), 팀별 필터도 지원. 캐시 5분.
 
-### 검증
-1. 대형 TM raw 임포트(수만 행) 시나리오에서 UI가 1~2초 내 접수 토스트를 받고 임포트가 정상 시작되는지 확인.
-2. 백그라운드에서 `backup_run_log`가 `queued → running → success`로 전이되고 `snapshots/<id>/` 아래 `part-000..NNN.json`이 생성되는지 확인.
-3. 기존 단일 파일 스냅샷 복원이 여전히 성공하는지(하위호환) 확인.
-4. 새 청크 스냅샷을 대상으로 복원/ZIP 다운로드가 성공하는지 확인.
+## 5. 대시보드 UI (`AbdDashboardPage.tsx`)
+1. **Batch 필터 상단 툴바 추가**  
+   - "As of" 옆에 `Batch No.` `Select` (multi-select 대신 단일 선택 우선; option 목록은 `loadAbdBatchOptions`).
+   - 선택 시 useQuery key에 `batchNo` 포함 → 전체 대시보드가 해당 batch로 필터링.
+   - "All batches" / "No batch (미부여)" / 개별 batch 옵션.
+2. **집계 위젯 카드 신설: "Batch Progress"**
+   - `CrossCutSection` 옆(또는 아래)에 신규 카드로 배치.
+   - `data.byBatch` 를 재사용해 `CrossCutList`와 동일한 스타일로 각 batch별 approved% / overdue 표시.
+   - 각 행 클릭 시 `openRawData({ batch: c.key })` — Raw Data 필터로 이동.
+   - 상단 batch 필터가 걸린 경우는 카드 자체를 축소(선택된 batch만 표시).
 
-### 비영향 범위
-- 사용자·역할·RLS 정책 변경 없음.
-- 자동(23:50) 스냅샷 라우트도 동일 코어를 사용하므로 자동으로 청크 방식 이득을 봄.
+## 6. 라우트 검색 파라미터 연동
+- 대시보드 batch 필터 상태를 URL search param `?batch=...` 로 동기화하여 새로고침/공유 시 유지.
+
+## 7. 검증
+1. 마이그레이션 후 컬럼/인덱스 존재 확인.
+2. Batch No. 헤더 포함 엑셀 임포트 → Raw Data 컬럼/값 노출.
+3. Admin > Mapping > As Built Drawing > Header Mapping 3팀 시드 노출.
+4. 대시보드 상단 Batch Select 조작 → KPI/Funnel/Trend/Attention 전부 재집계.
+5. 신규 "Batch Progress" 카드 행 클릭 → Raw Data가 `batch` 필터로 진입.
+6. Batch No.가 없는 승인건은 `"— No Batch"` 그룹으로 정상 노출.
+
+## 8. 오픈 이슈
+- Batch 필터를 **단일 선택 vs 다중 선택** 중 어느 쪽으로 할지 확답 필요.  
+  → 기본안: **단일 선택**(대시보드 성능·URL 단순화). 다중 선택이 필요하면 알려주세요.
+- "Batch Progress" 카드의 정렬 기준 기본값은 **approved% 낮은 순 → total 큰 순**(진척이 뒤처진 batch 우선 노출). 다르게 원하시면 알려주세요.
