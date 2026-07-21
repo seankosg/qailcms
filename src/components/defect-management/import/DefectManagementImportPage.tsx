@@ -265,7 +265,7 @@ function Inner() {
                 isRunning={isRunning}
                 onRemove={() => removeFile(f.id)}
                 onDataDateChange={(v) => setFileDataDateOverride(f.id, v)}
-                onOpenColumnSelect={() => setColumnDialogFileId(f.id)}
+                onOpenColumnSelect={() => void openColumnDialog(f.id)}
                 onSheetChange={(sheet) => setFileSheet(f.id, sheet)}
                 onOpenDuplicateReview={() => setDupDialogFileId(f.id)}
                 onToggleAiClassify={(v) => setFileAiClassifyEnabled(f.id, v)}
