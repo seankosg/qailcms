@@ -411,6 +411,7 @@ export function AbdImportPage() {
         onClose={() => setTeamDialogOpen(false)}
         onRegistered={() => { /* team_master invalidation via qc; entries의 team 문자열은 유지 */ }}
       />
+      <ModuleGuardDialog {...guard.dialogProps} />
     </div>
   );
 }
