@@ -14,8 +14,24 @@ import { Download, Loader2 } from "lucide-react";
 import { TM_COLUMNS } from "@/lib/task-management/columns";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
+import { toast } from "sonner";
 
 type ExportFormat = "view" | "reimport";
+type SplitAxis = "none" | "team" | "hdec_pic_name" | "plot";
+
+const AXIS_TAG: Record<Exclude<SplitAxis, "none">, string> = {
+  team: "team",
+  hdec_pic_name: "hdec-pic",
+  plot: "plot",
+};
+
+const AXIS_LABEL: Record<Exclude<SplitAxis, "none">, string> = {
+  team: "Team",
+  hdec_pic_name: "HDEC PIC",
+  plot: "Plot",
+};
+
+const ZIP_THRESHOLD = 7;
 
 interface Props {
   open: boolean;
@@ -57,11 +73,13 @@ const JUDGMENT_FILL: Record<string, string> = {
 
 export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
   const [format, setFormat] = useState<ExportFormat>("view");
+  const [axis, setAxis] = useState<SplitAxis>("none");
   const [busy, setBusy] = useState(false);
   const resolveLabel = useTmColumnLabel();
 
   const run = async () => {
     setBusy(true);
+    const toastId = toast.loading("내보내는 중...");
     try {
       const isView = format === "view";
       const keys = isView ? visibleKeys : TM_COLUMNS.map((c) => c.key);
@@ -80,45 +98,114 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       const dateFields = TM_COLUMNS.filter((c) => c.type === "date").map((c) => c.key);
 
       const exportedTs = dohaDateTime();
-
-      const rowsSnapshot = rows;
-      await streamXlsxExport({
-        filename: `task-management_${format}_${timestamp()}.xlsx`,
+      const ts = timestamp();
+      const commonWriterOpts = {
         sheetName: "Task Management",
         columns,
         columnWidths,
         dateFields,
         numFmtByKey: NUMFMT_BY_KEY,
-        header: {
-          title: `Task Management Raw Data  (${isView ? "View" : "Re-import"})`,
-          metaRows: [
-            `Exported: ${exportedTs}`,
-            `Rows: ${rows.length.toLocaleString()}   Columns: ${columns.length}`,
-            "",
-            "",
-            "",
-          ],
-          freezeCols: isView ? 3 : 1,
-        },
-        cellFillFor: (key, value) => {
+        cellFillFor: (key: string, value: unknown) => {
           if (key === "auto_judgment" && typeof value === "string") {
             return JUDGMENT_FILL[value] ?? null;
           }
           if (key === "risk" && value === "High") return "FFED7D31";
           return null;
         },
-        rowFillFor: (row) => {
+        rowFillFor: (row: Record<string, unknown>) => {
           const j = row["auto_judgment"];
           if (j === "Delayed") return "FFFDECEA";
           return null;
         },
-        fetchPage: async (offset) => {
-          if (offset >= rowsSnapshot.length) return { rows: [], total: rowsSnapshot.length };
-          const slice = rowsSnapshot.slice(offset, offset + 1000);
-          return { rows: slice as Record<string, unknown>[], total: rowsSnapshot.length };
-        },
+      } as const;
+
+      const buildHeader = (extraMeta?: string) => ({
+        title: `Task Management Raw Data  (${isView ? "View" : "Re-import"})`,
+        metaRows: [
+          `Exported: ${exportedTs}`,
+          `Rows: ${rows.length.toLocaleString()}   Columns: ${columns.length}`,
+          "",
+          "",
+          extraMeta ?? "",
+        ] as [string, string, string, string, string],
+        freezeCols: isView ? 3 : 1,
       });
+
+      const pagerFor = (rs: Record<string, unknown>[]) =>
+        async (offset: number) => {
+          if (offset >= rs.length) return { rows: [], total: rs.length };
+          return { rows: rs.slice(offset, offset + 1000), total: rs.length };
+        };
+
+      if (axis === "none") {
+        await streamXlsxExport({
+          ...commonWriterOpts,
+          filename: `task-management_${format}_${ts}.xlsx`,
+          header: buildHeader(),
+          fetchPage: pagerFor(rows),
+        });
+        toast.success(`${rows.length.toLocaleString()}건 내보내기 완료`, { id: toastId });
+        onOpenChange(false);
+        return;
+      }
+
+      // ── Per-axis split ──
+      const axisKey = axis;
+      const groups = new Map<string, Record<string, unknown>[]>();
+      for (const r of rows) {
+        const raw = (r as any)[axisKey];
+        const key = raw != null && String(raw).trim() ? String(raw).trim() : "Unassigned";
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(r);
+      }
+      // Sort keys alphabetically; Unassigned last.
+      const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+        if (a === "Unassigned") return 1;
+        if (b === "Unassigned") return -1;
+        return a.localeCompare(b);
+      });
+      const axisTag = AXIS_TAG[axisKey];
+      const axisLabel = AXIS_LABEL[axisKey];
+
+      if (sortedKeys.length >= ZIP_THRESHOLD) {
+        const JSZip = (await import("jszip")).default;
+        const zip = new JSZip();
+        let done = 0;
+        for (const key of sortedKeys) {
+          const rs = groups.get(key)!;
+          const { buffer } = await streamXlsxExport({
+            ...commonWriterOpts,
+            filename: `${axisTag}-${sanitize(key)}.xlsx`,
+            header: buildHeader(`Split: ${axisLabel} = ${key}`),
+            fetchPage: pagerFor(rs),
+            output: "buffer",
+          });
+          if (buffer) zip.file(`task-management_${format}_${axisTag}-${sanitize(key)}_${ts}.xlsx`, buffer);
+          groups.set(key, []);
+          done += 1;
+          toast.loading(`ZIP 생성 중 ${done} / ${sortedKeys.length}`, { id: toastId });
+          await new Promise((r) => setTimeout(r, 0));
+        }
+        const blob = await zip.generateAsync({ type: "blob" });
+        downloadBlob(blob, `task-management_${format}_by-${axisTag}_${ts}.zip`);
+        toast.success(`${sortedKeys.length}개 그룹 → ZIP 다운로드`, { id: toastId });
+      } else {
+        for (const key of sortedKeys) {
+          const rs = groups.get(key)!;
+          await streamXlsxExport({
+            ...commonWriterOpts,
+            filename: `task-management_${format}_${axisTag}-${sanitize(key)}_${ts}.xlsx`,
+            header: buildHeader(`Split: ${axisLabel} = ${key}`),
+            fetchPage: pagerFor(rs),
+          });
+          groups.set(key, []);
+          await new Promise((r) => setTimeout(r, 0));
+        }
+        toast.success(`${sortedKeys.length}개 파일 다운로드`, { id: toastId });
+      }
       onOpenChange(false);
+    } catch (e: any) {
+      toast.error(`내보내기 실패: ${e?.message ?? e}`, { id: toastId });
     } finally {
       setBusy(false);
     }
@@ -154,6 +241,34 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
               </label>
             </RadioGroup>
           </div>
+          <div>
+            <Label className="text-xs">Output</Label>
+            <RadioGroup
+              value={axis}
+              onValueChange={(v) => setAxis(v as SplitAxis)}
+              className="mt-2 flex flex-col gap-2"
+            >
+              <label className="flex items-start gap-2 text-sm">
+                <RadioGroupItem value="none" className="mt-1" />
+                <span>단일 파일</span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <RadioGroupItem value="team" className="mt-1" />
+                <span>Team 별 분리</span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <RadioGroupItem value="hdec_pic_name" className="mt-1" />
+                <span>HDEC PIC 별 분리</span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <RadioGroupItem value="plot" className="mt-1" />
+                <span>Plot 별 분리</span>
+              </label>
+            </RadioGroup>
+            <p className="mt-2 text-xs text-muted-foreground">
+              그룹 수 ≥ {ZIP_THRESHOLD} 이면 자동으로 ZIP 으로 묶입니다.
+            </p>
+          </div>
           <p className="text-xs text-muted-foreground">
             Gantt 캘린더/파생 수식은 폐기되어 값은 정적으로 기록됩니다. 지연/위험 행은 셀 배경색으로 표시됩니다.
           </p>
@@ -175,4 +290,19 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       </DialogContent>
     </Dialog>
   );
+}
+
+function sanitize(name: string): string {
+  return (name || "Unassigned").replace(/[\\/:*?"<>|]/g, "_").trim().slice(0, 40) || "Unassigned";
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
