@@ -54,6 +54,7 @@ export interface AbdDashboardData {
   byTeam: CrossCutCell[];
   byPic: CrossCutCell[];
   byDis: CrossCutCell[];
+  byBatch: CrossCutCell[];
 }
 
 type Row = {
@@ -63,6 +64,7 @@ type Row = {
   dis: string | null;
   service: string | null;
   pic: string | null;
+  batch_no: string | null;
   document_title: string | null;
   abd_number: string | null;
   latest_status: string | null;
@@ -86,7 +88,7 @@ type Row = {
 };
 
 const SELECT_COLS = [
-  "id","team","plot","dis","service","pic","document_title","abd_number",
+  "id","team","plot","dis","service","pic","batch_no","document_title","abd_number",
   "latest_status","status_group","approval_date",
   "r1_drafting_plan","r1_drafting_actual","r1_submission_plan","r1_submission_actual","r1_dar_plan","r1_dar_actual",
   "r2_drafting_actual","r2_submission_actual","r2_dar_plan","r2_dar_actual",
@@ -173,15 +175,16 @@ function fmtLabel(row: Row): string {
   return `${num}${title}`;
 }
 
-async function fetchAllRows(): Promise<Row[]> {
+async function fetchAllRows(opts: { batchNo?: string[] } = {}): Promise<Row[]> {
   const PAGE = 1000;
   const rows: Row[] = [];
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await (supabase as any)
+    let q = (supabase as any)
       .from("abd_items_raw")
       .select(SELECT_COLS)
-      .eq("is_active", true)
-      .range(from, from + PAGE - 1);
+      .eq("is_active", true);
+    if (opts.batchNo && opts.batchNo.length) q = q.in("batch_no", opts.batchNo);
+    const { data, error } = await q.range(from, from + PAGE - 1);
     if (error) throw error;
     const chunk = (data ?? []) as Row[];
     rows.push(...chunk);
@@ -190,9 +193,9 @@ async function fetchAllRows(): Promise<Row[]> {
   return rows;
 }
 
-export async function loadAbdDashboardData(opts: { asOf?: Date } = {}): Promise<AbdDashboardData> {
+export async function loadAbdDashboardData(opts: { asOf?: Date; batchNo?: string[] } = {}): Promise<AbdDashboardData> {
   const asOf = startOfDay(opts.asOf ?? new Date());
-  const rows = await fetchAllRows();
+  const rows = await fetchAllRows({ batchNo: opts.batchNo });
 
   const stageCounts: Record<AbdStage, number> = {
     Pending: 0, R1: 0, R2: 0, R3: 0, Approved: 0,
@@ -205,6 +208,7 @@ export async function loadAbdDashboardData(opts: { asOf?: Date } = {}): Promise<
   const byTeam = new Map<string, CrossCutCell>();
   const byPic = new Map<string, CrossCutCell>();
   const byDis = new Map<string, CrossCutCell>();
+  const byBatch = new Map<string, CrossCutCell>();
 
   let approved = 0;
   let overdue = 0;
@@ -297,6 +301,7 @@ export async function loadAbdDashboardData(opts: { asOf?: Date } = {}): Promise<
     bumpCross(byTeam, row.team, patch);
     bumpCross(byPic, row.pic, patch);
     bumpCross(byDis, row.dis, patch);
+    bumpCross(byBatch, row.batch_no, patch);
 
     // isAfter usage to keep tree-shake happy on strict configs
     void isAfter;
@@ -322,6 +327,7 @@ export async function loadAbdDashboardData(opts: { asOf?: Date } = {}): Promise<
     byTeam: Array.from(byTeam.values()).sort((a, b) => b.total - a.total),
     byPic: Array.from(byPic.values()).sort((a, b) => b.total - a.total),
     byDis: Array.from(byDis.values()).sort((a, b) => b.total - a.total),
+    byBatch: Array.from(byBatch.values()).sort((a, b) => b.total - a.total),
   };
 }
 
