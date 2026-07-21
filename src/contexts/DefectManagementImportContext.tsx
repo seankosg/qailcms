@@ -1359,6 +1359,33 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     }
   }, [files, isRunning, executeImport]);
 
+  /**
+   * DB의 최신 defect_header_mappings 를 다시 읽고, 이미 파싱된 파일들의
+   * headerToFieldMap 만 다시 계산한다. 관리자 탭에서 매핑을 방금 수정한
+   * 사용자를 위한 즉시 반영 경로. 원본 파일은 재파싱하지 않는다.
+   */
+  const refreshAliases = useCallback(async (): Promise<number> => {
+    const extraAliases = await fetchAliases();
+    let aliasCount = 0;
+    for (const list of Object.values(extraAliases)) aliasCount += list.length;
+    setFiles((cur) =>
+      cur.map((f) => {
+        if (!f.availableHeaders) return f;
+        const next: Record<string, string> = {};
+        for (const h of f.availableHeaders) {
+          next[h] = toDefectFieldName(h, extraAliases);
+        }
+        // resolver가 채택했던 source_issue_no 결정은 파서 결과에 이미 반영되어 있으므로
+        // 기존 headerToFieldMap 에서 source_issue_no 로 지정된 헤더는 유지한다.
+        for (const [h, field] of Object.entries(f.headerToFieldMap ?? {})) {
+          if (field === "source_issue_no") next[h] = "source_issue_no";
+        }
+        return { ...f, headerToFieldMap: next };
+      }),
+    );
+    return aliasCount;
+  }, [fetchAliases]);
+
   return (
     <Ctx.Provider
       value={{
@@ -1377,6 +1404,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         setFileAiClassifyEnabled,
         setFileParsedRows,
         setFileMasterMappingNote,
+        refreshAliases,
       }}
     >
       {children}
