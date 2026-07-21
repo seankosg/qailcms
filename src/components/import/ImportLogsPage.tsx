@@ -598,9 +598,77 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
             <CardTitle className="text-base">{selectedBatch?.file_name}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border overflow-auto">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                <Badge variant="outline">Total {rowLogs.length}</Badge>
+                {(["inserted", "updated", "skipped", "rejected"] as const).map((a) => (
+                  <Badge
+                    key={a}
+                    variant="outline"
+                    className={`cursor-pointer ${actionColor[a] || ""} ${
+                      actionFilter === a ? "ring-2 ring-offset-1 ring-primary" : ""
+                    }`}
+                    onClick={() => {
+                      setActionFilter((cur) => (cur === a ? "all" : a));
+                      setRenderLimit(500);
+                    }}
+                  >
+                    {a} {actionCounts[a] || 0}
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex-1" />
+              <Select
+                value={actionFilter}
+                onValueChange={(v) => {
+                  setActionFilter(v);
+                  setRenderLimit(500);
+                }}
+              >
+                <SelectTrigger className="h-8 w-[140px] text-xs">
+                  <SelectValue placeholder="Action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All actions</SelectItem>
+                  <SelectItem value="inserted">inserted</SelectItem>
+                  <SelectItem value="updated">updated</SelectItem>
+                  <SelectItem value="skipped">skipped</SelectItem>
+                  <SelectItem value="rejected">rejected</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={reasonFilter}
+                onValueChange={(v) => {
+                  setReasonFilter(v);
+                  setRenderLimit(500);
+                }}
+              >
+                <SelectTrigger className="h-8 w-[220px] text-xs">
+                  <SelectValue placeholder="Reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All reasons</SelectItem>
+                  <SelectItem value="__none__">(no reason)</SelectItem>
+                  {reasonOptions.map((rc) => (
+                    <SelectItem key={rc} value={rc}>
+                      {rc}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                value={rowSearch}
+                onChange={(e) => {
+                  setRowSearch(e.target.value);
+                  setRenderLimit(500);
+                }}
+                placeholder="Row #"
+                className="h-8 w-[100px] text-xs"
+              />
+            </div>
+            <div className="rounded-md border max-h-[560px] overflow-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="text-xs w-16">Row</TableHead>
                     <TableHead className="text-xs">{cfg.keyLabel}</TableHead>
@@ -616,35 +684,54 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                         Loading…
                       </TableCell>
                     </TableRow>
-                  ) : rowLogs.length === 0 ? (
+                  ) : filteredRowLogs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                        행 로그가 없습니다
+                        {rowLogs.length === 0
+                          ? "행 로그가 없습니다"
+                          : "필터에 해당하는 행이 없습니다"}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    rowLogs.slice(0, 1000).map((r) => (
+                    visibleRowLogs.map((r) => (
                       <TableRow key={r.id}>
                         <TableCell className="text-xs">{r.raw_row_no ?? "—"}</TableCell>
                         <TableCell className="text-xs font-mono">{r.key_value ?? "—"}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={`text-xs ${actionColor[r.action_taken] || ""}`}>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${actionColor[r.action_taken] || ""}`}
+                          >
                             {r.action_taken}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-xs">{r.reason_code ?? "—"}</TableCell>
-                        <TableCell className="text-xs">{r.reason_detail ?? "—"}</TableCell>
+                        <TableCell className="text-xs max-w-[420px] whitespace-normal break-words">
+                          {r.reason_detail ?? "—"}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
                 </TableBody>
               </Table>
             </div>
-            {rowLogs.length > 1000 && (
-              <p className="text-xs text-muted-foreground mt-2">
-                상위 1000행만 표시 (총 {rowLogs.length}행)
-              </p>
-            )}
+            <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+              <span>
+                Showing {visibleRowLogs.length} of {filteredRowLogs.length}
+                {filteredRowLogs.length !== rowLogs.length
+                  ? ` (filtered from ${rowLogs.length})`
+                  : ""}
+              </span>
+              {visibleRowLogs.length < filteredRowLogs.length && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRenderLimit((l) => l + 500)}
+                >
+                  Show 500 more
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
