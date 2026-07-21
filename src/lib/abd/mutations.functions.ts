@@ -10,7 +10,7 @@ const UpdateFieldSchema = z.object({
 });
 
 const EDITABLE_FIELDS = new Set<string>([
-  "pic", "document_title", "latest_rev", "latest_status", "approval_date",
+  "pic", "document_title", "latest_rev", "latest_status", "approval_date", "batch_no",
   "r1_drafting_plan", "r1_drafting_actual", "r1_submission_plan", "r1_submission_actual", "r1_dar_plan", "r1_dar_actual",
   "r2_drafting_plan", "r2_drafting_actual", "r2_submission_plan", "r2_submission_actual", "r2_dar_plan", "r2_dar_actual",
   "r3_drafting_plan", "r3_drafting_actual", "r3_submission_plan", "r3_submission_actual", "r3_dar_plan", "r3_dar_actual",
