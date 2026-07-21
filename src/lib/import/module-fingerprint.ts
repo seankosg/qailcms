@@ -111,6 +111,19 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Plan Start",
       "Plan Finish",
       "Actual Progress",
+      // Korean anchors (real files use these)
+      "항목",
+      "계획 시작",
+      "계획 완료",
+      "계획 일수",
+      "실제 시작",
+      "실제 완료",
+      "계획 진도율",
+      "실적 진도율",
+      "자동 판정",
+      "HDEC PIC",
+      "HDEC ENG",
+      "Data Date",
     ],
     signature: [
       "Task No",
@@ -131,6 +144,24 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Slip Days",
       "계획완료일",
       "실적진도율",
+      "항목",
+      "계획 시작",
+      "계획 완료",
+      "계획 일수",
+      "실제 시작",
+      "실제 완료",
+      "계획 진도율",
+      "실적 진도율",
+      "자동 판정",
+      "HDEC PIC",
+      "HDEC ENG",
+      "단계별 세부 업무",
+      "유형",
+      "상태",
+      "Plot",
+      "Category",
+      "리스크",
+      "담당",
     ],
     filenameHints: [/task/i, /\btm\b/i, /schedule/i],
   },
@@ -266,8 +297,15 @@ export function evaluateImport(
   const targetScore = detection.scores[target];
   const topScore = detection.scores[detection.top];
 
-  // A. target 앵커가 하나도 없으면 하드 블록
-  if (targetAnchors === 0) {
+  // A. target 앵커가 하나도 없고, 시그니처 겹침도 미미하며, 파일명 힌트도 없을 때만 하드 블록
+  const targetFp = MODULE_FINGERPRINTS[target];
+  const fnameLower = (filename ?? "").toLowerCase();
+  const filenameMatch = !!(
+    targetFp.filenameHints &&
+    fnameLower &&
+    targetFp.filenameHints.some((re) => re.test(fnameLower))
+  );
+  if (targetAnchors === 0 && targetScore < 0.05 && !filenameMatch) {
     return {
       verdict: "block",
       target,
@@ -284,8 +322,8 @@ export function evaluateImport(
   // B. Top 모듈이 target 이 아닌 경우
   if (detection.top !== target) {
     const gap = topScore - targetScore;
-    // 확실히 다른 모듈이 앞선 경우(격차 ≥ 0.20)
-    if (gap >= 0.2) {
+    // 확실히 다른 모듈이 앞선 경우(격차 ≥ 0.25)
+    if (gap >= 0.25) {
       return {
         verdict: "block",
         target,
