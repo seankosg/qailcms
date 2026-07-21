@@ -301,6 +301,8 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
       let inserted = 0;
       let updated = 0;
       let rejected = 0;
+      // 실패한 doc_ref와 사유 — row_logs를 정확히 표시하기 위함.
+      const rejectedByDocRef = new Map<string, { reason_code: string; reason_detail?: string }>();
       let processed = 0;
 
       try {
@@ -354,8 +356,16 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
               const { error: e2 } = await supabase
                 .from("spare_parts_raw")
                 .upsert(p as never, { onConflict: "doc_ref" });
-              if (e2) rejected++;
-              else if (existingSet.has(p.doc_ref)) updated++;
+              if (e2) {
+                rejected++;
+                const key = String(p.doc_ref ?? "");
+                if (key) {
+                  rejectedByDocRef.set(key, {
+                    reason_code: (e2 as any).code || "UPSERT_FAILED",
+                    reason_detail: (e2 as any).details || (e2 as any).message,
+                  });
+                }
+              } else if (existingSet.has(p.doc_ref)) updated++;
               else inserted++;
             }
           } else {
@@ -388,12 +398,22 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
 
         // Write per-row import logs (inserted/updated/rejected).
         try {
-          const rowLogRows = parsed.map((p, idx) => ({
-            upload_id: logId,
-            raw_row_no: idx + 1,
-            doc_ref: p.doc_ref,
-            action_taken: existingSet.has(p.doc_ref) ? "updated" : "inserted",
-          }));
+          const rowLogRows = parsed.map((p, idx) => {
+            const rej = rejectedByDocRef.get(String(p.doc_ref ?? ""));
+            const action = rej
+              ? "rejected"
+              : existingSet.has(p.doc_ref)
+                ? "updated"
+                : "inserted";
+            return {
+              upload_id: logId,
+              raw_row_no: idx + 1,
+              doc_ref: p.doc_ref,
+              action_taken: action,
+              reason_code: rej?.reason_code ?? null,
+              reason_detail: rej?.reason_detail ?? null,
+            };
+          });
           for (let i = 0; i < rowLogRows.length; i += 500) {
             await (supabase as any)
               .from("spare_part_import_row_logs")
