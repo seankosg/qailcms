@@ -58,6 +58,8 @@ import {
   formatUnresolvedNamesNote,
   type NameFieldSpec,
 } from "@/lib/import/master-name-validation";
+import { useModuleGuard } from "@/hooks/useModuleGuard";
+import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks/useMasterOptions";
 import type { ParsedTaskRow } from "@/lib/task-management/parser";
 
