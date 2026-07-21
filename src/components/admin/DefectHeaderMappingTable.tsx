@@ -52,6 +52,16 @@ export function DefectHeaderMappingTable() {
   }, [testHeader, rows]);
 
   const activeTargetFields = useMemo(() => new Set(fields.map((f) => f.field_name)), [fields]);
+  // 파생(derived) 필드는 서버에서 자동 계산되므로 사용자가 임포트로 덮어쓸 수 없다.
+  // Target Field 옵션에서 제외하고, 이미 이렇게 저장된 매핑은 목록에서 붉은 배지로 노출.
+  const derivedFields = useMemo(
+    () => new Set(fields.filter((f) => f.origin === "derived").map((f) => f.field_name)),
+    [fields],
+  );
+  const targetFieldOptions = useMemo(
+    () => fields.filter((f) => !derivedFields.has(f.field_name)),
+    [fields, derivedFields],
+  );
 
   const saveSourceHeader = async (r: DefectHeaderMappingRow, trimmed: string) => {
     const { error } = await (supabase as any)
@@ -100,6 +110,11 @@ export function DefectHeaderMappingTable() {
 
   const submitNew = async () => {
     if (!newSource.trim() || !newTarget) return toast.error("필수 입력", { description: "원본 헤더와 대상 필드를 입력하세요." });
+    if (derivedFields.has(newTarget)) {
+      return toast.error("파생 필드 매핑 불가", {
+        description: `"${newTarget}"는 서버에서 자동 계산되는 파생 필드입니다. 임포트로 덮어쓸 수 없습니다.`,
+      });
+    }
     if (newTarget === "source_issue_no") {
       const v = validateSourceIssueNoMapping(newSource);
       if (!v.ok) return toast.error("허용되지 않는 매핑", { description: v.error });
@@ -170,14 +185,21 @@ export function DefectHeaderMappingTable() {
                     <EditableSourceHeaderCell row={r} rows={rows} activeTargetFields={activeTargetFields} onSave={(v) => saveSourceHeader(r, v)} canEdit={canEdit} />
                   </TableCell>
                   <TableCell className="text-xs">
-                    <EditableTargetFieldCell
-                      row={r}
-                      rows={rows}
-                      fields={fields}
-                      activeTargetFields={activeTargetFields}
-                      onSave={(v) => saveTargetField(r, v)}
-                      canEdit={canEdit}
-                    />
+                      <div className="flex items-center gap-2">
+                        <EditableTargetFieldCell
+                          row={r}
+                          rows={rows}
+                          fields={targetFieldOptions}
+                          activeTargetFields={activeTargetFields}
+                          onSave={(v) => saveTargetField(r, v)}
+                          canEdit={canEdit}
+                        />
+                        {derivedFields.has(r.target_field) && (
+                          <Badge variant="destructive" className="text-[10px]" title="서버 자동 계산 필드로 매핑되어 있어 임포트 시 반영되지 않습니다.">
+                            파생 · 임포트 불가
+                          </Badge>
+                        )}
+                      </div>
                   </TableCell>
                   <TableCell>
                     {r.is_custom ? (<Badge variant="secondary">Custom</Badge>) : (<Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" />System</Badge>)}
@@ -210,7 +232,7 @@ export function DefectHeaderMappingTable() {
               <Select value={newTarget} onValueChange={setNewTarget}>
                 <SelectTrigger><SelectValue placeholder="대상 필드 선택" /></SelectTrigger>
                 <SelectContent className="max-h-72">
-                  {fields.map((f) => (
+                  {targetFieldOptions.map((f) => (
                     <SelectItem key={f.field_name} value={f.field_name}>
                       <span className="font-mono text-xs mr-2">{f.field_name}</span>
                       <span className="text-muted-foreground">— {f.display_name}</span>
@@ -218,6 +240,9 @@ export function DefectHeaderMappingTable() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-[11px] text-muted-foreground">
+                서버가 자동 계산하는 파생 필드는 목록에서 제외됩니다.
+              </p>
             </div>
           </div>
           <DialogFooter>
