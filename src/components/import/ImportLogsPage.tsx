@@ -298,6 +298,10 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
   const loadDetail = async (id: string) => {
     setSelected(id);
     setDetailLoading(true);
+    setActionFilter("all");
+    setReasonFilter("all");
+    setRowSearch("");
+    setRenderLimit(500);
     try {
       const cols =
         kind === "spare_part"
