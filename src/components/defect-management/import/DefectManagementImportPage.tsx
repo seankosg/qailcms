@@ -46,6 +46,8 @@ import {
 } from "@/lib/import/master-name-validation";
 import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks/useMasterOptions";
 import type { ParsedDefectRow } from "@/lib/defect-management/parser";
+import { useModuleGuard } from "@/hooks/useModuleGuard";
+import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 
 const statusBadge: Record<DefectFileStatus, { label: string; cls: string }> = {
   parsing: { label: "Parsing", cls: "bg-muted text-muted-foreground" },
@@ -99,6 +101,7 @@ function Inner() {
     setFileParsedRows,
     setFileMasterMappingNote,
   } = useDefectImport();
+  const guard = useModuleGuard("sm", (fs) => addFiles(fs));
   const inputRef = useRef<HTMLInputElement>(null);
   const [columnDialogFileId, setColumnDialogFileId] = useState<string | null>(null);
   const [dupDialogFileId, setDupDialogFileId] = useState<string | null>(null);
@@ -147,16 +150,16 @@ function Inner() {
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      addFiles(Array.from(e.dataTransfer.files));
+      void guard.receive(Array.from(e.dataTransfer.files));
     },
-    [addFiles],
+    [guard],
   );
   const onSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      addFiles(e.target.files ? Array.from(e.target.files) : []);
+      void guard.receive(e.target.files ? Array.from(e.target.files) : []);
       if (inputRef.current) inputRef.current.value = "";
     },
-    [addFiles],
+    [guard],
   );
 
   const readyCount = files.filter(
@@ -287,6 +290,7 @@ function Inner() {
           }}
         />
       )}
+      <ModuleGuardDialog {...guard.dialogProps} />
     </div>
   );
 }

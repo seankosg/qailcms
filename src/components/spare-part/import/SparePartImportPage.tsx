@@ -35,6 +35,8 @@ import {
   type FileStatus,
   type ImportFileItem,
 } from "@/contexts/SparePartImportContext";
+import { useModuleGuard } from "@/hooks/useModuleGuard";
+import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 
 const statusBadge: Record<FileStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
@@ -74,20 +76,21 @@ function ImportPage() {
   } = useSparePartImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [colDialogFileId, setColDialogFileId] = useState<string | null>(null);
+  const guard = useModuleGuard("spare_part", (fs) => addFiles(fs));
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      addFiles(Array.from(e.dataTransfer.files));
+      void guard.receive(Array.from(e.dataTransfer.files));
     },
-    [addFiles],
+    [guard],
   );
   const onSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      addFiles(e.target.files ? Array.from(e.target.files) : []);
+      void guard.receive(e.target.files ? Array.from(e.target.files) : []);
       if (inputRef.current) inputRef.current.value = "";
     },
-    [addFiles],
+    [guard],
   );
 
   const readyCount = files.filter((f) => f.status === "ready").length;
@@ -204,6 +207,7 @@ function ImportPage() {
           setColDialogFileId(null);
         }}
       />
+      <ModuleGuardDialog {...guard.dialogProps} />
     </div>
   );
 }

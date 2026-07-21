@@ -45,6 +45,8 @@ import {
 import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks/useMasterOptions";
 import type { ParsedAbdRow } from "@/lib/abd/parser";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useModuleGuard } from "@/hooks/useModuleGuard";
+import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 
 type Status = "queued" | "parsing" | "ready" | "importing" | "done" | "error";
 
@@ -93,6 +95,10 @@ export function AbdImportPage() {
   const canRegisterTeam = !!(currentUserQ.data?.isAdmin || currentUserQ.data?.isSuperUser);
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const masterOptions = useAllMasterOptions();
+
+  const guard = useModuleGuard("abd", (fs) => {
+    void handleFiles(fs);
+  });
 
   const nameSpecs: NameFieldSpec<ParsedAbdRow>[] = [
     {
@@ -174,16 +180,16 @@ export function AbdImportPage() {
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      void handleFiles(Array.from(e.dataTransfer.files));
+      void guard.receive(Array.from(e.dataTransfer.files));
     },
-    [handleFiles],
+    [],
   );
   const onSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      void handleFiles(e.target.files ? Array.from(e.target.files) : []);
+      void guard.receive(e.target.files ? Array.from(e.target.files) : []);
       if (inputRef.current) inputRef.current.value = "";
     },
-    [handleFiles],
+    [],
   );
 
   const removeEntry = (id: string) =>
@@ -405,6 +411,7 @@ export function AbdImportPage() {
         onClose={() => setTeamDialogOpen(false)}
         onRegistered={() => { /* team_master invalidation via qc; entries의 team 문자열은 유지 */ }}
       />
+      <ModuleGuardDialog {...guard.dialogProps} />
     </div>
   );
 }
