@@ -354,6 +354,40 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
 
   const selectedBatch = batches.find((b) => b.id === selected) ?? null;
 
+  const actionCounts = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const r of rowLogs) {
+      const k = r.action_taken || "unknown";
+      acc[k] = (acc[k] || 0) + 1;
+    }
+    return acc;
+  }, [rowLogs]);
+
+  const reasonOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(rowLogs.map((r) => r.reason_code).filter(Boolean) as string[]),
+      ).sort(),
+    [rowLogs],
+  );
+
+  const filteredRowLogs = useMemo(() => {
+    const q = rowSearch.trim();
+    return rowLogs.filter((r) => {
+      if (actionFilter !== "all" && (r.action_taken || "") !== actionFilter)
+        return false;
+      if (reasonFilter !== "all") {
+        if (reasonFilter === "__none__") {
+          if (r.reason_code) return false;
+        } else if (r.reason_code !== reasonFilter) return false;
+      }
+      if (q && String(r.raw_row_no ?? "") !== q) return false;
+      return true;
+    });
+  }, [rowLogs, actionFilter, reasonFilter, rowSearch]);
+
+  const visibleRowLogs = filteredRowLogs.slice(0, renderLimit);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
