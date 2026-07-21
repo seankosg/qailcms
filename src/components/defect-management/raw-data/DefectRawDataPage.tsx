@@ -36,6 +36,7 @@ import {
   useDefectStatusCounts,
   useDefectDashboardSummary,
   useInvalidateDefects,
+  fetchDefectItemIds,
   type DefectItem,
   type DefectServerFilter,
   type DefectServerSort,
@@ -358,6 +359,9 @@ export function DefectRawDataPage() {
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
+  // 필터/검색 조건에 매칭되는 전체 ID 세트 (대량 선택용). null이면 미활성.
+  const [allMatchIds, setAllMatchIds] = useState<string[] | null>(null);
+  const [fetchingAllMatch, setFetchingAllMatch] = useState(false);
 
   // Sync URL → local (탭 전환 시 URL의 sort/filters를 초기화 반영)
   useEffect(() => {
@@ -646,9 +650,22 @@ export function DefectRawDataPage() {
 
   useEffect(() => {
     setRowSelection({});
+    setAllMatchIds(null);
   }, [columnFilters, q, tab]);
 
-  const selectedRows = useMemo(() => table.getSelectedRowModel().rows.map((r) => r.original), [table, rowSelection, rows]);
+  const pageSelectedRows = useMemo(
+    () => table.getSelectedRowModel().rows.map((r) => r.original),
+    [table, rowSelection, rows],
+  );
+  // 매칭 전체 선택이 활성이면 id만 담긴 경량 row 배열로 대체. BulkEditBar/삭제는 id만 사용.
+  const selectedRows = useMemo<Record<string, any>[]>(() => {
+    if (allMatchIds && allMatchIds.length > 0) {
+      const rowById = new Map<string, any>();
+      for (const r of rows) rowById.set(r.id, r);
+      return allMatchIds.map((id) => rowById.get(id) ?? { id });
+    }
+    return pageSelectedRows;
+  }, [allMatchIds, pageSelectedRows, rows]);
   const bulkFields = useMemo(() => {
     const optionMap: Record<string, { value: string; label: string }[]> = {
       team: teamCodesForEdit.map((value) => ({ value, label: value })),
@@ -858,13 +875,43 @@ export function DefectRawDataPage() {
 
       <CriticalBulkBar isAdmin={isAdmin} selectedRows={selectedRows as any} pending={criticalPending} setPending={setCriticalPending} />
 
+      <SelectAllMatchingBanner
+        pageSelectedCount={pageSelectedRows.length}
+        pageRowCount={rows.length}
+        total={total}
+        allMatchIds={allMatchIds}
+        fetching={fetchingAllMatch}
+        onSelectAllMatching={async () => {
+          setFetchingAllMatch(true);
+          try {
+            const ids = await fetchDefectItemIds({
+              statusGroup: tab,
+              includeInactive,
+              q,
+              filters: serverFilters,
+              limit: 200_000,
+            });
+            if (ids.length >= 200_000) {
+              toast.warning("상한(200,000)에 도달했습니다. 필터를 좁혀주세요.");
+            }
+            setAllMatchIds(ids);
+            toast.success(`${ids.length.toLocaleString()}건 선택됨`);
+          } catch (e: any) {
+            toast.error("전체 선택 실패", { description: e?.message ?? String(e) });
+          } finally {
+            setFetchingAllMatch(false);
+          }
+        }}
+        onClearMatching={() => setAllMatchIds(null)}
+      />
+
       <BulkEditBar
         selectedRows={selectedRows as any}
         fields={bulkFields}
         exportColumns={exportColumns}
         canEdit={isAdmin}
-        onClearSelection={() => setRowSelection({})}
-        onApplied={() => { setRowSelection({}); invalidateDefects(); }}
+        onClearSelection={() => { setRowSelection({}); setAllMatchIds(null); }}
+        onApplied={() => { setRowSelection({}); setAllMatchIds(null); invalidateDefects(); }}
       />
 
       <DefectRawTableView
@@ -1303,5 +1350,70 @@ function AiClassifyButton({ selectedRows, onDone }: { selectedRows: Array<{ id: 
       <Sparkles className={cn("mr-1 h-3.5 w-3.5", running && "animate-pulse")} />
       {running ? "분류 중…" : `AI 하자 분류${selectedRows.length > 0 ? ` (${selectedRows.length})` : ""}`}
     </Button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// "필터된 전체 N건 선택" 배너 — 현재 페이지 전체 선택 시 노출
+// ─────────────────────────────────────────────────────────────────────────────
+function SelectAllMatchingBanner({
+  pageSelectedCount,
+  pageRowCount,
+  total,
+  allMatchIds,
+  fetching,
+  onSelectAllMatching,
+  onClearMatching,
+}: {
+  pageSelectedCount: number;
+  pageRowCount: number;
+  total: number;
+  allMatchIds: string[] | null;
+  fetching: boolean;
+  onSelectAllMatching: () => void | Promise<void>;
+  onClearMatching: () => void;
+}) {
+  // 매칭 전체 선택이 활성인 경우: 상태 표시 + 취소 링크
+  if (allMatchIds && allMatchIds.length > 0) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs">
+        <span className="font-medium text-primary">
+          필터된 전체 {allMatchIds.length.toLocaleString()}건이 선택됨
+        </span>
+        <span className="text-muted-foreground">
+          · 이후 편집·삭제는 전체 매칭 행에 적용됩니다
+        </span>
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto px-1 py-0 text-xs"
+          onClick={onClearMatching}
+        >
+          이 페이지만 선택으로 돌아가기
+        </Button>
+      </div>
+    );
+  }
+
+  // 페이지 전체 선택 + 매칭 총량이 페이지보다 많을 때만 "전체 선택" 링크 노출
+  const showPrompt =
+    pageRowCount > 0 && pageSelectedCount === pageRowCount && total > pageRowCount;
+  if (!showPrompt) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5 text-xs">
+      <span>
+        이 페이지 <strong>{pageSelectedCount}</strong>건이 선택되었습니다.
+      </span>
+      <Button
+        variant="link"
+        size="sm"
+        className="h-auto px-1 py-0 text-xs"
+        disabled={fetching}
+        onClick={() => void onSelectAllMatching()}
+      >
+        {fetching ? "불러오는 중…" : `필터된 전체 ${total.toLocaleString()}건 선택`}
+      </Button>
+    </div>
   );
 }
