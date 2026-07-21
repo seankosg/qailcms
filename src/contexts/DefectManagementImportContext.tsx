@@ -1062,6 +1062,9 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       let processed = 0;
       let skippedLocked = 0;
       const importErrors: DefectImportError[] = [];
+      // 행별 rejection 사유 맵 — row_logs에 정확히 반영하기 위함.
+      // 키: source_issue_no (문자열). preflight/batch 실패 시 채워짐.
+      const rejectedByKey = new Map<string, { reason_code: string; reason_detail?: string }>();
       let lastProgressAt = 0;
       let lastProgressPct = -1;
 
@@ -1075,6 +1078,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           const validPayloads = payloads.filter((p) => p.team != null);
           const invalidPayloads = payloads.filter((p) => p.team == null);
           rejected += invalidPayloads.length;
+          for (const inv of invalidPayloads) {
+            const key = String(inv.source_issue_no ?? "");
+            if (key) {
+              rejectedByKey.set(key, {
+                reason_code: "PREFLIGHT_TEAM_NULL",
+                reason_detail: "Category/Team 컬럼이 제외되었거나 매핑되지 않았습니다.",
+              });
+            }
+          }
           const sample = invalidPayloads[0]?.source_issue_no as string | undefined;
           importErrors.push({
             batch: -1,
@@ -1135,6 +1147,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             failRows = split.rejectedRows;
             for (const row of successRows) delete (row as any).__ok;
             importErrors.push(...split.rowErrors);
+            for (const row of failRows) {
+              const key = String((row as any).source_issue_no ?? "");
+              if (key) {
+                rejectedByKey.set(key, {
+                  reason_code: (error as any).code || "UPSERT_FAILED",
+                  reason_detail: (error as any).details || error.message,
+                });
+              }
+            }
           }
 
           for (const row of successRows) {
@@ -1161,13 +1182,23 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
         // per-row logs — 사용자 응답성 확보를 위해 백그라운드로 병렬 삽입 (실패 시 콘솔 경고)
         if (logId) {
-          const rowLogRows = workingRows.map((p) => ({
-            upload_id: logId,
-            raw_row_no: p.rawRowNo,
-            team: pickTeam(p),
-            source_issue_no: p.source_issue_no,
-            action_taken: existing.has(p.source_issue_no) ? "updated" : "inserted",
-          }));
+          const rowLogRows = workingRows.map((p) => {
+            const rej = rejectedByKey.get(String(p.source_issue_no ?? ""));
+            const action = rej
+              ? "rejected"
+              : existing.has(p.source_issue_no)
+                ? "updated"
+                : "inserted";
+            return {
+              upload_id: logId,
+              raw_row_no: p.rawRowNo,
+              team: pickTeam(p),
+              source_issue_no: p.source_issue_no,
+              action_taken: action,
+              reason_code: rej?.reason_code ?? null,
+              reason_detail: rej?.reason_detail ?? null,
+            };
+          });
           const rowLogChunks: typeof rowLogRows[] = [];
           for (let i = 0; i < rowLogRows.length; i += ROW_LOG_CHUNK) {
             rowLogChunks.push(rowLogRows.slice(i, i + ROW_LOG_CHUNK));
