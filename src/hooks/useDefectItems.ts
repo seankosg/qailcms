@@ -99,6 +99,26 @@ export interface DefectFacetItem {
   cnt: number;
 }
 
+// ── defect_items_search_ids ───────────────────────────────────────────────
+// 현재 필터/검색 조건에 매칭되는 전체 행의 id만 반환 (대량 선택용)
+export async function fetchDefectItemIds(params: {
+  statusGroup: DefectStatusGroup;
+  includeInactive: boolean;
+  q?: string;
+  filters?: DefectServerFilter[];
+  limit?: number;
+}): Promise<string[]> {
+  const { data, error } = await (supabase as any).rpc("defect_items_search_ids", {
+    _status_group: params.statusGroup,
+    _include_inactive: params.includeInactive,
+    _q: params.q && params.q.trim() ? params.q.trim() : null,
+    _filters: params.filters ?? [],
+    _limit: params.limit ?? 100_000,
+  });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Array<{ id: string }>).map((r) => String(r.id));
+}
+
 export function useDefectFacet(
   column: string | null,
   opts: { statusGroup: DefectStatusGroup; includeInactive: boolean; enabled?: boolean },
