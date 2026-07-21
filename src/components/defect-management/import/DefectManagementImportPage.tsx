@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -6,6 +6,7 @@ import {
   Settings2,
   FileSpreadsheet,
   Loader2,
+  RefreshCw,
   Upload,
   X,
 } from "lucide-react";
@@ -100,12 +101,27 @@ function Inner() {
     setFileAiClassifyEnabled,
     setFileParsedRows,
     setFileMasterMappingNote,
+    refreshAliases,
   } = useDefectImport();
   const guard = useModuleGuard("sm", (fs) => addFiles(fs));
   const inputRef = useRef<HTMLInputElement>(null);
   const [columnDialogFileId, setColumnDialogFileId] = useState<string | null>(null);
   const [dupDialogFileId, setDupDialogFileId] = useState<string | null>(null);
   const masterOptions = useAllMasterOptions();
+
+  // 페이지 진입 시 관리자 매핑을 한번 최신화.
+  useEffect(() => {
+    void refreshAliases();
+  }, [refreshAliases]);
+
+  // 컬럼 선택 다이얼로그를 열 때마다 최신 매핑을 반영해 (unmapped) 오탐을 방지.
+  const openColumnDialog = useCallback(
+    async (fileId: string) => {
+      await refreshAliases();
+      setColumnDialogFileId(fileId);
+    },
+    [refreshAliases],
+  );
 
   const readExtra = (key: string) => (r: ParsedDefectRow) =>
     (r.extra?.[key] as string | null | undefined) ?? null;
