@@ -7,6 +7,10 @@ export { BACKUP_TABLES, type BackupTableName } from "./backup-shared";
 
 const BUCKET = "db-backups";
 const CHUNK_SIZE = 1000;
+// 파트당 최대 행 수: 대용량 raw 테이블을 여러 파일로 분할해 Worker 메모리/응답 시간 한도를 회피
+const ROWS_PER_PART = 10_000;
+// 개별 페이지 로드 크기 (Supabase Data API 상한 1000)
+const PAGE_SIZE = 1000;
 
 const TABLE_SORT_KEYS: Record<BackupTableName, string> = {
   abd_items_raw: "id",
@@ -49,6 +53,7 @@ export type SnapshotManifest = {
     rows: number;
     sha256: string;
     size_bytes: number;
+    parts?: { path: string; rows: number; sha256: string; size_bytes: number }[];
   }[];
   total_rows: number;
   sha256: string;
@@ -89,25 +94,65 @@ export async function createSnapshot(
   const overallHasher = new Hasher();
 
   for (const tableName of tablesToBackup) {
-    const rows = await readAllRows(supabaseAdmin, tableName);
-    const json = JSON.stringify(rows);
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(json);
-    const sha256 = await sha256Hex(bytes);
-    const path = `${folder}${tableName}.json`;
+    const parts: NonNullable<SnapshotManifest["tables"][number]["parts"]> = [];
+    let partIndex = 0;
+    let tableRows = 0;
+    let tableSize = 0;
+    const tablePartHashHex: string[] = [];
 
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(path, new Blob([bytes], { type: "application/json" }), {
-        contentType: "application/json",
-        cacheControl: "3600",
-      });
-    if (uploadError) throw new Error(`Upload failed for ${tableName}: ${uploadError.message}`);
+    for await (const batch of iterRowsInParts(supabaseAdmin, tableName)) {
+      const json = JSON.stringify(batch);
+      const bytes = new TextEncoder().encode(json);
+      const sha256 = await sha256Hex(bytes);
+      const partName = `${tableName}.part-${String(partIndex).padStart(3, "0")}.json`;
+      const path = `${folder}${partName}`;
 
-    overallHasher.update(bytes);
-    tableManifests.push({ name: tableName, rows: rows.length, sha256, size_bytes: bytes.length });
-    totalRows += rows.length;
-    totalSize += bytes.length;
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from(BUCKET)
+        .upload(path, new Blob([bytes], { type: "application/json" }), {
+          contentType: "application/json",
+          cacheControl: "3600",
+        });
+      if (uploadError) throw new Error(`Upload failed for ${tableName} part ${partIndex}: ${uploadError.message}`);
+
+      parts.push({ path: partName, rows: batch.length, sha256, size_bytes: bytes.length });
+      tablePartHashHex.push(sha256);
+      tableRows += batch.length;
+      tableSize += bytes.length;
+      partIndex++;
+    }
+
+    // 빈 테이블도 파트 0을 남겨 매니페스트 일관성 유지
+    if (parts.length === 0) {
+      const bytes = new TextEncoder().encode("[]");
+      const sha256 = await sha256Hex(bytes);
+      const partName = `${tableName}.part-000.json`;
+      const path = `${folder}${partName}`;
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from(BUCKET)
+        .upload(path, new Blob([bytes], { type: "application/json" }), {
+          contentType: "application/json",
+          cacheControl: "3600",
+        });
+      if (uploadError) throw new Error(`Upload failed for ${tableName} empty part: ${uploadError.message}`);
+      parts.push({ path: partName, rows: 0, sha256, size_bytes: bytes.length });
+      tablePartHashHex.push(sha256);
+      tableSize += bytes.length;
+    }
+
+    // 테이블 단위 sha256 = sha256( 각 파트 sha256 hex를 이어붙인 문자열 )
+    const tableHash = await sha256Hex(new TextEncoder().encode(tablePartHashHex.join("")));
+    overallHasher.update(new TextEncoder().encode(tableHash));
+
+    tableManifests.push({
+      name: tableName,
+      rows: tableRows,
+      sha256: tableHash,
+      size_bytes: tableSize,
+      parts,
+    });
+    totalRows += tableRows;
+    totalSize += tableSize;
   }
 
   const overallHash = await overallHasher.digest();
