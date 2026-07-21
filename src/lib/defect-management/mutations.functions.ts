@@ -11,9 +11,11 @@ const UpdateFieldSchema = z.object({
 const ALLOWED_FIELDS = new Set<string>([
   "source_issue_no", "team",
   "status_raw", "rectified_status", "closure_status",
+  "updated_status",
   "priority", "hdec_verification", "hdec_reason",
   "description",
   "area_type", "area_level", "area_location",
+  "room_group",
   "main_trade", "sub_trade", "work_type",
   "subcontractor_name", "subsub_name", "hdec_pic_name", "hdec_eng_name",
   "due_by",
