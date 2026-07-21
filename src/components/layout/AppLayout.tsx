@@ -110,7 +110,6 @@ const NAV: NavSection[] = [
         items: [
           { to: "/resource/dmr/dashboard", label: "Dashboard", icon: LayoutDashboard },
           { to: "/resource/dmr/raw-data", label: "Raw Data", icon: Database },
-          { to: "/resource/dmr/import", label: "Import", icon: Upload, editorOnly: true },
         ],
       },
     ],

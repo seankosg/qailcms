@@ -469,7 +469,7 @@ export function DmrRawDataPage() {
           />
           {canEdit && (
             <Button asChild size="sm">
-              <Link to="/resource/dmr/import"><Upload className="mr-1 h-3.5 w-3.5" />Import</Link>
+              <Link to="/import-log/import" search={{ tab: "dmr" }}><Upload className="mr-1 h-3.5 w-3.5" />Import</Link>
             </Button>
           )}
         </div>
