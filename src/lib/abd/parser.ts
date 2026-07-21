@@ -16,6 +16,7 @@ export interface ParsedAbdRow {
   document_title: string | null;
   abd_number: string;
   abd_ocs_no: string | null;
+  batch_no: string | null;
   pic: string | null;
   latest_rev: string | null;
   latest_status: string | null;
