@@ -1,91 +1,47 @@
-## 1. SHAW PROJECT CMS(SM) 분리 내보내기 로직 상세 검토
+## 문제
 
-SHAW 원본(`src/lib/defect-excel-export.ts` L444~589) + 현재 QAIL의 SM 포팅본(`src/components/defect-management/raw-data/ExportDialog.tsx` L134~188)의 실제 동작을 파일:라인 기준으로 정리했습니다.
+TM 임포트 지문 게이트가 한글 헤더로 구성된 정상 TM 원본(`Task_Management_Mech_260720_박기덕_책임.xlsx`)을 "필수 헤더(앵커) 없음"으로 하드 블록합니다.
 
-| 항목 | 동작 |
-|---|---|
-| 그룹 키 | `row.subcontractor_name`; 공백/`null` → `"Unassigned"` (ExportDialog L138) |
-| 정렬 | 알파벳 오름차순, `Unassigned`는 맨 뒤 (defect-excel-export L473~477) |
-| 파일 스타일 | 개별 파일마다 SHAW 스타일 헤더 블록을 재사용하되 `sourceSuffix = "Subcontractor: {name}"`로 6번째 메타 행에 그룹명 삽입 (ExportDialog L158/L179) |
-| 파일명 | `defect-raw-{sanitize(key)}-{VIEW\|REIMPORT}-{doha timestamp}.xlsx`. `sanitize()`는 파일시스템 금지문자를 `_`로 치환하고 40자로 잘라냄 (L382) |
-| 출력 임계값 | **그룹 수 ≥ 7 → JSZip 로 묶어 단일 `.zip` 다운로드** / 그 미만 → 파일별 순차 다운로드. 각 워크북 사이에 `setTimeout(0)`으로 이벤트 루프를 양보해 브라우저 다중 다운로드 차단을 회피 (L148/L165/L184) |
-| 메모리 | 그룹 처리 후 `groups.set(key, [])`로 해당 배열을 즉시 해제하고, 단일 파일 경로는 `streamXlsxExport`의 페이지네이션 라이터를 재사용 (L143, L164, L183) |
-| Format(view/reimport) | 그대로 유지 — 각 분리 파일도 동일한 format으로 생성 |
+원인:
+1. `module-fingerprint.ts`의 TM `anchors`가 영문 헤더만 등록되어 있음. 실제 파일은 `항목 / 계획 시작 / 계획 완료 / 실제 시작 / HDEC PIC / HDEC ENG / 자동 판정 / 계획 진도율 / 실적 진도율` 등 한글 헤더 기반.
+2. TM 파서(`src/lib/task-management/parser.ts`)는 이미 위 한글 별칭을 인식하지만, 게이트가 그보다 앞단에서 차단.
+3. 헤더 행 자동 탐지가 "가장 non-empty가 많은 행"을 헤더로 삼는데, TM 원본 상단은 요약/설정 텍스트가 많고 데이터 행이 헤더 행보다 셀 수가 더 많아 데이터 행이 헤더로 오인될 수 있음.
 
-핵심 재사용 부품:
-- `streamXlsxExport` (스트리밍 + 헤더/프리즈/셀 서식 통일)
-- `buildStyledWorkbookBuffer` (ZIP 경로 전용, `writeBuffer()`로 바이너리 반환)
-- `sanitize()`, `downloadBlob()` — 파일명 정화 및 blob 다운로드
+## 수정 범위
 
-## 2. TM에 이식할 계획
+`src/lib/import/module-fingerprint.ts` 한 파일만 수정. 파서/임포트 컨텍스트/UI 로직은 건드리지 않음 — 이 파일은 파서 앞단의 사전 게이트만 담당.
 
-TM Raw Data 내보내기는 현재 단일 파일만 지원 (`src/components/task-management/raw-data/ExportDialog.tsx`). 여기에 SM 방식을 **동일한 UX/로직**으로 확장합니다.
+### 1) TM 앵커/시그니처 한글 확장
 
-### 2-1. UI 변경 (`ExportDialog.tsx`)
+`MODULE_FINGERPRINTS.tm.anchors` 에 아래 한글 앵커 추가(기존 영문은 그대로 유지):
+- `항목`, `계획 시작`, `계획 완료`, `계획 일수`, `실제 시작`, `실제 완료`, `실적 진도율`, `계획 진도율`, `자동 판정`, `HDEC PIC`, `HDEC ENG`, `Data Date`
 
-기존 Format 라디오 아래에 **Output** 라디오 그룹 추가 (SM ExportDialog L216~228 미러):
+`signature`에도 위 한글 헤더 + `단계별 세부 업무`, `유형`, `상태`, `Plot`, `Category`, `리스크` 등 실측 헤더 추가. 정규화가 `\s` 를 제거하므로 `계획\n시작` 같은 줄바꿈 헤더도 자동으로 `계획시작` 로 매칭됨.
 
-```text
-Output
-( ) 단일 파일
-( ) Team 별 분리
-( ) HDEC PIC 별 분리
-( ) Plot 별 분리
-```
+SM/ABD/Spare Part 앵커에도 실제 사용되는 한글 헤더가 있으면 같은 원칙으로 소폭 보강(부작용 없이 정확도만 상승). 이 항목은 확장 여부만 리스트업하고 최소 추가로 제한.
 
-한 번에 하나의 분할 축만 선택 (다중 축 조합은 이번 스코프에서 제외 — 필요 시 후속 요청으로 처리).
+### 2) 판정 규칙 완화
 
-설명 문구: `그룹 수 ≥ 7 이면 자동으로 ZIP 으로 묶입니다.` (SM과 동일 임계값)
+`evaluateImport`:
+- 하드 블록 조건을 `targetAnchors === 0` 에서 **`targetAnchors === 0 && targetScore < 0.05 && (파일명 힌트도 없음)`** 로 완화. 즉 앵커 0이라도 시그니처 겹침이 유의미하거나 파일명이 `task/schedule/tm` 을 포함하면 `ambiguous` 로 강등.
+- Top 모듈이 target 이 아닐 때 격차 임계값을 `0.20 → 0.25` 로 상향(오탐 감소).
+- `ambiguous` 는 기존대로 사용자가 확인 후 진행 가능.
 
-### 2-2. 분할 축 정의
+### 3) 헤더 추출 견고화
 
-| 옵션 | 그룹 키 (row 필드) | 파일명 라벨 | 빈 값 라벨 |
-|---|---|---|---|
-| Team 별 | `team` | `Team: {value}` | `Unassigned` |
-| HDEC PIC 별 | `hdec_pic_name` | `HDEC PIC: {value}` | `Unassigned` |
-| Plot 별 | `plot` | `Plot: {value}` | `Unassigned` |
+`extractHeadersFromFile`:
+- 시트별 헤더 후보 선택 로직 개선. 현재는 non-empty 셀 수 최대인 행 하나만 선택 → 데이터 행이 헤더로 오인될 수 있음.
+- 개선: 상단 30행 각 행을 훑되, **행에 앵커(전 모듈 앵커 합집합) 매칭 셀이 하나라도 있으면 그 행을 우선 채택**. 앵커 매칭이 없는 시트에서만 non-empty 최대 행 fallback.
+- 여러 시트의 상위 헤더 후보를 모두 합쳐 지문 계산(현재 동작 유지, 커버리지만 향상).
 
-컬럼 키 확인 완료: `src/lib/task-management/columns.ts` L134/L141/L211/L215.
+### 4) 검증
 
-### 2-3. 그룹핑 & 파일 생성 로직
+- 유첨 TM 파일 → `verdict: "ok"` 확인.
+- 기존 ABD/SM/Spare Part 원본 3종을 TM 게이트에 통과시켰을 때 여전히 `block` 판정되는지 회귀 확인(자동 테스트 파일 없이 수동 확인).
+- SM 페이지에 TM 파일 업로드 시 여전히 `block` 되는지 크로스 확인.
 
-SM `ExportDialog` L134~188 을 그대로 미러링:
+## 영향
 
-1. `filteredRowsForExport`(현재 필터 결과 전체) 를 순회하여 `Map<string, Row[]>` 로 그룹화. 키 정규화는 `String(value).trim() || "Unassigned"`.
-2. 정렬: 알파벳 오름차순, `Unassigned` 는 맨 뒤.
-3. 각 그룹마다 SHAW 스타일 헤더(`title`, `metaRows`)의 5번째 메타 슬롯에 `Split: {축} = {키}` 를 삽입해 어느 축/값인지 파일 안에서도 식별 가능하게 함. TM 헤더 슬롯이 이미 5개이므로 그 중 마지막 빈 슬롯을 사용 (기존 필드는 유지).
-4. 파일명 규칙:
-   - 개별: `task-management_{format}_{axisTag}-{sanitize(key)}_{timestamp}.xlsx`
-   - ZIP: `task-management_{format}_by-{axisTag}_{timestamp}.zip`
-   - `axisTag` = `team` / `hdec-pic` / `plot`.
-5. 임계값: 그룹 수 ≥ 7 → JSZip 로 묶어 단일 `.zip` 다운로드. 미만이면 파일별 순차 다운로드 + `setTimeout(0)` yield.
-6. 각 그룹 처리 직후 `groups.set(key, [])` 로 배열 해제.
-7. Format(view / reimport) 및 서식(Judgment fill, date numFmt 등) 은 기존 단일 파일 경로와 동일하게 유지 → 라이터 함수 하나만 파라미터화.
-
-### 2-4. 라이터 재사용
-
-TM 은 `streamXlsxExport` 만 사용 중이고 `buildStyledWorkbookBuffer` 유사 함수가 없음. 다음 중 하나를 선택:
-
-- (A) `streamXlsxExport` 에 "buffer 반환" 모드(파일명 대신 Uint8Array) 를 추가하고 ZIP 경로는 이를 호출. `saveAs` 는 최상위에서만 실행.
-- (B) SM `ExportDialog` 의 `buildStyledWorkbookBuffer` 를 `src/lib/excel/` 공용 파일로 승격하고 TM 에서도 동일 옵션(`cellFillFor`, `rowFillFor`, `numFmtByKey`)을 지원하도록 확장한 뒤 SM/TM 모두 이 공용 모듈을 사용.
-
-권장은 (B) — SM 도 향후 동일 라이터로 통합되어 유지보수 표면이 줄어듬. 새 파일 후보: `src/lib/excel/styled-buffer.ts`.
-
-### 2-5. 호출부 변경 (`TaskManagementRawDataPage.tsx`)
-
-- Props 변화 없음(rows/visibleKeys 그대로). ExportDialog 내부에서만 축을 선택.
-- 필터 요약 문자열(현재 화면의 team/hdec/plot 필터 값)을 헤더 metaRows 에 이미 포함하는지 확인 후 그대로 유지.
-
-## 3. 스코프 밖 (질문 필요 시 알려주세요)
-
-- 조합 분할(Team × Plot 등) — 현재는 단일 축.
-- Task Summary(Tree) 페이지 및 Schedule Revision 페이지 내보내기 — 이번 계획은 Raw Data 만 대상.
-- 서브태스크가 다른 축값을 가질 때 부모/자식이 서로 다른 파일에 나뉘는 문제 — SM 과 동일하게 "행 단위" 그룹핑이 기본. 유지가 맞는지 확인 필요할 수 있음.
-
-## 4. 구현 순서
-
-1. `src/lib/excel/styled-buffer.ts` 신설: 기존 SM `buildStyledWorkbookBuffer` 를 공용화하고 TM 옵션(`cellFillFor`, `rowFillFor`, `numFmtByKey`, `columnWidths`) 지원.
-2. `src/components/defect-management/raw-data/ExportDialog.tsx` 를 신규 공용 라이터로 교체(동작 동일 유지, 회귀 없음 확인).
-3. `src/components/task-management/raw-data/ExportDialog.tsx` 에 Output 라디오 및 분할 실행 경로 추가, ZIP 임계값 7 적용.
-4. 파일명 규칙과 헤더 메타 슬롯 문구를 SM 과 동일한 톤으로 통일.
-5. 수동 검증 시나리오: (a) 그룹 6개 → 파일 6개 순차 다운로드, (b) 그룹 7개 → 단일 ZIP, (c) `team`/`hdec_pic_name`/`plot` 이 빈 행이 `Unassigned` 로 묶임, (d) view/reimport format 두 축 모두 동작.
+- 파서/DB/임포트 파이프라인 무변경. 사전 게이트만 완화.
+- 지문 오탐(정상 파일을 잘못된 모듈로 판정)은 앵커 확장으로 오히려 감소.
+- 사용자는 유첨 파일로 정상 진행 가능.
