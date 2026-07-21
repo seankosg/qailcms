@@ -306,13 +306,8 @@ export async function restoreSnapshot(
   });
 
   for (const tableName of ordered) {
-    const path = `${folder}${tableName}.json`;
-    const { data: blob, error: downloadError } = await supabaseAdmin.storage.from(BUCKET).download(path);
-    if (downloadError || !blob) throw new Error(`Download failed for ${tableName}: ${downloadError?.message}`);
-
-    const text = await blob.text();
-    const rows = JSON.parse(text) as unknown[];
-    if (!Array.isArray(rows)) throw new Error(`Invalid backup data for ${tableName}`);
+    // 신 포맷: 매니페스트의 parts를 우선 사용, 없으면 레거시 단일 파일로 폴백
+    const partPaths = await resolveTablePartPaths(supabaseAdmin, snapshot, folder, tableName);
 
     // For non-destructive restore, we skip tables that already have data? Actually non-destructive means insert on conflict.
     // For now, we treat non-destructive as upsert by id, but that's complex. Simpler: non-destructive still restores raw data only with truncate.
@@ -328,16 +323,28 @@ export async function restoreSnapshot(
     try {
       await supabaseAdmin.rpc("backup_truncate_table", { _table_name: tableName });
 
-      for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
-        const chunk = rows.slice(i, i + CHUNK_SIZE);
-        const { error: insertError } = await supabaseAdmin.rpc("backup_insert_rows_from_json", {
-          _table_name: tableName,
-          _rows_json: chunk as any,
-        });
-        if (insertError) {
-          throw new Error(`Insert failed for ${tableName} at chunk ${i}: ${insertError.message}`);
+      for (const partPath of partPaths) {
+        const { data: blob, error: downloadError } = await supabaseAdmin.storage
+          .from(BUCKET)
+          .download(`${folder}${partPath}`);
+        if (downloadError || !blob) {
+          throw new Error(`Download failed for ${tableName} (${partPath}): ${downloadError?.message}`);
         }
-        totalRows += chunk.length;
+        const text = await blob.text();
+        const rows = JSON.parse(text) as unknown[];
+        if (!Array.isArray(rows)) throw new Error(`Invalid backup data for ${tableName} (${partPath})`);
+
+        for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+          const chunk = rows.slice(i, i + CHUNK_SIZE);
+          const { error: insertError } = await supabaseAdmin.rpc("backup_insert_rows_from_json", {
+            _table_name: tableName,
+            _rows_json: chunk as any,
+          });
+          if (insertError) {
+            throw new Error(`Insert failed for ${tableName} at chunk ${i}: ${insertError.message}`);
+          }
+          totalRows += chunk.length;
+        }
       }
     } finally {
       await supabaseAdmin.rpc("backup_enable_triggers", { _table_name: tableName });
@@ -411,6 +418,70 @@ async function readAllRows<T extends Record<string, unknown>>(
   }
 
   return rows;
+}
+
+/**
+ * 테이블 행을 파트 단위로 순회. 각 파트는 최대 ROWS_PER_PART 행을 담고 있으며,
+ * DB에서는 PAGE_SIZE(1000)씩 페이지네이션해서 읽습니다.
+ */
+async function* iterRowsInParts(
+  supabaseAdmin: SupabaseClient<Database>,
+  tableName: string,
+): AsyncGenerator<Record<string, unknown>[], void, unknown> {
+  const sortKey = (TABLE_SORT_KEYS as Record<string, string>)[tableName] ?? "id";
+  let from = 0;
+  let buffer: Record<string, unknown>[] = [];
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from(tableName as any)
+      .select("*")
+      .order(sortKey, { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`Failed to read ${tableName}: ${error.message}`);
+    const rows = (data ?? []) as Record<string, unknown>[];
+    if (rows.length === 0) break;
+    buffer.push(...rows);
+
+    while (buffer.length >= ROWS_PER_PART) {
+      yield buffer.slice(0, ROWS_PER_PART);
+      buffer = buffer.slice(ROWS_PER_PART);
+    }
+
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  if (buffer.length > 0) yield buffer;
+}
+
+/**
+ * 매니페스트의 parts 배열을 반환하고, 매니페스트가 신 포맷이 아니면 레거시 단일 파일로 폴백.
+ */
+async function resolveTablePartPaths(
+  supabaseAdmin: SupabaseClient<Database>,
+  snapshot: { metadata?: unknown; storage_path?: string | null },
+  folder: string,
+  tableName: string,
+): Promise<string[]> {
+  const metadata = (snapshot?.metadata ?? null) as SnapshotManifest | null;
+  if (metadata && Array.isArray(metadata.tables)) {
+    const entry = metadata.tables.find((t) => t.name === tableName);
+    if (entry && Array.isArray(entry.parts) && entry.parts.length > 0) {
+      return entry.parts.map((p) => p.path);
+    }
+  }
+
+  // 레거시: storage에서 파트 파일 자동 탐색
+  const { data: files } = await supabaseAdmin.storage.from(BUCKET).list(folder);
+  const parts = (files ?? [])
+    .map((f) => f.name)
+    .filter((n) => n.startsWith(`${tableName}.part-`) && n.endsWith(".json"))
+    .sort();
+  if (parts.length > 0) return parts;
+
+  // 완전 레거시: 단일 `<table>.json`
+  return [`${tableName}.json`];
 }
 
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
