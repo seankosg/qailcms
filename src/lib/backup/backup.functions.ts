@@ -305,3 +305,46 @@ export const createPreImportSnapshot = createServerFn({ method: "POST" })
       throw err;
     }
   });
+
+// Enqueue a pre-import snapshot job for background execution.
+// Returns immediately after inserting a queued row and best-effort kicking the runner.
+export const enqueuePreImportSnapshot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { module: PreImportModule; import_log_id?: string }) => input)
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const runId = crypto.randomUUID();
+    const tables = MODULE_PRE_IMPORT_TABLES[data.module] ?? BACKUP_TABLES;
+
+    const { error: insertError } = await supabaseAdmin.from("backup_run_log").insert({
+      id: runId,
+      status: "queued",
+      snapshot_id: null,
+      metadata: {
+        kind: "pre-import",
+        module: data.module,
+        import_log_id: data.import_log_id ?? null,
+        triggered_by: "pre-import",
+        tables,
+        name: `pre-import-${data.module}-${new Date().toISOString()}`,
+      } as any,
+    });
+    if (insertError) throw new Error(insertError.message);
+
+    // Best-effort: poke the runner immediately so the queue drains without
+    // waiting for the next cron minute. Failure is fine — pg_cron will pick it up.
+    const apiKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+    if (apiKey) {
+      const url = "https://project--c5d84672-611a-4a97-92e3-1b90576d9b68.lovable.app/api/public/backup/run-queued-snapshot";
+      // Fire-and-forget: don't await, don't block the response.
+      fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: apiKey },
+        body: "{}",
+      }).catch((err) => {
+        console.warn("[enqueuePreImportSnapshot] runner poke failed", err);
+      });
+    }
+
+    return { ok: true as const, run_id: runId };
+  });

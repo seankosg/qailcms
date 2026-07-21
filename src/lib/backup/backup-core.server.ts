@@ -7,6 +7,10 @@ export { BACKUP_TABLES, type BackupTableName } from "./backup-shared";
 
 const BUCKET = "db-backups";
 const CHUNK_SIZE = 1000;
+// 파트당 최대 행 수: 대용량 raw 테이블을 여러 파일로 분할해 Worker 메모리/응답 시간 한도를 회피
+const ROWS_PER_PART = 10_000;
+// 개별 페이지 로드 크기 (Supabase Data API 상한 1000)
+const PAGE_SIZE = 1000;
 
 const TABLE_SORT_KEYS: Record<BackupTableName, string> = {
   abd_items_raw: "id",
@@ -49,6 +53,7 @@ export type SnapshotManifest = {
     rows: number;
     sha256: string;
     size_bytes: number;
+    parts?: { path: string; rows: number; sha256: string; size_bytes: number }[];
   }[];
   total_rows: number;
   sha256: string;
@@ -89,25 +94,65 @@ export async function createSnapshot(
   const overallHasher = new Hasher();
 
   for (const tableName of tablesToBackup) {
-    const rows = await readAllRows(supabaseAdmin, tableName);
-    const json = JSON.stringify(rows);
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(json);
-    const sha256 = await sha256Hex(bytes);
-    const path = `${folder}${tableName}.json`;
+    const parts: NonNullable<SnapshotManifest["tables"][number]["parts"]> = [];
+    let partIndex = 0;
+    let tableRows = 0;
+    let tableSize = 0;
+    const tablePartHashHex: string[] = [];
 
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(path, new Blob([bytes], { type: "application/json" }), {
-        contentType: "application/json",
-        cacheControl: "3600",
-      });
-    if (uploadError) throw new Error(`Upload failed for ${tableName}: ${uploadError.message}`);
+    for await (const batch of iterRowsInParts(supabaseAdmin, tableName)) {
+      const json = JSON.stringify(batch);
+      const bytes = new TextEncoder().encode(json);
+      const sha256 = await sha256Hex(bytes);
+      const partName = `${tableName}.part-${String(partIndex).padStart(3, "0")}.json`;
+      const path = `${folder}${partName}`;
 
-    overallHasher.update(bytes);
-    tableManifests.push({ name: tableName, rows: rows.length, sha256, size_bytes: bytes.length });
-    totalRows += rows.length;
-    totalSize += bytes.length;
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from(BUCKET)
+        .upload(path, new Blob([bytes], { type: "application/json" }), {
+          contentType: "application/json",
+          cacheControl: "3600",
+        });
+      if (uploadError) throw new Error(`Upload failed for ${tableName} part ${partIndex}: ${uploadError.message}`);
+
+      parts.push({ path: partName, rows: batch.length, sha256, size_bytes: bytes.length });
+      tablePartHashHex.push(sha256);
+      tableRows += batch.length;
+      tableSize += bytes.length;
+      partIndex++;
+    }
+
+    // 빈 테이블도 파트 0을 남겨 매니페스트 일관성 유지
+    if (parts.length === 0) {
+      const bytes = new TextEncoder().encode("[]");
+      const sha256 = await sha256Hex(bytes);
+      const partName = `${tableName}.part-000.json`;
+      const path = `${folder}${partName}`;
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from(BUCKET)
+        .upload(path, new Blob([bytes], { type: "application/json" }), {
+          contentType: "application/json",
+          cacheControl: "3600",
+        });
+      if (uploadError) throw new Error(`Upload failed for ${tableName} empty part: ${uploadError.message}`);
+      parts.push({ path: partName, rows: 0, sha256, size_bytes: bytes.length });
+      tablePartHashHex.push(sha256);
+      tableSize += bytes.length;
+    }
+
+    // 테이블 단위 sha256 = sha256( 각 파트 sha256 hex를 이어붙인 문자열 )
+    const tableHash = await sha256Hex(new TextEncoder().encode(tablePartHashHex.join("")));
+    overallHasher.update(new TextEncoder().encode(tableHash));
+
+    tableManifests.push({
+      name: tableName,
+      rows: tableRows,
+      sha256: tableHash,
+      size_bytes: tableSize,
+      parts,
+    });
+    totalRows += tableRows;
+    totalSize += tableSize;
   }
 
   const overallHash = await overallHasher.digest();
@@ -261,13 +306,8 @@ export async function restoreSnapshot(
   });
 
   for (const tableName of ordered) {
-    const path = `${folder}${tableName}.json`;
-    const { data: blob, error: downloadError } = await supabaseAdmin.storage.from(BUCKET).download(path);
-    if (downloadError || !blob) throw new Error(`Download failed for ${tableName}: ${downloadError?.message}`);
-
-    const text = await blob.text();
-    const rows = JSON.parse(text) as unknown[];
-    if (!Array.isArray(rows)) throw new Error(`Invalid backup data for ${tableName}`);
+    // 신 포맷: 매니페스트의 parts를 우선 사용, 없으면 레거시 단일 파일로 폴백
+    const partPaths = await resolveTablePartPaths(supabaseAdmin, snapshot, folder, tableName);
 
     // For non-destructive restore, we skip tables that already have data? Actually non-destructive means insert on conflict.
     // For now, we treat non-destructive as upsert by id, but that's complex. Simpler: non-destructive still restores raw data only with truncate.
@@ -283,16 +323,28 @@ export async function restoreSnapshot(
     try {
       await supabaseAdmin.rpc("backup_truncate_table", { _table_name: tableName });
 
-      for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
-        const chunk = rows.slice(i, i + CHUNK_SIZE);
-        const { error: insertError } = await supabaseAdmin.rpc("backup_insert_rows_from_json", {
-          _table_name: tableName,
-          _rows_json: chunk as any,
-        });
-        if (insertError) {
-          throw new Error(`Insert failed for ${tableName} at chunk ${i}: ${insertError.message}`);
+      for (const partPath of partPaths) {
+        const { data: blob, error: downloadError } = await supabaseAdmin.storage
+          .from(BUCKET)
+          .download(`${folder}${partPath}`);
+        if (downloadError || !blob) {
+          throw new Error(`Download failed for ${tableName} (${partPath}): ${downloadError?.message}`);
         }
-        totalRows += chunk.length;
+        const text = await blob.text();
+        const rows = JSON.parse(text) as unknown[];
+        if (!Array.isArray(rows)) throw new Error(`Invalid backup data for ${tableName} (${partPath})`);
+
+        for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+          const chunk = rows.slice(i, i + CHUNK_SIZE);
+          const { error: insertError } = await supabaseAdmin.rpc("backup_insert_rows_from_json", {
+            _table_name: tableName,
+            _rows_json: chunk as any,
+          });
+          if (insertError) {
+            throw new Error(`Insert failed for ${tableName} at chunk ${i}: ${insertError.message}`);
+          }
+          totalRows += chunk.length;
+        }
       }
     } finally {
       await supabaseAdmin.rpc("backup_enable_triggers", { _table_name: tableName });
@@ -366,6 +418,70 @@ async function readAllRows<T extends Record<string, unknown>>(
   }
 
   return rows;
+}
+
+/**
+ * 테이블 행을 파트 단위로 순회. 각 파트는 최대 ROWS_PER_PART 행을 담고 있으며,
+ * DB에서는 PAGE_SIZE(1000)씩 페이지네이션해서 읽습니다.
+ */
+async function* iterRowsInParts(
+  supabaseAdmin: SupabaseClient<Database>,
+  tableName: string,
+): AsyncGenerator<Record<string, unknown>[], void, unknown> {
+  const sortKey = (TABLE_SORT_KEYS as Record<string, string>)[tableName] ?? "id";
+  let from = 0;
+  let buffer: Record<string, unknown>[] = [];
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from(tableName as any)
+      .select("*")
+      .order(sortKey, { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`Failed to read ${tableName}: ${error.message}`);
+    const rows = ((data ?? []) as unknown) as Record<string, unknown>[];
+    if (rows.length === 0) break;
+    buffer.push(...rows);
+
+    while (buffer.length >= ROWS_PER_PART) {
+      yield buffer.slice(0, ROWS_PER_PART);
+      buffer = buffer.slice(ROWS_PER_PART);
+    }
+
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  if (buffer.length > 0) yield buffer;
+}
+
+/**
+ * 매니페스트의 parts 배열을 반환하고, 매니페스트가 신 포맷이 아니면 레거시 단일 파일로 폴백.
+ */
+async function resolveTablePartPaths(
+  supabaseAdmin: SupabaseClient<Database>,
+  snapshot: { metadata?: unknown; storage_path?: string | null },
+  folder: string,
+  tableName: string,
+): Promise<string[]> {
+  const metadata = (snapshot?.metadata ?? null) as SnapshotManifest | null;
+  if (metadata && Array.isArray(metadata.tables)) {
+    const entry = metadata.tables.find((t) => t.name === tableName);
+    if (entry && Array.isArray(entry.parts) && entry.parts.length > 0) {
+      return entry.parts.map((p) => p.path);
+    }
+  }
+
+  // 레거시: storage에서 파트 파일 자동 탐색
+  const { data: files } = await supabaseAdmin.storage.from(BUCKET).list(folder);
+  const parts = (files ?? [])
+    .map((f) => f.name)
+    .filter((n) => n.startsWith(`${tableName}.part-`) && n.endsWith(".json"))
+    .sort();
+  if (parts.length > 0) return parts;
+
+  // 완전 레거시: 단일 `<table>.json`
+  return [`${tableName}.json`];
 }
 
 async function sha256Hex(bytes: Uint8Array): Promise<string> {

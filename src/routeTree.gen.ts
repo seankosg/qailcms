@@ -27,6 +27,7 @@ import { Route as AuthenticatedAdminMastersRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
 import { Route as AuthenticatedAdminBackupRouteImport } from './routes/_authenticated/admin/backup'
 import { Route as AuthenticatedClosureDashboardIndexRouteImport } from './routes/_authenticated/closure/dashboard/index'
+import { Route as ApiPublicBackupRunQueuedSnapshotRouteImport } from './routes/api/public/backup/run-queued-snapshot'
 import { Route as ApiPublicBackupAutoSnapshotRouteImport } from './routes/api/public/backup/auto-snapshot'
 import { Route as ApiPublicBackupArchiveDownloadRouteImport } from './routes/api/public/backup/archive-download'
 import { Route as AuthenticatedResourceDmrRawDataRouteImport } from './routes/_authenticated/resource/dmr/raw-data'
@@ -158,6 +159,12 @@ const AuthenticatedClosureDashboardIndexRoute =
     id: '/closure/dashboard/',
     path: '/closure/dashboard/',
     getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiPublicBackupRunQueuedSnapshotRoute =
+  ApiPublicBackupRunQueuedSnapshotRouteImport.update({
+    id: '/api/public/backup/run-queued-snapshot',
+    path: '/api/public/backup/run-queued-snapshot',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicBackupAutoSnapshotRoute =
   ApiPublicBackupAutoSnapshotRouteImport.update({
@@ -393,6 +400,7 @@ export interface FileRoutesByFullPath {
   '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
+  '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
   '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
@@ -443,6 +451,7 @@ export interface FileRoutesByTo {
   '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
+  '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
   '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
@@ -496,6 +505,7 @@ export interface FileRoutesById {
   '/_authenticated/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
+  '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
   '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/_authenticated/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/_authenticated/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
@@ -549,6 +559,7 @@ export interface FileRouteTypes {
     | '/resource/dmr/raw-data'
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
+    | '/api/public/backup/run-queued-snapshot'
     | '/closure/dashboard/'
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
@@ -599,6 +610,7 @@ export interface FileRouteTypes {
     | '/resource/dmr/raw-data'
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
+    | '/api/public/backup/run-queued-snapshot'
     | '/closure/dashboard'
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
@@ -651,6 +663,7 @@ export interface FileRouteTypes {
     | '/_authenticated/resource/dmr/raw-data'
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
+    | '/api/public/backup/run-queued-snapshot'
     | '/_authenticated/closure/dashboard/'
     | '/_authenticated/closure/abd/import/logs'
     | '/_authenticated/closure/snag-management/detail/$id'
@@ -670,6 +683,7 @@ export interface RootRouteChildren {
   ApiPublicVersionRoute: typeof ApiPublicVersionRoute
   ApiPublicBackupArchiveDownloadRoute: typeof ApiPublicBackupArchiveDownloadRoute
   ApiPublicBackupAutoSnapshotRoute: typeof ApiPublicBackupAutoSnapshotRoute
+  ApiPublicBackupRunQueuedSnapshotRoute: typeof ApiPublicBackupRunQueuedSnapshotRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -799,6 +813,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/closure/dashboard/'
       preLoaderRoute: typeof AuthenticatedClosureDashboardIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/backup/run-queued-snapshot': {
+      id: '/api/public/backup/run-queued-snapshot'
+      path: '/api/public/backup/run-queued-snapshot'
+      fullPath: '/api/public/backup/run-queued-snapshot'
+      preLoaderRoute: typeof ApiPublicBackupRunQueuedSnapshotRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/backup/auto-snapshot': {
       id: '/api/public/backup/auto-snapshot'
@@ -1194,17 +1215,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicVersionRoute: ApiPublicVersionRoute,
   ApiPublicBackupArchiveDownloadRoute: ApiPublicBackupArchiveDownloadRoute,
   ApiPublicBackupAutoSnapshotRoute: ApiPublicBackupAutoSnapshotRoute,
+  ApiPublicBackupRunQueuedSnapshotRoute: ApiPublicBackupRunQueuedSnapshotRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
