@@ -365,6 +365,14 @@ export async function extractHeadersFromFile(
   const wb = XLSX.read(buf, { type: "array", cellDates: true });
   const sheetNames = wb.SheetNames ?? [];
   const collected: string[] = [];
+  // 전 모듈 앵커 정규화 집합 — 헤더 행 우선 판정에 사용
+  const allAnchorSet = new Set<string>();
+  (Object.keys(MODULE_FINGERPRINTS) as ModuleId[]).forEach((mod) => {
+    for (const a of MODULE_FINGERPRINTS[mod].anchors) {
+      const n = normalizeHeader(a);
+      if (n) allAnchorSet.add(n);
+    }
+  });
   for (const name of sheetNames) {
     const ws = wb.Sheets[name];
     if (!ws) continue;
@@ -372,26 +380,44 @@ export async function extractHeadersFromFile(
     if (!ref) continue;
     const range = XLSX.utils.decode_range(ref);
     const scanEndRow = Math.min(range.s.r + 30, range.e.r);
+    // 각 행의 (앵커 매칭 수, non-empty 수) 를 계산
     let bestRow = range.s.r;
+    let bestAnchor = -1;
     let bestCount = 0;
+    const rowValues: Record<number, string[]> = {};
     for (let r = range.s.r; r <= scanEndRow; r++) {
-      let count = 0;
+      const vals: string[] = [];
+      let anchorHits = 0;
       for (let c = range.s.c; c <= range.e.c; c++) {
         const cell = ws[XLSX.utils.encode_cell({ r, c })];
         const v = cell?.v;
-        if (v !== undefined && v !== null && String(v).trim() !== "") count++;
+        if (v !== undefined && v !== null && String(v).trim() !== "") {
+          const s = String(v).trim();
+          vals.push(s);
+          if (allAnchorSet.has(normalizeHeader(s))) anchorHits++;
+        }
       }
-      if (count > bestCount) {
-        bestCount = count;
+      rowValues[r] = vals;
+      // 앵커 매칭 우선, 동률이면 non-empty 최대 행
+      if (
+        anchorHits > bestAnchor ||
+        (anchorHits === bestAnchor && vals.length > bestCount)
+      ) {
+        bestAnchor = anchorHits;
+        bestCount = vals.length;
         bestRow = r;
       }
     }
-    if (bestCount === 0) continue;
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const cell = ws[XLSX.utils.encode_cell({ r: bestRow, c })];
-      const v = cell?.v;
-      if (v !== undefined && v !== null && String(v).trim() !== "") {
-        collected.push(String(v).trim());
+    const chosen = rowValues[bestRow] ?? [];
+    if (chosen.length === 0) continue;
+    for (const s of chosen) collected.push(s);
+    // 헤더 후보가 데이터 행일 수 있으므로, 앵커 매칭이 발견된 행이 따로 있으면 그 행도 함께 수집
+    if (bestAnchor <= 0) {
+      for (let r = range.s.r; r <= scanEndRow; r++) {
+        const vals = rowValues[r] ?? [];
+        for (const s of vals) {
+          if (allAnchorSet.has(normalizeHeader(s))) collected.push(s);
+        }
       }
     }
   }
