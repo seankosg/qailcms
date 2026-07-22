@@ -1,13 +1,13 @@
 import { todayInDoha, formatDdMmm as _fmtShort, formatDdMmmYyyy } from "@/lib/time/doha";
 
-/** Short display: dd-MMM (backwards-compat name). */
+/** Long display: dd-MMM-yyyy (name retained for backwards compat). */
 export function formatDdMmm(v: string | null | undefined): string {
-  return _fmtShort(v);
+  return formatDdMmmYyyy(v);
 }
 
-/** Long display: dd-MMM-yyyy. */
-export function formatDdMmmLong(v: string | null | undefined): string {
-  return formatDdMmmYyyy(v);
+/** Short display: dd-MMM. */
+export function formatDdMmmShort(v: string | null | undefined): string {
+  return _fmtShort(v);
 }
 
 export function formatNumber(v: number | null | undefined, digits = 0): string {
