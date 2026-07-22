@@ -175,9 +175,17 @@ export function DateRangeDropdown({ column }: { column: any }) {
   );
 }
 
-export function ColumnFilterDropdown({ column }: { column: any }) {
+export function ColumnFilterDropdown({
+  column,
+  q,
+  serverFilters,
+}: {
+  column: any;
+  q?: string;
+  serverFilters?: DefectServerFilter[];
+}) {
   const meta = column.columnDef.meta as any;
-  if (meta?.filterType === "multi-select") return <MultiSelectDropdown column={column} options={meta.filterOptions ?? []} q={meta.q} serverFilters={meta.serverFilters} />;
+  if (meta?.filterType === "multi-select") return <MultiSelectDropdown column={column} options={meta.filterOptions ?? []} q={q} serverFilters={serverFilters} />;
   if (meta?.filterType === "date-range") return <DateRangeDropdown column={column} />;
   return <TextFilterDropdown column={column} />;
 }
