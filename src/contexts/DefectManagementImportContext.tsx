@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -729,6 +730,16 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     };
 
     for (const f of ready) {
+      if (cancelRequestedRef.current) {
+        setFiles((cur) =>
+          cur.map((x) =>
+            x.id === f.id
+              ? { ...x, status: "failed", error: "사용자 취소 — 대기 중 파일" }
+              : x,
+          ),
+        );
+        continue;
+      }
       const parsed = f.parsed ?? [];
       const dataDate = f.dataDateOverride ?? todayInDoha();
       const startedAtIso = new Date().toISOString();
@@ -1131,6 +1142,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         }
 
         await runWithConcurrency(slices, BATCH_CONCURRENCY, async ({ rows: slice, batchIndex }) => {
+          if (cancelRequestedRef.current) return;
           const batchStart = performance.now();
           const { error } = await upsertBatch(slice);
           let successRows: Array<Record<string, unknown>> = [];
@@ -1372,7 +1384,11 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
     setIsRunning(false);
     // Defect 캐시 무효화 → status_group 재계산으로 Unclosed/Closed 탭 자동 정합
     try { qc.invalidateQueries({ queryKey: ["defect"] }); } catch { /* ignore */ }
-    toast.success(`Snag List import 완료: ${ready.length} file(s)`);
+    if (cancelRequestedRef.current) {
+      toast.info("Snag List import 취소됨");
+    } else {
+      toast.success(`Snag List import 완료: ${ready.length} file(s)`);
+    }
   }, [qc]);
 
   const startImport = useCallback(async () => {
@@ -1384,6 +1400,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       toast.error("Import 가능한 파일이 없습니다.");
       return;
     }
+    cancelRequestedRef.current = false;
+    setIsCancelling(false);
     setIsRunning(true);
     try {
       await takePreImportSnapshotWithFeedback("sm");
@@ -1398,6 +1416,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       toast.error(`Snag List import 실패: ${msg}`);
     } finally {
       setIsRunning(false);
+      cancelRequestedRef.current = false;
+      setIsCancelling(false);
     }
   }, [files, isRunning, executeImport]);
 
@@ -1433,6 +1453,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       value={{
         files,
         isRunning,
+        isCancelling,
+        requestCancel,
         addFiles,
         removeFile,
         clearAll,
