@@ -67,10 +67,13 @@ export function dohaWallToUtcIso(
   return new Date(`${y}-${mm}-${dd}T${hh}:${mi}:${ss}+03:00`).toISOString();
 }
 
-/** Convert a Date to YYYY-MM-DD read as Doha wall-clock (regardless of runtime TZ). */
+/** Read a Date's local wall-clock components as `YYYY-MM-DD` (Doha semantics). */
 export function dohaDateOnly(d: Date): string | null {
   if (Number.isNaN(d.getTime())) return null;
-  return shiftToDoha(d).toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
 }
 
 /**
