@@ -1,51 +1,43 @@
-# SM Raw Data 필터 카운트가 전체보다 큰 원인 및 수정 계획
+## 목표
+SM Progress 페이지의 KPI 카드(Total, Plan, Actual) 값 오른쪽 괄호 안에 `Total`을 기준으로 한 백분율을 표시한다. 이미 `(±X.X%)` 형태로 구현된 `Difference` 카드와 동일한 스타일/배치를 따른다.
 
-## 재현된 현상
+## 현재 상태
+- `src/components/defect-management/progress/SnagProgressPage.tsx` 내 `kpis` 객체는 `totalStages`, `cumPlan`, `cumActual`, `progressPct`, `planPct` 등을 계산하고 있다.
+- `TOTAL`, `PLAN`, `ACTUAL` 카드는 현재 "순수 숫자" 값만 표시 중이다.
+- `DIFFERENCE` 카드는 `suffix`로 `(±X.X%)`를 표시하고 있어 참조 스타일이 확보되어 있다.
+- `PROGRESS` 카드는 이미 `(P X.X%)` 형태의 괄호 정보를 표시하고 있다.
 
-- 상단 chip: `Active column filters: Start Status: Done` (파생 컬럼 필터 적용됨)
-- 표 헤더: `8,470 records` — 서버 조회는 정상적으로 Start Status=Done을 반영
-- Team 컬럼 필터 드롭다운: `ARCH 28,832 / ELEC 9,232 / MECH 9,991` → **합계 48,055** (= Unclosed 탭 전체 건수)
-- 즉, **facet 카운트만 Start Status 필터를 반영하지 못함** → 개별 카운트가 표시된 전체 레코드(8,470)보다 큼
+## 변경 범위
+파일: `src/components/defect-management/progress/SnagProgressPage.tsx`
 
-## 원인 진단 (근거 포함)
+### 1. KPI 수치 계산 보강
+- `kpis` useMemo에 다음 값을 추가:
+  - `totalPct`: `totalStages / totalStages * 100` (항상 100.0)
+  - `planPctOfTotal`: `totalStages > 0 ? (cumPlan / totalStages) * 100 : 0`
+  - `actualPctOfTotal`: `totalStages > 0 ? (cumActual / totalStages) * 100 : 0`
+- 기존 `planPct`는 PROGRESS 카드 `(P ...)`용이므로 그대로 유지.
 
-1. **RPC 자체는 정상**  
-   `defect_items_facets('team','unclosed',false, NULL, [{"column":"start_status","op":"in","value":["Done"]}], 500)` 직접 호출 결과: **MECH 5,028 / ARCH 2,018 / ELEC 1,424 = 합계 8,470** ✓
-2. **클라이언트 배선 문제**  
-   `MultiSelectDropdown`(`src/components/defect-management/raw-data/ColumnFilterDropdowns.tsx:26-35`)이 `column.getContext().table.options.meta` 에서 `serverFilters`를 읽는데, TanStack Table의 `options.meta`를 통한 간접 전달이 리액트 렌더 사이에 최신값을 보장하지 못하거나, 드롭다운 open 시점의 스냅샷을 사용해 이후 필터 변경이 반영되지 않는 것으로 추정.  
-   - `DefectRawDataPage.tsx:632`: `meta: { q, serverFilters }` — 매 렌더 새 객체지만 dropdown 내부의 `useMemo`/`useQuery` 관성에 의해 stale 값이 유지될 수 있음.
-   - `columnFilters` 내 `start_status`는 정상적으로 존재(chip 렌더링이 그 증거)하고 `serverFilters` 배열에도 `{column:'start_status', op:'in', value:['Done']}` 형태로 들어감(서버 조회 8,470이 그 증거).
+### 2. 카드별 suffix/괄호 추가
+- **TOTAL 카드**
+  - `suffix` 추가: `(100.0%)`
+  - `stageBreakdown` 각 항목: `(100.0%)` (단, `total === 0`이면 `—`)
+- **PLAN 카드**
+  - `suffix` 추가: `(planPctOfTotal.toFixed(1)%)`
+  - `stageBreakdown` 각 항목: `(byStage[s].plan / byStage[s].total * 100%)` (0이면 `—`)
+- **ACTUAL 카드**
+  - `suffix` 추가: `(actualPctOfTotal.toFixed(1)%)`
+  - `stageBreakdown` 각 항목: `(byStage[s].actual / byStage[s].total * 100%)` (0이면 `—`)
 
-## 수정 방안 (프론트엔드 한정, 로직/데이터 변경 없음)
+### 3. 스타일
+- Difference 카드와 같은 방식으로 괄호는 `text-[10px]` 크기, `tabular-nums`로 처리.
+- 색상: Total은 `text-muted-foreground`, Plan/Actual은 필요시 `text-muted-foreground` 또는 카드 톤에 맞춘 색상 유지. 부호에 따른 변색은 Difference와 동일 로직을 적용하지 않음 (값 기준 %는 항상 0~100 범위).
 
-### 1) `MultiSelectDropdown`에 크로스 필터를 props로 명시 전달
+## 검증
+- 변경 후 로컬 프리뷰에서 SM Progress 페이지를 열고 Total/Plan/Actual 카드에 괄호 %가 추가되었는지 확인.
+- Stage breakdown 항목에도 동일하게 %가 노출되는지 확인.
+- PROGRESS 카드의 `(P X.X%)`는 그대로 유지되어야 함.
 
-`table.options.meta` 우회를 그만두고 컬럼 정의 단에서 `q`, `serverFilters`를 props로 넘긴다.
-
-- `src/components/defect-management/raw-data/DefectRawDataPage.tsx`
-  - `renderHeader`에서 필터 아이콘 렌더 시 `q`와 `serverFilters`를 캡처해 `MultiSelectDropdown`에 직접 전달.
-- `src/components/defect-management/raw-data/ColumnFilterDropdowns.tsx`
-  - `MultiSelectDropdown` 시그니처를 `{ column, options, q, serverFilters, statusGroup, includeInactive, serverFacetCol }`로 변경.
-  - `tableMeta` 경로 제거 → props 값을 그대로 `useDefectFacet`에 넘김.
-
-이렇게 하면 필터/검색어 변경 → 부모 재렌더 → 새 props → React Query가 새 키로 refetch가 결정적으로 이뤄져 stale 카운트 문제가 사라진다.
-
-### 2) 안전장치: query key에 `columnFilters` 원본도 포함(선택)
-
-`useDefectFacet`의 queryKey에 `otherFilters`(현재 사용 중)를 유지하되, `serverFilters` 객체 안정화를 위해 부모의 `useMemo` deps에 `columnFilters` 외 파생값도 포함되어 있는지 재확인. 이미 `useMemo(() => toServerFilters(columnFilters), [columnFilters])`로 정상.
-
-### 3) 회귀 검증
-
-- Snag Raw Data에서 chip `Start Status: Done` 유지 상태로 Team 필터 열기 → MECH 5,028 / ARCH 2,018 / ELEC 1,424 노출, 합계 8,470 확인.
-- 여러 컬럼 필터 조합(Team + Building 등) 후 세 번째 컬럼 드롭다운 카운트가 실시간으로 재계산되는지 확인.
-- 검색어(`q`) 입력 후 드롭다운 카운트가 반영되는지 확인.
-
-## 영향 범위
-
-- 프론트엔드 2개 파일만 수정 (`DefectRawDataPage.tsx`, `ColumnFilterDropdowns.tsx`).
-- DB/RPC/스키마 변경 없음. 다른 모듈(ABD/TM/Spare Part) 영향 없음.
-- 사용자 경험은 정확한 크로스 필터 카운트 노출로 개선.
-
-## 대안 (참고)
-
-- meta 경로를 유지하되 `MultiSelectDropdown` 내부에서 `useEffect`로 tableMeta 변경을 감지해 강제 refetch — props 전달보다 복잡하고 stale window가 잠깐 남을 수 있어 비권장.
+## 영향도
+- 서버 RPC/DB 변경 없음.
+- 다른 모듈(ABD, TM, DMR) 미변경.
+- URLSearchParams, 라우팅, 클릭 핸들러 변경 없음.

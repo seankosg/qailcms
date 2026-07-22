@@ -289,7 +289,10 @@ export function SnagProgressPage() {
     const variance = cumPlan > 0 ? (diffAbs / cumPlan) * 100 : null;
     const progressPct = totalStages > 0 ? (doneStages / totalStages) * 100 : 0;
     const planPct = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
-    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct };
+    const totalPct = totalStages > 0 ? 100 : 0;
+    const planPctOfTotal = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
+    const actualPctOfTotal = totalStages > 0 ? (cumActual / totalStages) * 100 : 0;
+    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct, totalPct, planPctOfTotal, actualPctOfTotal };
   }, [totalsQ.data, effectiveStages]);
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
@@ -554,9 +557,14 @@ export function SnagProgressPage() {
           value={kpis.totalStages.toLocaleString()}
           onClick={() => handleKpiClick("done", "all")}
           tone="info"
+          suffix={
+            <span className="text-[10px] tabular-nums text-muted-foreground">
+              ({kpis.totalPct.toFixed(1)}%)
+            </span>
+          }
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
-            text: kpis.byStage[s].total.toLocaleString(),
+            text: `${kpis.byStage[s].total.toLocaleString()} (${kpis.byStage[s].total > 0 ? 100.0.toFixed(1) : "—"}%)`,
             onClick: () => handleKpiClick("done", s),
           }))}
         />
@@ -565,22 +573,40 @@ export function SnagProgressPage() {
           value={kpis.cumPlan.toLocaleString()}
           onClick={() => handleKpiClick("plan", "all")}
           tone="neutral"
-          stageBreakdown={effectiveStages.map((s) => ({
-            stage: s,
-            text: kpis.byStage[s].plan.toLocaleString(),
-            onClick: () => handleKpiClick("plan", s),
-          }))}
+          suffix={
+            <span className="text-[10px] tabular-nums text-muted-foreground">
+              ({kpis.planPctOfTotal.toFixed(1)}%)
+            </span>
+          }
+          stageBreakdown={effectiveStages.map((s) => {
+            const total = kpis.byStage[s].total;
+            const pct = total > 0 ? (kpis.byStage[s].plan / total) * 100 : null;
+            return {
+              stage: s,
+              text: `${kpis.byStage[s].plan.toLocaleString()} (${pct === null ? "—" : `${pct.toFixed(1)}%`})`,
+              onClick: () => handleKpiClick("plan", s),
+            };
+          })}
         />
         <KpiCard
           label="ACTUAL"
           value={kpis.cumActual.toLocaleString()}
           onClick={() => handleKpiClick("actual", "all")}
           tone="emerald"
-          stageBreakdown={effectiveStages.map((s) => ({
-            stage: s,
-            text: kpis.byStage[s].actual.toLocaleString(),
-            onClick: () => handleKpiClick("actual", s),
-          }))}
+          suffix={
+            <span className="text-[10px] tabular-nums text-muted-foreground">
+              ({kpis.actualPctOfTotal.toFixed(1)}%)
+            </span>
+          }
+          stageBreakdown={effectiveStages.map((s) => {
+            const total = kpis.byStage[s].total;
+            const pct = total > 0 ? (kpis.byStage[s].actual / total) * 100 : null;
+            return {
+              stage: s,
+              text: `${kpis.byStage[s].actual.toLocaleString()} (${pct === null ? "—" : `${pct.toFixed(1)}%`})`,
+              onClick: () => handleKpiClick("actual", s),
+            };
+          })}
         />
         <KpiCard
           label="DIFFERENCE"
