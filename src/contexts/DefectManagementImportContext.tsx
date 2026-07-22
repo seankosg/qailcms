@@ -826,6 +826,9 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           main_trade: string | null;
           sub_trade: string | null;
           work_type: string | null;
+          hdec_pic_name: string | null;
+          hdec_eng_name: string | null;
+          subcontractor_name: string | null;
         }
       >();
       const idChunks: string[][] = [];
@@ -835,7 +838,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
         const { data, error } = await (supabase as any)
           .from("defect_items_raw")
-          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, actual_rectified_date, actual_start_date, rectified_status, closure_status, defect_location, main_trade, sub_trade, work_type")
+          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, actual_rectified_date, actual_start_date, rectified_status, closure_status, defect_location, main_trade, sub_trade, work_type, hdec_pic_name, hdec_eng_name, subcontractor_name")
           .in("source_issue_no", chunk);
         if (error) {
           throw new Error(
@@ -855,6 +858,9 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             main_trade: r.main_trade ?? null,
             sub_trade: r.sub_trade ?? null,
             work_type: r.work_type ?? null,
+            hdec_pic_name: r.hdec_pic_name ?? null,
+            hdec_eng_name: r.hdec_eng_name ?? null,
+            subcontractor_name: r.subcontractor_name ?? null,
           });
         }
       });
