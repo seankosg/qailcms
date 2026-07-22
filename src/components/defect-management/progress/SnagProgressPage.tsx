@@ -774,7 +774,7 @@ function KpiCard({
               {Icon ? <Icon className="h-3 w-3" /> : null}
               {label}
             </div>
-            <div className="flex items-baseline gap-1">
+            <div className="flex flex-col gap-0">
               <div
                 className={cn(
                   "text-3xl font-bold tabular-nums leading-tight",
