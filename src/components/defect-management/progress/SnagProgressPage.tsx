@@ -246,7 +246,8 @@ export function SnagProgressPage() {
     const diffAbs = cumActual - cumPlan;
     const variance = cumPlan > 0 ? (diffAbs / cumPlan) * 100 : null;
     const progressPct = totalStages > 0 ? (doneStages / totalStages) * 100 : 0;
-    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct };
+    const planPct = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
+    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct };
   }, [totalsQ.data, effectiveStages]);
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
@@ -507,6 +508,17 @@ export function SnagProgressPage() {
       {/* KPI Strip */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard
+          label="TOTAL"
+          value={kpis.totalStages.toLocaleString()}
+          onClick={() => handleKpiClick("done", "all")}
+          tone="info"
+          stageBreakdown={effectiveStages.map((s) => ({
+            stage: s,
+            text: kpis.byStage[s].total.toLocaleString(),
+            onClick: () => handleKpiClick("done", s),
+          }))}
+        />
+        <KpiCard
           label="PLAN"
           value={kpis.cumPlan.toLocaleString()}
           onClick={() => handleKpiClick("plan", "all")}
@@ -564,28 +576,23 @@ export function SnagProgressPage() {
           })}
         />
         <KpiCard
-          label="DONE"
-          value={`${kpis.doneStages.toLocaleString()} / ${kpis.totalStages.toLocaleString()}`}
-          onClick={() => handleKpiClick("done", "all")}
-          tone="info"
-          stageBreakdown={effectiveStages.map((s) => ({
-            stage: s,
-            text: `${kpis.byStage[s].done.toLocaleString()} / ${kpis.byStage[s].total.toLocaleString()}`,
-            onClick: () => handleKpiClick("done", s),
-          }))}
-        />
-        <KpiCard
           label="PROGRESS"
           value={`${kpis.progressPct.toFixed(1)}%`}
           icon={TrendingUp}
           onClick={() => handleKpiClick("done", "all")}
           tone="emerald"
+          suffix={
+            <span className="text-[10px] tabular-nums text-muted-foreground">
+              (Plan {kpis.planPct.toFixed(1)}%)
+            </span>
+          }
           stageBreakdown={effectiveStages.map((s) => {
             const total = kpis.byStage[s].total;
-            const pct = total > 0 ? (kpis.byStage[s].done / total) * 100 : null;
+            const actualPct = total > 0 ? (kpis.byStage[s].done / total) * 100 : null;
+            const planPct = total > 0 ? (kpis.byStage[s].plan / total) * 100 : null;
             return {
               stage: s,
-              text: pct === null ? "—" : `${pct.toFixed(1)}%`,
+              text: actualPct === null ? "—" : `${actualPct.toFixed(1)}% (Plan ${planPct?.toFixed(1)}%)`,
               onClick: () => handleKpiClick("done", s),
             };
           })}
