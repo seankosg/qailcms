@@ -1,0 +1,1 @@
+UPDATE public.defect_items_raw SET rectified_status = 'Not finish yet' WHERE rectified_status = 'Not Started';
