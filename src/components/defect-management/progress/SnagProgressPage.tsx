@@ -168,6 +168,39 @@ export function SnagProgressPage() {
       buckets,
       stagesToShow: effectiveStages,
     });
+    // Day 뷰: 2026-07-21까지의 일일 컬럼을 하나의 누계 컬럼으로 접기
+    if (bucket === "day") {
+      const CUTOFF = "2026-07-22";
+      const CUM_ISO = "2026-07-21";
+      const cutoffIdx = result.buckets.findIndex((b) => b >= CUTOFF);
+      const preRange = cutoffIdx < 0 ? result.buckets.length : cutoffIdx;
+      let visStart = preRange;
+      if (hidePast) {
+        const t = result.buckets.findIndex((b) => b >= today);
+        if (t > visStart) visStart = t;
+      }
+      const sumRange = (arr: { bucket: string; plan: number; actual: number }[]) => {
+        let p = 0;
+        let a = 0;
+        for (let i = 0; i < preRange; i++) {
+          p += arr[i]?.plan ?? 0;
+          a += arr[i]?.actual ?? 0;
+        }
+        return { bucket: CUM_ISO, plan: p, actual: a };
+      };
+      const newBuckets = [CUM_ISO, ...result.buckets.slice(visStart)];
+      const rows = result.rows.map((r) => ({
+        ...r,
+        combined: [sumRange(r.combined), ...r.combined.slice(visStart)],
+        stages: {
+          start: { ...r.stages.start, cells: [sumRange(r.stages.start.cells), ...r.stages.start.cells.slice(visStart)] },
+          rectified: { ...r.stages.rectified, cells: [sumRange(r.stages.rectified.cells), ...r.stages.rectified.cells.slice(visStart)] },
+          closure: { ...r.stages.closure, cells: [sumRange(r.stages.closure.cells), ...r.stages.closure.cells.slice(visStart)] },
+        },
+      }));
+      return { buckets: newBuckets, rows };
+    }
+    // Week 뷰: 기존 hidePast 슬라이스만 유지
     if (!hidePast) return result;
     const startIdx = result.buckets.findIndex((b) => b >= today);
     if (startIdx <= 0) return result;
@@ -182,7 +215,7 @@ export function SnagProgressPage() {
       },
     }));
     return { buckets: newBuckets, rows };
-  }, [cellsQ.data, totalsQ.data, buckets, effectiveStages, hidePast, today]);
+  }, [cellsQ.data, totalsQ.data, buckets, effectiveStages, hidePast, today, bucket]);
 
   const kpis = useMemo(() => {
     const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number }> = {
@@ -589,6 +622,7 @@ export function SnagProgressPage() {
                     asOfLabel={asOfLabel}
                     groupHeader={groupHeader}
                     onCellClick={handleCellClick}
+                    cumBucketIso={bucket === "day" ? "2026-07-21" : undefined}
                   />
                 </CardContent>
               </CollapsibleContent>
