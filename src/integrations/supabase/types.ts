@@ -2727,6 +2727,45 @@ export type Database = {
           },
         ]
       }
+      task_progress_chart_cache: {
+        Row: {
+          actual_points: Json
+          discipline: string
+          id: string
+          last_actual_progress: number | null
+          last_plan_progress: number | null
+          plan_points: Json
+          task_no: string
+          updated_at: string
+          x_end: string | null
+          x_start: string | null
+        }
+        Insert: {
+          actual_points?: Json
+          discipline: string
+          id?: string
+          last_actual_progress?: number | null
+          last_plan_progress?: number | null
+          plan_points?: Json
+          task_no: string
+          updated_at?: string
+          x_end?: string | null
+          x_start?: string | null
+        }
+        Update: {
+          actual_points?: Json
+          discipline?: string
+          id?: string
+          last_actual_progress?: number | null
+          last_plan_progress?: number | null
+          plan_points?: Json
+          task_no?: string
+          updated_at?: string
+          x_end?: string | null
+          x_start?: string | null
+        }
+        Relationships: []
+      }
       task_schedule_change_audit: {
         Row: {
           created_at: string
@@ -3345,6 +3384,10 @@ export type Database = {
         Returns: Json
       }
       recalc_task_auto_judgment: {
+        Args: { _discipline?: string }
+        Returns: number
+      }
+      recalc_task_progress_charts: {
         Args: { _discipline?: string }
         Returns: number
       }
