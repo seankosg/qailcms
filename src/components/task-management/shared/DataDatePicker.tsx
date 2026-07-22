@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatDdMmmYyyy } from "@/lib/time/doha";
 
 export interface DataDatePickerProps {
   value: string;
@@ -39,12 +40,14 @@ export function DataDatePicker({
       </span>
       <Select value={value || latest} onValueChange={(v) => onChange(v)}>
         <SelectTrigger className="h-7 w-[160px] text-xs">
-          <SelectValue placeholder={latest} />
+          <SelectValue placeholder={formatDdMmmYyyy(latest)}>
+            {formatDdMmmYyyy(value || latest)}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {list.map((d) => (
             <SelectItem key={d} value={d} className="text-xs">
-              {d}
+              {formatDdMmmYyyy(d)}
               {d === latest && (
                 <span className="ml-1 text-[10px] text-muted-foreground">(최신)</span>
               )}
