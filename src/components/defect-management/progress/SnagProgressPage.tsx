@@ -214,7 +214,7 @@ export function SnagProgressPage() {
       for (const t of cumRows) {
         const k = JSON.stringify(t.group_key ?? []);
         if (!cumMap.has(k)) cumMap.set(k, emptyStages());
-        cumMap.get(k)![t.stage] = { plan: t.plan_upto, actual: t.actual_upto };
+        cumMap.get(k)![t.stage as Stage] = { plan: t.plan_upto, actual: t.actual_upto };
       }
       const cellFor = (groupKeyRaw: string[], stage: Stage) => {
         const s = cumMap.get(JSON.stringify(groupKeyRaw))?.[stage] ?? { plan: 0, actual: 0 };
