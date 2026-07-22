@@ -74,7 +74,7 @@ export const HDEC_VERIFICATIONS = [
   "Cat B - Minor Defect",
   "Review Needed",
 ] as const;
-export const RECTIFIED_STATUSES = ["Not finish yet", "In Progress", "Rectified"] as const;
+export const RECTIFIED_STATUSES = ["Not start yet", "Not finish yet", "In Progress", "Rectified"] as const;
 export const CLOSURE_STATUSES = ["Not Closed", "Closed", "InD"] as const;
 
 export const TEAM_COLORS: Record<string, string> = {
@@ -96,12 +96,14 @@ export const TEAM_FALLBACK_COLOR = "bg-zinc-500/15 text-zinc-700 dark:text-zinc-
 
 export const STATUS_COLORS: Record<string, string> = {
   Open: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  "In Progress": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  "In Progress": "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   Closed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   "Not Closed": "bg-orange-500/15 text-orange-700 dark:text-orange-300",
   InD: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
   "Not Started": "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
-  "Not finish yet": "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
+  "Not start yet": "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
+  "Not finish yet": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  Rectified: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   Complete: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   // Stage-derived status labels
   Done: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",

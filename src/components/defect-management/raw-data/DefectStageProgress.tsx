@@ -20,6 +20,10 @@ export function classifyStage(item: Row, stage: StageName, asOfDate: string): St
   const closureStatus = String(item.closure_status ?? "").toLowerCase();
   if (stage === "start" && item.actual_start_date) return "wip";
   if (stage === "rectified") {
+    if (completionStatus === "not start yet") {
+      return item.planned_rectified_date ? "planned" : "empty";
+    }
+    if (completionStatus === "not finish yet") return "wip";
     const pct = Number(item.actual_progress_pct ?? 0);
     const normalized = pct > 1 ? pct : pct * 100;
     if (completionStatus === "wip" || (normalized > 0 && normalized < 100)) return "wip";
