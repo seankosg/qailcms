@@ -1,69 +1,54 @@
-## 목표
-ABD "Batch No." 파싱·매핑을 추가하고, **대시보드에 Batch No. 필터 + 집계 위젯**을 이번 작업에 포함.
+# 임포트 진행 중 취소 기능
 
-## 1. DB 마이그레이션
-1. `abd_items_raw`
-   - `ADD COLUMN batch_no text NULL`.
-   - `CREATE INDEX abd_items_raw_batch_no_idx ON public.abd_items_raw (team, batch_no) WHERE batch_no IS NOT NULL;`
-2. `abd_field_config` 시드
-   - `batch_no` : label="Batch No.", group="identity", data_type="text", editable=true, visible=true, sort_order는 `abd_ocs_no` 다음.
-3. `abd_header_mappings` 시드
-   - MECH/ELEC/ARCH × source_header ∈ {`BATCH NO.`, `BATCH NO`, `BATCH NUMBER`, `BATCH`} → `target_field='batch_no'`, `active=true`.
+모든 모듈(TM, SM, Spare Part, ABD, DMR)의 임포트 실행 도중 사용자가 취소할 수 있도록 통일된 취소 메커니즘을 추가합니다. 서버 트랜잭션을 중단시키는 것이 아니라, 클라이언트 측 청크 루프 사이에서 "취소 요청" 플래그를 확인하고 다음 청크로 넘어가기 전에 안전하게 중단합니다.
 
-기존 데이터 백필 없음(NULL 유지, 재임포트로 채움).
+## 공통 설계
 
-## 2. Parser / Server / 컬럼
+- 각 임포트 컨텍스트/페이지에 `cancelRequestedRef: MutableRefObject<boolean>`와 `isCancelling` 상태 추가.
+- `requestCancel()` 함수 노출: 플래그를 `true`로 설정하고 토스트 "취소 요청됨. 현재 청크 완료 후 중단됩니다".
+- 청크 upsert 루프 진입부에서 `if (cancelRequestedRef.current) break;` 체크.
+- 중단 시:
+  - 파일 상태를 `"cancelled"`로 설정하고 `error_message = "사용자 취소"`.
+  - 이미 커밋된 청크는 유지 (부분 임포트). 로그에 처리된/스킵된 행 수 기록.
+  - 임포트 로그 레코드(`*_import_logs`)의 `status = 'cancelled'`, `notes`에 "N/M 행에서 취소됨" 저장.
+- 진행 완료/실패/취소 후 플래그 리셋.
 
-### `src/lib/abd/parser.ts`
-- `ParsedAbdRow`에 `batch_no: string | null` 추가.
-- `findHeader()` anchor 라벨에 `BATCH NO.` / `BATCH NO` / `BATCH NUMBER` / `BATCH` 매칭 추가 → `colIndex.batch_no`.
-- 행 파싱에 `batch_no: getVal("batch_no") ? String(getVal("batch_no")).trim() : null` 대입.
+## 파일별 변경
 
-### `src/lib/abd/mutations.functions.ts`
-- `ImportRowSchema`에 `batch_no: z.string().nullable().optional()`.
-- upsert payload에 `batch_no: r.batch_no ?? null`.
+**공통 타입**
+- `src/contexts/TaskManagementImportContext.tsx`, `DefectManagementImportContext.tsx`, `SparePartImportContext.tsx`
+  - 상태 유니온에 `"cancelled"` 추가.
+  - `cancelRequestedRef` 및 `requestCancel` 추가하여 Provider value에 노출.
+  - 메인 upsert 루프(TM: 라인 766 근처 `INSERT_CHUNK` 루프, SM/SP도 동일 패턴)에서 각 배치 시작 시 취소 체크.
+  - 파일 단위 for 루프(`for (const f of ready)`)에서도 다음 파일 진행 전 체크.
 
-### `src/lib/abd/columns.ts`
-- identity 그룹, `abd_ocs_no` 다음에:
-  `{ key: "batch_no", label: "Batch No.", type: "text", width: 110, group: "identity", editable: true, editorType: "text", origin: "identity" }`
+**ABD**
+- `src/components/abd/import/AbdImportPage.tsx` (라인 222 루프)
+  - `cancelRequestedRef` state 추가, 시트 단위 및 배치 단위 취소 체크.
 
-Raw Data · Detail Sheet · Column Filter · Export는 `ABD_COLUMNS` 기반이라 자동 반영.
+**DMR**
+- `src/components/resource/dmr/DmrImportPage.tsx`
+  - `uploadAndParse`와 `saveAll` 두 단계 모두에 취소 지원. 업로드/파싱은 슬롯 단위, 저장은 배치 단위로 체크.
 
-## 3. Raw Data 라우트 검색 파라미터
-- `src/routes/_authenticated/closure/abd/raw-data.tsx`의 `abdRawDataSearchSchema`에 `batch: fallback(z.string(), "").default("")` 추가.
-- `AbdRawDataPage`에서 기존 컬럼 필터 파이프라인이 `ABD_COLUMNS.filter` 기반으로 batch_no 다중선택을 자동 노출(별도 UI 추가 불필요, 필요 시 원-클릭 링크만 dashboard에서 전달).
+**UI (각 임포트 페이지)**
+- `src/components/task-management/import/TaskManagementImportPage.tsx`
+- `src/components/defect-management/import/DefectManagementImportPage.tsx`
+- `src/components/spare-part/import/SparePartImportPage.tsx`
+- `src/components/abd/import/AbdImportPage.tsx`
+- `src/components/resource/dmr/DmrImportPage.tsx`
 
-## 4. 대시보드 데이터 계층 확장 (`src/lib/abd/dashboard-data.ts`)
-- `Row` 타입과 `SELECT_COLS`에 `batch_no` 추가.
-- `AbdDashboardData`에 다음 필드 추가:
-  - `byBatch: CrossCutCell[]` — batch_no별 total/approved/pending/overdue (batch_no IS NULL 은 `"— No Batch"` 키로 별도 표기).
-  - 집계 로직은 기존 `byTeam/byPic/byDis`와 동일 패턴 사용.
-- `loadAbdDashboardData({ asOf, batchNo? })` 파라미터 확장: `batchNo`가 주어지면 Supabase 쿼리 단계에서 `eq('batch_no', batchNo)` (또는 `is null` 옵션)로 서버측 필터 적용 후 나머지 KPI/Funnel/Trend/Attention/CrossCut 그대로 재계산.
-- 별도 `loadAbdBatchOptions()` 유틸:  batch_no distinct + row count 조회(RPC 없이 `select batch_no, count`), 팀별 필터도 지원. 캐시 5분.
+각 페이지의 진행 중 상태(`processing`)일 때 기존 "임포트 시작" 버튼 옆(또는 진행률 표시 옆)에 **빨간 outline "취소" 버튼** 노출. 클릭 시 확인 다이얼로그 → `requestCancel()`. `isCancelling` 상태에는 스피너 + "취소 중…" 라벨.
 
-## 5. 대시보드 UI (`AbdDashboardPage.tsx`)
-1. **Batch 필터 상단 툴바 추가**  
-   - "As of" 옆에 `Batch No.` `Select` (multi-select 대신 단일 선택 우선; option 목록은 `loadAbdBatchOptions`).
-   - 선택 시 useQuery key에 `batchNo` 포함 → 전체 대시보드가 해당 batch로 필터링.
-   - "All batches" / "No batch (미부여)" / 개별 batch 옵션.
-2. **집계 위젯 카드 신설: "Batch Progress"**
-   - `CrossCutSection` 옆(또는 아래)에 신규 카드로 배치.
-   - `data.byBatch` 를 재사용해 `CrossCutList`와 동일한 스타일로 각 batch별 approved% / overdue 표시.
-   - 각 행 클릭 시 `openRawData({ batch: c.key })` — Raw Data 필터로 이동.
-   - 상단 batch 필터가 걸린 경우는 카드 자체를 축소(선택된 batch만 표시).
+- 파일 목록 행에도 `"cancelled"` 상태 뱃지(회색 "취소됨") 표시.
 
-## 6. 라우트 검색 파라미터 연동
-- 대시보드 batch 필터 상태를 URL search param `?batch=...` 로 동기화하여 새로고침/공유 시 유지.
+## 기술 세부사항
 
-## 7. 검증
-1. 마이그레이션 후 컬럼/인덱스 존재 확인.
-2. Batch No. 헤더 포함 엑셀 임포트 → Raw Data 컬럼/값 노출.
-3. Admin > Mapping > As Built Drawing > Header Mapping 3팀 시드 노출.
-4. 대시보드 상단 Batch Select 조작 → KPI/Funnel/Trend/Attention 전부 재집계.
-5. 신규 "Batch Progress" 카드 행 클릭 → Raw Data가 `batch` 필터로 진입.
-6. Batch No.가 없는 승인건은 `"— No Batch"` 그룹으로 정상 노출.
+- 사용자 취소로 중단된 행에 대해 사전 스냅샷(pre-import snapshot)은 그대로 유지되어 필요 시 롤백 가능. 임포트 로그 UI의 롤백 버튼은 `cancelled` 상태에서도 활성화.
+- 취소 확인 다이얼로그 문구: "지금까지 처리된 N행은 저장된 상태로 유지되고, 이후 배치는 중단됩니다. 필요시 임포트 로그에서 롤백할 수 있습니다."
+- SM 이분 탐색(binary split) 재시도 로직 안에서도 취소 체크를 넣어, 대용량 배치 재시도 중에도 즉시 반응.
+- 취소 후 파일 재시도(재선택)를 방지하지 않음 — 사용자가 원하면 다시 시작 가능.
 
-## 8. 오픈 이슈
-- Batch 필터를 **단일 선택 vs 다중 선택** 중 어느 쪽으로 할지 확답 필요.  
-  → 기본안: **단일 선택**(대시보드 성능·URL 단순화). 다중 선택이 필요하면 알려주세요.
-- "Batch Progress" 카드의 정렬 기준 기본값은 **approved% 낮은 순 → total 큰 순**(진척이 뒤처진 batch 우선 노출). 다르게 원하시면 알려주세요.
+## 범위 제외
+
+- 이미 커밋된 청크의 자동 롤백은 하지 않음 (기존 롤백 UI 사용).
+- 서버 측 진행 중 트랜잭션 강제 중단(pg_cancel_backend) 없음 — 현재 청크는 정상 완료 후 다음 청크에서 중단.
