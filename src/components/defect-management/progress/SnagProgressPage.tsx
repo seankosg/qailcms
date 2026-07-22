@@ -640,7 +640,7 @@ export function SnagProgressPage() {
             const d = kpis.byStage[s].actual - kpis.byStage[s].plan;
             return {
               stage: s,
-              text: `${d > 0 ? "+" : ""}${d.toLocaleString()}`,
+              value: `${d > 0 ? "+" : ""}${d.toLocaleString()}`,
               tone: d < 0 ? "short" : d > 0 ? "over" : undefined,
               onClick: () => handleKpiClick("actual", s),
             };
