@@ -794,7 +794,7 @@ function KpiCard({
           </div>
           {stageBreakdown && stageBreakdown.length > 0 && (
             <div
-              className="flex max-h-28 min-w-[112px] shrink-0 flex-col gap-0.5 overflow-y-auto border-l pl-2"
+              className="flex max-h-36 min-w-[112px] shrink-0 flex-col gap-1 overflow-y-auto border-l pl-2"
               onClick={(e) => e.stopPropagation()}
             >
               {stageBreakdown.map((b) => (
@@ -806,22 +806,29 @@ function KpiCard({
                     b.onClick?.();
                   }}
                   className={cn(
-                    "flex h-5 items-center justify-between gap-2 rounded px-1 text-[11px] tabular-nums transition-colors",
+                    "flex h-auto min-h-[28px] flex-col justify-center rounded px-1 py-0.5 text-[11px] tabular-nums transition-colors",
                     b.onClick && "cursor-pointer hover:bg-primary/10",
                     !b.onClick && "cursor-default",
                   )}
                 >
-                  <span className="truncate text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
-                  <span
-                    className={cn(
-                      "font-medium",
-                      b.tone === "short" && "text-schedule-short",
-                      b.tone === "over" && "text-schedule-over",
-                      !b.tone && TONE_CLASSES[tone],
-                    )}
-                  >
-                    {b.text}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
+                    <span
+                      className={cn(
+                        "font-medium",
+                        b.tone === "short" && "text-schedule-short",
+                        b.tone === "over" && "text-schedule-over",
+                        !b.tone && TONE_CLASSES[tone],
+                      )}
+                    >
+                      {b.value}
+                    </span>
+                  </div>
+                  {b.suffix && (
+                    <div className="self-end text-[10px] text-muted-foreground">
+                      {b.suffix}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
