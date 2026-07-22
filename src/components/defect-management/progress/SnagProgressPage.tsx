@@ -289,7 +289,10 @@ export function SnagProgressPage() {
     const variance = cumPlan > 0 ? (diffAbs / cumPlan) * 100 : null;
     const progressPct = totalStages > 0 ? (doneStages / totalStages) * 100 : 0;
     const planPct = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
-    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct };
+    const totalPct = totalStages > 0 ? 100 : 0;
+    const planPctOfTotal = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
+    const actualPctOfTotal = totalStages > 0 ? (cumActual / totalStages) * 100 : 0;
+    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct, totalPct, planPctOfTotal, actualPctOfTotal };
   }, [totalsQ.data, effectiveStages]);
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
