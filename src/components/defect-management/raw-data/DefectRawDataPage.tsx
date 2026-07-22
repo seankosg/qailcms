@@ -391,6 +391,7 @@ export function DefectRawDataPage() {
     pageSize,
   });
   const rows = itemsData?.rows ?? [];
+  const [exportOpen, setExportOpen] = useState(false);
   const total = itemsData?.total ?? 0;
   const pageCount = isAllPage ? 1 : Math.max(1, Math.ceil(total / pageSize));
 
