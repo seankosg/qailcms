@@ -1112,7 +1112,11 @@ export function TaskManagementRawDataPage() {
           )}
           {kpiMode && (
             <FilterChip
-              label={`KPI: ${kpiMode.mode} · ${kpiMode.scope} · asOf ${kpiMode.asOf}`}
+              label={`KPI: ${kpiMode.mode} · ${kpiMode.scope} · asOf ${kpiMode.asOf}${
+                ["in_delay","start_delayed","completion_overdue","critical","behind"].includes(kpiMode.mode)
+                  ? " · Sub 포함"
+                  : ""
+              }`}
               onClear={() => setKpiMode(null)}
             />
           )}
