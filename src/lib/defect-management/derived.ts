@@ -1,6 +1,6 @@
 /** Defect 상태 파생 로직 (LetsBuild status_raw → rectified/closure).
  *  Status flow: Open → Rectified → Closed. 인스펙션 실패 시 Re-Opened로 되돌아감.
- *  Re-Opened는 진행률 관점에서 Open과 동일하게 Not Started로 취급하되,
+ *  Re-Opened는 진행률 관점에서 Open과 동일하게 "Not finish yet"로 취급하되,
  *  대시보드는 status_raw 기반으로 별도 Reopened 카운트를 유지한다.
  */
 
@@ -10,15 +10,15 @@ const REOPENED_STATUSES = new Set(["re-opened", "reopened", "re opened", "reopen
 const IN_PROGRESS_STATUSES = new Set(["in progress", "inprogress", "wip", "under review"]);
 
 export function deriveRectifiedStatus(statusRaw: string | null | undefined): string {
-  if (!statusRaw) return "Not Started";
+  if (!statusRaw) return "Not finish yet";
   const s = statusRaw.trim().toLowerCase();
   // Closed는 Rectified 후행 스테이지이므로 rectified_status도 Rectified로 반영.
   if (CLOSED_STATUSES.has(s)) return "Rectified";
   if (RECTIFIED_STATUSES_SET.has(s)) return "Rectified";
-  if (REOPENED_STATUSES.has(s)) return "Not Started";
+  if (REOPENED_STATUSES.has(s)) return "Not finish yet";
   if (IN_PROGRESS_STATUSES.has(s)) return "In Progress";
-  if (s === "open" || s === "new") return "Not Started";
-  return "Not Started";
+  if (s === "open" || s === "new") return "Not finish yet";
+  return "Not finish yet";
 }
 
 export function deriveClosureStatus(statusRaw: string | null | undefined): string {
