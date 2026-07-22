@@ -3240,6 +3240,12 @@ export type Database = {
           metadata: Json
         }[]
       }
+      defect_data_dates: {
+        Args: never
+        Returns: {
+          d: string
+        }[]
+      }
       defect_items_counts: {
         Args: { _include_inactive?: boolean }
         Returns: {
