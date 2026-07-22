@@ -711,6 +711,28 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       if (!category) return null;
       return teamByCategory.get(String(category).trim()) ?? null;
     };
+
+    // HDEC PIC/ENG 및 Subcon 자동 채움 rule 조회
+    let hdecRules: import("@/lib/defect-management/auto-fill-rules").HdecPicRule[] = [];
+    let subconRules: import("@/lib/defect-management/auto-fill-rules").SubconRule[] = [];
+    try {
+      const [hRes, sRes] = await Promise.all([
+        (supabase as any)
+          .from("defect_hdec_pic_rules")
+          .select("id, plot, building, room_group, hdec_pic, hdec_eng, sort_order, is_active")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
+        (supabase as any)
+          .from("defect_subcon_rules")
+          .select("id, plot, room_group, trade_keywords, subcontractor_name, sort_order, is_active")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
+      ]);
+      hdecRules = (hRes.data ?? []) as typeof hdecRules;
+      subconRules = (sRes.data ?? []) as typeof subconRules;
+    } catch (e) {
+      console.warn("[defect-import] auto-fill rules fetch failed", e);
+    }
     /** 파일의 team 값을 DEFECT_TEAMS 기준으로 정규화. 유효하지 않으면 null. */
     const normalizeFileTeam = (raw: unknown): DefectTeam | null => {
       if (raw == null) return null;
