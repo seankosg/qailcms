@@ -451,17 +451,86 @@ export function SnagProgressPage() {
       </Card>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <KpiCard label="Cum. Plan" value={kpis.cumPlan} />
-        <KpiCard label="Cum. Actual" value={kpis.cumActual} />
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard
-          label="Variance"
-          value={`${kpis.variance > 0 ? "+" : ""}${kpis.variance.toFixed(1)}%`}
-          accent={kpis.variance < 0 ? "text-schedule-short" : kpis.variance > 0 ? "text-schedule-over" : ""}
+          label="PLAN"
+          value={kpis.cumPlan.toLocaleString()}
+          onClick={() => handleKpiClick("plan", "all")}
+          stageBreakdown={effectiveStages.map((s) => ({
+            stage: s,
+            text: kpis.byStage[s].plan.toLocaleString(),
+            onClick: () => handleKpiClick("plan", s),
+          }))}
         />
-        <KpiCard label="Done Stages" value={`${kpis.doneStages} / ${kpis.totalStages}`} />
-        <KpiCard label="Progress" value={`${kpis.progressPct.toFixed(1)}%`} icon={TrendingUp} />
-        <KpiCard label="Range" value={`${rangeDays}d`} />
+        <KpiCard
+          label="ACTUAL"
+          value={kpis.cumActual.toLocaleString()}
+          onClick={() => handleKpiClick("actual", "all")}
+          stageBreakdown={effectiveStages.map((s) => ({
+            stage: s,
+            text: kpis.byStage[s].actual.toLocaleString(),
+            onClick: () => handleKpiClick("actual", s),
+          }))}
+        />
+        <KpiCard
+          label="DIFFERENCE"
+          value={`${kpis.diffAbs > 0 ? "+" : ""}${kpis.diffAbs.toLocaleString()}`}
+          accent={kpis.diffAbs < 0 ? "text-schedule-short" : kpis.diffAbs > 0 ? "text-schedule-over" : ""}
+          suffix={
+            kpis.variance === null ? (
+              <span className="text-[10px] text-muted-foreground">—</span>
+            ) : (
+              <span
+                className={cn(
+                  "text-[10px] tabular-nums",
+                  kpis.variance < 0
+                    ? "text-schedule-short"
+                    : kpis.variance > 0
+                      ? "text-schedule-over"
+                      : "text-muted-foreground",
+                )}
+              >
+                ({kpis.variance > 0 ? "+" : ""}
+                {kpis.variance.toFixed(1)}%)
+              </span>
+            )
+          }
+          onClick={() => handleKpiClick("actual", "all")}
+          stageBreakdown={effectiveStages.map((s) => {
+            const d = kpis.byStage[s].actual - kpis.byStage[s].plan;
+            return {
+              stage: s,
+              text: `${d > 0 ? "+" : ""}${d.toLocaleString()}`,
+              tone: d < 0 ? "short" : d > 0 ? "over" : undefined,
+              onClick: () => handleKpiClick("actual", s),
+            };
+          })}
+        />
+        <KpiCard
+          label="DONE"
+          value={`${kpis.doneStages.toLocaleString()} / ${kpis.totalStages.toLocaleString()}`}
+          onClick={() => handleKpiClick("done", "all")}
+          stageBreakdown={effectiveStages.map((s) => ({
+            stage: s,
+            text: `${kpis.byStage[s].done.toLocaleString()} / ${kpis.byStage[s].total.toLocaleString()}`,
+            onClick: () => handleKpiClick("done", s),
+          }))}
+        />
+        <KpiCard
+          label="PROGRESS"
+          value={`${kpis.progressPct.toFixed(1)}%`}
+          icon={TrendingUp}
+          onClick={() => handleKpiClick("done", "all")}
+          stageBreakdown={effectiveStages.map((s) => {
+            const total = kpis.byStage[s].total;
+            const pct = total > 0 ? (kpis.byStage[s].done / total) * 100 : null;
+            return {
+              stage: s,
+              text: pct === null ? "—" : `${pct.toFixed(1)}%`,
+              onClick: () => handleKpiClick("done", s),
+            };
+          })}
+        />
       </div>
 
       {error ? (
