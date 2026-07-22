@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.defect_data_dates() FROM anon;
