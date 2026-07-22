@@ -475,7 +475,7 @@ export function TaskManagementRawDataPage() {
       delayFilteredRows as unknown as TaskItem[],
       kpiMode.scope,
     ) as unknown as Row[];
-    return scoped.filter((r) => {
+    const matched = scoped.filter((r) => {
       const it = r as unknown as TaskItem;
       switch (kpiMode.mode) {
         case "completed":
@@ -502,6 +502,37 @@ export function TaskManagementRawDataPage() {
           return true;
       }
     });
+    // Delay 계열 mode: 매치된 Main Task의 모든 Sub를 함께 포함
+    // (Sub가 정상/주의여도 Main의 하위 컨텍스트 파악을 위해 노출)
+    const DELAY_MODES = new Set([
+      "in_delay",
+      "start_delayed",
+      "completion_overdue",
+      "critical",
+      "behind",
+    ]);
+    if (!DELAY_MODES.has(kpiMode.mode)) return matched;
+    const mainKeys = new Set<string>();
+    for (const r of matched) {
+      if ((r as any).level === "main") {
+        mainKeys.add(`${(r as any).discipline}::${(r as any).task_no}`);
+      }
+    }
+    if (mainKeys.size === 0) return matched;
+    // Sub는 scopeItems 이전(전체 delayFilteredRows)에서 다시 조회 —
+    // 대시보드에서 taskScope='main' 진입 시에도 하위 Sub를 노출하기 위함.
+    const matchedIds = new Set(matched.map((r) => (r as any).id));
+    const extraSubs: Row[] = [];
+    for (const r of delayFilteredRows) {
+      if ((r as any).level !== "sub") continue;
+      const parent = (r as any).main_task_no as string | null;
+      const disc = (r as any).discipline as string;
+      if (!parent) continue;
+      if (!mainKeys.has(`${disc}::${parent}`)) continue;
+      if (matchedIds.has((r as any).id)) continue;
+      extraSubs.push(r);
+    }
+    return [...matched, ...extraSubs];
   }, [delayFilteredRows, kpiMode, kpiThresholds]);
 
   // discipline-task_no 단위 collapse 키 유지 — 접힌 부모의 자식 행 숨김
@@ -1081,7 +1112,11 @@ export function TaskManagementRawDataPage() {
           )}
           {kpiMode && (
             <FilterChip
-              label={`KPI: ${kpiMode.mode} · ${kpiMode.scope} · asOf ${kpiMode.asOf}`}
+              label={`KPI: ${kpiMode.mode} · ${kpiMode.scope} · asOf ${kpiMode.asOf}${
+                ["in_delay","start_delayed","completion_overdue","critical","behind"].includes(kpiMode.mode)
+                  ? " · Sub 포함"
+                  : ""
+              }`}
               onClear={() => setKpiMode(null)}
             />
           )}
