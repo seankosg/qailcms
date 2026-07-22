@@ -240,7 +240,7 @@ export function DmrDashboardPage() {
 
   // Contractor × date matrix (actual)
   const matrix = useMemo(() => {
-    const dates = Array.from(new Set(rows.map((r) => r.report_date))).sort();
+    const dates = Array.from(new Set(rows.map((r) => r.report_date))).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
     const contractors = Array.from(new Set(rows.map((r) => r.contractor_name))).sort();
     const cell = (c: string, d: string) => rows
       .filter((r) => r.contractor_name === c && r.report_date === d)
@@ -360,7 +360,7 @@ export function DmrDashboardPage() {
 
       {/* Sub Contractor × Date Matrix */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Sub Contractor × 일자 매트릭스 (Actual)</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Daily Manpower Status</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] text-xs">

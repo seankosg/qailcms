@@ -304,6 +304,8 @@ function MatrixTables({
     );
   }
 
+  const displayDates = [...dates].reverse();
+
   return (
     <div className="space-y-6">
       {groups.map(([team, users]) => {
@@ -329,7 +331,7 @@ function MatrixTables({
                     <th className="sticky left-[100px] z-10 border-b border-r bg-muted/50 px-2 py-1.5 text-left">
                       로그인 ID
                     </th>
-                    {dates.map((d) => {
+                    {displayDates.map((d) => {
                       const wk = isWeekend(d);
                       const isToday = d === today;
                       return (
@@ -358,7 +360,7 @@ function MatrixTables({
                         <td className="sticky left-[100px] z-10 whitespace-nowrap border-b border-r bg-background px-2 py-1 text-muted-foreground">
                           {u.login_id ?? "-"}
                         </td>
-                        {dates.map((d) => {
+                        {displayDates.map((d) => {
                           const c = countMap.get(`${u.id}|${d}`) ?? 0;
                           const wk = isWeekend(d);
                           if (c > 0) count++;
