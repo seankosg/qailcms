@@ -9,16 +9,29 @@ const RECTIFIED_STATUSES_SET = new Set(["rectified", "complete", "completed"]);
 const REOPENED_STATUSES = new Set(["re-opened", "reopened", "re opened", "reopen", "re-open"]);
 const IN_PROGRESS_STATUSES = new Set(["in progress", "inprogress", "wip", "under review"]);
 
-export function deriveRectifiedStatus(statusRaw: string | null | undefined): string {
-  if (!statusRaw) return "Not finish yet";
-  const s = statusRaw.trim().toLowerCase();
+/** Start 스테이지가 Done 이면 true (stage-utils.isStageDone 'start'와 동일 기준). */
+function isStartDone(row: Record<string, any> | null | undefined): boolean {
+  if (!row) return false;
+  if (row.actual_start_date) return true;
+  const p = Number(row.actual_progress_pct ?? 0);
+  if (p > 0) return true;
+  return Boolean(row.actual_rectified_date || row.actual_closure_date);
+}
+
+export function deriveRectifiedStatus(
+  statusRaw: string | null | undefined,
+  row?: Record<string, any> | null,
+): string {
+  const s = (statusRaw ?? "").trim().toLowerCase();
   // Closed는 Rectified 후행 스테이지이므로 rectified_status도 Rectified로 반영.
   if (CLOSED_STATUSES.has(s)) return "Rectified";
   if (RECTIFIED_STATUSES_SET.has(s)) return "Rectified";
-  if (REOPENED_STATUSES.has(s)) return "Not finish yet";
   if (IN_PROGRESS_STATUSES.has(s)) return "In Progress";
-  if (s === "open" || s === "new") return "Not finish yet";
-  return "Not finish yet";
+  // 미완료 계열(open/new/re-opened/reopen/공백 등) → Start Done 여부에 따라 분기.
+  if (!s || REOPENED_STATUSES.has(s) || s === "open" || s === "new") {
+    return isStartDone(row) ? "Not finish yet" : "Not start yet";
+  }
+  return isStartDone(row) ? "Not finish yet" : "Not start yet";
 }
 
 export function deriveClosureStatus(statusRaw: string | null | undefined): string {
