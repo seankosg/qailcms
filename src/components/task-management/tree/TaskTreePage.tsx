@@ -14,15 +14,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, ChevronRight, Download, History, Loader2, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DISCIPLINES, AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
 import type { Discipline } from "@/lib/task-management/columns";
 import { computeJudgment, expectedProgressToday, todayGap, worstJudgment } from "@/lib/task-management/derived";
-import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDrawer";
 import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+import { MiniProgressChart } from "./MiniProgressChart";
+import { TaskProgressChartDialog } from "./TaskProgressChartDialog";
+import { useServerFn } from "@tanstack/react-start";
+import { getTaskProgressChartsBulk, type TaskChartCache } from "@/lib/task-management/progress-chart.functions";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
 
@@ -84,7 +87,7 @@ export function TaskTreePage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(new Set());
   const [picFilter, setPicFilter] = useState<string>("__all__");
-  const [historyTask, setHistoryTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
+  const [chartTask, setChartTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const { data = [], isLoading } = useQuery({
@@ -102,6 +105,18 @@ export function TaskTreePage() {
       return (data ?? []) as Row[];
     },
   });
+
+  const fetchChartsBulk = useServerFn(getTaskProgressChartsBulk);
+  const { data: chartRows = [] } = useQuery({
+    queryKey: ["task-progress-charts-bulk", discipline],
+    queryFn: () => fetchChartsBulk({ data: { discipline } }),
+    staleTime: 5 * 60_000,
+  });
+  const chartMap = useMemo(() => {
+    const m = new Map<string, TaskChartCache>();
+    for (const r of chartRows) m.set(r.task_no, r);
+    return m;
+  }, [chartRows]);
 
   const latestDataDate = useMemo(() => {
     let latest = "";
