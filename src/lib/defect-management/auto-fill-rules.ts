@@ -1,0 +1,124 @@
+/**
+ * SM Import Auto-fill Rules
+ * - HDEC PIC/ENG rule: Plot + Building + (Plan Group OR Room Group) 매칭
+ * - Subcon rule: Plot + Room Group + Trade 키워드 매칭
+ *
+ * 두 rule 모두 원본 엑셀 값 또는 기존 DB 값이 있으면 덮어쓰지 않음.
+ */
+
+export interface HdecPicRule {
+  id: string;
+  plot: string; // 'C' | 'D'
+  building: string;
+  room_group: string;
+  hdec_pic: string | null;
+  hdec_eng: string | null;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface SubconRule {
+  id: string;
+  plot: string;
+  room_group: string;
+  trade_keywords: string[];
+  subcontractor_name: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+const norm = (v: unknown): string =>
+  (v == null ? "" : String(v)).trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * plan_group 문자열 → 'C' | 'D' | null
+ * - "Plot D" 포함 or "Tower 4" → D
+ * - "Plot C" 포함 or "Tower 3" → C
+ */
+export function resolvePlotFromPlanGroup(planGroup: string | null | undefined): "C" | "D" | null {
+  const s = norm(planGroup);
+  if (!s) return null;
+  if (s.includes("plot d") || s.includes("tower 4")) return "D";
+  if (s.includes("plot c") || s.includes("tower 3")) return "C";
+  return null;
+}
+
+/**
+ * HDEC PIC / ENG 결정.
+ * rule.room_group 은 plan_group OR room_group 어느 쪽과 일치해도 hit.
+ */
+export function resolveHdec(
+  rules: HdecPicRule[],
+  plot: "C" | "D",
+  building: string | null | undefined,
+  planGroup: string | null | undefined,
+  roomGroup: string | null | undefined,
+): { pic: string | null; eng: string | null } | null {
+  const nBuilding = norm(building);
+  const nPlan = norm(planGroup);
+  const nRoom = norm(roomGroup);
+  if (!nBuilding) return null;
+  for (const r of rules) {
+    if (!r.is_active) continue;
+    if (r.plot !== plot) continue;
+    if (norm(r.building) !== nBuilding) continue;
+    const nRuleRoom = norm(r.room_group);
+    if (!nRuleRoom) continue;
+    if (nRuleRoom === nPlan || nRuleRoom === nRoom) {
+      return { pic: r.hdec_pic ?? null, eng: r.hdec_eng ?? null };
+    }
+  }
+  return null;
+}
+
+/**
+ * Subcon 결정.
+ * (1) main_trade/sub_trade 가 trade_keywords 중 하나와 정확 일치하면 hit.
+ * (2) 없으면 description 에 trade_keywords 중 하나라도 substring 포함이면 hit.
+ * room_group 은 plan_group OR room_group 매칭.
+ */
+export function resolveSubcon(
+  rules: SubconRule[],
+  plot: "C" | "D",
+  planGroup: string | null | undefined,
+  roomGroup: string | null | undefined,
+  mainTrade: string | null | undefined,
+  subTrade: string | null | undefined,
+  description: string | null | undefined,
+): string | null {
+  const nPlan = norm(planGroup);
+  const nRoom = norm(roomGroup);
+  const nMain = norm(mainTrade);
+  const nSub = norm(subTrade);
+  const nDesc = norm(description);
+
+  // Pass 1: trade 정확 일치
+  for (const r of rules) {
+    if (!r.is_active) continue;
+    if (r.plot !== plot) continue;
+    const nRuleRoom = norm(r.room_group);
+    if (!nRuleRoom || (nRuleRoom !== nPlan && nRuleRoom !== nRoom)) continue;
+    for (const kw of r.trade_keywords ?? []) {
+      const nkw = norm(kw);
+      if (!nkw) continue;
+      if (nkw === nMain || nkw === nSub) return r.subcontractor_name;
+    }
+  }
+
+  // Pass 2: description 부분 일치
+  if (nDesc) {
+    for (const r of rules) {
+      if (!r.is_active) continue;
+      if (r.plot !== plot) continue;
+      const nRuleRoom = norm(r.room_group);
+      if (!nRuleRoom || (nRuleRoom !== nPlan && nRuleRoom !== nRoom)) continue;
+      for (const kw of r.trade_keywords ?? []) {
+        const nkw = norm(kw);
+        if (!nkw) continue;
+        if (nDesc.includes(nkw)) return r.subcontractor_name;
+      }
+    }
+  }
+
+  return null;
+}
