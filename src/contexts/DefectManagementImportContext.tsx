@@ -117,6 +117,8 @@ export interface DefectImportFile {
 interface CtxValue {
   files: DefectImportFile[];
   isRunning: boolean;
+  isCancelling: boolean;
+  requestCancel: () => void;
   addFiles: (files: File[]) => Promise<void>;
   removeFile: (id: string) => void;
   clearAll: () => void;
@@ -286,6 +288,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
   const qc = useQueryClient();
   const [files, setFiles] = useState<DefectImportFile[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const cancelRequestedRef = useRef(false);
+  const requestCancel = useCallback(() => {
+    if (!cancelRequestedRef.current) {
+      cancelRequestedRef.current = true;
+      setIsCancelling(true);
+      toast.warning("취소 요청됨. 현재 배치 완료 후 중단됩니다.");
+    }
+  }, []);
 
   const fetchAliases = useCallback(async (): Promise<Record<string, string[]>> => {
     const extraAliases: Record<string, string[]> = {};
