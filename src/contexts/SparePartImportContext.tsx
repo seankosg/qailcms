@@ -553,16 +553,21 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        const cancelled = msg === "__CANCELLED__";
         await supabase
           .from("spare_parts_import_logs")
           .update({
-            status: "failed",
-            error_message: msg,
+            status: cancelled ? "cancelled" : "failed",
+            error_message: cancelled ? "사용자 취소" : msg,
             duration_ms: Date.now() - startTime,
           })
           .eq("id", logId);
         setFiles((cur) =>
-          cur.map((x) => (x.id === f.id ? { ...x, status: "failed", error: msg } : x)),
+          cur.map((x) =>
+            x.id === f.id
+              ? { ...x, status: "failed", error: cancelled ? "사용자 취소" : msg }
+              : x,
+          ),
         );
       }
     }
