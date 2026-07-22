@@ -91,9 +91,28 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
 
 export interface AbdFacetItem { value: string; cnt: number }
 
-export function useAbdFacet(column: string | null, opts: { team: AbdTeam; statusGroup: AbdStatusGroup; includeInactive: boolean; plot?: "C" | "D" | null; enabled?: boolean }) {
+export function useAbdFacet(
+  column: string | null,
+  opts: {
+    team: AbdTeam;
+    statusGroup: AbdStatusGroup;
+    includeInactive: boolean;
+    plot?: "C" | "D" | null;
+    enabled?: boolean;
+    q?: string;
+    filters?: AbdServerFilter[];
+  },
+) {
+  // 크로스 필터링: 자기 자신 컬럼 필터는 제외해 정확한 queryKey/카운트 산출.
+  const qNorm = (opts.q ?? "").trim();
+  const otherFilters = (opts.filters ?? []).filter((f) => f.column !== column);
   return useQuery<AbdFacetItem[]>({
-    queryKey: ["abd", "facet", column, opts],
+    queryKey: [
+      "abd",
+      "facet",
+      column,
+      { team: opts.team, statusGroup: opts.statusGroup, includeInactive: opts.includeInactive, plot: opts.plot ?? null, q: qNorm, filters: otherFilters },
+    ],
     queryFn: async () => {
       if (!column) return [];
       const { data, error } = await (supabase as any).rpc("abd_items_facets", {
@@ -102,6 +121,8 @@ export function useAbdFacet(column: string | null, opts: { team: AbdTeam; status
         _status_group: opts.statusGroup === "all" ? null : opts.statusGroup,
         _include_inactive: opts.includeInactive,
         _plot: opts.plot ?? null,
+        _q: qNorm.length > 0 ? qNorm : null,
+        _filters: otherFilters,
       });
       if (error) throw new Error(error.message);
       return ((data ?? []) as any[]).map((r) => ({ value: String(r.value), cnt: Number(r.cnt) }));

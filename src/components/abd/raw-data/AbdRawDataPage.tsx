@@ -593,6 +593,8 @@ export function AbdRawDataPage() {
         loading={!stateLoaded || isFetching}
         frozenColIds={frozenExtras}
         onRowClick={(id) => setUrl({ detail: id })}
+        q={q}
+        serverFilters={serverFilters}
       />
 
       <AbdExportDialog
@@ -676,9 +678,11 @@ interface TableViewProps {
   loading: boolean;
   frozenColIds: string[];
   onRowClick?: (id: string) => void;
+  q?: string;
+  serverFilters?: AbdServerFilter[];
 }
 
-function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick }: TableViewProps) {
+function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q, serverFilters }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
   const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
   const { stickyLefts, lastFrozenIndex, frozenWidth } = useMemo(() => {
@@ -758,7 +762,9 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick }:
                         {header.column.getIsSorted() && <span className="flex-shrink-0">{header.column.getIsSorted() === "asc" ? "▲" : "▼"}</span>}
                       </span>
                       {header.column.getCanFilter() && (
-                        <span onClick={(e) => e.stopPropagation()}><AbdColumnFilterDropdown column={header.column} /></span>
+                        <span onClick={(e) => e.stopPropagation()}>
+                          <AbdColumnFilterDropdown column={header.column} q={q} serverFilters={serverFilters} />
+                        </span>
                       )}
                     </div>
                     {header.column.getCanResize() && (

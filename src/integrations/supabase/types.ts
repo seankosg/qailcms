@@ -3094,8 +3094,11 @@ export type Database = {
         | {
             Args: {
               _column: string
+              _filters?: Json
               _include_inactive?: boolean
+              _limit?: number
               _plot?: string
+              _q?: string
               _status_group?: string
               _team?: string
             }
