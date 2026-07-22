@@ -1,34 +1,51 @@
-## 목표
-SM Progress Matrix의 일일 컬럼 영역에서 2026-07-21까지의 과거 일일 컬럼을 숨기고, 그 자리에 누계 컬럼 하나를 삽입한다. day 버킷 뷰에만 적용하고 week 뷰는 현행 유지한다.
+## 목적
+SM Progress 페이지의 상단 KPI 카드 5개(PLAN / ACTUAL / DIFFERENCE / DONE / PROGRESS)를 TM 대시보드의 `RiskKpiCard`("Start Delayed" 등)와 동일한 UI 톤·hover 반전·클릭 이동 UX로 통일합니다. 기존 스테이지별(Start/Rectified/Closure) 브레이크다운은 그대로 유지합니다.
 
-## 변경 파일
+## 범위
+- `src/components/defect-management/progress/SnagProgressPage.tsx` 내부의 `KpiCard` 로컬 컴포넌트만 수정.
+- KPI 계산·클릭 시 이동 라우팅(`handleKpiClick`)·필터 전달 로직은 손대지 않음(이미 raw data로 이동).
+- TM 파일(`RiskKpiCard.tsx`, `TmKpiCards.tsx`)은 변경하지 않음.
 
-### 1) src/components/defect-management/progress/SnagProgressPage.tsx
-- `matrix` useMemo 리팩터:
-  - 상수 `CUTOFF = "2026-07-22"`, `CUM_ISO = "2026-07-21"`.
-  - `bucket === "day"`일 때만 누계 병합 수행.
-  - `assembleMatrix` 결과 `full`에서 인덱스 `[0, preRange)` (b < CUTOFF) 셀을 row·stage·combined 별로 plan/actual 합산.
-  - 표시 시작 `visStart = hidePast ? max(preRange, todayIdx) : preRange`.
-  - 최종 `buckets = [CUM_ISO, ...full.buckets.slice(visStart)]`.
-  - 각 row의 `combined` 및 `stages.{start,rectified,closure}.cells`를 `[cumCell, ...tail]`로 재구성. `total/doneCount/cumPlan/cumActual`는 전체 누계이므로 그대로.
-  - `bucket === "week"`: 기존 hidePast 슬라이스만 유지.
-- `SnagScheduleMatrix`에 `cumBucketIso={bucket === "day" ? "2026-07-21" : undefined}` 전달.
+## 변경 사항 (파일 단위)
 
-### 2) src/components/defect-management/progress/SnagScheduleMatrix.tsx
-- Props에 `cumBucketIso?: string` 추가.
-- 타임라인 헤더 렌더링에서 `i === 0 && data.buckets[0] === cumBucketIso`인 경우 라벨을 커스텀:
-  - 상단 작은 글씨 `Up to` (`text-[9px] text-muted-foreground leading-tight`)
-  - 하단 큰 글씨 `21-Jul` (`formatDdMmm("2026-07-21")` 사용, 기존 primary 스타일)
-- 그 외 컬럼은 `formatBucketLabel` 그대로.
-- `todayBucketIdx`, 셀 클릭 콜백, 오늘 하이라이트, 스티키 좌측(Total Scope / Up to asOfLabel)은 변경 없음.
+### 1) `SnagProgressPage.tsx` — 로컬 `KpiCard` 리뉴얼
+TM `RiskKpiCard`의 시각적 특성을 이식:
+- 레이아웃: `<CardContent className="p-3">` + `flex items-start gap-3`. 좌측(라벨+큰 값), 우측(border-l pl-2, min-w [~112px], max-h-28 overflow-y-auto)로 스테이지 리스트.
+- 라벨: `text-[11px] font-semibold uppercase tracking-wide text-muted-foreground` (아이콘 사용 시 인라인, PROGRESS의 `TrendingUp` 유지).
+- 값: `text-3xl font-bold tabular-nums leading-tight` + 카드별 `tone` 컬러 클래스 적용.
+- 카드 hover: `cursor-pointer transition-colors hover:bg-primary/10` (accent/40 → primary/10 로 반전 강화).
+- 스테이지 행: 고정 높이 `h-5`, `text-[11px] tabular-nums`, hover `hover:bg-primary/10 rounded px-1`, 클릭 시 `e.stopPropagation()` 후 콜백. 라벨은 좌측(muted), 숫자는 우측(font-medium + tone 색). DIFFERENCE의 short/over 색은 기존대로 유지.
+- 카드 자체 클릭과 스테이지 행 클릭 분리(현재 유지). 우측 브레이크다운 컨테이너에도 `onClick={e => e.stopPropagation()}` 추가.
 
-## 유지 사항
-- KPI 카드 값 및 좌측 스티키 블록(누적 Plan/Actual/Diff/%) 로직 불변.
-- 셀 클릭 시 bucketIso `2026-07-21`가 전달되어 기존 Raw Data 이동 로직 유지("나머지는 그대로").
-- hidePast, planMode, stage 필터, plot/team 필터, RPC 파라미터 및 캐시 키 모두 변경 없음.
+### 2) 카드별 톤(tone) 지정
+새 prop `tone?: "neutral" | "info" | "emerald" | "danger" | "warn"` 를 `KpiCard`에 추가하고 값(text-3xl) 색에만 적용. TM 팔레트를 재사용:
+- PLAN → `neutral` (기본 foreground)
+- ACTUAL → `emerald` (`text-emerald-600 dark:text-emerald-400`)
+- DIFFERENCE → 값 자체를 기존 `accent` prop으로 부호에 따라 red/green 유지 (`text-schedule-short` / `text-schedule-over`), tone은 `neutral` 폴백
+- DONE → `info` (`text-blue-600 dark:text-blue-400`)
+- PROGRESS → `emerald`
+
+DIFFERENCE 카드의 `suffix`(괄호 안 %)와 스테이지 tone(short/over)은 현행 유지.
+
+### 3) 호출부(508~588행) 조정
+- 각 `<KpiCard>` 에 `tone` prop 전달.
+- PROGRESS 카드는 `icon={TrendingUp}` 유지, 라벨 우측 정렬을 위한 flex 정리(라벨과 아이콘 함께 왼쪽 정렬).
+- 그리드는 현행 `sm:grid-cols-2 lg:grid-cols-5` 유지 → 5개 카드 모두 동일 규격.
+
+## 비변경 항목
+- KPI 값 계산 로직 (`kpis`, `handleKpiClick` 파라미터 및 라우팅).
+- 스테이지 브레이크다운의 데이터·클릭 콜백.
+- TM 파일 및 라우팅 스키마.
+- SM 대시보드의 다른 카드(`DeSnagGrandTotalCards`).
+
+## 기술 노트
+- `RiskKpiCard`를 직접 재사용하지 않는 이유: SM 쪽 브레이크다운은 stage 3종(문자열 + short/over tone) 구조이고 TM쪽은 팀 count 구조라 인터페이스가 다릅니다. 로컬 `KpiCard`에 TM의 시각 규격을 이식하는 편이 안전하고 최소 침습적입니다.
+- 다크모드 대응: 톤 클래스 전부 `text-*-600 dark:text-*-400` 형식으로 정의(TM과 동일).
+- hover 색은 TM과 동일하게 `bg-primary/10` 사용(시맨틱 토큰). 하드코드 색상 없음.
 
 ## 검증
-- day 뷰: 첫 컬럼 라벨 `Up to / 21-Jul`, 값 = 이전 일일 컬럼들의 plan/actual 합; 이후 컬럼은 2026-07-22부터 표시.
-- hidePast on/off 전환 시 첫 컬럼 유지, 이후 컬럼만 슬라이스.
-- week 뷰: 라벨/컬럼 구성 현행 유지.
-- 다중 stage 선택 시 stage 행과 combined 행 모두 첫 컬럼 값이 stage 합계와 일치.
+1. 5개 카드 hover 시 카드 배경이 `primary/10` 로 즉시 반영되는지.
+2. 카드 본체 클릭 → 기존 handleKpiClick(mode, "all") 라우팅 유지.
+3. 스테이지 행 클릭 시 카드 클릭이 발생하지 않고 해당 스테이지 필터로 이동하는지(stopPropagation).
+4. DIFFERENCE 부호별 색상, `(±%)` suffix, 스테이지 short/over 색이 그대로 유지되는지.
+5. 좁은 뷰포트(sm)에서 2열, lg 이상에서 5열 유지 및 우측 리스트가 잘리지 않는지(min-w/max-h 확인).

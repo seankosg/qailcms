@@ -510,6 +510,7 @@ export function SnagProgressPage() {
           label="PLAN"
           value={kpis.cumPlan.toLocaleString()}
           onClick={() => handleKpiClick("plan", "all")}
+          tone="neutral"
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
             text: kpis.byStage[s].plan.toLocaleString(),
@@ -520,6 +521,7 @@ export function SnagProgressPage() {
           label="ACTUAL"
           value={kpis.cumActual.toLocaleString()}
           onClick={() => handleKpiClick("actual", "all")}
+          tone="emerald"
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
             text: kpis.byStage[s].actual.toLocaleString(),
@@ -530,6 +532,7 @@ export function SnagProgressPage() {
           label="DIFFERENCE"
           value={`${kpis.diffAbs > 0 ? "+" : ""}${kpis.diffAbs.toLocaleString()}`}
           accent={kpis.diffAbs < 0 ? "text-schedule-short" : kpis.diffAbs > 0 ? "text-schedule-over" : ""}
+          tone="neutral"
           suffix={
             kpis.variance === null ? (
               <span className="text-[10px] text-muted-foreground">—</span>
@@ -564,6 +567,7 @@ export function SnagProgressPage() {
           label="DONE"
           value={`${kpis.doneStages.toLocaleString()} / ${kpis.totalStages.toLocaleString()}`}
           onClick={() => handleKpiClick("done", "all")}
+          tone="info"
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
             text: `${kpis.byStage[s].done.toLocaleString()} / ${kpis.byStage[s].total.toLocaleString()}`,
@@ -575,6 +579,7 @@ export function SnagProgressPage() {
           value={`${kpis.progressPct.toFixed(1)}%`}
           icon={TrendingUp}
           onClick={() => handleKpiClick("done", "all")}
+          tone="emerald"
           stageBreakdown={effectiveStages.map((s) => {
             const total = kpis.byStage[s].total;
             const pct = total > 0 ? (kpis.byStage[s].done / total) * 100 : null;
@@ -659,6 +664,7 @@ function KpiCard({
   onClick,
   suffix,
   stageBreakdown,
+  tone = "neutral",
 }: {
   label: string;
   value: number | string;
@@ -672,54 +678,75 @@ function KpiCard({
     tone?: "short" | "over";
     onClick?: () => void;
   }>;
+  tone?: "neutral" | "info" | "emerald" | "danger" | "warn";
 }) {
+  const TONE_CLASSES: Record<NonNullable<typeof tone>, string> = {
+    neutral: "",
+    info: "text-blue-600 dark:text-blue-400",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+    danger: "text-red-600 dark:text-red-400",
+    warn: "text-amber-600 dark:text-amber-400",
+  };
   return (
     <Card
       onClick={onClick}
-      className={cn(onClick && "cursor-pointer transition-colors hover:bg-accent/40")}
+      className={cn(onClick && "cursor-pointer transition-colors hover:bg-primary/10")}
     >
-      <CardContent className="flex items-stretch justify-between gap-2 p-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {Icon ? <Icon className="h-3 w-3" /> : null}
-            {label}
-          </div>
-          <div className="flex items-baseline gap-1">
-            <div className={cn("text-xl font-semibold tabular-nums leading-tight", accent)}>
-              {value}
+      <CardContent className="p-3">
+        <div className="flex items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {Icon ? <Icon className="h-3 w-3" /> : null}
+              {label}
             </div>
-            {suffix}
-          </div>
-        </div>
-        {stageBreakdown && stageBreakdown.length > 0 && (
-          <div className="flex shrink-0 flex-col justify-center gap-0.5 border-l pl-2 text-[10px] tabular-nums">
-            {stageBreakdown.map((b) => (
-              <button
-                key={b.stage}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  b.onClick?.();
-                }}
+            <div className="flex items-baseline gap-1">
+              <div
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded px-1 text-right transition-colors",
-                  b.onClick && "cursor-pointer hover:bg-accent/60",
-                  !b.onClick && "cursor-default",
+                  "text-3xl font-bold tabular-nums leading-tight",
+                  TONE_CLASSES[tone],
+                  accent,
                 )}
               >
-                <span className="text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
-                <span
+                {value}
+              </div>
+              {suffix}
+            </div>
+          </div>
+          {stageBreakdown && stageBreakdown.length > 0 && (
+            <div
+              className="flex max-h-28 min-w-[112px] shrink-0 flex-col gap-0.5 overflow-y-auto border-l pl-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {stageBreakdown.map((b) => (
+                <button
+                  key={b.stage}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    b.onClick?.();
+                  }}
                   className={cn(
-                    b.tone === "short" && "text-schedule-short",
-                    b.tone === "over" && "text-schedule-over",
+                    "flex h-5 items-center justify-between gap-2 rounded px-1 text-[11px] tabular-nums transition-colors",
+                    b.onClick && "cursor-pointer hover:bg-primary/10",
+                    !b.onClick && "cursor-default",
                   )}
                 >
-                  {b.text}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+                  <span className="truncate text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      b.tone === "short" && "text-schedule-short",
+                      b.tone === "over" && "text-schedule-over",
+                      !b.tone && TONE_CLASSES[tone],
+                    )}
+                  >
+                    {b.text}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
