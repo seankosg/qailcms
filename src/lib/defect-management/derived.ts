@@ -12,6 +12,14 @@ const IN_PROGRESS_STATUSES = new Set(["in progress", "inprogress", "wip", "under
 /** Start 스테이지가 Done 이면 true (stage-utils.isStageDone 'start'와 동일 기준). */
 function isStartDone(row: Record<string, any> | null | undefined): boolean {
   if (!row) return false;
+  const sr = String(row.status_raw ?? "").trim().toLowerCase();
+  if (
+    sr === "rectified" ||
+    sr === "complete" ||
+    sr === "completed" ||
+    sr === "closed" ||
+    sr === "verified"
+  ) return true;
   if (row.actual_start_date) return true;
   const p = Number(row.actual_progress_pct ?? 0);
   if (p > 0) return true;
