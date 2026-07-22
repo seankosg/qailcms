@@ -3252,17 +3252,32 @@ export type Database = {
         Args: { _include_inactive?: boolean }
         Returns: Json
       }
-      defect_items_facets: {
-        Args: {
-          _column: string
-          _include_inactive?: boolean
-          _status_group?: string
-        }
-        Returns: {
-          cnt: number
-          value: string
-        }[]
-      }
+      defect_items_facets:
+        | {
+            Args: {
+              _column: string
+              _include_inactive?: boolean
+              _status_group?: string
+            }
+            Returns: {
+              cnt: number
+              value: string
+            }[]
+          }
+        | {
+            Args: {
+              _column: string
+              _filters?: Json
+              _include_inactive?: boolean
+              _limit?: number
+              _q?: string
+              _status_group?: string
+            }
+            Returns: {
+              cnt: number
+              value: string
+            }[]
+          }
       defect_items_search: {
         Args: {
           _filters?: Json

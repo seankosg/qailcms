@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EMPTY_TOKEN } from "@/lib/defect-management/filter-fns";
-import { useDefectFacet, type DefectStatusGroup } from "@/hooks/useDefectItems";
+import { useDefectFacet, type DefectStatusGroup, type DefectServerFilter } from "@/hooks/useDefectItems";
 
 export function MultiSelectDropdown({ column, options }: { column: any; options: { value: string; label: string }[] }) {
   const selected: string[] = (column.getFilterValue() as string[]) ?? [];
@@ -22,9 +22,15 @@ export function MultiSelectDropdown({ column, options }: { column: any; options:
   const serverFacetCol: string | null = meta.serverFacet ?? null;
   const statusGroup: DefectStatusGroup = (meta.statusGroup as DefectStatusGroup) ?? "unclosed";
   const includeInactive: boolean = !!meta.includeInactive;
+  // 크로스 필터링: 테이블 meta에서 현재 검색어/서버 필터를 읽어 자기 자신을 제외하고 전달
+  const tableMeta = (column.getContext?.().table?.options?.meta ?? {}) as any;
+  const q: string | undefined = tableMeta.q;
+  const serverFilters: DefectServerFilter[] = tableMeta.serverFilters ?? [];
   const { data: serverFacet } = useDefectFacet(open ? serverFacetCol : null, {
     statusGroup,
     includeInactive,
+    q,
+    filters: serverFilters,
     enabled: open && !!serverFacetCol,
   });
   const items = useMemo(() => {
