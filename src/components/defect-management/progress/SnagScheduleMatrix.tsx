@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
 import { ScheduleCell } from "@/components/schedule/ScheduleCell";
+import { formatDdMmm } from "@/lib/time/doha";
 import {
   type Bucket,
   type MatrixResult,
@@ -23,6 +24,8 @@ interface Props {
     stage: Stage | "all",
     field: "planned" | "actual",
   ) => void;
+  /** day 뷰에서 첫 컬럼을 "Up to <date>" 누계 컬럼으로 렌더하기 위한 iso */
+  cumBucketIso?: string;
 }
 
 const W_GROUP = 220;
@@ -47,6 +50,7 @@ export function SnagScheduleMatrix({
   asOfLabel,
   groupHeader,
   onCellClick,
+  cumBucketIso,
 }: Props) {
   const cellWidth = bucket === "day" ? 64 : 96;
 
@@ -234,21 +238,36 @@ export function SnagScheduleMatrix({
               <div className="flex">
                 <div className="flex" style={{ width: timelineGridWidth, minWidth: timelineGridWidth }}>
                   {data.buckets.map((b, i) => {
-                    const lbl = formatBucketLabel(b, bucket);
                     const isToday = i === todayBucketIdx;
+                    const isCum = i === 0 && cumBucketIso !== undefined && b === cumBucketIso;
+                    const lbl = isCum
+                      ? { primary: formatDdMmm(b), secondary: "Up to" }
+                      : formatBucketLabel(b, bucket);
                     return (
                       <div
                         key={b}
                         className={cn(
                           "flex flex-col items-center justify-center border-r border-border px-1 py-1.5 text-center",
                           isToday && "border-l-2 border-l-primary bg-primary/10",
+                          isCum && "bg-muted/40",
                         )}
                         style={{ width: cellWidth, minWidth: cellWidth }}
                       >
-                        <div className="leading-tight">{lbl.primary}</div>
-                        <div className="text-[9px] font-normal text-muted-foreground leading-tight">
-                          {lbl.secondary}
-                        </div>
+                        {isCum ? (
+                          <>
+                            <div className="text-[9px] font-normal text-muted-foreground leading-tight">
+                              {lbl.secondary}
+                            </div>
+                            <div className="leading-tight">{lbl.primary}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="leading-tight">{lbl.primary}</div>
+                            <div className="text-[9px] font-normal text-muted-foreground leading-tight">
+                              {lbl.secondary}
+                            </div>
+                          </>
+                        )}
                       </div>
                     );
                   })}
