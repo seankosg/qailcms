@@ -185,20 +185,29 @@ export function SnagProgressPage() {
   }, [cellsQ.data, totalsQ.data, buckets, effectiveStages, hidePast, today]);
 
   const kpis = useMemo(() => {
-    let cumPlan = 0;
-    let cumActual = 0;
-    let doneStages = 0;
-    let totalStages = 0;
+    const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number }> = {
+      start: { plan: 0, actual: 0, done: 0, total: 0 },
+      rectified: { plan: 0, actual: 0, done: 0, total: 0 },
+      closure: { plan: 0, actual: 0, done: 0, total: 0 },
+    };
     for (const t of totalsQ.data ?? []) {
       if (!effectiveStages.includes(t.stage)) continue;
-      cumPlan += t.plan_upto;
-      cumActual += t.actual_upto;
-      doneStages += t.done_upto;
-      totalStages += t.total;
+      byStage[t.stage].plan += t.plan_upto;
+      byStage[t.stage].actual += t.actual_upto;
+      byStage[t.stage].done += t.done_upto;
+      byStage[t.stage].total += t.total;
     }
-    const variance = cumPlan > 0 ? ((cumActual - cumPlan) / cumPlan) * 100 : 0;
+    let cumPlan = 0, cumActual = 0, doneStages = 0, totalStages = 0;
+    for (const s of effectiveStages) {
+      cumPlan += byStage[s].plan;
+      cumActual += byStage[s].actual;
+      doneStages += byStage[s].done;
+      totalStages += byStage[s].total;
+    }
+    const diffAbs = cumActual - cumPlan;
+    const variance = cumPlan > 0 ? (diffAbs / cumPlan) * 100 : null;
     const progressPct = totalStages > 0 ? (doneStages / totalStages) * 100 : 0;
-    return { cumPlan, cumActual, variance, doneStages, totalStages, progressPct };
+    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct };
   }, [totalsQ.data, effectiveStages]);
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
