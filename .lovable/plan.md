@@ -1,27 +1,34 @@
 ## 목표
-2026-07-22 이전 레거시 데이터 중 계획일과 실제일이 **둘 다 비어있는** 경우 두 필드 모두 **2026-07-20**로 채워 완료 처리한다.
+SM Progress Matrix의 일일 컬럼 영역에서 2026-07-21까지의 과거 일일 컬럼을 숨기고, 그 자리에 누계 컬럼 하나를 삽입한다. day 버킷 뷰에만 적용하고 week 뷰는 현행 유지한다.
 
-## 대상 및 조건
+## 변경 파일
 
-공통 필터: `created_at < '2026-07-22 00:00:00+03'` (도하 시간 기준)
+### 1) src/components/defect-management/progress/SnagProgressPage.tsx
+- `matrix` useMemo 리팩터:
+  - 상수 `CUTOFF = "2026-07-22"`, `CUM_ISO = "2026-07-21"`.
+  - `bucket === "day"`일 때만 누계 병합 수행.
+  - `assembleMatrix` 결과 `full`에서 인덱스 `[0, preRange)` (b < CUTOFF) 셀을 row·stage·combined 별로 plan/actual 합산.
+  - 표시 시작 `visStart = hidePast ? max(preRange, todayIdx) : preRange`.
+  - 최종 `buckets = [CUM_ISO, ...full.buckets.slice(visStart)]`.
+  - 각 row의 `combined` 및 `stages.{start,rectified,closure}.cells`를 `[cumCell, ...tail]`로 재구성. `total/doneCount/cumPlan/cumActual`는 전체 누계이므로 그대로.
+  - `bucket === "week"`: 기존 hidePast 슬라이스만 유지.
+- `SnagScheduleMatrix`에 `cumBucketIso={bucket === "day" ? "2026-07-21" : undefined}` 전달.
 
-### 1) Rectified 스테이지
-- `rectified_status = 'Rectified'`
-- `actual_rectified_date IS NULL`
-- `planned_rectified_date IS NULL`
-- → `planned_rectified_date = '2026-07-20'`, `actual_rectified_date = '2026-07-20'`
+### 2) src/components/defect-management/progress/SnagScheduleMatrix.tsx
+- Props에 `cumBucketIso?: string` 추가.
+- 타임라인 헤더 렌더링에서 `i === 0 && data.buckets[0] === cumBucketIso`인 경우 라벨을 커스텀:
+  - 상단 작은 글씨 `Up to` (`text-[9px] text-muted-foreground leading-tight`)
+  - 하단 큰 글씨 `21-Jul` (`formatDdMmm("2026-07-21")` 사용, 기존 primary 스타일)
+- 그 외 컬럼은 `formatBucketLabel` 그대로.
+- `todayBucketIdx`, 셀 클릭 콜백, 오늘 하이라이트, 스티키 좌측(Total Scope / Up to asOfLabel)은 변경 없음.
 
-### 2) Start 스테이지
-- `status_raw`가 완료 계열(rectified/complete/completed/closed/verified) 이거나 `rectified_status = 'Rectified'` (= Start가 Done으로 간주되는 조건)
-- `actual_start_date IS NULL`
-- `planned_start_date IS NULL`
-- → `planned_start_date = '2026-07-20'`, `actual_start_date = '2026-07-20'`
+## 유지 사항
+- KPI 카드 값 및 좌측 스티키 블록(누적 Plan/Actual/Diff/%) 로직 불변.
+- 셀 클릭 시 bucketIso `2026-07-21`가 전달되어 기존 Raw Data 이동 로직 유지("나머지는 그대로").
+- hidePast, planMode, stage 필터, plot/team 필터, RPC 파라미터 및 캐시 키 모두 변경 없음.
 
-## 실행 방법
-- `defect_items_raw`에 대해 단일 마이그레이션으로 두 개의 UPDATE 실행
-- 실행 전 대상 건수를 조회하여 사용자에게 보고 후 반영
-- 파생 필드(rectified_status, start_status)는 서버 RPC에서 자동 재계산되므로 별도 조치 불필요
-
-## 스코프 외
-- 7/22 이후 데이터는 건드리지 않음
-- Closure 스테이지는 이번 지시 범위 외 (요청 시 동일 로직 확장 가능)
+## 검증
+- day 뷰: 첫 컬럼 라벨 `Up to / 21-Jul`, 값 = 이전 일일 컬럼들의 plan/actual 합; 이후 컬럼은 2026-07-22부터 표시.
+- hidePast on/off 전환 시 첫 컬럼 유지, 이후 컬럼만 슬라이스.
+- week 뷰: 라벨/컬럼 구성 현행 유지.
+- 다중 stage 선택 시 stage 행과 combined 행 모두 첫 컬럼 값이 stage 합계와 일치.
