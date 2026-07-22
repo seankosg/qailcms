@@ -27,6 +27,7 @@ import {
 } from "@/lib/task-management/delay-utils";
 import { TmKpiCards } from "./TmKpiCards";
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
+import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { DelayTopTable } from "./DelayTopTable";
 import { OwnerLeaderboardCard } from "./OwnerLeaderboardCard";
@@ -86,12 +87,39 @@ export function TmDashboardPage() {
   const asOfDate = selectedDataDate;
   const asOfLabel = "Data Date";
 
+  // 과거 Data Date 선택 시 각 task의 actual_progress를 스냅샷 값으로 재계산
+  const snapshot = useTaskProgressSnapshot();
+  const isPastDate = asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
+  const effectiveItems = useMemo(() => {
+    if (!isPastDate || !snapshot.ready) return items;
+    return items.map((it) => {
+      const v = snapshot.actualAt(snapshotKey(it.discipline, it.task_no), asOfDate);
+      if (v == null) {
+        // 스냅샷 없음 → 아직 시작 전으로 간주
+        return {
+          ...it,
+          actual_progress: 0,
+          actual_start: null,
+          actual_finish: null,
+          auto_judgment: null,
+        } as typeof it;
+      }
+      const clamped = Math.max(0, Math.min(1, v));
+      return {
+        ...it,
+        actual_progress: clamped,
+        actual_finish: clamped >= 1 ? it.actual_finish : null,
+        auto_judgment: clamped >= 1 ? it.auto_judgment : null,
+      } as typeof it;
+    });
+  }, [items, isPastDate, snapshot, asOfDate]);
+
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
 
   const taskScope: TaskScope =
     search.taskScope === "main" || search.taskScope === "sub" ? search.taskScope : "all";
 
-  const scopedByTaskScope = useMemo(() => scopeItems(items, taskScope), [items, taskScope]);
+  const scopedByTaskScope = useMemo(() => scopeItems(effectiveItems, taskScope), [effectiveItems, taskScope]);
 
   const [ownerDetail, setOwnerDetail] = useState<{
     dim: OwnerDim;
@@ -221,7 +249,7 @@ export function TmDashboardPage() {
         <Skeleton className="h-64 w-full" />
       ) : (
         <TmKpiCards
-          items={items}
+          items={effectiveItems}
           asOfDate={asOfDate}
           taskScope={taskScope}
           onScopeChange={(v) => patch({ taskScope: v })}
