@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/chart";
 import { computeWeeklyDelayTrend } from "@/lib/task-management/delay-utils";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
+import { formatDdMmm } from "@/lib/time/doha";
 
 interface Props {
   items: TaskItem[];
@@ -36,7 +37,7 @@ const cfg: ChartConfig = {
 export function WeeklyDelayTrend({ items, today, weeks = 12 }: Props) {
   const points = useMemo(() => computeWeeklyDelayTrend(items, today, weeks), [items, today, weeks]);
   const data = points.map((p) => ({
-    label: p.weekStart.slice(5),
+    label: formatDdMmm(p.weekStart),
     ...p,
   }));
   return (
