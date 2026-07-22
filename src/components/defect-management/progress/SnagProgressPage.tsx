@@ -510,6 +510,7 @@ export function SnagProgressPage() {
           label="PLAN"
           value={kpis.cumPlan.toLocaleString()}
           onClick={() => handleKpiClick("plan", "all")}
+          tone="neutral"
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
             text: kpis.byStage[s].plan.toLocaleString(),
@@ -520,6 +521,7 @@ export function SnagProgressPage() {
           label="ACTUAL"
           value={kpis.cumActual.toLocaleString()}
           onClick={() => handleKpiClick("actual", "all")}
+          tone="emerald"
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
             text: kpis.byStage[s].actual.toLocaleString(),
@@ -530,6 +532,7 @@ export function SnagProgressPage() {
           label="DIFFERENCE"
           value={`${kpis.diffAbs > 0 ? "+" : ""}${kpis.diffAbs.toLocaleString()}`}
           accent={kpis.diffAbs < 0 ? "text-schedule-short" : kpis.diffAbs > 0 ? "text-schedule-over" : ""}
+          tone="neutral"
           suffix={
             kpis.variance === null ? (
               <span className="text-[10px] text-muted-foreground">—</span>
@@ -564,6 +567,7 @@ export function SnagProgressPage() {
           label="DONE"
           value={`${kpis.doneStages.toLocaleString()} / ${kpis.totalStages.toLocaleString()}`}
           onClick={() => handleKpiClick("done", "all")}
+          tone="info"
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
             text: `${kpis.byStage[s].done.toLocaleString()} / ${kpis.byStage[s].total.toLocaleString()}`,
@@ -575,6 +579,7 @@ export function SnagProgressPage() {
           value={`${kpis.progressPct.toFixed(1)}%`}
           icon={TrendingUp}
           onClick={() => handleKpiClick("done", "all")}
+          tone="emerald"
           stageBreakdown={effectiveStages.map((s) => {
             const total = kpis.byStage[s].total;
             const pct = total > 0 ? (kpis.byStage[s].done / total) * 100 : null;
