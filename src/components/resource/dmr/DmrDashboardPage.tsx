@@ -368,7 +368,7 @@ export function DmrDashboardPage() {
                 <tr>
                   <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Sub Contractor</th>
                   {matrix.dates.map((d) => (
-                    <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{d.slice(5)}</th>
+                    <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
                   ))}
                   <th className="px-2 py-1 text-right">합계</th>
                 </tr>

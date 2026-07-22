@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Check, X, Download } from "lucide-react";
+import { formatDdMmm } from "@/lib/time/doha";
 import { toast } from "sonner";
 import { exportTmImportRecord } from "./exportTmImportRecord";
 import { toDohaDateKey, todayInDoha } from "@/lib/time/doha";
@@ -342,7 +343,7 @@ function MatrixTables({
                           } ${isToday ? "bg-primary/10 font-semibold" : ""}`}
                           title={d}
                         >
-                          {d.slice(5)}
+                          {formatDdMmm(d)}
                         </th>
                       );
                     })}
