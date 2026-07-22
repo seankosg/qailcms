@@ -625,7 +625,7 @@ export function SnagProgressPage() {
           tone="emerald"
           suffix={
             <span className="text-[10px] tabular-nums text-muted-foreground">
-              (Plan {kpis.planPct.toFixed(1)}%)
+              (P {kpis.planPct.toFixed(1)}%)
             </span>
           }
           stageBreakdown={effectiveStages.map((s) => {
@@ -634,7 +634,7 @@ export function SnagProgressPage() {
             const planPct = total > 0 ? (kpis.byStage[s].plan / total) * 100 : null;
             return {
               stage: s,
-              text: actualPct === null ? "—" : `${actualPct.toFixed(1)}% (Plan ${planPct?.toFixed(1)}%)`,
+              text: actualPct === null ? "—" : `${actualPct.toFixed(1)}% (P ${planPct?.toFixed(1)}%)`,
               onClick: () => handleKpiClick("done", s),
             };
           })}
