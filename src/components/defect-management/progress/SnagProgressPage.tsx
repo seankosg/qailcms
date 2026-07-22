@@ -80,7 +80,7 @@ export function SnagProgressPage() {
   const groupBy = parseCsv<GroupBy>(search.groupBy, ALL_GROUP_BY);
   const effectiveGroupBy: GroupBy[] = groupBy.length > 0 ? groupBy : ["team"];
   const stageView = parseCsv<Stage>(search.stageView, ALL_STAGES);
-  const effectiveStages: Stage[] = stageView.length > 0 ? stageView : [...ALL_STAGES];
+  const effectiveStages: Stage[] = stageView.length > 0 ? stageView : ["start", "rectified"];
   const rangeDays = search.range;
   const hidePast = search.hidePast === 1;
   const asofMode = search.asofMode;
