@@ -89,8 +89,11 @@ export function SnagProgressPage() {
   const scurveOpen = search.scurveOpen === 1;
 
   const today = todayIso();
-  const asOfDate = today; // Data Date 개념이 미도입 상태이므로 today 로 통일
-  const asOfLabel = asofMode === "today" ? "Today" : "Data Date";
+  const { options: dataDateOptions, latest: latestDataDate } = useDefectLatestDataDate();
+  const effectiveDataDate =
+    (search.dataDate as string) || latestDataDate || today;
+  const asOfDate = asofMode === "today" ? today : effectiveDataDate;
+  const asOfLabel = asofMode === "today" ? "Today" : effectiveDataDate;
 
   const rangeStart = useMemo(() => addDays(today, -14), [today]);
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
