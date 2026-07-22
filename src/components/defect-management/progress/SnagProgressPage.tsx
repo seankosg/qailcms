@@ -247,6 +247,27 @@ export function SnagProgressPage() {
     window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
   };
 
+  const handleKpiClick = (
+    kind: "plan" | "actual" | "done",
+    stage: Stage | "all",
+  ) => {
+    const params = new URLSearchParams();
+    params.set("source", "progress-kpi");
+    params.set("plan_group", planGroups.join(","));
+    if (teams.length) params.set("team", teams.join(","));
+    if (roomGroups.length) params.set("roomGroup", roomGroups.join(","));
+    if (stage !== "all") params.set("stage", stage);
+    if (kind === "plan") {
+      params.set("dateField", stageDateField(stage, "planned"));
+      params.set("dateEnd", asOfDate);
+    } else if (kind === "actual") {
+      params.set("dateField", stageDateField(stage, "actual"));
+      params.set("dateEnd", asOfDate);
+    }
+    // 'done' 카드 총계 클릭 시: 활성 전체 리스트 (dateField 미지정)
+    window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
+  };
+
   const isAllGroups = effectiveGroupBy.length === ALL_GROUP_BY.length;
   const isAllStages = effectiveStages.length === ALL_STAGES.length;
 
@@ -601,20 +622,70 @@ function KpiCard({
   value,
   accent,
   icon: Icon,
+  onClick,
+  suffix,
+  stageBreakdown,
 }: {
   label: string;
   value: number | string;
   accent?: string;
   icon?: typeof TrendingUp;
+  onClick?: () => void;
+  suffix?: React.ReactNode;
+  stageBreakdown?: Array<{
+    stage: Stage;
+    text: string;
+    tone?: "short" | "over";
+    onClick?: () => void;
+  }>;
 }) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-1 p-3">
-        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-          {Icon ? <Icon className="h-3 w-3" /> : null}
-          {label}
+    <Card
+      onClick={onClick}
+      className={cn(onClick && "cursor-pointer transition-colors hover:bg-accent/40")}
+    >
+      <CardContent className="flex items-stretch justify-between gap-2 p-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {Icon ? <Icon className="h-3 w-3" /> : null}
+            {label}
+          </div>
+          <div className="flex items-baseline gap-1">
+            <div className={cn("text-xl font-semibold tabular-nums leading-tight", accent)}>
+              {value}
+            </div>
+            {suffix}
+          </div>
         </div>
-        <div className={cn("text-xl font-semibold tabular-nums", accent)}>{value}</div>
+        {stageBreakdown && stageBreakdown.length > 0 && (
+          <div className="flex shrink-0 flex-col justify-center gap-0.5 border-l pl-2 text-[10px] tabular-nums">
+            {stageBreakdown.map((b) => (
+              <button
+                key={b.stage}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  b.onClick?.();
+                }}
+                className={cn(
+                  "flex items-center justify-between gap-2 rounded px-1 text-right transition-colors",
+                  b.onClick && "cursor-pointer hover:bg-accent/60",
+                  !b.onClick && "cursor-default",
+                )}
+              >
+                <span className="text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
+                <span
+                  className={cn(
+                    b.tone === "short" && "text-schedule-short",
+                    b.tone === "over" && "text-schedule-over",
+                  )}
+                >
+                  {b.text}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
