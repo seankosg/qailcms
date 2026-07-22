@@ -629,6 +629,24 @@ export type Database = {
         }
         Relationships: []
       }
+      defect_actual_backfill_snapshot_20260722: {
+        Row: {
+          actual_start_date_old: string | null
+          defect_item_id: string
+          snapshotted_at: string
+        }
+        Insert: {
+          actual_start_date_old?: string | null
+          defect_item_id: string
+          snapshotted_at?: string
+        }
+        Update: {
+          actual_start_date_old?: string | null
+          defect_item_id?: string
+          snapshotted_at?: string
+        }
+        Relationships: []
+      }
       defect_category_team_map: {
         Row: {
           category: string
@@ -934,6 +952,7 @@ export type Database = {
       }
       defect_items_raw: {
         Row: {
+          _backfilled_asd_before_20260722: boolean
           aconex_comments: string | null
           actual_closure_date: string | null
           actual_progress_pct: number | null
@@ -1018,6 +1037,7 @@ export type Database = {
           work_type: string | null
         }
         Insert: {
+          _backfilled_asd_before_20260722?: boolean
           aconex_comments?: string | null
           actual_closure_date?: string | null
           actual_progress_pct?: number | null
@@ -1102,6 +1122,7 @@ export type Database = {
           work_type?: string | null
         }
         Update: {
+          _backfilled_asd_before_20260722?: boolean
           aconex_comments?: string | null
           actual_closure_date?: string | null
           actual_progress_pct?: number | null

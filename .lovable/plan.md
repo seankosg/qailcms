@@ -1,30 +1,30 @@
-## 목표
-Defect(SM) 모듈의 `rectified_status` 컬럼에서 사용되던 **"Not Started"** 값을 **"Not finish yet"**으로 저장값·표시 라벨 모두 통일합니다. 기존 DB 행은 단일 마이그레이션으로 일괄 갱신합니다.
+## Rectified 스테이지 3조건 실측 결과: 백필 대상 0건
 
-## 변경 계획
+Start와 동일한 3조건을 적용:
+1. `rectified_status = 'Done'`
+   = `isStageDone(row,'rectified')`
+   = `actual_rectified_date IS NOT NULL` OR `actual_progress_pct ≥ 100` OR `actual_closure_date IS NOT NULL`
+2. `actual_rectified_date IS NULL`
+3. `planned_rectified_date IS NOT NULL`
 
-### 1) DB 마이그레이션 (1회성 일괄 UPDATE)
-```sql
-UPDATE public.defect_items_raw
-SET rectified_status = 'Not finish yet'
-WHERE rectified_status = 'Not Started';
-```
+`is_active=true AND status_group='unclosed'` 대상:
 
-### 2) 코드 수정
-- `src/lib/defect-management/derived.ts`: `deriveRectifiedStatus`의 `"Not Started"` 반환값 4곳을 `"Not finish yet"`으로 교체. 주석 문구도 소폭 갱신.
-- `src/lib/defect-management/columns.ts`:
-  - `RECTIFIED_STATUSES = ["Not finish yet", "In Progress", "Rectified"]`
-  - `DEFECT_STATUS_STYLES`의 `"Not Started"` 키를 `"Not finish yet"`으로 교체(기존 zinc 스타일 유지).
+| 항목 | 건수 |
+|---|---:|
+| Rectified Done 총계 | 7,744 |
+| Done 이지만 `actual_rectified_date IS NULL` | **0** |
+| 3조건 모두 만족 (백필 대상) | **0** |
 
-### 3) 유지 항목 (동일 문구지만 별개 개념)
-- `stage-utils.ts`의 `classifyDefectStage` 반환 enum "Not Started" — Progress 가상 컬럼의 파생 스테이지 라벨로 `rectified_status`와 독립. 그대로 둡니다.
-- `DefectRawDataPage.tsx`의 stage_progress 필터 옵션 "Not Started" — 위와 동일한 가상 컬럼용이므로 유지.
-- `DefectStageProgress.tsx` — `rectified_status`를 `"wip"` 여부만 검사하므로 영향 없음.
+추가 sanity check도 0건 확인:
+- `actual_progress_pct ≥ 100` 이면서 `actual_rectified_date IS NULL` → 0건
+- `actual_closure_date IS NOT NULL` 이면서 `actual_rectified_date IS NULL` → 0건
 
-### 4) 검증
-- 타입체크 통과 확인.
-- Raw Data 페이지 Rectified Status 필터 옵션·뱃지가 "Not finish yet"으로 표시되는지 확인.
-- 마이그레이션 후 `SELECT DISTINCT rectified_status FROM defect_items_raw`에 "Not Started" 미존재 확인.
+즉 Rectified 스테이지는 UI 상 Done인 모든 행이 이미 `actual_rectified_date`를 가지고 있어 **백필할 데이터가 없습니다**. Closure도 마찬가지로 `closure_status='Done' ⇔ actual_closure_date IS NOT NULL` 이므로 구조적으로 백필 대상이 0건입니다.
 
-## 진행 순서
-빌드 모드 전환 후 마이그레이션 승인 → 실행 → 위 2개 파일 수정 → 타입체크.
+## 결론
+
+- 이전 승인안 그대로 **Start 스테이지만 1,721행 백필** 하면 됩니다.
+- Rectified/Closure에는 마이그레이션·백필 필요 없음.
+- 계획서(Start 전용 스냅샷 + planned_start_date → actual_start_date 복사) 변경 없음.
+
+이 상태로 build 모드 승인 부탁드립니다.
