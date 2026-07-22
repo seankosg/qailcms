@@ -7,6 +7,7 @@ const searchSchema = z.object({
   plot: fallback(z.enum(["C", "D"]), "C").default("C"),
   teams: fallback(z.string(), "").default(""),
   roomGroups: fallback(z.string(), "").default(""),
+  dataDate: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/snag-management/dashboard")({
