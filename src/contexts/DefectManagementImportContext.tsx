@@ -20,6 +20,11 @@ import {
   type ParsedDefectRow,
 } from "@/lib/defect-management/parser";
 import { deriveRectifiedStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
+import {
+  resolvePlotFromPlanGroup,
+  resolveHdec,
+  resolveSubcon,
+} from "@/lib/defect-management/auto-fill-rules";
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
@@ -711,6 +716,28 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       if (!category) return null;
       return teamByCategory.get(String(category).trim()) ?? null;
     };
+
+    // HDEC PIC/ENG 및 Subcon 자동 채움 rule 조회
+    let hdecRules: import("@/lib/defect-management/auto-fill-rules").HdecPicRule[] = [];
+    let subconRules: import("@/lib/defect-management/auto-fill-rules").SubconRule[] = [];
+    try {
+      const [hRes, sRes] = await Promise.all([
+        (supabase as any)
+          .from("defect_hdec_pic_rules")
+          .select("id, plot, building, room_group, hdec_pic, hdec_eng, sort_order, is_active")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
+        (supabase as any)
+          .from("defect_subcon_rules")
+          .select("id, plot, room_group, trade_keywords, subcontractor_name, sort_order, is_active")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
+      ]);
+      hdecRules = (hRes.data ?? []) as typeof hdecRules;
+      subconRules = (sRes.data ?? []) as typeof subconRules;
+    } catch (e) {
+      console.warn("[defect-import] auto-fill rules fetch failed", e);
+    }
     /** 파일의 team 값을 DEFECT_TEAMS 기준으로 정규화. 유효하지 않으면 null. */
     const normalizeFileTeam = (raw: unknown): DefectTeam | null => {
       if (raw == null) return null;
@@ -804,6 +831,9 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           main_trade: string | null;
           sub_trade: string | null;
           work_type: string | null;
+          hdec_pic_name: string | null;
+          hdec_eng_name: string | null;
+          subcontractor_name: string | null;
         }
       >();
       const idChunks: string[][] = [];
@@ -813,7 +843,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
         const { data, error } = await (supabase as any)
           .from("defect_items_raw")
-          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, actual_rectified_date, actual_start_date, rectified_status, closure_status, defect_location, main_trade, sub_trade, work_type")
+          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, actual_rectified_date, actual_start_date, rectified_status, closure_status, defect_location, main_trade, sub_trade, work_type, hdec_pic_name, hdec_eng_name, subcontractor_name")
           .in("source_issue_no", chunk);
         if (error) {
           throw new Error(
@@ -833,6 +863,9 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             main_trade: r.main_trade ?? null,
             sub_trade: r.sub_trade ?? null,
             work_type: r.work_type ?? null,
+            hdec_pic_name: r.hdec_pic_name ?? null,
+            hdec_eng_name: r.hdec_eng_name ?? null,
+            subcontractor_name: r.subcontractor_name ?? null,
           });
         }
       });
@@ -913,6 +946,46 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             if (k === "team") continue;
             if (k === "hdec_verification" && skipVerification) continue;
             put(base, k, v);
+          }
+        }
+        // ── 자동 채움 rule: HDEC PIC/ENG · Subcon ──
+        // 원본 엑셀 값(base 에 이미 있음) 또는 기존 DB 값이 있으면 skip.
+        {
+          const planGroupVal = (base.plan_group ?? p.plan_group ?? null) as string | null;
+          const roomGroupVal = (base.room_group ?? p.room_group ?? null) as string | null;
+          const buildingVal = (base.building ?? p.building ?? null) as string | null;
+          const plot = resolvePlotFromPlanGroup(planGroupVal);
+          if (plot) {
+            // HDEC PIC / ENG
+            const needPic = !base.hdec_pic_name && !prev?.hdec_pic_name && !excludedFields.has("hdec_pic_name");
+            const needEng = !base.hdec_eng_name && !prev?.hdec_eng_name && !excludedFields.has("hdec_eng_name");
+            if (needPic || needEng) {
+              const hit = resolveHdec(hdecRules, plot, buildingVal, planGroupVal, roomGroupVal);
+              if (hit) {
+                if (needPic && hit.pic) base.hdec_pic_name = hit.pic;
+                if (needEng && hit.eng) base.hdec_eng_name = hit.eng;
+              }
+            }
+            // Subcon
+            if (
+              !base.subcontractor_name &&
+              !prev?.subcontractor_name &&
+              !excludedFields.has("subcontractor_name")
+            ) {
+              const mainTradeVal = (base.main_trade ?? null) as string | null;
+              const subTradeVal = (base.sub_trade ?? null) as string | null;
+              const descVal = (base.description ?? p.description ?? null) as string | null;
+              const sub = resolveSubcon(
+                subconRules,
+                plot,
+                planGroupVal,
+                roomGroupVal,
+                mainTradeVal,
+                subTradeVal,
+                descVal,
+              );
+              if (sub) base.subcontractor_name = sub;
+            }
           }
         }
         // ── Status 전이 기반 Actual Date 자동 채움 ────────────────────────────

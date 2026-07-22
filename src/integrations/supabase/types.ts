@@ -776,6 +776,45 @@ export type Database = {
         }
         Relationships: []
       }
+      defect_hdec_pic_rules: {
+        Row: {
+          building: string
+          created_at: string
+          hdec_eng: string | null
+          hdec_pic: string | null
+          id: string
+          is_active: boolean
+          plot: string
+          room_group: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          building: string
+          created_at?: string
+          hdec_eng?: string | null
+          hdec_pic?: string | null
+          id?: string
+          is_active?: boolean
+          plot: string
+          room_group: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          building?: string
+          created_at?: string
+          hdec_eng?: string | null
+          hdec_pic?: string | null
+          id?: string
+          is_active?: boolean
+          plot?: string
+          room_group?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       defect_header_mappings: {
         Row: {
           created_at: string
@@ -1247,6 +1286,42 @@ export type Database = {
           source_issue_no?: string | null
           team?: string | null
           upload_id?: string | null
+        }
+        Relationships: []
+      }
+      defect_subcon_rules: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          plot: string
+          room_group: string
+          sort_order: number
+          subcontractor_name: string
+          trade_keywords: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          plot: string
+          room_group: string
+          sort_order?: number
+          subcontractor_name: string
+          trade_keywords?: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          plot?: string
+          room_group?: string
+          sort_order?: number
+          subcontractor_name?: string
+          trade_keywords?: string[]
+          updated_at?: string
         }
         Relationships: []
       }

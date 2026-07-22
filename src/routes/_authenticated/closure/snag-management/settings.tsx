@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DefectCategoryTeamMapPage } from "@/components/defect-management/settings/DefectCategoryTeamMapPage";
+import { SnagListSettingsPage } from "@/components/defect-management/settings/SnagListSettingsPage";
 
 export const Route = createFileRoute("/_authenticated/closure/snag-management/settings")({
   head: () => ({ meta: [{ title: "Snag List Settings — QAIL CMS" }] }),
-  component: DefectCategoryTeamMapPage,
+  component: SnagListSettingsPage,
 });
