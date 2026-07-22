@@ -1212,7 +1212,7 @@ export function TaskManagementRawDataPage() {
                       "group absolute left-0 top-0 flex cursor-pointer border-b text-xs hover:bg-accent/40",
                       row.getIsSelected() && "bg-primary/5",
                       isParent && "bg-muted/30 font-medium text-sm",
-                      isDone && "bg-muted/40 text-muted-foreground/70",
+                      isDone && "bg-muted/40 text-muted-foreground/70 grayscale",
                     )}
                   >
                     {row.getVisibleCells().map((cell) => {
