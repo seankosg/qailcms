@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { DefectTeam } from "./columns";
+import { dohaWallToUtcIso } from "@/lib/time/doha";
 
 /** Re-import 마커 헤더 — Raw Data에서 재수출한 파일에만 존재. */
 export const REIMPORT_MARKER_HEADER = "QAIL_DEFECT_REIMPORT_V1";
@@ -288,21 +289,64 @@ function toIsoDate(v: unknown): string | null {
 function toIsoDateTime(v: unknown): string | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
-    return Number.isNaN(v.getTime()) ? null : v.toISOString();
+    if (Number.isNaN(v.getTime())) return null;
+    // XLSX cellDates:true returns a Date whose *local* components hold the
+    // sheet's wall-clock value. Interpret those components as Doha (+03:00).
+    return dohaWallToUtcIso(
+      v.getFullYear(),
+      v.getMonth() + 1,
+      v.getDate(),
+      v.getHours(),
+      v.getMinutes(),
+      v.getSeconds(),
+    );
   }
   if (typeof v === "number") {
-    // Excel serial → UTC datetime
     const parsed = XLSX.SSF?.parse_date_code?.(v);
     if (parsed) {
-      const d = new Date(
-        Date.UTC(parsed.y, parsed.m - 1, parsed.d, parsed.H || 0, parsed.M || 0, Math.floor(parsed.S || 0)),
+      return dohaWallToUtcIso(
+        parsed.y,
+        parsed.m,
+        parsed.d,
+        parsed.H || 0,
+        parsed.M || 0,
+        Math.floor(parsed.S || 0),
       );
-      return d.toISOString();
     }
   }
   if (typeof v === "string") {
-    const d = new Date(v);
-    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    const s = v.trim();
+    if (!s) return null;
+    // If the string carries an explicit timezone (Z or ±HH:MM), respect it.
+    if (/(Z|[+\-]\d{2}:?\d{2})$/.test(s)) {
+      const d = new Date(s);
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    }
+    // Naive wall-clock: `YYYY-MM-DD[ T]HH:mm(:ss)?` — treat as Doha local.
+    const m = s.match(
+      /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/,
+    );
+    if (m) {
+      return dohaWallToUtcIso(
+        Number(m[1]),
+        Number(m[2]),
+        Number(m[3]),
+        Number(m[4] ?? 0),
+        Number(m[5] ?? 0),
+        Number(m[6] ?? 0),
+      );
+    }
+    // Fallback: let JS parse (e.g. `Jul 22 2026`) — read components as-is.
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return null;
+    return dohaWallToUtcIso(
+      d.getFullYear(),
+      d.getMonth() + 1,
+      d.getDate(),
+      d.getHours(),
+      d.getMinutes(),
+      d.getSeconds(),
+    );
   }
   return null;
 }
