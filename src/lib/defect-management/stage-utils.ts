@@ -16,6 +16,14 @@ export function isStageDone(row: Row, stage: "start" | "rectified" | "closure"):
     return Boolean(row.actual_closure_date);
   }
   // start
+  const sr = String(row.status_raw ?? "").trim().toLowerCase();
+  if (
+    sr === "rectified" ||
+    sr === "complete" ||
+    sr === "completed" ||
+    sr === "closed" ||
+    sr === "verified"
+  ) return true;
   if (row.actual_start_date) return true;
   const p = Number(row.actual_progress_pct ?? 0);
   if (p > 0) return true;
