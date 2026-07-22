@@ -135,13 +135,9 @@ interface PersistedState {
   frozenExtras: string[];
 }
 
+import { formatDdMmmYyyy } from "@/lib/time/doha";
 function formatDdMmm(v: string | null | undefined): string {
-  if (!v) return "";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return String(v);
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  const mon = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
-  return `${day}-${mon}`;
+  return formatDdMmmYyyy(v);
 }
 
 function renderBadge(key: string, value: string) {

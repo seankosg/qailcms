@@ -128,14 +128,7 @@ export const PLOT_COLORS: Record<string, string> = {
   D: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
 };
 
-export function formatDdMmm(v: string | null | undefined): string {
-  if (!v) return "";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return String(v);
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  const mon = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
-  return `${day}-${mon}`;
-}
+export { formatDdMmm } from "@/lib/time/doha";
 
 export function formatNumber(v: number | null | undefined, digits = 0): string {
   if (v == null) return "";

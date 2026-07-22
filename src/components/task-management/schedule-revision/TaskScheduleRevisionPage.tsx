@@ -106,23 +106,13 @@ function stageLeafIds(stage: Stage): { id: string; label: string; size: number }
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+import { formatDdMmmYyyy as _fmtLong, formatDdMmmYyyyHm as _fmtLongHm } from "@/lib/time/doha";
 function formatDdMmm(v: string | null | undefined): string {
-  if (!v) return "—";
-  const s = String(v).slice(0, 10);
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (!m) return s;
-  const mo = Number(m[2]);
-  return `${m[3]}-${MONTHS[mo - 1] ?? m[2]}`;
+  const out = _fmtLong(v);
+  return out || "—";
 }
 function formatDateTimeDdMmmYyyy(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = MONTHS[d.getMonth()];
-  const yy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}-${mm}-${yy} ${hh}:${mi}`;
+  return _fmtLongHm(iso) || iso;
 }
 function formatSignedDays(v: number | null | undefined): string {
   if (v == null) return "—";

@@ -140,11 +140,9 @@ function toServerSort(s: SortingState): AbdServerSort[] {
   return s.map((x) => ({ column: x.id, desc: !!x.desc }));
 }
 
+import { formatDdMmmYyyy as _fmtLong } from "@/lib/time/doha";
 function formatDdMmm(v: any): string {
-  if (!v) return "";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return String(v);
-  return `${String(d.getDate()).padStart(2, "0")}-${d.toLocaleString("en", { month: "short" })}-${String(d.getFullYear()).slice(2)}`;
+  return _fmtLong(v);
 }
 
 

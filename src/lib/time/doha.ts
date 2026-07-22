@@ -45,6 +45,74 @@ export function dohaDateTime(input?: string | Date): string {
   return shiftToDoha(d).toISOString().slice(0, 16).replace("T", " ");
 }
 
+// ── User-facing date display formatters ──────────────────────────
+// Canonical formats:
+//   Long  : dd-MMM-yyyy  (e.g. 22-Jul-2026)
+//   Short : dd-MMM       (e.g. 22-Jul)
+//   Short w/ year : dd-MMM-yy (e.g. 22-Jul-26)
+//   Date+Time     : dd-MMM-yyyy HH:mm
+// All inputs are interpreted per Doha wall-clock. Invalid inputs → "".
+
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function toDohaParts(input: string | number | Date | null | undefined):
+  | { d: string; m: string; y: string; hh: string; mm: string }
+  | null {
+  if (input == null || input === "") return null;
+  let date: Date;
+  if (input instanceof Date) {
+    date = input;
+  } else if (typeof input === "number") {
+    date = new Date(input);
+  } else {
+    const s = String(input).trim();
+    if (!s) return null;
+    // Bare YYYY-MM-DD → treat as Doha calendar date (no TZ shift needed).
+    const bareIso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (bareIso) {
+      const [, y, m, d] = bareIso;
+      const mi = Number(m) - 1;
+      if (mi < 0 || mi > 11) return null;
+      return { d, m: MONTHS_SHORT[mi], y, hh: "00", mm: "00" };
+    }
+    date = new Date(s);
+  }
+  if (Number.isNaN(date.getTime())) return null;
+  const shifted = shiftToDoha(date);
+  const iso = shifted.toISOString();
+  const y = iso.slice(0, 4);
+  const mIdx = Number(iso.slice(5, 7)) - 1;
+  const d = iso.slice(8, 10);
+  const hh = iso.slice(11, 13);
+  const mm = iso.slice(14, 16);
+  if (mIdx < 0 || mIdx > 11) return null;
+  return { d, m: MONTHS_SHORT[mIdx], y, hh, mm };
+}
+
+/** dd-MMM-yyyy (long, canonical single-date display). */
+export function formatDdMmmYyyy(input: string | number | Date | null | undefined): string {
+  const p = toDohaParts(input);
+  return p ? `${p.d}-${p.m}-${p.y}` : "";
+}
+
+/** dd-MMM (compact, no year). */
+export function formatDdMmm(input: string | number | Date | null | undefined): string {
+  const p = toDohaParts(input);
+  return p ? `${p.d}-${p.m}` : "";
+}
+
+/** dd-MMM-yy (compact w/ 2-digit year). */
+export function formatDdMmmYy(input: string | number | Date | null | undefined): string {
+  const p = toDohaParts(input);
+  return p ? `${p.d}-${p.m}-${p.y.slice(2)}` : "";
+}
+
+/** dd-MMM-yyyy HH:mm (single date-time display). */
+export function formatDdMmmYyyyHm(input: string | number | Date | null | undefined): string {
+  const p = toDohaParts(input);
+  return p ? `${p.d}-${p.m}-${p.y} ${p.hh}:${p.mm}` : "";
+}
+
 /** Convert a Doha calendar date-key + local wall time to the equivalent UTC ISO. */
 export function dohaDateKeyToUtcIso(dateKey: string, wallTime = "00:00:00"): string {
   return new Date(`${dateKey}T${wallTime}+03:00`).toISOString();

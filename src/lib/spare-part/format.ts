@@ -1,11 +1,13 @@
-import { todayInDoha } from "@/lib/time/doha";
+import { todayInDoha, formatDdMmm as _fmtShort, formatDdMmmYyyy } from "@/lib/time/doha";
+
+/** Long display: dd-MMM-yyyy (name retained for backwards compat). */
 export function formatDdMmm(v: string | null | undefined): string {
-  if (!v) return "";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return String(v);
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  const mon = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
-  return `${day}-${mon}`;
+  return formatDdMmmYyyy(v);
+}
+
+/** Short display: dd-MMM. */
+export function formatDdMmmShort(v: string | null | undefined): string {
+  return _fmtShort(v);
 }
 
 export function formatNumber(v: number | null | undefined, digits = 0): string {

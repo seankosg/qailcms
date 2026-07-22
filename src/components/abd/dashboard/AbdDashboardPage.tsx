@@ -143,7 +143,7 @@ export function AbdDashboardPage() {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2 font-normal">
                 <CalendarIcon className="h-4 w-4" />
-                As of: {format(asOf, "dd MMM yyyy")}
+                As of: {format(asOf, "dd-MMM-yyyy")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -529,7 +529,7 @@ function TrendCard({
             <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
-              tickFormatter={(v) => format(parseISO(v), "MMM d")}
+              tickFormatter={(v) => format(parseISO(v), "dd-MMM")}
               tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
               tickLine={false}
               axisLine={false}
@@ -549,7 +549,7 @@ function TrendCard({
                 borderRadius: 6,
                 fontSize: 12,
               }}
-              labelFormatter={(v) => format(parseISO(String(v)), "yyyy-MM-dd")}
+              labelFormatter={(v) => format(parseISO(String(v)), "dd-MMM-yyyy")}
             />
             <Area
               type="monotone"
