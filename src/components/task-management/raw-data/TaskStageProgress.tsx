@@ -12,12 +12,9 @@ function toDate(v: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+import { formatDdMmm as _fmtShort } from "@/lib/time/doha";
 function fmtDdMmm(v: unknown): string {
-  const d = toDate(v);
-  if (!d) return "";
-  const day = String(d.getDate()).padStart(2, "0");
-  const mon = d.toLocaleString("en-US", { month: "short" });
-  return `${day} ${mon}`;
+  return _fmtShort(v as any);
 }
 
 import { todayInDoha } from "@/lib/time/doha";
