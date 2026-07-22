@@ -1,40 +1,27 @@
-## 원인
+## 목표
+2026-07-22 이전 레거시 데이터 중 계획일과 실제일이 **둘 다 비어있는** 경우 두 필드 모두 **2026-07-20**로 채워 완료 처리한다.
 
-`src/lib/defect-management/stage-utils.ts`의 `isStageDone`이 Rectified/Closure 스테이지에서 오직 실적 날짜/진도율만 검사하기 때문에, `status_raw`나 파생 상태가 이미 완료 계열이더라도 실적 날짜가 비어있으면 아이콘이 "planned"로 표시됩니다.
+## 대상 및 조건
 
-DB 확인 결과 (ID 100840 / 100850 / 100854):
+공통 필터: `created_at < '2026-07-22 00:00:00+03'` (도하 시간 기준)
 
-| source_issue_no | status_raw | rectified_status | actual_rectified_date |
-|---|---|---|---|
-| 100840 | Rectified | Rectified | NULL |
-| 100850 | Rectified | Rectified | NULL |
-| 100854 | Rectified | Rectified | NULL |
+### 1) Rectified 스테이지
+- `rectified_status = 'Rectified'`
+- `actual_rectified_date IS NULL`
+- `planned_rectified_date IS NULL`
+- → `planned_rectified_date = '2026-07-20'`, `actual_rectified_date = '2026-07-20'`
 
-앞서 확립된 규칙 "status_raw가 rectified 계열 → Start=Done, Rectified=Rectified"는 파생값에만 반영되었고 `isStageDone`의 Rectified/Closure 분기에는 반영되지 않았습니다.
+### 2) Start 스테이지
+- `status_raw`가 완료 계열(rectified/complete/completed/closed/verified) 이거나 `rectified_status = 'Rectified'` (= Start가 Done으로 간주되는 조건)
+- `actual_start_date IS NULL`
+- `planned_start_date IS NULL`
+- → `planned_start_date = '2026-07-20'`, `actual_start_date = '2026-07-20'`
 
-## 수정 방침
+## 실행 방법
+- `defect_items_raw`에 대해 단일 마이그레이션으로 두 개의 UPDATE 실행
+- 실행 전 대상 건수를 조회하여 사용자에게 보고 후 반영
+- 파생 필드(rectified_status, start_status)는 서버 RPC에서 자동 재계산되므로 별도 조치 불필요
 
-`src/lib/defect-management/stage-utils.ts`의 `isStageDone` 함수만 수정합니다(기존 조건 유지, OR로 확장).
-
-**Rectified 분기 추가 조건**
-- `status_raw` ∈ { rectified, complete, completed, closed, verified } → Done
-- `rectified_status` == `Rectified` → Done
-
-**Closure 분기 추가 조건**
-- `status_raw` ∈ { closed, verified } → Done
-- `closure_status` ∈ { Closed, Verified } → Done
-
-Start 분기는 이미 status_raw 완료 계열을 Done 처리하고 있으므로 변경 없음.
-
-## 변경 범위
-
-- **수정 파일**: `src/lib/defect-management/stage-utils.ts` — `isStageDone`의 rectified / closure 분기에 위 OR 조건 추가.
-- **파급 (자동 반영)**:
-  - `DefectStageProgress.classifyStage` → 아이콘 done(●, 초록) 표시
-  - `isActualComplete`, `isClosureComplete`, `classifyDefectStage`, `isStageDelayedAsOf` → Rectified/Closure 완료 정합성 확보
-- **DB 마이그레이션 없음** — 코드 로직 수정만.
-- **서버 RPC**(`defect_items_search` 등)는 이번 스코프에서 건드리지 않음(리포트는 UI 아이콘 문제). 필요 시 별도 지시로 확장.
-
-## 검증
-
-`/closure/raw-data`에서 ID 100840 / 100850 / 100854의 Progress 아이콘이 Start ● + Rectified ● (초록) 로 표시되는지 확인. Closure는 `status_raw`/`closure_status`가 Closed·Verified인 샘플로 별도 확인.
+## 스코프 외
+- 7/22 이후 데이터는 건드리지 않음
+- Closure 스테이지는 이번 지시 범위 외 (요청 시 동일 로직 확장 가능)
