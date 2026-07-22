@@ -1,76 +1,71 @@
-## 범위
-`src/components/defect-management/progress/SnagProgressPage.tsx` KPI 카드 재구성 + Snag Progress/Dashboard 상단에 Data Date 선택기 도입. 매트릭스/차트 로직은 무변경.
+## 목표
+앱 전체의 사용자 노출 날짜 표시 형식을 아래 규칙으로 통일합니다.
+- 긴 형식: `yyyy-mm-dd` → `dd-MMM-yyyy` (예: `22-Jul-2026`)
+- 짧은 형식: `dd-MMM` 또는 `dd-MMM-yy` (예: `22-Jul`, `22-Jul-26`)
 
----
+DB에 저장되는 ISO 값(`YYYY-MM-DD`, `timestamptz`)과 파일명용 타임스탬프(`dohaStampCompact`)는 그대로 유지합니다. 변경 대상은 **UI 표시 문자열**과 엑셀 셀 표시값만입니다.
 
-## 1. KPI 카드 재구성 (SM Progress)
+## 구현 방식
 
-파일: `src/components/defect-management/progress/SnagProgressPage.tsx`
+### 1. 공통 포매터 신설 (`src/lib/time/doha.ts`)
+아래 헬퍼를 추가하여 앱 전역이 단일 소스에서 포맷팅하도록 만듭니다.
+- `formatDdMmmYyyy(input)` → `22-Jul-2026` (긴 형식, 기본)
+- `formatDdMmm(input)` → `22-Jul` (짧은 형식, 연도 생략)
+- `formatDdMmmYy(input)` → `22-Jul-26` (짧은 형식, 2자리 연도)
+- `formatDdMmmYyyyHm(input)` → `22-Jul-2026 14:30` (기존 `dohaDateTime` 대체용, 필요 지점에서만)
 
-- Range 카드 제거 → 5개 카드로 축소 (`lg:grid-cols-6` → `lg:grid-cols-5`).
-- 라벨 변경:
-  - `Cum. Plan` → **PLAN**
-  - `Cum. Actual` → **ACTUAL**
-  - `Variance` → **DIFFERENCE**
-  - `Done Stages` → **DONE**
-  - `Progress` → **PROGRESS** (유지)
-- 카드 내부 레이아웃을 좌/우 2-컬럼으로 개편(카드 크기 현행 유지). 좌측: 라벨 + 총계. 우측: **Stage 별 breakdown**(Start / Rect / Close 3줄, 우측 정렬 tabular-nums, 10px muted).
-- Stage별 값 계산 (`totalsQ.data`를 `effectiveStages`로 필터한 뒤 stage별 집계 map 생성):
-  - PLAN: `plan_upto` per stage
-  - ACTUAL: `actual_upto` per stage
-  - DIFFERENCE: `actual_upto - plan_upto` per stage (부호 포함)
-  - DONE: `done_upto / total` per stage
-  - PROGRESS: stage별 `done_upto / total * 100` (0 division 시 `-`)
-- DIFFERENCE 카드 본체 값: 절대 차이 `ACTUAL - PLAN` (+면 초록 `text-schedule-over`, −면 빨강 `text-schedule-short`). 값 오른쪽에 작은 % 배지 `(±xx.x%)`, plan=0이면 `—`.
-- `KpiCard`를 좌/우 슬롯 + `stageBreakdown` + `onClick`(총계/스테이지 각각) 프롭 받는 형태로 확장.
+모두 도하 타임존 기준으로 계산하며, 잘못된 값은 빈 문자열을 반환합니다.
 
-### 1-1. 카드 클릭 → Raw Data 이동 (기존필터 리셋)
-- 카드 본체(총계) 또는 우측 Stage 뱃지 클릭 시 Raw Data로 이동. `window.location.assign`로 이동하여 기존 Raw Data URL 파라미터를 완전히 대체(리셋 보장).
-- 파라미터 구성 규칙 (Progress 페이지의 Plot/Team/RoomGroup/asOfDate만 승계, 그 외 Raw Data 필터는 넘기지 않음):
-  - 공통: `source=progress-kpi`, `plan_group=planGroupsForPlot(plot)`, 필요 시 `team`, `roomGroup`, `asOfDate=effectiveDataDate`
-  - 카드별 필터:
-    - **PLAN**: `dateField=<stage.planned>`, `dateEnd=effectiveDataDate` (계획 <= as-of)
-    - **ACTUAL**: `dateField=<stage.actual>`, `dateEnd=effectiveDataDate` (실제 <= as-of, 완료건)
-    - **DIFFERENCE**: `ACTUAL` 카드와 동일 URL (실적 목록). 별도 정의 없음 안내는 생략.
-    - **DONE**: 총계 클릭 = 전체 대상(`status=Open,Rectified,Re-Opened,Closed` 미지정, 즉 활성 전체). Stage 뱃지 클릭 = 해당 stage 완료건 (= ACTUAL 규칙).
-    - **PROGRESS**: DONE과 동일.
-  - 총계(전체 stage) 클릭 시: `stage` 파라미터 미설정, `dateField`는 `stage="all"` 매핑(=`*_rectified_date`) 사용.
-  - Stage 뱃지 클릭 시: `stage=<start|rectified|closure>` 추가.
-- `stageDateField(stage, "planned"|"actual")` (`progress-utils.ts`)는 그대로 재사용.
+### 2. 기존 로컬 포매터 통합
+현재 프로젝트에는 동일 목적의 포매터가 파일별로 흩어져 있습니다. 모두 위 공통 헬퍼로 교체합니다.
+- `src/lib/defect-management/stage-utils.ts` → `formatDdMmm`
+- `src/lib/spare-part/format.ts` → `formatDdMmm`
+- `src/components/task-management/raw-data/TaskStageProgress.tsx` → 내부 `fmtDdMmm`
+- 기타 컴포넌트에서 `toLocaleDateString`, `slice(0,10)`, `date-fns/format` 로 직접 만드는 곳
 
----
+### 3. 교체 대상 스캔 규칙
+빌드 모드 진입 후 다음 패턴을 정적 검색으로 훑어 후보를 뽑고, UI 표시 문자열만 교체합니다.
+- `toLocaleDateString(` — 사용자 표시 문자열 대부분
+- `\.slice\(0,\s*10\)` — 표시 목적으로 ISO 앞 10자만 잘라 쓰는 곳
+- `date-fns` `format(` 호출 중 `yyyy`, `yyyy-MM-dd`, `PPP`, `MMM d, yyyy` 등
+- 커스텀 `fmt*Date`, `formatDate`, `fmtDdMmm` 등의 로컬 헬퍼
 
-## 2. Data Date 선택기
+DB 저장/전송/파일명/HTML `<input type="date">` value 는 제외합니다 (아래 §5).
 
-### 2-1. 공용 훅 신설
-`src/hooks/useDefectLatestDataDate.ts` (신규)
-- `supabase.from("defect_items_raw").select("data_date").eq("is_active", true).not("data_date","is",null)` → 클라이언트 distinct → 내림차순. `latest = arr[0]`.
-- 반환 `{ options: string[], latest: string | null, isLoading }`. staleTime 5분.
+### 4. 페이지·컴포넌트 표시 지점 (대표)
+- Raw Data 테이블 (SM/TM/ABD/DMR/Spare Part) 의 날짜 셀
+- 상세 시트/페이지의 필드 값
+- 대시보드 KPI 카드, 매트릭스 헤더/툴팁, S-Curve 축 라벨
+- Task Tree 미니 차트 툴팁, Progress Chart Dialog 축·툴팁
+- Data Date Picker 트리거 라벨, DatePicker 트리거
+- Import Log 매트릭스 헤더(날짜 컬럼 축약형은 짧은 형식 사용)
+- 댓글 타임스탬프 (`formatDdMmmYyyyHm`)
+- 엑셀 내보내기 셀 값(파일명은 유지)
 
-### 2-2. URL 파라미터 추가
-- `src/routes/_authenticated/closure/snag-management/progress.tsx` `searchSchema`에 `dataDate: fallback(z.string(), "").default("")` 추가.
-- `src/routes/_authenticated/closure/snag-management/dashboard.tsx` 동일 추가.
+각 지점에서 자연스러운 표시 폭을 위해 다음 원칙을 적용합니다.
+- 단일 날짜 필드/툴팁: 긴 형식(`dd-MMM-yyyy`)
+- 매트릭스 컬럼 헤더, 차트 축, 좁은 셀 배지, 스테이지 배지 부제: 짧은 형식(`dd-MMM`)
+- 여러 해가 섞이는 축(장기 S-Curve 등): 필요 시 `dd-MMM-yy`
 
-### 2-3. Progress 페이지 통합
-- `useDefectLatestDataDate()` → `effectiveDataDate = search.dataDate || latest || todayIso()`.
-- 기존 `asOfDate = today`를 `asOfDate = effectiveDataDate` 로 교체. `asOfLabel`은 선택된 날짜 문자열 표시.
-- 헤더 "Snag Progress Status" 라벨 옆에 `DataDatePicker`(`src/components/task-management/shared/DataDatePicker.tsx` 재사용) 배치. `onReset` = `dataDate` 파라미터 클리어.
-- 기존 toolbar의 `As-of` (Data Date / Today) ToggleGroup 유지(로직 영향 없음, 표시 라벨만).
+### 5. 변경 제외 항목 (중요)
+아래는 그대로 유지합니다.
+- Supabase 저장/RPC 파라미터: 계속 ISO(`YYYY-MM-DD`) 사용
+- `<input type="date">` value/onChange 인자
+- 파일명 타임스탬프: `dohaStampCompact` (`YYYYMMDD-HHmm`)
+- URL 쿼리 파라미터 `dataDate`
+- 임포트 파서의 문자열 파싱 규칙(입력측 인식): 기존 로직 유지, 표시측만 재포맷
 
-### 2-4. Dashboard 페이지 통합
-- `DeSnagDashboardPage.tsx` 헤더 "De-Snagging Dashboard" 옆에 동일 `DataDatePicker` 배치.
-- `useSnagDashboardMatrix(plot, teams, dataDate)` 로 시그니처 확장, RPC 호출 시 `_as_of_date` 인자 추가.
+### 6. 검증
+- `rg` 로 남은 `toLocaleDateString`, `slice(0, 10)` 표시 용도 잔여 검색
+- 대표 페이지 5곳(SM Raw Data, TM Task Tree, ABD Dashboard, DMR Dashboard, Task Detail)에서 표시 확인
+- 엑셀 export 파일 1개 열어 셀 표시 확인
+- 빌드/타입체크 통과 확인
 
-### 2-5. 마이그레이션 (Dashboard RPC 확장)
-- `defect_snag_dashboard_matrix(_plan_groups, _teams)` → `(_plan_groups, _teams, _as_of_date date default null)`. 내부 where 절에 `and (_as_of_date is null or data_date <= _as_of_date)` 추가. Grant 동일.
+## 세부 기술 항목
+- 월 이름은 `en-US` locale의 `short` (`Jan`~`Dec`) 사용.
+- 도하 타임존 처리는 기존 `shiftToDoha` 흐름을 그대로 재사용하여 UTC↔로컬 왜곡을 방지.
+- 기존 심볼(`formatDdMmm` 등)은 유지하되 내부 구현만 새 헬퍼에 위임하여 호출부 breaking change 없이 마이그레이션.
 
----
-
-## 미확인 사항
-- DIFFERENCE 색상 규칙: +=초록/−=빨강 가정. 반대로 원하시면 알려주세요.
-- KPI 카드 뱃지 클릭 시 Raw Data가 승계할 필터 범위를 "Plot/Team/RoomGroup/asOfDate + 카드별 stage/date"로 최소화합니다(기존 Raw Data URL은 완전 리셋). 다른 승계 규칙 원하시면 알려주세요.
-
-## 검증
-- Progress: 카드 5개(Range 없음), DONE 라벨, DIFFERENCE 부호/색/%. Stage breakdown 3줄 표시.
-- KPI 카드/뱃지 클릭 → Raw Data 이동, 기존 URL 필터가 초기화되고 새 파라미터만 적용됨.
-- Progress/Dashboard: Data Date 변경 시 매트릭스·KPI 재조회.
+## 확인 필요
+1. 짧은 형식에서 **연도가 다른 해로 넘어가는 경우** 자동으로 `dd-MMM-yy`로 보강할까요, 아니면 짧은 형식은 항상 `dd-MMM`으로 두고 필요한 곳만 개별적으로 `dd-MMM-yy`를 명시할까요?
+2. 날짜+시간 표시(댓글, 상태 이력, `created_at`/`updated_at` 감사 컬럼)의 시간 부분은 현행 `HH:mm`(24시간) 유지로 진행해도 될까요?
