@@ -246,7 +246,8 @@ export function SnagProgressPage() {
     const diffAbs = cumActual - cumPlan;
     const variance = cumPlan > 0 ? (diffAbs / cumPlan) * 100 : null;
     const progressPct = totalStages > 0 ? (doneStages / totalStages) * 100 : 0;
-    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct };
+    const planPct = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
+    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct };
   }, [totalsQ.data, effectiveStages]);
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
