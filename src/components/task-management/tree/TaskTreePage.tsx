@@ -14,15 +14,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, ChevronRight, Download, History, Loader2, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DISCIPLINES, AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
 import type { Discipline } from "@/lib/task-management/columns";
 import { computeJudgment, expectedProgressToday, todayGap, worstJudgment } from "@/lib/task-management/derived";
-import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDrawer";
 import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+import { MiniProgressChart } from "./MiniProgressChart";
+import { TaskProgressChartDialog } from "./TaskProgressChartDialog";
+import { useServerFn } from "@tanstack/react-start";
+import { getTaskProgressChartsBulk, type TaskChartCache } from "@/lib/task-management/progress-chart.functions";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
 
@@ -84,7 +87,7 @@ export function TaskTreePage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(new Set());
   const [picFilter, setPicFilter] = useState<string>("__all__");
-  const [historyTask, setHistoryTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
+  const [chartTask, setChartTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const { data = [], isLoading } = useQuery({
@@ -102,6 +105,18 @@ export function TaskTreePage() {
       return (data ?? []) as Row[];
     },
   });
+
+  const fetchChartsBulk = useServerFn(getTaskProgressChartsBulk);
+  const { data: chartRows = [] } = useQuery({
+    queryKey: ["task-progress-charts-bulk", discipline],
+    queryFn: () => fetchChartsBulk({ data: { discipline } }),
+    staleTime: 5 * 60_000,
+  });
+  const chartMap = useMemo(() => {
+    const m = new Map<string, TaskChartCache>();
+    for (const r of chartRows) m.set(r.task_no, r);
+    return m;
+  }, [chartRows]);
 
   const latestDataDate = useMemo(() => {
     let latest = "";
@@ -416,18 +431,17 @@ export function TaskTreePage() {
                   )}
                   <ProgressBar v={p.actual_progress} />
                   <GapCell gap={pGap} />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6"
+                  <MiniProgressChart
+                    planPoints={chartMap.get(p.task_no)?.plan_points}
+                    actualPoints={chartMap.get(p.task_no)?.actual_points}
+                    xStart={chartMap.get(p.task_no)?.x_start ?? null}
+                    xEnd={chartMap.get(p.task_no)?.x_end ?? null}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setHistoryTask({ task_no: p.task_no, task_name: p.task_name });
+                      setChartTask({ task_no: p.task_no, task_name: p.task_name });
                     }}
-                    title="이력 보기"
-                  >
-                    <History className="h-3.5 w-3.5" />
-                  </Button>
+                    title="클릭하여 진도율 상세 차트 보기"
+                  />
                 </div>
               </CardHeader>
               {isOpen && (
@@ -486,17 +500,17 @@ export function TaskTreePage() {
                               )}
                             </td>
                             <td className="px-2 py-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6"
+                              <MiniProgressChart
+                                planPoints={chartMap.get(k.task_no)?.plan_points}
+                                actualPoints={chartMap.get(k.task_no)?.actual_points}
+                                xStart={chartMap.get(k.task_no)?.x_start ?? null}
+                                xEnd={chartMap.get(k.task_no)?.x_end ?? null}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setHistoryTask({ task_no: k.task_no, task_name: k.task_name });
+                                  setChartTask({ task_no: k.task_no, task_name: k.task_name });
                                 }}
-                              >
-                                <History className="h-3.5 w-3.5" />
-                              </Button>
+                                title="클릭하여 진도율 상세 차트 보기"
+                              />
                             </td>
                           </tr>
                         );
@@ -516,12 +530,12 @@ export function TaskTreePage() {
         </div>
       )}
 
-      <HistoryDrawer
-        open={!!historyTask}
-        onClose={() => setHistoryTask(null)}
+      <TaskProgressChartDialog
+        open={!!chartTask}
+        onClose={() => setChartTask(null)}
         discipline={discipline}
-        taskNo={historyTask?.task_no ?? null}
-        taskName={historyTask?.task_name ?? null}
+        taskNo={chartTask?.task_no ?? null}
+        taskName={chartTask?.task_name ?? null}
       />
     </div>
   );
