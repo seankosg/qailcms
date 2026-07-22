@@ -946,9 +946,6 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         // ── 자동 채움 rule: HDEC PIC/ENG · Subcon ──
         // 원본 엑셀 값(base 에 이미 있음) 또는 기존 DB 값이 있으면 skip.
         {
-          const { resolvePlotFromPlanGroup, resolveHdec, resolveSubcon } = await import(
-            "@/lib/defect-management/auto-fill-rules"
-          );
           const planGroupVal = (base.plan_group ?? p.plan_group ?? null) as string | null;
           const roomGroupVal = (base.room_group ?? p.room_group ?? null) as string | null;
           const buildingVal = (base.building ?? p.building ?? null) as string | null;
