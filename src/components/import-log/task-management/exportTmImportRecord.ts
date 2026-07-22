@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { dohaStamp } from "@/lib/time/doha";
+import { dohaStamp, formatDdMmm } from "@/lib/time/doha";
 
 interface PicUser {
   id: string;
@@ -78,7 +78,7 @@ export async function exportTmImportRecord(opts: {
 
   // Row 8 — column headers
   const headerRow = 8;
-  const headers = ["팀", "이름", "로그인 ID", ...dates.map((d) => d.slice(5)), "업로드일수", "미업로드(주말제외)", "최근 업로드일"];
+  const headers = ["팀", "이름", "로그인 ID", ...dates.map((d) => formatDdMmm(d)), "업로드일수", "미업로드(주말제외)", "최근 업로드일"];
   for (let c = 0; c < headers.length; c++) {
     const cell = ws.getCell(headerRow, c + 1);
     cell.value = headers[c];
