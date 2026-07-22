@@ -88,6 +88,15 @@ function formatSize(b: number) {
 export function AbdImportPage() {
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const cancelRequestedRef = useRef(false);
+  const requestCancel = () => {
+    if (!cancelRequestedRef.current) {
+      cancelRequestedRef.current = true;
+      setIsCancelling(true);
+      toast.warning("취소 요청됨. 현재 시트 완료 후 중단됩니다.");
+    }
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   const [dupOpenId, setDupOpenId] = useState<string | null>(null);
   const { data: teamOptions = [] } = useTeamOptions();
@@ -214,6 +223,8 @@ export function AbdImportPage() {
 
   const startImport = async () => {
     setBusy(true);
+    cancelRequestedRef.current = false;
+    setIsCancelling(false);
     try {
       await takePreImportSnapshotWithFeedback("abd");
     } catch {
@@ -221,12 +232,25 @@ export function AbdImportPage() {
     }
     for (const e of entries) {
       if (!isReady(e) || !e.parsed || !e.team) continue;
+      if (cancelRequestedRef.current) {
+        setEntries((p) =>
+          p.map((x) =>
+            x.id === e.id
+              ? { ...x, status: "error", error: "사용자 취소 — 대기 중" }
+              : x,
+          ),
+        );
+        continue;
+      }
       setEntries((p) =>
         p.map((x) => (x.id === e.id ? { ...x, status: "importing", progress: 20 } : x)),
       );
       try {
         const agg = { inserted: 0, updated: 0, inactivated: 0, total: 0 };
         for (const sheet of e.parsed.sheets) {
+          if (cancelRequestedRef.current) {
+            throw new Error("__CANCELLED__");
+          }
           const rows = sheet.rows.map((r) => ({ ...r, plot: r.plot ?? sheet.plot ?? null }));
           const res = await importAbdBatch({
             data: {
@@ -255,17 +279,22 @@ export function AbdImportPage() {
           `${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성`,
         );
       } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        const cancelled = msg === "__CANCELLED__";
         setEntries((p) =>
           p.map((x) =>
             x.id === e.id
-              ? { ...x, status: "error", error: err?.message ?? String(err) }
+              ? { ...x, status: "error", error: cancelled ? "사용자 취소" : msg }
               : x,
           ),
         );
-        toast.error(`${e.file.name} 임포트 실패: ${err?.message ?? err}`);
+        if (!cancelled) toast.error(`${e.file.name} 임포트 실패: ${msg}`);
       }
     }
     setBusy(false);
+    if (cancelRequestedRef.current) toast.info("ABD import 취소됨");
+    cancelRequestedRef.current = false;
+    setIsCancelling(false);
   };
 
   return (
@@ -354,6 +383,16 @@ export function AbdImportPage() {
               <Button variant="outline" size="sm" onClick={clearAll} disabled={isRunning}>
                 Clear all
               </Button>
+              {isRunning && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={requestCancel}
+                  disabled={isCancelling}
+                >
+                  {isCancelling ? "취소 중…" : "취소"}
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={startImport}
