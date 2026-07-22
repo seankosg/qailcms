@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { dohaDateOnly } from "@/lib/time/doha";
 
 /**
  * QAIL Spare Part Excel parser — SHAW-parity architecture.
@@ -277,7 +278,7 @@ function excelSerialToDate(n: number): string | null {
 
 function normalizeDate(value: unknown): string | null {
   if (value == null || value === "") return null;
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) return dohaDateOnly(value);
   if (typeof value === "number") return excelSerialToDate(value);
   const s = String(value).trim();
   if (!s) return null;
@@ -290,7 +291,7 @@ function normalizeDate(value: unknown): string | null {
     return `${yy}-${String(dmy[2]).padStart(2, "0")}-${String(dmy[1]).padStart(2, "0")}`;
   }
   const d = new Date(s);
-  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  if (!Number.isNaN(d.getTime())) return dohaDateOnly(d);
   return null;
 }
 

@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { z } from 'zod';
+import { dohaDateOnly } from '@/lib/time/doha';
 import { normalizeDmrTeam, normalizeDmrContractor, isDmrDirectContractor } from './dmr/types';
 
 const InputSchema = z.object({
@@ -43,7 +44,7 @@ function normalizeDate(raw: string): string {
     return `${m2[3]}-${m2[2].padStart(2, '0')}-${m2[1].padStart(2, '0')}`;
   }
   const d = new Date(s);
-  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  if (!isNaN(d.getTime())) return dohaDateOnly(d) ?? s;
   return s;
 }
 

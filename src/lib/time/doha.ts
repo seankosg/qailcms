@@ -66,3 +66,29 @@ export function dohaWallToUtcIso(
   const ss = String(s).padStart(2, "0");
   return new Date(`${y}-${mm}-${dd}T${hh}:${mi}:${ss}+03:00`).toISOString();
 }
+
+/** Read a Date's local wall-clock components as `YYYY-MM-DD` (Doha semantics). */
+export function dohaDateOnly(d: Date): string | null {
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+/**
+ * Convert any Date to UTC ISO by re-interpreting its *local* wall-clock
+ * components as Doha (+03:00). Use for Date objects produced by user input
+ * (date pickers, XLSX cellDates:true) where the wall-clock is authoritative.
+ */
+export function dohaLocalDateToUtcIso(d: Date): string | null {
+  if (Number.isNaN(d.getTime())) return null;
+  return dohaWallToUtcIso(
+    d.getFullYear(),
+    d.getMonth() + 1,
+    d.getDate(),
+    d.getHours(),
+    d.getMinutes(),
+    d.getSeconds(),
+  );
+}
