@@ -3270,7 +3270,11 @@ export type Database = {
         }[]
       }
       defect_snag_dashboard_matrix: {
-        Args: { _plan_groups?: string[]; _teams?: string[] }
+        Args: {
+          _as_of_date?: string
+          _plan_groups?: string[]
+          _teams?: string[]
+        }
         Returns: {
           building: string
           cnt: number

@@ -3,13 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MatrixRawRow, PlotKey, TeamKey } from "@/lib/defect-management/dashboard-shape";
 import { planGroupsForPlot } from "@/lib/defect-management/dashboard-shape";
 
-export function useSnagDashboardMatrix(plot: PlotKey, teams: TeamKey[]) {
+export function useSnagDashboardMatrix(plot: PlotKey, teams: TeamKey[], asOfDate?: string | null) {
   return useQuery<MatrixRawRow[]>({
-    queryKey: ["snag-dashboard-matrix", plot, [...teams].sort().join(",")],
+    queryKey: ["snag-dashboard-matrix", plot, [...teams].sort().join(","), asOfDate ?? ""],
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("defect_snag_dashboard_matrix", {
         _plan_groups: planGroupsForPlot(plot),
         _teams: teams.length ? teams : null,
+        _as_of_date: asOfDate || null,
       });
       if (error) throw new Error(error.message);
       return (data ?? []).map((r: any) => ({

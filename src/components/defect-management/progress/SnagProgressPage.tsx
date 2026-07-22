@@ -19,6 +19,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { DeSnagToolbar } from "@/components/defect-management/dashboard/DeSnagToolbar";
 import { DeSnagRoomGroupFilterBar } from "@/components/defect-management/dashboard/DeSnagRoomGroupFilterBar";
+import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
 import {
   ALL_TEAMS,
   ROOM_GROUP_ORDER,
@@ -87,8 +89,11 @@ export function SnagProgressPage() {
   const scurveOpen = search.scurveOpen === 1;
 
   const today = todayIso();
-  const asOfDate = today; // Data Date 개념이 미도입 상태이므로 today 로 통일
-  const asOfLabel = asofMode === "today" ? "Today" : "Data Date";
+  const { options: dataDateOptions, latest: latestDataDate } = useDefectLatestDataDate();
+  const effectiveDataDate =
+    (search.dataDate as string) || latestDataDate || today;
+  const asOfDate = asofMode === "today" ? today : effectiveDataDate;
+  const asOfLabel = asofMode === "today" ? "Today" : effectiveDataDate;
 
   const rangeStart = useMemo(() => addDays(today, -14), [today]);
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
@@ -180,20 +185,35 @@ export function SnagProgressPage() {
   }, [cellsQ.data, totalsQ.data, buckets, effectiveStages, hidePast, today]);
 
   const kpis = useMemo(() => {
-    let cumPlan = 0;
-    let cumActual = 0;
-    let doneStages = 0;
-    let totalStages = 0;
-    for (const t of totalsQ.data ?? []) {
+    const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number }> = {
+      start: { plan: 0, actual: 0, done: 0, total: 0 },
+      rectified: { plan: 0, actual: 0, done: 0, total: 0 },
+      closure: { plan: 0, actual: 0, done: 0, total: 0 },
+    };
+    for (const t of (totalsQ.data ?? []) as Array<{
+      stage: Stage;
+      plan_upto: number;
+      actual_upto: number;
+      done_upto: number;
+      total: number;
+    }>) {
       if (!effectiveStages.includes(t.stage)) continue;
-      cumPlan += t.plan_upto;
-      cumActual += t.actual_upto;
-      doneStages += t.done_upto;
-      totalStages += t.total;
+      byStage[t.stage].plan += t.plan_upto;
+      byStage[t.stage].actual += t.actual_upto;
+      byStage[t.stage].done += t.done_upto;
+      byStage[t.stage].total += t.total;
     }
-    const variance = cumPlan > 0 ? ((cumActual - cumPlan) / cumPlan) * 100 : 0;
+    let cumPlan = 0, cumActual = 0, doneStages = 0, totalStages = 0;
+    for (const s of effectiveStages) {
+      cumPlan += byStage[s].plan;
+      cumActual += byStage[s].actual;
+      doneStages += byStage[s].done;
+      totalStages += byStage[s].total;
+    }
+    const diffAbs = cumActual - cumPlan;
+    const variance = cumPlan > 0 ? (diffAbs / cumPlan) * 100 : null;
     const progressPct = totalStages > 0 ? (doneStages / totalStages) * 100 : 0;
-    return { cumPlan, cumActual, variance, doneStages, totalStages, progressPct };
+    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct };
   }, [totalsQ.data, effectiveStages]);
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
@@ -227,6 +247,27 @@ export function SnagProgressPage() {
     window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
   };
 
+  const handleKpiClick = (
+    kind: "plan" | "actual" | "done",
+    stage: Stage | "all",
+  ) => {
+    const params = new URLSearchParams();
+    params.set("source", "progress-kpi");
+    params.set("plan_group", planGroups.join(","));
+    if (teams.length) params.set("team", teams.join(","));
+    if (roomGroups.length) params.set("roomGroup", roomGroups.join(","));
+    if (stage !== "all") params.set("stage", stage);
+    if (kind === "plan") {
+      params.set("dateField", stageDateField(stage, "planned"));
+      params.set("dateEnd", asOfDate);
+    } else if (kind === "actual") {
+      params.set("dateField", stageDateField(stage, "actual"));
+      params.set("dateEnd", asOfDate);
+    }
+    // 'done' 카드 총계 클릭 시: 활성 전체 리스트 (dateField 미지정)
+    window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
+  };
+
   const isAllGroups = effectiveGroupBy.length === ALL_GROUP_BY.length;
   const isAllStages = effectiveStages.length === ALL_STAGES.length;
 
@@ -238,10 +279,23 @@ export function SnagProgressPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <CalendarDays className="h-5 w-5 text-primary" />
-            Snag Progress Status
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              Snag Progress Status
+            </h1>
+            {latestDataDate && (
+              <DataDatePicker
+                value={effectiveDataDate}
+                latest={latestDataDate}
+                options={dataDateOptions}
+                onChange={(v) =>
+                  setSearch({ dataDate: v === latestDataDate ? "" : v })
+                }
+                onReset={() => setSearch({ dataDate: "" })}
+              />
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Plot {plot} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} · As-of {asOfLabel} ({asOfDate}) ·
             Plan: {planMode === "remaining" ? "Remaining" : "Baseline"} · Range {rangeDays}d
@@ -418,17 +472,86 @@ export function SnagProgressPage() {
       </Card>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <KpiCard label="Cum. Plan" value={kpis.cumPlan} />
-        <KpiCard label="Cum. Actual" value={kpis.cumActual} />
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard
-          label="Variance"
-          value={`${kpis.variance > 0 ? "+" : ""}${kpis.variance.toFixed(1)}%`}
-          accent={kpis.variance < 0 ? "text-schedule-short" : kpis.variance > 0 ? "text-schedule-over" : ""}
+          label="PLAN"
+          value={kpis.cumPlan.toLocaleString()}
+          onClick={() => handleKpiClick("plan", "all")}
+          stageBreakdown={effectiveStages.map((s) => ({
+            stage: s,
+            text: kpis.byStage[s].plan.toLocaleString(),
+            onClick: () => handleKpiClick("plan", s),
+          }))}
         />
-        <KpiCard label="Done Stages" value={`${kpis.doneStages} / ${kpis.totalStages}`} />
-        <KpiCard label="Progress" value={`${kpis.progressPct.toFixed(1)}%`} icon={TrendingUp} />
-        <KpiCard label="Range" value={`${rangeDays}d`} />
+        <KpiCard
+          label="ACTUAL"
+          value={kpis.cumActual.toLocaleString()}
+          onClick={() => handleKpiClick("actual", "all")}
+          stageBreakdown={effectiveStages.map((s) => ({
+            stage: s,
+            text: kpis.byStage[s].actual.toLocaleString(),
+            onClick: () => handleKpiClick("actual", s),
+          }))}
+        />
+        <KpiCard
+          label="DIFFERENCE"
+          value={`${kpis.diffAbs > 0 ? "+" : ""}${kpis.diffAbs.toLocaleString()}`}
+          accent={kpis.diffAbs < 0 ? "text-schedule-short" : kpis.diffAbs > 0 ? "text-schedule-over" : ""}
+          suffix={
+            kpis.variance === null ? (
+              <span className="text-[10px] text-muted-foreground">—</span>
+            ) : (
+              <span
+                className={cn(
+                  "text-[10px] tabular-nums",
+                  kpis.variance < 0
+                    ? "text-schedule-short"
+                    : kpis.variance > 0
+                      ? "text-schedule-over"
+                      : "text-muted-foreground",
+                )}
+              >
+                ({kpis.variance > 0 ? "+" : ""}
+                {kpis.variance.toFixed(1)}%)
+              </span>
+            )
+          }
+          onClick={() => handleKpiClick("actual", "all")}
+          stageBreakdown={effectiveStages.map((s) => {
+            const d = kpis.byStage[s].actual - kpis.byStage[s].plan;
+            return {
+              stage: s,
+              text: `${d > 0 ? "+" : ""}${d.toLocaleString()}`,
+              tone: d < 0 ? "short" : d > 0 ? "over" : undefined,
+              onClick: () => handleKpiClick("actual", s),
+            };
+          })}
+        />
+        <KpiCard
+          label="DONE"
+          value={`${kpis.doneStages.toLocaleString()} / ${kpis.totalStages.toLocaleString()}`}
+          onClick={() => handleKpiClick("done", "all")}
+          stageBreakdown={effectiveStages.map((s) => ({
+            stage: s,
+            text: `${kpis.byStage[s].done.toLocaleString()} / ${kpis.byStage[s].total.toLocaleString()}`,
+            onClick: () => handleKpiClick("done", s),
+          }))}
+        />
+        <KpiCard
+          label="PROGRESS"
+          value={`${kpis.progressPct.toFixed(1)}%`}
+          icon={TrendingUp}
+          onClick={() => handleKpiClick("done", "all")}
+          stageBreakdown={effectiveStages.map((s) => {
+            const total = kpis.byStage[s].total;
+            const pct = total > 0 ? (kpis.byStage[s].done / total) * 100 : null;
+            return {
+              stage: s,
+              text: pct === null ? "—" : `${pct.toFixed(1)}%`,
+              onClick: () => handleKpiClick("done", s),
+            };
+          })}
+        />
       </div>
 
       {error ? (
@@ -499,20 +622,70 @@ function KpiCard({
   value,
   accent,
   icon: Icon,
+  onClick,
+  suffix,
+  stageBreakdown,
 }: {
   label: string;
   value: number | string;
   accent?: string;
   icon?: typeof TrendingUp;
+  onClick?: () => void;
+  suffix?: React.ReactNode;
+  stageBreakdown?: Array<{
+    stage: Stage;
+    text: string;
+    tone?: "short" | "over";
+    onClick?: () => void;
+  }>;
 }) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-1 p-3">
-        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-          {Icon ? <Icon className="h-3 w-3" /> : null}
-          {label}
+    <Card
+      onClick={onClick}
+      className={cn(onClick && "cursor-pointer transition-colors hover:bg-accent/40")}
+    >
+      <CardContent className="flex items-stretch justify-between gap-2 p-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {Icon ? <Icon className="h-3 w-3" /> : null}
+            {label}
+          </div>
+          <div className="flex items-baseline gap-1">
+            <div className={cn("text-xl font-semibold tabular-nums leading-tight", accent)}>
+              {value}
+            </div>
+            {suffix}
+          </div>
         </div>
-        <div className={cn("text-xl font-semibold tabular-nums", accent)}>{value}</div>
+        {stageBreakdown && stageBreakdown.length > 0 && (
+          <div className="flex shrink-0 flex-col justify-center gap-0.5 border-l pl-2 text-[10px] tabular-nums">
+            {stageBreakdown.map((b) => (
+              <button
+                key={b.stage}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  b.onClick?.();
+                }}
+                className={cn(
+                  "flex items-center justify-between gap-2 rounded px-1 text-right transition-colors",
+                  b.onClick && "cursor-pointer hover:bg-accent/60",
+                  !b.onClick && "cursor-default",
+                )}
+              >
+                <span className="text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
+                <span
+                  className={cn(
+                    b.tone === "short" && "text-schedule-short",
+                    b.tone === "over" && "text-schedule-over",
+                  )}
+                >
+                  {b.text}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
