@@ -5,9 +5,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EMPTY_TOKEN } from "@/lib/abd/filter-fns";
-import { useAbdFacet, type AbdStatusGroup, type AbdTeam } from "@/hooks/useAbdItems";
+import { useAbdFacet, type AbdStatusGroup, type AbdTeam, type AbdServerFilter } from "@/hooks/useAbdItems";
 
-export function AbdMultiSelectDropdown({ column, options }: { column: any; options: { value: string; label: string }[] }) {
+export function AbdMultiSelectDropdown({
+  column,
+  options,
+  q,
+  serverFilters,
+}: {
+  column: any;
+  options: { value: string; label: string }[];
+  q?: string;
+  serverFilters?: AbdServerFilter[];
+}) {
   const selected: string[] = (column.getFilterValue() as string[]) ?? [];
   const isActive = selected.length > 0;
   const [open, setOpen] = useState(false);
@@ -18,7 +28,17 @@ export function AbdMultiSelectDropdown({ column, options }: { column: any; optio
   const statusGroup: AbdStatusGroup = (meta.statusGroup as AbdStatusGroup) ?? "all";
   const includeInactive: boolean = !!meta.includeInactive;
   const plot: "C" | "D" | null = (meta.plot as "C" | "D" | null) ?? null;
-  const { data: serverFacet } = useAbdFacet(open ? serverFacetCol : null, { team, statusGroup, includeInactive, plot, enabled: open && !!serverFacetCol });
+  // 크로스 필터링: props로 부모의 최신 검색어/서버 필터를 받아 자기 자신은 훅에서 제외.
+  const activeFilters: AbdServerFilter[] = serverFilters ?? [];
+  const { data: serverFacet } = useAbdFacet(open ? serverFacetCol : null, {
+    team,
+    statusGroup,
+    includeInactive,
+    plot,
+    q,
+    filters: activeFilters,
+    enabled: open && !!serverFacetCol,
+  });
   const labelMap = useMemo(() => new Map(options.map((o) => [o.value, o.label])), [options]);
   const items = useMemo(() => {
     const counts = new Map<string, number>();
@@ -134,9 +154,18 @@ export function AbdDateRangeDropdown({ column }: { column: any }) {
   );
 }
 
-export function AbdColumnFilterDropdown({ column }: { column: any }) {
+export function AbdColumnFilterDropdown({
+  column,
+  q,
+  serverFilters,
+}: {
+  column: any;
+  q?: string;
+  serverFilters?: AbdServerFilter[];
+}) {
   const meta = column.columnDef.meta as any;
-  if (meta?.filterType === "multi-select") return <AbdMultiSelectDropdown column={column} options={meta.filterOptions ?? []} />;
+  if (meta?.filterType === "multi-select")
+    return <AbdMultiSelectDropdown column={column} options={meta.filterOptions ?? []} q={q} serverFilters={serverFilters} />;
   if (meta?.filterType === "date-range") return <AbdDateRangeDropdown column={column} />;
   return <AbdTextFilterDropdown column={column} />;
 }
