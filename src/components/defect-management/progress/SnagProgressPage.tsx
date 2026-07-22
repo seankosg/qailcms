@@ -258,10 +258,23 @@ export function SnagProgressPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <CalendarDays className="h-5 w-5 text-primary" />
-            Snag Progress Status
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              Snag Progress Status
+            </h1>
+            {latestDataDate && (
+              <DataDatePicker
+                value={effectiveDataDate}
+                latest={latestDataDate}
+                options={dataDateOptions}
+                onChange={(v) =>
+                  setSearch({ dataDate: v === latestDataDate ? "" : v })
+                }
+                onReset={() => setSearch({ dataDate: "" })}
+              />
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Plot {plot} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} · As-of {asOfLabel} ({asOfDate}) ·
             Plan: {planMode === "remaining" ? "Remaining" : "Baseline"} · Range {rangeDays}d
