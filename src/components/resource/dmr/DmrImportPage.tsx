@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +50,16 @@ export function DmrImportPage() {
   const [overwrite, setOverwrite] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const cancelRequestedRef = useRef(false);
+  const requestCancel = () => {
+    if (!cancelRequestedRef.current) {
+      cancelRequestedRef.current = true;
+      setIsCancelling(true);
+      toast.warning('취소 요청됨. 진행 중 작업이 완료된 뒤 중단됩니다.');
+    }
+  };
+  const isBusy = parsing || saving;
 
   function setSlot(d: DmrDiscipline, patch: Partial<Slot>) {
     setSlots((prev) => ({ ...prev, [d]: { ...prev[d], ...patch } }));
@@ -75,6 +85,8 @@ export function DmrImportPage() {
     if (active.length === 0) { toast.error('이미지를 최소 1장 업로드하세요'); return; }
 
     setParsing(true);
+    cancelRequestedRef.current = false;
+    setIsCancelling(false);
     try {
       // Reset stages for active slots
       for (const d of active) setSlot(d, { stage: 'uploading', progress: 5, error: null, section: null });
@@ -82,6 +94,10 @@ export function DmrImportPage() {
       // 1) Upload each file to storage sequentially, updating per-slot progress
       const uploaded: Array<{ discipline: DmrDiscipline; path: string }> = [];
       for (const d of active) {
+        if (cancelRequestedRef.current) {
+          setSlot(d, { stage: 'error', progress: 100, error: '사용자 취소' });
+          continue;
+        }
         try {
           const s = slots[d];
           const file = s.file!;
@@ -98,6 +114,7 @@ export function DmrImportPage() {
       }
 
       if (uploaded.length === 0) throw new Error('모든 파일 업로드에 실패했습니다');
+      if (cancelRequestedRef.current) throw new Error('__CANCELLED__');
 
       // 2) Parse each uploaded image individually so we can update per-slot progress
       for (const d of uploaded.map((u) => u.discipline)) setSlot(d, { stage: 'parsing', progress: 70 });
@@ -105,6 +122,10 @@ export function DmrImportPage() {
       let ok = 0;
       await Promise.all(
         uploaded.map(async (u) => {
+          if (cancelRequestedRef.current) {
+            setSlot(u.discipline, { stage: 'error', progress: 100, error: '사용자 취소' });
+            return;
+          }
           try {
             const { results } = await parseFn({ data: { storagePaths: [u.path] } });
             const r = results[0];
@@ -123,11 +144,16 @@ export function DmrImportPage() {
         }),
       );
 
-      toast.success(`파싱 완료: ${ok}/${uploaded.length}장`);
+      if (cancelRequestedRef.current) toast.info('DMR 파싱 취소됨');
+      else toast.success(`파싱 완료: ${ok}/${uploaded.length}장`);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg === '__CANCELLED__') toast.info('DMR 파싱 취소됨');
+      else toast.error(msg);
     } finally {
       setParsing(false);
+      cancelRequestedRef.current = false;
+      setIsCancelling(false);
     }
   }
 
@@ -137,7 +163,10 @@ export function DmrImportPage() {
     if (!reportDate) { toast.error('Report Date를 입력하세요'); return; }
 
     setSaving(true);
+    cancelRequestedRef.current = false;
+    setIsCancelling(false);
     try {
+      if (cancelRequestedRef.current) throw new Error('__CANCELLED__');
       const entries = active.flatMap((d) => {
         const s = slots[d].section!;
         const withDate: DmrParsedSection = { ...s, report_date: reportDate, discipline: d };
@@ -168,9 +197,13 @@ export function DmrImportPage() {
       toast.success(`저장 완료: ${res.inserted}/${res.total} 행`);
       navigate({ to: '/resource/dmr/raw-data' });
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg === '__CANCELLED__') toast.info('DMR 저장 취소됨');
+      else toast.error(msg);
     } finally {
       setSaving(false);
+      cancelRequestedRef.current = false;
+      setIsCancelling(false);
     }
   }
 
@@ -240,6 +273,11 @@ export function DmrImportPage() {
           {parsing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
           업로드 & AI 파싱
         </Button>
+        {isBusy && (
+          <Button variant="destructive" onClick={requestCancel} disabled={isCancelling}>
+            {isCancelling ? '취소 중…' : '취소'}
+          </Button>
+        )}
         {activeCount > 0 && (parsing || overallProgress > 0) && (
           <div className="flex min-w-[220px] flex-1 flex-col gap-1">
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">

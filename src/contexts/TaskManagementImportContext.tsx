@@ -99,6 +99,8 @@ interface CtxValue {
   files: TmImportFileItem[];
   getFiles: () => TmImportFileItem[];
   isRunning: boolean;
+  isCancelling: boolean;
+  requestCancel: () => void;
   rollupMode: RollupMode;
   setRollupMode: (m: RollupMode) => void;
   recalcJudgment: boolean;
@@ -142,6 +144,15 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
   filesRef.current = files;
   const getFiles = useCallback(() => filesRef.current, []);
   const [isRunning, setIsRunning] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const cancelRequestedRef = useRef(false);
+  const requestCancel = useCallback(() => {
+    if (!cancelRequestedRef.current) {
+      cancelRequestedRef.current = true;
+      setIsCancelling(true);
+      toast.warning("취소 요청됨. 현재 배치 완료 후 중단됩니다.");
+    }
+  }, []);
   const [rollupMode, setRollupMode] = useState<RollupMode>("auto");
   const [recalcJudgment, setRecalcJudgment] = useState<boolean>(true);
   const [importScope, setImportScope] = useState<ImportScope>("mine");
@@ -506,6 +517,16 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     const userId = userData.user?.id ?? null;
 
     for (const f of ready) {
+      if (cancelRequestedRef.current) {
+        setFiles((cur) =>
+          cur.map((x) =>
+            x.id === f.id
+              ? { ...x, status: "failed", error: "사용자 취소 — 대기 중 파일" }
+              : x,
+          ),
+        );
+        continue;
+      }
       const parsedAll = f.parsed ?? [];
       const effectiveScope: ImportScope = isImporterAdminRef.current
         ? "all"
@@ -762,6 +783,9 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
       try {
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
+          if (cancelRequestedRef.current) {
+            throw new Error("__CANCELLED__");
+          }
           const slice = payloads.slice(i, i + INSERT_CHUNK);
           const batchIndex = Math.floor(i / INSERT_CHUNK);
           const { data, error } = await (supabase as any)
@@ -1066,19 +1090,30 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        const cancelled = msg === "__CANCELLED__";
         console.error("[task-import] fatal", e);
         if (logId) {
           await (supabase as any)
             .from("task_management_import_logs")
             .update({
-              status: "failed",
-              errors: [{ batch: -1, message: msg }],
+              status: cancelled ? "cancelled" : "failed",
+              errors: cancelled ? null : [{ batch: -1, message: msg }],
               finished_at: new Date().toISOString(),
             })
             .eq("id", logId);
         }
         setFiles((cur) =>
-          cur.map((x) => (x.id === f.id ? { ...x, status: "failed", error: msg } : x)),
+          cur.map((x) =>
+            x.id === f.id
+              ? {
+                  ...x,
+                  status: "failed",
+                  error: cancelled
+                    ? `사용자 취소 — 처리 ${processed}/${payloads.length}행`
+                    : msg,
+                }
+              : x,
+          ),
         );
       }
 
@@ -1086,7 +1121,11 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     }
 
     setIsRunning(false);
-    toast.success(`Task Management import 완료: ${ready.length} file(s)`);
+    if (cancelRequestedRef.current) {
+      toast.info("Task Management import 취소됨");
+    } else {
+      toast.success(`Task Management import 완료: ${ready.length} file(s)`);
+    }
   }, [rollupMode, recalcJudgment]);
 
   const startImport = useCallback(async () => {
@@ -1111,6 +1150,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       toast.error("Import 가능한 파일이 없습니다");
       return;
     }
+    cancelRequestedRef.current = false;
+    setIsCancelling(false);
     setIsRunning(true);
     try {
       await takePreImportSnapshotWithFeedback("tm");
@@ -1125,6 +1166,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       toast.error(`Task Management import 실패: ${msg}`);
     } finally {
       setIsRunning(false);
+      cancelRequestedRef.current = false;
+      setIsCancelling(false);
     }
   }, [files, isRunning, executeImport]);
 
@@ -1134,6 +1177,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         files,
         getFiles,
         isRunning,
+        isCancelling,
+        requestCancel,
         rollupMode,
         setRollupMode,
         recalcJudgment,
