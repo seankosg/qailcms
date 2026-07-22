@@ -564,7 +564,8 @@ export function SnagProgressPage() {
           }
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
-            text: `${kpis.byStage[s].total.toLocaleString()} (${kpis.byStage[s].total > 0 ? 100.0.toFixed(1) : "—"}%)`,
+            value: kpis.byStage[s].total.toLocaleString(),
+            suffix: `(${kpis.byStage[s].total > 0 ? 100.0.toFixed(1) : "—"}%)`,
             onClick: () => handleKpiClick("done", s),
           }))}
         />
@@ -583,7 +584,8 @@ export function SnagProgressPage() {
             const pct = total > 0 ? (kpis.byStage[s].plan / total) * 100 : null;
             return {
               stage: s,
-              text: `${kpis.byStage[s].plan.toLocaleString()} (${pct === null ? "—" : `${pct.toFixed(1)}%`})`,
+              value: kpis.byStage[s].plan.toLocaleString(),
+              suffix: `(${pct === null ? "—" : `${pct.toFixed(1)}%`})`,
               onClick: () => handleKpiClick("plan", s),
             };
           })}
@@ -603,7 +605,8 @@ export function SnagProgressPage() {
             const pct = total > 0 ? (kpis.byStage[s].actual / total) * 100 : null;
             return {
               stage: s,
-              text: `${kpis.byStage[s].actual.toLocaleString()} (${pct === null ? "—" : `${pct.toFixed(1)}%`})`,
+              value: kpis.byStage[s].actual.toLocaleString(),
+              suffix: `(${pct === null ? "—" : `${pct.toFixed(1)}%`})`,
               onClick: () => handleKpiClick("actual", s),
             };
           })}
@@ -637,7 +640,7 @@ export function SnagProgressPage() {
             const d = kpis.byStage[s].actual - kpis.byStage[s].plan;
             return {
               stage: s,
-              text: `${d > 0 ? "+" : ""}${d.toLocaleString()}`,
+              value: `${d > 0 ? "+" : ""}${d.toLocaleString()}`,
               tone: d < 0 ? "short" : d > 0 ? "over" : undefined,
               onClick: () => handleKpiClick("actual", s),
             };
@@ -660,7 +663,8 @@ export function SnagProgressPage() {
             const planPct = total > 0 ? (kpis.byStage[s].plan / total) * 100 : null;
             return {
               stage: s,
-              text: actualPct === null ? "—" : `${actualPct.toFixed(1)}% (P ${planPct?.toFixed(1)}%)`,
+              value: actualPct === null ? "—" : `${actualPct.toFixed(1)}%`,
+              suffix: actualPct === null ? undefined : `(P ${planPct?.toFixed(1)}%)`,
               onClick: () => handleKpiClick("done", s),
             };
           })}
@@ -749,7 +753,8 @@ function KpiCard({
   suffix?: React.ReactNode;
   stageBreakdown?: Array<{
     stage: Stage;
-    text: string;
+    value: string;
+    suffix?: string;
     tone?: "short" | "over";
     onClick?: () => void;
   }>;
@@ -789,7 +794,7 @@ function KpiCard({
           </div>
           {stageBreakdown && stageBreakdown.length > 0 && (
             <div
-              className="flex max-h-28 min-w-[112px] shrink-0 flex-col gap-0.5 overflow-y-auto border-l pl-2"
+              className="flex max-h-36 min-w-[112px] shrink-0 flex-col gap-1 overflow-y-auto border-l pl-2"
               onClick={(e) => e.stopPropagation()}
             >
               {stageBreakdown.map((b) => (
@@ -801,22 +806,29 @@ function KpiCard({
                     b.onClick?.();
                   }}
                   className={cn(
-                    "flex h-5 items-center justify-between gap-2 rounded px-1 text-[11px] tabular-nums transition-colors",
+                    "flex h-auto min-h-[28px] flex-col justify-center rounded px-1 py-0.5 text-[11px] tabular-nums transition-colors",
                     b.onClick && "cursor-pointer hover:bg-primary/10",
                     !b.onClick && "cursor-default",
                   )}
                 >
-                  <span className="truncate text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
-                  <span
-                    className={cn(
-                      "font-medium",
-                      b.tone === "short" && "text-schedule-short",
-                      b.tone === "over" && "text-schedule-over",
-                      !b.tone && TONE_CLASSES[tone],
-                    )}
-                  >
-                    {b.text}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
+                    <span
+                      className={cn(
+                        "font-medium",
+                        b.tone === "short" && "text-schedule-short",
+                        b.tone === "over" && "text-schedule-over",
+                        !b.tone && TONE_CLASSES[tone],
+                      )}
+                    >
+                      {b.value}
+                    </span>
+                  </div>
+                  {b.suffix && (
+                    <div className="self-end text-[10px] text-muted-foreground">
+                      {b.suffix}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
