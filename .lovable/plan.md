@@ -1,53 +1,72 @@
-## 문제 원인 (실측 확인)
+## 목표
 
-`task_management_status_history`는 값 변경 시 `(old→NULL)` + `(NULL→new)` 두 행을 쌍으로 기록합니다. 현재 `getTaskProgressChartDetail` 핸들러는 `new_value` 문자열을 `Number(raw) || 0`으로 파싱하면서 `NULL`을 **0으로 취급**해서, 실제 진도율이 유지되는 구간에서 0%로 급락하는 지그재그가 그려집니다.
+SM 규칙 보강: `status_raw`가 `rectified` (동등 값: `complete`, `completed` 포함)인 항목은
+- Start 스테이지가 무조건 `Done` 으로 표시/집계되어야 함
+- `rectified_status`도 무조건 `Rectified` 로 표시/집계되어야 함
 
-AR-C-T-04 실측:
+Closed/Verified는 이미 rectified 후행이므로 동일 규칙을 함께 적용(기존 로직과 일관).
+
+## 현재 상태 vs 목표
+
+| 항목 | 현재 | 목표 |
+|---|---|---|
+| DB RPC `_start_status_expr` (search / search_ids / facets) | `actual_*` 날짜/진도만 검사 → `status_raw=rectified`이고 actual_start_date 비어있으면 `Delay/Planned`로 뜸 | `status_raw ∈ {rectified, complete, completed, closed, verified}` 이면 즉시 `Done` |
+| 클라이언트 `stage-utils.isStageDone('start')` (`DefectStageProgress` pip, matrix classify 등) | `actual_*` 기반만 | 동일하게 `status_raw` 완료계열이면 `true` |
+| 클라이언트 `derived.ts isStartDone` (rectified_status 파생 시 사용) | `actual_*` 기반만 | 동일하게 `status_raw` 완료계열이면 `true` |
+| `deriveRectifiedStatus` | `rectified/complete/completed/closed/verified` → `Rectified` (이미 OK) | 변경 없음 |
+| 저장된 기존 행 (`defect_items_raw.rectified_status`) | 과거 임포트 시 규칙 이전이면 `Not finish yet` 등으로 남아 있을 수 있음 | 1회 마이그레이션으로 `status_raw`가 완료계열이면 `rectified_status='Rectified'` 로 일괄 UPDATE |
+
+## 변경 사항
+
+### 1) DB 마이그레이션 (신규 파일)
+
+`_start_status_expr` 를 아래 형태로 교체하여 3개 RPC (`defect_items_search`, `defect_items_search_ids`, `defect_items_facets`) 모두 재정의:
+
+```text
+CASE
+  WHEN lower(trim(status_raw)) IN
+       ('rectified','complete','completed','closed','verified')
+       THEN 'Done'
+  WHEN actual_start_date IS NOT NULL
+       OR COALESCE(actual_progress_pct,0) > 0
+       OR actual_rectified_date IS NOT NULL
+       OR actual_closure_date IS NOT NULL
+       THEN 'Done'
+  WHEN planned_start_date IS NOT NULL
+       AND planned_start_date <= (now() at time zone 'Asia/Qatar')::date
+       THEN 'Delay'
+  WHEN planned_start_date IS NOT NULL THEN 'Planned'
+  ELSE NULL
+END
 ```
-07-19 04:57  null → 0.6435
-07-20 04:18  0.6435 → null   ← 0%로 찍힘
-07-20 04:18  null → 0.6223
-07-20 15:45  0.6223 → null   ← 0%로 찍힘
-07-22 06:24  null → 0.6514
+
+동일 마이그레이션에서 저장값 백필:
+
+```sql
+UPDATE public.defect_items_raw
+   SET rectified_status = 'Rectified'
+ WHERE lower(trim(status_raw)) IN
+       ('rectified','complete','completed','closed','verified')
+   AND (rectified_status IS DISTINCT FROM 'Rectified');
 ```
 
-## 수정 범위
+### 2) `src/lib/defect-management/stage-utils.ts`
 
-`src/lib/task-management/progress-chart.functions.ts` 의 `getTaskProgressChartDetail` 핸들러 한 곳:
+`isStageDone(row,'start')` 상단에 `status_raw` 완료계열이면 즉시 true 반환.
 
-1. 히스토리 조회 시 `.not('new_value','is',null)` 필터를 추가해 NULL 행을 원천 배제.
-2. 방어적으로 루프 안에서도 `h.new_value == null` 이면 skip.
-3. 히스토리 개수 판단(`>= 2` fallback 분기)은 NULL 제거 후 카운트로 판단.
-4. 같은 도하 날짜(`d`)에 여러 유효 이벤트가 있으면 **가장 늦은 시각의 값**을 채택(현재 dialog 쪽 Map 병합이 삽입 순서상 마지막 값을 남기므로 서버 정렬만 오름차순 유지하면 자연히 성립. 별도 dedupe 로직은 추가하지 않음).
+### 3) `src/lib/defect-management/derived.ts`
 
-캐시 갱신 로직(`recalc_task_progress_charts` RPC/`task_progress_chart_cache`)은 이번 스코프에서 건드리지 않습니다. 팝업 차트는 매번 서버에서 즉시 재계산되므로 코드 수정만으로 즉시 반영되고, 미니 스파크라인은 다음 05시 캐시 재계산 때 자연스럽게 갱신됩니다. 만약 사용자가 원하면 캐시 SQL 함수도 동일하게 NULL 제외하도록 후속 조치 가능합니다.
+`isStartDone(row)` 에도 동일 완료계열 조기 반환 추가. 결과적으로 rectified 원본은 항상 `Rectified` 로 파생되며 (기존 로직 유지) Start 스테이지 판정도 Done으로 이어짐.
+
+## 영향 범위
+
+- Raw Data의 Start Status 컬럼(서버 정렬/필터/facet 카운트 포함) 즉시 반영.
+- Progress 매트릭스 Start Stage 집계(Cum Actual, Done, Progress) 자동 반영.
+- `DefectStageProgress` 3-pip UI에서 Start pip이 Done(초록)으로 표시.
+- 자동판별 없이 원본 `status_raw` 값은 그대로 유지(사용자 확인 규칙 준수). 파생/저장 컬럼만 갱신.
 
 ## 검증
 
-- 수정 후 AR-C-T-04 팝업에서 실적선이 07-19 64.35% → 07-20 62.23% → 07-22 65.14% 로 부드럽게 이어지는지 확인.
-- 히스토리가 0~1건인 태스크는 기존 fallback(`actual_start`=0, `data_date`=현재 진도율) 그대로 동작하는지 확인.
-
-## 기술 상세
-
-```ts
-const { data: hist } = await supa
-  .from("task_management_status_history")
-  .select("new_value, changed_at")
-  .eq("discipline", data.discipline)
-  .eq("task_no", data.task_no)
-  .eq("field", "actual_progress")
-  .not("new_value", "is", null)   // 추가
-  .order("changed_at", { ascending: true })
-  .limit(2000);
-```
-
-루프 내부:
-```ts
-for (const h of hist) {
-  if (h.new_value == null) continue;   // 방어
-  const v = Math.max(0, Math.min(1, Number(h.new_value) || 0));
-  ...
-}
-```
-
-캐시 함수(`recalc_task_progress_charts`)도 동일 규칙으로 맞출지 여부는 사용자 확인 후 후속 마이그레이션으로 처리.
+1. `status_raw='rectified'` 이고 `actual_start_date IS NULL` 인 샘플 몇 건을 SQL로 조회 → 마이그레이션 이후 `rectified_status='Rectified'` 확인.
+2. Raw Data에서 Start Status 필터로 `Done` 선택 시 위 항목 포함되는지 확인.
+3. Progress 매트릭스 해당 Plot/팀의 Start Cum Actual 이 증가하는지 확인.
