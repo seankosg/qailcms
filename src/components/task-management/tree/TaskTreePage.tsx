@@ -82,7 +82,7 @@ export function TaskTreePage() {
   const [discipline, setDiscipline] = useState<Discipline>("ARCH");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [delayFilter, setDelayFilter] = useState<"off" | "all" | "main" | "sub">("off");
+  const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(new Set());
   const [picFilter, setPicFilter] = useState<string>("__all__");
   const [historyTask, setHistoryTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -160,12 +160,16 @@ export function TaskTreePage() {
   const filtered = useMemo(() => {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
-      if (delayFilter !== "off") {
-        const mainBehind = todayGap(p, asOfDate) < -0.05;
-        const subBehind = kids.some((r) => todayGap(r, asOfDate) < -0.05);
-        if (delayFilter === "all" && !(mainBehind || subBehind)) return false;
-        if (delayFilter === "main" && !mainBehind) return false;
-        if (delayFilter === "sub" && !subBehind) return false;
+      if (judgmentFilter.size > 0) {
+        const judgeOf = (r: Row) =>
+          (r.auto_judgment && r.auto_judgment.trim()) ||
+          computeJudgment(r, undefined, asOfDate) ||
+          "";
+        const mainJ = judgeOf(p) || (worstJudgment(kids.map((k) => k.auto_judgment)) ?? "");
+        const anyMatch =
+          (mainJ && judgmentFilter.has(mainJ)) ||
+          kids.some((k) => judgmentFilter.has(judgeOf(k)));
+        if (!anyMatch) return false;
       }
       if (picFilter !== "__all__") {
         if (picFilter === "__unassigned__") {
@@ -187,7 +191,7 @@ export function TaskTreePage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [mainTasks, subsByMain, q, delayFilter, picFilter, asOfDate]);
+  }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfDate]);
 
   function toggle(taskNo: string) {
     setExpanded((cur) => {
@@ -222,13 +226,9 @@ export function TaskTreePage() {
         : picFilter === "__unassigned__"
           ? "PIC=(미지정)"
           : `PIC=${picFilter}`,
-      delayFilter === "off"
-        ? null
-        : delayFilter === "all"
-          ? "지연=All"
-          : delayFilter === "main"
-            ? "지연=Main"
-            : "지연=Sub",
+      judgmentFilter.size > 0
+        ? `위험도=${Array.from(judgmentFilter).join(",")}`
+        : null,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -301,20 +301,42 @@ export function TaskTreePage() {
           </SelectContent>
         </Select>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Select
-            value={delayFilter}
-            onValueChange={(v) => setDelayFilter(v as typeof delayFilter)}
-          >
-            <SelectTrigger className="h-8 w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="off">지연 필터 없음</SelectItem>
-              <SelectItem value="all">All 지연</SelectItem>
-              <SelectItem value="main">Main Task 지연</SelectItem>
-              <SelectItem value="sub">Sub Task 지연</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1">
+            {(["정상", "주의", "지연", "위험"] as const).map((j) => {
+              const active = judgmentFilter.has(j);
+              return (
+                <button
+                  key={j}
+                  type="button"
+                  onClick={() =>
+                    setJudgmentFilter((cur) => {
+                      const next = new Set(cur);
+                      if (next.has(j)) next.delete(j);
+                      else next.add(j);
+                      return next;
+                    })
+                  }
+                  className={cn(
+                    "h-7 rounded-full border px-2.5 text-[11px] font-medium transition",
+                    active
+                      ? (AUTO_JUDGMENT_COLORS[j] ?? "bg-muted") + " border-transparent ring-1 ring-current"
+                      : "text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {j}
+                </button>
+              );
+            })}
+            {judgmentFilter.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setJudgmentFilter(new Set())}
+                className="ml-1 text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                해제
+              </button>
+            )}
+          </div>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -369,8 +391,21 @@ export function TaskTreePage() {
                 ) : (
                   <ChevronRight className="h-4 w-4" />
                 )}
-                <span className="font-mono text-xs">{p.task_no}</span>
-                <CardTitle className="text-sm">{p.task_name ?? "-"}</CardTitle>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 text-left hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate({
+                      to: "/closure/task-management/detail/$id",
+                      params: { id: p.id },
+                    });
+                  }}
+                  title="상세 페이지로 이동"
+                >
+                  <span className="font-mono text-xs">{p.task_no}</span>
+                  <span className="text-sm font-semibold">{p.task_name ?? "-"}</span>
+                </button>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
                   <Badge variant="outline">Sub Task {kids.length}</Badge>
                   {behindCount > 0 && (
@@ -416,8 +451,19 @@ export function TaskTreePage() {
                         const gap = todayGap(k, asOfDate);
                         const j = k.auto_judgment ?? computeJudgment(k, undefined, asOfDate);
                         return (
-                          <tr key={k.id} className="border-t hover:bg-accent/30">
-                            <td className="px-2 py-1 font-mono">{k.task_no}</td>
+                          <tr
+                            key={k.id}
+                            className="cursor-pointer border-t hover:bg-accent/30"
+                            onClick={() =>
+                              navigate({
+                                to: "/closure/task-management/detail/$id",
+                                params: { id: k.id },
+                              })
+                            }
+                          >
+                            <td className="px-2 py-1 font-mono text-primary underline-offset-2 hover:underline">
+                              {k.task_no}
+                            </td>
                             <td className="px-2 py-1">{k.sub_task_desc ?? "-"}</td>
                             <td className="px-2 py-1">{k.hdec_pic_name ?? k.hdec_eng_name ?? "-"}</td>
                             <td className="px-2 py-1 text-[10px] tabular-nums">
@@ -444,9 +490,10 @@ export function TaskTreePage() {
                                 size="icon"
                                 variant="ghost"
                                 className="h-6 w-6"
-                                onClick={() =>
-                                  setHistoryTask({ task_no: k.task_no, task_name: k.task_name })
-                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setHistoryTask({ task_no: k.task_no, task_name: k.task_name });
+                                }}
                               >
                                 <History className="h-3.5 w-3.5" />
                               </Button>
