@@ -36,27 +36,20 @@ export function DataDatePicker({
   const [open, setOpen] = useState(false);
   const active = value || latest || "";
 
-  // 선택 가능한 날짜 집합(YYYY-MM-DD) + Date 범위 산출
-  const { allowed, minDate, maxDate, selectedDate, defaultMonth } = useMemo(() => {
-    const allowed = new Set<string>();
-    for (const s of options ?? []) {
-      if (typeof s === "string" && s.length >= 10) allowed.add(s.slice(0, 10));
-    }
-    if (latest) allowed.add(latest.slice(0, 10));
-    const sorted = Array.from(allowed).sort();
+  // 데이터 유무와 무관하게 모든 날짜 선택 허용.
+  // options/latest 는 defaultMonth 힌트로만 사용.
+  const { selectedDate, defaultMonth } = useMemo(() => {
     const toDate = (s: string): Date => {
       const [y, m, d] = s.split("-").map(Number);
       return new Date(y, (m ?? 1) - 1, d ?? 1);
     };
     const selectedDate = active ? toDate(active.slice(0, 10)) : undefined;
+    const fallback = latest ? toDate(latest.slice(0, 10)) : undefined;
     return {
-      allowed,
-      minDate: sorted.length ? toDate(sorted[0]) : undefined,
-      maxDate: sorted.length ? toDate(sorted[sorted.length - 1]) : undefined,
       selectedDate,
-      defaultMonth: selectedDate ?? (sorted.length ? toDate(sorted[sorted.length - 1]) : undefined),
+      defaultMonth: selectedDate ?? fallback,
     };
-  }, [options, latest, active]);
+  }, [latest, active]);
 
   const toKey = (d: Date) => {
     const y = d.getFullYear();
@@ -94,14 +87,9 @@ export function DataDatePicker({
             mode="single"
             selected={selectedDate}
             defaultMonth={defaultMonth}
-            fromDate={minDate}
-            toDate={maxDate}
-            disabled={(date) => !allowed.has(toKey(date))}
             onSelect={(d) => {
               if (!d) return;
-              const key = toKey(d);
-              if (!allowed.has(key)) return;
-              onChange(key);
+              onChange(toKey(d));
               setOpen(false);
             }}
             initialFocus
