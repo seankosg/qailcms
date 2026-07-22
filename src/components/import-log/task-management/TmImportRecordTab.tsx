@@ -343,7 +343,7 @@ function MatrixTables({
                           } ${isToday ? "bg-primary/10 font-semibold" : ""}`}
                           title={d}
                         >
-                          {d.slice(5)}
+                          {formatDdMmm(d)}
                         </th>
                       );
                     })}
