@@ -68,6 +68,7 @@ export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
       .eq("discipline", data.discipline)
       .eq("task_no", data.task_no)
       .eq("field", "actual_progress")
+      .not("new_value", "is", null)
       .order("changed_at", { ascending: true })
       .limit(2000);
     if (histErr) throw new Error(histErr.message);
@@ -91,10 +92,12 @@ export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
     }
 
     const actual_points: ChartPoint[] = [];
-    if ((hist?.length ?? 0) >= 2) {
-      for (const h of hist as { new_value: string | null; changed_at: string }[]) {
-        const raw = h.new_value ?? "0";
-        const v = Math.max(0, Math.min(1, Number(raw) || 0));
+    const validHist = ((hist ?? []) as { new_value: string | null; changed_at: string }[]).filter(
+      (h) => h.new_value != null && h.new_value !== "",
+    );
+    if (validHist.length >= 2) {
+      for (const h of validHist) {
+        const v = Math.max(0, Math.min(1, Number(h.new_value) || 0));
         // Convert UTC changed_at to Doha calendar date
         const dohaShift = new Date(new Date(h.changed_at).getTime() + 3 * 3600_000);
         actual_points.push({
