@@ -70,6 +70,12 @@ import { CriticalPendingBar } from "./CriticalPendingBar";
 import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { exportAllUnclosed } from "./exportAllUnclosed";
+import { ExportDialog } from "./ExportDialog";
+import {
+  inferSourceLabel,
+  summarizeServerFilters,
+  summarizeServerSort,
+} from "@/lib/defect-management/export-meta";
 import { EditCellPopover } from "./EditCellPopover";
 import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
