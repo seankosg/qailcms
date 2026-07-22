@@ -190,7 +190,13 @@ export function SnagProgressPage() {
       rectified: { plan: 0, actual: 0, done: 0, total: 0 },
       closure: { plan: 0, actual: 0, done: 0, total: 0 },
     };
-    for (const t of totalsQ.data ?? []) {
+    for (const t of (totalsQ.data ?? []) as Array<{
+      stage: Stage;
+      plan_upto: number;
+      actual_upto: number;
+      done_upto: number;
+      total: number;
+    }>) {
       if (!effectiveStages.includes(t.stage)) continue;
       byStage[t.stage].plan += t.plan_upto;
       byStage[t.stage].actual += t.actual_upto;
