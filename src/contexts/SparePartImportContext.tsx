@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -58,6 +59,8 @@ export interface ImportFileItem {
 interface CtxValue {
   files: ImportFileItem[];
   isRunning: boolean;
+  isCancelling: boolean;
+  requestCancel: () => void;
   addFiles: (files: File[]) => Promise<void>;
   removeFile: (id: string) => void;
   clearAll: () => void;
@@ -100,6 +103,15 @@ async function loadUserMap(): Promise<{
 export function SparePartImportProvider({ children }: { children: ReactNode }) {
   const [files, setFiles] = useState<ImportFileItem[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const cancelRequestedRef = useRef(false);
+  const requestCancel = useCallback(() => {
+    if (!cancelRequestedRef.current) {
+      cancelRequestedRef.current = true;
+      setIsCancelling(true);
+      toast.warning("취소 요청됨. 현재 배치 완료 후 중단됩니다.");
+    }
+  }, []);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [customFields, setCustomFields] = useState<Set<string>>(new Set());
 
@@ -247,6 +259,16 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
     const userId = userData.user?.id ?? null;
 
     for (const f of ready) {
+      if (cancelRequestedRef.current) {
+        setFiles((cur) =>
+          cur.map((x) =>
+            x.id === f.id
+              ? { ...x, status: "failed", error: "사용자 취소 — 대기 중 파일" }
+              : x,
+          ),
+        );
+        continue;
+      }
       const parsed = f.parsed ?? [];
       const startTime = Date.now();
 
@@ -345,6 +367,9 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
 
         // Bulk upsert in chunks.
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
+          if (cancelRequestedRef.current) {
+            throw new Error("__CANCELLED__");
+          }
           const slice = payloads.slice(i, i + INSERT_CHUNK);
           const { data, error } = await supabase
             .from("spare_parts_raw")
@@ -543,7 +568,11 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
     }
 
     setIsRunning(false);
-    toast.success(`Import complete: ${ready.length} file(s) processed`);
+    if (cancelRequestedRef.current) {
+      toast.info("Spare Part import 취소됨");
+    } else {
+      toast.success(`Import complete: ${ready.length} file(s) processed`);
+    }
   }, []);
 
   const startImport = useCallback(async () => {
@@ -555,6 +584,8 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
       toast.error("No files ready to import");
       return;
     }
+    cancelRequestedRef.current = false;
+    setIsCancelling(false);
     setIsRunning(true);
     try {
       await takePreImportSnapshotWithFeedback("spare-part");
@@ -569,6 +600,8 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
       toast.error(`Spare Part import 실패: ${msg}`);
     } finally {
       setIsRunning(false);
+      cancelRequestedRef.current = false;
+      setIsCancelling(false);
     }
   }, [files, isRunning, executeImport]);
 
@@ -577,6 +610,8 @@ export function SparePartImportProvider({ children }: { children: ReactNode }) {
       value={{
         files,
         isRunning,
+        isCancelling,
+        requestCancel,
         addFiles,
         removeFile,
         clearAll,
