@@ -749,7 +749,8 @@ function KpiCard({
   suffix?: React.ReactNode;
   stageBreakdown?: Array<{
     stage: Stage;
-    text: string;
+    value: string;
+    suffix?: string;
     tone?: "short" | "over";
     onClick?: () => void;
   }>;
