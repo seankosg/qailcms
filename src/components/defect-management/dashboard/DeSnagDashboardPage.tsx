@@ -9,6 +9,8 @@ import { DeSnagGrandTotalCards } from "./DeSnagGrandTotalCards";
 import { DeSnagRoomGroupCards } from "./DeSnagRoomGroupCards";
 import { DeSnagRoomGroupFilterBar } from "./DeSnagRoomGroupFilterBar";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
+import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
+import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import {
   ALL_TEAMS,
   buildMatrix,
@@ -48,6 +50,9 @@ export function DeSnagDashboardPage() {
     [search.roomGroups],
   );
 
+  const { options: dataDateOptions, latest: latestDataDate } = useDefectLatestDataDate();
+  const effectiveDataDate = (search.dataDate as string) || latestDataDate || "";
+
   // Plot/Team은 스테이징: 변경해도 서버 재호출 없음, '재계산' 버튼으로 적용
   const [stagedPlot, setStagedPlot] = useState<PlotKey>(appliedPlot);
   const [stagedTeams, setStagedTeams] = useState<TeamKey[]>(appliedTeams);
@@ -61,6 +66,7 @@ export function DeSnagDashboardPage() {
   const { data: rawRows = [], isLoading, error } = useSnagDashboardMatrix(
     appliedPlot,
     appliedTeams,
+    effectiveDataDate || null,
   );
   const filteredRows = useMemo(() => {
     if (appliedRoomGroups.length === 0) return rawRows;
@@ -158,7 +164,30 @@ export function DeSnagDashboardPage() {
     <div className="flex flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">De-Snagging Dashboard</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-xl font-semibold tracking-tight">De-Snagging Dashboard</h1>
+            {latestDataDate && (
+              <DataDatePicker
+                value={effectiveDataDate}
+                latest={latestDataDate}
+                options={dataDateOptions}
+                onChange={(v) =>
+                  navigate({
+                    to: "/closure/snag-management/dashboard",
+                    search: (prev: Record<string, unknown>) =>
+                      ({ ...prev, dataDate: v === latestDataDate ? "" : v }) as any,
+                  })
+                }
+                onReset={() =>
+                  navigate({
+                    to: "/closure/snag-management/dashboard",
+                    search: (prev: Record<string, unknown>) =>
+                      ({ ...prev, dataDate: "" }) as any,
+                  })
+                }
+              />
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Plot · Building · Level × Room Group 매트릭스. 셀·헤더 클릭 시 Raw Data 드릴다운.
           </p>
