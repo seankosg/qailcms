@@ -1,65 +1,78 @@
-
 ## 목표
-원본 엑셀에 적힌 "타임존 표기 없는" 날짜·시각 값을 **도하 로컬(+03:00)** 로 해석하여 DB(UTC `timestamptz`)에 저장한다. 지금은 서버(런타임 UTC)에서 `new Date("2026-07-22 09:00")`을 UTC로 파싱하기 때문에, 사용자가 도하 09:00으로 적은 값이 실제로는 도하 12:00 시점으로 저장되어 3시간 어긋난다.
+Task Tree의 Main Task 헤더 및 Subtask 행의 오른쪽 끝(현재 시계 아이콘 자리)에 **계획(파랑) vs 누계 실적(빨강)** 미니 라인차트 표시. 클릭 시 팝업으로 대형 차트. 미니차트는 도하 05:00에 서버가 사전 계산한 캐시만 표시(로딩 시 재계산 없음). 팝업 오픈 순간에만 해당 항목을 즉시 재계산.
 
-## 현재 상태(확인 결과)
+## 계획선 규칙 (핵심 명확화)
+- **계획선은 Data Date와 무관하게 `plan_start` ~ `plan_end` 전 구간을 사전 계산해 그린다.**
+- Data Date 이후 구간도 원래 계획 종료일까지 이어져서 100%에 도달하는 곡선이 완결된 형태로 보여야 한다.
+- 계산식: `t ∈ [plan_start, plan_end]` 을 균등 24포인트로 샘플링, 각 포인트에서 `planned% = (t - plan_start) / plan_days` (0~1, clip). `plan_days` 없으면 `plan_end - plan_start`.
+- 결과적으로 X축 범위는 `min(plan_start, actual_start)` ~ `plan_end` (실적이 plan_end 를 넘어 진행 중이면 `max(plan_end, data_date)`).
 
-- `src/lib/defect-management/parser.ts`
-  - `toIsoDate()`: 순수 날짜(`YYYY-MM-DD`)만 반환하므로 이슈 없음. 유지.
-  - `toIsoDateTime()`: 
-    - 문자열은 `new Date(v).toISOString()` → 서버 UTC 기준으로 해석되어 어긋남.
-    - Excel serial(숫자)은 `Date.UTC(y,m,d,H,M,S)` 로 만들고 `toISOString()` → 마찬가지로 어긋남.
-    - `v instanceof Date` 는 XLSX `cellDates:true`가 로컬 미드나잇/시간으로 준 Date → `toISOString()` 시 서버 UTC로 해석되어 어긋남.
-- `src/lib/task-management/parser.ts`, `src/lib/abd/parser.ts`, `src/lib/spare-part-import-parser.ts`
-  - `toIsoDate()` / `normalizeDate()` 는 `YYYY-MM-DD`만 뽑음. 로컬/`getFullYear` 경로여서 캘린더 날짜는 문제 없음. **유지.**
-  - 이 세 모듈에는 시각(HH:mm)이 붙는 datetime 임포트 필드가 없다(감사 타임스탬프 `created_at/updated_at`은 DB `now()` 기본값이라 파서와 무관).
-- 결론: 실제 시프트 문제가 발생하는 파서는 **SM(`defect-management/parser.ts`)의 `toIsoDateTime` 한 곳**뿐이다. 다른 모듈은 date-only 이므로 손대지 않는다.
+## 실적선 규칙
+- `task_management_status_history` 에서 `field='actual_progress'` 인 로그를 시간 오름차순으로 수집 → 각 시점 `new_value` 를 stepped-forward 로 이어붙임.
+- 시작점: `actual_start` 가 있으면 그 날짜에 0, 없으면 첫 로그 이전 구간은 그리지 않음.
+- 끝점: `data_date` (또는 최신 갱신 시각)에서 현재 `actual_progress`.
+- Data Date 이후는 실적선을 그리지 않음(계획선만 이어짐).
 
-## 변경 범위
+## DB 변경 (마이그레이션 1개)
+1. `public.task_progress_chart_cache`
+   - `id uuid pk`, `discipline text`, `task_no text`, `updated_at timestamptz default now()`,
+     `plan_points jsonb`(형식: `[{d:'YYYY-MM-DD', v:0.00..1.00}]`),
+     `actual_points jsonb`(동일 형식),
+     `x_start date`, `x_end date`,
+     `last_actual_progress numeric`, `last_plan_progress numeric`
+   - `unique(discipline, task_no)`
+   - `GRANT SELECT, INSERT, UPDATE, DELETE ON public.task_progress_chart_cache TO authenticated;`
+   - `GRANT ALL ON public.task_progress_chart_cache TO service_role;`
+   - RLS ENABLE + policy: authenticated SELECT 허용, 쓰기는 service_role 만 (definer 함수 통해서만).
+2. `public.recalc_task_progress_charts(_discipline text default null)` SECURITY DEFINER
+   - `task_management_raw` 전체(또는 공종) 순회
+   - 계획선: 위 규칙대로 24포인트 (Data Date 무관, plan_end 까지 완결)
+   - 실적선: status_history 조회 → 계단식 24포인트로 리샘플링 (기간 균등 나누기, 각 구간의 마지막 값)
+   - `upsert` on `(discipline, task_no)`
+3. status_history 에 `actual_progress` 로그가 부족한 오래된 행 대응: 함수 내에서 로그가 없거나 1개 이하면 폴백으로 `[{actual_start,0}, {data_date, actual_progress}]` 2포인트 사용.
+4. pg_cron: `daily-task-progress-recalc` — `0 2 * * *` UTC (= Doha 05:00) → `SELECT public.recalc_task_progress_charts(NULL);`
 
-### 1) `src/lib/time/doha.ts` — 헬퍼 1개 추가
-```ts
-/** 타임존 없는 wall-clock 성분(YMDhms)을 Doha(+03:00) 기준으로 UTC ISO로 변환 */
-export function dohaWallToUtcIso(
-  y: number, m: number, d: number,
-  h = 0, min = 0, s = 0
-): string {
-  const mm = String(m).padStart(2, "0");
-  const dd = String(d).padStart(2, "0");
-  const hh = String(h).padStart(2, "0");
-  const mi = String(min).padStart(2, "0");
-  const ss = String(s).padStart(2, "0");
-  return new Date(`${y}-${mm}-${dd}T${hh}:${mi}:${ss}+03:00`).toISOString();
-}
-```
+## 서버 함수
+`src/lib/task-management/progress-chart.functions.ts`
+- `getTaskProgressChartsBulk({ discipline })` — 캐시 테이블에서 해당 공종 모든 행 반환. Task Tree 진입 시 1회.
+- `getTaskProgressChartDetail({ discipline, task_no })` — 캐시 무시하고 위 계산 로직을 **60포인트** 로 실시간 재계산 후 반환. 팝업 오픈 시.
+- `recalcTaskProgressChartsNow({ discipline? })` — 관리자 수동 트리거(선택).
 
-### 2) `src/lib/defect-management/parser.ts` — `toIsoDateTime` 재작성
+## UI 변경
+### `TaskTreePage.tsx`
+- `useQuery(['task-progress-charts', discipline])` 로 bulk 조회 → `chartMap`.
+- Main Card 헤더 우측 `History` 아이콘 자리를 `<MiniProgressChart>` 로 교체.
+- Subtask row 우측 `History` 아이콘 자리도 동일 컴포넌트로 교체.
+- 기존 이력 보기(HistoryDrawer) 는 팝업 내부 보조 버튼으로 이동해 기능 유지.
 
-원본에 타임존이 명시되어 있으면 그대로 존중, 없으면 Doha로 해석한다.
+### 신규 컴포넌트
+1. `MiniProgressChart.tsx` — **고정 120×32 px** 순수 SVG. path 2개:
+   - 계획: `stroke: hsl(215 90% 55%)` (파랑) 실선
+   - 실적: `stroke: hsl(0 80% 55%)` (빨강) 실선
+   - 데이터 없으면 회색 dashed placeholder + `-`
+   - cursor:pointer, `title` 툴팁으로 최신 Plan%/Actual% 요약. 클릭 → 팝업 오픈.
+2. `TaskProgressChartDialog.tsx` — shadcn `Dialog`, 내부 Recharts `LineChart` 640×320.
+   - X: date, Y: 0~100%, grid, legend
+   - Plan(파랑 실선), Actual(빨강 실선), Data Date 수직 참조선
+   - 오픈 시 `getTaskProgressChartDetail` (react-query, `staleTime: 0`, `enabled: dialogOpen`)
+   - 헤더: Task No · Task Name · 갱신 시각 · "이력 보기" 버튼 (기존 HistoryDrawer 재사용)
 
-- `v instanceof Date` (XLSX cellDates:true 결과)  
-  → `getFullYear/Month/Date/Hours/Minutes/Seconds` 로 벽시계 성분을 뽑아 `dohaWallToUtcIso(...)`.
-- `typeof v === "number"` (Excel serial)  
-  → 기존 `XLSX.SSF.parse_date_code(v)`로 `{y,m,d,H,M,S}` 얻고 → `dohaWallToUtcIso(...)`. (기존 `Date.UTC` 사용 라인 삭제)
-- `typeof v === "string"`  
-  → 문자열에 명시적 타임존(`Z` 또는 `±HH:MM`)이 있으면 `new Date(s).toISOString()` 그대로.  
-  → 없으면 `YYYY-MM-DD[ T]HH:mm(:ss)?` 정규식으로 성분 추출 후 `dohaWallToUtcIso(...)`.  
-  → 파싱 실패 시 `null`.
+## 관리자 화면 (최소)
+`/admin` 페이지에 "Task 진도율 차트 지금 재계산" 버튼 추가 → `recalcTaskProgressChartsNow`.
 
-### 3) 회귀 방지 확인
-- SM raw data 상에서 이미 저장된 값은 그대로 두고, **향후 임포트부터** 도하 기준으로 저장. (과거 값 마이그레이션은 이번 스코프 아님 — 필요 시 별도 요청)
-- `formatDohaDateTime` 등 표시 로직은 이미 Asia/Qatar로 출력하므로 저장이 올바르면 화면도 자연스럽게 3시간 밀림 없이 표시됨.
-- TM/ABD/SP 임포트는 date-only만 취급하므로 변경 없음. 캘린더 날짜는 지금도 정확.
+## 성능
+- 캐시 bulk 조회: 공종당 수천 행 × 48 point JSON ≈ 수 MB 이내, 단일 SELECT.
+- 로딩 경로에서 서버 재계산 0회 (네트워크 탭으로 검증).
+- 팝업 재계산은 단건이라 즉시 응답.
+- 크론 재계산은 공종 무관 일괄, plan 곡선은 순수 산술이라 빠르며 실적 곡선 조회만 status_history 인덱스 (`discipline, task_no, field, changed_at`) 로 처리.
 
-## 검증
-- 타입체크 통과 확인.
-- 유닛 확인용 임시 로그로 다음 케이스가 아래와 같이 되는지 확인:
-  - 문자열 `"2026-07-22 09:00"` → `2026-07-22T06:00:00.000Z`
-  - 문자열 `"2026-07-22T09:00:00+03:00"` → `2026-07-22T06:00:00.000Z`
-  - 문자열 `"2026-07-22T09:00:00Z"` → `2026-07-22T09:00:00.000Z` (원 타임존 존중)
-  - Excel serial(도하 09:00 저장) → `2026-07-22T06:00:00.000Z`
+## 검증 체크리스트
+- [ ] plan_end 가 미래여도 계획선이 plan_end 시점에 100% 로 완결.
+- [ ] Data Date 가 plan_end 이전이어도 계획선은 그 이후 구간까지 사전 계산된 값으로 표시.
+- [ ] 실적선은 Data Date 를 넘어 그리지 않음.
+- [ ] 미니차트 폭/높이는 기간 무관 120×32 고정.
+- [ ] Task Tree 재로딩 시 detail 서버 함수 호출 0회.
+- [ ] 팝업 오픈 시 detail 호출 1회.
+- [ ] `SELECT * FROM cron.job WHERE jobname='daily-task-progress-recalc';` 등록 확인.
 
-## 스코프 밖(이번에 하지 않음)
-- 기존 DB 값 소급 보정 마이그레이션
-- date-only 필드를 datetime으로 재해석
-- DMR 파싱 프롬프트/AI 결과 재해석 (문자열 저장 기반이라 별도 검토 필요)
+승인해 주시면 마이그레이션 → 서버 함수 → UI 순으로 구현합니다.
