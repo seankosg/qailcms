@@ -1,54 +1,61 @@
-# 임포트 진행 중 취소 기능
+## 1. Main Task 진도율이 롤업되지 않는 이유 (근본 원인)
 
-모든 모듈(TM, SM, Spare Part, ABD, DMR)의 임포트 실행 도중 사용자가 취소할 수 있도록 통일된 취소 메커니즘을 추가합니다. 서버 트랜잭션을 중단시키는 것이 아니라, 클라이언트 측 청크 루프 사이에서 "취소 요청" 플래그를 확인하고 다음 청크로 넘어가기 전에 안전하게 중단합니다.
+DB에서 `public.update_task_summary(_discipline, _parent_task_no)` 함수 본문을 실측한 결과, 집계·업데이트 시 `level` 필터가 **옛 명칭**을 그대로 사용하고 있음을 확인했습니다.
 
-## 공통 설계
+- 하위 집계: `where ... and level = 'child'`
+- 부모 업데이트: `where ... and task_no = _parent_task_no and level = 'parent'`
 
-- 각 임포트 컨텍스트/페이지에 `cancelRequestedRef: MutableRefObject<boolean>`와 `isCancelling` 상태 추가.
-- `requestCancel()` 함수 노출: 플래그를 `true`로 설정하고 토스트 "취소 요청됨. 현재 청크 완료 후 중단됩니다".
-- 청크 upsert 루프 진입부에서 `if (cancelRequestedRef.current) break;` 체크.
-- 중단 시:
-  - 파일 상태를 `"cancelled"`로 설정하고 `error_message = "사용자 취소"`.
-  - 이미 커밋된 청크는 유지 (부분 임포트). 로그에 처리된/스킵된 행 수 기록.
-  - 임포트 로그 레코드(`*_import_logs`)의 `status = 'cancelled'`, `notes`에 "N/M 행에서 취소됨" 저장.
-- 진행 완료/실패/취소 후 플래그 리셋.
+그러나 현재 `task_management_raw` 데이터의 `level` 값은 `main` / `sub` 로만 존재합니다 (`main=167`, `sub=1161`, `child`/`parent` = 0건).
 
-## 파일별 변경
+결과적으로,
+- 서브 집계가 항상 0행 → 함수가 `agg.cnt = 0`에서 조기 return
+- 설령 통과하더라도 `level='parent'` 조건에 매칭되는 Main Task 행이 0건 → UPDATE 0 rows
+- 따라서 `rollup_task_all_mains`가 실행돼도 Main Task의 `actual_progress`, `plan_progress`, `plan_start/end`, `slip_days`, `auto_judgment` 등이 전혀 갱신되지 않음
 
-**공통 타입**
-- `src/contexts/TaskManagementImportContext.tsx`, `DefectManagementImportContext.tsx`, `SparePartImportContext.tsx`
-  - 상태 유니온에 `"cancelled"` 추가.
-  - `cancelRequestedRef` 및 `requestCancel` 추가하여 Provider value에 노출.
-  - 메인 upsert 루프(TM: 라인 766 근처 `INSERT_CHUNK` 루프, SM/SP도 동일 패턴)에서 각 배치 시작 시 취소 체크.
-  - 파일 단위 for 루프(`for (const f of ready)`)에서도 다음 파일 진행 전 체크.
+이전에 `main_task_no` 컬럼명 마이그레이션은 반영됐지만, `level` 라벨 변경(`parent/child` → `main/sub`)이 이 함수에 반영되지 않은 상태로 남아있었기 때문입니다. (Sub Task 파생 필드는 별도 트리거 `calc_sub_task_derived_fn`로 계산되므로 정상 동작해 왔음.)
 
-**ABD**
-- `src/components/abd/import/AbdImportPage.tsx` (라인 222 루프)
-  - `cancelRequestedRef` state 추가, 시트 단위 및 배치 단위 취소 체크.
+### 수정
 
-**DMR**
-- `src/components/resource/dmr/DmrImportPage.tsx`
-  - `uploadAndParse`와 `saveAll` 두 단계 모두에 취소 지원. 업로드/파싱은 슬롯 단위, 저장은 배치 단위로 체크.
+`update_task_summary` 함수 본문의 두 `level` 리터럴을 교체하는 마이그레이션을 실행:
 
-**UI (각 임포트 페이지)**
-- `src/components/task-management/import/TaskManagementImportPage.tsx`
-- `src/components/defect-management/import/DefectManagementImportPage.tsx`
-- `src/components/spare-part/import/SparePartImportPage.tsx`
-- `src/components/abd/import/AbdImportPage.tsx`
-- `src/components/resource/dmr/DmrImportPage.tsx`
+```sql
+-- child -> sub
+where discipline = _discipline
+  and main_task_no = _parent_task_no
+  and level = 'sub'
 
-각 페이지의 진행 중 상태(`processing`)일 때 기존 "임포트 시작" 버튼 옆(또는 진행률 표시 옆)에 **빨간 outline "취소" 버튼** 노출. 클릭 시 확인 다이얼로그 → `requestCancel()`. `isCancelling` 상태에는 스피너 + "취소 중…" 라벨.
+-- parent -> main
+update public.task_management_raw
+   set ...
+ where discipline = _discipline
+   and task_no = _parent_task_no
+   and level = 'main';
+```
 
-- 파일 목록 행에도 `"cancelled"` 상태 뱃지(회색 "취소됨") 표시.
+이후 `rollup_task_all_mains`를 5개 공종(ARCH/ELEC/MECH/DESN/PRJC)에 대해 1회 실행하여 기존 Main Task 진도율을 즉시 재계산합니다. 이후부터는 임포트 완료 후 자동 롤업이 정상 동작합니다.
 
-## 기술 세부사항
+## 2. 항목 클릭 → 상세 페이지 드릴다운
 
-- 사용자 취소로 중단된 행에 대해 사전 스냅샷(pre-import snapshot)은 그대로 유지되어 필요 시 롤백 가능. 임포트 로그 UI의 롤백 버튼은 `cancelled` 상태에서도 활성화.
-- 취소 확인 다이얼로그 문구: "지금까지 처리된 N행은 저장된 상태로 유지되고, 이후 배치는 중단됩니다. 필요시 임포트 로그에서 롤백할 수 있습니다."
-- SM 이분 탐색(binary split) 재시도 로직 안에서도 취소 체크를 넣어, 대용량 배치 재시도 중에도 즉시 반응.
-- 취소 후 파일 재시도(재선택)를 방지하지 않음 — 사용자가 원하면 다시 시작 가능.
+파일: `src/components/task-management/tree/TaskTreePage.tsx`
 
-## 범위 제외
+- Main Task `CardHeader`: 현재 클릭 시 펴기/접기만 동작. 셰브론 아이콘 영역만 토글로 유지하고, `task_no` / `task_name` 텍스트 영역을 클릭하면 `/closure/task-management/detail/$id` (Route: `detail.$id.tsx`, `p.id` 전달)로 이동. 우측 컨트롤(Progress/Gap/History 버튼)은 `stopPropagation` 유지.
+- Sub Task `<tr>`: `task_no` 셀 또는 행 전체 클릭 시 동일 라우트로 `k.id` 전달하며 이동. History 버튼은 기존대로 `stopPropagation` 유지.
+- 이동은 `useNavigate({ to: "/closure/task-management/detail/$id", params: { id } })` 사용.
 
-- 이미 커밋된 청크의 자동 롤백은 하지 않음 (기존 롤백 UI 사용).
-- 서버 측 진행 중 트랜잭션 강제 중단(pg_cancel_backend) 없음 — 현재 청크는 정상 완료 후 다음 청크에서 중단.
+## 3. 지연 필터 → 위험도(정상/주의/지연/위험) 필터로 교체
+
+파일: `src/components/task-management/tree/TaskTreePage.tsx`
+
+현재 `delayFilter: "off" | "all" | "main" | "sub"` (Main/Sub 지연 구분)을 **위험도 다중선택 필터**로 대체합니다. 위험도 라벨은 `AUTO_JUDGMENTS`(`완료 / 정상 / 주의 / 지연 / 위험`) 중 사용자가 요청한 4종 `정상 / 주의 / 지연 / 위험`을 노출.
+
+- 상태: `const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(new Set())`  (빈 세트 = 필터 없음)
+- UI: 기존 Select 자리에 4개 Toggle 형태의 pill 버튼 그룹 (`정상 · 주의 · 지연 · 위험`). 각 pill은 `AUTO_JUDGMENT_COLORS`로 착색, 선택 시 반전 강조. 우측 끝에 "모두 해제" 텍스트 버튼.
+- 판정 소스: 각 행의 `auto_judgment`가 있으면 그대로 사용, 없으면 `computeJudgment(row, undefined, asOfDate)`로 계산. Main Task는 자체 `auto_judgment` + 서브의 `worstJudgment(kids.map(k => k.auto_judgment))` 중 worst.
+- 매칭 규칙: `judgmentFilter`가 비어있지 않을 때, Main Task 또는 그 하위 Sub 중 하나라도 선택된 위험도에 포함되면 표시. (기존 지연 필터가 Main/Sub 어느쪽 지연도 매칭했던 UX와 동등.)
+- 엑셀 내보내기 필터 라벨 및 URL/상태만 사용하므로 라우트 스키마 변경 없음. `filtersLabel`은 `위험도=정상,지연` 형태로 요약.
+
+## 기술 상세
+
+- 마이그레이션은 `supabase--migration` 툴로 실행하며 함수 정의만 CREATE OR REPLACE. 이후 5개 discipline 각각 `rollup_task_all_mains` 호출.
+- 드릴다운은 이미 존재하는 `/closure/task-management/detail/$id` 라우트를 재사용하므로 신규 라우트 없음.
+- 위험도 필터 로직은 컴포넌트 로컬 상태로 처리(URL 파라미터 추가 없음). 향후 필요 시 search param화 가능.
