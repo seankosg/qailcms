@@ -99,6 +99,8 @@ function ImportInner() {
     files,
     getFiles,
     isRunning,
+    isCancelling,
+    requestCancel,
     rollupMode,
     setRollupMode,
     recalcJudgment,
@@ -426,6 +428,16 @@ function ImportInner() {
               <Button variant="outline" size="sm" onClick={clearAll} disabled={isRunning}>
                 Clear all
               </Button>
+              {isRunning && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={requestCancel}
+                  disabled={isCancelling}
+                >
+                  {isCancelling ? "취소 중…" : "취소"}
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={runStartImport}
