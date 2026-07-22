@@ -1,5 +1,5 @@
 // Lightweight stage helpers used by Defect Raw Data UI (overdue tinting, stage progress).
-import { todayInDoha, formatDdMmm as _fmtShort } from "@/lib/time/doha";
+import { todayInDoha, formatDdMmmYyyy as _fmtLong } from "@/lib/time/doha";
 
 export function todayIso(): string {
   return todayInDoha();
@@ -60,5 +60,5 @@ export function classifyDefectStage(row: Row, asOf: string | null | undefined): 
 }
 
 export function formatDdMmm(iso: string | null | undefined): string {
-  return _fmtShort(iso);
+  return _fmtLong(iso);
 }
