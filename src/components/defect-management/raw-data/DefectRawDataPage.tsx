@@ -783,8 +783,6 @@ export function DefectRawDataPage() {
             onServerVisibility={onServerVisibility}
             onServerLabel={onServerLabel}
           />
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           {tab === "unclosed" && (
             <Button
               variant="default"
