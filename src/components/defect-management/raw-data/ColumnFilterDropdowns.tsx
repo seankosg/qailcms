@@ -7,7 +7,17 @@ import { cn } from "@/lib/utils";
 import { EMPTY_TOKEN } from "@/lib/defect-management/filter-fns";
 import { useDefectFacet, type DefectStatusGroup, type DefectServerFilter } from "@/hooks/useDefectItems";
 
-export function MultiSelectDropdown({ column, options }: { column: any; options: { value: string; label: string }[] }) {
+export function MultiSelectDropdown({
+  column,
+  options,
+  q,
+  serverFilters,
+}: {
+  column: any;
+  options: { value: string; label: string }[];
+  q?: string;
+  serverFilters?: DefectServerFilter[];
+}) {
   const selected: string[] = (column.getFilterValue() as string[]) ?? [];
   const isActive = selected.length > 0;
   const toggle = (v: string) => {
@@ -22,15 +32,14 @@ export function MultiSelectDropdown({ column, options }: { column: any; options:
   const serverFacetCol: string | null = meta.serverFacet ?? null;
   const statusGroup: DefectStatusGroup = (meta.statusGroup as DefectStatusGroup) ?? "unclosed";
   const includeInactive: boolean = !!meta.includeInactive;
-  // 크로스 필터링: 테이블 meta에서 현재 검색어/서버 필터를 읽어 자기 자신을 제외하고 전달
-  const tableMeta = (column.getContext?.().table?.options?.meta ?? {}) as any;
-  const q: string | undefined = tableMeta.q;
-  const serverFilters: DefectServerFilter[] = tableMeta.serverFilters ?? [];
+  // 크로스 필터링: props로 부모의 최신 검색어/서버 필터를 받아 자기 자신은 훅에서 제외.
+  // (기존 tableMeta 경로는 useReactTable options 갱신 타이밍 이슈로 stale 값이 남을 수 있어 폐기.)
+  const activeFilters: DefectServerFilter[] = serverFilters ?? [];
   const { data: serverFacet } = useDefectFacet(open ? serverFacetCol : null, {
     statusGroup,
     includeInactive,
     q,
-    filters: serverFilters,
+    filters: activeFilters,
     enabled: open && !!serverFacetCol,
   });
   const items = useMemo(() => {
@@ -168,7 +177,7 @@ export function DateRangeDropdown({ column }: { column: any }) {
 
 export function ColumnFilterDropdown({ column }: { column: any }) {
   const meta = column.columnDef.meta as any;
-  if (meta?.filterType === "multi-select") return <MultiSelectDropdown column={column} options={meta.filterOptions ?? []} />;
+  if (meta?.filterType === "multi-select") return <MultiSelectDropdown column={column} options={meta.filterOptions ?? []} q={meta.q} serverFilters={meta.serverFilters} />;
   if (meta?.filterType === "date-range") return <DateRangeDropdown column={column} />;
   return <TextFilterDropdown column={column} />;
 }
