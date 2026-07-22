@@ -68,6 +68,8 @@ function ImportPage() {
   const {
     files,
     isRunning,
+    isCancelling,
+    requestCancel,
     addFiles,
     removeFile,
     clearAll,
@@ -168,6 +170,16 @@ function ImportPage() {
               >
                 Clear all
               </Button>
+              {isRunning && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={requestCancel}
+                  disabled={isCancelling}
+                >
+                  {isCancelling ? "취소 중…" : "취소"}
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={startImport}
