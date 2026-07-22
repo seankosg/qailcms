@@ -69,13 +69,7 @@ import { DefectStatusBadge } from "./DefectStatusBadge";
 import { CriticalPendingBar } from "./CriticalPendingBar";
 import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
-import { ExportDialog } from "./ExportDialog";
 import { exportAllUnclosed } from "./exportAllUnclosed";
-import {
-  inferSourceLabel,
-  summarizeServerFilters,
-  summarizeServerSort,
-} from "@/lib/defect-management/export-meta";
 import { EditCellPopover } from "./EditCellPopover";
 import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
@@ -354,7 +348,6 @@ export function DefectRawDataPage() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [searchInput, setSearchInput] = useState(urlSearch.q ?? "");
   const [criticalPending, setCriticalPending] = useState<Map<string, boolean>>(new Map());
-  const [exportOpen, setExportOpen] = useState(false);
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [visibility, setVisibility] = useState<VisibilityState>({});
