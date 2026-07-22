@@ -49,3 +49,20 @@ export function dohaDateTime(input?: string | Date): string {
 export function dohaDateKeyToUtcIso(dateKey: string, wallTime = "00:00:00"): string {
   return new Date(`${dateKey}T${wallTime}+03:00`).toISOString();
 }
+
+/** Convert wall-clock (Y/M/D/h/m/s, no timezone) interpreted as Doha (+03:00) to UTC ISO. */
+export function dohaWallToUtcIso(
+  y: number,
+  m: number,
+  d: number,
+  h = 0,
+  min = 0,
+  s = 0,
+): string {
+  const mm = String(m).padStart(2, "0");
+  const dd = String(d).padStart(2, "0");
+  const hh = String(h).padStart(2, "0");
+  const mi = String(min).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return new Date(`${y}-${mm}-${dd}T${hh}:${mi}:${ss}+03:00`).toISOString();
+}
