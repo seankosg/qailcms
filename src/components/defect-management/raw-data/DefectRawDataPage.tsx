@@ -960,6 +960,8 @@ export function DefectRawDataPage() {
         frozenColIds={[...SYSTEM_FROZEN_IDS, ...frozenExtras]}
         getSourceOrigin={helpers.getSourceOrigin}
         onRowClick={(r) => navigate({ to: "/closure/snag-management/detail/$id", params: { id: r.id } })}
+        q={q}
+        serverFilters={serverFilters}
       />
 
       <ExportDialog
