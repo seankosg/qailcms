@@ -629,6 +629,7 @@ export function DefectRawDataPage() {
     data: enrichedRows as DefectItem[],
     columns,
     state: { sorting, columnFilters, columnSizing, columnVisibility, rowSelection },
+    meta: { q, serverFilters } as any,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnSizingChange: setColumnSizing,
