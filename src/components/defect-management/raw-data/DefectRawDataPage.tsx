@@ -69,13 +69,7 @@ import { DefectStatusBadge } from "./DefectStatusBadge";
 import { CriticalPendingBar } from "./CriticalPendingBar";
 import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
-import { ExportDialog } from "./ExportDialog";
 import { exportAllUnclosed } from "./exportAllUnclosed";
-import {
-  inferSourceLabel,
-  summarizeServerFilters,
-  summarizeServerSort,
-} from "@/lib/defect-management/export-meta";
 import { EditCellPopover } from "./EditCellPopover";
 import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
@@ -354,7 +348,6 @@ export function DefectRawDataPage() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [searchInput, setSearchInput] = useState(urlSearch.q ?? "");
   const [criticalPending, setCriticalPending] = useState<Map<string, boolean>>(new Map());
-  const [exportOpen, setExportOpen] = useState(false);
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [visibility, setVisibility] = useState<VisibilityState>({});
@@ -790,8 +783,6 @@ export function DefectRawDataPage() {
             onServerVisibility={onServerVisibility}
             onServerLabel={onServerLabel}
           />
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export Excel</Button>
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           {tab === "unclosed" && (
             <Button
               variant="default"
@@ -962,65 +953,6 @@ export function DefectRawDataPage() {
         onRowClick={(r) => navigate({ to: "/closure/snag-management/detail/$id", params: { id: r.id } })}
         q={q}
         serverFilters={serverFilters}
-      />
-
-      <ExportDialog
-        open={exportOpen}
-        onOpenChange={setExportOpen}
-        getRows={() => rows}
-        fetchPage={async (offset, limit) => {
-          const { supabase } = await import("@/integrations/supabase/client");
-          const { data, error } = await (supabase as any).rpc("defect_items_search", {
-            _status_group: tab,
-            _include_inactive: includeInactive,
-            _q: q && q.trim() ? q.trim() : null,
-            _filters: serverFilters,
-            _sort: serverSort,
-            _offset: offset,
-            _limit: limit,
-          });
-          if (error) throw new Error(error.message);
-          const arr = (data ?? []) as { rows: any; total_count: number | string }[];
-          const rs = arr.map((r) => r.rows as Record<string, any>);
-          const total = Number(arr[0]?.total_count ?? rs.length);
-          return { rows: rs, total };
-        }}
-        fetchAllRows={async (onProgress) => {
-          const { supabase } = await import("@/integrations/supabase/client");
-          const CHUNK = 1000;
-          const all: Record<string, any>[] = [];
-          let offset = 0;
-          let total = Infinity;
-          while (offset < total) {
-            const { data, error } = await (supabase as any).rpc("defect_items_search", {
-              _status_group: tab,
-              _include_inactive: includeInactive,
-              _q: q && q.trim() ? q.trim() : null,
-              _filters: serverFilters,
-              _sort: serverSort,
-              _offset: offset,
-              _limit: CHUNK,
-            });
-            if (error) throw new Error(error.message);
-            const arr = (data ?? []) as { rows: any; total_count: number | string }[];
-            if (arr.length === 0) break;
-            total = Number(arr[0]?.total_count ?? all.length);
-            for (const r of arr) all.push(r.rows as Record<string, any>);
-            offset += arr.length;
-            onProgress?.(all.length, total);
-            if (all.length >= total) break;
-          }
-          return all;
-        }}
-        columnHeaders={DEFECT_COLUMNS.map((c) => ({ key: c.key, label: helpers.getLabel(c.key) }))}
-        meta={{
-          userName: user?.name ?? user?.email ?? "unknown",
-          userType: (user as any)?.userType ?? (user?.isAdmin ? "admin" : ""),
-        }}
-        sourceLabel={inferSourceLabel(urlSearch as Record<string, unknown>, tab, includeInactive)}
-        search={q}
-        filterSummary={summarizeServerFilters(serverFilters)}
-        sortSummary={summarizeServerSort(serverSort)}
       />
 
       <CriticalPendingBar
