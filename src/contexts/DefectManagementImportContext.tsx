@@ -902,7 +902,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         put(base, "room_group", p.room_group);
         put(base, "level_name", p.level_name);
         put(base, "review_flag", p.review_flag);
-        put(base, "rectified_status", deriveRectifiedStatus(p.status_raw));
+        put(base, "rectified_status", deriveRectifiedStatus(p.status_raw, base));
         put(base, "closure_status", deriveClosureStatus(p.status_raw));
         if (!skipPriority) put(base, "priority", p.priority);
 
