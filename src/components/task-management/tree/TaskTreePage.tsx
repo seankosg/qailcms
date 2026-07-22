@@ -431,18 +431,17 @@ export function TaskTreePage() {
                   )}
                   <ProgressBar v={p.actual_progress} />
                   <GapCell gap={pGap} />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6"
+                  <MiniProgressChart
+                    planPoints={chartMap.get(p.task_no)?.plan_points}
+                    actualPoints={chartMap.get(p.task_no)?.actual_points}
+                    xStart={chartMap.get(p.task_no)?.x_start ?? null}
+                    xEnd={chartMap.get(p.task_no)?.x_end ?? null}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setHistoryTask({ task_no: p.task_no, task_name: p.task_name });
+                      setChartTask({ task_no: p.task_no, task_name: p.task_name });
                     }}
-                    title="이력 보기"
-                  >
-                    <History className="h-3.5 w-3.5" />
-                  </Button>
+                    title="클릭하여 진도율 상세 차트 보기"
+                  />
                 </div>
               </CardHeader>
               {isOpen && (
@@ -501,17 +500,17 @@ export function TaskTreePage() {
                               )}
                             </td>
                             <td className="px-2 py-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6"
+                              <MiniProgressChart
+                                planPoints={chartMap.get(k.task_no)?.plan_points}
+                                actualPoints={chartMap.get(k.task_no)?.actual_points}
+                                xStart={chartMap.get(k.task_no)?.x_start ?? null}
+                                xEnd={chartMap.get(k.task_no)?.x_end ?? null}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setHistoryTask({ task_no: k.task_no, task_name: k.task_name });
+                                  setChartTask({ task_no: k.task_no, task_name: k.task_name });
                                 }}
-                              >
-                                <History className="h-3.5 w-3.5" />
-                              </Button>
+                                title="클릭하여 진도율 상세 차트 보기"
+                              />
                             </td>
                           </tr>
                         );
@@ -531,12 +530,12 @@ export function TaskTreePage() {
         </div>
       )}
 
-      <HistoryDrawer
-        open={!!historyTask}
-        onClose={() => setHistoryTask(null)}
+      <TaskProgressChartDialog
+        open={!!chartTask}
+        onClose={() => setChartTask(null)}
         discipline={discipline}
-        taskNo={historyTask?.task_no ?? null}
-        taskName={historyTask?.task_name ?? null}
+        taskNo={chartTask?.task_no ?? null}
+        taskName={chartTask?.task_name ?? null}
       />
     </div>
   );
