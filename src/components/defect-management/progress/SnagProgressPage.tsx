@@ -157,7 +157,34 @@ export function SnagProgressPage() {
     refetchOnWindowFocus: false,
   });
 
-  const buckets = useMemo(() => buildBucketRange(rpcStart, rpcEnd, bucket), [rpcStart, rpcEnd, bucket]);
+  // Day 뷰의 "Up to 21-Jul" 누계 컬럼용: 서버가 계산한 7/21 기준 누계값을 그대로 사용.
+  // 이렇게 하면 카드/우측 총합(actual_upto)과 셀 합계가 정확히 일치.
+  const LEGACY_CUM_ISO = "2026-07-21";
+  const totalsCumQ = useQuery({
+    queryKey: ["snag-progress-totals-cum", plot, teamsKey, roomKey, groupKey, planMode],
+    queryFn: () =>
+      totalsFn({
+        data: {
+          planGroups,
+          teams,
+          roomGroups,
+          groupBy: effectiveGroupBy,
+          asOfDate: LEGACY_CUM_ISO,
+          planMode,
+        },
+      }),
+    enabled: bucket === "day",
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Day 뷰에서는 셀 RPC 범위를 7/22 이후로만 잡는다. 7/21 이전 누계는 totalsCumQ가 제공.
+  const CUTOFF_ISO = "2026-07-22";
+  const effectiveRpcStart = bucket === "day" && rpcStart < CUTOFF_ISO ? CUTOFF_ISO : rpcStart;
+  const buckets = useMemo(
+    () => buildBucketRange(effectiveRpcStart, rpcEnd, bucket),
+    [effectiveRpcStart, rpcEnd, bucket],
+  );
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
@@ -168,34 +195,49 @@ export function SnagProgressPage() {
       buckets,
       stagesToShow: effectiveStages,
     });
-    // Day 뷰: 2026-07-21까지의 일일 컬럼을 하나의 누계 컬럼으로 접기
+    // Day 뷰: 서버가 계산한 7/21 누계를 별도 컬럼으로 prepend
     if (bucket === "day") {
-      const CUTOFF = "2026-07-22";
       const CUM_ISO = "2026-07-21";
-      const cutoffIdx = result.buckets.findIndex((b) => b >= CUTOFF);
-      const preRange = cutoffIdx < 0 ? result.buckets.length : cutoffIdx;
-      let visStart = preRange;
+      let visStart = 0;
       if (hidePast) {
         const t = result.buckets.findIndex((b) => b >= today);
         if (t > visStart) visStart = t;
       }
-      const sumRange = (arr: { bucket: string; plan: number; actual: number }[]) => {
+      // 그룹키/스테이지별 7/21 누계 조회 맵
+      const cumRows = totalsCumQ.data ?? [];
+      const cumMap = new Map<string, Record<Stage, { plan: number; actual: number }>>();
+      const emptyStages = (): Record<Stage, { plan: number; actual: number }> => ({
+        start: { plan: 0, actual: 0 },
+        rectified: { plan: 0, actual: 0 },
+        closure: { plan: 0, actual: 0 },
+      });
+      for (const t of cumRows) {
+        const k = JSON.stringify(t.group_key ?? []);
+        if (!cumMap.has(k)) cumMap.set(k, emptyStages());
+        cumMap.get(k)![t.stage as Stage] = { plan: t.plan_upto, actual: t.actual_upto };
+      }
+      const cellFor = (groupKeyRaw: string[], stage: Stage) => {
+        const s = cumMap.get(JSON.stringify(groupKeyRaw))?.[stage] ?? { plan: 0, actual: 0 };
+        return { bucket: CUM_ISO, plan: s.plan, actual: s.actual };
+      };
+      const combinedFor = (groupKeyRaw: string[]) => {
         let p = 0;
         let a = 0;
-        for (let i = 0; i < preRange; i++) {
-          p += arr[i]?.plan ?? 0;
-          a += arr[i]?.actual ?? 0;
+        for (const st of effectiveStages) {
+          const c = cellFor(groupKeyRaw, st);
+          p += c.plan;
+          a += c.actual;
         }
         return { bucket: CUM_ISO, plan: p, actual: a };
       };
       const newBuckets = [CUM_ISO, ...result.buckets.slice(visStart)];
       const rows = result.rows.map((r) => ({
         ...r,
-        combined: [sumRange(r.combined), ...r.combined.slice(visStart)],
+        combined: [combinedFor(r.groupKeyRaw), ...r.combined.slice(visStart)],
         stages: {
-          start: { ...r.stages.start, cells: [sumRange(r.stages.start.cells), ...r.stages.start.cells.slice(visStart)] },
-          rectified: { ...r.stages.rectified, cells: [sumRange(r.stages.rectified.cells), ...r.stages.rectified.cells.slice(visStart)] },
-          closure: { ...r.stages.closure, cells: [sumRange(r.stages.closure.cells), ...r.stages.closure.cells.slice(visStart)] },
+          start: { ...r.stages.start, cells: [cellFor(r.groupKeyRaw, "start"), ...r.stages.start.cells.slice(visStart)] },
+          rectified: { ...r.stages.rectified, cells: [cellFor(r.groupKeyRaw, "rectified"), ...r.stages.rectified.cells.slice(visStart)] },
+          closure: { ...r.stages.closure, cells: [cellFor(r.groupKeyRaw, "closure"), ...r.stages.closure.cells.slice(visStart)] },
         },
       }));
       return { buckets: newBuckets, rows };
@@ -215,7 +257,7 @@ export function SnagProgressPage() {
       },
     }));
     return { buckets: newBuckets, rows };
-  }, [cellsQ.data, totalsQ.data, buckets, effectiveStages, hidePast, today, bucket]);
+  }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket]);
 
   const kpis = useMemo(() => {
     const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number }> = {
