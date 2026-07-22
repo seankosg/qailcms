@@ -20,6 +20,11 @@ import {
   type ParsedDefectRow,
 } from "@/lib/defect-management/parser";
 import { deriveRectifiedStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
+import {
+  resolvePlotFromPlanGroup,
+  resolveHdec,
+  resolveSubcon,
+} from "@/lib/defect-management/auto-fill-rules";
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
