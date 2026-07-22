@@ -178,7 +178,7 @@ export const DEFECT_COLUMNS: DefectColumnDef[] = [
   // Stage sets: [P.Date | A.Date | Status] × Start → Rectified → Closure
   { key: "planned_start_date", label: "P.Start", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
   { key: "actual_start_date", label: "A.Start", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
-  { key: "start_status", label: "Start Status", type: "badge", width: 110, group: "progress", derived: true },
+  { key: "start_status", label: "Start Status", type: "badge", width: 130, group: "progress" },
   { key: "planned_rectified_date", label: "P.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
   { key: "actual_rectified_date", label: "A.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
   { key: "rectified_status", label: "Rectified Status", type: "badge", width: 130, group: "progress", editable: true, editorType: "select", options: [...RECTIFIED_STATUSES] },
