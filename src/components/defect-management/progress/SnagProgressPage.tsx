@@ -564,7 +564,8 @@ export function SnagProgressPage() {
           }
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
-            text: `${kpis.byStage[s].total.toLocaleString()} (${kpis.byStage[s].total > 0 ? 100.0.toFixed(1) : "—"}%)`,
+            value: kpis.byStage[s].total.toLocaleString(),
+            suffix: `(${kpis.byStage[s].total > 0 ? 100.0.toFixed(1) : "—"}%)`,
             onClick: () => handleKpiClick("done", s),
           }))}
         />
