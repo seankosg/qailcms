@@ -943,6 +943,49 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             put(base, k, v);
           }
         }
+        // ── 자동 채움 rule: HDEC PIC/ENG · Subcon ──
+        // 원본 엑셀 값(base 에 이미 있음) 또는 기존 DB 값이 있으면 skip.
+        {
+          const { resolvePlotFromPlanGroup, resolveHdec, resolveSubcon } = await import(
+            "@/lib/defect-management/auto-fill-rules"
+          );
+          const planGroupVal = (base.plan_group ?? p.plan_group ?? null) as string | null;
+          const roomGroupVal = (base.room_group ?? p.room_group ?? null) as string | null;
+          const buildingVal = (base.building ?? p.building ?? null) as string | null;
+          const plot = resolvePlotFromPlanGroup(planGroupVal);
+          if (plot) {
+            // HDEC PIC / ENG
+            const needPic = !base.hdec_pic_name && !prev?.hdec_pic_name && !excludedFields.has("hdec_pic_name");
+            const needEng = !base.hdec_eng_name && !prev?.hdec_eng_name && !excludedFields.has("hdec_eng_name");
+            if (needPic || needEng) {
+              const hit = resolveHdec(hdecRules, plot, buildingVal, planGroupVal, roomGroupVal);
+              if (hit) {
+                if (needPic && hit.pic) base.hdec_pic_name = hit.pic;
+                if (needEng && hit.eng) base.hdec_eng_name = hit.eng;
+              }
+            }
+            // Subcon
+            if (
+              !base.subcontractor_name &&
+              !prev?.subcontractor_name &&
+              !excludedFields.has("subcontractor_name")
+            ) {
+              const mainTradeVal = (base.main_trade ?? null) as string | null;
+              const subTradeVal = (base.sub_trade ?? null) as string | null;
+              const descVal = (base.description ?? p.description ?? null) as string | null;
+              const sub = resolveSubcon(
+                subconRules,
+                plot,
+                planGroupVal,
+                roomGroupVal,
+                mainTradeVal,
+                subTradeVal,
+                descVal,
+              );
+              if (sub) base.subcontractor_name = sub;
+            }
+          }
+        }
         // ── Status 전이 기반 Actual Date 자동 채움 ────────────────────────────
         // last_updated_at (없으면 data_date) 을 fallback 날짜로 사용.
         const transitionDate =
