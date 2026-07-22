@@ -1127,9 +1127,11 @@ interface TableViewProps {
   frozenColIds: string[];
   getSourceOrigin: (field: string) => "hdec" | "aconex" | "system" | "derived";
   onRowClick: (row: DefectItem) => void;
+  q?: string;
+  serverFilters?: DefectServerFilter[];
 }
 
-function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, getSourceOrigin, onRowClick }: TableViewProps) {
+function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, getSourceOrigin, onRowClick, q, serverFilters }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
   const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
   // 리프 컬럼을 순회하면서 frozen id인 것들만 왼쪽부터 sticky 스택으로 쌓음.
@@ -1231,7 +1233,7 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                         {header.column.getIsSorted() && <span className="flex-shrink-0">{header.column.getIsSorted() === "asc" ? "▲" : "▼"}</span>}
                       </span>
                       {header.column.getCanFilter() && (
-                        <span onClick={(e) => e.stopPropagation()}><ColumnFilterDropdown column={header.column} /></span>
+                        <span onClick={(e) => e.stopPropagation()}><ColumnFilterDropdown column={header.column} q={q} serverFilters={serverFilters} /></span>
                       )}
                     </div>
                     {header.column.getCanResize() && (
