@@ -584,7 +584,8 @@ export function SnagProgressPage() {
             const pct = total > 0 ? (kpis.byStage[s].plan / total) * 100 : null;
             return {
               stage: s,
-              text: `${kpis.byStage[s].plan.toLocaleString()} (${pct === null ? "—" : `${pct.toFixed(1)}%`})`,
+              value: kpis.byStage[s].plan.toLocaleString(),
+              suffix: `(${pct === null ? "—" : `${pct.toFixed(1)}%`})`,
               onClick: () => handleKpiClick("plan", s),
             };
           })}
