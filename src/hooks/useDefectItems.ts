@@ -121,14 +121,27 @@ export async function fetchDefectItemIds(params: {
 
 export function useDefectFacet(
   column: string | null,
-  opts: { statusGroup: DefectStatusGroup; includeInactive: boolean; enabled?: boolean },
+  opts: {
+    statusGroup: DefectStatusGroup;
+    includeInactive: boolean;
+    enabled?: boolean;
+    q?: string;
+    filters?: DefectServerFilter[];
+  },
 ) {
+  const otherFilters = (opts.filters ?? []).filter((f) => f.column !== column);
+  const qNorm = opts.q && opts.q.trim() ? opts.q.trim() : null;
   return useQuery<DefectFacetItem[]>({
     queryKey: [
       "defect",
       "facet",
       column,
-      { statusGroup: opts.statusGroup, includeInactive: opts.includeInactive },
+      {
+        statusGroup: opts.statusGroup,
+        includeInactive: opts.includeInactive,
+        q: qNorm,
+        filters: otherFilters,
+      },
     ],
     queryFn: async () => {
       if (!column) return [];
@@ -136,6 +149,8 @@ export function useDefectFacet(
         _column: column,
         _status_group: opts.statusGroup,
         _include_inactive: opts.includeInactive,
+        _q: qNorm,
+        _filters: otherFilters,
       });
       if (error) throw new Error(error.message);
       return ((data ?? []) as any[]).map((r) => ({ value: String(r.value), cnt: Number(r.cnt) }));
