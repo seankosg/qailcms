@@ -70,6 +70,12 @@ import { CriticalPendingBar } from "./CriticalPendingBar";
 import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
 import { exportAllUnclosed } from "./exportAllUnclosed";
+import { ExportDialog } from "./ExportDialog";
+import {
+  inferSourceLabel,
+  summarizeServerFilters,
+  summarizeServerSort,
+} from "@/lib/defect-management/export-meta";
 import { EditCellPopover } from "./EditCellPopover";
 import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
@@ -385,6 +391,7 @@ export function DefectRawDataPage() {
     pageSize,
   });
   const rows = itemsData?.rows ?? [];
+  const [exportOpen, setExportOpen] = useState(false);
   const total = itemsData?.total ?? 0;
   const pageCount = isAllPage ? 1 : Math.max(1, Math.ceil(total / pageSize));
 
@@ -783,6 +790,7 @@ export function DefectRawDataPage() {
             onServerVisibility={onServerVisibility}
             onServerLabel={onServerLabel}
           />
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           {tab === "unclosed" && (
             <Button
               variant="default"
@@ -962,6 +970,38 @@ export function DefectRawDataPage() {
           invalidateDefects();
         }}
         onDiscard={() => setCriticalPending(new Map())}
+      />
+
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        getRows={() => rows}
+        fetchPage={async (offset, limit) => {
+          const { supabase } = await import("@/integrations/supabase/client");
+          const { data, error } = await (supabase as any).rpc("defect_items_search", {
+            _status_group: tab,
+            _include_inactive: includeInactive,
+            _q: q && q.trim() ? q.trim() : null,
+            _filters: serverFilters,
+            _sort: serverSort,
+            _offset: offset,
+            _limit: limit,
+          });
+          if (error) throw new Error(error.message);
+          const arr = (data ?? []) as { rows: any; total_count: number | string }[];
+          const rs = arr.map((r) => r.rows as Record<string, any>);
+          const total = Number(arr[0]?.total_count ?? rs.length);
+          return { rows: rs, total };
+        }}
+        columnHeaders={DEFECT_COLUMNS.map((c) => ({ key: c.key, label: helpers.getLabel(c.key) }))}
+        meta={{
+          userName: user?.name ?? user?.email ?? "unknown",
+          userType: (user as any)?.userType ?? (user?.isAdmin ? "admin" : ""),
+        }}
+        sourceLabel={inferSourceLabel(urlSearch as Record<string, unknown>, tab, includeInactive)}
+        search={q}
+        filterSummary={summarizeServerFilters(serverFilters)}
+        sortSummary={summarizeServerSort(serverSort)}
       />
 
     </div>
