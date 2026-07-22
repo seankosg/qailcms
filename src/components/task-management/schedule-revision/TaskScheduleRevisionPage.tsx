@@ -12,7 +12,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { CalendarClock, Columns3, Filter, Pin, PinOff, RotateCcw, X } from "lucide-react";
+import { CalendarClock, Columns3, Download, Filter, Pin, PinOff, RotateCcw, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import {
+  buildScheduleRevisionWorkbook,
+  saveScheduleRevisionWorkbook,
+  type FlatCol,
+  type StageGroup,
+  type StageLeaf,
+} from "./exportScheduleRevision";
+import { dohaStampCompact } from "@/lib/time/doha";
 
 type Stage = "plan_start" | "plan_end" | "forecast_end";
 type FilterKind = "text" | "date-range" | "multi-select";
@@ -606,6 +614,54 @@ export function TaskScheduleRevisionPage() {
               Clear sort
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={loading || visibleRows.length === 0}
+            onClick={() => {
+              const flatCols: FlatCol[] = visibleFlatCols.map((c) => ({
+                key: c.id,
+                label: c.label,
+                widthPx: table.getColumn(c.id)?.getSize() ?? c.size,
+                kind: c.id === "created_at" ? "datetime" : "text",
+              }));
+              const groups: StageGroup[] = stageGroups
+                .map((stage, idx) => {
+                  const leaves: StageLeaf[] = stageVisibleLeaves[idx].map((l) => ({
+                    key: l.id,
+                    label: l.label,
+                    widthPx: table.getColumn(l.id)?.getSize() ?? l.size,
+                    kind: l.id.endsWith("_old_date") || l.id.endsWith("_new_date")
+                      ? "date"
+                      : l.id.endsWith("_diff_days")
+                        ? "diff"
+                        : "gap",
+                  }));
+                  return { stage, label: stageLabels[stage], leaves };
+                })
+                .filter((g) => g.leaves.length > 0);
+              const rowData = visibleRows.map((r) => r.original as unknown as Record<string, unknown>);
+              const wb = buildScheduleRevisionWorkbook({
+                flatColumns: flatCols,
+                stageGroups: groups,
+                rows: rowData,
+                freezeCols: Math.max(1, visibleFlatCols.findIndex((c) => c.id === "task_no") + 1) || 1,
+                metaLines: [
+                  `Filters: ${columnFilters.length}   Sort: ${
+                    sorting.map((s) => `${s.id}${s.desc ? "↓" : "↑"}`).join(", ") || "—"
+                  }`,
+                ],
+              });
+              saveScheduleRevisionWorkbook(
+                wb,
+                `TM__Schedule_Revision__${dohaStampCompact()}.xlsx`,
+              );
+            }}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </Button>
           <ColumnsMenu table={table} />
         </div>
       </div>
