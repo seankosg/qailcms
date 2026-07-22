@@ -8,22 +8,33 @@ export function todayIso(): string {
 type Row = Record<string, any>;
 
 export function isStageDone(row: Row, stage: "start" | "rectified" | "closure"): boolean {
-  if (stage === "closure") return Boolean(row.actual_closure_date);
-  if (stage === "rectified") {
-    if (row.actual_rectified_date) return true;
-    const p = Number(row.actual_progress_pct ?? 0);
-    if ((p > 1 ? p : p * 100) >= 100) return true;
-    return Boolean(row.actual_closure_date);
-  }
-  // start
   const sr = String(row.status_raw ?? "").trim().toLowerCase();
-  if (
+  const isRectifiedFamily =
     sr === "rectified" ||
     sr === "complete" ||
     sr === "completed" ||
     sr === "closed" ||
-    sr === "verified"
-  ) return true;
+    sr === "verified";
+  const isClosedFamily = sr === "closed" || sr === "verified";
+  if (stage === "closure") {
+    if (row.actual_closure_date) return true;
+    if (isClosedFamily) return true;
+    const cs = String(row.closure_status ?? "").trim().toLowerCase();
+    if (cs === "closed" || cs === "verified") return true;
+    return false;
+  }
+  if (stage === "rectified") {
+    if (row.actual_rectified_date) return true;
+    const p = Number(row.actual_progress_pct ?? 0);
+    if ((p > 1 ? p : p * 100) >= 100) return true;
+    if (row.actual_closure_date) return true;
+    if (isRectifiedFamily) return true;
+    const rs = String(row.rectified_status ?? "").trim().toLowerCase();
+    if (rs === "rectified") return true;
+    return false;
+  }
+  // start
+  if (isRectifiedFamily) return true;
   if (row.actual_start_date) return true;
   const p = Number(row.actual_progress_pct ?? 0);
   if (p > 0) return true;
