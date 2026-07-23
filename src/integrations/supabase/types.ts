@@ -2828,7 +2828,9 @@ export type Database = {
           actual_points: Json
           discipline: string
           id: string
+          last_actual_at_dd: number | null
           last_actual_progress: number | null
+          last_plan_at_dd: number | null
           last_plan_progress: number | null
           plan_points: Json
           task_no: string
@@ -2840,7 +2842,9 @@ export type Database = {
           actual_points?: Json
           discipline: string
           id?: string
+          last_actual_at_dd?: number | null
           last_actual_progress?: number | null
+          last_plan_at_dd?: number | null
           last_plan_progress?: number | null
           plan_points?: Json
           task_no: string
@@ -2852,7 +2856,9 @@ export type Database = {
           actual_points?: Json
           discipline?: string
           id?: string
+          last_actual_at_dd?: number | null
           last_actual_progress?: number | null
+          last_plan_at_dd?: number | null
           last_plan_progress?: number | null
           plan_points?: Json
           task_no?: string
