@@ -81,6 +81,9 @@ import { TaskStageProgress } from "./TaskStageProgress";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { canEditRawRow } from "@/lib/auth/roles";
+import { EditCellPopover } from "./EditCellPopover";
+import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
+import { DISCIPLINES } from "@/lib/task-management/columns";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import {
   runRollupAllMains,
@@ -203,6 +206,12 @@ export function TaskManagementRawDataPage() {
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const canEdit = !!currentUser?.isAdmin;
+  const isSuperUser = !!(currentUser as any)?.isSuperUser;
+  const isDSuperUser = !!(currentUser as any)?.isDSuperUser;
+  const canEditTaskNo = canEdit || isDSuperUser;
+  const canEditOwnerFieldsBase = canEdit || isSuperUser;
+  const myPic = String((currentUser as any)?.hdec_pic_name ?? "").trim().toLowerCase();
+  const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
   const canEditRow = useCallback(
     (row: Record<string, unknown>) =>
       canEditRawRow(currentUser ?? null, "task_management_raw", row as Record<string, any>),
