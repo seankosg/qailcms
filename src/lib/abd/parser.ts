@@ -87,32 +87,51 @@ function cleanCell(v: any): any {
 }
 
 function toIsoDate(v: any): string | null {
-  if (v == null || v === "") return null;
-  if (v instanceof Date) {
-    if (isNaN(v.getTime())) return null;
-    // xlsx `cellDates:true` returns a Date whose UTC components hold the
-    // sheet's wall-clock date. Interpret that date as Doha (+03:00) calendar.
-    return toDohaDateKey(v) || null;
-  }
-  if (typeof v === "number" && Number.isFinite(v)) {
-    // Excel serial date: treat parsed wall-clock as Doha (+03:00).
-    const parsed = XLSX.SSF?.parse_date_code?.(v);
-    if (parsed) {
-      return toDohaDateKey(dohaWallToUtcIso(parsed.y, parsed.m, parsed.d)) || null;
+function toIsoDate(v: any): string | null {
+  try {
+    if (v == null || v === "") return null;
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return null;
+      return toDohaDateKey(v) || null;
     }
+    if (typeof v === "number") {
+      if (!Number.isFinite(v) || v <= 0) return null;
+      const parsed = XLSX.SSF?.parse_date_code?.(v);
+      if (!parsed) return null;
+      const { y, m, d } = parsed;
+      if (!y || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return null;
+      const iso = dohaWallToUtcIso(y, m, d);
+      if (!iso) return null;
+      return toDohaDateKey(iso) || null;
+    }
+    const s = String(v).trim();
+    if (!s) return null;
+    const upper = s.toUpperCase();
+    if (
+      upper === "TBD" || upper === "TBA" || upper === "PENDING" ||
+      upper === "N/A" || upper === "NA" || upper === "#N/A" ||
+      upper === "-" || upper === "--" || upper === "0"
+    ) return null;
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) {
+      const mo = Number(iso[2]);
+      const da = Number(iso[3]);
+      if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+      return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    }
+    const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+    if (dmy) {
+      const da = Number(dmy[1]);
+      const mo = Number(dmy[2]);
+      if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+      const yy = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+      if (yy < 1900 || yy > 2999) return null;
+      return `${yy}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
+    }
+    return toDohaDateKey(s) || null;
+  } catch {
+    return null;
   }
-  const s = String(v).trim();
-  if (!s) return null;
-  // YYYY-MM-DD: treat as Doha calendar date directly.
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  // dd/mm/yyyy or dd-mm-yyyy (dd first, mm second).
-  const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
-  if (dmy) {
-    const yy = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
-    return `${yy}-${String(dmy[2]).padStart(2, "0")}-${String(dmy[1]).padStart(2, "0")}`;
-  }
-  return toDohaDateKey(s) || null;
 }
 
 /**
