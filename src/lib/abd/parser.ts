@@ -18,7 +18,8 @@ export interface ParsedAbdRow {
   abd_number: string;
   abd_ocs_no: string | null;
   batch_no: string | null;
-  pic: string | null;
+  hdec_pic_name: string | null;
+  hdec_eng_name: string | null;
   latest_rev: string | null;
   latest_status: string | null;
   approval_date: string | null;
@@ -279,7 +280,20 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
     else if (isAbdNumberLabel(label) && !("abd_number" in colIndex)) colIndex.abd_number = c;
     else if (label === "ABD OCS NO." || label === "ABD OCS NO" || label === "OCS NO.") colIndex.abd_ocs_no = c;
     else if (label === "BATCH NO." || label === "BATCH NO" || label === "BATCH NUMBER" || label === "BATCH") colIndex.batch_no = c;
-    else if (label === "PIC") colIndex.pic = c;
+    else if (
+      label === "HDEC PIC" || label === "HDEC_PIC" ||
+      label === "담당(한글)" || label === "담당 (한글)" || label === "담당(국문)" || label === "담당"
+    ) {
+      colIndex.hdec_pic_name = c;
+    }
+    else if (
+      label === "HDEC ENG" || label === "HDEC_ENG" ||
+      label === "담당(영문)" || label === "담당 (영문)" ||
+      label === "PIC(ENG)" || label === "PIC (ENG)" || label === "PIC"
+    ) {
+      // 레거시 단일 "PIC" 컬럼은 ENG 슬롯으로 매핑 (한글이면 아래 자동 분배 로직으로 hdec_pic_name 로 이동)
+      colIndex.hdec_eng_name = c;
+    }
     else if (label === "REV") colIndex.latest_rev = c;
     else if (label === "STATUS") colIndex.latest_status = c;
     else if (label === "APPOVAL" || label === "APPROVAL" || label === "APPROVAL DATE") colIndex.approval_date = c;
@@ -349,6 +363,24 @@ export async function parseAbdFile(
       const raw_payload: Record<string, any> = {};
       for (const key of Object.keys(hdr.colIndex)) raw_payload[key] = getVal(key);
 
+      // HDEC PIC / HDEC ENG 값 결정: 단일 컬럼만 있을 때 한글이면 PIC, 아니면 ENG 로 분배
+      const picCol = hdr.colIndex.hdec_pic_name;
+      const engCol = hdr.colIndex.hdec_eng_name;
+      const singlePicColumn = picCol != null && picCol === engCol;
+      const rawPic = picCol != null ? getVal("hdec_pic_name") : null;
+      const rawEng = !singlePicColumn && engCol != null ? getVal("hdec_eng_name") : null;
+      let hdec_pic_name: string | null = null;
+      let hdec_eng_name: string | null = null;
+      if (singlePicColumn) {
+        const v = rawPic != null ? String(rawPic).trim() : null;
+        if (v) {
+          if (/[\uAC00-\uD7A3]/.test(v)) hdec_pic_name = v; else hdec_eng_name = v;
+        }
+      } else {
+        hdec_pic_name = rawPic != null ? String(rawPic).trim() || null : null;
+        hdec_eng_name = rawEng != null ? String(rawEng).trim() || null : null;
+      }
+
       const row: ParsedAbdRow = {
         sl_no: getVal("sl_no") != null ? Number(getVal("sl_no")) : null,
         plot,
@@ -363,7 +395,8 @@ export async function parseAbdFile(
         abd_number: abd,
         abd_ocs_no: getVal("abd_ocs_no") ? String(getVal("abd_ocs_no")).trim() : null,
         batch_no: getVal("batch_no") ? String(getVal("batch_no")).trim() : null,
-        pic: getVal("pic") ? String(getVal("pic")) : null,
+        hdec_pic_name,
+        hdec_eng_name,
         latest_rev: getVal("latest_rev") ? String(getVal("latest_rev")) : null,
         latest_status: getVal("latest_status") ? String(getVal("latest_status")).toUpperCase() : null,
         approval_date: toIsoDate(getVal("approval_date")),
