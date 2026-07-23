@@ -55,7 +55,7 @@ export function DmrDashboardPage() {
   const [asOf, setAsOf] = useState<string>('');
   const [rangeDays, setRangeDays] = useState<7 | 14 | 30>(14);
   const [groupBy, setGroupBy] = useState<GroupBy>('team');
-  const [recordTab, setRecordTab] = useState<'subcon' | 'system'>('subcon');
+  const [recordTab, setRecordTab] = useState<'subcon' | 'system'>('system');
 
   // Latest date
   const latestQuery = useQuery({
@@ -247,7 +247,13 @@ export function DmrDashboardPage() {
     const cell = (k: string, d: string) => rows
       .filter((r) => r.contractor_name === k && r.report_date === d)
       .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
-    return { dates, keys, cell };
+    const systemsBy = new Map<string, string[]>();
+    for (const r of rows) {
+      const arr = systemsBy.get(r.contractor_name) ?? [];
+      if (r.system_name && !arr.includes(r.system_name)) arr.push(r.system_name);
+      systemsBy.set(r.contractor_name, arr);
+    }
+    return { dates, keys, cell, systemsBy };
   }, [rows]);
 
   const systemMatrix = useMemo(() => {
@@ -256,7 +262,13 @@ export function DmrDashboardPage() {
     const cell = (k: string, d: string) => rows
       .filter((r) => r.system_name === k && r.report_date === d)
       .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
-    return { dates, keys, cell };
+    const subconsBy = new Map<string, string[]>();
+    for (const r of rows) {
+      const arr = subconsBy.get(r.system_name) ?? [];
+      if (r.contractor_name && !arr.includes(r.contractor_name)) arr.push(r.contractor_name);
+      subconsBy.set(r.system_name, arr);
+    }
+    return { dates, keys, cell, subconsBy };
   }, [rows]);
 
   return (
@@ -383,7 +395,8 @@ export function DmrDashboardPage() {
                 <table className="w-full min-w-[600px] text-xs">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="sticky left-0 top-0 z-30 bg-muted px-2 py-1 text-left">Sub Contractor</th>
+                      <th className="sticky left-0 top-0 z-30 bg-muted px-2 py-1 text-left min-w-[160px]">Sub Contractor</th>
+                      <th className="sticky left-[160px] top-0 z-30 bg-muted px-2 py-1 text-left min-w-[160px]">System</th>
                       {subconMatrix.dates.map((d) => (
                         <th key={d} className="sticky top-0 z-20 bg-muted px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
                       ))}
@@ -393,9 +406,11 @@ export function DmrDashboardPage() {
                   <tbody>
                     {subconMatrix.keys.map((k) => {
                       const sum = subconMatrix.dates.reduce((a, d) => a + subconMatrix.cell(k, d), 0);
+                      const sysList = (subconMatrix.systemsBy.get(k) ?? []).sort().join(', ');
                       return (
                         <tr key={k} className="border-t hover:bg-muted/30">
-                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background">{k}{directNames.has(k) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
+                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background min-w-[160px]">{k}{directNames.has(k) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
+                          <td className="sticky left-[160px] z-10 bg-background px-2 py-1 text-muted-foreground hover:bg-background min-w-[160px]" title={sysList}>{sysList || '—'}</td>
                           {subconMatrix.dates.map((d) => {
                             const v = subconMatrix.cell(k, d);
                             return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
@@ -405,7 +420,7 @@ export function DmrDashboardPage() {
                       );
                     })}
                     {subconMatrix.keys.length === 0 && (
-                      <tr><td colSpan={subconMatrix.dates.length + 2} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
+                      <tr><td colSpan={subconMatrix.dates.length + 3} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -416,7 +431,8 @@ export function DmrDashboardPage() {
                 <table className="w-full min-w-[600px] text-xs">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="sticky left-0 top-0 z-30 bg-muted px-2 py-1 text-left">System</th>
+                      <th className="sticky left-0 top-0 z-30 bg-muted px-2 py-1 text-left min-w-[160px]">System</th>
+                      <th className="sticky left-[160px] top-0 z-30 bg-muted px-2 py-1 text-left min-w-[160px]">Subcon</th>
                       {systemMatrix.dates.map((d) => (
                         <th key={d} className="sticky top-0 z-20 bg-muted px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
                       ))}
@@ -426,9 +442,11 @@ export function DmrDashboardPage() {
                   <tbody>
                     {systemMatrix.keys.map((k) => {
                       const sum = systemMatrix.dates.reduce((a, d) => a + systemMatrix.cell(k, d), 0);
+                      const subList = (systemMatrix.subconsBy.get(k) ?? []).sort().join(', ');
                       return (
                         <tr key={k} className="border-t hover:bg-muted/30">
-                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background">{k}</td>
+                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background min-w-[160px]">{k}</td>
+                          <td className="sticky left-[160px] z-10 bg-background px-2 py-1 text-muted-foreground hover:bg-background min-w-[160px]" title={subList}>{subList || '—'}</td>
                           {systemMatrix.dates.map((d) => {
                             const v = systemMatrix.cell(k, d);
                             return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
@@ -438,7 +456,7 @@ export function DmrDashboardPage() {
                       );
                     })}
                     {systemMatrix.keys.length === 0 && (
-                      <tr><td colSpan={systemMatrix.dates.length + 2} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
+                      <tr><td colSpan={systemMatrix.dates.length + 3} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
                     )}
                   </tbody>
                 </table>
