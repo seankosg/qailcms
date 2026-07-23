@@ -369,42 +369,82 @@ export function DmrDashboardPage() {
         ))}
       </div>
 
-      {/* Sub Contractor × Date Matrix */}
+      {/* Daily Manpower Record — Subcon / System tabs */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Daily Manpower Status</CardTitle></CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-xs">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Sub Contractor</th>
-                  {matrix.dates.map((d) => (
-                    <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
-                  ))}
-                  <th className="px-2 py-1 text-right">합계</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matrix.contractors.map((c) => {
-                  const sum = matrix.dates.reduce((a, d) => a + matrix.cell(c, d), 0);
-                  return (
-                    <tr key={c} className="border-t hover:bg-muted/30">
-                      <td className="sticky left-0 z-[5] bg-background px-2 py-1 font-medium">{c}{directNames.has(c) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
-                      {matrix.dates.map((d) => {
-                        const v = matrix.cell(c, d);
-                        return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
-                      })}
-                      <td className="px-2 py-1 text-right font-semibold">{sum}</td>
+        <CardHeader className="pb-2">
+          <Tabs value={recordTab} onValueChange={(v) => setRecordTab(v as 'subcon' | 'system')}>
+            <TabsList className="h-7">
+              <TabsTrigger value="subcon" className="px-3 text-xs">Subcon</TabsTrigger>
+              <TabsTrigger value="system" className="px-3 text-xs">System</TabsTrigger>
+            </TabsList>
+            <TabsContent value="subcon" className="mt-2">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px] text-xs">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Sub Contractor</th>
+                      {subconMatrix.dates.map((d) => (
+                        <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
+                      ))}
+                      <th className="px-2 py-1 text-right">합계</th>
                     </tr>
-                  );
-                })}
-                {matrix.contractors.length === 0 && (
-                  <tr><td colSpan={matrix.dates.length + 2} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
+                  </thead>
+                  <tbody>
+                    {subconMatrix.keys.map((k) => {
+                      const sum = subconMatrix.dates.reduce((a, d) => a + subconMatrix.cell(k, d), 0);
+                      return (
+                        <tr key={k} className="border-t hover:bg-muted/30">
+                          <td className="sticky left-0 z-[5] bg-background px-2 py-1 font-medium">{k}{directNames.has(k) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
+                          {subconMatrix.dates.map((d) => {
+                            const v = subconMatrix.cell(k, d);
+                            return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
+                          })}
+                          <td className="px-2 py-1 text-right font-semibold">{sum}</td>
+                        </tr>
+                      );
+                    })}
+                    {subconMatrix.keys.length === 0 && (
+                      <tr><td colSpan={subconMatrix.dates.length + 2} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+            <TabsContent value="system" className="mt-2">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px] text-xs">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">System</th>
+                      {systemMatrix.dates.map((d) => (
+                        <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
+                      ))}
+                      <th className="px-2 py-1 text-right">합계</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {systemMatrix.keys.map((k) => {
+                      const sum = systemMatrix.dates.reduce((a, d) => a + systemMatrix.cell(k, d), 0);
+                      return (
+                        <tr key={k} className="border-t hover:bg-muted/30">
+                          <td className="sticky left-0 z-[5] bg-background px-2 py-1 font-medium">{k}</td>
+                          {systemMatrix.dates.map((d) => {
+                            const v = systemMatrix.cell(k, d);
+                            return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
+                          })}
+                          <td className="px-2 py-1 text-right font-semibold">{sum}</td>
+                        </tr>
+                      );
+                    })}
+                    {systemMatrix.keys.length === 0 && (
+                      <tr><td colSpan={systemMatrix.dates.length + 2} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardHeader>
       </Card>
 
       {/* Trend chart */}
