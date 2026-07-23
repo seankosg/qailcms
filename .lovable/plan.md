@@ -1,42 +1,49 @@
-## 현재 상태 확인
+## 목표
+`admin/mapping` 페이지의 **As Built Drawing → Header Mapping** 탭을 Snag List Management → Header Mapping 탭과 동일한 UI/기능으로 재구현. ABD 고유값(`team`, `round_index`, `stage`, `plan_or_actual`)은 삭제하지 않고 Snag 이식판 위에 얹는 형태로 유지.
 
-업로드된 파일 `Task_Management_Mech_260722_KD_Park_R1.xlsx`와 현재 `src/lib/task-management/parser.ts`의 `toIsoDate()` 함수를 확인한 결과, **현재 TM 파서는 파일 날짜를 도하(Asia/Qatar, UTC+03:00) 시간으로 인식하지 않습니다.**
+## 현재 상태(실측 확인)
+- `abd_header_mappings` 테이블 컬럼: `team`, `source_header`, `target_field`, `round_index`, `stage`, `plan_or_actual`, `active`, `created_at`, `updated_at` — Snag 표준의 `is_custom`, `is_active`, `note`, `updated_by` 없음, unique 제약 없음.
+- 현재 `AbdHeaderMappingTable.tsx`는 자체 `useState`+`useEffect` 로컬 로드, 인라인 편집 없음(추가/삭제/토글만), Mapping Test 없음, System/Custom 배지 없음, 권한 게이팅 없음.
+- `abd_field_config`에는 `origin` 컬럼이 **없음** → Snag의 "파생 필드 임포트 불가" 로직은 이번 이식에서 제외.
+- Snag 이식 대상: `DefectHeaderMappingTable.tsx` — Card 헤더, Add 버튼, Mapping Test 박스, 검색, `EditableSourceHeaderCell`/`EditableTargetFieldCell`, Type 배지, Active Switch, 삭제 버튼, Add Dialog(field_config 기반 Target Select), React Query 기반 무효화, `useCurrentUser().isAdmin` 권한 게이팅.
 
-- `toIsoDate()`가 Date 객체, Excel serial, 문자열 날짜를 모두 **런타임 로컬/UTC 컴포넌트**로 변환하고 있음.
-- `src/lib/time/doha.ts`에 있는 `dohaLocalDateToUtcIso()` / `dohaWallToUtcIso()` 도구는 파서에서 사용되지 않음.
-- 이전에 요청하신 "원본 엑셀 날짜 컬럼을 도하 시간으로 해석하도록 임포트 로직 수정"이 아직 파서에 반영되지 않은 상태.
-- ABD 파서(`src/lib/abd/parser.ts`)에서도 동일하게 로컬/UTC 기준 변환을 사용 중.
+## 작업 순서
 
-또한 업로드 파일은 `Gantt` 시트에 `Data Date`가 3행, Task No가 5행 이후에 있는 비표준 구조라, **컬럼 매핑 자체가 정상적으로 될지도 함께 확인해야 합니다.**
+### 1) DB 마이그레이션 (`supabase--migration`)
+`abd_header_mappings` 를 Snag 표준과 정합하게 확장:
+- `ADD COLUMN is_custom boolean NOT NULL DEFAULT false`
+- `ADD COLUMN is_active boolean NOT NULL DEFAULT true` — 기존 `active` 값을 복사 후 `active` 컬럼은 남겨두되 앱은 `is_active`만 사용(호환성 유지). 또는 완전 대체가 원하시면 rename.
+- `ADD COLUMN note text`, `ADD COLUMN updated_by uuid`
+- `ADD CONSTRAINT abd_header_mappings_team_source_header_key UNIQUE (team, source_header)` — ABD는 team별 매핑이므로 스코프에 team 포함
+- 기존 시드 매핑 12건은 `is_custom = false`(System)로 표시되도록 값 유지.
 
-## 계획
+### 2) 훅 신설 `src/hooks/useAbdHeaderMappings.ts`
+Snag의 `useDefectHeaderMappings` 패턴 그대로:
+- `AbdHeaderMappingRow` 인터페이스에 `team`, `round_index`, `stage`, `plan_or_actual` 포함.
+- `ABD_HEADER_MAPPING_QK` 상수 export.
+- `useQuery` — `team`, `source_header` 순 정렬.
 
-1. **TM 파서 날짜 변환을 도하 기준으로 변경**
-   - `src/lib/task-management/parser.ts`의 `toIsoDate()`를 수정.
-   - `Date` 객체 → `dohaLocalDateToUtcIso()` 사용.
-   - Excel serial → `XLSX.SSF.parse_date_code`로 날짜 추출 후 `dohaWallToUtcIso()`로 변환.
-   - `YYYY-MM-DD` 문자열 → 그대로 도하로 간주, UTC ISO로 변환.
-   - Data Date 탐색 로직(`scanForDate`)도 동일 기준으로 변경.
+### 3) `AbdHeaderMappingTable.tsx` 전면 재작성
+Snag 컴포넌트를 베이스로 이식하되 다음만 ABD 특화 유지:
+- **컬럼**: `Team` | `Source Header` | `Target Field` | `Round` | `Stage` | `Plan/Actual` | `Type` | `Active` | `Actions` — Team/Round/Stage/Plan-Actual은 표시용, 나머지 Source/Target은 `EditableSourceHeaderCell`/`EditableTargetFieldCell` 사용.
+- **툴바**: Team 필터 Select(All/MECH/ELEC/ARCH) + 검색 Input + Add Mapping 버튼(admin 전용).
+- **Mapping Test 박스**: Snag와 동일 — 정규화된 norm 값과 매칭된 target 배지 표시.
+- **Add Dialog**: Team Select + Source Header Input + Target Field **Select(useAbdFieldConfig 기반)** + Round/Stage/Plan-Actual Input(선택 입력). Insert 시 `module` 대신 `team` 사용, `is_custom: true`, `is_active: true`.
+- **삭제/토글/편집**: Snag와 동일하게 React Query 무효화(`ABD_HEADER_MAPPING_QK`) + `refetch`.
+- **권한**: `useCurrentUser().isAdmin` 으로 Edit/Add/Delete/Switch 게이팅. Snag의 System/Custom 배지 표시.
+- **파생 필드 로직 제외**: `abd_field_config`에 `origin` 컬럼이 없어 이번 이식에서는 생략(추후 필드 도입 시 재이식).
 
-2. **ABD/SM/DMR/SparePart 파서에도 동일 원칙 적용**
-   - 각 모듈의 `toIsoDate()` 또는 동등 함수를 찾아 도하 기준으로 통일.
-   - Date 객체, Excel serial, 문자열 모두 동일하게 처리.
+### 4) 검증
+- 12건 시드 매핑이 `System` 배지 + 잠금 아이콘으로 표시.
+- Team 필터 + 검색 + Mapping Test 동작.
+- 인라인 수정 → 정규화/충돌 검증(`validateSourceHeaderEdit`) 재사용.
+- Admin이 아닐 때 Add/Delete/Switch 비활성.
+- 빌드/타입 통과.
 
-3. **파서 안전성 보강**
-   - Excel serial에서 날짜/시간 구분 처리(시간 부분은 00:00:00으로 폐기, 날짜만 저장).
-   - 변환 실패 시 `null` 반환 및 경고 메시지 유지.
-   - 무효한 날짜(예: 1899-12-30) 필터링 강화.
+## 기술 세부
+- 정규화·충돌 검증 로직: `src/lib/admin/header-mapping-validation.ts`를 그대로 재사용(모듈 무관). `source_issue_no` 특수 룰은 ABD에는 해당 필드가 없어 자연 스킵.
+- 기존 `active` 컬럼은 코드에서 참조하지 않아 남겨두어도 무해. 향후 정리 마이그레이션은 별도.
+- `abd_header_mappings`의 RLS/정책·트리거는 변경 없음(관리자 write, 인증 사용자 read).
 
-4. **업로드 파일 매핑 확인**
-   - 비표준 `Gantt` 시트 구조(헤더가 5행이 아닌 1~3행에 분산)를 확인.
-   - 현재 30행 스캔 로직으로 자동 헤더 감지가 가능한지, 아니면 별도 매핑 개선이 필요한지 판단.
-   - 필요 시 해당 파일에 대한 수동 헤더 위치 override 또는 별도 시트 처리 옵션 추가 검토.
-
-5. **검증**
-   - 업로드 파일 내 표시된 날짜(예: `2026-07-22`, `2026-07-23`)가 DB에 저장될 때 동일한 달력일로 유지되는지 확인.
-   - UTC ISO로 저장 후 표시 시 `formatDdMmmYyyy()` 등 도하 포맷터로 원래 날짜가 그대로 출력되는지 확인.
-   - TM, ABD, SM, DMR, SparePart 임포트 각각에 대해 날짜 손실/하루 어긋남이 없는지 검증.
-
-## 배제하지 않은 부분
-- 파일 구조가 매우 비표준일 경우 별도의 매핑 설정이 추가로 필요할 수 있습니다. 이 경우 추가 질문을 드리겠습니다.
-- 날짜뿐 아니라 시간(`HH:mm`)을 포함한 datetime 컬럼은 현재 TM 모델에 없으므로, 이 계획은 date-only 범위로 한정합니다.
+## 확인 필요 (선택)
+- Round/Stage/Plan-Actual 3개 컬럼은 현재 12건 시드에서 실제로 사용 중일 가능성이 있어 **표시 + 편집 유지**로 계획했습니다. 이 3개 필드를 Add Dialog에서 편집 대상에서 빼고 표시 전용으로 두거나, 아예 UI에서 제거하길 원하시면 알려주세요.

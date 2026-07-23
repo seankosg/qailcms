@@ -207,6 +207,9 @@ export type Database = {
           active: boolean
           created_at: string
           id: string
+          is_active: boolean
+          is_custom: boolean
+          note: string | null
           plan_or_actual: string | null
           round_index: number | null
           source_header: string
@@ -214,11 +217,15 @@ export type Database = {
           target_field: string
           team: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           active?: boolean
           created_at?: string
           id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          note?: string | null
           plan_or_actual?: string | null
           round_index?: number | null
           source_header: string
@@ -226,11 +233,15 @@ export type Database = {
           target_field: string
           team: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           active?: boolean
           created_at?: string
           id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          note?: string | null
           plan_or_actual?: string | null
           round_index?: number | null
           source_header?: string
@@ -238,6 +249,7 @@ export type Database = {
           target_field?: string
           team?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
