@@ -10,6 +10,8 @@ import { TASK_STAGE_LABELS, type TaskItem } from "@/lib/task-management/schedule
 interface Props {
   items: TaskItem[];
   asOfDate: string;
+  /** compact=true 일 때는 도넛 없이 스테이지 판정 스택만 렌더 (StatusMix 옆 배치용) */
+  compact?: boolean;
 }
 
 const COLOR: Record<string, string> = {
@@ -20,16 +22,14 @@ const COLOR: Record<string, string> = {
   위험: "var(--schedule-short)",
 };
 
-export function JudgmentStageBreakdown({ items, asOfDate }: Props) {
+export function JudgmentStageBreakdown({ items, asOfDate, compact = false }: Props) {
   const breakdown = useMemo(
     () => computeJudgmentStageBreakdown(items, asOfDate),
     [items, asOfDate],
   );
 
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      <JudgmentDonut counts={breakdown.judgmentCounts} />
-      <Card>
+  const stageStackCard = (
+    <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">스테이지별 판정 스택</CardTitle>
         </CardHeader>
@@ -69,6 +69,14 @@ export function JudgmentStageBreakdown({ items, asOfDate }: Props) {
           ))}
         </CardContent>
       </Card>
+  );
+
+  if (compact) return stageStackCard;
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <JudgmentDonut counts={breakdown.judgmentCounts} />
+      {stageStackCard}
     </div>
   );
 }
