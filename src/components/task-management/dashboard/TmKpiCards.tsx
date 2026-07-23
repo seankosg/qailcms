@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ProgressKpiCard } from "./ProgressKpiCard";
@@ -32,6 +32,7 @@ interface Props {
     hdec_eng_name?: string[];
     discipline?: string[];
   };
+  statusMixSideSlot?: ReactNode;
 }
 
 const SCOPE_LABEL: Record<TaskScope, string> = {
@@ -50,6 +51,7 @@ export function TmKpiCards({
   disciplines,
   onDisciplinesChange,
   ownerContext,
+  statusMixSideSlot,
 }: Props) {
   const navigate = useNavigate();
   const { data: thresholds } = useTaskManagementSettings();
@@ -162,13 +164,16 @@ export function TmKpiCards({
         />
       </div>
 
-      <StatusMixBar
-        total={kpi.total}
-        completed={kpi.completed}
-        wip={kpi.wip}
-        notStarted={kpi.notStarted}
-        onSegmentClick={(seg) => goRaw(seg)}
-      />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <StatusMixBar
+          total={kpi.total}
+          completed={kpi.completed}
+          wip={kpi.wip}
+          notStarted={kpi.notStarted}
+          onSegmentClick={(seg) => goRaw(seg)}
+        />
+        <div className="min-w-0">{statusMixSideSlot}</div>
+      </div>
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <RiskKpiCard
