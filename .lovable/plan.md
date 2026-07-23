@@ -1,49 +1,87 @@
+
 ## 목표
-`admin/mapping` 페이지의 **As Built Drawing → Header Mapping** 탭을 Snag List Management → Header Mapping 탭과 동일한 UI/기능으로 재구현. ABD 고유값(`team`, `round_index`, `stage`, `plan_or_actual`)은 삭제하지 않고 Snag 이식판 위에 얹는 형태로 유지.
+현재 각 모듈의 Import Log는 행(Row) 단위 요약(`action_taken`, `reason_code`, `reason_detail`)만 표시합니다. SHAW 프로젝트처럼 **각 행을 확장하여 해당 행에서 처리된 개별 필드들의 상세(Field / Outcome / Raw / Applied / Previous / Reason)** 를 서브 테이블로 보여주고, 상단에서 Outcome 필터 및 `Field-level CSV` 다운로드를 지원하도록 이식합니다. 대상 모듈은 **TM, SM(Defect), ABD** 세 개입니다.
 
-## 현재 상태(실측 확인)
-- `abd_header_mappings` 테이블 컬럼: `team`, `source_header`, `target_field`, `round_index`, `stage`, `plan_or_actual`, `active`, `created_at`, `updated_at` — Snag 표준의 `is_custom`, `is_active`, `note`, `updated_by` 없음, unique 제약 없음.
-- 현재 `AbdHeaderMappingTable.tsx`는 자체 `useState`+`useEffect` 로컬 로드, 인라인 편집 없음(추가/삭제/토글만), Mapping Test 없음, System/Custom 배지 없음, 권한 게이팅 없음.
-- `abd_field_config`에는 `origin` 컬럼이 **없음** → Snag의 "파생 필드 임포트 불가" 로직은 이번 이식에서 제외.
-- Snag 이식 대상: `DefectHeaderMappingTable.tsx` — Card 헤더, Add 버튼, Mapping Test 박스, 검색, `EditableSourceHeaderCell`/`EditableTargetFieldCell`, Type 배지, Active Switch, 삭제 버튼, Add Dialog(field_config 기반 Target Select), React Query 기반 무효화, `useCurrentUser().isAdmin` 권한 게이팅.
+## 1. DB — 공용 `import_field_logs` 테이블
+SHAW와 동일한 스키마를 채택하되, 소유권 검증만 우리 프로젝트 구조에 맞춥니다.
 
-## 작업 순서
+- 마이그레이션: `create_import_field_logs`
+  - 컬럼: `id, upload_id (uuid), kind ('task_management'|'defect'|'abd'|'spare_part'), row_log_id (uuid, nullable), raw_row_no int, field_name text, outcome text CHECK, raw_value / applied_value / previous_value text, reason_code / reason_detail text, created_by uuid, created_at timestamptz`
+  - 인덱스: `(upload_id)`, `(upload_id, outcome)`, `(upload_id, field_name)`, `(row_log_id)`
+  - GRANT: `authenticated`(SELECT/INSERT), `service_role`(ALL)
+  - RLS
+    - SELECT: 인증 사용자 모두
+    - INSERT: `is_admin_or_superuser(auth.uid())` OR 해당 `upload_id`의 `*_import_logs.uploaded_by = auth.uid()`
+    - DELETE: 관리자/슈퍼유저 또는 배치 롤백 소유자
 
-### 1) DB 마이그레이션 (`supabase--migration`)
-`abd_header_mappings` 를 Snag 표준과 정합하게 확장:
-- `ADD COLUMN is_custom boolean NOT NULL DEFAULT false`
-- `ADD COLUMN is_active boolean NOT NULL DEFAULT true` — 기존 `active` 값을 복사 후 `active` 컬럼은 남겨두되 앱은 `is_active`만 사용(호환성 유지). 또는 완전 대체가 원하시면 rename.
-- `ADD COLUMN note text`, `ADD COLUMN updated_by uuid`
-- `ADD CONSTRAINT abd_header_mappings_team_source_header_key UNIQUE (team, source_header)` — ABD는 team별 매핑이므로 스코프에 team 포함
-- 기존 시드 매핑 12건은 `is_custom = false`(System)로 표시되도록 값 유지.
+## 2. 필드 로그 수집 유틸 신설
+`src/lib/import/field-log.ts` (SHAW의 `import-field-log.ts` 참조 이식)
+- `FieldLogOutcome`, `PendingFieldLog`, `buildFieldLog(kind, args)`, `classifyChange(incoming, existing)`, `stringifyForLog`, `valuesEqual` 제공
+- `kind`는 우리 모듈명(`task_management` / `defect` / `abd` / `spare_part`)에 맞춤
 
-### 2) 훅 신설 `src/hooks/useAbdHeaderMappings.ts`
-Snag의 `useDefectHeaderMappings` 패턴 그대로:
-- `AbdHeaderMappingRow` 인터페이스에 `team`, `round_index`, `stage`, `plan_or_actual` 포함.
-- `ABD_HEADER_MAPPING_QK` 상수 export.
-- `useQuery` — `team`, `source_header` 순 정렬.
+## 3. 임포트 파이프라인에 필드 로그 기록
+각 모듈의 기존 배치 upsert 로직에 최소 침습으로 삽입합니다.
 
-### 3) `AbdHeaderMappingTable.tsx` 전면 재작성
-Snag 컴포넌트를 베이스로 이식하되 다음만 ABD 특화 유지:
-- **컬럼**: `Team` | `Source Header` | `Target Field` | `Round` | `Stage` | `Plan/Actual` | `Type` | `Active` | `Actions` — Team/Round/Stage/Plan-Actual은 표시용, 나머지 Source/Target은 `EditableSourceHeaderCell`/`EditableTargetFieldCell` 사용.
-- **툴바**: Team 필터 Select(All/MECH/ELEC/ARCH) + 검색 Input + Add Mapping 버튼(admin 전용).
-- **Mapping Test 박스**: Snag와 동일 — 정규화된 norm 값과 매칭된 target 배지 표시.
-- **Add Dialog**: Team Select + Source Header Input + Target Field **Select(useAbdFieldConfig 기반)** + Round/Stage/Plan-Actual Input(선택 입력). Insert 시 `module` 대신 `team` 사용, `is_custom: true`, `is_active: true`.
-- **삭제/토글/편집**: Snag와 동일하게 React Query 무효화(`ABD_HEADER_MAPPING_QK`) + `refetch`.
-- **권한**: `useCurrentUser().isAdmin` 으로 Edit/Add/Delete/Switch 게이팅. Snag의 System/Custom 배지 표시.
-- **파생 필드 로직 제외**: `abd_field_config`에 `origin` 컬럼이 없어 이번 이식에서는 생략(추후 필드 도입 시 재이식).
+### 3-1. SM (`src/contexts/DefectManagementImportContext.tsx`)
+- 배치별 `existingRow` 맵을 이미 갖고 있으므로 payload 필드 loop에서
+  - 빈값 스킵 → `skipped_empty`
+  - 값 동일 → `unchanged`
+  - 다름 → `applied` (previous=existing)
+  - 규칙 자동 분류/자동 채움은 `derived` / `auto_filled`
+  - preflight team null, upsert 실패, priority_locked 스킵 → `rejected_invalid` / `rejected_conflict` / `skipped_no_permission`
+- `pendingFieldLogs` 배열을 배치와 함께 누적, 250건 단위로 `import_field_logs` 삽입 (기존 row-log 삽입과 동일 패턴)
 
-### 4) 검증
-- 12건 시드 매핑이 `System` 배지 + 잠금 아이콘으로 표시.
-- Team 필터 + 검색 + Mapping Test 동작.
-- 인라인 수정 → 정규화/충돌 검증(`validateSourceHeaderEdit`) 재사용.
-- Admin이 아닐 때 Add/Delete/Switch 비활성.
-- 빌드/타입 통과.
+### 3-2. TM (`src/contexts/TaskManagementImportContext.tsx`)
+- `existingSet` 대신 `existingByTaskNo` 맵을 사전 조회하도록 확장(성능 영향 최소화: 배치 단위 select)
+- `plan_start / plan_end / forecast_end / actual_progress / actual_finish / discipline / team / level / main_task_no / hdec_pic / plot` 등 트래킹 필드 loop
+- 이미 존재하는 Schedule Revision 감사 로직과 이중 기록되지 않도록 필드 로그 쪽에서만 previous/applied를 기록
+- `rejectedByTaskNo` 사유는 `__row__` outcome=`rejected_invalid`로 1건 기록
 
-## 기술 세부
-- 정규화·충돌 검증 로직: `src/lib/admin/header-mapping-validation.ts`를 그대로 재사용(모듈 무관). `source_issue_no` 특수 룰은 ABD에는 해당 필드가 없어 자연 스킵.
-- 기존 `active` 컬럼은 코드에서 참조하지 않아 남겨두어도 무해. 향후 정리 마이그레이션은 별도.
-- `abd_header_mappings`의 RLS/정책·트리거는 변경 없음(관리자 write, 인증 사용자 read).
+### 3-3. ABD (`src/lib/abd/mutations.functions.ts`)
+- upsert 전 `nums`로 조회하는 `existingRows`를 `select("abd_number, plot, ..., latest_status, ...")`로 확장
+- `ABD_TRACKED_FIELDS`(스테이지 12개 + latest_status/approval_date/hdec_pic_name/hdec_eng_name/batch_no/document_title 등) loop로 로그 생성
+- `inactivated` 행은 `__row__` outcome=`applied` reason_code=`missing_in_upload`
+- `abd_import_row_logs` insert 이후 `import_field_logs`도 chunked insert
 
-## 확인 필요 (선택)
-- Round/Stage/Plan-Actual 3개 컬럼은 현재 12건 시드에서 실제로 사용 중일 가능성이 있어 **표시 + 편집 유지**로 계획했습니다. 이 3개 필드를 Add Dialog에서 편집 대상에서 빼고 표시 전용으로 두거나, 아예 UI에서 제거하길 원하시면 알려주세요.
+## 4. UI — `FieldLogTable` 컴포넌트 이식
+`src/components/import/FieldLogTable.tsx` 신설 (SHAW 원본과 동일 UI/기능)
+- Exports: `FieldLog` 타입, `FieldLogTable`, `FieldLogSummaryChips`, `OUTCOME_LABELS`, `downloadFieldLevelCsv(logs, filename)`
+- 서브 테이블 컬럼: **Field / Outcome (배지) / Raw / Applied / Previous / Reason**
+- Outcome별 배지 색상은 SHAW 매핑을 그대로 사용 (applied=blue, derived/auto_filled=violet, rejected_*=red 등)
+- 빈값은 `—`로 표시
+
+## 5. `ImportLogsPage` 확장 (통합 컴포넌트)
+`src/components/import/ImportLogsPage.tsx` 수정 — 세 모듈 모두 공용이므로 한 번의 개편으로 이식 완료.
+
+- 배치 선택 시 서버에서 해당 `upload_id`의 `import_field_logs` 전체를 `fetchAllByUploadId` 유틸(신설, 1000-row paging)로 로드하여 `raw_row_no`별로 그룹화
+- 각 행 로그 왼쪽에 확장 아이콘(`ChevronRight/ChevronDown`) 추가
+  - 확장 시 `<TableRow colSpan=(현재 컬럼수)>` 안에 `<FieldLogTable logs={grouped[rawRowNo]} />` 렌더
+  - 필드 로그가 없는 행은 "No field-level details for this row." 문구 표시
+- 상단 필터 툴바에 신규 컨트롤 추가
+  - `Field outcome` 드롭다운 (multi/single은 SHAW와 동일: single Select, 'all' 옵션)
+  - `Field name` 텍스트 검색
+  - `Field-level CSV` 버튼 → `downloadFieldLevelCsv`
+  - 요약 `FieldLogSummaryChips`를 배치 헤더 아래에 배치
+- kind별 `row_logs` 테이블/컬럼(discipline, task_no / source_issue_no / abd_number)은 기존 그대로 유지하고, colSpan만 kind에 따라 조정
+
+## 6. 검증
+1. `tsgo`로 타입 통과 확인
+2. TM/SM/ABD 각 1건씩 소량 파일 임포트 → `import_field_logs` 삽입 여부, 확장 UI에서 필드 상세 노출 확인
+3. Field outcome 필터·CSV 다운로드 동작 확인
+4. RLS: 일반 user는 본인이 업로드한 배치만 필드 로그를 확인 가능 여부(현행 row-log 정책과 동일 수준 유지)
+
+## 마이그레이션 제약
+- 소급 데이터 없음: 기존에 업로드된 배치는 필드 로그가 없으므로 확장 시 "No field-level details" 표시. 사용자에게 안내.
+- Spare Part / Warranty 탭은 이번 스코프 밖 (요청은 TM/SM/ABD)
+
+## 세부 파일 목록
+- 신규
+  - `supabase/migrations/<ts>_create_import_field_logs.sql`
+  - `src/lib/import/field-log.ts`
+  - `src/lib/import/fetch-all-by-upload.ts`
+  - `src/components/import/FieldLogTable.tsx`
+- 수정
+  - `src/components/import/ImportLogsPage.tsx`
+  - `src/contexts/DefectManagementImportContext.tsx`
+  - `src/contexts/TaskManagementImportContext.tsx`
+  - `src/lib/abd/mutations.functions.ts`
