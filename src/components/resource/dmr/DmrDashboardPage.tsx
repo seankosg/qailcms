@@ -428,7 +428,7 @@ export function DmrDashboardPage() {
                       const sum = systemMatrix.dates.reduce((a, d) => a + systemMatrix.cell(k, d), 0);
                       return (
                         <tr key={k} className="border-t hover:bg-muted/30">
-                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium">{k}</td>
+                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background">{k}</td>
                           {systemMatrix.dates.map((d) => {
                             const v = systemMatrix.cell(k, d);
                             return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
