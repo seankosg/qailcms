@@ -30,7 +30,8 @@ export interface AttentionItem {
   id: string;
   label: string;
   team: string | null;
-  pic: string | null;
+  hdec_pic_name: string | null;
+  hdec_eng_name: string | null;
   stage: AbdStage;
   daysLate?: number;
   daysWaiting?: number;
@@ -52,7 +53,8 @@ export interface AbdDashboardData {
   topAwaiting: AttentionItem[];
   topStuck: AttentionItem[];
   byTeam: CrossCutCell[];
-  byPic: CrossCutCell[];
+  byHdecPic: CrossCutCell[];
+  byHdecEng: CrossCutCell[];
   byDis: CrossCutCell[];
   byBatch: CrossCutCell[];
 }
@@ -63,7 +65,8 @@ type Row = {
   plot: string | null;
   dis: string | null;
   service: string | null;
-  pic: string | null;
+  hdec_pic_name: string | null;
+  hdec_eng_name: string | null;
   batch_no: string | null;
   document_title: string | null;
   abd_number: string | null;
@@ -88,7 +91,7 @@ type Row = {
 };
 
 const SELECT_COLS = [
-  "id","team","plot","dis","service","pic","batch_no","document_title","abd_number",
+  "id","team","plot","dis","service","hdec_pic_name","hdec_eng_name","batch_no","document_title","abd_number",
   "latest_status","status_group","approval_date",
   "r1_drafting_plan","r1_drafting_actual","r1_submission_plan","r1_submission_actual","r1_dar_plan","r1_dar_actual",
   "r2_drafting_actual","r2_submission_actual","r2_dar_plan","r2_dar_actual",
@@ -206,7 +209,8 @@ export async function loadAbdDashboardData(opts: { asOf?: Date; batchNo?: string
   const topAwaiting: AttentionItem[] = [];
   const topStuck: AttentionItem[] = [];
   const byTeam = new Map<string, CrossCutCell>();
-  const byPic = new Map<string, CrossCutCell>();
+  const byHdecPic = new Map<string, CrossCutCell>();
+  const byHdecEng = new Map<string, CrossCutCell>();
   const byDis = new Map<string, CrossCutCell>();
   const byBatch = new Map<string, CrossCutCell>();
 
@@ -243,7 +247,8 @@ export async function loadAbdDashboardData(opts: { asOf?: Date; batchNo?: string
           id: row.id,
           label: fmtLabel(row),
           team: row.team,
-          pic: row.pic,
+          hdec_pic_name: row.hdec_pic_name,
+          hdec_eng_name: row.hdec_eng_name,
           stage,
           daysLate,
         });
@@ -266,7 +271,8 @@ export async function loadAbdDashboardData(opts: { asOf?: Date; batchNo?: string
         id: row.id,
         label: fmtLabel(row),
         team: row.team,
-        pic: row.pic,
+        hdec_pic_name: row.hdec_pic_name,
+        hdec_eng_name: row.hdec_eng_name,
         stage,
         daysWaiting: since ? Math.max(0, differenceInDays(asOf, since)) : 0,
       });
@@ -283,7 +289,8 @@ export async function loadAbdDashboardData(opts: { asOf?: Date; batchNo?: string
             id: row.id,
             label: fmtLabel(row),
             team: row.team,
-            pic: row.pic,
+            hdec_pic_name: row.hdec_pic_name,
+            hdec_eng_name: row.hdec_eng_name,
             stage,
             daysIdle: idle,
           });
@@ -299,7 +306,8 @@ export async function loadAbdDashboardData(opts: { asOf?: Date; batchNo?: string
       overdue: isOverdueRow ? 1 : 0,
     };
     bumpCross(byTeam, row.team, patch);
-    bumpCross(byPic, row.pic, patch);
+    bumpCross(byHdecPic, row.hdec_pic_name, patch);
+    bumpCross(byHdecEng, row.hdec_eng_name, patch);
     bumpCross(byDis, row.dis, patch);
     bumpCross(byBatch, row.batch_no, patch);
 
@@ -325,7 +333,8 @@ export async function loadAbdDashboardData(opts: { asOf?: Date; batchNo?: string
     topAwaiting: sortDesc(topAwaiting, "daysWaiting"),
     topStuck: sortDesc(topStuck, "daysIdle"),
     byTeam: Array.from(byTeam.values()).sort((a, b) => b.total - a.total),
-    byPic: Array.from(byPic.values()).sort((a, b) => b.total - a.total),
+    byHdecPic: Array.from(byHdecPic.values()).sort((a, b) => b.total - a.total),
+    byHdecEng: Array.from(byHdecEng.values()).sort((a, b) => b.total - a.total),
     byDis: Array.from(byDis.values()).sort((a, b) => b.total - a.total),
     byBatch: Array.from(byBatch.values()).sort((a, b) => b.total - a.total),
   };

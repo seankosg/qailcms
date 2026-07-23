@@ -5,7 +5,6 @@ export const TEXT_FILTER_FIELDS = new Set<string>([
   "abd_number",
   "abd_ocs_no",
   "document_title",
-  "pic",
   "service",
 ]);
 
@@ -23,7 +22,7 @@ export const NUMBER_FILTER_FIELDS = new Set<string>(["sl_no"]);
 export const BOOL_FILTER_FIELDS = new Set<string>(["is_active"]);
 
 export const FACET_FIELDS = new Set<string>([
-  "plot", "dis", "latest_rev", "latest_status", "pic", "doc_ax", "doc_axx",
+  "plot", "dis", "latest_rev", "latest_status", "hdec_pic_name", "hdec_eng_name", "doc_ax", "doc_axx",
 ]);
 
 export function tokenizeAnd(text: string): string[] {

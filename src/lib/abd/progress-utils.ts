@@ -16,7 +16,8 @@ export type GroupBy =
   | "plot"
   | "dis"
   | "service"
-  | "pic"
+  | "hdec_pic_name"
+  | "hdec_eng_name"
   | "doc_ax"
   | "doc_axx";
 
@@ -25,7 +26,8 @@ export const ALL_GROUP_BY: GroupBy[] = [
   "plot",
   "dis",
   "service",
-  "pic",
+  "hdec_pic_name",
+  "hdec_eng_name",
   "doc_ax",
   "doc_axx",
 ];
@@ -35,7 +37,8 @@ export const GROUP_LABELS: Record<GroupBy, string> = {
   plot: "Plot",
   dis: "DIS",
   service: "Service",
-  pic: "PIC",
+  hdec_pic_name: "HDEC PIC",
+  hdec_eng_name: "HDEC ENG",
   doc_ax: "AX",
   doc_axx: "AXX",
 };
@@ -46,7 +49,8 @@ export const GROUP_QUERY_PARAM: Record<GroupBy, string> = {
   plot: "plot",
   dis: "dis",
   service: "service",
-  pic: "pic",
+  hdec_pic_name: "hdec_pic_name",
+  hdec_eng_name: "hdec_eng_name",
   doc_ax: "doc_ax",
   doc_axx: "doc_axx",
 };

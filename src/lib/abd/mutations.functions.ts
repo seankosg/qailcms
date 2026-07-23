@@ -10,7 +10,7 @@ const UpdateFieldSchema = z.object({
 });
 
 const EDITABLE_FIELDS = new Set<string>([
-  "pic", "document_title", "latest_rev", "latest_status", "approval_date", "batch_no",
+  "hdec_pic_name", "hdec_eng_name", "document_title", "latest_rev", "latest_status", "approval_date", "batch_no",
   "r1_drafting_plan", "r1_drafting_actual", "r1_submission_plan", "r1_submission_actual", "r1_dar_plan", "r1_dar_actual",
   "r2_drafting_plan", "r2_drafting_actual", "r2_submission_plan", "r2_submission_actual", "r2_dar_plan", "r2_dar_actual",
   "r3_drafting_plan", "r3_drafting_actual", "r3_submission_plan", "r3_submission_actual", "r3_dar_plan", "r3_dar_actual",
@@ -53,7 +53,8 @@ const ImportRowSchema = z.object({
   document_title: z.string().nullable().optional(),
   abd_ocs_no: z.string().nullable().optional(),
   batch_no: z.string().nullable().optional(),
-  pic: z.string().nullable().optional(),
+  hdec_pic_name: z.string().nullable().optional(),
+  hdec_eng_name: z.string().nullable().optional(),
   latest_rev: z.string().nullable().optional(),
   latest_status: z.string().nullable().optional(),
   approval_date: z.string().nullable().optional(),
@@ -186,7 +187,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           document_title: r.document_title ?? null,
           abd_ocs_no: r.abd_ocs_no ?? null,
           batch_no: r.batch_no ?? null,
-          pic: r.pic ?? null,
+          hdec_pic_name: r.hdec_pic_name ?? null,
+          hdec_eng_name: r.hdec_eng_name ?? null,
           latest_rev: r.latest_rev ?? null,
           latest_status: r.latest_status ?? null,
           approval_date: r.approval_date ?? null,

@@ -78,7 +78,8 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
 
   // Content
   { key: "document_title", label: "Document Title", type: "text", width: 340, group: "content", editable: true, editorType: "text", origin: "identity" },
-  { key: "pic", label: "PIC", type: "text", width: 120, group: "content", editable: true, editorType: "text", origin: "identity" },
+  { key: "hdec_pic_name", label: "HDEC PIC", type: "text", width: 120, group: "content", editable: true, editorType: "text", origin: "identity" },
+  { key: "hdec_eng_name", label: "HDEC ENG", type: "text", width: 140, group: "content", editable: true, editorType: "text", origin: "identity" },
 
   // Latest
   { key: "latest_rev", label: "Latest Rev", type: "text", width: 90, group: "latest", editable: true, editorType: "text", origin: "latest" },
@@ -123,7 +124,7 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
 ];
 
 export const ABD_SEARCH_FIELDS = [
-  "abd_number", "abd_ocs_no", "batch_no", "document_title", "pic", "dis", "service",
+  "abd_number", "abd_ocs_no", "batch_no", "document_title", "hdec_pic_name", "hdec_eng_name", "dis", "service",
   "plot", "latest_rev", "latest_status", "doc_ax", "doc_axx", "doc_nn1", "doc_n", "doc_nn2",
 ] as const;
 
@@ -131,7 +132,10 @@ export function inferAbdFilterType(t: AbdFieldType, key?: string): AbdFilterType
   if (t === "badge") return "multi-select";
   if (t === "date") return "date-range";
   if (t === "number") return "number-range";
-  if (key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status" || key === "batch_no") return "multi-select";
+  if (
+    key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status" ||
+    key === "batch_no" || key === "hdec_pic_name" || key === "hdec_eng_name"
+  ) return "multi-select";
   return "text";
 }
 
