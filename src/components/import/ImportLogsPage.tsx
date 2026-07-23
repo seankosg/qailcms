@@ -54,6 +54,7 @@ interface Batch {
   started_at: string;
   finished_at: string | null;
   imported_by: string | null;
+  data_date: string | null;
   total: number;
   inserted: number;
   updated: number;
@@ -181,7 +182,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await supabase
         .from("spare_parts_import_logs")
         .select(
-          "id, file_name, status, executed_at, duration_ms, executed_by, row_counts, sheet_name, rolled_back_at",
+          "id, file_name, status, executed_at, duration_ms, executed_by, data_date, row_counts, sheet_name, rolled_back_at",
         )
         .order("executed_at", { ascending: false })
         .limit(100);
@@ -198,6 +199,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
           started_at: startedAt,
           finished_at: finishedAt,
           imported_by: r.executed_by,
+          data_date: r.data_date,
           total: c.total ?? 0,
           inserted: c.inserted ?? 0,
           updated: c.updated ?? 0,
@@ -213,7 +215,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await supabase
         .from("task_management_import_logs")
         .select(
-          "id, file_name, status, started_at, finished_at, imported_by, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at",
+          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at",
         )
         .order("started_at", { ascending: false })
         .limit(100);
@@ -224,6 +226,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         started_at: r.started_at,
         finished_at: r.finished_at,
         imported_by: r.imported_by,
+        data_date: r.data_date,
         total: r.total_rows ?? 0,
         inserted: r.inserted ?? 0,
         updated: r.updated ?? 0,
@@ -238,7 +241,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await (supabase as any)
         .from("defect_import_logs")
         .select(
-          "id, file_name, status, started_at, finished_at, imported_by, total_rows, inserted, updated, skipped, rejected, team, rolled_back_at",
+          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, team, rolled_back_at",
         )
         .order("started_at", { ascending: false })
         .limit(100);
@@ -249,6 +252,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         started_at: r.started_at,
         finished_at: r.finished_at,
         imported_by: r.imported_by,
+        data_date: r.data_date,
         total: r.total_rows ?? 0,
         inserted: r.inserted ?? 0,
         updated: r.updated ?? 0,
@@ -275,6 +279,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         started_at: r.started_at,
         finished_at: r.finished_at,
         imported_by: r.imported_by,
+        data_date: null,
         total: r.total_rows ?? 0,
         inserted: r.inserted ?? 0,
         updated: r.updated ?? 0,
@@ -467,6 +472,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   <TableRow>
                     <TableHead className="text-xs">File</TableHead>
                     {hasExtra && <TableHead className="text-xs">{cfg.extraLabel}</TableHead>}
+                    <TableHead className="text-xs">Data Date</TableHead>
                     <TableHead className="text-xs">Uploaded</TableHead>
                     <TableHead className="text-xs">Uploader</TableHead>
                     <TableHead className="text-xs text-right">Duration</TableHead>
@@ -481,9 +487,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow>
+                  <TableRow>
                       <TableCell
-                        colSpan={11 + (hasExtra ? 1 : 0)}
+                        colSpan={12 + (hasExtra ? 1 : 0)}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Loading…
@@ -492,7 +498,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   ) : batches.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={11 + (hasExtra ? 1 : 0)}
+                        colSpan={12 + (hasExtra ? 1 : 0)}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Import 이력이 없습니다
@@ -522,6 +528,12 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                               {b.extra ?? "—"}
                             </TableCell>
                           )}
+                          <TableCell
+                            className="text-xs cursor-pointer whitespace-nowrap"
+                            onClick={() => loadDetail(b.id)}
+                          >
+                            {b.data_date ? new Date(b.data_date).toLocaleDateString("ko-KR") : "—"}
+                          </TableCell>
                           <TableCell
                             className="text-xs cursor-pointer whitespace-nowrap"
                             onClick={() => loadDetail(b.id)}
