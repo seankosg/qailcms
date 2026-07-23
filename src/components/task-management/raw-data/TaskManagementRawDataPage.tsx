@@ -81,6 +81,9 @@ import { TaskStageProgress } from "./TaskStageProgress";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { canEditRawRow } from "@/lib/auth/roles";
+import { EditCellPopover } from "./EditCellPopover";
+import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
+import { DISCIPLINES } from "@/lib/task-management/columns";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import {
   runRollupAllMains,
@@ -203,6 +206,12 @@ export function TaskManagementRawDataPage() {
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const canEdit = !!currentUser?.isAdmin;
+  const isSuperUser = !!(currentUser as any)?.isSuperUser;
+  const isDSuperUser = !!(currentUser as any)?.isDSuperUser;
+  const canEditTaskNo = canEdit || isDSuperUser;
+  const canEditOwnerFieldsBase = canEdit || isSuperUser;
+  const myPic = String((currentUser as any)?.hdec_pic_name ?? "").trim().toLowerCase();
+  const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
   const canEditRow = useCallback(
     (row: Record<string, unknown>) =>
       canEditRawRow(currentUser ?? null, "task_management_raw", row as Record<string, any>),
@@ -893,12 +902,60 @@ export function TaskManagementRawDataPage() {
               </span>
             );
           }
-          return rendered;
+          const rr = row.original as any;
+          const isMain = rr.level === "main";
+          const rowOwner = String(rr?.hdec_pic_name ?? "").trim().toLowerCase();
+          const isOwner = !!myPic && !!rowOwner && myPic === rowOwner;
+          const canEditOwnerFields = canEditOwnerFieldsBase || isOwner;
+          const isTeamOverride = c.key === "team";
+          const isDataDateOverride = c.key === "data_date";
+          let effectiveColumn: TmColumnDef = c;
+          let effectiveCanEdit = canEdit;
+          let useOwnerSave = false;
+          if (isTeamOverride) {
+            effectiveColumn = { ...c, editable: true, editorType: "select", options: [...DISCIPLINES] };
+            effectiveCanEdit = canEditOwnerFields;
+            useOwnerSave = true;
+          } else if (isDataDateOverride) {
+            effectiveColumn = { ...c, editable: true, editorType: "date" };
+            effectiveCanEdit = canEditOwnerFields;
+            useOwnerSave = true;
+          }
+          const editableInline =
+            !!effectiveColumn.editable &&
+            !!effectiveColumn.editorType &&
+            effectiveCanEdit &&
+            !(c.key === "actual_progress" && isMain);
+          if (!editableInline) return rendered;
+          return (
+            <EditCellPopover
+              rowId={String(rr.id)}
+              column={effectiveColumn}
+              currentValue={val}
+              canEdit={effectiveCanEdit}
+              onSaved={() => refetch()}
+              onSave={
+                useOwnerSave
+                  ? async (value) => {
+                      await updateOwnerFieldFn({
+                        data: {
+                          id: String(rr.id),
+                          field: effectiveColumn.key,
+                          value: value ?? null,
+                        },
+                      });
+                    }
+                  : undefined
+              }
+            >
+              {rendered}
+            </EditCellPopover>
+          );
         },
       });
     }
     return cols;
-  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds, tActualMap]);
+  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds, tActualMap, canEditOwnerFieldsBase, myPic, updateOwnerFieldFn]);
 
   const table = useReactTable({
     data: visibleRows,
