@@ -379,15 +379,15 @@ export function DmrDashboardPage() {
               <TabsTrigger value="system" className="px-3 text-xs">System</TabsTrigger>
             </TabsList>
             <TabsContent value="subcon" className="mt-2">
-              <div className="overflow-x-auto">
+              <div className="max-h-[400px] overflow-auto rounded-md border">
                 <table className="w-full min-w-[600px] text-xs">
-                  <thead className="bg-muted/50">
+                  <thead className="bg-muted">
                     <tr>
-                      <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">Sub Contractor</th>
+                      <th className="sticky left-0 top-0 z-30 bg-muted px-2 py-1 text-left">Sub Contractor</th>
                       {subconMatrix.dates.map((d) => (
-                        <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
+                        <th key={d} className="sticky top-0 z-20 bg-muted px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
                       ))}
-                      <th className="px-2 py-1 text-right">합계</th>
+                      <th className="sticky top-0 z-20 bg-muted px-2 py-1 text-right">합계</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -395,7 +395,7 @@ export function DmrDashboardPage() {
                       const sum = subconMatrix.dates.reduce((a, d) => a + subconMatrix.cell(k, d), 0);
                       return (
                         <tr key={k} className="border-t hover:bg-muted/30">
-                          <td className="sticky left-0 z-[5] bg-background px-2 py-1 font-medium">{k}{directNames.has(k) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
+                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium">{k}{directNames.has(k) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
                           {subconMatrix.dates.map((d) => {
                             const v = subconMatrix.cell(k, d);
                             return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
@@ -412,15 +412,15 @@ export function DmrDashboardPage() {
               </div>
             </TabsContent>
             <TabsContent value="system" className="mt-2">
-              <div className="overflow-x-auto">
+              <div className="max-h-[400px] overflow-auto rounded-md border">
                 <table className="w-full min-w-[600px] text-xs">
-                  <thead className="bg-muted/50">
+                  <thead className="bg-muted">
                     <tr>
-                      <th className="sticky left-0 z-10 bg-muted/80 px-2 py-1 text-left">System</th>
+                      <th className="sticky left-0 top-0 z-30 bg-muted px-2 py-1 text-left">System</th>
                       {systemMatrix.dates.map((d) => (
-                        <th key={d} className="px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
+                        <th key={d} className="sticky top-0 z-20 bg-muted px-2 py-1 text-right whitespace-nowrap">{fmtDate(d)}</th>
                       ))}
-                      <th className="px-2 py-1 text-right">합계</th>
+                      <th className="sticky top-0 z-20 bg-muted px-2 py-1 text-right">합계</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -428,7 +428,7 @@ export function DmrDashboardPage() {
                       const sum = systemMatrix.dates.reduce((a, d) => a + systemMatrix.cell(k, d), 0);
                       return (
                         <tr key={k} className="border-t hover:bg-muted/30">
-                          <td className="sticky left-0 z-[5] bg-background px-2 py-1 font-medium">{k}</td>
+                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium">{k}</td>
                           {systemMatrix.dates.map((d) => {
                             const v = systemMatrix.cell(k, d);
                             return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
