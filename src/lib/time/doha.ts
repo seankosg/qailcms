@@ -8,6 +8,9 @@ export const DOHA_TZ = "Asia/Qatar";
 export const DOHA_OFFSET_MIN = 3 * 60; // +03:00, no DST
 
 function shiftToDoha(d: Date): Date {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) {
+    return new Date(NaN);
+  }
   return new Date(d.getTime() + DOHA_OFFSET_MIN * 60_000);
 }
 
@@ -22,9 +25,13 @@ export function todayInDoha(): string {
 }
 
 /** Convert any ISO/Date to the Doha calendar date key (`YYYY-MM-DD`). */
-export function toDohaDateKey(input: string | Date): string {
+export function toDohaDateKey(input: string | Date | null | undefined): string {
+  if (input == null || input === "") return "";
   const d = typeof input === "string" ? new Date(input) : input;
-  return shiftToDoha(d).toISOString().slice(0, 10);
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "";
+  const shifted = shiftToDoha(d);
+  if (Number.isNaN(shifted.getTime())) return "";
+  return shifted.toISOString().slice(0, 10);
 }
 
 /** Doha timestamp for filenames: `YYYYMMDD-HHmm`. */
@@ -36,13 +43,19 @@ export function dohaStampCompact(): string {
 /** Doha timestamp for display: `YYYY-MM-DD HH:mm:ss`. */
 export function dohaStamp(input?: string | Date): string {
   const d = input ? (typeof input === "string" ? new Date(input) : input) : new Date();
-  return shiftToDoha(d).toISOString().slice(0, 19).replace("T", " ");
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "";
+  const shifted = shiftToDoha(d);
+  if (Number.isNaN(shifted.getTime())) return "";
+  return shifted.toISOString().slice(0, 19).replace("T", " ");
 }
 
 /** Doha date-time for display: `YYYY-MM-DD HH:mm`. */
 export function dohaDateTime(input?: string | Date): string {
   const d = input ? (typeof input === "string" ? new Date(input) : input) : new Date();
-  return shiftToDoha(d).toISOString().slice(0, 16).replace("T", " ");
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "";
+  const shifted = shiftToDoha(d);
+  if (Number.isNaN(shifted.getTime())) return "";
+  return shifted.toISOString().slice(0, 16).replace("T", " ");
 }
 
 // ── User-facing date display formatters ──────────────────────────
@@ -115,7 +128,10 @@ export function formatDdMmmYyyyHm(input: string | number | Date | null | undefin
 
 /** Convert a Doha calendar date-key + local wall time to the equivalent UTC ISO. */
 export function dohaDateKeyToUtcIso(dateKey: string, wallTime = "00:00:00"): string {
-  return new Date(`${dateKey}T${wallTime}+03:00`).toISOString();
+  if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return "";
+  const d = new Date(`${dateKey}T${wallTime}+03:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString();
 }
 
 /** Convert wall-clock (Y/M/D/h/m/s, no timezone) interpreted as Doha (+03:00) to UTC ISO. */
@@ -127,12 +143,21 @@ export function dohaWallToUtcIso(
   min = 0,
   s = 0,
 ): string {
+  if (
+    !Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d) ||
+    y < 1900 || y > 2999 || m < 1 || m > 12 || d < 1 || d > 31 ||
+    h < 0 || h > 23 || min < 0 || min > 59 || s < 0 || s > 59
+  ) {
+    return "";
+  }
   const mm = String(m).padStart(2, "0");
   const dd = String(d).padStart(2, "0");
   const hh = String(h).padStart(2, "0");
   const mi = String(min).padStart(2, "0");
   const ss = String(s).padStart(2, "0");
-  return new Date(`${y}-${mm}-${dd}T${hh}:${mi}:${ss}+03:00`).toISOString();
+  const parsed = new Date(`${y}-${mm}-${dd}T${hh}:${mi}:${ss}+03:00`);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString();
 }
 
 /** Read a Date's local wall-clock components as `YYYY-MM-DD` (Doha semantics). */
