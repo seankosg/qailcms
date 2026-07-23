@@ -360,6 +360,7 @@ export function DmrDashboardPage() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* KPI Strip */}
       <div className="grid gap-3 md:grid-cols-4">
