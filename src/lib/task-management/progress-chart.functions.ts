@@ -15,6 +15,8 @@ export interface TaskChartCache {
   x_end: string | null;
   last_plan_progress: number | null;
   last_actual_progress: number | null;
+  last_plan_at_dd?: number | null;
+  last_actual_at_dd?: number | null;
   updated_at: string;
 }
 
@@ -28,7 +30,7 @@ export const getTaskProgressChartsBulk = createServerFn({ method: "POST" })
     const { data: rows, error } = await (context.supabase as any)
       .from("task_progress_chart_cache")
       .select(
-        "task_no, plan_points, actual_points, x_start, x_end, last_plan_progress, last_actual_progress, updated_at",
+        "task_no, plan_points, actual_points, x_start, x_end, last_plan_progress, last_actual_progress, last_plan_at_dd, last_actual_at_dd, updated_at",
       )
       .eq("discipline", data.discipline);
     if (error) throw new Error(error.message);
@@ -54,7 +56,7 @@ export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
     const { data: rawRow, error: rawErr } = await supa
       .from("task_management_raw")
       .select(
-        "task_no, task_name, plan_start, plan_end, plan_days, actual_start, actual_finish, actual_progress, data_date",
+        "task_no, task_name, plan_start, plan_end, actual_start, actual_finish, actual_progress, data_date",
       )
       .eq("discipline", data.discipline)
       .eq("task_no", data.task_no)
@@ -79,10 +81,8 @@ export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
     const pe = rawRow.plan_end ? new Date(`${rawRow.plan_end}T00:00:00Z`) : null;
     if (ps && pe && pe.getTime() > ps.getTime()) {
       const durationMs = pe.getTime() - ps.getTime();
-      const pdays =
-        rawRow.plan_days && Number(rawRow.plan_days) > 0
-          ? Number(rawRow.plan_days)
-          : Math.max(1, durationMs / 86400000);
+      // Calendar-day linear plan: aligns with Raw Data Cum. Plan / T.Plan
+      const pdays = Math.max(1, durationMs / 86400000);
       for (let i = 0; i < NPTS; i++) {
         const t = new Date(ps.getTime() + (durationMs * i) / (NPTS - 1));
         const days = (t.getTime() - ps.getTime()) / 86400000;
@@ -91,30 +91,46 @@ export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
       }
     }
 
+    // Actual curve: start anchor (actual_start ?? plan_start, v=0)
+    //  → mid history snapshots (strictly between anchors)
+    //  → last anchor (data_date, actual_progress)
+    // No history ⇒ two-point linear = "일할 역계산" inference.
     const actual_points: ChartPoint[] = [];
-    const validHist = ((hist ?? []) as { new_value: string | null; changed_at: string }[]).filter(
-      (h) => h.new_value != null && h.new_value !== "",
-    );
-    if (validHist.length >= 2) {
-      for (const h of validHist) {
-        const v = Math.max(0, Math.min(1, Number(h.new_value) || 0));
-        // Convert UTC changed_at to Doha calendar date
+    const startAnchorDate: string | null =
+      (rawRow.actual_start ? String(rawRow.actual_start).slice(0, 10) : null) ??
+      (rawRow.plan_start ? String(rawRow.plan_start).slice(0, 10) : null);
+    const lastAnchorDate: string | null = rawRow.data_date
+      ? String(rawRow.data_date).slice(0, 10)
+      : null;
+    const lastAnchorVal: number | null =
+      rawRow.actual_progress != null
+        ? Math.max(0, Math.min(1, Number(rawRow.actual_progress)))
+        : null;
+
+    if (startAnchorDate) {
+      actual_points.push({ d: startAnchorDate, v: 0 });
+    }
+
+    const validHist = ((hist ?? []) as { new_value: string | null; changed_at: string }[])
+      .filter((h) => h.new_value != null && h.new_value !== "")
+      .map((h) => {
         const dohaShift = new Date(new Date(h.changed_at).getTime() + 3 * 3600_000);
-        actual_points.push({
+        return {
           d: dohaShift.toISOString().slice(0, 10),
-          v: Number(v.toFixed(4)),
-        });
-      }
-    } else {
-      if (rawRow.actual_start) {
-        actual_points.push({ d: String(rawRow.actual_start).slice(0, 10), v: 0 });
-      }
-      if (rawRow.data_date && rawRow.actual_progress != null) {
-        actual_points.push({
-          d: String(rawRow.data_date).slice(0, 10),
-          v: Math.max(0, Math.min(1, Number(rawRow.actual_progress))),
-        });
-      }
+          v: Math.max(0, Math.min(1, Number(h.new_value) || 0)),
+        };
+      })
+      .filter(
+        (p) =>
+          (!startAnchorDate || p.d > startAnchorDate) &&
+          (!lastAnchorDate || p.d < lastAnchorDate),
+      );
+    for (const p of validHist) {
+      actual_points.push({ d: p.d, v: Number(p.v.toFixed(4)) });
+    }
+
+    if (lastAnchorDate && lastAnchorVal != null) {
+      actual_points.push({ d: lastAnchorDate, v: Number(lastAnchorVal.toFixed(4)) });
     }
 
     return {
