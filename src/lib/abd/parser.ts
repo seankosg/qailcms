@@ -87,7 +87,6 @@ function cleanCell(v: any): any {
 }
 
 function toIsoDate(v: any): string | null {
-function toIsoDate(v: any): string | null {
   try {
     if (v == null || v === "") return null;
     if (v instanceof Date) {
