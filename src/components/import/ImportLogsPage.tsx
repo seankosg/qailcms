@@ -532,6 +532,12 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                             className="text-xs cursor-pointer whitespace-nowrap"
                             onClick={() => loadDetail(b.id)}
                           >
+                            {b.data_date ? new Date(b.data_date).toLocaleDateString("ko-KR") : "—"}
+                          </TableCell>
+                          <TableCell
+                            className="text-xs cursor-pointer whitespace-nowrap"
+                            onClick={() => loadDetail(b.id)}
+                          >
                             {fmtDateTime(b.started_at)}
                           </TableCell>
                           <TableCell
