@@ -814,13 +814,7 @@ export function TaskManagementRawDataPage() {
               <AlarmBadge
                 value={String(val)}
                 todayGap={
-                  rr.today_gap != null
-                    ? Number(rr.today_gap)
-                    : todayGap({
-                        actual_progress: rr.actual_progress,
-                        plan_start: rr.plan_start,
-                        plan_end: rr.plan_end,
-                      }, selectedDataDate || undefined)
+                  computeDailyDiff(rr as any, tActualMap.get(String(rr.id)) ?? 0) ?? 0
                 }
                 slipDays={rr.slip_days != null ? Number(rr.slip_days) : null}
                 actualProgress={
