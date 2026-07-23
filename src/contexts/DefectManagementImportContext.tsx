@@ -1310,10 +1310,20 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           // Field-level logs
           try {
             const SM_TRACKED_FIELDS = [
-              "defect_location","main_trade","sub_trade","work_type",
-              "hdec_pic_name","hdec_eng_name","subcontractor_name",
-              "actual_closure_date","actual_rectified_date","actual_start_date",
-              "rectified_status","closure_status",
+              // identity / status
+              "team","status_raw","priority","hdec_verification","hdec_reason",
+              // content
+              "category","defect_type","item","description",
+              // location
+              "area_type","area_level","area_location","defect_location","room_group",
+              // trade / people
+              "main_trade","sub_trade","work_type",
+              "hdec_pic_name","hdec_eng_name","subcontractor_name","subsub_name",
+              // dates / progress
+              "due_by","planned_start_date","actual_start_date",
+              "planned_rectified_date","actual_rectified_date","rectified_status",
+              "planned_closure_date","actual_closure_date","closure_status",
+              "planned_progress_pct","actual_progress_pct","updated_status",
             ] as const;
             const payloadByKey2 = new Map<string, any>();
             for (let i = 0; i < workingRows.length; i++) {
@@ -1335,6 +1345,19 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                   }),
                 );
                 return;
+              }
+              // priority_locked 로 인해 실질 스킵된 행: __row__ / skipped_clear_blocked
+              if (existing.get(p.source_issue_no as string)?.priority_locked) {
+                pendingFieldLogs.push(
+                  buildFieldLog("defect", {
+                    rawRowNo: p.rawRowNo ?? null,
+                    field: "__row__",
+                    outcome: "skipped_clear_blocked",
+                    raw: key,
+                    code: "priority_locked",
+                    detail: "우선순위 잠금으로 인해 값 변경이 차단되었습니다.",
+                  }),
+                );
               }
               const prior = existing.get(p.source_issue_no) ?? ({} as any);
               const wasExisting = existing.has(p.source_issue_no);
