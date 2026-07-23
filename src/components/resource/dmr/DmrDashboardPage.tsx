@@ -55,7 +55,7 @@ export function DmrDashboardPage() {
   const [asOf, setAsOf] = useState<string>('');
   const [rangeDays, setRangeDays] = useState<7 | 14 | 30>(14);
   const [groupBy, setGroupBy] = useState<GroupBy>('team');
-  const [recordTab, setRecordTab] = useState<'subcon' | 'system'>('subcon');
+  const [recordTab, setRecordTab] = useState<'subcon' | 'system'>('system');
 
   // Latest date
   const latestQuery = useQuery({
@@ -247,7 +247,13 @@ export function DmrDashboardPage() {
     const cell = (k: string, d: string) => rows
       .filter((r) => r.contractor_name === k && r.report_date === d)
       .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
-    return { dates, keys, cell };
+    const systemsBy = new Map<string, string[]>();
+    for (const r of rows) {
+      const arr = systemsBy.get(r.contractor_name) ?? [];
+      if (r.system_name && !arr.includes(r.system_name)) arr.push(r.system_name);
+      systemsBy.set(r.contractor_name, arr);
+    }
+    return { dates, keys, cell, systemsBy };
   }, [rows]);
 
   const systemMatrix = useMemo(() => {
@@ -256,7 +262,13 @@ export function DmrDashboardPage() {
     const cell = (k: string, d: string) => rows
       .filter((r) => r.system_name === k && r.report_date === d)
       .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
-    return { dates, keys, cell };
+    const subconsBy = new Map<string, string[]>();
+    for (const r of rows) {
+      const arr = subconsBy.get(r.system_name) ?? [];
+      if (r.contractor_name && !arr.includes(r.contractor_name)) arr.push(r.contractor_name);
+      subconsBy.set(r.system_name, arr);
+    }
+    return { dates, keys, cell, subconsBy };
   }, [rows]);
 
   return (
