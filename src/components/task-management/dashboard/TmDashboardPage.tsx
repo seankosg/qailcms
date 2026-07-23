@@ -31,7 +31,6 @@ import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSna
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { DelayTopTable } from "./DelayTopTable";
 import { OwnerLeaderboardCard } from "./OwnerLeaderboardCard";
-import { WeeklyDelayTrend } from "./WeeklyDelayTrend";
 import { JudgmentStageBreakdown } from "./JudgmentStageBreakdown";
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
 
@@ -286,9 +285,6 @@ export function TmDashboardPage() {
               onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
             />
           </div>
-
-          {/* Weekly trend */}
-          <WeeklyDelayTrend items={scopedItems} today={asOfDate} />
 
           {/* Judgment breakdown */}
           <JudgmentStageBreakdown items={scopedItems} asOfDate={asOfDate} />
