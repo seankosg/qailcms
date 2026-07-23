@@ -120,52 +120,14 @@ export function TmKpiCards({
     ];
   };
 
+  // Toolbar controls (Task Filter / Discipline / items count) moved to TmDashboardPage sticky toolbar.
+  // Props `taskScope`, `onScopeChange`, `disciplines`, `onDisciplinesChange` kept for API stability.
+  void onScopeChange;
+  void onDisciplinesChange;
+  void disciplines;
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Task Filter
-        </span>
-        <ToggleGroup
-          type="single"
-          value={taskScope}
-          onValueChange={(v) => {
-            if (v === "all" || v === "main" || v === "sub") onScopeChange(v);
-          }}
-          className="gap-1"
-        >
-          {(["all", "main", "sub"] as const).map((k) => (
-            <ToggleGroupItem
-              key={k}
-              value={k}
-              className="h-8 px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-            >
-              {SCOPE_LABEL[k]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <span className="mx-1 h-5 w-px bg-border" aria-hidden />
-        <ToggleGroup
-          type="multiple"
-          value={disciplines}
-          onValueChange={(v) => onDisciplinesChange(v)}
-          className="gap-1"
-        >
-          {DISCIPLINE_KEYS.map((k) => (
-            <ToggleGroupItem
-              key={k}
-              value={k}
-              className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-            >
-              {k}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <span className="text-[11px] text-muted-foreground tabular-nums">
-          {kpi.total.toLocaleString()} items
-        </span>
-      </div>
-
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <ProgressKpiCard
           label="Completed"

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft, CalendarDays, RotateCcw, Search } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +27,13 @@ import {
   type OwnerLeaderboardRow,
 } from "@/lib/task-management/delay-utils";
 import { TmKpiCards } from "./TmKpiCards";
+
+const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
+const TASK_SCOPE_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "main", label: "Main Task" },
+  { value: "sub", label: "Sub Task" },
+] as const;
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
 import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
@@ -152,92 +160,154 @@ export function TmDashboardPage() {
       search: (prev: Record<string, unknown>) => ({ ...prev, ...obj }) as any,
     });
 
+  const disciplines = search.discipline ?? [];
+  const totalItems = effectiveItems.length;
+
   return (
     <div className="flex flex-col gap-4 p-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link to="/closure/task-management/tree" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-xl font-semibold tracking-tight">
-              Task Management Dashboard
-            </h1>
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <CalendarDays className="h-3 w-3" />
-              Data Date
-            </span>
-            <Select
-              value={selectedDataDate}
-              onValueChange={(v) => patch({ dataDate: v })}
-            >
-              <SelectTrigger className="h-7 w-[160px] text-xs">
-                <SelectValue placeholder={latestDataDate} />
-              </SelectTrigger>
-              <SelectContent>
-                {(dataDateOptions.length ? dataDateOptions : [latestDataDate]).map((d) => (
-                  <SelectItem key={d} value={d} className="text-xs">
-                    {d}
-                    {d === latestDataDate && (
-                      <span className="ml-1 text-[10px] text-muted-foreground">(최신)</span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedDataDate !== latestDataDate && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-[11px]"
-                onClick={() => patch({ dataDate: "" })}
-              >
-                <RotateCcw className="mr-1 h-3 w-3" />
-                최신
-              </Button>
-            )}
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Link to="/closure/task-management/tree" className="text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <h1 className="truncate text-xl font-semibold tracking-tight">
+            Task Management Dashboard
+          </h1>
         </div>
+        <span className="text-[11px] text-muted-foreground tabular-nums">
+          {totalItems.toLocaleString()} items
+        </span>
       </div>
 
-      {/* Toolbar */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 p-3">
-          <OwnerQuickFilterPills
-            teamOptions={teamOptions}
-            picOptions={picOptions}
-            engOptions={engOptions}
-            team={search.team}
-            hdecPic={search.hdecPic}
-            hdecEng={search.hdecEng}
-            onChange={patch}
-          />
+      {/* Unified Toolbar (sticky) */}
+      <Card className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <CardContent className="flex flex-col gap-2 p-3">
+          {/* Row 1: Data Date · Task · Discipline · Delay · Search */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <CalendarDays className="h-3 w-3" />
+                Data Date
+              </span>
+              <Select
+                value={selectedDataDate}
+                onValueChange={(v) => patch({ dataDate: v })}
+              >
+                <SelectTrigger className="h-8 w-[150px] text-xs">
+                  <SelectValue placeholder={latestDataDate} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(dataDateOptions.length ? dataDateOptions : [latestDataDate]).map((d) => (
+                    <SelectItem key={d} value={d} className="text-xs">
+                      {d}
+                      {d === latestDataDate && (
+                        <span className="ml-1 text-[10px] text-muted-foreground">(최신)</span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedDataDate !== latestDataDate && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => patch({ dataDate: "" })}
+                  aria-label="최신 Data Date로 초기화"
+                  title="최신으로"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
 
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              지연 필터
-            </span>
-            <Tabs value={search.delayFilter} onValueChange={(v) => patch({ delayFilter: v })}>
-              <TabsList className="h-8">
-                {DELAY_FILTER_OPTIONS.map((o) => (
-                  <TabsTrigger key={o.value} value={o.value} className="h-6 px-2 text-xs">
+            <span className="h-5 w-px bg-border" aria-hidden />
+
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Task
+              </span>
+              <ToggleGroup
+                type="single"
+                value={taskScope}
+                onValueChange={(v) => {
+                  if (v === "all" || v === "main" || v === "sub") patch({ taskScope: v });
+                }}
+                className="gap-1"
+              >
+                {TASK_SCOPE_OPTIONS.map((o) => (
+                  <ToggleGroupItem
+                    key={o.value}
+                    value={o.value}
+                    className="h-8 px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
                     {o.label}
-                  </TabsTrigger>
+                  </ToggleGroupItem>
                 ))}
-              </TabsList>
-            </Tabs>
+              </ToggleGroup>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Discipline
+              </span>
+              <ToggleGroup
+                type="multiple"
+                value={disciplines}
+                onValueChange={(v) => patch({ discipline: v })}
+                className="gap-1"
+              >
+                {DISCIPLINE_KEYS.map((k) => (
+                  <ToggleGroupItem
+                    key={k}
+                    value={k}
+                    className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    {k}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+
+            <span className="h-5 w-px bg-border" aria-hidden />
+
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                지연 필터
+              </span>
+              <Tabs value={search.delayFilter} onValueChange={(v) => patch({ delayFilter: v })}>
+                <TabsList className="h-8">
+                  {DELAY_FILTER_OPTIONS.map((o) => (
+                    <TabsTrigger key={o.value} value={o.value} className="h-6 px-2 text-xs">
+                      {o.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="ml-auto flex items-center gap-1.5">
+              <Search className="h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={search.q}
+                placeholder="task_no / 이름 / 담당"
+                className="h-8 w-56 text-xs"
+                onChange={(e) => patch({ q: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-1.5">
-            <Search className="h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              value={search.q}
-              placeholder="task_no / 이름 / 담당"
-              className="h-8 w-56 text-xs"
-              onChange={(e) => patch({ q: e.target.value })}
+          {/* Row 2: Owner axis pills */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
+            <OwnerQuickFilterPills
+              teamOptions={teamOptions}
+              picOptions={picOptions}
+              engOptions={engOptions}
+              team={search.team}
+              hdecPic={search.hdecPic}
+              hdecEng={search.hdecEng}
+              onChange={patch}
             />
           </div>
         </CardContent>
