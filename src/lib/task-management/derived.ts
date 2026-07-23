@@ -171,14 +171,18 @@ export function getStageJudgment(
   const asOfD = resolveAsOf(row, asOf);
 
   if (stage === "start") {
-    if (row.actual_start) return "완료";
+    if (
+      row.actual_start ||
+      Number(row.actual_progress ?? 0) >= 1 ||
+      row.auto_judgment === "완료"
+    )
+      return "완료";
     const ps = parseDate(row.plan_start);
     if (!ps || ps.getTime() > asOfD.getTime()) return "정상";
     const d = daysDiff(ps, asOfD);
     if (d > t.slip_late_days) return "위험";
     if (d > t.slip_warn_days) return "지연";
-    if (d > 0) return "주의";
-    return "정상";
+    return "주의";
   }
 
   if (stage === "wip") {
@@ -194,12 +198,11 @@ export function getStageJudgment(
   }
 
   // finish
-  const actual = Number(row.actual_progress ?? 0);
-  if (actual >= 1 && row.actual_finish) return "완료";
+  if (Number(row.actual_progress ?? 0) >= 1 || row.auto_judgment === "완료")
+    return "완료";
   const pe = parseDate(row.plan_end);
   if (!pe || pe.getTime() > asOfD.getTime()) return "정상";
-  const slipCol = Number(row.slip_days ?? 0);
-  const slip = Number.isFinite(slipCol) && slipCol > 0 ? slipCol : daysDiff(pe, asOfD);
+  const slip = daysDiff(pe, asOfD);
   if (slip > t.slip_late_days) return "위험";
   if (slip > t.slip_warn_days) return "지연";
   if (slip > 0) return "주의";

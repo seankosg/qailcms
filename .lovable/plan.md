@@ -1,41 +1,86 @@
-## 목적
-Task Tree의 Main Task 카드 뱃지/판정을 **Sub Task와 동일한 로직**으로 통일합니다. 현재는 하위 Sub Task 판정의 worst-of 를 뱃지로 보여주고 있어, 롤업된 Main Task 자체의 진도율(`actual_progress` vs `plan_progress`)과 시각적으로 어긋납니다.
+## 재점검 결과 — Finish 스테이지의 3가지 어긋남
 
-## 현재 동작 (확인됨)
-`src/components/task-management/tree/TaskTreePage.tsx` L397:
+숫자가 우연히 4=4로 맞아 보였지만, 데이터 조건이 달라지면 **KPI Completion Overdue와 Finish 스택의 (주의+지연+위험) 합이 반드시 어긋나는** 3개의 로직 차이가 있음. Start와 함께 정렬 필요.
+
+### KPI 기준 (`kpi-utils.ts`)
+
+- `isCompleted(row)` = `actual_progress ≥ 1` **OR** `auto_judgment === '완료'`
+- `isCompletionOverdue(row, asOf)` = `plan_end < asOf` **AND** `!isCompleted(row)`
+- **`actual_finish`는 참조하지 않음**, **`slip_days`는 참조하지 않음**.
+
+### 현재 Finish 스택 (`derived.ts` line 196–206)
+
+```text
+if (actual_progress ≥ 1 && actual_finish) return "완료";  // ① 문제
+const pe = parseDate(row.plan_end);
+if (!pe || pe > asOf) return "정상";
+const slipCol = Number(row.slip_days ?? 0);
+const slip = slipCol > 0 ? slipCol : daysDiff(pe, asOf);  // ② ③ 문제
+if (slip > slip_late_days) 위험;
+if (slip > slip_warn_days) 지연;
+if (slip > 0) 주의;
+return "정상";
 ```
-const worst = worstJudgment(kids.map((k) => k.auto_judgment)) ?? p.auto_judgment;
+
+### 어긋남 3건
+
+1. **완료 판정 소스 불일치 (①)**
+   - KPI 완료: `actual_progress ≥ 1` OR `auto_judgment === '완료'`.
+   - 스택 완료: `actual_progress ≥ 1` AND `actual_finish` 둘 다 필요.
+   - 결과: `actual_progress=1`인데 `actual_finish`가 비어 있는 행은 KPI에선 완료(overdue 아님)이지만, 스택에선 완료가 아니고 `plan_end ≤ asOf`라면 지연/주의/위험으로 이중계상됨. `auto_judgment='완료'`이지만 `actual_progress<1`인 행도 동일 문제.
+
+2. **`slip_days` DB 컬럼 사용으로 인한 asOf 무관 부풀림 (②)**
+   - `slip_days`는 마지막 갱신 시점 기준 최종 값이며, **선택된 asOf(과거 Data Date)와 무관**.
+   - 과거 Data Date 선택 시 KPI는 `plan_end < asOf` 순수 달력 비교로 판정하는데, 스택은 `slip_days`(현재 시점 값)를 그대로 써서 위험/지연 카테고리를 부풀릴 수 있음.
+   - 정합성 확보 위해 스택 slip은 **항상 `daysDiff(pe, asOf)`로 계산** — KPI와 동일한 asOf 기준 순수 달력 비교.
+
+3. **경계 조건 (③)**
+   - KPI: `plan_end < asOf` — 하루라도 지나야 overdue.
+   - 스택: `pe > asOf → 정상`, `slip > 0`이면 주의 → `pe == asOf` 케이스는 양쪽 모두 overdue 아님으로 일치. 다만 위 ②를 고치면 자연스럽게 KPI와 완전 정렬됨(추가 변경 불필요).
+
+## 최종 수정안 (`src/lib/task-management/derived.ts`)
+
+### Start 분기
+
+```text
+if (stage === "start") {
+  if (row.actual_start
+      || Number(row.actual_progress ?? 0) >= 1
+      || row.auto_judgment === "완료") return "완료";
+  const ps = parseDate(row.plan_start);
+  if (!ps || ps.getTime() > asOfD.getTime()) return "정상";
+  const d = daysDiff(ps, asOfD);
+  if (d > t.slip_late_days) return "위험";
+  if (d > t.slip_warn_days) return "지연";
+  return "주의";  // plan_start ≤ asOf 이면 최소 "주의" (KPI isPlannedStartedBy와 정렬)
+}
 ```
-→ Main 뱃지가 **하위 Sub 판정 중 최악값**으로 표시됨.
 
-L188 (판정 필터):
+### Finish 분기
+
+```text
+// finish
+if (Number(row.actual_progress ?? 0) >= 1 || row.auto_judgment === "완료") return "완료";
+const pe = parseDate(row.plan_end);
+if (!pe || pe.getTime() > asOfD.getTime()) return "정상";
+const slip = daysDiff(pe, asOfD);  // slip_days DB 컬럼 사용 중단, asOf 기준으로만 계산
+if (slip > t.slip_late_days) return "위험";
+if (slip > t.slip_warn_days) return "지연";
+if (slip > 0) return "주의";
+return "정상";
 ```
-const mainJ = judgeOf(p) || (worstJudgment(kids.map((k) => k.auto_judgment)) ?? "");
-```
-→ Main 자체 판정이 비었을 때 Sub worst 로 폴백.
 
-`p.auto_judgment` 자체는 DB의 `update_task_summary` 롤업으로 Main의 롤업된 `actual_progress`/`plan_progress`를 기반으로 `computeJudgment` 되어 저장됨 (Sub 와 동일 산식).
+### WIP 분기 — 변경 없음 (이미 KPI와 정렬)
 
-## 변경 내용
-`src/components/task-management/tree/TaskTreePage.tsx` 만 수정합니다. DB 로직/롤업/스키마 변경 없음.
+## 검증 방법
 
-1. **Main 판정 뱃지 (L397)** — Sub worst-of 대신 Main 자신의 판정 사용:
-   ```
-   const mainJudgment = (p.auto_judgment && p.auto_judgment.trim())
-     || computeJudgment(p, undefined, asOfDate);
-   ```
-   뱃지 렌더링도 `worst` → `mainJudgment` 로 교체.
+수정 후 여러 Data Date(최신 + 과거 2~3개)에서:
+- Start 스택 (주의+지연+위험) 합 == KPI "Start Delayed"
+- WIP 스택 (주의+지연+위험) 합 == KPI "Behind Schedule"
+- **Finish 스택 (주의+지연+위험) 합 == KPI "Completion Overdue"** (특히 과거 Data Date에서 재검증)
 
-2. **판정 필터 폴백 (L188)** — Main 판정이 없을 때 Sub worst 폴백 제거. Main 자신의 값만 사용 (그 값이 없으면 `computeJudgment(p)` 로만 대체). Sub 판정은 `kids.some(...)` 매칭에서 그대로 유지.
+## 변경 파일
 
-3. **"지연 N" 카운트 뱃지 (L433-434)** — 이 뱃지는 "하위 Sub 중 지연 개수" 정보용이며 사용자가 유지 요청한 뱃지 스코프(=Main 자체 판정)와 별개 요약 지표입니다. 요구사항 문구가 "뱃지들"로 복수형이라 다음 중 어느 쪽을 원하시는지 확인이 필요합니다:
-   - (A) 유지 — 지연된 Sub 개수 표시는 정보성이므로 그대로 둠.
-   - (B) 제거 — 모든 뱃지를 Main 자체 판정만 반영.
+- `src/lib/task-management/derived.ts` — `getStageJudgment` start/finish 분기
 
-## 검증
-- Main의 롤업 `actual_progress` / `plan_progress` 가 정상 범위인 태스크에서 하위 1개만 위험이어도 Main 뱃지는 더 이상 "위험"으로 뜨지 않고 Main 자체 판정을 표시.
-- Progress 바(`ProgressBar v={p.actual_progress}`)/GapCell(`computeVariance(p)`) 과 뱃지 색이 일치.
-- 판정 필터로 "지연/위험" 선택 시, Main 자체 판정이 해당하지 않아도 하위 Sub 중 해당 항목이 있으면 카드가 표시되는 동작은 유지.
-
-## 질문
-"지연 N" (하위 지연 Sub 개수) 뱃지는 (A) 유지 / (B) 제거 중 어느 쪽으로 처리할까요?
+기타 파일(delay-utils, JudgmentStageBreakdown, kpi-utils)은 변경 없음.
