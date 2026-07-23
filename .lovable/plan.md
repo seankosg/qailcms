@@ -1,86 +1,51 @@
-## 재점검 결과 — Finish 스테이지의 3가지 어긋남
+## 목표
+TM Dashboard 상단 영역에 흩어져 있는 4개 컨트롤(Data Date / 담당자축 필터 / 지연 필터 / Task 필터)을 하나의 통합 툴바로 재배치해 화면 세로 공간을 절약하고 시선 흐름을 정리한다. 필터 형태는 최대한 유지하되, 공간 효율을 위해 일부만 형태 변경.
 
-숫자가 우연히 4=4로 맞아 보였지만, 데이터 조건이 달라지면 **KPI Completion Overdue와 Finish 스택의 (주의+지연+위험) 합이 반드시 어긋나는** 3개의 로직 차이가 있음. Start와 함께 정렬 필요.
-
-### KPI 기준 (`kpi-utils.ts`)
-
-- `isCompleted(row)` = `actual_progress ≥ 1` **OR** `auto_judgment === '완료'`
-- `isCompletionOverdue(row, asOf)` = `plan_end < asOf` **AND** `!isCompleted(row)`
-- **`actual_finish`는 참조하지 않음**, **`slip_days`는 참조하지 않음**.
-
-### 현재 Finish 스택 (`derived.ts` line 196–206)
-
+## 현재 배치 (3영역 분산)
 ```text
-if (actual_progress ≥ 1 && actual_finish) return "완료";  // ① 문제
-const pe = parseDate(row.plan_end);
-if (!pe || pe > asOf) return "정상";
-const slipCol = Number(row.slip_days ?? 0);
-const slip = slipCol > 0 ? slipCol : daysDiff(pe, asOf);  // ② ③ 문제
-if (slip > slip_late_days) 위험;
-if (slip > slip_warn_days) 지연;
-if (slip > 0) 주의;
-return "정상";
+[Header]     제목 + Data Date Select + "최신" 버튼
+[Toolbar]    OwnerQuickFilterPills(담당자축) | 지연 필터 Tabs | (우측) 검색 Input
+[KPI 상단]   Task Filter(All/Main/Sub) | Discipline 토글 | items 카운트
 ```
+문제: Data Date와 Task Filter가 서로 다른 층에 있고, 툴바-Header 사이 여백이 이중으로 발생.
 
-### 어긋남 3건
-
-1. **완료 판정 소스 불일치 (①)**
-   - KPI 완료: `actual_progress ≥ 1` OR `auto_judgment === '완료'`.
-   - 스택 완료: `actual_progress ≥ 1` AND `actual_finish` 둘 다 필요.
-   - 결과: `actual_progress=1`인데 `actual_finish`가 비어 있는 행은 KPI에선 완료(overdue 아님)이지만, 스택에선 완료가 아니고 `plan_end ≤ asOf`라면 지연/주의/위험으로 이중계상됨. `auto_judgment='완료'`이지만 `actual_progress<1`인 행도 동일 문제.
-
-2. **`slip_days` DB 컬럼 사용으로 인한 asOf 무관 부풀림 (②)**
-   - `slip_days`는 마지막 갱신 시점 기준 최종 값이며, **선택된 asOf(과거 Data Date)와 무관**.
-   - 과거 Data Date 선택 시 KPI는 `plan_end < asOf` 순수 달력 비교로 판정하는데, 스택은 `slip_days`(현재 시점 값)를 그대로 써서 위험/지연 카테고리를 부풀릴 수 있음.
-   - 정합성 확보 위해 스택 slip은 **항상 `daysDiff(pe, asOf)`로 계산** — KPI와 동일한 asOf 기준 순수 달력 비교.
-
-3. **경계 조건 (③)**
-   - KPI: `plan_end < asOf` — 하루라도 지나야 overdue.
-   - 스택: `pe > asOf → 정상`, `slip > 0`이면 주의 → `pe == asOf` 케이스는 양쪽 모두 overdue 아님으로 일치. 다만 위 ②를 고치면 자연스럽게 KPI와 완전 정렬됨(추가 변경 불필요).
-
-## 최종 수정안 (`src/lib/task-management/derived.ts`)
-
-### Start 분기
-
+## 신규 배치 (단일 sticky 툴바)
 ```text
-if (stage === "start") {
-  if (row.actual_start
-      || Number(row.actual_progress ?? 0) >= 1
-      || row.auto_judgment === "완료") return "완료";
-  const ps = parseDate(row.plan_start);
-  if (!ps || ps.getTime() > asOfD.getTime()) return "정상";
-  const d = daysDiff(ps, asOfD);
-  if (d > t.slip_late_days) return "위험";
-  if (d > t.slip_warn_days) return "지연";
-  return "주의";  // plan_start ≤ asOf 이면 최소 "주의" (KPI isPlannedStartedBy와 정렬)
-}
+[Header 1행]  ← 제목 · (우측) items 카운트만 유지
+[Toolbar Card, sticky top]
+  ┌ 좌측(축·범위) ────────────────┐  ┌ 중앙(필터) ─────────────┐  ┌ 우측(검색) ┐
+  │ 📅 Data Date [Popover]  |     │  │ Task: [All|Main|Sub]     │  │ 🔍 검색     │
+  │ 담당자축 Pills(Team/PIC/Eng) │  │ Discipline: [ARCH...SUPP]│  │             │
+  │                              │  │ 지연: [Tabs]              │  │             │
+  └──────────────────────────────┘  └──────────────────────────┘  └────────────┘
 ```
+- 툴바 1행: Data Date(팝오버로 축소) · 구분선 · Task Filter · Discipline · 구분선 · 지연 필터 · (ml-auto) 검색
+- 툴바 2행(모바일에서만 wrap): 담당자축 Pills 전체 폭 사용
+- 데스크톱(lg 이상)에서는 모두 1행에 배치, 그 이하에서는 자연스럽게 2행으로 wrap
+- Data Date의 "(최신)" 표시와 초기화 버튼은 팝오버 트리거 옆 작은 뱃지/아이콘 버튼으로 통합
 
-### Finish 분기
+## 형태 변경 (최소)
+- Data Date: `Select` → 컴팩트 `Popover` 트리거 (버튼에 날짜 텍스트 + 최신 여부 뱃지, 아이콘 버튼으로 초기화). SM/DMR에서 쓰는 `DataDatePicker` 스타일과 일치.
+- Task Filter / Discipline 토글: 현재 ToggleGroup 형태 그대로 유지, 위치만 KPI 카드 상단 → 통합 툴바로 이동.
+- 지연 필터: 현재 Tabs 그대로 유지.
+- 담당자축 Pills(`OwnerQuickFilterPills`): 그대로 유지, 툴바 하단 행으로 이동.
 
-```text
-// finish
-if (Number(row.actual_progress ?? 0) >= 1 || row.auto_judgment === "완료") return "완료";
-const pe = parseDate(row.plan_end);
-if (!pe || pe.getTime() > asOfD.getTime()) return "정상";
-const slip = daysDiff(pe, asOfD);  // slip_days DB 컬럼 사용 중단, asOf 기준으로만 계산
-if (slip > t.slip_late_days) return "위험";
-if (slip > t.slip_warn_days) return "지연";
-if (slip > 0) return "주의";
-return "정상";
-```
+## 편집 파일
+- `src/components/task-management/dashboard/TmDashboardPage.tsx`
+  - Header 블록에서 Data Date 셀렉트/최신 버튼 제거
+  - Toolbar Card 재구성: 1행(Data Date + Task Filter + Discipline + 지연 필터 + 검색), 2행(담당자축 Pills)
+  - Card에 `sticky top-0 z-20 bg-background/95 backdrop-blur` 적용
+  - items 카운트를 헤더 우측으로 이동 (props로 전달 or 상단에서 계산)
+- `src/components/task-management/dashboard/TmKpiCards.tsx`
+  - 최상단 컨트롤 행(Task Filter + Discipline + items 카운트) 제거. props로 계속 taskScope/disciplines 수신은 유지하되 렌더링만 상단으로 이관.
+  - 파일 자체 로직/계산은 변경 없음.
 
-### WIP 분기 — 변경 없음 (이미 KPI와 정렬)
+## 비 변경 사항
+- KPI 카드, StatusMixBar, 하위 차트/테이블 로직 및 계산식 일체 유지.
+- 필터 상태 관리(search params, patch), 라우팅 연결 유지.
+- 담당자축·Discipline·지연 필터 옵션 및 동작 방식 유지.
 
-## 검증 방법
-
-수정 후 여러 Data Date(최신 + 과거 2~3개)에서:
-- Start 스택 (주의+지연+위험) 합 == KPI "Start Delayed"
-- WIP 스택 (주의+지연+위험) 합 == KPI "Behind Schedule"
-- **Finish 스택 (주의+지연+위험) 합 == KPI "Completion Overdue"** (특히 과거 Data Date에서 재검증)
-
-## 변경 파일
-
-- `src/lib/task-management/derived.ts` — `getStageJudgment` start/finish 분기
-
-기타 파일(delay-utils, JudgmentStageBreakdown, kpi-utils)은 변경 없음.
+## 검증
+- 데스크톱(≥1280px): 1+1행 툴바가 세로 공간을 이전 대비 약 40~50px 축소하는지 확인.
+- 태블릿/모바일: wrap이 자연스럽게 동작하고 sticky 시 KPI가 밑으로 스크롤되는지 확인.
+- 각 필터 클릭 → 라우팅 search 파라미터 갱신 및 KPI 카운트 변동 확인.
