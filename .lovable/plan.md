@@ -1,49 +1,42 @@
-## 목표
-TM 대시보드 중단부의 Status Mix(현재 좌 절반, 가로 스택 바)를 도넛형 카드로 교체하고, 기존 Status Mix가 차지하던 폭(전체의 절반)을 다시 반으로 나눠 좌측 = Status Mix 도넛, 우측 = 자동 판정 분포(JudgmentDonut) 배치. 우측 절반(기존 스테이지 판정 스택)은 현재 그대로 유지.
+## 현재 상태 확인
 
-## 최종 레이아웃
-```text
-[ KPI 카드 4개 그리드 ]
-[ Status Mix 도넛 | 자동 판정 분포 도넛 || 스테이지별 판정 스택 (변경 없음) ]
-  └──── 폭 25% ────┴──── 폭 25% ────┘└─────── 폭 50% (기존 그대로) ───────┘
-```
-- 3개 카드 모두 `h-full`, 그리드 `items-stretch` → 우측 스테이지 판정 스택 카드의 자연 높이에 좌/중 도넛 카드가 맞춰 늘어남 (요청한 "높이 정합" 유지).
+업로드된 파일 `Task_Management_Mech_260722_KD_Park_R1.xlsx`와 현재 `src/lib/task-management/parser.ts`의 `toIsoDate()` 함수를 확인한 결과, **현재 TM 파서는 파일 날짜를 도하(Asia/Qatar, UTC+03:00) 시간으로 인식하지 않습니다.**
 
-## 현재 상태 (확인 완료)
-- `TmKpiCards.tsx`의 `<div className="grid gap-3 lg:grid-cols-2">` 내부: 좌 = `StatusMixBar`, 우 = `statusMixSideSlot`.
-- `TmDashboardPage.tsx`에서 `statusMixSideSlot`에 `<JudgmentStageBreakdown compact />`(= 스테이지 판정 스택만)를 전달.
-- `JudgmentDonut.tsx`는 이미 SVG 도넛으로 구현되어 있고 `counts` prop 하나만 받음.
-- `JudgmentStageBreakdown` 은 `compact=true`면 스테이지 스택 카드 단독 렌더 → 그대로 재사용.
-- `StatusMixBar.tsx`는 `TmKpiCards`에서만 사용.
+- `toIsoDate()`가 Date 객체, Excel serial, 문자열 날짜를 모두 **런타임 로컬/UTC 컴포넌트**로 변환하고 있음.
+- `src/lib/time/doha.ts`에 있는 `dohaLocalDateToUtcIso()` / `dohaWallToUtcIso()` 도구는 파서에서 사용되지 않음.
+- 이전에 요청하신 "원본 엑셀 날짜 컬럼을 도하 시간으로 해석하도록 임포트 로직 수정"이 아직 파서에 반영되지 않은 상태.
+- ABD 파서(`src/lib/abd/parser.ts`)에서도 동일하게 로컬/UTC 기준 변환을 사용 중.
 
-## 변경 사항
+또한 업로드 파일은 `Gantt` 시트에 `Data Date`가 3행, Task No가 5행 이후에 있는 비표준 구조라, **컬럼 매핑 자체가 정상적으로 될지도 함께 확인해야 합니다.**
 
-### 1. `StatusMixDonut.tsx` 신규
-- `JudgmentDonut`과 동일한 시각 사양(반경/두께/중앙 total 텍스트/우측 범례)의 SVG 도넛.
-- 세그먼트 3개: Completed / WIP / Not Started.
-  - 색상: Completed = `var(--schedule-actual)`, WIP = `var(--schedule-plan)`, Not Started = 중립 muted 톤. 기존 `StatusMixBar` 색과 일관.
-- 범례 각 행 클릭 시 `onSegmentClick(seg)` 호출 → 기존 raw-data 필터 연동 유지.
-- 카드 타이틀: "Status Mix".
-- 카드에 `h-full flex flex-col` 부여, SVG 영역은 `flex-1`로 세로 여백을 흡수하여 스테이지 스택 카드 높이 정합.
+## 계획
 
-### 2. `TmKpiCards.tsx` 수정
-- 기존 `<div className="grid gap-3 lg:grid-cols-2">` 를 `<div className="grid gap-3 lg:grid-cols-4">` 로 변경.
-- 왼쪽에 `<StatusMixDonut ... className="lg:col-span-1" />` (총 4 중 1칸).
-- 그 옆에 `<div className="lg:col-span-1">{statusMixLeftExtraSlot}</div>` (자동 판정 분포용, 1칸).
-- 오른쪽에 `<div className="lg:col-span-2">{statusMixSideSlot}</div>` (스테이지 판정 스택 그대로, 2칸).
-- Props에 `statusMixLeftExtraSlot?: ReactNode` 추가.
+1. **TM 파서 날짜 변환을 도하 기준으로 변경**
+   - `src/lib/task-management/parser.ts`의 `toIsoDate()`를 수정.
+   - `Date` 객체 → `dohaLocalDateToUtcIso()` 사용.
+   - Excel serial → `XLSX.SSF.parse_date_code`로 날짜 추출 후 `dohaWallToUtcIso()`로 변환.
+   - `YYYY-MM-DD` 문자열 → 그대로 도하로 간주, UTC ISO로 변환.
+   - Data Date 탐색 로직(`scanForDate`)도 동일 기준으로 변경.
 
-### 3. `TmDashboardPage.tsx` 수정
-- `judgmentCounts` `useMemo` 추가: `computeJudgmentStageBreakdown(scopedItems, asOfDate).judgmentCounts` 산출.
-- `TmKpiCards`에 아래 두 slot 전달:
-  - `statusMixLeftExtraSlot={<JudgmentDonut counts={judgmentCounts} />}`
-  - `statusMixSideSlot={<JudgmentStageBreakdown items={scopedItems} asOfDate={asOfDate} compact />}` (현재와 동일 — 변경 없음)
+2. **ABD/SM/DMR/SparePart 파서에도 동일 원칙 적용**
+   - 각 모듈의 `toIsoDate()` 또는 동등 함수를 찾아 도하 기준으로 통일.
+   - Date 객체, Excel serial, 문자열 모두 동일하게 처리.
 
-### 4. 정리
-- `StatusMixBar.tsx`는 다른 사용처 없음을 build 진입 시 재확인 후 파일 삭제(사용처 있으면 존치).
+3. **파서 안전성 보강**
+   - Excel serial에서 날짜/시간 구분 처리(시간 부분은 00:00:00으로 폐기, 날짜만 저장).
+   - 변환 실패 시 `null` 반환 및 경고 메시지 유지.
+   - 무효한 날짜(예: 1899-12-30) 필터링 강화.
 
-## 영향 없음
-- 하단 "지연 Top + Owner Leaderboard" 행: 변경 없음.
-- KPI 카드 4개 그리드: 변경 없음.
-- 스테이지 판정 스택 카드 자체(내용/스타일/데이터): 변경 없음. 위치도 유지.
-- Raw Data 드릴다운 필터 로직: 기존 `goRaw(seg)` 동일 재사용.
+4. **업로드 파일 매핑 확인**
+   - 비표준 `Gantt` 시트 구조(헤더가 5행이 아닌 1~3행에 분산)를 확인.
+   - 현재 30행 스캔 로직으로 자동 헤더 감지가 가능한지, 아니면 별도 매핑 개선이 필요한지 판단.
+   - 필요 시 해당 파일에 대한 수동 헤더 위치 override 또는 별도 시트 처리 옵션 추가 검토.
+
+5. **검증**
+   - 업로드 파일 내 표시된 날짜(예: `2026-07-22`, `2026-07-23`)가 DB에 저장될 때 동일한 달력일로 유지되는지 확인.
+   - UTC ISO로 저장 후 표시 시 `formatDdMmmYyyy()` 등 도하 포맷터로 원래 날짜가 그대로 출력되는지 확인.
+   - TM, ABD, SM, DMR, SparePart 임포트 각각에 대해 날짜 손실/하루 어긋남이 없는지 검증.
+
+## 배제하지 않은 부분
+- 파일 구조가 매우 비표준일 경우 별도의 매핑 설정이 추가로 필요할 수 있습니다. 이 경우 추가 질문을 드리겠습니다.
+- 날짜뿐 아니라 시간(`HH:mm`)을 포함한 datetime 컬럼은 현재 TM 모델에 없으므로, 이 계획은 date-only 범위로 한정합니다.
