@@ -395,7 +395,7 @@ export function DmrDashboardPage() {
                       const sum = subconMatrix.dates.reduce((a, d) => a + subconMatrix.cell(k, d), 0);
                       return (
                         <tr key={k} className="border-t hover:bg-muted/30">
-                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium">{k}{directNames.has(k) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
+                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background">{k}{directNames.has(k) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}</td>
                           {subconMatrix.dates.map((d) => {
                             const v = subconMatrix.cell(k, d);
                             return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
