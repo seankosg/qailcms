@@ -258,17 +258,24 @@ export function DmrDashboardPage() {
 
   const systemMatrix = useMemo(() => {
     const dates = Array.from(new Set(rows.map((r) => r.report_date))).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
-    const keys = Array.from(new Set(rows.map((r) => r.system_name))).sort();
-    const cell = (k: string, d: string) => rows
-      .filter((r) => r.system_name === k && r.report_date === d)
-      .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
-    const subconsBy = new Map<string, string[]>();
+    const SEP = '\u0001';
+    const pairSet = new Set<string>();
     for (const r of rows) {
-      const arr = subconsBy.get(r.system_name) ?? [];
-      if (r.contractor_name && !arr.includes(r.contractor_name)) arr.push(r.contractor_name);
-      subconsBy.set(r.system_name, arr);
+      const sys = r.system_name ?? '';
+      const sub = r.contractor_name ?? '';
+      if (!sys && !sub) continue;
+      pairSet.add(`${sys}${SEP}${sub}`);
     }
-    return { dates, keys, cell, subconsBy };
+    const pairs = Array.from(pairSet)
+      .map((k) => {
+        const [system, subcon] = k.split(SEP);
+        return { key: k, system, subcon };
+      })
+      .sort((a, b) => a.system.localeCompare(b.system) || a.subcon.localeCompare(b.subcon));
+    const cell = (system: string, subcon: string, d: string) => rows
+      .filter((r) => (r.system_name ?? '') === system && (r.contractor_name ?? '') === subcon && r.report_date === d)
+      .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
+    return { dates, pairs, cell };
   }, [rows]);
 
   return (
