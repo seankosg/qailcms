@@ -280,13 +280,14 @@ export function DmrDashboardPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">DMR Dashboard</h1>
-        <p className="text-xs text-muted-foreground">Daily Manpower Record — 실적 요약 및 추이</p>
-      </div>
+      <div className="sticky top-0 z-40 -mx-4 space-y-3 border-b bg-background px-4 pb-3 pt-2 shadow-sm">
+        <div>
+          <h1 className="text-xl font-semibold">DMR Dashboard</h1>
+          <p className="text-xs text-muted-foreground">Daily Manpower Record — 실적 요약 및 추이</p>
+        </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
+        {/* Filters */}
+        <div className="flex flex-wrap items-end gap-3 rounded-md border bg-background p-3">
         <div>
           <div className="mb-1 text-[11px] text-muted-foreground">Data Date</div>
           <Input type="date" value={currentAsOf} onChange={(e) => setAsOf(e.target.value)} className="h-8 w-40 text-xs" />
