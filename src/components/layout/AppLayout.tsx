@@ -104,7 +104,7 @@ const NAV: NavSection[] = [
     dashboard: { to: "/resource/dashboard", label: "Dashboard", icon: LayoutDashboard },
     modules: [
       {
-        label: "DMR (Daily Manpower)",
+        label: "DMR (Daily Manpower Record)",
         icon: HardHat,
         matchPrefix: "/resource/dmr",
         items: [
