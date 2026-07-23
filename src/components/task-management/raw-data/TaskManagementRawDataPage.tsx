@@ -86,7 +86,7 @@ import {
   runRollupAllMains,
   runRecalcAutoJudgment,
 } from "@/lib/task-management/rollup.functions";
-import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
+import { expectedProgressToday, todayGap, computeVariance } from "@/lib/task-management/derived";
 import {
   ALL_TASK_TIMELINE_STAGE_KEYS,
   isTaskStageDelayedAsOf,
