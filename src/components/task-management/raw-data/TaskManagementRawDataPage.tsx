@@ -686,8 +686,12 @@ export function TaskManagementRawDataPage() {
         });
         continue;
       }
-      // 파생 컬럼(오늘 계획/오늘 차이) — 실제 DB 값이 없으므로 accessorFn으로 계산
-      if (c.key === "expected_progress_today" || c.key === "today_gap") {
+      // Today 3형제 (T.Plan / T.Actual / T.Diff) — 모두 파생 계산 (일할 증분 관점)
+      if (
+        c.key === "expected_progress_today" ||
+        c.key === "today_gap" ||
+        c.key === "today_actual"
+      ) {
         cols.push({
           id: c.key,
           size: c.width,
@@ -696,15 +700,22 @@ export function TaskManagementRawDataPage() {
           enableSorting: true,
           enableColumnFilter: false,
           accessorFn: (r: Row) => {
-            if (c.key === "expected_progress_today")
-              return expectedProgressToday(r as any, selectedDataDate || undefined);
-            return todayGap(r as any, selectedDataDate || undefined);
+            if (c.key === "expected_progress_today") {
+              // T.Plan(일할) = 1 / duration_days
+              return computeDailyPlan(r as any) ?? 0;
+            }
+            if (c.key === "today_actual") {
+              return tActualMap.get(String((r as any).id)) ?? 0;
+            }
+            // today_gap = T.Diff(일할) = T.Actual − T.Plan
+            const ta = tActualMap.get(String((r as any).id)) ?? 0;
+            return computeDailyDiff(r as any, ta) ?? 0;
           },
           header: labelOverrides[c.key] ?? c.label,
           meta: { group: c.group },
           cell: ({ getValue }) => {
             const v = Number(getValue()) || 0;
-            if (c.key === "expected_progress_today") {
+            if (c.key === "expected_progress_today" || c.key === "today_actual") {
               return (
                 <span className="w-full text-right tabular-nums">
                   {(v * 100).toFixed(1)}%
