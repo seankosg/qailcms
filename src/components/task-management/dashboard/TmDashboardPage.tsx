@@ -165,6 +165,8 @@ export function TmDashboardPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      {/* Sticky top region: header + toolbar */}
+      <div className="sticky top-0 z-30 -mx-4 -mt-4 flex flex-col gap-3 bg-background/95 px-4 pt-4 pb-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
@@ -180,8 +182,8 @@ export function TmDashboardPage() {
         </span>
       </div>
 
-      {/* Unified Toolbar (sticky) */}
-      <Card className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      {/* Unified Toolbar */}
+      <Card className="bg-background">
         <CardContent className="flex flex-col gap-2 p-3">
           {/* Row 1: Data Date · Task · Discipline · Delay · Search */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -312,6 +314,7 @@ export function TmDashboardPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* KPI Cards (SHAW Punch style) */}
       {isLoading ? (
