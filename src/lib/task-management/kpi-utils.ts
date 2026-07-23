@@ -1,7 +1,7 @@
 // TM Dashboard KPI 계산 유틸 — SHAW PunchDashboard 산식을 TM 컬럼에 매핑
 import type { TaskItem } from "./schedule-utils";
 import type { TaskThresholds } from "./derived";
-import { computeTPlan, isTaskDelayed, computeJudgment } from "./derived";
+import { cumPlanProgress, cumActualProgress, isTaskDelayed, computeJudgment, computeVariance } from "./derived";
 
 function parseDate(v: unknown): number | null {
   if (!v) return null;
@@ -15,14 +15,14 @@ function asOfMs(asOf: string): number {
   return parseDate(asOf) ?? Date.now();
 }
 
-/** asOfDate 기준 계획 진도율 (0..1). derived.expectedProgressToday의 asOf 파라미터화 버전. */
+/** asOfDate 기준 누계 계획 진도율 (Cum. Plan, 0..1) — plan_progress 우선, NULL 시 computeTPlan 폴백. */
 export function expectedProgressAt(row: TaskItem, asOf: string): number {
-  return computeTPlan(row, asOf) ?? 0;
+  return cumPlanProgress(row, asOf);
 }
 
+/** Cum. Diff = Actual% − Cum. Plan%. Variance/Alarm/KPI 판정과 동일 소스. */
 export function gapAt(row: TaskItem, asOf: string): number {
-  const actual = Number(row.actual_progress ?? 0);
-  return actual - expectedProgressAt(row, asOf);
+  return computeVariance(row, asOf) ?? (cumActualProgress(row) - cumPlanProgress(row, asOf));
 }
 
 export type TaskScope = "all" | "main" | "sub";
@@ -90,8 +90,8 @@ export function weightedProgress(rows: TaskItem[], asOf: string): WeightedProgre
   let sumPlan = 0;
   let sumActual = 0;
   for (const r of rows) {
-    sumPlan += expectedProgressAt(r, asOf);
-    sumActual += Math.max(0, Math.min(1, Number(r.actual_progress ?? 0)));
+    sumPlan += cumPlanProgress(r, asOf);
+    sumActual += cumActualProgress(r);
   }
   return {
     planned: (sumPlan / rows.length) * 100,
