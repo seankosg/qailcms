@@ -673,6 +673,41 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 ))}
               </div>
               <div className="flex-1" />
+              {fieldLogs.length > 0 && (
+                <>
+                  <Select
+                    value={fieldOutcomeFilter}
+                    onValueChange={(v) => setFieldOutcomeFilter(v)}
+                  >
+                    <SelectTrigger className="h-8 w-[180px] text-xs">
+                      <SelectValue placeholder="Field outcome" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All field outcomes</SelectItem>
+                      {fieldOutcomeOptions.map((o) => (
+                        <SelectItem key={o} value={o}>
+                          {OUTCOME_LABELS[o] || o}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() =>
+                      downloadFieldLevelCsv(
+                        fieldOutcomeFilter === "all"
+                          ? fieldLogs
+                          : fieldLogs.filter((f) => f.outcome === fieldOutcomeFilter),
+                        `${selectedBatch?.file_name ?? "field-logs"}.csv`,
+                      )
+                    }
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1" /> Field-level CSV
+                  </Button>
+                </>
+              )}
               <Select
                 value={actionFilter}
                 onValueChange={(v) => {
@@ -721,10 +756,20 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 className="h-8 w-[100px] text-xs"
               />
             </div>
+            {fieldLogs.length > 0 && (
+              <div className="mb-2">
+                <FieldLogSummaryChips
+                  logs={fieldLogs}
+                  activeOutcome={fieldOutcomeFilter}
+                  onSelect={(o) => setFieldOutcomeFilter(o)}
+                />
+              </div>
+            )}
             <div className="rounded-md border max-h-[560px] overflow-auto">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
+                    <TableHead className="text-xs w-8"></TableHead>
                     <TableHead className="text-xs w-16">Row</TableHead>
                     <TableHead className="text-xs">{cfg.keyLabel}</TableHead>
                     <TableHead className="text-xs">Action</TableHead>
@@ -735,37 +780,70 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 <TableBody>
                   {detailLoading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                         Loading…
                       </TableCell>
                     </TableRow>
                   ) : filteredRowLogs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                         {rowLogs.length === 0
                           ? "행 로그가 없습니다"
                           : "필터에 해당하는 행이 없습니다"}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    visibleRowLogs.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="text-xs">{r.raw_row_no ?? "—"}</TableCell>
-                        <TableCell className="text-xs font-mono">{r.key_value ?? "—"}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${actionColor[r.action_taken] || ""}`}
-                          >
-                            {r.action_taken}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs">{r.reason_code ?? "—"}</TableCell>
-                        <TableCell className="text-xs max-w-[420px] whitespace-normal break-words">
-                          {r.reason_detail ?? "—"}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    visibleRowLogs.map((r) => {
+                      const rowNo = r.raw_row_no ?? -1;
+                      const fls = fieldLogsByRow.get(rowNo) ?? [];
+                      const hasField = fls.length > 0;
+                      const isOpen = expandedRowNo === rowNo;
+                      return (
+                        <Fragment key={r.id}>
+                          <TableRow className={hasField ? "cursor-pointer hover:bg-muted/40" : ""}>
+                            <TableCell className="text-xs">
+                              {hasField ? (
+                                <button
+                                  type="button"
+                                  className="p-0.5 rounded hover:bg-muted"
+                                  onClick={() => setExpandedRowNo(isOpen ? null : rowNo)}
+                                  aria-label={isOpen ? "Collapse" : "Expand"}
+                                >
+                                  {isOpen ? (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+                              ) : (
+                                <span className="text-muted-foreground">·</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-xs">{r.raw_row_no ?? "—"}</TableCell>
+                            <TableCell className="text-xs font-mono">{r.key_value ?? "—"}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${actionColor[r.action_taken] || ""}`}
+                              >
+                                {r.action_taken}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">{r.reason_code ?? "—"}</TableCell>
+                            <TableCell className="text-xs max-w-[420px] whitespace-normal break-words">
+                              {r.reason_detail ?? "—"}
+                            </TableCell>
+                          </TableRow>
+                          {isOpen && (
+                            <TableRow className="bg-muted/20 hover:bg-muted/20">
+                              <TableCell colSpan={6} className="p-2">
+                                <FieldLogTable logs={fls} />
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </Fragment>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
