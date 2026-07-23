@@ -240,7 +240,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await (supabase as any)
         .from("defect_import_logs")
         .select(
-          "id, file_name, status, started_at, finished_at, imported_by, total_rows, inserted, updated, skipped, rejected, team, rolled_back_at",
+          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, team, rolled_back_at",
         )
         .order("started_at", { ascending: false })
         .limit(100);
@@ -251,6 +251,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         started_at: r.started_at,
         finished_at: r.finished_at,
         imported_by: r.imported_by,
+        data_date: r.data_date,
         total: r.total_rows ?? 0,
         inserted: r.inserted ?? 0,
         updated: r.updated ?? 0,
