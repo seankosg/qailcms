@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { ABD_HEADER_MAPPING_QK } from "@/hooks/useAbdHeaderMappings";
+import { ABD_FIELD_CONFIG_QK } from "@/hooks/useAbdFieldConfig";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -22,6 +25,7 @@ export function AbdFieldConfigTable() {
   const [rows, setRows] = useState<FieldConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const qc = useQueryClient();
 
   const load = async () => {
     setLoading(true);
@@ -41,6 +45,9 @@ export function AbdFieldConfigTable() {
     const { error } = await (supabase as any).from("abd_field_config").update(changes).eq("id", r.id);
     if (error) { toast.error("저장 실패", { description: error.message }); return; }
     setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, ...changes } : x)));
+    // Header Mapping 탭도 자동 동기화 (label 변경 시 시스템 매핑 source_header가 트리거로 갱신됨)
+    qc.invalidateQueries({ queryKey: ABD_HEADER_MAPPING_QK });
+    qc.invalidateQueries({ queryKey: ABD_FIELD_CONFIG_QK });
   };
 
   return (
