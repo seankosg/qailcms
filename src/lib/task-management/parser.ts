@@ -182,6 +182,7 @@ function normalizeHeader(v: unknown): string {
 }
 
 function toIsoDate(v: unknown): string | null {
+  try {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) return null;
@@ -190,27 +191,42 @@ function toIsoDate(v: unknown): string | null {
     return toDohaDateKey(v) || null;
   }
   if (typeof v === "number") {
-    // Excel serial number
+    if (!Number.isFinite(v) || v <= 0) return null;
     const parsed = XLSX.SSF?.parse_date_code?.(v);
-    if (parsed) {
-      return toDohaDateKey(dohaWallToUtcIso(parsed.y, parsed.m, parsed.d)) || null;
+    if (parsed && parsed.y && parsed.m && parsed.d) {
+      const iso = dohaWallToUtcIso(parsed.y, parsed.m, parsed.d);
+      return iso ? toDohaDateKey(iso) || null : null;
     }
   }
   if (typeof v === "string") {
     const s = v.trim();
     if (!s) return null;
+    const upper = s.toUpperCase();
+    if (
+      upper === "TBD" || upper === "TBA" || upper === "PENDING" ||
+      upper === "N/A" || upper === "NA" || upper === "#N/A" ||
+      upper === "-" || upper === "--" || upper === "0"
+    ) return null;
     // YYYY-MM-DD: treat as Doha calendar date directly.
     const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    if (iso) {
+      const mo = Number(iso[2]), da = Number(iso[3]);
+      if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+      return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    }
     // dd/mm/yyyy or dd-mm-yyyy (dd first, mm second).
     const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
     if (dmy) {
+      const da = Number(dmy[1]), mo = Number(dmy[2]);
+      if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
       const yy = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
-      return `${yy}-${String(dmy[2]).padStart(2, "0")}-${String(dmy[1]).padStart(2, "0")}`;
+      if (yy < 1900 || yy > 2999) return null;
+      return `${yy}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
     }
     return toDohaDateKey(s) || null;
   }
   return null;
+  } catch { return null; }
 }
 
 function toNumber(v: unknown): number | null {
