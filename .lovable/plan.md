@@ -1,51 +1,49 @@
 ## 목표
-TM Dashboard 상단 영역에 흩어져 있는 4개 컨트롤(Data Date / 담당자축 필터 / 지연 필터 / Task 필터)을 하나의 통합 툴바로 재배치해 화면 세로 공간을 절약하고 시선 흐름을 정리한다. 필터 형태는 최대한 유지하되, 공간 효율을 위해 일부만 형태 변경.
+TM 대시보드 중단부의 Status Mix(현재 좌 절반, 가로 스택 바)를 도넛형 카드로 교체하고, 기존 Status Mix가 차지하던 폭(전체의 절반)을 다시 반으로 나눠 좌측 = Status Mix 도넛, 우측 = 자동 판정 분포(JudgmentDonut) 배치. 우측 절반(기존 스테이지 판정 스택)은 현재 그대로 유지.
 
-## 현재 배치 (3영역 분산)
+## 최종 레이아웃
 ```text
-[Header]     제목 + Data Date Select + "최신" 버튼
-[Toolbar]    OwnerQuickFilterPills(담당자축) | 지연 필터 Tabs | (우측) 검색 Input
-[KPI 상단]   Task Filter(All/Main/Sub) | Discipline 토글 | items 카운트
+[ KPI 카드 4개 그리드 ]
+[ Status Mix 도넛 | 자동 판정 분포 도넛 || 스테이지별 판정 스택 (변경 없음) ]
+  └──── 폭 25% ────┴──── 폭 25% ────┘└─────── 폭 50% (기존 그대로) ───────┘
 ```
-문제: Data Date와 Task Filter가 서로 다른 층에 있고, 툴바-Header 사이 여백이 이중으로 발생.
+- 3개 카드 모두 `h-full`, 그리드 `items-stretch` → 우측 스테이지 판정 스택 카드의 자연 높이에 좌/중 도넛 카드가 맞춰 늘어남 (요청한 "높이 정합" 유지).
 
-## 신규 배치 (단일 sticky 툴바)
-```text
-[Header 1행]  ← 제목 · (우측) items 카운트만 유지
-[Toolbar Card, sticky top]
-  ┌ 좌측(축·범위) ────────────────┐  ┌ 중앙(필터) ─────────────┐  ┌ 우측(검색) ┐
-  │ 📅 Data Date [Popover]  |     │  │ Task: [All|Main|Sub]     │  │ 🔍 검색     │
-  │ 담당자축 Pills(Team/PIC/Eng) │  │ Discipline: [ARCH...SUPP]│  │             │
-  │                              │  │ 지연: [Tabs]              │  │             │
-  └──────────────────────────────┘  └──────────────────────────┘  └────────────┘
-```
-- 툴바 1행: Data Date(팝오버로 축소) · 구분선 · Task Filter · Discipline · 구분선 · 지연 필터 · (ml-auto) 검색
-- 툴바 2행(모바일에서만 wrap): 담당자축 Pills 전체 폭 사용
-- 데스크톱(lg 이상)에서는 모두 1행에 배치, 그 이하에서는 자연스럽게 2행으로 wrap
-- Data Date의 "(최신)" 표시와 초기화 버튼은 팝오버 트리거 옆 작은 뱃지/아이콘 버튼으로 통합
+## 현재 상태 (확인 완료)
+- `TmKpiCards.tsx`의 `<div className="grid gap-3 lg:grid-cols-2">` 내부: 좌 = `StatusMixBar`, 우 = `statusMixSideSlot`.
+- `TmDashboardPage.tsx`에서 `statusMixSideSlot`에 `<JudgmentStageBreakdown compact />`(= 스테이지 판정 스택만)를 전달.
+- `JudgmentDonut.tsx`는 이미 SVG 도넛으로 구현되어 있고 `counts` prop 하나만 받음.
+- `JudgmentStageBreakdown` 은 `compact=true`면 스테이지 스택 카드 단독 렌더 → 그대로 재사용.
+- `StatusMixBar.tsx`는 `TmKpiCards`에서만 사용.
 
-## 형태 변경 (최소)
-- Data Date: `Select` → 컴팩트 `Popover` 트리거 (버튼에 날짜 텍스트 + 최신 여부 뱃지, 아이콘 버튼으로 초기화). SM/DMR에서 쓰는 `DataDatePicker` 스타일과 일치.
-- Task Filter / Discipline 토글: 현재 ToggleGroup 형태 그대로 유지, 위치만 KPI 카드 상단 → 통합 툴바로 이동.
-- 지연 필터: 현재 Tabs 그대로 유지.
-- 담당자축 Pills(`OwnerQuickFilterPills`): 그대로 유지, 툴바 하단 행으로 이동.
+## 변경 사항
 
-## 편집 파일
-- `src/components/task-management/dashboard/TmDashboardPage.tsx`
-  - Header 블록에서 Data Date 셀렉트/최신 버튼 제거
-  - Toolbar Card 재구성: 1행(Data Date + Task Filter + Discipline + 지연 필터 + 검색), 2행(담당자축 Pills)
-  - Card에 `sticky top-0 z-20 bg-background/95 backdrop-blur` 적용
-  - items 카운트를 헤더 우측으로 이동 (props로 전달 or 상단에서 계산)
-- `src/components/task-management/dashboard/TmKpiCards.tsx`
-  - 최상단 컨트롤 행(Task Filter + Discipline + items 카운트) 제거. props로 계속 taskScope/disciplines 수신은 유지하되 렌더링만 상단으로 이관.
-  - 파일 자체 로직/계산은 변경 없음.
+### 1. `StatusMixDonut.tsx` 신규
+- `JudgmentDonut`과 동일한 시각 사양(반경/두께/중앙 total 텍스트/우측 범례)의 SVG 도넛.
+- 세그먼트 3개: Completed / WIP / Not Started.
+  - 색상: Completed = `var(--schedule-actual)`, WIP = `var(--schedule-plan)`, Not Started = 중립 muted 톤. 기존 `StatusMixBar` 색과 일관.
+- 범례 각 행 클릭 시 `onSegmentClick(seg)` 호출 → 기존 raw-data 필터 연동 유지.
+- 카드 타이틀: "Status Mix".
+- 카드에 `h-full flex flex-col` 부여, SVG 영역은 `flex-1`로 세로 여백을 흡수하여 스테이지 스택 카드 높이 정합.
 
-## 비 변경 사항
-- KPI 카드, StatusMixBar, 하위 차트/테이블 로직 및 계산식 일체 유지.
-- 필터 상태 관리(search params, patch), 라우팅 연결 유지.
-- 담당자축·Discipline·지연 필터 옵션 및 동작 방식 유지.
+### 2. `TmKpiCards.tsx` 수정
+- 기존 `<div className="grid gap-3 lg:grid-cols-2">` 를 `<div className="grid gap-3 lg:grid-cols-4">` 로 변경.
+- 왼쪽에 `<StatusMixDonut ... className="lg:col-span-1" />` (총 4 중 1칸).
+- 그 옆에 `<div className="lg:col-span-1">{statusMixLeftExtraSlot}</div>` (자동 판정 분포용, 1칸).
+- 오른쪽에 `<div className="lg:col-span-2">{statusMixSideSlot}</div>` (스테이지 판정 스택 그대로, 2칸).
+- Props에 `statusMixLeftExtraSlot?: ReactNode` 추가.
 
-## 검증
-- 데스크톱(≥1280px): 1+1행 툴바가 세로 공간을 이전 대비 약 40~50px 축소하는지 확인.
-- 태블릿/모바일: wrap이 자연스럽게 동작하고 sticky 시 KPI가 밑으로 스크롤되는지 확인.
-- 각 필터 클릭 → 라우팅 search 파라미터 갱신 및 KPI 카운트 변동 확인.
+### 3. `TmDashboardPage.tsx` 수정
+- `judgmentCounts` `useMemo` 추가: `computeJudgmentStageBreakdown(scopedItems, asOfDate).judgmentCounts` 산출.
+- `TmKpiCards`에 아래 두 slot 전달:
+  - `statusMixLeftExtraSlot={<JudgmentDonut counts={judgmentCounts} />}`
+  - `statusMixSideSlot={<JudgmentStageBreakdown items={scopedItems} asOfDate={asOfDate} compact />}` (현재와 동일 — 변경 없음)
+
+### 4. 정리
+- `StatusMixBar.tsx`는 다른 사용처 없음을 build 진입 시 재확인 후 파일 삭제(사용처 있으면 존치).
+
+## 영향 없음
+- 하단 "지연 Top + Owner Leaderboard" 행: 변경 없음.
+- KPI 카드 4개 그리드: 변경 없음.
+- 스테이지 판정 스택 카드 자체(내용/스타일/데이터): 변경 없음. 위치도 유지.
+- Raw Data 드릴다운 필터 로직: 기존 `goRaw(seg)` 동일 재사용.
