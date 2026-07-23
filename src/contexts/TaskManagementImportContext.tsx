@@ -18,6 +18,7 @@ import {
 import type { Discipline } from "@/lib/task-management/columns";
 import { runRollupAllMains, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
 import { stripNullExcept } from "@/lib/import/strip-null";
+import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
 import {
   previewTaskImport,
   allocateTaskNo,
