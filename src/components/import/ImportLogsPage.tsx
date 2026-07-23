@@ -54,6 +54,7 @@ interface Batch {
   started_at: string;
   finished_at: string | null;
   imported_by: string | null;
+  data_date: string | null;
   total: number;
   inserted: number;
   updated: number;
