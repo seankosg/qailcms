@@ -333,6 +333,9 @@ export function TmDashboardPage() {
             hdec_eng_name: search.hdecEng,
             discipline: search.discipline,
           }}
+          statusMixSideSlot={
+            <JudgmentStageBreakdown items={scopedItems} asOfDate={asOfDate} compact />
+          }
         />
       )}
 
@@ -358,9 +361,6 @@ export function TmDashboardPage() {
               onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
             />
           </div>
-
-          {/* Judgment breakdown */}
-          <JudgmentStageBreakdown items={scopedItems} asOfDate={asOfDate} />
         </>
       )}
 
