@@ -83,6 +83,16 @@ export function todayGap(row: JudgmentRow, asOf?: string): number {
   return actual - expectedProgressToday(row, asOf);
 }
 
+/** Cum. Diff — 누계 실적(Actual %) − 누계 계획(Plan %, =computeTPlan).
+ *  단일 소스: Variance(=Cum. Diff), Alarm(WIP), Behind Schedule, Critical Delay 모두 이 값 사용.
+ *  computeTPlan 이 null(plan_start/기간 정보 부족)이면 null 반환. */
+export function computeVariance(row: JudgmentRow, asOf?: string): number | null {
+  const tPlan = computeTPlan(row, asOf);
+  if (tPlan == null) return null;
+  const actual = Math.max(0, Math.min(1, Number(row.actual_progress ?? 0)));
+  return actual - tPlan;
+}
+
 export const JUDGMENT_ORDER: Record<string, number> = {
   위험: 0,
   지연: 1,

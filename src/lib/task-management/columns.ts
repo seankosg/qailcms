@@ -150,7 +150,7 @@ export const TM_COLUMNS: TmColumnDef[] = [
   { key: "actual_duration", label: "A.Duration", type: "number", width: 100, group: "actual" },
   { key: "actual_progress", label: "Actual %", type: "percent", width: 120, group: "actual", editable: true, editorType: "number" },
   { key: "plan_progress", label: "Plan %", type: "percent", width: 120, group: "forecast" },
-  { key: "progress_variance", label: "Variance (%p)", type: "percent", width: 120, group: "forecast" },
+  { key: "progress_variance", label: "Cum. Diff", type: "percent", width: 120, group: "forecast" },
   { key: "expected_progress_today", label: "T.Plan", type: "percent", width: 100, group: "forecast" },
   { key: "today_gap", label: "T.Diff", type: "percent", width: 100, group: "forecast" },
   { key: "forecast_end", label: "Revised Finish", type: "date", width: 130, group: "forecast", editable: true, editorType: "date" },

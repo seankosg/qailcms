@@ -86,7 +86,7 @@ import {
   runRollupAllMains,
   runRecalcAutoJudgment,
 } from "@/lib/task-management/rollup.functions";
-import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
+import { expectedProgressToday, todayGap, computeVariance } from "@/lib/task-management/derived";
 import {
   ALL_TASK_TIMELINE_STAGE_KEYS,
   isTaskStageDelayedAsOf,
@@ -692,6 +692,46 @@ export function TaskManagementRawDataPage() {
         });
         continue;
       }
+      // Cum. Diff — 누계 실적(Actual %) − 누계 계획(Plan %) 파생 계산.
+      // DB 저장값(임포트값)은 표시에 사용하지 않는다.
+      if (c.key === "progress_variance") {
+        const th = kpiThresholds ?? DEFAULT_THRESHOLDS;
+        cols.push({
+          id: c.key,
+          size: c.width,
+          minSize: 60,
+          maxSize: 240,
+          enableSorting: true,
+          enableColumnFilter: true,
+          filterFn: numberRangeFilterFn,
+          accessorFn: (r: Row) =>
+            computeVariance(r as any, selectedDataDate || undefined),
+          header: labelOverrides[c.key] ?? c.label,
+          meta: { filterType: "number-range" as const, group: c.group },
+          cell: ({ getValue }) => {
+            const raw = getValue();
+            if (raw == null)
+              return <span className="text-muted-foreground/40">—</span>;
+            const v = Number(raw);
+            const cls =
+              v < th.behind_late_gap
+                ? "text-rose-600 font-semibold"
+                : v < th.behind_warn_gap
+                  ? "text-orange-600"
+                  : v < 0
+                    ? "text-amber-600"
+                    : "text-emerald-600";
+            const sign = v > 0 ? "+" : "";
+            return (
+              <span className={cn("w-full text-right tabular-nums", cls)}>
+                {sign}
+                {(v * 100).toFixed(1)}%p
+              </span>
+            );
+          },
+        });
+        continue;
+      }
       const filterType = inferTmFilterType(c.type);
       cols.push({
         id: c.key,
@@ -822,7 +862,7 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate]);
+  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds]);
 
   const table = useReactTable({
     data: visibleRows,
