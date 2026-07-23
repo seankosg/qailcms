@@ -459,6 +459,31 @@ export function TaskManagementRawDataPage() {
       ? search.dataDate
       : (latestDataDate ?? "");
 
+  // T.Actual (오늘 실적) — 서버 RPC로 (오늘 누계 − 어제 누계) 일괄 조회.
+  const rowIds = useMemo(
+    () => rows.map((r) => String((r as any).id)).filter(Boolean),
+    [rows],
+  );
+  const { data: tActualRows } = useQuery({
+    queryKey: ["tm-today-actual", selectedDataDate, rowIds.length],
+    queryFn: async () => {
+      if (!rowIds.length || !selectedDataDate) return [] as Array<{ id: string; t_actual: number }>;
+      const { data, error } = await (supabase as any).rpc("tm_today_actual", {
+        _ids: rowIds,
+        _as_of: selectedDataDate,
+      });
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; t_actual: number }>;
+    },
+    enabled: rowIds.length > 0 && !!selectedDataDate,
+    staleTime: 60_000,
+  });
+  const tActualMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of tActualRows ?? []) m.set(String(r.id), Number(r.t_actual) || 0);
+    return m;
+  }, [tActualRows]);
+
   // 지연 모드: 대시보드에서 넘어온 스테이지 지연 조건에 해당하는 행만 노출
   const delayFilteredRows = useMemo(() => {
     if (!delayMode) return rows;
