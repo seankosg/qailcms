@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft, CalendarDays, RotateCcw, Search } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +27,13 @@ import {
   type OwnerLeaderboardRow,
 } from "@/lib/task-management/delay-utils";
 import { TmKpiCards } from "./TmKpiCards";
+
+const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
+const TASK_SCOPE_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "main", label: "Main Task" },
+  { value: "sub", label: "Sub Task" },
+] as const;
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
 import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
