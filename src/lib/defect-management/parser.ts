@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import type { DefectTeam } from "./columns";
-import { dohaWallToUtcIso } from "@/lib/time/doha";
+import { dohaWallToUtcIso, toDohaDateKey } from "@/lib/time/doha";
 
 /** Re-import 마커 헤더 — Raw Data에서 재수출한 파일에만 존재. */
 export const REIMPORT_MARKER_HEADER = "QAIL_DEFECT_REIMPORT_V1";
