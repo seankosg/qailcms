@@ -185,7 +185,7 @@ export function TaskTreePage() {
           (r.auto_judgment && r.auto_judgment.trim()) ||
           computeJudgment(r, undefined, asOfDate) ||
           "";
-        const mainJ = judgeOf(p) || (worstJudgment(kids.map((k) => k.auto_judgment)) ?? "");
+        const mainJ = judgeOf(p);
         const anyMatch =
           (mainJ && judgmentFilter.has(mainJ)) ||
           kids.some((k) => judgmentFilter.has(judgeOf(k)));
@@ -394,7 +394,9 @@ export function TaskTreePage() {
         {filtered.map((p) => {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
-          const worst = worstJudgment(kids.map((k) => k.auto_judgment)) ?? p.auto_judgment;
+          const mainJudgment =
+            (p.auto_judgment && p.auto_judgment.trim()) ||
+            computeJudgment(p, undefined, asOfDate);
           const behindCount = kids.filter(
             (k) => (computeVariance(k, asOfDate) ?? 0) < -0.05,
           ).length;
@@ -433,8 +435,8 @@ export function TaskTreePage() {
                   {behindCount > 0 && (
                     <Badge className="bg-rose-500/15 text-rose-700">지연 {behindCount}</Badge>
                   )}
-                  {worst && (
-                    <Badge className={AUTO_JUDGMENT_COLORS[worst] ?? "bg-muted"}>{worst}</Badge>
+                  {mainJudgment && (
+                    <Badge className={AUTO_JUDGMENT_COLORS[mainJudgment] ?? "bg-muted"}>{mainJudgment}</Badge>
                   )}
                   <ProgressBar v={p.actual_progress} />
                   <GapCell gap={pGap} />
