@@ -425,6 +425,24 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
 
   const visibleRowLogs = filteredRowLogs.slice(0, renderLimit);
 
+  // raw_row_no별 field log 그룹 & outcome 필터 적용
+  const fieldLogsByRow = useMemo(() => {
+    const m = new Map<number, FieldLog[]>();
+    for (const f of fieldLogs) {
+      if (fieldOutcomeFilter !== "all" && f.outcome !== fieldOutcomeFilter) continue;
+      const key = f.raw_row_no ?? -1;
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push(f);
+    }
+    return m;
+  }, [fieldLogs, fieldOutcomeFilter]);
+
+  const fieldOutcomeOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const f of fieldLogs) s.add(f.outcome);
+    return Array.from(s).sort();
+  }, [fieldLogs]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
