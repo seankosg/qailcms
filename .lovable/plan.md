@@ -1,54 +1,41 @@
-## 배경
+## 원인 (쉬운 설명)
 
-ABD 임포트 파일 `PLOT C&D MECH ABD 완료계획_260723_.xlsx` 업로드 시 파일 카드에 `Invalid time value` 에러가 표시되며 "0 ready to import" 상태로 진입이 막힘.
+임포트 자체가 아니라 **DB 트리거의 잔재** 때문입니다.
 
-원인 요약:
-- 엑셀의 날짜 컬럼에 "TBD", "PENDING", "-", "0" 같은 비-날짜 값 또는 잘못된 Excel serial(0/음수)이 섞여 있음
-- `src/lib/time/doha.ts`의 `toDohaDateKey()`가 유효하지 않은 Date에 대해 `.toISOString()`을 호출 → JS 런타임이 `RangeError: Invalid time value`를 던짐
-- `src/lib/abd/parser.ts`의 `toIsoDate()`가 `toDohaDateKey`·`dohaWallToUtcIso` 결과를 감싸지 않아 예외가 파서 전체를 중단시키고, ABD 임포트 UI가 파일 카드 아래에 `Invalid time value` 배지로 표기
+- 이전에 ABD의 `pic` 필드를 `hdec_pic_name` + `hdec_eng_name` 두 개로 분리하는 마이그레이션을 진행하면서, 실제 컬럼(`abd_items_raw.pic`)은 삭제되었습니다.
+- 그런데 두 개의 트리거 함수가 아직도 존재하지 않는 `NEW.pic`을 참조하고 있습니다:
+  1. `abd_auto_owner_user_id()` — INSERT/UPDATE 시 담당자로 소유자를 자동 매핑
+  2. `trg_abd_change_log_fn()` — UPDATE 변경 이력을 `abd_change_log`에 기록
+- 임포트가 첫 행을 INSERT 하는 순간 Postgres가 `record "new" has no field "pic"` 에러를 던져 파일 전체가 "0 ready to import"로 막힙니다.
 
-## 수정 범위 (프론트엔드/파서만, 비즈니스 로직·DB 스키마 변경 없음)
+즉 **엑셀 파일에는 문제가 없습니다.** 컬럼을 아무리 손봐도 트리거가 존재하지 않는 `pic`을 찾고 있어서 계속 실패합니다.
 
-### 1. `src/lib/time/doha.ts` — 방어 로직 강화
-- `shiftToDoha`, `toDohaDateKey`, `dohaWallToUtcIso`, `dohaDateKeyToUtcIso`, `dohaStamp*`, `dohaDateTime` 등 모든 헬퍼에서 다음 케이스를 `null`(문자열 반환 함수는 `""`)로 처리:
-  - `Date` 객체가 `NaN` (`isNaN(d.getTime())`)
-  - 문자열 파싱 결과가 `Invalid Date`
-  - `dohaWallToUtcIso`의 년/월/일이 비정상 범위(예: y<1900 또는 y>2999, m<1||>12, d<1||>31)
-- 각 함수 진입 시 try/catch 없이 사전 검증 → `.toISOString()` 호출 자체를 회피
+## 대책
 
-### 2. `src/lib/abd/parser.ts` — `toIsoDate` 안전화
-- 함수 전체를 `try { ... } catch { return null; }` 로 감싸 최후 방어선 마련
-- Excel serial의 경우:
-  - `v <= 0` 또는 `!Number.isFinite(v)` 즉시 `null`
-  - `XLSX.SSF.parse_date_code` 결과의 `y/m/d` 유효성 검증 후에만 `dohaWallToUtcIso` 호출
-- 문자열 케이스 강화:
-  - 대문자화하여 `TBD`, `PENDING`, `TBA`, `NA`, `N/A`, `#N/A`, `-`, `--` 이면 `null`
-  - `dmy`/`ymd` 정규식 매치 후 `Number(m) 1..12`, `Number(d) 1..31` 검증
+### 방법 A — 엑셀 원본을 수정 (권장하지 않음, 근본 해결 불가)
 
-### 3. ABD 임포트 컨텍스트 — 파일 단위 예외 격리
-- 파일 카드에 뜨는 `Invalid time value` 문구를 만든 지점을 찾아, 파서가 예외를 던지더라도 해당 파일만 "실패" 상태로 남고 전체 큐가 멈추지 않도록 처리
-  - `src/contexts/AbdImportContext.tsx` (또는 동등 파일)의 `parseWorkbook`/`prepareRows` 호출부를 `try/catch`로 감싸고, 에러 메시지를 사용자에게는 "날짜 형식이 올바르지 않은 셀이 있어 스킵되었습니다"로 표기
-  - 파일 상태를 `error`로 유지하면서 다른 파일 처리는 계속
+이 에러는 셀 값이 아니라 서버 측 트리거 문제라서, 엑셀 컬럼 어떤 것을 지우거나 바꿔도 해결되지 않습니다. 굳이 우회하려면 임포트 시점에 change_log 트리거를 회피해야 하는데, 이는 사용자가 엑셀에서 할 수 있는 조치가 아닙니다. 따라서 이 경로는 유효한 해결책이 아님을 명시.
 
-### 4. 타 모듈 회귀 확인 및 동일 패치 이식
-동일한 `toIsoDate` 패턴을 사용하는 다음 파서/유틸에도 위 1·2의 방어 로직을 그대로 적용해 회귀 방지:
-- `src/lib/defect-management/parser.ts` (SM)
-- `src/lib/task-management/parser.ts` (TM)
-- `src/lib/dmr/utils.ts` (DMR)
-- `src/lib/spare-part-import-parser.ts` (Spare Part)
+### 방법 B — 시스템에서 완화 (정답, 마이그레이션으로 처리)
 
-각 파일의 로컬 `toIsoDate`가 동일 결함(비-날짜 문자열/음수 serial → 예외)을 갖는지 재확인 후, 동일한 사전 검증 및 try/catch 래핑 추가.
+DB 트리거 함수 2개를 신 스키마(`hdec_pic_name`, `hdec_eng_name`)에 맞게 재작성:
+
+1. `abd_auto_owner_user_id()` 재작성
+   - 기존: `NEW.pic` 참조
+   - 변경: `NEW.hdec_pic_name`(우선) → 없으면 `NEW.hdec_eng_name`으로 `resolve_owner_by_name()` 호출
+   - UPDATE 조기 반환 조건도 `hdec_pic_name`/`hdec_eng_name`의 변화 여부로 판단
+2. `trg_abd_change_log_fn()` 재작성
+   - `fields` 배열에서 `'pic'` 제거, 대신 `'hdec_pic_name'`, `'hdec_eng_name'` 추가
+   - 나머지 24개 필드(문서·라운드 스테이지·상태)는 그대로 유지
+3. 마이그레이션 하나로 `CREATE OR REPLACE FUNCTION` 두 개 실행 (RLS·정책·GRANT·기존 데이터 변경 없음, 위험도 낮음)
 
 ## 검증
 
-1. TypeScript 타입체크 통과 확인
-2. 문제의 원본 파일(`PLOT C&D MECH ABD 완료계획_260723_.xlsx`)을 임포트 UI에서 다시 업로드하여:
-   - 파일 카드에 `Invalid time value` 배지가 사라지고 정상적으로 "N ready to import"로 진행되는지
-   - 비-날짜 셀은 `null`로 임포트되고, 정상 날짜 셀은 도하 기준으로 저장되는지 (Raw Data에서 몇 행 샘플 확인)
-3. SM/TM/DMR 임포트에서 기존 정상 파일이 그대로 동작하는지 회귀 확인
+1. 문제의 파일 `PLOT C&D ELEC ABD 완료계획_260723_.xlsx` 재업로드 → 파일 카드가 "정상 ready" 상태로 진입, 임포트 성공
+2. 임의의 행에서 `hdec_pic_name`을 수정 → `abd_change_log`에 정확히 기록되는지 확인
+3. 임포트 시 owner_user_id가 `hdec_pic_name` 기준으로 매핑되는지 표본 확인
 
-## 비고
+## 사용자에게 드리는 답변 요약
 
-- DB 스키마·RLS·RPC 변경 없음
-- 사용자에게 보이는 UI 변경은 파일 카드 에러 문구 개선(옵션) 외에는 없음
-- 도하 시간 해석 정책은 유지, 잘못된 셀만 안전하게 `null` 처리
+- 엑셀 파일에는 잘못이 없습니다. 수정할 컬럼도 없습니다.
+- 시스템 측 잔여 트리거(구 `pic` 컬럼 참조) 두 개를 신 컬럼으로 재작성하는 마이그레이션으로 해결합니다.
