@@ -338,6 +338,11 @@ export function TmDashboardPage() {
           statusMixSideSlot={
             <JudgmentStageBreakdown items={scopedItems} asOfDate={asOfDate} compact />
           }
+          statusMixLeftExtraSlot={
+            <JudgmentDonut
+              counts={computeJudgmentStageBreakdown(scopedItems, asOfDate).judgmentCounts}
+            />
+          }
         />
       )}
 
