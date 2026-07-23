@@ -88,6 +88,9 @@ const actionColor: Record<string, string> = {
   updated: "bg-blue-100 text-blue-800",
   skipped: "bg-yellow-100 text-yellow-800",
   rejected: "bg-red-100 text-red-800",
+  inactivated: "bg-slate-200 text-slate-800",
+  skipped_locked: "bg-yellow-100 text-yellow-800",
+  mismatched: "bg-orange-100 text-orange-800",
 };
 
 const CFG = {
@@ -405,6 +408,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
     return acc;
   }, [rowLogs]);
 
+  const actionOptions = useMemo(
+    () => Array.from(new Set(rowLogs.map((r) => r.action_taken).filter(Boolean))).sort(),
+    [rowLogs],
+  );
+
   const reasonOptions = useMemo(
     () =>
       Array.from(
@@ -668,7 +676,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1.5 text-xs">
                 <Badge variant="outline">Total {rowLogs.length}</Badge>
-                {(["inserted", "updated", "skipped", "rejected"] as const).map((a) => (
+                {actionOptions.map((a) => (
                   <Badge
                     key={a}
                     variant="outline"
@@ -732,10 +740,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All actions</SelectItem>
-                  <SelectItem value="inserted">inserted</SelectItem>
-                  <SelectItem value="updated">updated</SelectItem>
-                  <SelectItem value="skipped">skipped</SelectItem>
-                  <SelectItem value="rejected">rejected</SelectItem>
+                  {actionOptions.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {a}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select
