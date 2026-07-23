@@ -169,9 +169,9 @@ export function getStageJudgment(
   if (stage === "wip") {
     const actual = Number(row.actual_progress ?? 0);
     if (actual >= 1) return "완료";
-    const tPlan = computeTPlan(row, asOf);
-    if (tPlan == null) return "정상";
-    const gap = actual - tPlan;
+    // WIP 판정도 Cum. Diff(=Variance) 단일 소스 사용.
+    const gap = computeVariance(row, asOf);
+    if (gap == null) return "정상";
     if (gap < t.behind_late_gap) return "위험";
     if (gap < t.behind_warn_gap) return "지연";
     if (gap < 0) return "주의";
