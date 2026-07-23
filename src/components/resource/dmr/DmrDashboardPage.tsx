@@ -258,17 +258,24 @@ export function DmrDashboardPage() {
 
   const systemMatrix = useMemo(() => {
     const dates = Array.from(new Set(rows.map((r) => r.report_date))).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
-    const keys = Array.from(new Set(rows.map((r) => r.system_name))).sort();
-    const cell = (k: string, d: string) => rows
-      .filter((r) => r.system_name === k && r.report_date === d)
-      .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
-    const subconsBy = new Map<string, string[]>();
+    const SEP = '\u0001';
+    const pairSet = new Set<string>();
     for (const r of rows) {
-      const arr = subconsBy.get(r.system_name) ?? [];
-      if (r.contractor_name && !arr.includes(r.contractor_name)) arr.push(r.contractor_name);
-      subconsBy.set(r.system_name, arr);
+      const sys = r.system_name ?? '';
+      const sub = r.contractor_name ?? '';
+      if (!sys && !sub) continue;
+      pairSet.add(`${sys}${SEP}${sub}`);
     }
-    return { dates, keys, cell, subconsBy };
+    const pairs = Array.from(pairSet)
+      .map((k) => {
+        const [system, subcon] = k.split(SEP);
+        return { key: k, system, subcon };
+      })
+      .sort((a, b) => a.system.localeCompare(b.system) || a.subcon.localeCompare(b.subcon));
+    const cell = (system: string, subcon: string, d: string) => rows
+      .filter((r) => (r.system_name ?? '') === system && (r.contractor_name ?? '') === subcon && r.report_date === d)
+      .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
+    return { dates, pairs, cell };
   }, [rows]);
 
   return (
@@ -440,22 +447,24 @@ export function DmrDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {systemMatrix.keys.map((k) => {
-                      const sum = systemMatrix.dates.reduce((a, d) => a + systemMatrix.cell(k, d), 0);
-                      const subList = (systemMatrix.subconsBy.get(k) ?? []).sort().join(', ');
+                    {systemMatrix.pairs.map((p) => {
+                      const sum = systemMatrix.dates.reduce((a, d) => a + systemMatrix.cell(p.system, p.subcon, d), 0);
                       return (
-                        <tr key={k} className="border-t hover:bg-muted/30">
-                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background min-w-[160px]">{k}</td>
-                          <td className="sticky left-[160px] z-10 bg-background px-2 py-1 text-muted-foreground hover:bg-background min-w-[160px]" title={subList}>{subList || '—'}</td>
+                        <tr key={p.key} className="border-t hover:bg-muted/30">
+                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background min-w-[160px]">{p.system || '—'}</td>
+                          <td className="sticky left-[160px] z-10 bg-background px-2 py-1 text-muted-foreground hover:bg-background min-w-[160px]">
+                            {p.subcon || '—'}
+                            {p.subcon && directNames.has(p.subcon) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}
+                          </td>
                           {systemMatrix.dates.map((d) => {
-                            const v = systemMatrix.cell(k, d);
+                            const v = systemMatrix.cell(p.system, p.subcon, d);
                             return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
                           })}
                           <td className="px-2 py-1 text-right font-semibold">{sum}</td>
                         </tr>
                       );
                     })}
-                    {systemMatrix.keys.length === 0 && (
+                    {systemMatrix.pairs.length === 0 && (
                       <tr><td colSpan={systemMatrix.dates.length + 3} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
                     )}
                   </tbody>
