@@ -898,7 +898,7 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds]);
+  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds, tActualMap]);
 
   const table = useReactTable({
     data: visibleRows,
