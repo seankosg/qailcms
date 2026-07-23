@@ -152,6 +152,7 @@ export const TM_COLUMNS: TmColumnDef[] = [
   { key: "plan_progress", label: "Plan %", type: "percent", width: 120, group: "forecast" },
   { key: "progress_variance", label: "Cum. Diff", type: "percent", width: 120, group: "forecast" },
   { key: "expected_progress_today", label: "T.Plan", type: "percent", width: 100, group: "forecast" },
+  { key: "today_actual", label: "T.Actual", type: "percent", width: 100, group: "forecast" },
   { key: "today_gap", label: "T.Diff", type: "percent", width: 100, group: "forecast" },
   { key: "forecast_end", label: "Revised Finish", type: "date", width: 130, group: "forecast", editable: true, editorType: "date" },
   { key: "slip_days", label: "Slip (days)", type: "number", width: 100, group: "forecast" },

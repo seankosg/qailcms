@@ -93,6 +93,29 @@ export function computeVariance(row: JudgmentRow, asOf?: string): number | null 
   return actual - tPlan;
 }
 
+/** T.Plan(일할 계획) — 하루치 계획 증분 = 1 / duration_days (달력일 기준).
+ *  plan_days 우선, 없으면 plan_end - plan_start + 1. 계산 불가 시 null. */
+export function computeDailyPlan(row: JudgmentRow): number | null {
+  const pd = row.plan_days == null ? null : Number(row.plan_days);
+  if (pd != null && !Number.isNaN(pd) && pd > 0) return 1 / pd;
+  const s = parseDate(row.plan_start);
+  const e = parseDate(row.plan_end);
+  if (!s || !e) return null;
+  const days = Math.max(1, daysDiff(s, e) + 1);
+  return 1 / days;
+}
+
+/** T.Diff(일할) — T.Actual − T.Plan. T.Plan 계산 불가 시 null. */
+export function computeDailyDiff(
+  row: JudgmentRow,
+  tActual: number | null | undefined,
+): number | null {
+  const dp = computeDailyPlan(row);
+  if (dp == null) return null;
+  const a = Number(tActual ?? 0) || 0;
+  return a - dp;
+}
+
 export const JUDGMENT_ORDER: Record<string, number> = {
   위험: 0,
   지연: 1,

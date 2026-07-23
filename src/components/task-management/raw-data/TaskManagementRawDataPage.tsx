@@ -86,7 +86,13 @@ import {
   runRollupAllMains,
   runRecalcAutoJudgment,
 } from "@/lib/task-management/rollup.functions";
-import { expectedProgressToday, todayGap, computeVariance } from "@/lib/task-management/derived";
+import {
+  expectedProgressToday,
+  todayGap,
+  computeVariance,
+  computeDailyPlan,
+  computeDailyDiff,
+} from "@/lib/task-management/derived";
 import {
   ALL_TASK_TIMELINE_STAGE_KEYS,
   isTaskStageDelayedAsOf,
@@ -453,6 +459,31 @@ export function TaskManagementRawDataPage() {
       ? search.dataDate
       : (latestDataDate ?? "");
 
+  // T.Actual (오늘 실적) — 서버 RPC로 (오늘 누계 − 어제 누계) 일괄 조회.
+  const rowIds = useMemo(
+    () => rows.map((r) => String((r as any).id)).filter(Boolean),
+    [rows],
+  );
+  const { data: tActualRows } = useQuery({
+    queryKey: ["tm-today-actual", selectedDataDate, rowIds.length],
+    queryFn: async () => {
+      if (!rowIds.length || !selectedDataDate) return [] as Array<{ id: string; t_actual: number }>;
+      const { data, error } = await (supabase as any).rpc("tm_today_actual", {
+        _ids: rowIds,
+        _as_of: selectedDataDate,
+      });
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; t_actual: number }>;
+    },
+    enabled: rowIds.length > 0 && !!selectedDataDate,
+    staleTime: 60_000,
+  });
+  const tActualMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of tActualRows ?? []) m.set(String(r.id), Number(r.t_actual) || 0);
+    return m;
+  }, [tActualRows]);
+
   // 지연 모드: 대시보드에서 넘어온 스테이지 지연 조건에 해당하는 행만 노출
   const delayFilteredRows = useMemo(() => {
     if (!delayMode) return rows;
@@ -655,8 +686,12 @@ export function TaskManagementRawDataPage() {
         });
         continue;
       }
-      // 파생 컬럼(오늘 계획/오늘 차이) — 실제 DB 값이 없으므로 accessorFn으로 계산
-      if (c.key === "expected_progress_today" || c.key === "today_gap") {
+      // Today 3형제 (T.Plan / T.Actual / T.Diff) — 모두 파생 계산 (일할 증분 관점)
+      if (
+        c.key === "expected_progress_today" ||
+        c.key === "today_gap" ||
+        c.key === "today_actual"
+      ) {
         cols.push({
           id: c.key,
           size: c.width,
@@ -665,15 +700,22 @@ export function TaskManagementRawDataPage() {
           enableSorting: true,
           enableColumnFilter: false,
           accessorFn: (r: Row) => {
-            if (c.key === "expected_progress_today")
-              return expectedProgressToday(r as any, selectedDataDate || undefined);
-            return todayGap(r as any, selectedDataDate || undefined);
+            if (c.key === "expected_progress_today") {
+              // T.Plan(일할) = 1 / duration_days
+              return computeDailyPlan(r as any) ?? 0;
+            }
+            if (c.key === "today_actual") {
+              return tActualMap.get(String((r as any).id)) ?? 0;
+            }
+            // today_gap = T.Diff(일할) = T.Actual − T.Plan
+            const ta = tActualMap.get(String((r as any).id)) ?? 0;
+            return computeDailyDiff(r as any, ta) ?? 0;
           },
           header: labelOverrides[c.key] ?? c.label,
           meta: { group: c.group },
           cell: ({ getValue }) => {
             const v = Number(getValue()) || 0;
-            if (c.key === "expected_progress_today") {
+            if (c.key === "expected_progress_today" || c.key === "today_actual") {
               return (
                 <span className="w-full text-right tabular-nums">
                   {(v * 100).toFixed(1)}%
@@ -772,13 +814,7 @@ export function TaskManagementRawDataPage() {
               <AlarmBadge
                 value={String(val)}
                 todayGap={
-                  rr.today_gap != null
-                    ? Number(rr.today_gap)
-                    : todayGap({
-                        actual_progress: rr.actual_progress,
-                        plan_start: rr.plan_start,
-                        plan_end: rr.plan_end,
-                      }, selectedDataDate || undefined)
+                  computeDailyDiff(rr as any, tActualMap.get(String(rr.id)) ?? 0) ?? 0
                 }
                 slipDays={rr.slip_days != null ? Number(rr.slip_days) : null}
                 actualProgress={
@@ -862,7 +898,7 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds]);
+  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds, tActualMap]);
 
   const table = useReactTable({
     data: visibleRows,
