@@ -22,6 +22,8 @@ interface Props {
   canEdit: boolean;
   onSaved: () => void;
   children: React.ReactNode;
+  /** 커스텀 저장 경로 (제공 시 supabase 직접 update 대신 호출됨) */
+  onSave?: (value: unknown) => Promise<void>;
 }
 
 export function EditCellPopover({
@@ -31,6 +33,7 @@ export function EditCellPopover({
   canEdit,
   onSaved,
   children,
+  onSave,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState<string>(
@@ -50,11 +53,15 @@ export function EditCellPopover({
         const n = Number(val);
         payload = Number.isFinite(n) ? n : null;
       }
-      const { error } = await (supabase as any)
-        .from("task_management_raw")
-        .update({ [column.key]: payload })
-        .eq("id", rowId);
-      if (error) throw error;
+      if (onSave) {
+        await onSave(payload);
+      } else {
+        const { error } = await (supabase as any)
+          .from("task_management_raw")
+          .update({ [column.key]: payload })
+          .eq("id", rowId);
+        if (error) throw error;
+      }
       toast.success("저장 완료", { description: displayLabel });
       setOpen(false);
       onSaved();

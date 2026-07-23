@@ -8,6 +8,7 @@ import { ArrowLeft, RefreshCcw, ShieldCheck, ShieldOff } from "lucide-react";
 import {
   TM_COLUMNS,
   DISCIPLINE_COLORS,
+  DISCIPLINES,
   TEAM_COLORS,
   TEAM_FALLBACK_COLOR,
   RISK_COLORS,
@@ -23,6 +24,8 @@ import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
 import { formatDdMmm } from "@/lib/defect-management/stage-utils";
 import { cn } from "@/lib/utils";
 import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThread";
+import { useServerFn } from "@tanstack/react-start";
+import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
 
 const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   id: "Identification",
@@ -39,9 +42,13 @@ export function TaskDetailPage() {
   const router = useRouter();
   const { data: user } = useCurrentUser();
   const isAdmin = !!(user as any)?.isAdmin;
+  const isSuperUser = !!(user as any)?.isSuperUser;
   const isDSuperUser = !!(user as any)?.isDSuperUser;
   const canEditTaskNo = isAdmin || isDSuperUser;
+  const canEditOwnerFieldsBase = isAdmin || isSuperUser; // d_superuser 제외
+  const myPic = String((user as any)?.hdec_pic_name ?? "").trim().toLowerCase();
   const resolveLabel = useTmColumnLabel();
+  const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
 
   const { data: row, refetch, isFetching } = useQuery({
     queryKey: ["task-detail", id],
@@ -71,6 +78,9 @@ export function TaskDetailPage() {
   }
 
   const isParent = row.level === "main";
+  const rowOwner = String(row?.hdec_pic_name ?? "").trim().toLowerCase();
+  const isOwner = !!myPic && !!rowOwner && myPic === rowOwner;
+  const canEditOwnerFields = canEditOwnerFieldsBase || isOwner;
 
   const onFieldSaved = () => {
     refetch();
@@ -127,20 +137,39 @@ export function TaskDetailPage() {
                   const display = renderFieldValue(c, v);
                   // task_no는 컬럼 정의상 non-editable이지만 Admin/Super User(d_superuser)는 상세페이지에서 편집 허용
                   const isTaskNoOverride = c.key === "task_no" && canEditTaskNo;
-                  const effectiveColumn: TmColumnDef = isTaskNoOverride
-                    ? { ...c, editable: true, editorType: "text" }
-                    : c;
-                  const effectiveCanEdit = isTaskNoOverride ? canEditTaskNo : isAdmin;
+                  const isTeamOverride = c.key === "team" && canEditOwnerFields;
+                  const isDataDateOverride = c.key === "data_date" && canEditOwnerFields;
+                  let effectiveColumn: TmColumnDef = c;
+                  let effectiveCanEdit = isAdmin;
+                  let useOwnerSave = false;
+                  if (isTaskNoOverride) {
+                    effectiveColumn = { ...c, editable: true, editorType: "text" };
+                    effectiveCanEdit = canEditTaskNo;
+                  } else if (isTeamOverride) {
+                    effectiveColumn = { ...c, editable: true, editorType: "select", options: [...DISCIPLINES] };
+                    effectiveCanEdit = canEditOwnerFields;
+                    useOwnerSave = true;
+                  } else if (isDataDateOverride) {
+                    effectiveColumn = { ...c, editable: true, editorType: "date" };
+                    effectiveCanEdit = canEditOwnerFields;
+                    useOwnerSave = true;
+                  }
                   const editable =
                     !!effectiveColumn.editable &&
                     !!effectiveColumn.editorType &&
+                    effectiveCanEdit &&
                     !(c.key === "actual_progress" && isParent);
                   return (
                     <div key={c.key} className="flex items-baseline gap-2">
                       <div className="min-w-[110px] text-[11px] text-muted-foreground">
                         {resolveLabel(c.key)}
                       </div>
-                      <div className="flex-1 text-xs">
+                      <div
+                        className={cn(
+                          "flex-1 text-xs rounded px-1.5 py-0.5",
+                          !editable && "bg-muted/60 text-muted-foreground",
+                        )}
+                      >
                         {editable ? (
                           <EditCellPopover
                             rowId={String(row.id)}
@@ -148,6 +177,19 @@ export function TaskDetailPage() {
                             currentValue={v}
                             canEdit={effectiveCanEdit}
                             onSaved={onFieldSaved}
+                            onSave={
+                              useOwnerSave
+                                ? async (value) => {
+                                    await updateOwnerFieldFn({
+                                      data: {
+                                        id: String(row.id),
+                                        field: effectiveColumn.key,
+                                        value: value ?? null,
+                                      },
+                                    });
+                                  }
+                                : undefined
+                            }
                           >
                             {display}
                           </EditCellPopover>
