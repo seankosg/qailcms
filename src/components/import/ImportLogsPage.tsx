@@ -472,6 +472,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   <TableRow>
                     <TableHead className="text-xs">File</TableHead>
                     {hasExtra && <TableHead className="text-xs">{cfg.extraLabel}</TableHead>}
+                    <TableHead className="text-xs">Data Date</TableHead>
                     <TableHead className="text-xs">Uploaded</TableHead>
                     <TableHead className="text-xs">Uploader</TableHead>
                     <TableHead className="text-xs text-right">Duration</TableHead>
