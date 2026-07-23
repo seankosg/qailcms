@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { dohaWallToUtcIso, toDohaDateKey } from "@/lib/time/doha";
 import type { AbdTeam } from "./columns";
 import type { TeamOption } from "@/lib/team/team-master";
 import { detectTeamFromText } from "@/lib/team/team-master";
@@ -88,20 +89,29 @@ function toIsoDate(v: any): string | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
     if (isNaN(v.getTime())) return null;
-    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`;
+    // xlsx `cellDates:true` returns a Date whose UTC components hold the
+    // sheet's wall-clock date. Interpret that date as Doha (+03:00) calendar.
+    return toDohaDateKey(v) || null;
   }
   if (typeof v === "number" && Number.isFinite(v)) {
-    // Excel serial date (XLSX cellDates:true handles this normally)
-    const epoch = new Date(Date.UTC(1899, 11, 30));
-    const d = new Date(epoch.getTime() + v * 86400000);
-    if (isNaN(d.getTime())) return null;
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    // Excel serial date: treat parsed wall-clock as Doha (+03:00).
+    const parsed = XLSX.SSF?.parse_date_code?.(v);
+    if (parsed) {
+      return toDohaDateKey(dohaWallToUtcIso(parsed.y, parsed.m, parsed.d)) || null;
+    }
   }
   const s = String(v).trim();
   if (!s) return null;
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // YYYY-MM-DD: treat as Doha calendar date directly.
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  // dd/mm/yyyy or dd-mm-yyyy (dd first, mm second).
+  const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+  if (dmy) {
+    const yy = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+    return `${yy}-${String(dmy[2]).padStart(2, "0")}-${String(dmy[1]).padStart(2, "0")}`;
+  }
+  return toDohaDateKey(s) || null;
 }
 
 /**
