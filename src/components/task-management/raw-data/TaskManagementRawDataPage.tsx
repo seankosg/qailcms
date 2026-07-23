@@ -695,6 +695,7 @@ export function TaskManagementRawDataPage() {
       // Cum. Diff — 누계 실적(Actual %) − 누계 계획(Plan %) 파생 계산.
       // DB 저장값(임포트값)은 표시에 사용하지 않는다.
       if (c.key === "progress_variance") {
+        const th = kpiThresholds ?? DEFAULT_THRESHOLDS;
         cols.push({
           id: c.key,
           size: c.width,
@@ -713,9 +714,9 @@ export function TaskManagementRawDataPage() {
               return <span className="text-muted-foreground/40">—</span>;
             const v = Number(raw);
             const cls =
-              v < (t.behind_late_gap ?? -0.15)
+              v < th.behind_late_gap
                 ? "text-rose-600 font-semibold"
-                : v < (t.behind_warn_gap ?? -0.05)
+                : v < th.behind_warn_gap
                   ? "text-orange-600"
                   : v < 0
                     ? "text-amber-600"
