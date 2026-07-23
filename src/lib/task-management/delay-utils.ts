@@ -12,7 +12,7 @@ import {
   type TaskItem,
   type TaskScheduleStage,
 } from "./schedule-utils";
-import { computeTPlan, getStageJudgment, isTaskDelayed } from "./derived";
+import { cumPlanProgress, cumActualProgress, getStageJudgment, isTaskDelayed, computeVariance } from "./derived";
 
 export type OwnerDim = "team" | "hdec_pic_name" | "hdec_eng_name";
 
@@ -43,11 +43,11 @@ export function computeDelayTopN(
   for (const it of items) {
     // task-level plan/actual percentage across all stages
     // Plan% = T.Plan (Data Date 당일 일할 계획진도율), Actual% = actual_progress 누계.
-    const tPlan = computeTPlan(it, asOfDate);
-    const planPct = tPlan != null ? tPlan * 100 : 0;
-    const rawActualPct = Number(it.actual_progress ?? 0) * 100;
-    const actualPct = Math.max(0, Math.min(100, rawActualPct));
-    const diffPp = actualPct - planPct;
+    // Plan% = Cum. Plan (plan_progress 우선, NULL 시 T.Plan 폴백), Actual% = 누계 실적.
+    const planPct = cumPlanProgress(it, asOfDate) * 100;
+    const actualPct = cumActualProgress(it) * 100;
+    const variance = computeVariance(it, asOfDate);
+    const diffPp = variance != null ? variance * 100 : actualPct - planPct;
     // 스테이지별 지연 항목 나열. WIP 는 날짜가 없어 plannedDate 는 plan_start 로 대체.
     for (const st of ALL_TASK_STAGE_KEYS) {
       const stageJ = getStageJudgment(it, st, undefined, asOfDate);
@@ -135,9 +135,8 @@ export function computeOwnerLeaderboard(
     const raw = (it as any)[dim];
     const key = raw ? String(raw).trim() || NONE : NONE;
     const cur = memberSum.get(key) ?? { plan: 0, actual: 0, n: 0 };
-    const tp = computeTPlan(it, asOfDate);
-    cur.plan += tp ?? 0;
-    cur.actual += Math.max(0, Math.min(1, Number(it.actual_progress ?? 0)));
+    cur.plan += cumPlanProgress(it, asOfDate);
+    cur.actual += cumActualProgress(it);
     cur.n += 1;
     memberSum.set(key, cur);
   }

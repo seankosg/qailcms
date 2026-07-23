@@ -84,6 +84,21 @@ export function todayGap(row: JudgmentRow, asOf?: string): number {
   return actual - expectedProgressToday(row, asOf);
 }
 
+/** 누계 계획진도율 (Cum. Plan) — plan_progress 우선, NULL 시 computeTPlan 폴백.
+ *  computeVariance 와 동일한 분모. 대시보드/트리/리더보드 공통 사용. */
+export function cumPlanProgress(row: JudgmentRow, asOf?: string): number {
+  const rawPlan = row.plan_progress;
+  if (rawPlan != null && !Number.isNaN(Number(rawPlan))) {
+    return Math.max(0, Math.min(1, Number(rawPlan)));
+  }
+  return computeTPlan(row, asOf) ?? 0;
+}
+
+/** 누계 실적 (0..1 clamp). computeVariance 와 동일한 피감수. */
+export function cumActualProgress(row: JudgmentRow): number {
+  return Math.max(0, Math.min(1, Number(row.actual_progress ?? 0)));
+}
+
 /** Cum. Diff — 누계 실적(Actual %) − 누계 계획(Plan %, row.plan_progress).
  *  단일 소스: Variance(=Cum. Diff), Alarm(WIP), Behind Schedule, Critical Delay 모두 이 값 사용.
  *  plan_progress 가 NULL 이면 computeTPlan(시간경과율)으로 폴백. 둘 다 없으면 null 반환. */

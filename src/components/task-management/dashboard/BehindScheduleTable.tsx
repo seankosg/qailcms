@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AUTO_JUDGMENT_COLORS, DISCIPLINE_COLORS } from "@/lib/task-management/columns";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
-import { todayGap } from "@/lib/task-management/derived";
+import { computeVariance } from "@/lib/task-management/derived";
 
 interface Props {
   items: TaskItem[];
@@ -12,7 +12,7 @@ interface Props {
 
 export function BehindScheduleTable({ items, limit = 20 }: Props) {
   const behindList = items
-    .map((r) => ({ ...r, gap: todayGap(r) }))
+    .map((r) => ({ ...r, gap: computeVariance(r) ?? 0 }))
     .filter((r) => r.gap < -0.001 && Number(r.actual_progress ?? 0) < 1)
     .sort((a, b) => a.gap - b.gap)
     .slice(0, limit);

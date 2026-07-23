@@ -1,6 +1,6 @@
 import { dohaStampCompact } from "@/lib/time/doha";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
-import { expectedProgressToday, todayGap } from "@/lib/task-management/derived";
+import { cumPlanProgress, computeVariance } from "@/lib/task-management/derived";
 
 export interface TaskSummaryRow {
   id: string;
@@ -157,8 +157,8 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
 }
 
 function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean, asOf?: string): Record<string, unknown> & { __isMain: boolean; __zebra: boolean } {
-  const gap = todayGap(r, asOf);
-  const expected = expectedProgressToday(r, asOf);
+  const gap = computeVariance(r, asOf) ?? 0;
+  const expected = cumPlanProgress(r, asOf);
   return {
     __isMain: isMain,
     __zebra: zebra,
