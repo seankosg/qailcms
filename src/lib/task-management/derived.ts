@@ -24,6 +24,7 @@ export interface JudgmentRow {
   actual_start?: string | null;
   actual_finish?: string | null;
   actual_progress?: number | null;
+  plan_progress?: number | null;
   slip_days?: number | null;
   data_date?: string | null;
 }
