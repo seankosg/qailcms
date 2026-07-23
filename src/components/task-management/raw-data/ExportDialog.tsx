@@ -14,7 +14,12 @@ import { Download, Loader2 } from "lucide-react";
 import { TM_COLUMNS } from "@/lib/task-management/columns";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
-import { computeVariance } from "@/lib/task-management/derived";
+import {
+  computeVariance,
+  computeDailyPlan,
+  computeDailyDiff,
+} from "@/lib/task-management/derived";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type ExportFormat = "view" | "reimport";
@@ -59,6 +64,9 @@ const NUMFMT_BY_KEY: Record<string, string> = {
   actual_progress: "0.0%",
   plan_progress: "0.0%",
   progress_variance: "+0.0%;-0.0%;0.0%",
+  expected_progress_today: "0.0%",
+  today_actual: "0.0%",
+  today_gap: "+0.0%;-0.0%;0.0%",
   plan_days: "0;-0;-",
   actual_duration: "0;-0;-",
   slip_days: "+0;-0;-",
@@ -85,13 +93,42 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       const isView = format === "view";
       const keys = isView ? visibleKeys : TM_COLUMNS.map((c) => c.key);
 
-      // Cum. Diff(=progress_variance) 는 파생 계산(actual - Cum.Plan). 임포트값 무시.
+      // T.Actual (오늘 실적) — data_date 별로 그룹화해 서버 RPC 배치 조회.
+      const idsByDate = new Map<string, string[]>();
+      for (const r of rows) {
+        const id = String((r as any).id ?? "");
+        const d = ((r as any).data_date as string | null) ?? "";
+        if (!id || !d) continue;
+        const dd = String(d).slice(0, 10);
+        if (!idsByDate.has(dd)) idsByDate.set(dd, []);
+        idsByDate.get(dd)!.push(id);
+      }
+      const tActualMap = new Map<string, number>();
+      for (const [dd, ids] of idsByDate) {
+        const { data, error } = await (supabase as any).rpc("tm_today_actual", {
+          _ids: ids,
+          _as_of: dd,
+        });
+        if (error) throw error;
+        for (const row of (data ?? []) as Array<{ id: string; t_actual: number }>) {
+          tActualMap.set(String(row.id), Number(row.t_actual) || 0);
+        }
+      }
+
+      // Cum. Diff / T.Plan / T.Actual / T.Diff 모두 파생 계산으로 덮어쓴다 (임포트값 무시).
       const derivedRows = rows.map((r) => {
-        const v = computeVariance(
-          r as any,
-          ((r as any).data_date as string | null) ?? undefined,
-        );
-        return { ...r, progress_variance: v };
+        const asOf = ((r as any).data_date as string | null) ?? undefined;
+        const cumDiff = computeVariance(r as any, asOf);
+        const tPlan = computeDailyPlan(r as any);
+        const tActual = tActualMap.get(String((r as any).id)) ?? 0;
+        const tDiff = computeDailyDiff(r as any, tActual);
+        return {
+          ...r,
+          progress_variance: cumDiff,
+          expected_progress_today: tPlan,
+          today_actual: tActual,
+          today_gap: tDiff,
+        };
       });
 
       const columns = keys.map((k) => ({
