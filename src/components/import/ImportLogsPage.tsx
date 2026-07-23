@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Loader2, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Download, Loader2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,14 @@ import {
 import { RollbackDialog, type RollbackKind } from "@/components/import/RollbackDialog";
 import { fetchAllByUploadId } from "@/lib/import/fetchAllByUploadId";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import {
+  FieldLogTable,
+  FieldLogSummaryChips,
+  OUTCOME_LABELS,
+  downloadFieldLevelCsv,
+  type FieldLog,
+} from "@/components/import/FieldLogTable";
+import { Fragment } from "react";
 
 type Kind = RollbackKind;
 
@@ -151,6 +159,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
   const [uploaderNames, setUploaderNames] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [rowLogs, setRowLogs] = useState<RowLog[]>([]);
+  const [fieldLogs, setFieldLogs] = useState<FieldLog[]>([]);
+  const [expandedRowNo, setExpandedRowNo] = useState<number | null>(null);
+  const [fieldOutcomeFilter, setFieldOutcomeFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -302,6 +313,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
     setReasonFilter("all");
     setRowSearch("");
     setRenderLimit(500);
+    setFieldLogs([]);
+    setExpandedRowNo(null);
+    setFieldOutcomeFilter("all");
     try {
       const cols =
         kind === "spare_part"
@@ -329,6 +343,29 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         processed_at: r.processed_at,
       }));
       setRowLogs(mapped);
+      // 필드 단위 로그 조회 (SHAW 스타일 확장 상세)
+      try {
+        const kindKey =
+          kind === "task_management"
+            ? "task_management"
+            : kind === "defect_management"
+              ? "defect"
+              : kind === "spare_part"
+                ? "spare_part"
+                : "abd";
+        const { data: fl } = await (supabase as any)
+          .from("import_field_logs")
+          .select(
+            "id, raw_row_no, field_name, outcome, raw_value, applied_value, previous_value, reason_code, reason_detail",
+          )
+          .eq("upload_id", id)
+          .eq("kind", kindKey)
+          .order("raw_row_no", { ascending: true, nullsFirst: true });
+        setFieldLogs((fl ?? []) as FieldLog[]);
+      } catch (e) {
+        console.warn("field logs load failed", e);
+        setFieldLogs([]);
+      }
     } catch (e) {
       console.error("Row logs load failed", e);
       setRowLogs([]);
