@@ -28,6 +28,7 @@ import {
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
+import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
 import { bulkClassifyDefects } from "@/lib/defect-management/classifier/bulk-classify.functions";
 import { CLASSIFIER_FIELDS } from "@/lib/defect-management/classifier/rules";
 import { takePreImportSnapshotWithFeedback } from "@/lib/backup/pre-import-snapshot";
