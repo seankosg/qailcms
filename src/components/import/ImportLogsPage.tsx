@@ -88,6 +88,9 @@ const actionColor: Record<string, string> = {
   updated: "bg-blue-100 text-blue-800",
   skipped: "bg-yellow-100 text-yellow-800",
   rejected: "bg-red-100 text-red-800",
+  inactivated: "bg-slate-200 text-slate-800",
+  skipped_locked: "bg-yellow-100 text-yellow-800",
+  mismatched: "bg-orange-100 text-orange-800",
 };
 
 const CFG = {
