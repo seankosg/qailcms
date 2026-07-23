@@ -376,6 +376,8 @@ export type Database = {
           doc_nn2: string | null
           document_title: string | null
           field_mismatch: boolean
+          hdec_eng_name: string | null
+          hdec_pic_name: string | null
           id: string
           inactive_reason: string | null
           is_active: boolean
@@ -383,7 +385,6 @@ export type Database = {
           latest_status: string | null
           mismatch_fields: Json
           owner_user_id: string | null
-          pic: string | null
           plot: string | null
           r1_dar_actual: string | null
           r1_dar_plan: string | null
@@ -428,6 +429,8 @@ export type Database = {
           doc_nn2?: string | null
           document_title?: string | null
           field_mismatch?: boolean
+          hdec_eng_name?: string | null
+          hdec_pic_name?: string | null
           id?: string
           inactive_reason?: string | null
           is_active?: boolean
@@ -435,7 +438,6 @@ export type Database = {
           latest_status?: string | null
           mismatch_fields?: Json
           owner_user_id?: string | null
-          pic?: string | null
           plot?: string | null
           r1_dar_actual?: string | null
           r1_dar_plan?: string | null
@@ -480,6 +482,8 @@ export type Database = {
           doc_nn2?: string | null
           document_title?: string | null
           field_mismatch?: boolean
+          hdec_eng_name?: string | null
+          hdec_pic_name?: string | null
           id?: string
           inactive_reason?: string | null
           is_active?: boolean
@@ -487,7 +491,6 @@ export type Database = {
           latest_status?: string | null
           mismatch_fields?: Json
           owner_user_id?: string | null
-          pic?: string | null
           plot?: string | null
           r1_dar_actual?: string | null
           r1_dar_plan?: string | null
