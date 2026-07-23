@@ -372,6 +372,7 @@ export function DmrDashboardPage() {
       {/* Daily Manpower Record — Subcon / System tabs */}
       <Card>
         <CardHeader className="pb-2">
+          <CardTitle className="mb-2 text-sm">Daily Manpower Record</CardTitle>
           <Tabs value={recordTab} onValueChange={(v) => setRecordTab(v as 'subcon' | 'system')}>
             <TabsList className="h-7">
               <TabsTrigger value="subcon" className="px-3 text-xs">Subcon</TabsTrigger>
