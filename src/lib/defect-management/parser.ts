@@ -263,25 +263,29 @@ function toIsoDate(v: unknown): string | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) return null;
-    const y = v.getFullYear();
-    const m = String(v.getMonth() + 1).padStart(2, "0");
-    const d = String(v.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    // xlsx `cellDates:true` returns a Date whose UTC components hold the
+    // sheet's wall-clock date. Interpret that date as Doha (+03:00) calendar.
+    return toDohaDateKey(v) || null;
   }
   if (typeof v === "number") {
     const parsed = XLSX.SSF?.parse_date_code?.(v);
     if (parsed) {
-      const y = String(parsed.y).padStart(4, "0");
-      const m = String(parsed.m).padStart(2, "0");
-      const d = String(parsed.d).padStart(2, "0");
-      return `${y}-${m}-${d}`;
+      return toDohaDateKey(dohaWallToUtcIso(parsed.y, parsed.m, parsed.d)) || null;
     }
   }
   if (typeof v === "string") {
     const s = v.trim();
     if (!s) return null;
-    const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) return toIsoDate(d);
+    // YYYY-MM-DD: treat as Doha calendar date directly.
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    // dd/mm/yyyy or dd-mm-yyyy (dd first, mm second).
+    const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+    if (dmy) {
+      const yy = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+      return `${yy}-${String(dmy[2]).padStart(2, "0")}-${String(dmy[1]).padStart(2, "0")}`;
+    }
+    return toDohaDateKey(s) || null;
   }
   return null;
 }
