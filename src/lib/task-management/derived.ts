@@ -27,6 +27,7 @@ export interface JudgmentRow {
   plan_progress?: number | null;
   slip_days?: number | null;
   data_date?: string | null;
+  auto_judgment?: string | null;
 }
 
 function parseDate(v: unknown): Date | null {
