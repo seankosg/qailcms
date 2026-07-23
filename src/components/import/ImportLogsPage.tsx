@@ -487,9 +487,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow>
+                  <TableRow>
                       <TableCell
-                        colSpan={11 + (hasExtra ? 1 : 0)}
+                        colSpan={12 + (hasExtra ? 1 : 0)}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Loading…
@@ -498,7 +498,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   ) : batches.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={11 + (hasExtra ? 1 : 0)}
+                        colSpan={12 + (hasExtra ? 1 : 0)}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Import 이력이 없습니다
