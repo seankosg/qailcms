@@ -263,7 +263,7 @@ export function DmrDashboardPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold">DMR Dashboard</h1>
-        <p className="text-xs text-muted-foreground">Daily Manpower Report — 실적 요약 및 추이</p>
+        <p className="text-xs text-muted-foreground">Daily Manpower Record — 실적 요약 및 추이</p>
       </div>
 
       {/* Filters */}
