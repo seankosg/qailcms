@@ -598,11 +598,17 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         string,
         { id: string; plan_start: string | null; plan_end: string | null; forecast_end: string | null }
       >();
+      const existingByTaskNo = new Map<string, any>();
+      const TM_TRACKED_FIELDS = [
+        "main_task_no","level","team","category","plot","task_name","risk","sub_task_desc",
+        "hdec_pic_name","hdec_eng_name","row_type","status_manual",
+        "plan_start","plan_end","actual_start","actual_progress","forecast_end","actual_finish",
+      ] as const;
       for (let i = 0; i < taskNos.length; i += 500) {
         const chunk = taskNos.slice(i, i + 500);
         const { data } = await (supabase as any)
           .from("task_management_raw")
-          .select("id, task_no, plan_start, plan_end, forecast_end")
+          .select("id, task_no, plan_start, plan_end, forecast_end," + TM_TRACKED_FIELDS.filter(f=>!["plan_start","plan_end","forecast_end"].includes(f)).join(","))
           .eq("discipline", discipline)
           .in("task_no", chunk);
         for (const r of data ?? []) {
@@ -613,6 +619,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
             plan_end: r.plan_end ?? null,
             forecast_end: r.forecast_end ?? null,
           });
+          existingByTaskNo.set(r.task_no, r);
         }
       }
 
