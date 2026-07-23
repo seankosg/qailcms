@@ -447,7 +447,15 @@ export function TaskTreePage() {
                     <Badge className="bg-rose-500/15 text-rose-700">지연 {behindCount}</Badge>
                   )}
                   {mainJudgment && (
-                    <Badge className={AUTO_JUDGMENT_COLORS[mainJudgment] ?? "bg-muted"}>{mainJudgment}</Badge>
+                    <Badge
+                      className={cn(
+                        "rounded-none border border-black/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider shadow-sm",
+                        AUTO_JUDGMENT_COLORS[mainJudgment] ?? "bg-muted",
+                      )}
+                      title="Main Task 판정"
+                    >
+                      {mainJudgment}
+                    </Badge>
                   )}
                   <ProgressBar v={p.actual_progress} />
                   <GapCell gap={pGap} />
