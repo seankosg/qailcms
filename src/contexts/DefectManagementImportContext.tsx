@@ -28,6 +28,7 @@ import {
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
+import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
 import { bulkClassifyDefects } from "@/lib/defect-management/classifier/bulk-classify.functions";
 import { CLASSIFIER_FIELDS } from "@/lib/defect-management/classifier/rules";
 import { takePreImportSnapshotWithFeedback } from "@/lib/backup/pre-import-snapshot";
@@ -1305,6 +1306,60 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               .insert(chunk);
             if (error) console.warn("[defect-import] row-log insert failed", error);
           });
+
+          // Field-level logs
+          try {
+            const SM_TRACKED_FIELDS = [
+              "defect_location","main_trade","sub_trade","work_type",
+              "hdec_pic_name","hdec_eng_name","subcontractor_name",
+              "actual_closure_date","actual_rectified_date","actual_start_date",
+              "rectified_status","closure_status",
+            ] as const;
+            const payloadByKey2 = new Map<string, any>();
+            for (let i = 0; i < workingRows.length; i++) {
+              payloadByKey2.set(workingRows[i].source_issue_no, payloads[i]);
+            }
+            const pendingFieldLogs: PendingFieldLog[] = [];
+            workingRows.forEach((p) => {
+              const key = String(p.source_issue_no ?? "");
+              const rej = rejectedByKey.get(key);
+              if (rej) {
+                pendingFieldLogs.push(
+                  buildFieldLog("defect", {
+                    rawRowNo: p.rawRowNo ?? null,
+                    field: "__row__",
+                    outcome: "rejected_invalid",
+                    raw: key,
+                    code: rej.reason_code,
+                    detail: rej.reason_detail ?? null,
+                  }),
+                );
+                return;
+              }
+              const prior = existing.get(p.source_issue_no) ?? ({} as any);
+              const wasExisting = existing.has(p.source_issue_no);
+              const applied = payloadByKey2.get(p.source_issue_no) ?? {};
+              for (const fname of SM_TRACKED_FIELDS) {
+                const incoming = (applied as any)[fname] ?? null;
+                const previous = (prior as any)[fname] ?? null;
+                const cls = classifyChange(incoming, previous);
+                if (cls === "empty") continue;
+                pendingFieldLogs.push(
+                  buildFieldLog("defect", {
+                    rawRowNo: p.rawRowNo ?? null,
+                    field: fname,
+                    outcome: cls === "applied" ? "applied" : "unchanged",
+                    raw: incoming,
+                    applied: incoming,
+                    previous: wasExisting ? previous : null,
+                  }),
+                );
+              }
+            });
+            await flushFieldLogs(supabase, logId, userId, pendingFieldLogs);
+          } catch (e) {
+            console.warn("[defect-import] field-log insert failed", e);
+          }
         }
 
         const finalStatus =

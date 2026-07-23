@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { stripNullExcept } from "@/lib/import/strip-null";
+import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
 
 const UpdateFieldSchema = z.object({
   id: z.string().uuid(),
@@ -154,6 +155,16 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     const seenNumbers = new Set<string>();
     const CHUNK = 500;
     const rowLogs: any[] = [];
+    const pendingFieldLogs: PendingFieldLog[] = [];
+    // Tracked fields for import_field_logs (excluding meta/system)
+    const ABD_TRACKED_FIELDS = [
+      "plot","sl_no","dis","service","doc_ax","doc_axx","doc_nn1","doc_n","doc_nn2",
+      "document_title","abd_ocs_no","batch_no","hdec_pic_name","hdec_eng_name",
+      "latest_rev","latest_status","approval_date",
+      "r1_drafting_plan","r1_drafting_actual","r1_submission_plan","r1_submission_actual","r1_dar_plan","r1_dar_actual",
+      "r2_drafting_plan","r2_drafting_actual","r2_submission_plan","r2_submission_actual","r2_dar_plan","r2_dar_actual",
+      "r3_drafting_plan","r3_drafting_actual","r3_submission_plan","r3_submission_actual","r3_dar_plan","r3_dar_actual",
+    ] as const;
     let rowIndex = 0;
     const ABD_FORCE_KEYS = [
       "team",
@@ -218,10 +229,12 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       const nums = chunk.map((r) => r.abd_number);
       const { data: existingRows } = await supa
         .from("abd_items_raw")
-        .select("abd_number")
+        .select("abd_number," + ABD_TRACKED_FIELDS.join(","))
         .eq("team", data.team)
         .in("abd_number", nums);
-      const existingSet = new Set((existingRows ?? []).map((x: any) => x.abd_number));
+      const existingMap = new Map<string, any>();
+      for (const e of (existingRows ?? []) as any[]) existingMap.set(e.abd_number, e);
+      const existingSet = new Set(existingMap.keys());
 
       const { error: upErr } = await supa
         .from("abd_items_raw")
@@ -241,6 +254,24 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           reason_code: null,
           reason_detail: null,
         });
+        // Field-level logs
+        const prior = existingMap.get(r.abd_number) ?? {};
+        for (const fname of ABD_TRACKED_FIELDS) {
+          const incoming = (r as any)[fname] ?? null;
+          const previous = prior[fname] ?? null;
+          const cls = classifyChange(incoming, previous);
+          if (cls === "empty") continue;
+          pendingFieldLogs.push(
+            buildFieldLog("abd", {
+              rawRowNo: rowIndex,
+              field: fname,
+              outcome: cls === "applied" ? (wasExisting ? "applied" : "applied") : "unchanged",
+              raw: incoming,
+              applied: incoming,
+              previous: wasExisting ? previous : null,
+            }),
+          );
+        }
       }
     }
 
@@ -276,6 +307,18 @@ export const importAbdBatch = createServerFn({ method: "POST" })
             reason_code: "missing_in_upload",
             reason_detail: `missing_in_upload:${batchId}`,
           });
+          pendingFieldLogs.push(
+            buildFieldLog("abd", {
+              rawRowNo: null,
+              field: "is_active",
+              outcome: "applied",
+              raw: null,
+              applied: false,
+              previous: true,
+              code: "missing_in_upload",
+              detail: `missing_in_upload:${batchId}`,
+            }),
+          );
         }
       }
     }
@@ -284,6 +327,9 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     for (let i = 0; i < rowLogs.length; i += 500) {
       await supa.from("abd_import_row_logs").insert(rowLogs.slice(i, i + 500));
     }
+
+    // 3.6) persist field logs
+    await flushFieldLogs(supa, batchId, context.userId, pendingFieldLogs);
 
     // 4) finalize log
     await supa

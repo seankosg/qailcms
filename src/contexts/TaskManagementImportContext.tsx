@@ -18,6 +18,7 @@ import {
 import type { Discipline } from "@/lib/task-management/columns";
 import { runRollupAllMains, runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
 import { stripNullExcept } from "@/lib/import/strip-null";
+import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
 import {
   previewTaskImport,
   allocateTaskNo,
@@ -597,11 +598,17 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         string,
         { id: string; plan_start: string | null; plan_end: string | null; forecast_end: string | null }
       >();
+      const existingByTaskNo = new Map<string, any>();
+      const TM_TRACKED_FIELDS = [
+        "main_task_no","level","team","category","plot","task_name","risk","sub_task_desc",
+        "hdec_pic_name","hdec_eng_name","row_type","status_manual",
+        "plan_start","plan_end","actual_start","actual_progress","forecast_end","actual_finish",
+      ] as const;
       for (let i = 0; i < taskNos.length; i += 500) {
         const chunk = taskNos.slice(i, i + 500);
         const { data } = await (supabase as any)
           .from("task_management_raw")
-          .select("id, task_no, plan_start, plan_end, forecast_end")
+          .select("id, task_no, plan_start, plan_end, forecast_end," + TM_TRACKED_FIELDS.filter(f=>!["plan_start","plan_end","forecast_end"].includes(f)).join(","))
           .eq("discipline", discipline)
           .in("task_no", chunk);
         for (const r of data ?? []) {
@@ -612,6 +619,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
             plan_end: r.plan_end ?? null,
             forecast_end: r.forecast_end ?? null,
           });
+          existingByTaskNo.set(r.task_no, r);
         }
       }
 
@@ -891,6 +899,50 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
             }
           } catch (e) {
             console.warn("[task-import] row-log insert failed", e);
+          }
+
+          // Field-level logs
+          try {
+            const pendingFieldLogs: PendingFieldLog[] = [];
+            applied.forEach((p, idx) => {
+              const taskKey = String(p.task_no ?? "");
+              const rawRowNo = idx + 1;
+              const rej = rejectedByTaskNo.get(taskKey);
+              if (rej) {
+                pendingFieldLogs.push(
+                  buildFieldLog("task_management", {
+                    rawRowNo,
+                    field: "__row__",
+                    outcome: "rejected_invalid",
+                    raw: taskKey,
+                    code: rej.reason_code,
+                    detail: rej.reason_detail ?? null,
+                  }),
+                );
+                return;
+              }
+              const prior = existingByTaskNo.get(p.task_no) ?? {};
+              const wasExisting = existingSet.has(p.task_no);
+              for (const fname of TM_TRACKED_FIELDS) {
+                const incoming = (p as any)[fname] ?? null;
+                const previous = prior[fname] ?? null;
+                const cls = classifyChange(incoming, previous);
+                if (cls === "empty") continue;
+                pendingFieldLogs.push(
+                  buildFieldLog("task_management", {
+                    rawRowNo,
+                    field: fname,
+                    outcome: cls === "applied" ? "applied" : "unchanged",
+                    raw: incoming,
+                    applied: incoming,
+                    previous: wasExisting ? previous : null,
+                  }),
+                );
+              }
+            });
+            await flushFieldLogs(supabase, logId, userId, pendingFieldLogs);
+          } catch (e) {
+            console.warn("[task-import] field-log insert failed", e);
           }
         }
 

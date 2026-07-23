@@ -1490,6 +1490,57 @@ export type Database = {
           },
         ]
       }
+      import_field_logs: {
+        Row: {
+          applied_value: string | null
+          created_at: string
+          created_by: string | null
+          field_name: string
+          id: string
+          kind: string
+          outcome: string
+          previous_value: string | null
+          raw_row_no: number | null
+          raw_value: string | null
+          reason_code: string | null
+          reason_detail: string | null
+          row_log_id: string | null
+          upload_id: string
+        }
+        Insert: {
+          applied_value?: string | null
+          created_at?: string
+          created_by?: string | null
+          field_name: string
+          id?: string
+          kind: string
+          outcome: string
+          previous_value?: string | null
+          raw_row_no?: number | null
+          raw_value?: string | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          row_log_id?: string | null
+          upload_id: string
+        }
+        Update: {
+          applied_value?: string | null
+          created_at?: string
+          created_by?: string | null
+          field_name?: string
+          id?: string
+          kind?: string
+          outcome?: string
+          previous_value?: string | null
+          raw_row_no?: number | null
+          raw_value?: string | null
+          reason_code?: string | null
+          reason_detail?: string | null
+          row_log_id?: string | null
+          upload_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
