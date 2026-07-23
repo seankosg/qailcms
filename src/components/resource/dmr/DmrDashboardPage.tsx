@@ -447,22 +447,24 @@ export function DmrDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {systemMatrix.keys.map((k) => {
-                      const sum = systemMatrix.dates.reduce((a, d) => a + systemMatrix.cell(k, d), 0);
-                      const subList = (systemMatrix.subconsBy.get(k) ?? []).sort().join(', ');
+                    {systemMatrix.pairs.map((p) => {
+                      const sum = systemMatrix.dates.reduce((a, d) => a + systemMatrix.cell(p.system, p.subcon, d), 0);
                       return (
-                        <tr key={k} className="border-t hover:bg-muted/30">
-                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background min-w-[160px]">{k}</td>
-                          <td className="sticky left-[160px] z-10 bg-background px-2 py-1 text-muted-foreground hover:bg-background min-w-[160px]" title={subList}>{subList || '—'}</td>
+                        <tr key={p.key} className="border-t hover:bg-muted/30">
+                          <td className="sticky left-0 z-10 bg-background px-2 py-1 font-medium hover:bg-background min-w-[160px]">{p.system || '—'}</td>
+                          <td className="sticky left-[160px] z-10 bg-background px-2 py-1 text-muted-foreground hover:bg-background min-w-[160px]">
+                            {p.subcon || '—'}
+                            {p.subcon && directNames.has(p.subcon) && <span className="ml-1 rounded bg-secondary px-1 text-[9px]">직영</span>}
+                          </td>
                           {systemMatrix.dates.map((d) => {
-                            const v = systemMatrix.cell(k, d);
+                            const v = systemMatrix.cell(p.system, p.subcon, d);
                             return <td key={d} className="px-2 py-1 text-right text-muted-foreground">{v || ''}</td>;
                           })}
                           <td className="px-2 py-1 text-right font-semibold">{sum}</td>
                         </tr>
                       );
                     })}
-                    {systemMatrix.keys.length === 0 && (
+                    {systemMatrix.pairs.length === 0 && (
                       <tr><td colSpan={systemMatrix.dates.length + 3} className="p-4 text-center text-muted-foreground">데이터가 없습니다</td></tr>
                     )}
                   </tbody>
