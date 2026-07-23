@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronDown } from 'lucide-react';
@@ -54,6 +55,7 @@ export function DmrDashboardPage() {
   const [asOf, setAsOf] = useState<string>('');
   const [rangeDays, setRangeDays] = useState<7 | 14 | 30>(14);
   const [groupBy, setGroupBy] = useState<GroupBy>('team');
+  const [recordTab, setRecordTab] = useState<'subcon' | 'system'>('subcon');
 
   // Latest date
   const latestQuery = useQuery({
@@ -238,14 +240,23 @@ export function DmrDashboardPage() {
       .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
   }, [rows, currentAsOf]);
 
-  // Contractor × date matrix (actual)
-  const matrix = useMemo(() => {
+  // Subcon / System × date matrix (actual)
+  const subconMatrix = useMemo(() => {
     const dates = Array.from(new Set(rows.map((r) => r.report_date))).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
-    const contractors = Array.from(new Set(rows.map((r) => r.contractor_name))).sort();
-    const cell = (c: string, d: string) => rows
-      .filter((r) => r.contractor_name === c && r.report_date === d)
+    const keys = Array.from(new Set(rows.map((r) => r.contractor_name))).sort();
+    const cell = (k: string, d: string) => rows
+      .filter((r) => r.contractor_name === k && r.report_date === d)
       .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
-    return { dates, contractors, cell };
+    return { dates, keys, cell };
+  }, [rows]);
+
+  const systemMatrix = useMemo(() => {
+    const dates = Array.from(new Set(rows.map((r) => r.report_date))).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+    const keys = Array.from(new Set(rows.map((r) => r.system_name))).sort();
+    const cell = (k: string, d: string) => rows
+      .filter((r) => r.system_name === k && r.report_date === d)
+      .reduce((a, r) => a + (r.actual_manpower ?? 0), 0);
+    return { dates, keys, cell };
   }, [rows]);
 
   return (
