@@ -408,6 +408,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
     return acc;
   }, [rowLogs]);
 
+  const actionOptions = useMemo(
+    () => Array.from(new Set(rowLogs.map((r) => r.action_taken).filter(Boolean))).sort(),
+    [rowLogs],
+  );
+
   const reasonOptions = useMemo(
     () =>
       Array.from(
