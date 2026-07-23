@@ -310,11 +310,11 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           pendingFieldLogs.push(
             buildFieldLog("abd", {
               rawRowNo: null,
-              field: "is_active",
-              outcome: "applied",
-              raw: null,
-              applied: false,
-              previous: true,
+              field: "__row__",
+              outcome: "info",
+              raw: m.abd_number,
+              applied: "inactivated",
+              previous: "active",
               code: "missing_in_upload",
               detail: `missing_in_upload:${batchId}`,
             }),
