@@ -64,7 +64,7 @@ export function AbdDashboardPage() {
     if (batchFilter.length && !("batch" in search)) {
       search.batch = batchFilter.join(",");
     }
-    const progressKeys = ["team", "dis", "service", "pic", "docAx", "docAxx", "batch"];
+    const progressKeys = ["team", "dis", "service", "hdec_pic_name", "hdec_eng_name", "docAx", "docAxx", "batch"];
     if (progressKeys.some((k) => k in search) && !("source" in search)) {
       search.source = "progress";
     }
@@ -634,14 +634,15 @@ function AttentionList({
             onClick={() =>
               onOpen({
                 ...(it.team ? { team: it.team } : {}),
-                ...(it.pic ? { pic: it.pic } : {}),
+                ...(it.hdec_pic_name ? { hdec_pic_name: it.hdec_pic_name } : {}),
+                ...(it.hdec_eng_name ? { hdec_eng_name: it.hdec_eng_name } : {}),
               })
             }
           >
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">{it.label}</div>
               <div className="text-[11px] text-muted-foreground">
-                {[it.team, it.pic, `Stage: ${it.stage}`].filter(Boolean).join(" · ")}
+                {[it.team, it.hdec_pic_name ?? it.hdec_eng_name, `Stage: ${it.stage}`].filter(Boolean).join(" · ")}
               </div>
             </div>
             <div
@@ -679,15 +680,19 @@ function CrossCutSection({
         <Tabs defaultValue="team">
           <TabsList>
             <TabsTrigger value="team">By Team</TabsTrigger>
-            <TabsTrigger value="pic">By PIC</TabsTrigger>
+            <TabsTrigger value="hdec_pic">By HDEC PIC</TabsTrigger>
+            <TabsTrigger value="hdec_eng">By HDEC ENG</TabsTrigger>
             <TabsTrigger value="dis">By DIS</TabsTrigger>
             <TabsTrigger value="batch">By Batch</TabsTrigger>
           </TabsList>
           <TabsContent value="team" className="mt-3">
             <CrossCutList cells={data.byTeam} keyName="team" onOpen={onOpen} />
           </TabsContent>
-          <TabsContent value="pic" className="mt-3">
-            <CrossCutList cells={data.byPic} keyName="pic" onOpen={onOpen} />
+          <TabsContent value="hdec_pic" className="mt-3">
+            <CrossCutList cells={data.byHdecPic} keyName="hdec_pic_name" onOpen={onOpen} />
+          </TabsContent>
+          <TabsContent value="hdec_eng" className="mt-3">
+            <CrossCutList cells={data.byHdecEng} keyName="hdec_eng_name" onOpen={onOpen} />
           </TabsContent>
           <TabsContent value="dis" className="mt-3">
             <CrossCutList cells={data.byDis} keyName="dis" onOpen={onOpen} />
@@ -707,7 +712,7 @@ function CrossCutList({
   onOpen,
 }: {
   cells: CrossCutCell[];
-  keyName: "team" | "pic" | "dis" | "batch";
+  keyName: "team" | "hdec_pic_name" | "hdec_eng_name" | "dis" | "batch";
   onOpen: (params?: Record<string, string>) => void;
 }) {
   const rows = cells.slice(0, 12);

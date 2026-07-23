@@ -115,7 +115,8 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
               <div><span className="text-muted-foreground">Sl.No</span><div className="font-medium">{item.sl_no ?? "—"}</div></div>
               <div><span className="text-muted-foreground">OCS No</span><div className="font-medium">{item.abd_ocs_no ?? "—"}</div></div>
               <div className="col-span-2"><span className="text-muted-foreground">Document Title</span><div className="font-medium">{item.document_title ?? "—"}</div></div>
-              <div><span className="text-muted-foreground">PIC</span><div className="font-medium">{item.pic ?? "—"}</div></div>
+              <div><span className="text-muted-foreground">HDEC PIC</span><div className="font-medium">{item.hdec_pic_name ?? "—"}</div></div>
+              <div><span className="text-muted-foreground">HDEC ENG</span><div className="font-medium">{item.hdec_eng_name ?? "—"}</div></div>
               <div><span className="text-muted-foreground">Latest Rev</span><div className="font-medium">{item.latest_rev ?? "—"}</div></div>
               <div><span className="text-muted-foreground">Latest Status</span><div className="font-medium">{item.latest_status ?? "—"}</div></div>
               <div><span className="text-muted-foreground">Approval Date</span><div className="font-medium">{fmtDate(item.approval_date)}</div></div>

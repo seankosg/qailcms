@@ -98,7 +98,8 @@ function buildFiltersFromProgressContext(urlSearch: any): ColumnFiltersState {
   };
   addMulti("dis", urlSearch.dis);
   addMulti("service", urlSearch.service);
-  addMulti("pic", urlSearch.pic);
+  addMulti("hdec_pic_name", urlSearch.hdec_pic_name);
+  addMulti("hdec_eng_name", urlSearch.hdec_eng_name);
   addMulti("doc_ax", urlSearch.docAx);
   addMulti("doc_axx", urlSearch.docAxx);
   addMulti("batch_no", urlSearch.batch);

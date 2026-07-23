@@ -113,9 +113,17 @@ export function AbdImportPage() {
     {
       fieldLabel: "HDEC PIC",
       masterKind: "hdec_pic",
-      read: (r) => r.pic,
+      read: (r) => r.hdec_pic_name,
       write: (r, v) => {
-        r.pic = v;
+        r.hdec_pic_name = v;
+      },
+    },
+    {
+      fieldLabel: "HDEC ENG",
+      masterKind: "hdec_eng",
+      read: (r) => r.hdec_eng_name,
+      write: (r, v) => {
+        r.hdec_eng_name = v;
       },
     },
   ];
