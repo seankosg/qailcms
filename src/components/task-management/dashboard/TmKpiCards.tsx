@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ProgressKpiCard } from "./ProgressKpiCard";
 import { RiskKpiCard, type RiskKpiBreakdownRow } from "./RiskKpiCard";
-import { StatusMixBar } from "./StatusMixBar";
+import { StatusMixDonut } from "./StatusMixDonut";
 import { CriticalThresholdPopover } from "@/components/task-management/shared/CriticalThresholdPopover";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import {
@@ -33,6 +33,7 @@ interface Props {
     discipline?: string[];
   };
   statusMixSideSlot?: ReactNode;
+  statusMixLeftExtraSlot?: ReactNode;
 }
 
 const SCOPE_LABEL: Record<TaskScope, string> = {
@@ -52,6 +53,7 @@ export function TmKpiCards({
   onDisciplinesChange,
   ownerContext,
   statusMixSideSlot,
+  statusMixLeftExtraSlot,
 }: Props) {
   const navigate = useNavigate();
   const { data: thresholds } = useTaskManagementSettings();
@@ -164,15 +166,18 @@ export function TmKpiCards({
         />
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <StatusMixBar
-          total={kpi.total}
-          completed={kpi.completed}
-          wip={kpi.wip}
-          notStarted={kpi.notStarted}
-          onSegmentClick={(seg) => goRaw(seg)}
-        />
-        <div className="min-w-0">{statusMixSideSlot}</div>
+      <div className="grid gap-3 lg:grid-cols-4">
+        <div className="min-w-0 lg:col-span-1">
+          <StatusMixDonut
+            total={kpi.total}
+            completed={kpi.completed}
+            wip={kpi.wip}
+            notStarted={kpi.notStarted}
+            onSegmentClick={(seg) => goRaw(seg)}
+          />
+        </div>
+        <div className="min-w-0 lg:col-span-1">{statusMixLeftExtraSlot}</div>
+        <div className="min-w-0 lg:col-span-2">{statusMixSideSlot}</div>
       </div>
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
