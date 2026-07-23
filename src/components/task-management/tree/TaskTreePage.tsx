@@ -18,7 +18,12 @@ import { ChevronDown, ChevronRight, Download, Loader2, Search } from "lucide-rea
 import { cn } from "@/lib/utils";
 import { DISCIPLINES, AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
 import type { Discipline } from "@/lib/task-management/columns";
-import { computeJudgment, expectedProgressToday, todayGap, worstJudgment } from "@/lib/task-management/derived";
+import {
+  computeJudgment,
+  cumPlanProgress,
+  computeVariance,
+  worstJudgment,
+} from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -390,8 +395,10 @@ export function TaskTreePage() {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
           const worst = worstJudgment(kids.map((k) => k.auto_judgment)) ?? p.auto_judgment;
-          const behindCount = kids.filter((k) => todayGap(k, asOfDate) < -0.05).length;
-          const pGap = todayGap(p, asOfDate);
+          const behindCount = kids.filter(
+            (k) => (computeVariance(k, asOfDate) ?? 0) < -0.05,
+          ).length;
+          const pGap = computeVariance(p, asOfDate) ?? 0;
           return (
             <Card key={p.id} className="overflow-hidden">
               <CardHeader
@@ -462,7 +469,7 @@ export function TaskTreePage() {
                     </thead>
                     <tbody>
                       {kids.map((k) => {
-                        const gap = todayGap(k, asOfDate);
+                        const gap = computeVariance(k, asOfDate) ?? 0;
                         const j = k.auto_judgment ?? computeJudgment(k, undefined, asOfDate);
                         return (
                           <tr
@@ -487,7 +494,7 @@ export function TaskTreePage() {
                               <ProgressBar v={k.actual_progress} />
                             </td>
                             <td className="px-2 py-1 tabular-nums text-[10px]">
-                              {(expectedProgressToday(k, asOfDate) * 100).toFixed(0)}%
+                              {(cumPlanProgress(k, asOfDate) * 100).toFixed(0)}%
                             </td>
                             <td className="px-2 py-1">
                               <GapCell gap={gap} />
