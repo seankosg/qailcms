@@ -900,6 +900,50 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           } catch (e) {
             console.warn("[task-import] row-log insert failed", e);
           }
+
+          // Field-level logs
+          try {
+            const pendingFieldLogs: PendingFieldLog[] = [];
+            applied.forEach((p, idx) => {
+              const taskKey = String(p.task_no ?? "");
+              const rawRowNo = idx + 1;
+              const rej = rejectedByTaskNo.get(taskKey);
+              if (rej) {
+                pendingFieldLogs.push(
+                  buildFieldLog("task_management", {
+                    rawRowNo,
+                    field: "__row__",
+                    outcome: "rejected_invalid",
+                    raw: taskKey,
+                    code: rej.reason_code,
+                    detail: rej.reason_detail ?? null,
+                  }),
+                );
+                return;
+              }
+              const prior = existingByTaskNo.get(p.task_no) ?? {};
+              const wasExisting = existingSet.has(p.task_no);
+              for (const fname of TM_TRACKED_FIELDS) {
+                const incoming = (p as any)[fname] ?? null;
+                const previous = prior[fname] ?? null;
+                const cls = classifyChange(incoming, previous);
+                if (cls === "empty") continue;
+                pendingFieldLogs.push(
+                  buildFieldLog("task_management", {
+                    rawRowNo,
+                    field: fname,
+                    outcome: cls === "applied" ? "applied" : "unchanged",
+                    raw: incoming,
+                    applied: incoming,
+                    previous: wasExisting ? previous : null,
+                  }),
+                );
+              }
+            });
+            await flushFieldLogs(supabase, logId, userId, pendingFieldLogs);
+          } catch (e) {
+            console.warn("[task-import] field-log insert failed", e);
+          }
         }
 
         // Schedule Revision audit — Plan Start / Plan End / Forecast End 변경 이력 기록
