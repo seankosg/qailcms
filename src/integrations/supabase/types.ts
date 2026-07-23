@@ -3536,6 +3536,13 @@ export type Database = {
       rollup_task_all_mains: { Args: { _discipline: string }; Returns: number }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      tm_today_actual: {
+        Args: { _as_of: string; _ids: string[] }
+        Returns: {
+          id: string
+          t_actual: number
+        }[]
+      }
       update_task_summary: {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
