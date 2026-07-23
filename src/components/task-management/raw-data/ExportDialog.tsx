@@ -14,6 +14,7 @@ import { Download, Loader2 } from "lucide-react";
 import { TM_COLUMNS } from "@/lib/task-management/columns";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
+import { computeVariance } from "@/lib/task-management/derived";
 import { toast } from "sonner";
 
 type ExportFormat = "view" | "reimport";
@@ -84,6 +85,15 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       const isView = format === "view";
       const keys = isView ? visibleKeys : TM_COLUMNS.map((c) => c.key);
 
+      // Cum. Diff(=progress_variance) 는 파생 계산(actual - Cum.Plan). 임포트값 무시.
+      const derivedRows = rows.map((r) => {
+        const v = computeVariance(
+          r as any,
+          ((r as any).data_date as string | null) ?? undefined,
+        );
+        return { ...r, progress_variance: v };
+      });
+
       const columns = keys.map((k) => ({
         key: k,
         label: isView ? resolveLabel(k) : k,
@@ -142,7 +152,7 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
           ...commonWriterOpts,
           filename: `task-management_${format}_${ts}.xlsx`,
           header: buildHeader(),
-          fetchPage: pagerFor(rows),
+          fetchPage: pagerFor(derivedRows),
         });
         toast.success(`${rows.length.toLocaleString()}건 내보내기 완료`, { id: toastId });
         onOpenChange(false);
@@ -152,7 +162,7 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       // ── Per-axis split ──
       const axisKey = axis;
       const groups = new Map<string, Record<string, unknown>[]>();
-      for (const r of rows) {
+      for (const r of derivedRows) {
         const raw = (r as any)[axisKey];
         const key = raw != null && String(raw).trim() ? String(raw).trim() : "Unassigned";
         if (!groups.has(key)) groups.set(key, []);
