@@ -213,6 +213,16 @@ export function TaskTreePage() {
     });
   }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfDate]);
 
+  // 완료(Actual% ≥ 100%) Main Task 는 하단으로 정렬
+  const sortedFiltered = useMemo(() => {
+    const isDone = (r: Row) => Number(r.actual_progress ?? 0) >= 1;
+    return [...filtered].sort((a, b) => {
+      const da = isDone(a) ? 1 : 0;
+      const db = isDone(b) ? 1 : 0;
+      return da - db;
+    });
+  }, [filtered]);
+
   function toggle(taskNo: string) {
     setExpanded((cur) => {
       const next = new Set(cur);
@@ -391,9 +401,10 @@ export function TaskTreePage() {
       {isLoading && <div className="text-sm text-muted-foreground">로딩 중…</div>}
 
       <div className="space-y-2">
-        {filtered.map((p) => {
+        {sortedFiltered.map((p) => {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
+          const isDone = Number(p.actual_progress ?? 0) >= 1;
           const mainJudgment =
             (p.auto_judgment && p.auto_judgment.trim()) ||
             computeJudgment(p, undefined, asOfDate);
@@ -402,7 +413,7 @@ export function TaskTreePage() {
           ).length;
           const pGap = computeVariance(p, asOfDate) ?? 0;
           return (
-            <Card key={p.id} className="overflow-hidden">
+            <Card key={p.id} className={cn("overflow-hidden", isDone && "bg-muted/60 text-muted-foreground opacity-70")}> 
               <CardHeader
                 className={cn(
                   "cursor-pointer flex flex-row items-center gap-2 py-2",
