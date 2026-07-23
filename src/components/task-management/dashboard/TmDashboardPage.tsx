@@ -291,12 +291,12 @@ export function TmDashboardPage() {
               </Tabs>
             </div>
 
-            <div className="ml-auto flex items-center gap-1.5">
-              <Search className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
+              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <Input
                 value={search.q}
                 placeholder="task_no / 이름 / 담당"
-                className="h-8 w-56 text-xs"
+                className="h-8 w-full text-xs sm:w-56"
                 onChange={(e) => patch({ q: e.target.value })}
               />
             </div>
