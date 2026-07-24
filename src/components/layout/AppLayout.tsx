@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2, HardHat,
+  LayoutDashboard, Database, Upload, FileClock, RefreshCw, LogOut, Menu, ChevronDown, ChevronRight, Package, ShieldCheck, Settings2, Users, AlertTriangle, FileSpreadsheet, ClipboardList, FileCheck2, HardHat, UserCircle2,
 } from "lucide-react";
 import { ListTree, Sliders, TrendingUp, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,10 @@ type NavSection = {
 };
 
 const NAV: NavSection[] = [
+  {
+    label: "My Work Space",
+    dashboard: { to: "/my-work-space", label: "My Work Space", icon: UserCircle2 },
+  },
   {
     label: "Outstanding Work",
     dashboard: { to: "/outstanding/dashboard", label: "Dashboard", icon: LayoutDashboard },

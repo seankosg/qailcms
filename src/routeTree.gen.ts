@@ -13,6 +13,7 @@ import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedMyWorkSpaceRouteImport } from './routes/_authenticated/my-work-space'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
@@ -79,6 +80,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedMyWorkSpaceRoute =
+  AuthenticatedMyWorkSpaceRouteImport.update({
+    id: '/my-work-space',
+    path: '/my-work-space',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -357,6 +364,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
@@ -407,6 +415,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
+  '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
@@ -460,6 +469,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/_authenticated/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/_authenticated/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/_authenticated/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/_authenticated/admin/masters': typeof AuthenticatedAdminMastersRoute
@@ -513,6 +523,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/admin'
+    | '/my-work-space'
     | '/admin/backup'
     | '/admin/mapping'
     | '/admin/masters'
@@ -563,6 +574,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/change-password'
+    | '/my-work-space'
     | '/admin/backup'
     | '/admin/mapping'
     | '/admin/masters'
@@ -615,6 +627,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/_authenticated/admin'
+    | '/_authenticated/my-work-space'
     | '/_authenticated/admin/backup'
     | '/_authenticated/admin/mapping'
     | '/_authenticated/admin/masters'
@@ -702,6 +715,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/my-work-space': {
+      id: '/_authenticated/my-work-space'
+      path: '/my-work-space'
+      fullPath: '/my-work-space'
+      preLoaderRoute: typeof AuthenticatedMyWorkSpaceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
@@ -1085,6 +1105,7 @@ const AuthenticatedClosureSparePartImportRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
+  AuthenticatedMyWorkSpaceRoute: typeof AuthenticatedMyWorkSpaceRoute
   AuthenticatedCloseoutDashboardRoute: typeof AuthenticatedCloseoutDashboardRoute
   AuthenticatedImportLogImportRoute: typeof AuthenticatedImportLogImportRoute
   AuthenticatedImportLogLogsRoute: typeof AuthenticatedImportLogLogsRoute
@@ -1122,6 +1143,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
+  AuthenticatedMyWorkSpaceRoute: AuthenticatedMyWorkSpaceRoute,
   AuthenticatedCloseoutDashboardRoute: AuthenticatedCloseoutDashboardRoute,
   AuthenticatedImportLogImportRoute: AuthenticatedImportLogImportRoute,
   AuthenticatedImportLogLogsRoute: AuthenticatedImportLogLogsRoute,

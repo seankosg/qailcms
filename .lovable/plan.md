@@ -1,85 +1,83 @@
-# TM 상세페이지 컴팩트 리디자인 계획 (v2)
+# My Work Space — 최종 계획 (Admin 전체 열람 추가)
 
-현재 필드 구성과 7개 그룹(Identification / Task / Status / Plan / Actual / Forecast / System) 분류는 그대로 유지하면서, 시각 밀도·정보 계층·편집 어포던스만 개선합니다. **데스크톱에서 Comments 패널 위치(우측 컬럼)는 현재와 동일하게 유지합니다.**
+## 1. 사이드바
+`AppLayout.tsx` NAV 최상단에 "MY WORK SPACE" 섹션 추가 (`/my-work-space`, User 아이콘). 모든 인증 사용자에게 노출.
 
-## 현재 문제점 요약
+## 2. 라우트 / 파일
+- `src/routes/_authenticated/my-work-space.tsx`
+- `src/components/my-work-space/MyWorkSpacePage.tsx`
+- `src/components/my-work-space/ModuleKpiCard.tsx`
+- `src/components/my-work-space/ModuleRowList.tsx`
+- `src/hooks/useMyWorkspaceData.ts`
 
-- 그룹 카드가 세로로만 쌓여 스크롤 길이가 길다 (7개 섹션 × 2열 목록).
-- 각 필드가 `label(min-w 110px) + value(px-1.5 py-0.5)` 한 줄 구조라 값이 짧아도 세로 공간을 균등 소비.
-- 편집 가능/불가 구분이 배경 음영 하나뿐 → 편집 어포던스가 약함.
-- 헤더의 Task No · Discipline · Team · Task Name이 한 줄에 몰려 모바일에서 줄바꿈 붕괴.
+## 3. 데이터 조회 (Admin 예외 포함)
 
-## 리디자인 방향 (레이아웃/디자인만, 데이터·권한·필드 셋 변경 없음)
+`useCurrentUser()`에서 `isAdmin`, `hdec_pic_name`를 읽어 필터 결정:
 
-### 1. 헤더 컴팩트화
-- 2행 구조:
-  - 1행: 뒤로가기 · `Task No`(mono, 큰 글씨) · 편집 상태 뱃지 · Refresh
-  - 2행: Discipline / Team / Level / Risk / Status 뱃지 스트립 (`text-[10px] h-5` 통일)
-- Task Name은 헤더 아래 한 줄로 분리, `truncate` + 툴팁.
-- responsive-layout-patterns의 grid + min-w-0 + shrink-0 패턴 적용.
-
-### 2. 본문 레이아웃 (Comments 위치 유지)
-- 최상위 그리드는 현재와 동일하게 `lg:grid-cols-3`, 본문 `lg:col-span-2`, Comments 우측 1컬럼 유지.
-- **좌측 본문 내부만** 밀도형 재편:
-  - 그룹 카드 내부 그리드를 `md:grid-cols-2 xl:grid-cols-3`으로 확장(카드 자체는 세로 스택 유지).
-  - 카드 padding `p-3 → p-2.5`, 헤더 라벨 `text-[10px] uppercase` + 그룹 색상 dot(`GROUP_HEADER_BG` 재사용).
-- 필드 리스트를 `<dl>` 시맨틱으로 전환:
-  - `dt`: `text-[10px] text-muted-foreground`, 우측 정렬, 고정 `w-[92px]`.
-  - `dd`: `text-xs`, `truncate`, hover 시 편집 어포던스 표시.
-  - 행 높이 `h-6` 균일 → 세로 밀도 30~40% 개선.
-
-### 3. 편집 어포던스 개선 (권한 로직 불변)
-- 편집 가능 필드: hover 시 `ring-1 ring-primary/30` + 우측 미세한 연필 아이콘.
-- 편집 불가 필드: 현재의 `bg-muted/60` 대신 `text-muted-foreground/80` + 좌측 `border-l-2 border-dashed border-muted pl-1.5` 인디케이터.
-- Owner 전용(Team / Data Date)은 좌측에 `key` 아이콘으로 "권한 편집" 표기.
-
-### 4. 값 표현 정제
-- `date`: `formatDdMmm` 유지, `font-mono tabular-nums` 통일.
-- `percent`: 숫자 + 얇은 프로그레스 바(`h-1 bg-muted` / `bg-primary`)를 값 아래 병기 (Actual %, Plan %, T.Actual 등). 데이터 변경 없음.
-- `boolean`: Yes/No를 Check/X 아이콘으로 축약.
-- 빈 값 `—`을 `text-muted-foreground/40 text-[10px]`로 낮은 강조.
-
-### 5. Comments 사이드바 (데스크톱 위치 유지)
-- 데스크톱(lg 이상): 현재 그리드의 우측 컬럼 위치 그대로 유지. 다만 카드에 `sticky top-4 max-h-[calc(100vh-6rem)] overflow-auto`만 추가하여 긴 본문 스크롤 시에도 함께 보이도록 개선(위치 자체는 이동 없음).
-- 모바일(lg 미만): 현재와 동일하게 본문 하단으로 자연 배치.
-
-### 6. 반응형 & 접근성
-- 모바일(<768): 그룹 카드 1열, 필드 라벨 상단·값 하단 스택으로 자동 전환.
-- 모든 편집 셀에 `role="button"` + `aria-label="{label} 편집"`.
-- 헤더/뱃지 스트립에 `flex-wrap gap-1.5` + shrink-0 유지.
-
-## 기술 세부
-
-- 수정 파일: `src/components/task-management/detail/TaskDetailPage.tsx` 단일. `EditCellPopover`, `columns.ts`, 서버 함수, 훅은 변경 없음.
-- 같은 파일 내 하위 컴포넌트로 분리:
-  - `DetailHeader({row})`
-  - `GroupCard({group, cols, row, ...perm})`
-  - `FieldRow({col, value, editable, onSave})` — dl/dt/dd 렌더링.
-  - `PercentValue({value})` — 숫자 + 미니 progress bar.
-- semantic 토큰(`bg-card`, `text-muted-foreground`, `bg-primary`, `ring-primary/30`)만 사용. 하드코딩 색상 금지.
-- 그룹 강조 색상은 기존 `GROUP_HEADER_BG` 재사용.
-
-## 예상 레이아웃 (데스크톱 lg+)
-
-```text
-┌───────── Header (2 rows) ─────────┐
-│  ← 목록  TASK_NO  [편집]  [Refresh]│
-│  [Disc][Team][Lvl][Risk][Status]  │
-│  Task Name                        │
-└───────────────────────────────────┘
-┌──── Body (col-span-2) ────┐┌ Comments ┐
-│ [ID][Task][Status]        ││ sticky   │
-│ [Plan][Actual][Forecast]  ││ (우측    │
-│ [System                  ]││  유지)   │
-└───────────────────────────┘└──────────┘
+```ts
+const filterPic = me.isAdmin ? null : me.hdec_pic_name;
+// filterPic === null: WHERE 절에 hdec_pic_name 조건 미적용 → 전체 조회
+// 그 외: WHERE hdec_pic_name = filterPic
 ```
 
-## 비변경 항목
+- **Admin (admin / superuser)**: 담당자 필터 없이 TM/SM/ABD 전체 데이터 조회
+- **일반 사용자**: 본인 `hdec_pic_name`으로 필터
+- **`hdec_pic_name`이 null인 비-Admin 사용자**: "프로필에 HDEC PIC가 지정되지 않았습니다" 안내
 
-- 필드 목록, 라벨(`useTmColumnLabel`), 그룹 분류, 편집 권한 규칙, `EditCellPopover` 동작, `renderFieldValue` 데이터 해석.
-- Comments 스레드 컴포넌트/카테고리, **데스크톱 우측 배치**.
-- 라우팅, 쿼리 키, 서버 함수.
+상한: 개인 2,000행 / Admin 5,000행. 초과 시 배지 안내 및 "Raw Data에서 전체 보기" 링크.
 
-## 다음 단계
+## 4. 페이지 헤더 표기
 
-승인 시 `TaskDetailPage.tsx` 한 파일만 리팩터하여 위 컴팩트 레이아웃을 적용하고, 모바일·데스크톱 두 뷰포트에서 스크린샷으로 회귀 검증합니다.
+- 개인: `My Work Space · 담당자(HDEC PIC): <이름>`
+- Admin: `My Work Space · 관리자 전체 보기` 배지 표시로 스코프 인지도 확보
+
+## 5. KPI 카드 (5종, 시인성 강조 디자인)
+
+카드 구성 (Total / WIP / 지연 / 임박 / 완료), 각 카드에 값 + `%(대비 Total)` 표시.
+
+**시인성 강조 스펙**
+- 좌측 4px 컬러 바 + 카드 상단 상태 dot + uppercase 라벨
+- 상태 컬러: WIP=info(파랑) · 지연=destructive(빨강) · 임박=warning(앰버, 값>0 시 컬러 바 `animate-pulse`) · 완료=success(초록) · Total=중립
+- 큰 숫자 `text-4xl font-bold tabular-nums` + 옆 `%` pill 배지
+- 카드 하단 2px progress bar (상태색)
+- Hover `shadow-md`+`ring-primary/30`, 클릭 시 하단 리스트박스 해당 탭 자동 선택 + 스크롤
+- `src/styles.css`에 `--info/--warning/--success` 토큰 없으면 oklch로 신규 정의(light/dark)
+- 반응형: `grid-cols-2 md:grid-cols-3 lg:grid-cols-5`
+
+## 6. 리스트박스 (탭 + 스크롤 + 드릴다운)
+
+- 탭: `[전체 N] [위험 N] [임박 N]` (기본: 전체)
+  - 위험/임박 판정은 KPI와 동일 로직
+- 높이 ≈ 10행 (`max-h-[440px] overflow-y-auto`), sticky header
+- 정렬: 모듈 기본 정렬 (TM: task_no, SM: issue_no, ABD: drawing_no)
+- 컬럼:
+  - TM: Task No · Task · P.Finish · Actual% · 판정
+  - SM: Issue No · Location · Trade · Reported · Status
+  - ABD: Drawing No · Title · Round · Plan Date · Status
+- Admin 모드일 때만 각 리스트 첫 컬럼 앞에 "HDEC PIC" 컬럼 추가 표시 (담당자 식별)
+- 행 클릭 드릴다운:
+  - TM → `/closure/task-management/detail/$id`
+  - SM → `/closure/snag-management/detail/$id`
+  - ABD → `AbdDetailSheet` 오픈
+- 빈 상태: "해당 조건 항목 없음"
+
+## 7. 페이지 레이아웃
+
+```
+[Header: My Work Space · 담당자/관리자 모드 배지]
+
+── Task Management ──
+[Total][WIP][지연][임박][완료]
+[전체][위험][임박] 탭
+스크롤 리스트박스
+
+── Snag List ──   동일 패턴
+── As Built Drawing ──   동일 패턴
+```
+
+## 8. 변경 요약
+
+- 추가 5개 파일 (라우트/페이지/카드/리스트/훅)
+- 수정: `AppLayout.tsx` (NAV), `src/styles.css` (상태 토큰 필요 시)
+
+DB/서버 함수 변경 없음. Admin 전체 조회는 기존 테이블 RLS 정책(Admin 전체 접근 허용)에 의존.
