@@ -227,11 +227,12 @@ export function computeKpiBreakdownByTeam(
   const criticalDelay = new Map<string, KpiTeamBreakdownEntry>();
   const behindSchedule = new Map<string, KpiTeamBreakdownEntry>();
   for (const r of rows) {
-    if (isInDelay(r, asOf)) bumpTeam(inDelay, r);
-    if (isStartDelayed(r, asOf)) bumpTeam(startDelayed, r);
-    if (isCompletionOverdue(r, asOf)) bumpTeam(completionOverdue, r);
+    const inDelayFlag = isInDelay(r, asOf);
+    if (inDelayFlag) bumpTeam(inDelay, r);
+    if (inDelayFlag && isStartDelayed(r, asOf)) bumpTeam(startDelayed, r);
+    if (inDelayFlag && isCompletionOverdue(r, asOf)) bumpTeam(completionOverdue, r);
     if (isCriticalDelay(r, asOf, thresholds)) bumpTeam(criticalDelay, r);
-    if (isBehindSchedule(r, asOf)) bumpTeam(behindSchedule, r);
+    if (inDelayFlag && isBehindSchedule(r, asOf)) bumpTeam(behindSchedule, r);
   }
   return {
     inDelay: sortEntries(inDelay),
