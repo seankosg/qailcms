@@ -39,7 +39,6 @@ import {
   History,
   Pin,
   Plus,
-  RotateCcw,
   Search,
   Sliders,
   Upload,
@@ -1044,19 +1043,6 @@ export function TaskManagementRawDataPage() {
     [rowModel.rows],
   );
 
-  function resetAll() {
-    setSorting(DEFAULT_SORTING);
-    setSizing({});
-    setVisibility({});
-    setColumnFilters([]);
-    setGlobalFilter("");
-    setSearchInput("");
-    setOrder(DEFAULT_ORDER);
-    setFrozenExtras(DEFAULT_FROZEN_EXTRAS);
-    setRowSelection({});
-    setDelayMode(null);
-  }
-
   const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
   const allCollapsed = parentKeys.length > 0 && collapsedParents.size >= parentKeys.length;
 
@@ -1117,13 +1103,7 @@ export function TaskManagementRawDataPage() {
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
           />
-          <Button variant="outline" size="sm" className="h-8" onClick={resetAll}>
-            <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
-          </Button>
           </div>
-          <Button variant="outline" size="sm" className="h-8" onClick={() => refetch()}>
-            Refresh
-          </Button>
           <Button
             variant="outline"
             size="sm"
