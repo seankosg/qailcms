@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCcw, ShieldCheck, ShieldOff } from "lucide-react";
+import { ArrowLeft, RefreshCcw, ShieldCheck, ShieldOff, Pencil, KeyRound, Check, X } from "lucide-react";
 import {
   TM_COLUMNS,
   DISCIPLINE_COLORS,
@@ -16,6 +16,7 @@ import {
   STATUS_COLORS,
   AUTO_JUDGMENT_COLORS,
   PLOT_COLORS,
+  GROUP_HEADER_BG,
   type TmColumnDef,
 } from "@/lib/task-management/columns";
 import { EditCellPopover } from "../raw-data/EditCellPopover";
@@ -36,6 +37,8 @@ const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   forecast: "Forecast",
   system: "System",
 };
+
+const OWNER_FIELDS = new Set(["team", "data_date"]);
 
 export function TaskDetailPage() {
   const { id } = useParams({ from: "/_authenticated/closure/task-management/detail/$id" });
@@ -87,55 +90,89 @@ export function TaskDetailPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <header className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="ghost" size="sm" onClick={() => router.history.back()}>
+    <div className="space-y-3">
+      {/* Header row 1 */}
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-7 shrink-0 px-2" onClick={() => router.history.back()}>
             <ArrowLeft className="mr-1 h-3.5 w-3.5" /> 목록
           </Button>
-          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <span className="font-mono">{row.task_no ?? "—"}</span>
-            {row.discipline && (
-              <Badge className={cn("text-[10px]", DISCIPLINE_COLORS[String(row.discipline)] ?? TEAM_FALLBACK_COLOR)}>
-                {row.discipline}
-              </Badge>
-            )}
-            {row.team && (
-              <Badge className={cn("text-[10px]", TEAM_COLORS[String(row.team)] ?? TEAM_FALLBACK_COLOR)}>
-                {row.team}
-              </Badge>
-            )}
-            {row.task_name && <span className="text-sm font-normal text-muted-foreground">· {row.task_name}</span>}
-          </h1>
+          <span className="truncate font-mono text-lg font-semibold tracking-tight">{row.task_no ?? "—"}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           {isAdmin ? (
-            <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-              <ShieldCheck className="mr-1 h-3 w-3" /> 편집 가능
+            <Badge className="h-5 text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              <ShieldCheck className="mr-1 h-3 w-3" /> 편집
             </Badge>
           ) : (
-            <Badge className="text-[10px] bg-zinc-500/15 text-zinc-700 dark:text-zinc-300">
-              <ShieldOff className="mr-1 h-3 w-3" /> 읽기 전용
+            <Badge className="h-5 text-[10px] bg-zinc-500/15 text-zinc-700 dark:text-zinc-300">
+              <ShieldOff className="mr-1 h-3 w-3" /> 읽기전용
             </Badge>
           )}
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
+          <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCcw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
           </Button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-3">
+      {/* Badge strip */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {row.level && (
+          <Badge variant="outline" className="h-5 text-[10px]">
+            {row.level === "main" ? "Main" : "Sub"}
+          </Badge>
+        )}
+        {row.discipline && (
+          <Badge className={cn("h-5 text-[10px]", DISCIPLINE_COLORS[String(row.discipline)] ?? TEAM_FALLBACK_COLOR)}>
+            {row.discipline}
+          </Badge>
+        )}
+        {row.team && (
+          <Badge className={cn("h-5 text-[10px]", TEAM_COLORS[String(row.team)] ?? TEAM_FALLBACK_COLOR)}>
+            {row.team}
+          </Badge>
+        )}
+        {row.risk && (
+          <Badge className={cn("h-5 text-[10px]", RISK_COLORS[String(row.risk)] ?? TEAM_FALLBACK_COLOR)}>
+            {row.risk}
+          </Badge>
+        )}
+        {row.status_manual && (
+          <Badge className={cn("h-5 text-[10px]", STATUS_COLORS[String(row.status_manual)] ?? TEAM_FALLBACK_COLOR)}>
+            {row.status_manual}
+          </Badge>
+        )}
+        {row.auto_judgment && (
+          <Badge className={cn("h-5 text-[10px]", AUTO_JUDGMENT_COLORS[String(row.auto_judgment)] ?? TEAM_FALLBACK_COLOR)}>
+            {row.auto_judgment}
+          </Badge>
+        )}
+      </div>
+
+      {row.task_name && (
+        <h2 className="truncate text-sm text-foreground" title={String(row.task_name)}>
+          {row.task_name}
+        </h2>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="space-y-3 lg:col-span-2">
           {Object.entries(grouped).map(([grp, cols]) => (
-            <div key={grp} className="rounded-lg border bg-card p-3">
-              <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {GROUP_LABELS[grp as TmColumnDef["group"]] ?? grp}
+            <section key={grp} className="rounded-md border bg-card p-2.5">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    GROUP_HEADER_BG[grp as TmColumnDef["group"]] ?? "bg-muted",
+                  )}
+                />
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {GROUP_LABELS[grp as TmColumnDef["group"]] ?? grp}
+                </div>
               </div>
-              <div className="grid grid-cols-1 gap-x-4 gap-y-2 md:grid-cols-2">
+              <dl className="grid grid-cols-1 gap-x-3 gap-y-0.5 md:grid-cols-2 xl:grid-cols-3">
                 {cols.map((c) => {
                   const v = row[c.key];
-                  const display = renderFieldValue(c, v);
-                  // task_no는 컬럼 정의상 non-editable이지만 Admin/Super User(d_superuser)는 상세페이지에서 편집 허용
                   const isTaskNoOverride = c.key === "task_no" && canEditTaskNo;
                   const isTeamOverride = c.key === "team" && canEditOwnerFields;
                   const isDataDateOverride = c.key === "data_date" && canEditOwnerFields;
@@ -159,55 +196,74 @@ export function TaskDetailPage() {
                     !!effectiveColumn.editorType &&
                     effectiveCanEdit &&
                     !(c.key === "actual_progress" && isParent);
+                  const isOwnerField = OWNER_FIELDS.has(c.key);
+                  const label = resolveLabel(c.key);
+                  const display = renderFieldValue(c, v);
                   return (
-                    <div key={c.key} className="flex items-baseline gap-2">
-                      <div className="min-w-[110px] text-[11px] text-muted-foreground">
-                        {resolveLabel(c.key)}
-                      </div>
-                      <div
-                        className={cn(
-                          "flex-1 text-xs rounded px-1.5 py-0.5",
-                          !editable && "bg-muted/60 text-muted-foreground",
+                    <div
+                      key={c.key}
+                      className="group flex min-h-[24px] items-center gap-1.5 border-b border-dashed border-border/40 py-0.5 last:border-0"
+                    >
+                      <dt
+                        className="flex w-[92px] shrink-0 items-center justify-end gap-1 text-right text-[10px] uppercase tracking-wide text-muted-foreground"
+                        title={label}
+                      >
+                        {isOwnerField && editable && (
+                          <KeyRound className="h-2.5 w-2.5 text-primary/60" aria-label="권한 편집" />
                         )}
+                        <span className="truncate">{label}</span>
+                      </dt>
+                      <dd
+                        className={cn(
+                          "flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-0.5 text-xs",
+                          editable
+                            ? "cursor-pointer transition-shadow hover:ring-1 hover:ring-primary/30"
+                            : "border-l-2 border-dashed border-muted pl-1.5 text-muted-foreground/80",
+                        )}
+                        aria-label={editable ? `${label} 편집` : label}
+                        role={editable ? "button" : undefined}
                       >
                         {editable ? (
-                          <EditCellPopover
-                            rowId={String(row.id)}
-                            column={effectiveColumn}
-                            currentValue={v}
-                            canEdit={effectiveCanEdit}
-                            onSaved={onFieldSaved}
-                            onSave={
-                              useOwnerSave
-                                ? async (value) => {
-                                    await updateOwnerFieldFn({
-                                      data: {
-                                        id: String(row.id),
-                                        field: effectiveColumn.key,
-                                        value: value ?? null,
-                                      },
-                                    });
-                                  }
-                                : undefined
-                            }
-                          >
-                            {display}
-                          </EditCellPopover>
+                          <>
+                            <EditCellPopover
+                              rowId={String(row.id)}
+                              column={effectiveColumn}
+                              currentValue={v}
+                              canEdit={effectiveCanEdit}
+                              onSaved={onFieldSaved}
+                              onSave={
+                                useOwnerSave
+                                  ? async (value) => {
+                                      await updateOwnerFieldFn({
+                                        data: {
+                                          id: String(row.id),
+                                          field: effectiveColumn.key,
+                                          value: value ?? null,
+                                        },
+                                      });
+                                    }
+                                  : undefined
+                              }
+                            >
+                              <span className="block min-w-0 truncate">{display}</span>
+                            </EditCellPopover>
+                            <Pencil className="ml-auto h-2.5 w-2.5 shrink-0 text-muted-foreground/0 transition-colors group-hover:text-muted-foreground/70" />
+                          </>
                         ) : (
-                          display
+                          <span className="block min-w-0 truncate">{display}</span>
                         )}
-                      </div>
+                      </dd>
                     </div>
                   );
                 })}
-              </div>
-            </div>
+              </dl>
+            </section>
           ))}
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-lg border bg-card p-3">
-            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-md border bg-card p-2.5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-auto">
+            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Comments
             </div>
             <CommentsThread
@@ -225,7 +281,7 @@ export function TaskDetailPage() {
 }
 
 function renderFieldValue(c: TmColumnDef, v: any) {
-  if (v == null || v === "") return <span className="text-muted-foreground/50">—</span>;
+  if (v == null || v === "") return <span className="text-[10px] text-muted-foreground/40">—</span>;
   if (c.type === "badge") {
     const s = String(v);
     const palette =
@@ -244,20 +300,29 @@ function renderFieldValue(c: TmColumnDef, v: any) {
                   : c.key === "plot"
                     ? PLOT_COLORS
                     : undefined;
-    return <Badge className={cn("text-[10px]", palette?.[s] ?? TEAM_FALLBACK_COLOR)}>{s}</Badge>;
+    return <Badge className={cn("h-4 text-[10px]", palette?.[s] ?? TEAM_FALLBACK_COLOR)}>{s}</Badge>;
   }
-  if (c.type === "date") return <span className="tabular-nums">{formatDdMmm(v)}</span>;
+  if (c.type === "date") return <span className="font-mono tabular-nums">{formatDdMmm(v)}</span>;
   if (c.type === "percent") {
     const n = Number(v);
     const pct = n > 1 ? n : n * 100;
-    return <span className="tabular-nums">{isNaN(pct) ? String(v) : pct.toFixed(1) + "%"}</span>;
+    if (isNaN(pct)) return <span className="tabular-nums">{String(v)}</span>;
+    const clamped = Math.max(0, Math.min(100, pct));
+    return (
+      <span className="flex w-full items-center gap-1.5">
+        <span className="tabular-nums">{pct.toFixed(1)}%</span>
+        <span className="relative h-1 flex-1 min-w-[24px] overflow-hidden rounded-full bg-muted">
+          <span className="absolute inset-y-0 left-0 bg-primary" style={{ width: `${clamped}%` }} />
+        </span>
+      </span>
+    );
   }
   if (c.type === "number") return <span className="tabular-nums">{String(v)}</span>;
   if (c.type === "boolean")
     return v ? (
-      <Badge className="text-[10px] bg-rose-500/15 text-rose-700 dark:text-rose-300">Yes</Badge>
+      <Check className="h-3.5 w-3.5 text-rose-600" aria-label="Yes" />
     ) : (
-      <span className="text-muted-foreground/50">No</span>
+      <X className="h-3.5 w-3.5 text-muted-foreground/50" aria-label="No" />
     );
-  return <span className="whitespace-pre-wrap">{String(v)}</span>;
+  return <span className="truncate">{String(v)}</span>;
 }
