@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export type RowListTab = "all" | "risk" | "upcoming";
+export type RowListTab = "today" | "risk" | "upcoming" | "all";
 
 export interface RowColumn<T> {
   key: string;
@@ -17,7 +17,7 @@ interface Props<T> {
   columns: RowColumn<T>[];
   activeTab: RowListTab;
   onTabChange: (t: RowListTab) => void;
-  counts: { all: number; risk: number; upcoming: number };
+  counts: { today: number; all: number; risk: number; upcoming: number };
   filterRow: (row: T, tab: RowListTab) => boolean;
   onRowClick?: (row: T) => void;
   emptyText?: string;
@@ -33,9 +33,10 @@ export function ModuleRowList<T>({
       <div className="flex items-center justify-between border-b px-2 py-1.5">
         <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as RowListTab)}>
           <TabsList className="h-8">
-            <TabsTrigger value="all" className="text-xs h-7 px-2.5">전체 ({counts.all.toLocaleString()})</TabsTrigger>
-            <TabsTrigger value="risk" className="text-xs h-7 px-2.5">위험 ({counts.risk.toLocaleString()})</TabsTrigger>
+            <TabsTrigger value="today" className="text-xs h-7 px-2.5">오늘 ({counts.today.toLocaleString()})</TabsTrigger>
+            <TabsTrigger value="risk" className="text-xs h-7 px-2.5">지연 ({counts.risk.toLocaleString()})</TabsTrigger>
             <TabsTrigger value="upcoming" className="text-xs h-7 px-2.5">임박 ({counts.upcoming.toLocaleString()})</TabsTrigger>
+            <TabsTrigger value="all" className="text-xs h-7 px-2.5">전체 ({counts.all.toLocaleString()})</TabsTrigger>
           </TabsList>
         </Tabs>
         <div className="text-[11px] text-muted-foreground pr-1 tabular-nums">
