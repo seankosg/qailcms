@@ -35,12 +35,12 @@ export function JudgmentDonut({ counts }: Props) {
   });
 
   return (
-    <Card>
+    <Card className="@container">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">자동 판정 분포</CardTitle>
       </CardHeader>
-      <CardContent className="flex items-center gap-4">
-        <svg width="160" height="160" viewBox="0 0 160 160" className="shrink-0">
+      <CardContent className="flex flex-col items-center gap-4 @[320px]:flex-row">
+        <svg viewBox="0 0 160 160" className="h-32 w-32 shrink-0 @[380px]:h-40 @[380px]:w-40">
           <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--muted)" strokeWidth="20" />
           {segs.map(
             (s) =>
@@ -78,17 +78,17 @@ export function JudgmentDonut({ counts }: Props) {
             총 Task
           </text>
         </svg>
-        <div className="flex flex-1 flex-col gap-1 text-xs">
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-1 text-xs">
           {ORDER.map((k) => (
-            <div key={k} className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
+            <div key={k} className="flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <span
-                  className="inline-block h-3 w-3 rounded-sm"
+                  className="inline-block h-3 w-3 shrink-0 rounded-sm"
                   style={{ background: SEG_COLOR[k] }}
                 />
-                <Badge className={cn("px-2 py-0", AUTO_JUDGMENT_COLORS[k])}>{k}</Badge>
+                <Badge className={cn("truncate px-2 py-0", AUTO_JUDGMENT_COLORS[k])}>{k}</Badge>
               </div>
-              <span className="tabular-nums text-muted-foreground">
+              <span className="shrink-0 tabular-nums text-muted-foreground">
                 {(counts[k] ?? 0).toLocaleString()}
                 {total > 0 && (
                   <span className="ml-1 text-[10px]">
