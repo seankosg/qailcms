@@ -15,6 +15,7 @@ import { AbdDetailSheet } from "@/components/abd/raw-data/AbdDetailSheet";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { dohaStamp } from "@/lib/time/doha";
+import { cumPlanProgress, computeVariance } from "@/lib/task-management/derived";
 import { ClipboardList, AlertTriangle, FileCheck2, ShieldAlert } from "lucide-react";
 
 function fmtDate(d?: string | null): string {
@@ -142,7 +143,14 @@ export function MyWorkSpacePage() {
             { key: "name", label: "Task", render: (r) => <span className="truncate block max-w-[420px]">{r.task_name ?? "-"}</span> },
             ...(isAdmin ? [{ key: "pic", label: "HDEC PIC", width: "120px", render: (r: TmMyRow) => r.hdec_pic_name ?? "-" }] : []),
             { key: "plan_end", label: "P.Finish", width: "100px", render: (r) => <span className="font-mono">{fmtDate(r.plan_end)}</span> },
-            { key: "actual", label: "Actual%", width: "80px", className: "text-right", render: (r) => <span className="tabular-nums">{Math.round(Number(r.actual_progress ?? 0) * 100)}%</span> },
+            { key: "plan_pct", label: "Plan%", width: "70px", className: "text-right", render: (r) => <span className="tabular-nums text-muted-foreground">{Math.round(cumPlanProgress(r as any) * 100)}%</span> },
+            { key: "actual", label: "Actual%", width: "70px", className: "text-right", render: (r) => <span className="tabular-nums">{Math.round(Number(r.actual_progress ?? 0) * 100)}%</span> },
+            { key: "diff", label: "Diff%", width: "70px", className: "text-right", render: (r) => {
+              const v = computeVariance(r as any);
+              if (v == null) return <span className="tabular-nums text-muted-foreground">-</span>;
+              const pct = Math.round(v * 100);
+              return <span className={cn("tabular-nums font-medium", pct < 0 ? "text-destructive" : pct > 0 ? "text-success" : "text-muted-foreground")}>{pct > 0 ? "+" : ""}{pct}%</span>;
+            } },
             { key: "j", label: "Alarm", width: "70px", render: (r) => <Badge variant="outline" className={cn("text-[10px]", r.auto_judgment === "위험" || r.auto_judgment === "지연" ? "border-destructive text-destructive" : r.auto_judgment === "주의" ? "border-warning text-warning" : r.auto_judgment === "완료" ? "border-success text-success" : "")}>{r.auto_judgment ?? "-"}</Badge> },
           ]}
         />
