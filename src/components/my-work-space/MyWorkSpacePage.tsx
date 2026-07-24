@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { dohaStamp } from "@/lib/time/doha";
 import { cumPlanProgress, computeVariance } from "@/lib/task-management/derived";
+import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { ClipboardList, AlertTriangle, FileCheck2, ShieldAlert } from "lucide-react";
 
 function fmtDate(d?: string | null): string {
@@ -51,7 +52,9 @@ export function MyWorkSpacePage() {
   const [abdTab, setAbdTab] = useState<RowListTab>("all");
   const [abdDetailId, setAbdDetailId] = useState<string | null>(null);
 
-  const t = today();
+  const latestToday = today();
+  const [dataDate, setDataDate] = useState<string>("");
+  const t = dataDate || latestToday;
 
   const tmStats = useMemo(() => {
     const rows = tm.data ?? [];
@@ -110,9 +113,18 @@ export function MyWorkSpacePage() {
             {isAdmin ? "관리자 모드 · 전체 담당자 데이터" : `HDEC PIC · ${pic}`} · Data as of {dohaStamp()}
           </p>
         </div>
-        {isAdmin && (
-          <Badge variant="secondary" className="uppercase tracking-wide">Admin View</Badge>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <DataDatePicker
+            value={dataDate}
+            latest={latestToday}
+            options={[]}
+            onChange={setDataDate}
+            onReset={() => setDataDate("")}
+          />
+          {isAdmin && (
+            <Badge variant="secondary" className="uppercase tracking-wide">Admin View</Badge>
+          )}
+        </div>
       </header>
 
       {/* ============= TM ============= */}
