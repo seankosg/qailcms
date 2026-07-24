@@ -107,6 +107,7 @@ export interface SmMyRow {
   actual_rectified_date: string | null;
   actual_progress_pct: number | null;
   created_date: string | null;
+  created_at: string | null;
   hdec_pic_name: string | null;
 }
 
@@ -119,7 +120,7 @@ export function useMyDefects(filterPic: string | null, isAdmin: boolean) {
       const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const rows = await fetchAll<SmMyRow>(
         "defect_items_raw",
-        "id,source_issue_no,location_raw,main_trade,status_raw,planned_closure_date,planned_rectified_date,actual_closure_date,actual_rectified_date,actual_progress_pct,created_date,hdec_pic_name",
+        "id,source_issue_no,location_raw,main_trade,status_raw,planned_closure_date,planned_rectified_date,actual_closure_date,actual_rectified_date,actual_progress_pct,created_date,created_at,hdec_pic_name",
         (q) => (isAdmin ? q : q.eq("hdec_pic_name", filterPic)),
         { col: "source_issue_no", asc: true },
         limit,
@@ -156,6 +157,11 @@ export function smIsUpcoming(r: SmMyRow, today: string, days = 3): boolean {
   const d = daysBetween(due, today);
   return d >= 0 && d <= days;
 }
+export function smIsCreatedToday(r: SmMyRow, today: string): boolean {
+  if (!r.created_at) return false;
+  return String(r.created_at).slice(0, 10) === today.slice(0, 10);
+}
+
 
 // ==================== ABD ====================
 export interface AbdMyRow {
