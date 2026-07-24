@@ -1,41 +1,85 @@
-## 원인 (쉬운 설명)
+# TM 상세페이지 컴팩트 리디자인 계획 (v2)
 
-임포트 자체가 아니라 **DB 트리거의 잔재** 때문입니다.
+현재 필드 구성과 7개 그룹(Identification / Task / Status / Plan / Actual / Forecast / System) 분류는 그대로 유지하면서, 시각 밀도·정보 계층·편집 어포던스만 개선합니다. **데스크톱에서 Comments 패널 위치(우측 컬럼)는 현재와 동일하게 유지합니다.**
 
-- 이전에 ABD의 `pic` 필드를 `hdec_pic_name` + `hdec_eng_name` 두 개로 분리하는 마이그레이션을 진행하면서, 실제 컬럼(`abd_items_raw.pic`)은 삭제되었습니다.
-- 그런데 두 개의 트리거 함수가 아직도 존재하지 않는 `NEW.pic`을 참조하고 있습니다:
-  1. `abd_auto_owner_user_id()` — INSERT/UPDATE 시 담당자로 소유자를 자동 매핑
-  2. `trg_abd_change_log_fn()` — UPDATE 변경 이력을 `abd_change_log`에 기록
-- 임포트가 첫 행을 INSERT 하는 순간 Postgres가 `record "new" has no field "pic"` 에러를 던져 파일 전체가 "0 ready to import"로 막힙니다.
+## 현재 문제점 요약
 
-즉 **엑셀 파일에는 문제가 없습니다.** 컬럼을 아무리 손봐도 트리거가 존재하지 않는 `pic`을 찾고 있어서 계속 실패합니다.
+- 그룹 카드가 세로로만 쌓여 스크롤 길이가 길다 (7개 섹션 × 2열 목록).
+- 각 필드가 `label(min-w 110px) + value(px-1.5 py-0.5)` 한 줄 구조라 값이 짧아도 세로 공간을 균등 소비.
+- 편집 가능/불가 구분이 배경 음영 하나뿐 → 편집 어포던스가 약함.
+- 헤더의 Task No · Discipline · Team · Task Name이 한 줄에 몰려 모바일에서 줄바꿈 붕괴.
 
-## 대책
+## 리디자인 방향 (레이아웃/디자인만, 데이터·권한·필드 셋 변경 없음)
 
-### 방법 A — 엑셀 원본을 수정 (권장하지 않음, 근본 해결 불가)
+### 1. 헤더 컴팩트화
+- 2행 구조:
+  - 1행: 뒤로가기 · `Task No`(mono, 큰 글씨) · 편집 상태 뱃지 · Refresh
+  - 2행: Discipline / Team / Level / Risk / Status 뱃지 스트립 (`text-[10px] h-5` 통일)
+- Task Name은 헤더 아래 한 줄로 분리, `truncate` + 툴팁.
+- responsive-layout-patterns의 grid + min-w-0 + shrink-0 패턴 적용.
 
-이 에러는 셀 값이 아니라 서버 측 트리거 문제라서, 엑셀 컬럼 어떤 것을 지우거나 바꿔도 해결되지 않습니다. 굳이 우회하려면 임포트 시점에 change_log 트리거를 회피해야 하는데, 이는 사용자가 엑셀에서 할 수 있는 조치가 아닙니다. 따라서 이 경로는 유효한 해결책이 아님을 명시.
+### 2. 본문 레이아웃 (Comments 위치 유지)
+- 최상위 그리드는 현재와 동일하게 `lg:grid-cols-3`, 본문 `lg:col-span-2`, Comments 우측 1컬럼 유지.
+- **좌측 본문 내부만** 밀도형 재편:
+  - 그룹 카드 내부 그리드를 `md:grid-cols-2 xl:grid-cols-3`으로 확장(카드 자체는 세로 스택 유지).
+  - 카드 padding `p-3 → p-2.5`, 헤더 라벨 `text-[10px] uppercase` + 그룹 색상 dot(`GROUP_HEADER_BG` 재사용).
+- 필드 리스트를 `<dl>` 시맨틱으로 전환:
+  - `dt`: `text-[10px] text-muted-foreground`, 우측 정렬, 고정 `w-[92px]`.
+  - `dd`: `text-xs`, `truncate`, hover 시 편집 어포던스 표시.
+  - 행 높이 `h-6` 균일 → 세로 밀도 30~40% 개선.
 
-### 방법 B — 시스템에서 완화 (정답, 마이그레이션으로 처리)
+### 3. 편집 어포던스 개선 (권한 로직 불변)
+- 편집 가능 필드: hover 시 `ring-1 ring-primary/30` + 우측 미세한 연필 아이콘.
+- 편집 불가 필드: 현재의 `bg-muted/60` 대신 `text-muted-foreground/80` + 좌측 `border-l-2 border-dashed border-muted pl-1.5` 인디케이터.
+- Owner 전용(Team / Data Date)은 좌측에 `key` 아이콘으로 "권한 편집" 표기.
 
-DB 트리거 함수 2개를 신 스키마(`hdec_pic_name`, `hdec_eng_name`)에 맞게 재작성:
+### 4. 값 표현 정제
+- `date`: `formatDdMmm` 유지, `font-mono tabular-nums` 통일.
+- `percent`: 숫자 + 얇은 프로그레스 바(`h-1 bg-muted` / `bg-primary`)를 값 아래 병기 (Actual %, Plan %, T.Actual 등). 데이터 변경 없음.
+- `boolean`: Yes/No를 Check/X 아이콘으로 축약.
+- 빈 값 `—`을 `text-muted-foreground/40 text-[10px]`로 낮은 강조.
 
-1. `abd_auto_owner_user_id()` 재작성
-   - 기존: `NEW.pic` 참조
-   - 변경: `NEW.hdec_pic_name`(우선) → 없으면 `NEW.hdec_eng_name`으로 `resolve_owner_by_name()` 호출
-   - UPDATE 조기 반환 조건도 `hdec_pic_name`/`hdec_eng_name`의 변화 여부로 판단
-2. `trg_abd_change_log_fn()` 재작성
-   - `fields` 배열에서 `'pic'` 제거, 대신 `'hdec_pic_name'`, `'hdec_eng_name'` 추가
-   - 나머지 24개 필드(문서·라운드 스테이지·상태)는 그대로 유지
-3. 마이그레이션 하나로 `CREATE OR REPLACE FUNCTION` 두 개 실행 (RLS·정책·GRANT·기존 데이터 변경 없음, 위험도 낮음)
+### 5. Comments 사이드바 (데스크톱 위치 유지)
+- 데스크톱(lg 이상): 현재 그리드의 우측 컬럼 위치 그대로 유지. 다만 카드에 `sticky top-4 max-h-[calc(100vh-6rem)] overflow-auto`만 추가하여 긴 본문 스크롤 시에도 함께 보이도록 개선(위치 자체는 이동 없음).
+- 모바일(lg 미만): 현재와 동일하게 본문 하단으로 자연 배치.
 
-## 검증
+### 6. 반응형 & 접근성
+- 모바일(<768): 그룹 카드 1열, 필드 라벨 상단·값 하단 스택으로 자동 전환.
+- 모든 편집 셀에 `role="button"` + `aria-label="{label} 편집"`.
+- 헤더/뱃지 스트립에 `flex-wrap gap-1.5` + shrink-0 유지.
 
-1. 문제의 파일 `PLOT C&D ELEC ABD 완료계획_260723_.xlsx` 재업로드 → 파일 카드가 "정상 ready" 상태로 진입, 임포트 성공
-2. 임의의 행에서 `hdec_pic_name`을 수정 → `abd_change_log`에 정확히 기록되는지 확인
-3. 임포트 시 owner_user_id가 `hdec_pic_name` 기준으로 매핑되는지 표본 확인
+## 기술 세부
 
-## 사용자에게 드리는 답변 요약
+- 수정 파일: `src/components/task-management/detail/TaskDetailPage.tsx` 단일. `EditCellPopover`, `columns.ts`, 서버 함수, 훅은 변경 없음.
+- 같은 파일 내 하위 컴포넌트로 분리:
+  - `DetailHeader({row})`
+  - `GroupCard({group, cols, row, ...perm})`
+  - `FieldRow({col, value, editable, onSave})` — dl/dt/dd 렌더링.
+  - `PercentValue({value})` — 숫자 + 미니 progress bar.
+- semantic 토큰(`bg-card`, `text-muted-foreground`, `bg-primary`, `ring-primary/30`)만 사용. 하드코딩 색상 금지.
+- 그룹 강조 색상은 기존 `GROUP_HEADER_BG` 재사용.
 
-- 엑셀 파일에는 잘못이 없습니다. 수정할 컬럼도 없습니다.
-- 시스템 측 잔여 트리거(구 `pic` 컬럼 참조) 두 개를 신 컬럼으로 재작성하는 마이그레이션으로 해결합니다.
+## 예상 레이아웃 (데스크톱 lg+)
+
+```text
+┌───────── Header (2 rows) ─────────┐
+│  ← 목록  TASK_NO  [편집]  [Refresh]│
+│  [Disc][Team][Lvl][Risk][Status]  │
+│  Task Name                        │
+└───────────────────────────────────┘
+┌──── Body (col-span-2) ────┐┌ Comments ┐
+│ [ID][Task][Status]        ││ sticky   │
+│ [Plan][Actual][Forecast]  ││ (우측    │
+│ [System                  ]││  유지)   │
+└───────────────────────────┘└──────────┘
+```
+
+## 비변경 항목
+
+- 필드 목록, 라벨(`useTmColumnLabel`), 그룹 분류, 편집 권한 규칙, `EditCellPopover` 동작, `renderFieldValue` 데이터 해석.
+- Comments 스레드 컴포넌트/카테고리, **데스크톱 우측 배치**.
+- 라우팅, 쿼리 키, 서버 함수.
+
+## 다음 단계
+
+승인 시 `TaskDetailPage.tsx` 한 파일만 리팩터하여 위 컴팩트 레이아웃을 적용하고, 모바일·데스크톱 두 뷰포트에서 스크린샷으로 회귀 검증합니다.
