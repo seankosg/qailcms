@@ -130,6 +130,10 @@ export function CriticalThresholdPopover({
         </div>
         <Separator className="my-3" />
         {isAdmin ? (
+          <>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              임계값을 바꾸지 않고 전체 재계산만 필요할 때도 값을 그대로 두고 <b>저장+재계산</b>을 클릭하세요.
+            </p>
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -151,6 +155,7 @@ export function CriticalThresholdPopover({
               저장+재계산
             </Button>
           </div>
+          </>
         ) : (
           <p className="text-[11px] text-muted-foreground">
             수정은 관리자만 가능합니다.
