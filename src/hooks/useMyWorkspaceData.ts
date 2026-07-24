@@ -250,6 +250,11 @@ export function abdCurrentPlanDate(r: AbdMyRow): string | null {
   return abdCurrentPlan(r);
 }
 
+export function abdIsCreatedToday(r: AbdMyRow, today: string): boolean {
+  if (!r.created_at) return false;
+  return String(r.created_at).slice(0, 10) === today.slice(0, 10);
+}
+
 export function today(): string {
   return todayInDoha();
 }
