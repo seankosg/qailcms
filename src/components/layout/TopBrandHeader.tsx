@@ -1,10 +1,12 @@
-import { Bell, Menu, Sparkles } from "lucide-react";
+import { Bell, Menu, PanelLeftClose, PanelLeftOpen, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import hyundaiLogo from "@/assets/hyundai-logo.png.asset.json";
 import { forceFreshAppLoad } from "@/hooks/useVersionCheck";
 
 interface Props {
   onMobileMenu?: () => void;
+  onToggleSidebar?: () => void;
+  sidebarCollapsed?: boolean;
 }
 
 function NewVersionButton() {
@@ -29,7 +31,7 @@ function NewVersionButton() {
   );
 }
 
-export function TopBrandHeader({ onMobileMenu }: Props) {
+export function TopBrandHeader({ onMobileMenu, onToggleSidebar, sidebarCollapsed }: Props) {
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-card px-3 lg:px-4">
       <Button
@@ -41,6 +43,24 @@ export function TopBrandHeader({ onMobileMenu }: Props) {
       >
         <Menu className="h-5 w-5" />
       </Button>
+      {onToggleSidebar && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden lg:inline-flex shrink-0"
+          onClick={onToggleSidebar}
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!sidebarCollapsed}
+          aria-controls="app-sidebar"
+          title={sidebarCollapsed ? "사이드바 펼치기 (])" : "사이드바 접기 ([)"}
+        >
+          {sidebarCollapsed ? (
+            <PanelLeftOpen className="h-5 w-5" />
+          ) : (
+            <PanelLeftClose className="h-5 w-5" />
+          )}
+        </Button>
+      )}
 
       <img
         src={hyundaiLogo.url}
