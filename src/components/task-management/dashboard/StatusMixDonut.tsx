@@ -40,7 +40,7 @@ export function StatusMixDonut({ total, completed, wip, notStarted, onSegmentCli
   });
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card className="@container flex h-full flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Status Mix</CardTitle>
       </CardHeader>
