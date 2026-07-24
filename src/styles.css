@@ -103,6 +103,10 @@
   --schedule-short: oklch(0.62 0.22 25);
   --warning: oklch(0.72 0.18 70);
   --warning-foreground: oklch(0.208 0.042 265.755);
+  --success: oklch(0.62 0.16 155);
+  --success-foreground: oklch(0.984 0.003 247.858);
+  --info: oklch(0.6 0.18 240);
+  --info-foreground: oklch(0.984 0.003 247.858);
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
   --sidebar-primary: oklch(0.208 0.042 265.755);
