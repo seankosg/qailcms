@@ -3,21 +3,23 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   useMyTasks, useMyDefects, useMyAbd,
-  tmIsCompleted, tmIsStarted, tmIsDelayed, tmIsUpcoming, tmIsCreatedToday,
-  smIsCompleted, smIsDelayed, smIsInProgress, smIsUpcoming, smIsCreatedToday,
-  abdIsApproved, abdIsInProgress, abdIsDelayed, abdIsUpcoming, abdIsCreatedToday, abdStage, abdCurrentPlanDate,
+  tmIsCompleted, tmIsStarted, tmIsDelayed, tmIsUpcoming, tmIsToday, tmTodayKinds,
+  smIsCompleted, smIsDelayed, smIsInProgress, smIsUpcoming, smIsToday, smTodayKinds,
+  abdIsApproved, abdIsInProgress, abdIsDelayed, abdIsUpcoming, abdIsToday, abdTodayKind, abdStage, abdCurrentPlanDate,
   today,
   type TmMyRow, type SmMyRow, type AbdMyRow,
 } from "@/hooks/useMyWorkspaceData";
 import { ModuleKpiCard, type KpiTone } from "./ModuleKpiCard";
-import { ModuleRowList, type RowListTab } from "./ModuleRowList";
+import { ModuleRowList, type RowColumn, type RowListTab } from "./ModuleRowList";
+import { MwsColumnOrderMenu } from "./MwsColumnOrderMenu";
+import { useMwsColumnPrefs } from "@/hooks/useMwsColumnPrefs";
 import { AbdDetailSheet } from "@/components/abd/raw-data/AbdDetailSheet";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { dohaStamp } from "@/lib/time/doha";
-import { cumPlanProgress, computeVariance } from "@/lib/task-management/derived";
+import { cumPlanProgress, cumActualProgress, computeVariance } from "@/lib/task-management/derived";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
-import { ClipboardList, AlertTriangle, FileCheck2, ShieldAlert } from "lucide-react";
+import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
 
 function fmtDate(d?: string | null): string {
   if (!d) return "-";
@@ -35,6 +37,25 @@ function judgmentTone(j: string | null | undefined): KpiTone {
     default: return "muted";
   }
 }
+void judgmentTone;
+
+function daysBetweenIso(a?: string | null, base?: string | null): number | null {
+  if (!a || !base) return null;
+  const x = new Date(`${String(a).slice(0, 10)}T00:00:00Z`).getTime();
+  const y = new Date(`${String(base).slice(0, 10)}T00:00:00Z`).getTime();
+  if (Number.isNaN(x) || Number.isNaN(y)) return null;
+  return Math.round((x - y) / 86_400_000);
+}
+
+function CtxBadge({ text, tone = "muted" }: { text: string; tone?: "info" | "warning" | "destructive" | "success" | "muted" }) {
+  const cls =
+    tone === "info" ? "border-info text-info"
+    : tone === "warning" ? "border-warning text-warning"
+    : tone === "destructive" ? "border-destructive text-destructive"
+    : tone === "success" ? "border-success text-success"
+    : "";
+  return <Badge variant="outline" className={cn("text-[10px] font-medium", cls)}>{text}</Badge>;
+}
 
 export function MyWorkSpacePage() {
   const { data: me, isLoading: meLoading } = useCurrentUser();
@@ -47,9 +68,9 @@ export function MyWorkSpacePage() {
   const sm = useMyDefects(pic, isAdmin);
   const abd = useMyAbd(pic, isAdmin);
 
-  const [tmTab, setTmTab] = useState<RowListTab>("all");
-  const [smTab, setSmTab] = useState<RowListTab>("all");
-  const [abdTab, setAbdTab] = useState<RowListTab>("all");
+  const [tmTab, setTmTab] = useState<RowListTab>("today");
+  const [smTab, setSmTab] = useState<RowListTab>("today");
+  const [abdTab, setAbdTab] = useState<RowListTab>("today");
   const [abdDetailId, setAbdDetailId] = useState<string | null>(null);
 
   const latestToday = today();
@@ -64,7 +85,7 @@ export function MyWorkSpacePage() {
       delayed: rows.filter(tmIsDelayed).length,
       upcoming: rows.filter((r) => tmIsUpcoming(r, t)).length,
       completed: rows.filter(tmIsCompleted).length,
-      today: rows.filter((r) => tmIsCreatedToday(r, t)).length,
+      today: rows.filter((r) => tmIsToday(r, t)).length,
     };
   }, [tm.data, t]);
 
@@ -76,7 +97,7 @@ export function MyWorkSpacePage() {
       delayed: rows.filter((r) => smIsDelayed(r, t)).length,
       upcoming: rows.filter((r) => smIsUpcoming(r, t)).length,
       completed: rows.filter(smIsCompleted).length,
-      today: rows.filter((r) => smIsCreatedToday(r, t)).length,
+      today: rows.filter((r) => smIsToday(r, t)).length,
     };
   }, [sm.data, t]);
 
@@ -88,11 +109,137 @@ export function MyWorkSpacePage() {
       delayed: rows.filter((r) => abdIsDelayed(r, t)).length,
       upcoming: rows.filter((r) => abdIsUpcoming(r, t)).length,
       completed: rows.filter(abdIsApproved).length,
-      today: rows.filter((r) => abdIsCreatedToday(r, t)).length,
+      today: rows.filter((r) => abdIsToday(r, t)).length,
     };
   }, [abd.data, t]);
 
   const setTabFromKpi = (setter: (v: RowListTab) => void, kind: "risk" | "upcoming") => () => setter(kind);
+
+  // ---------- Context 컬럼 렌더 (탭별) ----------
+  const renderTmCtx = (r: TmMyRow, tab: RowListTab): React.ReactNode => {
+    if (tab === "today") {
+      const kinds = tmTodayKinds(r, t);
+      if (kinds.length === 0) return <span className="text-muted-foreground">—</span>;
+      return (
+        <div className="flex gap-1">
+          {kinds.map((k) => (
+            <CtxBadge key={k} text={k} tone={k === "Start" ? "info" : "warning"} />
+          ))}
+        </div>
+      );
+    }
+    if (tab === "risk") {
+      const v = computeVariance(r as any, t);
+      const gap = v ?? (cumActualProgress(r as any) - cumPlanProgress(r as any, t));
+      const pct = Math.round(gap * 100);
+      return <span className="tabular-nums font-medium text-destructive">{pct}%</span>;
+    }
+    if (tab === "upcoming") {
+      const d = daysBetweenIso(r.plan_end, t);
+      return d != null ? <span className="tabular-nums font-medium text-warning">D-{d}</span> : <span className="text-muted-foreground">—</span>;
+    }
+    return <span className="text-muted-foreground">—</span>;
+  };
+  const renderSmCtx = (r: SmMyRow, tab: RowListTab): React.ReactNode => {
+    if (tab === "today") {
+      const kinds = smTodayKinds(r, t);
+      if (kinds.length === 0) return <span className="text-muted-foreground">—</span>;
+      return (
+        <div className="flex gap-1 flex-wrap">
+          {kinds.map((k) => (
+            <CtxBadge key={k} text={k} tone={k === "Start" ? "info" : k === "Close" ? "success" : "warning"} />
+          ))}
+        </div>
+      );
+    }
+    if (tab === "risk") {
+      const due = r.planned_closure_date ?? r.planned_rectified_date;
+      const d = daysBetweenIso(t, due);
+      return d != null && d > 0 ? <span className="tabular-nums font-medium text-destructive">D+{d}</span> : <span className="text-muted-foreground">—</span>;
+    }
+    if (tab === "upcoming") {
+      const due = r.planned_closure_date ?? r.planned_rectified_date;
+      const d = daysBetweenIso(due, t);
+      return d != null && d > 0 ? <span className="tabular-nums font-medium text-warning">D-{d}</span> : <span className="text-muted-foreground">—</span>;
+    }
+    return <span className="text-muted-foreground">—</span>;
+  };
+  const renderAbdCtx = (r: AbdMyRow, tab: RowListTab): React.ReactNode => {
+    if (tab === "today") {
+      const k = abdTodayKind(r, t);
+      return k ? <CtxBadge text={k} tone={k === "Draft" ? "info" : k === "Sub" ? "warning" : "success"} /> : <span className="text-muted-foreground">—</span>;
+    }
+    const plan = abdCurrentPlanDate(r);
+    if (tab === "risk") {
+      const d = daysBetweenIso(t, plan);
+      return d != null && d > 0 ? <span className="tabular-nums font-medium text-destructive">D+{d}</span> : <span className="text-muted-foreground">—</span>;
+    }
+    if (tab === "upcoming") {
+      const d = daysBetweenIso(plan, t);
+      return d != null && d > 0 ? <span className="tabular-nums font-medium text-warning">D-{d}</span> : <span className="text-muted-foreground">—</span>;
+    }
+    return <span className="text-muted-foreground">—</span>;
+  };
+
+  // ---------- 컬럼 정의 ----------
+  const tmColumns: RowColumn<TmMyRow>[] = [
+    { key: "__ctx", label: "구분", width: "88px", render: (r) => renderTmCtx(r, tmTab) },
+    { key: "task_no", label: "Task No", width: "120px", render: (r) => <span className="font-mono text-[11px]">{r.task_no ?? "-"}</span> },
+    { key: "level", label: "Tier", width: "60px", render: (r) => <span className="text-[10px] uppercase text-muted-foreground">{r.level ?? "-"}</span> },
+    { key: "name", label: "Task", render: (r) => <span className="truncate block max-w-[420px]">{r.task_name ?? "-"}</span> },
+    ...(isAdmin ? [{ key: "pic", label: "HDEC PIC", width: "120px", render: (r: TmMyRow) => r.hdec_pic_name ?? "-" }] : []),
+    { key: "plan_end", label: "P.Finish", width: "100px", render: (r) => <span className="font-mono">{fmtDate(r.plan_end)}</span> },
+    { key: "plan_pct", label: "Plan%", width: "70px", className: "text-right", render: (r) => <span className="tabular-nums text-muted-foreground">{Math.round(cumPlanProgress(r as any) * 100)}%</span> },
+    { key: "actual", label: "Actual%", width: "70px", className: "text-right", render: (r) => <span className="tabular-nums">{Math.round(Number(r.actual_progress ?? 0) * 100)}%</span> },
+    { key: "diff", label: "Diff%", width: "70px", className: "text-right", render: (r) => {
+      const v = computeVariance(r as any);
+      if (v == null) return <span className="tabular-nums text-muted-foreground">-</span>;
+      const pct = Math.round(v * 100);
+      return <span className={cn("tabular-nums font-medium", pct < 0 ? "text-destructive" : pct > 0 ? "text-success" : "text-muted-foreground")}>{pct > 0 ? "+" : ""}{pct}%</span>;
+    } },
+    { key: "j", label: "Alarm", width: "70px", render: (r) => <Badge variant="outline" className={cn("text-[10px]", r.auto_judgment === "위험" || r.auto_judgment === "지연" ? "border-destructive text-destructive" : r.auto_judgment === "주의" ? "border-warning text-warning" : r.auto_judgment === "완료" ? "border-success text-success" : "")}>{r.auto_judgment ?? "-"}</Badge> },
+  ];
+  const smColumns: RowColumn<SmMyRow>[] = [
+    { key: "__ctx", label: "구분", width: "108px", render: (r) => renderSmCtx(r, smTab) },
+    { key: "no", label: "ID", width: "100px", render: (r) => <span className="font-mono text-[11px]">{r.source_issue_no ?? "-"}</span> },
+    { key: "loc", label: "Location", render: (r) => <span className="truncate block max-w-[300px]">{r.location_raw ?? "-"}</span> },
+    { key: "trade", label: "Trade", width: "120px", render: (r) => r.main_trade ?? "-" },
+    ...(isAdmin ? [{ key: "pic", label: "HDEC PIC", width: "120px", render: (r: SmMyRow) => r.hdec_pic_name ?? "-" }] : []),
+    { key: "status", label: "Status", width: "110px", render: (r) => <Badge variant="outline" className="text-[10px]">{r.status_raw ?? "-"}</Badge> },
+    { key: "due", label: "P.Closure", width: "100px", render: (r) => <span className="font-mono">{fmtDate(r.planned_closure_date ?? r.planned_rectified_date)}</span> },
+  ];
+  const abdColumns: RowColumn<AbdMyRow>[] = [
+    { key: "__ctx", label: "구분", width: "88px", render: (r) => renderAbdCtx(r, abdTab) },
+    { key: "no", label: "ABD No", width: "140px", render: (r) => <span className="font-mono text-[11px]">{r.abd_number ?? "-"}</span> },
+    { key: "title", label: "Document", render: (r) => <span className="truncate block max-w-[360px]">{r.document_title ?? "-"}</span> },
+    ...(isAdmin ? [{ key: "pic", label: "HDEC PIC", width: "120px", render: (r: AbdMyRow) => r.hdec_pic_name ?? "-" }] : []),
+    { key: "stage", label: "Stage", width: "90px", render: (r) => <Badge variant="outline" className={cn("text-[10px]", abdIsApproved(r) && "border-success text-success")}>{abdStage(r)}</Badge> },
+    { key: "rev", label: "Rev", width: "60px", render: (r) => r.latest_rev ?? "-" },
+    { key: "plan", label: "P.Date", width: "100px", render: (r) => <span className="font-mono">{fmtDate(abdCurrentPlanDate(r))}</span> },
+  ];
+
+  // ---------- Columns 메뉴 상태 ----------
+  const tmDefaults = useMemo(() => ({
+    order: tmColumns.map((c) => c.key),
+    visibility: Object.fromEntries(tmColumns.map((c) => [c.key, true])),
+    frozen: ["__ctx"],
+  }), [tmColumns]);
+  const smDefaults = useMemo(() => ({
+    order: smColumns.map((c) => c.key),
+    visibility: Object.fromEntries(smColumns.map((c) => [c.key, true])),
+    frozen: ["__ctx"],
+  }), [smColumns]);
+  const abdDefaults = useMemo(() => ({
+    order: abdColumns.map((c) => c.key),
+    visibility: Object.fromEntries(abdColumns.map((c) => [c.key, true])),
+    frozen: ["__ctx"],
+  }), [abdColumns]);
+
+  const tmPrefs = useMwsColumnPrefs("mws-tm", tmDefaults);
+  const smPrefs = useMwsColumnPrefs("mws-sm", smDefaults);
+  const abdPrefs = useMwsColumnPrefs("mws-abd", abdDefaults);
+
+  const labelDict = <T,>(cols: RowColumn<T>[]) => Object.fromEntries(cols.map((c) => [c.key, c.label]));
 
   if (meLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
@@ -149,25 +296,33 @@ export function MyWorkSpacePage() {
           activeTab={tmTab}
           onTabChange={setTmTab}
           counts={{ today: tmStats.today, all: tmStats.total, risk: tmStats.delayed, upcoming: tmStats.upcoming }}
-          filterRow={(r, tab) => tab === "all" ? true : tab === "risk" ? tmIsDelayed(r) : tmIsUpcoming(r, t)}
+          filterRow={(r, tab) =>
+            tab === "all" ? true
+            : tab === "risk" ? tmIsDelayed(r)
+            : tab === "today" ? tmIsToday(r, t)
+            : tmIsUpcoming(r, t)
+          }
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate({ to: "/closure/task-management/detail/$id", params: { id: r.id } })}
-          columns={[
-            { key: "task_no", label: "Task No", width: "120px", render: (r) => <span className="font-mono text-[11px]">{r.task_no ?? "-"}</span> },
-            { key: "level", label: "Tier", width: "60px", render: (r) => <span className="text-[10px] uppercase text-muted-foreground">{r.level ?? "-"}</span> },
-            { key: "name", label: "Task", render: (r) => <span className="truncate block max-w-[420px]">{r.task_name ?? "-"}</span> },
-            ...(isAdmin ? [{ key: "pic", label: "HDEC PIC", width: "120px", render: (r: TmMyRow) => r.hdec_pic_name ?? "-" }] : []),
-            { key: "plan_end", label: "P.Finish", width: "100px", render: (r) => <span className="font-mono">{fmtDate(r.plan_end)}</span> },
-            { key: "plan_pct", label: "Plan%", width: "70px", className: "text-right", render: (r) => <span className="tabular-nums text-muted-foreground">{Math.round(cumPlanProgress(r as any) * 100)}%</span> },
-            { key: "actual", label: "Actual%", width: "70px", className: "text-right", render: (r) => <span className="tabular-nums">{Math.round(Number(r.actual_progress ?? 0) * 100)}%</span> },
-            { key: "diff", label: "Diff%", width: "70px", className: "text-right", render: (r) => {
-              const v = computeVariance(r as any);
-              if (v == null) return <span className="tabular-nums text-muted-foreground">-</span>;
-              const pct = Math.round(v * 100);
-              return <span className={cn("tabular-nums font-medium", pct < 0 ? "text-destructive" : pct > 0 ? "text-success" : "text-muted-foreground")}>{pct > 0 ? "+" : ""}{pct}%</span>;
-            } },
-            { key: "j", label: "Alarm", width: "70px", render: (r) => <Badge variant="outline" className={cn("text-[10px]", r.auto_judgment === "위험" || r.auto_judgment === "지연" ? "border-destructive text-destructive" : r.auto_judgment === "주의" ? "border-warning text-warning" : r.auto_judgment === "완료" ? "border-success text-success" : "")}>{r.auto_judgment ?? "-"}</Badge> },
-          ]}
+          columns={tmColumns}
+          order={tmPrefs.order}
+          visibility={tmPrefs.visibility}
+          frozen={tmPrefs.frozen}
+          toolbarExtra={
+            <MwsColumnOrderMenu
+              order={tmPrefs.order}
+              visibility={tmPrefs.visibility}
+              frozen={tmPrefs.frozen}
+              forcedFrozen={["__ctx"]}
+              labels={labelDict(tmColumns)}
+              defaultOrder={tmDefaults.order}
+              defaultVisibility={tmDefaults.visibility}
+              defaultFrozen={tmDefaults.frozen}
+              onOrderChange={tmPrefs.setOrder}
+              onVisibilityChange={tmPrefs.setVisibility}
+              onFrozenChange={tmPrefs.setFrozen}
+            />
+          }
         />
       </section>
 
@@ -190,17 +345,33 @@ export function MyWorkSpacePage() {
           activeTab={smTab}
           onTabChange={setSmTab}
           counts={{ today: smStats.today, all: smStats.total, risk: smStats.delayed, upcoming: smStats.upcoming }}
-          filterRow={(r, tab) => tab === "all" ? true : tab === "risk" ? smIsDelayed(r, t) : smIsUpcoming(r, t)}
+          filterRow={(r, tab) =>
+            tab === "all" ? true
+            : tab === "risk" ? smIsDelayed(r, t)
+            : tab === "today" ? smIsToday(r, t)
+            : smIsUpcoming(r, t)
+          }
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate({ to: "/closure/snag-management/detail/$id", params: { id: r.id } })}
-          columns={[
-            { key: "no", label: "ID", width: "100px", render: (r) => <span className="font-mono text-[11px]">{r.source_issue_no ?? "-"}</span> },
-            { key: "loc", label: "Location", render: (r) => <span className="truncate block max-w-[300px]">{r.location_raw ?? "-"}</span> },
-            { key: "trade", label: "Trade", width: "120px", render: (r) => r.main_trade ?? "-" },
-            ...(isAdmin ? [{ key: "pic", label: "HDEC PIC", width: "120px", render: (r: SmMyRow) => r.hdec_pic_name ?? "-" }] : []),
-            { key: "status", label: "Status", width: "110px", render: (r) => <Badge variant="outline" className="text-[10px]">{r.status_raw ?? "-"}</Badge> },
-            { key: "due", label: "P.Closure", width: "100px", render: (r) => <span className="font-mono">{fmtDate(r.planned_closure_date ?? r.planned_rectified_date)}</span> },
-          ]}
+          columns={smColumns}
+          order={smPrefs.order}
+          visibility={smPrefs.visibility}
+          frozen={smPrefs.frozen}
+          toolbarExtra={
+            <MwsColumnOrderMenu
+              order={smPrefs.order}
+              visibility={smPrefs.visibility}
+              frozen={smPrefs.frozen}
+              forcedFrozen={["__ctx"]}
+              labels={labelDict(smColumns)}
+              defaultOrder={smDefaults.order}
+              defaultVisibility={smDefaults.visibility}
+              defaultFrozen={smDefaults.frozen}
+              onOrderChange={smPrefs.setOrder}
+              onVisibilityChange={smPrefs.setVisibility}
+              onFrozenChange={smPrefs.setFrozen}
+            />
+          }
         />
       </section>
 
@@ -223,17 +394,33 @@ export function MyWorkSpacePage() {
           activeTab={abdTab}
           onTabChange={setAbdTab}
           counts={{ today: abdStats.today, all: abdStats.total, risk: abdStats.delayed, upcoming: abdStats.upcoming }}
-          filterRow={(r, tab) => tab === "all" ? true : tab === "risk" ? abdIsDelayed(r, t) : abdIsUpcoming(r, t)}
+          filterRow={(r, tab) =>
+            tab === "all" ? true
+            : tab === "risk" ? abdIsDelayed(r, t)
+            : tab === "today" ? abdIsToday(r, t)
+            : abdIsUpcoming(r, t)
+          }
           rowKey={(r) => r.id}
           onRowClick={(r) => setAbdDetailId(r.id)}
-          columns={[
-            { key: "no", label: "ABD No", width: "140px", render: (r) => <span className="font-mono text-[11px]">{r.abd_number ?? "-"}</span> },
-            { key: "title", label: "Document", render: (r) => <span className="truncate block max-w-[360px]">{r.document_title ?? "-"}</span> },
-            ...(isAdmin ? [{ key: "pic", label: "HDEC PIC", width: "120px", render: (r: AbdMyRow) => r.hdec_pic_name ?? "-" }] : []),
-            { key: "stage", label: "Stage", width: "90px", render: (r) => <Badge variant="outline" className={cn("text-[10px]", abdIsApproved(r) && "border-success text-success")}>{abdStage(r)}</Badge> },
-            { key: "rev", label: "Rev", width: "60px", render: (r) => r.latest_rev ?? "-" },
-            { key: "plan", label: "P.Date", width: "100px", render: (r) => <span className="font-mono">{fmtDate(abdCurrentPlanDate(r))}</span> },
-          ]}
+          columns={abdColumns}
+          order={abdPrefs.order}
+          visibility={abdPrefs.visibility}
+          frozen={abdPrefs.frozen}
+          toolbarExtra={
+            <MwsColumnOrderMenu
+              order={abdPrefs.order}
+              visibility={abdPrefs.visibility}
+              frozen={abdPrefs.frozen}
+              forcedFrozen={["__ctx"]}
+              labels={labelDict(abdColumns)}
+              defaultOrder={abdDefaults.order}
+              defaultVisibility={abdDefaults.visibility}
+              defaultFrozen={abdDefaults.frozen}
+              onOrderChange={abdPrefs.setOrder}
+              onVisibilityChange={abdPrefs.setVisibility}
+              onFrozenChange={abdPrefs.setFrozen}
+            />
+          }
         />
       </section>
 
@@ -241,6 +428,3 @@ export function MyWorkSpacePage() {
     </div>
   );
 }
-
-// silence unused import warning if a lucide icon becomes unused after tweaks
-void ShieldAlert;
