@@ -3,9 +3,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   useMyTasks, useMyDefects, useMyAbd,
-  tmIsCompleted, tmIsStarted, tmIsDelayed, tmIsUpcoming,
-  smIsCompleted, smIsDelayed, smIsInProgress, smIsUpcoming,
-  abdIsApproved, abdIsInProgress, abdIsDelayed, abdIsUpcoming, abdStage, abdCurrentPlanDate,
+  tmIsCompleted, tmIsStarted, tmIsDelayed, tmIsUpcoming, tmIsCreatedToday,
+  smIsCompleted, smIsDelayed, smIsInProgress, smIsUpcoming, smIsCreatedToday,
+  abdIsApproved, abdIsInProgress, abdIsDelayed, abdIsUpcoming, abdIsCreatedToday, abdStage, abdCurrentPlanDate,
   today,
   type TmMyRow, type SmMyRow, type AbdMyRow,
 } from "@/hooks/useMyWorkspaceData";
@@ -64,6 +64,7 @@ export function MyWorkSpacePage() {
       delayed: rows.filter(tmIsDelayed).length,
       upcoming: rows.filter((r) => tmIsUpcoming(r, t)).length,
       completed: rows.filter(tmIsCompleted).length,
+      today: rows.filter((r) => tmIsCreatedToday(r, t)).length,
     };
   }, [tm.data, t]);
 
@@ -75,6 +76,7 @@ export function MyWorkSpacePage() {
       delayed: rows.filter((r) => smIsDelayed(r, t)).length,
       upcoming: rows.filter((r) => smIsUpcoming(r, t)).length,
       completed: rows.filter(smIsCompleted).length,
+      today: rows.filter((r) => smIsCreatedToday(r, t)).length,
     };
   }, [sm.data, t]);
 
@@ -86,6 +88,7 @@ export function MyWorkSpacePage() {
       delayed: rows.filter((r) => abdIsDelayed(r, t)).length,
       upcoming: rows.filter((r) => abdIsUpcoming(r, t)).length,
       completed: rows.filter(abdIsApproved).length,
+      today: rows.filter((r) => abdIsCreatedToday(r, t)).length,
     };
   }, [abd.data, t]);
 
@@ -145,7 +148,7 @@ export function MyWorkSpacePage() {
           rows={tm.data ?? []}
           activeTab={tmTab}
           onTabChange={setTmTab}
-          counts={{ all: tmStats.total, risk: tmStats.delayed, upcoming: tmStats.upcoming }}
+          counts={{ today: tmStats.today, all: tmStats.total, risk: tmStats.delayed, upcoming: tmStats.upcoming }}
           filterRow={(r, tab) => tab === "all" ? true : tab === "risk" ? tmIsDelayed(r) : tmIsUpcoming(r, t)}
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate({ to: "/closure/task-management/detail/$id", params: { id: r.id } })}
@@ -186,7 +189,7 @@ export function MyWorkSpacePage() {
           rows={sm.data ?? []}
           activeTab={smTab}
           onTabChange={setSmTab}
-          counts={{ all: smStats.total, risk: smStats.delayed, upcoming: smStats.upcoming }}
+          counts={{ today: smStats.today, all: smStats.total, risk: smStats.delayed, upcoming: smStats.upcoming }}
           filterRow={(r, tab) => tab === "all" ? true : tab === "risk" ? smIsDelayed(r, t) : smIsUpcoming(r, t)}
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate({ to: "/closure/snag-management/detail/$id", params: { id: r.id } })}
@@ -219,7 +222,7 @@ export function MyWorkSpacePage() {
           rows={abd.data ?? []}
           activeTab={abdTab}
           onTabChange={setAbdTab}
-          counts={{ all: abdStats.total, risk: abdStats.delayed, upcoming: abdStats.upcoming }}
+          counts={{ today: abdStats.today, all: abdStats.total, risk: abdStats.delayed, upcoming: abdStats.upcoming }}
           filterRow={(r, tab) => tab === "all" ? true : tab === "risk" ? abdIsDelayed(r, t) : abdIsUpcoming(r, t)}
           rowKey={(r) => r.id}
           onRowClick={(r) => setAbdDetailId(r.id)}
