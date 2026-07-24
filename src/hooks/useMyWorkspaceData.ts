@@ -50,6 +50,7 @@ export interface TmMyRow {
   plan_days: number | null;
   plan_progress: number | null;
   data_date: string | null;
+  created_at: string | null;
 }
 
 export function useMyTasks(filterPic: string | null, isAdmin: boolean) {
@@ -61,7 +62,7 @@ export function useMyTasks(filterPic: string | null, isAdmin: boolean) {
       const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const rows = await fetchAll<TmMyRow>(
         "task_management_raw",
-        "id,task_no,main_task_no,task_name,level,hdec_pic_name,plan_end,actual_progress,auto_judgment,plan_start,plan_days,plan_progress,data_date",
+        "id,task_no,main_task_no,task_name,level,hdec_pic_name,plan_end,actual_progress,auto_judgment,plan_start,plan_days,plan_progress,data_date,created_at",
         (q) => (isAdmin ? q : q.eq("hdec_pic_name", filterPic)),
         { col: "task_no", asc: true },
         limit,
@@ -87,6 +88,11 @@ export function tmIsUpcoming(r: TmMyRow, today: string, days = 3): boolean {
   const d = daysBetween(r.plan_end, today);
   return d >= 0 && d <= days;
 }
+export function tmIsCreatedToday(r: TmMyRow, today: string): boolean {
+  if (!r.created_at) return false;
+  return String(r.created_at).slice(0, 10) === today.slice(0, 10);
+}
+
 
 // ==================== SM ====================
 export interface SmMyRow {
