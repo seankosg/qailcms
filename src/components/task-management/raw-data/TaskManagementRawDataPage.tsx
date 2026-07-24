@@ -1486,7 +1486,6 @@ export function TaskManagementRawDataPage() {
       <AddMainTaskDialog
         open={addMainOpen}
         onOpenChange={setAddMainOpen}
-        defaultDiscipline={discipline}
         onCreated={() => refetch()}
       />
     </div>
