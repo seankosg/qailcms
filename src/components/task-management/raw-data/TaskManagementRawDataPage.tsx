@@ -76,6 +76,7 @@ import { ExportDialog } from "./ExportDialog";
 import { HistoryDrawer } from "./HistoryDrawer";
 import { TopHorizontalScrollbar } from "@/components/spare-part/raw-data/TopHorizontalScrollbar";
 import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
+import { AddMainTaskDialog } from "./AddMainTaskDialog";
 import { AlarmBadge } from "./AlarmBadge";
 import { TaskStageProgress } from "./TaskStageProgress";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -269,6 +270,7 @@ export function TaskManagementRawDataPage() {
   const [rollupBusy, setRollupBusy] = useState<null | "rollup" | "judgment">(null);
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [addChildParent, setAddChildParent] = useState<ParentSeed | null>(null);
+  const [addMainOpen, setAddMainOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const rollupFn = useServerFn(runRollupAllMains);
   const judgmentFn = useServerFn(runRecalcAutoJudgment);
@@ -1223,6 +1225,11 @@ export function TaskManagementRawDataPage() {
           <Button size="sm" className="h-8" onClick={() => setExportOpen(true)}>
             <Download className="mr-1 h-3.5 w-3.5" /> Export
           </Button>
+          {canEdit && (
+            <Button size="sm" className="h-8" onClick={() => setAddMainOpen(true)}>
+              <Plus className="mr-1 h-3.5 w-3.5" /> Task 추가
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1474,6 +1481,12 @@ export function TaskManagementRawDataPage() {
           setAddChildParent(null);
           refetch();
         }}
+      />
+
+      <AddMainTaskDialog
+        open={addMainOpen}
+        onOpenChange={setAddMainOpen}
+        onCreated={() => refetch()}
       />
     </div>
   );
