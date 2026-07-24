@@ -37,10 +37,8 @@ import {
   Download,
   Filter,
   History,
-  Loader2,
   Pin,
   Plus,
-  RefreshCcw,
   RotateCcw,
   Search,
   Sliders,
@@ -86,10 +84,6 @@ import { EditCellPopover } from "./EditCellPopover";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
 import { DISCIPLINES } from "@/lib/task-management/columns";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
-import {
-  runRollupAllMains,
-  runRecalcAutoJudgment,
-} from "@/lib/task-management/rollup.functions";
 import {
   expectedProgressToday,
   todayGap,
@@ -267,13 +261,10 @@ export function TaskManagementRawDataPage() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [exportOpen, setExportOpen] = useState(false);
   const [historyTask, setHistoryTask] = useState<{ discipline: string; task_no: string; task_name?: string | null } | null>(null);
-  const [rollupBusy, setRollupBusy] = useState<null | "rollup" | "judgment">(null);
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [addChildParent, setAddChildParent] = useState<ParentSeed | null>(null);
   const [addMainOpen, setAddMainOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const rollupFn = useServerFn(runRollupAllMains);
-  const judgmentFn = useServerFn(runRecalcAutoJudgment);
 
   // initial load from server-backed view preference (with local cache fallback)
   useEffect(() => {
@@ -1069,37 +1060,6 @@ export function TaskManagementRawDataPage() {
   const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
   const allCollapsed = parentKeys.length > 0 && collapsedParents.size >= parentKeys.length;
 
-  async function handleRollup() {
-    setRollupBusy("rollup");
-    try {
-      const res = await Promise.all([
-        rollupFn({ data: { discipline: "ARCH" } }),
-        rollupFn({ data: { discipline: "ELEC" } }),
-        rollupFn({ data: { discipline: "MECH" } }),
-      ]);
-      const total = res.reduce((s: number, r: { rolledUp: number }) => s + r.rolledUp, 0);
-      toast.success(`Summary 재계산 완료: ${total}개 Main Task`);
-      refetch();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "재계산 실패");
-    } finally {
-      setRollupBusy(null);
-    }
-  }
-
-  async function handleRecalcJudgment() {
-    setRollupBusy("judgment");
-    try {
-      const res = await judgmentFn({ data: {} });
-      toast.success(`Auto‑judgment 재계산 완료: ${res.updated}행`);
-      refetch();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "재계산 실패");
-    } finally {
-      setRollupBusy(null);
-    }
-  }
-
   return (
     <div className="flex h-[calc(100dvh-6rem)] flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -1181,36 +1141,6 @@ export function TaskManagementRawDataPage() {
           </Button>
           {canEdit && (
             <div className="hidden sm:contents">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={handleRollup}
-                disabled={!!rollupBusy}
-                title="Sub Task 진도로 Main Task 자동 재계산"
-              >
-                {rollupBusy === "rollup" ? (
-                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCcw className="mr-1 h-3.5 w-3.5" />
-                )}
-                Rollup
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={handleRecalcJudgment}
-                disabled={!!rollupBusy}
-                title="임계값 기준으로 자동 판정 재계산"
-              >
-                {rollupBusy === "judgment" ? (
-                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCcw className="mr-1 h-3.5 w-3.5" />
-                )}
-                Judgment
-              </Button>
               <CriticalThresholdPopover />
             </div>
           )}
