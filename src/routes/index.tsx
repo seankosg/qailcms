@@ -15,7 +15,7 @@ function IndexRedirect() {
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       navigate({
-        to: data.session ? "/outstanding/dashboard" : "/auth",
+        to: data.session ? "/my-work-space" : "/auth",
         replace: true,
       });
     });
