@@ -27,8 +27,6 @@ interface Props {
   onClick?: () => void;
   action?: React.ReactNode;
   breakdown?: RiskKpiBreakdownRow[];
-  /** 상위집합 표기용. 있으면 라벨 옆에 아웃라인 뱃지로 렌더 (예: "⊂ In Delay") */
-  parentLabel?: string;
   /** hover 툴팁으로 노출할 산식 문자열 */
   formula?: string;
 }
@@ -43,7 +41,6 @@ export function RiskKpiCard({
   onClick,
   action,
   breakdown,
-  parentLabel,
   formula,
 }: Props) {
   const primary =
@@ -64,16 +61,9 @@ export function RiskKpiCard({
       <CardContent className="p-3">
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground truncate">
-                  {label}
-                </div>
-                {parentLabel && (
-                  <span className="rounded-sm border border-border/70 px-1 py-[1px] text-[9px] font-medium uppercase tracking-wide text-muted-foreground/80">
-                    {parentLabel}
-                  </span>
-                )}
+            <div className="flex items-start justify-between gap-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-normal break-words leading-tight">
+                {label}
               </div>
               {action ? <div onClick={(e) => e.stopPropagation()}>{action}</div> : null}
             </div>
