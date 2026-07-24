@@ -136,11 +136,13 @@ export function computeKpi(
     else notStarted++;
     if (isPlannedStartedBy(r, asOf)) plannedStartedByAsOf++;
     if (isStarted(r)) actuallyStarted++;
-    if (isInDelay(r, asOf)) inDelay++;
-    if (isStartDelayed(r, asOf)) startDelayed++;
-    if (isCompletionOverdue(r, asOf)) completionOverdue++;
-    if (isCriticalDelay(r, asOf, thresholds)) criticalDelay++;
-    if (isBehindSchedule(r, asOf)) behindSchedule++;
+    // In Delay 우산 상위 KPI. 아래 4개 카드는 In Delay ∩ <원자 조건> 으로 종속.
+    const inDelayFlag = isInDelay(r, asOf);
+    if (inDelayFlag) inDelay++;
+    if (inDelayFlag && isStartDelayed(r, asOf)) startDelayed++;
+    if (inDelayFlag && isCompletionOverdue(r, asOf)) completionOverdue++;
+    if (isCriticalDelay(r, asOf, thresholds)) criticalDelay++; // Critical ⊂ In Delay by 정의
+    if (inDelayFlag && isBehindSchedule(r, asOf)) behindSchedule++;
   }
   return {
     total: rows.length,
