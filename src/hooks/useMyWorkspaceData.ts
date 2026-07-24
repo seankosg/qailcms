@@ -180,6 +180,7 @@ export interface AbdMyRow {
   r3_drafting_plan: string | null; r3_drafting_actual: string | null;
   r3_submission_plan: string | null; r3_submission_actual: string | null;
   r3_dar_plan: string | null; r3_dar_actual: string | null;
+  created_at: string | null;
 }
 
 export function useMyAbd(filterPic: string | null, isAdmin: boolean) {
@@ -190,7 +191,7 @@ export function useMyAbd(filterPic: string | null, isAdmin: boolean) {
     queryFn: async () => {
       const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const cols = [
-        "id,abd_number,document_title,latest_status,latest_rev,hdec_pic_name",
+        "id,abd_number,document_title,latest_status,latest_rev,hdec_pic_name,created_at",
         "r1_drafting_plan,r1_drafting_actual,r1_submission_plan,r1_submission_actual,r1_dar_plan,r1_dar_actual",
         "r2_drafting_plan,r2_drafting_actual,r2_submission_plan,r2_submission_actual,r2_dar_plan,r2_dar_actual",
         "r3_drafting_plan,r3_drafting_actual,r3_submission_plan,r3_submission_actual,r3_dar_plan,r3_dar_actual",
