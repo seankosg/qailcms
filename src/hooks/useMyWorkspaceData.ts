@@ -86,11 +86,24 @@ export function tmIsUpcoming(r: TmMyRow, today: string, days = 3): boolean {
   if (tmIsCompleted(r)) return false;
   if (!r.plan_end) return false;
   const d = daysBetween(r.plan_end, today);
-  return d >= 0 && d <= days;
+  return d >= 1 && d <= days;
 }
-export function tmIsCreatedToday(r: TmMyRow, today: string): boolean {
-  if (!r.created_at) return false;
-  return String(r.created_at).slice(0, 10) === today.slice(0, 10);
+
+function sameDay(a: string | null | undefined, today: string): boolean {
+  if (!a) return false;
+  return String(a).slice(0, 10) === today.slice(0, 10);
+}
+
+export type TmTodayKind = "Start" | "Finish";
+export function tmTodayKinds(r: TmMyRow, today: string): TmTodayKind[] {
+  if (tmIsCompleted(r)) return [];
+  const kinds: TmTodayKind[] = [];
+  if (sameDay(r.plan_start, today)) kinds.push("Start");
+  if (sameDay(r.plan_end, today)) kinds.push("Finish");
+  return kinds;
+}
+export function tmIsToday(r: TmMyRow, today: string): boolean {
+  return tmTodayKinds(r, today).length > 0;
 }
 
 
@@ -101,6 +114,7 @@ export interface SmMyRow {
   location_raw: string | null;
   main_trade: string | null;
   status_raw: string | null;
+  planned_start_date: string | null;
   planned_closure_date: string | null;
   planned_rectified_date: string | null;
   actual_closure_date: string | null;
@@ -120,7 +134,7 @@ export function useMyDefects(filterPic: string | null, isAdmin: boolean) {
       const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const rows = await fetchAll<SmMyRow>(
         "defect_items_raw",
-        "id,source_issue_no,location_raw,main_trade,status_raw,planned_closure_date,planned_rectified_date,actual_closure_date,actual_rectified_date,actual_progress_pct,created_date,created_at,hdec_pic_name",
+        "id,source_issue_no,location_raw,main_trade,status_raw,planned_start_date,planned_closure_date,planned_rectified_date,actual_closure_date,actual_rectified_date,actual_progress_pct,created_date,created_at,hdec_pic_name",
         (q) => (isAdmin ? q : q.eq("hdec_pic_name", filterPic)),
         { col: "source_issue_no", asc: true },
         limit,
@@ -155,11 +169,20 @@ export function smIsUpcoming(r: SmMyRow, today: string, days = 3): boolean {
   const due = r.planned_closure_date ?? r.planned_rectified_date;
   if (!due) return false;
   const d = daysBetween(due, today);
-  return d >= 0 && d <= days;
+  return d >= 1 && d <= days;
 }
-export function smIsCreatedToday(r: SmMyRow, today: string): boolean {
-  if (!r.created_at) return false;
-  return String(r.created_at).slice(0, 10) === today.slice(0, 10);
+
+export type SmTodayKind = "Start" | "Rectify" | "Close";
+export function smTodayKinds(r: SmMyRow, today: string): SmTodayKind[] {
+  if (smIsCompleted(r)) return [];
+  const kinds: SmTodayKind[] = [];
+  if (sameDay(r.planned_start_date, today)) kinds.push("Start");
+  if (sameDay(r.planned_rectified_date, today)) kinds.push("Rectify");
+  if (sameDay(r.planned_closure_date, today)) kinds.push("Close");
+  return kinds;
+}
+export function smIsToday(r: SmMyRow, today: string): boolean {
+  return smTodayKinds(r, today).length > 0;
 }
 
 
@@ -244,15 +267,33 @@ export function abdIsUpcoming(r: AbdMyRow, today: string, days = 3): boolean {
   const plan = abdCurrentPlan(r);
   if (!plan) return false;
   const d = daysBetween(plan, today);
-  return d >= 0 && d <= days;
+  return d >= 1 && d <= days;
 }
 export function abdCurrentPlanDate(r: AbdMyRow): string | null {
   return abdCurrentPlan(r);
 }
 
-export function abdIsCreatedToday(r: AbdMyRow, today: string): boolean {
-  if (!r.created_at) return false;
-  return String(r.created_at).slice(0, 10) === today.slice(0, 10);
+export type AbdTodayKind = "Draft" | "Sub" | "Resp";
+function abdCurrentPlanKind(r: AbdMyRow): { plan: string | null; kind: AbdTodayKind | null } {
+  const st = abdStage(r);
+  const pick = (draft: string | null, sub: string | null, resp: string | null): { plan: string | null; kind: AbdTodayKind | null } => {
+    if (resp) return { plan: resp, kind: "Resp" };
+    if (sub) return { plan: sub, kind: "Sub" };
+    if (draft) return { plan: draft, kind: "Draft" };
+    return { plan: null, kind: null };
+  };
+  if (st === "R3") return pick(r.r3_drafting_plan, r.r3_submission_plan, r.r3_dar_plan);
+  if (st === "R2") return pick(r.r2_drafting_plan, r.r2_submission_plan, r.r2_dar_plan);
+  return pick(r.r1_drafting_plan, r.r1_submission_plan, r.r1_dar_plan);
+}
+export function abdTodayKind(r: AbdMyRow, today: string): AbdTodayKind | null {
+  if (abdIsApproved(r)) return null;
+  const { plan, kind } = abdCurrentPlanKind(r);
+  if (!plan || !kind) return null;
+  return sameDay(plan, today) ? kind : null;
+}
+export function abdIsToday(r: AbdMyRow, today: string): boolean {
+  return abdTodayKind(r, today) != null;
 }
 
 export function today(): string {
