@@ -3337,6 +3337,7 @@ export type Database = {
           pdate: string
         }[]
       }
+      allocate_main_task_no: { Args: { _discipline: string }; Returns: string }
       allocate_task_no: {
         Args: { _discipline: string; _main_task_no: string }
         Returns: string
@@ -3389,6 +3390,10 @@ export type Database = {
           id: string
           metadata: Json
         }[]
+      }
+      create_main_with_subs: {
+        Args: { _discipline: string; _main: Json; _subs: Json }
+        Returns: Json
       }
       defect_data_dates: {
         Args: never
