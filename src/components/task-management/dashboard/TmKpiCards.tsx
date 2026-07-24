@@ -189,7 +189,6 @@ export function TmKpiCards({
           tone="danger"
           onClick={() => goRaw("start_delayed")}
           breakdown={toBreakdownRows("start_delayed", breakdown.startDelayed)}
-          parentLabel="⊂ In Delay"
           formula="In Delay ∩ (plan_start ≤ asOf & actual_start 없음)"
         />
         <RiskKpiCard
@@ -199,7 +198,6 @@ export function TmKpiCards({
           tone="danger"
           onClick={() => goRaw("completion_overdue")}
           breakdown={toBreakdownRows("completion_overdue", breakdown.completionOverdue)}
-          parentLabel="⊂ In Delay"
           formula="In Delay ∩ (plan_end < asOf)"
         />
         <RiskKpiCard
@@ -210,7 +208,6 @@ export function TmKpiCards({
           onClick={() => goRaw("critical")}
           action={<CriticalThresholdPopover compact triggerVariant="ghost" triggerLabel="설정" />}
           breakdown={toBreakdownRows("critical", breakdown.criticalDelay)}
-          parentLabel="⊂ In Delay"
           formula="미완료 & 스테이지 worst-of 판정 = 위험 (Critical ⊂ In Delay)"
         />
         <RiskKpiCard
@@ -220,7 +217,6 @@ export function TmKpiCards({
           tone="danger"
           onClick={() => goRaw("behind")}
           breakdown={toBreakdownRows("behind", breakdown.behindSchedule)}
-          parentLabel="⊂ In Delay"
           formula="In Delay ∩ (Actual% − CumPlan% < 0)"
         />
       </div>
