@@ -21,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Search, RefreshCcw, Upload, Filter, Download, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Sparkles } from "lucide-react";
+import { Search, Upload, Filter, Download, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Sparkles } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { bulkClassifyDefects } from "@/lib/defect-management/classifier/bulk-classify.functions";
 import {
@@ -814,9 +814,6 @@ export function DefectRawDataPage() {
               <Download className="mr-1.5 h-3.5 w-3.5" /> {downloadingAll ? "다운로드 중..." : "Unclosed 전체 XLSX"}
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => { invalidateDefects(); refetch(); }} disabled={isFetching}>
-            <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
-          </Button>
         </div>
       </header>
 
