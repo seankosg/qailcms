@@ -523,13 +523,13 @@ export function TaskManagementRawDataPage() {
         case "in_delay":
           return kpiIsInDelay(it, asOf);
         case "start_delayed":
-          return kpiIsStartDelayed(it, asOf);
+          return kpiIsInDelay(it, asOf) && kpiIsStartDelayed(it, asOf);
         case "completion_overdue":
-          return kpiIsCompletionOverdue(it, asOf);
+          return kpiIsInDelay(it, asOf) && kpiIsCompletionOverdue(it, asOf);
         case "critical":
           return kpiIsCriticalDelay(it, asOf, t);
         case "behind":
-          return kpiIsBehindSchedule(it, asOf);
+          return kpiIsInDelay(it, asOf) && kpiIsBehindSchedule(it, asOf);
         default:
           return true;
       }
