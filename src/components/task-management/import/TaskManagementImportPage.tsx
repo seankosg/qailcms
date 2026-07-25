@@ -118,6 +118,7 @@ function ImportInner() {
     setFileDataDateOverride,
     setFileSheet,
     setFileExcludedHeaders,
+    setFileDateOverrides,
     setFileConflictPolicy,
     setFileConflictDecisions,
     clearFileConflictDecisions,
