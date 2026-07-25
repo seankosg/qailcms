@@ -312,6 +312,13 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
         </div>
       </header>
 
+      <CommentsInbox
+        userId={me?.id ?? null}
+        scope={scope}
+        filterValue={filterValue}
+        isAdmin={isAdmin}
+      />
+
       {/* ============= TM ============= */}
       <section className="space-y-2">
         <div className="flex items-center gap-2">
