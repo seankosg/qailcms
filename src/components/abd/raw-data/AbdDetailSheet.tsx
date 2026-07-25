@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CommentsThread, ABD_CATEGORIES } from "@/components/shared/CommentsThread";
+import { formatDdMmmYyyy } from "@/lib/time/doha";
 
 interface AbdItemRow {
   id: string;
@@ -48,7 +49,7 @@ const ROUND_FIELDS: { round: 1 | 2 | 3; stage: "Drafting" | "Submission" | "DAR"
 
 function fmtDate(v: string | null | undefined) {
   if (!v) return "—";
-  return String(v).slice(0, 10);
+  return formatDdMmmYyyy(v) || "—";
 }
 
 function isLate(plan: string | null, actual: string | null): boolean {
