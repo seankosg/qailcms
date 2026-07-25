@@ -471,7 +471,7 @@ export function TaskManagementRawDataPage() {
     staleTime: 30_000,
   });
 
-  const { id: currentUserId } = useCurrentUser().data ?? { id: null as string | null };
+  const currentUserId = currentUser?.id ?? null;
   const { isRead, markRead } = useCommentReadState(currentUserId);
 
   const latestDataDate = useMemo(() => {
