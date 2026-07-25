@@ -370,10 +370,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
         ) : (
           <div className="flex h-14 items-center justify-end gap-2 border-b px-4">
-            <div className="flex flex-col items-end">
-              <span className="max-w-[110px] truncate text-sm font-medium">{me?.name ?? me?.email}</span>
-              <span className="text-[10px] leading-none text-muted-foreground">{displayRoleLabel}</span>
-            </div>
+            <span className="max-w-[110px] truncate text-sm font-medium">{me?.name ?? me?.email}</span>
             {me?.primaryRole === "guest" || me?.isGuest ? (
               <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Guest</span>
             ) : me?.isAdmin || me?.isDSuperUser ? (
