@@ -264,10 +264,14 @@ function toIsoDate(v: unknown): string | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) return null;
-    // xlsx `cellDates:true` returns a Date built from the sheet's wall-clock
-    // components as LOCAL time. Read local Y/M/D directly; never touch UTC
-    // arithmetic here or the day will shift by the browser TZ offset.
-    return dohaDateOnly(v);
+    // TZ-independent: read UTC components. With cellDates:false (default),
+    // SheetJS never produces a Date here; this branch only handles Date
+    // objects from other sources (date pickers, tests).
+    const y = v.getUTCFullYear();
+    const mo = v.getUTCMonth() + 1;
+    const da = v.getUTCDate();
+    if (!y || mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+    return `${y}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
   }
   if (typeof v === "number") {
     if (!Number.isFinite(v) || v <= 0) return null;
@@ -303,7 +307,31 @@ function toIsoDate(v: unknown): string | null {
       if (yy < 1900 || yy > 2999) return null;
       return `${yy}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
     }
-    return toDohaDateKey(s) || null;
+    // dd-MMM-yyyy / MMM dd yyyy (TZ-independent).
+    const MONTHS: Record<string, number> = {
+      jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12,
+    };
+    const dMonY = s.match(/^(\d{1,2})[\s\-\/.]+([A-Za-z]{3,4})[\s\-\/.]+(\d{2,4})$/);
+    if (dMonY) {
+      const da = Number(dMonY[1]);
+      const mo = MONTHS[dMonY[2].toLowerCase()];
+      const yy = dMonY[3].length === 2 ? 2000 + Number(dMonY[3]) : Number(dMonY[3]);
+      if (mo && da >= 1 && da <= 31 && yy >= 1900 && yy <= 2999) {
+        return `${yy}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+      }
+    }
+    const monDY = s.match(/^([A-Za-z]{3,4})[\s\-\/.]+(\d{1,2})[\s,\-\/.]+(\d{2,4})$/);
+    if (monDY) {
+      const mo = MONTHS[monDY[1].toLowerCase()];
+      const da = Number(monDY[2]);
+      const yy = monDY[3].length === 2 ? 2000 + Number(monDY[3]) : Number(monDY[3]);
+      if (mo && da >= 1 && da <= 31 && yy >= 1900 && yy <= 2999) {
+        return `${yy}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+      }
+    }
+    // No further fallback: NEVER call new Date(string) or toDohaDateKey(s) here,
+    // both introduce browser/worker TZ shifts that produce -1 day errors.
+    return null;
   }
   return null;
   } catch { return null; }
@@ -314,15 +342,15 @@ function toIsoDateTime(v: unknown): string | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) return null;
-    // XLSX cellDates:true returns a Date whose *local* components hold the
-    // sheet's wall-clock value. Interpret those components as Doha (+03:00).
+    // TZ-independent: read UTC components (SheetJS with cellDates:false
+    // never lands here). Interpret as Doha wall-clock.
     return dohaWallToUtcIso(
-      v.getFullYear(),
-      v.getMonth() + 1,
-      v.getDate(),
-      v.getHours(),
-      v.getMinutes(),
-      v.getSeconds(),
+      v.getUTCFullYear(),
+      v.getUTCMonth() + 1,
+      v.getUTCDate(),
+      v.getUTCHours(),
+      v.getUTCMinutes(),
+      v.getUTCSeconds(),
     ) || null;
   }
   if (typeof v === "number") {
@@ -367,17 +395,20 @@ function toIsoDateTime(v: unknown): string | null {
         Number(m[6] ?? 0),
       ) || null;
     }
-    // Fallback: let JS parse (e.g. `Jul 22 2026`) — read components as-is.
-    const d = new Date(s);
-    if (Number.isNaN(d.getTime())) return null;
-    return dohaWallToUtcIso(
-      d.getFullYear(),
-      d.getMonth() + 1,
-      d.getDate(),
-      d.getHours(),
-      d.getMinutes(),
-      d.getSeconds(),
-    ) || null;
+    // dd/mm/yyyy [HH:mm[:ss]] (TZ-independent).
+    const dmyt = s.match(
+      /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/,
+    );
+    if (dmyt) {
+      const da = Number(dmyt[1]), mo = Number(dmyt[2]);
+      const yy = dmyt[3].length === 2 ? 2000 + Number(dmyt[3]) : Number(dmyt[3]);
+      if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31 && yy >= 1900 && yy <= 2999) {
+        return dohaWallToUtcIso(yy, mo, da,
+          Number(dmyt[4] ?? 0), Number(dmyt[5] ?? 0), Number(dmyt[6] ?? 0)) || null;
+      }
+    }
+    // No further fallback: never call new Date(string) here (TZ shift).
+    return null;
   }
   return null;
   } catch { return null; }
@@ -588,7 +619,7 @@ export function toDefectFieldName(
 /** 워크북의 시트 이름 리스트. */
 export async function getDefectExcelSheetNames(file: File): Promise<string[]> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: true, bookSheets: true });
+  const wb = XLSX.read(buf, { type: "array", bookSheets: true });
   return wb.SheetNames ?? [];
 }
 
@@ -604,7 +635,7 @@ export async function getDefectExcelHeaders(
   isReimport: boolean;
 } | null> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const wb = XLSX.read(buf, { type: "array" });
   const name = sheetName ?? wb.SheetNames[0];
   const sheet = wb.Sheets[name];
   if (!sheet) return null;
@@ -625,7 +656,7 @@ export async function parseDefectExcel(
   opts: ParseDefectOptions = {},
 ): Promise<ParseDefectResult> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const wb = XLSX.read(buf, { type: "array" });
   const sheetName = opts.sheetName ?? wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
   if (!sheet) throw new Error("시트를 찾을 수 없습니다");

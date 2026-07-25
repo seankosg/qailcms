@@ -150,10 +150,13 @@ function toIsoDate(v: any): string | null {
     if (v == null || v === "") return null;
     if (v instanceof Date) {
       if (isNaN(v.getTime())) return null;
-      // xlsx `cellDates:true` returns a Date built from the sheet's wall-clock
-      // components as LOCAL time. Read local Y/M/D directly; never touch UTC
-      // arithmetic here or the day will shift by the browser TZ offset.
-      return dohaDateOnly(v);
+      // TZ-independent: read UTC components (SheetJS with cellDates:false
+      // never lands here; this only handles Date from pickers/tests).
+      const y = v.getUTCFullYear();
+      const mo = v.getUTCMonth() + 1;
+      const da = v.getUTCDate();
+      if (!y || mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+      return `${y}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
     }
     if (typeof v === "number") {
       if (!Number.isFinite(v) || v <= 0) return null;
@@ -187,7 +190,29 @@ function toIsoDate(v: any): string | null {
       if (yy < 1900 || yy > 2999) return null;
       return `${yy}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
     }
-    return toDohaDateKey(s) || null;
+    const MONTHS: Record<string, number> = {
+      jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12,
+    };
+    const dMonY = s.match(/^(\d{1,2})[\s\-\/.]+([A-Za-z]{3,4})[\s\-\/.]+(\d{2,4})$/);
+    if (dMonY) {
+      const da = Number(dMonY[1]);
+      const mo = MONTHS[dMonY[2].toLowerCase()];
+      const yy = dMonY[3].length === 2 ? 2000 + Number(dMonY[3]) : Number(dMonY[3]);
+      if (mo && da >= 1 && da <= 31 && yy >= 1900 && yy <= 2999) {
+        return `${yy}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+      }
+    }
+    const monDY = s.match(/^([A-Za-z]{3,4})[\s\-\/.]+(\d{1,2})[\s,\-\/.]+(\d{2,4})$/);
+    if (monDY) {
+      const mo = MONTHS[monDY[1].toLowerCase()];
+      const da = Number(monDY[2]);
+      const yy = monDY[3].length === 2 ? 2000 + Number(monDY[3]) : Number(monDY[3]);
+      if (mo && da >= 1 && da <= 31 && yy >= 1900 && yy <= 2999) {
+        return `${yy}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+      }
+    }
+    // No further fallback: never call new Date(string) or toDohaDateKey(s) here.
+    return null;
   } catch {
     return null;
   }
@@ -400,7 +425,7 @@ export async function parseAbdFile(
   teamOptions?: TeamOption[],
 ): Promise<ParsedFileResult> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { cellDates: true });
+  const wb = XLSX.read(buf);
   const teamFromFilename = teamOverride ?? detectTeamFromFilename(file.name, teamOptions);
   const result: ParsedFileResult = {
     file_name: file.name,

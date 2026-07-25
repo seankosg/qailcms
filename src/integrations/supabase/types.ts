@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      _tm_date_shift_backup_20260725: {
+        Row: {
+          actual_finish: string | null
+          actual_start: string | null
+          backed_up_at: string | null
+          data_date: string | null
+          forecast_end: string | null
+          plan_end: string | null
+          plan_start: string | null
+          task_no: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          backed_up_at?: string | null
+          data_date?: string | null
+          forecast_end?: string | null
+          plan_end?: string | null
+          plan_start?: string | null
+          task_no?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          backed_up_at?: string | null
+          data_date?: string | null
+          forecast_end?: string | null
+          plan_end?: string | null
+          plan_start?: string | null
+          task_no?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       _tm_date_shift_log_20260720: {
         Row: {
           actual_finish: string | null
