@@ -1,6 +1,6 @@
 import { dohaStampCompact } from "@/lib/time/doha";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
-import { cumPlanProgress, computeVariance } from "@/lib/task-management/derived";
+import { cumPlanProgress, computeVariance, computeJudgment } from "@/lib/task-management/derived";
 
 export interface TaskSummaryRow {
   id: string;
@@ -159,6 +159,10 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
 function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean, asOf?: string): Record<string, unknown> & { __isMain: boolean; __zebra: boolean } {
   const gap = computeVariance(r, asOf) ?? 0;
   const expected = cumPlanProgress(r, asOf);
+  // Main Task는 Data Date 기반 클라이언트 재계산 우선; Sub는 DB값 우선.
+  const judgment = isMain
+    ? computeJudgment(r, undefined, asOf) || r.auto_judgment || ""
+    : r.auto_judgment || computeJudgment(r, undefined, asOf) || "";
   return {
     __isMain: isMain,
     __zebra: zebra,
@@ -176,7 +180,7 @@ function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean, asOf?: str
     actual_progress: pct(r.actual_progress),
     gap: Number.isFinite(gap) ? gap : "",
     slip_days: r.slip_days ?? "",
-    auto_judgment: r.auto_judgment ?? "",
+    auto_judgment: judgment,
     // for cellFillFor access
     auto_judgment_raw: r.auto_judgment ?? null,
   };

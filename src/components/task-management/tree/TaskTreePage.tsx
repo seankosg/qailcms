@@ -22,7 +22,6 @@ import {
   computeJudgment,
   cumPlanProgress,
   computeVariance,
-  worstJudgment,
 } from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
@@ -52,6 +51,14 @@ interface Row {
   sub_task_desc: string | null;
   sort_order: number | null;
   data_date: string | null;
+}
+
+/** Main Task는 Data Date 변경에 민감하므로 클라이언트 재계산 우선, Sub는 DB값 우선. */
+function resolveJudgment(r: Row, asOfDate?: string): string {
+  if (r.level === "main") {
+    return computeJudgment(r, undefined, asOfDate) || r.auto_judgment || "";
+  }
+  return r.auto_judgment || computeJudgment(r, undefined, asOfDate) || "";
 }
 
 function ProgressBar({ v }: { v: number | null | undefined }) {
@@ -181,14 +188,10 @@ export function TaskTreePage() {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
       if (judgmentFilter.size > 0) {
-        const judgeOf = (r: Row) =>
-          (r.auto_judgment && r.auto_judgment.trim()) ||
-          computeJudgment(r, undefined, asOfDate) ||
-          "";
-        const mainJ = judgeOf(p);
+        const mainJ = resolveJudgment(p, asOfDate);
         const anyMatch =
           (mainJ && judgmentFilter.has(mainJ)) ||
-          kids.some((k) => judgmentFilter.has(judgeOf(k)));
+          kids.some((k) => judgmentFilter.has(resolveJudgment(k, asOfDate)));
         if (!anyMatch) return false;
       }
       if (picFilter !== "__all__") {
@@ -405,9 +408,7 @@ export function TaskTreePage() {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
           const isDone = Number(p.actual_progress ?? 0) >= 1;
-          const mainJudgment =
-            (p.auto_judgment && p.auto_judgment.trim()) ||
-            computeJudgment(p, undefined, asOfDate);
+          const mainJudgment = resolveJudgment(p, asOfDate);
           const behindCount = kids.filter(
             (k) => (computeVariance(k, asOfDate) ?? 0) < -0.05,
           ).length;
@@ -491,7 +492,7 @@ export function TaskTreePage() {
                     <tbody>
                       {kids.map((k) => {
                         const gap = computeVariance(k, asOfDate) ?? 0;
-                        const j = k.auto_judgment ?? computeJudgment(k, undefined, asOfDate);
+                        const j = resolveJudgment(k, asOfDate);
                         return (
                           <tr
                             key={k.id}
