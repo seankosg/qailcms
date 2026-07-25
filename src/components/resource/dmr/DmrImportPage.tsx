@@ -15,6 +15,7 @@ import { Loader2, Upload, ImageIcon, CheckCircle2, XCircle, CloudUpload, Sparkle
 import { DmrPreviewTable } from './DmrPreviewTable';
 import { DISCIPLINE_LABEL, normalizeDmrContractor, isDmrDirectContractor, type DmrDiscipline, type DmrParsedSection } from '@/lib/dmr/types';
 import { flattenSection } from '@/lib/dmr/utils';
+import { formatDdMmmYyyy } from '@/lib/time/doha';
 
 const SLOTS: DmrDiscipline[] = ['ARCH', 'ELEC', 'MECH'];
 
@@ -311,7 +312,7 @@ export function DmrImportPage() {
             if (!s.section) return null;
             return (
               <div key={d} className="space-y-2 rounded-md border p-3">
-                <div className="text-sm font-semibold">{d} · {s.section.rows.length}행 · {s.section.report_date}</div>
+                <div className="text-sm font-semibold">{d} · {s.section.rows.length}행 · {formatDdMmmYyyy(s.section.report_date) || s.section.report_date}</div>
                 <DmrPreviewTable
                   section={s.section}
                   onChange={(next) => setSlot(d, { section: next })}
