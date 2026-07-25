@@ -89,6 +89,8 @@ export interface DefectImportFile {
   headerToFieldMap?: Record<string, string>;
   excludedHeaders?: string[];
   excludedFields?: Set<string>;
+  dateIssues?: import("@/lib/import/date-audit").DateIssue[];
+  dateOverrides?: Record<string, string>;
   isReimport?: boolean;
   warnings?: string[];
   categorySummary?: string[];
@@ -132,6 +134,7 @@ interface CtxValue {
   setFileDataDateOverride: (id: string, date: string | null) => void;
   setFileSheet: (id: string, sheetName: string) => Promise<void>;
   setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
+  setFileDateOverrides: (id: string, overrides: Record<string, string>) => Promise<void>;
   setFileDuplicateStrategy: (id: string, strategy: DuplicateStrategy) => void;
   setFileDuplicateSelection: (id: string, groupKey: string, parsedIndex: number) => void;
   resolveDuplicates: (id: string) => void;
@@ -288,6 +291,9 @@ function validate(f: DefectImportFile): string | null {
   if ((f.duplicateGroups?.length ?? 0) > 0) {
     return `동일 Issue No 중복이 ${f.duplicateGroups!.length}그룹 감지되었습니다. "중복 검토"를 완료하세요.`;
   }
+  if ((f.dateIssues?.length ?? 0) > 0) {
+    return `날짜 형식 오류 ${f.dateIssues!.length}건이 있습니다. 아래 목록에서 수정 후 재파싱하세요.`;
+  }
   return null;
 }
 
@@ -420,11 +426,14 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
   const parseAndApply = useCallback(
     async (id: string, file: File, sheetName?: string, excludedHeaders?: string[]) => {
       const extraAliases = await fetchAliases();
+      const current = (filesRefLocal.current ?? []).find((f) => f.id === id);
+      const dateOverrides = current?.dateOverrides ?? {};
       try {
         const parsed = await parseDefectExcel(file, {
           extraAliases,
           sheetName,
           excludedHeaders,
+          dateOverrides,
         });
         setFiles((cur) =>
           cur.map((f) => {
@@ -447,6 +456,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               headerToFieldMap: parsed.headerToFieldMap,
               excludedHeaders: parsed.excludedHeaders,
               excludedFields: parsed.excludedFields,
+              dateIssues: parsed.dateIssues,
               isReimport: parsed.isReimport,
               warnings: parsed.warnings,
               categorySummary: parsed.categorySummary,
@@ -633,6 +643,21 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       });
       if (!target) return;
       await parseAndApply(id, target.file, target.sheetName, excluded);
+    },
+    [parseAndApply],
+  );
+
+  const setFileDateOverrides = useCallback(
+    async (id: string, overrides: Record<string, string>) => {
+      let target: DefectImportFile | undefined;
+      setFiles((cur) => {
+        target = cur.find((f) => f.id === id);
+        return cur.map((f) =>
+          f.id === id ? { ...f, status: "parsing", dateOverrides: overrides } : f,
+        );
+      });
+      if (!target) return;
+      await parseAndApply(id, target.file, target.sheetName, target.excludedHeaders);
     },
     [parseAndApply],
   );
@@ -1612,6 +1637,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         setFileDataDateOverride,
         setFileSheet,
         setFileExcludedHeaders,
+        setFileDateOverrides,
         setFileDuplicateStrategy,
         setFileDuplicateSelection,
         resolveDuplicates,
