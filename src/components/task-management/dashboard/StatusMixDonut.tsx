@@ -15,7 +15,7 @@ interface Props {
 const ORDER: { key: Seg; label: string; color: string }[] = [
   { key: "completed", label: "Completed", color: "var(--schedule-actual)" },
   { key: "wip", label: "WIP", color: "var(--schedule-plan)" },
-  { key: "not_started", label: "Not Started", color: "hsl(var(--muted-foreground))" },
+  { key: "not_started", label: "No Start", color: "hsl(var(--muted-foreground))" },
 ];
 
 export function StatusMixDonut({ total, completed, wip, notStarted, onSegmentClick }: Props) {
