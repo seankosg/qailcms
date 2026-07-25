@@ -1,53 +1,69 @@
-## 문제 진단 (확인된 사실)
 
-프로덕션 번들을 실측한 결과 **클라이언트 JS 어디에도 buildId 문자열이 포함되어 있지 않음**:
+## 배경
 
-- 서버(edge worker) 응답: `GET https://qailcms.com/api/public/version` → `{"buildId":"2026-07-25T05:33:20.810Z"}` ✅ 정상
-- 클라이언트 번들: 모든 `/assets/*.js`에서 `2026-...Z` 패턴 검색 → **0건**. 즉 `__APP_BUILD_ID__`가 클라이언트에서 미치환.
+Raw Data 보유 모듈 중 HDEC PIC 축으로 필터링·개인화가 불가능한 모듈은 **DMR**과 **Spare Part** 두 곳입니다. DMR은 성격상 PIC 축이 없지만, Spare Part는 이미 `issue_owner`(자유 텍스트) → `owner_user_id` 트리거가 존재해 담당자 개념이 자연스럽게 존재합니다. 요청하신 대로 SM/TM/ABD와 **동일 수준**으로 이식합니다.
 
-결과적으로 `useVersionCheck`의 `getCurrentBuildId()`가 `""`을 반환 → `isDevBuild("")`가 `true` → **버전 체크 자체가 조기 리턴**됩니다. 같은 이유로 헤더의 "New Version" 버튼도 렌더링되지 않습니다.
+## 스코프
 
-**원인**: `vite.config.ts`의 최상위 `vite.define`이 Vite 7 멀티 환경 빌드에서 SSR/worker 번들에는 반영되지만, `@lovable.dev/vite-tanstack-config`가 클라이언트 환경에서 `import.meta.env.*` 계열 define만 병합하는 흐름과 어긋나 `__APP_BUILD_ID__` 심볼이 클라이언트 번들에서 치환되지 않고 사라짐(전역 identifier로 남으면 dead-code로 제거).
+### 1. DB 스키마 (migration)
+- `spare_parts_raw`에 컬럼 추가
+  - `hdec_pic_name text`
+  - `hdec_eng_name text`
+- 인덱스 (Raw Data 서버 필터 성능): `hdec_pic_name`, `hdec_eng_name` 대상 btree + trigram(pg_trgm)
+- `spare_parts_auto_owner_user_id` 트리거 함수 개편
+  - 우선순위: `hdec_pic_name` → `hdec_eng_name` → `issue_owner`
+  - profiles.hdec_pic_name / hdec_eng_name 매칭 결과가 있으면 그 user_id 사용, 없을 때 기존 `resolve_owner_by_name(issue_owner)` 폴백
+- `profiles_propagate_to_raw` 트리거: 기존 SM/TM/ABD와 동일하게 `spare_parts_raw`도 propagate 대상에 포함(이름 변경 시 raw 동기화)
+- `spare_part_field_config` 시드: `hdec_pic_name` / `hdec_eng_name` 항목 추가(visible=true, group=id, sort_order 조정)
 
-## 수정 계획
+### 2. TypeScript 컬럼 정의
+- `src/lib/spare-part/columns.ts`
+  - `SPARE_PART_COLUMNS` 배열에 두 필드 삽입 (group `"id"`, 라벨 "HDEC PIC" / "HDEC ENG", width 130/140)
+  - `RAW_SEARCH_FIELDS`에 `hdec_pic_name`, `hdec_eng_name` 추가
+  - `BULK_EDITABLE_FIELDS`에 둘 다 추가 (SM/TM/ABD 정책과 동일)
 
-### 1. `vite.config.ts`
-buildId를 **VITE_ 접두사 환경변수 형태로도** 주입하여 클라이언트/서버 양쪽에 확실히 치환되게 함:
+### 3. Import 매핑
+- `src/lib/spare-part-import-parser.ts`: 헤더 후보 사전에 `"HDEC PIC"`, `"HDEC Engineer"`, `"HDEC ENG"`, 국문 표기 후보 추가
+- `spare_part_header_mappings` 기본 매핑 시드 추가
+- `SparePartImportContext`: preview / diff / upsert payload에 두 필드 포함
+- 임포트 대시보드 `FieldLogTable` 자동 노출 (기존 스키마 반영)
 
-```ts
-const buildId = process.env.VITE_APP_BUILD_ID || new Date().toISOString();
+### 4. Raw Data UI
+- `SparePartRawDataPage.tsx`
+  - 신규 컬럼 자동 렌더링 (기존 `SPARE_PART_COLUMNS` iteration 기반이라 정의 추가로 확보)
+  - `ColumnFilters`: `hdec_pic_name` / `hdec_eng_name`를 multi-select 파셋으로 노출
+  - `DEFAULT_ORDER` / 사용자 저장 컬럼 순서에 두 필드 포함, 기본 노출
+- `SparePartDetailPage.tsx` `FieldRenderer` 자동 반영 (field_config 기반)
 
-export default defineConfig({
-  tanstackStart: { server: { entry: "server" } },
-  vite: {
-    define: {
-      __APP_BUILD_ID__: JSON.stringify(buildId),
-      "import.meta.env.VITE_APP_BUILD_ID": JSON.stringify(buildId),
-    },
-  },
-});
-```
+### 5. 자동 배정 (Auto-fill) 규칙
+- SM의 `HdecPicRuleTab`을 참고하여 Spare Part 전용 `spare_part_hdec_pic_rules` 테이블 추가
+  - 매칭 축: `plot`, `discipline`, `category` (Spare Part 도메인에 맞춤)
+  - 신설 `spare-part/settings` 서브탭에서 관리
+- 저장/변경 시 트리거로 값 propagate
 
-### 2. `src/hooks/useVersionCheck.ts`
-`getCurrentBuildId()`가 `__APP_BUILD_ID__`와 `import.meta.env.VITE_APP_BUILD_ID` 중 실제로 값이 있는 쪽을 사용하도록 폴백 추가.
+### 6. MWS / MTWS 연동
+- `useMyWorkspaceData.ts`에 Spare Part 브랜치 추가 (기존 SM/TM/ABD 패턴 재사용)
+- 서버 집계 함수 신설
+  - `sp_my_workspace_counts(user_pic text, user_team text, mode text)`
+  - `sp_my_workspace_rows(...)` — Today / Delayed / Upcoming / Overdue 등 SM과 동일 스키마
+- MWS/MTWS UI 탭에 "Spare Part" 카드 추가 (기존 Snag 카드 컴포넌트 재사용, 컬럼 세트만 spare_part용으로 매핑)
+- "전체" 탭 클릭 시 현재 필터를 들고 `/procurement/spare-part/raw-data`로 이동 (SM과 동일 규칙)
 
-### 3. `src/components/layout/TopBrandHeader.tsx`
-`NewVersionButton`의 `buildId` 읽는 방식을 동일 폴백으로 통일.
+### 7. 권한
+- `spare_parts_raw` RLS는 그대로. `owner_user_id` 기반 `is_row_owner` / `can_edit_row` 정책이 이미 존재하므로 추가 정책 불필요.
+- `updateSparePartOwnerField` 유사 로직이 없다면 TM와 같은 인라인 편집 훅 신설 (senior_user / d_superuser만 PIC 변경 가능)
 
-### 4. `src/routes/api/public/version.ts`
-서버는 이미 정상 응답 중이나, 동일한 폴백을 적용해 향후 정의 방식이 바뀌어도 어긋나지 않게 함.
+### 8. 데이터 백필
+- 이미 존재하는 행에 대해 issue_owner 텍스트 기반으로 hdec_pic_name 추정 백필은 하지 않음(스팸 방지). 신규 임포트부터 채워짐.
+- 필요 시 추후 별도 마이그레이션.
 
-### 5. `src/vite-env.d.ts`
-`interface ImportMetaEnv { readonly VITE_APP_BUILD_ID?: string }` 타입 선언 추가.
+## 사용자 확인 필요
 
-## 부가 개선 (같은 턴에 함께 반영)
+1. Auto-fill 규칙의 매칭 축을 `plot / discipline / category`로 잡았는데, Spare Part에서 실제로 담당 배분에 쓰는 축이 다르면 알려주세요.
+2. MWS에서 Spare Part "Today / Delayed / Upcoming" 기준을 어느 날짜 컬럼으로 계산할지 (`spl_list_target`, `quotation_target`, `po_target`, `delivery_target` 중 우선순위). 초안은 "가장 임박한 미완료 단계 target"으로 설계합니다.
 
-- **세션 dismiss 무결성**: 현재 module-level `toastShown` 플래그가 한 번 표시되면 이후 새 배포가 나와도 토스트가 다시 뜨지 않습니다. `toastShown`을 **표시한 buildId 기준으로 판정**하도록 변경(신 buildId가 들어오면 재표시).
-- **크로스 오리진 302 회피**: `qailcms.lovable.app`에서 접근 시 `/api/public/version`이 `qailcms.com`으로 302됨. 이 경우에도 `fetch`가 리다이렉트를 따라가 200을 받지만, 미래를 위해 `fetch(url, { cache: "no-store", credentials: "omit", redirect: "follow" })` 유지. (별도 코드 변경 불필요, 기록용)
+## 파일 변경 요약
 
-## 검증 계획
-
-1. `tsgo` 타입체크 통과.
-2. 빌드 후 `/assets/*.js` 번들에서 buildId 문자열이 실제로 포함되는지 grep으로 확인.
-3. 프리뷰에서 `window.__APP_BUILD_ID__` 대신 `import.meta.env.VITE_APP_BUILD_ID` 값이 콘솔에 노출되는지 실행 스니펫으로 검증.
-4. `/api/public/version`의 buildId를 임의로 다르게 만드는 시나리오(캐시 삭제 후 재접속)에서 토스트/배너/버튼이 표시되는지 세션 확인.
+- 신규: `supabase migration` (컬럼·인덱스·트리거·rule 테이블·RPC)
+- 신규: `src/components/spare-part/settings/HdecPicRuleTab.tsx`
+- 수정: `src/lib/spare-part/columns.ts`, `spare-part-import-parser.ts`, `SparePartImportContext.tsx`, `SparePartRawDataPage.tsx`, `ColumnFilters.tsx`, `useMyWorkspaceData.ts`, MWS/MTWS 페이지, 사이드바 라우팅
