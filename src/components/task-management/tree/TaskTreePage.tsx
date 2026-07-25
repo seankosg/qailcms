@@ -232,13 +232,26 @@ export function TaskTreePage() {
       const { data, error } = await (supabase as any)
         .from("task_management_raw")
         .select(
-          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
+          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, plan_days, actual_start, actual_finish, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
         )
         .eq("discipline", discipline)
         .order("sort_order", { ascending: true })
         .limit(10000);
       if (error) throw error;
       return (data ?? []) as Row[];
+    },
+  });
+
+  const { data: thresholds = DEFAULT_THRESHOLDS } = useQuery({
+    queryKey: ["task-management-thresholds"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("task_management_settings")
+        .select("behind_warn_gap, behind_late_gap, slip_warn_days, slip_late_days")
+        .eq("id", "default")
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? DEFAULT_THRESHOLDS) as TaskThresholds;
     },
   });
 
@@ -323,10 +336,10 @@ export function TaskTreePage() {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
       if (judgmentFilter.size > 0) {
-        const mainJ = resolveJudgment(p, asOfDate);
+        const mainJ = resolveMainJudgment(p, kids, thresholds, asOfDate);
         const anyMatch =
           (mainJ && judgmentFilter.has(mainJ)) ||
-          kids.some((k) => judgmentFilter.has(resolveJudgment(k, asOfDate)));
+          kids.some((k) => judgmentFilter.has(resolveRowJudgment(k, thresholds, asOfDate)));
         if (!anyMatch) return false;
       }
       if (picFilter !== "__all__") {
@@ -349,7 +362,7 @@ export function TaskTreePage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfDate]);
+  }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfDate, thresholds]);
 
   // 완료(Actual% ≥ 100%) Main Task 는 하단으로 정렬
   const sortedFiltered = useMemo(() => {
@@ -391,11 +404,13 @@ export function TaskTreePage() {
     const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 위험: 0 };
     for (const r of data) {
       if (!matchPic(r)) continue;
-      const j = resolveJudgment(r, asOfDate);
+      const j = r.level === "main"
+        ? resolveMainJudgment(r, subsByMain.get(r.task_no) ?? [], thresholds, asOfDate)
+        : resolveRowJudgment(r, thresholds, asOfDate);
       if (j && j in counts) counts[j] += 1;
     }
     return counts;
-  }, [data, picFilter, asOfDate]);
+  }, [data, picFilter, asOfDate, subsByMain, thresholds]);
 
   function goToRawDataMissing(kind: "no_plan_start" | "no_plan_end") {
     const searchParams: Record<string, string> = {
