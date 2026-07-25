@@ -133,7 +133,9 @@ export function useMyDefects(filterValue: string | null, isAdmin: boolean, mode:
     enabled: isAdmin || !!filterValue,
     staleTime: 60_000,
     queryFn: async () => {
-      const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
+      // Step 1: 상한 제거 — 서버 RPC 도입 이전에도 잘림 방지.
+      // (실사용은 useMyDefectsCounts/Bucket 조합으로 대체됨)
+      const limit = 100_000;
       const rows = await fetchAll<SmMyRow>(
         "defect_items_raw",
         "id,source_issue_no,location_raw,main_trade,status_raw,planned_start_date,planned_closure_date,planned_rectified_date,actual_closure_date,actual_rectified_date,actual_progress_pct,created_date,created_at,hdec_pic_name",
@@ -142,6 +144,83 @@ export function useMyDefects(filterValue: string | null, isAdmin: boolean, mode:
         limit,
       );
       return rows;
+    },
+  });
+}
+
+// ============ Step 2: 서버 판정 RPC 훅 ============
+export type SmBucket = "today" | "delayed" | "upcoming" | "in_progress" | "completed";
+
+export interface SmMyCounts {
+  today_count: number;
+  delayed_count: number;
+  upcoming_count: number;
+  in_progress_count: number;
+  completed_count: number;
+  total_count: number;
+}
+
+function smRpcMode(isAdmin: boolean, scope: MwsScope): "admin" | "pic" | "team" {
+  if (isAdmin) return "admin";
+  return scope === "team" ? "team" : "pic";
+}
+
+export function useMyDefectsCounts(
+  filterValue: string | null,
+  isAdmin: boolean,
+  scope: MwsScope,
+  todayIso: string,
+) {
+  const mode = smRpcMode(isAdmin, scope);
+  return useQuery<SmMyCounts>({
+    queryKey: ["my-workspace", "sm-counts", mode, filterValue, todayIso],
+    enabled: isAdmin || !!filterValue,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("sm_my_workspace_counts", {
+        _mode: mode,
+        _filter_value: mode === "admin" ? null : filterValue,
+        _today: todayIso,
+      });
+      if (error) throw new Error(error.message);
+      const row = (data ?? [])[0] ?? {};
+      return {
+        today_count: Number(row.today_count ?? 0),
+        delayed_count: Number(row.delayed_count ?? 0),
+        upcoming_count: Number(row.upcoming_count ?? 0),
+        in_progress_count: Number(row.in_progress_count ?? 0),
+        completed_count: Number(row.completed_count ?? 0),
+        total_count: Number(row.total_count ?? 0),
+      };
+    },
+  });
+}
+
+export function useMyDefectsBucket(
+  filterValue: string | null,
+  isAdmin: boolean,
+  scope: MwsScope,
+  todayIso: string,
+  bucket: SmBucket | null,
+  opts?: { limit?: number; enabled?: boolean },
+) {
+  const mode = smRpcMode(isAdmin, scope);
+  const enabledBase = isAdmin || !!filterValue;
+  return useQuery<SmMyRow[]>({
+    queryKey: ["my-workspace", "sm-bucket", mode, filterValue, todayIso, bucket, opts?.limit ?? 5000],
+    enabled: enabledBase && !!bucket && (opts?.enabled !== false),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("sm_my_workspace_rows", {
+        _mode: mode,
+        _filter_value: mode === "admin" ? null : filterValue,
+        _today: todayIso,
+        _bucket: bucket,
+        _limit: opts?.limit ?? 5000,
+        _offset: 0,
+      });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as SmMyRow[];
     },
   });
 }
