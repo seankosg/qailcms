@@ -15,6 +15,10 @@ const EDITABLE_FIELDS = new Set<string>([
   "r1_drafting_plan", "r1_drafting_actual", "r1_submission_plan", "r1_submission_actual", "r1_dar_plan", "r1_dar_actual",
   "r2_drafting_plan", "r2_drafting_actual", "r2_submission_plan", "r2_submission_actual", "r2_dar_plan", "r2_dar_actual",
   "r3_drafting_plan", "r3_drafting_actual", "r3_submission_plan", "r3_submission_actual", "r3_dar_plan", "r3_dar_actual",
+  // v5 신규: DS/DF + Response Result
+  "r1_draft_start_plan","r1_draft_start_actual","r1_draft_finish_plan","r1_draft_finish_actual","r1_response_result",
+  "r2_draft_start_plan","r2_draft_start_actual","r2_draft_finish_plan","r2_draft_finish_actual","r2_response_result",
+  "r3_draft_start_plan","r3_draft_start_actual","r3_draft_finish_plan","r3_draft_finish_actual","r3_response_result",
   "is_active",
 ]);
 
@@ -68,6 +72,16 @@ const ImportRowSchema = z.object({
   r3_drafting_plan: z.string().nullable().optional(),   r3_drafting_actual: z.string().nullable().optional(),
   r3_submission_plan: z.string().nullable().optional(), r3_submission_actual: z.string().nullable().optional(),
   r3_dar_plan: z.string().nullable().optional(),        r3_dar_actual: z.string().nullable().optional(),
+  // v5 신규
+  r1_draft_start_plan: z.string().nullable().optional(),  r1_draft_start_actual: z.string().nullable().optional(),
+  r1_draft_finish_plan: z.string().nullable().optional(), r1_draft_finish_actual: z.string().nullable().optional(),
+  r1_response_result: z.string().nullable().optional(),
+  r2_draft_start_plan: z.string().nullable().optional(),  r2_draft_start_actual: z.string().nullable().optional(),
+  r2_draft_finish_plan: z.string().nullable().optional(), r2_draft_finish_actual: z.string().nullable().optional(),
+  r2_response_result: z.string().nullable().optional(),
+  r3_draft_start_plan: z.string().nullable().optional(),  r3_draft_start_actual: z.string().nullable().optional(),
+  r3_draft_finish_plan: z.string().nullable().optional(), r3_draft_finish_actual: z.string().nullable().optional(),
+  r3_response_result: z.string().nullable().optional(),
   raw_payload: z.record(z.string(), z.any()).optional(),
   excel_row: z.number().optional(),
   sheet_name: z.string().optional(),
@@ -164,6 +178,9 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       "r1_drafting_plan","r1_drafting_actual","r1_submission_plan","r1_submission_actual","r1_dar_plan","r1_dar_actual",
       "r2_drafting_plan","r2_drafting_actual","r2_submission_plan","r2_submission_actual","r2_dar_plan","r2_dar_actual",
       "r3_drafting_plan","r3_drafting_actual","r3_submission_plan","r3_submission_actual","r3_dar_plan","r3_dar_actual",
+      "r1_draft_start_plan","r1_draft_start_actual","r1_draft_finish_plan","r1_draft_finish_actual","r1_response_result",
+      "r2_draft_start_plan","r2_draft_start_actual","r2_draft_finish_plan","r2_draft_finish_actual","r2_response_result",
+      "r3_draft_start_plan","r3_draft_start_actual","r3_draft_finish_plan","r3_draft_finish_actual","r3_response_result",
     ] as const;
     let rowIndex = 0;
     const ABD_FORCE_KEYS = [
@@ -212,6 +229,15 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           r3_drafting_plan: r.r3_drafting_plan ?? null,   r3_drafting_actual: r.r3_drafting_actual ?? null,
           r3_submission_plan: r.r3_submission_plan ?? null, r3_submission_actual: r.r3_submission_actual ?? null,
           r3_dar_plan: r.r3_dar_plan ?? null,             r3_dar_actual: r.r3_dar_actual ?? null,
+          r1_draft_start_plan: r.r1_draft_start_plan ?? null,   r1_draft_start_actual: r.r1_draft_start_actual ?? null,
+          r1_draft_finish_plan: r.r1_draft_finish_plan ?? null, r1_draft_finish_actual: r.r1_draft_finish_actual ?? null,
+          r1_response_result: r.r1_response_result ?? null,
+          r2_draft_start_plan: r.r2_draft_start_plan ?? null,   r2_draft_start_actual: r.r2_draft_start_actual ?? null,
+          r2_draft_finish_plan: r.r2_draft_finish_plan ?? null, r2_draft_finish_actual: r.r2_draft_finish_actual ?? null,
+          r2_response_result: r.r2_response_result ?? null,
+          r3_draft_start_plan: r.r3_draft_start_plan ?? null,   r3_draft_start_actual: r.r3_draft_start_actual ?? null,
+          r3_draft_finish_plan: r.r3_draft_finish_plan ?? null, r3_draft_finish_actual: r.r3_draft_finish_actual ?? null,
+          r3_response_result: r.r3_response_result ?? null,
           field_mismatch: false,
           mismatch_fields: {},
           raw_payload: r.raw_payload ?? {},
