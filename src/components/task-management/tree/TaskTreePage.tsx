@@ -461,6 +461,7 @@ export function TaskTreePage() {
   }
 
   function toggle(taskNo: string) {
+    markTouched();
     setExpanded((cur) => {
       const next = new Set(cur);
       if (next.has(taskNo)) next.delete(taskNo);
@@ -470,9 +471,11 @@ export function TaskTreePage() {
   }
 
   function expandAll() {
+    markTouched();
     setExpanded(new Set(filtered.map((p) => p.task_no)));
   }
   function collapseAll() {
+    markTouched();
     setExpanded(new Set());
   }
 
