@@ -23,18 +23,29 @@ const EDITABLE_FIELDS = new Set<string>([
 ]);
 
 async function assertEditor(ctx: any) {
-  const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" }),
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "superuser" }),
-  ]);
-  if (!isAdmin && !isSuper) throw new Error("권한 없음: 관리자만 편집할 수 있습니다");
+  // 임포트 등 행 단위 판정이 어려운 경로용 – rank ≥ senior_user 통과
+  const { data: ok } = await ctx.supabase.rpc("has_any_role", {
+    _user_id: ctx.userId,
+    _roles: ["admin", "superuser", "senior_user"],
+  });
+  if (!ok) throw new Error("권한 없음: 편집 권한이 없습니다");
+}
+
+async function assertCanEditRow(ctx: any, rowId: string) {
+  const { data: ok, error } = await ctx.supabase.rpc("can_edit_row", {
+    _user_id: ctx.userId,
+    _table_name: "abd_items_raw",
+    _row_id: rowId,
+  });
+  if (error) throw new Error(error.message);
+  if (!ok) throw new Error("권한 없음: 이 행을 편집할 수 없습니다");
 }
 
 export const updateAbdField = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => UpdateFieldSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await assertEditor(context);
+    await assertCanEditRow(context, data.id);
     if (!EDITABLE_FIELDS.has(data.field)) throw new Error(`Field '${data.field}' 은 편집 대상이 아닙니다.`);
     await (context.supabase as any).rpc("set_config", { setting_name: "app.change_source", new_value: "manual", is_local: true }).catch(() => {});
     const patch: Record<string, any> = { [data.field]: data.value, updated_at: new Date().toISOString(), updated_by: context.userId };
