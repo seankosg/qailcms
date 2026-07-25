@@ -15,7 +15,7 @@ interface Props {
 const ORDER: { key: Seg; label: string; color: string }[] = [
   { key: "completed", label: "Completed", color: "var(--schedule-actual)" },
   { key: "wip", label: "WIP", color: "var(--schedule-plan)" },
-  { key: "not_started", label: "Not Started", color: "hsl(var(--muted-foreground))" },
+  { key: "not_started", label: "No Start", color: "hsl(var(--muted-foreground))" },
 ];
 
 export function StatusMixDonut({ total, completed, wip, notStarted, onSegmentClick }: Props) {
@@ -44,8 +44,8 @@ export function StatusMixDonut({ total, completed, wip, notStarted, onSegmentCli
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Status Mix</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col items-center gap-4 @[320px]:flex-row @[320px]:items-center">
-        <svg viewBox="0 0 160 160" className="h-32 w-32 shrink-0 @[380px]:h-40 @[380px]:w-40">
+      <CardContent className="flex flex-1 flex-col items-center gap-2 @[320px]:flex-row @[320px]:items-center">
+        <svg viewBox="0 0 160 160" className="h-28 w-28 shrink-0 @[380px]:h-32 @[380px]:w-32">
           <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--muted)" strokeWidth="20" />
           {segs.map(
             (s) =>

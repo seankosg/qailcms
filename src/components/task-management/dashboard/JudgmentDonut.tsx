@@ -35,12 +35,12 @@ export function JudgmentDonut({ counts }: Props) {
   });
 
   return (
-    <Card className="@container">
+    <Card className="@container flex h-full flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">자동 판정 분포</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col items-center gap-4 @[320px]:flex-row">
-        <svg viewBox="0 0 160 160" className="h-32 w-32 shrink-0 @[380px]:h-40 @[380px]:w-40">
+      <CardContent className="flex flex-1 flex-col items-center gap-2 @[320px]:flex-row">
+        <svg viewBox="0 0 160 160" className="h-28 w-28 shrink-0 @[380px]:h-32 @[380px]:w-32">
           <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--muted)" strokeWidth="20" />
           {segs.map(
             (s) =>

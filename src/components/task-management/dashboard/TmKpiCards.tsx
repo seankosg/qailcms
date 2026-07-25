@@ -167,8 +167,8 @@ export function TmKpiCards({
         />
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-4">
-        <div className="min-w-0 lg:col-span-1">
+      <div className="grid items-stretch gap-3 lg:grid-cols-4">
+        <div className="min-w-0 h-full lg:col-span-1">
           <StatusMixDonut
             total={kpi.total}
             completed={kpi.completed}
@@ -177,8 +177,8 @@ export function TmKpiCards({
             onSegmentClick={(seg) => goRaw(seg)}
           />
         </div>
-        <div className="min-w-0 lg:col-span-1">{statusMixLeftExtraSlot}</div>
-        <div className="min-w-0 lg:col-span-2">{statusMixSideSlot}</div>
+        <div className="min-w-0 h-full lg:col-span-1">{statusMixLeftExtraSlot}</div>
+        <div className="min-w-0 h-full lg:col-span-2">{statusMixSideSlot}</div>
       </div>
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
