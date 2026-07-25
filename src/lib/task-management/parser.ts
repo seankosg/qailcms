@@ -453,6 +453,8 @@ export async function parseTaskManagementExcel(
       : {};
   const extraAliases = opts.extraAliases;
   const excludedHeadersInput = opts.excludedHeaders ?? [];
+  const dateOverrides = opts.dateOverrides ?? {};
+  const { audit, read: readDateCell } = makeDateAudit(dateOverrides);
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
 
@@ -835,6 +837,12 @@ export async function parseTaskManagementExcel(
     headerSamples,
     headerToFieldMap,
     excludedHeaders: excludedHeadersInput,
+    excludedFields,
+    dateIssues: audit.issues,
+  } as ParseTaskManagementResult;
+}
+
+// removed duplicate closer below
     excludedFields,
   };
 }
