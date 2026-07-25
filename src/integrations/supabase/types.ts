@@ -166,6 +166,7 @@ export type Database = {
           label: string
           options: Json | null
           sort_order: number
+          source_group: string
           updated_at: string
           visible: boolean
           visible_to_roles: Database["public"]["Enums"]["app_role"][]
@@ -181,6 +182,7 @@ export type Database = {
           label: string
           options?: Json | null
           sort_order?: number
+          source_group?: string
           updated_at?: string
           visible?: boolean
           visible_to_roles?: Database["public"]["Enums"]["app_role"][]
@@ -196,6 +198,7 @@ export type Database = {
           label?: string
           options?: Json | null
           sort_order?: number
+          source_group?: string
           updated_at?: string
           visible?: boolean
           visible_to_roles?: Database["public"]["Enums"]["app_role"][]
@@ -271,6 +274,7 @@ export type Database = {
           rolled_back_by: string | null
           sheet_name: string | null
           skipped_no_key: number | null
+          source_kind: string
           started_at: string | null
           status: string
           team: string | null
@@ -295,6 +299,7 @@ export type Database = {
           rolled_back_by?: string | null
           sheet_name?: string | null
           skipped_no_key?: number | null
+          source_kind?: string
           started_at?: string | null
           status?: string
           team?: string | null
@@ -319,6 +324,7 @@ export type Database = {
           rolled_back_by?: string | null
           sheet_name?: string | null
           skipped_no_key?: number | null
+          source_kind?: string
           started_at?: string | null
           status?: string
           team?: string | null
@@ -376,10 +382,18 @@ export type Database = {
         Row: {
           abd_number: string
           abd_ocs_no: string | null
+          aconex_date_modified: string | null
+          aconex_last_synced_at: string | null
+          aconex_review_status_raw: string | null
+          aconex_status_raw: string | null
+          active_round: number | null
           approval_date: string | null
           batch_no: string | null
+          bucket_top: string | null
           created_at: string
+          current_stage: string | null
           data_date: string | null
+          delay_bucket: string[]
           dis: string | null
           doc_ax: string | null
           doc_axx: string | null
@@ -387,52 +401,83 @@ export type Database = {
           doc_nn1: string | null
           doc_nn2: string | null
           document_title: string | null
+          extra_rounds: Json | null
           field_mismatch: boolean
+          has_r4_plus: boolean
           hdec_eng_name: string | null
           hdec_pic_name: string | null
           id: string
           inactive_reason: string | null
           is_active: boolean
+          is_terminated: boolean
           latest_rev: string | null
           latest_status: string | null
+          latest_status_norm: string | null
           mismatch_fields: Json
+          needs_planning: boolean
           owner_user_id: string | null
           plot: string | null
           r1_dar_actual: string | null
           r1_dar_plan: string | null
+          r1_draft_finish_actual: string | null
+          r1_draft_finish_plan: string | null
+          r1_draft_start_actual: string | null
+          r1_draft_start_plan: string | null
           r1_drafting_actual: string | null
           r1_drafting_plan: string | null
+          r1_response_result: string | null
           r1_submission_actual: string | null
           r1_submission_plan: string | null
           r2_dar_actual: string | null
           r2_dar_plan: string | null
+          r2_draft_finish_actual: string | null
+          r2_draft_finish_plan: string | null
+          r2_draft_start_actual: string | null
+          r2_draft_start_plan: string | null
           r2_drafting_actual: string | null
           r2_drafting_plan: string | null
+          r2_response_result: string | null
           r2_submission_actual: string | null
           r2_submission_plan: string | null
           r3_dar_actual: string | null
           r3_dar_plan: string | null
+          r3_draft_finish_actual: string | null
+          r3_draft_finish_plan: string | null
+          r3_draft_start_actual: string | null
+          r3_draft_start_plan: string | null
           r3_drafting_actual: string | null
           r3_drafting_plan: string | null
+          r3_response_result: string | null
           r3_submission_actual: string | null
           r3_submission_plan: string | null
           raw_payload: Json
           row_version: number
+          rs_result_missing: boolean
           service: string | null
           sl_no: number | null
           source_import_log_id: string | null
           status_group: string | null
+          status_mismatch: boolean
           team: string
           updated_at: string
           updated_by: string | null
+          ur_aging_days: number | null
         }
         Insert: {
           abd_number: string
           abd_ocs_no?: string | null
+          aconex_date_modified?: string | null
+          aconex_last_synced_at?: string | null
+          aconex_review_status_raw?: string | null
+          aconex_status_raw?: string | null
+          active_round?: number | null
           approval_date?: string | null
           batch_no?: string | null
+          bucket_top?: string | null
           created_at?: string
+          current_stage?: string | null
           data_date?: string | null
+          delay_bucket?: string[]
           dis?: string | null
           doc_ax?: string | null
           doc_axx?: string | null
@@ -440,52 +485,83 @@ export type Database = {
           doc_nn1?: string | null
           doc_nn2?: string | null
           document_title?: string | null
+          extra_rounds?: Json | null
           field_mismatch?: boolean
+          has_r4_plus?: boolean
           hdec_eng_name?: string | null
           hdec_pic_name?: string | null
           id?: string
           inactive_reason?: string | null
           is_active?: boolean
+          is_terminated?: boolean
           latest_rev?: string | null
           latest_status?: string | null
+          latest_status_norm?: string | null
           mismatch_fields?: Json
+          needs_planning?: boolean
           owner_user_id?: string | null
           plot?: string | null
           r1_dar_actual?: string | null
           r1_dar_plan?: string | null
+          r1_draft_finish_actual?: string | null
+          r1_draft_finish_plan?: string | null
+          r1_draft_start_actual?: string | null
+          r1_draft_start_plan?: string | null
           r1_drafting_actual?: string | null
           r1_drafting_plan?: string | null
+          r1_response_result?: string | null
           r1_submission_actual?: string | null
           r1_submission_plan?: string | null
           r2_dar_actual?: string | null
           r2_dar_plan?: string | null
+          r2_draft_finish_actual?: string | null
+          r2_draft_finish_plan?: string | null
+          r2_draft_start_actual?: string | null
+          r2_draft_start_plan?: string | null
           r2_drafting_actual?: string | null
           r2_drafting_plan?: string | null
+          r2_response_result?: string | null
           r2_submission_actual?: string | null
           r2_submission_plan?: string | null
           r3_dar_actual?: string | null
           r3_dar_plan?: string | null
+          r3_draft_finish_actual?: string | null
+          r3_draft_finish_plan?: string | null
+          r3_draft_start_actual?: string | null
+          r3_draft_start_plan?: string | null
           r3_drafting_actual?: string | null
           r3_drafting_plan?: string | null
+          r3_response_result?: string | null
           r3_submission_actual?: string | null
           r3_submission_plan?: string | null
           raw_payload?: Json
           row_version?: number
+          rs_result_missing?: boolean
           service?: string | null
           sl_no?: number | null
           source_import_log_id?: string | null
           status_group?: string | null
+          status_mismatch?: boolean
           team: string
           updated_at?: string
           updated_by?: string | null
+          ur_aging_days?: number | null
         }
         Update: {
           abd_number?: string
           abd_ocs_no?: string | null
+          aconex_date_modified?: string | null
+          aconex_last_synced_at?: string | null
+          aconex_review_status_raw?: string | null
+          aconex_status_raw?: string | null
+          active_round?: number | null
           approval_date?: string | null
           batch_no?: string | null
+          bucket_top?: string | null
           created_at?: string
+          current_stage?: string | null
           data_date?: string | null
+          delay_bucket?: string[]
           dis?: string | null
           doc_ax?: string | null
           doc_axx?: string | null
@@ -493,44 +569,100 @@ export type Database = {
           doc_nn1?: string | null
           doc_nn2?: string | null
           document_title?: string | null
+          extra_rounds?: Json | null
           field_mismatch?: boolean
+          has_r4_plus?: boolean
           hdec_eng_name?: string | null
           hdec_pic_name?: string | null
           id?: string
           inactive_reason?: string | null
           is_active?: boolean
+          is_terminated?: boolean
           latest_rev?: string | null
           latest_status?: string | null
+          latest_status_norm?: string | null
           mismatch_fields?: Json
+          needs_planning?: boolean
           owner_user_id?: string | null
           plot?: string | null
           r1_dar_actual?: string | null
           r1_dar_plan?: string | null
+          r1_draft_finish_actual?: string | null
+          r1_draft_finish_plan?: string | null
+          r1_draft_start_actual?: string | null
+          r1_draft_start_plan?: string | null
           r1_drafting_actual?: string | null
           r1_drafting_plan?: string | null
+          r1_response_result?: string | null
           r1_submission_actual?: string | null
           r1_submission_plan?: string | null
           r2_dar_actual?: string | null
           r2_dar_plan?: string | null
+          r2_draft_finish_actual?: string | null
+          r2_draft_finish_plan?: string | null
+          r2_draft_start_actual?: string | null
+          r2_draft_start_plan?: string | null
           r2_drafting_actual?: string | null
           r2_drafting_plan?: string | null
+          r2_response_result?: string | null
           r2_submission_actual?: string | null
           r2_submission_plan?: string | null
           r3_dar_actual?: string | null
           r3_dar_plan?: string | null
+          r3_draft_finish_actual?: string | null
+          r3_draft_finish_plan?: string | null
+          r3_draft_start_actual?: string | null
+          r3_draft_start_plan?: string | null
           r3_drafting_actual?: string | null
           r3_drafting_plan?: string | null
+          r3_response_result?: string | null
           r3_submission_actual?: string | null
           r3_submission_plan?: string | null
           raw_payload?: Json
           row_version?: number
+          rs_result_missing?: boolean
           service?: string | null
           sl_no?: number | null
           source_import_log_id?: string | null
           status_group?: string | null
+          status_mismatch?: boolean
           team?: string
           updated_at?: string
           updated_by?: string | null
+          ur_aging_days?: number | null
+        }
+        Relationships: []
+      }
+      abd_settings: {
+        Row: {
+          ds_gap_after_rs_days: number
+          id: string
+          rs_plan_gap_days: number
+          stuck_ns_days: number
+          updated_at: string
+          updated_by: string | null
+          ur_aging_late_days: number
+          ur_aging_warn_days: number
+        }
+        Insert: {
+          ds_gap_after_rs_days?: number
+          id?: string
+          rs_plan_gap_days?: number
+          stuck_ns_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          ur_aging_late_days?: number
+          ur_aging_warn_days?: number
+        }
+        Update: {
+          ds_gap_after_rs_days?: number
+          id?: string
+          rs_plan_gap_days?: number
+          stuck_ns_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          ur_aging_late_days?: number
+          ur_aging_warn_days?: number
         }
         Relationships: []
       }
