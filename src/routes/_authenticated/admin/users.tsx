@@ -169,12 +169,12 @@ function UsersTab() {
           bv = (b.login_id ?? "").toString().toLowerCase();
           break;
         case "user_type":
-          av = USER_TYPE_LABELS[a.user_type] ?? "";
-          bv = USER_TYPE_LABELS[b.user_type] ?? "";
+          av = USER_TYPE_LABELS[(a.user_type ?? "") as UserType] ?? "";
+          bv = USER_TYPE_LABELS[(b.user_type ?? "") as UserType] ?? "";
           break;
         case "role":
-          av = ROLE_LABELS[a.roles?.[0]] ?? "";
-          bv = ROLE_LABELS[b.roles?.[0]] ?? "";
+          av = ROLE_LABELS[(a.roles?.[0] ?? "guest") as AppRole] ?? "";
+          bv = ROLE_LABELS[(b.roles?.[0] ?? "guest") as AppRole] ?? "";
           break;
         case "active":
           av = a.is_active ? 1 : 0;
