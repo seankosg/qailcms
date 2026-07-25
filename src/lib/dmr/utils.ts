@@ -54,7 +54,10 @@ export function emptyRow(system = '', contractor = ''): DmrParsedRow {
 }
 
 export function formatDate(d: string | Date): string {
+  // Canonical user-facing date display is dd-MMM-yyyy (Doha semantics).
   const date = typeof d === 'string' ? new Date(d) : d;
   if (isNaN(date.getTime())) return String(d);
-  return date.toISOString().slice(0, 10);
+  // Local import to avoid circular deps at module init.
+  const { formatDdMmmYyyy } = require('@/lib/time/doha') as typeof import('@/lib/time/doha');
+  return formatDdMmmYyyy(date) || String(d);
 }
