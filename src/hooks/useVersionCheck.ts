@@ -5,14 +5,21 @@ const POLL_INTERVAL_MS = 60_000;
 const SESSION_DISMISS_KEY = "qail-cms:version-dismissed";
 
 function getCurrentBuildId(): string {
-  return typeof __APP_BUILD_ID__ === "string" ? __APP_BUILD_ID__ : "";
+  const fromDefine =
+    typeof __APP_BUILD_ID__ === "string" ? __APP_BUILD_ID__ : "";
+  if (fromDefine) return fromDefine;
+  const fromEnv =
+    typeof import.meta !== "undefined"
+      ? import.meta.env?.VITE_APP_BUILD_ID
+      : undefined;
+  return typeof fromEnv === "string" ? fromEnv : "";
 }
 
 function isDevBuild(id: string) {
   return !id || id === "development" || id.startsWith("__");
 }
 
-let toastShown = false;
+let toastShownForBuildId: string | null = null;
 
 export async function forceFreshAppLoad() {
   if (typeof window === "undefined") return;
@@ -66,8 +73,8 @@ export function useVersionCheck() {
             typeof window !== "undefined"
               ? window.sessionStorage.getItem(SESSION_DISMISS_KEY)
               : null;
-          if (!toastShown && dismissed !== remote) {
-            toastShown = true;
+          if (toastShownForBuildId !== remote && dismissed !== remote) {
+            toastShownForBuildId = remote;
             toast("새 버전이 배포되었습니다", {
               description:
                 "우측 상단의 New Version 버튼 또는 상단 배너의 '지금 새로고침'을 눌러 주세요.",

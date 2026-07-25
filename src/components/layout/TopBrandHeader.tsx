@@ -10,7 +10,13 @@ interface Props {
 }
 
 function NewVersionButton() {
-  const buildId = typeof __APP_BUILD_ID__ === "string" ? __APP_BUILD_ID__ : "";
+  const fromDefine =
+    typeof __APP_BUILD_ID__ === "string" ? __APP_BUILD_ID__ : "";
+  const fromEnv =
+    typeof import.meta !== "undefined"
+      ? import.meta.env?.VITE_APP_BUILD_ID
+      : undefined;
+  const buildId = fromDefine || (typeof fromEnv === "string" ? fromEnv : "");
   if (!buildId || buildId.startsWith("__") || buildId === "development") {
     return null;
   }
