@@ -369,6 +369,11 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
         colIndex[`r${roundIdx}_${stageKey}_${which}`] = c;
       }
     }
+    else if (isResponseResultLabel(label, stageBand)) {
+      const roundMatch = /ROUND\s*(\d)/.exec(roundBand);
+      const roundIdx = roundMatch ? Number(roundMatch[1]) : null;
+      if (roundIdx) colIndex[`r${roundIdx}_response_result`] = c;
+    }
   }
 
   return { headerRow: anchorRow, colIndex };
@@ -481,6 +486,21 @@ export async function parseAbdFile(
         r3_submission_actual: toIsoDate(getVal("r3_submission_actual")),
         r3_dar_plan: toIsoDate(getVal("r3_dar_plan")),
         r3_dar_actual: toIsoDate(getVal("r3_dar_actual")),
+        r1_draft_start_plan: toIsoDate(getVal("r1_draft_start_plan")),
+        r1_draft_start_actual: toIsoDate(getVal("r1_draft_start_actual")),
+        r1_draft_finish_plan: toIsoDate(getVal("r1_draft_finish_plan")) ?? toIsoDate(getVal("r1_drafting_plan")),
+        r1_draft_finish_actual: toIsoDate(getVal("r1_draft_finish_actual")) ?? toIsoDate(getVal("r1_drafting_actual")),
+        r1_response_result: normResponseResult(getVal("r1_response_result")),
+        r2_draft_start_plan: toIsoDate(getVal("r2_draft_start_plan")),
+        r2_draft_start_actual: toIsoDate(getVal("r2_draft_start_actual")),
+        r2_draft_finish_plan: toIsoDate(getVal("r2_draft_finish_plan")) ?? toIsoDate(getVal("r2_drafting_plan")),
+        r2_draft_finish_actual: toIsoDate(getVal("r2_draft_finish_actual")) ?? toIsoDate(getVal("r2_drafting_actual")),
+        r2_response_result: normResponseResult(getVal("r2_response_result")),
+        r3_draft_start_plan: toIsoDate(getVal("r3_draft_start_plan")),
+        r3_draft_start_actual: toIsoDate(getVal("r3_draft_start_actual")),
+        r3_draft_finish_plan: toIsoDate(getVal("r3_draft_finish_plan")) ?? toIsoDate(getVal("r3_drafting_plan")),
+        r3_draft_finish_actual: toIsoDate(getVal("r3_draft_finish_actual")) ?? toIsoDate(getVal("r3_drafting_actual")),
+        r3_response_result: normResponseResult(getVal("r3_response_result")),
         raw_payload,
         excel_row: r + 1,
         sheet_name: name,
