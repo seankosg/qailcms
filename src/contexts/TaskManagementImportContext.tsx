@@ -209,9 +209,11 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     ) => {
       const extraAliases = await fetchAliases();
       let currentOverride: string | null = null;
+      let currentDateOverrides: Record<string, string> = {};
       setFiles((cur) => {
         const t = cur.find((f) => f.id === id);
         currentOverride = t?.dataDateOverride ?? null;
+        currentDateOverrides = t?.dateOverrides ?? {};
         return cur.map((f) =>
           f.id === id ? { ...f, status: "parsing" } : f,
         );
@@ -222,17 +224,21 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           sheetName,
           excludedHeaders,
           dataDateOverride: currentOverride,
+          dateOverrides: currentDateOverrides,
         });
         setFiles((cur) =>
           cur.map((f) => {
             if (f.id !== id) return f;
             const effective = f.dataDateOverride ?? parsed.dataDate ?? null;
+            const hasDateIssues = (parsed.dateIssues?.length ?? 0) > 0;
             const validation =
               parsed.rows.length === 0
                 ? "행을 찾지 못했습니다. 헤더 위치를 확인하세요."
                 : !effective
                   ? "Data Date를 읽지 못했습니다. 아래에서 직접 입력하세요."
-                  : null;
+                  : hasDateIssues
+                    ? `날짜 형식 오류 ${parsed.dateIssues.length}건이 있습니다. 아래 목록에서 수정 후 재파싱하세요.`
+                    : null;
             return {
               ...f,
               status: "ready",
@@ -250,6 +256,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               headerSamples: parsed.headerSamples,
               headerToFieldMap: parsed.headerToFieldMap,
               excludedHeaders: parsed.excludedHeaders,
+              dateIssues: parsed.dateIssues,
               // preflight 재실행 필요 — 결과 초기화
               preflight: null,
               preflightError: null,
