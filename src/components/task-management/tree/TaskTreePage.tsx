@@ -22,7 +22,6 @@ import {
   computeJudgment,
   cumPlanProgress,
   computeVariance,
-  worstJudgment,
 } from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
