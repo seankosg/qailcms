@@ -493,7 +493,7 @@ export function TaskTreePage() {
                     <tbody>
                       {kids.map((k) => {
                         const gap = computeVariance(k, asOfDate) ?? 0;
-                        const j = k.auto_judgment ?? computeJudgment(k, undefined, asOfDate);
+                        const j = resolveJudgment(k, asOfDate);
                         return (
                           <tr
                             key={k.id}
