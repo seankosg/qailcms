@@ -32,13 +32,13 @@ export interface AbdItem {
   latest_rev: string | null;
   latest_status: string | null;
   approval_date: string | null;
-  r1_drafting_plan: string | null; r1_drafting_actual: string | null;
+  r1_draft_finish_plan: string | null; r1_draft_finish_actual: string | null;
   r1_submission_plan: string | null; r1_submission_actual: string | null;
   r1_dar_plan: string | null; r1_dar_actual: string | null;
-  r2_drafting_plan: string | null; r2_drafting_actual: string | null;
+  r2_draft_finish_plan: string | null; r2_draft_finish_actual: string | null;
   r2_submission_plan: string | null; r2_submission_actual: string | null;
   r2_dar_plan: string | null; r2_dar_actual: string | null;
-  r3_drafting_plan: string | null; r3_drafting_actual: string | null;
+  r3_draft_finish_plan: string | null; r3_draft_finish_actual: string | null;
   r3_submission_plan: string | null; r3_submission_actual: string | null;
   r3_dar_plan: string | null; r3_dar_actual: string | null;
   is_active: boolean;

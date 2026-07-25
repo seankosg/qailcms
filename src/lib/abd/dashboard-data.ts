@@ -74,17 +74,17 @@ type Row = {
   latest_status: string | null;
   status_group: string | null;
   approval_date: string | null;
-  r1_drafting_plan: string | null;
-  r1_drafting_actual: string | null;
+  r1_draft_finish_plan: string | null;
+  r1_draft_finish_actual: string | null;
   r1_submission_plan: string | null;
   r1_submission_actual: string | null;
   r1_dar_plan: string | null;
   r1_dar_actual: string | null;
-  r2_drafting_actual: string | null;
+  r2_draft_finish_actual: string | null;
   r2_submission_actual: string | null;
   r2_dar_plan: string | null;
   r2_dar_actual: string | null;
-  r3_drafting_actual: string | null;
+  r3_draft_finish_actual: string | null;
   r3_submission_actual: string | null;
   r3_dar_plan: string | null;
   r3_dar_actual: string | null;
@@ -94,9 +94,9 @@ type Row = {
 const SELECT_COLS = [
   "id","team","plot","dis","service","hdec_pic_name","hdec_eng_name","batch_no","document_title","abd_number",
   "latest_status","status_group","approval_date",
-  "r1_drafting_plan","r1_drafting_actual","r1_submission_plan","r1_submission_actual","r1_dar_plan","r1_dar_actual",
-  "r2_drafting_actual","r2_submission_actual","r2_dar_plan","r2_dar_actual",
-  "r3_drafting_actual","r3_submission_actual","r3_dar_plan","r3_dar_actual",
+  "r1_draft_finish_plan","r1_draft_finish_actual","r1_submission_plan","r1_submission_actual","r1_dar_plan","r1_dar_actual",
+  "r2_draft_finish_actual","r2_submission_actual","r2_dar_plan","r2_dar_actual",
+  "r3_draft_finish_actual","r3_submission_actual","r3_dar_plan","r3_dar_actual",
   "created_at",
 ].join(",");
 
@@ -119,9 +119,9 @@ function isApproved(row: Row): boolean {
 
 function deriveStage(row: Row): AbdStage {
   if (isApproved(row)) return "Approved";
-  if (row.r3_drafting_actual || row.r3_submission_actual || row.r3_dar_actual) return "R3";
-  if (row.r2_drafting_actual || row.r2_submission_actual || row.r2_dar_actual) return "R2";
-  if (row.r1_drafting_actual || row.r1_submission_actual || row.r1_dar_actual) return "R1";
+  if (row.r3_draft_finish_actual || row.r3_submission_actual || row.r3_dar_actual) return "R3";
+  if (row.r2_draft_finish_actual || row.r2_submission_actual || row.r2_dar_actual) return "R2";
+  if (row.r1_draft_finish_actual || row.r1_submission_actual || row.r1_dar_actual) return "R1";
   return "Pending";
 }
 
@@ -132,7 +132,7 @@ function targetDate(row: Row): Date | null {
     safeIso(row.r2_dar_plan) ??
     safeIso(row.r1_dar_plan) ??
     safeIso(row.r1_submission_plan) ??
-    safeIso(row.r1_drafting_plan) ??
+    safeIso(row.r1_draft_finish_plan) ??
     null
   );
 }
@@ -142,13 +142,13 @@ function lastActivity(row: Row): Date | null {
   return (
     safeIso(row.r3_dar_actual) ??
     safeIso(row.r3_submission_actual) ??
-    safeIso(row.r3_drafting_actual) ??
+    safeIso(row.r3_draft_finish_actual) ??
     safeIso(row.r2_dar_actual) ??
     safeIso(row.r2_submission_actual) ??
-    safeIso(row.r2_drafting_actual) ??
+    safeIso(row.r2_draft_finish_actual) ??
     safeIso(row.r1_dar_actual) ??
     safeIso(row.r1_submission_actual) ??
-    safeIso(row.r1_drafting_actual) ??
+    safeIso(row.r1_draft_finish_actual) ??
     null
   );
 }
