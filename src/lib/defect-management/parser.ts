@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { DefectTeam } from "./columns";
 import { dohaWallToUtcIso, toDohaDateKey, dohaDateOnly } from "@/lib/time/doha";
+import { makeDateAudit, toCellRef, type DateIssue } from "@/lib/import/date-audit";
 
 /** Re-import 마커 헤더 — Raw Data에서 재수출한 파일에만 존재. */
 export const REIMPORT_MARKER_HEADER = "QAIL_DEFECT_REIMPORT_V1";
@@ -191,6 +192,8 @@ export interface ParseDefectResult {
   sourceKeyOrigin: "source_issue_no" | "letsbuild_id" | "override" | "alias" | null;
   /** UUID 값이 source_issue_no로 감지되어 파싱에서 제외된 행 수 */
   uuidKeyRejectedRows: number;
+  /** 날짜 파싱에 실패한 셀 목록. 임포트 UI에서 사용자가 수정. */
+  dateIssues: DateIssue[];
 }
 
 export interface ParseDefectOptions {
@@ -200,6 +203,8 @@ export interface ParseDefectOptions {
   sheetName?: string;
   /** 사용자가 제외한 raw 헤더. 해당 컬럼은 결과에 포함되지 않음. */
   excludedHeaders?: string[];
+  /** 날짜 오류 셀에 대한 사용자 수정값. { cellRef → 'YYYY-MM-DD' } */
+  dateOverrides?: Record<string, string>;
 }
 
 function normalizeHeader(v: unknown): string {
@@ -662,6 +667,7 @@ export async function parseDefectExcel(
   if (!sheet) throw new Error("시트를 찾을 수 없습니다");
 
   const warnings: string[] = [];
+  const { audit: dateAudit, read: readDateCell } = makeDateAudit(opts.dateOverrides ?? {});
   const { map: headerMap, entries, headerRow } = scanHeaders(sheet);
   if (headerRow > 0) {
     warnings.push(`헤더 행 자동 감지: ${headerRow + 1}행부터 읽습니다.`);
@@ -810,7 +816,15 @@ export async function parseDefectExcel(
       item: cols.item ? toStr(getCell(sheet, r, cols.item)) : null,
       description: cols.description ? toStr(getCell(sheet, r, cols.description)) : null,
       priority: cols.priority ? toStr(getCell(sheet, r, cols.priority)) : null,
-      due_by: cols.due_by ? toIsoDate(getCell(sheet, r, cols.due_by)) : null,
+      due_by: cols.due_by
+        ? readDateCell(getCell(sheet, r, cols.due_by), {
+            cellRef: toCellRef(r, cols.due_by),
+            row: r,
+            col: cols.due_by,
+            field: "due_by",
+            header: entries.find((e) => e.col === cols.due_by)?.header || "Due by",
+          })
+        : null,
       created_by_name: cols.created_by_name ? toStr(getCell(sheet, r, cols.created_by_name)) : null,
       created_by_team_name: cols.created_by_team_name ? toStr(getCell(sheet, r, cols.created_by_team_name)) : null,
       created_date: cols.created_date ? toIsoDateTime(getCell(sheet, r, cols.created_date)) : null,
@@ -860,5 +874,6 @@ export async function parseDefectExcel(
     isReimport,
     sourceKeyOrigin,
     uuidKeyRejectedRows,
+    dateIssues: dateAudit.issues,
   };
 }

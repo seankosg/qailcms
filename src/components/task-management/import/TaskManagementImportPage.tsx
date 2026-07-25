@@ -45,6 +45,7 @@ import { DISCIPLINES, type Discipline } from "@/lib/task-management/columns";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DateIssuesPanel } from "@/components/import/DateIssuesPanel";
 import type { RollupMode } from "@/contexts/TaskManagementImportContext";
 import { TaskColumnSelect } from "./TaskColumnSelect";
 import { ConflictDecisionDialog } from "./ConflictDecisionDialog";
@@ -117,6 +118,7 @@ function ImportInner() {
     setFileDataDateOverride,
     setFileSheet,
     setFileExcludedHeaders,
+    setFileDateOverrides,
     setFileConflictPolicy,
     setFileConflictDecisions,
     clearFileConflictDecisions,
@@ -478,6 +480,7 @@ function ImportInner() {
                 onPolicyChange={(p) => setFileConflictPolicy(f.id, p)}
                 onRunPreflight={() => runPreflight(f.id)}
                 onOpenConflict={() => setConflictFileId(f.id)}
+                onDateOverridesApply={(ov) => setFileDateOverrides(f.id, ov)}
               />
             ))}
           </CardContent>
@@ -550,6 +553,7 @@ function FileRow({
   onPolicyChange,
   onRunPreflight,
   onOpenConflict,
+  onDateOverridesApply,
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
@@ -565,6 +569,7 @@ function FileRow({
   onPolicyChange: (p: ConflictPolicy) => void;
   onRunPreflight: () => void;
   onOpenConflict: () => void;
+  onDateOverridesApply: (overrides: Record<string, string>) => void | Promise<void>;
 }) {
   const badge = statusBadge[f.status];
   const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
@@ -784,6 +789,18 @@ function FileRow({
               <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{f.validationError}</span>
+              </div>
+            )}
+            {f.dateIssues && f.dateIssues.length > 0 && (
+              <div className="mt-2">
+                <DateIssuesPanel
+                  fileName={f.name}
+                  sheetName={f.sheetName ?? null}
+                  issues={f.dateIssues}
+                  currentOverrides={f.dateOverrides}
+                  onApply={onDateOverridesApply}
+                  disabled={isRunning}
+                />
               </div>
             )}
             {f.error && (
