@@ -368,23 +368,22 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           <span className="text-xs text-muted-foreground">/ 담당 스낵 현황</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-          <ModuleKpiCard label="Total" value={smStats.total} total={smStats.total} tone="muted" onClick={() => setSmTab("all")} />
-          <ModuleKpiCard label="진행중" value={smStats.inProgress} total={smStats.total} tone="info" onClick={() => setSmTab("all")} />
+          <ModuleKpiCard label="Total" value={smStats.total} total={smStats.total} tone="muted" onClick={gotoSnagRawData} />
+          <ModuleKpiCard label="진행중" value={smStats.inProgress} total={smStats.total} tone="info" onClick={gotoSnagRawData} />
           <ModuleKpiCard label="지연" value={smStats.delayed} total={smStats.total} tone="destructive" active={smTab === "risk"} onClick={setTabFromKpi(setSmTab, "risk")} />
           <ModuleKpiCard label="임박 (3d)" value={smStats.upcoming} total={smStats.total} tone="warning" animatePulse active={smTab === "upcoming"} onClick={setTabFromKpi(setSmTab, "upcoming")} />
-          <ModuleKpiCard label="완료" value={smStats.completed} total={smStats.total} tone="success" onClick={() => setSmTab("all")} />
+          <ModuleKpiCard label="완료" value={smStats.completed} total={smStats.total} tone="success" onClick={gotoSnagRawData} />
         </div>
         <ModuleRowList<SmMyRow>
-          rows={sm.data ?? []}
+          rows={smRows}
           activeTab={smTab}
-          onTabChange={setSmTab}
+          onTabChange={(tab) => {
+            if (tab === "all") { gotoSnagRawData(); return; }
+            setSmTab(tab);
+          }}
           counts={{ today: smStats.today, all: smStats.total, risk: smStats.delayed, upcoming: smStats.upcoming }}
-          filterRow={(r, tab) =>
-            tab === "all" ? true
-            : tab === "risk" ? smIsDelayed(r, t)
-            : tab === "today" ? smIsToday(r, t)
-            : smIsUpcoming(r, t)
-          }
+          filterRow={() => true}
+          emptyText={smBucketQ.isLoading ? "불러오는 중…" : "표시할 항목이 없습니다."}
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate({ to: "/closure/snag-management/detail/$id", params: { id: r.id } })}
           columns={smColumns}
