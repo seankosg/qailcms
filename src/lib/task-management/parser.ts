@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { dohaWallToUtcIso, toDohaDateKey, dohaDateOnly } from "@/lib/time/doha";
 import type { Discipline } from "./columns";
+import { makeDateAudit, toCellRef, type DateIssue } from "@/lib/import/date-audit";
 
 export interface ParsedTaskRow {
   rawRowNo: number;
@@ -56,6 +57,8 @@ export interface ParseTaskManagementResult {
   excludedHeaders: string[];
   /** 제외된 canonical field 집합 */
   excludedFields: Set<string>;
+  /** 날짜 파싱에 실패한 셀 목록. 임포트 UI에서 사용자가 수정. */
+  dateIssues: DateIssue[];
 }
 
 export interface SheetHeaderEntry {
@@ -376,6 +379,8 @@ export interface ParseTaskManagementOptions {
   sheetName?: string;
   /** 사용자가 직접 지정한 Data Date (override). ISO YYYY-MM-DD */
   dataDateOverride?: string | null;
+  /** 날짜 오류 셀에 대한 사용자 수정값. { cellRef → 'YYYY-MM-DD' } */
+  dateOverrides?: Record<string, string>;
 }
 
 /** 워크북의 시트 이름 리스트. */
