@@ -661,7 +661,7 @@ export function TaskManagementRawDataPage() {
   const orderedKeys = useMemo(() => {
     const frozenSet = new Set(frozenExtras);
     const rest = order.filter((k) => !frozenSet.has(k) && k !== "task_no");
-    return ["__select", "task_no", ...frozenExtras, ...rest];
+    return ["__select", "__comments", "task_no", ...frozenExtras, ...rest];
   }, [order, frozenExtras]);
 
   const columns = useMemo<ColumnDef<Row>[]>(() => {
@@ -698,6 +698,44 @@ export function TaskManagementRawDataPage() {
               />
             </span>
           ),
+        });
+        continue;
+      }
+      if (key === "__comments") {
+        cols.push({
+          id: "__comments",
+          size: 48,
+          minSize: 40,
+          maxSize: 64,
+          enableSorting: false,
+          enableColumnFilter: false,
+          enableResizing: false,
+          header: () => (
+            <span className="flex w-full items-center justify-center" title="댓글">
+              <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+            </span>
+          ),
+          cell: ({ row }) => {
+            const rr = row.original as Row;
+            const rid = String(rr.id);
+            const info = commentCounts?.[rid];
+            if (!info || info.count <= 0) {
+              return <span className="flex w-full items-center justify-center text-muted-foreground/30">—</span>;
+            }
+            const read = isRead(rid, info.lastUpdatedAt);
+            return (
+              <span
+                className={cn(
+                  "flex w-full items-center justify-center gap-0.5 tabular-nums",
+                  read ? "text-muted-foreground" : "text-primary font-semibold",
+                )}
+                title={read ? `댓글 ${info.count}개 (읽음)` : `새 댓글 · 총 ${info.count}개`}
+              >
+                <MessageCircle className={cn("h-3.5 w-3.5", read ? "" : "fill-primary/15")} />
+                <span className="text-[10px]">{info.count}</span>
+              </span>
+            );
+          },
         });
         continue;
       }
