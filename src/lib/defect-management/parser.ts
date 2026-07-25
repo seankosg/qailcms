@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { DefectTeam } from "./columns";
 import { dohaWallToUtcIso, toDohaDateKey, dohaDateOnly } from "@/lib/time/doha";
+import { makeDateAudit, toCellRef, type DateIssue } from "@/lib/import/date-audit";
 
 /** Re-import 마커 헤더 — Raw Data에서 재수출한 파일에만 존재. */
 export const REIMPORT_MARKER_HEADER = "QAIL_DEFECT_REIMPORT_V1";
@@ -191,6 +192,8 @@ export interface ParseDefectResult {
   sourceKeyOrigin: "source_issue_no" | "letsbuild_id" | "override" | "alias" | null;
   /** UUID 값이 source_issue_no로 감지되어 파싱에서 제외된 행 수 */
   uuidKeyRejectedRows: number;
+  /** 날짜 파싱에 실패한 셀 목록. 임포트 UI에서 사용자가 수정. */
+  dateIssues: DateIssue[];
 }
 
 export interface ParseDefectOptions {
@@ -200,6 +203,8 @@ export interface ParseDefectOptions {
   sheetName?: string;
   /** 사용자가 제외한 raw 헤더. 해당 컬럼은 결과에 포함되지 않음. */
   excludedHeaders?: string[];
+  /** 날짜 오류 셀에 대한 사용자 수정값. { cellRef → 'YYYY-MM-DD' } */
+  dateOverrides?: Record<string, string>;
 }
 
 function normalizeHeader(v: unknown): string {
