@@ -57,16 +57,22 @@ function CtxBadge({ text, tone = "muted" }: { text: string; tone?: "info" | "war
   return <Badge variant="outline" className={cn("text-[10px] font-medium", cls)}>{text}</Badge>;
 }
 
-export function MyWorkSpacePage() {
+export interface MyWorkSpacePageProps {
+  scope?: "pic" | "team";
+}
+
+export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   const { data: me, isLoading: meLoading } = useCurrentUser();
   const navigate = useNavigate();
 
   const isAdmin = !!me?.isAdmin;
   const pic = me?.hdec_pic_name ?? null;
+  const team = (me as any)?.team ?? null;
+  const filterValue = scope === "team" ? team : pic;
 
-  const tm = useMyTasks(pic, isAdmin);
-  const sm = useMyDefects(pic, isAdmin);
-  const abd = useMyAbd(pic, isAdmin);
+  const tm = useMyTasks(filterValue, isAdmin, scope);
+  const sm = useMyDefects(filterValue, isAdmin, scope);
+  const abd = useMyAbd(filterValue, isAdmin, scope);
 
   const [tmTab, setTmTab] = useState<RowListTab>("today");
   const [smTab, setSmTab] = useState<RowListTab>("today");
@@ -235,20 +241,23 @@ export function MyWorkSpacePage() {
     frozen: ["__ctx"],
   }), [abdColumns]);
 
-  const tmPrefs = useMwsColumnPrefs("mws-tm", tmDefaults);
-  const smPrefs = useMwsColumnPrefs("mws-sm", smDefaults);
-  const abdPrefs = useMwsColumnPrefs("mws-abd", abdDefaults);
+  const prefsSuffix = scope === "team" ? "-team" : "";
+  const tmPrefs = useMwsColumnPrefs(`mws-tm${prefsSuffix}`, tmDefaults);
+  const smPrefs = useMwsColumnPrefs(`mws-sm${prefsSuffix}`, smDefaults);
+  const abdPrefs = useMwsColumnPrefs(`mws-abd${prefsSuffix}`, abdDefaults);
 
   const labelDict = <T,>(cols: RowColumn<T>[]) => Object.fromEntries(cols.map((c) => [c.key, c.label]));
 
   if (meLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   }
-  if (!isAdmin && !pic) {
+  if (!isAdmin && !filterValue) {
     return (
       <div className="p-6">
         <div className="rounded-md border bg-card p-6 text-sm text-muted-foreground">
-          프로필에 HDEC PIC 값이 설정되어 있지 않습니다. 관리자에게 문의해주세요.
+          {scope === "team"
+            ? "프로필에 소속 팀 정보가 설정되어 있지 않습니다. 관리자에게 문의해주세요."
+            : "프로필에 HDEC PIC 값이 설정되어 있지 않습니다. 관리자에게 문의해주세요."}
         </div>
       </div>
     );
@@ -258,9 +267,18 @@ export function MyWorkSpacePage() {
     <div className="p-4 md:p-6 space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-semibold">My Work Space</h1>
+          <h1 className="text-xl md:text-2xl font-semibold">
+            {scope === "team" ? "My Team Work Space" : "My Work Space"}
+            {scope === "team" && !isAdmin && team ? ` — ${team}` : ""}
+            {scope === "team" && isAdmin ? " — 전체" : ""}
+          </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {isAdmin ? "관리자 모드 · 전체 담당자 데이터" : `HDEC PIC · ${pic}`} · Data as of {dohaStamp()}
+            {isAdmin
+              ? "관리자 모드 · 전체 데이터"
+              : scope === "team"
+                ? `Team · ${team}`
+                : `HDEC PIC · ${pic}`}
+            {" · Data as of "}{dohaStamp()}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
