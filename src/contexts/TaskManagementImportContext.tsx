@@ -449,6 +449,21 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     [parseAndApply],
   );
 
+  const setFileDateOverrides = useCallback(
+    async (id: string, overrides: Record<string, string>) => {
+      let target: TmImportFileItem | undefined;
+      setFiles((cur) => {
+        target = cur.find((f) => f.id === id);
+        return cur.map((f) =>
+          f.id === id ? { ...f, status: "parsing", dateOverrides: overrides } : f,
+        );
+      });
+      if (!target) return;
+      await parseAndApply(id, target.file, target.sheetName, target.excludedHeaders);
+    },
+    [parseAndApply],
+  );
+
   const setFileConflictPolicy = useCallback((id: string, policy: ConflictPolicy) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, conflictPolicy: policy } : f)));
   }, []);
