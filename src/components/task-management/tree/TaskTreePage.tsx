@@ -190,10 +190,9 @@ export function TaskTreePage() {
       const kids = subsByMain.get(p.task_no) ?? [];
       if (judgmentFilter.size > 0) {
         const mainJ = resolveJudgment(p, asOfDate);
-        const subJs = kids.map((k) => resolveJudgment(k, asOfDate));
         const anyMatch =
           (mainJ && judgmentFilter.has(mainJ)) ||
-          kids.some((k) => judgmentFilter.has(judgeOf(k)));
+          kids.some((k) => judgmentFilter.has(resolveJudgment(k, asOfDate)));
         if (!anyMatch) return false;
       }
       if (picFilter !== "__all__") {
