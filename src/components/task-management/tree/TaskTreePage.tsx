@@ -125,14 +125,21 @@ export function TaskTreePage() {
   const navigate = useNavigate();
   // 뷰 상태를 sessionStorage 로 유지 — Raw Data 로 드릴다운 후 되돌아왔을 때
   // discipline / 필터 / 검색어 / 펼침 상태가 그대로 복원되도록 함.
-  const VIEW_STATE_KEY = "qail.task-tree.view-state.v2";
+  // v3: 탭(discipline)별로 expanded/judgmentFilter/touched 를 분리 저장 →
+  //     탭 전환 시 기본값(전체 펴기 + "위험" 필터) 재적용, 사용자가 조정한
+  //     탭은 touched=true 로 표시되어 이후 재방문 시 상태 그대로 복원.
+  const VIEW_STATE_KEY = "qail.task-tree.view-state.v3";
+  type PerDisciplineState = {
+    expanded: string[];
+    judgmentFilter: string[];
+    touched: boolean;
+  };
   type PersistedView = {
     discipline: Discipline;
     search: string;
-    expanded: string[];
-    judgmentFilter: string[];
     picFilter: string;
     scrollY?: number;
+    perDiscipline: Partial<Record<Discipline, PerDisciplineState>>;
   };
   const persisted: PersistedView | null = (() => {
     if (typeof window === "undefined") return null;
@@ -147,36 +154,58 @@ export function TaskTreePage() {
     (persisted?.discipline as Discipline) ?? "ARCH",
   );
   const [search, setSearch] = useState(persisted?.search ?? "");
+  const initialPerDiscipline = persisted?.perDiscipline?.[
+    (persisted?.discipline as Discipline) ?? "ARCH"
+  ];
   const [expanded, setExpanded] = useState<Set<string>>(
-    new Set(persisted?.expanded ?? []),
+    new Set(initialPerDiscipline?.expanded ?? []),
   );
-  // 저장된 펼침 항목이 실제로 있을 때만 복원하고, 없거나 빈 배열이면 기본값은 전체 펴기.
-  const hasPersistedExpanded = (persisted?.expanded?.length ?? 0) > 0;
   const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(
-    new Set(persisted?.judgmentFilter ?? ["위험"]),
+    new Set(initialPerDiscipline?.judgmentFilter ?? ["위험"]),
   );
+  // discipline 별 사용자 조정 여부를 세션 내에서 추적.
+  const [touchedByDiscipline, setTouchedByDiscipline] = useState<
+    Partial<Record<Discipline, boolean>>
+  >(() => {
+    const map: Partial<Record<Discipline, boolean>> = {};
+    const src = persisted?.perDiscipline ?? {};
+    for (const key of Object.keys(src) as Discipline[]) {
+      if (src[key]?.touched) map[key] = true;
+    }
+    return map;
+  });
   const [picFilter, setPicFilter] = useState<string>(
     persisted?.picFilter ?? "__all__",
   );
   const [chartTask, setChartTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  // 상태 변경 시 sessionStorage 로 저장.
+  // 상태 변경 시 sessionStorage 로 저장 (현재 discipline 슬롯만 갱신).
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const payload: PersistedView = {
-      discipline,
-      search,
-      expanded: Array.from(expanded),
-      judgmentFilter: Array.from(judgmentFilter),
-      picFilter,
-    };
     try {
+      const raw = window.sessionStorage.getItem(VIEW_STATE_KEY);
+      const prev: PersistedView = raw
+        ? (JSON.parse(raw) as PersistedView)
+        : ({ discipline, search, picFilter, perDiscipline: {} } as PersistedView);
+      const nextPer = { ...(prev.perDiscipline ?? {}) };
+      nextPer[discipline] = {
+        expanded: Array.from(expanded),
+        judgmentFilter: Array.from(judgmentFilter),
+        touched: !!touchedByDiscipline[discipline],
+      };
+      const payload: PersistedView = {
+        discipline,
+        search,
+        picFilter,
+        scrollY: prev.scrollY,
+        perDiscipline: nextPer,
+      };
       window.sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify(payload));
     } catch {
       // storage full/blocked — ignore
     }
-  }, [discipline, search, expanded, judgmentFilter, picFilter]);
+  }, [discipline, search, expanded, judgmentFilter, picFilter, touchedByDiscipline]);
 
   // 최초 마운트 시 저장된 스크롤 위치 복원.
   useEffect(() => {
@@ -196,15 +225,8 @@ export function TaskTreePage() {
     return () => {
       try {
         const raw = window.sessionStorage.getItem(VIEW_STATE_KEY);
-        const base: PersistedView = raw
-          ? (JSON.parse(raw) as PersistedView)
-          : {
-              discipline,
-              search,
-              expanded: Array.from(expanded),
-              judgmentFilter: Array.from(judgmentFilter),
-              picFilter,
-            };
+        if (!raw) return;
+        const base = JSON.parse(raw) as PersistedView;
         base.scrollY = window.scrollY;
         window.sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify(base));
       } catch {
@@ -275,9 +297,6 @@ export function TaskTreePage() {
 
   const asOfDate = routeSearch.dataDate || latestDataDate || undefined;
 
-  // 저장된 펼침 상태가 없으면 mainTasks 로드 시 자동 전체 펴기(1회).
-  const [autoExpandedOnce, setAutoExpandedOnce] = useState(false);
-
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
     const subsByMain = new Map<string, Row[]>();
@@ -292,13 +311,38 @@ export function TaskTreePage() {
     return { mainTasks, subsByMain };
   }, [data]);
 
+  // discipline 이 바뀌거나 데이터가 새로 로드되었을 때 — 해당 discipline 이
+  // 아직 사용자에게 조정되지 않았다면 기본값(전체 펴기 + "위험" 필터) 적용.
+  // 조정된 적이 있다면 sessionStorage 에 저장된 값 복원.
   useEffect(() => {
-    if (autoExpandedOnce) return;
-    if (hasPersistedExpanded) return;
     if (mainTasks.length === 0) return;
-    setExpanded(new Set(mainTasks.map((m) => m.task_no)));
-    setAutoExpandedOnce(true);
-  }, [mainTasks, autoExpandedOnce, hasPersistedExpanded]);
+    const touched = !!touchedByDiscipline[discipline];
+    if (touched) {
+      try {
+        const raw =
+          typeof window !== "undefined"
+            ? window.sessionStorage.getItem(VIEW_STATE_KEY)
+            : null;
+        const parsed = raw ? (JSON.parse(raw) as PersistedView) : null;
+        const slot = parsed?.perDiscipline?.[discipline];
+        setExpanded(new Set(slot?.expanded ?? []));
+        setJudgmentFilter(new Set(slot?.judgmentFilter ?? ["위험"]));
+      } catch {
+        setExpanded(new Set(mainTasks.map((m) => m.task_no)));
+        setJudgmentFilter(new Set(["위험"]));
+      }
+    } else {
+      setExpanded(new Set(mainTasks.map((m) => m.task_no)));
+      setJudgmentFilter(new Set(["위험"]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discipline, mainTasks]);
+
+  function markTouched() {
+    setTouchedByDiscipline((cur) =>
+      cur[discipline] ? cur : { ...cur, [discipline]: true },
+    );
+  }
 
   const picOptions = useMemo(() => {
     const names = new Set<string>();
@@ -417,6 +461,7 @@ export function TaskTreePage() {
   }
 
   function toggle(taskNo: string) {
+    markTouched();
     setExpanded((cur) => {
       const next = new Set(cur);
       if (next.has(taskNo)) next.delete(taskNo);
@@ -426,9 +471,11 @@ export function TaskTreePage() {
   }
 
   function expandAll() {
+    markTouched();
     setExpanded(new Set(filtered.map((p) => p.task_no)));
   }
   function collapseAll() {
+    markTouched();
     setExpanded(new Set());
   }
 
@@ -599,12 +646,15 @@ export function TaskTreePage() {
                 key={j}
                 type="button"
                 onClick={() =>
-                  setJudgmentFilter((cur) => {
+                  {
+                    markTouched();
+                    setJudgmentFilter((cur) => {
                     const next = new Set(cur);
                     if (next.has(j)) next.delete(j);
                     else next.add(j);
                     return next;
-                  })
+                    });
+                  }
                 }
                 className={cn(
                   "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition",
