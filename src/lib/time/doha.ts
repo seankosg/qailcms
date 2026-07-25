@@ -3,6 +3,15 @@
 // Use these helpers for anything user-facing: "today", data-date defaults,
 // filename stamps, and display formatting. DB audit timestamps
 // (created_at / updated_at / started_at / finished_at) remain UTC.
+//
+// ⚠️ Pure-date (day-only) imports rule:
+// Values coming from xlsx `cellDates:true` or from date pickers are Date
+// objects whose LOCAL wall-clock components are authoritative. For pure
+// day-only fields (DB `date` columns), read `getFullYear/getMonth/getDate`
+// directly via `dohaDateOnly(v)` and format as `YYYY-MM-DD`. Never route
+// them through `toDohaDateKey` or any `getTime()` / UTC arithmetic — that
+// shifts the day by the browser's timezone offset and produces off-by-one
+// bugs (e.g. KST +09 → date arrives 1 day earlier in DB).
 
 export const DOHA_TZ = "Asia/Qatar";
 export const DOHA_OFFSET_MIN = 3 * 60; // +03:00, no DST

@@ -1,77 +1,68 @@
-# My Work Space — 내 항목 댓글 리스트
+# SM 임포트 날짜 하루 빠름 — 수정 계획
 
-## 목표
-사용자가 담당(HDEC PIC/Team, 관리자 = 전체)하는 4개 모듈(TM / SM / ABD / Spare Part)의 항목에 달린 댓글을 한 곳에 모아 보여주고, 각 댓글의 읽음/안읽음 상태를 사용자별로 기억.
+## 원인 요약 (사용자 친화 설명)
 
-## UI 배치
-`src/components/my-work-space/MyWorkSpacePage.tsx` 상단 KPI 영역 하단, 모듈 리스트 위에 새 섹션 **"내 항목 댓글"** 카드 추가.
-- 헤더: 제목 + 미확인 총합(빨간 pill) + "모두 읽음 처리" 링크 + 접기/펼치기 토글.
-- 탭: `전체 · TM · SM · ABD · SP` (각 탭에 미확인 카운트 배지).
-- 각 탭은 스크롤 영역(max-h-96) 안의 카드 목록.
-- 기본 정렬: `updated_at desc`. 최신 20건씩 무한 스크롤(더보기 버튼).
-- MyWorkSpacePage와 MyTeamWorkSpacePage 모두 재사용(scope=`pic`/`team` 전달).
+- Excel 파일에 **2027-01-20** 이라고 적혀 있으면, 시스템은 그 날짜를 그대로 DB에 저장해야 합니다.
+- 그런데 현재 코드는 브라우저의 로컬 시간대(예: 한국 KST)를 거치면서 **UTC 시간 기준으로 날짜를 재계산**하다가 하루가 밀립니다.
+- 한국에서 업로드 시 `2027-01-20` → `2027-01-19` 로 저장됨. 도하(+03) 현지 PC에서만 우연히 정상 동작해서 발견이 늦었습니다.
+- 해결: **Excel Date 셀은 연/월/일 숫자만 브라우저 로컬 구성요소로 읽어 `YYYY-MM-DD` 문자열로 조합**하고, 시간대 가감 계산을 제거합니다.
 
-## 각 댓글 카드에 표시할 정보
-```
-[모듈 배지] [카테고리 배지] [●안읽음 dot]         xx분 전
-Task/Issue No · 항목명(요약)                       [바로가기 →]
-"댓글 본문 최대 2줄 말줄임"
-작성자 · (수정됨) · 부모 상세로 이동 (전체 카드 클릭)
-```
-- 안읽은 카드: 배경 `bg-primary/5`, 좌측 2px `border-l-primary`, 굵은 텍스트.
-- 읽은 카드: 기본 배경, 회색 텍스트.
+## 확인된 증거 (파일 vs DB, 15건 무작위 표본)
 
-## 데이터 소스
-4개 테이블: `task_comments`, `defect_comments`, `abd_comments`, `spare_part_comments`.
-필터: 관리자면 전체, 아니면 부모 테이블의 `hdec_pic_name = 나` (팀 스코프면 `team = 내팀`).
+| ID | Excel planned_start | DB planned_start | Excel planned_closure | DB planned_closure |
+|---|---|---|---|---|
+| 29444 | 2026-07-09 | 2026-07-08 | 2026-07-19 | 2026-07-18 |
+| 100309 | 2027-01-20 | 2027-01-19 | 2027-01-25 | 2027-01-24 |
+| 111894 | 2027-07-06 | 2027-07-05 | 2027-07-11 | 2027-07-10 |
+| 112453 | 2026-10-21 | 2026-10-20 | 2026-10-26 | 2026-10-25 |
+| 65253 | 2026-08-01 | 2026-07-31 | 2026-08-11 | 2026-08-10 |
+| 87820 | 2026-10-08 | 2026-10-07 | 2026-10-13 | 2026-10-12 |
 
-### 조회 방식
-효율/RLS를 고려해 **서버 함수 1개** `getMyWorkspaceComments`(`src/lib/my-work-space/comments.functions.ts`) 신설:
-- 입력: `{ scope: "pic" | "team", filterValue: string | null, isAdmin: boolean, module: "all"|"tm"|"sm"|"abd"|"sp", limit, before }`.
-- 각 모듈별로 (a) 담당 부모 ID 목록을 조회한 뒤 (b) 해당 부모 ID 배열로 댓글 테이블을 `updated_at desc`로 pagination. 반환 DTO:
-```ts
-{ items: Array<{
-  id, module, category, message, source, author_user_id,
-  created_at, updated_at, edited,
-  parent_id, parent_ref, parent_label, // 예: task_no + task_name
-  detail_href // 상세 페이지 라우트
-}>; nextBefore: string | null; unreadTotal: Record<Module,number> }
-```
-- 관리자 스코프: 부모 필터 없이 최근 200건 제한.
-- 정렬/페이징: `updated_at`+`id` 커서. 미확인 카운트 계산은 클라이언트가 읽음 맵과 대조.
+모든 `planned_*` 날짜 컬럼이 정확히 −1일. 반면 `created_date`(문자열 타임스탬프), `due_by`(문자열 YYYY-MM-DD)는 정확히 일치 → 오차는 **Excel 순수 날짜 셀에만** 발생.
 
-### Realtime
-`supabase.channel("mws-comments-<userId>")`에 4개 테이블 postgres_changes 구독 → 발생 시 쿼리 무효화(디바운스 500ms).
+## 저장 형식(중요)
 
-## 읽음 상태 관리
-- 기존 `useCommentReadState`는 `taskRawId → lastReadAt` 구조 → 새로 `useCommentInboxRead` 훅 추가.
-- 키: `qail.mws.comments-read::<userId>`, 값: `{ [commentId]: readAtISO }`.
-- `isRead(comment)` = 저장된 값이 `comment.updated_at` 이상.
-- markRead 트리거:
-  1. 카드의 "바로가기 →" 클릭 또는 카드 전체 클릭 시.
-  2. "모두 읽음 처리" 클릭 시 현재 탭의 모든 항목.
-  3. 카드가 뷰포트에 1초 이상 노출된 경우(IntersectionObserver 옵션, 기본 활성).
-- 안읽은 총합/탭별 카운트는 훅+로컬 상태로 실시간 갱신.
+- Postgres `date` 컬럼(`planned_start_date` 등)은 순수 날짜 타입이며 시간대 개념이 없습니다.
+- 파서가 넘겨주는 값이 `"YYYY-MM-DD"` 문자열이면 Supabase 클라이언트가 자동으로 `date` 타입으로 정확히 캐스팅합니다.
+- 따라서 **파서 출력은 `YYYY-MM-DD` 문자열, DB에는 `date` 타입**으로 저장되어 내부 판정 로직·필터·엑셀 Export 시 모두 날짜 속성으로 사용됩니다. (별도 명시적 `Date` 객체 변환 불필요; 오히려 `Date`로 감싸면 다시 시간대 문제가 발생함.)
+- Export 시에도 문자열이 아니라 진짜 `date` 값을 읽어 엑셀의 날짜 셀로 출력됩니다.
 
-## 라우팅(바로가기)
-- TM: `/closure/task-management/detail/$id`
-- SM: `/closure/snag-list/detail/$id` (기존 라우트 확인)
-- ABD: `/closure/abd/raw-data?open=<id>` (AbdDetailSheet 오픈 파라미터)
-- SP: `/closure/spare-part/detail/$doc_ref` (기존 라우트)
-클릭 시 해당 route로 navigate + 방금 클릭한 comment.id를 markRead.
+## 수정 항목
 
-## 파일 변경 요약
-신규
-- `src/lib/my-work-space/comments.functions.ts` — createServerFn `getMyWorkspaceComments`.
-- `src/hooks/useCommentInboxRead.ts` — 사용자별 읽음 맵.
-- `src/components/my-work-space/CommentsInbox.tsx` — 탭/리스트/카드 UI.
+### 1. SM 파서 수정 (핵심)
+`src/lib/defect-management/parser.ts` — `toIsoDate()` 의 `Date` 분기:
 
-수정
-- `src/components/my-work-space/MyWorkSpacePage.tsx` — 새 섹션 삽입, scope/filterValue/isAdmin 전달.
+- **현재(잘못)**: `toDohaDateKey(v)` 호출 → 내부에서 `getTime() + 3h` → `.toISOString().slice(0,10)`
+- **수정 후**: `v.getFullYear()` / `v.getMonth()+1` / `v.getDate()` 만 사용해서 `` `${y}-${MM}-${dd}` `` 로 조립
+- 결과 문자열은 DB `date` 컬럼에 그대로 저장되고, 조회 시 자동으로 date 타입.
 
-## 검증
-- 사용자가 담당한 태스크에 댓글 달면 5초 이내 인박스에 뜨고 미확인 카운트 증가.
-- 카드 클릭 → 상세 페이지로 이동, 재접속 시 해당 카드는 회색.
-- "모두 읽음 처리" → 미확인 카운트 0.
-- 관리자 계정에서는 전 항목 노출.
-- 팀 워크스페이스에서는 팀 기준으로 필터 노출.
+`toIsoDateTime()` 은 이미 로컬 구성요소를 쓰고 있어 수정 불필요.
+
+### 2. 다른 모듈 동일 취약점 점검·수정
+동일 패턴 여부 확인 후 필요한 곳만 수정:
+- `src/lib/task-management/parser.ts`
+- `src/lib/abd/parser.ts`
+- `src/lib/spare-part-import-parser.ts`
+- `src/lib/dmr-parse.functions.ts`
+
+문자열(YYYY-MM-DD, DD/MM/YYYY)·Excel serial number 분기는 이미 로컬 계산이라 유지.
+
+### 3. 회귀 방지 테스트
+`src/lib/defect-management/__tests__/parser.date.test.ts` (Vitest) 추가:
+- 브라우저 TZ를 KST(+09) / UTC / Doha(+03) 로 각각 스텁
+- Excel Date 셀 / Excel serial number / YYYY-MM-DD 문자열 / DD/MM/YYYY 문자열 4 케이스 모두 동일 결과 반환 확인
+
+### 4. 기존 저장분 처리
+- 배포 후 최신 파일을 **재임포트하면 upsert 로 자동 정정**됩니다(권장).
+- 별도 대량 마이그레이션은 이 계획에 포함하지 않음. 필요하시면 특정 upload 배치 범위를 지정해 `date + 1` 백필 스크립트를 별도로 요청해 주세요.
+
+## 검증 절차
+1. 수정 배포 후 동일 파일을 SM에 재임포트.
+2. 위 15개 ID의 `planned_start_date`, `planned_rectified_date`, `planned_closure_date` 재조회 → 파일과 완전 일치 확인.
+3. `date` 타입으로 저장되었는지 확인(정렬·범위 필터·엑셀 Export 시 날짜 셀로 출력).
+4. TM/ABD/Spare Part/DMR 대표 파일 각 1개씩 재임포트하여 5건 샘플 비교.
+
+## 원칙 (재발 방지)
+- xlsx `cellDates:true` 로 얻은 `Date` 는 "브라우저 로컬 시간의 벽시계 값" 이다.
+- 순수 날짜(day-only)는 **로컬 연/월/일만 읽어 `YYYY-MM-DD` 문자열로 조립** → DB `date` 컬럼에 그대로 저장.
+- `getTime()` 기반 시간대 가감을 pure-date 처리에 절대 사용하지 말 것. 이 규칙을 `src/lib/time/doha.ts` 헤더 주석에 명시.

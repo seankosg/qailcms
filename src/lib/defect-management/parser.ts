@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import type { DefectTeam } from "./columns";
-import { dohaWallToUtcIso, toDohaDateKey } from "@/lib/time/doha";
+import { dohaWallToUtcIso, toDohaDateKey, dohaDateOnly } from "@/lib/time/doha";
 
 /** Re-import 마커 헤더 — Raw Data에서 재수출한 파일에만 존재. */
 export const REIMPORT_MARKER_HEADER = "QAIL_DEFECT_REIMPORT_V1";
@@ -264,16 +264,18 @@ function toIsoDate(v: unknown): string | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) return null;
-    // xlsx `cellDates:true` returns a Date whose UTC components hold the
-    // sheet's wall-clock date. Interpret that date as Doha (+03:00) calendar.
-    return toDohaDateKey(v) || null;
+    // xlsx `cellDates:true` returns a Date built from the sheet's wall-clock
+    // components as LOCAL time. Read local Y/M/D directly; never touch UTC
+    // arithmetic here or the day will shift by the browser TZ offset.
+    return dohaDateOnly(v);
   }
   if (typeof v === "number") {
     if (!Number.isFinite(v) || v <= 0) return null;
     const parsed = XLSX.SSF?.parse_date_code?.(v);
     if (parsed && parsed.y && parsed.m && parsed.d) {
-      const iso = dohaWallToUtcIso(parsed.y, parsed.m, parsed.d);
-      return iso ? toDohaDateKey(iso) || null : null;
+      const mo = parsed.m, da = parsed.d;
+      if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+      return `${parsed.y}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
     }
   }
   if (typeof v === "string") {
