@@ -646,12 +646,15 @@ export function TaskTreePage() {
                 key={j}
                 type="button"
                 onClick={() =>
-                  setJudgmentFilter((cur) => {
+                  {
+                    markTouched();
+                    setJudgmentFilter((cur) => {
                     const next = new Set(cur);
                     if (next.has(j)) next.delete(j);
                     else next.add(j);
                     return next;
-                  })
+                    });
+                  }
                 }
                 className={cn(
                   "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition",
