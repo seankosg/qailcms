@@ -479,6 +479,7 @@ function ImportInner() {
                 onPolicyChange={(p) => setFileConflictPolicy(f.id, p)}
                 onRunPreflight={() => runPreflight(f.id)}
                 onOpenConflict={() => setConflictFileId(f.id)}
+                onDateOverridesApply={(ov) => setFileDateOverrides(f.id, ov)}
               />
             ))}
           </CardContent>
