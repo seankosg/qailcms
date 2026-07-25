@@ -97,9 +97,7 @@ function resolveMainJudgment(
     actual_finish: allDone ? (main.actual_finish ?? main.plan_end) : null,
     auto_judgment: allDone ? "완료" : null,
   };
-  const mainJudgment = computeJudgment(syntheticMain, thresholds, asOfDate);
-  const childWorst = worstJudgment(kids.map((k) => resolveRowJudgment(k, thresholds, asOfDate)));
-  return worstJudgment([mainJudgment, childWorst]) ?? mainJudgment ?? childWorst ?? "";
+  return computeJudgment(syntheticMain, thresholds, asOfDate);
 }
 
 function ProgressBar({ v }: { v: number | null | undefined }) {
