@@ -436,6 +436,43 @@ export function TaskTreePage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => goToRawDataMissing("no_plan_start")}
+          disabled={missingPlanCounts.noStart === 0}
+          title="P.Start 가 비어있는 태스크 목록 보기"
+          className={cn(
+            "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition",
+            missingPlanCounts.noStart > 0
+              ? "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+              : "border-muted bg-muted/40 text-muted-foreground cursor-not-allowed",
+          )}
+        >
+          <span>P.Start 없음</span>
+          <span className="tabular-nums font-semibold">
+            {missingPlanCounts.noStart.toLocaleString()}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => goToRawDataMissing("no_plan_end")}
+          disabled={missingPlanCounts.noEnd === 0}
+          title="P.Finish 가 비어있는 태스크 목록 보기"
+          className={cn(
+            "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition",
+            missingPlanCounts.noEnd > 0
+              ? "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+              : "border-muted bg-muted/40 text-muted-foreground cursor-not-allowed",
+          )}
+        >
+          <span>P.Finish 없음</span>
+          <span className="tabular-nums font-semibold">
+            {missingPlanCounts.noEnd.toLocaleString()}
+          </span>
+        </button>
+      </div>
+
       {isLoading && <div className="text-sm text-muted-foreground">로딩 중…</div>}
 
       <div className="space-y-2">
