@@ -16,7 +16,7 @@ import { useMwsColumnPrefs } from "@/hooks/useMwsColumnPrefs";
 import { AbdDetailSheet } from "@/components/abd/raw-data/AbdDetailSheet";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { dohaStamp } from "@/lib/time/doha";
+import { dohaStamp, formatDdMmmYyyy } from "@/lib/time/doha";
 import { cumPlanProgress, cumActualProgress, computeVariance } from "@/lib/task-management/derived";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
@@ -24,9 +24,7 @@ import { CommentsInbox } from "./CommentsInbox";
 
 function fmtDate(d?: string | null): string {
   if (!d) return "-";
-  try {
-    return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  } catch { return String(d); }
+  return formatDdMmmYyyy(d) || "-";
 }
 
 function judgmentTone(j: string | null | undefined): KpiTone {
