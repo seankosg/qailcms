@@ -19,10 +19,12 @@ import { cn } from "@/lib/utils";
 import { DISCIPLINES, AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
 import type { Discipline } from "@/lib/task-management/columns";
 import {
+  DEFAULT_THRESHOLDS,
   computeJudgment,
   cumPlanProgress,
   computeVariance,
 } from "@/lib/task-management/derived";
+import type { TaskThresholds } from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -44,6 +46,9 @@ interface Row {
   plan_progress: number | null;
   plan_start: string | null;
   plan_end: string | null;
+  plan_days: number | null;
+  actual_start: string | null;
+  actual_finish: string | null;
   slip_days: number | null;
   auto_judgment: string | null;
   hdec_pic_name: string | null;
@@ -53,12 +58,36 @@ interface Row {
   data_date: string | null;
 }
 
-/** Main Task는 Data Date 변경에 민감하므로 클라이언트 재계산 우선, Sub는 DB값 우선. */
-function resolveJudgment(r: Row, asOfDate?: string): string {
-  if (r.level === "main") {
-    return computeJudgment(r, undefined, asOfDate) || r.auto_judgment || "";
+/** Sub Task는 저장 판정 우선, Main Task는 화면에 로드된 Sub Task 실적 롤업 기준으로 재판정. */
+function resolveRowJudgment(
+  r: Row,
+  thresholds: TaskThresholds,
+  asOfDate?: string,
+): string {
+  return r.auto_judgment || computeJudgment(r, thresholds, asOfDate) || "";
+}
+
+function resolveMainJudgment(
+  main: Row,
+  kids: Row[],
+  thresholds: TaskThresholds,
+  asOfDate?: string,
+): string {
+  if (kids.length === 0) {
+    return computeJudgment(main, thresholds, asOfDate) || main.auto_judgment || "";
   }
-  return r.auto_judgment || computeJudgment(r, undefined, asOfDate) || "";
+
+  const rolledActual = main.actual_progress;
+  const allDone = kids.every((k) => Number(k.actual_progress ?? 0) >= 1 || k.auto_judgment === "완료");
+  const hasProgress = Number(rolledActual ?? 0) > 0;
+  const syntheticMain: Row = {
+    ...main,
+    actual_progress: rolledActual ?? main.actual_progress,
+    actual_start: main.actual_start ?? (hasProgress ? main.plan_start : null),
+    actual_finish: allDone ? (main.actual_finish ?? main.plan_end) : null,
+    auto_judgment: allDone ? "완료" : null,
+  };
+  return computeJudgment(syntheticMain, thresholds, asOfDate);
 }
 
 function ProgressBar({ v }: { v: number | null | undefined }) {
@@ -191,13 +220,26 @@ export function TaskTreePage() {
       const { data, error } = await (supabase as any)
         .from("task_management_raw")
         .select(
-          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
+          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, plan_days, actual_start, actual_finish, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
         )
         .eq("discipline", discipline)
         .order("sort_order", { ascending: true })
         .limit(10000);
       if (error) throw error;
       return (data ?? []) as Row[];
+    },
+  });
+
+  const { data: thresholds = DEFAULT_THRESHOLDS } = useQuery({
+    queryKey: ["task-management-thresholds"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("task_management_settings")
+        .select("behind_warn_gap, behind_late_gap, slip_warn_days, slip_late_days")
+        .eq("id", "default")
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? DEFAULT_THRESHOLDS) as TaskThresholds;
     },
   });
 
@@ -282,10 +324,10 @@ export function TaskTreePage() {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
       if (judgmentFilter.size > 0) {
-        const mainJ = resolveJudgment(p, asOfDate);
+        const mainJ = resolveMainJudgment(p, kids, thresholds, asOfDate);
         const anyMatch =
           (mainJ && judgmentFilter.has(mainJ)) ||
-          kids.some((k) => judgmentFilter.has(resolveJudgment(k, asOfDate)));
+          kids.some((k) => judgmentFilter.has(resolveRowJudgment(k, thresholds, asOfDate)));
         if (!anyMatch) return false;
       }
       if (picFilter !== "__all__") {
@@ -308,7 +350,7 @@ export function TaskTreePage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfDate]);
+  }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfDate, thresholds]);
 
   // 완료(Actual% ≥ 100%) Main Task 는 하단으로 정렬
   const sortedFiltered = useMemo(() => {
@@ -350,11 +392,13 @@ export function TaskTreePage() {
     const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 위험: 0 };
     for (const r of data) {
       if (!matchPic(r)) continue;
-      const j = resolveJudgment(r, asOfDate);
+      const j = r.level === "main"
+        ? resolveMainJudgment(r, subsByMain.get(r.task_no) ?? [], thresholds, asOfDate)
+        : resolveRowJudgment(r, thresholds, asOfDate);
       if (j && j in counts) counts[j] += 1;
     }
     return counts;
-  }, [data, picFilter, asOfDate]);
+  }, [data, picFilter, asOfDate, subsByMain, thresholds]);
 
   function goToRawDataMissing(kind: "no_plan_start" | "no_plan_end") {
     const searchParams: Record<string, string> = {
@@ -593,7 +637,7 @@ export function TaskTreePage() {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
           const isDone = Number(p.actual_progress ?? 0) >= 1;
-          const mainJudgment = resolveJudgment(p, asOfDate);
+          const mainJudgment = resolveMainJudgment(p, kids, thresholds, asOfDate);
           const behindCount = kids.filter(
             (k) => (computeVariance(k, asOfDate) ?? 0) < -0.05,
           ).length;
@@ -677,7 +721,7 @@ export function TaskTreePage() {
                     <tbody>
                       {kids.map((k) => {
                         const gap = computeVariance(k, asOfDate) ?? 0;
-                        const j = resolveJudgment(k, asOfDate);
+                        const j = resolveRowJudgment(k, thresholds, asOfDate);
                         return (
                           <tr
                             key={k.id}
