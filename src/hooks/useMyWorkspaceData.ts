@@ -53,17 +53,19 @@ export interface TmMyRow {
   created_at: string | null;
 }
 
-export function useMyTasks(filterPic: string | null, isAdmin: boolean) {
+export type MwsScope = "pic" | "team";
+
+export function useMyTasks(filterValue: string | null, isAdmin: boolean, mode: MwsScope = "pic") {
   return useQuery({
-    queryKey: ["my-workspace", "tm", filterPic, isAdmin],
-    enabled: isAdmin || !!filterPic,
+    queryKey: ["my-workspace", "tm", mode, filterValue, isAdmin],
+    enabled: isAdmin || !!filterValue,
     staleTime: 60_000,
     queryFn: async () => {
       const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const rows = await fetchAll<TmMyRow>(
         "task_management_raw",
         "id,task_no,main_task_no,task_name,level,hdec_pic_name,plan_end,actual_progress,auto_judgment,plan_start,plan_days,plan_progress,data_date,created_at",
-        (q) => (isAdmin ? q : q.eq("hdec_pic_name", filterPic)),
+        (q) => (isAdmin ? q : q.eq(mode === "team" ? "team" : "hdec_pic_name", filterValue)),
         { col: "task_no", asc: true },
         limit,
       );
@@ -125,17 +127,17 @@ export interface SmMyRow {
   hdec_pic_name: string | null;
 }
 
-export function useMyDefects(filterPic: string | null, isAdmin: boolean) {
+export function useMyDefects(filterValue: string | null, isAdmin: boolean, mode: MwsScope = "pic") {
   return useQuery({
-    queryKey: ["my-workspace", "sm", filterPic, isAdmin],
-    enabled: isAdmin || !!filterPic,
+    queryKey: ["my-workspace", "sm", mode, filterValue, isAdmin],
+    enabled: isAdmin || !!filterValue,
     staleTime: 60_000,
     queryFn: async () => {
       const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const rows = await fetchAll<SmMyRow>(
         "defect_items_raw",
         "id,source_issue_no,location_raw,main_trade,status_raw,planned_start_date,planned_closure_date,planned_rectified_date,actual_closure_date,actual_rectified_date,actual_progress_pct,created_date,created_at,hdec_pic_name",
-        (q) => (isAdmin ? q : q.eq("hdec_pic_name", filterPic)),
+        (q) => (isAdmin ? q : q.eq(mode === "team" ? "team" : "hdec_pic_name", filterValue)),
         { col: "source_issue_no", asc: true },
         limit,
       );
@@ -206,10 +208,10 @@ export interface AbdMyRow {
   created_at: string | null;
 }
 
-export function useMyAbd(filterPic: string | null, isAdmin: boolean) {
+export function useMyAbd(filterValue: string | null, isAdmin: boolean, mode: MwsScope = "pic") {
   return useQuery({
-    queryKey: ["my-workspace", "abd", filterPic, isAdmin],
-    enabled: isAdmin || !!filterPic,
+    queryKey: ["my-workspace", "abd", mode, filterValue, isAdmin],
+    enabled: isAdmin || !!filterValue,
     staleTime: 60_000,
     queryFn: async () => {
       const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
@@ -224,7 +226,7 @@ export function useMyAbd(filterPic: string | null, isAdmin: boolean) {
         cols,
         (q) => {
           const base = q.eq("is_active", true);
-          return isAdmin ? base : base.eq("hdec_pic_name", filterPic);
+          return isAdmin ? base : base.eq(mode === "team" ? "team" : "hdec_pic_name", filterValue);
         },
         { col: "abd_number", asc: true },
         limit,

@@ -1,26 +1,48 @@
-## 계획: 비밀번호 변경 버튼 배치 + 사이드바 최상단 "QAIL CMS" 라벨 삭제
+## 계획: My Team Work Space (MTWS) 페이지 구현
 
-### 1. 비밀번호 변경 버튼 배치
-- **위치**: `src/components/layout/AppLayout.tsx` 사이드바 상단 헤더의 로그인 정보(이름/역할 뱃지) 오른쪽, 기존 Sign out(LogOut) 버튼 왼쪽에 아이콘 버튼으로 배치.
-- **아이콘**: `KeyRound` (`lucide-react`), Tooltip/title은 "비밀번호 변경".
-- **동작**: 클릭 시 `/change-password` 라우트로 이동. (이미 구축된 페이지 재활용)
-- **노출 대상**: 본인 비밀번호 변경 기능이므로 Guest 계열 포함 모든 로그인 사용자에게 노출.
-- **접힌 사이드바(collapsed)**: 현재 Sign out 버튼이 있는 360~365행 영역에 KeyRound 버튼을 추가하여 접힌 상태에서도 접근 가능.
+### 개념
+- **MWS**: 로그인 사용자가 **HDEC PIC**로 지정된 항목만 필터 (개인 담당).
+- **MTWS**: 로그인 사용자의 **team**과 동일한 team의 항목을 필터 (팀 담당).
+- **Admin / d-superuser**: MWS와 동일하게 필터 없이 **전체 조회**.
+- MWS의 UI/컴포넌트(오늘/지연/임박/전체 탭, 좌측 컨텍스트 컬럼, KPI 카드, Columns 메뉴, DataDatePicker 등)를 그대로 재사용. 필터 축만 `hdec_pic_name` → `team`으로 교체.
 
-### 2. 사이드바 최상단 "QAIL CMS" 라벨 삭제
-- **대상**: `AppLayout.tsx`의 사이드바 헤더에서 "QAIL CMS" 텍스트(367~369행 영역)를 제거.
-- **접힌 상태**: 이미 "QAIL" 축약 텍스트만 표시되고 있음. 별도 삭제 대상은 아니나, 전체 라벨 제거에 맞춰 상단 영역을 정리하여 불필요한 텍스트 공간을 줄임.
-- **영향**: TopBrandHeader 상단 브랜드 바는 그대로 유지. 사이드바 내부의 중복 브랜드 라벨만 제거.
+### 1. 데이터 훅 확장 (`src/hooks/useMyWorkspaceData.ts`)
+- 기존 `useMyTasks / useMySnags / useMyAbd`에 파라미터 `mode: "pic" | "team"` 추가.
+  - `pic` 모드: 현재대로 `hdec_pic_name` eq.
+  - `team` 모드: `team` eq (사용자 `profiles.team` 값 사용).
+  - Admin/d-superuser: mode와 무관하게 필터 없이 전체 로드(현행 동일).
+- `queryKey`에 `mode`와 필터값을 포함해 캐시 분리.
+- 3개 raw 테이블(`task_management_raw`, `defect_items_raw`, `abd_items_raw`) 모두 `team` 컬럼 존재 확인 완료.
 
-### 3. `/change-password` 페이지 개선
-- **성공 후 리다이렉트**: 현재 `/closure/spare-part/raw-data`로 되어 있는 부분을 `/my-work-space`로 변경.
-- **취소/뒤로 가기**: 강제 비밀번호 변경 흐름이 아닌 일반 진입 시, 사용자가 이전 페이지로 돌아갈 수 있도록 취소 버튼 추가. (기존 `must_change_password` 흐름에는 영향 없음)
+### 2. 신규 라우트 (`src/routes/_authenticated/my-team-work-space.tsx`)
+- `MyWorkSpacePage`를 그대로 렌더링, `scope="team"` prop 전달.
+- `head()`에 팀 워크스페이스용 title/description.
 
-### 4. 변경하지 않는 것
-- TopBrandHeader, 로그인 정보 이름/역할 뱃지 스타일, 로그아웃 버튼 위치.
-- `/change-password`의 비밀번호 유효성 검사 및 세션 확인 로직.
-- 사이드바 네비게이션 항목 및 3D 아이콘.
+### 3. 페이지 컴포넌트 (`src/components/my-work-space/MyWorkSpacePage.tsx`)
+- `scope: "pic" | "team"` prop 신설 (default `"pic"`).
+- 상단 제목:
+  - `pic`: "My Work Space"
+  - `team`: "My Team Work Space — {팀명}" (admin은 "My Team Work Space — 전체")
+- 훅 호출:
+  - `pic` 모드: 기존대로 `me.hdec_pic_name` 사용.
+  - `team` 모드: `me.team` 사용. Admin/d-superuser는 훅 내부에서 필터 무시하고 전체 조회.
+  - Non-admin이면서 `me.team`이 비어있으면 "소속 팀 정보가 없습니다" 안내.
+- Columns 저장 키(`useMwsColumnPrefs`)에 scope 접미사 추가 (`mws:tm:pic` vs `mws:tm:team`)하여 독립 저장.
 
-### 5. 확인 항목
-- 데스크톱/모바일 사이드바에서 KeyRound 버튼이 시인성 있게 표시되는지.
-- "QAIL CMS" 라벨 삭제 후 사이드바 헤더 높이/정렬이 자연스러운지.
+### 4. 사이드바 항목 추가 (`src/components/layout/AppLayout.tsx`)
+- "My Work Space" 바로 아래에 "My Team Work Space" 메뉴 항목 추가.
+- 아이콘: 팀/그룹을 상징하는 lucide `Users` 아이콘 사용 (추후 3D 아이콘 교체 가능).
+- 접힘/펼침 상태 모두 반영, Guest 노출 정책은 MWS와 동일.
+
+### 5. 검증 항목
+- 타입체크 통과.
+- 일반 사용자: 본인 team의 항목만 노출.
+- Admin/d-superuser: 전체 항목 노출.
+- team이 없는 일반 사용자: 빈 상태 안내.
+- Columns 설정이 MWS/MTWS 간 상호 침범 없이 저장·복원.
+- 오늘/지연/임박 필터 규칙과 좌측 컨텍스트 컬럼은 MWS와 완전 동일 동작.
+
+### 6. 변경하지 않는 것
+- MWS의 기존 로직·판정 기준·필터 정의.
+- Raw 테이블 스키마, RLS, RPC.
+- 최초 접속 리다이렉트(`/my-work-space` 유지).
