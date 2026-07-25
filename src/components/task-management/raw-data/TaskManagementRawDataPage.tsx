@@ -439,6 +439,41 @@ export function TaskManagementRawDataPage() {
 
   const rows = useMemo(() => data ?? [], [data]);
 
+  // 댓글 수/최종 갱신 시각 조회 — 현재 로드된 행 기준
+  const { data: commentCounts } = useQuery({
+    queryKey: ["tm-comment-counts", rows.length],
+    queryFn: async () => {
+      const ids = rows.map((r) => String((r as any).id)).filter(Boolean);
+      if (!ids.length) return {} as Record<string, { count: number; lastUpdatedAt: string }>;
+      const map: Record<string, { count: number; lastUpdatedAt: string }> = {};
+      // chunk to avoid PostgREST URL-length limits
+      const chunkSize = 500;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const { data, error } = await (supabase as any)
+          .from("task_comments")
+          .select("task_raw_id, updated_at")
+          .in("task_raw_id", chunk);
+        if (error) throw error;
+        for (const row of (data ?? []) as Array<{ task_raw_id: string; updated_at: string }>) {
+          const key = String(row.task_raw_id);
+          const cur = map[key];
+          if (!cur) map[key] = { count: 1, lastUpdatedAt: row.updated_at };
+          else {
+            cur.count += 1;
+            if (row.updated_at > cur.lastUpdatedAt) cur.lastUpdatedAt = row.updated_at;
+          }
+        }
+      }
+      return map;
+    },
+    enabled: rows.length > 0,
+    staleTime: 30_000,
+  });
+
+  const { id: currentUserId } = useCurrentUser().data ?? { id: null as string | null };
+  const { isRead, markRead } = useCommentReadState(currentUserId);
+
   const latestDataDate = useMemo(() => {
     let latest: string | null = null;
     for (const r of rows) {
