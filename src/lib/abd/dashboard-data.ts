@@ -1,7 +1,8 @@
-// ABD Dashboard 집계 유틸.
-// SHAW PROJECT CMS 의 Docs Management Dashboard ABD 섹션 UI에 대응하되,
-// QAIL 의 abd_items_raw 스키마(R1/R2/R3 × Draft/Submission/DAR + latest_status/approval_date)
-// 스테이지 로직을 기반으로 KPI/Funnel/Trend/Attention/CrossCut 데이터를 만든다.
+// @deprecated (Phase 5 SSOT 이관 완료)
+// ABD Dashboard 는 이제 abd_dashboard_row1/row2/status_dist/approval_trend/
+// overdue_heatmap/attention_lists/crosscut RPC 만을 유일한 소스로 사용한다.
+// 이 파일은 과거 대시보드가 사용하던 클라이언트 집계 유틸로, 신규 코드에서
+// 참조하지 말 것. 다음 라운드에서 안전하게 제거 예정.
 
 import { supabase } from "@/integrations/supabase/client";
 import {
