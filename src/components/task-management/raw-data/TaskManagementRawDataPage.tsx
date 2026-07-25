@@ -37,6 +37,7 @@ import {
   Download,
   Filter,
   History,
+  MessageCircle,
   Pin,
   Plus,
   Search,
@@ -83,6 +84,7 @@ import { EditCellPopover } from "./EditCellPopover";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
 import { DISCIPLINES } from "@/lib/task-management/columns";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
+import { useCommentReadState } from "@/lib/task-management/useCommentReadState";
 import {
   expectedProgressToday,
   todayGap,
@@ -437,6 +439,41 @@ export function TaskManagementRawDataPage() {
 
   const rows = useMemo(() => data ?? [], [data]);
 
+  // 댓글 수/최종 갱신 시각 조회 — 현재 로드된 행 기준
+  const { data: commentCounts } = useQuery({
+    queryKey: ["tm-comment-counts", rows.length],
+    queryFn: async () => {
+      const ids = rows.map((r) => String((r as any).id)).filter(Boolean);
+      if (!ids.length) return {} as Record<string, { count: number; lastUpdatedAt: string }>;
+      const map: Record<string, { count: number; lastUpdatedAt: string }> = {};
+      // chunk to avoid PostgREST URL-length limits
+      const chunkSize = 500;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const { data, error } = await (supabase as any)
+          .from("task_comments")
+          .select("task_raw_id, updated_at")
+          .in("task_raw_id", chunk);
+        if (error) throw error;
+        for (const row of (data ?? []) as Array<{ task_raw_id: string; updated_at: string }>) {
+          const key = String(row.task_raw_id);
+          const cur = map[key];
+          if (!cur) map[key] = { count: 1, lastUpdatedAt: row.updated_at };
+          else {
+            cur.count += 1;
+            if (row.updated_at > cur.lastUpdatedAt) cur.lastUpdatedAt = row.updated_at;
+          }
+        }
+      }
+      return map;
+    },
+    enabled: rows.length > 0,
+    staleTime: 30_000,
+  });
+
+  const currentUserId = currentUser?.id ?? null;
+  const { isRead, markRead } = useCommentReadState(currentUserId);
+
   const latestDataDate = useMemo(() => {
     let latest: string | null = null;
     for (const r of rows) {
@@ -624,7 +661,7 @@ export function TaskManagementRawDataPage() {
   const orderedKeys = useMemo(() => {
     const frozenSet = new Set(frozenExtras);
     const rest = order.filter((k) => !frozenSet.has(k) && k !== "task_no");
-    return ["__select", "task_no", ...frozenExtras, ...rest];
+    return ["__select", "__comments", "task_no", ...frozenExtras, ...rest];
   }, [order, frozenExtras]);
 
   const columns = useMemo<ColumnDef<Row>[]>(() => {
@@ -661,6 +698,44 @@ export function TaskManagementRawDataPage() {
               />
             </span>
           ),
+        });
+        continue;
+      }
+      if (key === "__comments") {
+        cols.push({
+          id: "__comments",
+          size: 48,
+          minSize: 40,
+          maxSize: 64,
+          enableSorting: false,
+          enableColumnFilter: false,
+          enableResizing: false,
+          header: () => (
+            <span className="flex w-full items-center justify-center" title="댓글">
+              <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+            </span>
+          ),
+          cell: ({ row }) => {
+            const rr = row.original as Row;
+            const rid = String(rr.id);
+            const info = commentCounts?.[rid];
+            if (!info || info.count <= 0) {
+              return <span className="flex w-full items-center justify-center text-muted-foreground/30">—</span>;
+            }
+            const read = isRead(rid, info.lastUpdatedAt);
+            return (
+              <span
+                className={cn(
+                  "flex w-full items-center justify-center gap-0.5 tabular-nums",
+                  read ? "text-muted-foreground" : "text-primary font-semibold",
+                )}
+                title={read ? `댓글 ${info.count}개 (읽음)` : `새 댓글 · 총 ${info.count}개`}
+              >
+                <MessageCircle className={cn("h-3.5 w-3.5", read ? "" : "fill-primary/15")} />
+                <span className="text-[10px]">{info.count}</span>
+              </span>
+            );
+          },
         });
         continue;
       }
@@ -951,7 +1026,7 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds, tActualMap, canEditOwnerFieldsBase, myPic, updateOwnerFieldFn]);
+  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds, tActualMap, canEditOwnerFieldsBase, myPic, updateOwnerFieldFn, commentCounts, isRead]);
 
   const table = useReactTable({
     data: visibleRows,
@@ -989,7 +1064,7 @@ export function TaskManagementRawDataPage() {
   });
 
   const totalWidth = table.getTotalSize();
-  const frozenColIds = ["__select", "task_no", ...frozenExtras];
+  const frozenColIds = ["__select", "__comments", "task_no", ...frozenExtras];
   const frozenWidth = table
     .getVisibleLeafColumns()
     .filter((c) => frozenColIds.includes(c.id))
@@ -1289,12 +1364,15 @@ export function TaskManagementRawDataPage() {
                 return (
                   <div
                     key={row.id}
-                    onClick={() =>
+                    onClick={() => {
+                      const rid = String((row.original as Row).id);
+                      const info = commentCounts?.[rid];
+                      if (info && info.count > 0) markRead(rid, info.lastUpdatedAt);
                       navigate({
                         to: "/closure/task-management/detail/$id",
-                        params: { id: String((row.original as Row).id) },
-                      })
-                    }
+                        params: { id: rid },
+                      });
+                    }}
                     style={{
                       transform: `translateY(${v.start}px)`,
                       height: v.size,
