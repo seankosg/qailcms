@@ -841,8 +841,3 @@ export async function parseTaskManagementExcel(
     dateIssues: audit.issues,
   } as ParseTaskManagementResult;
 }
-
-// removed duplicate closer below
-    excludedFields,
-  };
-}
