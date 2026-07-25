@@ -92,6 +92,35 @@ function exportUsersXlsx(rows: any[]) {
   URL.revokeObjectURL(url);
 }
 
+type SortKey = "name" | "team" | "login_id" | "user_type" | "role" | "active";
+
+function SortHeader({
+  label,
+  sortKey,
+  currentKey,
+  dir,
+  onClick,
+}: {
+  label: string;
+  sortKey: SortKey;
+  currentKey: SortKey;
+  dir: "asc" | "desc";
+  onClick: (key: SortKey) => void;
+}) {
+  const active = currentKey === sortKey;
+  return (
+    <TableHead
+      onClick={() => onClick(sortKey)}
+      className="cursor-pointer select-none hover:bg-muted/50"
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {active && <span className="text-xs">{dir === "asc" ? "↑" : "↓"}</span>}
+      </div>
+    </TableHead>
+  );
+}
+
 function UsersTab() {
   const list = useServerFn(listAppUsers);
   const resetPw = useServerFn(resetUserPassword);
