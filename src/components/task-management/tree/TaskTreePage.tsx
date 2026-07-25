@@ -326,6 +326,23 @@ export function TaskTreePage() {
     return { noStart, noEnd };
   }, [data, picFilter]);
 
+  // 판정별 카운트 — P.Start/P.Finish 없음과 동일 스코프(현재 discipline + PIC 필터).
+  const judgmentCounts = useMemo(() => {
+    const matchPic = (r: Row) => {
+      if (picFilter === "__all__") return true;
+      const v = (r.hdec_pic_name ?? "").trim();
+      if (picFilter === "__unassigned__") return !v;
+      return v === picFilter;
+    };
+    const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 위험: 0 };
+    for (const r of data) {
+      if (!matchPic(r)) continue;
+      const j = resolveJudgment(r, asOfDate);
+      if (j && j in counts) counts[j] += 1;
+    }
+    return counts;
+  }, [data, picFilter, asOfDate]);
+
   function goToRawDataMissing(kind: "no_plan_start" | "no_plan_end") {
     const searchParams: Record<string, string> = {
       source: "dashboard",
@@ -450,42 +467,6 @@ export function TaskTreePage() {
           </SelectContent>
         </Select>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            {(["정상", "주의", "지연", "위험"] as const).map((j) => {
-              const active = judgmentFilter.has(j);
-              return (
-                <button
-                  key={j}
-                  type="button"
-                  onClick={() =>
-                    setJudgmentFilter((cur) => {
-                      const next = new Set(cur);
-                      if (next.has(j)) next.delete(j);
-                      else next.add(j);
-                      return next;
-                    })
-                  }
-                  className={cn(
-                    "h-7 rounded-full border px-2.5 text-[11px] font-medium transition",
-                    active
-                      ? (AUTO_JUDGMENT_COLORS[j] ?? "bg-muted") + " border-transparent ring-1 ring-current"
-                      : "text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  {j}
-                </button>
-              );
-            })}
-            {judgmentFilter.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setJudgmentFilter(new Set())}
-                className="ml-1 text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
-              >
-                해제
-              </button>
-            )}
-          </div>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -552,6 +533,44 @@ export function TaskTreePage() {
             {missingPlanCounts.noEnd.toLocaleString()}
           </span>
         </button>
+        <div className="flex items-center gap-1">
+          {(["정상", "주의", "지연", "위험"] as const).map((j) => {
+            const active = judgmentFilter.has(j);
+            const count = judgmentCounts[j] ?? 0;
+            return (
+              <button
+                key={j}
+                type="button"
+                onClick={() =>
+                  setJudgmentFilter((cur) => {
+                    const next = new Set(cur);
+                    if (next.has(j)) next.delete(j);
+                    else next.add(j);
+                    return next;
+                  })
+                }
+                className={cn(
+                  "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition",
+                  active
+                    ? (AUTO_JUDGMENT_COLORS[j] ?? "bg-muted") + " border-transparent ring-1 ring-current"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+              >
+                <span>{j}</span>
+                <span className="tabular-nums font-semibold">{count.toLocaleString()}</span>
+              </button>
+            );
+          })}
+          {judgmentFilter.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setJudgmentFilter(new Set())}
+              className="ml-1 text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              해제
+            </button>
+          )}
+        </div>
       </div>
 
       {isLoading && <div className="text-sm text-muted-foreground">로딩 중…</div>}
