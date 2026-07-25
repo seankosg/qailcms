@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { dohaWallToUtcIso, toDohaDateKey } from "@/lib/time/doha";
+import { dohaWallToUtcIso, toDohaDateKey, dohaDateOnly } from "@/lib/time/doha";
 import type { AbdTeam } from "./columns";
 import type { TeamOption } from "@/lib/team/team-master";
 import { detectTeamFromText } from "@/lib/team/team-master";
@@ -91,7 +91,10 @@ function toIsoDate(v: any): string | null {
     if (v == null || v === "") return null;
     if (v instanceof Date) {
       if (isNaN(v.getTime())) return null;
-      return toDohaDateKey(v) || null;
+      // xlsx `cellDates:true` returns a Date built from the sheet's wall-clock
+      // components as LOCAL time. Read local Y/M/D directly; never touch UTC
+      // arithmetic here or the day will shift by the browser TZ offset.
+      return dohaDateOnly(v);
     }
     if (typeof v === "number") {
       if (!Number.isFinite(v) || v <= 0) return null;
@@ -99,9 +102,7 @@ function toIsoDate(v: any): string | null {
       if (!parsed) return null;
       const { y, m, d } = parsed;
       if (!y || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return null;
-      const iso = dohaWallToUtcIso(y, m, d);
-      if (!iso) return null;
-      return toDohaDateKey(iso) || null;
+      return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     }
     const s = String(v).trim();
     if (!s) return null;
