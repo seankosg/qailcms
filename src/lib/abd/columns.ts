@@ -23,6 +23,10 @@ export interface AbdColumnDef {
   editorType?: "text" | "select" | "date" | "number";
   options?: string[];
   origin?: "identity" | "r1" | "r2" | "r3" | "latest" | "system";
+  /** true 인 legacy 컬럼은 사용자 컬럼 설정에서 기본 숨김 처리 */
+  legacy?: boolean;
+  /** 기본 숨김 여부 (신규 legacy 컬럼용) */
+  hiddenByDefault?: boolean;
 }
 
 export const ABD_TEAMS = [
@@ -89,28 +93,43 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "ur_aging_days", label: "UR Aging (d)", type: "number", width: 110, group: "latest", origin: "system" },
 
   // Round 1
-  { key: "r1_drafting_plan", label: "R1 Draft P", type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
-  { key: "r1_drafting_actual", label: "R1 Draft A", type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
+  { key: "r1_draft_start_plan",   label: "R1 DS P",  type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
+  { key: "r1_draft_start_actual", label: "R1 DS A",  type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
+  { key: "r1_draft_finish_plan",  label: "R1 DF P",  type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
+  { key: "r1_draft_finish_actual",label: "R1 DF A",  type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
   { key: "r1_submission_plan", label: "R1 Sub P", type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
   { key: "r1_submission_actual", label: "R1 Sub A", type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
   { key: "r1_dar_plan", label: "R1 DAR P", type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
   { key: "r1_dar_actual", label: "R1 DAR A", type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
+  { key: "r1_response_result", label: "R1 Result", type: "badge", width: 90, group: "round1", editable: true, editorType: "select", options: ["A","B","C"], origin: "r1" },
+  { key: "r1_drafting_plan",  label: "R1 Draft P (legacy)", type: "date", width: 130, group: "round1", editable: true, editorType: "date", origin: "r1", legacy: true, hiddenByDefault: true },
+  { key: "r1_drafting_actual",label: "R1 Draft A (legacy)", type: "date", width: 130, group: "round1", editable: true, editorType: "date", origin: "r1", legacy: true, hiddenByDefault: true },
 
   // Round 2
-  { key: "r2_drafting_plan", label: "R2 Draft P", type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
-  { key: "r2_drafting_actual", label: "R2 Draft A", type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
+  { key: "r2_draft_start_plan",   label: "R2 DS P",  type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
+  { key: "r2_draft_start_actual", label: "R2 DS A",  type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
+  { key: "r2_draft_finish_plan",  label: "R2 DF P",  type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
+  { key: "r2_draft_finish_actual",label: "R2 DF A",  type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
   { key: "r2_submission_plan", label: "R2 Sub P", type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
   { key: "r2_submission_actual", label: "R2 Sub A", type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
   { key: "r2_dar_plan", label: "R2 DAR P", type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
   { key: "r2_dar_actual", label: "R2 DAR A", type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
+  { key: "r2_response_result", label: "R2 Result", type: "badge", width: 90, group: "round2", editable: true, editorType: "select", options: ["A","B","C"], origin: "r2" },
+  { key: "r2_drafting_plan",  label: "R2 Draft P (legacy)", type: "date", width: 130, group: "round2", editable: true, editorType: "date", origin: "r2", legacy: true, hiddenByDefault: true },
+  { key: "r2_drafting_actual",label: "R2 Draft A (legacy)", type: "date", width: 130, group: "round2", editable: true, editorType: "date", origin: "r2", legacy: true, hiddenByDefault: true },
 
   // Round 3
-  { key: "r3_drafting_plan", label: "R3 Draft P", type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
-  { key: "r3_drafting_actual", label: "R3 Draft A", type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
+  { key: "r3_draft_start_plan",   label: "R3 DS P",  type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
+  { key: "r3_draft_start_actual", label: "R3 DS A",  type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
+  { key: "r3_draft_finish_plan",  label: "R3 DF P",  type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
+  { key: "r3_draft_finish_actual",label: "R3 DF A",  type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
   { key: "r3_submission_plan", label: "R3 Sub P", type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
   { key: "r3_submission_actual", label: "R3 Sub A", type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
   { key: "r3_dar_plan", label: "R3 DAR P", type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
   { key: "r3_dar_actual", label: "R3 DAR A", type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
+  { key: "r3_response_result", label: "R3 Result", type: "badge", width: 90, group: "round3", editable: true, editorType: "select", options: ["A","B","C"], origin: "r3" },
+  { key: "r3_drafting_plan",  label: "R3 Draft P (legacy)", type: "date", width: 130, group: "round3", editable: true, editorType: "date", origin: "r3", legacy: true, hiddenByDefault: true },
+  { key: "r3_drafting_actual",label: "R3 Draft A (legacy)", type: "date", width: 130, group: "round3", editable: true, editorType: "date", origin: "r3", legacy: true, hiddenByDefault: true },
 
   // Segments
   { key: "doc_ax", label: "AX", type: "text", width: 70, group: "segments", origin: "identity" },
