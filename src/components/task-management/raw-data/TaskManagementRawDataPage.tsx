@@ -1064,7 +1064,7 @@ export function TaskManagementRawDataPage() {
   });
 
   const totalWidth = table.getTotalSize();
-  const frozenColIds = ["__select", "task_no", ...frozenExtras];
+  const frozenColIds = ["__select", "__comments", "task_no", ...frozenExtras];
   const frozenWidth = table
     .getVisibleLeafColumns()
     .filter((c) => frozenColIds.includes(c.id))
