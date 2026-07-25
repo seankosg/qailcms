@@ -667,10 +667,43 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
     const key = String(v).toUpperCase();
     return <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold", STATUS_COLORS[key] ?? "bg-zinc-500/15 text-zinc-700")}>{v}</span>;
   }
+  if (c.key === "current_stage") {
+    const key = String(v).toUpperCase();
+    const cls =
+      key === "APPROVED" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
+      key === "NS" ? "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300" :
+      key.startsWith("UR") ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" :
+      key.startsWith("RS") ? "bg-blue-500/15 text-blue-700 dark:text-blue-300" :
+      key.startsWith("DS") || key.startsWith("DF") ? "bg-violet-500/15 text-violet-700 dark:text-violet-300" :
+      key === "SB" ? "bg-orange-500/15 text-orange-700 dark:text-orange-300" :
+      "bg-zinc-500/15 text-zinc-700";
+    return <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold", cls)}>{String(v)}</span>;
+  }
+  if (c.key === "ur_aging_days") {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) return <span className="text-muted-foreground/50">—</span>;
+    return <UrAgingBadge days={n} />;
+  }
   if (c.key === "is_active") return v ? <Badge variant="secondary" className="text-[10px]">Active</Badge> : <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>;
   if (c.type === "date") return <span className="tabular-nums text-xs">{formatDdMmm(v)}</span>;
   if (c.type === "number") return <span className="tabular-nums text-xs">{String(v)}</span>;
   return <span className="text-xs">{String(v)}</span>;
+}
+
+function UrAgingBadge({ days }: { days: number }) {
+  const { data: settings } = useAbdSettingsQuery();
+  const tone = agingTone(days, settings);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+        AGING_TONE_CLASS[tone],
+      )}
+      title={`UR 경과 ${days}일 · 임계값 ${settings?.ur_aging_warn_days ?? "?"}/${settings?.ur_aging_late_days ?? "?"}일`}
+    >
+      {days}d
+    </span>
+  );
 }
 
 // ── Table view ─────────────────────────────────────────────────────────
