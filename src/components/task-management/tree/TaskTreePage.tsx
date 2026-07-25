@@ -122,7 +122,7 @@ export function TaskTreePage() {
     new Set(persisted?.expanded ?? []),
   );
   const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(
-    new Set(persisted?.judgmentFilter ?? []),
+    new Set(persisted?.judgmentFilter ?? ["위험"]),
   );
   const [picFilter, setPicFilter] = useState<string>(
     persisted?.picFilter ?? "__all__",
