@@ -43,6 +43,8 @@ export interface AbdItem {
   r3_dar_plan: string | null; r3_dar_actual: string | null;
   is_active: boolean;
   status_group: "approved" | "in_progress" | "not_started";
+  current_stage: string | null;
+  ur_aging_days: number | null;
   data_date: string | null;
   updated_at: string | null;
   [key: string]: any;
