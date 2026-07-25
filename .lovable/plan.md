@@ -1,48 +1,69 @@
-## 계획: My Team Work Space (MTWS) 페이지 구현
+# MWS/MTWS Snag 데이터 근원 해결 (Step 1 + Step 2 + 전체 탭 리다이렉트)
 
-### 개념
-- **MWS**: 로그인 사용자가 **HDEC PIC**로 지정된 항목만 필터 (개인 담당).
-- **MTWS**: 로그인 사용자의 **team**과 동일한 team의 항목을 필터 (팀 담당).
-- **Admin / d-superuser**: MWS와 동일하게 필터 없이 **전체 조회**.
-- MWS의 UI/컴포넌트(오늘/지연/임박/전체 탭, 좌측 컨텍스트 컬럼, KPI 카드, Columns 메뉴, DataDatePicker 등)를 그대로 재사용. 필터 축만 `hdec_pic_name` → `team`으로 교체.
+## 목표
+- Admin/일반 사용자 모두 MWS/MTWS의 Snag(SM) 카드에서 오늘/지연/임박/진행중 카운트가 **정확**하도록 개선.
+- 대용량(수만 건)에서도 브라우저 부담 없이 **서버에서 판정/카운트**.
+- **전체(All) 탭은 UI에 유지**하되, 클릭 시 즉시 **SM Raw Data 페이지로 이동** (별도 안내 문구 없음, PIC/Team 필터 자동 적용).
 
-### 1. 데이터 훅 확장 (`src/hooks/useMyWorkspaceData.ts`)
-- 기존 `useMyTasks / useMySnags / useMyAbd`에 파라미터 `mode: "pic" | "team"` 추가.
-  - `pic` 모드: 현재대로 `hdec_pic_name` eq.
-  - `team` 모드: `team` eq (사용자 `profiles.team` 값 사용).
-  - Admin/d-superuser: mode와 무관하게 필터 없이 전체 로드(현행 동일).
-- `queryKey`에 `mode`와 필터값을 포함해 캐시 분리.
-- 3개 raw 테이블(`task_management_raw`, `defect_items_raw`, `abd_items_raw`) 모두 `team` 컬럼 존재 확인 완료.
+## 범위
+- 대상 카드: MWS(`scope="pic"`), MTWS(`scope="team"`)의 **Snag(SM)** 컴포넌트만.
+- TM, ABD 카드는 이번 범위에서 **변경 없음**.
 
-### 2. 신규 라우트 (`src/routes/_authenticated/my-team-work-space.tsx`)
-- `MyWorkSpacePage`를 그대로 렌더링, `scope="team"` prop 전달.
-- `head()`에 팀 워크스페이스용 title/description.
+## 구현 단계
 
-### 3. 페이지 컴포넌트 (`src/components/my-work-space/MyWorkSpacePage.tsx`)
-- `scope: "pic" | "team"` prop 신설 (default `"pic"`).
-- 상단 제목:
-  - `pic`: "My Work Space"
-  - `team`: "My Team Work Space — {팀명}" (admin은 "My Team Work Space — 전체")
-- 훅 호출:
-  - `pic` 모드: 기존대로 `me.hdec_pic_name` 사용.
-  - `team` 모드: `me.team` 사용. Admin/d-superuser는 훅 내부에서 필터 무시하고 전체 조회.
-  - Non-admin이면서 `me.team`이 비어있으면 "소속 팀 정보가 없습니다" 안내.
-- Columns 저장 키(`useMwsColumnPrefs`)에 scope 접미사 추가 (`mws:tm:pic` vs `mws:tm:team`)하여 독립 저장.
+### Step 1 — 즉시 증상 완화 (Snag 상한 제거)
+- `src/hooks/useMyWorkspaceData.ts`
+  - `useMyDefects`가 사용하는 `TM_LIMIT_USER=2000 / TM_LIMIT_ADMIN=5000` 상한 제거 (Snag만, TM/ABD는 유지).
+  - 페이지 루프를 상한 없이 끝까지 진행 (마지막 페이지 감지 시 종료).
+- 목적: Step 2 배포 전이라도 Admin이 최소한 5,000건 상한에 걸려 잘리는 문제를 해소.
 
-### 4. 사이드바 항목 추가 (`src/components/layout/AppLayout.tsx`)
-- "My Work Space" 바로 아래에 "My Team Work Space" 메뉴 항목 추가.
-- 아이콘: 팀/그룹을 상징하는 lucide `Users` 아이콘 사용 (추후 3D 아이콘 교체 가능).
-- 접힘/펼침 상태 모두 반영, Guest 노출 정책은 MWS와 동일.
+### Step 2 — 서버 판정 RPC 도입 (근본 해결)
+DB에서 오늘/지연/임박/진행중을 계산해 **필요한 행만** 반환.
 
-### 5. 검증 항목
-- 타입체크 통과.
-- 일반 사용자: 본인 team의 항목만 노출.
-- Admin/d-superuser: 전체 항목 노출.
-- team이 없는 일반 사용자: 빈 상태 안내.
-- Columns 설정이 MWS/MTWS 간 상호 침범 없이 저장·복원.
-- 오늘/지연/임박 필터 규칙과 좌측 컨텍스트 컬럼은 MWS와 완전 동일 동작.
+#### 2-1. RPC 신설 (migration)
+- `sm_my_workspace_counts(_mode text, _filter_value text, _today date)`
+  - 반환: `today_count`, `delayed_count`, `upcoming_count`, `in_progress_count`, `completed_count`, `total_count`.
+  - 판정 로직은 프론트의 `smIsCompleted / smIsDelayed / smIsInProgress / smIsUpcoming / smTodayKinds`와 1:1 매칭.
+- `sm_my_workspace_rows(_mode text, _filter_value text, _today date, _bucket text, _limit int, _offset int)`
+  - `_bucket ∈ ('today','delayed','upcoming','in_progress','completed')`.
+  - 각 버킷에 해당하는 행만 반환 (기존 `SmMyRow`와 동일한 컬럼셋).
+  - Admin(`_mode='admin'`)일 때 필터 미적용, 아니면 `hdec_pic_name` 또는 `team` 기준 필터.
+- 판정 상수:
+  - `SM_CLOSED = ('closed','verified')`, `SM_RECTIFIED = ('rectified','complete','completed')`, 진행중 상태 문자열도 SQL LOWER/TRIM으로 동일하게 매칭.
+  - `upcoming_days = 3` (프론트 기본값과 동일).
+- GRANT: `authenticated`, `service_role`.
+- RLS: `defect_items_raw`의 기존 정책을 그대로 상속 (SECURITY INVOKER).
 
-### 6. 변경하지 않는 것
-- MWS의 기존 로직·판정 기준·필터 정의.
-- Raw 테이블 스키마, RLS, RPC.
-- 최초 접속 리다이렉트(`/my-work-space` 유지).
+#### 2-2. 훅 재설계
+- `src/hooks/useMyWorkspaceData.ts`
+  - `useMyDefectsCounts(mode, filterValue, isAdmin, today)` → `sm_my_workspace_counts` 호출.
+  - `useMyDefectsBucket(mode, filterValue, isAdmin, today, bucket, enabled)` → `sm_my_workspace_rows` 호출 (탭 활성 시에만 fetch).
+  - 기존 `useMyDefects` 훅은 **전체 탭 제거가 아닌 리다이렉트 방식**을 채택하므로, 다른 사용처 확인 후 남겨두거나 내부적으로 카운트/버킷 조합으로 대체.
+
+#### 2-3. Snag 카드 UI 갱신
+- `src/components/my-work-space/*` (Snag 담당 컴포넌트, 예: `ModuleKpiCard` / `ModuleRowList` 및 상위 페이지)
+  - 탭별 카운트는 `sm_my_workspace_counts` 결과 사용.
+  - 각 탭의 리스트는 해당 탭이 선택된 순간에만 `sm_my_workspace_rows`로 fetch (staleTime 60초 유지).
+
+### Step 3 — 전체(All) 탭 리다이렉트
+- MWS/MTWS의 Snag 카드에서 **탭 UI 자체는 유지**.
+- "전체(All)" 탭을 클릭하면:
+  - `scope="pic"` → `/closure/snag-management/raw-data?hdecPic=<현재 사용자>`
+  - `scope="team"` → `/closure/snag-management/raw-data?team=<현재 팀>`
+  - Admin: 별도 필터 없이 `/closure/snag-management/raw-data`.
+- 라우팅은 `@tanstack/react-router`의 `useNavigate` 또는 `<Link to params search>` 사용, 별도 안내 문구/모달 없음.
+- 전체 탭에서는 카운트/리스트를 fetch하지 않음 (클릭 시 즉시 이동).
+
+## 검증
+- Admin 로그인 후 MTWS Snag 카드:
+  - 오늘/지연/임박 카운트가 SM Raw Data의 실제 값과 일치하는지 spot check.
+  - 각 탭 클릭 시 서버에서 해당 버킷만 내려오는지 네트워크 확인.
+  - "전체" 탭 클릭 시 SM Raw Data로 이동, 팀/PIC 필터가 URL search에 반영되는지 확인.
+- 일반 사용자(PIC) 로그인:
+  - MWS Snag 카드가 본인 항목만, 카운트/리스트 정확성 확인.
+- 5,000건 상한 이슈 재현되지 않는지 확인.
+
+## 기술 노트
+- 서버 판정으로 옮기는 유일한 모듈은 SM. TM/ABD의 기존 `useMyTasks / useMyAbd`는 변경하지 않음.
+- 데이터 정합성을 위해 `today`는 프론트에서 `todayInDoha()`로 계산해 RPC에 전달 (서버 TZ 의존 배제).
+- 마이그레이션은 순수 `CREATE OR REPLACE FUNCTION` + `GRANT`만 포함 (테이블 변경 없음).
