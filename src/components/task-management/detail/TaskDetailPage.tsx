@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThread";
 import { useServerFn } from "@tanstack/react-start";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
+import { canEditRawRow } from "@/lib/auth/roles";
 
 const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   id: "Identification",
@@ -84,6 +85,7 @@ export function TaskDetailPage() {
   const rowOwner = String(row?.hdec_pic_name ?? "").trim().toLowerCase();
   const isOwner = !!myPic && !!rowOwner && myPic === rowOwner;
   const canEditOwnerFields = canEditOwnerFieldsBase || isOwner;
+  const canEditRow = canEditRawRow(user as any, "task_management_raw", row);
 
   const onFieldSaved = () => {
     refetch();
@@ -100,9 +102,10 @@ export function TaskDetailPage() {
           <span className="truncate font-mono text-lg font-semibold tracking-tight">{row.task_no ?? "—"}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {isAdmin ? (
+          {canEditRow ? (
             <Badge className="h-5 text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-              <ShieldCheck className="mr-1 h-3 w-3" /> 편집
+              <ShieldCheck className="mr-1 h-3 w-3" />
+              {isAdmin || isSuperUser || isDSuperUser ? " 편집" : " Owner 편집"}
             </Badge>
           ) : (
             <Badge className="h-5 text-[10px] bg-zinc-500/15 text-zinc-700 dark:text-zinc-300">
@@ -177,7 +180,7 @@ export function TaskDetailPage() {
                   const isTeamOverride = c.key === "team" && canEditOwnerFields;
                   const isDataDateOverride = c.key === "data_date" && canEditOwnerFields;
                   let effectiveColumn: TmColumnDef = c;
-                  let effectiveCanEdit = isAdmin;
+                  let effectiveCanEdit = canEditRow;
                   let useOwnerSave = false;
                   if (isTaskNoOverride) {
                     effectiveColumn = { ...c, editable: true, editorType: "text" };
