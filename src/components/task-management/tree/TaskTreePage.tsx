@@ -326,6 +326,23 @@ export function TaskTreePage() {
     return { noStart, noEnd };
   }, [data, picFilter]);
 
+  // 판정별 카운트 — P.Start/P.Finish 없음과 동일 스코프(현재 discipline + PIC 필터).
+  const judgmentCounts = useMemo(() => {
+    const matchPic = (r: Row) => {
+      if (picFilter === "__all__") return true;
+      const v = (r.hdec_pic_name ?? "").trim();
+      if (picFilter === "__unassigned__") return !v;
+      return v === picFilter;
+    };
+    const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 위험: 0 };
+    for (const r of data) {
+      if (!matchPic(r)) continue;
+      const j = resolveJudgment(r, asOfDate);
+      if (j && j in counts) counts[j] += 1;
+    }
+    return counts;
+  }, [data, picFilter, asOfDate]);
+
   function goToRawDataMissing(kind: "no_plan_start" | "no_plan_end") {
     const searchParams: Record<string, string> = {
       source: "dashboard",
