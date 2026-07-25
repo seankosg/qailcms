@@ -95,6 +95,7 @@ function Inner() {
     setFileDataDateOverride,
     setFileSheet,
     setFileExcludedHeaders,
+    setFileDateOverrides,
     setFileDuplicateStrategy,
     setFileDuplicateSelection,
     resolveDuplicates,
@@ -280,6 +281,7 @@ function Inner() {
                 onSheetChange={(sheet) => setFileSheet(f.id, sheet)}
                 onOpenDuplicateReview={() => setDupDialogFileId(f.id)}
                 onToggleAiClassify={(v) => setFileAiClassifyEnabled(f.id, v)}
+                onDateOverridesApply={(ov) => setFileDateOverrides(f.id, ov)}
               />
             ))}
           </CardContent>
