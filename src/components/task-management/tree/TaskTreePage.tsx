@@ -121,6 +121,8 @@ export function TaskTreePage() {
   const [expanded, setExpanded] = useState<Set<string>>(
     new Set(persisted?.expanded ?? []),
   );
+  // 저장된 펼침 상태가 없다면 데이터 로드 후 자동으로 전체 펴기.
+  const hasPersistedExpanded = !!persisted?.expanded;
   const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(
     new Set(persisted?.judgmentFilter ?? ["위험"]),
   );
