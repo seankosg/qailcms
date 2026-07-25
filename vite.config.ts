@@ -17,6 +17,7 @@ export default defineConfig({
   vite: {
     define: {
       __APP_BUILD_ID__: JSON.stringify(buildId),
+      "import.meta.env.VITE_APP_BUILD_ID": JSON.stringify(buildId),
     },
   },
 });
