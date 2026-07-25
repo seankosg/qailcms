@@ -568,6 +568,7 @@ function FileRow({
   onPolicyChange: (p: ConflictPolicy) => void;
   onRunPreflight: () => void;
   onOpenConflict: () => void;
+  onDateOverridesApply: (overrides: Record<string, string>) => void | Promise<void>;
 }) {
   const badge = statusBadge[f.status];
   const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
