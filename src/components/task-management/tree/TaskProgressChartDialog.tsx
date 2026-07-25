@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import { getTaskProgressChartDetail } from "@/lib/task-management/progress-chart.functions";
 import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDrawer";
+import { formatDdMmm, formatDdMmmYyyy } from "@/lib/time/doha";
 
 interface Props {
   open: boolean;
@@ -120,6 +121,7 @@ export function TaskProgressChartDialog({
                     dataKey="d"
                     tick={{ fontSize: 11 }}
                     minTickGap={30}
+                    tickFormatter={(v: string) => formatDdMmm(v) || v}
                   />
                   <YAxis
                     domain={[0, 100]}
@@ -132,7 +134,7 @@ export function TaskProgressChartDialog({
                       `${Number(value).toFixed(1)}%`,
                       name === "plan" ? "계획" : "실적",
                     ]}
-                    labelFormatter={(l) => `날짜: ${l}`}
+                    labelFormatter={(l) => `날짜: ${formatDdMmmYyyy(String(l)) || l}`}
                   />
                   <Legend
                     formatter={(v) => (v === "plan" ? "계획" : "실적")}

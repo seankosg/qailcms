@@ -44,6 +44,7 @@ import {
   type FieldLog,
 } from "@/components/import/FieldLogTable";
 import { Fragment } from "react";
+import { formatDdMmmYyyy, formatDdMmmYyyyHm } from "@/lib/time/doha";
 
 type Kind = RollbackKind;
 
@@ -139,8 +140,7 @@ const CFG = {
 
 function fmtDateTime(iso: string | null | undefined) {
   if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleString("ko-KR", { hour12: false });
+  return formatDdMmmYyyyHm(iso) || "—";
 }
 
 function fmtDuration(startedAt: string, finishedAt: string | null) {
@@ -540,7 +540,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                             className="text-xs cursor-pointer whitespace-nowrap"
                             onClick={() => loadDetail(b.id)}
                           >
-                            {b.data_date ? new Date(b.data_date).toLocaleDateString("ko-KR") : "—"}
+                            {b.data_date ? (formatDdMmmYyyy(b.data_date) || "—") : "—"}
                           </TableCell>
                           <TableCell
                             className="text-xs cursor-pointer whitespace-nowrap"
