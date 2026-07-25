@@ -3,10 +3,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CommentsThread, ABD_CATEGORIES } from "@/components/shared/CommentsThread";
 import { formatDdMmmYyyy } from "@/lib/time/doha";
+import { AbdEditCellPopover } from "./AbdEditCellPopover";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { canEditRawRow } from "@/lib/auth/roles";
+import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "@/components/abd/dashboard/AbdAgingSettingsPopover";
 
 interface AbdItemRow {
   id: string;
@@ -35,17 +39,33 @@ interface ChangeLogRow {
   changed_by: string | null;
 }
 
-const ROUND_FIELDS: { round: 1 | 2 | 3; stage: "Drafting" | "Submission" | "DAR"; plan: string; actual: string }[] = [
-  { round: 1, stage: "Drafting",   plan: "r1_drafting_plan",   actual: "r1_drafting_actual" },
-  { round: 1, stage: "Submission", plan: "r1_submission_plan", actual: "r1_submission_actual" },
-  { round: 1, stage: "DAR",        plan: "r1_dar_plan",        actual: "r1_dar_actual" },
-  { round: 2, stage: "Drafting",   plan: "r2_drafting_plan",   actual: "r2_drafting_actual" },
-  { round: 2, stage: "Submission", plan: "r2_submission_plan", actual: "r2_submission_actual" },
-  { round: 2, stage: "DAR",        plan: "r2_dar_plan",        actual: "r2_dar_actual" },
-  { round: 3, stage: "Drafting",   plan: "r3_drafting_plan",   actual: "r3_drafting_actual" },
-  { round: 3, stage: "Submission", plan: "r3_submission_plan", actual: "r3_submission_actual" },
-  { round: 3, stage: "DAR",        plan: "r3_dar_plan",        actual: "r3_dar_actual" },
-];
+type StageKey = "draft_start" | "draft_finish" | "submission" | "dar";
+const STAGE_LABELS: Record<StageKey, string> = {
+  draft_start: "Draft Start (DS)",
+  draft_finish: "Draft Finish (DF)",
+  submission: "Submission",
+  dar: "DAR / Response",
+};
+const STAGES: StageKey[] = ["draft_start", "draft_finish", "submission", "dar"];
+
+function stageFields(round: 1 | 2 | 3, stage: StageKey): { plan: string; actual: string } {
+  return { plan: `r${round}_${stage}_plan`, actual: `r${round}_${stage}_actual` };
+}
+
+function resultField(round: 1 | 2 | 3): string {
+  return `r${round}_response_result`;
+}
+
+const RESULT_TONE: Record<string, string> = {
+  A: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
+  B: "bg-amber-500/15 text-amber-700 border-amber-500/30",
+  C: "bg-rose-500/15 text-rose-700 border-rose-500/30",
+};
+
+function normalizeResult(v: any): "A" | "B" | "C" | null {
+  const s = (v ?? "").toString().trim().toUpperCase();
+  return s === "A" || s === "B" || s === "C" ? s : null;
+}
 
 function fmtDate(v: string | null | undefined) {
   if (!v) return "—";
@@ -61,6 +81,8 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
   const [item, setItem] = useState<AbdItemRow | null>(null);
   const [changes, setChanges] = useState<ChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const { data: me } = useCurrentUser();
+  const { data: settings } = useAbdSettingsQuery();
 
   useEffect(() => {
     if (!id) { setItem(null); setChanges([]); return; }
@@ -87,15 +109,33 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
     return () => { cancel = true; };
   }, [id]);
 
+  const reloadItem = async () => {
+    if (!id) return;
+    const { data: it } = await (supabase as any).from("abd_items_raw").select("*").eq("id", id).maybeSingle();
+    setItem(it as any);
+  };
+
+  const canEdit = !!item && canEditRawRow(me as any, "abd_items_raw", item as any);
+  const aging = item?.ur_aging_days as number | null | undefined;
+  const tone = agingTone(aging ?? null, settings);
+
   return (
     <Sheet open={!!id} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="text-base">
             {item ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono">{item.abd_number}</span>
                 {!item.is_active && <Badge variant="secondary">Inactive</Badge>}
+                {item.current_stage && (
+                  <Badge variant="outline" className="text-[10px]">{item.current_stage}</Badge>
+                )}
+                {typeof aging === "number" && aging > 0 && (
+                  <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold", AGING_TONE_CLASS[tone])}>
+                    UR {aging}d
+                  </span>
+                )}
               </div>
             ) : "Loading..."}
           </SheetTitle>
@@ -107,7 +147,18 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
           </div>
         ) : !item ? (
           <div className="py-16 text-center text-muted-foreground text-sm">데이터가 없습니다.</div>
-        ) : (
+        ) : (() => {
+          const alerts: string[] = [];
+          if (item.rs_result_missing) alerts.push("Response 결과 코드(A/B/C)가 누락되었습니다.");
+          ([1, 2] as const).forEach((r) => {
+            const res = normalizeResult((item as any)[resultField(r)]);
+            if (res === "B" || res === "C") {
+              const nextR = (r + 1) as 2 | 3;
+              const nextDS = (item as any)[stageFields(nextR, "draft_start").plan];
+              if (!nextDS) alerts.push(`R${r} 결과 ${res} → R${nextR} 계획(DS/DF/Sub/DAR)이 필요합니다.`);
+            }
+          });
+          return (
           <div className="mt-4 space-y-6 text-xs">
             {/* Summary */}
             <section className="grid grid-cols-2 gap-x-4 gap-y-2">
@@ -123,39 +174,140 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
               <div><span className="text-muted-foreground">Approval Date</span><div className="font-medium">{fmtDate(item.approval_date)}</div></div>
             </section>
 
+            {alerts.length > 0 && (
+              <section className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 space-y-1">
+                {alerts.map((a, i) => (
+                  <div key={i} className="flex items-start gap-1.5 text-amber-800">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>{a}</span>
+                  </div>
+                ))}
+              </section>
+            )}
+
             <Separator />
 
             {/* Rounds Timeline */}
             <section>
               <h3 className="font-semibold text-sm mb-2">Rounds Timeline</h3>
-              <div className="rounded-md border overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left px-2 py-1.5 w-16">Round</th>
-                      <th className="text-left px-2 py-1.5 w-24">Stage</th>
-                      <th className="text-left px-2 py-1.5">Plan</th>
-                      <th className="text-left px-2 py-1.5">Actual</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ROUND_FIELDS.map((rf) => {
-                      const plan = (item as any)[rf.plan] as string | null;
-                      const actual = (item as any)[rf.actual] as string | null;
-                      const late = isLate(plan, actual);
-                      return (
-                        <tr key={`${rf.round}-${rf.stage}`} className="border-t">
-                          <td className="px-2 py-1">R{rf.round}</td>
-                          <td className="px-2 py-1">{rf.stage}</td>
-                          <td className="px-2 py-1 text-muted-foreground">{fmtDate(plan)}</td>
-                          <td className={cn("px-2 py-1", actual ? "font-medium" : "text-muted-foreground", late && "text-destructive")}>{fmtDate(actual)}{late && " ⚠"}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="space-y-3">
+                {([1, 2, 3] as const).map((r) => {
+                  const result = normalizeResult((item as any)[resultField(r)]);
+                  const hasAnyData = STAGES.some((s) => {
+                    const f = stageFields(r, s);
+                    return (item as any)[f.plan] || (item as any)[f.actual];
+                  }) || !!result;
+                  const prevResult = r > 1 ? normalizeResult((item as any)[resultField((r - 1) as 1 | 2)]) : "B"; // R1 항상 활성
+                  const activated = r === 1 || prevResult === "B" || prevResult === "C" || hasAnyData;
+                  return (
+                    <div key={r} className={cn(
+                      "rounded-md border overflow-hidden",
+                      !activated && "opacity-60",
+                    )}>
+                      <div className="flex items-center justify-between bg-muted/50 px-2 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">Round {r}</span>
+                          {!activated && <Badge variant="outline" className="text-[10px]">비활성</Badge>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">Response Result</span>
+                          {canEdit ? (
+                            <AbdEditCellPopover
+                              id={item.id}
+                              field={resultField(r)}
+                              label={`R${r} Response Result`}
+                              editorType="select"
+                              options={["A", "B", "C"]}
+                              currentValue={result}
+                              onSaved={() => void reloadItem()}
+                            >
+                              {result ? (
+                                <span className={cn("inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-bold", RESULT_TONE[result])}>{result}</span>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px]">—</span>
+                              )}
+                            </AbdEditCellPopover>
+                          ) : result ? (
+                            <span className={cn("inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-bold", RESULT_TONE[result])}>{result}</span>
+                          ) : (
+                            <span className="text-muted-foreground text-[10px]">—</span>
+                          )}
+                        </div>
+                      </div>
+                      <table className="w-full text-xs">
+                        <thead className="bg-background border-t">
+                          <tr>
+                            <th className="text-left px-2 py-1 w-40">Stage</th>
+                            <th className="text-left px-2 py-1">Plan</th>
+                            <th className="text-left px-2 py-1">Actual</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {STAGES.map((s) => {
+                            const f = stageFields(r, s);
+                            const plan = (item as any)[f.plan] as string | null;
+                            const actual = (item as any)[f.actual] as string | null;
+                            const late = isLate(plan, actual);
+                            const planCell = (
+                              <span className={cn(!plan && "text-muted-foreground")}>{fmtDate(plan)}</span>
+                            );
+                            const actualCell = (
+                              <span className={cn(actual ? "font-medium" : "text-muted-foreground", late && "text-destructive")}>
+                                {fmtDate(actual)}{late && " ⚠"}
+                              </span>
+                            );
+                            return (
+                              <tr key={s} className="border-t">
+                                <td className="px-2 py-1">{STAGE_LABELS[s]}</td>
+                                <td className="px-2 py-1">
+                                  {canEdit ? (
+                                    <AbdEditCellPopover
+                                      id={item.id}
+                                      field={f.plan}
+                                      label={`R${r} ${STAGE_LABELS[s]} Plan`}
+                                      editorType="date"
+                                      currentValue={plan}
+                                      onSaved={() => void reloadItem()}
+                                    >{planCell}</AbdEditCellPopover>
+                                  ) : planCell}
+                                </td>
+                                <td className="px-2 py-1">
+                                  {canEdit ? (
+                                    <AbdEditCellPopover
+                                      id={item.id}
+                                      field={f.actual}
+                                      label={`R${r} ${STAGE_LABELS[s]} Actual`}
+                                      editorType="date"
+                                      currentValue={actual}
+                                      onSaved={() => void reloadItem()}
+                                    >{actualCell}</AbdEditCellPopover>
+                                  ) : actualCell}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })}
               </div>
             </section>
+
+            {/* Aconex Sync */}
+            {(item.aconex_status_raw || item.aconex_review_status_raw || item.aconex_last_synced_at || item.aconex_date_modified) && (
+              <section>
+                <h3 className="font-semibold text-sm mb-2 flex items-center gap-1.5">
+                  Aconex <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                </h3>
+                <div className="rounded-md border p-2 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  <div><span className="text-muted-foreground">Status</span><div className="font-medium">{item.aconex_status_raw ?? "—"}</div></div>
+                  <div><span className="text-muted-foreground">Review</span><div className="font-medium">{item.aconex_review_status_raw ?? "—"}</div></div>
+                  <div><span className="text-muted-foreground">Date Modified</span><div className="font-medium">{fmtDate(item.aconex_date_modified)}</div></div>
+                  <div><span className="text-muted-foreground">Last Synced</span><div className="font-medium">{item.aconex_last_synced_at ? new Date(item.aconex_last_synced_at).toLocaleString("ko-KR", { hour12: false }) : "—"}</div></div>
+                </div>
+              </section>
+            )}
 
             {/* Change Log */}
             <section>
@@ -212,7 +364,8 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
               </details>
             </section>
           </div>
-        )}
+          );
+        })()}
       </SheetContent>
     </Sheet>
   );
