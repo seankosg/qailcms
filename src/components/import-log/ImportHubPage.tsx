@@ -4,6 +4,7 @@ import { TaskManagementImportPage } from "@/components/task-management/import/Ta
 import { DefectManagementImportPage } from "@/components/defect-management/import/DefectManagementImportPage";
 import { SparePartImportPage } from "@/components/spare-part/import/SparePartImportPage";
 import { AbdImportPage } from "@/components/abd/import/AbdImportPage";
+import { AbdAconexImportPage } from "@/components/abd/import/AbdAconexImportPage";
 import { DmrImportPage } from "@/components/resource/dmr/DmrImportPage";
 import { getRouteApi } from "@tanstack/react-router";
 
@@ -45,7 +46,7 @@ export function ImportHubPage() {
           <SparePartImportPage />
         </TabsContent>
         <TabsContent value="abd" className="mt-4">
-          <AbdImportPage />
+          <AbdImportSection />
         </TabsContent>
         <TabsContent value="dmr" className="mt-4">
           <DmrImportPage />
@@ -67,5 +68,22 @@ function ComingSoonCard() {
       </CardHeader>
       <CardContent className="text-xs text-muted-foreground">Coming soon</CardContent>
     </Card>
+  );
+}
+
+function AbdImportSection() {
+  return (
+    <Tabs defaultValue="hdec" className="w-full">
+      <TabsList>
+        <TabsTrigger value="hdec">HDEC 계획 (Round/Draft/Submission)</TabsTrigger>
+        <TabsTrigger value="aconex">Aconex 실적 (Status Sync)</TabsTrigger>
+      </TabsList>
+      <TabsContent value="hdec" className="mt-4">
+        <AbdImportPage />
+      </TabsContent>
+      <TabsContent value="aconex" className="mt-4">
+        <AbdAconexImportPage />
+      </TabsContent>
+    </Tabs>
   );
 }

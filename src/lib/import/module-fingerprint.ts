@@ -58,6 +58,9 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Submission",
       "DAR Response",
       "Latest Status",
+      // Aconex Export anchors — 같은 ABD 페이지로 유입 허용
+      "Review Status",
+      "Date Modified",
     ],
     signature: [
       "Document No",
@@ -75,8 +78,12 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Discipline",
       "Package",
       "Title",
+      "Review Status",
+      "Date Modified",
+      "Created By",
+      "Revision Date",
     ],
-    filenameHints: [/abd/i, /as[\s_-]?built/i],
+    filenameHints: [/abd/i, /as[\s_-]?built/i, /aconex/i, /exportdocs/i],
   },
   sm: {
     anchors: [
