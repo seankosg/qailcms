@@ -43,7 +43,7 @@ function ChangePasswordPage() {
       await mark({});
       await qc.invalidateQueries({ queryKey: ["current-user"] });
       toast.success("비밀번호가 변경되었습니다");
-      navigate({ to: "/closure/spare-part/raw-data", replace: true });
+      navigate({ to: "/my-work-space", replace: true });
     } catch (err: any) {
       toast.error(err?.message ?? "변경에 실패했습니다");
     } finally {
