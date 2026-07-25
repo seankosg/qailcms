@@ -226,6 +226,41 @@ export function TaskTreePage() {
     });
   }, [filtered]);
 
+  // Header 강조: 현재 discipline + PIC 필터가 적용된 데이터 기준
+  // Plan Start / Plan End 가 비어있는 태스크 갯수
+  const missingPlanCounts = useMemo(() => {
+    const matchPic = (r: Row) => {
+      if (picFilter === "__all__") return true;
+      const v = (r.hdec_pic_name ?? "").trim();
+      if (picFilter === "__unassigned__") return !v;
+      return v === picFilter;
+    };
+    let noStart = 0;
+    let noEnd = 0;
+    for (const r of data) {
+      if (!matchPic(r)) continue;
+      if (!r.plan_start) noStart += 1;
+      if (!r.plan_end) noEnd += 1;
+    }
+    return { noStart, noEnd };
+  }, [data, picFilter]);
+
+  function goToRawDataMissing(kind: "no_plan_start" | "no_plan_end") {
+    const searchParams: Record<string, string> = {
+      source: "dashboard",
+      mode: kind,
+      taskScope: "all",
+      discipline,
+    };
+    if (picFilter !== "__all__" && picFilter !== "__unassigned__") {
+      searchParams.hdec_pic_name = picFilter;
+    }
+    navigate({
+      to: "/closure/task-management/raw-data",
+      search: searchParams as any,
+    });
+  }
+
   function toggle(taskNo: string) {
     setExpanded((cur) => {
       const next = new Set(cur);
