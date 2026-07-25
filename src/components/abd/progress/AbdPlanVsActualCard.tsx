@@ -75,9 +75,10 @@ export function AbdPlanVsActualCard({
     });
 
   const stageLabelShort: Record<Stage, string> = {
-    draft: STAGE_LABELS.draft,
-    submission: STAGE_LABELS.submission,
-    dar: STAGE_LABELS.dar,
+    draft_start:  STAGE_LABELS.draft_start,
+    draft_finish: STAGE_LABELS.draft_finish,
+    submission:   STAGE_LABELS.submission,
+    dar:          STAGE_LABELS.dar,
   };
 
   const seriesByKey = new Map<string, (typeof scurve.series)[number]>();
