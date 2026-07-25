@@ -1,0 +1,228 @@
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+export type InboxModule = "tm" | "sm" | "abd" | "sp";
+
+export interface InboxComment {
+  id: string;
+  module: InboxModule;
+  category: string | null;
+  message: string;
+  author_user_id: string | null;
+  author_name: string | null;
+  created_at: string;
+  updated_at: string;
+  edited: boolean;
+  parent_id: string; // task_raw_id / defect_raw_id / abd_item_id / doc_ref
+  parent_ref: string | null; // 표시용 short id (task_no, source_issue_no, abd_number, doc_ref)
+  parent_label: string | null; // 표시용 부제 (task_name, location_raw 등)
+}
+
+interface InboxScope {
+  userId: string | null | undefined;
+  scope: "pic" | "team";
+  filterValue: string | null; // hdec_pic_name 또는 team 이름
+  isAdmin: boolean;
+}
+
+/** 각 모듈별 부모 ID 목록을 담당 기준으로 조회. Admin이면 null 반환(= 전체). */
+async function fetchOwnedParentIds(scope: InboxScope) {
+  const { isAdmin, filterValue, scope: mode, userId } = scope;
+
+  async function idsFrom<T extends string>(
+    table: T,
+    idCol: string,
+    labelCols: string,
+    filter: (q: any) => any,
+  ): Promise<Array<Record<string, any>>> {
+    let q = (supabase as any).from(table).select(`${idCol},${labelCols}`).limit(5000);
+    q = filter(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as any[];
+  }
+
+  const tmParents = isAdmin
+    ? null
+    : await idsFrom("task_management_raw", "id", "task_no,task_name", (q) =>
+        mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
+      );
+  const smParents = isAdmin
+    ? null
+    : await idsFrom("defect_items_raw", "id", "source_issue_no,location_raw", (q) =>
+        mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
+      );
+  const abdParents = isAdmin
+    ? null
+    : await idsFrom("abd_items_raw", "id", "abd_number,document_title", (q) =>
+        mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
+      );
+  const spParents = isAdmin
+    ? null
+    : await idsFrom("spare_parts_raw", "doc_ref", "subject,plot", (q) =>
+        mode === "team" ? q.eq("team", filterValue) : q.eq("owner_user_id", userId ?? "__none__"),
+      );
+
+  const map = (rows: Array<Record<string, any>> | null, idKey: string, refKey: string, labelKey: string) => {
+    if (!rows) return null;
+    const m = new Map<string, { ref: string | null; label: string | null }>();
+    for (const r of rows) {
+      m.set(String(r[idKey]), {
+        ref: r[refKey] != null ? String(r[refKey]) : null,
+        label: r[labelKey] != null ? String(r[labelKey]) : null,
+      });
+    }
+    return m;
+  };
+
+  return {
+    tm: map(tmParents, "id", "task_no", "task_name"),
+    sm: map(smParents, "id", "source_issue_no", "location_raw"),
+    abd: map(abdParents, "id", "abd_number", "document_title"),
+    sp: map(spParents, "doc_ref", "subject", "plot"),
+  };
+}
+
+async function fetchComments(scope: InboxScope, limit: number): Promise<InboxComment[]> {
+  const parents = await fetchOwnedParentIds(scope);
+
+  async function loadTable(
+    table: string,
+    parentCol: string,
+    messageCol: string,
+    categoryCol: string | null,
+    mod: InboxModule,
+    parentMap: Map<string, { ref: string | null; label: string | null }> | null,
+  ): Promise<InboxComment[]> {
+    if (parentMap && parentMap.size === 0) return [];
+    const cols = [
+      "id",
+      parentCol,
+      messageCol,
+      categoryCol ?? "'general' as category",
+      "author_user_id",
+      "edited",
+      "created_at",
+      "updated_at",
+    ].join(",");
+    let q = (supabase as any)
+      .from(table)
+      .select(cols)
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+    if (parentMap) {
+      const ids = Array.from(parentMap.keys());
+      if (ids.length === 0) return [];
+      // Supabase URL 길이 제한 회피용 slicing
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 500) chunks.push(ids.slice(i, i + 500));
+      const all: any[] = [];
+      for (const c of chunks) {
+        const { data, error } = await (supabase as any)
+          .from(table)
+          .select(cols)
+          .in(parentCol, c)
+          .order("updated_at", { ascending: false })
+          .limit(limit);
+        if (error) throw error;
+        all.push(...(data ?? []));
+      }
+      return normalize(all, parentCol, messageCol, categoryCol, mod, parentMap);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return normalize(data ?? [], parentCol, messageCol, categoryCol, mod, parentMap);
+  }
+
+  function normalize(
+    rows: any[],
+    parentCol: string,
+    messageCol: string,
+    categoryCol: string | null,
+    mod: InboxModule,
+    parentMap: Map<string, { ref: string | null; label: string | null }> | null,
+  ): InboxComment[] {
+    return rows.map((r) => {
+      const pid = String(r[parentCol]);
+      const meta = parentMap?.get(pid) ?? null;
+      return {
+        id: String(r.id),
+        module: mod,
+        category: categoryCol ? (r[categoryCol] ?? null) : null,
+        message: String(r[messageCol] ?? ""),
+        author_user_id: r.author_user_id ?? null,
+        author_name: null,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        edited: !!r.edited,
+        parent_id: pid,
+        parent_ref: meta?.ref ?? null,
+        parent_label: meta?.label ?? null,
+      };
+    });
+  }
+
+  const [tm, sm, abd, sp] = await Promise.all([
+    loadTable("task_comments", "task_raw_id", "message", "category", "tm", parents.tm),
+    loadTable("defect_comments", "defect_raw_id", "message", "category", "sm", parents.sm),
+    loadTable("abd_comments", "abd_item_id", "message", "category", "abd", parents.abd),
+    loadTable("spare_part_comments", "doc_ref", "body", null, "sp", parents.sp),
+  ]);
+
+  const all = [...tm, ...sm, ...abd, ...sp].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
+
+  // 작성자 이름 해석
+  const authorIds = Array.from(new Set(all.map((x) => x.author_user_id).filter(Boolean))) as string[];
+  if (authorIds.length > 0) {
+    const { data: profs } = await (supabase as any)
+      .from("profiles")
+      .select("id,name,display_name,login_id")
+      .in("id", authorIds);
+    const nm = new Map<string, string>();
+    for (const p of profs ?? []) {
+      nm.set(String(p.id), p.name ?? p.display_name ?? p.login_id ?? "user");
+    }
+    for (const c of all) {
+      if (c.author_user_id) c.author_name = nm.get(c.author_user_id) ?? null;
+    }
+  }
+
+  return all;
+}
+
+export function useCommentInbox(scope: InboxScope, limitPerTable = 100) {
+  const qc = useQueryClient();
+  const key = ["mws-comment-inbox", scope.userId, scope.scope, scope.filterValue, scope.isAdmin] as const;
+
+  const query = useQuery({
+    queryKey: key,
+    enabled: !!scope.userId && (scope.isAdmin || !!scope.filterValue),
+    staleTime: 30_000,
+    queryFn: () => fetchComments(scope, limitPerTable),
+  });
+
+  // Realtime 구독 (4개 댓글 테이블 변경 시 무효화)
+  useEffect(() => {
+    if (!scope.userId) return;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const invalidate = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => qc.invalidateQueries({ queryKey: key.slice(0, 1) as any }), 500);
+    };
+    const channel = supabase
+      .channel(`mws-comments-${scope.userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_comments" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "defect_comments" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "abd_comments" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "spare_part_comments" }, invalidate)
+      .subscribe();
+    return () => {
+      if (t) clearTimeout(t);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope.userId]);
+
+  return query;
+}

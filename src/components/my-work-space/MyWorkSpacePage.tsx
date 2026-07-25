@@ -20,6 +20,7 @@ import { dohaStamp } from "@/lib/time/doha";
 import { cumPlanProgress, cumActualProgress, computeVariance } from "@/lib/task-management/derived";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
+import { CommentsInbox } from "./CommentsInbox";
 
 function fmtDate(d?: string | null): string {
   if (!d) return "-";
@@ -310,6 +311,13 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           )}
         </div>
       </header>
+
+      <CommentsInbox
+        userId={me?.id ?? null}
+        scope={scope}
+        filterValue={filterValue}
+        isAdmin={isAdmin}
+      />
 
       {/* ============= TM ============= */}
       <section className="space-y-2">

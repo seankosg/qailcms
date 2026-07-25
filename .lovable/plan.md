@@ -1,47 +1,77 @@
-# Task Tree — 탭(Discipline) 전환 시 기본값 자동 재적용
-
-## 현재 동작
-- `expanded`/`judgmentFilter`가 단일 상태로 유지되어 탭 전환 시 이전 discipline의 task_no 기반 `expanded`가 남고, 새 탭에서는 아무 것도 펼쳐지지 않음.
-- `autoExpandedOnce`는 세션당 1회만 발동 → 첫 탭 이후로 자동 전체 펴기가 다시 실행되지 않음.
-- `judgmentFilter`도 탭이 바뀌어도 그대로 유지 → 사용자가 다른 탭에서 조정한 값이 새 탭에 노출됨.
+# My Work Space — 내 항목 댓글 리스트
 
 ## 목표
-탭(Discipline)을 새로 열 때마다 **기본값(전체 펼침 + "위험" 필터 선택)** 적용. 사용자가 그 탭에서 펼침이나 위험 필터를 수동으로 조정하면 이후 재방문 시 그 상태 유지.
+사용자가 담당(HDEC PIC/Team, 관리자 = 전체)하는 4개 모듈(TM / SM / ABD / Spare Part)의 항목에 달린 댓글을 한 곳에 모아 보여주고, 각 댓글의 읽음/안읽음 상태를 사용자별로 기억.
 
-## 구현
+## UI 배치
+`src/components/my-work-space/MyWorkSpacePage.tsx` 상단 KPI 영역 하단, 모듈 리스트 위에 새 섹션 **"내 항목 댓글"** 카드 추가.
+- 헤더: 제목 + 미확인 총합(빨간 pill) + "모두 읽음 처리" 링크 + 접기/펼치기 토글.
+- 탭: `전체 · TM · SM · ABD · SP` (각 탭에 미확인 카운트 배지).
+- 각 탭은 스크롤 영역(max-h-96) 안의 카드 목록.
+- 기본 정렬: `updated_at desc`. 최신 20건씩 무한 스크롤(더보기 버튼).
+- MyWorkSpacePage와 MyTeamWorkSpacePage 모두 재사용(scope=`pic`/`team` 전달).
 
-### 1. 상태를 discipline별로 분리 저장
-`sessionStorage`의 뷰 상태 스키마 확장:
-```ts
-type PerDiscipline = {
-  expanded: string[];
-  judgmentFilter: string[];
-  touched: boolean; // 사용자가 직접 조정했는지
-};
-type PersistedView = {
-  discipline: Discipline;
-  search: string;
-  picFilter: string;
-  scrollY?: number;
-  perDiscipline: Record<Discipline, PerDiscipline>;
-};
+## 각 댓글 카드에 표시할 정보
 ```
-기존 키(`qail.task-tree.view-state.v2`) → **v3**로 버전업(구 스키마는 무시).
+[모듈 배지] [카테고리 배지] [●안읽음 dot]         xx분 전
+Task/Issue No · 항목명(요약)                       [바로가기 →]
+"댓글 본문 최대 2줄 말줄임"
+작성자 · (수정됨) · 부모 상세로 이동 (전체 카드 클릭)
+```
+- 안읽은 카드: 배경 `bg-primary/5`, 좌측 2px `border-l-primary`, 굵은 텍스트.
+- 읽은 카드: 기본 배경, 회색 텍스트.
 
-### 2. 탭 전환/최초 로드 시 자동 리셋
-- discipline이 바뀌거나 mainTasks가 로드될 때 실행되는 effect:
-  - `perDiscipline[discipline]?.touched === true`면 저장된 `expanded`/`judgmentFilter` 그대로 적용.
-  - 아니면 기본값 적용: `expanded = 전체 mainTask.task_no`, `judgmentFilter = ["위험"]`.
-- `autoExpandedOnce` 플래그 제거(1회 제한 대신 discipline별로 판정).
+## 데이터 소스
+4개 테이블: `task_comments`, `defect_comments`, `abd_comments`, `spare_part_comments`.
+필터: 관리자면 전체, 아니면 부모 테이블의 `hdec_pic_name = 나` (팀 스코프면 `team = 내팀`).
 
-### 3. touched 마킹
-- `toggleExpand`, `expandAll`, `collapseAll`, `judgmentFilter` 토글 핸들러에서 현재 discipline의 `touched=true`로 저장.
-- `search`/`picFilter`는 전역 유지(현재와 동일).
+### 조회 방식
+효율/RLS를 고려해 **서버 함수 1개** `getMyWorkspaceComments`(`src/lib/my-work-space/comments.functions.ts`) 신설:
+- 입력: `{ scope: "pic" | "team", filterValue: string | null, isAdmin: boolean, module: "all"|"tm"|"sm"|"abd"|"sp", limit, before }`.
+- 각 모듈별로 (a) 담당 부모 ID 목록을 조회한 뒤 (b) 해당 부모 ID 배열로 댓글 테이블을 `updated_at desc`로 pagination. 반환 DTO:
+```ts
+{ items: Array<{
+  id, module, category, message, source, author_user_id,
+  created_at, updated_at, edited,
+  parent_id, parent_ref, parent_label, // 예: task_no + task_name
+  detail_href // 상세 페이지 라우트
+}>; nextBefore: string | null; unreadTotal: Record<Module,number> }
+```
+- 관리자 스코프: 부모 필터 없이 최근 200건 제한.
+- 정렬/페이징: `updated_at`+`id` 커서. 미확인 카운트 계산은 클라이언트가 읽음 맵과 대조.
 
-### 4. 세부
-- 파일 변경: `src/components/task-management/tree/TaskTreePage.tsx` 단일.
-- 뒤로가기(Raw Data 드릴다운 복귀) 시나리오는 이미 discipline별 touched=true로 기록되어 있으므로 그대로 복원됨.
+### Realtime
+`supabase.channel("mws-comments-<userId>")`에 4개 테이블 postgres_changes 구독 → 발생 시 쿼리 무효화(디바운스 500ms).
+
+## 읽음 상태 관리
+- 기존 `useCommentReadState`는 `taskRawId → lastReadAt` 구조 → 새로 `useCommentInboxRead` 훅 추가.
+- 키: `qail.mws.comments-read::<userId>`, 값: `{ [commentId]: readAtISO }`.
+- `isRead(comment)` = 저장된 값이 `comment.updated_at` 이상.
+- markRead 트리거:
+  1. 카드의 "바로가기 →" 클릭 또는 카드 전체 클릭 시.
+  2. "모두 읽음 처리" 클릭 시 현재 탭의 모든 항목.
+  3. 카드가 뷰포트에 1초 이상 노출된 경우(IntersectionObserver 옵션, 기본 활성).
+- 안읽은 총합/탭별 카운트는 훅+로컬 상태로 실시간 갱신.
+
+## 라우팅(바로가기)
+- TM: `/closure/task-management/detail/$id`
+- SM: `/closure/snag-list/detail/$id` (기존 라우트 확인)
+- ABD: `/closure/abd/raw-data?open=<id>` (AbdDetailSheet 오픈 파라미터)
+- SP: `/closure/spare-part/detail/$doc_ref` (기존 라우트)
+클릭 시 해당 route로 navigate + 방금 클릭한 comment.id를 markRead.
+
+## 파일 변경 요약
+신규
+- `src/lib/my-work-space/comments.functions.ts` — createServerFn `getMyWorkspaceComments`.
+- `src/hooks/useCommentInboxRead.ts` — 사용자별 읽음 맵.
+- `src/components/my-work-space/CommentsInbox.tsx` — 탭/리스트/카드 UI.
+
+수정
+- `src/components/my-work-space/MyWorkSpacePage.tsx` — 새 섹션 삽입, scope/filterValue/isAdmin 전달.
 
 ## 검증
-- ARCH → 위험 필터 자동, 전체 펼침. MEP 클릭 → 위험 필터 자동, 전체 펼침. ARCH로 복귀 → 초기 그대로.
-- MEP에서 필터를 "지연"으로 변경 후 ARCH → MEP 다시 클릭 시 "지연" 그대로 유지.
+- 사용자가 담당한 태스크에 댓글 달면 5초 이내 인박스에 뜨고 미확인 카운트 증가.
+- 카드 클릭 → 상세 페이지로 이동, 재접속 시 해당 카드는 회색.
+- "모두 읽음 처리" → 미확인 카운트 0.
+- 관리자 계정에서는 전 항목 노출.
+- 팀 워크스페이스에서는 팀 기준으로 필터 노출.
