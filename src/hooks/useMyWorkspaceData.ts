@@ -275,13 +275,13 @@ export interface AbdMyRow {
   latest_status: string | null;
   latest_rev: string | null;
   hdec_pic_name: string | null;
-  r1_drafting_plan: string | null; r1_drafting_actual: string | null;
+  r1_draft_finish_plan: string | null; r1_draft_finish_actual: string | null;
   r1_submission_plan: string | null; r1_submission_actual: string | null;
   r1_dar_plan: string | null; r1_dar_actual: string | null;
-  r2_drafting_plan: string | null; r2_drafting_actual: string | null;
+  r2_draft_finish_plan: string | null; r2_draft_finish_actual: string | null;
   r2_submission_plan: string | null; r2_submission_actual: string | null;
   r2_dar_plan: string | null; r2_dar_actual: string | null;
-  r3_drafting_plan: string | null; r3_drafting_actual: string | null;
+  r3_draft_finish_plan: string | null; r3_draft_finish_actual: string | null;
   r3_submission_plan: string | null; r3_submission_actual: string | null;
   r3_dar_plan: string | null; r3_dar_actual: string | null;
   created_at: string | null;
@@ -296,9 +296,9 @@ export function useMyAbd(filterValue: string | null, isAdmin: boolean, mode: Mws
       const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const cols = [
         "id,abd_number,document_title,latest_status,latest_rev,hdec_pic_name,created_at",
-        "r1_drafting_plan,r1_drafting_actual,r1_submission_plan,r1_submission_actual,r1_dar_plan,r1_dar_actual",
-        "r2_drafting_plan,r2_drafting_actual,r2_submission_plan,r2_submission_actual,r2_dar_plan,r2_dar_actual",
-        "r3_drafting_plan,r3_drafting_actual,r3_submission_plan,r3_submission_actual,r3_dar_plan,r3_dar_actual",
+        "r1_draft_finish_plan,r1_draft_finish_actual,r1_submission_plan,r1_submission_actual,r1_dar_plan,r1_dar_actual",
+        "r2_draft_finish_plan,r2_draft_finish_actual,r2_submission_plan,r2_submission_actual,r2_dar_plan,r2_dar_actual",
+        "r3_draft_finish_plan,r3_draft_finish_actual,r3_submission_plan,r3_submission_actual,r3_dar_plan,r3_dar_actual",
       ].join(",");
       const rows = await fetchAll<AbdMyRow>(
         "abd_items_raw",
@@ -321,16 +321,16 @@ export function abdIsApproved(r: AbdMyRow): boolean {
 export type AbdRoundStage = "Approved" | "R3" | "R2" | "R1" | "Pending";
 export function abdStage(r: AbdMyRow): AbdRoundStage {
   if (abdIsApproved(r)) return "Approved";
-  if (r.r3_drafting_actual || r.r3_submission_actual || r.r3_dar_actual) return "R3";
-  if (r.r2_drafting_actual || r.r2_submission_actual || r.r2_dar_actual) return "R2";
-  if (r.r1_drafting_actual || r.r1_submission_actual || r.r1_dar_actual) return "R1";
+  if (r.r3_draft_finish_actual || r.r3_submission_actual || r.r3_dar_actual) return "R3";
+  if (r.r2_draft_finish_actual || r.r2_submission_actual || r.r2_dar_actual) return "R2";
+  if (r.r1_draft_finish_actual || r.r1_submission_actual || r.r1_dar_actual) return "R1";
   return "Pending";
 }
 function abdCurrentPlan(r: AbdMyRow): string | null {
   const st = abdStage(r);
-  if (st === "R3") return r.r3_dar_plan ?? r.r3_submission_plan ?? r.r3_drafting_plan ?? null;
-  if (st === "R2") return r.r2_dar_plan ?? r.r2_submission_plan ?? r.r2_drafting_plan ?? null;
-  if (st === "R1" || st === "Pending") return r.r1_dar_plan ?? r.r1_submission_plan ?? r.r1_drafting_plan ?? null;
+  if (st === "R3") return r.r3_dar_plan ?? r.r3_submission_plan ?? r.r3_draft_finish_plan ?? null;
+  if (st === "R2") return r.r2_dar_plan ?? r.r2_submission_plan ?? r.r2_draft_finish_plan ?? null;
+  if (st === "R1" || st === "Pending") return r.r1_dar_plan ?? r.r1_submission_plan ?? r.r1_draft_finish_plan ?? null;
   return null;
 }
 export function abdIsInProgress(r: AbdMyRow): boolean {
@@ -363,9 +363,9 @@ function abdCurrentPlanKind(r: AbdMyRow): { plan: string | null; kind: AbdTodayK
     if (draft) return { plan: draft, kind: "Draft" };
     return { plan: null, kind: null };
   };
-  if (st === "R3") return pick(r.r3_drafting_plan, r.r3_submission_plan, r.r3_dar_plan);
-  if (st === "R2") return pick(r.r2_drafting_plan, r.r2_submission_plan, r.r2_dar_plan);
-  return pick(r.r1_drafting_plan, r.r1_submission_plan, r.r1_dar_plan);
+  if (st === "R3") return pick(r.r3_draft_finish_plan, r.r3_submission_plan, r.r3_dar_plan);
+  if (st === "R2") return pick(r.r2_draft_finish_plan, r.r2_submission_plan, r.r2_dar_plan);
+  return pick(r.r1_draft_finish_plan, r.r1_submission_plan, r.r1_dar_plan);
 }
 export function abdTodayKind(r: AbdMyRow, today: string): AbdTodayKind | null {
   if (abdIsApproved(r)) return null;
