@@ -50,9 +50,10 @@ export function buildAbdSCurve(opts: {
     if (!cells) continue;
     // 스테이지별 일일 카운트 집계
     const daily: Record<Stage, { p: number[]; a: number[] }> = {
-      draft: { p: new Array(n).fill(0), a: new Array(n).fill(0) },
-      submission: { p: new Array(n).fill(0), a: new Array(n).fill(0) },
-      dar: { p: new Array(n).fill(0), a: new Array(n).fill(0) },
+      draft_start:  { p: new Array(n).fill(0), a: new Array(n).fill(0) },
+      draft_finish: { p: new Array(n).fill(0), a: new Array(n).fill(0) },
+      submission:   { p: new Array(n).fill(0), a: new Array(n).fill(0) },
+      dar:          { p: new Array(n).fill(0), a: new Array(n).fill(0) },
     };
     for (const c of cells) {
       if (!c.bucket_iso) continue;
@@ -96,9 +97,10 @@ export function buildAbdSCurve(opts: {
 }
 
 export const ABD_STAGE_COLORS: Record<Stage, { line: string; bar: string }> = {
-  draft: { line: "hsl(217, 91%, 60%)", bar: "hsla(217, 91%, 60%, 0.45)" },
-  submission: { line: "hsl(38, 92%, 50%)", bar: "hsla(38, 92%, 50%, 0.45)" },
-  dar: { line: "hsl(160, 60%, 45%)", bar: "hsla(160, 60%, 45%, 0.45)" },
+  draft_start:  { line: "hsl(217, 91%, 60%)", bar: "hsla(217, 91%, 60%, 0.45)" },
+  draft_finish: { line: "hsl(262, 83%, 58%)", bar: "hsla(262, 83%, 58%, 0.45)" },
+  submission:   { line: "hsl(38, 92%, 50%)",  bar: "hsla(38, 92%, 50%, 0.45)" },
+  dar:          { line: "hsl(160, 60%, 45%)", bar: "hsla(160, 60%, 45%, 0.45)" },
 };
 
 /** 라운드별 대시 패턴 (색상은 stage로 결정) */

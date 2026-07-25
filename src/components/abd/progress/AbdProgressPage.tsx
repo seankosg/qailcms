@@ -216,9 +216,10 @@ export function AbdProgressPage() {
       ...r,
       combined: r.combined.slice(startIdx),
       stages: {
-        draft: { ...r.stages.draft, cells: r.stages.draft.cells.slice(startIdx) },
-        submission: { ...r.stages.submission, cells: r.stages.submission.cells.slice(startIdx) },
-        dar: { ...r.stages.dar, cells: r.stages.dar.cells.slice(startIdx) },
+        draft_start:  { ...r.stages.draft_start,  cells: r.stages.draft_start.cells.slice(startIdx) },
+        draft_finish: { ...r.stages.draft_finish, cells: r.stages.draft_finish.cells.slice(startIdx) },
+        submission:   { ...r.stages.submission,   cells: r.stages.submission.cells.slice(startIdx) },
+        dar:          { ...r.stages.dar,          cells: r.stages.dar.cells.slice(startIdx) },
       },
     }));
     return { buckets: newBuckets, rows };
@@ -418,7 +419,7 @@ export function AbdProgressPage() {
             <ToolbarGroup label="Stage">
               <ToggleGroup
                 type="multiple"
-                value={isAllStages ? ["draft", "submission", "dar"] : effectiveStages}
+                value={isAllStages ? [...ALL_STAGES] : effectiveStages}
                 onValueChange={(v) => {
                   const next = (v as Stage[]).filter((x) => (ALL_STAGES as string[]).includes(x));
                   if (next.length === 0) return;

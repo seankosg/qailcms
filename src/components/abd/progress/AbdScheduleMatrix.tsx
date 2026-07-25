@@ -305,7 +305,8 @@ export function AbdScheduleMatrix({
                           <span
                             className={cn(
                               "inline-flex h-4 min-w-7 px-1 items-center justify-center rounded text-[9px] font-semibold",
-                              st === "draft" && "bg-secondary text-secondary-foreground",
+                              st === "draft_start" && "bg-secondary text-secondary-foreground",
+                              st === "draft_finish" && "bg-violet-500/15 text-violet-700 dark:text-violet-400",
                               st === "submission" && "bg-primary/20 text-primary",
                               st === "dar" && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
                             )}

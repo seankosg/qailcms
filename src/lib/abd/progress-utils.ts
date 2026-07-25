@@ -1,10 +1,11 @@
 // ABD Progress 매트릭스 클라이언트 유틸.
 // DB 사전 집계(RPC) 결과를 UI 매트릭스 형태로 조립하는 순수 함수 모음.
 
-export type Stage = "draft" | "submission" | "dar";
-export const ALL_STAGES: Stage[] = ["draft", "submission", "dar"];
+export type Stage = "draft_start" | "draft_finish" | "submission" | "dar";
+export const ALL_STAGES: Stage[] = ["draft_start", "draft_finish", "submission", "dar"];
 export const STAGE_LABELS: Record<Stage, string> = {
-  draft: "Draft",
+  draft_start: "DS",
+  draft_finish: "DF",
   submission: "Submission",
   dar: "DAR",
 };
@@ -224,7 +225,8 @@ export function assembleMatrix(opts: {
         cumPlan: 0,
         cumActual: 0,
         stages: {
-          draft: emptyStageRow(buckets, "draft", 0),
+          draft_start: emptyStageRow(buckets, "draft_start", 0),
+          draft_finish: emptyStageRow(buckets, "draft_finish", 0),
           submission: emptyStageRow(buckets, "submission", 0),
           dar: emptyStageRow(buckets, "dar", 0),
         },
@@ -305,7 +307,8 @@ export function stageDateField(stage: Stage | "all", field: "planned" | "actual"
     return `${rn}_dar_${field === "planned" ? "plan" : "actual"}`;
   }
   const map: Record<Stage, { planned: string; actual: string }> = {
-    draft: { planned: "drafting_plan", actual: "drafting_actual" },
+    draft_start:  { planned: "draft_start_plan",  actual: "draft_start_actual" },
+    draft_finish: { planned: "draft_finish_plan", actual: "draft_finish_actual" },
     submission: { planned: "submission_plan", actual: "submission_actual" },
     dar: { planned: "dar_plan", actual: "dar_actual" },
   };
