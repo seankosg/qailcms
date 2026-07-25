@@ -81,15 +81,16 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
 interface Props {
   plots?: string[];
   teams?: string[];
+  batchNo?: string[];
   onOpenRaw: (params: Record<string, string>) => void;
 }
 
 /** Row 1: 배타적 5분류 (Total, Approved, UR, DS, NS) */
-export function AbdRow1Kpis({ plots = [], teams = [], onOpenRaw }: Props) {
+export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }: Props) {
   const fn = useServerFn(getAbdDashboardRow1);
   const { data } = useQuery({
-    queryKey: ["abd-dash-row1", plots.join(","), teams.join(",")],
-    queryFn: () => fn({ data: { plots, teams } }),
+    queryKey: ["abd-dash-row1", plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
     staleTime: 30_000,
   });
   const { totals, byTeam } = useMemo(() => pivotRows(data ?? []), [data]);
@@ -127,11 +128,11 @@ export function AbdRow1Kpis({ plots = [], teams = [], onOpenRaw }: Props) {
 }
 
 /** Row 2: 지연 카드 (RS/SB/DS 지연 · No Plan) */
-export function AbdRow2Kpis({ plots = [], teams = [], onOpenRaw }: Props) {
+export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }: Props) {
   const fn = useServerFn(getAbdDashboardRow2);
   const { data } = useQuery({
-    queryKey: ["abd-dash-row2", plots.join(","), teams.join(",")],
-    queryFn: () => fn({ data: { plots, teams } }),
+    queryKey: ["abd-dash-row2", plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
     staleTime: 30_000,
   });
   const { totals, byTeam } = useMemo(() => pivotRows(data ?? []), [data]);

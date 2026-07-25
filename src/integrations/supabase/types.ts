@@ -3332,69 +3332,149 @@ export type Database = {
         Args: { _row: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
         Returns: number
       }
-      abd_dashboard_approval_trend: {
-        Args: { _months?: number; _plots?: string[]; _teams?: string[] }
-        Returns: {
-          approved_cnt: number
-          month_start: string
-          team: string
-        }[]
-      }
-      abd_dashboard_attention_lists: {
-        Args: { _limit?: number; _plots?: string[]; _teams?: string[] }
-        Returns: {
-          abd_number: string
-          current_stage: string
-          document_title: string
-          hdec_pic_name: string
-          id: string
-          latest_status: string
-          list_kind: string
-          plot: string
-          team: string
-          ur_aging_days: number
-        }[]
-      }
-      abd_dashboard_crosscut: {
-        Args: { _plots?: string[]; _teams?: string[] }
-        Returns: {
-          bucket: string
-          cnt: number
-          dis: string
-          service: string
-        }[]
-      }
-      abd_dashboard_overdue_heatmap: {
-        Args: { _plots?: string[]; _teams?: string[] }
-        Returns: {
-          bucket: string
-          cnt: number
-          team: string
-        }[]
-      }
-      abd_dashboard_row1: {
-        Args: { _plots?: string[]; _teams?: string[] }
-        Returns: {
-          bucket: string
-          cnt: number
-          team: string
-        }[]
-      }
-      abd_dashboard_row2: {
-        Args: { _plots?: string[]; _teams?: string[] }
-        Returns: {
-          bucket: string
-          cnt: number
-          team: string
-        }[]
-      }
-      abd_dashboard_status_dist: {
-        Args: { _plots?: string[]; _teams?: string[] }
-        Returns: {
-          cnt: number
-          status: string
-        }[]
-      }
+      abd_dashboard_approval_trend:
+        | {
+            Args: { _months?: number; _plots?: string[]; _teams?: string[] }
+            Returns: {
+              approved_cnt: number
+              month_start: string
+              team: string
+            }[]
+          }
+        | {
+            Args: {
+              _batch_no?: string[]
+              _months?: number
+              _plots?: string[]
+              _teams?: string[]
+            }
+            Returns: {
+              approved_cnt: number
+              month_start: string
+              team: string
+            }[]
+          }
+      abd_dashboard_attention_lists:
+        | {
+            Args: { _limit?: number; _plots?: string[]; _teams?: string[] }
+            Returns: {
+              abd_number: string
+              current_stage: string
+              document_title: string
+              hdec_pic_name: string
+              id: string
+              latest_status: string
+              list_kind: string
+              plot: string
+              team: string
+              ur_aging_days: number
+            }[]
+          }
+        | {
+            Args: {
+              _batch_no?: string[]
+              _limit?: number
+              _plots?: string[]
+              _teams?: string[]
+            }
+            Returns: {
+              abd_number: string
+              current_stage: string
+              document_title: string
+              hdec_pic_name: string
+              id: string
+              latest_status: string
+              list_kind: string
+              plot: string
+              team: string
+              ur_aging_days: number
+            }[]
+          }
+      abd_dashboard_crosscut:
+        | {
+            Args: { _plots?: string[]; _teams?: string[] }
+            Returns: {
+              bucket: string
+              cnt: number
+              dis: string
+              service: string
+            }[]
+          }
+        | {
+            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
+            Returns: {
+              bucket: string
+              cnt: number
+              dis: string
+              service: string
+            }[]
+          }
+      abd_dashboard_overdue_heatmap:
+        | {
+            Args: { _plots?: string[]; _teams?: string[] }
+            Returns: {
+              bucket: string
+              cnt: number
+              team: string
+            }[]
+          }
+        | {
+            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
+            Returns: {
+              bucket: string
+              cnt: number
+              team: string
+            }[]
+          }
+      abd_dashboard_row1:
+        | {
+            Args: { _plots?: string[]; _teams?: string[] }
+            Returns: {
+              bucket: string
+              cnt: number
+              team: string
+            }[]
+          }
+        | {
+            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
+            Returns: {
+              bucket: string
+              cnt: number
+              team: string
+            }[]
+          }
+      abd_dashboard_row2:
+        | {
+            Args: { _plots?: string[]; _teams?: string[] }
+            Returns: {
+              bucket: string
+              cnt: number
+              team: string
+            }[]
+          }
+        | {
+            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
+            Returns: {
+              bucket: string
+              cnt: number
+              team: string
+            }[]
+          }
+      abd_dashboard_status_dist:
+        | {
+            Args: { _plots?: string[]; _teams?: string[] }
+            Returns: {
+              cnt: number
+              status: string
+            }[]
+          }
+        | {
+            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
+            Returns: {
+              cnt: number
+              status: string
+            }[]
+          }
       abd_items_counts:
         | {
             Args: { _include_inactive?: boolean; _team?: string }

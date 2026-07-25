@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const FilterSchema = z.object({
   plots: z.array(z.string()).default([]),
   teams: z.array(z.string()).default([]),
+  batch_no: z.array(z.string()).default([]),
 });
 
 type RowOut = { bucket: string; team: string | null; cnt: number };
@@ -20,6 +21,7 @@ export const getAbdDashboardRow1 = createServerFn({ method: "POST" })
     const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_row1", {
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
+      _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []) as RowOut[];
@@ -32,6 +34,7 @@ export const getAbdDashboardRow2 = createServerFn({ method: "POST" })
     const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_row2", {
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
+      _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []) as RowOut[];
@@ -44,6 +47,7 @@ export const getAbdDashboardStatusDist = createServerFn({ method: "POST" })
     const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_status_dist", {
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
+      _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []) as Array<{ status: string; cnt: number }>;
@@ -57,6 +61,7 @@ export const getAbdDashboardApprovalTrend = createServerFn({ method: "POST" })
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _months: data.months,
+      _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []) as Array<{ month_start: string; team: string | null; approved_cnt: number }>;
@@ -69,6 +74,7 @@ export const getAbdDashboardOverdueHeatmap = createServerFn({ method: "POST" })
     const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_overdue_heatmap", {
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
+      _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []) as Array<{ team: string; bucket: string; cnt: number }>;
@@ -82,6 +88,7 @@ export const getAbdDashboardAttentionLists = createServerFn({ method: "POST" })
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _limit: data.limit,
+      _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []) as Array<{
@@ -99,6 +106,7 @@ export const getAbdDashboardCrosscut = createServerFn({ method: "POST" })
     const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_crosscut", {
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
+      _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []) as Array<{ dis: string; service: string; bucket: string; cnt: number }>;

@@ -178,28 +178,28 @@ export function AbdDashboardPage() {
       </div>
 
       {/* Row 1 — 배타적 5분류 (Total / Approved / UR / DS / NS) */}
-      <AbdRow1Kpis onOpenRaw={openRawData} />
+      <AbdRow1Kpis batchNo={batchFilter} onOpenRaw={openRawData} />
 
       {/* Row 2 — 지연 (Total / RS / SB / DS / No Plan) */}
-      <AbdRow2Kpis onOpenRaw={openRawData} />
+      <AbdRow2Kpis batchNo={batchFilter} onOpenRaw={openRawData} />
 
       {/* Row 3 — Latest Status Distribution + Row 4 — Approval Trend */}
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-1">
-          <AbdRow3StatusDist onOpenRaw={openRawData} />
+          <AbdRow3StatusDist batchNo={batchFilter} onOpenRaw={openRawData} />
         </div>
         <div className="xl:col-span-2">
-          <AbdRow4ApprovalTrend onOpenRaw={openRawData} />
+          <AbdRow4ApprovalTrend batchNo={batchFilter} onOpenRaw={openRawData} />
         </div>
       </div>
 
       {/* Row 5 — Overdue Heatmap */}
-      <AbdRow5OverdueHeatmap onOpenRaw={openRawData} />
+      <AbdRow5OverdueHeatmap batchNo={batchFilter} onOpenRaw={openRawData} />
 
       {/* Row 6 — Attention Lists + Cross-cut */}
       <div className="grid gap-4 xl:grid-cols-2">
-        <AbdRow6Attention onOpenRaw={openRawData} />
-        <AbdRow6Crosscut onOpenRaw={openRawData} />
+        <AbdRow6Attention batchNo={batchFilter} onOpenRaw={openRawData} />
+        <AbdRow6Crosscut batchNo={batchFilter} onOpenRaw={openRawData} />
       </div>
 
       {/* Legacy Focus/Trend/Attention/Crosscut (loaded from legacy dashboard-data) */}
