@@ -786,6 +786,18 @@ function FileRow({
                 <span>{f.validationError}</span>
               </div>
             )}
+            {f.dateIssues && f.dateIssues.length > 0 && (
+              <div className="mt-2">
+                <DateIssuesPanel
+                  fileName={f.name}
+                  sheetName={f.sheetName ?? null}
+                  issues={f.dateIssues}
+                  currentOverrides={f.dateOverrides}
+                  onApply={onDateOverridesApply}
+                  disabled={isRunning}
+                />
+              </div>
+            )}
             {f.error && (
               <div className="mt-1 rounded border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
                 ⚠ {f.error}
