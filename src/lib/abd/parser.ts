@@ -23,6 +23,7 @@ export interface ParsedAbdRow {
   latest_rev: string | null;
   latest_status: string | null;
   approval_date: string | null;
+  // Legacy 단일 Draft 컬럼 (구 스키마와 호환 유지)
   r1_drafting_plan: string | null;   r1_drafting_actual: string | null;
   r1_submission_plan: string | null; r1_submission_actual: string | null;
   r1_dar_plan: string | null;        r1_dar_actual: string | null;
@@ -32,6 +33,16 @@ export interface ParsedAbdRow {
   r3_drafting_plan: string | null;   r3_drafting_actual: string | null;
   r3_submission_plan: string | null; r3_submission_actual: string | null;
   r3_dar_plan: string | null;        r3_dar_actual: string | null;
+  // v5: Draft Start / Draft Finish 분리 + Round 별 Response Result (A/B/C)
+  r1_draft_start_plan: string | null;   r1_draft_start_actual: string | null;
+  r1_draft_finish_plan: string | null;  r1_draft_finish_actual: string | null;
+  r1_response_result: string | null;
+  r2_draft_start_plan: string | null;   r2_draft_start_actual: string | null;
+  r2_draft_finish_plan: string | null;  r2_draft_finish_actual: string | null;
+  r2_response_result: string | null;
+  r3_draft_start_plan: string | null;   r3_draft_start_actual: string | null;
+  r3_draft_finish_plan: string | null;  r3_draft_finish_actual: string | null;
+  r3_response_result: string | null;
   raw_payload: Record<string, any>;
   /** Excel row index (1-based, matches Excel's row numbering) */
   excel_row: number;
@@ -65,12 +76,60 @@ export interface ParsedFileResult {
   }>;
 }
 
-const STAGE_TO_KEY: Record<string, "drafting" | "submission" | "dar"> = {
+/**
+ * 헤더의 Stage 밴드를 내부 stage key 로 매핑.
+ * - "DRAFTING" 은 legacy(단일) 컬럼용 stage 로 유지 (이관용).
+ * - v5 신규: Draft Start(DS), Draft Finish(DF).
+ */
+type StageKey =
+  | "drafting"
+  | "draft_start"
+  | "draft_finish"
+  | "submission"
+  | "dar";
+
+const STAGE_TO_KEY: Record<string, StageKey> = {
   "DRAFTING": "drafting",
+  "DRAFT": "drafting",
+  "DRAFT START": "draft_start",
+  "DRAFTING START": "draft_start",
+  "DS": "draft_start",
+  "DRAFT FINISH": "draft_finish",
+  "DRAFTING FINISH": "draft_finish",
+  "DF": "draft_finish",
   "SUBMISSION": "submission",
+  "SUBMIT": "submission",
+  "SB": "submission",
   "DAR RESPONSE": "dar",
   "DAR": "dar",
+  "RS": "dar",
+  "RESPONSE": "dar",
 };
+
+/** Round 단독 컬럼 (Plan/Actual 쌍이 없는 결과 컬럼) 인식 */
+function isResponseResultLabel(label: string, stageBand: string): boolean {
+  const l = label.replace(/[._\s]+/g, " ").trim();
+  const s = stageBand.replace(/[._\s]+/g, " ").trim();
+  if (l === "RESULT" || l === "RESPONSE RESULT" || l === "RESPONSE" || l === "STATUS" && s === "") return false;
+  if (l === "RESULT" || l === "RESPONSE RESULT") return true;
+  if (s === "DAR RESPONSE" && (l === "RESULT" || l === "RESPONSE")) return true;
+  return false;
+}
+
+/** "A - Approved" / "b" / "A/C" 등을 정규화해 A|B|C|NS 로 축약. */
+function normResponseResult(v: any): string | null {
+  if (v == null) return null;
+  const s = String(v).trim().toUpperCase();
+  if (!s) return null;
+  if (s === "NS" || s === "N/A" || s === "-") return null;
+  const m = s.match(/^([ABCD])\b/);
+  if (m) return m[1];
+  if (s.includes("APPROV")) return "A";
+  if (s.includes("COMMENT")) return "B";
+  if (s.includes("RESUBMIT") || s.includes("REVISE")) return "C";
+  if (s.includes("REJECT")) return "D";
+  return null;
+}
 
 function normText(v: any): string {
   return String(v ?? "").trim().toUpperCase();
@@ -325,6 +384,11 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
         colIndex[`r${roundIdx}_${stageKey}_${which}`] = c;
       }
     }
+    else if (isResponseResultLabel(label, stageBand)) {
+      const roundMatch = /ROUND\s*(\d)/.exec(roundBand);
+      const roundIdx = roundMatch ? Number(roundMatch[1]) : null;
+      if (roundIdx) colIndex[`r${roundIdx}_response_result`] = c;
+    }
   }
 
   return { headerRow: anchorRow, colIndex };
@@ -437,6 +501,21 @@ export async function parseAbdFile(
         r3_submission_actual: toIsoDate(getVal("r3_submission_actual")),
         r3_dar_plan: toIsoDate(getVal("r3_dar_plan")),
         r3_dar_actual: toIsoDate(getVal("r3_dar_actual")),
+        r1_draft_start_plan: toIsoDate(getVal("r1_draft_start_plan")),
+        r1_draft_start_actual: toIsoDate(getVal("r1_draft_start_actual")),
+        r1_draft_finish_plan: toIsoDate(getVal("r1_draft_finish_plan")) ?? toIsoDate(getVal("r1_drafting_plan")),
+        r1_draft_finish_actual: toIsoDate(getVal("r1_draft_finish_actual")) ?? toIsoDate(getVal("r1_drafting_actual")),
+        r1_response_result: normResponseResult(getVal("r1_response_result")),
+        r2_draft_start_plan: toIsoDate(getVal("r2_draft_start_plan")),
+        r2_draft_start_actual: toIsoDate(getVal("r2_draft_start_actual")),
+        r2_draft_finish_plan: toIsoDate(getVal("r2_draft_finish_plan")) ?? toIsoDate(getVal("r2_drafting_plan")),
+        r2_draft_finish_actual: toIsoDate(getVal("r2_draft_finish_actual")) ?? toIsoDate(getVal("r2_drafting_actual")),
+        r2_response_result: normResponseResult(getVal("r2_response_result")),
+        r3_draft_start_plan: toIsoDate(getVal("r3_draft_start_plan")),
+        r3_draft_start_actual: toIsoDate(getVal("r3_draft_start_actual")),
+        r3_draft_finish_plan: toIsoDate(getVal("r3_draft_finish_plan")) ?? toIsoDate(getVal("r3_drafting_plan")),
+        r3_draft_finish_actual: toIsoDate(getVal("r3_draft_finish_actual")) ?? toIsoDate(getVal("r3_drafting_actual")),
+        r3_response_result: normResponseResult(getVal("r3_response_result")),
         raw_payload,
         excel_row: r + 1,
         sheet_name: name,
