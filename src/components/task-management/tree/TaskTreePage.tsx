@@ -94,13 +94,94 @@ function GapCell({ gap }: { gap: number }) {
 export function TaskTreePage() {
   const routeSearch = routeApi.useSearch();
   const navigate = useNavigate();
-  const [discipline, setDiscipline] = useState<Discipline>("ARCH");
-  const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(new Set());
-  const [picFilter, setPicFilter] = useState<string>("__all__");
+  // 뷰 상태를 sessionStorage 로 유지 — Raw Data 로 드릴다운 후 되돌아왔을 때
+  // discipline / 필터 / 검색어 / 펼침 상태가 그대로 복원되도록 함.
+  const VIEW_STATE_KEY = "qail.task-tree.view-state.v1";
+  type PersistedView = {
+    discipline: Discipline;
+    search: string;
+    expanded: string[];
+    judgmentFilter: string[];
+    picFilter: string;
+    scrollY?: number;
+  };
+  const persisted: PersistedView | null = (() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.sessionStorage.getItem(VIEW_STATE_KEY);
+      return raw ? (JSON.parse(raw) as PersistedView) : null;
+    } catch {
+      return null;
+    }
+  })();
+  const [discipline, setDiscipline] = useState<Discipline>(
+    (persisted?.discipline as Discipline) ?? "ARCH",
+  );
+  const [search, setSearch] = useState(persisted?.search ?? "");
+  const [expanded, setExpanded] = useState<Set<string>>(
+    new Set(persisted?.expanded ?? []),
+  );
+  const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(
+    new Set(persisted?.judgmentFilter ?? []),
+  );
+  const [picFilter, setPicFilter] = useState<string>(
+    persisted?.picFilter ?? "__all__",
+  );
   const [chartTask, setChartTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  // 상태 변경 시 sessionStorage 로 저장.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const payload: PersistedView = {
+      discipline,
+      search,
+      expanded: Array.from(expanded),
+      judgmentFilter: Array.from(judgmentFilter),
+      picFilter,
+    };
+    try {
+      window.sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify(payload));
+    } catch {
+      // storage full/blocked — ignore
+    }
+  }, [discipline, search, expanded, judgmentFilter, picFilter]);
+
+  // 최초 마운트 시 저장된 스크롤 위치 복원.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const y = persisted?.scrollY;
+    if (typeof y === "number" && y > 0) {
+      // 데이터 렌더 이후로 지연.
+      const id = window.setTimeout(() => window.scrollTo({ top: y }), 0);
+      return () => window.clearTimeout(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 이탈 직전 스크롤 위치를 함께 저장.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    return () => {
+      try {
+        const raw = window.sessionStorage.getItem(VIEW_STATE_KEY);
+        const base: PersistedView = raw
+          ? (JSON.parse(raw) as PersistedView)
+          : {
+              discipline,
+              search,
+              expanded: Array.from(expanded),
+              judgmentFilter: Array.from(judgmentFilter),
+              picFilter,
+            };
+        base.scrollY = window.scrollY;
+        window.sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify(base));
+      } catch {
+        // ignore
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["task-tree", discipline],
