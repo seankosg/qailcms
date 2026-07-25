@@ -58,6 +58,7 @@ export function ColumnOrderMenu({
   const onDragOver = (k: string) => (e: React.DragEvent) => {
     e.preventDefault();
     if (!dragKey || dragKey === k) return;
+    if (frozenExtras.includes(dragKey)) return; // frozen 항목은 frozen 리스트 내에서만 이동
     const next = [...order];
     const from = next.indexOf(dragKey);
     const to = next.indexOf(k);
@@ -66,6 +67,21 @@ export function ColumnOrderMenu({
     next.splice(to, 0, dragKey);
     onOrderChange(next);
     scheduleReorderPersist(next);
+  };
+  const onFrozenDragOver = (k: string) => (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!dragKey || dragKey === k) return;
+    if (!frozenExtras.includes(dragKey) || !frozenExtras.includes(k)) return;
+    const nextFrozen = [...frozenExtras];
+    const from = nextFrozen.indexOf(dragKey);
+    const to = nextFrozen.indexOf(k);
+    if (from === -1 || to === -1) return;
+    nextFrozen.splice(from, 1);
+    nextFrozen.splice(to, 0, dragKey);
+    onFrozenChange(nextFrozen);
+    const nextOrder = [...nextFrozen, ...order.filter((x) => !nextFrozen.includes(x))];
+    onOrderChange(nextOrder);
+    scheduleReorderPersist(nextOrder);
   };
   const onDragEnd = () => setDragKey(null);
 
@@ -104,7 +120,18 @@ export function ColumnOrderMenu({
             Frozen · task_no (고정)
           </div>
           {frozenExtras.map((k) => (
-            <div key={k} className="flex items-center gap-1 rounded px-1 py-1 text-xs">
+            <div
+              key={k}
+              draggable
+              onDragStart={onDragStart(k)}
+              onDragOver={onFrozenDragOver(k)}
+              onDragEnd={onDragEnd}
+              className={cn(
+                "group flex cursor-move items-center gap-1 rounded px-1 py-1 text-xs hover:bg-muted/50",
+                dragKey === k && "opacity-50",
+              )}
+            >
+              <GripVertical className="h-3 w-3 text-muted-foreground/40" />
               <Pin className="h-3 w-3 text-primary" />
               <span className="flex-1 truncate">{resolveLabel(k)}</span>
               <button
