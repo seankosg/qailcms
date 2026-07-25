@@ -1,6 +1,6 @@
 import { dohaStampCompact } from "@/lib/time/doha";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
-import { cumPlanProgress, computeVariance } from "@/lib/task-management/derived";
+import { cumPlanProgress, computeVariance, computeJudgment } from "@/lib/task-management/derived";
 
 export interface TaskSummaryRow {
   id: string;
