@@ -58,15 +58,6 @@ interface Row {
   data_date: string | null;
 }
 
-function averageProgress(rows: Row[]): number | null {
-  if (rows.length === 0) return null;
-  let total = 0;
-  for (const r of rows) {
-    total += Math.max(0, Math.min(1, Number(r.actual_progress ?? 0)));
-  }
-  return total / rows.length;
-}
-
 /** Sub Task는 저장 판정 우선, Main Task는 화면에 로드된 Sub Task 실적 롤업 기준으로 재판정. */
 function resolveRowJudgment(
   r: Row,
@@ -86,7 +77,7 @@ function resolveMainJudgment(
     return computeJudgment(main, thresholds, asOfDate) || main.auto_judgment || "";
   }
 
-  const rolledActual = averageProgress(kids);
+  const rolledActual = main.actual_progress;
   const allDone = kids.every((k) => Number(k.actual_progress ?? 0) >= 1 || k.auto_judgment === "완료");
   const hasProgress = Number(rolledActual ?? 0) > 0;
   const syntheticMain: Row = {
