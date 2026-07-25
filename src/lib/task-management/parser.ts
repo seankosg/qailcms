@@ -381,7 +381,7 @@ export interface ParseTaskManagementOptions {
 /** 워크북의 시트 이름 리스트. */
 export async function getTaskExcelSheetNames(file: File): Promise<string[]> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: true, bookSheets: true });
+  const wb = XLSX.read(buf, { type: "array", cellDates: false, bookSheets: true });
   return wb.SheetNames ?? [];
 }
 
@@ -396,7 +396,7 @@ export async function getTaskExcelHeaders(
   sample: Record<string, unknown>;
 } | null> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const wb = XLSX.read(buf, { type: "array", cellDates: false });
   const name =
     sheetName ??
     wb.SheetNames.find((n) => n.trim().toLowerCase() === "gantt") ??
@@ -449,7 +449,7 @@ export async function parseTaskManagementExcel(
   const extraAliases = opts.extraAliases;
   const excludedHeadersInput = opts.excludedHeaders ?? [];
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const wb = XLSX.read(buf, { type: "array", cellDates: false });
 
   const sheetName =
     opts.sheetName ??
