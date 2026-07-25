@@ -76,6 +76,8 @@ export interface TmImportFileItem {
   headerSamples?: Record<string, unknown>;
   headerToFieldMap?: Record<string, string>;
   excludedHeaders?: string[];
+  dateIssues?: import("@/lib/import/date-audit").DateIssue[];
+  dateOverrides?: Record<string, string>;
   conflictPolicy?: ConflictPolicy;
   conflictDecisions?: Record<string, ConflictPolicy>;
   preflight?: PreflightSummary | null;
@@ -120,6 +122,7 @@ interface CtxValue {
   setFileDataDateOverride: (id: string, date: string | null) => void;
   setFileSheet: (id: string, sheetName: string) => Promise<void>;
   setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
+  setFileDateOverrides: (id: string, overrides: Record<string, string>) => Promise<void>;
   setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
   setFileConflictDecisions: (id: string, decisions: Record<string, ConflictPolicy>) => void;
   clearFileConflictDecisions: (id: string) => void;
