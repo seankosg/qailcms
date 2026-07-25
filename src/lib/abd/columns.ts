@@ -102,8 +102,6 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "r1_dar_plan", label: "R1 DAR P", type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
   { key: "r1_dar_actual", label: "R1 DAR A", type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
   { key: "r1_response_result", label: "R1 Result", type: "badge", width: 90, group: "round1", editable: true, editorType: "select", options: ["A","B","C"], origin: "r1" },
-  { key: "r1_drafting_plan",  label: "R1 Draft P (legacy)", type: "date", width: 130, group: "round1", editable: true, editorType: "date", origin: "r1", legacy: true, hiddenByDefault: true },
-  { key: "r1_drafting_actual",label: "R1 Draft A (legacy)", type: "date", width: 130, group: "round1", editable: true, editorType: "date", origin: "r1", legacy: true, hiddenByDefault: true },
 
   // Round 2
   { key: "r2_draft_start_plan",   label: "R2 DS P",  type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
@@ -115,8 +113,6 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "r2_dar_plan", label: "R2 DAR P", type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
   { key: "r2_dar_actual", label: "R2 DAR A", type: "date", width: 100, group: "round2", editable: true, editorType: "date", origin: "r2" },
   { key: "r2_response_result", label: "R2 Result", type: "badge", width: 90, group: "round2", editable: true, editorType: "select", options: ["A","B","C"], origin: "r2" },
-  { key: "r2_drafting_plan",  label: "R2 Draft P (legacy)", type: "date", width: 130, group: "round2", editable: true, editorType: "date", origin: "r2", legacy: true, hiddenByDefault: true },
-  { key: "r2_drafting_actual",label: "R2 Draft A (legacy)", type: "date", width: 130, group: "round2", editable: true, editorType: "date", origin: "r2", legacy: true, hiddenByDefault: true },
 
   // Round 3
   { key: "r3_draft_start_plan",   label: "R3 DS P",  type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
@@ -128,8 +124,6 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "r3_dar_plan", label: "R3 DAR P", type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
   { key: "r3_dar_actual", label: "R3 DAR A", type: "date", width: 100, group: "round3", editable: true, editorType: "date", origin: "r3" },
   { key: "r3_response_result", label: "R3 Result", type: "badge", width: 90, group: "round3", editable: true, editorType: "select", options: ["A","B","C"], origin: "r3" },
-  { key: "r3_drafting_plan",  label: "R3 Draft P (legacy)", type: "date", width: 130, group: "round3", editable: true, editorType: "date", origin: "r3", legacy: true, hiddenByDefault: true },
-  { key: "r3_drafting_actual",label: "R3 Draft A (legacy)", type: "date", width: 130, group: "round3", editable: true, editorType: "date", origin: "r3", legacy: true, hiddenByDefault: true },
 
   // Segments
   { key: "doc_ax", label: "AX", type: "text", width: 70, group: "segments", origin: "identity" },
