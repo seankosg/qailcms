@@ -52,7 +52,11 @@ function toIso(v: any): string | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) {
     if (isNaN(v.getTime())) return null;
-    return dohaDateOnly(v);
+    const y = v.getUTCFullYear();
+    const mo = v.getUTCMonth() + 1;
+    const da = v.getUTCDate();
+    if (!y || mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+    return `${y}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
   }
   if (typeof v === "number") {
     const p = XLSX.SSF?.parse_date_code?.(v);
@@ -64,8 +68,34 @@ function toIso(v: any): string | null {
   const s = String(v).trim();
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) return dohaDateOnly(d);
+  const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+  if (dmy) {
+    const da = Number(dmy[1]), mo = Number(dmy[2]);
+    if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+    const yy = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+    return `${yy}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
+  }
+  const MONTHS: Record<string, number> = {
+    jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12,
+  };
+  const dMonY = s.match(/^(\d{1,2})[\s\-\/.]+([A-Za-z]{3,4})[\s\-\/.]+(\d{2,4})$/);
+  if (dMonY) {
+    const da = Number(dMonY[1]);
+    const mo = MONTHS[dMonY[2].toLowerCase()];
+    const yy = dMonY[3].length === 2 ? 2000 + Number(dMonY[3]) : Number(dMonY[3]);
+    if (mo && da >= 1 && da <= 31 && yy >= 1900 && yy <= 2999) {
+      return `${yy}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+    }
+  }
+  const monDY = s.match(/^([A-Za-z]{3,4})[\s\-\/.]+(\d{1,2})[\s,\-\/.]+(\d{2,4})$/);
+  if (monDY) {
+    const mo = MONTHS[monDY[1].toLowerCase()];
+    const da = Number(monDY[2]);
+    const yy = monDY[3].length === 2 ? 2000 + Number(monDY[3]) : Number(monDY[3]);
+    if (mo && da >= 1 && da <= 31 && yy >= 1900 && yy <= 2999) {
+      return `${yy}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+    }
+  }
   return null;
 }
 
@@ -129,7 +159,7 @@ function findHeaderRow(ws: XLSX.WorkSheet): { row: number; cols: Record<string, 
 
 export async function parseAconexFile(file: File): Promise<ParsedAconexFile> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { cellDates: true });
+  const wb = XLSX.read(buf);
   // "Docs" 시트 우선, 없으면 첫 시트
   const sheetName =
     wb.SheetNames.find((n) => n.toUpperCase() === "DOCS") ?? wb.SheetNames[0];
