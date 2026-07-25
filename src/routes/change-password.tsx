@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { PASSWORD_REGEX, PASSWORD_HINT } from "@/types/enums";
 
 export const Route = createFileRoute("/change-password")({
@@ -21,10 +22,12 @@ export const Route = createFileRoute("/change-password")({
 function ChangePasswordPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { data: me } = useCurrentUser();
   const mark = useServerFn(markPasswordChanged);
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
   const [loading, setLoading] = useState(false);
+  const isForced = me?.mustChangePassword === true;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -43,7 +46,7 @@ function ChangePasswordPage() {
       await mark({});
       await qc.invalidateQueries({ queryKey: ["current-user"] });
       toast.success("비밀번호가 변경되었습니다");
-      navigate({ to: "/closure/spare-part/raw-data", replace: true });
+      navigate({ to: "/my-work-space", replace: true });
     } catch (err: any) {
       toast.error(err?.message ?? "변경에 실패했습니다");
     } finally {
@@ -69,10 +72,17 @@ function ChangePasswordPage() {
               <Label htmlFor="p2">새 비밀번호 확인</Label>
               <Input id="p2" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={6} />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              변경하기
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" className="flex-1" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                변경하기
+              </Button>
+              {!isForced && (
+                <Button type="button" variant="outline" className="flex-1" onClick={() => navigate({ to: "/my-work-space", replace: true })}>
+                  취소
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>
