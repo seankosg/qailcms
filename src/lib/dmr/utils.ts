@@ -1,5 +1,6 @@
 import type { DmrParsedRow, DmrParsedSection, DmrEntryRow, DmrPlot } from './types';
 import { normalizeDmrContractor } from './types';
+import { formatDdMmmYyyy } from '@/lib/time/doha';
 
 export function flattenSection(section: DmrParsedSection, sourceImagePath?: string) {
   const out: Array<Omit<DmrEntryRow, 'id'> & { source_image_path?: string }> = [];
@@ -55,9 +56,5 @@ export function emptyRow(system = '', contractor = ''): DmrParsedRow {
 
 export function formatDate(d: string | Date): string {
   // Canonical user-facing date display is dd-MMM-yyyy (Doha semantics).
-  const date = typeof d === 'string' ? new Date(d) : d;
-  if (isNaN(date.getTime())) return String(d);
-  // Local import to avoid circular deps at module init.
-  const { formatDdMmmYyyy } = require('@/lib/time/doha') as typeof import('@/lib/time/doha');
-  return formatDdMmmYyyy(date) || String(d);
+  return formatDdMmmYyyy(d) || (typeof d === 'string' ? d : '');
 }
