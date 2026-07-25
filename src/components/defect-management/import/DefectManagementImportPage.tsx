@@ -333,6 +333,7 @@ function FileRow({
   onSheetChange,
   onOpenDuplicateReview,
   onToggleAiClassify,
+  onDateOverridesApply,
 }: {
   file: DefectImportFile;
   isRunning: boolean;
@@ -342,6 +343,7 @@ function FileRow({
   onSheetChange: (sheet: string) => void;
   onOpenDuplicateReview: () => void;
   onToggleAiClassify: (enabled: boolean) => void;
+  onDateOverridesApply: (overrides: Record<string, string>) => void | Promise<void>;
 }) {
   const badge = statusBadge[f.status];
   const rowsCount = f.parsed?.length ?? 0;
@@ -480,6 +482,18 @@ function FileRow({
               <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{f.validationError}</span>
+              </div>
+            )}
+            {f.dateIssues && f.dateIssues.length > 0 && (
+              <div className="mt-2">
+                <DateIssuesPanel
+                  fileName={f.name}
+                  sheetName={f.sheetName ?? null}
+                  issues={f.dateIssues}
+                  currentOverrides={f.dateOverrides}
+                  onApply={onDateOverridesApply}
+                  disabled={disabled}
+                />
               </div>
             )}
             {f.error && (
