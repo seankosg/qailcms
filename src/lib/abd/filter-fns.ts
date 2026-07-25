@@ -12,9 +12,12 @@ export const DATE_FILTER_FIELDS = new Set<string>([
   "approval_date",
   "data_date",
   "updated_at",
-  "r1_draft_finish_plan", "r1_draft_finish_actual", "r1_submission_plan", "r1_submission_actual", "r1_dar_plan", "r1_dar_actual",
-  "r2_draft_finish_plan", "r2_draft_finish_actual", "r2_submission_plan", "r2_submission_actual", "r2_dar_plan", "r2_dar_actual",
-  "r3_draft_finish_plan", "r3_draft_finish_actual", "r3_submission_plan", "r3_submission_actual", "r3_dar_plan", "r3_dar_actual",
+  "r1_draft_start_plan", "r1_draft_start_actual", "r1_draft_finish_plan", "r1_draft_finish_actual",
+  "r1_submission_plan", "r1_submission_actual", "r1_dar_plan", "r1_dar_actual",
+  "r2_draft_start_plan", "r2_draft_start_actual", "r2_draft_finish_plan", "r2_draft_finish_actual",
+  "r2_submission_plan", "r2_submission_actual", "r2_dar_plan", "r2_dar_actual",
+  "r3_draft_start_plan", "r3_draft_start_actual", "r3_draft_finish_plan", "r3_draft_finish_actual",
+  "r3_submission_plan", "r3_submission_actual", "r3_dar_plan", "r3_dar_actual",
 ]);
 
 export const NUMBER_FILTER_FIELDS = new Set<string>(["sl_no"]);
