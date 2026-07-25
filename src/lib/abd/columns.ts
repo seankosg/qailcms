@@ -136,7 +136,8 @@ export function inferAbdFilterType(t: AbdFieldType, key?: string): AbdFilterType
   if (t === "number") return "number-range";
   if (
     key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status" ||
-    key === "batch_no" || key === "hdec_pic_name" || key === "hdec_eng_name"
+    key === "batch_no" || key === "hdec_pic_name" || key === "hdec_eng_name" ||
+    key === "current_stage"
   ) return "multi-select";
   return "text";
 }
