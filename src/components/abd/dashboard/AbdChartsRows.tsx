@@ -30,6 +30,7 @@ import {
 interface BaseProps {
   plots?: string[];
   teams?: string[];
+  batchNo?: string[];
   onOpenRaw: (params: Record<string, string>) => void;
 }
 
@@ -42,11 +43,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 /** Row 3 — Latest Status Distribution */
-export function AbdRow3StatusDist({ plots = [], teams = [], onOpenRaw }: BaseProps) {
+export function AbdRow3StatusDist({ plots = [], teams = [], batchNo = [], onOpenRaw }: BaseProps) {
   const fn = useServerFn(getAbdDashboardStatusDist);
   const { data } = useQuery({
-    queryKey: ["abd-dash-status", plots.join(","), teams.join(",")],
-    queryFn: () => fn({ data: { plots, teams } }),
+    queryKey: ["abd-dash-status", plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
     staleTime: 30_000,
   });
   const rows = data ?? [];
@@ -116,11 +117,11 @@ export function AbdRow3StatusDist({ plots = [], teams = [], onOpenRaw }: BasePro
 }
 
 /** Row 4 — Approval Trend (last N months, stacked by team) */
-export function AbdRow4ApprovalTrend({ plots = [], teams = [], months = 12 }: BaseProps & { months?: number }) {
+export function AbdRow4ApprovalTrend({ plots = [], teams = [], batchNo = [], months = 12 }: BaseProps & { months?: number }) {
   const fn = useServerFn(getAbdDashboardApprovalTrend);
   const { data } = useQuery({
-    queryKey: ["abd-dash-trend", plots.join(","), teams.join(","), months],
-    queryFn: () => fn({ data: { plots, teams, months } }),
+    queryKey: ["abd-dash-trend", plots.join(","), teams.join(","), batchNo.join(","), months],
+    queryFn: () => fn({ data: { plots, teams, months, batch_no: batchNo } }),
     staleTime: 30_000,
   });
   const rows = data ?? [];
@@ -209,11 +210,11 @@ export function AbdRow4ApprovalTrend({ plots = [], teams = [], months = 12 }: Ba
 }
 
 /** Row 5 — Overdue Heatmap (Team × Bucket) */
-export function AbdRow5OverdueHeatmap({ plots = [], teams = [], onOpenRaw }: BaseProps) {
+export function AbdRow5OverdueHeatmap({ plots = [], teams = [], batchNo = [], onOpenRaw }: BaseProps) {
   const fn = useServerFn(getAbdDashboardOverdueHeatmap);
   const { data } = useQuery({
-    queryKey: ["abd-dash-heat", plots.join(","), teams.join(",")],
-    queryFn: () => fn({ data: { plots, teams } }),
+    queryKey: ["abd-dash-heat", plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
     staleTime: 30_000,
   });
   const rows = data ?? [];
@@ -293,11 +294,11 @@ export function AbdRow5OverdueHeatmap({ plots = [], teams = [], onOpenRaw }: Bas
 }
 
 /** Row 6a — Attention Lists (needs_planning / ur_aging / status_mismatch) */
-export function AbdRow6Attention({ plots = [], teams = [], onOpenRaw }: BaseProps) {
+export function AbdRow6Attention({ plots = [], teams = [], batchNo = [], onOpenRaw }: BaseProps) {
   const fn = useServerFn(getAbdDashboardAttentionLists);
   const { data } = useQuery({
-    queryKey: ["abd-dash-attention", plots.join(","), teams.join(",")],
-    queryFn: () => fn({ data: { plots, teams, limit: 20 } }),
+    queryKey: ["abd-dash-attention", plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, limit: 20, batch_no: batchNo } }),
     staleTime: 30_000,
   });
   const rows = data ?? [];
@@ -415,11 +416,11 @@ function AttentionRows({
 }
 
 /** Row 6b — DIS × Service Cross-cut */
-export function AbdRow6Crosscut({ plots = [], teams = [], onOpenRaw }: BaseProps) {
+export function AbdRow6Crosscut({ plots = [], teams = [], batchNo = [], onOpenRaw }: BaseProps) {
   const fn = useServerFn(getAbdDashboardCrosscut);
   const { data } = useQuery({
-    queryKey: ["abd-dash-crosscut", plots.join(","), teams.join(",")],
-    queryFn: () => fn({ data: { plots, teams } }),
+    queryKey: ["abd-dash-crosscut", plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
     staleTime: 30_000,
   });
   const rows = data ?? [];
