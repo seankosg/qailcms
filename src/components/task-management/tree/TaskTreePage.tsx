@@ -297,9 +297,6 @@ export function TaskTreePage() {
 
   const asOfDate = routeSearch.dataDate || latestDataDate || undefined;
 
-  // 저장된 펼침 상태가 없으면 mainTasks 로드 시 자동 전체 펴기(1회).
-  const [autoExpandedOnce, setAutoExpandedOnce] = useState(false);
-
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
     const subsByMain = new Map<string, Row[]>();
@@ -314,13 +311,38 @@ export function TaskTreePage() {
     return { mainTasks, subsByMain };
   }, [data]);
 
+  // discipline 이 바뀌거나 데이터가 새로 로드되었을 때 — 해당 discipline 이
+  // 아직 사용자에게 조정되지 않았다면 기본값(전체 펴기 + "위험" 필터) 적용.
+  // 조정된 적이 있다면 sessionStorage 에 저장된 값 복원.
   useEffect(() => {
-    if (autoExpandedOnce) return;
-    if (hasPersistedExpanded) return;
     if (mainTasks.length === 0) return;
-    setExpanded(new Set(mainTasks.map((m) => m.task_no)));
-    setAutoExpandedOnce(true);
-  }, [mainTasks, autoExpandedOnce, hasPersistedExpanded]);
+    const touched = !!touchedByDiscipline[discipline];
+    if (touched) {
+      try {
+        const raw =
+          typeof window !== "undefined"
+            ? window.sessionStorage.getItem(VIEW_STATE_KEY)
+            : null;
+        const parsed = raw ? (JSON.parse(raw) as PersistedView) : null;
+        const slot = parsed?.perDiscipline?.[discipline];
+        setExpanded(new Set(slot?.expanded ?? []));
+        setJudgmentFilter(new Set(slot?.judgmentFilter ?? ["위험"]));
+      } catch {
+        setExpanded(new Set(mainTasks.map((m) => m.task_no)));
+        setJudgmentFilter(new Set(["위험"]));
+      }
+    } else {
+      setExpanded(new Set(mainTasks.map((m) => m.task_no)));
+      setJudgmentFilter(new Set(["위험"]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discipline, mainTasks]);
+
+  function markTouched() {
+    setTouchedByDiscipline((cur) =>
+      cur[discipline] ? cur : { ...cur, [discipline]: true },
+    );
+  }
 
   const picOptions = useMemo(() => {
     const names = new Set<string>();
