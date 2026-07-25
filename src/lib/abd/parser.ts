@@ -23,14 +23,10 @@ export interface ParsedAbdRow {
   latest_rev: string | null;
   latest_status: string | null;
   approval_date: string | null;
-  // Legacy 단일 Draft 컬럼 (구 스키마와 호환 유지)
-  r1_drafting_plan: string | null;   r1_drafting_actual: string | null;
   r1_submission_plan: string | null; r1_submission_actual: string | null;
   r1_dar_plan: string | null;        r1_dar_actual: string | null;
-  r2_drafting_plan: string | null;   r2_drafting_actual: string | null;
   r2_submission_plan: string | null; r2_submission_actual: string | null;
   r2_dar_plan: string | null;        r2_dar_actual: string | null;
-  r3_drafting_plan: string | null;   r3_drafting_actual: string | null;
   r3_submission_plan: string | null; r3_submission_actual: string | null;
   r3_dar_plan: string | null;        r3_dar_actual: string | null;
   // v5: Draft Start / Draft Finish 분리 + Round 별 Response Result (A/B/C)
@@ -508,20 +504,14 @@ export async function parseAbdFile(
         latest_rev: getVal("latest_rev") ? String(getVal("latest_rev")) : null,
         latest_status: getVal("latest_status") ? String(getVal("latest_status")).toUpperCase() : null,
         approval_date: toIsoDate(getVal("approval_date")),
-        r1_drafting_plan: toIsoDate(getVal("r1_drafting_plan")),
-        r1_drafting_actual: toIsoDate(getVal("r1_drafting_actual")),
         r1_submission_plan: toIsoDate(getVal("r1_submission_plan")),
         r1_submission_actual: toIsoDate(getVal("r1_submission_actual")),
         r1_dar_plan: toIsoDate(getVal("r1_dar_plan")),
         r1_dar_actual: toIsoDate(getVal("r1_dar_actual")),
-        r2_drafting_plan: toIsoDate(getVal("r2_drafting_plan")),
-        r2_drafting_actual: toIsoDate(getVal("r2_drafting_actual")),
         r2_submission_plan: toIsoDate(getVal("r2_submission_plan")),
         r2_submission_actual: toIsoDate(getVal("r2_submission_actual")),
         r2_dar_plan: toIsoDate(getVal("r2_dar_plan")),
         r2_dar_actual: toIsoDate(getVal("r2_dar_actual")),
-        r3_drafting_plan: toIsoDate(getVal("r3_drafting_plan")),
-        r3_drafting_actual: toIsoDate(getVal("r3_drafting_actual")),
         r3_submission_plan: toIsoDate(getVal("r3_submission_plan")),
         r3_submission_actual: toIsoDate(getVal("r3_submission_actual")),
         r3_dar_plan: toIsoDate(getVal("r3_dar_plan")),
