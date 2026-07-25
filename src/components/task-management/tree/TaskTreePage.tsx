@@ -233,6 +233,9 @@ export function TaskTreePage() {
 
   const asOfDate = routeSearch.dataDate || latestDataDate || undefined;
 
+  // 저장된 펼침 상태가 없으면 mainTasks 로드 시 자동 전체 펴기(1회).
+  const [autoExpandedOnce, setAutoExpandedOnce] = useState(false);
+
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
     const subsByMain = new Map<string, Row[]>();
@@ -246,6 +249,14 @@ export function TaskTreePage() {
     }
     return { mainTasks, subsByMain };
   }, [data]);
+
+  useEffect(() => {
+    if (autoExpandedOnce) return;
+    if (hasPersistedExpanded) return;
+    if (mainTasks.length === 0) return;
+    setExpanded(new Set(mainTasks.map((m) => m.task_no)));
+    setAutoExpandedOnce(true);
+  }, [mainTasks, autoExpandedOnce, hasPersistedExpanded]);
 
   const picOptions = useMemo(() => {
     const names = new Set<string>();
