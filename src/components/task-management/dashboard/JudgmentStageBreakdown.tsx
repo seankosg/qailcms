@@ -29,11 +29,11 @@ export function JudgmentStageBreakdown({ items, asOfDate, compact = false }: Pro
   );
 
   const stageStackCard = (
-    <Card>
+    <Card className="flex h-full flex-col">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">스테이지별 판정 스택</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="flex-1 space-y-2">
           {breakdown.stageJudgment.map(({ stage, counts, total }) => (
             <div key={stage} className="space-y-1">
               <div className="flex items-baseline justify-between text-xs">
