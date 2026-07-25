@@ -3613,6 +3613,43 @@ export type Database = {
       rollup_task_all_mains: { Args: { _discipline: string }; Returns: number }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      sm_my_workspace_counts: {
+        Args: { _filter_value: string; _mode: string; _today: string }
+        Returns: {
+          completed_count: number
+          delayed_count: number
+          in_progress_count: number
+          today_count: number
+          total_count: number
+          upcoming_count: number
+        }[]
+      }
+      sm_my_workspace_rows: {
+        Args: {
+          _bucket: string
+          _filter_value: string
+          _limit?: number
+          _mode: string
+          _offset?: number
+          _today: string
+        }
+        Returns: {
+          actual_closure_date: string
+          actual_progress_pct: number
+          actual_rectified_date: string
+          created_at: string
+          created_date: string
+          hdec_pic_name: string
+          id: string
+          location_raw: string
+          main_trade: string
+          planned_closure_date: string
+          planned_rectified_date: string
+          planned_start_date: string
+          source_issue_no: string
+          status_raw: string
+        }[]
+      }
       tm_today_actual: {
         Args: { _as_of: string; _ids: string[] }
         Returns: {
