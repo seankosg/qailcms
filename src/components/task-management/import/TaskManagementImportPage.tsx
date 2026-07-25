@@ -45,6 +45,7 @@ import { DISCIPLINES, type Discipline } from "@/lib/task-management/columns";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DateIssuesPanel } from "@/components/import/DateIssuesPanel";
 import type { RollupMode } from "@/contexts/TaskManagementImportContext";
 import { TaskColumnSelect } from "./TaskColumnSelect";
 import { ConflictDecisionDialog } from "./ConflictDecisionDialog";
