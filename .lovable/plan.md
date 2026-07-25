@@ -1,62 +1,67 @@
+## 배경
 
-# ABD 대시보드 v5 - 단계별 실행 계획
+세 파일 실측 audit 결과:
 
-작업 규모가 매우 크므로 **7단계**로 분할하여 각 단계 완료 후 검증하고 다음 단계로 넘어가는 방식으로 진행합니다. 사용자는 각 단계 완료 시점에 회귀 여부를 확인할 수 있습니다.
+| 파일 | 비교 행 | 총 diff | -1일 시프트 |
+|---|---|---|---|
+| 신민호 `Task_Management_전기_260723_신민호_2.xlsx` | 93 | 190 | **190 (100%)** |
+| 서창훈 `Task_Management_전기_260725_서창훈_1.xlsx` | 66 | 170 | **155 (91%)** |
+| 임대현 `task-management_reimport_20260725_임대현.xlsx` | 57 | 8 | 1 (재수출본이므로 이미 시프트된 값끼리 재-일치) |
 
-## 스코프 확정 (레퍼런스-우선 원칙)
+**근본 원인 (`src/lib/task-management/parser.ts` + `src/lib/time/doha.ts`)**
 
-- Aconex 파일: `Plot_D_ABD_1_Aconex.xlsx` (Docs 시트, 헤더는 row 1, `Document No`/`Status`/`Revision`/`Date Modified` 컬럼 확인 완료)
-- HDEC 파일: `PLOT_C_D_MECH_ABD_완료계획_DB_260713.xlsx` 등 기존 원본
-- 참조 프롬프트: `ABD_KPI_Prompt.md`, `aconex_status_update_prompt.md`
-- 기존 1단계 마이그레이션(파생 컬럼, 트리거, `abd_settings`)은 이미 적용된 상태 — 재활용
+1. `XLSX.read(buf, { cellDates: true })` — 숫자 serial 셀을 `Date` 객체로 자동 변환.
+2. `toIsoDate` 안에서 `dohaDateOnly(v)` 호출 → `dohaDateOnly`는 `d.getFullYear/getMonth/getDate()`를 사용해 **브라우저 로컬 TZ의 wall-clock**을 읽음.
+3. Cloudflare Worker(SSR) 또는 UTC+ 오프셋 브라우저 조합에서 `cellDates`가 만든 `Date`의 로컬 Y/M/D가 원본 셀의 Y/M/D와 하루씩 어긋남 → -1일 시프트 대량 발생.
+4. 문자열 fallback 경로에서 `toDohaDateKey(s)`도 내부적으로 `new Date(string)`을 사용해 동일 위험.
 
-## Phase 1: Aconex 파서 + Fingerprint + Import UI 분기
-- `src/lib/abd/aconex-parser.ts` 신규: `Document No`/`Status` 분할(A/B/C/Cancelled)/`Date Modified`/`Revision` 추출
-- `src/lib/import/module-fingerprint.ts`: `abd-aconex` 서브 타입 감지 (헤더: File + Document No + Status + Review Status)
-- `src/components/abd/import/AbdImportPage.tsx`: 파일 지문에 따라 "HDEC 계획" vs "Aconex 실적" 자동 분기 표시, 이미 존재하는 doc_no만 UPDATE (신규 INSERT 금지)
-- 검증: 업로드된 Aconex 샘플로 preview → 매칭 개수/미매칭 목록/Status 분포 확인
+## 목표
 
-## Phase 2: HDEC 파서 개편
-- Draft Start/Finish 분리(DS/DF)
-- Response Result(A/B/C) 별도 필드
-- `batch_no` 컬럼 매핑
-- Round별 SB Plan/Actual, RS Plan/Actual 표준화
-- 헤더 매핑 갱신, 기존 mapping row 재사용
+1. TM 파서에서 **TZ 개입을 원천 차단**하여 향후 임포트에서 -1일 시프트 재발 방지.
+2. 이번 3개 배치(신민호·서창훈·임대현 재임포트)가 최종 write한 행들의 시프트된 날짜 컬럼을 **+1일 복구**.
+3. 세 파일 재-audit로 -1일 시프트 0건 확인.
 
-## Phase 3: RPC 7종
-- `abd_dashboard_row1` (배타 5분류: 전체/승인/UR/DS/NS + Team 브레이크다운)
-- `abd_dashboard_row2` (지연 5분류: 총합/RS/SB/DS/NoPlan)
-- `abd_status_dist`, `abd_approval_trend`, `abd_overdue_heatmap`
-- `abd_attention_lists` (Needs Planning, UR Aging)
-- `abd_crosscut` (Team × Plot × Round)
+## Phase 1 — 파서 근본 수정 (코드)
 
-## Phase 4: Dashboard Row 1~6 재작성
-- `AbdKpiCard` 신규 (SCR-20260725-nlvc.png 레퍼런스: KPI + progress bar + 우측 Team 브레이크다운)
-- Row 1(배타 5분류 카드), Row 2(지연 5분류), Row 3(Status 분포+Approval 추세), Row 4(지연 히트맵), Row 5(Attention 리스트), Row 6(Crosscut 매트릭스)
-- 카드 클릭 → Raw Data 필터 이동
+**대상 파일**: `src/lib/task-management/parser.ts`
 
-## Phase 5: UR Aging 설정 popover + Progress SSOT + Raw Data 뱃지
-- `abd_settings`의 UR Aging 임계값을 Dashboard 우상단 popover에서 편집
-- Progress Page를 신규 RPC(SSOT)로 재배선
-- Raw Data 테이블에 `current_stage`, `bucket_top`, `delay_bucket` 컬럼/뱃지 노출
+- `XLSX.read` 호출 3곳(라인 354, 369, 422)에서 `cellDates: true` → **`cellDates: false`** 로 변경.
+- `toIsoDate`(라인 184~232) 재작성:
+  - `Date` 입력 분기 유지하되(레거시 안전), `dohaDateOnly` 대신 **UTC getters** 사용 (`d.getUTCFullYear/…`). SheetJS가 cellDates 없이 반환한 값이 아니라 외부에서 넘어오는 Date 대비.
+  - `number` 입력 → 기존대로 `XLSX.SSF.parse_date_code`로 Y/M/D 추출 (이미 TZ 무관).
+  - `string` 입력 fallback:
+    - `YYYY-MM-DD`, `dd/mm/yyyy`, `dd-mm-yyyy`, `dd-MMM-yyyy`, `MMM dd yyyy`, `m/d/yy` 등 **정규식으로 Y/M/D 숫자만 추출**하는 헬퍼 신설.
+    - `toDohaDateKey(s)` 최종 fallback 호출을 **완전히 제거**.
+- `src/lib/time/doha.ts`: `dohaDateOnly` 주석에 "TZ 의존 함수 — 파서에서 사용 금지" 명시 (다른 UI 표시용 호출은 그대로 유지).
 
-## Phase 6: Admin - Aconex 탭 + source_group 뱃지
-- `AbdHeaderMappingTable`에 Aconex 소스 탭 추가
-- `AbdFieldConfigTable`에 `source_group` 컬럼(HDEC/Aconex/Computed) 뱃지
+## Phase 2 — 데이터 복구 (마이그레이션 아님, `insert` 툴)
 
-## Phase 7: 회귀 검증 + Migration 2 (구 컬럼 DROP)
-- 대시보드/Progress/Raw Data 회귀 시나리오 확인 후 구 컬럼 DROP 마이그레이션
+**대상 배치** (import_logs id로 특정):
+- 신민호: `Task Management_전기_260723_신민호 (2).xlsx` (도하시간 2026-07-25 17:48)
+- 서창훈: `Task Management_전기_260725_서창훈 (1).xlsx` (도하시간 2026-07-25 16:38)
+- 임대현: `task-management_reimport_20260725_1321.xlsx` (도하시간 2026-07-25 16:47)
 
----
+**복구 규칙**:
+- 각 배치의 `_batch_no`로 필터한 `task_management_raw` 행들에서 아래 컬럼을 **`+ INTERVAL '1 day'`**:
+  - `plan_start`, `plan_end`, `actual_start`, `actual_finish`, `forecast_end`, `data_date`
+- **적용 조건**: 해당 행의 `source_file`이 위 세 파일 중 하나이고, 이후 다른 배치가 같은 `task_no`를 덮어쓰지 않았을 때만 (즉 `updated_at`이 그 배치 임포트 시각 근처인 행만 대상). 안전을 위해 배치 단위 `_batch_no` 매칭을 1차 조건으로 사용.
+- 롤업/트리거 재계산이 필요한 파생 필드(`plan_progress`, `progress_variance`, `expected_progress_today`, `forecast_end` 자동값 등)는 기존 트리거 `calc_sub_task_derived_fn` / `recalc_task_auto_judgment` / `rollup_task_all_mains`가 UPDATE 발생 시 자동 재계산되므로 별도 조치 불필요 (계획 검증 시 실행 후 spot-check).
 
-## 진행 방식
+**보호 장치**:
+- 실행 전 `task_schedule_change_audit`에 스냅샷 자동 기록 여부 확인. 없다면 수동으로 `SELECT INTO` 백업 테이블 `_tm_date_shift_backup_20260725` 생성.
+- 시프트 대상이 아닌(이미 정상 저장된) 행 오염 방지를 위해, `UPDATE ... WHERE _batch_no = $batch AND <col> IS NOT NULL` 형태로 좁힘.
 
-**즉시 Phase 1부터 순차적으로 진행합니다.** 각 Phase 완료 시 요약을 보고하고, 사용자가 "다음" 또는 특정 회귀를 지적하면 즉시 후속 조치합니다.
+## Phase 3 — 검증
 
-**질문 (Phase 4 진입 전 답변 필요):**
+1. `parser.ts` 수정본으로 세 파일 재-parse (테스트 스크립트) → 엑셀 원본 값과 100% 일치 확인.
+2. Phase 2 복구 후 세 배치 대상 `task_management_raw` vs 엑셀 원본 diff 재-실행 → -1일 시프트 0건 확인.
+3. 파생 필드(plan_progress, forecast_end 자동값) 트리거 재계산 결과 spot-check.
 
-1. Row 1의 "UR"에는 Aconex `For Review` + HDEC 측 Submission 완료 후 미결(response 없음) 도면 모두 포함해야 하나요, 아니면 Aconex Under Review만 포함하나요?
-2. Row 2 "No Plan"의 정의: (a) RS Plan/SB Plan 모두 공란 (b) 현재 활성 라운드의 Plan 공란 — 어느 쪽인가요?
-3. UR Aging 기준일: `Date Modified` (Aconex 최종 수정) vs Submission Actual 날짜 — 어느 기준인가요?
+## 사용자 조치 순서
 
-Phase 1~3은 위 질문 없이도 진행 가능하므로, 승인 즉시 시작하겠습니다.
+Phase 1 (코드) → Phase 2 (`insert` 툴로 복구 SQL 실행 승인) → Phase 3 (검증 리포트).
+
+## 기술 노트
+
+- 다른 모듈 파서(defect, abd, aconex)도 동일한 `cellDates:true` + `dohaDateOnly` 조합을 사용하므로 **동일 결함 잠재** — 이번 계획에는 포함하지 않되, 완료 후 별건으로 감사 권장.
+- Phase 2 복구는 오직 **이번 3개 배치**만 대상 (사용자 확정). 다른 과거 배치의 시프트는 남으며, 필요 시 별도 논의.
