@@ -533,6 +533,44 @@ export function TaskTreePage() {
             {missingPlanCounts.noEnd.toLocaleString()}
           </span>
         </button>
+        <div className="flex items-center gap-1">
+          {(["정상", "주의", "지연", "위험"] as const).map((j) => {
+            const active = judgmentFilter.has(j);
+            const count = judgmentCounts[j] ?? 0;
+            return (
+              <button
+                key={j}
+                type="button"
+                onClick={() =>
+                  setJudgmentFilter((cur) => {
+                    const next = new Set(cur);
+                    if (next.has(j)) next.delete(j);
+                    else next.add(j);
+                    return next;
+                  })
+                }
+                className={cn(
+                  "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition",
+                  active
+                    ? (AUTO_JUDGMENT_COLORS[j] ?? "bg-muted") + " border-transparent ring-1 ring-current"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+              >
+                <span>{j}</span>
+                <span className="tabular-nums font-semibold">{count.toLocaleString()}</span>
+              </button>
+            );
+          })}
+          {judgmentFilter.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setJudgmentFilter(new Set())}
+              className="ml-1 text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              해제
+            </button>
+          )}
+        </div>
       </div>
 
       {isLoading && <div className="text-sm text-muted-foreground">로딩 중…</div>}
