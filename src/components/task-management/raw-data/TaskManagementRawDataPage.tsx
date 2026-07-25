@@ -1364,12 +1364,15 @@ export function TaskManagementRawDataPage() {
                 return (
                   <div
                     key={row.id}
-                    onClick={() =>
+                    onClick={() => {
+                      const rid = String((row.original as Row).id);
+                      const info = commentCounts?.[rid];
+                      if (info && info.count > 0) markRead(rid, info.lastUpdatedAt);
                       navigate({
                         to: "/closure/task-management/detail/$id",
-                        params: { id: String((row.original as Row).id) },
-                      })
-                    }
+                        params: { id: rid },
+                      });
+                    }}
                     style={{
                       transform: `translateY(${v.start}px)`,
                       height: v.size,
