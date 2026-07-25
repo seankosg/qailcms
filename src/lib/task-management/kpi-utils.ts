@@ -176,7 +176,9 @@ export type TmKpiMode =
   | "start_delayed"
   | "completion_overdue"
   | "critical"
-  | "behind";
+  | "behind"
+  | "no_plan_start"
+  | "no_plan_end";
 
 /** 팀별 breakdown 계산 결과 항목 */
 export interface KpiTeamBreakdownEntry {

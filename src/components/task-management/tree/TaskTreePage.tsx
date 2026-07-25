@@ -226,6 +226,41 @@ export function TaskTreePage() {
     });
   }, [filtered]);
 
+  // Header 강조: 현재 discipline + PIC 필터가 적용된 데이터 기준
+  // Plan Start / Plan End 가 비어있는 태스크 갯수
+  const missingPlanCounts = useMemo(() => {
+    const matchPic = (r: Row) => {
+      if (picFilter === "__all__") return true;
+      const v = (r.hdec_pic_name ?? "").trim();
+      if (picFilter === "__unassigned__") return !v;
+      return v === picFilter;
+    };
+    let noStart = 0;
+    let noEnd = 0;
+    for (const r of data) {
+      if (!matchPic(r)) continue;
+      if (!r.plan_start) noStart += 1;
+      if (!r.plan_end) noEnd += 1;
+    }
+    return { noStart, noEnd };
+  }, [data, picFilter]);
+
+  function goToRawDataMissing(kind: "no_plan_start" | "no_plan_end") {
+    const searchParams: Record<string, string> = {
+      source: "dashboard",
+      mode: kind,
+      taskScope: "all",
+      discipline,
+    };
+    if (picFilter !== "__all__" && picFilter !== "__unassigned__") {
+      searchParams.hdec_pic_name = picFilter;
+    }
+    navigate({
+      to: "/closure/task-management/raw-data",
+      search: searchParams as any,
+    });
+  }
+
   function toggle(taskNo: string) {
     setExpanded((cur) => {
       const next = new Set(cur);
@@ -399,6 +434,43 @@ export function TaskTreePage() {
             Excel
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => goToRawDataMissing("no_plan_start")}
+          disabled={missingPlanCounts.noStart === 0}
+          title="P.Start 가 비어있는 태스크 목록 보기"
+          className={cn(
+            "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition",
+            missingPlanCounts.noStart > 0
+              ? "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+              : "border-muted bg-muted/40 text-muted-foreground cursor-not-allowed",
+          )}
+        >
+          <span>P.Start 없음</span>
+          <span className="tabular-nums font-semibold">
+            {missingPlanCounts.noStart.toLocaleString()}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => goToRawDataMissing("no_plan_end")}
+          disabled={missingPlanCounts.noEnd === 0}
+          title="P.Finish 가 비어있는 태스크 목록 보기"
+          className={cn(
+            "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition",
+            missingPlanCounts.noEnd > 0
+              ? "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+              : "border-muted bg-muted/40 text-muted-foreground cursor-not-allowed",
+          )}
+        >
+          <span>P.Finish 없음</span>
+          <span className="tabular-nums font-semibold">
+            {missingPlanCounts.noEnd.toLocaleString()}
+          </span>
+        </button>
       </div>
 
       {isLoading && <div className="text-sm text-muted-foreground">로딩 중…</div>}

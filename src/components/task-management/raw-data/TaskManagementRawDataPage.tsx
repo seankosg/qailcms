@@ -530,6 +530,10 @@ export function TaskManagementRawDataPage() {
           return kpiIsCriticalDelay(it, asOf, t);
         case "behind":
           return kpiIsInDelay(it, asOf) && kpiIsBehindSchedule(it, asOf);
+        case "no_plan_start":
+          return !(it as any).plan_start;
+        case "no_plan_end":
+          return !(it as any).plan_end;
         default:
           return true;
       }
