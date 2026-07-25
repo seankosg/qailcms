@@ -359,36 +359,39 @@ export function AppLayout({ children }: { children: ReactNode }) {
         {collapsed ? (
           <div className="flex h-14 flex-col items-center justify-center gap-1 border-b">
             <span className="text-[10px] font-bold tracking-wider text-primary">QAIL</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSignOut} title="Sign out">
-              <LogOut className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        ) : (
-          <div className="flex h-14 items-center justify-between gap-2 border-b px-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold tracking-wide">QAIL CMS</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex flex-col items-end">
-                <span className="max-w-[110px] truncate text-sm font-medium">{me?.name ?? me?.email}</span>
-                <span className="text-[10px] leading-none text-muted-foreground">{displayRoleLabel}</span>
-              </div>
-              {me?.primaryRole === "guest" || me?.isGuest ? (
-                <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Guest</span>
-              ) : me?.isAdmin || me?.isDSuperUser ? (
-                <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                  <ShieldCheck className="h-3 w-3" />
-                  {displayRoleLabel}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium">
-                  {displayRoleLabel}
-                </span>
-              )}
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSignOut} title="Sign out">
-                <LogOut className="h-4 w-4" />
+            <div className="flex items-center gap-0.5">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate({ to: "/change-password" })} title="비밀번호 변경">
+                <KeyRound className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSignOut} title="Sign out">
+                <LogOut className="h-3.5 w-3.5" />
               </Button>
             </div>
+          </div>
+        ) : (
+          <div className="flex h-14 items-center justify-end gap-2 border-b px-4">
+            <div className="flex flex-col items-end">
+              <span className="max-w-[110px] truncate text-sm font-medium">{me?.name ?? me?.email}</span>
+              <span className="text-[10px] leading-none text-muted-foreground">{displayRoleLabel}</span>
+            </div>
+            {me?.primaryRole === "guest" || me?.isGuest ? (
+              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Guest</span>
+            ) : me?.isAdmin || me?.isDSuperUser ? (
+              <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                <ShieldCheck className="h-3 w-3" />
+                {displayRoleLabel}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium">
+                {displayRoleLabel}
+              </span>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate({ to: "/change-password" })} title="비밀번호 변경">
+              <KeyRound className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSignOut} title="Sign out">
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         )}
         <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden", collapsed ? "px-1.5 py-3" : "p-3")}>
