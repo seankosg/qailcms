@@ -667,6 +667,7 @@ export async function parseDefectExcel(
   if (!sheet) throw new Error("시트를 찾을 수 없습니다");
 
   const warnings: string[] = [];
+  const { audit: dateAudit, read: readDateCell } = makeDateAudit(opts.dateOverrides ?? {});
   const { map: headerMap, entries, headerRow } = scanHeaders(sheet);
   if (headerRow > 0) {
     warnings.push(`헤더 행 자동 감지: ${headerRow + 1}행부터 읽습니다.`);
@@ -865,5 +866,6 @@ export async function parseDefectExcel(
     isReimport,
     sourceKeyOrigin,
     uuidKeyRejectedRows,
+    dateIssues: dateAudit.issues,
   };
 }
