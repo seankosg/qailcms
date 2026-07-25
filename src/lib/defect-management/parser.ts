@@ -816,7 +816,15 @@ export async function parseDefectExcel(
       item: cols.item ? toStr(getCell(sheet, r, cols.item)) : null,
       description: cols.description ? toStr(getCell(sheet, r, cols.description)) : null,
       priority: cols.priority ? toStr(getCell(sheet, r, cols.priority)) : null,
-      due_by: cols.due_by ? toIsoDate(getCell(sheet, r, cols.due_by)) : null,
+      due_by: cols.due_by
+        ? readDateCell(getCell(sheet, r, cols.due_by), {
+            cellRef: toCellRef(r, cols.due_by),
+            row: r,
+            col: cols.due_by,
+            field: "due_by",
+            header: entries.find((e) => e.col === cols.due_by)?.header || "Due by",
+          })
+        : null,
       created_by_name: cols.created_by_name ? toStr(getCell(sheet, r, cols.created_by_name)) : null,
       created_by_team_name: cols.created_by_team_name ? toStr(getCell(sheet, r, cols.created_by_team_name)) : null,
       created_date: cols.created_date ? toIsoDateTime(getCell(sheet, r, cols.created_date)) : null,
