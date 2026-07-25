@@ -40,6 +40,7 @@ import {
   type AttentionItem,
   type CrossCutCell,
 } from "@/lib/abd/dashboard-data";
+import { AbdRow1Kpis, AbdRow2Kpis } from "./AbdKpiRows";
 
 export function AbdDashboardPage() {
   const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
@@ -169,47 +170,11 @@ export function AbdDashboardPage() {
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {data ? (
-          <>
-            <KpiCard
-              label="Total"
-              value={data.total}
-              hint={`${data.approved.toLocaleString()} approved`}
-              onClick={() => openRawData()}
-            />
-            <KpiCard
-              label="Approved"
-              value={data.approved}
-              hint={`${pct(data.approved, data.total)}% of total`}
-              tone="ok"
-              onClick={() => openRawData({ status_group: "approved" })}
-            />
-            <KpiCard
-              label="In Progress"
-              value={data.pending - data.overdue - data.stageCounts.Pending}
-              hint={`Pending ${data.stageCounts.Pending.toLocaleString()}`}
-              tone="info"
-              onClick={() => openRawData({ status_group: "in_progress" })}
-            />
-            <KpiCard
-              label="Overdue"
-              value={data.overdue}
-              hint={`Awaiting ${data.awaitingResponse.toLocaleString()}`}
-              tone="danger"
-              onClick={() => openRawData({ status_group: "not_started" })}
-            />
-          </>
-        ) : (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-[120px] animate-pulse rounded-md border border-border/60 bg-muted/30"
-            />
-          ))
-        )}
-      </div>
+      {/* Row 1 — 배타적 5분류 (Total / Approved / UR / DS / NS) */}
+      <AbdRow1Kpis onOpenRaw={openRawData} />
+
+      {/* Row 2 — 지연 (Total / RS / SB / DS / No Plan) */}
+      <AbdRow2Kpis onOpenRaw={openRawData} />
 
       {/* Focus + Trend */}
       {data && (
