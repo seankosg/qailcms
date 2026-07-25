@@ -1,6 +1,7 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 export type RowListTab = "today" | "risk" | "upcoming" | "all";
 
@@ -26,12 +27,14 @@ interface Props<T> {
   visibility?: Record<string, boolean>;
   frozen?: string[];
   toolbarExtra?: ReactNode;
+  defaultCollapsed?: boolean;
 }
 
 export function ModuleRowList<T>({
   rows, columns, activeTab, onTabChange, counts, filterRow, onRowClick, emptyText = "표시할 항목이 없습니다.", rowKey,
-  order, visibility, frozen, toolbarExtra,
+  order, visibility, frozen, toolbarExtra, defaultCollapsed = true,
 }: Props<T>) {
+  const [collapsed, setCollapsed] = useState<boolean>(defaultCollapsed);
   const filtered = useMemo(() => rows.filter((r) => filterRow(r, activeTab)), [rows, activeTab, filterRow]);
   const orderedCols = useMemo(() => {
     const byKey = new Map(columns.map((c) => [c.key, c]));
@@ -77,14 +80,24 @@ export function ModuleRowList<T>({
   return (
     <div className="rounded-md border bg-card overflow-hidden">
       <div className="flex items-center justify-between border-b px-2 py-1.5">
-        <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as RowListTab)}>
-          <TabsList className="h-8">
-            <TabsTrigger value="today" className="text-xs h-7 px-2.5">오늘 ({counts.today.toLocaleString()})</TabsTrigger>
-            <TabsTrigger value="risk" className="text-xs h-7 px-2.5">지연 ({counts.risk.toLocaleString()})</TabsTrigger>
-            <TabsTrigger value="upcoming" className="text-xs h-7 px-2.5">임박 ({counts.upcoming.toLocaleString()})</TabsTrigger>
-            <TabsTrigger value="all" className="text-xs h-7 px-2.5">전체 ({counts.all.toLocaleString()})</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            aria-label={collapsed ? "펼치기" : "접기"}
+            onClick={() => setCollapsed((v) => !v)}
+            className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-accent text-muted-foreground"
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+          <Tabs value={activeTab} onValueChange={(v) => { onTabChange(v as RowListTab); setCollapsed(false); }}>
+            <TabsList className="h-8">
+              <TabsTrigger value="today" className="text-xs h-7 px-2.5">오늘 ({counts.today.toLocaleString()})</TabsTrigger>
+              <TabsTrigger value="risk" className="text-xs h-7 px-2.5">지연 ({counts.risk.toLocaleString()})</TabsTrigger>
+              <TabsTrigger value="upcoming" className="text-xs h-7 px-2.5">임박 ({counts.upcoming.toLocaleString()})</TabsTrigger>
+              <TabsTrigger value="all" className="text-xs h-7 px-2.5">전체 ({counts.all.toLocaleString()})</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
         <div className="flex items-center gap-2">
           <div className="text-[11px] text-muted-foreground tabular-nums">
             {filtered.length.toLocaleString()} 건
@@ -92,6 +105,7 @@ export function ModuleRowList<T>({
           {toolbarExtra}
         </div>
       </div>
+      {!collapsed && (
       <div className="max-h-[360px] overflow-auto">
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-muted/60 backdrop-blur z-10">
@@ -142,6 +156,7 @@ export function ModuleRowList<T>({
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
