@@ -547,7 +547,7 @@ export function TaskTreePage() {
           </span>
         </button>
         <div className="flex items-center gap-1">
-          {(["정상", "주의", "지연", "위험"] as const).map((j) => {
+          {(["위험", "지연", "주의", "정상"] as const).map((j) => {
             const active = judgmentFilter.has(j);
             const count = judgmentCounts[j] ?? 0;
             return (
