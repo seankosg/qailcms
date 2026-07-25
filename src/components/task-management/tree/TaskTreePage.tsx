@@ -409,9 +409,7 @@ export function TaskTreePage() {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
           const isDone = Number(p.actual_progress ?? 0) >= 1;
-          const mainJudgment =
-            (p.auto_judgment && p.auto_judgment.trim()) ||
-            computeJudgment(p, undefined, asOfDate);
+          const mainJudgment = resolveJudgment(p, asOfDate);
           const behindCount = kids.filter(
             (k) => (computeVariance(k, asOfDate) ?? 0) < -0.05,
           ).length;
