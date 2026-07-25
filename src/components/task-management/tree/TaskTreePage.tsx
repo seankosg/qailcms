@@ -772,10 +772,14 @@ export function TaskTreePage() {
                       {kids.map((k) => {
                         const gap = computeVariance(k, asOfDate) ?? 0;
                         const j = resolveRowJudgment(k, thresholds, asOfDate);
+                        const kDone = Number(k.actual_progress ?? 0) >= 1;
                         return (
                           <tr
                             key={k.id}
-                            className="cursor-pointer border-t hover:bg-accent/30"
+                            className={cn(
+                              "cursor-pointer border-t hover:bg-accent/30",
+                              kDone && "bg-muted/50 text-muted-foreground opacity-70",
+                            )}
                             onClick={() =>
                               navigate({
                                 to: "/closure/task-management/detail/$id",
