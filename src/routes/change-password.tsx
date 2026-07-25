@@ -72,10 +72,17 @@ function ChangePasswordPage() {
               <Label htmlFor="p2">새 비밀번호 확인</Label>
               <Input id="p2" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={6} />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              변경하기
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" className="flex-1" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                변경하기
+              </Button>
+              {!isForced && (
+                <Button type="button" variant="outline" className="flex-1" onClick={() => navigate({ to: "/my-work-space", replace: true })}>
+                  취소
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>
