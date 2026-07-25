@@ -425,7 +425,7 @@ export async function parseAbdFile(
   teamOptions?: TeamOption[],
 ): Promise<ParsedFileResult> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf });
+  const wb = XLSX.read(buf);
   const teamFromFilename = teamOverride ?? detectTeamFromFilename(file.name, teamOptions);
   const result: ParsedFileResult = {
     file_name: file.name,
