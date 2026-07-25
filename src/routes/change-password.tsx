@@ -22,10 +22,12 @@ export const Route = createFileRoute("/change-password")({
 function ChangePasswordPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { data: me } = useCurrentUser();
   const mark = useServerFn(markPasswordChanged);
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
   const [loading, setLoading] = useState(false);
+  const isForced = me?.mustChangePassword === true;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
