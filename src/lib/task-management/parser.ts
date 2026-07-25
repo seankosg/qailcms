@@ -794,14 +794,46 @@ export async function parseTaskManagementExcel(
         return idx ? toStr(getCell(sheet, r, idx)) : null;
       })(),
       status_manual: toStr(getCell(sheet, r, cols.status_manual)),
-      plan_start: toIsoDate(getCell(sheet, r, cols.plan_start)),
-      plan_end: toIsoDate(getCell(sheet, r, cols.plan_end)),
+      plan_start: cols.plan_start
+        ? readDateCell(getCell(sheet, r, cols.plan_start), {
+            cellRef: toCellRef(r, cols.plan_start),
+            row: r,
+            col: cols.plan_start,
+            field: "plan_start",
+            header: sheetHeaders.find((h) => h.col === cols.plan_start)?.header || "계획 시작",
+          })
+        : null,
+      plan_end: cols.plan_end
+        ? readDateCell(getCell(sheet, r, cols.plan_end), {
+            cellRef: toCellRef(r, cols.plan_end),
+            row: r,
+            col: cols.plan_end,
+            field: "plan_end",
+            header: sheetHeaders.find((h) => h.col === cols.plan_end)?.header || "계획 완료",
+          })
+        : null,
       plan_days: toNumber(getCell(sheet, r, cols.plan_days)),
-      actual_start: toIsoDate(getCell(sheet, r, cols.actual_start)),
+      actual_start: cols.actual_start
+        ? readDateCell(getCell(sheet, r, cols.actual_start), {
+            cellRef: toCellRef(r, cols.actual_start),
+            row: r,
+            col: cols.actual_start,
+            field: "actual_start",
+            header: sheetHeaders.find((h) => h.col === cols.actual_start)?.header || "실제 시작",
+          })
+        : null,
       actual_progress: toPct4(getCell(sheet, r, cols.actual_progress)),
       plan_progress: toPct4(getCell(sheet, r, cols.plan_progress)),
       progress_variance: toPct4(getCell(sheet, r, cols.progress_variance)),
-      forecast_end: toIsoDate(getCell(sheet, r, cols.forecast_end)),
+      forecast_end: cols.forecast_end
+        ? readDateCell(getCell(sheet, r, cols.forecast_end), {
+            cellRef: toCellRef(r, cols.forecast_end),
+            row: r,
+            col: cols.forecast_end,
+            field: "forecast_end",
+            header: sheetHeaders.find((h) => h.col === cols.forecast_end)?.header || "예상 완료",
+          })
+        : null,
       // A.Finish 자동 보정: 100% 완료면 Revise Finish(=forecast_end) → dataDate 폴백.
       actual_finish: (() => {
         const ap = toPct4(getCell(sheet, r, cols.actual_progress));
