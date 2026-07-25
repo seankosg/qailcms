@@ -61,6 +61,9 @@ const NAV: NavSection[] = [
   {
     label: "My Work Space",
     dashboard: { to: "/my-work-space", label: "My Work Space", icon: iconUser },
+    items: [
+      { to: "/my-team-work-space", label: "My Team Work Space", icon: iconPeople },
+    ],
   },
   {
     label: "Outstanding Work",

@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedMyWorkSpaceRouteImport } from './routes/_authenticated/my-work-space'
+import { Route as AuthenticatedMyTeamWorkSpaceRouteImport } from './routes/_authenticated/my-team-work-space'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
@@ -84,6 +85,12 @@ const AuthenticatedMyWorkSpaceRoute =
   AuthenticatedMyWorkSpaceRouteImport.update({
     id: '/my-work-space',
     path: '/my-work-space',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMyTeamWorkSpaceRoute =
+  AuthenticatedMyTeamWorkSpaceRouteImport.update({
+    id: '/my-team-work-space',
+    path: '/my-team-work-space',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
@@ -364,6 +371,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
@@ -415,6 +423,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
+  '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
@@ -469,6 +478,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/_authenticated/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/_authenticated/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/_authenticated/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/_authenticated/admin/mapping': typeof AuthenticatedAdminMappingRoute
@@ -523,6 +533,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/admin'
+    | '/my-team-work-space'
     | '/my-work-space'
     | '/admin/backup'
     | '/admin/mapping'
@@ -574,6 +585,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/change-password'
+    | '/my-team-work-space'
     | '/my-work-space'
     | '/admin/backup'
     | '/admin/mapping'
@@ -627,6 +639,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/_authenticated/admin'
+    | '/_authenticated/my-team-work-space'
     | '/_authenticated/my-work-space'
     | '/_authenticated/admin/backup'
     | '/_authenticated/admin/mapping'
@@ -721,6 +734,13 @@ declare module '@tanstack/react-router' {
       path: '/my-work-space'
       fullPath: '/my-work-space'
       preLoaderRoute: typeof AuthenticatedMyWorkSpaceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/my-team-work-space': {
+      id: '/_authenticated/my-team-work-space'
+      path: '/my-team-work-space'
+      fullPath: '/my-team-work-space'
+      preLoaderRoute: typeof AuthenticatedMyTeamWorkSpaceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin': {
@@ -1105,6 +1125,7 @@ const AuthenticatedClosureSparePartImportRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
+  AuthenticatedMyTeamWorkSpaceRoute: typeof AuthenticatedMyTeamWorkSpaceRoute
   AuthenticatedMyWorkSpaceRoute: typeof AuthenticatedMyWorkSpaceRoute
   AuthenticatedCloseoutDashboardRoute: typeof AuthenticatedCloseoutDashboardRoute
   AuthenticatedImportLogImportRoute: typeof AuthenticatedImportLogImportRoute
@@ -1143,6 +1164,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
+  AuthenticatedMyTeamWorkSpaceRoute: AuthenticatedMyTeamWorkSpaceRoute,
   AuthenticatedMyWorkSpaceRoute: AuthenticatedMyWorkSpaceRoute,
   AuthenticatedCloseoutDashboardRoute: AuthenticatedCloseoutDashboardRoute,
   AuthenticatedImportLogImportRoute: AuthenticatedImportLogImportRoute,
