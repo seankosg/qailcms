@@ -41,6 +41,13 @@ import {
   type CrossCutCell,
 } from "@/lib/abd/dashboard-data";
 import { AbdRow1Kpis, AbdRow2Kpis } from "./AbdKpiRows";
+import {
+  AbdRow3StatusDist,
+  AbdRow4ApprovalTrend,
+  AbdRow5OverdueHeatmap,
+  AbdRow6Attention,
+  AbdRow6Crosscut,
+} from "./AbdChartsRows";
 
 export function AbdDashboardPage() {
   const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
@@ -176,6 +183,26 @@ export function AbdDashboardPage() {
       {/* Row 2 — 지연 (Total / RS / SB / DS / No Plan) */}
       <AbdRow2Kpis onOpenRaw={openRawData} />
 
+      {/* Row 3 — Latest Status Distribution + Row 4 — Approval Trend */}
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="xl:col-span-1">
+          <AbdRow3StatusDist onOpenRaw={openRawData} />
+        </div>
+        <div className="xl:col-span-2">
+          <AbdRow4ApprovalTrend onOpenRaw={openRawData} />
+        </div>
+      </div>
+
+      {/* Row 5 — Overdue Heatmap */}
+      <AbdRow5OverdueHeatmap onOpenRaw={openRawData} />
+
+      {/* Row 6 — Attention Lists + Cross-cut */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <AbdRow6Attention onOpenRaw={openRawData} />
+        <AbdRow6Crosscut onOpenRaw={openRawData} />
+      </div>
+
+      {/* Legacy Focus/Trend/Attention/Crosscut (loaded from legacy dashboard-data) */}
       {/* Focus + Trend */}
       {data && (
         <div className="grid gap-4 xl:grid-cols-3">
