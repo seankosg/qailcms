@@ -18,6 +18,7 @@ import { format, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "./AbdAgingSettingsPopover";
 import { cn } from "@/lib/utils";
 import {
   getAbdDashboardStatusDist,
@@ -365,6 +366,7 @@ function AttentionRows({
   kind: "needs_planning" | "ur_aging" | "status_mismatch";
   onOpen: (params: Record<string, string>) => void;
 }) {
+  const { data: settings } = useAbdSettingsQuery();
   if (items.length === 0) {
     return <p className="py-6 text-center text-sm text-muted-foreground">해당 항목이 없습니다.</p>;
   }
@@ -398,7 +400,13 @@ function AttentionRows({
           </div>
           <div className="shrink-0 text-right">
             {kind === "ur_aging" && it.ur_aging_days != null && (
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+                  AGING_TONE_CLASS[agingTone(it.ur_aging_days, settings)],
+                )}
+                title={`UR 경과 ${it.ur_aging_days}일 · 임계값 ${settings?.ur_aging_warn_days ?? "?"}/${settings?.ur_aging_late_days ?? "?"}일`}
+              >
                 {it.ur_aging_days}d
               </span>
             )}
