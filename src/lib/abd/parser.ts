@@ -116,6 +116,21 @@ function isResponseResultLabel(label: string, stageBand: string): boolean {
   return false;
 }
 
+/** "A - Approved" / "b" / "A/C" 등을 정규화해 A|B|C|NS 로 축약. */
+function normResponseResult(v: any): string | null {
+  if (v == null) return null;
+  const s = String(v).trim().toUpperCase();
+  if (!s) return null;
+  if (s === "NS" || s === "N/A" || s === "-") return null;
+  const m = s.match(/^([ABCD])\b/);
+  if (m) return m[1];
+  if (s.includes("APPROV")) return "A";
+  if (s.includes("COMMENT")) return "B";
+  if (s.includes("RESUBMIT") || s.includes("REVISE")) return "C";
+  if (s.includes("REJECT")) return "D";
+  return null;
+}
+
 function normText(v: any): string {
   return String(v ?? "").trim().toUpperCase();
 }
