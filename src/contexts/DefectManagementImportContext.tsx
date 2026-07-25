@@ -426,8 +426,12 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
   const parseAndApply = useCallback(
     async (id: string, file: File, sheetName?: string, excludedHeaders?: string[]) => {
       const extraAliases = await fetchAliases();
-      const current = (filesRefLocal.current ?? []).find((f) => f.id === id);
-      const dateOverrides = current?.dateOverrides ?? {};
+      let dateOverrides: Record<string, string> = {};
+      setFiles((cur) => {
+        const t = cur.find((f) => f.id === id);
+        dateOverrides = t?.dateOverrides ?? {};
+        return cur;
+      });
       try {
         const parsed = await parseDefectExcel(file, {
           extraAliases,
