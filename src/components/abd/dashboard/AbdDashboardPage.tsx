@@ -1,45 +1,17 @@
 import { nowInDoha } from "@/lib/time/doha";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
-  ArrowRight,
   CalendarIcon,
-  FileSpreadsheet,
   RefreshCw,
-  TrendingUp,
   Filter,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import {
-  ResponsiveContainer,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+import { format } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import {
-  loadAbdDashboardData,
-  buildTrendSeries,
-  ABD_STAGES,
-  type AbdDashboardData,
-  type AbdStage,
-  type AttentionItem,
-  type CrossCutCell,
-} from "@/lib/abd/dashboard-data";
 import { AbdRow1Kpis, AbdRow2Kpis } from "./AbdKpiRows";
 import {
   AbdRow3StatusDist,
@@ -48,24 +20,47 @@ import {
   AbdRow6Attention,
   AbdRow6Crosscut,
 } from "./AbdChartsRows";
+import { AbdAgingSettingsPopover, useAbdSettingsQuery } from "./AbdAgingSettingsPopover";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export function AbdDashboardPage() {
   const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
   const [batchFilter, setBatchFilter] = useState<string[]>([]);
   const navigate = useNavigate();
-
-  const {
-    data,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useQuery<AbdDashboardData>({
-    queryKey: ["abd-dashboard", format(asOf, "yyyy-MM-dd"), batchFilter.join(",")],
-    queryFn: () => loadAbdDashboardData({ asOf, batchNo: batchFilter.length ? batchFilter : undefined }),
-    staleTime: 60_000,
+  const qc = useQueryClient();
+  // SSOT: 대시보드 상단 필터를 위한 batch 옵션 — abd_items_facets("batch_no")로 조회
+  const batchListQ = useQuery<string[]>({
+    queryKey: ["abd-batch-list"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("abd_items_facets", {
+        _column: "batch_no",
+        _team: "MECH", // team 무관 조회를 위해 임의값 — 이후 union 대체 예정
+        _status_group: null,
+        _include_inactive: false,
+        _plot: null,
+        _q: null,
+        _filters: [],
+      });
+      if (error) return [];
+      return ((data ?? []) as any[])
+        .map((r) => String(r.value ?? ""))
+        .filter((v) => v && v !== "(empty)");
+    },
+    staleTime: 5 * 60_000,
   });
-
-  const trend = useMemo(() => (data ? buildTrendSeries(data, 30) : []), [data]);
+  // aging 설정을 사전 로드해 하위 카드에서 즉시 사용
+  useAbdSettingsQuery();
+  const isFetching = false;
+  const refetch = () => {
+    qc.invalidateQueries({ queryKey: ["abd-dash-row1"] });
+    qc.invalidateQueries({ queryKey: ["abd-dash-row2"] });
+    qc.invalidateQueries({ queryKey: ["abd-dash-status"] });
+    qc.invalidateQueries({ queryKey: ["abd-dash-trend"] });
+    qc.invalidateQueries({ queryKey: ["abd-dash-overdue"] });
+    qc.invalidateQueries({ queryKey: ["abd-dash-attention"] });
+    qc.invalidateQueries({ queryKey: ["abd-dash-crosscut"] });
+  };
 
   const openRawData = (params: Record<string, string> = {}) => {
     const search: Record<string, string> = { ...params };
@@ -79,12 +74,11 @@ export function AbdDashboardPage() {
     navigate({ to: "/closure/abd/raw-data", search: search as any });
   };
 
-  // 사용 가능한 batch 목록: data.byBatch에서 유래 (선택된 필터로 축소되지 않도록 별도 쿼리를 두지 않음).
   const batchOptions = useMemo(() => {
     const set = new Set<string>(batchFilter);
-    for (const c of data?.byBatch ?? []) if (c.key && c.key !== "— Unassigned") set.add(c.key);
+    for (const v of batchListQ.data ?? []) set.add(v);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [data, batchFilter]);
+  }, [batchListQ.data, batchFilter]);
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -95,10 +89,11 @@ export function AbdDashboardPage() {
             As-Built Drawing Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
-            R1 · R2 · R3 라운드 진척과 승인 상태를 한눈에.
+            NS · DS · UR · Approved 5분류와 라운드 진척을 한눈에.
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AbdAgingSettingsPopover />
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2 font-normal">
@@ -201,25 +196,6 @@ export function AbdDashboardPage() {
         <AbdRow6Attention batchNo={batchFilter} onOpenRaw={openRawData} />
         <AbdRow6Crosscut batchNo={batchFilter} onOpenRaw={openRawData} />
       </div>
-
-      {/* Legacy Focus/Trend/Attention/Crosscut (loaded from legacy dashboard-data) */}
-      {/* Focus + Trend */}
-      {data && (
-        <div className="grid gap-4 xl:grid-cols-3">
-          <FocusCard data={data} className="xl:col-span-1" />
-          <TrendCard trend={trend} className="xl:col-span-2" />
-        </div>
-      )}
-
-      {/* Attention */}
-      {data && <AttentionSection data={data} onOpen={openRawData} />}
-
-      {/* Cross-cut */}
-      {data && <CrossCutSection data={data} onOpen={openRawData} />}
-
-      {isLoading && !data && (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      )}
     </div>
   );
 }
