@@ -19,10 +19,13 @@ import { cn } from "@/lib/utils";
 import { DISCIPLINES, AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
 import type { Discipline } from "@/lib/task-management/columns";
 import {
+  DEFAULT_THRESHOLDS,
   computeJudgment,
   cumPlanProgress,
   computeVariance,
+  worstJudgment,
 } from "@/lib/task-management/derived";
+import type { TaskThresholds } from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -44,6 +47,9 @@ interface Row {
   plan_progress: number | null;
   plan_start: string | null;
   plan_end: string | null;
+  plan_days: number | null;
+  actual_start: string | null;
+  actual_finish: string | null;
   slip_days: number | null;
   auto_judgment: string | null;
   hdec_pic_name: string | null;
@@ -53,12 +59,47 @@ interface Row {
   data_date: string | null;
 }
 
-/** Main Task는 Data Date 변경에 민감하므로 클라이언트 재계산 우선, Sub는 DB값 우선. */
-function resolveJudgment(r: Row, asOfDate?: string): string {
-  if (r.level === "main") {
-    return computeJudgment(r, undefined, asOfDate) || r.auto_judgment || "";
+function averageProgress(rows: Row[]): number | null {
+  if (rows.length === 0) return null;
+  let total = 0;
+  for (const r of rows) {
+    total += Math.max(0, Math.min(1, Number(r.actual_progress ?? 0)));
   }
-  return r.auto_judgment || computeJudgment(r, undefined, asOfDate) || "";
+  return total / rows.length;
+}
+
+/** Sub Task는 저장 판정 우선, Main Task는 화면에 로드된 Sub Task 실적 롤업 기준으로 재판정. */
+function resolveRowJudgment(
+  r: Row,
+  thresholds: TaskThresholds,
+  asOfDate?: string,
+): string {
+  return r.auto_judgment || computeJudgment(r, thresholds, asOfDate) || "";
+}
+
+function resolveMainJudgment(
+  main: Row,
+  kids: Row[],
+  thresholds: TaskThresholds,
+  asOfDate?: string,
+): string {
+  if (kids.length === 0) {
+    return computeJudgment(main, thresholds, asOfDate) || main.auto_judgment || "";
+  }
+
+  const rolledActual = averageProgress(kids);
+  const allDone = kids.every((k) => Number(k.actual_progress ?? 0) >= 1 || k.auto_judgment === "완료");
+  const hasProgress = Number(rolledActual ?? 0) > 0;
+  const syntheticMain: Row = {
+    ...main,
+    actual_progress: rolledActual ?? main.actual_progress,
+    actual_start: main.actual_start ?? (hasProgress ? main.plan_start : null),
+    actual_finish: allDone ? (main.actual_finish ?? main.plan_end) : null,
+    auto_judgment: allDone ? "완료" : null,
+  };
+  const mainJudgment = computeJudgment(syntheticMain, thresholds, asOfDate);
+  const childWorst = worstJudgment(kids.map((k) => resolveRowJudgment(k, thresholds, asOfDate)));
+  return worstJudgment([mainJudgment, childWorst]) ?? mainJudgment ?? childWorst ?? "";
 }
 
 function ProgressBar({ v }: { v: number | null | undefined }) {
