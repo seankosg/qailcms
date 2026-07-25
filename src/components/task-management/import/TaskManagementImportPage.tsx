@@ -553,6 +553,7 @@ function FileRow({
   onPolicyChange,
   onRunPreflight,
   onOpenConflict,
+  onDateOverridesApply,
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
