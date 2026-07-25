@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
-  useMyTasks, useMyDefects, useMyAbd,
+  useMyTasks, useMyDefectsCounts, useMyDefectsBucket, useMyAbd,
   tmIsCompleted, tmIsStarted, tmIsDelayed, tmIsUpcoming, tmIsToday, tmTodayKinds,
-  smIsCompleted, smIsDelayed, smIsInProgress, smIsUpcoming, smIsToday, smTodayKinds,
+  smTodayKinds,
   abdIsApproved, abdIsInProgress, abdIsDelayed, abdIsUpcoming, abdIsToday, abdTodayKind, abdStage, abdCurrentPlanDate,
   today,
   type TmMyRow, type SmMyRow, type AbdMyRow,
@@ -71,7 +71,6 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   const filterValue = scope === "team" ? team : pic;
 
   const tm = useMyTasks(filterValue, isAdmin, scope);
-  const sm = useMyDefects(filterValue, isAdmin, scope);
   const abd = useMyAbd(filterValue, isAdmin, scope);
 
   const [tmTab, setTmTab] = useState<RowListTab>("today");
@@ -82,6 +81,35 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   const latestToday = today();
   const [dataDate, setDataDate] = useState<string>("");
   const t = dataDate || latestToday;
+
+  // ─── SM: 서버 판정 카운트 + 버킷 fetch ───
+  const smCountsQ = useMyDefectsCounts(filterValue, isAdmin, scope, t);
+  const smBucket: "today" | "delayed" | "upcoming" | null =
+    smTab === "today" ? "today"
+    : smTab === "risk" ? "delayed"
+    : smTab === "upcoming" ? "upcoming"
+    : null;
+  const smBucketQ = useMyDefectsBucket(filterValue, isAdmin, scope, t, smBucket);
+  const smCounts = smCountsQ.data;
+  const smStats = {
+    total: smCounts?.total_count ?? 0,
+    inProgress: smCounts?.in_progress_count ?? 0,
+    delayed: smCounts?.delayed_count ?? 0,
+    upcoming: smCounts?.upcoming_count ?? 0,
+    completed: smCounts?.completed_count ?? 0,
+    today: smCounts?.today_count ?? 0,
+  };
+  const smRows: SmMyRow[] = smBucketQ.data ?? [];
+
+  // "전체" 탭 클릭 → SM Raw Data로 이동 (PIC/Team 필터 자동 적용)
+  const gotoSnagRawData = () => {
+    const search: Record<string, string> = {};
+    if (!isAdmin) {
+      if (scope === "team" && team) search.team = String(team);
+      else if (scope === "pic" && pic) search.hdecPic = String(pic);
+    }
+    navigate({ to: "/closure/snag-management/raw-data", search: search as any });
+  };
 
   const tmStats = useMemo(() => {
     const rows = tm.data ?? [];
@@ -94,18 +122,6 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
       today: rows.filter((r) => tmIsToday(r, t)).length,
     };
   }, [tm.data, t]);
-
-  const smStats = useMemo(() => {
-    const rows = sm.data ?? [];
-    return {
-      total: rows.length,
-      inProgress: rows.filter(smIsInProgress).length,
-      delayed: rows.filter((r) => smIsDelayed(r, t)).length,
-      upcoming: rows.filter((r) => smIsUpcoming(r, t)).length,
-      completed: rows.filter(smIsCompleted).length,
-      today: rows.filter((r) => smIsToday(r, t)).length,
-    };
-  }, [sm.data, t]);
 
   const abdStats = useMemo(() => {
     const rows = abd.data ?? [];
