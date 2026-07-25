@@ -172,6 +172,47 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
 
   const all = [...tm, ...sm, ...abd, ...sp].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
 
+  // Admin: 부모 메타(parent_ref/label)가 비어있는 항목들을 뒤에서 채워줌
+  async function enrichParents(
+    mod: InboxModule,
+    table: string,
+    idCol: string,
+    refCol: string,
+    labelCol: string,
+  ) {
+    const need = all.filter((c) => c.module === mod && (!c.parent_ref || !c.parent_label));
+    if (need.length === 0) return;
+    const ids = Array.from(new Set(need.map((c) => c.parent_id)));
+    const m = new Map<string, { ref: string | null; label: string | null }>();
+    for (let i = 0; i < ids.length; i += 500) {
+      const chunk = ids.slice(i, i + 500);
+      const { data, error } = await (supabase as any)
+        .from(table)
+        .select(`${idCol},${refCol},${labelCol}`)
+        .in(idCol, chunk);
+      if (error) continue;
+      for (const r of data ?? []) {
+        m.set(String(r[idCol]), {
+          ref: r[refCol] != null ? String(r[refCol]) : null,
+          label: r[labelCol] != null ? String(r[labelCol]) : null,
+        });
+      }
+    }
+    for (const c of need) {
+      const meta = m.get(c.parent_id);
+      if (meta) {
+        c.parent_ref = meta.ref;
+        c.parent_label = meta.label;
+      }
+    }
+  }
+  await Promise.all([
+    enrichParents("tm", "task_management_raw", "id", "task_no", "task_name"),
+    enrichParents("sm", "defect_items_raw", "id", "source_issue_no", "location_raw"),
+    enrichParents("abd", "abd_items_raw", "id", "abd_number", "document_title"),
+    enrichParents("sp", "spare_parts_raw", "doc_ref", "subject", "plot"),
+  ]);
+
   // 작성자 이름 해석
   const authorIds = Array.from(new Set(all.map((x) => x.author_user_id).filter(Boolean))) as string[];
   if (authorIds.length > 0) {
