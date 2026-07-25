@@ -1,0 +1,160 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+/**
+ * Aconex Export 임포트 - 기존 abd_items_raw 행에 대해 UPDATE 전용.
+ * - 매칭 키: abd_number = document_no
+ * - 갱신 컬럼: latest_status, latest_rev, approval_date,
+ *   aconex_status_raw, aconex_review_status_raw, aconex_date_modified,
+ *   aconex_last_synced_at
+ * - 미매칭 문서는 INSERT 하지 않음 (unmatched 로 리포트).
+ * - CX / TM (Cancelled / Terminated) 은 latest_status 를 그대로 반영하되
+ *   파생 트리거가 상태 분류에서 제외 처리.
+ */
+
+const RowSchema = z.object({
+  document_no: z.string().min(1),
+  revision: z.string().nullable().optional(),
+  status_raw: z.string().nullable().optional(),
+  review_status_raw: z.string().nullable().optional(),
+  status_code: z.string().nullable().optional(),
+  status_norm: z.string().nullable().optional(),
+  date_modified: z.string().nullable().optional(),
+  is_excluded: z.boolean().default(false),
+  excel_row: z.number().optional(),
+});
+
+const InputSchema = z.object({
+  file_name: z.string(),
+  data_date: z.string().nullable().optional(),
+  rows: z.array(RowSchema).max(20000),
+  /** true = 실제 반영 / false = preview 만 */
+  apply: z.boolean().default(false),
+});
+
+export type AconexImportPreview = {
+  total: number;
+  matched: number;
+  unmatched: number;
+  excluded: number;
+  by_status: Array<{ code: string; count: number }>;
+  unmatched_samples: string[];
+};
+
+export type AconexImportResult = AconexImportPreview & {
+  updated: number;
+  batch_id: string | null;
+};
+
+async function assertEditor(ctx: any) {
+  const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
+    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" }),
+    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "superuser" }),
+  ]);
+  if (!isAdmin && !isSuper) throw new Error("권한 없음: 관리자만 Aconex 임포트를 실행할 수 있습니다");
+}
+
+export const importAbdAconexBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => InputSchema.parse(v))
+  .handler(async ({ data, context }): Promise<AconexImportResult> => {
+    await assertEditor(context);
+    const supa = context.supabase as any;
+
+    // 1) 상태 분포 집계
+    const byStatus = new Map<string, number>();
+    for (const r of data.rows) {
+      const key = r.status_code ?? "UNKNOWN";
+      byStatus.set(key, (byStatus.get(key) ?? 0) + 1);
+    }
+    const excludedCount = data.rows.filter((r) => r.is_excluded).length;
+
+    // 2) 매칭 검사: chunked IN
+    const docNos = Array.from(new Set(data.rows.map((r) => r.document_no)));
+    const existing = new Set<string>();
+    const CHUNK = 500;
+    for (let i = 0; i < docNos.length; i += CHUNK) {
+      const slice = docNos.slice(i, i + CHUNK);
+      const { data: rows, error } = await supa
+        .from("abd_items_raw")
+        .select("abd_number")
+        .in("abd_number", slice);
+      if (error) throw new Error(error.message);
+      for (const row of rows ?? []) existing.add(row.abd_number);
+    }
+    const matched = data.rows.filter((r) => existing.has(r.document_no));
+    const unmatched = data.rows.filter((r) => !existing.has(r.document_no));
+
+    const preview: AconexImportPreview = {
+      total: data.rows.length,
+      matched: matched.length,
+      unmatched: unmatched.length,
+      excluded: excludedCount,
+      by_status: Array.from(byStatus.entries())
+        .map(([code, count]) => ({ code, count }))
+        .sort((a, b) => b.count - a.count),
+      unmatched_samples: unmatched.slice(0, 20).map((r) => r.document_no),
+    };
+
+    if (!data.apply) {
+      return { ...preview, updated: 0, batch_id: null };
+    }
+
+    // 3) import log
+    const nowIso = new Date().toISOString();
+    const { data: logRow, error: logErr } = await supa
+      .from("abd_import_logs")
+      .insert({
+        file_name: data.file_name,
+        team: "MECH", // Aconex 는 team 무관, NOT NULL 스키마 회피
+        plot: null,
+        sheet_name: "Docs (Aconex)",
+        total_rows: data.rows.length,
+        status: "in_progress",
+        started_at: nowIso,
+        imported_by: context.userId,
+        note: `Aconex sync — matched=${matched.length} unmatched=${unmatched.length}`,
+      })
+      .select("id")
+      .single();
+    if (logErr) throw new Error(logErr.message);
+    const batchId = logRow.id as string;
+
+    // 4) 개별 UPDATE (RLS + trigger 안전, 소규모라 성능 OK)
+    let updated = 0;
+    for (const r of matched) {
+      const patch: Record<string, any> = {
+        aconex_status_raw: r.status_raw ?? null,
+        aconex_review_status_raw: r.review_status_raw ?? null,
+        aconex_date_modified: r.date_modified ?? null,
+        aconex_last_synced_at: nowIso,
+        latest_status: r.status_code ?? r.status_raw ?? null,
+        source_import_log_id: batchId,
+        updated_at: nowIso,
+        updated_by: context.userId,
+      };
+      if (r.revision) patch.latest_rev = r.revision;
+      if (r.status_code === "A" && r.date_modified) patch.approval_date = r.date_modified;
+      const { error: upErr } = await supa
+        .from("abd_items_raw")
+        .update(patch)
+        .eq("abd_number", r.document_no);
+      if (upErr) throw new Error(upErr.message);
+      updated++;
+    }
+
+    await supa
+      .from("abd_import_logs")
+      .update({
+        inserted: 0,
+        updated,
+        inactivated: 0,
+        mismatched: unmatched.length,
+        status: "success",
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", batchId);
+
+    return { ...preview, updated, batch_id: batchId };
+  });
