@@ -459,8 +459,6 @@ export type Database = {
           r1_draft_finish_plan: string | null
           r1_draft_start_actual: string | null
           r1_draft_start_plan: string | null
-          r1_drafting_actual: string | null
-          r1_drafting_plan: string | null
           r1_response_result: string | null
           r1_submission_actual: string | null
           r1_submission_plan: string | null
@@ -470,8 +468,6 @@ export type Database = {
           r2_draft_finish_plan: string | null
           r2_draft_start_actual: string | null
           r2_draft_start_plan: string | null
-          r2_drafting_actual: string | null
-          r2_drafting_plan: string | null
           r2_response_result: string | null
           r2_submission_actual: string | null
           r2_submission_plan: string | null
@@ -481,8 +477,6 @@ export type Database = {
           r3_draft_finish_plan: string | null
           r3_draft_start_actual: string | null
           r3_draft_start_plan: string | null
-          r3_drafting_actual: string | null
-          r3_drafting_plan: string | null
           r3_response_result: string | null
           r3_submission_actual: string | null
           r3_submission_plan: string | null
@@ -543,8 +537,6 @@ export type Database = {
           r1_draft_finish_plan?: string | null
           r1_draft_start_actual?: string | null
           r1_draft_start_plan?: string | null
-          r1_drafting_actual?: string | null
-          r1_drafting_plan?: string | null
           r1_response_result?: string | null
           r1_submission_actual?: string | null
           r1_submission_plan?: string | null
@@ -554,8 +546,6 @@ export type Database = {
           r2_draft_finish_plan?: string | null
           r2_draft_start_actual?: string | null
           r2_draft_start_plan?: string | null
-          r2_drafting_actual?: string | null
-          r2_drafting_plan?: string | null
           r2_response_result?: string | null
           r2_submission_actual?: string | null
           r2_submission_plan?: string | null
@@ -565,8 +555,6 @@ export type Database = {
           r3_draft_finish_plan?: string | null
           r3_draft_start_actual?: string | null
           r3_draft_start_plan?: string | null
-          r3_drafting_actual?: string | null
-          r3_drafting_plan?: string | null
           r3_response_result?: string | null
           r3_submission_actual?: string | null
           r3_submission_plan?: string | null
@@ -627,8 +615,6 @@ export type Database = {
           r1_draft_finish_plan?: string | null
           r1_draft_start_actual?: string | null
           r1_draft_start_plan?: string | null
-          r1_drafting_actual?: string | null
-          r1_drafting_plan?: string | null
           r1_response_result?: string | null
           r1_submission_actual?: string | null
           r1_submission_plan?: string | null
@@ -638,8 +624,6 @@ export type Database = {
           r2_draft_finish_plan?: string | null
           r2_draft_start_actual?: string | null
           r2_draft_start_plan?: string | null
-          r2_drafting_actual?: string | null
-          r2_drafting_plan?: string | null
           r2_response_result?: string | null
           r2_submission_actual?: string | null
           r2_submission_plan?: string | null
@@ -649,8 +633,6 @@ export type Database = {
           r3_draft_finish_plan?: string | null
           r3_draft_start_actual?: string | null
           r3_draft_start_plan?: string | null
-          r3_drafting_actual?: string | null
-          r3_drafting_plan?: string | null
           r3_response_result?: string | null
           r3_submission_actual?: string | null
           r3_submission_plan?: string | null
@@ -3536,35 +3518,22 @@ export type Database = {
               total_count: number
             }[]
           }
-      abd_items_facets:
-        | {
-            Args: {
-              _column: string
-              _include_inactive?: boolean
-              _status_group?: string
-              _team?: string
-            }
-            Returns: {
-              cnt: number
-              value: string
-            }[]
-          }
-        | {
-            Args: {
-              _column: string
-              _filters?: Json
-              _include_inactive?: boolean
-              _limit?: number
-              _plot?: string
-              _q?: string
-              _status_group?: string
-              _team?: string
-            }
-            Returns: {
-              cnt: number
-              value: string
-            }[]
-          }
+      abd_items_facets: {
+        Args: {
+          _column: string
+          _filters?: Json
+          _include_inactive?: boolean
+          _limit?: number
+          _plot?: string
+          _q?: string
+          _status_group?: string
+          _team?: string
+        }
+        Returns: {
+          cnt: number
+          value: string
+        }[]
+      }
       abd_items_search:
         | {
             Args: {
@@ -3599,44 +3568,79 @@ export type Database = {
               total_count: number
             }[]
           }
-      abd_progress_cells: {
-        Args: {
-          _as_of_date: string
-          _bucket: string
-          _group_by: string[]
-          _plan_mode: string
-          _plots: string[]
-          _range_end: string
-          _range_start: string
-          _round: string
-          _teams: string[]
-        }
-        Returns: {
-          actual_cnt: number
-          bucket_iso: string
-          group_key: string[]
-          plan_cnt: number
-          stage: string
-        }[]
-      }
-      abd_progress_totals: {
-        Args: {
-          _as_of_date: string
-          _group_by: string[]
-          _plan_mode: string
-          _plots: string[]
-          _round: string
-          _teams: string[]
-        }
-        Returns: {
-          actual_upto: number
-          done_upto: number
-          group_key: string[]
-          plan_upto: number
-          stage: string
-          total: number
-        }[]
-      }
+      abd_progress_cells:
+        | {
+            Args: {
+              _batch_no?: string
+              _bucket: string
+              _from?: string
+              _plot?: string
+              _team?: string
+              _to?: string
+            }
+            Returns: {
+              actual_cnt: number
+              bucket_iso: string
+              group_key: string[]
+              plan_cnt: number
+              stage: string
+            }[]
+          }
+        | {
+            Args: {
+              _as_of_date: string
+              _bucket: string
+              _group_by: string[]
+              _plan_mode: string
+              _plots: string[]
+              _range_end: string
+              _range_start: string
+              _round: string
+              _teams: string[]
+            }
+            Returns: {
+              actual_cnt: number
+              bucket_iso: string
+              group_key: string[]
+              plan_cnt: number
+              stage: string
+            }[]
+          }
+      abd_progress_totals:
+        | {
+            Args: {
+              _asof?: string
+              _batch_no?: string
+              _plot?: string
+              _team?: string
+            }
+            Returns: {
+              actual_upto: number
+              done_upto: number
+              group_key: string[]
+              plan_upto: number
+              stage: string
+              total: number
+            }[]
+          }
+        | {
+            Args: {
+              _as_of_date: string
+              _group_by: string[]
+              _plan_mode: string
+              _plots: string[]
+              _round: string
+              _teams: string[]
+            }
+            Returns: {
+              actual_upto: number
+              done_upto: number
+              group_key: string[]
+              plan_upto: number
+              stage: string
+              total: number
+            }[]
+          }
       abd_round_stage_dates: {
         Args: {
           _round: number
