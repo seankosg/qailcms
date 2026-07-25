@@ -54,6 +54,14 @@ interface Row {
   data_date: string | null;
 }
 
+/** Main Task는 Data Date 변경에 민감하므로 클라이언트 재계산 우선, Sub는 DB값 우선. */
+function resolveJudgment(r: Row, asOfDate?: string): string {
+  if (r.level === "main") {
+    return computeJudgment(r, undefined, asOfDate) || r.auto_judgment || "";
+  }
+  return r.auto_judgment || computeJudgment(r, undefined, asOfDate) || "";
+}
+
 function ProgressBar({ v }: { v: number | null | undefined }) {
   const n = Math.max(0, Math.min(1, Number(v ?? 0)));
   return (
