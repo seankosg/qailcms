@@ -96,7 +96,7 @@ export function TaskTreePage() {
   const navigate = useNavigate();
   // 뷰 상태를 sessionStorage 로 유지 — Raw Data 로 드릴다운 후 되돌아왔을 때
   // discipline / 필터 / 검색어 / 펼침 상태가 그대로 복원되도록 함.
-  const VIEW_STATE_KEY = "qail.task-tree.view-state.v1";
+  const VIEW_STATE_KEY = "qail.task-tree.view-state.v2";
   type PersistedView = {
     discipline: Discipline;
     search: string;
@@ -121,8 +121,8 @@ export function TaskTreePage() {
   const [expanded, setExpanded] = useState<Set<string>>(
     new Set(persisted?.expanded ?? []),
   );
-  // 저장된 펼침 상태가 없다면 데이터 로드 후 자동으로 전체 펴기.
-  const hasPersistedExpanded = !!persisted?.expanded;
+  // 저장된 펼침 항목이 실제로 있을 때만 복원하고, 없거나 빈 배열이면 기본값은 전체 펴기.
+  const hasPersistedExpanded = (persisted?.expanded?.length ?? 0) > 0;
   const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(
     new Set(persisted?.judgmentFilter ?? ["위험"]),
   );
