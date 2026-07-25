@@ -403,11 +403,12 @@ export function AbdRawDataPage() {
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = {};
+    const defByKey = new Map(ABD_COLUMNS.map((c) => [c.key, c] as const));
     for (const c of columns) {
       const id = (c as any).id ?? (c as any).accessorKey;
       if (!id || id in vis) continue;
       if (id in visibility) { vis[id] = visibility[id] !== false; continue; }
-      vis[id] = true;
+      vis[id] = !defByKey.get(id)?.hiddenByDefault;
     }
     return vis;
   }, [columns, visibility]);
