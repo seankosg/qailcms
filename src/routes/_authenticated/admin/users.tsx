@@ -136,17 +136,67 @@ function UsersTab() {
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  const rows = useMemo(() => (data ?? []).filter((u: any) => {
-    if (filterRole !== "all" && !(u.roles ?? []).includes(filterRole)) return false;
-    if (filterType !== "all" && u.user_type !== filterType) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const hay = `${u.login_id ?? ""} ${u.name ?? ""} ${u.display_name ?? ""} ${u.team ?? ""} ${u.subcontractor_name ?? ""} ${u.subsub_name ?? ""} ${u.hdec_pic_name ?? ""} ${u.hdec_eng_name ?? ""}`.toLowerCase();
-      if (!hay.includes(q)) return false;
+  const rows = useMemo(() => {
+    const filtered = (data ?? []).filter((u: any) => {
+      if (filterRole !== "all" && !(u.roles ?? []).includes(filterRole)) return false;
+      if (filterType !== "all" && u.user_type !== filterType) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const hay = `${u.login_id ?? ""} ${u.name ?? ""} ${u.display_name ?? ""} ${u.team ?? ""} ${u.subcontractor_name ?? ""} ${u.subsub_name ?? ""} ${u.hdec_pic_name ?? ""} ${u.hdec_eng_name ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a: any, b: any) => {
+      let av: string | number;
+      let bv: string | number;
+      switch (sortKey) {
+        case "name":
+          av = (a.name ?? a.display_name ?? "").toString().toLowerCase();
+          bv = (b.name ?? b.display_name ?? "").toString().toLowerCase();
+          break;
+        case "team":
+          av = (a.team ?? "").toString().toLowerCase();
+          bv = (b.team ?? "").toString().toLowerCase();
+          break;
+        case "login_id":
+          av = (a.login_id ?? "").toString().toLowerCase();
+          bv = (b.login_id ?? "").toString().toLowerCase();
+          break;
+        case "user_type":
+          av = USER_TYPE_LABELS[a.user_type] ?? "";
+          bv = USER_TYPE_LABELS[b.user_type] ?? "";
+          break;
+        case "role":
+          av = ROLE_LABELS[a.roles?.[0]] ?? "";
+          bv = ROLE_LABELS[b.roles?.[0]] ?? "";
+          break;
+        case "active":
+          av = a.is_active ? 1 : 0;
+          bv = b.is_active ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+  }, [data, filterRole, filterType, search, sortKey, sortDir]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
     }
-    return true;
-  }), [data, filterRole, filterType, search]);
+  };
 
   return (
     <Card>
@@ -176,32 +226,23 @@ function UsersTab() {
       </CardHeader>
       <CardContent>
         {isLoading ? <div className="text-sm text-muted-foreground">불러오는 중…</div> : (
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[calc(100vh-220px)]">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
-                  <TableHead>Login ID</TableHead>
-                  <TableHead>이름</TableHead>
-                  <TableHead>User Type</TableHead>
-                  <TableHead>Team</TableHead>
+                  <SortHeader label="사용자 이름" sortKey="name" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                  <SortHeader label="팀" sortKey="team" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                  <SortHeader label="Login ID" sortKey="login_id" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                  <SortHeader label="User Type" sortKey="user_type" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                   <TableHead>Linked Master</TableHead>
-                  <TableHead>역할</TableHead>
-                  <TableHead>상태</TableHead>
+                  <SortHeader label="역할" sortKey="role" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                  <SortHeader label="상태" sortKey="active" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                   <TableHead className="text-right">액션</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((u: any) => (
                   <TableRow key={u.id}>
-                    <TableCell className="font-mono text-xs">
-                      <LoginIdCell
-                        value={u.login_id}
-                        onSave={async (v) => {
-                          await updLogin({ data: { user_id: u.id, login_id: v } });
-                          invalidate();
-                        }}
-                      />
-                    </TableCell>
                     <TableCell>
                       <InlineText
                         value={u.name ?? u.display_name ?? ""}
@@ -210,15 +251,6 @@ function UsersTab() {
                           invalidate();
                         }}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Select value={u.user_type} onValueChange={async (v) => {
-                        try { await updProfile({ data: { user_id: u.id, user_type: v as any } }); toast.success("업데이트됨"); invalidate(); }
-                        catch (e: any) { toast.error(e.message); }
-                      }}>
-                        <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
-                        <SelectContent>{USER_TYPES.map((t) => <SelectItem key={t} value={t}>{USER_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
-                      </Select>
                     </TableCell>
                     <TableCell>
                       <Select
@@ -233,6 +265,24 @@ function UsersTab() {
                           <SelectItem value="__none__">—</SelectItem>
                           {(teams.data ?? []).map((t) => <SelectItem key={t.id} value={t.code}>{t.code}</SelectItem>)}
                         </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <LoginIdCell
+                        value={u.login_id}
+                        onSave={async (v) => {
+                          await updLogin({ data: { user_id: u.id, login_id: v } });
+                          invalidate();
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Select value={u.user_type} onValueChange={async (v) => {
+                        try { await updProfile({ data: { user_id: u.id, user_type: v as any } }); toast.success("업데이트됨"); invalidate(); }
+                        catch (e: any) { toast.error(e.message); }
+                      }}>
+                        <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                        <SelectContent>{USER_TYPES.map((t) => <SelectItem key={t} value={t}>{USER_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
                       </Select>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
