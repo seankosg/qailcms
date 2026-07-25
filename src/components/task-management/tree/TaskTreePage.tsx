@@ -189,11 +189,8 @@ export function TaskTreePage() {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
       if (judgmentFilter.size > 0) {
-        const judgeOf = (r: Row) =>
-          (r.auto_judgment && r.auto_judgment.trim()) ||
-          computeJudgment(r, undefined, asOfDate) ||
-          "";
-        const mainJ = judgeOf(p);
+        const mainJ = resolveJudgment(p, asOfDate);
+        const subJs = kids.map((k) => resolveJudgment(k, asOfDate));
         const anyMatch =
           (mainJ && judgmentFilter.has(mainJ)) ||
           kids.some((k) => judgmentFilter.has(judgeOf(k)));
