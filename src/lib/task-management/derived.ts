@@ -26,6 +26,12 @@ export interface JudgmentRow {
   slip_days?: number | null;
   data_date?: string | null;
   auto_judgment?: string | null;
+  /** DB 저장 파생 (tm_compute_derived 결과). asOf 미지정 시 신뢰. */
+  cum_plan_pct?: number | null;
+  cum_actual_pct?: number | null;
+  gap_pct?: number | null;
+  delay_days?: number | null;
+  alarm_reason?: string | null;
 }
 
 function parseDate(v: unknown): Date | null {
@@ -50,11 +56,9 @@ function daysDiff(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
-/** T.Plan — Data Date(또는 asOf) 당일의 계획 진도율 (0..1).
- *  기본식: (asOf - plan_start) / plan_days.
- *  plan_days 가 없으면 (plan_end - plan_start) 로 대체.
- *  계산 불가 시 null 반환.
- */
+/** T.Plan — Data Date(또는 asOf) 당일의 누계 계획 진도율 (0..1).
+ *  DB 표준식과 일치: ((asOf - plan_start) + 1) / plan_days (달력일).
+ *  계산 불가 시 null 반환. */
 export function computeTPlan(row: JudgmentRow, asOf?: string): number | null {
   const start = parseDate(row.plan_start);
   if (!start) return null;
@@ -65,11 +69,14 @@ export function computeTPlan(row: JudgmentRow, asOf?: string): number | null {
     durationDays = pd;
   } else {
     const end = parseDate(row.plan_end);
-    if (end) durationDays = Math.max(1, daysDiff(start, end));
+    if (end) durationDays = Math.max(1, daysDiff(start, end) + 1);
   }
   if (!durationDays) return null;
-  const elapsed = daysDiff(start, asOfD);
-  return Math.max(0, Math.min(1, elapsed / durationDays));
+  const end = parseDate(row.plan_end);
+  if (asOfD.getTime() < start.getTime()) return 0;
+  if (end && asOfD.getTime() >= end.getTime()) return 1;
+  const elapsedInc = daysDiff(start, asOfD) + 1; // +1 = DB 공식과 일치
+  return Math.max(0, Math.min(1, elapsedInc / durationDays));
 }
 
 /** actual_progress 를 [0,1] 로 정규화. DB 오염(30 저장 등)에도 안전. */
@@ -223,6 +230,8 @@ export function computeJudgment(
   t: TaskThresholds = DEFAULT_THRESHOLDS,
   asOf?: string,
 ): string {
+  // asOf 미지정 시 DB가 계산한 표준 판정을 그대로 신뢰 (단일 진실원)
+  if (!asOf && row.auto_judgment) return row.auto_judgment;
   const actual = normActual(row.actual_progress);
   if (actual >= 1) return "완료";
   const started = !!row.actual_start || actual > 0;
