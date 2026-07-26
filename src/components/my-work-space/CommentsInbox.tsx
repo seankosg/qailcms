@@ -144,7 +144,7 @@ export function CommentsInbox({ userId, scope, filterValue, isAdmin }: Props) {
           </div>
 
           {/* List */}
-          <ScrollArea className="max-h-[420px]">
+          <ScrollArea className="h-[260px]">
             <ul className="divide-y">
               {isLoading && (
                 <li className="px-4 py-6 text-center text-xs text-muted-foreground">불러오는 중…</li>
