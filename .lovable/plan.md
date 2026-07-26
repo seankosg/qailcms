@@ -1,4 +1,6 @@
-## 목표
+## [완료] Aconex semantic 라우팅 (Phase 12 후속)
+> 아래는 기 확정·구현된 내용. 참조용 보관.
+
 Aconex Export의 `Status` + `Review Status` 조합을 정규화하고, 그 결과에 따라 `Date Modified`를 ABD의 올바른 라운드/스테이지 날짜 필드로 라우팅. 현재 라운드는 `Latest Status`(Aconex `Status` 반영값) 기준으로 판별. Excluded 항목은 통계에서 완전히 제외하고 개수만 별도 표시.
 
 ## 매핑 규칙 (확정)
@@ -85,3 +87,67 @@ Aconex Export의 `Status` + `Review Status` 조합을 정규화하고, 그 결�
 3. Raw Data 상단 카운트에서 Excluded 225건이 총계에서 빠지고 별도 배지에 225로 표시.
 4. Progress 매트릭스, Dashboard KPI에서 Excluded 행 제외 확인.
 5. R1 완료 상태에서 A가 재임포트 → R2 DAR로 라우팅.
+
+---
+
+# ABD 잔여 후보 작업 (2026-07-26 기준)
+
+## 현재까지 완료 요약
+- Phase 1–8: 데이터 모델(Draft DS/DF, Submission, DAR), 파생 트리거, RPC SSOT, UR Aging 설정, Detail Sheet 타임라인, Progress 4-스테이지 매트릭스/S-Curve, 레거시 `drafting_*` 제거.
+- Phase 9–12: Aconex 동기화(필드 선택 가드·프리셋·컬럼 선택 다이얼로그), 다음 라운드 계획 알림(Attention 카드/딥링크), 임포트 UI 정합화(HDEC/Aconex 토글), Aconex semantic(Status+Review) 라우팅·Excluded 처리.
+- 공통 기반: 날짜 파싱 TZ-독립화, 임포트 date-audit 패널, 댓글(`abd_comments`)·Comment Inbox 연동, 파일별 컬럼 선택 프리셋.
+
+## 계획 수정 사항
+1. 기존 Phase 로드맵에 있던 "Legacy drafting_* 정리"는 완료. 하지만 검증 단계에서 아직 남은 참조/뷰가 있는지 재확인 필요 → **아래 T1**.
+2. Aconex semantic 라우팅 도입으로 `latest_status` 값 도메인이 확장(A/B/C/UR + `Cancelled`/`Terminated` 원문). 기존 대시보드·필터 UI가 신규 라벨을 인지하도록 톤/뱃지 매핑 점검 → **T3**.
+3. Phase 10 "다음 라운드 계획 알림"은 대시보드 Attention 카드까지만 구현. Inbox·MWS 통합은 미착수 → **T5**.
+4. 백업/복원은 SM/TM 기준으로만 구축. ABD 스냅샷 대상 추가 필요 → **T7**.
+
+## 잔여 후보 (우선순위순)
+
+### T1. Legacy 잔재 최종 스윕
+- `drafting_*`, 구 progress 뷰, 이전 `latest_status` enum 참조 잔존 여부 확인.
+- 남은 참조는 삭제 또는 신규 SSOT로 치환. 마이그레이션 1건.
+
+### T2. Aconex 자동 동기화 스케줄
+- `pg_cron` + `/api/public/abd/aconex-sync` 라우트 조합.
+- 최근 업로드된 Aconex 파일이 없을 때는 skip. 사용자 트리거·자동 스케줄 로그(`abd_sync_runs`) 분리.
+- Settings 팝오버에서 주기(off / daily 05:00 도하 / weekly) 설정.
+
+### T3. `latest_status` 라벨·톤 정합화
+- Cancelled/Terminated 신규 도메인에 뱃지 컬러 지정 (회색·중립).
+- Raw Data 상단 상태 탭에서 Excluded 배지가 클릭 시 그리드 필터를 자동 토글하도록 배선.
+- 대시보드 KPI/도넛에서 Cancelled/Terminated는 별도 subtle 표기.
+
+### T4. Round 계획 알림 → Inbox/MWS 통합
+- Attention 리스트를 `useCommentInbox`와 동일한 컨텍스트로 확장하여 `abd_pending_next_round` 카운트를 사이드바 뱃지로 노출.
+- MWS: "내가 담당 PIC인 ABD 항목" 섹션 추가 (SM PIC 규칙 재사용).
+
+### T5. Aconex 임포트 감사(Audit) & Diff View
+- Preview 단계에서 매칭된 행별 before/after 값을 표로 노출 (semantic·라운드·날짜).
+- 적용 후 `abd_import_logs`에 diff JSON 저장, 상세 시트 히스토리 탭에서 참조.
+
+### T6. ABD 필드 변경 로그 (SM `flushFieldLogs` 이식)
+- `abd_field_change_logs` 신설. 임포트/수동 편집 모두 대상.
+- 백그라운드 flush + `excluded` 필드 스킵 규칙(SM에서 검증됨) 재사용.
+
+### T7. 백업/복원 대상에 ABD 포함
+- `abd_items_raw`, `abd_settings`, `abd_import_presets`, `abd_comments` 스냅샷.
+- 도하 23:50 자동 백업 러너에 테이블 등록.
+
+### T8. R4+ 대비 (선택)
+- 현행 R1–R3 하드코딩. `abd_settings.max_rounds` 추가 후 동적 렌더링.
+- 트리거·RPC·Progress 매트릭스가 라운드 수에 파라미터화되도록 refactor.
+- 현장 요구가 확인된 뒤 착수.
+
+### T9. Aconex 미매칭(unknown Document No.) 처리
+- 현재는 skip. 미매칭 목록을 preview 하단에 노출하고 CSV 다운로드 제공.
+- 사용자가 `abd_items_raw.source_issue_no` 별칭을 등록할 수 있는 매핑 테이블(`abd_aconex_alias`) 검토.
+
+### T10. 문서/온보딩
+- Semantic 매핑 표·라운드 정의·Excluded 규칙을 `docs/abd/` 문서로 고정.
+- Detail Sheet 툴팁·헬프 아이콘에 링크.
+
+## 권장 진행 순서
+T1 → T3 → T5 → T6 → T2 → T4 → T7 → T9 → T10 → T8.
+T1·T3은 현 구현 안정화 성격이라 즉시 착수. T2·T7은 인프라(pg_cron·러너) 손대는 작업이라 묶어서 처리 권장.
