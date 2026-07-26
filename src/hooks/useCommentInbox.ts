@@ -106,11 +106,6 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
       "created_at",
       "updated_at",
     ].join(",");
-    let q = (supabase as any)
-      .from(table)
-      .select(cols)
-      .order("updated_at", { ascending: false })
-      .limit(limit);
     if (parentMap) {
       const ids = Array.from(parentMap.keys());
       if (ids.length === 0) return [];
@@ -130,9 +125,24 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
       }
       return normalize(all, parentCol, messageCol, categoryCol, mod, parentMap);
     }
-    const { data, error } = await q;
-    if (error) throw error;
-    return normalize(data ?? [], parentCol, messageCol, categoryCol, mod, parentMap);
+    // Admin: 전체 댓글을 페이지네이션으로 모두 조회 (테이블당 limit 제한 없음)
+    const pageSize = 1000;
+    const all: any[] = [];
+    let from = 0;
+    // 안전 상한: 100,000건
+    while (from < 100_000) {
+      const { data, error } = await (supabase as any)
+        .from(table)
+        .select(cols)
+        .order("updated_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const chunk = data ?? [];
+      all.push(...chunk);
+      if (chunk.length < pageSize) break;
+      from += pageSize;
+    }
+    return normalize(all, parentCol, messageCol, categoryCol, mod, parentMap);
   }
 
   function normalize(
