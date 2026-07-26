@@ -43,7 +43,7 @@ function Page() {
     },
   });
 
-  const { data: rows = [] } = useQuery({
+  const { data: rows = [] } = useQuery<Array<Record<string, unknown>>>({
     queryKey: ["task-preview-rows"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -62,18 +62,20 @@ function Page() {
   useEffect(() => {
     if (settings) {
       setT({
-        behind_warn_gap: Number(settings.behind_warn_gap ?? -0.05),
-        behind_late_gap: Number(settings.behind_late_gap ?? -0.15),
-        slip_warn_days: Number(settings.slip_warn_days ?? 3),
-        slip_late_days: Number(settings.slip_late_days ?? 14),
+        caution_gap_buffer: Number(
+          (settings as any).caution_gap_buffer ?? DEFAULT_THRESHOLDS.caution_gap_buffer,
+        ),
+        worsen_gap: Number(
+          (settings as any).worsen_gap ?? DEFAULT_THRESHOLDS.worsen_gap,
+        ),
       });
     }
   }, [settings]);
 
   const preview = useMemo(() => {
-    const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 위험: 0, 완료: 0 };
+    const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 악화: 0, 완료: 0 };
     for (const r of rows) {
-      const j = computeJudgment(r, t);
+      const j = computeJudgment(r as any, t);
       counts[j] = (counts[j] ?? 0) + 1;
     }
     return counts;
@@ -104,7 +106,7 @@ function Page() {
           Admin — Task Auto‑Judgment 임계값
         </h1>
         <p className="text-sm text-muted-foreground">
-          자동 판정(정상/주의/지연/위험/완료)의 경계값을 조정합니다.
+          자동 판정(완료/정상/주의/지연/악화)의 경계값을 조정합니다.
         </p>
       </div>
 
@@ -117,50 +119,36 @@ function Page() {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label className="text-sm">주의 경계 (gap 최소)</Label>
+            <Label className="text-sm">주의 여유 임계치 (caution_gap_buffer)</Label>
             <Input
               type="number"
               step="0.01"
-              value={t.behind_warn_gap}
-              onChange={(e) => setT({ ...t, behind_warn_gap: Number(e.target.value) })}
+              value={t.caution_gap_buffer}
+              onChange={(e) => setT({ ...t, caution_gap_buffer: Number(e.target.value) })}
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              gap이 이 값 미만이면 "주의". 기본 -0.05 (계획 대비 5%p 뒤짐).
+              0 ≤ gap {"<"} 이 값 이면 "주의" (지연 임박). 기본 +0.05 (5%p 여유).
             </p>
           </div>
           <div>
-            <Label className="text-sm">지연/위험 경계 (gap)</Label>
+            <Label className="text-sm">악화 경계 (worsen_gap)</Label>
             <Input
               type="number"
               step="0.01"
-              value={t.behind_late_gap}
-              onChange={(e) => setT({ ...t, behind_late_gap: Number(e.target.value) })}
+              value={t.worsen_gap}
+              onChange={(e) => setT({ ...t, worsen_gap: Number(e.target.value) })}
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              gap이 이 값 미만이면 "위험". 기본 -0.15.
+              gap {"<"} 이 값 이면 "악화" (심각 지연). 기본 -0.15 (-15%p).
             </p>
           </div>
-          <div>
-            <Label className="text-sm">지연 slip 일수</Label>
-            <Input
-              type="number"
-              value={t.slip_warn_days}
-              onChange={(e) => setT({ ...t, slip_warn_days: Number(e.target.value) })}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              차이(일)가 이 값 초과 시 "지연". 기본 3.
-            </p>
-          </div>
-          <div>
-            <Label className="text-sm">위험 slip 일수</Label>
-            <Input
-              type="number"
-              value={t.slip_late_days}
-              onChange={(e) => setT({ ...t, slip_late_days: Number(e.target.value) })}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              차이(일)가 이 값 초과 시 "위험". 기본 14.
-            </p>
+          <div className="sm:col-span-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+            <div><b>판정 축</b>: gap = Actual% − Cum.Plan%</div>
+            <div>· <b>완료</b>: Actual ≥ 100%</div>
+            <div>· <b>정상</b>: gap ≥ caution_gap_buffer (또는 미착수·기한 전)</div>
+            <div>· <b>주의</b>: 0 ≤ gap {"<"} caution_gap_buffer</div>
+            <div>· <b>지연</b>: gap {"<"} 0 (또는 미착수인데 plan_start 도래)</div>
+            <div>· <b>악화</b>: gap {"<"} worsen_gap</div>
           </div>
         </CardContent>
       </Card>
@@ -174,7 +162,7 @@ function Page() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            {(["정상", "주의", "지연", "위험", "완료"] as const).map((k) => (
+            {(["완료", "정상", "주의", "지연", "악화"] as const).map((k) => (
               <Badge
                 key={k}
                 className={cn(
