@@ -233,6 +233,8 @@ export interface BulkEditableField {
   field: string;
   label: string;
   inputType: "text" | "select" | "date" | "number";
+  /** true 이면 UI 는 0~100 (%) 로 입력, 저장 시 100 으로 나눔 */
+  isPercent?: boolean;
   options?: { value: string; label: string }[];
   group: string;
 }
@@ -255,6 +257,7 @@ export function getBulkEditableFields(): BulkEditableField[] {
       field: c.key,
       label: c.label,
       inputType: c.editorType,
+      isPercent: c.type === "percent",
       options: c.options?.map((v) => ({ value: v, label: v })),
       group: GROUP_LABELS[c.group] ?? c.group,
     });

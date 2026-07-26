@@ -45,11 +45,36 @@ export function EditCellPopover({
 
   if (!column.editable || !canEdit) return <>{children}</>;
 
+  const isPercent = column.type === "percent";
+  // percent 컬럼은 UI 는 0~100 (% 단위), DB 는 0~1 (fraction) 로 저장.
+  const toDisplay = (v: unknown): string => {
+    if (v == null || v === "") return "";
+    if (isPercent) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return "";
+      return String(Math.round(n * 1000) / 10);
+    }
+    return String(v);
+  };
+
   async function save() {
     setBusy(true);
     try {
       let payload: unknown = val === "" ? null : val;
-      if (column.editorType === "number" && payload != null) {
+      if (isPercent && payload != null) {
+        const n = Number(val);
+        if (!Number.isFinite(n)) {
+          toast.error("숫자를 입력해주세요");
+          setBusy(false);
+          return;
+        }
+        if (n < 0 || n > 100) {
+          toast.error("0 ~ 100 사이의 % 값을 입력해주세요");
+          setBusy(false);
+          return;
+        }
+        payload = Math.round((n / 100) * 10000) / 10000;
+      } else if (column.editorType === "number" && payload != null) {
         const n = Number(val);
         payload = Number.isFinite(n) ? n : null;
       }
@@ -78,7 +103,7 @@ export function EditCellPopover({
       onOpenChange={(v) => {
         setOpen(v);
         if (v)
-          setVal(currentValue == null ? "" : String(currentValue));
+          setVal(toDisplay(currentValue));
       }}
     >
       <PopoverTrigger asChild>
@@ -121,13 +146,36 @@ export function EditCellPopover({
           />
         )}
         {column.editorType === "number" && (
-          <Input
-            type="number"
-            step="0.0001"
-            className="h-8 text-xs"
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-          />
+          isPercent ? (
+            <div className="relative">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step="0.1"
+                className="h-8 pr-6 text-xs"
+                value={val}
+                onChange={(e) => setVal(e.target.value)}
+                placeholder="0 ~ 100"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
+                %
+              </span>
+            </div>
+          ) : (
+            <Input
+              type="number"
+              step="0.0001"
+              className="h-8 text-xs"
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+            />
+          )
+        )}
+        {isPercent && (
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            % 값을 입력하세요 (예: 30 → 30%)
+          </p>
         )}
         {column.editorType === "text" && (
           <Input

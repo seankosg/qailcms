@@ -274,7 +274,10 @@ function toNumber(v: unknown): number | null {
 function toPct4(v: unknown): number | null {
   const n = toNumber(v);
   if (n == null) return null;
-  const clamped = Math.max(-9.9999, Math.min(9.9999, n));
+  // 엑셀에서 "%" 서식 없이 "30"만 입력된 셀은 30 으로 들어옴.
+  // 진도율은 [0,1] 스케일이므로 1 초과 값은 % 로 간주하여 100 으로 나눔.
+  const normalized = n > 1 ? n / 100 : n;
+  const clamped = Math.max(0, Math.min(1, normalized));
   return Math.round(clamped * 10000) / 10000;
 }
 

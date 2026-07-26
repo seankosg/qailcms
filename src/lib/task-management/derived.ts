@@ -74,6 +74,14 @@ export function computeTPlan(row: JudgmentRow, asOf?: string): number | null {
   return Math.max(0, Math.min(1, elapsed / durationDays));
 }
 
+/** actual_progress 를 [0,1] 로 정규화. DB 오염(30 저장 등)에도 안전. */
+function normActual(v: unknown): number {
+  const n = Number(v ?? 0);
+  if (!Number.isFinite(n)) return 0;
+  const scaled = n > 1 ? n / 100 : n;
+  return Math.max(0, Math.min(1, scaled));
+}
+
 /** asOf(또는 오늘) 기준 T.Plan. asOf 미지정 시 row.data_date → today 순으로 폴백. */
 export function expectedProgressToday(row: JudgmentRow, asOf?: string): number {
   return computeTPlan(row, asOf) ?? 0;
@@ -81,7 +89,7 @@ export function expectedProgressToday(row: JudgmentRow, asOf?: string): number {
 
 /** asOf(또는 오늘) 기준 Actual% - T.Plan. */
 export function todayGap(row: JudgmentRow, asOf?: string): number {
-  const actual = Number(row.actual_progress ?? 0);
+  const actual = normActual(row.actual_progress);
   return actual - expectedProgressToday(row, asOf);
 }
 
@@ -97,18 +105,18 @@ export function cumPlanProgress(row: JudgmentRow, asOf?: string): number {
 
 /** 누계 실적 (0..1 clamp). computeVariance 와 동일한 피감수. */
 export function cumActualProgress(row: JudgmentRow): number {
-  return Math.max(0, Math.min(1, Number(row.actual_progress ?? 0)));
+  return normActual(row.actual_progress);
 }
 
 /** Cum. Diff — 누계 실적(Actual %) − 누계 계획(Plan %, row.plan_progress).
  *  단일 소스: Variance(=Cum. Diff), Alarm(WIP), Behind Schedule, Critical Delay 모두 이 값 사용.
  *  plan_progress 가 NULL 이면 computeTPlan(시간경과율)으로 폴백. 둘 다 없으면 null 반환. */
 export function computeVariance(row: JudgmentRow, asOf?: string): number | null {
-  const actual = Math.max(0, Math.min(1, Number(row.actual_progress ?? 0)));
+  const actual = normActual(row.actual_progress);
   const rawPlan = row.plan_progress;
   let plan: number | null;
   if (rawPlan != null && !Number.isNaN(Number(rawPlan))) {
-    plan = Math.max(0, Math.min(1, Number(rawPlan)));
+    plan = Math.max(0, Math.min(1, Number(rawPlan) > 1 ? Number(rawPlan) / 100 : Number(rawPlan)));
   } else {
     plan = computeTPlan(row, asOf);
   }
@@ -174,8 +182,8 @@ export function getStageJudgment(
   if (stage === "start") {
     if (
       row.actual_start ||
-      Number(row.actual_progress ?? 0) >= 1 ||
-      Number(row.actual_progress ?? 0) > 0 ||
+      normActual(row.actual_progress) >= 1 ||
+      normActual(row.actual_progress) > 0 ||
       row.auto_judgment === "완료"
     )
       return "완료";
@@ -188,7 +196,7 @@ export function getStageJudgment(
   }
 
   if (stage === "wip") {
-    const actual = Number(row.actual_progress ?? 0);
+    const actual = normActual(row.actual_progress);
     if (actual >= 1) return "완료";
     // WIP 판정도 Cum. Diff(=Variance) 단일 소스 사용.
     const gap = computeVariance(row, asOf);
@@ -200,7 +208,7 @@ export function getStageJudgment(
   }
 
   // finish
-  if (Number(row.actual_progress ?? 0) >= 1 || row.auto_judgment === "완료")
+  if (normActual(row.actual_progress) >= 1 || row.auto_judgment === "완료")
     return "완료";
   const pe = parseDate(row.plan_end);
   if (!pe || pe.getTime() > asOfD.getTime()) return "정상";
@@ -224,7 +232,7 @@ export function computeJudgment(
   const candidates: string[] = [];
   // Start 스테이지는 미착수(진도 0 & actual_start 없음)일 때만 후보에 포함.
   // 진도가 이미 발생한 행은 착수된 것으로 간주하고 WIP/Finish 로만 판정.
-  if (!row.actual_start && Number(row.actual_progress ?? 0) <= 0) {
+  if (!row.actual_start && normActual(row.actual_progress) <= 0) {
     candidates.push(jStart);
   }
   candidates.push(jWip, jFinish);
