@@ -1,6 +1,13 @@
 import { cn } from "@/lib/utils";
 
-export type StageState = "completed" | "completed_late" | "wip" | "delay" | "plan" | "empty";
+/** Start pip 4종 세분 판정 + Finish 는 completed/completed_late/wip/delay/plan/empty */
+export type StageState =
+  | "completed"       // Start: 정상완료 / Finish: 정상완료
+  | "completed_late"  // Start: 지연완료 / Finish: 지연완료
+  | "wip"             // Finish 전용
+  | "delay"           // Start: 지연진행 (미착수·기한 초과) / Finish: 지연
+  | "plan"            // Start: 정상(미착수·기한 전) / Finish: plan
+  | "empty";
 export type AlarmState = "done" | "ok" | "caution" | "late" | "risk" | "empty";
 
 type Row = Record<string, unknown>;
@@ -26,10 +33,14 @@ export function classifyStart(row: Row, dataDate: string | null): StageState {
   const actualStart = toDate((row as any).actual_start);
   const planStart = toDate((row as any).plan_start);
   const asOf = toDate(dataDate ?? todayIso())!;
-  if (actualStart) return "completed";
+  if (actualStart) {
+    // 정상완료 vs 지연완료 (Start 기준)
+    if (planStart && actualStart.getTime() > planStart.getTime()) return "completed_late";
+    return "completed";
+  }
   if (!planStart) return "empty";
-  if (planStart.getTime() <= asOf.getTime()) return "delay";
-  return "plan";
+  if (planStart.getTime() <= asOf.getTime()) return "delay"; // 지연진행
+  return "plan"; // 정상 (기한 전)
 }
 
 export function classifyFinish(row: Row, dataDate: string | null): StageState {
@@ -53,7 +64,7 @@ export function classifyAlarm(row: Row): AlarmState {
   if (v === "정상") return "ok";
   if (v === "주의") return "caution";
   if (v === "지연") return "late";
-  if (v === "위험") return "risk";
+  if (v === "악화") return "risk";
   return "empty";
 }
 
@@ -107,7 +118,7 @@ export const ALARM_LABEL: Record<AlarmState, string> = {
   ok: "정상",
   caution: "주의",
   late: "지연",
-  risk: "위험",
+  risk: "악화",
   empty: "—",
 };
 

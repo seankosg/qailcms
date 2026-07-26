@@ -7,23 +7,23 @@ import { AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
 import { cn } from "@/lib/utils";
 import { getAbdDashboardJudgmentMix, type AbdJudgmentMixRow } from "@/lib/abd/dashboard.functions";
 
-const ORDER = ["완료", "정상", "주의", "지연", "위험"] as const;
+const ORDER = ["완료", "정상", "주의", "지연", "악화"] as const;
 const SEG_COLOR: Record<string, string> = {
   완료: "var(--schedule-actual)",
   정상: "var(--schedule-plan)",
   주의: "var(--warning)",
   지연: "var(--schedule-over)",
-  위험: "var(--schedule-short)",
+  악화: "var(--schedule-short)",
 };
 
 export function sumJudgmentMix(rows: AbdJudgmentMixRow[] | undefined): Record<string, number> {
-  const out: Record<string, number> = { 완료: 0, 정상: 0, 주의: 0, 지연: 0, 위험: 0 };
+  const out: Record<string, number> = { 완료: 0, 정상: 0, 주의: 0, 지연: 0, 악화: 0 };
   for (const r of rows ?? []) {
     out["완료"] += Number(r.approved ?? 0);
     out["정상"] += Number(r.normal ?? 0);
     out["주의"] += Number(r.caution ?? 0);
     out["지연"] += Number(r.delayed ?? 0);
-    out["위험"] += Number(r.critical ?? 0);
+    out["악화"] += Number(r.critical ?? 0);
   }
   return out;
 }
