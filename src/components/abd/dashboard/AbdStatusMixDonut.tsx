@@ -14,11 +14,11 @@ const ORDER: { key: Seg; label: string; color: string }[] = [
   { key: "NS", label: "NS", color: "hsl(var(--muted-foreground))" },
 ];
 
-export function AbdStatusMixDonut({ batchNo }: { batchNo: string[] }) {
+export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; plots?: string[] }) {
   const fn = useServerFn(getAbdDashboardJudgmentMix);
   const q = useQuery({
-    queryKey: ["abd-dash-judgment-mix", batchNo],
-    queryFn: () => fn({ data: { batch_no: batchNo } }),
+    queryKey: ["abd-dash-judgment-mix", plots.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { batch_no: batchNo, plots } }),
     staleTime: 60_000,
   });
 

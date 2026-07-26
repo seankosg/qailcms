@@ -3478,7 +3478,7 @@ export type Database = {
             }[]
           }
       abd_dashboard_judgment_mix: {
-        Args: { _batch_no?: string[] }
+        Args: { _batch_no?: string[]; _plots?: string[] }
         Returns: {
           approved: number
           caution: number

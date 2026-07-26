@@ -4,7 +4,6 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   CalendarIcon,
   RefreshCw,
-  Filter,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -14,7 +13,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { AbdRow1Kpis, AbdRow2Kpis } from "./AbdKpiRows";
 import {
-  AbdRow4ApprovalTrend,
   AbdRow6Attention,
   AbdRow6Crosscut,
 } from "./AbdChartsRows";
@@ -28,20 +26,40 @@ import { AbdJudgmentStageBreakdown } from "./AbdJudgmentStageBreakdown";
 
 export function AbdDashboardPage() {
   const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
+  const [plotFilter, setPlotFilter] = useState<string[]>([]);
   const [batchFilter, setBatchFilter] = useState<string[]>([]);
   const [detail, setDetail] = useState<{ id: string; focus?: "rounds" | "aconex" | "comments" } | null>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
-  // SSOT: 대시보드 상단 필터를 위한 batch 옵션 — abd_items_facets("batch_no")로 조회
-  const batchListQ = useQuery<string[]>({
-    queryKey: ["abd-batch-list"],
+  // SSOT: 대시보드 필터 옵션 — abd_items_facets 로 조회
+  const plotListQ = useQuery<string[]>({
+    queryKey: ["abd-plot-list"],
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("abd_items_facets", {
-        _column: "batch_no",
-        _team: "MECH", // team 무관 조회를 위해 임의값 — 이후 union 대체 예정
+        _column: "plot",
+        _team: "MECH",
         _status_group: null,
         _include_inactive: false,
         _plot: null,
+        _q: null,
+        _filters: [],
+      });
+      if (error) return [];
+      return ((data ?? []) as any[])
+        .map((r) => String(r.value ?? ""))
+        .filter((v) => v && v !== "(empty)");
+    },
+    staleTime: 5 * 60_000,
+  });
+  const batchListQ = useQuery<string[]>({
+    queryKey: ["abd-batch-list", plotFilter.join(",")],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("abd_items_facets", {
+        _column: "batch_no",
+        _team: "MECH",
+        _status_group: null,
+        _include_inactive: false,
+        _plot: plotFilter.length === 1 ? plotFilter[0] : null,
         _q: null,
         _filters: [],
       });
@@ -58,7 +76,6 @@ export function AbdDashboardPage() {
   const refetch = () => {
     qc.invalidateQueries({ queryKey: ["abd-dash-row1"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-row2"] });
-    qc.invalidateQueries({ queryKey: ["abd-dash-trend"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-attention"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-crosscut"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-judgment-mix"] });
@@ -69,6 +86,9 @@ export function AbdDashboardPage() {
     if (batchFilter.length && !("batch" in search)) {
       search.batch = batchFilter.join(",");
     }
+    if (plotFilter.length && !("plot" in search)) {
+      search.plot = plotFilter.join(",");
+    }
     const progressKeys = ["team", "dis", "service", "hdec_pic_name", "hdec_eng_name", "docAx", "docAxx", "batch"];
     if (progressKeys.some((k) => k in search) && !("source" in search)) {
       search.source = "progress";
@@ -76,11 +96,20 @@ export function AbdDashboardPage() {
     navigate({ to: "/closure/abd/raw-data", search: search as any });
   };
 
+  const plotOptions = useMemo(() => {
+    const set = new Set<string>(plotFilter);
+    for (const v of plotListQ.data ?? []) set.add(v);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [plotListQ.data, plotFilter]);
+
   const batchOptions = useMemo(() => {
     const set = new Set<string>(batchFilter);
     for (const v of batchListQ.data ?? []) set.add(v);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [batchListQ.data, batchFilter]);
+
+  const toggleIn = (list: string[], v: string) =>
+    list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -96,54 +125,6 @@ export function AbdDashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <AbdAgingSettingsPopover />
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 font-normal">
-                <Filter className="h-4 w-4" />
-                Batch: {batchFilter.length ? `${batchFilter.length} selected` : "All"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-2" align="end">
-              <div className="flex items-center justify-between px-1 pb-2">
-                <span className="text-xs font-medium text-muted-foreground">Filter by Batch No.</span>
-                {batchFilter.length > 0 && (
-                  <button
-                    className="text-[11px] text-primary hover:underline"
-                    onClick={() => setBatchFilter([])}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="max-h-64 overflow-y-auto space-y-0.5">
-                {batchOptions.length === 0 && (
-                  <div className="px-2 py-3 text-xs text-muted-foreground text-center">
-                    Batch 데이터 없음
-                  </div>
-                )}
-                {batchOptions.map((b) => {
-                  const checked = batchFilter.includes(b);
-                  return (
-                    <label
-                      key={b}
-                      className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          setBatchFilter((prev) =>
-                            e.target.checked ? [...prev, b] : prev.filter((x) => x !== b),
-                          );
-                        }}
-                      />
-                      <span className="truncate">{b}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </PopoverContent>
-          </Popover>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2 font-normal">
@@ -174,38 +155,128 @@ export function AbdDashboardPage() {
         </div>
       </div>
 
+      {/* Filter bar — 탭형 다중선택 (Plot → Batch) */}
+      <div className="space-y-2 rounded-md border bg-card p-3">
+        <FilterRow
+          label="Plot"
+          options={plotOptions}
+          selected={plotFilter}
+          onToggle={(v) => setPlotFilter((prev) => toggleIn(prev, v))}
+          onClear={() => setPlotFilter([])}
+          onAll={() => setPlotFilter([])}
+          emptyText="Plot 데이터 없음"
+        />
+        <FilterRow
+          label="Batch"
+          options={batchOptions}
+          selected={batchFilter}
+          onToggle={(v) => setBatchFilter((prev) => toggleIn(prev, v))}
+          onClear={() => setBatchFilter([])}
+          onAll={() => setBatchFilter([])}
+          emptyText="Batch 데이터 없음"
+        />
+      </div>
+
       {/* Row 1 — 배타적 5분류 (Total / Approved / UR / DS / NS) */}
-      <AbdRow1Kpis batchNo={batchFilter} onOpenRaw={openRawData} />
+      <AbdRow1Kpis plots={plotFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
 
       {/* Row 2 — 지연 (Total / RS / SB / DS / No Plan) */}
-      <AbdRow2Kpis batchNo={batchFilter} onOpenRaw={openRawData} />
+      <AbdRow2Kpis plots={plotFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
 
       {/* Row 2.5 — Status Mix / 자동 판정 분포 / 스테이지별 판정 스택 (TM 이식) */}
       <div className="grid gap-4 xl:grid-cols-3">
-        <AbdStatusMixDonut batchNo={batchFilter} />
-        <AbdJudgmentDonut batchNo={batchFilter} />
-        <AbdJudgmentStageBreakdown batchNo={batchFilter} />
-      </div>
-
-      {/* Row 3 — Approval Trend */}
-      <div className="grid gap-4 xl:grid-cols-1">
-        <AbdRow4ApprovalTrend batchNo={batchFilter} onOpenRaw={openRawData} />
+        <AbdStatusMixDonut plots={plotFilter} batchNo={batchFilter} />
+        <AbdJudgmentDonut plots={plotFilter} batchNo={batchFilter} />
+        <AbdJudgmentStageBreakdown plots={plotFilter} batchNo={batchFilter} />
       </div>
 
       {/* Row 4 — Attention Lists + Cross-cut */}
       <div className="grid gap-4 xl:grid-cols-2">
         <AbdRow6Attention
+          plots={plotFilter}
           batchNo={batchFilter}
           onOpenRaw={openRawData}
           onOpenDetail={(id, focus) => setDetail({ id, focus })}
         />
-        <AbdRow6Crosscut batchNo={batchFilter} onOpenRaw={openRawData} />
+        <AbdRow6Crosscut plots={plotFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
       </div>
       <AbdDetailSheet
         id={detail?.id ?? null}
         focusSection={detail?.focus ?? null}
         onOpenChange={(open) => { if (!open) setDetail(null); }}
       />
+    </div>
+  );
+}
+
+function FilterRow({
+  label,
+  options,
+  selected,
+  onToggle,
+  onClear,
+  onAll,
+  emptyText,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onToggle: (v: string) => void;
+  onClear: () => void;
+  onAll: () => void;
+  emptyText: string;
+}) {
+  const isAll = selected.length === 0;
+  return (
+    <div className="flex items-start gap-2">
+      <div className="pt-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground shrink-0 w-14">
+        {label}
+      </div>
+      <div className="flex flex-1 min-w-0 flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onAll}
+          className={cn(
+            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            isAll
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-background hover:bg-muted",
+          )}
+        >
+          All
+        </button>
+        {options.length === 0 && (
+          <span className="px-2 py-1 text-xs text-muted-foreground">{emptyText}</span>
+        )}
+        {options.map((v) => {
+          const active = selected.includes(v);
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => onToggle(v)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors max-w-[220px] truncate",
+                active
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background hover:bg-muted",
+              )}
+              title={v}
+            >
+              {v}
+            </button>
+          );
+        })}
+      </div>
+      <div className="pt-1.5 shrink-0 text-[11px] text-muted-foreground">
+        {selected.length > 0 ? (
+          <button className="text-primary hover:underline" onClick={onClear}>
+            Clear ({selected.length})
+          </button>
+        ) : (
+          <span>All</span>
+        )}
+      </div>
     </div>
   );
 }

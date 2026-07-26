@@ -53,20 +53,6 @@ export const getAbdDashboardStatusDist = createServerFn({ method: "POST" })
     return (rows ?? []) as Array<{ status: string; cnt: number }>;
   });
 
-export const getAbdDashboardApprovalTrend = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((v: unknown) => FilterSchema.extend({ months: z.number().int().default(12) }).parse(v))
-  .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_approval_trend", {
-      _plots: toArrOrNull(data.plots),
-      _teams: toArrOrNull(data.teams),
-      _months: data.months,
-      _batch_no: toArrOrNull(data.batch_no),
-    });
-    if (error) throw new Error(error.message);
-    return (rows ?? []) as Array<{ month_start: string; team: string | null; approved_cnt: number }>;
-  });
-
 export const getAbdDashboardAttentionLists = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => FilterSchema.extend({ limit: z.number().int().default(20) }).parse(v))
@@ -130,12 +116,18 @@ export type AbdJudgmentMixRow = {
 export const getAbdDashboardJudgmentMix = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) =>
-    z.object({ batch_no: z.array(z.string()).default([]) }).parse(v),
+    z.object({
+      batch_no: z.array(z.string()).default([]),
+      plots: z.array(z.string()).default([]),
+    }).parse(v),
   )
   .handler(async ({ data, context }) => {
     const { data: rows, error } = await (context.supabase as any).rpc(
       "abd_dashboard_judgment_mix",
-      { _batch_no: toArrOrNull(data.batch_no) },
+      {
+        _batch_no: toArrOrNull(data.batch_no),
+        _plots: toArrOrNull(data.plots),
+      },
     );
     if (error) throw new Error(error.message);
     return ((rows ?? []) as any[]).map((r) => ({
