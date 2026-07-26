@@ -60,7 +60,7 @@ export function normalizeDiscipline(v: string | null | undefined): Discipline | 
 export const ROW_TYPES = ["항목", "실행", "승인", "대기"] as const;
 export const STATUS_MANUAL = ["예정", "진행", "완료"] as const;
 export const RISK_LEVELS = ["Critical", "High", "Med", "Low"] as const;
-export const AUTO_JUDGMENTS = ["완료", "정상", "주의", "지연", "위험"] as const;
+export const AUTO_JUDGMENTS = ["완료", "정상", "주의", "지연", "악화"] as const;
 export const PLOTS = ["C", "D"] as const;
 export const LEVELS = ["main", "sub"] as const;
 
@@ -89,7 +89,7 @@ export const AUTO_JUDGMENT_COLORS: Record<string, string> = {
   "정상": "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   "주의": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   "지연": "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-  "위험": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+  "악화": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
 };
 
 export const PLOT_COLORS: Record<string, string> = {
