@@ -23,6 +23,7 @@ import {
   computeJudgment,
   cumPlanProgress,
   computeVariance,
+  worstJudgment,
 } from "@/lib/task-management/derived";
 import type { TaskThresholds } from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
