@@ -22,6 +22,17 @@ const RowSchema = z.object({
   status_norm: z.string().nullable().optional(),
   date_modified: z.string().nullable().optional(),
   is_excluded: z.boolean().default(false),
+  semantic: z
+    .enum([
+      "DAR_APPROVED_A",
+      "DAR_APPROVED_B",
+      "DAR_REJECTED",
+      "SUBMITTED",
+      "EXCLUDED_TERMINATED",
+      "EXCLUDED_CANCELLED",
+      "UNKNOWN",
+    ])
+    .default("UNKNOWN"),
   excel_row: z.number().optional(),
 });
 
@@ -32,6 +43,8 @@ const SYNC_FIELD_KEYS = [
   "aconex_status_raw",
   "aconex_review_status_raw",
   "aconex_date_modified",
+  "round_actual",
+  "is_terminated",
 ] as const;
 export type AconexSyncField = (typeof SYNC_FIELD_KEYS)[number];
 
@@ -51,6 +64,7 @@ export type AconexImportPreview = {
   unmatched: number;
   excluded: number;
   by_status: Array<{ code: string; count: number }>;
+  by_semantic: Array<{ semantic: string; count: number }>;
   unmatched_samples: string[];
 };
 
@@ -76,9 +90,12 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
 
     // 1) 상태 분포 집계
     const byStatus = new Map<string, number>();
+    const bySemantic = new Map<string, number>();
     for (const r of data.rows) {
       const key = r.status_code ?? "UNKNOWN";
       byStatus.set(key, (byStatus.get(key) ?? 0) + 1);
+      const sem = r.semantic ?? "UNKNOWN";
+      bySemantic.set(sem, (bySemantic.get(sem) ?? 0) + 1);
     }
     const excludedCount = data.rows.filter((r) => r.is_excluded).length;
 
@@ -95,8 +112,24 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       for (const row of rows ?? []) existing.add(row.abd_number);
     }
-    const matched = data.rows.filter((r) => existing.has(r.document_no));
-    const unmatched = data.rows.filter((r) => !existing.has(r.document_no));
+    // 라운드 라우팅을 위해 기존 행의 라운드별 값을 함께 로드.
+    const existingRows = new Map<string, any>();
+    const roundCols =
+      "abd_number,latest_status,latest_status_norm,is_terminated,active_round," +
+      "r1_submission_actual,r2_submission_actual,r3_submission_actual," +
+      "r1_dar_actual,r2_dar_actual,r3_dar_actual," +
+      "r1_response_result,r2_response_result,r3_response_result";
+    for (let i = 0; i < docNos.length; i += CHUNK) {
+      const slice = docNos.slice(i, i + CHUNK);
+      const { data: rows, error } = await supa
+        .from("abd_items_raw")
+        .select(roundCols)
+        .in("abd_number", slice);
+      if (error) throw new Error(error.message);
+      for (const row of rows ?? []) existingRows.set(row.abd_number, row);
+    }
+    const matched = data.rows.filter((r) => existingRows.has(r.document_no));
+    const unmatched = data.rows.filter((r) => !existingRows.has(r.document_no));
 
     const preview: AconexImportPreview = {
       total: data.rows.length,
@@ -105,6 +138,9 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       excluded: excludedCount,
       by_status: Array.from(byStatus.entries())
         .map(([code, count]) => ({ code, count }))
+        .sort((a, b) => b.count - a.count),
+      by_semantic: Array.from(bySemantic.entries())
+        .map(([semantic, count]) => ({ semantic, count }))
         .sort((a, b) => b.count - a.count),
       unmatched_samples: unmatched.slice(0, 20).map((r) => r.document_no),
     };
@@ -141,6 +177,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     );
     let updated = 0;
     for (const r of matched) {
+      const existing = existingRows.get(r.document_no) ?? {};
       // 항상 세팅되는 메타데이터 (감사/추적)
       const patch: Record<string, any> = {
         aconex_last_synced_at: nowIso,
@@ -148,15 +185,76 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
         updated_at: nowIso,
         updated_by: context.userId,
       };
-      // 사용자 선택 필드만 반영
-      if (allowed.has("latest_status")) patch.latest_status = r.status_code ?? r.status_raw ?? null;
-      if (allowed.has("latest_rev") && r.revision) patch.latest_rev = r.revision;
-      if (allowed.has("approval_date") && r.status_code === "A" && r.date_modified) {
-        patch.approval_date = r.date_modified;
-      }
+
+      // --- 원시 메타 필드 (참조/감사용) ---
       if (allowed.has("aconex_status_raw")) patch.aconex_status_raw = r.status_raw ?? null;
-      if (allowed.has("aconex_review_status_raw")) patch.aconex_review_status_raw = r.review_status_raw ?? null;
-      if (allowed.has("aconex_date_modified")) patch.aconex_date_modified = r.date_modified ?? null;
+      if (allowed.has("aconex_review_status_raw"))
+        patch.aconex_review_status_raw = r.review_status_raw ?? null;
+      if (allowed.has("aconex_date_modified"))
+        patch.aconex_date_modified = r.date_modified ?? null;
+      if (allowed.has("latest_rev") && r.revision) patch.latest_rev = r.revision;
+
+      // --- semantic 라우팅 ---
+      const semantic = r.semantic ?? "UNKNOWN";
+      const iso = r.date_modified;
+
+      // Excluded: is_terminated 만 세팅하고 latest_status 반영 (HDEC/Aconex 코드 그대로)
+      if (semantic === "EXCLUDED_TERMINATED" || semantic === "EXCLUDED_CANCELLED") {
+        if (allowed.has("is_terminated")) patch.is_terminated = true;
+        if (allowed.has("latest_status"))
+          patch.latest_status = r.status_code ?? r.status_raw ?? null;
+      } else {
+        // 현재 라운드 판정: DB 의 active_round 우선, 없으면 라운드별 컬럼 존재로 추정.
+        let n: 1 | 2 | 3 = (existing.active_round as 1 | 2 | 3) ?? 1;
+        if (!existing.active_round) {
+          if (
+            existing.r3_submission_actual ||
+            existing.r3_dar_actual ||
+            existing.r2_response_result === "B" ||
+            existing.r2_response_result === "C"
+          )
+            n = 3;
+          else if (
+            existing.r2_submission_actual ||
+            existing.r2_dar_actual ||
+            existing.r1_response_result === "B" ||
+            existing.r1_response_result === "C"
+          )
+            n = 2;
+          else n = 1;
+        }
+
+        if (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B") {
+          if (allowed.has("round_actual") && iso) {
+            patch[`r${n}_dar_actual`] = iso;
+            patch[`r${n}_response_result`] = semantic === "DAR_APPROVED_A" ? "A" : "B";
+          }
+          if (allowed.has("approval_date") && iso && semantic === "DAR_APPROVED_A") {
+            patch.approval_date = iso;
+          }
+          if (allowed.has("latest_status"))
+            patch.latest_status = semantic === "DAR_APPROVED_A" ? "A" : "B";
+        } else if (semantic === "DAR_REJECTED") {
+          if (allowed.has("round_actual") && iso) {
+            patch[`r${n}_dar_actual`] = iso;
+            patch[`r${n}_response_result`] = r.status_code === "D" ? "D" : "C";
+          }
+          if (allowed.has("latest_status"))
+            patch.latest_status = r.status_code === "D" ? "D" : "C";
+        } else if (semantic === "SUBMITTED") {
+          // HDEC 값 우선: 이미 rN_submission_actual 이 있으면 덮어쓰지 않음.
+          const submissionCol = `r${n}_submission_actual`;
+          if (allowed.has("round_actual") && iso && !existing[submissionCol]) {
+            patch[submissionCol] = iso;
+          }
+          // latest_status: 승인/반려 상태(A/B/C/D) 인 경우 덮어쓰지 않음
+          const cur = String(existing.latest_status ?? "").toUpperCase();
+          if (allowed.has("latest_status") && !["A", "B", "C", "D"].includes(cur)) {
+            patch.latest_status = "UR";
+          }
+        }
+      }
+
       const { error: upErr } = await supa
         .from("abd_items_raw")
         .update(patch)
