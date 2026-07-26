@@ -23,6 +23,9 @@ import { AbdAgingSettingsPopover, useAbdSettingsQuery } from "./AbdAgingSettings
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AbdDetailSheet } from "@/components/abd/raw-data/AbdDetailSheet";
+import { AbdStatusMixDonut } from "./AbdStatusMixDonut";
+import { AbdJudgmentDonut } from "./AbdJudgmentDonut";
+import { AbdJudgmentStageBreakdown } from "./AbdJudgmentStageBreakdown";
 
 export function AbdDashboardPage() {
   const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
@@ -60,6 +63,7 @@ export function AbdDashboardPage() {
     qc.invalidateQueries({ queryKey: ["abd-dash-trend"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-attention"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-crosscut"] });
+    qc.invalidateQueries({ queryKey: ["abd-dash-judgment-mix"] });
   };
 
   const openRawData = (params: Record<string, string> = {}) => {
@@ -177,6 +181,13 @@ export function AbdDashboardPage() {
 
       {/* Row 2 — 지연 (Total / RS / SB / DS / No Plan) */}
       <AbdRow2Kpis batchNo={batchFilter} onOpenRaw={openRawData} />
+
+      {/* Row 2.5 — Status Mix / 자동 판정 분포 / 스테이지별 판정 스택 (TM 이식) */}
+      <div className="grid gap-4 xl:grid-cols-3">
+        <AbdStatusMixDonut batchNo={batchFilter} />
+        <AbdJudgmentDonut batchNo={batchFilter} />
+        <AbdJudgmentStageBreakdown batchNo={batchFilter} />
+      </div>
 
       {/* Row 3 — Latest Status Distribution + Row 4 — Approval Trend */}
       <div className="grid gap-4 xl:grid-cols-3">
