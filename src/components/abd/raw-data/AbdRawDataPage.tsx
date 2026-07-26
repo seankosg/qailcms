@@ -458,6 +458,7 @@ export function AbdRawDataPage() {
   const approvedCount = counts?.approved_count ?? 0;
   const inProgressCount = counts?.in_progress_count ?? 0;
   const notStartedCount = counts?.not_started_count ?? 0;
+  const excludedCount = counts?.excluded_count ?? 0;
 
   return (
     <div className="space-y-3">
@@ -546,6 +547,15 @@ export function AbdRawDataPage() {
             </button>
           );
         })}
+        {excludedCount > 0 && (
+          <span
+            className="ml-auto inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] text-muted-foreground"
+            title="Terminated / Cancelled — 통계에서 제외됨"
+          >
+            Excluded
+            <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{excludedCount}</Badge>
+          </span>
+        )}
       </div>
 
       {activeChips.length > 0 && (
