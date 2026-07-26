@@ -92,27 +92,11 @@ import {
   computeDailyPlan,
   computeDailyDiff,
 } from "@/lib/task-management/derived";
-import {
-  ALL_TASK_TIMELINE_STAGE_KEYS,
-  isTaskStageDelayedAsOf,
-  todayIso,
-  type TaskItem,
-} from "@/lib/task-management/schedule-utils";
-import {
-  isCompleted as kpiIsCompleted,
-  isStarted as kpiIsStarted,
-  isPlannedStartedBy as kpiIsPlannedStartedBy,
-  isStartDelayed as kpiIsStartDelayed,
-  isCompletionOverdue as kpiIsCompletionOverdue,
-  isCriticalDelay as kpiIsCriticalDelay,
-  isBehindSchedule as kpiIsBehindSchedule,
-  isInDelay as kpiIsInDelay,
-  scopeItems,
-  type TmKpiMode,
-  type TaskScope,
-} from "@/lib/task-management/kpi-utils";
+import { todayIso } from "@/lib/task-management/schedule-utils";
+import { type TaskScope } from "@/lib/task-management/kpi-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
+import { useTmJudgmentAtDate, mergeTmJudgment } from "@/hooks/useTmJudgmentAtDate";
 import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
@@ -190,12 +174,83 @@ function chipValue(v: unknown): string {
   if (typeof v === "object") {
     const o = v as any;
     if (o.emptyOnly) return "(Empty)";
+    if (o.notEmptyOnly) return "(Not Empty)";
     if (o.text) return String(o.text);
     if (o.from || o.to) return `${o.from ?? ""}~${o.to ?? ""}`;
     if (o.min != null || o.max != null) return `${o.min ?? ""}~${o.max ?? ""}`;
   }
   return String(v);
 }
+
+function previousDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() - 1);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function modeToColumnFilters(
+  mode: string | undefined,
+  asOf: string,
+  scope: TaskScope,
+): ColumnFiltersState {
+  const out: ColumnFiltersState = [];
+  if (scope !== "all") {
+    out.push({ id: "level", value: [scope] });
+  }
+  if (!mode) return out;
+
+  const notCompleted = ["정상", "주의", "지연", "악화", EMPTY_TOKEN];
+  const delayOnly = ["지연", "악화"];
+
+  switch (mode) {
+    case "completed":
+      out.push({ id: "auto_judgment", value: ["완료"] });
+      break;
+    case "wip":
+      out.push({ id: "actual_start", value: { notEmptyOnly: true } });
+      out.push({ id: "auto_judgment", value: notCompleted });
+      break;
+    case "not_started":
+      out.push({ id: "actual_start", value: { emptyOnly: true } });
+      out.push({ id: "auto_judgment", value: notCompleted });
+      break;
+    case "planned_started":
+      out.push({ id: "plan_start", value: { to: asOf } });
+      break;
+    case "actual_started":
+      out.push({ id: "actual_start", value: { notEmptyOnly: true } });
+      break;
+    case "in_delay":
+    case "behind":
+    case "delay":
+      out.push({ id: "auto_judgment", value: delayOnly });
+      break;
+    case "start_delayed":
+      out.push({ id: "auto_judgment", value: delayOnly });
+      out.push({ id: "actual_start", value: { emptyOnly: true } });
+      out.push({ id: "plan_start", value: { to: asOf } });
+      break;
+    case "completion_overdue":
+      out.push({ id: "auto_judgment", value: delayOnly });
+      out.push({ id: "plan_end", value: { to: previousDay(asOf) } });
+      break;
+    case "critical":
+      out.push({ id: "auto_judgment", value: ["악화"] });
+      break;
+    case "no_plan_start":
+      out.push({ id: "plan_start", value: { emptyOnly: true } });
+      break;
+    case "no_plan_end":
+      out.push({ id: "plan_end", value: { emptyOnly: true } });
+      break;
+  }
+  return out;
+}
+
 
 export function TaskManagementRawDataPage() {
   const navigate = useNavigate();
@@ -243,15 +298,6 @@ export function TaskManagementRawDataPage() {
   const [stateLoaded, setStateLoaded] = useState(false);
   const search = routeApi.useSearch();
   const dashboardAppliedRef = useRef(false);
-  const [delayMode, setDelayMode] = useState<{ asOf: string } | null>(null);
-  const [kpiMode, setKpiMode] = useState<{
-    mode: TmKpiMode;
-    asOf: string;
-    scope: TaskScope;
-  } | null>(null);
-  // KPI 딥링크 진입 시 Delay 계열은 매칭 Main 의 이슈 Sub 를 컨텍스트로 함께 노출.
-  // 사용자가 카드 숫자와 100% 일치를 확인하고 싶을 때 이 컨텍스트 Sub 를 숨길 수 있음.
-  const [hideContextSubs, setHideContextSubs] = useState(false);
   const { data: kpiThresholds } = useTaskManagementSettings();
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
   const [sizing, setSizing] = useState<ColumnSizingState>({});
@@ -402,22 +448,19 @@ export function TaskManagementRawDataPage() {
     const q = (s.q ?? "").trim();
     setGlobalFilter(q);
     setSearchInput(q);
-    setColumnFilters(next);
     setCollapsedParents(new Set());
-    setHideContextSubs(false);
-    const asOf = s.asOf && s.asOf.length ? s.asOf : todayIso();
+
+    const asOf = s.asOf && s.asOf.length ? s.asOf : latestDataDate || todayIso();
     const scope: TaskScope =
       s.taskScope === "main" || s.taskScope === "sub" ? s.taskScope : "all";
-    if (s.mode === "delay") {
-      setDelayMode({ asOf });
-      setKpiMode(null);
-    } else if (s.mode) {
-      setDelayMode(null);
-      setKpiMode({ mode: s.mode as TmKpiMode, asOf, scope });
-    } else {
-      setDelayMode(null);
-      setKpiMode(null);
-    }
+
+    // Data Date 동기화: Dashboard 와 동일한 시점으로 공유 상태 설정
+    const nextShared = asOf === latestDataDate ? "" : asOf;
+    setSharedDataDate(nextShared);
+
+    // SHAW 방식: mode 를 TanStack ColumnFilters 로 변환하여 한꺼번에 적용
+    const kpiFilters = modeToColumnFilters(s.mode, asOf, scope);
+    setColumnFilters([...next, ...kpiFilters]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateLoaded, search]);
 
@@ -522,7 +565,7 @@ export function TaskManagementRawDataPage() {
   }, [rows]);
 
   // Data Date 는 Dashboard 의 설정을 세션 전역으로 공유. Raw Data 자체 픽커는 폐기.
-  const [sharedDataDate] = useTmDataDate();
+  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
   const selectedDataDate = sharedDataDate || (latestDataDate ?? "");
 
   // T.Actual (오늘 실적) — 서버 RPC로 (오늘 누계 − 어제 누계) 일괄 조회.
@@ -550,129 +593,21 @@ export function TaskManagementRawDataPage() {
     return m;
   }, [tActualRows]);
 
-  // 지연 모드: 대시보드에서 넘어온 스테이지 지연 조건에 해당하는 행만 노출
-  const delayFilteredRows = useMemo(() => {
-    if (!delayMode) return rows;
-    const asOf = delayMode.asOf;
-    return rows.filter((r) => {
-      const it = r as unknown as TaskItem;
-      for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
-        if (isTaskStageDelayedAsOf(it, st, asOf)) return true;
-      }
-      return false;
-    });
-  }, [rows, delayMode]);
-
-  // KPI 카드 딥링크 모드: 대시보드 상단 카드 클릭 시 조건
-  const kpiSelection = useMemo(() => {
-    if (!kpiMode) {
-      return { rows: delayFilteredRows, matchCount: delayFilteredRows.length, contextCount: 0 };
-    }
-    const t = kpiThresholds ?? DEFAULT_THRESHOLDS;
-    const asOf = kpiMode.asOf;
-    const scoped = scopeItems(
-      delayFilteredRows as unknown as TaskItem[],
-      kpiMode.scope,
-    ) as unknown as Row[];
-    const matched = scoped.filter((r) => {
-      const it = r as unknown as TaskItem;
-      switch (kpiMode.mode) {
-        case "completed":
-          return kpiIsCompleted(it);
-        case "not_started":
-          return !kpiIsStarted(it);
-        case "wip":
-          return kpiIsStarted(it) && !kpiIsCompleted(it);
-        case "planned_started":
-          return kpiIsPlannedStartedBy(it, asOf);
-        case "actual_started":
-          return kpiIsStarted(it);
-        case "in_delay":
-          return kpiIsInDelay(it, asOf);
-        case "start_delayed":
-          return kpiIsInDelay(it, asOf) && kpiIsStartDelayed(it, asOf);
-        case "completion_overdue":
-          return kpiIsInDelay(it, asOf) && kpiIsCompletionOverdue(it, asOf);
-        case "critical":
-          return kpiIsCriticalDelay(it, asOf, t);
-        case "behind":
-          return kpiIsInDelay(it, asOf) && kpiIsBehindSchedule(it, asOf);
-        case "no_plan_start":
-          return !(it as any).plan_start;
-        case "no_plan_end":
-          return !(it as any).plan_end;
-        default:
-          return true;
-      }
-    });
-    // Delay 계열 mode: 매치된 Main Task의 모든 Sub를 함께 포함
-    // (Sub가 정상/주의여도 Main의 하위 컨텍스트 파악을 위해 노출)
-    const DELAY_MODES = new Set([
-      "in_delay",
-      "start_delayed",
-      "completion_overdue",
-      "critical",
-      "behind",
-    ]);
-    if (!DELAY_MODES.has(kpiMode.mode)) {
-      return { rows: matched, matchCount: matched.length, contextCount: 0 };
-    }
-    const mainKeys = new Set<string>();
-    for (const r of matched) {
-      if ((r as any).level === "main") {
-        mainKeys.add(`${(r as any).discipline}::${(r as any).task_no}`);
-      }
-    }
-    if (mainKeys.size === 0) {
-      return { rows: matched, matchCount: matched.length, contextCount: 0 };
-    }
-    // Sub는 scopeItems 이전(전체 delayFilteredRows)에서 다시 조회 —
-    // 대시보드에서 taskScope='main' 진입 시에도 하위 Sub를 노출하기 위함.
-    const matchedIds = new Set(matched.map((r) => (r as any).id));
-    const extraSubs: Row[] = [];
-    for (const r of delayFilteredRows) {
-      if ((r as any).level !== "sub") continue;
-      const parent = (r as any).main_task_no as string | null;
-      const disc = (r as any).discipline as string;
-      if (!parent) continue;
-      if (!mainKeys.has(`${disc}::${parent}`)) continue;
-      if (matchedIds.has((r as any).id)) continue;
-      // 정상/완료 Sub는 제외 (주의/지연/악화 등 이슈 Sub만 함께 노출)
-      const j = (r as any).auto_judgment as string | null | undefined;
-      if (j === "정상" || j === "완료") continue;
-      extraSubs.push(r);
-    }
-    return {
-      rows: [...matched, ...extraSubs],
-      matchCount: matched.length,
-      contextCount: extraSubs.length,
-    };
-  }, [delayFilteredRows, kpiMode, kpiThresholds]);
-
-  const kpiFilteredRows = useMemo(() => {
-    if (!kpiMode) return kpiSelection.rows;
-    if (hideContextSubs && kpiSelection.contextCount > 0) {
-      // 매칭만 남기기: rows 앞쪽 matchCount 개가 matched.
-      return kpiSelection.rows.slice(0, kpiSelection.matchCount);
-    }
-    return kpiSelection.rows;
-  }, [kpiSelection, kpiMode, hideContextSubs]);
-
-  // discipline-task_no 단위 collapse 키 유지 — 접힌 부모의 자식 행 숨김
-  const visibleRows = useMemo(() => {
-    const src = kpiFilteredRows;
-    if (collapsedParents.size === 0) return src;
-    return src.filter((r) => {
-      const parent = (r as any).main_task_no as string | null;
-      const disc = (r as any).discipline as string;
-      if (!parent) return true;
-      return !collapsedParents.has(`${disc}::${parent}`);
-    });
-  }, [kpiFilteredRows, collapsedParents]);
+  // 과거 Data Date 시 Dashboard 와 동일하게 서버 재판정 결과를 병합.
+  // Actual% 는 절대 덮어쓰지 않고 Plan/gap/judgment/delay_days/alarm_reason 만 갱신.
+  const isPastDate = useMemo(
+    () => !!selectedDataDate && !!latestDataDate && selectedDataDate.slice(0, 10) < latestDataDate.slice(0, 10),
+    [selectedDataDate, latestDataDate],
+  );
+  const judge = useTmJudgmentAtDate(selectedDataDate, !!isPastDate);
+  const effectiveRows = useMemo(
+    () => mergeTmJudgment(rows, judge.map),
+    [rows, judge.map],
+  );
 
   const parentKeys = useMemo(() => {
     const keys: string[] = [];
-    for (const r of rows) {
+    for (const r of effectiveRows) {
       if ((r as any).level === "main") {
         keys.push(`${(r as any).discipline}::${(r as any).task_no}`);
       }
@@ -1076,7 +1011,7 @@ export function TaskManagementRawDataPage() {
   }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds, tActualMap, canEditOwnerFieldsBase, myPic, updateOwnerFieldFn, commentCounts, isRead]);
 
   const table = useReactTable({
-    data: visibleRows,
+    data: effectiveRows,
     columns,
     state: {
       sorting,
@@ -1103,8 +1038,19 @@ export function TaskManagementRawDataPage() {
   });
 
   const rowModel = table.getRowModel();
+  // collapse 는 UI 상태일 뿐, 집계/필터 카운트에는 영향을 주지 않습니다.
+  const renderRows = useMemo(() => {
+    if (collapsedParents.size === 0) return rowModel.rows;
+    return rowModel.rows.filter((row) => {
+      const parent = (row.original as any).main_task_no as string | null;
+      const disc = (row.original as any).discipline as string;
+      if (!parent) return true;
+      return !collapsedParents.has(`${disc}::${parent}`);
+    });
+  }, [rowModel.rows, collapsedParents]);
+
   const virtualizer = useVirtualizer({
-    count: rowModel.rows.length,
+    count: renderRows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 32,
     overscan: 12,
@@ -1264,42 +1210,9 @@ export function TaskManagementRawDataPage() {
         }}
       />
 
-      {(activeFilterCount > 0 || delayMode || kpiMode) && (
+      {(activeFilterCount > 0) && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <Filter className="h-3 w-3 text-muted-foreground" />
-          {delayMode && (
-            <FilterChip
-              label={`지연 모드 · asOf ${delayMode.asOf}`}
-              onClear={() => setDelayMode(null)}
-            />
-          )}
-          {kpiMode && (
-            <>
-              <FilterChip
-                label={`KPI: ${kpiMode.mode} · scope ${kpiMode.scope} · asOf ${kpiMode.asOf}`}
-                onClear={() => setKpiMode(null)}
-              />
-              <span className="ml-1 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums">
-                매치 <span className="font-semibold text-foreground">{kpiSelection.matchCount.toLocaleString()}</span>건
-                {kpiSelection.contextCount > 0 && (
-                  <>
-                    {" · "}
-                    컨텍스트 Sub <span className="font-semibold text-foreground">{kpiSelection.contextCount.toLocaleString()}</span>건
-                  </>
-                )}
-                <span className="ml-1 text-[10px] text-muted-foreground/70">(카드 숫자 = 매치)</span>
-              </span>
-              {kpiSelection.contextCount > 0 && (
-                <button
-                  className="ml-1 rounded border border-border/60 bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                  onClick={() => setHideContextSubs((v) => !v)}
-                  title="컨텍스트 Sub 표시/숨기기"
-                >
-                  {hideContextSubs ? "컨텍스트 Sub 표시" : "컨텍스트 Sub 숨기기"}
-                </button>
-              )}
-            </>
-          )}
           {globalFilter && (
             <FilterChip
               label={`Search: ${globalFilter}`}
@@ -1403,7 +1316,7 @@ export function TaskManagementRawDataPage() {
 
             <div style={{ height: virtualizer.getTotalSize() }} className="relative">
               {virtualizer.getVirtualItems().map((v) => {
-                const row = rowModel.rows[v.index];
+                const row = renderRows[v.index];
                 if (!row) return null;
                 const isParent = (row.original as Row).level === "main";
                 const ap = Number((row.original as any).actual_progress ?? 0);
