@@ -28,6 +28,7 @@ const abdRawDataSearchSchema = z.object({
   dateField: fallback(z.string(), "").default(""),
   stage: fallback(z.string(), "").default(""),
   round: fallback(z.enum(["R1", "R2", "R3", "all"]), "all").default("all"),
+  excluded: fallback(z.enum(["hide", "only", "all"]), "hide").default("hide"),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/abd/raw-data")({
