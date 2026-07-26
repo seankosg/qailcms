@@ -1011,7 +1011,7 @@ export function TaskManagementRawDataPage() {
   }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds, tActualMap, canEditOwnerFieldsBase, myPic, updateOwnerFieldFn, commentCounts, isRead]);
 
   const table = useReactTable({
-    data: visibleRows,
+    data: effectiveRows,
     columns,
     state: {
       sorting,
@@ -1038,8 +1038,19 @@ export function TaskManagementRawDataPage() {
   });
 
   const rowModel = table.getRowModel();
+  // collapse 는 UI 상태일 뿐, 집계/필터 카운트에는 영향을 주지 않습니다.
+  const renderRows = useMemo(() => {
+    if (collapsedParents.size === 0) return rowModel.rows;
+    return rowModel.rows.filter((row) => {
+      const parent = (row.original as any).main_task_no as string | null;
+      const disc = (row.original as any).discipline as string;
+      if (!parent) return true;
+      return !collapsedParents.has(`${disc}::${parent}`);
+    });
+  }, [rowModel.rows, collapsedParents]);
+
   const virtualizer = useVirtualizer({
-    count: rowModel.rows.length,
+    count: renderRows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 32,
     overscan: 12,
