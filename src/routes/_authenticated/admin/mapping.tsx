@@ -9,6 +9,7 @@ import { DefectHeaderMappingTable } from "@/components/admin/DefectHeaderMapping
 import { DefectImportPresetTable } from "@/components/admin/DefectImportPresetTable";
 import { AbdFieldConfigTable } from "@/components/admin/AbdFieldConfigTable";
 import { AbdHeaderMappingTable } from "@/components/admin/AbdHeaderMappingTable";
+import { AbdImportPresetTable } from "@/components/admin/AbdImportPresetTable";
 
 export const Route = createFileRoute("/_authenticated/admin/mapping")({
   component: MappingPage,
@@ -35,9 +36,13 @@ function MappingPage() {
             <TabsList>
               <TabsTrigger value="field-config">Field Config</TabsTrigger>
               <TabsTrigger value="header-mapping">Header Mapping</TabsTrigger>
+              <TabsTrigger value="preset-hdec">HDEC Preset</TabsTrigger>
+              <TabsTrigger value="preset-aconex">Aconex Preset</TabsTrigger>
             </TabsList>
             <TabsContent value="field-config"><AbdFieldConfigTable /></TabsContent>
             <TabsContent value="header-mapping"><AbdHeaderMappingTable /></TabsContent>
+            <TabsContent value="preset-hdec"><AbdImportPresetTable mode="hdec" /></TabsContent>
+            <TabsContent value="preset-aconex"><AbdImportPresetTable mode="aconex" /></TabsContent>
           </Tabs>
         </TabsContent>
         <TabsContent value="spare-part" className="space-y-4">
