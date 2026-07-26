@@ -206,7 +206,6 @@ export function TmKpiCards({
           percent={pctNum(kpi.criticalDelay, kpi.total)}
           tone="danger"
           onClick={() => goRaw("critical")}
-          action={<CriticalThresholdPopover compact triggerVariant="ghost" triggerLabel="설정" />}
           breakdown={toBreakdownRows("critical", breakdown.criticalDelay)}
           formula="미완료 & 스테이지 worst-of 판정 = 위험 (Critical ⊂ In Delay)"
         />
