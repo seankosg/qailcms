@@ -17,12 +17,14 @@ async function fetchAll<T = any>(
   select: string,
   applyFilter: (q: any) => any,
   order: { col: string; asc?: boolean } | null,
-  limit: number,
+  limit: number | null,
 ): Promise<T[]> {
   const PAGE = 1000;
   const out: T[] = [];
-  for (let from = 0; from < limit; from += PAGE) {
-    const to = Math.min(from + PAGE, limit) - 1;
+  const MAX_PAGES = 200; // 안전장치: 최대 200k행
+  const effectiveLimit = limit ?? MAX_PAGES * PAGE;
+  for (let from = 0; from < effectiveLimit; from += PAGE) {
+    const to = Math.min(from + PAGE, effectiveLimit) - 1;
     let q = (supabase as any).from(table).select(select);
     q = applyFilter(q);
     if (order) q = q.order(order.col, { ascending: order.asc ?? true, nullsFirst: false });
