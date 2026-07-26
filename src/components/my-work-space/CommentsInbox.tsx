@@ -41,7 +41,7 @@ function detailHref(c: InboxComment): { to: string; params?: any; search?: any }
 export function CommentsInbox({ userId, scope, filterValue, isAdmin }: Props) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("all");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const { data: rows = [], isLoading, isFetching } = useCommentInbox({ userId, scope, filterValue, isAdmin });
   const { isRead, markRead, markManyRead } = useCommentInboxRead(userId);
@@ -78,7 +78,15 @@ export function CommentsInbox({ userId, scope, filterValue, isAdmin }: Props) {
   return (
     <section className="rounded-lg border bg-card">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b">
+      <div className="flex flex-wrap items-center gap-2 px-2 py-1.5 border-b">
+        <button
+          type="button"
+          aria-label={collapsed ? "펼치기" : "접기"}
+          onClick={() => setCollapsed((v) => !v)}
+          className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-accent text-muted-foreground"
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
         <MessageSquare className="h-4 w-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold">내 항목 댓글</h2>
         {perModule.unreadTotal > 0 && (
@@ -99,15 +107,6 @@ export function CommentsInbox({ userId, scope, filterValue, isAdmin }: Props) {
           >
             <CheckCheck className="h-3.5 w-3.5 mr-1" />
             모두 읽음
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? "펼치기" : "접기"}
-          >
-            {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
           </Button>
         </div>
       </div>
