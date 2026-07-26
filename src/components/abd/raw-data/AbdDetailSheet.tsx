@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -77,12 +77,31 @@ function isLate(plan: string | null, actual: string | null): boolean {
   return new Date(actual).getTime() > new Date(plan).getTime();
 }
 
-export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpenChange: (open: boolean) => void }) {
+export function AbdDetailSheet({ id, onOpenChange, focusSection }: { id: string | null; onOpenChange: (open: boolean) => void; focusSection?: "rounds" | "aconex" | "comments" | null }) {
   const [item, setItem] = useState<AbdItemRow | null>(null);
   const [changes, setChanges] = useState<ChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const { data: me } = useCurrentUser();
   const { data: settings } = useAbdSettingsQuery();
+  const roundsRef = useRef<HTMLElement>(null);
+  const aconexRef = useRef<HTMLElement>(null);
+  const commentsRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!id || !focusSection || !item) return;
+    const target = focusSection === "rounds" ? roundsRef.current
+      : focusSection === "aconex" ? aconexRef.current
+      : focusSection === "comments" ? commentsRef.current
+      : null;
+    if (target) {
+      const t = window.setTimeout(() => {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        target.classList.add("ring-2", "ring-primary/60", "rounded-md");
+        window.setTimeout(() => target.classList.remove("ring-2", "ring-primary/60", "rounded-md"), 1600);
+      }, 120);
+      return () => window.clearTimeout(t);
+    }
+  }, [id, focusSection, item]);
 
   useEffect(() => {
     if (!id) { setItem(null); setChanges([]); return; }
@@ -188,7 +207,7 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
             <Separator />
 
             {/* Rounds Timeline */}
-            <section>
+            <section ref={roundsRef} data-section="rounds" className="scroll-mt-4">
               <h3 className="font-semibold text-sm mb-2">Rounds Timeline</h3>
               <div className="space-y-3">
                 {([1, 2, 3] as const).map((r) => {
@@ -296,7 +315,7 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
 
             {/* Aconex Sync */}
             {(item.aconex_status_raw || item.aconex_review_status_raw || item.aconex_last_synced_at || item.aconex_date_modified) && (
-              <section>
+              <section ref={aconexRef} data-section="aconex" className="scroll-mt-4">
                 <h3 className="font-semibold text-sm mb-2 flex items-center gap-1.5">
                   Aconex <ExternalLink className="h-3 w-3 text-muted-foreground" />
                 </h3>
@@ -343,7 +362,7 @@ export function AbdDetailSheet({ id, onOpenChange }: { id: string | null; onOpen
             </section>
 
             {/* Comments */}
-            <section>
+            <section ref={commentsRef} data-section="comments" className="scroll-mt-4">
               <h3 className="font-semibold text-sm mb-2">Comments</h3>
               <CommentsThread
                 table="abd_comments"

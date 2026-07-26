@@ -33,6 +33,7 @@ interface BaseProps {
   teams?: string[];
   batchNo?: string[];
   onOpenRaw: (params: Record<string, string>) => void;
+  onOpenDetail?: (id: string, focus?: "rounds" | "aconex" | "comments") => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -295,7 +296,7 @@ export function AbdRow5OverdueHeatmap({ plots = [], teams = [], batchNo = [], on
 }
 
 /** Row 6a — Attention Lists (needs_planning / ur_aging / status_mismatch) */
-export function AbdRow6Attention({ plots = [], teams = [], batchNo = [], onOpenRaw }: BaseProps) {
+export function AbdRow6Attention({ plots = [], teams = [], batchNo = [], onOpenRaw, onOpenDetail }: BaseProps) {
   const fn = useServerFn(getAbdDashboardAttentionLists);
   const { data } = useQuery({
     queryKey: ["abd-dash-attention", plots.join(","), teams.join(","), batchNo.join(",")],
@@ -338,7 +339,7 @@ export function AbdRow6Attention({ plots = [], teams = [], batchNo = [], onOpenR
           </TabsList>
           {(["needs_planning", "ur_aging", "status_mismatch"] as const).map((k) => (
             <TabsContent key={k} value={k} className="mt-3">
-              <AttentionRows items={groups[k]} kind={k} onOpen={onOpenRaw} />
+              <AttentionRows items={groups[k]} kind={k} onOpen={onOpenRaw} onOpenDetail={onOpenDetail} />
             </TabsContent>
           ))}
         </Tabs>
@@ -351,6 +352,7 @@ function AttentionRows({
   items,
   kind,
   onOpen,
+  onOpenDetail,
 }: {
   items: Array<{
     id: string;
@@ -365,6 +367,7 @@ function AttentionRows({
   }>;
   kind: "needs_planning" | "ur_aging" | "status_mismatch";
   onOpen: (params: Record<string, string>) => void;
+  onOpenDetail?: (id: string, focus?: "rounds" | "aconex" | "comments") => void;
 }) {
   const { data: settings } = useAbdSettingsQuery();
   if (items.length === 0) {
@@ -376,12 +379,17 @@ function AttentionRows({
         <li
           key={it.id}
           className="flex items-center justify-between gap-3 rounded px-1 py-2 hover:bg-muted/40 cursor-pointer"
-          onClick={() =>
-            onOpen({
-              ...(it.team ? { team: it.team } : {}),
-              ...(it.hdec_pic_name ? { hdec_pic_name: it.hdec_pic_name } : {}),
-            })
-          }
+          onClick={() => {
+            if (onOpenDetail) {
+              const focus = kind === "needs_planning" ? "rounds" : kind === "status_mismatch" ? "aconex" : "rounds";
+              onOpenDetail(it.id, focus);
+            } else {
+              onOpen({
+                ...(it.team ? { team: it.team } : {}),
+                ...(it.hdec_pic_name ? { hdec_pic_name: it.hdec_pic_name } : {}),
+              });
+            }
+          }}
         >
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">

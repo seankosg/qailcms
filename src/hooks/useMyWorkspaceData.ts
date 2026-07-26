@@ -275,6 +275,12 @@ export interface AbdMyRow {
   latest_status: string | null;
   latest_rev: string | null;
   hdec_pic_name: string | null;
+  needs_planning: boolean | null;
+  active_round: number | null;
+  is_terminated: boolean | null;
+  r1_response_result: string | null;
+  r2_response_result: string | null;
+  r3_response_result: string | null;
   r1_draft_finish_plan: string | null; r1_draft_finish_actual: string | null;
   r1_submission_plan: string | null; r1_submission_actual: string | null;
   r1_dar_plan: string | null; r1_dar_actual: string | null;
@@ -295,7 +301,7 @@ export function useMyAbd(filterValue: string | null, isAdmin: boolean, mode: Mws
     queryFn: async () => {
       const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const cols = [
-        "id,abd_number,document_title,latest_status,latest_rev,hdec_pic_name,created_at",
+        "id,abd_number,document_title,latest_status,latest_rev,hdec_pic_name,created_at,needs_planning,active_round,is_terminated,r1_response_result,r2_response_result,r3_response_result",
         "r1_draft_finish_plan,r1_draft_finish_actual,r1_submission_plan,r1_submission_actual,r1_dar_plan,r1_dar_actual",
         "r2_draft_finish_plan,r2_draft_finish_actual,r2_submission_plan,r2_submission_actual,r2_dar_plan,r2_dar_actual",
         "r3_draft_finish_plan,r3_draft_finish_actual,r3_submission_plan,r3_submission_actual,r3_dar_plan,r3_dar_actual",
@@ -317,6 +323,29 @@ export function useMyAbd(filterValue: string | null, isAdmin: boolean, mode: Mws
 
 export function abdIsApproved(r: AbdMyRow): boolean {
   return String(r.latest_status ?? "").toUpperCase() === "A";
+}
+
+/** Response=B/C 인데 다음 라운드 DS/DF/Sub 계획이 하나도 없는 경우 */
+export function abdNeedsPlanning(r: AbdMyRow): boolean {
+  if (r.needs_planning === true) return true;
+  if (r.is_terminated) return false;
+  if (abdIsApproved(r)) return false;
+  const check = (res: string | null | undefined, plans: Array<string | null>) => {
+    const rr = String(res ?? "").toUpperCase();
+    if (rr !== "B" && rr !== "C") return false;
+    return plans.every((p) => !p);
+  };
+  if (check(r.r1_response_result, [r.r2_draft_finish_plan, r.r2_submission_plan])) return true;
+  if (check(r.r2_response_result, [r.r3_draft_finish_plan, r.r3_submission_plan])) return true;
+  return false;
+}
+
+export function abdNextPlanRoundLabel(r: AbdMyRow): string | null {
+  const rr1 = String(r.r1_response_result ?? "").toUpperCase();
+  const rr2 = String(r.r2_response_result ?? "").toUpperCase();
+  if ((rr2 === "B" || rr2 === "C") && !(r.r3_draft_finish_plan || r.r3_submission_plan)) return "R3";
+  if ((rr1 === "B" || rr1 === "C") && !(r.r2_draft_finish_plan || r.r2_submission_plan)) return "R2";
+  return null;
 }
 export type AbdRoundStage = "Approved" | "R3" | "R2" | "R1" | "Pending";
 export function abdStage(r: AbdMyRow): AbdRoundStage {

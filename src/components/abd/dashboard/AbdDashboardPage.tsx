@@ -23,10 +23,12 @@ import {
 import { AbdAgingSettingsPopover, useAbdSettingsQuery } from "./AbdAgingSettingsPopover";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { AbdDetailSheet } from "@/components/abd/raw-data/AbdDetailSheet";
 
 export function AbdDashboardPage() {
   const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
   const [batchFilter, setBatchFilter] = useState<string[]>([]);
+  const [detail, setDetail] = useState<{ id: string; focus?: "rounds" | "aconex" | "comments" } | null>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
   // SSOT: 대시보드 상단 필터를 위한 batch 옵션 — abd_items_facets("batch_no")로 조회
@@ -193,9 +195,18 @@ export function AbdDashboardPage() {
 
       {/* Row 6 — Attention Lists + Cross-cut */}
       <div className="grid gap-4 xl:grid-cols-2">
-        <AbdRow6Attention batchNo={batchFilter} onOpenRaw={openRawData} />
+        <AbdRow6Attention
+          batchNo={batchFilter}
+          onOpenRaw={openRawData}
+          onOpenDetail={(id, focus) => setDetail({ id, focus })}
+        />
         <AbdRow6Crosscut batchNo={batchFilter} onOpenRaw={openRawData} />
       </div>
+      <AbdDetailSheet
+        id={detail?.id ?? null}
+        focusSection={detail?.focus ?? null}
+        onOpenChange={(open) => { if (!open) setDetail(null); }}
+      />
     </div>
   );
 }
