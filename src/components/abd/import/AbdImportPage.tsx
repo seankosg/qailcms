@@ -630,6 +630,7 @@ export function AbdImportPage() {
                 onTeamChange={(t) => setTeam(e.id, t)}
                 onOpenDuplicates={() => setDupOpenId(e.id)}
                 onDateOverridesApply={(ovr) => reparseWithOverrides(e.id, ovr)}
+                onOpenColumnSelect={() => setColumnFileId(e.id)}
               />
             ))}
           </CardContent>
@@ -665,6 +666,22 @@ export function AbdImportPage() {
       />
       <ModuleGuardDialog {...guard.dialogProps} />
         </>
+      )}
+      {columnFile && (
+        <ColumnSelectDialog
+          open={!!columnFile}
+          onOpenChange={(o) => {
+            if (!o) setColumnFileId(null);
+          }}
+          fileName={columnFile.file.name}
+          headers={hdecFieldKeys}
+          samples={{}}
+          defaultExcluded={columnFile.excludedFields ?? []}
+          onApply={(excluded) => setFileExcludedFields(columnFile.id, excluded)}
+          helpers={columnSelectHelpers}
+          presets={columnSelectPresets}
+          lockRequired
+        />
       )}
     </div>
   );
