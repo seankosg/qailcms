@@ -335,6 +335,8 @@ export function AbdRawDataPage() {
 
   const { data: counts } = useAbdCounts({ team, includeInactive, plot: plotFilter });
   const dataDate = counts?.latest_data_date ?? null;
+  // Dashboard 에서 지정된 Data Date 를 참조(정보 표시용). 세션 전역 공유.
+  const [sharedAbdDate] = useAbdDataDate();
 
   // Restore view preferences
   useEffect(() => {
