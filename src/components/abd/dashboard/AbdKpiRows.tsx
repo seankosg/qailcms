@@ -26,10 +26,12 @@ interface KpiCardProps {
   tone?: Tone;
   breakdown?: Array<{ team: string; count: number; onClick?: () => void }>;
   onClick?: () => void;
+  stackBar?: Array<{ key: string; label: string; count: number; colorClass: string }>;
 }
 
-export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick }: KpiCardProps) {
+export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar }: KpiCardProps) {
   const pct = total && total > 0 ? Math.round((count / total) * 100) : null;
+  const stackTotal = stackBar ? stackBar.reduce((s, x) => s + (x.count || 0), 0) : 0;
   return (
     <Card
       onClick={onClick}
@@ -73,6 +75,36 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
             </div>
           )}
         </div>
+        {stackBar && stackTotal > 0 && (
+          <div className="mt-2 space-y-1">
+            <div className="flex h-1.5 w-full overflow-hidden rounded bg-muted">
+              {stackBar.map((s) => {
+                const w = (s.count / stackTotal) * 100;
+                if (w <= 0) return null;
+                const p = Math.round(w);
+                return (
+                  <div
+                    key={s.key}
+                    className={s.colorClass}
+                    style={{ width: `${w}%` }}
+                    title={`${s.label}: ${s.count.toLocaleString()} (${p}%)`}
+                  />
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground tabular-nums">
+              {stackBar.map((s) => {
+                const p = stackTotal > 0 ? Math.round((s.count / stackTotal) * 100) : 0;
+                return (
+                  <span key={s.key} className="inline-flex items-center gap-1">
+                    <span className={cn("inline-block h-1.5 w-1.5 rounded-sm", s.colorClass)} />
+                    {s.label} {p}%
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -96,6 +128,20 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
   const { totals, byTeam } = useMemo(() => pivotRows(data ?? []), [data]);
   const total = totals.get("TOTAL") ?? 0;
 
+  // TOTAL 팀별 breakdown: RPC가 TOTAL bucket에서 팀별 행을 주지 않으므로
+  // 4개 스테이지 팀별 카운트를 합산해 fallback으로 구성.
+  const totalByTeam = useMemo(() => {
+    const agg = new Map<string, number>();
+    for (const key of ["Approved", "UR", "DS", "NS"]) {
+      for (const b of byTeam.get(key) ?? []) {
+        agg.set(b.team, (agg.get(b.team) ?? 0) + b.count);
+      }
+    }
+    return Array.from(agg.entries())
+      .map(([team, count]) => ({ team, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [byTeam]);
+
   const mk = (label: string, key: string, tone: Tone, statusGroup?: string) => (
     <AbdKpiCard
       key={key}
@@ -116,9 +162,28 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
     />
   );
 
+  const totalStackBar = [
+    { key: "Approved", label: "Approved", count: totals.get("Approved") ?? 0, colorClass: "bg-emerald-500" },
+    { key: "UR", label: "UR", count: totals.get("UR") ?? 0, colorClass: "bg-blue-500" },
+    { key: "DS", label: "DS", count: totals.get("DS") ?? 0, colorClass: "bg-amber-500" },
+    { key: "NS", label: "NS", count: totals.get("NS") ?? 0, colorClass: "bg-red-500" },
+  ];
+
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-      {mk("Total", "TOTAL", "neutral")}
+      <AbdKpiCard
+        key="TOTAL"
+        label="Total"
+        count={total}
+        tone="neutral"
+        breakdown={totalByTeam.map((b) => ({
+          team: b.team,
+          count: b.count,
+          onClick: () => onOpenRaw({ team: b.team }),
+        }))}
+        stackBar={totalStackBar}
+        onClick={() => onOpenRaw({})}
+      />
       {mk("Approved", "Approved", "ok", "approved")}
       {mk("UR (Under Review)", "UR", "info", "under_review")}
       {mk("DS (Drafting)", "DS", "warn", "drafting")}
