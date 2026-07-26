@@ -234,7 +234,7 @@ export function computeJudgment(
   return getStageJudgment(row, "wip", t, asOf);
 }
 
-/** 행 단위 지연 판정 = 판정이 지연 또는 위험. */
+/** 행 단위 지연 판정 = 판정이 지연 또는 악화. */
 export function isTaskDelayed(
   row: JudgmentRow,
   t: TaskThresholds = DEFAULT_THRESHOLDS,
