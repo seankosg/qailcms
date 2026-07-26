@@ -76,6 +76,15 @@ export type AconexImportPreview = {
     semantic: string;
     changes: Array<{ field: string; previous: string | null; next: string | null }>;
   }>;
+  /** Termination/Cancelled 로 감지되어 해당 라운드가 재제출 대기 상태로 리셋된 도면 목록. */
+  terminated_reset: Array<{
+    document_no: string;
+    round: 1 | 2 | 3;
+    prev_submission_actual: string | null;
+    prev_response_result: string | null;
+    date_modified: string | null;
+    semantic: "EXCLUDED_TERMINATED" | "EXCLUDED_CANCELLED";
+  }>;
 };
 
 export type AconexImportResult = AconexImportPreview & {
@@ -128,7 +137,11 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       "abd_number,latest_status,latest_status_norm,is_terminated,active_round," +
       "r1_submission_actual,r2_submission_actual,r3_submission_actual," +
       "r1_dar_actual,r2_dar_actual,r3_dar_actual," +
-      "r1_response_result,r2_response_result,r3_response_result";
+      "r1_response_result,r2_response_result,r3_response_result," +
+      "r1_ds_actual,r2_ds_actual,r3_ds_actual," +
+      "r1_df_actual,r2_df_actual,r3_df_actual," +
+      "r1_ds_plan,r2_ds_plan,r3_ds_plan," +
+      "r1_df_plan,r2_df_plan,r3_df_plan";
     for (let i = 0; i < docNos.length; i += CHUNK) {
       const slice = docNos.slice(i, i + CHUNK);
       const { data: rows, error } = await supa
@@ -158,9 +171,21 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     };
     const fieldDiffCounts = new Map<string, number>();
     const diffs: Diff[] = [];
+    const terminatedReset: AconexImportPreview["terminated_reset"] = [];
     for (const r of matched) {
       const existing = existingRows.get(r.document_no) ?? {};
       const patch = computePatch(r, existing, allowed);
+      if (r.semantic === "EXCLUDED_TERMINATED" || r.semantic === "EXCLUDED_CANCELLED") {
+        const n = resolveActiveRound(existing);
+        terminatedReset.push({
+          document_no: r.document_no,
+          round: n,
+          prev_submission_actual: existing[`r${n}_submission_actual`] ?? null,
+          prev_response_result: existing[`r${n}_response_result`] ?? null,
+          date_modified: r.date_modified ?? null,
+          semantic: r.semantic,
+        });
+      }
       const changes: Diff["changes"] = [];
       for (const [field, next] of Object.entries(patch)) {
         if (META_FIELDS.has(field)) continue;
@@ -206,6 +231,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
           semantic,
           changes,
         })),
+      terminated_reset: terminatedReset,
     };
 
     if (!data.apply) {
@@ -314,6 +340,28 @@ const META_FIELDS = new Set([
   "updated_by",
 ]);
 
+function resolveActiveRound(existing: any): 1 | 2 | 3 {
+  let n: 1 | 2 | 3 = (existing?.active_round as 1 | 2 | 3) ?? 1;
+  if (!existing?.active_round) {
+    if (
+      existing?.r3_submission_actual ||
+      existing?.r3_dar_actual ||
+      existing?.r2_response_result === "B" ||
+      existing?.r2_response_result === "C"
+    )
+      n = 3;
+    else if (
+      existing?.r2_submission_actual ||
+      existing?.r2_dar_actual ||
+      existing?.r1_response_result === "B" ||
+      existing?.r1_response_result === "C"
+    )
+      n = 2;
+    else n = 1;
+  }
+  return n;
+}
+
 function computePatch(
   r: z.infer<typeof RowSchema>,
   existing: any,
@@ -332,30 +380,30 @@ function computePatch(
   const iso = r.date_modified;
 
   if (semantic === "EXCLUDED_TERMINATED" || semantic === "EXCLUDED_CANCELLED") {
-    if (allowed.has("is_terminated")) patch.is_terminated = true;
-    if (allowed.has("latest_status"))
-      patch.latest_status = r.status_code ?? r.status_raw ?? null;
+    // 재정의: Termination = HDEC 이 Submission 을 withdraw → 동일 라운드 재제출 대기.
+    //  - 해당 라운드의 Submission/DAR actual 및 Response 결과를 리셋
+    //  - DS/DF actual 이 비어있으면 date_modified 또는 plan 으로 자동 완료 채움
+    //  - is_terminated = false (통계 포함), latest_status = null (Submission 전 상태)
+    //  - active_round 는 유지 (증가시키지 않음)
+    const n = resolveActiveRound(existing);
+    if (allowed.has("round_actual")) {
+      patch[`r${n}_submission_actual`] = null;
+      patch[`r${n}_dar_actual`] = null;
+      patch[`r${n}_response_result`] = null;
+      if (!existing?.[`r${n}_ds_actual`]) {
+        patch[`r${n}_ds_actual`] = iso ?? existing?.[`r${n}_ds_plan`] ?? null;
+      }
+      if (!existing?.[`r${n}_df_actual`]) {
+        patch[`r${n}_df_actual`] = iso ?? existing?.[`r${n}_df_plan`] ?? null;
+      }
+    }
+    if (allowed.has("is_terminated")) patch.is_terminated = false;
+    if (allowed.has("latest_status")) patch.latest_status = null;
+    if (allowed.has("approval_date")) patch.approval_date = null;
     return patch;
   }
 
-  let n: 1 | 2 | 3 = (existing.active_round as 1 | 2 | 3) ?? 1;
-  if (!existing.active_round) {
-    if (
-      existing.r3_submission_actual ||
-      existing.r3_dar_actual ||
-      existing.r2_response_result === "B" ||
-      existing.r2_response_result === "C"
-    )
-      n = 3;
-    else if (
-      existing.r2_submission_actual ||
-      existing.r2_dar_actual ||
-      existing.r1_response_result === "B" ||
-      existing.r1_response_result === "C"
-    )
-      n = 2;
-    else n = 1;
-  }
+  const n = resolveActiveRound(existing);
 
   if (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B") {
     if (allowed.has("round_actual") && iso) {

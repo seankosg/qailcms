@@ -473,6 +473,43 @@ export function AbdAconexImportPage() {
                           </ul>
                         </details>
                       )}
+                      {e.preview && (e.preview.terminated_reset?.length ?? 0) > 0 && (
+                        <details className="mt-2 rounded border border-zinc-400/40 bg-zinc-400/10 p-2 text-[11px]" open>
+                          <summary className="cursor-pointer font-medium text-zinc-700 dark:text-zinc-300">
+                            Termination 리셋 ({e.preview.terminated_reset.length}건) — 해당 라운드 재제출 대기로 되돌림
+                          </summary>
+                          <div className="mt-1 max-h-56 overflow-auto">
+                            <table className="w-full border-collapse text-[10px]">
+                              <thead className="sticky top-0 bg-background">
+                                <tr className="border-b">
+                                  <th className="p-1 text-left">Document No</th>
+                                  <th className="p-1 text-left">Round</th>
+                                  <th className="p-1 text-left">이전 Submission</th>
+                                  <th className="p-1 text-left">이전 Response</th>
+                                  <th className="p-1 text-left">Date Modified</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {e.preview.terminated_reset.map((t) => (
+                                  <tr key={`${t.document_no}-${t.round}`} className="border-b last:border-0">
+                                    <td className="p-1 font-mono">{t.document_no}</td>
+                                    <td className="p-1">R{t.round}</td>
+                                    <td className="p-1 font-mono text-rose-700 dark:text-rose-300">
+                                      {t.prev_submission_actual ?? "∅"}
+                                    </td>
+                                    <td className="p-1 font-mono text-rose-700 dark:text-rose-300">
+                                      {t.prev_response_result ?? "∅"}
+                                    </td>
+                                    <td className="p-1 font-mono text-muted-foreground">
+                                      {t.date_modified ?? "-"}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </details>
+                      )}
                       {e.preview && (e.preview.field_diff_counts?.length ?? 0) > 0 && (
                         <div className="mt-2 rounded border border-dashed bg-muted/30 p-2">
                           <div className="mb-1 flex flex-wrap items-center gap-1 text-[11px] font-medium">
