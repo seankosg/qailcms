@@ -187,17 +187,12 @@ export function AbdDashboardPage() {
         <AbdJudgmentStageBreakdown batchNo={batchFilter} />
       </div>
 
-      {/* Row 3 — Latest Status Distribution + Row 4 — Approval Trend */}
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-1">
-          <AbdRow3StatusDist batchNo={batchFilter} onOpenRaw={openRawData} />
-        </div>
-        <div className="xl:col-span-2">
-          <AbdRow4ApprovalTrend batchNo={batchFilter} onOpenRaw={openRawData} />
-        </div>
+      {/* Row 3 — Approval Trend */}
+      <div className="grid gap-4 xl:grid-cols-1">
+        <AbdRow4ApprovalTrend batchNo={batchFilter} onOpenRaw={openRawData} />
       </div>
 
-      {/* Row 5 — Attention Lists + Cross-cut */}
+      {/* Row 4 — Attention Lists + Cross-cut */}
       <div className="grid gap-4 xl:grid-cols-2">
         <AbdRow6Attention
           batchNo={batchFilter}
