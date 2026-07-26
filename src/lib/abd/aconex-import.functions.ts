@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
 
 /**
  * Aconex Export 임포트 - 기존 abd_items_raw 행에 대해 UPDATE 전용.
@@ -66,6 +67,15 @@ export type AconexImportPreview = {
   by_status: Array<{ code: string; count: number }>;
   by_semantic: Array<{ semantic: string; count: number }>;
   unmatched_samples: string[];
+  /** 필드별 실제 변경 예상 건수 (unchanged 제외). */
+  field_diff_counts: Array<{ field: string; changed: number }>;
+  /** 미리보기용 상세 diff 샘플 (최대 200 rows). */
+  diff_rows: Array<{
+    document_no: string;
+    excel_row: number | null;
+    semantic: string;
+    changes: Array<{ field: string; previous: string | null; next: string | null }>;
+  }>;
 };
 
 export type AconexImportResult = AconexImportPreview & {
@@ -131,6 +141,47 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     const matched = data.rows.filter((r) => existingRows.has(r.document_no));
     const unmatched = data.rows.filter((r) => !existingRows.has(r.document_no));
 
+    // 어떤 필드가 실제 반영되는지 결정 (apply_fields 미지정 시 전체).
+    const allowed = new Set<string>(
+      data.apply_fields && data.apply_fields.length > 0
+        ? data.apply_fields
+        : (SYNC_FIELD_KEYS as readonly string[]),
+    );
+
+    // ---------- Diff 계산 (preview & apply 공통) ----------
+    type Diff = {
+      document_no: string;
+      excel_row: number | null;
+      semantic: string;
+      patch: Record<string, any>;
+      changes: Array<{ field: string; previous: string | null; next: string | null }>;
+    };
+    const fieldDiffCounts = new Map<string, number>();
+    const diffs: Diff[] = [];
+    for (const r of matched) {
+      const existing = existingRows.get(r.document_no) ?? {};
+      const patch = computePatch(r, existing, allowed);
+      const changes: Diff["changes"] = [];
+      for (const [field, next] of Object.entries(patch)) {
+        if (META_FIELDS.has(field)) continue;
+        const prev = existing[field] ?? null;
+        if (classifyChange(next, prev) !== "applied") continue;
+        changes.push({
+          field,
+          previous: prev == null ? null : String(prev),
+          next: next == null ? null : String(next),
+        });
+        fieldDiffCounts.set(field, (fieldDiffCounts.get(field) ?? 0) + 1);
+      }
+      diffs.push({
+        document_no: r.document_no,
+        excel_row: r.excel_row ?? null,
+        semantic: r.semantic ?? "UNKNOWN",
+        patch,
+        changes,
+      });
+    }
+
     const preview: AconexImportPreview = {
       total: data.rows.length,
       matched: matched.length,
@@ -143,6 +194,18 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
         .map(([semantic, count]) => ({ semantic, count }))
         .sort((a, b) => b.count - a.count),
       unmatched_samples: unmatched.slice(0, 20).map((r) => r.document_no),
+      field_diff_counts: Array.from(fieldDiffCounts.entries())
+        .map(([field, changed]) => ({ field, changed }))
+        .sort((a, b) => b.changed - a.changed),
+      diff_rows: diffs
+        .filter((d) => d.changes.length > 0)
+        .slice(0, 200)
+        .map(({ document_no, excel_row, semantic, changes }) => ({
+          document_no,
+          excel_row,
+          semantic,
+          changes,
+        })),
     };
 
     if (!data.apply) {
@@ -169,99 +232,61 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     if (logErr) throw new Error(logErr.message);
     const batchId = logRow.id as string;
 
-    // 4) 개별 UPDATE (RLS + trigger 안전, 소규모라 성능 OK)
-    const allowed = new Set<string>(
-      data.apply_fields && data.apply_fields.length > 0
-        ? data.apply_fields
-        : (SYNC_FIELD_KEYS as readonly string[]),
-    );
+    // 4) 개별 UPDATE + 필드 변경 로그 축적 (T6)
+    const pendingLogs: PendingFieldLog[] = [];
     let updated = 0;
-    for (const r of matched) {
-      const existing = existingRows.get(r.document_no) ?? {};
-      // 항상 세팅되는 메타데이터 (감사/추적)
-      const patch: Record<string, any> = {
+    for (const d of diffs) {
+      const existing = existingRows.get(d.document_no) ?? {};
+      const patch = {
+        ...d.patch,
         aconex_last_synced_at: nowIso,
         source_import_log_id: batchId,
         updated_at: nowIso,
         updated_by: context.userId,
       };
-
-      // --- 원시 메타 필드 (참조/감사용) ---
-      if (allowed.has("aconex_status_raw")) patch.aconex_status_raw = r.status_raw ?? null;
-      if (allowed.has("aconex_review_status_raw"))
-        patch.aconex_review_status_raw = r.review_status_raw ?? null;
-      if (allowed.has("aconex_date_modified"))
-        patch.aconex_date_modified = r.date_modified ?? null;
-      if (allowed.has("latest_rev") && r.revision) patch.latest_rev = r.revision;
-
-      // --- semantic 라우팅 ---
-      const semantic = r.semantic ?? "UNKNOWN";
-      const iso = r.date_modified;
-
-      // Excluded: is_terminated 만 세팅하고 latest_status 반영 (HDEC/Aconex 코드 그대로)
-      if (semantic === "EXCLUDED_TERMINATED" || semantic === "EXCLUDED_CANCELLED") {
-        if (allowed.has("is_terminated")) patch.is_terminated = true;
-        if (allowed.has("latest_status"))
-          patch.latest_status = r.status_code ?? r.status_raw ?? null;
-      } else {
-        // 현재 라운드 판정: DB 의 active_round 우선, 없으면 라운드별 컬럼 존재로 추정.
-        let n: 1 | 2 | 3 = (existing.active_round as 1 | 2 | 3) ?? 1;
-        if (!existing.active_round) {
-          if (
-            existing.r3_submission_actual ||
-            existing.r3_dar_actual ||
-            existing.r2_response_result === "B" ||
-            existing.r2_response_result === "C"
-          )
-            n = 3;
-          else if (
-            existing.r2_submission_actual ||
-            existing.r2_dar_actual ||
-            existing.r1_response_result === "B" ||
-            existing.r1_response_result === "C"
-          )
-            n = 2;
-          else n = 1;
-        }
-
-        if (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B") {
-          if (allowed.has("round_actual") && iso) {
-            patch[`r${n}_dar_actual`] = iso;
-            patch[`r${n}_response_result`] = semantic === "DAR_APPROVED_A" ? "A" : "B";
-          }
-          if (allowed.has("approval_date") && iso && semantic === "DAR_APPROVED_A") {
-            patch.approval_date = iso;
-          }
-          if (allowed.has("latest_status"))
-            patch.latest_status = semantic === "DAR_APPROVED_A" ? "A" : "B";
-        } else if (semantic === "DAR_REJECTED") {
-          if (allowed.has("round_actual") && iso) {
-            patch[`r${n}_dar_actual`] = iso;
-            patch[`r${n}_response_result`] = r.status_code === "D" ? "D" : "C";
-          }
-          if (allowed.has("latest_status"))
-            patch.latest_status = r.status_code === "D" ? "D" : "C";
-        } else if (semantic === "SUBMITTED") {
-          // HDEC 값 우선: 이미 rN_submission_actual 이 있으면 덮어쓰지 않음.
-          const submissionCol = `r${n}_submission_actual`;
-          if (allowed.has("round_actual") && iso && !existing[submissionCol]) {
-            patch[submissionCol] = iso;
-          }
-          // latest_status: 승인/반려 상태(A/B/C/D) 인 경우 덮어쓰지 않음
-          const cur = String(existing.latest_status ?? "").toUpperCase();
-          if (allowed.has("latest_status") && !["A", "B", "C", "D"].includes(cur)) {
-            patch.latest_status = "UR";
-          }
-        }
-      }
-
       const { error: upErr } = await supa
         .from("abd_items_raw")
         .update(patch)
-        .eq("abd_number", r.document_no);
+        .eq("abd_number", d.document_no);
       if (upErr) throw new Error(upErr.message);
       updated++;
+
+      for (const ch of d.changes) {
+        pendingLogs.push(
+          buildFieldLog("abd", {
+            rawRowNo: d.excel_row,
+            field: ch.field,
+            outcome: "applied",
+            raw: ch.next,
+            applied: ch.next,
+            previous: ch.previous,
+            code: "aconex_sync",
+            detail: `document_no=${d.document_no} semantic=${d.semantic}`,
+          }),
+        );
+      }
+      // 변경 없이 스킵된 필드 (unchanged) 도 축약 기록 - 라운드 라우팅 감사용
+      const cur = String(existing.latest_status ?? "").toUpperCase();
+      if (d.changes.length === 0) {
+        pendingLogs.push(
+          buildFieldLog("abd", {
+            rawRowNo: d.excel_row,
+            field: "latest_status",
+            outcome: "unchanged",
+            raw: cur,
+            applied: cur,
+            previous: cur,
+            code: "aconex_no_change",
+            detail: `document_no=${d.document_no} semantic=${d.semantic}`,
+          }),
+        );
+      }
     }
+
+    // 필드 변경 로그 flush (실패 시 임포트는 성공 처리)
+    void flushFieldLogs(supa, batchId, context.userId, pendingLogs).catch((e) =>
+      console.warn("[abd_aconex flushFieldLogs]", e),
+    );
 
     await supa
       .from("abd_import_logs")
@@ -277,3 +302,87 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
 
     return { ...preview, updated, batch_id: batchId };
   });
+
+// ------------------------------------------------------------------
+// 헬퍼: 단일 row → 패치 오브젝트 계산.
+// preview / apply 양쪽에서 동일 로직을 재사용.
+// ------------------------------------------------------------------
+const META_FIELDS = new Set([
+  "aconex_last_synced_at",
+  "source_import_log_id",
+  "updated_at",
+  "updated_by",
+]);
+
+function computePatch(
+  r: z.infer<typeof RowSchema>,
+  existing: any,
+  allowed: Set<string>,
+): Record<string, any> {
+  const patch: Record<string, any> = {};
+
+  if (allowed.has("aconex_status_raw")) patch.aconex_status_raw = r.status_raw ?? null;
+  if (allowed.has("aconex_review_status_raw"))
+    patch.aconex_review_status_raw = r.review_status_raw ?? null;
+  if (allowed.has("aconex_date_modified"))
+    patch.aconex_date_modified = r.date_modified ?? null;
+  if (allowed.has("latest_rev") && r.revision) patch.latest_rev = r.revision;
+
+  const semantic = r.semantic ?? "UNKNOWN";
+  const iso = r.date_modified;
+
+  if (semantic === "EXCLUDED_TERMINATED" || semantic === "EXCLUDED_CANCELLED") {
+    if (allowed.has("is_terminated")) patch.is_terminated = true;
+    if (allowed.has("latest_status"))
+      patch.latest_status = r.status_code ?? r.status_raw ?? null;
+    return patch;
+  }
+
+  let n: 1 | 2 | 3 = (existing.active_round as 1 | 2 | 3) ?? 1;
+  if (!existing.active_round) {
+    if (
+      existing.r3_submission_actual ||
+      existing.r3_dar_actual ||
+      existing.r2_response_result === "B" ||
+      existing.r2_response_result === "C"
+    )
+      n = 3;
+    else if (
+      existing.r2_submission_actual ||
+      existing.r2_dar_actual ||
+      existing.r1_response_result === "B" ||
+      existing.r1_response_result === "C"
+    )
+      n = 2;
+    else n = 1;
+  }
+
+  if (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B") {
+    if (allowed.has("round_actual") && iso) {
+      patch[`r${n}_dar_actual`] = iso;
+      patch[`r${n}_response_result`] = semantic === "DAR_APPROVED_A" ? "A" : "B";
+    }
+    if (allowed.has("approval_date") && iso && semantic === "DAR_APPROVED_A") {
+      patch.approval_date = iso;
+    }
+    if (allowed.has("latest_status"))
+      patch.latest_status = semantic === "DAR_APPROVED_A" ? "A" : "B";
+  } else if (semantic === "DAR_REJECTED") {
+    if (allowed.has("round_actual") && iso) {
+      patch[`r${n}_dar_actual`] = iso;
+      patch[`r${n}_response_result`] = r.status_code === "D" ? "D" : "C";
+    }
+    if (allowed.has("latest_status"))
+      patch.latest_status = r.status_code === "D" ? "D" : "C";
+  } else if (semantic === "SUBMITTED") {
+    const submissionCol = `r${n}_submission_actual`;
+    if (allowed.has("round_actual") && iso && !existing[submissionCol]) {
+      patch[submissionCol] = iso;
+    }
+    const cur = String(existing.latest_status ?? "").toUpperCase();
+    if (allowed.has("latest_status") && !["A", "B", "C", "D"].includes(cur)) {
+      patch.latest_status = "UR";
+    }
+  }
+  return patch;
+}

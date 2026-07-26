@@ -477,6 +477,76 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
                           </ul>
                         </details>
                       )}
+                      {e.preview && (e.preview.field_diff_counts?.length ?? 0) > 0 && (
+                        <div className="mt-2 rounded border border-dashed bg-muted/30 p-2">
+                          <div className="mb-1 flex flex-wrap items-center gap-1 text-[11px] font-medium">
+                            <span>실제 변경 예상</span>
+                            {e.preview.field_diff_counts.map((f) => (
+                              <Badge
+                                key={f.field}
+                                variant="outline"
+                                className="font-mono text-[10px]"
+                              >
+                                {f.field}: {f.changed}
+                              </Badge>
+                            ))}
+                          </div>
+                          {(e.preview.diff_rows?.length ?? 0) > 0 && (
+                            <details className="text-[11px]">
+                              <summary className="cursor-pointer text-muted-foreground">
+                                Before / After 샘플 보기 (최대 200 행)
+                              </summary>
+                              <div className="mt-1 max-h-64 overflow-auto">
+                                <table className="w-full border-collapse text-[10px]">
+                                  <thead className="sticky top-0 bg-background">
+                                    <tr className="border-b">
+                                      <th className="p-1 text-left">Document No</th>
+                                      <th className="p-1 text-left">Row</th>
+                                      <th className="p-1 text-left">Field</th>
+                                      <th className="p-1 text-left">Before</th>
+                                      <th className="p-1 text-left">After</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {e.preview.diff_rows.flatMap((d) =>
+                                      d.changes.map((ch, i) => (
+                                        <tr
+                                          key={`${d.document_no}-${ch.field}-${i}`}
+                                          className="border-b last:border-0"
+                                        >
+                                          {i === 0 && (
+                                            <>
+                                              <td
+                                                className="p-1 font-mono align-top"
+                                                rowSpan={d.changes.length}
+                                              >
+                                                {d.document_no}
+                                              </td>
+                                              <td
+                                                className="p-1 align-top text-muted-foreground"
+                                                rowSpan={d.changes.length}
+                                              >
+                                                {d.excel_row ?? "-"}
+                                              </td>
+                                            </>
+                                          )}
+                                          <td className="p-1 font-mono">{ch.field}</td>
+                                          <td className="p-1 font-mono text-rose-700 dark:text-rose-300">
+                                            {ch.previous ?? "∅"}
+                                          </td>
+                                          <td className="p-1 font-mono text-emerald-700 dark:text-emerald-300">
+                                            {ch.next ?? "∅"}
+                                          </td>
+                                        </tr>
+                                      )),
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      )}
                       {e.error && <p className="mt-1 text-xs text-destructive">{e.error}</p>}
                       <div className="mt-2">
                         <Button
