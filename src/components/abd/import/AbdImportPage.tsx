@@ -512,7 +512,7 @@ export function AbdImportPage() {
               <div>· Approval Date는 <code>Status=A</code> 이고 Date Modified가 있을 때만 갱신됩니다.</div>
             </AlertDescription>
           </Alert>
-          <AbdAconexImportPage hideHeader />
+          <AbdAconexImportPage />
         </>
       )}
 

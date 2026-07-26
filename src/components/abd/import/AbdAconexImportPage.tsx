@@ -2,7 +2,6 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  AlertTriangle,
   CheckCircle2,
   Columns3,
   FileSpreadsheet,
@@ -19,7 +18,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { parseAconexFile, type ParsedAconexFile } from "@/lib/abd/aconex-parser";
 import {
@@ -105,12 +103,7 @@ function formatSize(b: number) {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export interface AbdAconexImportPageProps {
-  /** 상단 안내 문구/알림 숨김 (탭에 내장할 때 사용) */
-  hideHeader?: boolean;
-}
-
-export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {}) {
+export function AbdAconexImportPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -348,20 +341,6 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
 
   return (
     <div className="space-y-4">
-      {!hideHeader && (
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Aconex Export 임포트 규칙</AlertTitle>
-        <AlertDescription className="text-xs space-y-1">
-          <div>· Aconex 시스템에서 다운로드한 Docs 시트를 업로드하면 <code>Document No</code> 기준으로 매칭됩니다.</div>
-          <div>· 매칭된 도면의 <b>Status(A/B/C/D/UR/Cancelled/Terminated)</b>, <b>Revision</b>, <b>Date Modified</b> 를 갱신합니다.</div>
-          <div>· <b>DB에 없는 Document No</b> 는 자동으로 INSERT 되지 않고 미매칭 목록으로 리포트됩니다.</div>
-          <div>· Status = <code>A - Approved</code> 이면 <code>Approval Date</code> 를 <code>Date Modified</code> 로 자동 반영합니다.</div>
-          <div>· <code>Cancelled</code> / <code>Terminated</code> 항목은 통계/대시보드 계산에서 제외됩니다.</div>
-        </AlertDescription>
-      </Alert>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle className="text-base">1. Aconex Export 업로드</CardTitle>
