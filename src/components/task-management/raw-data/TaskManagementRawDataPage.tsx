@@ -1198,11 +1198,6 @@ export function TaskManagementRawDataPage() {
             )}
             {allCollapsed ? "Expand All" : "Collapse All"}
           </Button>
-          {canEdit && (
-            <div className="hidden sm:contents">
-              <CriticalThresholdPopover />
-            </div>
-          )}
           <Button
             variant="outline"
             size="sm"
