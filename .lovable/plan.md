@@ -1,86 +1,51 @@
-## 오류 재현 및 근본 원인
+## 근본 원인
 
-**오류 메시지**
+임포트 실패 메시지:
 ```
-null value in column "status_mismatch" of relation "abd_items_raw" violates not-null constraint
+column "row_id" of relation "abd_change_log" does not exist
 ```
 
-**진짜 원인 (트리거 로직 결함)**
+`abd_change_log` 실제 스키마 컬럼: `id, abd_item_id, team, abd_number, field, old_value, new_value, source, upload_id, changed_by, changed_at`
 
-`abd_items_raw` 스키마:
-- `status_mismatch` : `NOT NULL DEFAULT false`
-- `latest_status_norm` : **NULLABLE** (누구도 계산해 넣지 않음)
-
-`abd_compute_derived` (BEFORE INSERT/UPDATE 트리거) 마지막 블록:
+그런데 UPDATE 트리거 `public.trg_abd_change_log_fn` (26~28행)이 존재하지 않는 컬럼 `row_id`에 INSERT 하고 있음:
 
 ```sql
-IF NEW.latest_status IS NOT NULL
-   AND upper(NEW.latest_status) <> COALESCE(NEW.latest_status_norm,'') THEN
-  IF NOT (upper(NEW.latest_status) IN ('A','B','C')
-          AND NEW.latest_status_norm IN ('A','B','C')) THEN     -- ← 여기 NULL 전파
-    NEW.status_mismatch := true;
-  ELSE
-    NEW.status_mismatch := (upper(NEW.latest_status) <> NEW.latest_status_norm); -- ← 여기서 NULL
-  END IF;
-ELSE
-  NEW.status_mismatch := false;
-END IF;
+INSERT INTO public.abd_change_log(row_id, field, old_value, new_value, changed_by, source)
+VALUES (NEW.id, _f, _old->_f, _new->_f, auth.uid(), _source);
 ```
 
-`latest_status_norm`이 항상 NULL이므로:
-1. `... AND NULL` → NULL, `NOT NULL` → NULL
-2. PL/pgSQL `IF NULL THEN` = false → ELSE 분기 실행
-3. `upper(...) <> NULL` = **NULL** 이 `status_mismatch`에 대입
-4. NOT NULL 제약 위반 → 전체 upsert 실패
+또한 `upload_id`가 채워지지 않아 롤백/삭제 함수(`delete_abd_import_batch`, `rollback_abd_import` 등이 `upload_id = _batch_id`로 조회)가 임포트 변경 로그를 잡지 못함. `team`/`abd_number`도 누락.
 
-업로드하신 HDEC 엑셀에 `latest_status`가 채워진 행이 하나라도 있으면 배치 전체가 실패합니다. 그래서 4,061행 파일과 2,596행 파일 모두 동일 에러가 발생한 것입니다.
+앞서 `abd_compute_derived` 트리거를 고쳤을 때 upsert가 실제로 UPDATE 경로를 타게 되면서(이전엔 어떤 이유로 INSERT-only였거나 실제로 도달하지 못했음) 이 트리거가 처음으로 실행되어 표면화된 것.
 
-**부가 원인**
-- `latest_status_norm` 컬럼은 존재하지만 계산 로직이 어디에도 없음(과거 마이그레이션에서 누락됨). Aconex 임포트/대시보드는 이 값을 참조 → 잠재적 오작동 가능.
+## 해결 계획 (마이그레이션 1건)
 
-## 근원적 해결 계획
+`trg_abd_change_log_fn` 재작성:
 
-### 1) 마이그레이션 (`abd_compute_derived` 재작성)
+1. 컬럼명을 실제 스키마에 맞게 `abd_item_id`로 교정.
+2. `upload_id`, `team`, `abd_number`를 함께 기록해 롤백/미리보기 함수와 정합:
+   ```sql
+   INSERT INTO public.abd_change_log(
+     abd_item_id, team, abd_number, field, old_value, new_value,
+     source, upload_id, changed_by
+   ) VALUES (
+     NEW.id, NEW.team, NEW.abd_number, _f,
+     _old->>_f, _new->>_f,
+     _source,
+     NULLIF(current_setting('app.upload_id', true), '')::uuid,
+     auth.uid()
+   );
+   ```
+   (기존은 `_old->_f` jsonb를 text 컬럼에 넣던 것도 `->>` text로 교정.)
+3. 파서/업서트 쪽 코드 변경 없음. `app.change_source`/`app.upload_id` GUC는 이미 임포트 경로에서 세팅되고 있다는 가정 하에 그대로 사용하고, 세팅되지 않은 수동 편집 시에는 upload_id=NULL, source='manual' 로 남김.
 
-트리거 최상단(is_terminated / Approved 분기보다 앞)에 `latest_status_norm` 정규화 로직을 삽입:
+## 검증
 
-```sql
-NEW.latest_status_norm := CASE
-  WHEN NEW.latest_status IS NULL OR btrim(NEW.latest_status) = '' THEN NULL
-  WHEN upper(btrim(NEW.latest_status)) IN ('A','B','C') THEN upper(btrim(NEW.latest_status))
-  ELSE upper(btrim(NEW.latest_status))   -- 원본 유지, 단 대문자화
-END;
-```
+- MECH 2,596 / ELEC 4,061 재임포트 → Failed 사라짐.
+- 롤백 미리보기가 update_count/conflict_count를 정상 계산.
+- `tsgo` 는 스키마만 변경이라 영향 없음.
 
-status_mismatch 최종 블록을 NULL-safe 로 교체:
+## 왜 근원적인가
 
-```sql
-NEW.status_mismatch := COALESCE(
-  NEW.latest_status IS NOT NULL
-  AND upper(btrim(NEW.latest_status)) IS DISTINCT FROM COALESCE(NEW.latest_status_norm,''),
-  false
-);
-```
-
-또한 초기 early-return 분기(`is_terminated`, `latest_status_norm='A'`)에도 `NEW.status_mismatch := false;` 명시 추가 → 방어 코드.
-
-### 2) 데이터 정합성 백필
-
-기존 행의 `latest_status_norm` 값을 강제 재계산 (`UPDATE ... SET latest_status = latest_status` 만으로 트리거 재실행). Terminated 행은 제외.
-
-### 3) 검증
-
-- 마이그레이션 후 첨부된 두 HDEC 엑셀(MECH 2,596 / ELEC 4,061)을 재임포트하여 완주 확인
-- ABD Dashboard의 status_mismatch attention 리스트가 정상 계산되는지 확인 (기존은 항상 0이었을 가능성)
-- `tsgo` 는 스키마만 변경이라 영향 없음, 그래도 실행
-
-## 코드 변경 범위
-
-- **DB 마이그레이션 1건**: `abd_compute_derived` 함수 재작성 + 기존 행 백필 UPDATE
-- **애플리케이션 코드 변경 없음** (트리거 결함이므로 파서/업서트 페이로드는 그대로 유지)
-
-## 왜 이 방식이 근원적인가
-
-- 파서/업서트에서 `status_mismatch: false` 를 강제 삽입하는 우회는 트리거가 나중에 다시 NULL 을 넣으므로 무효.
-- `latest_status_norm` 을 트리거에서 항상 계산하도록 만들면 `status_mismatch` 계산의 NULL 전파 원인 자체가 사라지고, Aconex diff·대시보드도 정확해집니다.
-- NOT NULL 제약을 제거하는 회피안은 다운스트림 통계 SQL(`WHERE status_mismatch`)의 3-값 논리 버그를 유발하므로 채택하지 않음.
+- 파서·업서트 페이로드는 정상이며 표면 오류는 순전히 UPDATE 트리거의 잘못된 컬럼명. 이 트리거만 정정하면 status_mismatch 계열 후속 결함이 재현하지 않음.
+- upload_id/team/abd_number까지 채워두어 이후 롤백·감사·대시보드 change_log 소비 로직이 스키마 기대와 다시 일치.
