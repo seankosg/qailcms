@@ -67,19 +67,6 @@ export const getAbdDashboardApprovalTrend = createServerFn({ method: "POST" })
     return (rows ?? []) as Array<{ month_start: string; team: string | null; approved_cnt: number }>;
   });
 
-export const getAbdDashboardOverdueHeatmap = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((v: unknown) => FilterSchema.parse(v))
-  .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_overdue_heatmap", {
-      _plots: toArrOrNull(data.plots),
-      _teams: toArrOrNull(data.teams),
-      _batch_no: toArrOrNull(data.batch_no),
-    });
-    if (error) throw new Error(error.message);
-    return (rows ?? []) as Array<{ team: string; bucket: string; cnt: number }>;
-  });
-
 export const getAbdDashboardAttentionLists = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => FilterSchema.extend({ limit: z.number().int().default(20) }).parse(v))

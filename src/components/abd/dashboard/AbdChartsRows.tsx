@@ -23,7 +23,6 @@ import { cn } from "@/lib/utils";
 import {
   getAbdDashboardStatusDist,
   getAbdDashboardApprovalTrend,
-  getAbdDashboardOverdueHeatmap,
   getAbdDashboardAttentionLists,
   getAbdDashboardCrosscut,
 } from "@/lib/abd/dashboard.functions";
@@ -211,91 +210,7 @@ export function AbdRow4ApprovalTrend({ plots = [], teams = [], batchNo = [], mon
   );
 }
 
-/** Row 5 — Overdue Heatmap (Team × Bucket) */
-export function AbdRow5OverdueHeatmap({ plots = [], teams = [], batchNo = [], onOpenRaw }: BaseProps) {
-  const fn = useServerFn(getAbdDashboardOverdueHeatmap);
-  const { data } = useQuery({
-    queryKey: ["abd-dash-heat", plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
-    staleTime: 30_000,
-  });
-  const rows = data ?? [];
-  const buckets = ["1-3d", "4-7d", "8-14d", "15-30d", "30d+"];
-  const teamList = useMemo(() => {
-    const s = new Set<string>();
-    rows.forEach((r) => s.add(r.team || "—"));
-    return Array.from(s).sort();
-  }, [rows]);
-  const grid = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of rows) m.set(`${r.team || "—"}::${r.bucket}`, r.cnt);
-    return m;
-  }, [rows]);
-  const max = Math.max(1, ...rows.map((r) => r.cnt));
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Overdue Heatmap</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {teamList.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">지연 항목 없음</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] text-sm">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="p-2 text-left font-medium">Team</th>
-                  {buckets.map((b) => (
-                    <th key={b} className="p-2 text-center font-medium">
-                      {b}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {teamList.map((t) => (
-                  <tr key={t} className="border-t border-border">
-                    <td className="p-2 font-medium">{t}</td>
-                    {buckets.map((b) => {
-                      const v = grid.get(`${t}::${b}`) ?? 0;
-                      const intensity = v > 0 ? 0.15 + (v / max) * 0.65 : 0;
-                      return (
-                        <td
-                          key={b}
-                          className={cn(
-                            "p-2 text-center tabular-nums transition-colors",
-                            v > 0 && "cursor-pointer hover:bg-primary/10",
-                          )}
-                          style={{
-                            background:
-                              v > 0
-                                ? `hsl(0 72% 51% / ${intensity.toFixed(2)})`
-                                : undefined,
-                            color: intensity > 0.5 ? "white" : undefined,
-                          }}
-                          onClick={() =>
-                            v > 0 &&
-                            onOpenRaw({ status_group: "delayed", team: t, overdue_bucket: b })
-                          }
-                        >
-                          {v > 0 ? v.toLocaleString() : "—"}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Row 6a — Attention Lists (needs_planning / ur_aging / status_mismatch) */
+/** Row 5 — Attention Lists (needs_planning / ur_aging / status_mismatch) */
 export function AbdRow6Attention({ plots = [], teams = [], batchNo = [], onOpenRaw, onOpenDetail }: BaseProps) {
   const fn = useServerFn(getAbdDashboardAttentionLists);
   const { data } = useQuery({
