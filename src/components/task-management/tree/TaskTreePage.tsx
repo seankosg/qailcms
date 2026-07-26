@@ -397,13 +397,14 @@ export function TaskTreePage() {
     });
   }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfDate, thresholds]);
 
-  // 완료(Actual% ≥ 100%) Main Task 는 하단으로 정렬
+  // 완료(Actual% ≥ 100%) Main Task 는 하단으로 정렬, 동일 그룹 내에서는 Main Task No 오름차순
   const sortedFiltered = useMemo(() => {
     const isDone = (r: Row) => Number(r.actual_progress ?? 0) >= 1;
     return [...filtered].sort((a, b) => {
       const da = isDone(a) ? 1 : 0;
       const db = isDone(b) ? 1 : 0;
-      return da - db;
+      if (da !== db) return da - db;
+      return a.task_no.localeCompare(b.task_no, undefined, { numeric: true });
     });
   }, [filtered]);
 
