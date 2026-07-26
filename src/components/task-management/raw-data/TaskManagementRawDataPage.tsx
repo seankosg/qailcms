@@ -1316,7 +1316,7 @@ export function TaskManagementRawDataPage() {
 
             <div style={{ height: virtualizer.getTotalSize() }} className="relative">
               {virtualizer.getVirtualItems().map((v) => {
-                const row = rowModel.rows[v.index];
+                const row = renderRows[v.index];
                 if (!row) return null;
                 const isParent = (row.original as Row).level === "main";
                 const ap = Number((row.original as any).actual_progress ?? 0);
