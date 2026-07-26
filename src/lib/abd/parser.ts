@@ -3,6 +3,7 @@ import { dohaWallToUtcIso, toDohaDateKey, dohaDateOnly } from "@/lib/time/doha";
 import type { AbdTeam } from "./columns";
 import type { TeamOption } from "@/lib/team/team-master";
 import { detectTeamFromText } from "@/lib/team/team-master";
+import { makeDateAudit, toCellRef, type DateIssue } from "@/lib/import/date-audit";
 
 export interface ParsedAbdRow {
   sl_no: number | null;
@@ -70,6 +71,30 @@ export interface ParsedFileResult {
       document_title: string | null;
     }>;
   }>;
+  /** 날짜 파싱 오류 셀 목록 (전체 시트 통합) */
+  dateIssues: DateIssue[];
+}
+
+export interface ParseAbdOptions {
+  /** DateIssuesPanel에서 사용자가 입력한 셀별 override (cellRef → YYYY-MM-DD) */
+  dateOverrides?: Record<string, string>;
+}
+
+function abdFieldHeader(key: string): string {
+  if (key === "approval_date") return "Approval Date";
+  const m = key.match(/^r(\d)_(draft_start|draft_finish|submission|dar|drafting)_(plan|actual)$/);
+  if (m) {
+    const stageMap: Record<string, string> = {
+      draft_start: "Draft Start",
+      draft_finish: "Draft Finish",
+      submission: "Submission",
+      dar: "DAR Response",
+      drafting: "Drafting",
+    };
+    const which = m[3] === "plan" ? "Plan" : "Actual";
+    return `R${m[1]} ${stageMap[m[2]]} ${which}`;
+  }
+  return key;
 }
 
 /**
@@ -419,9 +444,12 @@ export async function parseAbdFile(
   file: File,
   teamOverride?: string | null,
   teamOptions?: TeamOption[],
+  options?: ParseAbdOptions,
 ): Promise<ParsedFileResult> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf);
+  const wb = XLSX.read(buf, { type: "array", cellDates: false });
+  const dateOverrides = options?.dateOverrides ?? {};
+  const { audit, read: readDateCell } = makeDateAudit(dateOverrides);
   const teamFromFilename = teamOverride ?? detectTeamFromFilename(file.name, teamOptions);
   const result: ParsedFileResult = {
     file_name: file.name,
@@ -429,6 +457,7 @@ export async function parseAbdFile(
     sheets: [],
     ignored_sheets: [],
     duplicates_in_file: [],
+    dateIssues: [],
   };
 
   for (const name of wb.SheetNames) {
@@ -449,6 +478,19 @@ export async function parseAbdFile(
         if (c == null) return null;
         const cell = ws[XLSX.utils.encode_cell({ r, c })];
         return cleanCell(cell?.v);
+      };
+      const readDate = (key: string): string | null => {
+        const c = hdr.colIndex[key];
+        if (c == null) return null;
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        const raw = cell?.v ?? null;
+        return readDateCell(raw, {
+          cellRef: `${name}!${toCellRef(r + 1, c + 1)}`,
+          row: r + 1,
+          col: c + 1,
+          field: key,
+          header: abdFieldHeader(key),
+        });
       };
       const abdRaw = getVal("abd_number");
       const abd = abdRaw ? String(abdRaw).trim() : "";
@@ -503,33 +545,33 @@ export async function parseAbdFile(
         hdec_eng_name,
         latest_rev: getVal("latest_rev") ? String(getVal("latest_rev")) : null,
         latest_status: getVal("latest_status") ? String(getVal("latest_status")).toUpperCase() : null,
-        approval_date: toIsoDate(getVal("approval_date")),
-        r1_submission_plan: toIsoDate(getVal("r1_submission_plan")),
-        r1_submission_actual: toIsoDate(getVal("r1_submission_actual")),
-        r1_dar_plan: toIsoDate(getVal("r1_dar_plan")),
-        r1_dar_actual: toIsoDate(getVal("r1_dar_actual")),
-        r2_submission_plan: toIsoDate(getVal("r2_submission_plan")),
-        r2_submission_actual: toIsoDate(getVal("r2_submission_actual")),
-        r2_dar_plan: toIsoDate(getVal("r2_dar_plan")),
-        r2_dar_actual: toIsoDate(getVal("r2_dar_actual")),
-        r3_submission_plan: toIsoDate(getVal("r3_submission_plan")),
-        r3_submission_actual: toIsoDate(getVal("r3_submission_actual")),
-        r3_dar_plan: toIsoDate(getVal("r3_dar_plan")),
-        r3_dar_actual: toIsoDate(getVal("r3_dar_actual")),
-        r1_draft_start_plan: toIsoDate(getVal("r1_draft_start_plan")),
-        r1_draft_start_actual: toIsoDate(getVal("r1_draft_start_actual")),
-        r1_draft_finish_plan: toIsoDate(getVal("r1_draft_finish_plan")) ?? toIsoDate(getVal("r1_drafting_plan")),
-        r1_draft_finish_actual: toIsoDate(getVal("r1_draft_finish_actual")) ?? toIsoDate(getVal("r1_drafting_actual")),
+        approval_date: readDate("approval_date"),
+        r1_submission_plan: readDate("r1_submission_plan"),
+        r1_submission_actual: readDate("r1_submission_actual"),
+        r1_dar_plan: readDate("r1_dar_plan"),
+        r1_dar_actual: readDate("r1_dar_actual"),
+        r2_submission_plan: readDate("r2_submission_plan"),
+        r2_submission_actual: readDate("r2_submission_actual"),
+        r2_dar_plan: readDate("r2_dar_plan"),
+        r2_dar_actual: readDate("r2_dar_actual"),
+        r3_submission_plan: readDate("r3_submission_plan"),
+        r3_submission_actual: readDate("r3_submission_actual"),
+        r3_dar_plan: readDate("r3_dar_plan"),
+        r3_dar_actual: readDate("r3_dar_actual"),
+        r1_draft_start_plan: readDate("r1_draft_start_plan"),
+        r1_draft_start_actual: readDate("r1_draft_start_actual"),
+        r1_draft_finish_plan: readDate("r1_draft_finish_plan") ?? readDate("r1_drafting_plan"),
+        r1_draft_finish_actual: readDate("r1_draft_finish_actual") ?? readDate("r1_drafting_actual"),
         r1_response_result: normResponseResult(getVal("r1_response_result")),
-        r2_draft_start_plan: toIsoDate(getVal("r2_draft_start_plan")),
-        r2_draft_start_actual: toIsoDate(getVal("r2_draft_start_actual")),
-        r2_draft_finish_plan: toIsoDate(getVal("r2_draft_finish_plan")) ?? toIsoDate(getVal("r2_drafting_plan")),
-        r2_draft_finish_actual: toIsoDate(getVal("r2_draft_finish_actual")) ?? toIsoDate(getVal("r2_drafting_actual")),
+        r2_draft_start_plan: readDate("r2_draft_start_plan"),
+        r2_draft_start_actual: readDate("r2_draft_start_actual"),
+        r2_draft_finish_plan: readDate("r2_draft_finish_plan") ?? readDate("r2_drafting_plan"),
+        r2_draft_finish_actual: readDate("r2_draft_finish_actual") ?? readDate("r2_drafting_actual"),
         r2_response_result: normResponseResult(getVal("r2_response_result")),
-        r3_draft_start_plan: toIsoDate(getVal("r3_draft_start_plan")),
-        r3_draft_start_actual: toIsoDate(getVal("r3_draft_start_actual")),
-        r3_draft_finish_plan: toIsoDate(getVal("r3_draft_finish_plan")) ?? toIsoDate(getVal("r3_drafting_plan")),
-        r3_draft_finish_actual: toIsoDate(getVal("r3_draft_finish_actual")) ?? toIsoDate(getVal("r3_drafting_actual")),
+        r3_draft_start_plan: readDate("r3_draft_start_plan"),
+        r3_draft_start_actual: readDate("r3_draft_start_actual"),
+        r3_draft_finish_plan: readDate("r3_draft_finish_plan") ?? readDate("r3_drafting_plan"),
+        r3_draft_finish_actual: readDate("r3_draft_finish_actual") ?? readDate("r3_drafting_actual"),
         r3_response_result: normResponseResult(getVal("r3_response_result")),
         raw_payload,
         excel_row: r + 1,
@@ -572,5 +614,6 @@ export async function parseAbdFile(
     });
   }
 
+  result.dateIssues = audit.issues;
   return result;
 }
