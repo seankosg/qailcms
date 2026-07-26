@@ -835,11 +835,11 @@ export function TaskManagementRawDataPage() {
               return <span className="text-muted-foreground/40">—</span>;
             const v = Number(raw);
             const cls =
-              v < th.behind_late_gap
+              v < th.worsen_gap
                 ? "text-rose-600 font-semibold"
-                : v < th.behind_warn_gap
+                : v < 0
                   ? "text-orange-600"
-                  : v < 0
+                  : v < th.caution_gap_buffer
                     ? "text-amber-600"
                     : "text-emerald-600";
             const sign = v > 0 ? "+" : "";
