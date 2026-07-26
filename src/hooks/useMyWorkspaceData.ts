@@ -301,7 +301,6 @@ export function useMyAbd(filterValue: string | null, isAdmin: boolean, mode: Mws
     enabled: isAdmin || !!filterValue,
     staleTime: 60_000,
     queryFn: async () => {
-      const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const cols = [
         "id,abd_number,document_title,latest_status,latest_rev,hdec_pic_name,created_at,needs_planning,active_round,is_terminated,r1_response_result,r2_response_result,r3_response_result",
         "r1_draft_finish_plan,r1_draft_finish_actual,r1_submission_plan,r1_submission_actual,r1_dar_plan,r1_dar_actual",
@@ -316,7 +315,7 @@ export function useMyAbd(filterValue: string | null, isAdmin: boolean, mode: Mws
           return isAdmin ? base : base.eq(mode === "team" ? "team" : "hdec_pic_name", filterValue);
         },
         { col: "abd_number", asc: true },
-        limit,
+        null,
       );
       return rows;
     },
