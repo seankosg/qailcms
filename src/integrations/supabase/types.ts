@@ -3457,6 +3457,18 @@ export type Database = {
               service: string
             }[]
           }
+      abd_dashboard_judgment_mix: {
+        Args: { _batch_no?: string[] }
+        Returns: {
+          approved: number
+          caution: number
+          critical: number
+          delayed: number
+          normal: number
+          stage: string
+          total: number
+        }[]
+      }
       abd_dashboard_overdue_heatmap:
         | {
             Args: { _plots?: string[]; _teams?: string[] }

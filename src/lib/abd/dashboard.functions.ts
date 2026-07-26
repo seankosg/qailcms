@@ -116,3 +116,35 @@ export function pivotRows(rows: RowOut[]) {
 }
 
 export type AbdRowOut = RowOut;
+
+export type AbdJudgmentMixRow = {
+  stage: "NS" | "DS" | "UR" | "Approved";
+  total: number;
+  approved: number;
+  normal: number;
+  caution: number;
+  delayed: number;
+  critical: number;
+};
+
+export const getAbdDashboardJudgmentMix = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) =>
+    z.object({ batch_no: z.array(z.string()).default([]) }).parse(v),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await (context.supabase as any).rpc(
+      "abd_dashboard_judgment_mix",
+      { _batch_no: toArrOrNull(data.batch_no) },
+    );
+    if (error) throw new Error(error.message);
+    return ((rows ?? []) as any[]).map((r) => ({
+      stage: r.stage,
+      total: Number(r.total ?? 0),
+      approved: Number(r.approved ?? 0),
+      normal: Number(r.normal ?? 0),
+      caution: Number(r.caution ?? 0),
+      delayed: Number(r.delayed ?? 0),
+      critical: Number(r.critical ?? 0),
+    })) as AbdJudgmentMixRow[];
+  });
