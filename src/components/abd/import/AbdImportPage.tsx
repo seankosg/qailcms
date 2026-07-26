@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { todayInDoha } from "@/lib/time/doha";
 import {
   AlertCircle,
-  AlertTriangle,
   CheckCircle2,
   FileSpreadsheet,
   Loader2,
@@ -500,21 +499,7 @@ export function AbdImportPage() {
         </div>
       </div>
 
-      {mode === "aconex" && (
-        <>
-          <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Aconex Sync 규칙</AlertTitle>
-            <AlertDescription className="text-xs space-y-1">
-              <div>· Aconex Docs 시트를 업로드 → <code>Document No = ABD_NUMBER</code> 기준으로 매칭합니다.</div>
-              <div>· DB에 없는 Document No는 <b>자동 INSERT 되지 않고</b> 미매칭 목록으로 리포트됩니다.</div>
-              <div>· 각 파일 행의 <b>컬럼 선택</b> 버튼에서 UPDATE 대상 컬럼을 지정할 수 있습니다. 라운드 계획/실적은 절대 덮어쓰지 않습니다.</div>
-              <div>· Approval Date는 <code>Status=A</code> 이고 Date Modified가 있을 때만 갱신됩니다.</div>
-            </AlertDescription>
-          </Alert>
-          <AbdAconexImportPage />
-        </>
-      )}
+      {mode === "aconex" && <AbdAconexImportPage />}
 
       {mode === "hdec" && (
         <>
@@ -544,18 +529,6 @@ export function AbdImportPage() {
         optionsByKind={optionsByKind}
         onApply={applyMasterDecisions}
       />
-
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>임포트 규칙</AlertTitle>
-        <AlertDescription className="text-xs">
-          · 시트명이 <code>Bar chart</code>/<code>Subcon</code>/<code>Sheet*</code> 이거나 헤더(Sl.No + ABD NUMBER)가 없으면 자동 제외됩니다.<br />
-          · 엑셀 원본의 <code>ABD_NUMBER</code> 및 세그먼트 셀값을 그대로 저장합니다.<br />
-          · 동일 <code>ABD_NUMBER</code> 가 파일 내에 2회 이상 있으면 기본적으로 <b>임포트가 차단</b>됩니다. 상세를 확인해 원본을 수정하거나, 중복 허용을 선택할 수 있습니다.<br />
-          · 중복을 허용하면 첫 행은 원본 <code>ABD_NUMBER</code> 로 저장되고, 2번째 이후 행은 뒤에 <code>-02</code>, <code>-03</code> … 접미사를 붙여 <b>모두 별도 행으로 저장</b>됩니다.<br />
-          · 재업로드 시 동일 <code>ABD_NUMBER</code> 는 업데이트, 새 번호는 삽입, 이번 파일에 없는 도면은 자동으로 <b>비활성(Inactive)</b> 표시됩니다.
-        </AlertDescription>
-      </Alert>
 
       <Card>
         <CardHeader>
