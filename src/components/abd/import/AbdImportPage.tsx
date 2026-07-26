@@ -528,12 +528,14 @@ function FileRow({
   onRemove,
   onTeamChange,
   onOpenDuplicates,
+  onDateOverridesApply,
 }: {
   entry: FileEntry;
   isRunning: boolean;
   onRemove: () => void;
   onTeamChange: (t: string) => void;
   onOpenDuplicates: () => void;
+  onDateOverridesApply: (overrides: Record<string, string>) => void | Promise<void>;
 }) {
   const { data: teamOptions = [] } = useTeamOptions();
   const badge = statusBadge[e.status];
@@ -622,6 +624,18 @@ function FileRow({
               <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{e.error}</span>
+              </div>
+            )}
+            {e.parsed && e.parsed.dateIssues.length > 0 && (
+              <div className="mt-2">
+                <DateIssuesPanel
+                  fileName={e.file.name}
+                  sheetName={null}
+                  issues={e.parsed.dateIssues}
+                  currentOverrides={e.dateOverrides}
+                  onApply={onDateOverridesApply}
+                  disabled={isRunning || e.status === "importing"}
+                />
               </div>
             )}
           </div>
