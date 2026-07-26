@@ -174,8 +174,32 @@ export function AbdRawDataPage() {
     [],
   );
   const rawTab = String(urlSearch.tab ?? "").toUpperCase();
-  const matchedTeam = teamTabs.find((t) => t.value.toUpperCase() === rawTab);
-  const team: AbdTeam = ((matchedTeam?.value ?? "MECH") as unknown) as AbdTeam;
+  // 다중 팀 선택: 콤마 구분(예: "MECH,ELEC"). 유효한 팀만 유지.
+  const selectedTeams: AbdTeam[] = useMemo(() => {
+    const valid = new Set(teamTabs.map((t) => t.value.toUpperCase()));
+    const parts = rawTab
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && valid.has(s));
+    // 최소 1개는 보장 (없으면 MECH 기본)
+    const uniq = Array.from(new Set(parts));
+    return (uniq.length > 0 ? uniq : ["MECH"]) as AbdTeam[];
+  }, [rawTab, teamTabs]);
+  // RPC/뷰프리퍼런스/컬럼메타에 넘길 team 문자열 (콤마 조인)
+  const team: AbdTeam = (selectedTeams.join(",") as unknown) as AbdTeam;
+  const toggleTeam = useCallback((v: AbdTeam) => {
+    const set = new Set<AbdTeam>(selectedTeams);
+    if (set.has(v)) {
+      if (set.size === 1) return; // 마지막 하나는 해제 불가
+      set.delete(v);
+    } else {
+      set.add(v);
+    }
+    const ordered = teamTabs
+      .map((t) => t.value as AbdTeam)
+      .filter((t) => set.has(t));
+    setUrl({ tab: ordered.join(","), page: 1 });
+  }, [selectedTeams, teamTabs]);
   // 다중 선택 지원: 콤마로 구분된 status 문자열. "all" | "" → 전체
   const selectedStatuses: Array<Exclude<AbdStatusGroup, "all">> = useMemo(() => {
     const raw = String(urlSearch.status ?? "").trim();
@@ -502,15 +526,27 @@ export function AbdRawDataPage() {
           </TabsList>
         </Tabs>
         <div className="h-6 w-px bg-border" aria-hidden />
-        <Tabs value={team} onValueChange={(v) => setUrl({ tab: v, page: 1 })}>
-          <TabsList className="h-9">
-            {teamTabs.map((t) => (
-              <TabsTrigger key={t.value} value={t.value} className="text-xs">
+        <div className="flex flex-wrap items-center gap-1 rounded-md border bg-muted/30 p-1">
+          {teamTabs.map((t) => {
+            const active = selectedTeams.includes(t.value as AbdTeam);
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => toggleTeam(t.value as AbdTeam)}
+                aria-pressed={active}
+                className={cn(
+                  "inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] transition-colors",
+                  active
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-background/60",
+                )}
+              >
                 {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-1 rounded-md border bg-muted/30 p-1">
