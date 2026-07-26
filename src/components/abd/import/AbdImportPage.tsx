@@ -694,6 +694,7 @@ function FileRow({
   onTeamChange,
   onOpenDuplicates,
   onDateOverridesApply,
+  onOpenColumnSelect,
 }: {
   entry: FileEntry;
   isRunning: boolean;
@@ -701,6 +702,7 @@ function FileRow({
   onTeamChange: (t: string) => void;
   onOpenDuplicates: () => void;
   onDateOverridesApply: (overrides: Record<string, string>) => void | Promise<void>;
+  onOpenColumnSelect: () => void;
 }) {
   const { data: teamOptions = [] } = useTeamOptions();
   const badge = statusBadge[e.status];
@@ -741,6 +743,20 @@ function FileRow({
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 text-xs"
+                onClick={onOpenColumnSelect}
+                disabled={disabled}
+              >
+                <Columns3 className="h-3.5 w-3.5" /> 컬럼 선택
+                {e.excludedFields && e.excludedFields.length > 0 && (
+                  <span className="ml-1 text-[10px] text-muted-foreground">
+                    (제외 {e.excludedFields.length})
+                  </span>
+                )}
+              </Button>
             </div>
             {e.parsed && e.parsed.sheets.length > 0 && (
               <p className="mt-1 text-[11px] text-muted-foreground">
