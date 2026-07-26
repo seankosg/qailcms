@@ -33,6 +33,8 @@ import { MiniProgressChart } from "./MiniProgressChart";
 import { TaskProgressChartDialog } from "./TaskProgressChartDialog";
 import { useServerFn } from "@tanstack/react-start";
 import { getTaskProgressChartsBulk, type TaskChartCache } from "@/lib/task-management/progress-chart.functions";
+import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
 
@@ -324,7 +326,22 @@ export function TaskTreePage() {
     return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [data]);
 
-  const asOfDate = routeSearch.dataDate || latestDataDate || undefined;
+  // Data Date 소스 우선순위: route param > 세션 공유값 > 최신값.
+  const [sharedDataDate] = useTmDataDate();
+  const asOfDate = routeSearch.dataDate || sharedDataDate || latestDataDate || undefined;
+  const isPastAsOf =
+    !!asOfDate && !!latestDataDate && asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
+  const judge = useTmJudgmentAtDate(asOfDate ?? "", isPastAsOf);
+
+  // 서버 판정을 rows 에 병합 — Actual 은 절대 덮어쓰지 않는다.
+  const effData = useMemo<Row[]>(() => {
+    if (!isPastAsOf || judge.map.size === 0) return data;
+    return data.map((r) => {
+      const j = judge.map.get(r.id);
+      if (!j) return r;
+      return { ...r, auto_judgment: j.auto_judgment ?? null } as Row;
+    });
+  }, [data, isPastAsOf, judge.map]);
 
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
