@@ -1,9 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { todayInDoha } from "@/lib/time/doha";
-
-const TM_LIMIT_USER = 2000;
-const TM_LIMIT_ADMIN = 5000;
+import {
+  computeJudgment,
+  isTaskDelayed,
+  DEFAULT_THRESHOLDS,
+  type TaskThresholds,
+  type JudgmentRow,
+} from "@/lib/task-management/derived";
 
 function daysBetween(iso: string, base: string): number {
   const a = new Date(`${iso.slice(0, 10)}T00:00:00Z`).getTime();
@@ -52,6 +56,9 @@ export interface TmMyRow {
   plan_days: number | null;
   plan_progress: number | null;
   data_date: string | null;
+  actual_start: string | null;
+  actual_finish: string | null;
+  slip_days: number | null;
   created_at: string | null;
 }
 
@@ -63,13 +70,12 @@ export function useMyTasks(filterValue: string | null, isAdmin: boolean, mode: M
     enabled: isAdmin || !!filterValue,
     staleTime: 60_000,
     queryFn: async () => {
-      const limit = isAdmin ? TM_LIMIT_ADMIN : TM_LIMIT_USER;
       const rows = await fetchAll<TmMyRow>(
         "task_management_raw",
-        "id,task_no,main_task_no,task_name,level,hdec_pic_name,plan_end,actual_progress,auto_judgment,plan_start,plan_days,plan_progress,data_date,created_at",
+        "id,task_no,main_task_no,task_name,level,hdec_pic_name,plan_end,actual_progress,auto_judgment,plan_start,plan_days,plan_progress,data_date,actual_start,actual_finish,slip_days,created_at",
         (q) => (isAdmin ? q : q.eq(mode === "team" ? "team" : "hdec_pic_name", filterValue)),
         { col: "task_no", asc: true },
-        limit,
+        null,
       );
       return rows;
     },
@@ -82,9 +88,23 @@ export function tmIsCompleted(r: TmMyRow): boolean {
 export function tmIsStarted(r: TmMyRow): boolean {
   return !tmIsCompleted(r) && Number(r.actual_progress ?? 0) > 0;
 }
-export function tmIsDelayed(r: TmMyRow): boolean {
+/** MWS 지연 판정 — TM Dashboard/Task Summary와 동일한 런타임 소스(computeJudgment) 사용.
+ *  저장된 auto_judgment 문자열은 stale 가능성이 있으므로 직접 참조하지 않는다. */
+export function tmIsDelayed(
+  r: TmMyRow,
+  thresholds: TaskThresholds = DEFAULT_THRESHOLDS,
+  asOf?: string,
+): boolean {
   if (tmIsCompleted(r)) return false;
-  return r.auto_judgment === "지연" || r.auto_judgment === "위험";
+  return isTaskDelayed(r as JudgmentRow, thresholds, asOf);
+}
+/** MWS 알람 판정 — 런타임 computeJudgment 결과. */
+export function tmJudgment(
+  r: TmMyRow,
+  thresholds: TaskThresholds = DEFAULT_THRESHOLDS,
+  asOf?: string,
+): string {
+  return computeJudgment(r as JudgmentRow, thresholds, asOf);
 }
 export function tmIsUpcoming(r: TmMyRow, today: string, days = 3): boolean {
   if (tmIsCompleted(r)) return false;

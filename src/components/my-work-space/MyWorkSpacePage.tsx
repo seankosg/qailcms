@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   useMyTasks, useMyDefectsCounts, useMyDefectsBucket, useMyAbd,
-  tmIsCompleted, tmIsStarted, tmIsDelayed, tmIsUpcoming, tmIsToday, tmTodayKinds,
+  tmIsCompleted, tmIsStarted, tmIsDelayed, tmJudgment, tmIsUpcoming, tmIsToday, tmTodayKinds,
   smTodayKinds,
   abdIsApproved, abdIsInProgress, abdIsDelayed, abdIsUpcoming, abdIsToday, abdTodayKind, abdStage, abdCurrentPlanDate,
   abdNeedsPlanning, abdNextPlanRoundLabel,
@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { dohaStamp, formatDdMmmYyyy } from "@/lib/time/doha";
 import { cumPlanProgress, cumActualProgress, computeVariance } from "@/lib/task-management/derived";
+import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
+import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
 import { CommentsInbox } from "./CommentsInbox";
@@ -73,6 +75,8 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
 
   const tm = useMyTasks(filterValue, isAdmin, scope);
   const abd = useMyAbd(filterValue, isAdmin, scope);
+  const { data: tmSettings } = useTaskManagementSettings();
+  const tmThresholds = tmSettings ?? DEFAULT_THRESHOLDS;
 
   const [tmTab, setTmTab] = useState<RowListTab>("today");
   const [smTab, setSmTab] = useState<RowListTab>("today");
@@ -117,12 +121,12 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
     return {
       total: rows.length,
       inProgress: rows.filter(tmIsStarted).length,
-      delayed: rows.filter(tmIsDelayed).length,
+      delayed: rows.filter((r) => tmIsDelayed(r, tmThresholds, t)).length,
       upcoming: rows.filter((r) => tmIsUpcoming(r, t)).length,
       completed: rows.filter(tmIsCompleted).length,
       today: rows.filter((r) => tmIsToday(r, t)).length,
     };
-  }, [tm.data, t]);
+  }, [tm.data, t, tmThresholds]);
 
   const abdStats = useMemo(() => {
     const rows = abd.data ?? [];
@@ -239,7 +243,10 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
       const pct = Math.round(v * 100);
       return <span className={cn("tabular-nums font-medium", pct < 0 ? "text-destructive" : pct > 0 ? "text-success" : "text-muted-foreground")}>{pct > 0 ? "+" : ""}{pct}%</span>;
     } },
-    { key: "j", label: "Alarm", width: "70px", render: (r) => <Badge variant="outline" className={cn("text-[10px]", r.auto_judgment === "위험" || r.auto_judgment === "지연" ? "border-destructive text-destructive" : r.auto_judgment === "주의" ? "border-warning text-warning" : r.auto_judgment === "완료" ? "border-success text-success" : "")}>{r.auto_judgment ?? "-"}</Badge> },
+    { key: "j", label: "Alarm", width: "70px", render: (r) => {
+      const j = tmJudgment(r, tmThresholds, t);
+      return <Badge variant="outline" className={cn("text-[10px]", j === "위험" || j === "지연" ? "border-destructive text-destructive" : j === "주의" ? "border-warning text-warning" : j === "완료" ? "border-success text-success" : "")}>{j || "-"}</Badge>;
+    } },
   ];
   const smColumns: RowColumn<SmMyRow>[] = [
     { key: "__ctx", label: "구분", width: "108px", render: (r) => renderSmCtx(r, smTab) },
@@ -359,7 +366,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           counts={{ today: tmStats.today, all: tmStats.total, risk: tmStats.delayed, upcoming: tmStats.upcoming }}
           filterRow={(r, tab) =>
             tab === "all" ? true
-            : tab === "risk" ? tmIsDelayed(r)
+            : tab === "risk" ? tmIsDelayed(r, tmThresholds, t)
             : tab === "today" ? tmIsToday(r, t)
             : tmIsUpcoming(r, t)
           }

@@ -4,7 +4,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ProgressKpiCard } from "./ProgressKpiCard";
 import { RiskKpiCard, type RiskKpiBreakdownRow } from "./RiskKpiCard";
 import { StatusMixDonut } from "./StatusMixDonut";
-import { CriticalThresholdPopover } from "@/components/task-management/shared/CriticalThresholdPopover";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import {
   computeKpi,
@@ -206,7 +205,6 @@ export function TmKpiCards({
           percent={pctNum(kpi.criticalDelay, kpi.total)}
           tone="danger"
           onClick={() => goRaw("critical")}
-          action={<CriticalThresholdPopover compact triggerVariant="ghost" triggerLabel="설정" />}
           breakdown={toBreakdownRows("critical", breakdown.criticalDelay)}
           formula="미완료 & 스테이지 worst-of 판정 = 위험 (Critical ⊂ In Delay)"
         />

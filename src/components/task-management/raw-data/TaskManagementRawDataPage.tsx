@@ -113,7 +113,6 @@ import {
 } from "@/lib/task-management/kpi-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
-import { CriticalThresholdPopover } from "@/components/task-management/shared/CriticalThresholdPopover";
 import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
@@ -1198,11 +1197,6 @@ export function TaskManagementRawDataPage() {
             )}
             {allCollapsed ? "Expand All" : "Collapse All"}
           </Button>
-          {canEdit && (
-            <div className="hidden sm:contents">
-              <CriticalThresholdPopover />
-            </div>
-          )}
           <Button
             variant="outline"
             size="sm"
