@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { MessageSquare, ChevronDown, ChevronUp, CheckCheck, ArrowRight } from "lucide-react";
+import { MessageSquare, ChevronDown, ChevronRight, CheckCheck, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
