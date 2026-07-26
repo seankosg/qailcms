@@ -162,18 +162,35 @@ export function AbdAconexImportPage() {
     };
   }, [syncLabelMap]);
 
-  /** DB 프리셋(canonical sync 필드 저장)을 파일 헤더 기준으로 변환. */
+  /**
+   * DB 프리셋을 파일 헤더 기준으로 변환.
+   * - 신규 스키마: presetFields = 원본 헤더 문자열(canonical 비교).
+   * - 하위호환: 시스템 sync 필드 키가 섞여 있으면 ACONEX_HEADER_TO_FIELDS 역맵 사용.
+   */
   const buildPresetHeaders = (
     fileHeaders: string[],
     presetFields: string[],
   ): string[] => {
-    const keep = new Set(presetFields);
+    const headerKeep = new Set<string>();
+    const fieldKeep = new Set<string>();
+    for (const raw of presetFields) {
+      const canon = canonicalHeader(raw);
+      if (ACONEX_HEADER_TO_FIELDS[canon]) {
+        headerKeep.add(canon);
+      } else if (syncFieldKeys.includes(raw)) {
+        fieldKeep.add(raw);
+      } else {
+        // 알 수 없는 값 → 그대로 헤더로 취급 (사용자 커스텀 매핑 헤더)
+        headerKeep.add(canon);
+      }
+    }
     return fileHeaders.filter((h) => {
       const canon = canonicalHeader(h);
       if (canon === ACONEX_UNIQUE_HEADER) return true; // always keep unique key
+      if (headerKeep.has(canon)) return true;
       const fields = ACONEX_HEADER_TO_FIELDS[canon];
-      if (!fields || fields.length === 0) return false;
-      return fields.some((f) => keep.has(f));
+      if (fields && fields.some((f) => fieldKeep.has(f))) return true;
+      return false;
     });
   };
 
