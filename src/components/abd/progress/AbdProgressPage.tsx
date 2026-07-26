@@ -334,7 +334,7 @@ export function AbdProgressPage() {
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Plot {plot} · Round {ROUND_LABELS[round]} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} ·
+            Plot {plot} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} ·
             As-of {asOfLabel} ({asOfDate}) · Plan: {planMode === "remaining" ? "Remaining" : "Baseline"} · Range {rangeDays}d
           </p>
         </div>
