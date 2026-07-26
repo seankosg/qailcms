@@ -1,54 +1,57 @@
-## 목표
-1. TM Dashboard의 Data Date 시맨틱을 **(B) Actual 유지, Plan/gap만 재계산**으로 정정한다.
-2. 같은 시맨틱을 **MWS / MTWS / Task Summary** 에도 확장하여, Dashboard에서 지정한 세션 Data Date가 전 TM 페이지에 일관되게 적용되게 한다.
 
-## 현재 상태(코드 실측)
-- DB RPC 두 종류가 존재
-  - `tm_judge_at_date` — Actual 은 현재값, Plan/gap/judgment 만 as-of 재계산 ← **채택**
-  - `tm_judge_snapshot_at_date` — Actual 도 스냅샷으로 이동 (미채택, DB에는 보존)
-- `TmDashboardPage` 는 직전 턴 배선 오류로 스냅샷 RPC 를 사용 중 → 수정 대상
-- `useMyTasks` (MWS/MTWS) 는 `auto_judgment` 컬럼을 그대로 신뢰, `useTmDataDate` 미연결 → 항상 최신 기준
-- `TaskTreePage` (Task Summary) 는 `asOfDate = routeSearch.dataDate || latestDataDate` 로 이미 asOf 인지하지만, `useTmDataDate` 세션과 무관하며 과거일 재판정을 `computeJudgment` 클라이언트 계산으로 처리 (SSOT 미준수)
+## 왜 갑자기 어긋났나 (회귀 원인)
 
-## 변경 사항
+정합성 축이 세 곳에서 조금씩 추가되었는데 **수신부(Raw Data)** 만 함께 갱신되지 않아 누적된 격차가 이번에 드러났습니다. 커밋 이력으로 확인.
 
-### Part A — Dashboard 시맨틱 정정
-1) `src/hooks/useTmJudgmentAtDate.ts`
-   - 호출 RPC 를 `tm_judge_snapshot_at_date` → `tm_judge_at_date` 로 변경
-   - 반환 타입에서 `effective_actual_progress` 제거, queryKey 정정
-2) `src/components/task-management/dashboard/TmDashboardPage.tsx`
-   - `effectiveItems` 병합에서 `actual_progress` / `actual_finish` 덮어쓰기 제거
-   - 병합 필드: `auto_judgment`, `gap_pct`, `cum_plan_pct`, `delay_days`, `alarm_reason`
+- **2026-07-20 (`722b7d17`)**: Raw Data 라우트에 `validateSearch` 스키마 도입 — 이때 필드는 `source/mode/asOf/team/hdec_pic_name/hdec_eng_name/discipline` 만 정의. 이후 스키마에 없는 URL 파라미터는 조용히 버려짐.
+- **2026-07-23 (`106a18a9`)**: `TmDashboardPage` 에 Task 스코프(`taskScope`) 토글 및 `plot` 오너 필터 확장 도입. Dashboard KPI 계산 base 가 좁아짐.
+- **2026-07-24 (`5b871c70`)**: `TmKpiCards.goRaw` 가 `taskScope` 를 URL 에 실어 보내기 시작. 그러나 수신 스키마에 `taskScope` 가 없어 이 값은 라우터에 도착 즉시 소실되고, 그 결과 Raw Data 는 항상 `scope='all'` 로 폴백.
+- 같은 시점의 `useTaskDashboardData` 는 `plot`, `q` 를 서버 쿼리에 적용해 KPI base 를 축소하지만, `goRaw` 는 이 두 축을 URL 로 넘기지 않음. 수신 스키마에도 없음.
+- Delay 계열 KPI 딥링크 표시에서 이슈 Sub 를 컨텍스트로 함께 노출하는 `extraSubs` 로직(`TaskManagementRawDataPage.tsx:567-600`) 이 도입되었으나, 화면에는 그것이 "컨텍스트" 임을 알리는 표기가 없어 카드 숫자와 리스트 개수의 차이가 그대로 오해로 남음.
 
-### Part B — MWS / MTWS 파리티
-3) `src/hooks/useMyWorkspaceData.ts`
-   - `useMyTasks` 반환값에 세션 Data Date 기반 판정 오버라이드를 병합할 수 있도록 확장 (또는 페이지 측에서 병합)
-   - `latestDataDate` 판별 로직 재사용
-4) `src/components/my-work-space/MyWorkSpacePage.tsx`
-   - `useTmDataDate()` 로 세션 Data Date 구독
-   - 과거 날짜일 때 `useTmJudgmentAtDate(asOf, isPast)` 결과를 `useMyTasks` 결과와 id 기준 병합 (Actual 은 원본 유지, 판정/gap/plan/delay/alarm 만 교체)
-   - Delayed/Alarm KPI, Delay 리스트 등 하위 계산이 병합된 값을 참조하도록 확인
-   - MTWS 경로(같은 페이지 컴포넌트 재사용)에도 자동 적용
+즉 **각 커밋은 단독으로는 유효했으나, 라우트 스키마 확장 · 링크 페이로드 확장 · Raw Data 수신 로직 확장이 서로 다른 시점에 부분적으로만 이루어지면서 표시 축(plot/q/taskScope)이 조용히 손실**되었고, 여기에 delay 컨텍스트 Sub 삽입이 겹쳐 편차가 커진 것입니다. 논리 자체가 파괴된 것은 아니고 필드 배선 유실입니다.
 
-### Part C — Task Summary 파리티
-5) `src/components/task-management/tree/TaskTreePage.tsx`
-   - `asOfDate` 소스에 `useTmDataDate` 세션을 추가 (우선순위: routeSearch.dataDate > 세션 > latestDataDate)
-   - 과거일 때 `useTmJudgmentAtDate` 로 서버 판정 병합. Sub 행은 병합된 `auto_judgment` 사용
-   - Main 롤업 판정은 자식 판정을 참조하는 구조라 자연히 파생됨. `resolveMainJudgment` / `resolveRowJudgment` 는 병합된 `auto_judgment` 를 우선 사용하도록 유지
-   - `computeVariance` 는 asOf 기반 Plan 재계산 유지 (표시용) — DB 의 `gap_pct` 와 값이 일치하는지 검증
+## 수정 계획 (선택안 반영: 컨텍스트 Sub 유지 + 명시 뱃지)
 
-### Part D — 미사용 자원 정리 검토
-6) `useTaskProgressSnapshot` 사용처는 Dashboard 정정 후 0. 삭제 여부는 안전을 위해 유지, 주석에 `@deprecated` 추가만 진행
-7) `tm_judge_snapshot_at_date` RPC 는 DB 에 그대로 두되(재사용 여지), 클라이언트 참조 없음 상태 유지
+### A. 라우트 검색 스키마 확장 — `src/routes/_authenticated/closure/task-management/raw-data.tsx`
+`searchSchema` 에 다음을 추가(전부 CSV 문자열, `fallback(z.string(), "").default("")`):
+- `taskScope` — `all | main | sub` 는 컴포넌트 단에서 폴백 검증.
+- `plot`
+- `q`
 
-## 검증 절차
-1. **Dashboard**: 과거 Data Date 선택 시 Actual% 는 그대로, Plan% 하락, gap 증감, 판정 이동 확인 (EL-C-12-06 사례로 검증)
-2. **MWS**: Dashboard에서 Data Date 를 과거로 지정 후 MWS 이동 → 상단 KPI 카드 / Delay 리스트가 세션 Data Date 기준으로 재판정되는지 확인. Actual 표시값 변동 없어야 함
-3. **MTWS**: 팀 스코프에서 동일 동작 확인
-4. **Task Summary**: routeSearch.dataDate 없음 + 세션 값 있음 → 세션 반영. Sub 판정 뱃지가 서버 값과 일치
-5. **최신으로 복귀**: 어느 페이지에서든 세션 초기화 시 DB 저장 파생값(`auto_judgment` 컬럼)과 완전히 일치
+### B. 링크 페이로드 확장 — `src/components/task-management/dashboard/TmKpiCards.tsx`
+`Props` 에 `plots?: string[]`, `q?: string` 추가.
+`goRaw` / `goRawWithTeam` 두 함수 모두에서 다음을 URL 에 실어보냄.
+- `plot = plots.join(",")`
+- `q = q`
+- (기존) `team / hdec_pic_name / hdec_eng_name / discipline / taskScope / mode / asOf / source`
 
-## 기술 노트
-- `tm_judge_at_date(p_data_date, p_task_ids)` 는 `_task_ids=NULL` 이면 전체 활성 행 반환. MWS/MTWS/Summary 는 이미 페이지 단에서 필터된 소수 id 집합만 넘겨 부하 최소화 (id 배열 전달)
-- 훅은 오늘/미래 날짜에는 RPC 호출하지 않고 DB 저장 파생값을 그대로 사용 (기존 SSOT 유지)
-- Actual 관련 컬럼(`actual_progress`, `actual_start`, `actual_finish`) 은 어떤 상황에서도 클라이언트에서 재작성하지 않는다 — 이 규칙을 병합 헬퍼에 명시
+호출부 — `src/components/task-management/dashboard/TmDashboardPage.tsx` 의 `<TmKpiCards ... ownerContext={{…}}>` 에 `plots: search.plot`, `q: search.q` 추가.
+
+### C. Raw Data 수신 로직 확장 — `TaskManagementRawDataPage.tsx` (l.336~383 대시보드 진입 useEffect)
+- `push("plot", s.plot)` 을 `columnFilters` 에 추가.
+- `setGlobalFilter(s.q)` / `setSearchInput(s.q)` 로 검색 문자열 반영(현행 `""` 리셋 라인을 대체).
+- `taskScope` 는 스키마 확장 후 정상 도착 — `kpiMode.scope` 그대로 반영.
+
+### D. 컨텍스트 Sub 유지 + 명시 뱃지 (선택안)
+`kpiFilteredRows` 자체는 현행 유지(매칭 + 이슈 Sub). 대신 툴바에 뱃지 한 줄을 추가해 사용자가 오해하지 않도록:
+- 카운트를 계산할 때 `matched.length`(KPI 카드 정의와 100% 일치)와 `extraSubs.length` 를 각각 반환하도록 `kpiFilteredRows` 결과 형태를 소폭 변경 → useMemo 반환값을 `{ rows, matchCount, contextCount }` 로 개편, 표에는 `rows` 사용, 뱃지에는 두 카운트 사용.
+- 스티키 헤더 좌측에 뱃지 노출(예):
+  - `KPI: In Delay · asOf 2026-07-26 · scope All`
+  - `매치 342건 (카드 숫자와 동일)   ·   컨텍스트 Sub 87건 (하위 이슈 참고용)`
+  - 오른쪽 끝에 `[컨텍스트 Sub 숨기기]` 토글(로컬 상태) 추가 — 클릭 시 매치만 노출 → 카드 숫자와 화면 리스트가 완전 일치하는지 눈으로 즉시 검증 가능.
+- 뱃지는 KPI 딥링크 모드(`kpiMode !== null`) 일 때만 렌더.
+
+### E. 방어 장치 — 축 배선 회귀를 조기 검출
+- `TaskManagementRawDataPage` 에 dev 전용 `console.warn` 을 추가: `source=dashboard` 인데 `search` 에 정의되지 않은(스키마가 삼킨) 키가 존재하면 경고. 실제 검사는 dashboard 진입 훅 내부에서 `Object.keys(location.searchStr)` 파싱으로 수행.
+- 이렇게 하면 다음에 또 새 필터 축이 dashboard 에 추가되고 스키마가 누락됐을 때 개발 중에 즉시 노출됨.
+
+## 기술 세부
+
+- CSV 직렬화 관례 유지: 팀/PIC/Eng 는 콤마 조인, 개별 값 내 콤마는 dashboard 필터 UI 상 발생하지 않음(고정 옵션).
+- `EMPTY_TOKEN` 은 `goRawWithTeam` 에서만 단일 값으로 실어보내므로 CSV 조인 이슈 없음.
+- 뱃지 카운트는 delay 계열이 아닌 모드(`completed / planned_started / actual_started / wip / not_started` 등) 에서는 `matched === rows` 이므로 자동으로 `컨텍스트 Sub 0건` 로 표기되어 어색하지 않게 처리.
+- 이 변경은 서버 스키마/RPC/DB 변경 없음. 프런트 정합성 이슈만 수정.
+
+## 확인 완료
+사용자가 (대안) 컨텍스트 Sub 유지 + 명시 뱃지 를 선택함 — 위 D 로 반영.
