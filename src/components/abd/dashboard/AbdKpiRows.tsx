@@ -222,6 +222,18 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
     (totals.get("DS_DELAY") ?? 0) +
     (totals.get("NO_PLAN") ?? 0);
 
+  const totalDelayByTeam = useMemo(() => {
+    const acc = new Map<string, number>();
+    for (const k of ["RS_DELAY", "SB_DELAY", "DS_DELAY", "NO_PLAN"]) {
+      for (const b of byTeam.get(k) ?? []) {
+        acc.set(b.team, (acc.get(b.team) ?? 0) + b.count);
+      }
+    }
+    return sortByTeamOrder(
+      Array.from(acc, ([team, count]) => ({ team, count })),
+    );
+  }, [byTeam]);
+
   const mk = (label: string, key: string, statusGroup: string) => (
     <AbdKpiCard
       key={key}
@@ -243,11 +255,16 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         label="Total Delay"
         count={totalDelay}
         tone="danger"
+        breakdown={totalDelayByTeam.map((b) => ({
+          team: b.team,
+          count: b.count,
+          onClick: () => onOpenRaw({ status_group: "delayed", team: b.team }),
+        }))}
         onClick={() => onOpenRaw({ status_group: "delayed" })}
       />
-      {mk("RS Delay", "RS_DELAY", "rs_delay")}
-      {mk("SB Delay", "SB_DELAY", "sb_delay")}
-      {mk("DS Delay", "DS_DELAY", "ds_delay")}
+      {mk("Response Delay", "RS_DELAY", "rs_delay")}
+      {mk("Submission Delay", "SB_DELAY", "sb_delay")}
+      {mk("Draft Start Delay", "DS_DELAY", "ds_delay")}
       {mk("No Plan", "NO_PLAN", "no_plan")}
     </div>
   );
