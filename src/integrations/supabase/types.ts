@@ -3550,23 +3550,42 @@ export type Database = {
           value: string
         }[]
       }
-      abd_items_search: {
-        Args: {
-          _filters?: Json
-          _include_inactive?: boolean
-          _limit?: number
-          _offset?: number
-          _plot?: string
-          _q?: string
-          _sort?: Json
-          _status_group?: string
-          _team?: string
-        }
-        Returns: {
-          rows: Json
-          total_count: number
-        }[]
-      }
+      abd_items_search:
+        | {
+            Args: {
+              _filters?: Json
+              _include_inactive?: boolean
+              _limit?: number
+              _offset?: number
+              _plot?: string
+              _q?: string
+              _sort?: Json
+              _status_group?: string
+              _team?: string
+            }
+            Returns: {
+              rows: Json
+              total_count: number
+            }[]
+          }
+        | {
+            Args: {
+              _excluded_mode?: string
+              _filters?: Json
+              _include_inactive?: boolean
+              _limit?: number
+              _offset?: number
+              _plot?: string
+              _q?: string
+              _sort?: Json
+              _status_group?: string
+              _team?: string
+            }
+            Returns: {
+              rows: Json
+              total_count: number
+            }[]
+          }
       abd_progress_cells:
         | {
             Args: {
