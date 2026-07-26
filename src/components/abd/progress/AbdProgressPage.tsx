@@ -388,20 +388,25 @@ export function AbdProgressPage() {
               </div>
             </ToolbarGroup>
 
-            <ToolbarGroup label="Round">
+            <ToolbarGroup label="Stage">
               <ToggleGroup
-                type="single"
-                value={round}
-                onValueChange={(v) => v && setSearch({ round: v as RoundKey })}
+                type="multiple"
+                value={isAllStages ? [...ALL_STAGES] : effectiveStages}
+                onValueChange={(v) => {
+                  const next = (v as Stage[]).filter((x) => (ALL_STAGES as string[]).includes(x));
+                  if (next.length === 0) return;
+                  const sorted = ALL_STAGES.filter((k) => next.includes(k));
+                  setSearch({ stageView: sorted.join(",") });
+                }}
                 className="gap-1"
               >
-                {ALL_ROUNDS.map((r) => (
+                {ALL_STAGES.map((s) => (
                   <ToggleGroupItem
-                    key={r}
-                    value={r}
+                    key={s}
+                    value={s}
                     className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                   >
-                    {ROUND_LABELS[r]}
+                    {STAGE_SHORT_LABELS[s]}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
