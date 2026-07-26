@@ -1358,6 +1358,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             for (let i = 0; i < workingRows.length; i++) {
               payloadByKey2.set(workingRows[i].source_issue_no, payloads[i]);
             }
+            // 이번 임포트에서 사용자가 제외한 필드는 값 자체가 payload 에 실리지 않으므로,
+            // 매 행마다 previous 와 비교해봤자 모두 `unchanged` 로 판정되어 수십만 건의
+            // import_field_logs 를 만든다. 큰 임포트에서 이 부분이 UI 를 수 분간 정지시키는
+            // 원인이므로, 제외 필드는 아예 순회에서 뺀다.
+            const trackedFieldsForFile = SM_TRACKED_FIELDS.filter(
+              (fname) => !excludedFields.has(fname),
+            );
             const pendingFieldLogs: PendingFieldLog[] = [];
             workingRows.forEach((p) => {
               const key = String(p.source_issue_no ?? "");
@@ -1391,16 +1398,17 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
               const prior = existing.get(p.source_issue_no) ?? ({} as any);
               const wasExisting = existing.has(p.source_issue_no);
               const applied = payloadByKey2.get(p.source_issue_no) ?? {};
-              for (const fname of SM_TRACKED_FIELDS) {
+              for (const fname of trackedFieldsForFile) {
                 const incoming = (applied as any)[fname] ?? null;
                 const previous = (prior as any)[fname] ?? null;
                 const cls = classifyChange(incoming, previous);
-                if (cls === "empty") continue;
+                // `unchanged` / `empty` 는 감사 가치가 없고 볼륨만 폭증시키므로 저장 생략.
+                if (cls !== "applied") continue;
                 pendingFieldLogs.push(
                   buildFieldLog("defect", {
                     rawRowNo: p.rawRowNo ?? null,
                     field: fname,
-                    outcome: cls === "applied" ? "applied" : "unchanged",
+                    outcome: "applied",
                     raw: incoming,
                     applied: incoming,
                     previous: wasExisting ? previous : null,
@@ -1408,7 +1416,10 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                 );
               }
             });
-            await flushFieldLogs(supabase, logId, userId, pendingFieldLogs);
+            // 사용자 체감 응답성을 위해 백그라운드로 전송. 실패해도 임포트 결과에는 영향 없음.
+            void flushFieldLogs(supabase, logId, userId, pendingFieldLogs).catch((e) =>
+              console.warn("[defect-import] field-log flush failed", e),
+            );
           } catch (e) {
             console.warn("[defect-import] field-log insert failed", e);
           }
