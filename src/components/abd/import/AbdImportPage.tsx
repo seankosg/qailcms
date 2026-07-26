@@ -500,92 +500,6 @@ export function AbdImportPage() {
         </div>
       </div>
 
-      {/* 공용: 대상 필드 선택 카드 + 프리셋 */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between gap-2 flex-wrap">
-            <div>
-              <CardTitle className="text-base">
-                {mode === "hdec" ? "Import 대상 필드 선택 (HDEC)" : "Sync 대상 필드 선택 (Aconex)"}
-              </CardTitle>
-              <CardDescription>
-                {mode === "hdec"
-                  ? "체크된 필드만 이번 임포트에서 반영됩니다. 체크 해제된 필드는 파일에 값이 있어도 기존 DB 값이 유지됩니다."
-                  : "이번 업로드에서 실제로 UPDATE 할 컬럼만 체크하세요."}
-                (기본: 전체)
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="text-[11px] text-muted-foreground mr-1">프리셋:</span>
-              {modePresets.length === 0 && (
-                <span className="text-[11px] text-muted-foreground italic">등록된 프리셋 없음</span>
-              )}
-              {modePresets.map((p) => (
-                <Button
-                  key={p.id}
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs"
-                  onClick={() => applyPreset(p)}
-                >
-                  {p.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-auto">
-            {fieldOptions.map((opt) => {
-              const checked = selectedSet.has(opt.field);
-              return (
-                <label
-                  key={opt.field}
-                  className={`flex items-start gap-2 rounded border p-2 cursor-pointer transition ${
-                    checked ? "border-primary/60 bg-primary/5" : "hover:bg-muted/40"
-                  }`}
-                >
-                  <Checkbox
-                    checked={checked}
-                    onCheckedChange={(v) => {
-                      const next = new Set(selectedSet);
-                      if (v) next.add(opt.field);
-                      else next.delete(opt.field);
-                      setSelected(next);
-                    }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">{opt.label}</div>
-                    <div className="text-[10px] text-muted-foreground font-mono truncate">{opt.field}</div>
-                  </div>
-                </label>
-              );
-            })}
-            {fieldOptions.length === 0 && (
-              <div className="col-span-full px-2 py-4 text-center text-xs text-muted-foreground">
-                필드 옵션을 불러오는 중…
-              </div>
-            )}
-          </div>
-          <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-            <button
-              type="button"
-              className="rounded border px-2 py-0.5 hover:bg-muted"
-              onClick={selectAllFields}
-            >전체 선택</button>
-            <button
-              type="button"
-              className="rounded border px-2 py-0.5 hover:bg-muted"
-              onClick={clearAllFields}
-            >전체 해제</button>
-            <span>선택 {selectedSet.size} / {fieldOptions.length}</span>
-            {mode === "aconex" && aconexSelected.size === 0 && (
-              <span className="text-destructive">최소 1개 이상 선택해야 Sync 가 실행됩니다.</span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       {mode === "aconex" && (
         <>
           <Alert>
@@ -594,11 +508,11 @@ export function AbdImportPage() {
             <AlertDescription className="text-xs space-y-1">
               <div>· Aconex Docs 시트를 업로드 → <code>Document No = ABD_NUMBER</code> 기준으로 매칭합니다.</div>
               <div>· DB에 없는 Document No는 <b>자동 INSERT 되지 않고</b> 미매칭 목록으로 리포트됩니다.</div>
-              <div>· 위에서 체크한 컬럼만 실제 UPDATE 됩니다. 라운드 계획/실적은 절대 덮어쓰지 않습니다.</div>
+              <div>· 각 파일 행의 <b>컬럼 선택</b> 버튼에서 UPDATE 대상 컬럼을 지정할 수 있습니다. 라운드 계획/실적은 절대 덮어쓰지 않습니다.</div>
               <div>· Approval Date는 <code>Status=A</code> 이고 Date Modified가 있을 때만 갱신됩니다.</div>
             </AlertDescription>
           </Alert>
-          <AbdAconexImportPage syncFields={syncFields} hideHeader />
+          <AbdAconexImportPage hideHeader />
         </>
       )}
 
