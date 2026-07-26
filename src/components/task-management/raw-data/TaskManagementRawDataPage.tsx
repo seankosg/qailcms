@@ -598,15 +598,33 @@ export function TaskManagementRawDataPage() {
     return m;
   }, [tActualRows]);
 
-  // Data Date(과거/현재 모두) Dashboard 와 동일한 서버 재판정 결과를 병합.
-  // Actual% 는 절대 덮어쓰지 않고 Plan/gap/judgment/delay_days/alarm_reason 만 갱신.
-  // 현재 Data Date일 때도 DB 저장된 auto_judgment 대신 RPC 재계산 값을 사용하여
-  // Dashboard KPI(gap 축)와 Raw Data 행 수가 정확히 일치하도록 함.
-  const judge = useTmJudgmentAtDate(selectedDataDate, true);
-  const effectiveRows = useMemo(
-    () => mergeTmJudgment(rows, judge.map),
-    [rows, judge.map],
-  );
+  // Dashboard KPI 카드와 동일한 판정 기준으로 auto_judgment 를 재계산.
+  // Dashboard 는 gap(Actual% − Cum.Plan%) 축 하나로 지연/악화를 산정하며,
+  // DB에 저장된 auto_judgment 는 임포트 시점/설정에 따라 달라질 수 있어
+  // KPI 카드 숫자와 Raw Data 행 수가 일치하지 않는 경우가 있음.
+  // 따라서 Raw Data 에서도 Dashboard 와 동일한 kpi-utils 로직(gap + thresholds)으로
+  // 현재 선택된 Data Date 기준 auto_judgment 를 다시 매긴 뒤 필터/표시에 사용.
+  const effectiveRows = useMemo(() => {
+    const asOf = selectedDataDate || todayIso();
+    const th = kpiThresholds ?? DEFAULT_THRESHOLDS;
+    return rows.map((r) => ({
+      ...r,
+      auto_judgment: computeDashboardAutoJudgment(r, asOf, th),
+    }));
+  }, [rows, selectedDataDate, kpiThresholds]);
+
+  function computeDashboardAutoJudgment(
+    row: Row,
+    asOf: string,
+    th: TaskThresholds,
+  ): string {
+    if (isCompleted(row as any)) return "완료";
+    const gap = gapAt(row as any, asOf);
+    if (gap < th.worsen_gap) return "악화";
+    if (gap < 0) return "지연";
+    if (gap < th.caution_gap_buffer) return "주의";
+    return "정상";
+  }
 
   const parentKeys = useMemo(() => {
     const keys: string[] = [];
