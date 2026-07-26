@@ -81,6 +81,17 @@ import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from ".
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
 import { todayIso } from "@/lib/defect-management/stage-utils";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const SYSTEM_FROZEN_IDS = ["__select"];
 // is_critical / stage_progress 는 사용자 드래그/pin/hide 가능한 일반 컬럼으로 취급.
@@ -392,6 +403,7 @@ export function DefectRawDataPage() {
   });
   const rows = itemsData?.rows ?? [];
   const [exportOpen, setExportOpen] = useState(false);
+  const [confirmAllOpen, setConfirmAllOpen] = useState(false);
   const total = itemsData?.total ?? 0;
   const pageCount = isAllPage ? 1 : Math.max(1, Math.ceil(total / pageSize));
 
@@ -790,29 +802,44 @@ export function DefectRawDataPage() {
             onServerVisibility={onServerVisibility}
             onServerLabel={onServerLabel}
           />
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
+          <Button variant="default" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           {tab === "unclosed" && (
-            <Button
-              variant="default"
-              size="sm"
-              disabled={downloadingAll}
-              onClick={async () => {
-                setDownloadingAll(true);
-                const toastId = toast.loading("Unclosed 전체 다운로드 준비 중...");
-                try {
-                  const { count } = await exportAllUnclosed((fetched, total) => {
-                    toast.loading(`Unclosed 다운로드 ${fetched.toLocaleString()} / ${total.toLocaleString()}`, { id: toastId });
-                  });
-                  toast.success(`${count.toLocaleString()}건 XLSX 다운로드 완료`, { id: toastId });
-                } catch (e: any) {
-                  toast.error(`다운로드 실패: ${e?.message ?? e}`, { id: toastId });
-                } finally {
-                  setDownloadingAll(false);
-                }
-              }}
-            >
-              <Download className="mr-1.5 h-3.5 w-3.5" /> {downloadingAll ? "다운로드 중..." : "Unclosed 전체 XLSX"}
-            </Button>
+            <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" disabled={downloadingAll}>
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> {downloadingAll ? "다운로드 중..." : "Unclosed 전체 XLSX"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Unclosed 전체 XLSX 다운로드</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    현재 Unclosed 전체 {unclosedCount.toLocaleString()}건을 XLSX로 내보냅니다. 데이터 양에 따라 시간이 다소 소요될 수 있습니다. 진행하시겠습니까?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>취소</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      setDownloadingAll(true);
+                      const toastId = toast.loading("Unclosed 전체 다운로드 준비 중...");
+                      try {
+                        const { count } = await exportAllUnclosed((fetched, total) => {
+                          toast.loading(`Unclosed 다운로드 ${fetched.toLocaleString()} / ${total.toLocaleString()}`, { id: toastId });
+                        });
+                        toast.success(`${count.toLocaleString()}건 XLSX 다운로드 완료`, { id: toastId });
+                      } catch (e: any) {
+                        toast.error(`다운로드 실패: ${e?.message ?? e}`, { id: toastId });
+                      } finally {
+                        setDownloadingAll(false);
+                      }
+                    }}
+                  >
+                    다운로드 시작
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </header>
