@@ -455,10 +455,6 @@ export function DmrRawDataPage() {
           <p className="text-xs text-muted-foreground">일자별·TEAM별·협력사별 인원 실적 (롱포맷)</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={doExport} disabled={exporting || total === 0}>
-            <Download className="mr-1 h-3.5 w-3.5" />
-            Excel {exporting ? '…' : ''}
-          </Button>
           <DmrColumnOrderMenu
             order={order}
             visibility={visibility as Record<string, boolean>}
@@ -468,10 +464,14 @@ export function DmrRawDataPage() {
             onFrozenChange={(f) => { setFrozenExtras(f); persistPref({ frozenExtras: f }); }}
           />
           {canEdit && (
-            <Button asChild size="sm">
+            <Button asChild variant="outline" size="sm">
               <Link to="/import-log/import" search={{ tab: "dmr" }}><Upload className="mr-1 h-3.5 w-3.5" />Import</Link>
             </Button>
           )}
+          <Button size="sm" onClick={doExport} disabled={exporting || total === 0}>
+            <Download className="mr-1 h-3.5 w-3.5" />
+            Export {exporting ? '…' : ''}
+          </Button>
         </div>
       </div>
 
