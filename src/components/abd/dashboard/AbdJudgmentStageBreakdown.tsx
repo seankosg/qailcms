@@ -19,11 +19,11 @@ const COLOR: Record<string, string> = {
   위험: "var(--schedule-short)",
 };
 
-export function AbdJudgmentStageBreakdown({ batchNo }: { batchNo: string[] }) {
+export function AbdJudgmentStageBreakdown({ batchNo, plots = [] }: { batchNo: string[]; plots?: string[] }) {
   const fn = useServerFn(getAbdDashboardJudgmentMix);
   const q = useQuery({
-    queryKey: ["abd-dash-judgment-mix", batchNo],
-    queryFn: () => fn({ data: { batch_no: batchNo } }),
+    queryKey: ["abd-dash-judgment-mix", plots.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { batch_no: batchNo, plots } }),
     staleTime: 60_000,
   });
   const byStage = new Map((q.data ?? []).map((r) => [r.stage, r] as const));
