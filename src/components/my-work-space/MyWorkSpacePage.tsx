@@ -366,7 +366,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           counts={{ today: tmStats.today, all: tmStats.total, risk: tmStats.delayed, upcoming: tmStats.upcoming }}
           filterRow={(r, tab) =>
             tab === "all" ? true
-            : tab === "risk" ? tmIsDelayed(r)
+            : tab === "risk" ? tmIsDelayed(r, tmThresholds, t)
             : tab === "today" ? tmIsToday(r, t)
             : tmIsUpcoming(r, t)
           }
