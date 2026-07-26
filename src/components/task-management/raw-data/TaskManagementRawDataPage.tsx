@@ -174,12 +174,83 @@ function chipValue(v: unknown): string {
   if (typeof v === "object") {
     const o = v as any;
     if (o.emptyOnly) return "(Empty)";
+    if (o.notEmptyOnly) return "(Not Empty)";
     if (o.text) return String(o.text);
     if (o.from || o.to) return `${o.from ?? ""}~${o.to ?? ""}`;
     if (o.min != null || o.max != null) return `${o.min ?? ""}~${o.max ?? ""}`;
   }
   return String(v);
 }
+
+function previousDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() - 1);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function modeToColumnFilters(
+  mode: string | undefined,
+  asOf: string,
+  scope: TaskScope,
+): ColumnFiltersState {
+  const out: ColumnFiltersState = [];
+  if (scope !== "all") {
+    out.push({ id: "level", value: [scope] });
+  }
+  if (!mode) return out;
+
+  const notCompleted = ["정상", "주의", "지연", "악화", EMPTY_TOKEN];
+  const delayOnly = ["지연", "악화"];
+
+  switch (mode) {
+    case "completed":
+      out.push({ id: "auto_judgment", value: ["완료"] });
+      break;
+    case "wip":
+      out.push({ id: "actual_start", value: { notEmptyOnly: true } });
+      out.push({ id: "auto_judgment", value: notCompleted });
+      break;
+    case "not_started":
+      out.push({ id: "actual_start", value: { emptyOnly: true } });
+      out.push({ id: "auto_judgment", value: notCompleted });
+      break;
+    case "planned_started":
+      out.push({ id: "plan_start", value: { to: asOf } });
+      break;
+    case "actual_started":
+      out.push({ id: "actual_start", value: { notEmptyOnly: true } });
+      break;
+    case "in_delay":
+    case "behind":
+    case "delay":
+      out.push({ id: "auto_judgment", value: delayOnly });
+      break;
+    case "start_delayed":
+      out.push({ id: "auto_judgment", value: delayOnly });
+      out.push({ id: "actual_start", value: { emptyOnly: true } });
+      out.push({ id: "plan_start", value: { to: asOf } });
+      break;
+    case "completion_overdue":
+      out.push({ id: "auto_judgment", value: delayOnly });
+      out.push({ id: "plan_end", value: { to: previousDay(asOf) } });
+      break;
+    case "critical":
+      out.push({ id: "auto_judgment", value: ["악화"] });
+      break;
+    case "no_plan_start":
+      out.push({ id: "plan_start", value: { emptyOnly: true } });
+      break;
+    case "no_plan_end":
+      out.push({ id: "plan_end", value: { emptyOnly: true } });
+      break;
+  }
+  return out;
+}
+
 
 export function TaskManagementRawDataPage() {
   const navigate = useNavigate();
