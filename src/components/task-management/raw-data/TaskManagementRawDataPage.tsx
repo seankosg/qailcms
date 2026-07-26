@@ -1210,42 +1210,9 @@ export function TaskManagementRawDataPage() {
         }}
       />
 
-      {(activeFilterCount > 0 || delayMode || kpiMode) && (
+      {(activeFilterCount > 0) && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <Filter className="h-3 w-3 text-muted-foreground" />
-          {delayMode && (
-            <FilterChip
-              label={`지연 모드 · asOf ${delayMode.asOf}`}
-              onClear={() => setDelayMode(null)}
-            />
-          )}
-          {kpiMode && (
-            <>
-              <FilterChip
-                label={`KPI: ${kpiMode.mode} · scope ${kpiMode.scope} · asOf ${kpiMode.asOf}`}
-                onClear={() => setKpiMode(null)}
-              />
-              <span className="ml-1 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums">
-                매치 <span className="font-semibold text-foreground">{kpiSelection.matchCount.toLocaleString()}</span>건
-                {kpiSelection.contextCount > 0 && (
-                  <>
-                    {" · "}
-                    컨텍스트 Sub <span className="font-semibold text-foreground">{kpiSelection.contextCount.toLocaleString()}</span>건
-                  </>
-                )}
-                <span className="ml-1 text-[10px] text-muted-foreground/70">(카드 숫자 = 매치)</span>
-              </span>
-              {kpiSelection.contextCount > 0 && (
-                <button
-                  className="ml-1 rounded border border-border/60 bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                  onClick={() => setHideContextSubs((v) => !v)}
-                  title="컨텍스트 Sub 표시/숨기기"
-                >
-                  {hideContextSubs ? "컨텍스트 Sub 표시" : "컨텍스트 Sub 숨기기"}
-                </button>
-              )}
-            </>
-          )}
           {globalFilter && (
             <FilterChip
               label={`Search: ${globalFilter}`}
