@@ -92,27 +92,11 @@ import {
   computeDailyPlan,
   computeDailyDiff,
 } from "@/lib/task-management/derived";
-import {
-  ALL_TASK_TIMELINE_STAGE_KEYS,
-  isTaskStageDelayedAsOf,
-  todayIso,
-  type TaskItem,
-} from "@/lib/task-management/schedule-utils";
-import {
-  isCompleted as kpiIsCompleted,
-  isStarted as kpiIsStarted,
-  isPlannedStartedBy as kpiIsPlannedStartedBy,
-  isStartDelayed as kpiIsStartDelayed,
-  isCompletionOverdue as kpiIsCompletionOverdue,
-  isCriticalDelay as kpiIsCriticalDelay,
-  isBehindSchedule as kpiIsBehindSchedule,
-  isInDelay as kpiIsInDelay,
-  scopeItems,
-  type TmKpiMode,
-  type TaskScope,
-} from "@/lib/task-management/kpi-utils";
+import { todayIso } from "@/lib/task-management/schedule-utils";
+import { type TaskScope } from "@/lib/task-management/kpi-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
+import { useTmJudgmentAtDate, mergeTmJudgment } from "@/hooks/useTmJudgmentAtDate";
 import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
