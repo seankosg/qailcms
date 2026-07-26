@@ -41,6 +41,8 @@ export const ABD_ACONEX_SYNC_FIELDS: Array<{ field: string; label: string }> = [
   { field: "aconex_status_raw", label: "Aconex Status (원본)" },
   { field: "aconex_review_status_raw", label: "Aconex Review Status (원본)" },
   { field: "aconex_date_modified", label: "Aconex Date Modified" },
+  { field: "round_actual", label: "라운드 Actual (Submission / DAR)" },
+  { field: "is_terminated", label: "Terminated/Cancelled 통계 제외" },
 ];
 
 export function AbdImportPresetTable({ mode }: { mode: AbdPresetMode }) {

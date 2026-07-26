@@ -45,9 +45,15 @@ type Status = "queued" | "parsing" | "ready" | "previewing" | "preview" | "impor
 const ACONEX_HEADER_TO_FIELDS: Record<string, string[]> = {
   "Document No": [], // unique key
   "Revision": ["latest_rev"],
-  "Status": ["latest_status", "approval_date", "aconex_status_raw"],
-  "Review Status": ["aconex_review_status_raw"],
-  "Date Modified": ["aconex_date_modified"],
+  "Status": [
+    "latest_status",
+    "approval_date",
+    "aconex_status_raw",
+    "round_actual",
+    "is_terminated",
+  ],
+  "Review Status": ["aconex_review_status_raw", "round_actual", "is_terminated"],
+  "Date Modified": ["aconex_date_modified", "round_actual", "approval_date"],
 };
 const ACONEX_UNIQUE_HEADER = "Document No";
 /** 파일에 실제 위 헤더가 없을 때 대체 인식 (대문자/공백 정규화 후 비교). */
@@ -66,6 +72,16 @@ function canonicalHeader(h: string): string {
   const key = h.trim().toUpperCase().replace(/\s+/g, " ");
   return HEADER_ALIASES[key] ?? h;
 }
+
+const SEMANTIC_LABELS: Record<string, string> = {
+  DAR_APPROVED_A: "DAR Approved (A)",
+  DAR_APPROVED_B: "DAR Approved w/ Comments (B)",
+  DAR_REJECTED: "DAR Rejected (C/D)",
+  SUBMITTED: "Submitted (HDEC 우선)",
+  EXCLUDED_TERMINATED: "Terminated (제외)",
+  EXCLUDED_CANCELLED: "Cancelled (제외)",
+  UNKNOWN: "미분류",
+};
 
 interface Entry {
   id: string;
@@ -239,6 +255,7 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
               status_norm: r.status_norm,
               date_modified: r.date_modified,
               is_excluded: r.is_excluded,
+      semantic: r.semantic,
               excel_row: r.excel_row,
             })),
             apply: false,
@@ -302,6 +319,7 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
               status_norm: r.status_norm,
               date_modified: r.date_modified,
               is_excluded: r.is_excluded,
+              semantic: r.semantic,
               excel_row: r.excel_row,
             })),
             apply: true,
@@ -431,6 +449,20 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
                           {e.preview.by_status.map((s) => (
                             <Badge key={s.code} variant="secondary" className="text-[10px]">
                               {s.code}: {s.count}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {e.preview && e.preview.by_semantic && e.preview.by_semantic.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {e.preview.by_semantic.map((s) => (
+                            <Badge
+                              key={s.semantic}
+                              variant="outline"
+                              className="text-[10px]"
+                              title={SEMANTIC_LABELS[s.semantic] ?? s.semantic}
+                            >
+                              {SEMANTIC_LABELS[s.semantic] ?? s.semantic}: {s.count}
                             </Badge>
                           ))}
                         </div>
