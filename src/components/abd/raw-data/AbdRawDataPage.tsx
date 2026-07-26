@@ -144,6 +144,7 @@ function toServerSort(s: SortingState): AbdServerSort[] {
 }
 
 import { formatDdMmmYyyy as _fmtLong } from "@/lib/time/doha";
+import { useAbdDataDate } from "@/hooks/useAbdDataDate";
 function formatDdMmm(v: any): string {
   return _fmtLong(v);
 }
@@ -335,6 +336,8 @@ export function AbdRawDataPage() {
 
   const { data: counts } = useAbdCounts({ team, includeInactive, plot: plotFilter });
   const dataDate = counts?.latest_data_date ?? null;
+  // Dashboard 에서 지정된 Data Date 를 참조(정보 표시용). 세션 전역 공유.
+  const [sharedAbdDate] = useAbdDataDate();
 
   // Restore view preferences
   useEffect(() => {
@@ -495,7 +498,14 @@ export function AbdRawDataPage() {
       <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">ABD Raw Data</h1>
-          <p className="text-sm text-muted-foreground">As-Built Drawing 제출 계획 관리 · 최근 데이터: {dataDate ?? "—"}</p>
+          <p className="text-sm text-muted-foreground">
+            As-Built Drawing 제출 계획 관리 · 최근 데이터: {dataDate ?? "—"}
+            {sharedAbdDate && sharedAbdDate !== dataDate && (
+              <span className="ml-2 text-amber-600">
+                (Dashboard 지정 Data Date: {sharedAbdDate})
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
           <AbdColumnOrderMenu

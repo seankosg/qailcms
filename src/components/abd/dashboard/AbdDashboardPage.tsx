@@ -1,5 +1,6 @@
 import { nowInDoha } from "@/lib/time/doha";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useAbdDataDate } from "@/hooks/useAbdDataDate";
 import { useNavigate } from "@tanstack/react-router";
 import {
   CalendarIcon,
@@ -25,7 +26,24 @@ import { AbdJudgmentDonut } from "./AbdJudgmentDonut";
 import { AbdJudgmentStageBreakdown } from "./AbdJudgmentStageBreakdown";
 
 export function AbdDashboardPage() {
-  const [asOf, setAsOf] = useState<Date>(() => nowInDoha());
+  // ABD Data Date 는 세션 전역(useAbdDataDate)에 저장 → Raw Data/Progress 등과 공유,
+  // 페이지 이동 후 복귀해도 유지된다. 빈 값이면 오늘(Doha)로 간주.
+  const [sharedDate, setSharedDate] = useAbdDataDate();
+  const [asOf, setAsOf] = useState<Date>(() => {
+    if (sharedDate) {
+      const d = new Date(sharedDate);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+    return nowInDoha();
+  });
+  useEffect(() => {
+    const today = nowInDoha();
+    const iso = format(asOf, "yyyy-MM-dd");
+    const isToday = iso === format(today, "yyyy-MM-dd");
+    const next = isToday ? "" : iso;
+    if (next !== sharedDate) setSharedDate(next);
+     
+  }, [asOf]);
   const [plotFilter, setPlotFilter] = useState<string[]>([]);
   const [batchFilter, setBatchFilter] = useState<string[]>([]);
   const [detail, setDetail] = useState<{ id: string; focus?: "rounds" | "aconex" | "comments" } | null>(null);
