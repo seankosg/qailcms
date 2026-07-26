@@ -1,50 +1,86 @@
-## 원인
+## 오류 재현 및 근본 원인
 
-ABD 임포트의 Master Mapping 다이얼로그에서 **Subcon**은 admin이 정상 등록되지만, **HDEC PIC / HDEC ENG**는 다음 이유로 등록이 차단되고 있습니다.
+**오류 메시지**
+```
+null value in column "status_mismatch" of relation "abd_items_raw" violates not-null constraint
+```
 
-- `src/components/import/MasterMappingDialog.tsx` (L120~127): `masterKind === "hdec_pic" | "hdec_eng"`인 경우 무조건 토스트("HDEC PIC/ENG는 사용자관리에서만 등록됩니다")를 띄우고 `continue` 처리.
-- `src/lib/admin/users.functions.ts`의 `MasterKind` 타입이 `subcontractor | subsub | team`만 지원 → `addMasterName`이 `hdec_pic_master` / `hdec_eng_master`에 insert할 수 없음.
+**진짜 원인 (트리거 로직 결함)**
 
-즉, admin이 "신규 등록"을 선택해도 서버 함수가 대응하지 못해 UI에서 원천 차단되며, 이후 `handleApply`가 정상 완료 처리되어 다이얼로그가 그대로 닫혀버립니다. 사용자는 이를 "admin만 가능하다며 사라짐"으로 인지.
+`abd_items_raw` 스키마:
+- `status_mismatch` : `NOT NULL DEFAULT false`
+- `latest_status_norm` : **NULLABLE** (누구도 계산해 넣지 않음)
 
-한편 `hdec_pic_master`, `hdec_eng_master` 테이블은 이미 존재하며 `useMasterOptions("hdec_pic"|"hdec_eng")`가 이를 읽고 있으므로, 마스터 테이블에 직접 insert하는 경로만 열어주면 됩니다 (사용자 계정 생성과는 무관).
+`abd_compute_derived` (BEFORE INSERT/UPDATE 트리거) 마지막 블록:
 
-## 변경 범위
+```sql
+IF NEW.latest_status IS NOT NULL
+   AND upper(NEW.latest_status) <> COALESCE(NEW.latest_status_norm,'') THEN
+  IF NOT (upper(NEW.latest_status) IN ('A','B','C')
+          AND NEW.latest_status_norm IN ('A','B','C')) THEN     -- ← 여기 NULL 전파
+    NEW.status_mismatch := true;
+  ELSE
+    NEW.status_mismatch := (upper(NEW.latest_status) <> NEW.latest_status_norm); -- ← 여기서 NULL
+  END IF;
+ELSE
+  NEW.status_mismatch := false;
+END IF;
+```
 
-### 1) 서버 함수 확장 — `src/lib/admin/users.functions.ts`
+`latest_status_norm`이 항상 NULL이므로:
+1. `... AND NULL` → NULL, `NOT NULL` → NULL
+2. PL/pgSQL `IF NULL THEN` = false → ELSE 분기 실행
+3. `upper(...) <> NULL` = **NULL** 이 `status_mismatch`에 대입
+4. NOT NULL 제약 위반 → 전체 upsert 실패
 
-- `MasterKind` 타입에 `"hdec_pic" | "hdec_eng"` 추가.
-- `tableForKind`에 `hdec_pic → hdec_pic_master`, `hdec_eng → hdec_eng_master` 매핑 추가.
-- `addMasterName.handler`에서 kind가 `hdec_pic`/`hdec_eng`인 경우 `{ name, is_active: true }` payload로 insert.
-- `assertAdmin` 유지 (admin/superuser만 등록 가능).
-- `toggleMasterActive`, `deleteMaster` 등 다른 곳에서 `MasterKind`를 쓰는 함수도 새 kind에서 안전하게 동작하는지 확인하고 필요한 곳만 케이스 추가.
+업로드하신 HDEC 엑셀에 `latest_status`가 채워진 행이 하나라도 있으면 배치 전체가 실패합니다. 그래서 4,061행 파일과 2,596행 파일 모두 동일 에러가 발생한 것입니다.
 
-### 2) 다이얼로그 로직 개선 — `src/components/import/MasterMappingDialog.tsx`
+**부가 원인**
+- `latest_status_norm` 컬럼은 존재하지만 계산 로직이 어디에도 없음(과거 마이그레이션에서 누락됨). Aconex 임포트/대시보드는 이 값을 참조 → 잠재적 오작동 가능.
 
-- `hdec_pic` / `hdec_eng`에 대한 차단 토스트 및 `continue` 제거.
-- 다른 kind와 동일하게 `addMaster({ data: { kind, name: e.rawName } })` 호출.
-- 성공 시 `MASTER_OPTIONS_QK(e.masterKind)` invalidate.
-- 실패 시(권한/중복 등) 개별 항목 토스트만 노출하고 사용자가 다시 시도할 수 있도록 다이얼로그가 자동으로 닫히지 않도록 흐름 조정 — 등록 실패가 하나라도 있으면 `onClose()` 호출을 건너뛰고 실패 항목을 상단에 하이라이트.
+## 근원적 해결 계획
 
-### 3) 안내 문구 정정 — `MasterMappingDialog.tsx`
+### 1) 마이그레이션 (`abd_compute_derived` 재작성)
 
-- 헤더 설명 문구의 "신규 등록(admin)"을 "신규 등록(admin/superuser)"로 통일. Subcon/PIC/ENG 모두 동일 규칙임을 명시.
+트리거 최상단(is_terminated / Approved 분기보다 앞)에 `latest_status_norm` 정규화 로직을 삽입:
 
-### 4) DB 권한 확인 (마이그레이션 필요 시)
+```sql
+NEW.latest_status_norm := CASE
+  WHEN NEW.latest_status IS NULL OR btrim(NEW.latest_status) = '' THEN NULL
+  WHEN upper(btrim(NEW.latest_status)) IN ('A','B','C') THEN upper(btrim(NEW.latest_status))
+  ELSE upper(btrim(NEW.latest_status))   -- 원본 유지, 단 대문자화
+END;
+```
 
-- `hdec_pic_master`, `hdec_eng_master`에 `authenticated` INSERT 권한 및 admin/superuser 정책이 이미 있는지 SQL로 사전 확인.
-- 정책이 없으면 마이그레이션 1건 추가:
-  - `GRANT SELECT, INSERT, UPDATE ON public.hdec_pic_master TO authenticated;`
-  - `GRANT SELECT, INSERT, UPDATE ON public.hdec_eng_master TO authenticated;`
-  - RLS `insert` 정책 `has_any_role(auth.uid(), ARRAY['admin','superuser'])` 추가.
+status_mismatch 최종 블록을 NULL-safe 로 교체:
 
-### 5) 검증
+```sql
+NEW.status_mismatch := COALESCE(
+  NEW.latest_status IS NOT NULL
+  AND upper(btrim(NEW.latest_status)) IS DISTINCT FROM COALESCE(NEW.latest_status_norm,''),
+  false
+);
+```
 
-- `tsgo`로 타입 체크.
-- admin 계정으로 ABD 임포트 실행 → Subcon/HDEC PIC/HDEC ENG 모두 "신규 등록"으로 처리 후 다이얼로그 정상 종료, 후속 임포트에서 매칭되는지 확인.
-- 일반 사용자 계정에서는 여전히 등록 버튼이 비활성화(canRegister=false)되는지 회귀 확인.
+또한 초기 early-return 분기(`is_terminated`, `latest_status_norm='A'`)에도 `NEW.status_mismatch := false;` 명시 추가 → 방어 코드.
 
-## 사용자에게 보이는 변화
+### 2) 데이터 정합성 백필
 
-- admin/superuser는 임포트 매핑 다이얼로그에서 Subcon과 함께 **HDEC PIC / HDEC ENG도 즉시 신규 등록** 가능.
-- 등록 실패 시 다이얼로그가 자동으로 닫히지 않아 재시도 가능.
+기존 행의 `latest_status_norm` 값을 강제 재계산 (`UPDATE ... SET latest_status = latest_status` 만으로 트리거 재실행). Terminated 행은 제외.
+
+### 3) 검증
+
+- 마이그레이션 후 첨부된 두 HDEC 엑셀(MECH 2,596 / ELEC 4,061)을 재임포트하여 완주 확인
+- ABD Dashboard의 status_mismatch attention 리스트가 정상 계산되는지 확인 (기존은 항상 0이었을 가능성)
+- `tsgo` 는 스키마만 변경이라 영향 없음, 그래도 실행
+
+## 코드 변경 범위
+
+- **DB 마이그레이션 1건**: `abd_compute_derived` 함수 재작성 + 기존 행 백필 UPDATE
+- **애플리케이션 코드 변경 없음** (트리거 결함이므로 파서/업서트 페이로드는 그대로 유지)
+
+## 왜 이 방식이 근원적인가
+
+- 파서/업서트에서 `status_mismatch: false` 를 강제 삽입하는 우회는 트리거가 나중에 다시 NULL 을 넣으므로 무효.
+- `latest_status_norm` 을 트리거에서 항상 계산하도록 만들면 `status_mismatch` 계산의 NULL 전파 원인 자체가 사라지고, Aconex diff·대시보드도 정확해집니다.
+- NOT NULL 제약을 제거하는 회피안은 다운스트림 통계 SQL(`WHERE status_mismatch`)의 3-값 논리 버그를 유발하므로 채택하지 않음.
