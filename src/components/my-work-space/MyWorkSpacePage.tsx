@@ -133,7 +133,6 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
       upcoming: rows.filter((r) => abdIsUpcoming(r, t)).length,
       completed: rows.filter(abdIsApproved).length,
       today: rows.filter((r) => abdIsToday(r, t)).length,
-      needsPlan: rows.filter(abdNeedsPlanning).length,
     };
   }, [abd.data, t]);
 
