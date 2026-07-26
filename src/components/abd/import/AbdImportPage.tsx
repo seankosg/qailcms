@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { todayInDoha } from "@/lib/time/doha";
 import {
   AlertCircle,
@@ -49,10 +51,12 @@ import { useModuleGuard } from "@/hooks/useModuleGuard";
 import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 import { DateIssuesPanel } from "@/components/import/DateIssuesPanel";
 import type { DateIssue } from "@/lib/import/date-audit";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { RefreshCw } from "lucide-react";
 import { AbdAconexImportPage } from "./AbdAconexImportPage";
+import { useAbdFieldConfig } from "@/hooks/useAbdFieldConfig";
+import { ABD_ACONEX_SYNC_FIELDS } from "@/components/admin/AbdImportPresetTable";
 
 type AconexSyncKey =
   | "latest_status"
@@ -61,14 +65,16 @@ type AconexSyncKey =
   | "aconex_status_raw"
   | "aconex_review_status_raw"
   | "aconex_date_modified";
-const ACONEX_SYNC_OPTIONS: Array<{ key: AconexSyncKey; label: string; hint: string }> = [
-  { key: "latest_status", label: "Latest Status", hint: "A / B / C / D / UR / CX / TM" },
-  { key: "latest_rev", label: "Latest Rev", hint: "Aconex Revision 값" },
-  { key: "approval_date", label: "Approval Date", hint: "Status=A 인 경우 Date Modified 로 반영" },
-  { key: "aconex_status_raw", label: "Aconex Status (원본)", hint: "감사용 원본 문자열" },
-  { key: "aconex_review_status_raw", label: "Aconex Review Status (원본)", hint: "감사용 원본 문자열" },
-  { key: "aconex_date_modified", label: "Aconex Date Modified", hint: "Aconex 최종 수정일" },
-];
+
+type ImportMode = "hdec" | "aconex";
+
+interface PresetRow {
+  id: string;
+  mode: ImportMode;
+  label: string;
+  fields: string[];
+  sort_order: number;
+}
 
 type Status = "queued" | "parsing" | "ready" | "importing" | "done" | "error";
 
@@ -110,10 +116,75 @@ function formatSize(b: number) {
 
 export function AbdImportPage() {
   const [entries, setEntries] = useState<FileEntry[]>([]);
-  const [mode, setMode] = useState<"normal" | "aconex">("normal");
-  const [syncFields, setSyncFields] = useState<AconexSyncKey[]>(() => ACONEX_SYNC_OPTIONS.map((o) => o.key));
+  const [mode, setMode] = useState<ImportMode>("hdec");
   const [busy, setBusy] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+
+  // 활성 ABD field_config 필드 목록 (HDEC 모드용)
+  const { data: fieldConfig = [] } = useAbdFieldConfig();
+  const hdecFieldOptions = useMemo(
+    () =>
+      fieldConfig
+        .slice()
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((r) => ({ field: r.field_key, label: r.label || r.field_key })),
+    [fieldConfig],
+  );
+  const aconexFieldOptions = useMemo(
+    () => ABD_ACONEX_SYNC_FIELDS.map((o) => ({ field: o.field, label: o.label })),
+    [],
+  );
+  const fieldOptions = mode === "hdec" ? hdecFieldOptions : aconexFieldOptions;
+
+  // 대상 필드 선택: 체크된 필드 집합 (기본 = 전체 선택)
+  const [hdecSelected, setHdecSelected] = useState<Set<string> | null>(null);
+  const [aconexSelected, setAconexSelected] = useState<Set<string>>(
+    () => new Set(ABD_ACONEX_SYNC_FIELDS.map((o) => o.field)),
+  );
+  // HDEC 옵션이 로드되면 기본 = 전체 선택으로 초기화
+  const effectiveHdecSelected = useMemo(() => {
+    if (hdecSelected) return hdecSelected;
+    return new Set(hdecFieldOptions.map((o) => o.field));
+  }, [hdecSelected, hdecFieldOptions]);
+  const selectedSet = mode === "hdec" ? effectiveHdecSelected : aconexSelected;
+  const setSelected = (next: Set<string>) => {
+    if (mode === "hdec") setHdecSelected(new Set(next));
+    else setAconexSelected(new Set(next));
+  };
+
+  // 프리셋 목록
+  const { data: presets = [] } = useQuery({
+    queryKey: ["abd-import-presets", "all"],
+    queryFn: async (): Promise<PresetRow[]> => {
+      const { data, error } = await (supabase as any)
+        .from("abd_import_presets")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as PresetRow[];
+    },
+    staleTime: 10_000,
+  });
+  const modePresets = presets.filter((p) => p.mode === mode);
+
+  const applyPreset = (p: PresetRow) => {
+    setSelected(new Set(p.fields));
+    toast.success(`프리셋 적용: ${p.label} (${p.fields.length}개 필드)`);
+  };
+  const selectAllFields = () => setSelected(new Set(fieldOptions.map((o) => o.field)));
+  const clearAllFields = () => setSelected(new Set());
+
+  // Aconex 서버함수용 apply_fields (Aconex 6개 중 선택된 것)
+  const syncFields = useMemo(
+    () => Array.from(aconexSelected) as AconexSyncKey[],
+    [aconexSelected],
+  );
+  // HDEC 서버함수용 excluded_fields (전체 - 선택)
+  const hdecExcludedFields = useMemo(() => {
+    const all = new Set(hdecFieldOptions.map((o) => o.field));
+    return Array.from(all).filter((f) => !effectiveHdecSelected.has(f));
+  }, [hdecFieldOptions, effectiveHdecSelected]);
+
   const cancelRequestedRef = useRef(false);
   const requestCancel = () => {
     if (!cancelRequestedRef.current) {
@@ -351,6 +422,7 @@ export function AbdImportPage() {
               inactivate_missing: true,
               allow_duplicates: !!e.allowDuplicates,
               note: formatUnresolvedNamesNote(unresolvedNames) || null,
+              excluded_fields: hdecExcludedFields,
             } as any,
           });
           agg.inserted += res.inserted;
@@ -387,92 +459,132 @@ export function AbdImportPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">ABD — Import</h1>
-        <p className="text-sm text-muted-foreground">
-          Normal 모드: 원본 엑셀(다단 헤더)을 업로드해 파싱·평탄화 저장(ABD_NUMBER upsert). ·
-          Aconex Sync 모드: Aconex에서 다운로드한 Docs 시트로 <b>기존 항목의 상태/리비전만 갱신</b>합니다.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-semibold">ABD — Import</h1>
+          <p className="text-sm text-muted-foreground">
+            토글로 소스를 선택하세요 · <b>Import HDEC</b>: 원본 엑셀(다단 헤더) 업로드/upsert · <b>Import Aconex</b>: Aconex Docs 시트로 <b>기존 항목만 UPDATE</b>.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 rounded-md border px-3 py-2 bg-muted/30">
+          <div className={`flex items-center gap-1.5 text-sm ${mode === "hdec" ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+            <FileSpreadsheet className="h-4 w-4" /> Import HDEC
+          </div>
+          <Switch
+            checked={mode === "aconex"}
+            onCheckedChange={(v) => setMode(v ? "aconex" : "hdec")}
+            aria-label="Import 모드 전환"
+          />
+          <div className={`flex items-center gap-1.5 text-sm ${mode === "aconex" ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+            <RefreshCw className="h-4 w-4" /> Import Aconex
+          </div>
+        </div>
       </div>
 
-      <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
-        <TabsList>
-          <TabsTrigger value="normal">
-            <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" /> Normal Import
-          </TabsTrigger>
-          <TabsTrigger value="aconex">
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Aconex Sync
-          </TabsTrigger>
-        </TabsList>
+      {/* 공용: 대상 필드 선택 카드 + 프리셋 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="text-base">
+                {mode === "hdec" ? "Import 대상 필드 선택 (HDEC)" : "Sync 대상 필드 선택 (Aconex)"}
+              </CardTitle>
+              <CardDescription>
+                {mode === "hdec"
+                  ? "체크된 필드만 이번 임포트에서 반영됩니다. 체크 해제된 필드는 파일에 값이 있어도 기존 DB 값이 유지됩니다."
+                  : "이번 업로드에서 실제로 UPDATE 할 컬럼만 체크하세요."}
+                (기본: 전체)
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-[11px] text-muted-foreground mr-1">프리셋:</span>
+              {modePresets.length === 0 && (
+                <span className="text-[11px] text-muted-foreground italic">등록된 프리셋 없음</span>
+              )}
+              {modePresets.map((p) => (
+                <Button
+                  key={p.id}
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => applyPreset(p)}
+                >
+                  {p.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-auto">
+            {fieldOptions.map((opt) => {
+              const checked = selectedSet.has(opt.field);
+              return (
+                <label
+                  key={opt.field}
+                  className={`flex items-start gap-2 rounded border p-2 cursor-pointer transition ${
+                    checked ? "border-primary/60 bg-primary/5" : "hover:bg-muted/40"
+                  }`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(v) => {
+                      const next = new Set(selectedSet);
+                      if (v) next.add(opt.field);
+                      else next.delete(opt.field);
+                      setSelected(next);
+                    }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{opt.label}</div>
+                    <div className="text-[10px] text-muted-foreground font-mono truncate">{opt.field}</div>
+                  </div>
+                </label>
+              );
+            })}
+            {fieldOptions.length === 0 && (
+              <div className="col-span-full px-2 py-4 text-center text-xs text-muted-foreground">
+                필드 옵션을 불러오는 중…
+              </div>
+            )}
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <button
+              type="button"
+              className="rounded border px-2 py-0.5 hover:bg-muted"
+              onClick={selectAllFields}
+            >전체 선택</button>
+            <button
+              type="button"
+              className="rounded border px-2 py-0.5 hover:bg-muted"
+              onClick={clearAllFields}
+            >전체 해제</button>
+            <span>선택 {selectedSet.size} / {fieldOptions.length}</span>
+            {mode === "aconex" && aconexSelected.size === 0 && (
+              <span className="text-destructive">최소 1개 이상 선택해야 Sync 가 실행됩니다.</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="aconex" className="mt-4 space-y-4">
+      {mode === "aconex" && (
+        <>
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Aconex Sync 규칙</AlertTitle>
             <AlertDescription className="text-xs space-y-1">
               <div>· Aconex Docs 시트를 업로드 → <code>Document No = ABD_NUMBER</code> 기준으로 매칭합니다.</div>
               <div>· DB에 없는 Document No는 <b>자동 INSERT 되지 않고</b> 미매칭 목록으로 리포트됩니다.</div>
-              <div>· 아래 <b>Sync 필드</b>에서 체크한 컬럼만 실제 UPDATE 됩니다. 라운드 계획/실적은 절대 덮어쓰지 않습니다.</div>
+              <div>· 위에서 체크한 컬럼만 실제 UPDATE 됩니다. 라운드 계획/실적은 절대 덮어쓰지 않습니다.</div>
               <div>· Approval Date는 <code>Status=A</code> 이고 Date Modified가 있을 때만 갱신됩니다.</div>
             </AlertDescription>
           </Alert>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Sync 대상 필드 선택</CardTitle>
-              <CardDescription>이번 업로드에서 실제로 UPDATE 할 컬럼만 체크하세요. (기본: 전체)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {ACONEX_SYNC_OPTIONS.map((opt) => {
-                  const checked = syncFields.includes(opt.key);
-                  return (
-                    <label
-                      key={opt.key}
-                      className={`flex items-start gap-2 rounded border p-2 cursor-pointer transition ${
-                        checked ? "border-primary/60 bg-primary/5" : "hover:bg-muted/40"
-                      }`}
-                    >
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(v) => {
-                          setSyncFields((prev) =>
-                            v ? Array.from(new Set([...prev, opt.key])) : prev.filter((k) => k !== opt.key),
-                          );
-                        }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium">{opt.label}</div>
-                        <div className="text-[11px] text-muted-foreground">{opt.hint}</div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-              <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-                <button
-                  type="button"
-                  className="rounded border px-2 py-0.5 hover:bg-muted"
-                  onClick={() => setSyncFields(ACONEX_SYNC_OPTIONS.map((o) => o.key))}
-                >전체 선택</button>
-                <button
-                  type="button"
-                  className="rounded border px-2 py-0.5 hover:bg-muted"
-                  onClick={() => setSyncFields([])}
-                >전체 해제</button>
-                <span>선택 {syncFields.length} / {ACONEX_SYNC_OPTIONS.length}</span>
-                {syncFields.length === 0 && (
-                  <span className="text-destructive">최소 1개 이상 선택해야 Sync 가 실행됩니다.</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
           <AbdAconexImportPage syncFields={syncFields} hideHeader />
-        </TabsContent>
+        </>
+      )}
 
-        <TabsContent value="normal" className="mt-4 space-y-4">
-
+      {mode === "hdec" && (
+        <>
       {unknownTeamCodes.length > 0 && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -619,8 +731,8 @@ export function AbdImportPage() {
         onRegistered={() => { /* team_master invalidation via qc; entries의 team 문자열은 유지 */ }}
       />
       <ModuleGuardDialog {...guard.dialogProps} />
-        </TabsContent>
-      </Tabs>
+        </>
+      )}
     </div>
   );
 }

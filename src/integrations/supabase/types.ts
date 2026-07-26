@@ -370,6 +370,36 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_import_presets: {
+        Row: {
+          created_at: string
+          fields: string[]
+          id: string
+          label: string
+          mode: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fields?: string[]
+          id?: string
+          label: string
+          mode: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fields?: string[]
+          id?: string
+          label?: string
+          mode?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       abd_import_row_logs: {
         Row: {
           abd_number: string | null
