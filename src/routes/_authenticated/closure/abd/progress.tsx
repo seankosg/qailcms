@@ -13,6 +13,7 @@ const searchSchema = z.object({
   range: fallback(z.number().int(), 60).default(60),
   hidePast: fallback(z.union([z.literal(0), z.literal(1)]), 0).default(0),
   asofMode: fallback(z.enum(["dataDate", "today"]), "today").default("today"),
+  dataDate: fallback(z.string(), "").default(""),
   planMode: fallback(z.enum(["baseline", "remaining"]), "baseline").default("baseline"),
   matrixOpen: fallback(z.union([z.literal(0), z.literal(1)]), 1).default(1),
   scurveOpen: fallback(z.union([z.literal(0), z.literal(1)]), 1).default(1),

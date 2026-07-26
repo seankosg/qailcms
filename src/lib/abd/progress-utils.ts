@@ -10,6 +10,14 @@ export const STAGE_LABELS: Record<Stage, string> = {
   dar: "DAR",
 };
 
+/** 매트릭스/툴바 전용 단축 라벨 (DS/DF/SB/RS) */
+export const STAGE_SHORT_LABELS: Record<Stage, string> = {
+  draft_start: "DS",
+  draft_finish: "DF",
+  submission: "SB",
+  dar: "RS",
+};
+
 export type Bucket = "day" | "week";
 
 export type GroupBy =
@@ -20,7 +28,8 @@ export type GroupBy =
   | "hdec_pic_name"
   | "hdec_eng_name"
   | "doc_ax"
-  | "doc_axx";
+  | "doc_axx"
+  | "batch_no";
 
 export const ALL_GROUP_BY: GroupBy[] = [
   "team",
@@ -31,6 +40,7 @@ export const ALL_GROUP_BY: GroupBy[] = [
   "hdec_eng_name",
   "doc_ax",
   "doc_axx",
+  "batch_no",
 ];
 
 export const GROUP_LABELS: Record<GroupBy, string> = {
@@ -42,6 +52,7 @@ export const GROUP_LABELS: Record<GroupBy, string> = {
   hdec_eng_name: "HDEC ENG",
   doc_ax: "AX",
   doc_axx: "AXX",
+  batch_no: "Batch",
 };
 
 /** Raw Data 검색 파라미터 키 매핑 — 셀 클릭 시 filters JSON 생성에 사용 */
@@ -54,6 +65,7 @@ export const GROUP_QUERY_PARAM: Record<GroupBy, string> = {
   hdec_eng_name: "hdec_eng_name",
   doc_ax: "doc_ax",
   doc_axx: "doc_axx",
+  batch_no: "batch_no",
 };
 
 export type PlanMode = "baseline" | "remaining";

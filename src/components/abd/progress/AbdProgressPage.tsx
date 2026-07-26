@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { CalendarDays, TrendingUp } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -23,7 +25,7 @@ import {
   ALL_STAGES,
   ALL_ROUNDS,
   GROUP_LABELS,
-  STAGE_LABELS,
+  STAGE_SHORT_LABELS,
   ROUND_LABELS,
   type Bucket,
   type GroupBy,
@@ -85,7 +87,30 @@ export function AbdProgressPage() {
   const scurveOpen = search.scurveOpen === 1;
 
   const today = todayIso();
-  const asOfDate = today;
+
+  // Data Date 옵션 로드 (distinct data_date DESC)
+  const dataDatesQ = useQuery<string[]>({
+    queryKey: ["abd-data-dates"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("abd_items_raw")
+        .select("data_date")
+        .not("data_date", "is", null)
+        .order("data_date", { ascending: false })
+        .limit(2000);
+      if (error) throw new Error(error.message);
+      const set = new Set<string>();
+      for (const r of (data ?? []) as any[]) {
+        if (r.data_date) set.add(String(r.data_date).slice(0, 10));
+      }
+      return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
+    },
+    staleTime: 60_000,
+  });
+  const dataDateOptions = dataDatesQ.data ?? [];
+  const latestDataDate = dataDateOptions[0] ?? "";
+  const effectiveDataDate = search.dataDate || latestDataDate;
+  const asOfDate = asofMode === "today" || !effectiveDataDate ? today : effectiveDataDate;
   const asOfLabel = asofMode === "today" ? "Today" : "Data Date";
 
   const rangeStart = useMemo(() => addDays(today, -14), [today]);
@@ -299,10 +324,24 @@ export function AbdProgressPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <CalendarDays className="h-5 w-5 text-primary" />
-            ABD Progress Status
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              ABD Progress Status
+            </h1>
+            <DataDatePicker
+              value={effectiveDataDate}
+              latest={latestDataDate}
+              options={dataDateOptions}
+              onChange={(v) =>
+                setSearch({
+                  dataDate: v === latestDataDate ? "" : v,
+                  asofMode: "dataDate",
+                })
+              }
+              onReset={() => setSearch({ dataDate: "" })}
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             Plot {plot} · Round {ROUND_LABELS[round]} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} ·
             As-of {asOfLabel} ({asOfDate}) · Plan: {planMode === "remaining" ? "Remaining" : "Baseline"} · Range {rangeDays}d
@@ -434,7 +473,7 @@ export function AbdProgressPage() {
                     value={s}
                     className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                   >
-                    {STAGE_LABELS[s]}
+                    {STAGE_SHORT_LABELS[s]}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
@@ -588,8 +627,8 @@ export function AbdProgressPage() {
 
 function ToolbarGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="flex items-center gap-2 border-l pl-3 first:border-l-0 first:pl-0">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
       {children}
     </div>
   );
