@@ -47,6 +47,8 @@ import type { ParsedAbdRow } from "@/lib/abd/parser";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useModuleGuard } from "@/hooks/useModuleGuard";
 import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
+import { DateIssuesPanel } from "@/components/import/DateIssuesPanel";
+import type { DateIssue } from "@/lib/import/date-audit";
 
 type Status = "queued" | "parsing" | "ready" | "importing" | "done" | "error";
 
@@ -65,6 +67,7 @@ interface FileEntry {
   };
   progress?: number;
   allowDuplicates?: boolean;
+  dateOverrides?: Record<string, string>;
 }
 
 const statusBadge: Record<Status, { label: string; cls: string }> = {
@@ -182,6 +185,11 @@ export function AbdImportPage() {
               : x,
           ),
         );
+        if (parsed.dateIssues.length > 0) {
+          toast.warning(
+            `${e.file.name}: 날짜 형식 오류 ${parsed.dateIssues.length}건 — 아래 목록에서 수정 후 재파싱하세요.`,
+          );
+        }
       } catch (err: any) {
         setEntries((prev) =>
           prev.map((x) =>
@@ -193,6 +201,55 @@ export function AbdImportPage() {
       }
     }
   }, [teamOptions]);
+
+  const reparseWithOverrides = useCallback(
+    async (id: string, overrides: Record<string, string>) => {
+      const target = entries.find((x) => x.id === id);
+      if (!target) return;
+      setEntries((prev) =>
+        prev.map((x) =>
+          x.id === id ? { ...x, status: "parsing", dateOverrides: overrides } : x,
+        ),
+      );
+      try {
+        const parsed = await parseAbdFile(
+          target.file,
+          target.team ?? undefined,
+          teamOptions,
+          { dateOverrides: overrides },
+        );
+        setEntries((prev) =>
+          prev.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  parsed,
+                  team: parsed.team_from_filename ?? x.team,
+                  status: "ready",
+                  dateOverrides: overrides,
+                }
+              : x,
+          ),
+        );
+        if (parsed.dateIssues.length === 0) {
+          toast.success(`${target.file.name}: 날짜 오류 모두 해결됨`);
+        } else {
+          toast.warning(
+            `${target.file.name}: 아직 ${parsed.dateIssues.length}건의 날짜 오류가 남아 있습니다.`,
+          );
+        }
+      } catch (err: any) {
+        setEntries((prev) =>
+          prev.map((x) =>
+            x.id === id
+              ? { ...x, status: "error", error: err?.message ?? String(err) }
+              : x,
+          ),
+        );
+      }
+    },
+    [entries, teamOptions],
+  );
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -225,7 +282,8 @@ export function AbdImportPage() {
     e.status === "ready" &&
     !!e.team &&
     !!teamOptions.find((o) => o.code === e.team) &&
-    ((e.parsed?.duplicates_in_file.length ?? 0) === 0 || !!e.allowDuplicates);
+    ((e.parsed?.duplicates_in_file.length ?? 0) === 0 || !!e.allowDuplicates) &&
+    (e.parsed?.dateIssues.length ?? 0) === 0;
   const readyCount = entries.filter(isReady).length;
   const isRunning = busy;
 
@@ -425,6 +483,7 @@ export function AbdImportPage() {
                 onRemove={() => removeEntry(e.id)}
                 onTeamChange={(t) => setTeam(e.id, t)}
                 onOpenDuplicates={() => setDupOpenId(e.id)}
+                onDateOverridesApply={(ovr) => reparseWithOverrides(e.id, ovr)}
               />
             ))}
           </CardContent>
