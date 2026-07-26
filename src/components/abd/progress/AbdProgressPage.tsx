@@ -172,12 +172,10 @@ export function AbdProgressPage() {
 
   const buckets = useMemo(() => buildBucketRange(rpcStart, rpcEnd, bucket), [rpcStart, rpcEnd, bucket]);
 
-  // S-Curve: round==='all' 이면 R1/R2/R3 각각의 cells 를 별도로 로드.
-  // 단일 라운드일 때는 cellsQ 재사용.
-  const activeRounds: Array<Exclude<RoundKey, "all">> =
-    round === "all" ? ["R1", "R2", "R3"] : [round];
+  // S-Curve: R1/R2/R3 각각의 cells 를 별도로 로드.
+  const activeRounds: Array<"R1" | "R2" | "R3"> = ["R1", "R2", "R3"];
   const perRoundQueries = useQueries({
-    queries: (round === "all" ? (["R1", "R2", "R3"] as const) : []).map((r) => ({
+    queries: (["R1", "R2", "R3"] as const).map((r) => ({
       queryKey: [
         "abd-progress-cells",
         plot,
@@ -209,17 +207,13 @@ export function AbdProgressPage() {
       enabled: scurveOpen,
     })),
   });
-  const cellsByRound: Partial<Record<Exclude<RoundKey, "all">, CellRaw[]>> = useMemo(() => {
-    if (round !== "all") {
-      return { [round]: cellsQ.data ?? [] } as Partial<Record<Exclude<RoundKey, "all">, CellRaw[]>>;
-    }
-    const rounds: Array<Exclude<RoundKey, "all">> = ["R1", "R2", "R3"];
-    const out: Partial<Record<Exclude<RoundKey, "all">, CellRaw[]>> = {};
-    rounds.forEach((r, i) => {
+  const cellsByRound: Partial<Record<"R1" | "R2" | "R3", CellRaw[]>> = useMemo(() => {
+    const out: Partial<Record<"R1" | "R2" | "R3", CellRaw[]>> = {};
+    (["R1", "R2", "R3"] as const).forEach((r, i) => {
       out[r] = (perRoundQueries[i]?.data ?? []) as CellRaw[];
     });
     return out;
-  }, [round, cellsQ.data, perRoundQueries]);
+  }, [perRoundQueries]);
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
