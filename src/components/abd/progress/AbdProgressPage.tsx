@@ -474,7 +474,7 @@ export function AbdProgressPage() {
                     value={s}
                     className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                   >
-                    {STAGE_LABELS[s]}
+                    {STAGE_SHORT_LABELS[s]}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
