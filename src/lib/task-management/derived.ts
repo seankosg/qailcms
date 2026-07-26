@@ -2,17 +2,15 @@
 // 3-스테이지(Start/WIP/Finish) 판정 로직. T.Plan = Data Date 당일의 일할 계획진도율.
 
 export interface TaskThresholds {
-  behind_warn_gap: number; // -0.05
-  behind_late_gap: number; // -0.15
-  slip_warn_days: number; // 3
-  slip_late_days: number; // 14
+  /** 0 ≤ gap < caution_gap_buffer 일 때 '주의' (기본 +0.05 = +5%p 여유) */
+  caution_gap_buffer: number;
+  /** gap < worsen_gap 일 때 '악화' (기본 -0.15 = -15%p) */
+  worsen_gap: number;
 }
 
 export const DEFAULT_THRESHOLDS: TaskThresholds = {
-  behind_warn_gap: -0.05,
-  behind_late_gap: -0.15,
-  slip_warn_days: 3,
-  slip_late_days: 14,
+  caution_gap_buffer: 0.05,
+  worsen_gap: -0.15,
 };
 
 export type JudgmentStageKey = "start" | "wip" | "finish";
@@ -148,7 +146,7 @@ export function computeDailyDiff(
 }
 
 export const JUDGMENT_ORDER: Record<string, number> = {
-  위험: 0,
+  악화: 0,
   지연: 1,
   주의: 2,
   정상: 3,
@@ -170,52 +168,52 @@ export function worstJudgment(list: (string | null | undefined)[]): string | nul
   return best;
 }
 
-/** 스테이지별 판정. */
+/** Start 스테이지 세분 판정 (표시 전용). */
+export type StartJudgment = "정상완료" | "지연완료" | "지연진행" | "정상";
+
+export function getStartJudgment(row: JudgmentRow, asOf?: string): StartJudgment {
+  const asOfD = resolveAsOf(row, asOf);
+  const as = parseDate(row.actual_start);
+  const ps = parseDate(row.plan_start);
+  if (as) {
+    if (ps && as.getTime() > ps.getTime()) return "지연완료";
+    return "정상완료";
+  }
+  if (ps && ps.getTime() <= asOfD.getTime()) return "지연진행";
+  return "정상";
+}
+
+/** 스테이지별 판정 (통합 판정에서 사용). Start/WIP/Finish 모두 gap 단일 소스 기반. */
 export function getStageJudgment(
   row: JudgmentRow,
   stage: JudgmentStageKey,
   t: TaskThresholds = DEFAULT_THRESHOLDS,
   asOf?: string,
 ): string {
-  const asOfD = resolveAsOf(row, asOf);
+  const actual = normActual(row.actual_progress);
+  const started = !!row.actual_start || actual > 0;
 
   if (stage === "start") {
-    if (
-      row.actual_start ||
-      normActual(row.actual_progress) >= 1 ||
-      normActual(row.actual_progress) > 0 ||
-      row.auto_judgment === "완료"
-    )
-      return "완료";
-    const ps = parseDate(row.plan_start);
-    if (!ps || ps.getTime() > asOfD.getTime()) return "정상";
-    const d = daysDiff(ps, asOfD);
-    if (d > t.slip_late_days) return "위험";
-    if (d > t.slip_warn_days) return "지연";
-    return "주의";
+    if (started || row.auto_judgment === "완료") return "완료";
+    const sj = getStartJudgment(row, asOf);
+    return sj === "지연진행" ? "지연" : "정상";
   }
 
-  if (stage === "wip") {
-    const actual = normActual(row.actual_progress);
-    if (actual >= 1) return "완료";
-    // WIP 판정도 Cum. Diff(=Variance) 단일 소스 사용.
-    const gap = computeVariance(row, asOf);
-    if (gap == null) return "정상";
-    if (gap < t.behind_late_gap) return "위험";
-    if (gap < t.behind_warn_gap) return "지연";
-    if (gap < 0) return "주의";
-    return "정상";
+  // WIP / Finish 는 동일 gap 축으로 판정 (완료 조건만 다름)
+  if (actual >= 1) return "완료";
+
+  if (stage === "finish") {
+    // 미완료 상태에서 plan_end 도래 전이면 정상 취급.
+    const asOfD = resolveAsOf(row, asOf);
+    const pe = parseDate(row.plan_end);
+    if (pe && pe.getTime() > asOfD.getTime() && !started) return "정상";
   }
 
-  // finish
-  if (normActual(row.actual_progress) >= 1 || row.auto_judgment === "완료")
-    return "완료";
-  const pe = parseDate(row.plan_end);
-  if (!pe || pe.getTime() > asOfD.getTime()) return "정상";
-  const slip = daysDiff(pe, asOfD);
-  if (slip > t.slip_late_days) return "위험";
-  if (slip > t.slip_warn_days) return "지연";
-  if (slip > 0) return "주의";
+  const gap = computeVariance(row, asOf);
+  if (gap == null) return "정상";
+  if (gap < t.worsen_gap) return "악화";
+  if (gap < 0) return "지연";
+  if (gap < t.caution_gap_buffer) return "주의";
   return "정상";
 }
 
@@ -225,18 +223,15 @@ export function computeJudgment(
   t: TaskThresholds = DEFAULT_THRESHOLDS,
   asOf?: string,
 ): string {
-  const jStart = getStageJudgment(row, "start", t, asOf);
-  const jWip = getStageJudgment(row, "wip", t, asOf);
-  const jFinish = getStageJudgment(row, "finish", t, asOf);
-  if (jWip === "완료" && jFinish === "완료") return "완료";
-  const candidates: string[] = [];
-  // Start 스테이지는 미착수(진도 0 & actual_start 없음)일 때만 후보에 포함.
-  // 진도가 이미 발생한 행은 착수된 것으로 간주하고 WIP/Finish 로만 판정.
-  if (!row.actual_start && normActual(row.actual_progress) <= 0) {
-    candidates.push(jStart);
+  const actual = normActual(row.actual_progress);
+  if (actual >= 1) return "완료";
+  const started = !!row.actual_start || actual > 0;
+  if (!started) {
+    // 미착수: Start 스테이지 결과가 곧 통합 판정 (지연진행 → 지연, 그 외 → 정상)
+    return getStageJudgment(row, "start", t, asOf);
   }
-  candidates.push(jWip, jFinish);
-  return worstJudgment(candidates) ?? "정상";
+  // 착수 이후: WIP/Finish 는 동일 gap 축이므로 WIP 결과가 곧 통합 판정.
+  return getStageJudgment(row, "wip", t, asOf);
 }
 
 /** 행 단위 지연 판정 = 판정이 지연 또는 위험. */
@@ -246,7 +241,7 @@ export function isTaskDelayed(
   asOf?: string,
 ): boolean {
   const j = computeJudgment(row, t, asOf);
-  return j === "지연" || j === "위험";
+  return j === "지연" || j === "악화";
 }
 
 /** Start 는 완료됐지만 계획보다 늦게 시작한 마커. */
