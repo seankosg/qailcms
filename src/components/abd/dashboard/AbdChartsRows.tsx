@@ -1,27 +1,12 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend,
-} from "recharts";
-import { format, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "./AbdAgingSettingsPopover";
 import { cn } from "@/lib/utils";
 import {
-  getAbdDashboardApprovalTrend,
   getAbdDashboardAttentionLists,
   getAbdDashboardCrosscut,
 } from "@/lib/abd/dashboard.functions";
@@ -32,101 +17,6 @@ interface BaseProps {
   batchNo?: string[];
   onOpenRaw: (params: Record<string, string>) => void;
   onOpenDetail?: (id: string, focus?: "rounds" | "aconex" | "comments") => void;
-}
-
-
-
-/** Row 4 — Approval Trend (last N months, stacked by team) */
-export function AbdRow4ApprovalTrend({ plots = [], teams = [], batchNo = [], months = 12 }: BaseProps & { months?: number }) {
-  const fn = useServerFn(getAbdDashboardApprovalTrend);
-  const { data } = useQuery({
-    queryKey: ["abd-dash-trend", plots.join(","), teams.join(","), batchNo.join(","), months],
-    queryFn: () => fn({ data: { plots, teams, months, batch_no: batchNo } }),
-    staleTime: 30_000,
-  });
-  const rows = data ?? [];
-
-  const { series, teamList } = useMemo(() => {
-    const byMonth = new Map<string, Record<string, number | string>>();
-    const teamSet = new Set<string>();
-    for (const r of rows) {
-      const t = r.team || "—";
-      teamSet.add(t);
-      const mo = r.month_start;
-      const bucket = byMonth.get(mo) ?? { month_start: mo };
-      bucket[t] = ((bucket[t] as number) ?? 0) + r.approved_cnt;
-      byMonth.set(mo, bucket);
-    }
-    return {
-      series: Array.from(byMonth.values()).sort((a, b) =>
-        String(a.month_start).localeCompare(String(b.month_start)),
-      ),
-      teamList: Array.from(teamSet).sort(),
-    };
-  }, [rows]);
-
-  const palette = [
-    "hsl(217 91% 60%)",
-    "hsl(142 71% 45%)",
-    "hsl(38 92% 50%)",
-    "hsl(280 71% 60%)",
-    "hsl(340 82% 52%)",
-    "hsl(190 82% 45%)",
-  ];
-  const totalApproved = rows.reduce((s, r) => s + r.approved_cnt, 0);
-
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between pb-3 space-y-0">
-        <CardTitle className="text-base">Approval Trend — Last {months} months</CardTitle>
-        <span className="text-xs text-muted-foreground">
-          Total <span className="font-semibold text-foreground">{totalApproved.toLocaleString()}</span>
-        </span>
-      </CardHeader>
-      <CardContent className="h-72">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={series} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeDasharray="3 3" />
-            <XAxis
-              dataKey="month_start"
-              tickFormatter={(v) => format(parseISO(String(v)), "MMM-yy")}
-              tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              width={28}
-              allowDecimals={false}
-              tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-              tickLine={false}
-              axisLine={false}
-            />
-            <Tooltip
-              contentStyle={{
-                background: "hsl(var(--popover))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: 6,
-                fontSize: 12,
-              }}
-              labelFormatter={(v) => format(parseISO(String(v)), "MMM yyyy")}
-            />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            {teamList.map((t, i) => (
-              <Area
-                key={t}
-                type="monotone"
-                stackId="1"
-                dataKey={t}
-                stroke={palette[i % palette.length]}
-                fill={palette[i % palette.length]}
-                fillOpacity={0.35}
-              />
-            ))}
-          </AreaChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  );
 }
 
 /** Row 5 — Attention Lists (needs_planning / ur_aging / status_mismatch) */
