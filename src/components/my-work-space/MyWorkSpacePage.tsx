@@ -340,13 +340,6 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
         isAdmin={isAdmin}
       />
 
-      <AttentionInbox
-        userId={me?.id ?? null}
-        scope={scope}
-        filterValue={filterValue}
-        isAdmin={isAdmin}
-      />
-
       {/* ============= TM ============= */}
       <section className="space-y-2">
         <div className="flex items-center gap-2">
@@ -505,6 +498,13 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           }
         />
       </section>
+
+      <AttentionInbox
+        userId={me?.id ?? null}
+        scope={scope}
+        filterValue={filterValue}
+        isAdmin={isAdmin}
+      />
 
       <AbdDetailSheet id={abdDetailId} onOpenChange={(open) => { if (!open) setAbdDetailId(null); }} />
     </div>
