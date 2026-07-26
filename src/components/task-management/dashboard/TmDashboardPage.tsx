@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft, CalendarDays, RotateCcw, Search } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
+import { useTmDataDate } from "@/hooks/useTmDataDate";
 import {
   ALL_TASK_TIMELINE_STAGE_KEYS,
   isTaskStageDelayedAsOf,
@@ -91,8 +92,17 @@ export function TmDashboardPage() {
     return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [items]);
 
+  // 세션 전역 Data Date (Raw Data/MWS 등과 공유)
+  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
   const selectedDataDate =
-    search.dataDate && search.dataDate.length ? search.dataDate : latestDataDate;
+    (search.dataDate && search.dataDate.length ? search.dataDate : sharedDataDate) || latestDataDate;
+
+  // 세션 상태 동기화 — 선택이 최신과 다르면 저장, 최신이면 초기화
+  useEffect(() => {
+    const next = selectedDataDate === latestDataDate ? "" : selectedDataDate;
+    if (next !== sharedDataDate) setSharedDataDate(next);
+     
+  }, [selectedDataDate, latestDataDate]);
   const asOfDate = selectedDataDate;
   const asOfLabel = "Data Date";
 

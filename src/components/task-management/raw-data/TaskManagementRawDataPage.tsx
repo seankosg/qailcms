@@ -77,8 +77,8 @@ import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
 import { AddMainTaskDialog } from "./AddMainTaskDialog";
 import { AlarmBadge } from "./AlarmBadge";
 import { TaskStageProgress } from "./TaskStageProgress";
-import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useTmDataDate } from "@/hooks/useTmDataDate";
 import { canEditRawRow } from "@/lib/auth/roles";
 import { EditCellPopover } from "./EditCellPopover";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
@@ -482,19 +482,9 @@ export function TaskManagementRawDataPage() {
     return latest;
   }, [rows]);
 
-  const dataDateOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of rows) {
-      const d = (r as any).data_date as string | null | undefined;
-      if (d) set.add(String(d).slice(0, 10));
-    }
-    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
-  }, [rows]);
-
-  const selectedDataDate =
-    search.dataDate && search.dataDate.length
-      ? search.dataDate
-      : (latestDataDate ?? "");
+  // Data Date 는 Dashboard 의 설정을 세션 전역으로 공유. Raw Data 자체 픽커는 폐기.
+  const [sharedDataDate] = useTmDataDate();
+  const selectedDataDate = sharedDataDate || (latestDataDate ?? "");
 
   // T.Actual (오늘 실적) — 서버 RPC로 (오늘 누계 − 어제 누계) 일괄 조회.
   const rowIds = useMemo(
@@ -1137,25 +1127,14 @@ export function TaskManagementRawDataPage() {
           </Badge>
         )}
         {latestDataDate && (
-          <DataDatePicker
-            value={search.dataDate}
-            latest={latestDataDate}
-            options={dataDateOptions}
-            onChange={(v) =>
-              navigate({
-                to: "/closure/task-management/raw-data",
-                search: (prev: Record<string, unknown>) =>
-                  ({ ...prev, dataDate: v === latestDataDate ? "" : v }) as any,
-              })
-            }
-            onReset={() =>
-              navigate({
-                to: "/closure/task-management/raw-data",
-                search: (prev: Record<string, unknown>) =>
-                  ({ ...prev, dataDate: "" }) as any,
-              })
-            }
-          />
+          <span className="text-xs text-muted-foreground">
+            Data Date: <span className="font-medium">{selectedDataDate}</span>
+            {sharedDataDate && sharedDataDate !== latestDataDate && (
+              <span className="ml-1 text-amber-600">
+                (Dashboard 지정 · 최신 {latestDataDate})
+              </span>
+            )}
+          </span>
         )}
         {isFetching && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
 
