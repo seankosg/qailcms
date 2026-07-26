@@ -132,7 +132,9 @@ export function useAbdFacet(
       return ((data ?? []) as any[]).map((r) => ({ value: String(r.value), cnt: Number(r.cnt) }));
     },
     enabled: !!column && opts.enabled !== false,
-    staleTime: 60_000,
+    // 크로스필터: 다른 필터가 바뀌면 곧 다시 열릴 때 최신 카운트를 보여야 하므로 짧게.
+    staleTime: 15_000,
+    refetchOnMount: "always",
   });
 }
 
