@@ -25,12 +25,24 @@ const RowSchema = z.object({
   excel_row: z.number().optional(),
 });
 
+const SYNC_FIELD_KEYS = [
+  "latest_status",
+  "latest_rev",
+  "approval_date",
+  "aconex_status_raw",
+  "aconex_review_status_raw",
+  "aconex_date_modified",
+] as const;
+export type AconexSyncField = (typeof SYNC_FIELD_KEYS)[number];
+
 const InputSchema = z.object({
   file_name: z.string(),
   data_date: z.string().nullable().optional(),
   rows: z.array(RowSchema).max(20000),
   /** true = 실제 반영 / false = preview 만 */
   apply: z.boolean().default(false),
+  /** 사용자가 반영을 선택한 컬럼 집합 (null 이면 전체) */
+  apply_fields: z.array(z.enum(SYNC_FIELD_KEYS)).nullable().optional(),
 });
 
 export type AconexImportPreview = {
@@ -122,20 +134,29 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     const batchId = logRow.id as string;
 
     // 4) 개별 UPDATE (RLS + trigger 안전, 소규모라 성능 OK)
+    const allowed = new Set<string>(
+      data.apply_fields && data.apply_fields.length > 0
+        ? data.apply_fields
+        : (SYNC_FIELD_KEYS as readonly string[]),
+    );
     let updated = 0;
     for (const r of matched) {
+      // 항상 세팅되는 메타데이터 (감사/추적)
       const patch: Record<string, any> = {
-        aconex_status_raw: r.status_raw ?? null,
-        aconex_review_status_raw: r.review_status_raw ?? null,
-        aconex_date_modified: r.date_modified ?? null,
         aconex_last_synced_at: nowIso,
-        latest_status: r.status_code ?? r.status_raw ?? null,
         source_import_log_id: batchId,
         updated_at: nowIso,
         updated_by: context.userId,
       };
-      if (r.revision) patch.latest_rev = r.revision;
-      if (r.status_code === "A" && r.date_modified) patch.approval_date = r.date_modified;
+      // 사용자 선택 필드만 반영
+      if (allowed.has("latest_status")) patch.latest_status = r.status_code ?? r.status_raw ?? null;
+      if (allowed.has("latest_rev") && r.revision) patch.latest_rev = r.revision;
+      if (allowed.has("approval_date") && r.status_code === "A" && r.date_modified) {
+        patch.approval_date = r.date_modified;
+      }
+      if (allowed.has("aconex_status_raw")) patch.aconex_status_raw = r.status_raw ?? null;
+      if (allowed.has("aconex_review_status_raw")) patch.aconex_review_status_raw = r.review_status_raw ?? null;
+      if (allowed.has("aconex_date_modified")) patch.aconex_date_modified = r.date_modified ?? null;
       const { error: upErr } = await supa
         .from("abd_items_raw")
         .update(patch)

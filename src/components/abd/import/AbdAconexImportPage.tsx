@@ -36,7 +36,14 @@ function formatSize(b: number) {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function AbdAconexImportPage() {
+export interface AbdAconexImportPageProps {
+  /** 사용자가 선택한 sync 대상 컬럼 (undefined 이면 전체) */
+  syncFields?: string[];
+  /** 상단 안내 문구/알림 숨김 (탭에 내장할 때 사용) */
+  hideHeader?: boolean;
+}
+
+export function AbdAconexImportPage({ syncFields, hideHeader }: AbdAconexImportPageProps = {}) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -70,6 +77,7 @@ export function AbdAconexImportPage() {
               excel_row: r.excel_row,
             })),
             apply: false,
+            apply_fields: syncFields && syncFields.length ? syncFields : null,
           } as any,
         });
         setEntries((p) =>
@@ -83,7 +91,7 @@ export function AbdAconexImportPage() {
         );
       }
     }
-  }, []);
+  }, [syncFields]);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -128,6 +136,7 @@ export function AbdAconexImportPage() {
               excel_row: r.excel_row,
             })),
             apply: true,
+            apply_fields: syncFields && syncFields.length ? syncFields : null,
           } as any,
         });
         setEntries((p) =>
@@ -152,6 +161,7 @@ export function AbdAconexImportPage() {
 
   return (
     <div className="space-y-4">
+      {!hideHeader && (
       <Alert>
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle>Aconex Export 임포트 규칙</AlertTitle>
@@ -163,6 +173,7 @@ export function AbdAconexImportPage() {
           <div>· <code>Cancelled</code> / <code>Terminated</code> 항목은 통계/대시보드 계산에서 제외됩니다.</div>
         </AlertDescription>
       </Alert>
+      )}
 
       <Card>
         <CardHeader>
