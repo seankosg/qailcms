@@ -420,15 +420,18 @@ export function TaskTreePage() {
     if (!picOptions.names.includes(picFilter)) setPicFilter("__all__");
   }, [picFilter, picOptions.names]);
 
+  // 과거 as-of 모드일 때는 이미 서버 판정을 병합했으므로 asOf 를 넘기지 않아야
+  // computeJudgment 가 병합된 auto_judgment 를 그대로 사용한다.
+  const asOfForJudge = isPastAsOf ? undefined : asOfDate;
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
       if (judgmentFilter.size > 0) {
-        const mainJ = resolveMainJudgment(p, kids, thresholds, asOfDate);
+        const mainJ = resolveMainJudgment(p, kids, thresholds, asOfForJudge);
         const anyMatch =
           (mainJ && judgmentFilter.has(mainJ)) ||
-          kids.some((k) => judgmentFilter.has(resolveRowJudgment(k, thresholds, asOfDate)));
+          kids.some((k) => judgmentFilter.has(resolveRowJudgment(k, thresholds, asOfForJudge)));
         if (!anyMatch) return false;
       }
       if (picFilter !== "__all__") {
@@ -451,7 +454,7 @@ export function TaskTreePage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfDate, thresholds]);
+  }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfForJudge, thresholds]);
 
   // 완료(Actual% ≥ 100%) Main Task 는 하단으로 정렬, 동일 그룹 내에서는 Main Task No 오름차순
   const sortedFiltered = useMemo(() => {
@@ -495,12 +498,12 @@ export function TaskTreePage() {
     for (const r of effData) {
       if (!matchPic(r)) continue;
       const j = r.level === "main"
-        ? resolveMainJudgment(r, subsByMain.get(r.task_no) ?? [], thresholds, asOfDate)
-        : resolveRowJudgment(r, thresholds, asOfDate);
+        ? resolveMainJudgment(r, subsByMain.get(r.task_no) ?? [], thresholds, asOfForJudge)
+        : resolveRowJudgment(r, thresholds, asOfForJudge);
       if (j && j in counts) counts[j] += 1;
     }
     return counts;
-  }, [effData, picFilter, asOfDate, subsByMain, thresholds]);
+  }, [effData, picFilter, asOfForJudge, subsByMain, thresholds]);
 
   function goToRawDataMissing(kind: "no_plan_start" | "no_plan_end") {
     const searchParams: Record<string, string> = {
