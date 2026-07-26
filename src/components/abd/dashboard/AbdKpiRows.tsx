@@ -151,9 +151,9 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         agg.set(b.team, (agg.get(b.team) ?? 0) + b.count);
       }
     }
-    return Array.from(agg.entries())
-      .map(([team, count]) => ({ team, count }))
-      .sort((a, b) => b.count - a.count);
+    return sortByTeamOrder(
+      Array.from(agg.entries()).map(([team, count]) => ({ team, count })),
+    );
   }, [byTeam]);
 
   const mk = (label: string, key: string, tone: Tone, statusGroup?: string) => (
@@ -163,7 +163,7 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
       count={totals.get(key) ?? 0}
       total={key === "TOTAL" ? undefined : total}
       tone={tone}
-      breakdown={(byTeam.get(key) ?? []).map((b) => ({
+      breakdown={sortByTeamOrder(byTeam.get(key) ?? []).map((b) => ({
         team: b.team,
         count: b.count,
         onClick: () =>
@@ -199,9 +199,9 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         onClick={() => onOpenRaw({})}
       />
       {mk("Approved", "Approved", "ok", "approved")}
-      {mk("UR (Under Review)", "UR", "info", "under_review")}
-      {mk("DS (Drafting)", "DS", "warn", "drafting")}
-      {mk("NS (Not Started)", "NS", "danger", "not_started")}
+      {mk("Under Review", "UR", "info", "under_review")}
+      {mk("Draft Start", "DS", "warn", "drafting")}
+      {mk("Not Started", "NS", "danger", "not_started")}
     </div>
   );
 }
@@ -228,7 +228,7 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
       label={label}
       count={totals.get(key) ?? 0}
       tone="danger"
-      breakdown={(byTeam.get(key) ?? []).map((b) => ({
+      breakdown={sortByTeamOrder(byTeam.get(key) ?? []).map((b) => ({
         team: b.team,
         count: b.count,
         onClick: () => onOpenRaw({ status_group: statusGroup, team: b.team }),
