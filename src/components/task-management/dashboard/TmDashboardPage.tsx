@@ -36,7 +36,7 @@ const TASK_SCOPE_OPTIONS = [
   { value: "sub", label: "Sub Task" },
 ] as const;
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
-import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
+import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { DelayTopTable } from "./DelayTopTable";
 import { OwnerLeaderboardCard } from "./OwnerLeaderboardCard";
@@ -106,32 +106,28 @@ export function TmDashboardPage() {
   const asOfDate = selectedDataDate;
   const asOfLabel = "Data Date";
 
-  // 과거 Data Date 선택 시 각 task의 actual_progress를 스냅샷 값으로 재계산
-  const snapshot = useTaskProgressSnapshot();
+  // 과거 Data Date 선택 시 서버측 재판정 RPC(tm_judge_snapshot_at_date) 결과를 병합
   const isPastDate = asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
+  const judge = useTmJudgmentAtDate(asOfDate, isPastDate);
   const effectiveItems = useMemo(() => {
-    if (!isPastDate || !snapshot.ready) return items;
+    if (!isPastDate || !judge.ready) return items;
     return items.map((it) => {
-      const v = snapshot.actualAt(snapshotKey(it.discipline, it.task_no), asOfDate);
-      if (v == null) {
-        // 스냅샷 없음 → 아직 시작 전으로 간주
-        return {
-          ...it,
-          actual_progress: 0,
-          actual_start: null,
-          actual_finish: null,
-          auto_judgment: null,
-        } as typeof it;
-      }
-      const clamped = Math.max(0, Math.min(1, v));
+      const j = judge.map.get(it.id);
+      if (!j) return it;
+      const eff = j.effective_actual_progress ?? 0;
+      const clamped = Math.max(0, Math.min(1, Number(eff)));
       return {
         ...it,
         actual_progress: clamped,
         actual_finish: clamped >= 1 ? it.actual_finish : null,
-        auto_judgment: clamped >= 1 ? it.auto_judgment : null,
+        auto_judgment: j.auto_judgment ?? null,
+        gap_pct: j.gap_pct ?? null,
+        cum_plan_pct: j.cum_plan_pct ?? null,
+        delay_days: j.delay_days ?? null,
+        alarm_reason: j.alarm_reason ?? null,
       } as typeof it;
     });
-  }, [items, isPastDate, snapshot, asOfDate]);
+  }, [items, isPastDate, judge.ready, judge.map]);
 
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
 
