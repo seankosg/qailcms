@@ -10,6 +10,28 @@ import { dohaDateOnly } from "@/lib/time/doha";
 
 export type AconexApprovalCode = "A" | "B" | "C" | "D" | "UR" | "CX" | "TM";
 
+/**
+ * Status + Review Status 조합에서 파생되는 의미론 분류.
+ * Date Modified 를 어떤 라운드/스테이지 필드에 라우팅할지 결정한다.
+ *
+ *  DAR_APPROVED_A  A/Approved                     → 현재 라운드 rN_dar_actual + approval_date
+ *  DAR_APPROVED_B  B/Approved with Comments       → 현재 라운드 rN_dar_actual + approval_date
+ *  DAR_REJECTED    C/Revise & Resubmit, D/Reject  → 현재 라운드 rN_dar_actual (반려일)
+ *  SUBMITTED       For Review / Submitted /
+ *                  Under Workflow Review          → 현재 라운드 rN_submission_actual (HDEC 우선)
+ *  EXCLUDED_TERMINATED  For Review / Terminated   → 통계 제외 (is_terminated)
+ *  EXCLUDED_CANCELLED   Cancelled                 → 통계 제외 (is_terminated)
+ *  UNKNOWN         분류 실패                       → 아무 필드도 갱신하지 않음
+ */
+export type AconexSemantic =
+  | "DAR_APPROVED_A"
+  | "DAR_APPROVED_B"
+  | "DAR_REJECTED"
+  | "SUBMITTED"
+  | "EXCLUDED_TERMINATED"
+  | "EXCLUDED_CANCELLED"
+  | "UNKNOWN";
+
 export interface ParsedAconexRow {
   document_no: string;
   revision: string | null;
@@ -19,6 +41,7 @@ export interface ParsedAconexRow {
   status_norm: string | null; // APPROVED / APPROVED WITH COMMENTS / REVISE AND RESUBMIT / REJECTED / UNDER REVIEW / CANCELLED / TERMINATED
   date_modified: string | null; // ISO YYYY-MM-DD
   is_excluded: boolean;         // CX / TM 이면 통계에서 제외 대상
+  semantic: AconexSemantic;
   excel_row: number;
   raw: Record<string, any>;
 }
