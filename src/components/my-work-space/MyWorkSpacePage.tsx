@@ -25,6 +25,8 @@ import { DataDatePicker } from "@/components/task-management/shared/DataDatePick
 import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
 import { CommentsInbox } from "./CommentsInbox";
 import { AttentionInbox } from "./AttentionInbox";
+import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmJudgmentAtDate, mergeTmJudgment } from "@/hooks/useTmJudgmentAtDate";
 
 function fmtDate(d?: string | null): string {
   if (!d) return "-";
@@ -84,8 +86,16 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   const [abdDetailId, setAbdDetailId] = useState<string | null>(null);
 
   const latestToday = today();
-  const [dataDate, setDataDate] = useState<string>("");
+  const [dataDate, setDataDate, resetDataDate] = useTmDataDate();
   const t = dataDate || latestToday;
+
+  // 과거 Data Date 선택 시 서버측 재판정 병합 (Actual 유지, Plan/gap/judgment 만 as-of).
+  const isPastDate = !!dataDate && dataDate.slice(0, 10) < latestToday.slice(0, 10);
+  const judge = useTmJudgmentAtDate(dataDate, isPastDate);
+  const effTmData = useMemo(
+    () => mergeTmJudgment((tm.data ?? []) as any[], judge.map) as TmMyRow[],
+    [tm.data, judge.map],
+  );
 
   // ─── SM: 서버 판정 카운트 + 버킷 fetch ───
   const smCountsQ = useMyDefectsCounts(filterValue, isAdmin, scope, t);
@@ -117,16 +127,18 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   };
 
   const tmStats = useMemo(() => {
-    const rows = tm.data ?? [];
+    const rows = effTmData;
     return {
       total: rows.length,
       inProgress: rows.filter(tmIsStarted).length,
-      delayed: rows.filter((r) => tmIsDelayed(r, tmThresholds, t)).length,
+      delayed: rows.filter((r) =>
+        isPastDate ? (r.auto_judgment === "지연" || r.auto_judgment === "악화") : tmIsDelayed(r, tmThresholds, t),
+      ).length,
       upcoming: rows.filter((r) => tmIsUpcoming(r, t)).length,
       completed: rows.filter(tmIsCompleted).length,
       today: rows.filter((r) => tmIsToday(r, t)).length,
     };
-  }, [tm.data, t, tmThresholds]);
+  }, [effTmData, t, tmThresholds, isPastDate]);
 
   const abdStats = useMemo(() => {
     const rows = abd.data ?? [];
