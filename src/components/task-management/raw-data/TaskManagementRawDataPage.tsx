@@ -96,8 +96,6 @@ import { todayIso } from "@/lib/task-management/schedule-utils";
 import {
   type TaskScope,
   isCompleted,
-  isCriticalDelay,
-  isBehindSchedule,
   gapAt,
 } from "@/lib/task-management/kpi-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
