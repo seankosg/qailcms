@@ -286,7 +286,7 @@ export function TaskTreePage() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("task_management_settings")
-        .select("behind_warn_gap, behind_late_gap, slip_warn_days, slip_late_days")
+        .select("caution_gap_buffer, worsen_gap")
         .eq("id", "default")
         .maybeSingle();
       if (error) throw error;
