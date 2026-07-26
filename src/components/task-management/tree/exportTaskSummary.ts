@@ -39,7 +39,7 @@ const JUDGMENT_FILL: Record<string, string> = {
   "정상": "FFDBEAFE",
   "주의": "FFFEF3C7",
   "지연": "FFFFEDD5",
-  "위험": "FFFECACA",
+  "악화": "FFFECACA",
 };
 
 function pct(v: number | null | undefined): number | "" {

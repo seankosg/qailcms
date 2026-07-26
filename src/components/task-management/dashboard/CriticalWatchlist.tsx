@@ -28,7 +28,7 @@ export const CriticalWatchlist = memo(function CriticalWatchlist({
       <Section
         title="High Risk (≤7d)"
         icon={<AlertTriangle className="h-4 w-4 text-destructive" />}
-        empty="위험 항목이 없습니다."
+        empty="악화 항목이 없습니다."
         count={highRisk.length}
         accent="destructive"
       >

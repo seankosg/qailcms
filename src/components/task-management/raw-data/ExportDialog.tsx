@@ -75,7 +75,7 @@ const NUMFMT_BY_KEY: Record<string, string> = {
 // 자동판정 값별 정적 fill (ARGB)
 const JUDGMENT_FILL: Record<string, string> = {
   Delayed: "FFFFC7CE",       // 지연 — 빨강
-  "At Risk": "FFFFE699",     // 위험 — 노랑
+  "At Risk": "FFFFE699",     // 악화 — 노랑
   "On Track": "FFC6EFCE",    // 정상 — 초록
   Completed: "FFD9E1F2",     // 완료 — 파랑
 };
@@ -317,7 +317,7 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
             </p>
           </div>
           <p className="text-xs text-muted-foreground">
-            Gantt 캘린더/파생 수식은 폐기되어 값은 정적으로 기록됩니다. 지연/위험 행은 셀 배경색으로 표시됩니다.
+            Gantt 캘린더/파생 수식은 폐기되어 값은 정적으로 기록됩니다. 지연/악화 행은 셀 배경색으로 표시됩니다.
           </p>
         </div>
 

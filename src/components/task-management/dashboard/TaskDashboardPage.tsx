@@ -172,7 +172,7 @@ export function TaskDashboardPage({ compact = false }: Props) {
   }, [items, stageFilterArg, asOfDate, planMode, today, critical.highRisk.length]);
 
   const judgmentCounts = useMemo(() => {
-    const out: Record<string, number> = { 완료: 0, 정상: 0, 주의: 0, 지연: 0, 위험: 0 };
+    const out: Record<string, number> = { 완료: 0, 정상: 0, 주의: 0, 지연: 0, 악화: 0 };
     for (const r of items) {
       const j = r.auto_judgment ?? "";
       if (out[j] != null) out[j]++;

@@ -33,7 +33,7 @@ function fmtDate(d?: string | null): string {
 
 function judgmentTone(j: string | null | undefined): KpiTone {
   switch (j) {
-    case "위험": return "destructive";
+    case "악화": return "destructive";
     case "지연": return "destructive";
     case "주의": return "warning";
     case "완료": return "success";
@@ -245,7 +245,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
     } },
     { key: "j", label: "Alarm", width: "70px", render: (r) => {
       const j = tmJudgment(r, tmThresholds, t);
-      return <Badge variant="outline" className={cn("text-[10px]", j === "위험" || j === "지연" ? "border-destructive text-destructive" : j === "주의" ? "border-warning text-warning" : j === "완료" ? "border-success text-success" : "")}>{j || "-"}</Badge>;
+      return <Badge variant="outline" className={cn("text-[10px]", j === "악화" || j === "지연" ? "border-destructive text-destructive" : j === "주의" ? "border-warning text-warning" : j === "완료" ? "border-success text-success" : "")}>{j || "-"}</Badge>;
     } },
   ];
   const smColumns: RowColumn<SmMyRow>[] = [
