@@ -1,54 +1,33 @@
-# ABD 대시보드 — TM 3종 차트 이식
 
-## 목표
-ABD 대시보드 KPI(Row1/Row2) 바로 아래 새 row에 TM 대시보드의 3종 차트(Status Mix, 자동 판정 분포, 스테이지별 판정 스택)를 UI/디자인 그대로 이식하고, ABD 데이터 모델에 맞춰 로직만 재정의한다.
+## 변경 목표
+ABD Dashboard Row1의 Total KPI 카드에 (1) 다른 카드들처럼 팀별 breakdown 리스트를 표시하고, (2) 카드 하단에 Approved/UR/DS/NS 4개 포션을 각기 다른 색으로 표현하는 스택 진도율 바를 추가한다. 카드 높이는 그대로 유지한다.
 
-## 이식 로직 매핑 (사용자 확정)
+## 수정 파일
+- `src/components/abd/dashboard/AbdKpiRows.tsx`
+- `src/components/abd/dashboard/AbdDashboardPage.tsx` (변경 없음 — Row1이 내부적으로 처리)
 
-| 차트 | TM 원본 | ABD 이식 정의 |
-|---|---|---|
-| **Status Mix** | Completed / WIP / No Start (3분할) | **4분할: Approved / UR / DS / NS** (`current_stage` 기준) |
-| **자동 판정 분포** | 완료/정상/주의/지연/위험 (Plan% vs Actual%) | 완료=Approved · 정상=NS/DS 또는 UR<warn · 주의=UR≥warn · 지연=UR≥late · 위험=UR≥late×2 (임계값은 `abd_settings.ur_aging_warn_days`/`ur_aging_late_days`) |
-| **스테이지별 판정 스택** | Start/WIP/Finish 3행 × 판정 스택 | **4행: NS · DS · UR · Approved** × 판정 스택 |
+## 상세 구현
 
-**공통 조건**: `is_terminated=false`(Excluded CX/TM 제외), 상단 Batch 필터(`batchFilter`) 반영.
+### 1) `AbdKpiCard` 컴포넌트 확장
+- 새 옵션 prop `stackBar?: Array<{ key: string; label: string; count: number; className: string }>` 추가.
+- `stackBar`가 있으면 `CardContent` 하단에 높이 `h-1.5` 스택 바를 렌더링:
+  - 각 세그먼트 width = `(count / total) * 100%`, 각 세그먼트에 tone별 배경색 클래스 적용.
+  - hover 시 툴팁(title 속성)에 `label count (pct%)` 표시.
+- 바 아래 한 줄의 legend(범례) — `flex gap-2 text-[10px]` — 로 색상 dot + `Label pct%` 표시 (한 줄, truncate).
+- 카드 높이 유지를 위해 다른 카드와 padding/spacing 동일하게 처리 (breakdown 컬럼 유무는 이미 이 스택 바가 채워서 균형).
 
-## 산출물
+### 2) `AbdRow1Kpis` Total 카드 호출부 수정
+- Total 카드에 다음 두 가지 추가:
+  - `breakdown`: `byTeam.get("TOTAL")` — 다른 카드와 동일하게 팀별 카운트 표시, 클릭 시 `onOpenRaw({ team: b.team })`.
+  - `stackBar`: 순서 = Approved(emerald) → UR(blue) → DS(amber) → NS(red). 값은 `totals.get(key) ?? 0`, className은 아래 팔레트 사용.
+- 색상 팔레트(각 카드 숫자 톤과 정합):
+  - Approved: `bg-emerald-500`
+  - UR: `bg-blue-500`
+  - DS: `bg-amber-500`
+  - NS: `bg-red-500`
 
-### 1) 신규 RPC `abd_dashboard_judgment_mix`
-- 입력: `_batch_no text[]`
-- 출력: `stage`, `total`, `approved`, `normal`, `caution`, `delayed`, `critical` (스테이지 4행)
-- 내부: `abd_items_raw`에서 `is_terminated=false` + batch 필터 → `current_stage` 그룹핑, `ur_aging_days`와 `abd_settings` 임계값으로 판정 카테고리 산출.
-- 마이그레이션 파일에서 `GRANT EXECUTE TO authenticated, service_role`.
+### 3) 데이터 소스 확인 사항
+- `pivotRows`는 `bucket = "TOTAL"`이며 `team != null`인 행을 이미 `byTeam.get("TOTAL")`로 집계한다. RPC `abd_dashboard_row1`이 TOTAL bucket에 대해 팀별 행을 반환하는지 확인 후 그대로 사용. (반환하지 않는다면 4개 스테이지의 팀별 합을 클라이언트에서 합산하여 대체.)
 
-### 2) 컴포넌트 3종 (`src/components/abd/dashboard/`)
-- `AbdStatusMixDonut.tsx` — TM `StatusMixDonut.tsx` 그대로 복제, 세그먼트만 4개(Approved/UR/DS/NS)로 확장. 색상: Approved=`--schedule-actual`, UR=`--warning`, DS=`--schedule-plan`, NS=`hsl(var(--muted-foreground))`.
-- `AbdJudgmentDonut.tsx` — TM `JudgmentDonut.tsx` 그대로 복제. 데이터만 신규 RPC 결과에서 합산.
-- `AbdJudgmentStageBreakdown.tsx` — TM `JudgmentStageBreakdown.tsx` 그대로 복제. `stage` 라벨은 NS/DS/UR/Approved 4행, compact 모드 지원.
-
-세 컴포넌트 모두 카드 스타일·타이포·컨테이너 쿼리·툴팁·범례를 원본과 100% 동일하게 유지(원본 파일 복제 후 데이터 어댑터만 교체).
-
-### 3) 공통 쿼리 훅 `useAbdJudgmentMix(batchNo)` (`src/lib/abd/dashboard.functions.ts`)
-- `createServerFn` 래퍼 + `requireSupabaseAuth`로 신규 RPC 호출.
-- React Query 키: `["abd-dash-judgment-mix", batchNo]`, `staleTime: 60_000`.
-- `AbdDashboardPage`의 `refetch()`에 해당 쿼리 무효화 추가.
-
-### 4) `AbdDashboardPage.tsx` 배치
-Row2 아래, Row3(Status Dist) 위에 3-컬럼 그리드 삽입:
-```text
-[ AbdStatusMixDonut ] [ AbdJudgmentDonut ] [ AbdJudgmentStageBreakdown compact ]
-```
-- `xl:grid-cols-3`, 모바일 1열.
-- 클릭 시 Raw Data 이동은 이번 범위 밖(추후 요청 시 딥링크 추가).
-
-## 파일 변경 목록
-- 신규: `supabase/migrations/<timestamp>_abd_judgment_mix_rpc.sql`
-- 신규: `src/components/abd/dashboard/AbdStatusMixDonut.tsx`
-- 신규: `src/components/abd/dashboard/AbdJudgmentDonut.tsx`
-- 신규: `src/components/abd/dashboard/AbdJudgmentStageBreakdown.tsx`
-- 수정: `src/lib/abd/dashboard.functions.ts` — 신규 서버 함수 추가
-- 수정: `src/components/abd/dashboard/AbdDashboardPage.tsx` — 새 row 삽입 + refetch 키 추가
-
-## 검증
-- `tsgo --noEmit` 통과
-- Supabase 마이그레이션 적용 후 대시보드에서 3종 카드 렌더/숫자 합계 = KPI Row1 Total과 일치(제외분 제외 기준)
+## 미확인 항목 확인 필요
+빌드 모드 진입 후 첫 단계로 `abd_dashboard_row1` RPC가 TOTAL bucket의 팀별 행(team!=null)을 반환하는지 실제 응답을 확인. 반환하지 않으면 클라이언트에서 4개 스테이지 팀별 카운트를 합산하는 fallback으로 처리한다.
