@@ -1,68 +1,54 @@
-## 진행 순서 (T2 제외)
+# ABD 대시보드 — TM 3종 차트 이식
 
-**1) T4 — ABD Round 계획/지연 알림 → Inbox·MWS 연동**
-**2) T7 — ABD 데이터 백업/복원 편입**
-**4) T10 — 문서/온보딩 정리**
-**5) T1·T3·T5·T6 마무리 후 배포 체크**
+## 목표
+ABD 대시보드 KPI(Row1/Row2) 바로 아래 새 row에 TM 대시보드의 3종 차트(Status Mix, 자동 판정 분포, 스테이지별 판정 스택)를 UI/디자인 그대로 이식하고, ABD 데이터 모델에 맞춰 로직만 재정의한다.
 
----
+## 이식 로직 매핑 (사용자 확정)
 
-## 1) T4 — Attention 알림을 Inbox·MWS로 연동
+| 차트 | TM 원본 | ABD 이식 정의 |
+|---|---|---|
+| **Status Mix** | Completed / WIP / No Start (3분할) | **4분할: Approved / UR / DS / NS** (`current_stage` 기준) |
+| **자동 판정 분포** | 완료/정상/주의/지연/위험 (Plan% vs Actual%) | 완료=Approved · 정상=NS/DS 또는 UR<warn · 주의=UR≥warn · 지연=UR≥late · 위험=UR≥late×2 (임계값은 `abd_settings.ur_aging_warn_days`/`ur_aging_late_days`) |
+| **스테이지별 판정 스택** | Start/WIP/Finish 3행 × 판정 스택 | **4행: NS · DS · UR · Approved** × 판정 스택 |
 
-**현황**  
-- MWS ABD 섹션은 이미 `계획필요`, `지연`, `임박` KPI + 뱃지가 표시됨.  
-- `CommentsInbox`는 **댓글 전용**이라 계획필요/지연은 노출되지 않음.
+**공통 조건**: `is_terminated=false`(Excluded CX/TM 제외), 상단 Batch 필터(`batchFilter`) 반영.
 
-**변경**  
-- `src/hooks/useAbdAttentionInbox.ts` 신설: `abd_items_raw`에서 (a) `needs_planning=true` 또는 `active_round`가 `B/C` 이후 미계획, (b) `is_delayed`, (c) `is_upcoming` 3버킷 조회 (내 PIC/팀 기준, admin은 전체).  
-- `src/components/my-work-space/AttentionInbox.tsx` 신설: CommentsInbox 아래에 배치. 탭은 `계획필요 / 지연 / 임박`, 각 항목 클릭 시 ABD Raw Data 상세 시트로 딥링크(`?detail=<id>&round=r2` 등). 읽음처리는 localStorage 기반 `useCommentInboxRead` 패턴 재사용.  
-- `MyWorkSpacePage.tsx` 내 `<CommentsInbox />` 하단에 `<AttentionInbox />` 삽입.  
-- 대시보드 Attention 카드에서도 동일 딥링크 사용 확인.
+## 산출물
 
----
+### 1) 신규 RPC `abd_dashboard_judgment_mix`
+- 입력: `_batch_no text[]`
+- 출력: `stage`, `total`, `approved`, `normal`, `caution`, `delayed`, `critical` (스테이지 4행)
+- 내부: `abd_items_raw`에서 `is_terminated=false` + batch 필터 → `current_stage` 그룹핑, `ur_aging_days`와 `abd_settings` 임계값으로 판정 카테고리 산출.
+- 마이그레이션 파일에서 `GRANT EXECUTE TO authenticated, service_role`.
 
-## 2) T7 — ABD 데이터 백업/복원 편입
+### 2) 컴포넌트 3종 (`src/components/abd/dashboard/`)
+- `AbdStatusMixDonut.tsx` — TM `StatusMixDonut.tsx` 그대로 복제, 세그먼트만 4개(Approved/UR/DS/NS)로 확장. 색상: Approved=`--schedule-actual`, UR=`--warning`, DS=`--schedule-plan`, NS=`hsl(var(--muted-foreground))`.
+- `AbdJudgmentDonut.tsx` — TM `JudgmentDonut.tsx` 그대로 복제. 데이터만 신규 RPC 결과에서 합산.
+- `AbdJudgmentStageBreakdown.tsx` — TM `JudgmentStageBreakdown.tsx` 그대로 복제. `stage` 라벨은 NS/DS/UR/Approved 4행, compact 모드 지원.
 
-**현황**  
-- `backup_config` / `backup_run_log` / `database_snapshots` 인프라와 도하 23:50 스케줄 이미 존재 (SM/TM/DMR 등).  
-- ABD 계열 테이블(`abd_items_raw`, `abd_settings`, `abd_field_config`, `abd_header_mappings`, `abd_import_presets`, `abd_comments`, `abd_change_log`, `defect_category_team_map` 제외)이 아직 백업 대상 등록 여부 불확실.
+세 컴포넌트 모두 카드 스타일·타이포·컨테이너 쿼리·툴팁·범례를 원본과 100% 동일하게 유지(원본 파일 복제 후 데이터 어댑터만 교체).
 
-**변경**  
-- `supabase--migration`으로 `backup_config` INSERT/UPSERT: ABD 관련 테이블 8개를 백업 대상에 추가 (없으면 삽입, 있으면 스킵).  
-- Admin > Backup 페이지(`src/routes/_authenticated/admin/backup.tsx`) 카테고리 필터에 "ABD" 그룹 추가.  
-- 복원(`rollback_abd_import` 이미 존재) 경로가 백업 스냅샷과 연동되도록 라우팅 확인.  
-- 도하 23:50 자동 스냅샷에서 ABD가 실제로 백업되는지 dry-run 로그 확인.
+### 3) 공통 쿼리 훅 `useAbdJudgmentMix(batchNo)` (`src/lib/abd/dashboard.functions.ts`)
+- `createServerFn` 래퍼 + `requireSupabaseAuth`로 신규 RPC 호출.
+- React Query 키: `["abd-dash-judgment-mix", batchNo]`, `staleTime: 60_000`.
+- `AbdDashboardPage`의 `refetch()`에 해당 쿼리 무효화 추가.
 
----
+### 4) `AbdDashboardPage.tsx` 배치
+Row2 아래, Row3(Status Dist) 위에 3-컬럼 그리드 삽입:
+```text
+[ AbdStatusMixDonut ] [ AbdJudgmentDonut ] [ AbdJudgmentStageBreakdown compact ]
+```
+- `xl:grid-cols-3`, 모바일 1열.
+- 클릭 시 Raw Data 이동은 이번 범위 밖(추후 요청 시 딥링크 추가).
 
-## 4) T10 — 문서/온보딩
+## 파일 변경 목록
+- 신규: `supabase/migrations/<timestamp>_abd_judgment_mix_rpc.sql`
+- 신규: `src/components/abd/dashboard/AbdStatusMixDonut.tsx`
+- 신규: `src/components/abd/dashboard/AbdJudgmentDonut.tsx`
+- 신규: `src/components/abd/dashboard/AbdJudgmentStageBreakdown.tsx`
+- 수정: `src/lib/abd/dashboard.functions.ts` — 신규 서버 함수 추가
+- 수정: `src/components/abd/dashboard/AbdDashboardPage.tsx` — 새 row 삽입 + refetch 키 추가
 
-**변경**  
-- `docs/abd-workflow.md` 신설: 4-stage 모델(Draft Start/Finish → Submission → DAR Response), 라운드/승인 규칙, Aconex 임포트 절차(토글 · 컬럼 선택 · Diff View), UR Aging 임계값 관리, `Document No` 유니크 키 규칙.  
-- `docs/mws-workspace.md`: 담당/팀 필터, 계획필요/지연/임박 정의, Comments Inbox vs Attention Inbox 차이.  
-- `docs/backup-restore.md`: 대상 테이블 목록, 도하 23:50 스케줄, 복원 절차.  
-- 앱 내 `?` 헬프 링크는 이 단계에서는 미포함(별도 UX 결정 필요).
-
----
-
-## 5) 마무리 및 배포 체크
-
-**변경**  
-- `tsgo` 타입체크 + `bun run build` 실행 로그 확인.  
-- SM/TM/ABD Raw Data · MWS · Dashboard 3개 화면 Playwright 스모크(스크린샷 3장).  
-- `security--run_security_scan` 실행 후 신규 이슈만 리뷰.  
-- 최종 요약과 배포 안내(`publish` action) 노출.
-
----
-
-## 기술 노트
-
-- Attention Inbox는 read-model만 별도이며 **DB 스키마 변경 없음** (기존 컬럼만 사용).  
-- 백업은 스키마 변경 없이 `backup_config` 데이터 시드만 갱신 → 데이터 조작은 `supabase--insert`.  
-- Aconex API 자동 스케줄(`pg_cron`)은 이번 사이클에서 **명시적으로 제외**.
-
-## 산출물 예상
-
-- 신규: `useAbdAttentionInbox.ts`, `AttentionInbox.tsx`, docs 3개.  
-- 수정: `MyWorkSpacePage.tsx`, `admin/backup.tsx`(카테고리), backup_config 시드.  
-- 마이그레이션 0건, insert 1건.
+## 검증
+- `tsgo --noEmit` 통과
+- Supabase 마이그레이션 적용 후 대시보드에서 3종 카드 렌더/숫자 합계 = KPI Row1 Total과 일치(제외분 제외 기준)
