@@ -750,7 +750,7 @@ export function TaskTreePage() {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
           const isDone = Number(p.actual_progress ?? 0) >= 1;
-          const mainJudgment = resolveMainJudgment(p, kids, thresholds, asOfDate);
+          const mainJudgment = resolveMainJudgment(p, kids, thresholds, asOfForJudge);
           const behindCount = kids.filter(
             (k) => (computeVariance(k, asOfDate) ?? 0) < -0.05,
           ).length;
@@ -834,7 +834,7 @@ export function TaskTreePage() {
                     <tbody>
                       {kids.map((k) => {
                         const gap = computeVariance(k, asOfDate) ?? 0;
-                        const j = resolveRowJudgment(k, thresholds, asOfDate);
+                        const j = resolveRowJudgment(k, thresholds, asOfForJudge);
                         const kDone = Number(k.actual_progress ?? 0) >= 1;
                         return (
                           <tr
