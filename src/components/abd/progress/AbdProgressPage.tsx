@@ -451,28 +451,19 @@ export function AbdProgressPage() {
               </div>
             </ToolbarGroup>
 
-            <ToolbarGroup label="Stage">
-              <ToggleGroup
-                type="multiple"
-                value={isAllStages ? [...ALL_STAGES] : effectiveStages}
-                onValueChange={(v) => {
-                  const next = (v as Stage[]).filter((x) => (ALL_STAGES as string[]).includes(x));
-                  if (next.length === 0) return;
-                  const sorted = ALL_STAGES.filter((k) => next.includes(k));
-                  setSearch({ stageView: sorted.join(",") });
-                }}
-                className="gap-1"
-              >
-                {ALL_STAGES.map((s) => (
-                  <ToggleGroupItem
-                    key={s}
-                    value={s}
-                    className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                  >
-                    {STAGE_SHORT_LABELS[s]}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
+            <ToolbarGroup label="Range">
+              <Select value={String(rangeDays)} onValueChange={(v) => setSearch({ range: Number(v) })}>
+                <SelectTrigger className="h-8 w-24 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[30, 60, 90, 180].map((n) => (
+                    <SelectItem key={n} value={String(n)} className="text-xs">
+                      {n} days
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </ToolbarGroup>
 
             <ToolbarGroup label="Bucket">
@@ -489,21 +480,6 @@ export function AbdProgressPage() {
                   Week
                 </ToggleGroupItem>
               </ToggleGroup>
-            </ToolbarGroup>
-
-            <ToolbarGroup label="Range">
-              <Select value={String(rangeDays)} onValueChange={(v) => setSearch({ range: Number(v) })}>
-                <SelectTrigger className="h-8 w-24 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[30, 60, 90, 180].map((n) => (
-                    <SelectItem key={n} value={String(n)} className="text-xs">
-                      {n} days
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </ToolbarGroup>
 
             <div className="flex items-center gap-2">
