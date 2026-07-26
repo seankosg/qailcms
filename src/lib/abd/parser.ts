@@ -385,12 +385,52 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
     }
   }
 
+  // Resolve (round, stage) per column.
+  // Priority 1: stage band with trailing digit e.g. "DS1", "DF 2", "SB3", "RS 1"
+  // Priority 2: round band "ROUND n" + stage band token.
+  const resolved: Array<{ round: number | null; stage: StageKey | null }> = [];
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const roundBand = roundBands[c - range.s.c] || "";
+    const stageBand = stageBands[c - range.s.c] || "";
+    let round: number | null = null;
+    let stage: StageKey | null = null;
+    const stageDigit = stageBand.match(/^(DS|DF|SB|RS)\s*([1-3])$/i);
+    if (stageDigit) {
+      stage = STAGE_TO_KEY[stageDigit[1].toUpperCase()] ?? null;
+      round = Number(stageDigit[2]);
+    } else {
+      stage = STAGE_TO_KEY[stageBand] ?? null;
+      const rm = /ROUND\s*(\d)/i.exec(roundBand);
+      if (rm) round = Number(rm[1]);
+    }
+    resolved.push({ round, stage });
+  }
+
+  // Group contiguous columns sharing the same (round, stage) for position-based
+  // PLAN/ACTUAL fallback when anchor cells are blank/merged.
+  const posInGroup: number[] = new Array(resolved.length).fill(-1);
+  {
+    let i = 0;
+    while (i < resolved.length) {
+      const cur = resolved[i];
+      if (cur.round == null || cur.stage == null) { i++; continue; }
+      let j = i;
+      while (
+        j < resolved.length &&
+        resolved[j].round === cur.round &&
+        resolved[j].stage === cur.stage
+      ) { posInGroup[j] = j - i; j++; }
+      i = j;
+    }
+  }
+
   // Now walk anchor row labels
   for (let c = range.s.c; c <= range.e.c; c++) {
     const cell = ws[XLSX.utils.encode_cell({ r: anchorRow, c })];
     const label = normText(cell?.v);
     const roundBand = roundBands[c - range.s.c] || "";
     const stageBand = stageBands[c - range.s.c] || "";
+    const rez = resolved[c - range.s.c];
 
     if (label === "SL.NO" || label === "SL NO") colIndex.sl_no = c;
     else if (label === "DIS") colIndex.dis = c;
@@ -422,18 +462,26 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
     else if (label === "STATUS") colIndex.latest_status = c;
     else if (label === "APPOVAL" || label === "APPROVAL" || label === "APPROVAL DATE") colIndex.approval_date = c;
     else if (label === "PLAN" || label === "ACTUAL") {
-      const roundMatch = /ROUND\s*(\d)/.exec(roundBand);
-      const roundIdx = roundMatch ? Number(roundMatch[1]) : null;
-      const stageKey = STAGE_TO_KEY[stageBand];
-      if (roundIdx && stageKey) {
+      if (rez.round && rez.stage) {
         const which = label === "PLAN" ? "plan" : "actual";
-        colIndex[`r${roundIdx}_${stageKey}_${which}`] = c;
+        colIndex[`r${rez.round}_${rez.stage}_${which}`] = c;
       }
     }
     else if (isResponseResultLabel(label, stageBand)) {
-      const roundMatch = /ROUND\s*(\d)/.exec(roundBand);
-      const roundIdx = roundMatch ? Number(roundMatch[1]) : null;
+      const rm = /ROUND\s*(\d)/i.exec(roundBand);
+      const roundIdx = rm ? Number(rm[1]) : rez.round;
       if (roundIdx) colIndex[`r${roundIdx}_response_result`] = c;
+    }
+    else if (!label && rez.round && rez.stage) {
+      // Position-based PLAN/ACTUAL fallback (anchor cell blank/merged)
+      const pos = posInGroup[c - range.s.c];
+      if (pos === 0) {
+        const k = `r${rez.round}_${rez.stage}_plan`;
+        if (!(k in colIndex)) colIndex[k] = c;
+      } else if (pos === 1) {
+        const k = `r${rez.round}_${rez.stage}_actual`;
+        if (!(k in colIndex)) colIndex[k] = c;
+      }
     }
   }
 
