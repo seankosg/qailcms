@@ -1,5 +1,15 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Columns3,
+  FileSpreadsheet,
+  Loader2,
+  Upload,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,6 +27,11 @@ import {
   type AconexImportPreview,
 } from "@/lib/abd/aconex-import.functions";
 import { todayInDoha } from "@/lib/time/doha";
+import {
+  ColumnSelectDialog,
+  type ColumnSelectHelpers,
+} from "@/components/import/ColumnSelectDialog";
+import { ABD_ACONEX_SYNC_FIELDS } from "@/components/admin/AbdImportPresetTable";
 
 type Status = "queued" | "parsing" | "ready" | "previewing" | "preview" | "importing" | "done" | "error";
 
@@ -28,6 +43,8 @@ interface Entry {
   preview?: AconexImportPreview;
   result?: AconexImportPreview & { updated: number };
   error?: string;
+  /** 이 파일에서 UPDATE 제외할 sync 필드 목록 (기본 = 전체 포함). */
+  excludedFields?: string[];
 }
 
 function formatSize(b: number) {
@@ -37,16 +54,91 @@ function formatSize(b: number) {
 }
 
 export interface AbdAconexImportPageProps {
-  /** 사용자가 선택한 sync 대상 컬럼 (undefined 이면 전체) */
-  syncFields?: string[];
   /** 상단 안내 문구/알림 숨김 (탭에 내장할 때 사용) */
   hideHeader?: boolean;
 }
 
-export function AbdAconexImportPage({ syncFields, hideHeader }: AbdAconexImportPageProps = {}) {
+export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {}) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [columnFileId, setColumnFileId] = useState<string | null>(null);
+
+  const syncFieldKeys = useMemo(
+    () => ABD_ACONEX_SYNC_FIELDS.map((o) => o.field),
+    [],
+  );
+  const syncLabelMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of ABD_ACONEX_SYNC_FIELDS) m.set(o.field, o.label);
+    return m;
+  }, []);
+
+  const { data: aconexPresets = [] } = useQuery({
+    queryKey: ["abd-import-presets", "aconex"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("abd_import_presets")
+        .select("*")
+        .eq("mode", "aconex")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        label: string;
+        fields: string[];
+      }>;
+    },
+    staleTime: 10_000,
+  });
+
+  const helpers = useMemo<ColumnSelectHelpers>(() => {
+    const knownSet = new Set(syncFieldKeys);
+    return {
+      toFieldName: (h) => h,
+      getRequirement: () => ({ required: false }),
+      isKnownField: (field) => knownSet.has(field),
+      getSourceLabel: () => "Aconex",
+      getSourceOrigin: () => "aconex",
+    };
+  }, [syncFieldKeys]);
+
+  const presets = useMemo(
+    () => [
+      { id: "__all", label: "전체 선택", matchedHeaders: undefined },
+      ...aconexPresets.map((p) => ({
+        id: p.id,
+        label: p.label,
+        matchedHeaders: p.fields.filter((f) => syncFieldKeys.includes(f)),
+      })),
+    ],
+    [aconexPresets, syncFieldKeys],
+  );
+
+  const columnFile = useMemo(
+    () => entries.find((x) => x.id === columnFileId) ?? null,
+    [entries, columnFileId],
+  );
+
+  const computeApplyFields = (excluded: string[] | undefined): string[] => {
+    const ex = new Set(excluded ?? []);
+    return syncFieldKeys.filter((f) => !ex.has(f));
+  };
+
+  const setFileExcludedFields = (id: string, excluded: string[]) => {
+    setEntries((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, excludedFields: excluded } : x)),
+    );
+    if (excluded.length > 0) {
+      const shown = excluded
+        .map((f) => syncLabelMap.get(f) ?? f)
+        .slice(0, 3)
+        .join(", ");
+      toast.info(
+        `컬럼 선택: 제외 ${excluded.length}개${excluded.length > 3 ? "" : ` — ${shown}`}`,
+      );
+    }
+  };
 
   const handleFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -77,7 +169,7 @@ export function AbdAconexImportPage({ syncFields, hideHeader }: AbdAconexImportP
               excel_row: r.excel_row,
             })),
             apply: false,
-            apply_fields: syncFields && syncFields.length ? syncFields : null,
+            apply_fields: null,
           } as any,
         });
         setEntries((p) =>
@@ -91,7 +183,7 @@ export function AbdAconexImportPage({ syncFields, hideHeader }: AbdAconexImportP
         );
       }
     }
-  }, [syncFields]);
+  }, []);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -120,6 +212,10 @@ export function AbdAconexImportPage({ syncFields, hideHeader }: AbdAconexImportP
       if (!e.parsed) continue;
       setEntries((p) => p.map((x) => (x.id === e.id ? { ...x, status: "importing" } : x)));
       try {
+        const applyFields = computeApplyFields(e.excludedFields);
+        if (applyFields.length === 0) {
+          throw new Error("적용할 sync 컬럼이 없습니다. 컬럼 선택에서 최소 1개 이상 포함하세요.");
+        }
         const result = await importAbdAconexBatch({
           data: {
             file_name: e.file.name,
@@ -136,7 +232,7 @@ export function AbdAconexImportPage({ syncFields, hideHeader }: AbdAconexImportP
               excel_row: r.excel_row,
             })),
             apply: true,
-            apply_fields: syncFields && syncFields.length ? syncFields : null,
+            apply_fields: applyFields,
           } as any,
         });
         setEntries((p) =>
