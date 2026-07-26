@@ -256,7 +256,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
       return <span className={cn("tabular-nums font-medium", pct < 0 ? "text-destructive" : pct > 0 ? "text-success" : "text-muted-foreground")}>{pct > 0 ? "+" : ""}{pct}%</span>;
     } },
     { key: "j", label: "Alarm", width: "70px", render: (r) => {
-      const j = tmJudgment(r, tmThresholds, t);
+      const j = isPastDate ? (r.auto_judgment ?? "") : tmJudgment(r, tmThresholds, t);
       return <Badge variant="outline" className={cn("text-[10px]", j === "악화" || j === "지연" ? "border-destructive text-destructive" : j === "주의" ? "border-warning text-warning" : j === "완료" ? "border-success text-success" : "")}>{j || "-"}</Badge>;
     } },
   ];
@@ -342,7 +342,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
             latest={latestToday}
             options={[]}
             onChange={setDataDate}
-            onReset={() => setDataDate("")}
+            onReset={resetDataDate}
           />
           {isAdmin && (
             <Badge variant="secondary" className="uppercase tracking-wide">Admin View</Badge>
@@ -372,13 +372,13 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           <ModuleKpiCard label="완료" value={tmStats.completed} total={tmStats.total} tone="success" onClick={() => { setTmTab("all"); }} />
         </div>
         <ModuleRowList<TmMyRow>
-          rows={tm.data ?? []}
+          rows={effTmData}
           activeTab={tmTab}
           onTabChange={setTmTab}
           counts={{ today: tmStats.today, all: tmStats.total, risk: tmStats.delayed, upcoming: tmStats.upcoming }}
           filterRow={(r, tab) =>
             tab === "all" ? true
-            : tab === "risk" ? tmIsDelayed(r, tmThresholds, t)
+            : tab === "risk" ? (isPastDate ? (r.auto_judgment === "지연" || r.auto_judgment === "악화") : tmIsDelayed(r, tmThresholds, t))
             : tab === "today" ? tmIsToday(r, t)
             : tmIsUpcoming(r, t)
           }
