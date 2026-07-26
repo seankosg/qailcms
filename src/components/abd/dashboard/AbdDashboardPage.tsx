@@ -58,7 +58,6 @@ export function AbdDashboardPage() {
   const refetch = () => {
     qc.invalidateQueries({ queryKey: ["abd-dash-row1"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-row2"] });
-    qc.invalidateQueries({ queryKey: ["abd-dash-status"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-trend"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-attention"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-crosscut"] });
