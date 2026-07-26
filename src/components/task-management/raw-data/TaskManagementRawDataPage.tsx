@@ -565,7 +565,7 @@ export function TaskManagementRawDataPage() {
   }, [rows]);
 
   // Data Date 는 Dashboard 의 설정을 세션 전역으로 공유. Raw Data 자체 픽커는 폐기.
-  const [sharedDataDate] = useTmDataDate();
+  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
   const selectedDataDate = sharedDataDate || (latestDataDate ?? "");
 
   // T.Actual (오늘 실적) — 서버 RPC로 (오늘 누계 − 어제 누계) 일괄 조회.
