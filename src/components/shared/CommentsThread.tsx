@@ -15,7 +15,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 export interface CommentRow {
   id: string;
   parent_comment_id: string | null;
-  category: string;
+  category: string | null;
   message: string;
   source: string;
   author_user_id: string | null;
@@ -35,7 +35,7 @@ interface Props {
   parentKey: string; // e.g. "abd_item_id"
   parentValue: string;
   categories: CommentCategoryDef[];
-  defaultCategory?: string;
+  defaultCategory?: string | null;
   heightClass?: string;
   emptyLabel?: string;
 }
@@ -92,7 +92,9 @@ export function CommentsThread({
   }, [categories]);
 
   const [message, setMessage] = useState("");
-  const [category, setCategory] = useState<string>(defaultCategory ?? categories[0]?.value ?? "general");
+  const [category, setCategory] = useState<string | null>(
+    defaultCategory === undefined ? (categories[0]?.value ?? null) : defaultCategory,
+  );
   const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -157,7 +159,7 @@ export function CommentsThread({
     const payload: Record<string, unknown> = {
       [parentKey]: parentValue,
       parent_comment_id: replyTo?.id ?? null,
-      category: parentCategory,
+      category: parentCategory ?? null,
       message: trimmed,
       source: "app_manual",
       author_user_id: user.id,
@@ -202,7 +204,7 @@ export function CommentsThread({
 
   const renderComment = (c: CommentRow, depth: number, isReply: boolean) => {
     const isEditing = editingId === c.id;
-    const catDef = catMap[c.category];
+    const catDef = c.category ? catMap[c.category] : undefined;
     return (
       <div
         key={c.id}
@@ -213,9 +215,11 @@ export function CommentsThread({
         )}
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-            {isReply ? "reply" : (catDef?.label ?? c.category)}
-          </Badge>
+          {(isReply || catDef || c.category) && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+              {isReply ? "reply" : (catDef?.label ?? c.category)}
+            </Badge>
+          )}
           <span className="text-xs font-medium text-foreground">{authorName(c)}</span>
           {c.source !== "app_manual" && (
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
@@ -328,11 +332,12 @@ export function CommentsThread({
 
       <div className="flex gap-2 items-end">
         {!replyTo && (
-          <Select value={category} onValueChange={setCategory}>
+          <Select value={category ?? "__none__"} onValueChange={(v) => setCategory(v === "__none__" ? null : v)}>
             <SelectTrigger className="w-[140px] h-9 text-xs">
-              <SelectValue />
+              <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="__none__">— None —</SelectItem>
               {categories.map((c) => (
                 <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
               ))}
@@ -378,8 +383,9 @@ export const DEFECT_CATEGORIES: CommentCategoryDef[] = [
 ];
 
 export const TASK_CATEGORIES: CommentCategoryDef[] = [
-  { value: "plan",       label: "Plan",       className: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30" },
-  { value: "execution",  label: "Execution",  className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30" },
-  { value: "handover",   label: "Handover",   className: "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/30" },
+  { value: "progress",   label: "Progress",   className: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30" },
+  { value: "subcon",     label: "Subcon",     className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30" },
+  { value: "commercial", label: "Commercial", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30" },
+  { value: "quality",    label: "Quality",    className: "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/30" },
   { value: "general",    label: "General",    className: "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/30" },
 ];
