@@ -139,6 +139,7 @@ export interface AbdCounts {
   in_progress_count: number;
   not_started_count: number;
   total_count: number;
+  excluded_count: number;
   latest_data_date: string | null;
 }
 
@@ -158,6 +159,7 @@ export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean; pl
         in_progress_count: Number(r.in_progress_count ?? 0),
         not_started_count: Number(r.not_started_count ?? 0),
         total_count: Number(r.total_count ?? 0),
+        excluded_count: Number(r.excluded_count ?? 0),
         latest_data_date: r.latest_data_date ?? null,
       };
     },
