@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAbdFieldConfig, useAbdFieldHelpers } from "@/hooks/useAbdFieldConfig";
+import { useAbdHeaderMappings } from "@/hooks/useAbdHeaderMappings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,48 @@ export const ABD_ACONEX_SYNC_FIELDS: Array<{ field: string; label: string }> = [
   { field: "is_terminated", label: "Terminated/Cancelled 통계 제외" },
 ];
 
+/**
+ * Aconex Excel 원본 헤더 → 반영되는 sync 필드 매핑.
+ * `AbdAconexImportPage` 의 `ACONEX_HEADER_TO_FIELDS` 와 동일 규칙 (canonical key).
+ * Preset 관리 화면에서 fallback 표시 및 시스템 필드 → 원본 헤더 역매핑에 사용.
+ */
+export const ABD_ACONEX_CANONICAL_HEADER_TO_FIELDS: Record<string, string[]> = {
+  "Document No": [],
+  Revision: ["latest_rev"],
+  Status: [
+    "latest_status",
+    "approval_date",
+    "aconex_status_raw",
+    "round_actual",
+    "is_terminated",
+  ],
+  "Review Status": ["aconex_review_status_raw", "round_actual", "is_terminated"],
+  "Date Modified": ["aconex_date_modified", "round_actual", "approval_date"],
+};
+const ABD_ACONEX_UNIQUE_HEADER = "Document No";
+/** Aconex 계열로 인정할 시스템 target_field 집합. */
+const ABD_ACONEX_TARGET_FIELDS = new Set<string>([
+  "latest_status",
+  "latest_rev",
+  "approval_date",
+  "aconex_status_raw",
+  "aconex_review_status_raw",
+  "aconex_date_modified",
+  "round_actual",
+  "is_terminated",
+]);
+function isAconexRoundActual(field: string): boolean {
+  return /^r\d+_dar_actual$/i.test(field);
+}
+
+type AconexFieldOption = {
+  field: string; // = original header string (dedup key)
+  label: string;
+  targets: string[]; // system field keys the header maps to
+  teams: string[];
+  isCanonical: boolean;
+};
+
 export function AbdImportPresetTable({ mode }: { mode: AbdPresetMode }) {
   const qc = useQueryClient();
   const { data: currentUser } = useCurrentUser();
@@ -53,22 +96,109 @@ export function AbdImportPresetTable({ mode }: { mode: AbdPresetMode }) {
 
   const { data: fieldConfig = [] } = useAbdFieldConfig();
   const { getLabel: getAbdLabel } = useAbdFieldHelpers();
+  const { data: headerMappings = [] } = useAbdHeaderMappings();
 
-  const fieldOptions = useMemo(() => {
+  const aconexOptions = useMemo<AconexFieldOption[]>(() => {
+    const map = new Map<string, AconexFieldOption>();
+    // 1) Canonical 5 fallback headers — 항상 노출
+    for (const [header, targets] of Object.entries(
+      ABD_ACONEX_CANONICAL_HEADER_TO_FIELDS,
+    )) {
+      map.set(header, {
+        field: header,
+        label: header,
+        targets: [...targets],
+        teams: [],
+        isCanonical: true,
+      });
+    }
+    // 2) Header Mapping 에서 Aconex 계열 target_field 로 등록된 원본 헤더
+    for (const row of headerMappings) {
+      if (!row.is_active) continue;
+      const t = row.target_field;
+      if (!t) continue;
+      if (!ABD_ACONEX_TARGET_FIELDS.has(t) && !isAconexRoundActual(t)) continue;
+      const header = row.source_header?.trim();
+      if (!header) continue;
+      const exist = map.get(header);
+      if (exist) {
+        if (!exist.targets.includes(t)) exist.targets.push(t);
+        if (row.team && !exist.teams.includes(row.team)) exist.teams.push(row.team);
+      } else {
+        map.set(header, {
+          field: header,
+          label: header,
+          targets: [t],
+          teams: row.team ? [row.team] : [],
+          isCanonical: false,
+        });
+      }
+    }
+    const arr = Array.from(map.values());
+    arr.sort((a, b) => {
+      if (a.field === ABD_ACONEX_UNIQUE_HEADER) return -1;
+      if (b.field === ABD_ACONEX_UNIQUE_HEADER) return 1;
+      return a.field.localeCompare(b.field);
+    });
+    return arr;
+  }, [headerMappings]);
+
+  const fieldOptions = useMemo<Array<{ field: string; label: string }>>(() => {
     if (mode === "aconex") {
-      return ABD_ACONEX_SYNC_FIELDS.map((o) => ({ field: o.field, label: o.label }));
+      return aconexOptions.map((o) => ({ field: o.field, label: o.label }));
     }
     return fieldConfig
       .slice()
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((r) => ({ field: r.field_key, label: r.label || r.field_key }));
-  }, [mode, fieldConfig]);
+  }, [mode, fieldConfig, aconexOptions]);
+
+  /** 시스템 필드 키 → 원본 헤더 목록 (하위호환 초기값 복원용). */
+  const systemFieldToHeaders = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const opt of aconexOptions) {
+      for (const t of opt.targets) {
+        const arr = m.get(t) ?? [];
+        if (!arr.includes(opt.field)) arr.push(opt.field);
+        m.set(t, arr);
+      }
+    }
+    return m;
+  }, [aconexOptions]);
+
+  /** 저장값을 편집 selected 세트로 정규화 (원본 헤더 기준). */
+  const normalizePresetFields = (fields: string[]): string[] => {
+    if (mode !== "aconex") return fields;
+    const headerSet = new Set(aconexOptions.map((o) => o.field));
+    const out = new Set<string>();
+    for (const f of fields) {
+      if (headerSet.has(f)) {
+        out.add(f);
+        continue;
+      }
+      // 시스템 필드 키 → 헤더 역매핑
+      const mapped = systemFieldToHeaders.get(f);
+      if (mapped) for (const h of mapped) out.add(h);
+    }
+    return Array.from(out);
+  };
 
   const getLabel = (f: string): string => {
     if (mode === "aconex") {
+      // 이미 헤더 문자열이면 그대로
+      const opt = aconexOptions.find((o) => o.field === f);
+      if (opt) return opt.label;
+      // 시스템 필드 키가 저장돼 있던 경우 라벨 폴백
       return ABD_ACONEX_SYNC_FIELDS.find((o) => o.field === f)?.label ?? f;
     }
     return getAbdLabel(f);
+  };
+
+  const getOptionMeta = (
+    f: string,
+  ): { targets: string[]; teams: string[]; isCanonical: boolean } | null => {
+    if (mode !== "aconex") return null;
+    return aconexOptions.find((o) => o.field === f) ?? null;
   };
 
   const { data: presets = [], isLoading } = useQuery({
@@ -188,6 +318,9 @@ export function AbdImportPresetTable({ mode }: { mode: AbdPresetMode }) {
               canEdit={canEdit}
               fieldOptions={fieldOptions}
               getLabel={getLabel}
+              getOptionMeta={getOptionMeta}
+              normalizeFields={normalizePresetFields}
+              lockedField={mode === "aconex" ? ABD_ACONEX_UNIQUE_HEADER : null}
               onLabelChange={(label) =>
                 updateMutation.mutate({ id: p.id, patch: { label } })
               }
@@ -238,6 +371,9 @@ function PresetRow({
   canEdit,
   fieldOptions,
   getLabel,
+  getOptionMeta,
+  normalizeFields,
+  lockedField,
   onLabelChange,
   onFieldsChange,
   onMoveUp,
@@ -250,6 +386,11 @@ function PresetRow({
   canEdit: boolean;
   fieldOptions: Array<{ field: string; label: string }>;
   getLabel: (f: string) => string;
+  getOptionMeta: (
+    f: string,
+  ) => { targets: string[]; teams: string[]; isCanonical: boolean } | null;
+  normalizeFields: (fields: string[]) => string[];
+  lockedField: string | null;
   onLabelChange: (label: string) => void;
   onFieldsChange: (fields: string[]) => void;
   onMoveUp: () => void;
@@ -259,17 +400,29 @@ function PresetRow({
   const [labelDraft, setLabelDraft] = useState(preset.label);
   const [search, setSearch] = useState("");
 
-  const selected = new Set(preset.fields);
+  const normalized = useMemo(
+    () => normalizeFields(preset.fields),
+    [preset.fields, normalizeFields],
+  );
+  const selected = new Set<string>(normalized);
+  if (lockedField) selected.add(lockedField);
   const filteredOptions = fieldOptions.filter((o) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return o.field.toLowerCase().includes(q) || o.label.toLowerCase().includes(q);
+    const meta = getOptionMeta(o.field);
+    return (
+      o.field.toLowerCase().includes(q) ||
+      o.label.toLowerCase().includes(q) ||
+      (meta?.targets ?? []).some((t) => t.toLowerCase().includes(q))
+    );
   });
 
   const toggle = (field: string) => {
+    if (lockedField && field === lockedField) return;
     const next = new Set(selected);
     if (next.has(field)) next.delete(field);
     else next.add(field);
+    if (lockedField) next.add(lockedField);
     onFieldsChange(Array.from(next));
   };
 
@@ -299,14 +452,15 @@ function PresetRow({
         />
       </div>
       <div className="flex flex-wrap gap-1 items-center">
-        {preset.fields.length === 0 ? (
+        {selected.size === 0 ? (
           <span className="text-xs text-muted-foreground italic">
             필드가 선택되지 않았습니다
           </span>
         ) : (
-          preset.fields.map((f) => (
+          Array.from(selected).map((f) => (
             <Badge key={f} variant="secondary" className="text-[10px]">
               {getLabel(f)}
+              {lockedField === f && <span className="ml-1 opacity-60">🔒</span>}
             </Badge>
           ))
         )}
@@ -332,19 +486,43 @@ function PresetRow({
               <div className="max-h-72 overflow-auto p-1">
                 {filteredOptions.map((o) => {
                   const checked = selected.has(o.field);
+                  const meta = getOptionMeta(o.field);
+                  const isLocked = lockedField === o.field;
                   return (
                     <label
                       key={o.field}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs"
+                      className={`flex items-start gap-2 px-2 py-1.5 rounded hover:bg-muted text-xs ${isLocked ? "opacity-90 cursor-not-allowed" : "cursor-pointer"}`}
                     >
                       <Checkbox
                         checked={checked}
+                        disabled={isLocked}
                         onCheckedChange={() => toggle(o.field)}
+                        className="mt-0.5"
                       />
-                      <span className="flex-1 truncate">{o.label}</span>
-                      <code className="text-[10px] text-muted-foreground truncate max-w-[110px]">
-                        {o.field}
-                      </code>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="truncate font-medium">{o.label}</span>
+                          {isLocked && (
+                            <span className="text-[9px] text-muted-foreground">
+                              (유니크 키)
+                            </span>
+                          )}
+                          {meta && meta.teams.length > 0 && (
+                            <span className="text-[9px] text-muted-foreground">
+                              [{meta.teams.join("/")}]
+                            </span>
+                          )}
+                        </div>
+                        {meta && (
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {meta.targets.length === 0
+                              ? isLocked
+                                ? "→ 매칭 유니크 키"
+                                : "→ (미매핑 — 임포트 시 무시됨)"
+                              : `→ ${meta.targets.join(", ")}`}
+                          </div>
+                        )}
+                      </div>
                     </label>
                   );
                 })}
