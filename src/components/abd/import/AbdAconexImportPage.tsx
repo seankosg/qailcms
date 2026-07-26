@@ -73,6 +73,16 @@ function canonicalHeader(h: string): string {
   return HEADER_ALIASES[key] ?? h;
 }
 
+const SEMANTIC_LABELS: Record<string, string> = {
+  DAR_APPROVED_A: "DAR Approved (A)",
+  DAR_APPROVED_B: "DAR Approved w/ Comments (B)",
+  DAR_REJECTED: "DAR Rejected (C/D)",
+  SUBMITTED: "Submitted (HDEC 우선)",
+  EXCLUDED_TERMINATED: "Terminated (제외)",
+  EXCLUDED_CANCELLED: "Cancelled (제외)",
+  UNKNOWN: "미분류",
+};
+
 interface Entry {
   id: string;
   file: File;
@@ -439,6 +449,20 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
                           {e.preview.by_status.map((s) => (
                             <Badge key={s.code} variant="secondary" className="text-[10px]">
                               {s.code}: {s.count}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {e.preview && e.preview.by_semantic && e.preview.by_semantic.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {e.preview.by_semantic.map((s) => (
+                            <Badge
+                              key={s.semantic}
+                              variant="outline"
+                              className="text-[10px]"
+                              title={SEMANTIC_LABELS[s.semantic] ?? s.semantic}
+                            >
+                              {SEMANTIC_LABELS[s.semantic] ?? s.semantic}: {s.count}
                             </Badge>
                           ))}
                         </div>
