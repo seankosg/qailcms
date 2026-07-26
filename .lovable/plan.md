@@ -1,89 +1,53 @@
-## 최종 계획 (사용자 결정 반영)
+## 목표
+TM 대시보드 KPI 카드의 "IN DELAY"와 "BEHIND SCHEDULE"이 서로 다른 산식으로 계산되어 값이 어긋나는 문제를 해결. 두 카드가 동일한 뜻이므로 **gap 축**을 단일 판정 소스로 삼아 값이 항상 일치하도록 재정렬.
 
-- 오염된 sub 6개는 `actual_progress / 100` 자동 복구
-- 향후 방지: **TM 전체의 Actual Progress 입력은 % 단위(0~100)** 로 통일
+## 현재 문제 (진단)
+`src/lib/task-management/kpi-utils.ts`
+- `In Delay` = `computeJudgment(row) ∈ {지연,위험}` → 3-스테이지 + 임계값(behind_warn_gap, slip_warn_days) 기반
+- `Behind Schedule` = `In Delay ∩ (gap < 0)` → 판정+gap 이중 필터
+→ 두 축이 섞여 서로 다른 값 산출. 스샷의 ELEC 24 vs 22(=2 차이) 원인.
 
-### 1. 편집 UI: percent 컬럼을 % 단위로 (핵심 원천 차단)
+## 단일 소스 정의 (gap 기반)
+`gap(row, asOf) = cumActualProgress(row) − cumPlanProgress(row, asOf)`
+- **In Delay** = 미완료 AND `gap < 0` (Behind와 완전히 동일)
+- **Behind Schedule** = In Delay와 동일 (동의어로 남기고 KPI 계산도 동일 값)
+- **Start Delayed** ⊂ In Delay: `In Delay AND plan_start ≤ asOf AND actual_start 없음`
+- **Completion Overdue** ⊂ In Delay: `In Delay AND plan_end < asOf`
+- **Critical Delay** ⊂ In Delay: `In Delay AND gap < behind_late_gap (기본 −0.10)`
+  · 임계값은 기존 `task_management_settings.behind_late_gap` 재사용(별도 UI 변경 없음)
+  · 자동판정 '위험'과 개념 일치하되 gap 축 하나로 정의 통일
 
-`src/components/task-management/raw-data/EditCellPopover.tsx` (Raw Data + Detail 공용):
-
-- `column.type === "percent"` 분기 추가
-  - 초기 표시값: `Math.round((v ?? 0) * 1000) / 10` (예: 0.3 → 30.0)
-  - `<input type="number" min={0} max={100} step="0.1" />` + 우측 "%" 라벨
-  - 저장 직전 변환: `saved = clamp(Number(input) / 100, 0, 1)` 후 소수 4자리 반올림
-  - NaN·음수·>100 → 토스트 경고 + 저장 취소
-- Detail(`TaskDetailPage.tsx`)의 percent 편집 경로도 같은 팝오버를 쓰므로 자동 반영
-
-### 2. Bulk Edit / Row Add 등 다른 입력 경로 점검·통일
-
-`rg "actual_progress|plan_progress"` 로 식별된 사용자 입력 경로 전수 조사 후 다음도 % 단위로 통일:
-
-- Bulk Edit 다이얼로그(있으면) — actual_progress 입력 필드
-- 신규 행 추가 폼(있으면)
-- 이 조사에서 발견되는 모든 percent 컬럼 입력을 동일 규약(값 표시 % / 저장 fraction)으로 맞춤
-
-식별 후 발견된 각 지점은 계획 실행 중 개별 수정. 미발견 시 이 항목 무해 스킵.
-
-### 3. 임포트 파서 방어
-
-`src/lib/task-management/parser.ts` `toPct4`:
-
-- `n > 1` 이면 `n = n / 100` (엑셀에서 "%" 서식 없이 "30"만 입력된 셀 방어)
-- 이후 `[0, 1]` 로 클램프 후 소수 4자리 반올림
-- 동일 로직을 `plan_progress`, `progress_variance` 에도 자동 적용(기존 호출부 그대로 유지)
-
-### 4. DB 안전망 트리거 (마이그레이션)
-
-`task_management_raw`, `defect_items_raw` 에 BEFORE INSERT/UPDATE 트리거 `trg_*_clamp_progress`:
-
-- 대상: TM `actual_progress`, `plan_progress` / DMR `actual_progress_pct`, `planned_progress_pct`
-- `if v > 1 then v := v / 100; end if;` → `v := least(1, greatest(0, v))`
-- 어떤 경로(수동편집·임포트·트리거·SQL)로 들어와도 [0,1] 강제 유지
-
-### 5. 롤업 함수 정규화 (마이그레이션)
-
-`update_task_summary` 재정의:
-
-- sum 계산의 `actual_progress` / `plan_progress` 를 `least(1, greatest(0, coalesce(..., 0)))` 로 감쌈
-- `all_finished` 도 정규화된 값 기준
-- 저장 직전 결과에도 최종 `least(1, ...)`
-
-### 6. 판정 함수 방어 (마이그레이션 + TS)
-
-- DB `calc_auto_judgment_value`: 진입부 `actual := least(1, greatest(0, coalesce(_actual_progress, 0)))`
-- TS `src/lib/task-management/derived.ts` `computeJudgment`: `actual_progress` 사용 지점 모두 클램프
-- `TaskTreePage.tsx` `resolveMainJudgment`: 
-  - kids `actual_progress` 클램프 후 `allDone` 재판정
-  - **kids 가 있고 `allDone === false` 인 main 은 어떤 경우에도 "완료" 를 반환하지 않도록** 명시 가드 추가 (현재는 syntheticMain 을 computeJudgment 로 위임하여 rolledActual 만으로 완료 판정 발생)
-
-### 7. 오염 데이터 복구 (insert 도구)
-
-TM 사용자 결정에 따라 자동 `/100`:
-
-```sql
-UPDATE public.task_management_raw
-   SET actual_progress = LEAST(1, actual_progress / 100.0)
- WHERE level = 'sub' AND actual_progress > 1;
-
-UPDATE public.task_management_raw
-   SET plan_progress = LEAST(1, plan_progress / 100.0)
- WHERE level = 'sub' AND plan_progress > 1;
-
-SELECT public.rollup_task_all_mains('ARCH');
-SELECT public.rollup_task_all_mains('ELEC');
-SELECT public.rollup_task_all_mains('MECH');
-SELECT public.recalc_task_auto_judgment();
+이 정의로 아래 부등식이 수학적으로 보장됨:
+```
+Start Delayed ≤ In Delay
+Completion Overdue ≤ In Delay
+Critical Delay ≤ In Delay
+Behind Schedule == In Delay
 ```
 
-- 실측 오염: sub 6행(EL-C-13-03=99, C-14-01=85, C-19-01=30, D-10-01=30, D-12-01=85, D-17-01=30), main 6행은 롤업으로 자동 정정
-- DMR 은 현재 오염 0건이나 구조적 방어(1·4항)는 동일 적용
+## 수정 파일
+### `src/lib/task-management/kpi-utils.ts`
+- `isInDelay(row, asOf)` = `!isCompleted(row) && gapAt(row, asOf) < 0` 로 교체 (판정 기반 제거)
+- `isBehindSchedule` 는 `isInDelay` 를 그대로 위임 (동의 함수)
+- `isCriticalDelay(row, asOf, thresholds)` = `isInDelay && gap < thresholds.behind_late_gap`
+- `computeKpi` / `computeKpiBreakdownByTeam` 는 함수 시그니처/반환 필드 유지 — 내부 계산만 위 정의로 갱신
+- 임포트에서 사용하던 `computeJudgment`, `isTaskDelayed` 는 KPI 경로에서 제거
 
-### 8. 검증
+### `src/components/task-management/dashboard/TmKpiCards.tsx`
+- 카드 문구/툴팁을 새 정의에 맞춰 소폭 조정:
+  - IN DELAY 부제: "gap < 0 · 미완료"
+  - BEHIND SCHEDULE 툴팁에 "IN DELAY와 동일 산식(gap 기반)" 안내
+- 카드 배치·색상·딥링크 mode 키는 유지(레이아웃 변경 없음)
 
-- `SELECT count(*) FROM task_management_raw WHERE actual_progress > 1 OR plan_progress > 1;` → 0
-- `SELECT task_no, actual_progress, auto_judgment FROM task_management_raw WHERE task_no IN ('EL-D-17','EL-D-17-01','EL-D-17-02');` — main 은 kids 미완이므로 완료 아님, 01=0.30/정상, 02=0.20/정상
-- 프리뷰에서 EL-D-17 카드가 완료 스타일 미적용, sub 01=30% / sub 02=20% 로 표시, 편집 팝오버가 % 단위로 열리고 "30" 입력 시 DB 에 0.30 저장
+## 영향 범위 (변경 없음 확인)
+- `derived.ts` 의 자동판정(computeJudgment) 로직은 그대로. Raw Data 뱃지, Task Tree, MWS/MTWS의 자동판정은 영향 없음.
+- `isTaskDelayed` 는 대시보드 KPI에서만 호출 경로가 끊기고, MWS의 지연 리스트는 별도로 `computeJudgment` 를 직접 사용하므로 무관.
+- 딥링크 `mode=in_delay|behind|critical|start_delayed|completion_overdue` 라우팅과 Raw Data 필터 UI는 그대로.
 
-### 9. 사용자 안내 (UI 문구)
+## 검증
+1. 스샷 데이터셋(ELEC 24/22) 재조회 시 두 카드 동일 값 확인
+2. Start Delayed / Completion Overdue / Critical Delay ≤ In Delay 부등식 확인
+3. `computeKpiBreakdownByTeam` 팀별 stack 합계 == 카드 값 확인
 
-편집 팝오버 입력창 하단에 소형 힌트 "0~100 사이 % 값 입력 (예: 30)" 표기 및 컬럼 라벨은 기존 "Actual %" 유지.
+## 비고
+자동판정(`위험/지연/주의/정상/완료`)과 KPI 축을 분리해서 유지하는 방식입니다. 판정과 완전 일치를 원하시면 이후 별도 요청으로 조정 가능.
