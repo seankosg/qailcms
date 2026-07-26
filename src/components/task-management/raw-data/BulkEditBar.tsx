@@ -104,7 +104,12 @@ export function BulkEditBar({
     if (field.inputType === "number") {
       if (rawValue === "") return null;
       const n = Number(rawValue);
-      return Number.isFinite(n) ? n : null;
+      if (!Number.isFinite(n)) return null;
+      if (field.isPercent) {
+        const clamped = Math.max(0, Math.min(100, n));
+        return Math.round((clamped / 100) * 10000) / 10000;
+      }
+      return n;
     }
     return rawValue === "" ? null : rawValue;
   })();
@@ -244,15 +249,34 @@ export function BulkEditBar({
                   />
                 )}
                 {field.inputType === "number" && (
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="h-8 w-[160px]"
-                    value={setBlank ? "" : rawValue}
-                    disabled={setBlank}
-                    onChange={(e) => setRawValue(e.target.value)}
-                    placeholder="0"
-                  />
+                  field.isPercent ? (
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.1"
+                        className="h-8 w-[160px] pr-6"
+                        value={setBlank ? "" : rawValue}
+                        disabled={setBlank}
+                        onChange={(e) => setRawValue(e.target.value)}
+                        placeholder="0 ~ 100"
+                      />
+                      <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
+                        %
+                      </span>
+                    </div>
+                  ) : (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      className="h-8 w-[160px]"
+                      value={setBlank ? "" : rawValue}
+                      disabled={setBlank}
+                      onChange={(e) => setRawValue(e.target.value)}
+                      placeholder="0"
+                    />
+                  )
                 )}
                 {field.inputType === "text" && (
                   <Input
