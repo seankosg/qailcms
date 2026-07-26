@@ -16,7 +16,6 @@ import { AbdRow1Kpis, AbdRow2Kpis } from "./AbdKpiRows";
 import {
   AbdRow3StatusDist,
   AbdRow4ApprovalTrend,
-  AbdRow5OverdueHeatmap,
   AbdRow6Attention,
   AbdRow6Crosscut,
 } from "./AbdChartsRows";
@@ -59,7 +58,6 @@ export function AbdDashboardPage() {
     qc.invalidateQueries({ queryKey: ["abd-dash-row2"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-status"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-trend"] });
-    qc.invalidateQueries({ queryKey: ["abd-dash-overdue"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-attention"] });
     qc.invalidateQueries({ queryKey: ["abd-dash-crosscut"] });
   };
@@ -190,10 +188,7 @@ export function AbdDashboardPage() {
         </div>
       </div>
 
-      {/* Row 5 — Overdue Heatmap */}
-      <AbdRow5OverdueHeatmap batchNo={batchFilter} onOpenRaw={openRawData} />
-
-      {/* Row 6 — Attention Lists + Cross-cut */}
+      {/* Row 5 — Attention Lists + Cross-cut */}
       <div className="grid gap-4 xl:grid-cols-2">
         <AbdRow6Attention
           batchNo={batchFilter}
