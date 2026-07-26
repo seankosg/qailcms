@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { todayInDoha } from "@/lib/time/doha";
 
-export type AbdAttentionKind = "needs_plan" | "delayed" | "upcoming";
+export type AbdAttentionKind = "needs_plan" | "revise" | "delayed" | "upcoming";
 
 export interface AbdAttentionRow {
   id: string;
@@ -60,7 +60,7 @@ export function useAbdAttentionInbox({ isAdmin, scope, filterValue, userId }: Op
     staleTime: 60_000,
     queryFn: async () => {
       const cols = [
-        "id,abd_number,document_title,hdec_pic_name,team,latest_status,updated_at,is_terminated,is_active,needs_planning",
+        "id,abd_number,document_title,hdec_pic_name,team,latest_status,updated_at,is_terminated,is_active,needs_planning,needs_revise,revise_source_round",
         "r1_response_result,r2_response_result,r3_response_result",
         "r1_draft_finish_plan,r1_draft_finish_actual,r1_submission_plan,r1_submission_actual,r1_dar_plan,r1_dar_actual",
         "r2_draft_finish_plan,r2_draft_finish_actual,r2_submission_plan,r2_submission_actual,r2_dar_plan,r2_dar_actual",
@@ -98,6 +98,17 @@ export function useAbdAttentionInbox({ isAdmin, scope, filterValue, userId }: Op
         const needsPlan = !!r.needs_planning || !!nr;
         if (needsPlan) {
           out.push({ ...base, kind: "needs_plan", next_round: nr, plan_date: null, days: null });
+        }
+
+        if (r.needs_revise) {
+          const src = r.revise_source_round;
+          out.push({
+            ...base,
+            kind: "revise",
+            next_round: src === 1 ? "R2" : src === 2 ? "R3" : null,
+            plan_date: null,
+            days: null,
+          });
         }
 
         const plan = currentPlan(r);
