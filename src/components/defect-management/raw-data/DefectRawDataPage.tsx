@@ -81,6 +81,17 @@ import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from ".
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
 import { todayIso } from "@/lib/defect-management/stage-utils";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const SYSTEM_FROZEN_IDS = ["__select"];
 // is_critical / stage_progress 는 사용자 드래그/pin/hide 가능한 일반 컬럼으로 취급.
@@ -392,6 +403,7 @@ export function DefectRawDataPage() {
   });
   const rows = itemsData?.rows ?? [];
   const [exportOpen, setExportOpen] = useState(false);
+  const [confirmAllOpen, setConfirmAllOpen] = useState(false);
   const total = itemsData?.total ?? 0;
   const pageCount = isAllPage ? 1 : Math.max(1, Math.ceil(total / pageSize));
 
