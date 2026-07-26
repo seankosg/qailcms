@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "./AbdAgingSettingsPopover";
 import { cn } from "@/lib/utils";
 import {
-  getAbdDashboardStatusDist,
   getAbdDashboardApprovalTrend,
   getAbdDashboardAttentionLists,
   getAbdDashboardCrosscut,
