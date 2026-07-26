@@ -30,10 +30,42 @@ import { todayInDoha } from "@/lib/time/doha";
 import {
   ColumnSelectDialog,
   type ColumnSelectHelpers,
+  type ColumnRequirement,
 } from "@/components/import/ColumnSelectDialog";
 import { ABD_ACONEX_SYNC_FIELDS } from "@/components/admin/AbdImportPresetTable";
 
 type Status = "queued" | "parsing" | "ready" | "previewing" | "preview" | "importing" | "done" | "error";
+
+/**
+ * Aconex Export 파일의 실제 Excel 헤더 → 반영 대상 sync 필드 매핑.
+ * - `Document No` 는 매칭 유니크 키 (항상 필수, 잠금).
+ * - 나머지 헤더를 체크 해제하면 해당 sync 필드가 UPDATE 에서 제외됨.
+ * - 여기서 다루지 않는 헤더(File / Title / Discipline …)는 참고용으로 목록에만 노출.
+ */
+const ACONEX_HEADER_TO_FIELDS: Record<string, string[]> = {
+  "Document No": [], // unique key
+  "Revision": ["latest_rev"],
+  "Status": ["latest_status", "approval_date", "aconex_status_raw"],
+  "Review Status": ["aconex_review_status_raw"],
+  "Date Modified": ["aconex_date_modified"],
+};
+const ACONEX_UNIQUE_HEADER = "Document No";
+/** 파일에 실제 위 헤더가 없을 때 대체 인식 (대문자/공백 정규화 후 비교). */
+const HEADER_ALIASES: Record<string, string> = {
+  "DOCUMENT NO": "Document No",
+  "DOC NO": "Document No",
+  "DOCUMENT NUMBER": "Document No",
+  "REVISION": "Revision",
+  "REV": "Revision",
+  "STATUS": "Status",
+  "REVIEW STATUS": "Review Status",
+  "DATE MODIFIED": "Date Modified",
+  "MODIFIED DATE": "Date Modified",
+};
+function canonicalHeader(h: string): string {
+  const key = h.trim().toUpperCase().replace(/\s+/g, " ");
+  return HEADER_ALIASES[key] ?? h;
+}
 
 interface Entry {
   id: string;
@@ -43,8 +75,12 @@ interface Entry {
   preview?: AconexImportPreview;
   result?: AconexImportPreview & { updated: number };
   error?: string;
-  /** 이 파일에서 UPDATE 제외할 sync 필드 목록 (기본 = 전체 포함). */
-  excludedFields?: string[];
+  /** 이 파일에서 체크 해제된 Excel 헤더 목록 (기본 = 전체 포함). */
+  excludedHeaders?: string[];
+  /** 실제 파일에서 감지된 헤더 목록 (컬럼 선택 다이얼로그 표시용). */
+  fileHeaders?: string[];
+  /** 각 헤더 첫 데이터 행 샘플. */
+  sampleRow?: Record<string, unknown>;
 }
 
 function formatSize(b: number) {
@@ -93,49 +129,78 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
   });
 
   const helpers = useMemo<ColumnSelectHelpers>(() => {
-    const knownSet = new Set(syncFieldKeys);
     return {
-      toFieldName: (h) => h,
-      getRequirement: () => ({ required: false }),
-      isKnownField: (field) => knownSet.has(field),
+      toFieldName: (h) => {
+        const canon = canonicalHeader(h);
+        const fields = ACONEX_HEADER_TO_FIELDS[canon];
+        if (!fields) return "";
+        if (canon === ACONEX_UNIQUE_HEADER) return "abd_number (unique key)";
+        return fields.map((f) => syncLabelMap.get(f) ?? f).join(", ");
+      },
+      getRequirement: (h): ColumnRequirement => {
+        if (canonicalHeader(h) === ACONEX_UNIQUE_HEADER) {
+          return {
+            required: true,
+            reason: "system",
+            message: `"${ACONEX_UNIQUE_HEADER}" 은(는) 매칭 유니크 키입니다. 해제할 수 없습니다.`,
+          };
+        }
+        return { required: false };
+      },
+      isKnownField: (field) => Boolean(field),
       getSourceLabel: () => "Aconex",
       getSourceOrigin: () => "aconex",
     };
-  }, [syncFieldKeys]);
+  }, [syncLabelMap]);
 
-  const presets = useMemo(
-    () => [
-      { id: "__all", label: "전체 선택", matchedHeaders: undefined },
-      ...aconexPresets.map((p) => ({
-        id: p.id,
-        label: p.label,
-        matchedHeaders: p.fields.filter((f) => syncFieldKeys.includes(f)),
-      })),
-    ],
-    [aconexPresets, syncFieldKeys],
-  );
+  /** DB 프리셋(canonical sync 필드 저장)을 파일 헤더 기준으로 변환. */
+  const buildPresetHeaders = (
+    fileHeaders: string[],
+    presetFields: string[],
+  ): string[] => {
+    const keep = new Set(presetFields);
+    return fileHeaders.filter((h) => {
+      const canon = canonicalHeader(h);
+      if (canon === ACONEX_UNIQUE_HEADER) return true; // always keep unique key
+      const fields = ACONEX_HEADER_TO_FIELDS[canon];
+      if (!fields || fields.length === 0) return false;
+      return fields.some((f) => keep.has(f));
+    });
+  };
 
   const columnFile = useMemo(
     () => entries.find((x) => x.id === columnFileId) ?? null,
     [entries, columnFileId],
   );
 
-  const computeApplyFields = (excluded: string[] | undefined): string[] => {
-    const ex = new Set(excluded ?? []);
-    return syncFieldKeys.filter((f) => !ex.has(f));
+  const computeApplyFieldsFromHeaders = (
+    excludedHeaders: string[] | undefined,
+  ): string[] => {
+    const ex = new Set((excludedHeaders ?? []).map(canonicalHeader));
+    const excludedFields = new Set<string>();
+    for (const h of ex) {
+      const fields = ACONEX_HEADER_TO_FIELDS[h];
+      if (fields) for (const f of fields) excludedFields.add(f);
+    }
+    return syncFieldKeys.filter((f) => !excludedFields.has(f));
   };
 
-  const setFileExcludedFields = (id: string, excluded: string[]) => {
+  const presetsForFile = (fileHeaders: string[]) => [
+    { id: "__all", label: "전체 선택", matchedHeaders: undefined },
+    ...aconexPresets.map((p) => ({
+      id: p.id,
+      label: p.label,
+      matchedHeaders: buildPresetHeaders(fileHeaders, p.fields),
+    })),
+  ];
+
+  const setFileExcludedHeaders = (id: string, excluded: string[]) => {
     setEntries((prev) =>
-      prev.map((x) => (x.id === id ? { ...x, excludedFields: excluded } : x)),
+      prev.map((x) => (x.id === id ? { ...x, excludedHeaders: excluded } : x)),
     );
     if (excluded.length > 0) {
-      const shown = excluded
-        .map((f) => syncLabelMap.get(f) ?? f)
-        .slice(0, 3)
-        .join(", ");
       toast.info(
-        `컬럼 선택: 제외 ${excluded.length}개${excluded.length > 3 ? "" : ` — ${shown}`}`,
+        `컬럼 선택: 제외 ${excluded.length}개 — ${excluded.slice(0, 3).join(", ")}${excluded.length > 3 ? " …" : ""}`,
       );
     }
   };
@@ -152,7 +217,15 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
       try {
         setEntries((p) => p.map((x) => (x.id === e.id ? { ...x, status: "parsing" } : x)));
         const parsed = await parseAconexFile(e.file);
-        setEntries((p) => p.map((x) => (x.id === e.id ? { ...x, parsed, status: "previewing" } : x)));
+        // 파일의 원본 헤더 & 첫 데이터 행 샘플 추출 (컬럼 선택 다이얼로그용).
+        const { fileHeaders, sampleRow } = await readFileHeaders(e.file);
+        setEntries((p) =>
+          p.map((x) =>
+            x.id === e.id
+              ? { ...x, parsed, fileHeaders, sampleRow, status: "previewing" }
+              : x,
+          ),
+        );
         const preview = await importAbdAconexBatch({
           data: {
             file_name: e.file.name,
@@ -212,7 +285,7 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
       if (!e.parsed) continue;
       setEntries((p) => p.map((x) => (x.id === e.id ? { ...x, status: "importing" } : x)));
       try {
-        const applyFields = computeApplyFields(e.excludedFields);
+        const applyFields = computeApplyFieldsFromHeaders(e.excludedHeaders);
         if (applyFields.length === 0) {
           throw new Error("적용할 sync 컬럼이 없습니다. 컬럼 선택에서 최소 1개 이상 포함하세요.");
         }
@@ -382,9 +455,9 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
                           disabled={busy || e.status === "importing" || e.status === "done"}
                         >
                           <Columns3 className="h-3.5 w-3.5" /> 컬럼 선택
-                          {e.excludedFields && e.excludedFields.length > 0 && (
+                          {e.excludedHeaders && e.excludedHeaders.length > 0 && (
                             <span className="ml-1 text-[10px] text-muted-foreground">
-                              (제외 {e.excludedFields.length})
+                              (제외 {e.excludedHeaders.length})
                             </span>
                           )}
                         </Button>
@@ -407,14 +480,68 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
             if (!o) setColumnFileId(null);
           }}
           fileName={columnFile.file.name}
-          headers={syncFieldKeys}
-          samples={{}}
-          defaultExcluded={columnFile.excludedFields ?? []}
-          onApply={(excluded) => setFileExcludedFields(columnFile.id, excluded)}
+          headers={columnFile.fileHeaders ?? []}
+          samples={columnFile.sampleRow ?? {}}
+          defaultExcluded={columnFile.excludedHeaders ?? []}
+          onApply={(excluded) => setFileExcludedHeaders(columnFile.id, excluded)}
           helpers={helpers}
-          presets={presets}
+          presets={presetsForFile(columnFile.fileHeaders ?? [])}
+          lockRequired
         />
       )}
     </div>
   );
+}
+
+/** Aconex Export 파일에서 헤더 행과 첫 데이터 행 샘플만 가볍게 추출. */
+async function readFileHeaders(
+  file: File,
+): Promise<{ fileHeaders: string[]; sampleRow: Record<string, unknown> }> {
+  const XLSX = await import("xlsx");
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf);
+  const sheetName =
+    wb.SheetNames.find((n) => n.toUpperCase() === "DOCS") ?? wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const ref = ws["!ref"];
+  if (!ref) return { fileHeaders: [], sampleRow: {} };
+  const range = XLSX.utils.decode_range(ref);
+  const scanEnd = Math.min(range.s.r + 29, range.e.r);
+  // 헤더 행 = "Document No" / "Status" 셀 포함한 최상단 행.
+  let headerRow = -1;
+  const norm = (v: any) =>
+    String(v ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+  for (let r = range.s.r; r <= scanEnd; r++) {
+    let hasDoc = false;
+    let hasStatus = false;
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const v = norm(ws[XLSX.utils.encode_cell({ r, c })]?.v);
+      if (["DOCUMENT NO", "DOC NO", "DOCUMENT NUMBER"].includes(v)) hasDoc = true;
+      if (v === "STATUS") hasStatus = true;
+    }
+    if (hasDoc && hasStatus) {
+      headerRow = r;
+      break;
+    }
+  }
+  if (headerRow < 0) return { fileHeaders: [], sampleRow: {} };
+  const headers: string[] = [];
+  const colByHeader: Record<string, number> = {};
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const v = ws[XLSX.utils.encode_cell({ r: headerRow, c })]?.v;
+    if (v == null || String(v).trim() === "") continue;
+    const label = String(v).trim();
+    headers.push(label);
+    colByHeader[label] = c;
+  }
+  const sample: Record<string, unknown> = {};
+  const dataRow = headerRow + 1;
+  if (dataRow <= range.e.r) {
+    for (const h of headers) {
+      const c = colByHeader[h];
+      const v = ws[XLSX.utils.encode_cell({ r: dataRow, c })]?.v;
+      sample[h] = v ?? "";
+    }
+  }
+  return { fileHeaders: headers, sampleRow: sample };
 }
