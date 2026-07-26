@@ -76,6 +76,15 @@ export type AconexImportPreview = {
     semantic: string;
     changes: Array<{ field: string; previous: string | null; next: string | null }>;
   }>;
+  /** Termination/Cancelled 로 감지되어 해당 라운드가 재제출 대기 상태로 리셋된 도면 목록. */
+  terminated_reset: Array<{
+    document_no: string;
+    round: 1 | 2 | 3;
+    prev_submission_actual: string | null;
+    prev_response_result: string | null;
+    date_modified: string | null;
+    semantic: "EXCLUDED_TERMINATED" | "EXCLUDED_CANCELLED";
+  }>;
 };
 
 export type AconexImportResult = AconexImportPreview & {
@@ -128,7 +137,11 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       "abd_number,latest_status,latest_status_norm,is_terminated,active_round," +
       "r1_submission_actual,r2_submission_actual,r3_submission_actual," +
       "r1_dar_actual,r2_dar_actual,r3_dar_actual," +
-      "r1_response_result,r2_response_result,r3_response_result";
+      "r1_response_result,r2_response_result,r3_response_result," +
+      "r1_ds_actual,r2_ds_actual,r3_ds_actual," +
+      "r1_df_actual,r2_df_actual,r3_df_actual," +
+      "r1_ds_plan,r2_ds_plan,r3_ds_plan," +
+      "r1_df_plan,r2_df_plan,r3_df_plan";
     for (let i = 0; i < docNos.length; i += CHUNK) {
       const slice = docNos.slice(i, i + CHUNK);
       const { data: rows, error } = await supa
@@ -158,9 +171,21 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     };
     const fieldDiffCounts = new Map<string, number>();
     const diffs: Diff[] = [];
+    const terminatedReset: AconexImportPreview["terminated_reset"] = [];
     for (const r of matched) {
       const existing = existingRows.get(r.document_no) ?? {};
       const patch = computePatch(r, existing, allowed);
+      if (r.semantic === "EXCLUDED_TERMINATED" || r.semantic === "EXCLUDED_CANCELLED") {
+        const n = resolveActiveRound(existing);
+        terminatedReset.push({
+          document_no: r.document_no,
+          round: n,
+          prev_submission_actual: existing[`r${n}_submission_actual`] ?? null,
+          prev_response_result: existing[`r${n}_response_result`] ?? null,
+          date_modified: r.date_modified ?? null,
+          semantic: r.semantic,
+        });
+      }
       const changes: Diff["changes"] = [];
       for (const [field, next] of Object.entries(patch)) {
         if (META_FIELDS.has(field)) continue;
@@ -206,6 +231,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
           semantic,
           changes,
         })),
+      terminated_reset: terminatedReset,
     };
 
     if (!data.apply) {
