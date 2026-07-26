@@ -1,57 +1,87 @@
+# ABD Raw Data 필터 → TM 크로스필터 이식
 
-## 왜 갑자기 어긋났나 (회귀 원인)
+## 목표
 
-정합성 축이 세 곳에서 조금씩 추가되었는데 **수신부(Raw Data)** 만 함께 갱신되지 않아 누적된 격차가 이번에 드러났습니다. 커밋 이력으로 확인.
+ABD Raw Data의 컬럼 필터 드롭다운을 TM Raw Data와 **동일한 크로스필터 동작·UI·타입 커버리지**로 통일한다. 자기 필터만 제외하고 team·status·plot·검색어·다른 컬럼 필터가 모두 옵션 목록과 카운트에 실시간 반영되며, 0건 옵션은 숨긴다.
 
-- **2026-07-20 (`722b7d17`)**: Raw Data 라우트에 `validateSearch` 스키마 도입 — 이때 필드는 `source/mode/asOf/team/hdec_pic_name/hdec_eng_name/discipline` 만 정의. 이후 스키마에 없는 URL 파라미터는 조용히 버려짐.
-- **2026-07-23 (`106a18a9`)**: `TmDashboardPage` 에 Task 스코프(`taskScope`) 토글 및 `plot` 오너 필터 확장 도입. Dashboard KPI 계산 base 가 좁아짐.
-- **2026-07-24 (`5b871c70`)**: `TmKpiCards.goRaw` 가 `taskScope` 를 URL 에 실어 보내기 시작. 그러나 수신 스키마에 `taskScope` 가 없어 이 값은 라우터에 도착 즉시 소실되고, 그 결과 Raw Data 는 항상 `scope='all'` 로 폴백.
-- 같은 시점의 `useTaskDashboardData` 는 `plot`, `q` 를 서버 쿼리에 적용해 KPI base 를 축소하지만, `goRaw` 는 이 두 축을 URL 로 넘기지 않음. 수신 스키마에도 없음.
-- Delay 계열 KPI 딥링크 표시에서 이슈 Sub 를 컨텍스트로 함께 노출하는 `extraSubs` 로직(`TaskManagementRawDataPage.tsx:567-600`) 이 도입되었으나, 화면에는 그것이 "컨텍스트" 임을 알리는 표기가 없어 카드 숫자와 리스트 개수의 차이가 그대로 오해로 남음.
+## 현재 상태 요약 (확인 완료)
 
-즉 **각 커밋은 단독으로는 유효했으나, 라우트 스키마 확장 · 링크 페이로드 확장 · Raw Data 수신 로직 확장이 서로 다른 시점에 부분적으로만 이루어지면서 표시 축(plot/q/taskScope)이 조용히 손실**되었고, 여기에 delay 컨텍스트 Sub 삽입이 겹쳐 편차가 커진 것입니다. 논리 자체가 파괴된 것은 아니고 필드 배선 유실입니다.
+- ABD `useAbdFacet`(`src/hooks/useAbdItems.ts:98-137`)은 **이미 자기 컬럼을 제외한 다른 필터·team·status·plot·q를 서버로 넘긴다.** 훅 자체는 크로스필터 규칙과 동일함.
+- 서버 RPC `abd_items_facets`(`supabase/migrations/20260726070306_*.sql:147-253`)도 동일 규칙 준수. 단 **비어있음(NULL/'')은 group에서 제외**하여 `(Empty)` 카운트를 반환하지 않음.
+- `AbdMultiSelectDropdown`(`src/components/abd/raw-data/AbdColumnFilterDropdowns.tsx:43-51`)은
+  - `options` prop(정적 전체 목록)을 서버 facet에 병합해 **0건 옵션을 항상 노출** → 사용자가 "카운트가 안 바뀐다"고 체감하는 주 원인.
+  - `(Empty)` 카운트를 하드코딩 0으로 표시.
+  - 정렬이 라벨 asc → TM은 카운트 desc, 값 asc.
+  - `Select all`은 `filteredItems` 대상 (TM과 동일).
+- 타입 커버리지: ABD는 `multi-select / date-range / text`만 제공. TM은 추가로 `number-range`, `stage-progress` 존재.
 
-## 수정 계획 (선택안 반영: 컨텍스트 Sub 유지 + 명시 뱃지)
+## 변경 범위
 
-### A. 라우트 검색 스키마 확장 — `src/routes/_authenticated/closure/task-management/raw-data.tsx`
-`searchSchema` 에 다음을 추가(전부 CSV 문자열, `fallback(z.string(), "").default("")`):
-- `taskScope` — `all | main | sub` 는 컴포넌트 단에서 폴백 검증.
-- `plot`
-- `q`
+### 1) DB — `(Empty)` 카운트 지원
 
-### B. 링크 페이로드 확장 — `src/components/task-management/dashboard/TmKpiCards.tsx`
-`Props` 에 `plots?: string[]`, `q?: string` 추가.
-`goRaw` / `goRawWithTeam` 두 함수 모두에서 다음을 URL 에 실어보냄.
-- `plot = plots.join(",")`
-- `q = q`
-- (기존) `team / hdec_pic_name / hdec_eng_name / discipline / taskScope / mode / asOf / source`
+`supabase/migrations/`에 새 마이그레이션 추가하여 `abd_items_facets`가 `(Empty)` 그룹을 함께 반환:
 
-호출부 — `src/components/task-management/dashboard/TmDashboardPage.tsx` 의 `<TmKpiCards ... ownerContext={{…}}>` 에 `plots: search.plot`, `q: search.q` 추가.
+```sql
+-- group by 절 전 UNION ALL로 empty count 합산
+select value, cnt from (
+  select %I::text as value, count(*)::bigint as cnt
+    from public.abd_items_raw where %s and %I is not null and %I::text <> ''
+    group by %I
+  union all
+  select '__EMPTY__'::text, count(*)::bigint
+    from public.abd_items_raw where %s and (%I is null or %I::text = '')
+) t
+order by (value = '__EMPTY__') asc, cnt desc, value asc
+limit %s
+```
 
-### C. Raw Data 수신 로직 확장 — `TaskManagementRawDataPage.tsx` (l.336~383 대시보드 진입 useEffect)
-- `push("plot", s.plot)` 을 `columnFilters` 에 추가.
-- `setGlobalFilter(s.q)` / `setSearchInput(s.q)` 로 검색 문자열 반영(현행 `""` 리셋 라인을 대체).
-- `taskScope` 는 스키마 확장 후 정상 도착 — `kpiMode.scope` 그대로 반영.
+프론트는 `EMPTY_TOKEN` (`src/lib/abd/filter-fns.ts` 기존값)과 일치시켜 매핑.
 
-### D. 컨텍스트 Sub 유지 + 명시 뱃지 (선택안)
-`kpiFilteredRows` 자체는 현행 유지(매칭 + 이슈 Sub). 대신 툴바에 뱃지 한 줄을 추가해 사용자가 오해하지 않도록:
-- 카운트를 계산할 때 `matched.length`(KPI 카드 정의와 100% 일치)와 `extraSubs.length` 를 각각 반환하도록 `kpiFilteredRows` 결과 형태를 소폭 변경 → useMemo 반환값을 `{ rows, matchCount, contextCount }` 로 개편, 표에는 `rows` 사용, 뱃지에는 두 카운트 사용.
-- 스티키 헤더 좌측에 뱃지 노출(예):
-  - `KPI: In Delay · asOf 2026-07-26 · scope All`
-  - `매치 342건 (카드 숫자와 동일)   ·   컨텍스트 Sub 87건 (하위 이슈 참고용)`
-  - 오른쪽 끝에 `[컨텍스트 Sub 숨기기]` 토글(로컬 상태) 추가 — 클릭 시 매치만 노출 → 카드 숫자와 화면 리스트가 완전 일치하는지 눈으로 즉시 검증 가능.
-- 뱃지는 KPI 딥링크 모드(`kpiMode !== null`) 일 때만 렌더.
+### 2) 프론트 — `AbdMultiSelectDropdown` TM 화(化)
 
-### E. 방어 장치 — 축 배선 회귀를 조기 검출
-- `TaskManagementRawDataPage` 에 dev 전용 `console.warn` 을 추가: `source=dashboard` 인데 `search` 에 정의되지 않은(스키마가 삼킨) 키가 존재하면 경고. 실제 검사는 dashboard 진입 훅 내부에서 `Object.keys(location.searchStr)` 파싱으로 수행.
-- 이렇게 하면 다음에 또 새 필터 축이 dashboard 에 추가되고 스키마가 누락됐을 때 개발 중에 즉시 노출됨.
+`src/components/abd/raw-data/AbdColumnFilterDropdowns.tsx`
 
-## 기술 세부
+- **옵션 소스를 서버 facet 전용으로 전환**: 정적 `options` prop은 라벨 매핑용 dictionary로만 사용하고 목록에는 병합하지 않음 → 0건 옵션 자연 소거.
+- `(Empty)`는 서버가 반환한 empty 카운트가 0이면 숨김. 사용자가 이미 선택한 값은 카운트 0이어도 유지 노출 (TM과 동일).
+- 정렬을 TM과 일치: 카운트 desc → 값 asc, `(Empty)`는 최상단.
+- 카운트 뱃지 스타일·행 hover·(Empty) 흐림 처리 등 TM `MultiSelectDropdown` 시각과 픽셀 톤 통일.
+- 로딩 중 스켈레톤 한 줄 표시(현재 없음) — 서버 응답 대기 UX 개선.
 
-- CSV 직렬화 관례 유지: 팀/PIC/Eng 는 콤마 조인, 개별 값 내 콤마는 dashboard 필터 UI 상 발생하지 않음(고정 옵션).
-- `EMPTY_TOKEN` 은 `goRawWithTeam` 에서만 단일 값으로 실어보내므로 CSV 조인 이슈 없음.
-- 뱃지 카운트는 delay 계열이 아닌 모드(`completed / planned_started / actual_started / wip / not_started` 등) 에서는 `matched === rows` 이므로 자동으로 `컨텍스트 Sub 0건` 로 표기되어 어색하지 않게 처리.
-- 이 변경은 서버 스키마/RPC/DB 변경 없음. 프런트 정합성 이슈만 수정.
+### 3) 프론트 — TM 타입 이식
 
-## 확인 완료
-사용자가 (대안) 컨텍스트 Sub 유지 + 명시 뱃지 를 선택함 — 위 D 로 반영.
+ABD에 없는 두 타입을 신설:
+
+- `AbdNumberRangeDropdown` — TM `NumberRangeDropdown`과 동일 UX. 서버는 이미 `num_range` op 지원.
+- `AbdStageProgressDropdown` — TM 스타일 3섹션(Start/Alarm/Finish). ABD는 라운드 기반이라 완전 동일하진 않으므로 **1차는 스캐폴딩만 배치하고 실제 컬럼에 연결하지 않음**. 활성 대상 컬럼이 정해질 때 meta에서 `filterType: "stage-progress"` 선언으로 켤 수 있게 훅업.
+  - (이 항목은 사용자 확인 후 실제 컬럼에 연결. 현재 ABD 컬럼 정의에 `stage-progress` 대상이 없음.)
+
+`AbdColumnFilterDropdown` 스위치에 `number-range`, `stage-progress` 케이스 추가.
+
+### 4) 방어 로직
+
+- Dev 경고: `useAbdFacet`이 `otherFilters` 계산 후 `column === undefined`이거나 결과가 오래 stale일 때 콘솔 힌트.
+- Popover가 다시 열릴 때 최신 필터 스냅샷을 확실히 재요청하도록 `staleTime`을 60s → 15s로 낮추고, `refetchOnMount: "always"`로 크로스필터 지연 체감 제거.
+
+## 기술 상세
+
+- 서버 함수 시그니처 유지, 반환 컬럼 이름 `value/cnt` 유지 → 클라 훅 변경 최소화.
+- `EMPTY_TOKEN`은 프론트 상수와 SQL의 `'__EMPTY__'`가 문자열 일치해야 함. 현재 프론트 값 확인 후 SQL 리터럴을 맞춤.
+- TM의 `getFacetedRowModel` 흐름을 그대로 옮기지 않음 — ABD는 서버 페이지네이션 데이터라 클라이언트 faceted 모델을 만들 원본이 없다. 대신 **서버 RPC가 이미 정확한 크로스카운트를 제공**하므로 프론트는 소비만 개선.
+
+## 영향 없는 것
+
+- ABD 라우트 스키마, URL 파라미터, 팀/status/plot 토글 로직은 그대로.
+- Dashboard/Progress/Attention 등 타 페이지 무관.
+- TM 파일은 편집하지 않음(참조만).
+
+## 파일 목록
+
+- 수정: `src/components/abd/raw-data/AbdColumnFilterDropdowns.tsx`, `src/hooks/useAbdItems.ts` (staleTime/refetch 정책)
+- 신규: `supabase/migrations/<ts>_abd_facets_include_empty.sql`
+
+## 검증
+
+1. ABD Raw Data에서 team=MECH 선택 → `dis` 드롭다운을 열면 MECH에 존재하는 값만 표기되고 카운트가 실제 필터 결과와 일치.
+2. `hdec_pic_name`을 선택 → `doc_ax` 옵션 목록이 그 PIC의 도면 값만으로 즉시 좁혀짐(0건은 사라짐, 이미 선택된 값은 유지).
+3. 검색어 입력 후 다른 컬럼 드롭다운 오픈 → 검색 반영된 카운트가 표시.
+4. 비어있는 값이 있는 컬럼은 `(Empty) · N` 표기, 없으면 항목 숨김.
