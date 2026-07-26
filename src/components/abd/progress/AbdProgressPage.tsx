@@ -627,8 +627,8 @@ export function AbdProgressPage() {
 
 function ToolbarGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="flex items-center gap-2 border-l pl-3 first:border-l-0 first:pl-0">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
       {children}
     </div>
   );
