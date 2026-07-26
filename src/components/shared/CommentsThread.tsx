@@ -154,8 +154,11 @@ export function CommentsThread({
     const trimmed = message.trim();
     if (!trimmed) return;
     if (trimmed.length > 2000) return toast.error("Message too long (max 2000 chars)");
-    setSending(true);
     const parentCategory = replyTo?.category ?? category;
+    if (!replyTo && !parentCategory) {
+      return toast.error("카테고리를 선택해주세요");
+    }
+    setSending(true);
     const payload: Record<string, unknown> = {
       [parentKey]: parentValue,
       parent_comment_id: replyTo?.id ?? null,
