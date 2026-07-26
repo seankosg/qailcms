@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "./AbdAgingSettingsPopover";
 import { cn } from "@/lib/utils";
 import {
-  getAbdDashboardStatusDist,
   getAbdDashboardApprovalTrend,
   getAbdDashboardAttentionLists,
   getAbdDashboardCrosscut,
@@ -35,87 +34,7 @@ interface BaseProps {
   onOpenDetail?: (id: string, focus?: "rounds" | "aconex" | "comments") => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  Approved: "hsl(142 71% 45%)",
-  UR: "hsl(217 91% 60%)",
-  DS: "hsl(38 92% 50%)",
-  NS: "hsl(0 72% 51%)",
-  Other: "hsl(var(--muted-foreground))",
-};
 
-/** Row 3 — Latest Status Distribution */
-export function AbdRow3StatusDist({ plots = [], teams = [], batchNo = [], onOpenRaw }: BaseProps) {
-  const fn = useServerFn(getAbdDashboardStatusDist);
-  const { data } = useQuery({
-    queryKey: ["abd-dash-status", plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
-    staleTime: 30_000,
-  });
-  const rows = data ?? [];
-  const total = rows.reduce((s, r) => s + r.cnt, 0) || 1;
-  const pieData = rows.map((r) => ({
-    name: r.status || "Other",
-    value: r.cnt,
-    fill: STATUS_COLORS[r.status] ?? STATUS_COLORS.Other,
-  }));
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Latest Status Distribution</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 md:grid-cols-[220px,1fr] items-center">
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 6,
-                    fontSize: 12,
-                  }}
-                />
-                <Pie
-                  data={pieData}
-                  innerRadius={48}
-                  outerRadius={82}
-                  paddingAngle={2}
-                  dataKey="value"
-                  stroke="hsl(var(--background))"
-                  strokeWidth={2}
-                >
-                  {pieData.map((d, i) => (
-                    <Cell key={i} fill={d.fill} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <ul className="space-y-1.5">
-            {rows.map((r) => {
-              const pct = Math.round((r.cnt / total) * 100);
-              const color = STATUS_COLORS[r.status] ?? STATUS_COLORS.Other;
-              return (
-                <li
-                  key={r.status}
-                  className="grid grid-cols-[16px,1fr,auto,60px] items-center gap-2 rounded px-1 py-1 text-sm cursor-pointer hover:bg-muted/40"
-                  onClick={() => onOpenRaw({ status_group: r.status.toLowerCase() })}
-                >
-                  <span className="h-3 w-3 rounded-sm" style={{ background: color }} />
-                  <span className="truncate">{r.status || "Other"}</span>
-                  <span className="tabular-nums font-medium">{r.cnt.toLocaleString()}</span>
-                  <span className="tabular-nums text-right text-muted-foreground">{pct}%</span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 /** Row 4 — Approval Trend (last N months, stacked by team) */
 export function AbdRow4ApprovalTrend({ plots = [], teams = [], batchNo = [], months = 12 }: BaseProps & { months?: number }) {
