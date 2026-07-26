@@ -49,6 +49,26 @@ import { useModuleGuard } from "@/hooks/useModuleGuard";
 import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 import { DateIssuesPanel } from "@/components/import/DateIssuesPanel";
 import type { DateIssue } from "@/lib/import/date-audit";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RefreshCw } from "lucide-react";
+import { AbdAconexImportPage } from "./AbdAconexImportPage";
+
+type AconexSyncKey =
+  | "latest_status"
+  | "latest_rev"
+  | "approval_date"
+  | "aconex_status_raw"
+  | "aconex_review_status_raw"
+  | "aconex_date_modified";
+const ACONEX_SYNC_OPTIONS: Array<{ key: AconexSyncKey; label: string; hint: string }> = [
+  { key: "latest_status", label: "Latest Status", hint: "A / B / C / D / UR / CX / TM" },
+  { key: "latest_rev", label: "Latest Rev", hint: "Aconex Revision 값" },
+  { key: "approval_date", label: "Approval Date", hint: "Status=A 인 경우 Date Modified 로 반영" },
+  { key: "aconex_status_raw", label: "Aconex Status (원본)", hint: "감사용 원본 문자열" },
+  { key: "aconex_review_status_raw", label: "Aconex Review Status (원본)", hint: "감사용 원본 문자열" },
+  { key: "aconex_date_modified", label: "Aconex Date Modified", hint: "Aconex 최종 수정일" },
+];
 
 type Status = "queued" | "parsing" | "ready" | "importing" | "done" | "error";
 
@@ -90,6 +110,8 @@ function formatSize(b: number) {
 
 export function AbdImportPage() {
   const [entries, setEntries] = useState<FileEntry[]>([]);
+  const [mode, setMode] = useState<"normal" | "aconex">("normal");
+  const [syncFields, setSyncFields] = useState<AconexSyncKey[]>(() => ACONEX_SYNC_OPTIONS.map((o) => o.key));
   const [busy, setBusy] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const cancelRequestedRef = useRef(false);
@@ -368,9 +390,88 @@ export function AbdImportPage() {
       <div>
         <h1 className="text-xl font-semibold">ABD — Import</h1>
         <p className="text-sm text-muted-foreground">
-          원본 엑셀(다단 헤더)을 그대로 업로드하면 자동으로 파싱 · 평탄화 저장합니다. 재업로드 시 ABD_NUMBER 기준 upsert.
+          Normal 모드: 원본 엑셀(다단 헤더)을 업로드해 파싱·평탄화 저장(ABD_NUMBER upsert). ·
+          Aconex Sync 모드: Aconex에서 다운로드한 Docs 시트로 <b>기존 항목의 상태/리비전만 갱신</b>합니다.
         </p>
       </div>
+
+      <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
+        <TabsList>
+          <TabsTrigger value="normal">
+            <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" /> Normal Import
+          </TabsTrigger>
+          <TabsTrigger value="aconex">
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Aconex Sync
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="aconex" className="mt-4 space-y-4">
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Aconex Sync 규칙</AlertTitle>
+            <AlertDescription className="text-xs space-y-1">
+              <div>· Aconex Docs 시트를 업로드 → <code>Document No = ABD_NUMBER</code> 기준으로 매칭합니다.</div>
+              <div>· DB에 없는 Document No는 <b>자동 INSERT 되지 않고</b> 미매칭 목록으로 리포트됩니다.</div>
+              <div>· 아래 <b>Sync 필드</b>에서 체크한 컬럼만 실제 UPDATE 됩니다. 라운드 계획/실적은 절대 덮어쓰지 않습니다.</div>
+              <div>· Approval Date는 <code>Status=A</code> 이고 Date Modified가 있을 때만 갱신됩니다.</div>
+            </AlertDescription>
+          </Alert>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Sync 대상 필드 선택</CardTitle>
+              <CardDescription>이번 업로드에서 실제로 UPDATE 할 컬럼만 체크하세요. (기본: 전체)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {ACONEX_SYNC_OPTIONS.map((opt) => {
+                  const checked = syncFields.includes(opt.key);
+                  return (
+                    <label
+                      key={opt.key}
+                      className={`flex items-start gap-2 rounded border p-2 cursor-pointer transition ${
+                        checked ? "border-primary/60 bg-primary/5" : "hover:bg-muted/40"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setSyncFields((prev) =>
+                            v ? Array.from(new Set([...prev, opt.key])) : prev.filter((k) => k !== opt.key),
+                          );
+                        }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium">{opt.label}</div>
+                        <div className="text-[11px] text-muted-foreground">{opt.hint}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <button
+                  type="button"
+                  className="rounded border px-2 py-0.5 hover:bg-muted"
+                  onClick={() => setSyncFields(ACONEX_SYNC_OPTIONS.map((o) => o.key))}
+                >전체 선택</button>
+                <button
+                  type="button"
+                  className="rounded border px-2 py-0.5 hover:bg-muted"
+                  onClick={() => setSyncFields([])}
+                >전체 해제</button>
+                <span>선택 {syncFields.length} / {ACONEX_SYNC_OPTIONS.length}</span>
+                {syncFields.length === 0 && (
+                  <span className="text-destructive">최소 1개 이상 선택해야 Sync 가 실행됩니다.</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <AbdAconexImportPage syncFields={syncFields} hideHeader />
+        </TabsContent>
+
+        <TabsContent value="normal" className="mt-4 space-y-4">
 
       {unknownTeamCodes.length > 0 && (
         <Alert variant="destructive">
@@ -518,6 +619,8 @@ export function AbdImportPage() {
         onRegistered={() => { /* team_master invalidation via qc; entries의 team 문자열은 유지 */ }}
       />
       <ModuleGuardDialog {...guard.dialogProps} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
