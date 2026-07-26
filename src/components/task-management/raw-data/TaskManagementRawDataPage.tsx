@@ -482,15 +482,6 @@ export function TaskManagementRawDataPage() {
     return latest;
   }, [rows]);
 
-  const dataDateOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of rows) {
-      const d = (r as any).data_date as string | null | undefined;
-      if (d) set.add(String(d).slice(0, 10));
-    }
-    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
-  }, [rows]);
-
   // Data Date 는 Dashboard 의 설정을 세션 전역으로 공유. Raw Data 자체 픽커는 폐기.
   const [sharedDataDate] = useTmDataDate();
   const selectedDataDate = sharedDataDate || (latestDataDate ?? "");
