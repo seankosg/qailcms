@@ -162,7 +162,7 @@ export function TmKpiCards({
           showPercentFirst
           onClick={() => goRaw("in_delay")}
           breakdown={toBreakdownRows("in_delay", breakdown.inDelay)}
-          formula={`지연 우산 KPI\n= 미완료 & 스테이지 worst-of 판정 ∈ {지연, 위험}\nasOf=${asOfDate} · scope=${SCOPE_LABEL[taskScope]}\n하위 4개 카드는 모두 In Delay ∩ <원자 조건>`}
+          formula={`지연 우산 KPI (gap 단일 소스)\n= 미완료 & (Actual% − CumPlan% < 0)\nasOf=${asOfDate} · scope=${SCOPE_LABEL[taskScope]}\nBehind Schedule 과 동일 산식`}
         />
       </div>
 
@@ -206,7 +206,7 @@ export function TmKpiCards({
           tone="danger"
           onClick={() => goRaw("critical")}
           breakdown={toBreakdownRows("critical", breakdown.criticalDelay)}
-          formula="미완료 & 스테이지 worst-of 판정 = 위험 (Critical ⊂ In Delay)"
+          formula={`In Delay ∩ (gap < ${t.behind_late_gap})`}
         />
         <RiskKpiCard
           label="Behind Schedule"
@@ -215,7 +215,7 @@ export function TmKpiCards({
           tone="danger"
           onClick={() => goRaw("behind")}
           breakdown={toBreakdownRows("behind", breakdown.behindSchedule)}
-          formula="In Delay ∩ (Actual% − CumPlan% < 0)"
+          formula="In Delay 와 동일 산식 (gap<0 · 미완료)"
         />
       </div>
     </div>
