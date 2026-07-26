@@ -40,6 +40,10 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string> = {
   task_management_import_logs: "id",
   task_schedule_change_audit: "id",
   spare_parts_import_logs: "id",
+  abd_settings: "id",
+  abd_import_presets: "id",
+  abd_comments: "id",
+  abd_change_log: "id",
 };
 
 export type SnapshotManifest = {

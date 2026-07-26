@@ -22,6 +22,7 @@ import { cumPlanProgress, cumActualProgress, computeVariance } from "@/lib/task-
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
 import { CommentsInbox } from "./CommentsInbox";
+import { AttentionInbox } from "./AttentionInbox";
 
 function fmtDate(d?: string | null): string {
   if (!d) return "-";
@@ -333,6 +334,13 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
       </header>
 
       <CommentsInbox
+        userId={me?.id ?? null}
+        scope={scope}
+        filterValue={filterValue}
+        isAdmin={isAdmin}
+      />
+
+      <AttentionInbox
         userId={me?.id ?? null}
         scope={scope}
         filterValue={filterValue}
