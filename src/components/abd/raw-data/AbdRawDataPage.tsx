@@ -61,7 +61,8 @@ import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "@/components/a
 
 const SYSTEM_FROZEN_IDS: string[] = [];
 const DEFAULT_ORDER = ABD_COLUMNS.map((c) => c.key);
-const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
+const PAGE_SIZE_OPTIONS: Array<number | "all"> = [50, 100, 200, 500, "all"];
+const ALL_LIMIT = 1_000_000;
 
 function parseSortFromUrl(s: string): SortingState {
   if (!s) return [{ id: "sl_no", desc: false }];
@@ -207,8 +208,16 @@ export function AbdRawDataPage() {
     ["hide", "only", "all"].includes(String(urlSearch.excluded ?? "")) ? (urlSearch.excluded as any) : "hide";
   // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
   const includeInactive = false;
-  const page = Math.max(1, Number(urlSearch.page) || 1);
-  const pageSize = PAGE_SIZE_OPTIONS.includes(Number(urlSearch.pageSize)) ? Number(urlSearch.pageSize) : 100;
+  const rawPageSize = String(urlSearch.pageSize ?? "");
+  const pageSizeSel: number | "all" =
+    rawPageSize === "all"
+      ? "all"
+      : (PAGE_SIZE_OPTIONS as Array<number | "all">).includes(Number(rawPageSize))
+        ? Number(rawPageSize)
+        : 100;
+  const isAllPage = pageSizeSel === "all";
+  const pageSize = isAllPage ? ALL_LIMIT : (pageSizeSel as number);
+  const page = isAllPage ? 1 : Math.max(1, Number(urlSearch.page) || 1);
 
   const viewPref = useUserViewPreference(`abd.raw-data.${team}.v1`);
   const { defaultOrder: cfgDefaultOrder, defaultVisibility: cfgDefaultVisibility } = useAbdDefaults();
@@ -303,7 +312,7 @@ export function AbdRawDataPage() {
   });
   const rows = itemsData?.rows ?? [];
   const total = itemsData?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pageCount = isAllPage ? 1 : Math.max(1, Math.ceil(total / pageSize));
 
   const { data: counts } = useAbdCounts({ team, includeInactive, plot: plotFilter });
   const dataDate = counts?.latest_data_date ?? null;
@@ -594,19 +603,34 @@ export function AbdRawDataPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="text-muted-foreground">
-          {total > 0 ? `${((page - 1) * pageSize + 1).toLocaleString()}–${Math.min(page * pageSize, total).toLocaleString()} / ${total.toLocaleString()}` : "0 / 0"}
+          {total > 0
+            ? isAllPage
+              ? `1–${total.toLocaleString()} / ${total.toLocaleString()}`
+              : `${((page - 1) * pageSize + 1).toLocaleString()}–${Math.min(page * pageSize, total).toLocaleString()} / ${total.toLocaleString()}`
+            : "0 / 0"}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">페이지 크기</span>
-          <Select value={String(pageSize)} onValueChange={(v) => setUrl({ pageSize: Number(v), page: 1 })}>
+          <Select
+            value={String(pageSizeSel)}
+            onValueChange={(v) =>
+              setUrl({ pageSize: v === "all" ? ("all" as any) : (Number(v) as any), page: 1 })
+            }
+          >
             <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>{PAGE_SIZE_OPTIONS.map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
+            <SelectContent>
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <SelectItem key={String(n)} value={String(n)}>
+                  {n === "all" ? "ALL" : n}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={page <= 1} onClick={() => setUrl({ page: 1 })}><ChevronsLeft className="h-3.5 w-3.5" /></Button>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={page <= 1} onClick={() => setUrl({ page: page - 1 })}><ChevronLeft className="h-3.5 w-3.5" /></Button>
+          <Button size="icon" variant="outline" className="h-7 w-7" disabled={isAllPage || page <= 1} onClick={() => setUrl({ page: 1 })}><ChevronsLeft className="h-3.5 w-3.5" /></Button>
+          <Button size="icon" variant="outline" className="h-7 w-7" disabled={isAllPage || page <= 1} onClick={() => setUrl({ page: page - 1 })}><ChevronLeft className="h-3.5 w-3.5" /></Button>
           <span className="tabular-nums">{page} / {pageCount}</span>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={page >= pageCount} onClick={() => setUrl({ page: page + 1 })}><ChevronRight className="h-3.5 w-3.5" /></Button>
-          <Button size="icon" variant="outline" className="h-7 w-7" disabled={page >= pageCount} onClick={() => setUrl({ page: pageCount })}><ChevronsRight className="h-3.5 w-3.5" /></Button>
+          <Button size="icon" variant="outline" className="h-7 w-7" disabled={isAllPage || page >= pageCount} onClick={() => setUrl({ page: page + 1 })}><ChevronRight className="h-3.5 w-3.5" /></Button>
+          <Button size="icon" variant="outline" className="h-7 w-7" disabled={isAllPage || page >= pageCount} onClick={() => setUrl({ page: pageCount })}><ChevronsRight className="h-3.5 w-3.5" /></Button>
         </div>
       </div>
 
