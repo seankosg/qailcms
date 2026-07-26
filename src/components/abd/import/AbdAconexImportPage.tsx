@@ -373,6 +373,22 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
                         </details>
                       )}
                       {e.error && <p className="mt-1 text-xs text-destructive">{e.error}</p>}
+                      <div className="mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 text-xs"
+                          onClick={() => setColumnFileId(e.id)}
+                          disabled={busy || e.status === "importing" || e.status === "done"}
+                        >
+                          <Columns3 className="h-3.5 w-3.5" /> 컬럼 선택
+                          {e.excludedFields && e.excludedFields.length > 0 && (
+                            <span className="ml-1 text-[10px] text-muted-foreground">
+                              (제외 {e.excludedFields.length})
+                            </span>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => removeEntry(e.id)} disabled={busy}>
@@ -383,6 +399,21 @@ export function AbdAconexImportPage({ hideHeader }: AbdAconexImportPageProps = {
             ))}
           </CardContent>
         </Card>
+      )}
+      {columnFile && (
+        <ColumnSelectDialog
+          open={!!columnFile}
+          onOpenChange={(o) => {
+            if (!o) setColumnFileId(null);
+          }}
+          fileName={columnFile.file.name}
+          headers={syncFieldKeys}
+          samples={{}}
+          defaultExcluded={columnFile.excludedFields ?? []}
+          onApply={(excluded) => setFileExcludedFields(columnFile.id, excluded)}
+          helpers={helpers}
+          presets={presets}
+        />
       )}
     </div>
   );
