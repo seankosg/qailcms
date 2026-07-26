@@ -1,7 +1,7 @@
 // TM Dashboard KPI 계산 유틸 — SHAW PunchDashboard 산식을 TM 컬럼에 매핑
 import type { TaskItem } from "./schedule-utils";
 import type { TaskThresholds } from "./derived";
-import { cumPlanProgress, cumActualProgress, isTaskDelayed, computeJudgment, computeVariance } from "./derived";
+import { cumPlanProgress, cumActualProgress, computeVariance } from "./derived";
 
 function parseDate(v: unknown): number | null {
   if (!v) return null;
@@ -66,12 +66,13 @@ export function isCriticalDelay(
   thresholds: TaskThresholds,
 ): boolean {
   if (isCompleted(row)) return false;
-  return computeJudgment(row, thresholds, asOf) === "위험";
+  // gap 축 단일 소스: In Delay(=gap<0) 중 임계값(behind_late_gap, 기본 -0.10) 미만
+  return gapAt(row, asOf) < thresholds.behind_late_gap;
 }
 
 export function isInDelay(row: TaskItem, asOf: string): boolean {
-  if (isCompleted(row)) return false;
-  return isTaskDelayed(row, undefined, asOf);
+  // In Delay 와 Behind Schedule 은 gap<0 & 미완료 로 동일 소스.
+  return isBehindSchedule(row, asOf);
 }
 
 export function statusOf(row: TaskItem): "completed" | "wip" | "not_started" {
