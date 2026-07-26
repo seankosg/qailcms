@@ -60,6 +60,7 @@ export interface AbdItemsQueryParams {
   sort?: AbdServerSort[];
   page: number;
   pageSize: number;
+  excludedMode?: "hide" | "only" | "all";
 }
 
 export function useAbdItemsQuery(p: AbdItemsQueryParams) {
@@ -77,6 +78,7 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
         _offset: offset,
         _limit: p.pageSize,
         _plot: p.plot ?? null,
+        _excluded_mode: p.excludedMode ?? "hide",
       });
       if (error) throw new Error(error.message);
       const arr = (data ?? []) as { rows: any; total_count: number | string }[];
