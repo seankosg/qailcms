@@ -131,6 +131,15 @@ function toServerFilters(f: ColumnFiltersState): AbdServerFilter[] {
         out.push({ column: id, op: "date_range", value: { from: v.from ?? "", to: v.to ?? "" } });
         continue;
       }
+      // number-range: { min?: number|null, max?: number|null }
+      if (v.min != null || v.max != null) {
+        out.push({
+          column: id,
+          op: "num_range",
+          value: { min: v.min == null ? "" : String(v.min), max: v.max == null ? "" : String(v.max) },
+        });
+        continue;
+      }
       if (typeof v.text === "string" && v.text.trim()) {
         out.push({ column: id, op: "text", value: v.text.trim() });
       }
