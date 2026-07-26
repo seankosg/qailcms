@@ -448,22 +448,19 @@ export function TaskManagementRawDataPage() {
     const q = (s.q ?? "").trim();
     setGlobalFilter(q);
     setSearchInput(q);
-    setColumnFilters(next);
     setCollapsedParents(new Set());
-    setHideContextSubs(false);
-    const asOf = s.asOf && s.asOf.length ? s.asOf : todayIso();
+
+    const asOf = s.asOf && s.asOf.length ? s.asOf : latestDataDate || todayIso();
     const scope: TaskScope =
       s.taskScope === "main" || s.taskScope === "sub" ? s.taskScope : "all";
-    if (s.mode === "delay") {
-      setDelayMode({ asOf });
-      setKpiMode(null);
-    } else if (s.mode) {
-      setDelayMode(null);
-      setKpiMode({ mode: s.mode as TmKpiMode, asOf, scope });
-    } else {
-      setDelayMode(null);
-      setKpiMode(null);
-    }
+
+    // Data Date 동기화: Dashboard 와 동일한 시점으로 공유 상태 설정
+    const nextShared = asOf === latestDataDate ? "" : asOf;
+    setSharedDataDate(nextShared);
+
+    // SHAW 방식: mode 를 TanStack ColumnFilters 로 변환하여 한꺼번에 적용
+    const kpiFilters = modeToColumnFilters(s.mode, asOf, scope);
+    setColumnFilters([...next, ...kpiFilters]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateLoaded, search]);
 
