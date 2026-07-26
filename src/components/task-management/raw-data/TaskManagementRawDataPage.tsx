@@ -227,15 +227,6 @@ export function TaskManagementRawDataPage() {
   const [stateLoaded, setStateLoaded] = useState(false);
   const search = routeApi.useSearch();
   const dashboardAppliedRef = useRef(false);
-  const [delayMode, setDelayMode] = useState<{ asOf: string } | null>(null);
-  const [kpiMode, setKpiMode] = useState<{
-    mode: TmKpiMode;
-    asOf: string;
-    scope: TaskScope;
-  } | null>(null);
-  // KPI 딥링크 진입 시 Delay 계열은 매칭 Main 의 이슈 Sub 를 컨텍스트로 함께 노출.
-  // 사용자가 카드 숫자와 100% 일치를 확인하고 싶을 때 이 컨텍스트 Sub 를 숨길 수 있음.
-  const [hideContextSubs, setHideContextSubs] = useState(false);
   const { data: kpiThresholds } = useTaskManagementSettings();
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
   const [sizing, setSizing] = useState<ColumnSizingState>({});
