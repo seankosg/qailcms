@@ -450,17 +450,6 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           <ModuleKpiCard label="임박 (3d)" value={abdStats.upcoming} total={abdStats.total} tone="warning" animatePulse active={abdTab === "upcoming"} onClick={setTabFromKpi(setAbdTab, "upcoming")} />
           <ModuleKpiCard label="Approved" value={abdStats.completed} total={abdStats.total} tone="success" onClick={() => setAbdTab("all")} />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-          <ModuleKpiCard
-            label="계획필요 (Resp B/C)"
-            value={abdStats.needsPlan}
-            total={abdStats.total}
-            tone="destructive"
-            animatePulse={abdStats.needsPlan > 0}
-            active={abdOnlyNeedsPlan}
-            onClick={() => { setAbdOnlyNeedsPlan((v) => !v); setAbdTab("all"); }}
-          />
-        </div>
         <ModuleRowList<AbdMyRow>
           rows={abd.data ?? []}
           activeTab={abdTab}
