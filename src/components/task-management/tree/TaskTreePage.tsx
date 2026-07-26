@@ -77,17 +77,31 @@ function resolveMainJudgment(
     return computeJudgment(main, thresholds, asOfDate) || main.auto_judgment || "";
   }
 
-  const rolledActual = main.actual_progress;
-  const allDone = kids.every((k) => Number(k.actual_progress ?? 0) >= 1 || k.auto_judgment === "완료");
-  const hasProgress = Number(rolledActual ?? 0) > 0;
+  const clamp01 = (v: unknown) => {
+    const n = Number(v ?? 0);
+    if (!Number.isFinite(n)) return 0;
+    const s = n > 1 ? n / 100 : n;
+    return Math.max(0, Math.min(1, s));
+  };
+  const rolledActual = clamp01(main.actual_progress);
+  const allDone = kids.every(
+    (k) => clamp01(k.actual_progress) >= 1 || k.auto_judgment === "완료",
+  );
+  const hasProgress = rolledActual > 0;
   const syntheticMain: Row = {
     ...main,
-    actual_progress: rolledActual ?? main.actual_progress,
+    actual_progress: rolledActual,
     actual_start: main.actual_start ?? (hasProgress ? main.plan_start : null),
     actual_finish: allDone ? (main.actual_finish ?? main.plan_end) : null,
     auto_judgment: allDone ? "완료" : null,
   };
-  return computeJudgment(syntheticMain, thresholds, asOfDate);
+  const j = computeJudgment(syntheticMain, thresholds, asOfDate);
+  // 하위 하나라도 미완이면 상위는 어떤 경우에도 "완료"가 될 수 없음.
+  if (!allDone && j === "완료") {
+    const kidJudgments = kids.map((k) => resolveRowJudgment(k, thresholds, asOfDate));
+    return worstJudgment(kidJudgments) ?? "정상";
+  }
+  return j;
 }
 
 function ProgressBar({ v }: { v: number | null | undefined }) {
