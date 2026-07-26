@@ -249,6 +249,9 @@ export function TaskManagementRawDataPage() {
     asOf: string;
     scope: TaskScope;
   } | null>(null);
+  // KPI 딥링크 진입 시 Delay 계열은 매칭 Main 의 이슈 Sub 를 컨텍스트로 함께 노출.
+  // 사용자가 카드 숫자와 100% 일치를 확인하고 싶을 때 이 컨텍스트 Sub 를 숨길 수 있음.
+  const [hideContextSubs, setHideContextSubs] = useState(false);
   const { data: kpiThresholds } = useTaskManagementSettings();
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
   const [sizing, setSizing] = useState<ColumnSizingState>({});
@@ -346,9 +349,42 @@ export function TaskManagementRawDataPage() {
       hdec_pic_name?: string;
       hdec_eng_name?: string;
       discipline?: string;
+      plot?: string;
+      q?: string;
     };
     if (s.source !== "dashboard") return;
     dashboardAppliedRef.current = true;
+
+    // Dev 방어: dashboard 링크가 스키마에 없는 축을 실어 보내면 조용히 삼켜지지 않도록 경고
+    if (import.meta.env.DEV && typeof window !== "undefined") {
+      try {
+        const raw = new URLSearchParams(window.location.search);
+        const known = new Set([
+          "source",
+          "mode",
+          "asOf",
+          "taskScope",
+          "team",
+          "hdec_pic_name",
+          "hdec_eng_name",
+          "discipline",
+          "plot",
+          "q",
+          "dataDate",
+        ]);
+        const unknown = [...raw.keys()].filter((k) => !known.has(k));
+        if (unknown.length) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[TM Raw Data] dashboard 링크에 라우트 스키마가 모르는 키가 있습니다:",
+            unknown,
+            "→ src/routes/_authenticated/closure/task-management/raw-data.tsx 의 searchSchema 확장 필요",
+          );
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     const next: ColumnFiltersState = [];
     const push = (id: string, v: string | undefined) => {
@@ -360,12 +396,15 @@ export function TaskManagementRawDataPage() {
     push("hdec_pic_name", s.hdec_pic_name);
     push("hdec_eng_name", s.hdec_eng_name);
     push("discipline", s.discipline);
+    push("plot", s.plot);
 
     setSorting(DEFAULT_SORTING);
-    setGlobalFilter("");
-    setSearchInput("");
+    const q = (s.q ?? "").trim();
+    setGlobalFilter(q);
+    setSearchInput(q);
     setColumnFilters(next);
     setCollapsedParents(new Set());
+    setHideContextSubs(false);
     const asOf = s.asOf && s.asOf.length ? s.asOf : todayIso();
     const scope: TaskScope =
       s.taskScope === "main" || s.taskScope === "sub" ? s.taskScope : "all";
@@ -525,8 +564,10 @@ export function TaskManagementRawDataPage() {
   }, [rows, delayMode]);
 
   // KPI 카드 딥링크 모드: 대시보드 상단 카드 클릭 시 조건
-  const kpiFilteredRows = useMemo(() => {
-    if (!kpiMode) return delayFilteredRows;
+  const kpiSelection = useMemo(() => {
+    if (!kpiMode) {
+      return { rows: delayFilteredRows, matchCount: delayFilteredRows.length, contextCount: 0 };
+    }
     const t = kpiThresholds ?? DEFAULT_THRESHOLDS;
     const asOf = kpiMode.asOf;
     const scoped = scopeItems(
@@ -573,14 +614,18 @@ export function TaskManagementRawDataPage() {
       "critical",
       "behind",
     ]);
-    if (!DELAY_MODES.has(kpiMode.mode)) return matched;
+    if (!DELAY_MODES.has(kpiMode.mode)) {
+      return { rows: matched, matchCount: matched.length, contextCount: 0 };
+    }
     const mainKeys = new Set<string>();
     for (const r of matched) {
       if ((r as any).level === "main") {
         mainKeys.add(`${(r as any).discipline}::${(r as any).task_no}`);
       }
     }
-    if (mainKeys.size === 0) return matched;
+    if (mainKeys.size === 0) {
+      return { rows: matched, matchCount: matched.length, contextCount: 0 };
+    }
     // Sub는 scopeItems 이전(전체 delayFilteredRows)에서 다시 조회 —
     // 대시보드에서 taskScope='main' 진입 시에도 하위 Sub를 노출하기 위함.
     const matchedIds = new Set(matched.map((r) => (r as any).id));
@@ -597,8 +642,21 @@ export function TaskManagementRawDataPage() {
       if (j === "정상" || j === "완료") continue;
       extraSubs.push(r);
     }
-    return [...matched, ...extraSubs];
+    return {
+      rows: [...matched, ...extraSubs],
+      matchCount: matched.length,
+      contextCount: extraSubs.length,
+    };
   }, [delayFilteredRows, kpiMode, kpiThresholds]);
+
+  const kpiFilteredRows = useMemo(() => {
+    if (!kpiMode) return kpiSelection.rows;
+    if (hideContextSubs && kpiSelection.contextCount > 0) {
+      // 매칭만 남기기: rows 앞쪽 matchCount 개가 matched.
+      return kpiSelection.rows.slice(0, kpiSelection.matchCount);
+    }
+    return kpiSelection.rows;
+  }, [kpiSelection, kpiMode, hideContextSubs]);
 
   // discipline-task_no 단위 collapse 키 유지 — 접힌 부모의 자식 행 숨김
   const visibleRows = useMemo(() => {
@@ -1216,14 +1274,31 @@ export function TaskManagementRawDataPage() {
             />
           )}
           {kpiMode && (
-            <FilterChip
-              label={`KPI: ${kpiMode.mode} · ${kpiMode.scope} · asOf ${kpiMode.asOf}${
-                ["in_delay","start_delayed","completion_overdue","critical","behind"].includes(kpiMode.mode)
-                  ? " · Sub 포함"
-                  : ""
-              }`}
-              onClear={() => setKpiMode(null)}
-            />
+            <>
+              <FilterChip
+                label={`KPI: ${kpiMode.mode} · scope ${kpiMode.scope} · asOf ${kpiMode.asOf}`}
+                onClear={() => setKpiMode(null)}
+              />
+              <span className="ml-1 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums">
+                매치 <span className="font-semibold text-foreground">{kpiSelection.matchCount.toLocaleString()}</span>건
+                {kpiSelection.contextCount > 0 && (
+                  <>
+                    {" · "}
+                    컨텍스트 Sub <span className="font-semibold text-foreground">{kpiSelection.contextCount.toLocaleString()}</span>건
+                  </>
+                )}
+                <span className="ml-1 text-[10px] text-muted-foreground/70">(카드 숫자 = 매치)</span>
+              </span>
+              {kpiSelection.contextCount > 0 && (
+                <button
+                  className="ml-1 rounded border border-border/60 bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  onClick={() => setHideContextSubs((v) => !v)}
+                  title="컨텍스트 Sub 표시/숨기기"
+                >
+                  {hideContextSubs ? "컨텍스트 Sub 표시" : "컨텍스트 Sub 숨기기"}
+                </button>
+              )}
+            </>
           )}
           {globalFilter && (
             <FilterChip

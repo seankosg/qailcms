@@ -337,6 +337,8 @@ export function TmDashboardPage() {
             hdec_pic_name: search.hdecPic,
             hdec_eng_name: search.hdecEng,
             discipline: search.discipline,
+            plot: search.plot,
+            q: search.q,
           }}
           statusMixSideSlot={
             <JudgmentStageBreakdown items={scopedItems} asOfDate={asOfDate} compact />
