@@ -126,29 +126,8 @@ export function AbdImportPage() {
         .map((r) => ({ field: r.field_key, label: r.label || r.field_key })),
     [fieldConfig],
   );
-  const aconexFieldOptions = useMemo(
-    () => ABD_ACONEX_SYNC_FIELDS.map((o) => ({ field: o.field, label: o.label })),
-    [],
-  );
-  const fieldOptions = mode === "hdec" ? hdecFieldOptions : aconexFieldOptions;
 
-  // 대상 필드 선택: 체크된 필드 집합 (기본 = 전체 선택)
-  const [hdecSelected, setHdecSelected] = useState<Set<string> | null>(null);
-  const [aconexSelected, setAconexSelected] = useState<Set<string>>(
-    () => new Set(ABD_ACONEX_SYNC_FIELDS.map((o) => o.field)),
-  );
-  // HDEC 옵션이 로드되면 기본 = 전체 선택으로 초기화
-  const effectiveHdecSelected = useMemo(() => {
-    if (hdecSelected) return hdecSelected;
-    return new Set(hdecFieldOptions.map((o) => o.field));
-  }, [hdecSelected, hdecFieldOptions]);
-  const selectedSet = mode === "hdec" ? effectiveHdecSelected : aconexSelected;
-  const setSelected = (next: Set<string>) => {
-    if (mode === "hdec") setHdecSelected(new Set(next));
-    else setAconexSelected(new Set(next));
-  };
-
-  // 프리셋 목록
+  // 프리셋 목록 (HDEC 컬럼 선택 다이얼로그에 프리셋 버튼으로 노출)
   const { data: presets = [] } = useQuery({
     queryKey: ["abd-import-presets", "all"],
     queryFn: async (): Promise<PresetRow[]> => {
@@ -161,25 +140,69 @@ export function AbdImportPage() {
     },
     staleTime: 10_000,
   });
-  const modePresets = presets.filter((p) => p.mode === mode);
-
-  const applyPreset = (p: PresetRow) => {
-    setSelected(new Set(p.fields));
-    toast.success(`프리셋 적용: ${p.label} (${p.fields.length}개 필드)`);
-  };
-  const selectAllFields = () => setSelected(new Set(fieldOptions.map((o) => o.field)));
-  const clearAllFields = () => setSelected(new Set());
-
-  // Aconex 서버함수용 apply_fields (Aconex 6개 중 선택된 것)
-  const syncFields = useMemo(
-    () => Array.from(aconexSelected) as AconexSyncKey[],
-    [aconexSelected],
+  const hdecPresets = useMemo(
+    () => presets.filter((p) => p.mode === "hdec"),
+    [presets],
   );
-  // HDEC 서버함수용 excluded_fields (전체 - 선택)
-  const hdecExcludedFields = useMemo(() => {
-    const all = new Set(hdecFieldOptions.map((o) => o.field));
-    return Array.from(all).filter((f) => !effectiveHdecSelected.has(f));
-  }, [hdecFieldOptions, effectiveHdecSelected]);
+
+  // HDEC 컬럼 선택 다이얼로그 상태
+  const [columnFileId, setColumnFileId] = useState<string | null>(null);
+  const columnFile = useMemo(
+    () => entries.find((x) => x.id === columnFileId) ?? null,
+    [entries, columnFileId],
+  );
+  const hdecFieldKeys = useMemo(
+    () => hdecFieldOptions.map((o) => o.field),
+    [hdecFieldOptions],
+  );
+  const hdecFieldLabelMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of hdecFieldOptions) m.set(o.field, o.label);
+    return m;
+  }, [hdecFieldOptions]);
+
+  const columnSelectHelpers = useMemo<ColumnSelectHelpers>(() => {
+    const knownSet = new Set(hdecFieldKeys);
+    return {
+      toFieldName: (h) => h,
+      getRequirement: (header) => {
+        if (header === "abd_number") {
+          return {
+            required: true,
+            reason: "system",
+            message: `⚠ "abd_number"은(는) ABD 임포트의 유니크 키입니다. 제외할 수 없습니다.`,
+          };
+        }
+        return { required: false };
+      },
+      isKnownField: (field) => knownSet.has(field),
+      getSourceLabel: () => "HDEC",
+      getSourceOrigin: () => "hdec",
+    };
+  }, [hdecFieldKeys]);
+
+  const columnSelectPresets = useMemo(
+    () => [
+      { id: "__all", label: "전체 선택", matchedHeaders: undefined },
+      ...hdecPresets.map((p) => ({
+        id: p.id,
+        label: p.label,
+        matchedHeaders: p.fields.filter((f) => hdecFieldKeys.includes(f)),
+      })),
+    ],
+    [hdecPresets, hdecFieldKeys],
+  );
+
+  const setFileExcludedFields = (id: string, excluded: string[]) => {
+    setEntries((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, excludedFields: excluded } : x)),
+    );
+    const label = hdecFieldLabelMap;
+    if (excluded.length > 0) {
+      toast.info(`컬럼 선택: 제외 ${excluded.length}개`);
+    }
+    void label;
+  };
 
   const cancelRequestedRef = useRef(false);
   const requestCancel = () => {
