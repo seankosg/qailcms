@@ -1,41 +1,36 @@
-# Raw Data 툴바 버튼 통일
+# ABD Raw Data 0건 표시 — 원인과 수정
 
-## 통일 규칙 (좌 → 우)
+## 원인
 
-검색창(있는 경우)은 툴바 좌측 유지. 우측 액션 그룹은 아래 순서 고정:
+브라우저 네트워크 로그에 `abd_items_search` RPC가 400으로 실패 중:
 
-```text
-[Columns] → [모듈 전용] → [Reset] → [Import] → [Export] → [추가 액션]
+```
+{"code":"42703","message":"column \"is_excluded\" does not exist"}
 ```
 
-- **Refresh 버튼 전면 삭제** (5개 모듈 모두)
-- **Export는 검정색 primary 스타일 통일** (`<Button size="sm">` = default variant, `<Download>` 아이콘)
-- **Import 스타일 통일**: `variant="outline" size="sm"` + `<Upload>` 아이콘
-- **버튼 세트 자체는 그대로 유지** — 추가/삭제 없이 순서만 재배치 (+ Refresh 제거)
+- 마이그레이션 `20260726052939_...sql` 에서 `abd_items_search` 오버로드에 `_excluded_mode` 인자를 추가하며 `coalesce(is_excluded, false)` 조건을 삽입.
+- 그러나 `abd_items_raw` 테이블에 존재하는 컬럼은 `is_terminated` 뿐이며 `is_excluded` 컬럼은 없음(과거 Aconex 파서 도입 이후 컬럼 추가 마이그레이션 누락).
+- 같은 시점 `abd_items_counts` RPC는 `is_terminated` 를 사용하므로 정상 (200), 검색 RPC만 실패.
+- 결과: 목록·필터 결과가 모두 0건으로 표시. 실제 DB에는 6,710행 존재 확인.
 
-## 모듈별 최종 배치
+## 수정
 
-| 모듈 | 최종 버튼 순서 |
-|---|---|
-| **ABD** | Columns → Export → Import  ⇒ **Columns → Import → Export** (Refresh 삭제) |
-| **SM (Snag)** | Import → AiClassify → Columns → Export → Unclosed XLSX ⇒ **Columns → AiClassify(모듈전용) → Import → Export → Unclosed XLSX** |
-| **TM (Task)** | Columns → Expand/Collapse → CriticalThreshold → Import → Export → Task 추가 ⇒ **Columns → Expand/Collapse → CriticalThreshold(모듈전용) → Import → Export → Task 추가** (변경 최소, 순서 확인) |
-| **SP (Spare Part)** | Columns → Reset → Refresh → Import → Export ⇒ **Columns → Reset → Import → Export** (Refresh 삭제) |
-| **DMR** | Export → Columns → Import ⇒ **Columns → Import → Export** |
+새 마이그레이션 1개로 `abd_items_search`의 `is_excluded` 참조를 `is_terminated` 로 치환 (counts RPC 및 파서 semantic 과 통일). 컬럼 추가는 하지 않음 — 데이터 소스가 이미 `is_terminated` 로 정착돼 있음.
 
-## 기술 세부
+수정 지점 (RPC 본문 내):
 
-수정 파일 5개:
+- `_allowed_cols` 배열의 `'is_excluded'` → `'is_terminated'`
+- `_excluded_mode = 'only'` 분기: `coalesce(is_excluded, false) = true` → `coalesce(is_terminated, false) = true`
+- 기본 분기(`hide`): `coalesce(is_excluded, false) = false` → `coalesce(is_terminated, false) = false`
+- `all` 분기는 그대로 (필터 없음)
 
-- `src/components/abd/raw-data/AbdRawDataPage.tsx` (L481–501)
-- `src/components/defect-management/raw-data/DefectRawDataPage.tsx` (L788–812 영역, Export를 `variant="default"` 유지)
-- `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx` (L1173–1221)
-- `src/components/spare-part/raw-data/SparePartRawDataPage.tsx` (L490–518, Refresh 블록 삭제)
-- `src/components/resource/dmr/DmrRawDataPage.tsx` (L457–475, Export를 default variant로 변경)
+그 외 시그니처·리턴 타입·로직 변경 없음.
 
-Refresh 삭제로 인해 미사용이 되는 `RefreshCcw` import는 각 파일에서 함께 정리. Refresh에 연결됐던 `invalidate()`/`refetch()`는 필터·페이지 변경 시 자동 재조회 로직이 이미 있으므로 UI만 제거하고 훅은 유지.
+## 코드 정리 (동일 turn)
+
+`src/lib/abd/aconex-parser.ts`, `src/lib/abd/aconex-import.functions.ts`, `src/components/abd/import/AbdAconexImportPage.tsx` 에 남아 있는 `is_excluded` 명명은 파서 내부 로컬 필드로만 사용되고 DB에는 쓰지 않으므로 이번 수정 범위와 무관 — 변경 없음.
 
 ## 검증
 
-- `tsgo`로 타입 확인
-- 각 페이지 preview에서 툴바 스크린샷 (5개) — 버튼 순서·스타일 일관성 육안 확인
+1. RPC 재호출: `abd_items_search(_team:'ARCH', _excluded_mode:'hide', ...)` 200 응답 및 rows > 0.
+2. 프리뷰 새로고침 후 ABD Raw Data 페이지에 6,700+건 노출, Excluded 배지 토글(`hide/only/all`) 정상 동작 확인.
