@@ -18,9 +18,6 @@ export function ImportHubPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Import</h1>
-        <p className="text-sm text-muted-foreground">
-          각 모듈의 Excel 임포트 기능을 탭으로 전환하여 사용합니다.
-        </p>
       </div>
       <Tabs
         value={current}
