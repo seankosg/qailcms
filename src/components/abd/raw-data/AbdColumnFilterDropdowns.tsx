@@ -197,5 +197,81 @@ export function AbdColumnFilterDropdown({
   if (meta?.filterType === "multi-select")
     return <AbdMultiSelectDropdown column={column} options={meta.filterOptions ?? []} q={q} serverFilters={serverFilters} />;
   if (meta?.filterType === "date-range") return <AbdDateRangeDropdown column={column} />;
+  if (meta?.filterType === "number-range") return <AbdNumberRangeDropdown column={column} />;
   return <AbdTextFilterDropdown column={column} />;
+}
+
+export function AbdNumberRangeDropdown({ column }: { column: any }) {
+  const fv = column.getFilterValue() as
+    | { min?: number | null; max?: number | null; emptyOnly?: boolean }
+    | undefined;
+  const isActive = fv?.min != null || fv?.max != null || !!fv?.emptyOnly;
+  const update = (
+    patch: Partial<{ min: number | null; max: number | null; emptyOnly: boolean }>,
+  ) => {
+    const next = { ...(fv ?? {}), ...patch };
+    const hasAny =
+      next.min != null || next.max != null || next.emptyOnly === true;
+    column.setFilterValue(hasAny ? next : undefined);
+  };
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/80",
+            isActive ? "text-primary" : "text-muted-foreground/50",
+          )}
+          onClick={(e) => e.stopPropagation()}
+          title="Filter"
+        >
+          <Filter className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-56 space-y-2 p-3"
+        align="start"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 px-1">
+          <button
+            className="text-[11px] text-muted-foreground hover:underline"
+            onClick={() => column.setFilterValue(undefined)}
+          >
+            Clear all
+          </button>
+        </div>
+        <div className="flex gap-1.5">
+          <Input
+            type="number"
+            value={fv?.min ?? ""}
+            placeholder="Min"
+            disabled={!!fv?.emptyOnly}
+            onChange={(e) =>
+              update({ min: e.target.value === "" ? null : Number(e.target.value) })
+            }
+            className="h-7 text-xs"
+          />
+          <Input
+            type="number"
+            value={fv?.max ?? ""}
+            placeholder="Max"
+            disabled={!!fv?.emptyOnly}
+            onChange={(e) =>
+              update({ max: e.target.value === "" ? null : Number(e.target.value) })
+            }
+            className="h-7 text-xs"
+          />
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 pt-1 text-xs">
+          <Checkbox
+            checked={!!fv?.emptyOnly}
+            onCheckedChange={(c) => update({ emptyOnly: !!c, min: null, max: null })}
+            className="h-3.5 w-3.5"
+          />{" "}
+          Empty only
+        </label>
+      </PopoverContent>
+    </Popover>
+  );
 }
