@@ -34,13 +34,6 @@ interface BaseProps {
   onOpenDetail?: (id: string, focus?: "rounds" | "aconex" | "comments") => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  Approved: "hsl(142 71% 45%)",
-  UR: "hsl(217 91% 60%)",
-  DS: "hsl(38 92% 50%)",
-  NS: "hsl(0 72% 51%)",
-  Other: "hsl(var(--muted-foreground))",
-};
 
 
 /** Row 4 — Approval Trend (last N months, stacked by team) */
