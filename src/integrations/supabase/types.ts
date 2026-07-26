@@ -481,6 +481,7 @@ export type Database = {
           latest_status_norm: string | null
           mismatch_fields: Json
           needs_planning: boolean
+          needs_revise: boolean
           owner_user_id: string | null
           plot: string | null
           r1_dar_actual: string | null
@@ -511,6 +512,7 @@ export type Database = {
           r3_submission_actual: string | null
           r3_submission_plan: string | null
           raw_payload: Json
+          revise_source_round: number | null
           row_version: number
           rs_result_missing: boolean
           service: string | null
@@ -559,6 +561,7 @@ export type Database = {
           latest_status_norm?: string | null
           mismatch_fields?: Json
           needs_planning?: boolean
+          needs_revise?: boolean
           owner_user_id?: string | null
           plot?: string | null
           r1_dar_actual?: string | null
@@ -589,6 +592,7 @@ export type Database = {
           r3_submission_actual?: string | null
           r3_submission_plan?: string | null
           raw_payload?: Json
+          revise_source_round?: number | null
           row_version?: number
           rs_result_missing?: boolean
           service?: string | null
@@ -637,6 +641,7 @@ export type Database = {
           latest_status_norm?: string | null
           mismatch_fields?: Json
           needs_planning?: boolean
+          needs_revise?: boolean
           owner_user_id?: string | null
           plot?: string | null
           r1_dar_actual?: string | null
@@ -667,6 +672,7 @@ export type Database = {
           r3_submission_actual?: string | null
           r3_submission_plan?: string | null
           raw_payload?: Json
+          revise_source_round?: number | null
           row_version?: number
           rs_result_missing?: boolean
           service?: string | null
