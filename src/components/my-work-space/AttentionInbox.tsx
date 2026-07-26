@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, Clock, CalendarClock, ChevronDown, ChevronRight, ArrowRight, CheckCheck } from "lucide-react";
+import { AlertTriangle, Clock, CalendarClock, ChevronDown, ChevronRight, ArrowRight, CheckCheck, PenLine, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useAbdAttentionInbox, type AbdAttentionKind, type AbdAttentionRow } from "@/hooks/useAbdAttentionInbox";
 import { useCommentInboxRead } from "@/hooks/useCommentInboxRead";
+import { AbdReviseDraftDialog } from "@/components/abd/AbdReviseDraftDialog";
 
 interface Props {
   userId: string | null | undefined;
@@ -15,10 +16,11 @@ interface Props {
   isAdmin: boolean;
 }
 
-type Tab = "needs_plan" | "delayed" | "upcoming";
+type Tab = "needs_plan" | "revise" | "delayed" | "upcoming";
 
 const META: Record<Tab, { label: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
   needs_plan: { label: "계획필요", icon: AlertTriangle, tone: "border-destructive text-destructive" },
+  revise:     { label: "계획수정필요", icon: PenLine,   tone: "border-warning text-warning" },
   delayed:    { label: "지연",     icon: Clock,          tone: "border-destructive text-destructive" },
   upcoming:   { label: "임박 (3d)", icon: CalendarClock, tone: "border-warning text-warning" },
 };
@@ -30,18 +32,19 @@ export function AttentionInbox({ userId, scope, filterValue, isAdmin }: Props) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("needs_plan");
   const [collapsed, setCollapsed] = useState(true);
+  const [reviseId, setReviseId] = useState<string | null>(null);
 
   const { data: rows = [], isLoading, isFetching } = useAbdAttentionInbox({ isAdmin, scope, filterValue, userId });
   const { isRead, markRead, markManyRead } = useCommentInboxRead(userId);
 
   const counts = useMemo(() => {
-    const c: Record<Tab, number> = { needs_plan: 0, delayed: 0, upcoming: 0 };
-    const unread: Record<Tab, number> = { needs_plan: 0, delayed: 0, upcoming: 0 };
+    const c: Record<Tab, number> = { needs_plan: 0, revise: 0, delayed: 0, upcoming: 0 };
+    const unread: Record<Tab, number> = { needs_plan: 0, revise: 0, delayed: 0, upcoming: 0 };
     for (const r of rows) {
       c[r.kind] += 1;
       if (!isRead(rowKey(r), rowStamp(r))) unread[r.kind] += 1;
     }
-    return { c, unread, total: rows.length, unreadTotal: unread.needs_plan + unread.delayed + unread.upcoming };
+    return { c, unread, total: rows.length, unreadTotal: unread.needs_plan + unread.revise + unread.delayed + unread.upcoming };
   }, [rows, isRead]);
 
   const shown = useMemo(() => rows.filter((r) => r.kind === tab), [rows, tab]);
@@ -142,6 +145,9 @@ export function AttentionInbox({ userId, scope, filterValue, isAdmin }: Props) {
                       {r.kind === "needs_plan" && r.next_round && (
                         <Badge variant="outline" className="h-4 rounded px-1.5 text-[10px] border-info text-info">{r.next_round} 계획</Badge>
                       )}
+                      {r.kind === "revise" && r.next_round && (
+                        <Badge variant="outline" className="h-4 rounded px-1.5 text-[10px] border-warning text-warning">{r.next_round} 재계획</Badge>
+                      )}
                       {r.kind === "delayed" && r.days != null && (
                         <Badge variant="outline" className="h-4 rounded px-1.5 text-[10px] border-destructive text-destructive tabular-nums">D+{r.days}</Badge>
                       )}
@@ -157,7 +163,18 @@ export function AttentionInbox({ userId, scope, filterValue, isAdmin }: Props) {
                         {r.abd_number ?? r.id.slice(0, 8)}
                       </span>
                       <span className="truncate text-muted-foreground">{r.document_title ?? ""}</span>
-                      <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                      {r.kind === "revise" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-auto h-6 px-2 text-[11px]"
+                          onClick={(e) => { e.stopPropagation(); markRead(rowKey(r), rowStamp(r)); setReviseId(r.id); }}
+                        >
+                          <Wand2 className="h-3 w-3 mr-1" /> 계획생성
+                        </Button>
+                      ) : (
+                        <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                      )}
                     </div>
                     {r.plan_date && (
                       <div className="text-[10px] text-muted-foreground">계획일 · {r.plan_date.slice(0, 10)}</div>
@@ -169,6 +186,11 @@ export function AttentionInbox({ userId, scope, filterValue, isAdmin }: Props) {
           </ScrollArea>
         </>
       )}
+      <AbdReviseDraftDialog
+        itemId={reviseId}
+        open={!!reviseId}
+        onOpenChange={(v) => { if (!v) setReviseId(null); }}
+      />
     </section>
   );
 }
