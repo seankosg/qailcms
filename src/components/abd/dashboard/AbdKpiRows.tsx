@@ -19,6 +19,20 @@ const TONE: Record<Tone, string> = {
   danger: "text-red-600 dark:text-red-400",
 };
 
+const TEAM_ORDER = ["MECH", "ELEC"];
+function sortByTeamOrder<T extends { team: string }>(list: T[]): T[] {
+  return [...list].sort((a, b) => {
+    const ia = TEAM_ORDER.indexOf(a.team);
+    const ib = TEAM_ORDER.indexOf(b.team);
+    if (ia !== -1 || ib !== -1) {
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    }
+    return a.team.localeCompare(b.team);
+  });
+}
+
 interface KpiCardProps {
   label: string;
   count: number;
@@ -40,7 +54,7 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
       <CardContent className="p-3">
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
               {label}
             </div>
             <div className={cn("text-3xl font-bold tabular-nums leading-tight", TONE[tone])}>
@@ -137,9 +151,9 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         agg.set(b.team, (agg.get(b.team) ?? 0) + b.count);
       }
     }
-    return Array.from(agg.entries())
-      .map(([team, count]) => ({ team, count }))
-      .sort((a, b) => b.count - a.count);
+    return sortByTeamOrder(
+      Array.from(agg.entries()).map(([team, count]) => ({ team, count })),
+    );
   }, [byTeam]);
 
   const mk = (label: string, key: string, tone: Tone, statusGroup?: string) => (
@@ -149,7 +163,7 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
       count={totals.get(key) ?? 0}
       total={key === "TOTAL" ? undefined : total}
       tone={tone}
-      breakdown={(byTeam.get(key) ?? []).map((b) => ({
+      breakdown={sortByTeamOrder(byTeam.get(key) ?? []).map((b) => ({
         team: b.team,
         count: b.count,
         onClick: () =>
@@ -185,9 +199,9 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         onClick={() => onOpenRaw({})}
       />
       {mk("Approved", "Approved", "ok", "approved")}
-      {mk("UR (Under Review)", "UR", "info", "under_review")}
-      {mk("DS (Drafting)", "DS", "warn", "drafting")}
-      {mk("NS (Not Started)", "NS", "danger", "not_started")}
+      {mk("Under Review", "UR", "info", "under_review")}
+      {mk("Draft Start", "DS", "warn", "drafting")}
+      {mk("Not Started", "NS", "danger", "not_started")}
     </div>
   );
 }
@@ -214,7 +228,7 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
       label={label}
       count={totals.get(key) ?? 0}
       tone="danger"
-      breakdown={(byTeam.get(key) ?? []).map((b) => ({
+      breakdown={sortByTeamOrder(byTeam.get(key) ?? []).map((b) => ({
         team: b.team,
         count: b.count,
         onClick: () => onOpenRaw({ status_group: statusGroup, team: b.team }),
