@@ -326,9 +326,22 @@ export function TaskTreePage() {
     return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [data]);
 
-  // Data Date 소스 우선순위: route param > 세션 공유값 > 최신값.
-  const [sharedDataDate] = useTmDataDate();
-  const asOfDate = routeSearch.dataDate || sharedDataDate || latestDataDate || undefined;
+  // Data Date 소스: 세션 공유값 > 최신값.
+  // URL 의 dataDate 쿼리 파라미터(딥링크)는 진입 시 1회 세션으로 흡수한 뒤 URL에서 제거해,
+  // 이후 Dashboard 등에서 세션 값을 바꾸면 그 값이 그대로 반영되도록 한다.
+  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
+  useEffect(() => {
+    const urlDate = routeSearch.dataDate ? String(routeSearch.dataDate).slice(0, 10) : "";
+    if (!urlDate) return;
+    if (urlDate !== sharedDataDate) setSharedDataDate(urlDate);
+    navigate({
+      to: "/closure/task-management/tree",
+      search: (prev: Record<string, unknown>) => ({ ...prev, dataDate: "" }) as any,
+      replace: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeSearch.dataDate]);
+  const asOfDate = sharedDataDate || latestDataDate || undefined;
   const isPastAsOf =
     !!asOfDate && !!latestDataDate && asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
   const judge = useTmJudgmentAtDate(asOfDate ?? "", isPastAsOf);
@@ -588,23 +601,11 @@ export function TaskTreePage() {
         <h1 className="text-xl font-semibold tracking-tight">Task Tree</h1>
         {latestDataDate && (
           <DataDatePicker
-            value={routeSearch.dataDate}
+            value={sharedDataDate}
             latest={latestDataDate}
             options={dataDateOptions}
-            onChange={(v) =>
-              navigate({
-                to: "/closure/task-management/tree",
-                search: (prev: Record<string, unknown>) =>
-                  ({ ...prev, dataDate: v === latestDataDate ? "" : v }) as any,
-              })
-            }
-            onReset={() =>
-              navigate({
-                to: "/closure/task-management/tree",
-                search: (prev: Record<string, unknown>) =>
-                  ({ ...prev, dataDate: "" }) as any,
-              })
-            }
+            onChange={(v) => setSharedDataDate(v === latestDataDate ? "" : v)}
+            onReset={() => setSharedDataDate("")}
           />
         )}
         <Tabs value={discipline} onValueChange={(v) => setDiscipline(v as Discipline)}>
