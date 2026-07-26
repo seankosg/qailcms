@@ -96,13 +96,16 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
     parentMap: Map<string, { ref: string | null; label: string | null }> | null,
   ): Promise<InboxComment[]> {
     if (parentMap && parentMap.size === 0) return [];
+    // spare_part_comments 는 author_id, 나머지는 author_user_id
+    const authorCol = table === "spare_part_comments" ? "author_id" : "author_user_id";
+    const hasEdited = table !== "spare_part_comments";
     const cols = [
       "id",
       parentCol,
       messageCol,
       categoryCol ?? "'general' as category",
-      "author_user_id",
-      "edited",
+      `${authorCol} as author_user_id`,
+      hasEdited ? "edited" : "false as edited",
       "created_at",
       "updated_at",
     ].join(",");
