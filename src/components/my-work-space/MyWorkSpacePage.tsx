@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   useMyTasks, useMyDefectsCounts, useMyDefectsBucket, useMyAbd,
-  tmIsCompleted, tmIsStarted, tmIsDelayed, tmIsUpcoming, tmIsToday, tmTodayKinds,
+  tmIsCompleted, tmIsStarted, tmIsDelayed, tmJudgment, tmIsUpcoming, tmIsToday, tmTodayKinds,
   smTodayKinds,
   abdIsApproved, abdIsInProgress, abdIsDelayed, abdIsUpcoming, abdIsToday, abdTodayKind, abdStage, abdCurrentPlanDate,
   abdNeedsPlanning, abdNextPlanRoundLabel,
@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { dohaStamp, formatDdMmmYyyy } from "@/lib/time/doha";
 import { cumPlanProgress, cumActualProgress, computeVariance } from "@/lib/task-management/derived";
+import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
+import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
 import { CommentsInbox } from "./CommentsInbox";
