@@ -2902,14 +2902,19 @@ export type Database = {
           actual_finish: string | null
           actual_progress: number | null
           actual_start: string | null
+          alarm_reason: string | null
           auto_judgment: string | null
           auto_judgment_import: string | null
           category: string | null
           created_at: string
+          cum_actual_pct: number | null
+          cum_plan_pct: number | null
           data_date: string
+          delay_days: number | null
           discipline: string
           floor_level: string | null
           forecast_end: string | null
+          gap_pct: number | null
           hdec_eng_name: string | null
           hdec_pic_name: string | null
           id: string
@@ -2945,14 +2950,19 @@ export type Database = {
           actual_finish?: string | null
           actual_progress?: number | null
           actual_start?: string | null
+          alarm_reason?: string | null
           auto_judgment?: string | null
           auto_judgment_import?: string | null
           category?: string | null
           created_at?: string
+          cum_actual_pct?: number | null
+          cum_plan_pct?: number | null
           data_date: string
+          delay_days?: number | null
           discipline: string
           floor_level?: string | null
           forecast_end?: string | null
+          gap_pct?: number | null
           hdec_eng_name?: string | null
           hdec_pic_name?: string | null
           id?: string
@@ -2988,14 +2998,19 @@ export type Database = {
           actual_finish?: string | null
           actual_progress?: number | null
           actual_start?: string | null
+          alarm_reason?: string | null
           auto_judgment?: string | null
           auto_judgment_import?: string | null
           category?: string | null
           created_at?: string
+          cum_actual_pct?: number | null
+          cum_plan_pct?: number | null
           data_date?: string
+          delay_days?: number | null
           discipline?: string
           floor_level?: string | null
           forecast_end?: string | null
+          gap_pct?: number | null
           hdec_eng_name?: string | null
           hdec_pic_name?: string | null
           id?: string
@@ -3995,6 +4010,30 @@ export type Database = {
           planned_start_date: string
           source_issue_no: string
           status_raw: string
+        }[]
+      }
+      tm_compute_derived: {
+        Args: {
+          _actual_finish: string
+          _actual_progress: number
+          _actual_start: string
+          _data_date: string
+          _plan_days: number
+          _plan_end: string
+          _plan_start: string
+        }
+        Returns: Json
+      }
+      tm_judge_at_date: {
+        Args: { p_data_date: string; p_task_ids?: string[] }
+        Returns: {
+          alarm_reason: string
+          auto_judgment: string
+          cum_actual_pct: number
+          cum_plan_pct: number
+          delay_days: number
+          gap_pct: number
+          id: string
         }[]
       }
       tm_today_actual: {
