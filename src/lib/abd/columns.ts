@@ -61,6 +61,11 @@ export const STATUS_COLORS: Record<string, string> = {
   B: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40",
   C: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/40",
   "NOT YET": "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border border-zinc-500/30",
+  UR: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/40",
+  CX: "bg-zinc-400/20 text-zinc-600 dark:text-zinc-300 border border-zinc-400/40 line-through",
+  TM: "bg-zinc-400/20 text-zinc-600 dark:text-zinc-300 border border-zinc-400/40 line-through",
+  CANCELLED: "bg-zinc-400/20 text-zinc-600 dark:text-zinc-300 border border-zinc-400/40 line-through",
+  TERMINATED: "bg-zinc-400/20 text-zinc-600 dark:text-zinc-300 border border-zinc-400/40 line-through",
 };
 
 export const PLOT_COLORS: Record<string, string> = {
@@ -68,7 +73,7 @@ export const PLOT_COLORS: Record<string, string> = {
   D: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300",
 };
 
-export const ABD_STATUSES = ["A", "B", "C", "NOT YET"] as const;
+export const ABD_STATUSES = ["A", "B", "C", "UR", "NOT YET", "CX", "TM"] as const;
 
 export const ABD_COLUMNS: AbdColumnDef[] = [
   // Identity
