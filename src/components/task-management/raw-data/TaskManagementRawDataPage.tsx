@@ -113,7 +113,6 @@ import {
 } from "@/lib/task-management/kpi-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
-import { CriticalThresholdPopover } from "@/components/task-management/shared/CriticalThresholdPopover";
 import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
