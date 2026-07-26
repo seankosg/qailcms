@@ -115,17 +115,13 @@ export function MasterMappingDialog({
         const c = choices.get(e.key);
         return c?.action === "register";
       });
+      let hasRegisterFailure = false;
       for (const e of toRegister) {
         const c = choices.get(e.key);
-        if (e.masterKind === "hdec_pic" || e.masterKind === "hdec_eng") {
-          toast.error(
-            `${e.rawName}: HDEC PIC/ENG는 사용자관리에서만 등록됩니다. skip 또는 map을 선택하세요.`,
-          );
-          continue;
-        }
         if (e.masterKind === "subsub") {
           if (!c?.parentSubId) {
             toast.error(`${e.rawName}: 상위 협력사를 선택하세요.`);
+            hasRegisterFailure = true;
             continue;
           }
           try {
@@ -140,17 +136,19 @@ export function MasterMappingDialog({
             toast.success(`Sub-Sub "${e.rawName}" 등록`);
           } catch (err: any) {
             toast.error(`${e.rawName} 등록 실패: ${err?.message ?? err}`);
+            hasRegisterFailure = true;
           }
           continue;
         }
         try {
           await addMaster({
-            data: { kind: "subcontractor", name: e.rawName },
+            data: { kind: e.masterKind as any, name: e.rawName },
           });
           await qc.invalidateQueries({ queryKey: MASTER_OPTIONS_QK(e.masterKind) });
           toast.success(`${MASTER_LABEL[e.masterKind]} "${e.rawName}" 등록`);
         } catch (err: any) {
           toast.error(`${e.rawName} 등록 실패: ${err?.message ?? err}`);
+          hasRegisterFailure = true;
         }
       }
 
@@ -169,7 +167,7 @@ export function MasterMappingDialog({
         }
       }
       onApply(decisions);
-      onClose();
+      if (!hasRegisterFailure) onClose();
     } finally {
       setSubmitting(false);
     }

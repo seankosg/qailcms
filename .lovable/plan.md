@@ -1,36 +1,50 @@
-# ABD Raw Data 0건 표시 — 원인과 수정
-
 ## 원인
 
-브라우저 네트워크 로그에 `abd_items_search` RPC가 400으로 실패 중:
+ABD 임포트의 Master Mapping 다이얼로그에서 **Subcon**은 admin이 정상 등록되지만, **HDEC PIC / HDEC ENG**는 다음 이유로 등록이 차단되고 있습니다.
 
-```
-{"code":"42703","message":"column \"is_excluded\" does not exist"}
-```
+- `src/components/import/MasterMappingDialog.tsx` (L120~127): `masterKind === "hdec_pic" | "hdec_eng"`인 경우 무조건 토스트("HDEC PIC/ENG는 사용자관리에서만 등록됩니다")를 띄우고 `continue` 처리.
+- `src/lib/admin/users.functions.ts`의 `MasterKind` 타입이 `subcontractor | subsub | team`만 지원 → `addMasterName`이 `hdec_pic_master` / `hdec_eng_master`에 insert할 수 없음.
 
-- 마이그레이션 `20260726052939_...sql` 에서 `abd_items_search` 오버로드에 `_excluded_mode` 인자를 추가하며 `coalesce(is_excluded, false)` 조건을 삽입.
-- 그러나 `abd_items_raw` 테이블에 존재하는 컬럼은 `is_terminated` 뿐이며 `is_excluded` 컬럼은 없음(과거 Aconex 파서 도입 이후 컬럼 추가 마이그레이션 누락).
-- 같은 시점 `abd_items_counts` RPC는 `is_terminated` 를 사용하므로 정상 (200), 검색 RPC만 실패.
-- 결과: 목록·필터 결과가 모두 0건으로 표시. 실제 DB에는 6,710행 존재 확인.
+즉, admin이 "신규 등록"을 선택해도 서버 함수가 대응하지 못해 UI에서 원천 차단되며, 이후 `handleApply`가 정상 완료 처리되어 다이얼로그가 그대로 닫혀버립니다. 사용자는 이를 "admin만 가능하다며 사라짐"으로 인지.
 
-## 수정
+한편 `hdec_pic_master`, `hdec_eng_master` 테이블은 이미 존재하며 `useMasterOptions("hdec_pic"|"hdec_eng")`가 이를 읽고 있으므로, 마스터 테이블에 직접 insert하는 경로만 열어주면 됩니다 (사용자 계정 생성과는 무관).
 
-새 마이그레이션 1개로 `abd_items_search`의 `is_excluded` 참조를 `is_terminated` 로 치환 (counts RPC 및 파서 semantic 과 통일). 컬럼 추가는 하지 않음 — 데이터 소스가 이미 `is_terminated` 로 정착돼 있음.
+## 변경 범위
 
-수정 지점 (RPC 본문 내):
+### 1) 서버 함수 확장 — `src/lib/admin/users.functions.ts`
 
-- `_allowed_cols` 배열의 `'is_excluded'` → `'is_terminated'`
-- `_excluded_mode = 'only'` 분기: `coalesce(is_excluded, false) = true` → `coalesce(is_terminated, false) = true`
-- 기본 분기(`hide`): `coalesce(is_excluded, false) = false` → `coalesce(is_terminated, false) = false`
-- `all` 분기는 그대로 (필터 없음)
+- `MasterKind` 타입에 `"hdec_pic" | "hdec_eng"` 추가.
+- `tableForKind`에 `hdec_pic → hdec_pic_master`, `hdec_eng → hdec_eng_master` 매핑 추가.
+- `addMasterName.handler`에서 kind가 `hdec_pic`/`hdec_eng`인 경우 `{ name, is_active: true }` payload로 insert.
+- `assertAdmin` 유지 (admin/superuser만 등록 가능).
+- `toggleMasterActive`, `deleteMaster` 등 다른 곳에서 `MasterKind`를 쓰는 함수도 새 kind에서 안전하게 동작하는지 확인하고 필요한 곳만 케이스 추가.
 
-그 외 시그니처·리턴 타입·로직 변경 없음.
+### 2) 다이얼로그 로직 개선 — `src/components/import/MasterMappingDialog.tsx`
 
-## 코드 정리 (동일 turn)
+- `hdec_pic` / `hdec_eng`에 대한 차단 토스트 및 `continue` 제거.
+- 다른 kind와 동일하게 `addMaster({ data: { kind, name: e.rawName } })` 호출.
+- 성공 시 `MASTER_OPTIONS_QK(e.masterKind)` invalidate.
+- 실패 시(권한/중복 등) 개별 항목 토스트만 노출하고 사용자가 다시 시도할 수 있도록 다이얼로그가 자동으로 닫히지 않도록 흐름 조정 — 등록 실패가 하나라도 있으면 `onClose()` 호출을 건너뛰고 실패 항목을 상단에 하이라이트.
 
-`src/lib/abd/aconex-parser.ts`, `src/lib/abd/aconex-import.functions.ts`, `src/components/abd/import/AbdAconexImportPage.tsx` 에 남아 있는 `is_excluded` 명명은 파서 내부 로컬 필드로만 사용되고 DB에는 쓰지 않으므로 이번 수정 범위와 무관 — 변경 없음.
+### 3) 안내 문구 정정 — `MasterMappingDialog.tsx`
 
-## 검증
+- 헤더 설명 문구의 "신규 등록(admin)"을 "신규 등록(admin/superuser)"로 통일. Subcon/PIC/ENG 모두 동일 규칙임을 명시.
 
-1. RPC 재호출: `abd_items_search(_team:'ARCH', _excluded_mode:'hide', ...)` 200 응답 및 rows > 0.
-2. 프리뷰 새로고침 후 ABD Raw Data 페이지에 6,700+건 노출, Excluded 배지 토글(`hide/only/all`) 정상 동작 확인.
+### 4) DB 권한 확인 (마이그레이션 필요 시)
+
+- `hdec_pic_master`, `hdec_eng_master`에 `authenticated` INSERT 권한 및 admin/superuser 정책이 이미 있는지 SQL로 사전 확인.
+- 정책이 없으면 마이그레이션 1건 추가:
+  - `GRANT SELECT, INSERT, UPDATE ON public.hdec_pic_master TO authenticated;`
+  - `GRANT SELECT, INSERT, UPDATE ON public.hdec_eng_master TO authenticated;`
+  - RLS `insert` 정책 `has_any_role(auth.uid(), ARRAY['admin','superuser'])` 추가.
+
+### 5) 검증
+
+- `tsgo`로 타입 체크.
+- admin 계정으로 ABD 임포트 실행 → Subcon/HDEC PIC/HDEC ENG 모두 "신규 등록"으로 처리 후 다이얼로그 정상 종료, 후속 임포트에서 매칭되는지 확인.
+- 일반 사용자 계정에서는 여전히 등록 버튼이 비활성화(canRegister=false)되는지 회귀 확인.
+
+## 사용자에게 보이는 변화
+
+- admin/superuser는 임포트 매핑 다이얼로그에서 Subcon과 함께 **HDEC PIC / HDEC ENG도 즉시 신규 등록** 가능.
+- 등록 실패 시 다이얼로그가 자동으로 닫히지 않아 재시도 가능.

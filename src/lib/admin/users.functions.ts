@@ -5,7 +5,7 @@ const DUMMY_EMAIL_DOMAIN = "qail.local";
 /** @deprecated Phase 2 이후 DEFAULT_PASSWORD 사용. 하위호환용 유지. */
 export const DEFAULT_INITIAL_PASSWORD = "Qail@2026!";
 
-type MasterKind = "subcontractor" | "subsub" | "team";
+type MasterKind = "subcontractor" | "subsub" | "team" | "hdec_pic" | "hdec_eng";
 
 function tableForKind(kind: MasterKind): string {
   switch (kind) {
@@ -14,6 +14,10 @@ function tableForKind(kind: MasterKind): string {
       return "subcontractor_master";
     case "team":
       return "team_master";
+    case "hdec_pic":
+      return "hdec_pic_name_master";
+    case "hdec_eng":
+      return "hdec_eng_name_master";
   }
 }
 
@@ -248,6 +252,8 @@ export const addMasterName = createServerFn({ method: "POST" })
     } else if (data.kind === "subsub") {
       if (!data.parent_id) throw new Error("상위 협력사를 선택하세요.");
       payload = { name, type: "subsub", parent_subcontractor_id: data.parent_id, owner_code: data.owner_code ?? null };
+    } else if (data.kind === "hdec_pic" || data.kind === "hdec_eng") {
+      payload = { name, is_active: true };
     }
     const { error } = await (context.supabase as any).from(table).insert(payload);
     if (error) throw new Error(error.message);
