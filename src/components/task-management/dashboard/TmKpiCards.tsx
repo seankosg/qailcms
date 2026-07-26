@@ -4,7 +4,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ProgressKpiCard } from "./ProgressKpiCard";
 import { RiskKpiCard, type RiskKpiBreakdownRow } from "./RiskKpiCard";
 import { StatusMixDonut } from "./StatusMixDonut";
-import { CriticalThresholdPopover } from "@/components/task-management/shared/CriticalThresholdPopover";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import {
   computeKpi,
