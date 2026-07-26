@@ -20,7 +20,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Search, RefreshCcw, Upload, Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, Upload, Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import {
   ABD_COLUMNS,
   ABD_STATUSES,
@@ -479,7 +479,6 @@ export function AbdRawDataPage() {
           <p className="text-sm text-muted-foreground">As-Built Drawing 제출 계획 관리 · 최근 데이터: {dataDate ?? "—"}</p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "abd" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
           <AbdColumnOrderMenu
             order={order}
             visibility={visibility as Record<string, boolean>}
@@ -494,10 +493,8 @@ export function AbdRawDataPage() {
             onServerVisibility={onServerVisibility}
             onServerLabel={onServerLabel}
           />
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
-          <Button variant="outline" size="sm" onClick={() => { invalidate(); refetch(); }} disabled={isFetching}>
-            <RefreshCcw className={cn("mr-1 h-3.5 w-3.5", isFetching && "animate-spin")} /> Refresh
-          </Button>
+          <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "abd" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
+          <Button size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
         </div>
       </header>
 
