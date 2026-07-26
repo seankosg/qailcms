@@ -135,6 +135,19 @@ function GapCell({ gap }: { gap: number }) {
   );
 }
 
+function inferMainTaskNoFromSubTaskNo(
+  taskNo: string,
+  mainTaskNos: Set<string>,
+): string | null {
+  const parts = taskNo.split("-");
+  while (parts.length > 1) {
+    parts.pop();
+    const candidate = parts.join("-");
+    if (mainTaskNos.has(candidate)) return candidate;
+  }
+  return null;
+}
+
 export function TaskTreePage() {
   const routeSearch = routeApi.useSearch();
   const navigate = useNavigate();
@@ -316,12 +329,23 @@ export function TaskTreePage() {
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
     const subsByMain = new Map<string, Row[]>();
+    const mainTaskNos = new Set<string>();
     for (const r of data) {
-      if (r.level === "main") mainTasks.push(r);
-      else if (r.main_task_no) {
-        const arr = subsByMain.get(r.main_task_no) ?? [];
+      if (r.level === "main") {
+        mainTasks.push(r);
+        mainTaskNos.add(r.task_no);
+      }
+    }
+    for (const r of data) {
+      if (r.level === "sub") {
+        const parentTaskNo =
+          r.main_task_no && mainTaskNos.has(r.main_task_no)
+            ? r.main_task_no
+            : inferMainTaskNoFromSubTaskNo(r.task_no, mainTaskNos);
+        if (!parentTaskNo) continue;
+        const arr = subsByMain.get(parentTaskNo) ?? [];
         arr.push(r);
-        subsByMain.set(r.main_task_no, arr);
+        subsByMain.set(parentTaskNo, arr);
       }
     }
     return { mainTasks, subsByMain };

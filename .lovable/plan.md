@@ -1,53 +1,98 @@
-## 목표
-TM 대시보드 KPI 카드의 "IN DELAY"와 "BEHIND SCHEDULE"이 서로 다른 산식으로 계산되어 값이 어긋나는 문제를 해결. 두 카드가 동일한 뜻이므로 **gap 축**을 단일 판정 소스로 삼아 값이 항상 일치하도록 재정렬.
+## 확인된 원인
 
-## 현재 문제 (진단)
-`src/lib/task-management/kpi-utils.ts`
-- `In Delay` = `computeJudgment(row) ∈ {지연,위험}` → 3-스테이지 + 임계값(behind_warn_gap, slip_warn_days) 기반
-- `Behind Schedule` = `In Delay ∩ (gap < 0)` → 판정+gap 이중 필터
-→ 두 축이 섞여 서로 다른 값 산출. 스샷의 ELEC 24 vs 22(=2 차이) 원인.
+사용자 말씀대로 Raw Data의 보이는 번호는 모두 맞습니다.
 
-## 단일 소스 정의 (gap 기반)
-`gap(row, asOf) = cumActualProgress(row) − cumPlanProgress(row, asOf)`
-- **In Delay** = 미완료 AND `gap < 0` (Behind와 완전히 동일)
-- **Behind Schedule** = In Delay와 동일 (동의어로 남기고 KPI 계산도 동일 값)
-- **Start Delayed** ⊂ In Delay: `In Delay AND plan_start ≤ asOf AND actual_start 없음`
-- **Completion Overdue** ⊂ In Delay: `In Delay AND plan_end < asOf`
-- **Critical Delay** ⊂ In Delay: `In Delay AND gap < behind_late_gap (기본 −0.10)`
-  · 임계값은 기존 `task_management_settings.behind_late_gap` 재사용(별도 UI 변경 없음)
-  · 자동판정 '위험'과 개념 일치하되 gap 축 하나로 정의 통일
+실제 DB 확인 결과:
 
-이 정의로 아래 부등식이 수학적으로 보장됨:
+| task_no | level | main_task_no |
+|---|---|---|
+| EL-G-29 | main | null |
+| EL-G-29-01 | sub | EL-C-29 |
+| EL-G-29-02 | sub | EL-C-29 |
+| EL-G-29-03 | sub | EL-C-29 |
+
+즉 문제는 **Sub Task No가 틀린 것**이 아니라, 화면에는 보통 보이지 않는 부모 연결키인 **`main_task_no`가 과거 값 `EL-C-29`로 남아있는 것**입니다.
+
+Task Summary는 트리 구조를 만들 때 `sub.main_task_no === main.task_no` 기준으로 하위 태스크를 붙입니다. 그래서 `EL-G-29-xx` 행들은 존재하지만 `main_task_no = EL-C-29`라서 `EL-G-29` 아래에 붙지 못하고, `EL-C-29` Main도 없으므로 Task Summary에서 orphan처럼 빠집니다.
+
+## 화면별 원소스 확인
+
+| 화면 | 데이터 소스 | 현재 판단 |
+|---|---|---|
+| Raw Data | `task_management_raw` | Raw 행 직접 표시라 정상 노출 |
+| Dashboard | `task_management_raw` | 행 단위 집계라 영향 작음 |
+| Task Summary | `task_management_raw` | `main_task_no` 기반 트리 구성이라 이번 문제 발생 |
+| MWS | `task_management_raw` | 행 단위 조회라 정상 노출 |
+| MTWS | `task_management_raw` | MWS와 동일 훅 기반이라 정상 노출 |
+
+결론: 네 화면 모두 Raw Data 테이블을 원소스로 사용하고 있으나, **Task Summary만 계층 연결키 정합성에 의존**합니다.
+
+## 수정 계획
+
+### 1. 기존 EL-G-29 데이터 복구
+
+마이그레이션으로 현재 오염된 연결키를 복구합니다.
+
+```sql
+UPDATE task_management_raw
+SET main_task_no = 'EL-G-29'
+WHERE level = 'sub'
+  AND task_no LIKE 'EL-G-29-%'
+  AND main_task_no = 'EL-C-29';
 ```
-Start Delayed ≤ In Delay
-Completion Overdue ≤ In Delay
-Critical Delay ≤ In Delay
-Behind Schedule == In Delay
+
+이후 부모 롤업 재계산을 1회 수행합니다.
+
+```sql
+SELECT rollup_task_all_mains();
 ```
 
-## 수정 파일
-### `src/lib/task-management/kpi-utils.ts`
-- `isInDelay(row, asOf)` = `!isCompleted(row) && gapAt(row, asOf) < 0` 로 교체 (판정 기반 제거)
-- `isBehindSchedule` 는 `isInDelay` 를 그대로 위임 (동의 함수)
-- `isCriticalDelay(row, asOf, thresholds)` = `isInDelay && gap < thresholds.behind_late_gap`
-- `computeKpi` / `computeKpiBreakdownByTeam` 는 함수 시그니처/반환 필드 유지 — 내부 계산만 위 정의로 갱신
-- 임포트에서 사용하던 `computeJudgment`, `isTaskDelayed` 는 KPI 경로에서 제거
+### 2. 재발 방지: Main Task No 변경 시 하위 연결키 자동 동기화
 
-### `src/components/task-management/dashboard/TmKpiCards.tsx`
-- 카드 문구/툴팁을 새 정의에 맞춰 소폭 조정:
-  - IN DELAY 부제: "gap < 0 · 미완료"
-  - BEHIND SCHEDULE 툴팁에 "IN DELAY와 동일 산식(gap 기반)" 안내
-- 카드 배치·색상·딥링크 mode 키는 유지(레이아웃 변경 없음)
+Main Task의 `task_no`가 변경될 때, 기존 `main_task_no = OLD.task_no`였던 Sub Task들의 `main_task_no`를 새 번호로 자동 갱신하는 DB 트리거를 추가합니다.
 
-## 영향 범위 (변경 없음 확인)
-- `derived.ts` 의 자동판정(computeJudgment) 로직은 그대로. Raw Data 뱃지, Task Tree, MWS/MTWS의 자동판정은 영향 없음.
-- `isTaskDelayed` 는 대시보드 KPI에서만 호출 경로가 끊기고, MWS의 지연 리스트는 별도로 `computeJudgment` 를 직접 사용하므로 무관.
-- 딥링크 `mode=in_delay|behind|critical|start_delayed|completion_overdue` 라우팅과 Raw Data 필터 UI는 그대로.
+동작 예:
 
-## 검증
-1. 스샷 데이터셋(ELEC 24/22) 재조회 시 두 카드 동일 값 확인
-2. Start Delayed / Completion Overdue / Critical Delay ≤ In Delay 부등식 확인
-3. `computeKpiBreakdownByTeam` 팀별 stack 합계 == 카드 값 확인
+```text
+Main: EL-C-29 → EL-G-29
+Sub:  main_task_no EL-C-29 → EL-G-29 자동 변경
+```
 
-## 비고
-자동판정(`위험/지연/주의/정상/완료`)과 KPI 축을 분리해서 유지하는 방식입니다. 판정과 완전 일치를 원하시면 이후 별도 요청으로 조정 가능.
+보이는 Sub Task No는 사용자가 이미 수정할 수 있고, 부모 연결키는 DB가 자동 보정하도록 분리합니다.
+
+### 3. 일반 orphan 데이터도 함께 점검/복구
+
+EL-G-29만 고치는 것이 아니라, 같은 유형의 데이터가 있는지 전체 점검합니다.
+
+복구 기준:
+
+```text
+sub.task_no = main.task_no || '-...'
+인데 sub.main_task_no != main.task_no 인 경우
+```
+
+이 조건에 맞는 경우는 `main_task_no`를 실제 prefix Main Task No로 보정합니다.
+
+### 4. Task Summary 방어 로직 보강
+
+DB 정합성이 원칙이지만, Task Summary에서도 안전망을 추가합니다.
+
+- 우선순위 1: `main_task_no` 기준으로 연결
+- 우선순위 2: `main_task_no`가 누락/불일치하고 `task_no` prefix가 존재하는 경우, 화면상에서는 prefix Main 아래로 임시 연결
+
+단, 이 방어 로직은 표시 누락 방지용이며, 실제 데이터 정합성은 DB 트리거/복구가 담당합니다.
+
+### 5. 재계산 최소화 원칙
+
+- Task Summary용 별도 캐시/중복 테이블은 만들지 않음.
+- `task_management_raw`를 계속 원소스로 유지.
+- Main Task No 변경 시 해당 Main과 관련 Sub만 갱신.
+- 전체 롤업은 기존 오염 복구 직후 1회만 수행.
+- 이후에는 변경된 그룹만 트리거에 의해 필요한 만큼만 재계산.
+
+## 검증 계획
+
+1. DB에서 `EL-G-29-01/02/03.main_task_no = EL-G-29` 확인.
+2. Task Summary에서 `EL-G-29` Main 아래에 Sub 3건이 표시되는지 확인.
+3. Raw Data, Dashboard, MWS, MTWS가 모두 `task_management_raw` 기준으로 동일 카운트/판정을 유지하는지 확인.
+4. 유사 orphan 조건 조회 결과가 0건인지 확인.
