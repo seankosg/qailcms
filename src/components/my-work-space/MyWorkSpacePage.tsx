@@ -78,7 +78,6 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   const [smTab, setSmTab] = useState<RowListTab>("today");
   const [abdTab, setAbdTab] = useState<RowListTab>("today");
   const [abdDetailId, setAbdDetailId] = useState<string | null>(null);
-  const [abdOnlyNeedsPlan, setAbdOnlyNeedsPlan] = useState<boolean>(false);
 
   const latestToday = today();
   const [dataDate, setDataDate] = useState<string>("");
@@ -134,7 +133,6 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
       upcoming: rows.filter((r) => abdIsUpcoming(r, t)).length,
       completed: rows.filter(abdIsApproved).length,
       today: rows.filter((r) => abdIsToday(r, t)).length,
-      needsPlan: rows.filter(abdNeedsPlanning).length,
     };
   }, [abd.data, t]);
 
@@ -451,29 +449,16 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           <ModuleKpiCard label="임박 (3d)" value={abdStats.upcoming} total={abdStats.total} tone="warning" animatePulse active={abdTab === "upcoming"} onClick={setTabFromKpi(setAbdTab, "upcoming")} />
           <ModuleKpiCard label="Approved" value={abdStats.completed} total={abdStats.total} tone="success" onClick={() => setAbdTab("all")} />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-          <ModuleKpiCard
-            label="계획필요 (Resp B/C)"
-            value={abdStats.needsPlan}
-            total={abdStats.total}
-            tone="destructive"
-            animatePulse={abdStats.needsPlan > 0}
-            active={abdOnlyNeedsPlan}
-            onClick={() => { setAbdOnlyNeedsPlan((v) => !v); setAbdTab("all"); }}
-          />
-        </div>
         <ModuleRowList<AbdMyRow>
           rows={abd.data ?? []}
           activeTab={abdTab}
           onTabChange={setAbdTab}
           counts={{ today: abdStats.today, all: abdStats.total, risk: abdStats.delayed, upcoming: abdStats.upcoming }}
           filterRow={(r, tab) =>
-            (abdOnlyNeedsPlan ? abdNeedsPlanning(r) : true) && (
-              tab === "all" ? true
-              : tab === "risk" ? abdIsDelayed(r, t)
-              : tab === "today" ? abdIsToday(r, t)
-              : abdIsUpcoming(r, t)
-            )
+            tab === "all" ? true
+            : tab === "risk" ? abdIsDelayed(r, t)
+            : tab === "today" ? abdIsToday(r, t)
+            : abdIsUpcoming(r, t)
           }
           rowKey={(r) => r.id}
           onRowClick={(r) => setAbdDetailId(r.id)}
