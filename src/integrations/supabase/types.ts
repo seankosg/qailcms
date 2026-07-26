@@ -4047,6 +4047,19 @@ export type Database = {
           id: string
         }[]
       }
+      tm_judge_snapshot_at_date: {
+        Args: { p_data_date: string; p_task_ids?: string[] }
+        Returns: {
+          alarm_reason: string
+          auto_judgment: string
+          cum_actual_pct: number
+          cum_plan_pct: number
+          delay_days: number
+          effective_actual_progress: number
+          gap_pct: number
+          id: string
+        }[]
+      }
       tm_today_actual: {
         Args: { _as_of: string; _ids: string[] }
         Returns: {
