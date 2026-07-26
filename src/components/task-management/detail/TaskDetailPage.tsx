@@ -274,7 +274,7 @@ export function TaskDetailPage() {
               parentKey="task_raw_id"
               parentValue={String(row.id)}
               categories={TASK_CATEGORIES}
-              defaultCategory="general"
+              defaultCategory={null}
             />
           </div>
         </div>

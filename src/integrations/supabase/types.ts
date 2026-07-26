@@ -2645,7 +2645,7 @@ export type Database = {
       task_comments: {
         Row: {
           author_user_id: string | null
-          category: string
+          category: string | null
           created_at: string
           edited: boolean
           id: string
@@ -2657,7 +2657,7 @@ export type Database = {
         }
         Insert: {
           author_user_id?: string | null
-          category?: string
+          category?: string | null
           created_at?: string
           edited?: boolean
           id?: string
@@ -2669,7 +2669,7 @@ export type Database = {
         }
         Update: {
           author_user_id?: string | null
-          category?: string
+          category?: string | null
           created_at?: string
           edited?: boolean
           id?: string
