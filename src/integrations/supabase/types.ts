@@ -3523,31 +3523,17 @@ export type Database = {
               status: string
             }[]
           }
-      abd_items_counts:
-        | {
-            Args: { _include_inactive?: boolean; _team?: string }
-            Returns: {
-              approved_count: number
-              in_progress_count: number
-              latest_data_date: string
-              not_started_count: number
-              total_count: number
-            }[]
-          }
-        | {
-            Args: {
-              _include_inactive?: boolean
-              _plot?: string
-              _team?: string
-            }
-            Returns: {
-              approved_count: number
-              in_progress_count: number
-              latest_data_date: string
-              not_started_count: number
-              total_count: number
-            }[]
-          }
+      abd_items_counts: {
+        Args: { _include_inactive?: boolean; _plot?: string; _team?: string }
+        Returns: {
+          approved_count: number
+          excluded_count: number
+          in_progress_count: number
+          latest_data_date: string
+          not_started_count: number
+          total_count: number
+        }[]
+      }
       abd_items_facets: {
         Args: {
           _column: string
