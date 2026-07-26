@@ -78,7 +78,6 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   const [smTab, setSmTab] = useState<RowListTab>("today");
   const [abdTab, setAbdTab] = useState<RowListTab>("today");
   const [abdDetailId, setAbdDetailId] = useState<string | null>(null);
-  const [abdOnlyNeedsPlan, setAbdOnlyNeedsPlan] = useState<boolean>(false);
 
   const latestToday = today();
   const [dataDate, setDataDate] = useState<string>("");
