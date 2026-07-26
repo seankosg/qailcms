@@ -25,6 +25,8 @@ import { DataDatePicker } from "@/components/task-management/shared/DataDatePick
 import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
 import { CommentsInbox } from "./CommentsInbox";
 import { AttentionInbox } from "./AttentionInbox";
+import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmJudgmentAtDate, mergeTmJudgment } from "@/hooks/useTmJudgmentAtDate";
 
 function fmtDate(d?: string | null): string {
   if (!d) return "-";
@@ -84,8 +86,16 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   const [abdDetailId, setAbdDetailId] = useState<string | null>(null);
 
   const latestToday = today();
-  const [dataDate, setDataDate] = useState<string>("");
+  const [dataDate, setDataDate, resetDataDate] = useTmDataDate();
   const t = dataDate || latestToday;
+
+  // 과거 Data Date 선택 시 서버측 재판정 병합 (Actual 유지, Plan/gap/judgment 만 as-of).
+  const isPastDate = !!dataDate && dataDate.slice(0, 10) < latestToday.slice(0, 10);
+  const judge = useTmJudgmentAtDate(dataDate, isPastDate);
+  const effTmData = useMemo(
+    () => mergeTmJudgment((tm.data ?? []) as any[], judge.map) as TmMyRow[],
+    [tm.data, judge.map],
+  );
 
   // ─── SM: 서버 판정 카운트 + 버킷 fetch ───
   const smCountsQ = useMyDefectsCounts(filterValue, isAdmin, scope, t);
@@ -117,16 +127,18 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   };
 
   const tmStats = useMemo(() => {
-    const rows = tm.data ?? [];
+    const rows = effTmData;
     return {
       total: rows.length,
       inProgress: rows.filter(tmIsStarted).length,
-      delayed: rows.filter((r) => tmIsDelayed(r, tmThresholds, t)).length,
+      delayed: rows.filter((r) =>
+        isPastDate ? (r.auto_judgment === "지연" || r.auto_judgment === "악화") : tmIsDelayed(r, tmThresholds, t),
+      ).length,
       upcoming: rows.filter((r) => tmIsUpcoming(r, t)).length,
       completed: rows.filter(tmIsCompleted).length,
       today: rows.filter((r) => tmIsToday(r, t)).length,
     };
-  }, [tm.data, t, tmThresholds]);
+  }, [effTmData, t, tmThresholds, isPastDate]);
 
   const abdStats = useMemo(() => {
     const rows = abd.data ?? [];
@@ -244,7 +256,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
       return <span className={cn("tabular-nums font-medium", pct < 0 ? "text-destructive" : pct > 0 ? "text-success" : "text-muted-foreground")}>{pct > 0 ? "+" : ""}{pct}%</span>;
     } },
     { key: "j", label: "Alarm", width: "70px", render: (r) => {
-      const j = tmJudgment(r, tmThresholds, t);
+      const j = isPastDate ? (r.auto_judgment ?? "") : tmJudgment(r, tmThresholds, t);
       return <Badge variant="outline" className={cn("text-[10px]", j === "악화" || j === "지연" ? "border-destructive text-destructive" : j === "주의" ? "border-warning text-warning" : j === "완료" ? "border-success text-success" : "")}>{j || "-"}</Badge>;
     } },
   ];
@@ -330,7 +342,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
             latest={latestToday}
             options={[]}
             onChange={setDataDate}
-            onReset={() => setDataDate("")}
+            onReset={resetDataDate}
           />
           {isAdmin && (
             <Badge variant="secondary" className="uppercase tracking-wide">Admin View</Badge>
@@ -360,13 +372,13 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           <ModuleKpiCard label="완료" value={tmStats.completed} total={tmStats.total} tone="success" onClick={() => { setTmTab("all"); }} />
         </div>
         <ModuleRowList<TmMyRow>
-          rows={tm.data ?? []}
+          rows={effTmData}
           activeTab={tmTab}
           onTabChange={setTmTab}
           counts={{ today: tmStats.today, all: tmStats.total, risk: tmStats.delayed, upcoming: tmStats.upcoming }}
           filterRow={(r, tab) =>
             tab === "all" ? true
-            : tab === "risk" ? tmIsDelayed(r, tmThresholds, t)
+            : tab === "risk" ? (isPastDate ? (r.auto_judgment === "지연" || r.auto_judgment === "악화") : tmIsDelayed(r, tmThresholds, t))
             : tab === "today" ? tmIsToday(r, t)
             : tmIsUpcoming(r, t)
           }

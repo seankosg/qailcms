@@ -106,7 +106,8 @@ export function TmDashboardPage() {
   const asOfDate = selectedDataDate;
   const asOfLabel = "Data Date";
 
-  // 과거 Data Date 선택 시 서버측 재판정 RPC(tm_judge_snapshot_at_date) 결과를 병합
+  // 과거 Data Date 선택 시 서버측 재판정 RPC(tm_judge_at_date) 결과를 병합.
+  // Actual% 는 절대 덮어쓰지 않는다 — Plan/gap/judgment 만 as-of 재계산.
   const isPastDate = asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
   const judge = useTmJudgmentAtDate(asOfDate, isPastDate);
   const effectiveItems = useMemo(() => {
@@ -114,12 +115,8 @@ export function TmDashboardPage() {
     return items.map((it) => {
       const j = judge.map.get(it.id);
       if (!j) return it;
-      const eff = j.effective_actual_progress ?? 0;
-      const clamped = Math.max(0, Math.min(1, Number(eff)));
       return {
         ...it,
-        actual_progress: clamped,
-        actual_finish: clamped >= 1 ? it.actual_finish : null,
         auto_judgment: j.auto_judgment ?? null,
         gap_pct: j.gap_pct ?? null,
         cum_plan_pct: j.cum_plan_pct ?? null,

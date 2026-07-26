@@ -33,6 +33,8 @@ import { MiniProgressChart } from "./MiniProgressChart";
 import { TaskProgressChartDialog } from "./TaskProgressChartDialog";
 import { useServerFn } from "@tanstack/react-start";
 import { getTaskProgressChartsBulk, type TaskChartCache } from "@/lib/task-management/progress-chart.functions";
+import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
 
@@ -324,19 +326,34 @@ export function TaskTreePage() {
     return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [data]);
 
-  const asOfDate = routeSearch.dataDate || latestDataDate || undefined;
+  // Data Date 소스 우선순위: route param > 세션 공유값 > 최신값.
+  const [sharedDataDate] = useTmDataDate();
+  const asOfDate = routeSearch.dataDate || sharedDataDate || latestDataDate || undefined;
+  const isPastAsOf =
+    !!asOfDate && !!latestDataDate && asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
+  const judge = useTmJudgmentAtDate(asOfDate ?? "", isPastAsOf);
+
+  // 서버 판정을 rows 에 병합 — Actual 은 절대 덮어쓰지 않는다.
+  const effData = useMemo<Row[]>(() => {
+    if (!isPastAsOf || judge.map.size === 0) return data;
+    return data.map((r) => {
+      const j = judge.map.get(r.id);
+      if (!j) return r;
+      return { ...r, auto_judgment: j.auto_judgment ?? null } as Row;
+    });
+  }, [data, isPastAsOf, judge.map]);
 
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
     const subsByMain = new Map<string, Row[]>();
     const mainTaskNos = new Set<string>();
-    for (const r of data) {
+    for (const r of effData) {
       if (r.level === "main") {
         mainTasks.push(r);
         mainTaskNos.add(r.task_no);
       }
     }
-    for (const r of data) {
+    for (const r of effData) {
       if (r.level === "sub") {
         const parentTaskNo =
           r.main_task_no && mainTaskNos.has(r.main_task_no)
@@ -349,7 +366,7 @@ export function TaskTreePage() {
       }
     }
     return { mainTasks, subsByMain };
-  }, [data]);
+  }, [effData]);
 
   // discipline 이 바뀌거나 데이터가 새로 로드되었을 때 — 해당 discipline 이
   // 아직 사용자에게 조정되지 않았다면 기본값(전체 펴기 + "악화" 필터) 적용.
@@ -403,15 +420,18 @@ export function TaskTreePage() {
     if (!picOptions.names.includes(picFilter)) setPicFilter("__all__");
   }, [picFilter, picOptions.names]);
 
+  // 과거 as-of 모드일 때는 이미 서버 판정을 병합했으므로 asOf 를 넘기지 않아야
+  // computeJudgment 가 병합된 auto_judgment 를 그대로 사용한다.
+  const asOfForJudge = isPastAsOf ? undefined : asOfDate;
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
     return mainTasks.filter((p) => {
       const kids = subsByMain.get(p.task_no) ?? [];
       if (judgmentFilter.size > 0) {
-        const mainJ = resolveMainJudgment(p, kids, thresholds, asOfDate);
+        const mainJ = resolveMainJudgment(p, kids, thresholds, asOfForJudge);
         const anyMatch =
           (mainJ && judgmentFilter.has(mainJ)) ||
-          kids.some((k) => judgmentFilter.has(resolveRowJudgment(k, thresholds, asOfDate)));
+          kids.some((k) => judgmentFilter.has(resolveRowJudgment(k, thresholds, asOfForJudge)));
         if (!anyMatch) return false;
       }
       if (picFilter !== "__all__") {
@@ -434,7 +454,7 @@ export function TaskTreePage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfDate, thresholds]);
+  }, [mainTasks, subsByMain, q, judgmentFilter, picFilter, asOfForJudge, thresholds]);
 
   // 완료(Actual% ≥ 100%) Main Task 는 하단으로 정렬, 동일 그룹 내에서는 Main Task No 오름차순
   const sortedFiltered = useMemo(() => {
@@ -458,13 +478,13 @@ export function TaskTreePage() {
     };
     let noStart = 0;
     let noEnd = 0;
-    for (const r of data) {
+    for (const r of effData) {
       if (!matchPic(r)) continue;
       if (!r.plan_start) noStart += 1;
       if (!r.plan_end) noEnd += 1;
     }
     return { noStart, noEnd };
-  }, [data, picFilter]);
+  }, [effData, picFilter]);
 
   // 판정별 카운트 — P.Start/P.Finish 없음과 동일 스코프(현재 discipline + PIC 필터).
   const judgmentCounts = useMemo(() => {
@@ -475,15 +495,15 @@ export function TaskTreePage() {
       return v === picFilter;
     };
     const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 악화: 0 };
-    for (const r of data) {
+    for (const r of effData) {
       if (!matchPic(r)) continue;
       const j = r.level === "main"
-        ? resolveMainJudgment(r, subsByMain.get(r.task_no) ?? [], thresholds, asOfDate)
-        : resolveRowJudgment(r, thresholds, asOfDate);
+        ? resolveMainJudgment(r, subsByMain.get(r.task_no) ?? [], thresholds, asOfForJudge)
+        : resolveRowJudgment(r, thresholds, asOfForJudge);
       if (j && j in counts) counts[j] += 1;
     }
     return counts;
-  }, [data, picFilter, asOfDate, subsByMain, thresholds]);
+  }, [effData, picFilter, asOfForJudge, subsByMain, thresholds]);
 
   function goToRawDataMissing(kind: "no_plan_start" | "no_plan_end") {
     const searchParams: Record<string, string> = {
@@ -730,7 +750,7 @@ export function TaskTreePage() {
           const kids = subsByMain.get(p.task_no) ?? [];
           const isOpen = expanded.has(p.task_no);
           const isDone = Number(p.actual_progress ?? 0) >= 1;
-          const mainJudgment = resolveMainJudgment(p, kids, thresholds, asOfDate);
+          const mainJudgment = resolveMainJudgment(p, kids, thresholds, asOfForJudge);
           const behindCount = kids.filter(
             (k) => (computeVariance(k, asOfDate) ?? 0) < -0.05,
           ).length;
@@ -814,7 +834,7 @@ export function TaskTreePage() {
                     <tbody>
                       {kids.map((k) => {
                         const gap = computeVariance(k, asOfDate) ?? 0;
-                        const j = resolveRowJudgment(k, thresholds, asOfDate);
+                        const j = resolveRowJudgment(k, thresholds, asOfForJudge);
                         const kDone = Number(k.actual_progress ?? 0) >= 1;
                         return (
                           <tr
