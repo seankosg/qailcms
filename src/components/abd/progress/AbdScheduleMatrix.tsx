@@ -7,6 +7,7 @@ import {
   type MatrixResult,
   type Stage,
   STAGE_LABELS,
+  STAGE_SHORT_LABELS,
   formatBucketLabel,
 } from "@/lib/abd/progress-utils";
 
