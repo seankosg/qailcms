@@ -30,6 +30,8 @@ interface Props {
     hdec_pic_name?: string[];
     hdec_eng_name?: string[];
     discipline?: string[];
+    plot?: string[];
+    q?: string;
   };
   statusMixSideSlot?: ReactNode;
   statusMixLeftExtraSlot?: ReactNode;
@@ -76,6 +78,8 @@ export function TmKpiCards({
     if (ownerContext?.hdec_pic_name?.length) s.hdec_pic_name = ownerContext.hdec_pic_name.join(",");
     if (ownerContext?.hdec_eng_name?.length) s.hdec_eng_name = ownerContext.hdec_eng_name.join(",");
     if (ownerContext?.discipline?.length) s.discipline = ownerContext.discipline.join(",");
+    if (ownerContext?.plot?.length) s.plot = ownerContext.plot.join(",");
+    if (ownerContext?.q && ownerContext.q.trim()) s.q = ownerContext.q.trim();
     navigate({ to: "/closure/task-management/raw-data", search: s as any });
   };
 
@@ -91,6 +95,8 @@ export function TmKpiCards({
     if (ownerContext?.hdec_pic_name?.length) s.hdec_pic_name = ownerContext.hdec_pic_name.join(",");
     if (ownerContext?.hdec_eng_name?.length) s.hdec_eng_name = ownerContext.hdec_eng_name.join(",");
     if (ownerContext?.discipline?.length) s.discipline = ownerContext.discipline.join(",");
+    if (ownerContext?.plot?.length) s.plot = ownerContext.plot.join(",");
+    if (ownerContext?.q && ownerContext.q.trim()) s.q = ownerContext.q.trim();
     navigate({ to: "/closure/task-management/raw-data", search: s as any });
   };
 

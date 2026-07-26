@@ -7,10 +7,13 @@ const searchSchema = z.object({
   source: fallback(z.string(), "").default(""),
   mode: fallback(z.string(), "").default(""),
   asOf: fallback(z.string(), "").default(""),
+  taskScope: fallback(z.string(), "").default(""),
   team: fallback(z.string(), "").default(""),
   hdec_pic_name: fallback(z.string(), "").default(""),
   hdec_eng_name: fallback(z.string(), "").default(""),
   discipline: fallback(z.string(), "").default(""),
+  plot: fallback(z.string(), "").default(""),
+  q: fallback(z.string(), "").default(""),
   dataDate: fallback(z.string(), "").default(""),
 });
 
