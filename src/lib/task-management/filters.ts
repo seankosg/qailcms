@@ -45,9 +45,10 @@ export const textFilterFn = (row: Row<any>, columnId: string, filterValue: any) 
 
 export const dateRangeFilterFn = (row: Row<any>, columnId: string, filterValue: any) => {
   if (!filterValue) return true;
-  const { from, to, emptyOnly } = filterValue;
+  const { from, to, emptyOnly, notEmptyOnly } = filterValue;
   const val = row.getValue(columnId) as string | null;
   if (emptyOnly) return val == null || val === "";
+  if (notEmptyOnly) return val != null && val !== "";
   if (!from && !to) return true;
   if (!val) return false;
   const iso = String(val).slice(0, 10);
