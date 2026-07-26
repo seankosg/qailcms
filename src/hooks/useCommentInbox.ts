@@ -160,7 +160,7 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
         module: mod,
         category: categoryCol ? (r[categoryCol] ?? null) : null,
         message: String(r[messageCol] ?? ""),
-        author_user_id: r.author_user_id ?? null,
+        author_user_id: r.author_user_id ?? r.author_id ?? null,
         author_name: null,
         created_at: r.created_at,
         updated_at: r.updated_at,
