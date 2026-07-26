@@ -593,13 +593,11 @@ export function TaskManagementRawDataPage() {
     return m;
   }, [tActualRows]);
 
-  // 과거 Data Date 시 Dashboard 와 동일하게 서버 재판정 결과를 병합.
+  // Data Date(과거/현재 모두) Dashboard 와 동일한 서버 재판정 결과를 병합.
   // Actual% 는 절대 덮어쓰지 않고 Plan/gap/judgment/delay_days/alarm_reason 만 갱신.
-  const isPastDate = useMemo(
-    () => !!selectedDataDate && !!latestDataDate && selectedDataDate.slice(0, 10) < latestDataDate.slice(0, 10),
-    [selectedDataDate, latestDataDate],
-  );
-  const judge = useTmJudgmentAtDate(selectedDataDate, !!isPastDate);
+  // 현재 Data Date일 때도 DB 저장된 auto_judgment 대신 RPC 재계산 값을 사용하여
+  // Dashboard KPI(gap 축)와 Raw Data 행 수가 정확히 일치하도록 함.
+  const judge = useTmJudgmentAtDate(selectedDataDate, true);
   const effectiveRows = useMemo(
     () => mergeTmJudgment(rows, judge.map),
     [rows, judge.map],
