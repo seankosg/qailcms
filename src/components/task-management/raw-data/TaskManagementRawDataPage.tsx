@@ -91,6 +91,8 @@ import {
   computeVariance,
   computeDailyPlan,
   computeDailyDiff,
+  cumActualProgress,
+  computeTPlan,
 } from "@/lib/task-management/derived";
 import { todayIso } from "@/lib/task-management/schedule-utils";
 import {
