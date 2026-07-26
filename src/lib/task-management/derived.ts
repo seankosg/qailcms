@@ -175,6 +175,7 @@ export function getStageJudgment(
     if (
       row.actual_start ||
       Number(row.actual_progress ?? 0) >= 1 ||
+      Number(row.actual_progress ?? 0) > 0 ||
       row.auto_judgment === "완료"
     )
       return "완료";
@@ -221,7 +222,11 @@ export function computeJudgment(
   const jFinish = getStageJudgment(row, "finish", t, asOf);
   if (jWip === "완료" && jFinish === "완료") return "완료";
   const candidates: string[] = [];
-  if (!row.actual_start) candidates.push(jStart);
+  // Start 스테이지는 미착수(진도 0 & actual_start 없음)일 때만 후보에 포함.
+  // 진도가 이미 발생한 행은 착수된 것으로 간주하고 WIP/Finish 로만 판정.
+  if (!row.actual_start && Number(row.actual_progress ?? 0) <= 0) {
+    candidates.push(jStart);
+  }
   candidates.push(jWip, jFinish);
   return worstJudgment(candidates) ?? "정상";
 }
