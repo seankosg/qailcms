@@ -593,129 +593,21 @@ export function TaskManagementRawDataPage() {
     return m;
   }, [tActualRows]);
 
-  // 지연 모드: 대시보드에서 넘어온 스테이지 지연 조건에 해당하는 행만 노출
-  const delayFilteredRows = useMemo(() => {
-    if (!delayMode) return rows;
-    const asOf = delayMode.asOf;
-    return rows.filter((r) => {
-      const it = r as unknown as TaskItem;
-      for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
-        if (isTaskStageDelayedAsOf(it, st, asOf)) return true;
-      }
-      return false;
-    });
-  }, [rows, delayMode]);
-
-  // KPI 카드 딥링크 모드: 대시보드 상단 카드 클릭 시 조건
-  const kpiSelection = useMemo(() => {
-    if (!kpiMode) {
-      return { rows: delayFilteredRows, matchCount: delayFilteredRows.length, contextCount: 0 };
-    }
-    const t = kpiThresholds ?? DEFAULT_THRESHOLDS;
-    const asOf = kpiMode.asOf;
-    const scoped = scopeItems(
-      delayFilteredRows as unknown as TaskItem[],
-      kpiMode.scope,
-    ) as unknown as Row[];
-    const matched = scoped.filter((r) => {
-      const it = r as unknown as TaskItem;
-      switch (kpiMode.mode) {
-        case "completed":
-          return kpiIsCompleted(it);
-        case "not_started":
-          return !kpiIsStarted(it);
-        case "wip":
-          return kpiIsStarted(it) && !kpiIsCompleted(it);
-        case "planned_started":
-          return kpiIsPlannedStartedBy(it, asOf);
-        case "actual_started":
-          return kpiIsStarted(it);
-        case "in_delay":
-          return kpiIsInDelay(it, asOf);
-        case "start_delayed":
-          return kpiIsInDelay(it, asOf) && kpiIsStartDelayed(it, asOf);
-        case "completion_overdue":
-          return kpiIsInDelay(it, asOf) && kpiIsCompletionOverdue(it, asOf);
-        case "critical":
-          return kpiIsCriticalDelay(it, asOf, t);
-        case "behind":
-          return kpiIsInDelay(it, asOf) && kpiIsBehindSchedule(it, asOf);
-        case "no_plan_start":
-          return !(it as any).plan_start;
-        case "no_plan_end":
-          return !(it as any).plan_end;
-        default:
-          return true;
-      }
-    });
-    // Delay 계열 mode: 매치된 Main Task의 모든 Sub를 함께 포함
-    // (Sub가 정상/주의여도 Main의 하위 컨텍스트 파악을 위해 노출)
-    const DELAY_MODES = new Set([
-      "in_delay",
-      "start_delayed",
-      "completion_overdue",
-      "critical",
-      "behind",
-    ]);
-    if (!DELAY_MODES.has(kpiMode.mode)) {
-      return { rows: matched, matchCount: matched.length, contextCount: 0 };
-    }
-    const mainKeys = new Set<string>();
-    for (const r of matched) {
-      if ((r as any).level === "main") {
-        mainKeys.add(`${(r as any).discipline}::${(r as any).task_no}`);
-      }
-    }
-    if (mainKeys.size === 0) {
-      return { rows: matched, matchCount: matched.length, contextCount: 0 };
-    }
-    // Sub는 scopeItems 이전(전체 delayFilteredRows)에서 다시 조회 —
-    // 대시보드에서 taskScope='main' 진입 시에도 하위 Sub를 노출하기 위함.
-    const matchedIds = new Set(matched.map((r) => (r as any).id));
-    const extraSubs: Row[] = [];
-    for (const r of delayFilteredRows) {
-      if ((r as any).level !== "sub") continue;
-      const parent = (r as any).main_task_no as string | null;
-      const disc = (r as any).discipline as string;
-      if (!parent) continue;
-      if (!mainKeys.has(`${disc}::${parent}`)) continue;
-      if (matchedIds.has((r as any).id)) continue;
-      // 정상/완료 Sub는 제외 (주의/지연/악화 등 이슈 Sub만 함께 노출)
-      const j = (r as any).auto_judgment as string | null | undefined;
-      if (j === "정상" || j === "완료") continue;
-      extraSubs.push(r);
-    }
-    return {
-      rows: [...matched, ...extraSubs],
-      matchCount: matched.length,
-      contextCount: extraSubs.length,
-    };
-  }, [delayFilteredRows, kpiMode, kpiThresholds]);
-
-  const kpiFilteredRows = useMemo(() => {
-    if (!kpiMode) return kpiSelection.rows;
-    if (hideContextSubs && kpiSelection.contextCount > 0) {
-      // 매칭만 남기기: rows 앞쪽 matchCount 개가 matched.
-      return kpiSelection.rows.slice(0, kpiSelection.matchCount);
-    }
-    return kpiSelection.rows;
-  }, [kpiSelection, kpiMode, hideContextSubs]);
-
-  // discipline-task_no 단위 collapse 키 유지 — 접힌 부모의 자식 행 숨김
-  const visibleRows = useMemo(() => {
-    const src = kpiFilteredRows;
-    if (collapsedParents.size === 0) return src;
-    return src.filter((r) => {
-      const parent = (r as any).main_task_no as string | null;
-      const disc = (r as any).discipline as string;
-      if (!parent) return true;
-      return !collapsedParents.has(`${disc}::${parent}`);
-    });
-  }, [kpiFilteredRows, collapsedParents]);
+  // 과거 Data Date 시 Dashboard 와 동일하게 서버 재판정 결과를 병합.
+  // Actual% 는 절대 덮어쓰지 않고 Plan/gap/judgment/delay_days/alarm_reason 만 갱신.
+  const isPastDate = useMemo(
+    () => !!selectedDataDate && !!latestDataDate && selectedDataDate.slice(0, 10) < latestDataDate.slice(0, 10),
+    [selectedDataDate, latestDataDate],
+  );
+  const judge = useTmJudgmentAtDate(selectedDataDate, !!isPastDate);
+  const effectiveRows = useMemo(
+    () => mergeTmJudgment(rows, judge.map),
+    [rows, judge.map],
+  );
 
   const parentKeys = useMemo(() => {
     const keys: string[] = [];
-    for (const r of rows) {
+    for (const r of effectiveRows) {
       if ((r as any).level === "main") {
         keys.push(`${(r as any).discipline}::${(r as any).task_no}`);
       }
