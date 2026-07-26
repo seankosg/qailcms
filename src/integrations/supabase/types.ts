@@ -3038,31 +3038,25 @@ export type Database = {
       }
       task_management_settings: {
         Row: {
-          behind_late_gap: number
-          behind_warn_gap: number
+          caution_gap_buffer: number
           id: string
-          slip_late_days: number
-          slip_warn_days: number
           updated_at: string
           updated_by: string | null
+          worsen_gap: number
         }
         Insert: {
-          behind_late_gap?: number
-          behind_warn_gap?: number
+          caution_gap_buffer?: number
           id?: string
-          slip_late_days?: number
-          slip_warn_days?: number
           updated_at?: string
           updated_by?: string | null
+          worsen_gap?: number
         }
         Update: {
-          behind_late_gap?: number
-          behind_warn_gap?: number
+          caution_gap_buffer?: number
           id?: string
-          slip_late_days?: number
-          slip_warn_days?: number
           updated_at?: string
           updated_by?: string | null
+          worsen_gap?: number
         }
         Relationships: []
       }

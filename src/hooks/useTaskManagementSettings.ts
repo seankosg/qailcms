@@ -17,10 +17,10 @@ export function useTaskManagementSettings() {
       if (error) throw error;
       if (!data) return { ...DEFAULT_THRESHOLDS };
       return {
-        behind_warn_gap: Number(data.behind_warn_gap ?? DEFAULT_THRESHOLDS.behind_warn_gap),
-        behind_late_gap: Number(data.behind_late_gap ?? DEFAULT_THRESHOLDS.behind_late_gap),
-        slip_warn_days: Number(data.slip_warn_days ?? DEFAULT_THRESHOLDS.slip_warn_days),
-        slip_late_days: Number(data.slip_late_days ?? DEFAULT_THRESHOLDS.slip_late_days),
+        caution_gap_buffer: Number(
+          data.caution_gap_buffer ?? DEFAULT_THRESHOLDS.caution_gap_buffer,
+        ),
+        worsen_gap: Number(data.worsen_gap ?? DEFAULT_THRESHOLDS.worsen_gap),
       } satisfies TaskThresholds;
     },
     staleTime: 30_000,

@@ -3,10 +3,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const SettingsSchema = z.object({
-  behind_warn_gap: z.number().min(-1).max(0),
-  behind_late_gap: z.number().min(-1).max(0),
-  slip_warn_days: z.number().int().min(0).max(365),
-  slip_late_days: z.number().int().min(0).max(365),
+  caution_gap_buffer: z.number().min(0).max(1),
+  worsen_gap: z.number().min(-1).max(0),
 });
 
 export const saveTaskThresholds = createServerFn({ method: "POST" })
@@ -23,10 +21,8 @@ export const saveTaskThresholds = createServerFn({ method: "POST" })
       .from("task_management_settings")
       .upsert({
         id: "default",
-        behind_warn_gap: data.behind_warn_gap,
-        behind_late_gap: data.behind_late_gap,
-        slip_warn_days: data.slip_warn_days,
-        slip_late_days: data.slip_late_days,
+        caution_gap_buffer: data.caution_gap_buffer,
+        worsen_gap: data.worsen_gap,
         updated_by: context.userId,
       });
     if (error) throw new Error(error.message);

@@ -19,7 +19,7 @@ const COLOR: Record<string, string> = {
   정상: "var(--schedule-plan)",
   주의: "var(--warning)",
   지연: "var(--schedule-over)",
-  위험: "var(--schedule-short)",
+  악화: "var(--schedule-short)",
 };
 
 export function JudgmentStageBreakdown({ items, asOfDate, compact = false }: Props) {

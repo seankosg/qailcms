@@ -154,7 +154,7 @@ export function TaskTreePage() {
   // 뷰 상태를 sessionStorage 로 유지 — Raw Data 로 드릴다운 후 되돌아왔을 때
   // discipline / 필터 / 검색어 / 펼침 상태가 그대로 복원되도록 함.
   // v3: 탭(discipline)별로 expanded/judgmentFilter/touched 를 분리 저장 →
-  //     탭 전환 시 기본값(전체 펴기 + "위험" 필터) 재적용, 사용자가 조정한
+  //     탭 전환 시 기본값(전체 펴기 + "악화" 필터) 재적용, 사용자가 조정한
   //     탭은 touched=true 로 표시되어 이후 재방문 시 상태 그대로 복원.
   const VIEW_STATE_KEY = "qail.task-tree.view-state.v3";
   type PerDisciplineState = {
@@ -189,7 +189,7 @@ export function TaskTreePage() {
     new Set(initialPerDiscipline?.expanded ?? []),
   );
   const [judgmentFilter, setJudgmentFilter] = useState<Set<string>>(
-    new Set(initialPerDiscipline?.judgmentFilter ?? ["위험"]),
+    new Set(initialPerDiscipline?.judgmentFilter ?? ["악화"]),
   );
   // discipline 별 사용자 조정 여부를 세션 내에서 추적.
   const [touchedByDiscipline, setTouchedByDiscipline] = useState<
@@ -286,7 +286,7 @@ export function TaskTreePage() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("task_management_settings")
-        .select("behind_warn_gap, behind_late_gap, slip_warn_days, slip_late_days")
+        .select("caution_gap_buffer, worsen_gap")
         .eq("id", "default")
         .maybeSingle();
       if (error) throw error;
@@ -352,7 +352,7 @@ export function TaskTreePage() {
   }, [data]);
 
   // discipline 이 바뀌거나 데이터가 새로 로드되었을 때 — 해당 discipline 이
-  // 아직 사용자에게 조정되지 않았다면 기본값(전체 펴기 + "위험" 필터) 적용.
+  // 아직 사용자에게 조정되지 않았다면 기본값(전체 펴기 + "악화" 필터) 적용.
   // 조정된 적이 있다면 sessionStorage 에 저장된 값 복원.
   useEffect(() => {
     if (mainTasks.length === 0) return;
@@ -366,14 +366,14 @@ export function TaskTreePage() {
         const parsed = raw ? (JSON.parse(raw) as PersistedView) : null;
         const slot = parsed?.perDiscipline?.[discipline];
         setExpanded(new Set(slot?.expanded ?? []));
-        setJudgmentFilter(new Set(slot?.judgmentFilter ?? ["위험"]));
+        setJudgmentFilter(new Set(slot?.judgmentFilter ?? ["악화"]));
       } catch {
         setExpanded(new Set(mainTasks.map((m) => m.task_no)));
-        setJudgmentFilter(new Set(["위험"]));
+        setJudgmentFilter(new Set(["악화"]));
       }
     } else {
       setExpanded(new Set(mainTasks.map((m) => m.task_no)));
-      setJudgmentFilter(new Set(["위험"]));
+      setJudgmentFilter(new Set(["악화"]));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [discipline, mainTasks]);
@@ -474,7 +474,7 @@ export function TaskTreePage() {
       if (picFilter === "__unassigned__") return !v;
       return v === picFilter;
     };
-    const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 위험: 0 };
+    const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 악화: 0 };
     for (const r of data) {
       if (!matchPic(r)) continue;
       const j = r.level === "main"
@@ -680,7 +680,7 @@ export function TaskTreePage() {
           </span>
         </button>
         <div className="flex items-center gap-1">
-          {(["위험", "지연", "주의", "정상"] as const).map((j) => {
+          {(["악화", "지연", "주의", "정상"] as const).map((j) => {
             const active = judgmentFilter.has(j);
             const count = judgmentCounts[j] ?? 0;
             return (

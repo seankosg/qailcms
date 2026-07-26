@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAbdDashboardJudgmentMix } from "@/lib/abd/dashboard.functions";
 
-const JUDGMENT_KEY_ORDER = ["완료", "정상", "주의", "지연", "위험"] as const;
+const JUDGMENT_KEY_ORDER = ["완료", "정상", "주의", "지연", "악화"] as const;
 const STAGE_ORDER: Array<"NS" | "DS" | "UR" | "Approved"> = ["NS", "DS", "UR", "Approved"];
 const STAGE_LABEL: Record<string, string> = {
   NS: "NS (Not Started)",
@@ -16,7 +16,7 @@ const COLOR: Record<string, string> = {
   정상: "var(--schedule-plan)",
   주의: "var(--warning)",
   지연: "var(--schedule-over)",
-  위험: "var(--schedule-short)",
+  악화: "var(--schedule-short)",
 };
 
 export function AbdJudgmentStageBreakdown({ batchNo, plots = [] }: { batchNo: string[]; plots?: string[] }) {
@@ -41,7 +41,7 @@ export function AbdJudgmentStageBreakdown({ batchNo, plots = [] }: { batchNo: st
             정상: Number(r?.normal ?? 0),
             주의: Number(r?.caution ?? 0),
             지연: Number(r?.delayed ?? 0),
-            위험: Number(r?.critical ?? 0),
+            악화: Number(r?.critical ?? 0),
           };
           const total = Number(r?.total ?? 0);
           return (

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-type Judgment = "완료" | "정상" | "주의" | "지연" | "위험";
+type Judgment = "완료" | "정상" | "주의" | "지연" | "악화";
 
 interface Config {
   icon: LucideIcon;
@@ -44,7 +44,7 @@ const CONFIG: Record<Judgment, Config> = {
     cls:
       "bg-orange-600 text-white ring-1 ring-inset ring-orange-700/40 shadow-sm",
   },
-  "위험": {
+  "악화": {
     icon: AlertTriangle,
     cls:
       "bg-rose-600 text-white ring-1 ring-inset ring-rose-700/40 shadow-sm",

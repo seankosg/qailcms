@@ -51,7 +51,7 @@ export function computeDelayTopN(
     // 스테이지별 지연 항목 나열. WIP 는 날짜가 없어 plannedDate 는 plan_start 로 대체.
     for (const st of ALL_TASK_STAGE_KEYS) {
       const stageJ = getStageJudgment(it, st, undefined, asOfDate);
-      if (stageJ !== "지연" && stageJ !== "위험") continue;
+      if (stageJ !== "지연" && stageJ !== "악화") continue;
       const plannedDate =
         st === "wip"
           ? (it.plan_start ? it.plan_start.slice(0, 10) : asOfDate)
@@ -216,7 +216,7 @@ export interface JudgmentStageBreakdown {
   }>;
 }
 
-const JUDGMENT_KEYS = ["완료", "정상", "주의", "지연", "위험"] as const;
+const JUDGMENT_KEYS = ["완료", "정상", "주의", "지연", "악화"] as const;
 
 export function computeJudgmentStageBreakdown(
   items: TaskItem[],
@@ -227,7 +227,7 @@ export function computeJudgmentStageBreakdown(
     정상: 0,
     주의: 0,
     지연: 0,
-    위험: 0,
+    악화: 0,
   };
   for (const it of items) {
     const j = String(it.auto_judgment ?? "").trim();
@@ -239,7 +239,7 @@ export function computeJudgmentStageBreakdown(
       정상: 0,
       주의: 0,
       지연: 0,
-      위험: 0,
+      악화: 0,
     };
     let total = 0;
     for (const it of items) {

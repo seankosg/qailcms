@@ -66,8 +66,8 @@ export function isCriticalDelay(
   thresholds: TaskThresholds,
 ): boolean {
   if (isCompleted(row)) return false;
-  // gap 축 단일 소스: In Delay(=gap<0) 중 임계값(behind_late_gap, 기본 -0.10) 미만
-  return gapAt(row, asOf) < thresholds.behind_late_gap;
+  // gap 축 단일 소스: In Delay(=gap<0) 중 worsen_gap(기본 -0.15) 미만 → '악화'
+  return gapAt(row, asOf) < thresholds.worsen_gap;
 }
 
 export function isInDelay(row: TaskItem, asOf: string): boolean {

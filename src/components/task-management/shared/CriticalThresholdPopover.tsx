@@ -80,50 +80,30 @@ export function CriticalThresholdPopover({
         <div className="space-y-2">
           <div className="text-sm font-semibold">Auto‑Judgment 임계값</div>
           <p className="text-[11px] text-muted-foreground">
-            gap = 실적 진도율 − 오늘 계획 진도율. slip은 예상 완료가 계획 대비 초과된 일수.
+          gap = Actual% − Cum.Plan%. 지연/정상 경계는 gap=0 (파생), 주의·악화 경계만 여기서 설정.
           </p>
         </div>
         <Separator className="my-3" />
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label className="text-[11px]">주의 gap (&lt;)</Label>
+          <Label className="text-[11px]">주의 여유 (+)</Label>
             <Input
               type="number"
               step="0.01"
               className="h-8 text-xs"
-              value={t.behind_warn_gap}
-              onChange={(e) => setT({ ...t, behind_warn_gap: Number(e.target.value) })}
+            value={t.caution_gap_buffer}
+            onChange={(e) => setT({ ...t, caution_gap_buffer: Number(e.target.value) })}
               disabled={!isAdmin}
             />
           </div>
           <div>
-            <Label className="text-[11px]">위험 gap (&lt;)</Label>
+          <Label className="text-[11px]">악화 gap (&lt;)</Label>
             <Input
               type="number"
               step="0.01"
               className="h-8 text-xs"
-              value={t.behind_late_gap}
-              onChange={(e) => setT({ ...t, behind_late_gap: Number(e.target.value) })}
-              disabled={!isAdmin}
-            />
-          </div>
-          <div>
-            <Label className="text-[11px]">지연 slip (&gt;일)</Label>
-            <Input
-              type="number"
-              className="h-8 text-xs"
-              value={t.slip_warn_days}
-              onChange={(e) => setT({ ...t, slip_warn_days: Number(e.target.value) })}
-              disabled={!isAdmin}
-            />
-          </div>
-          <div>
-            <Label className="text-[11px]">위험 slip (&gt;일)</Label>
-            <Input
-              type="number"
-              className="h-8 text-xs"
-              value={t.slip_late_days}
-              onChange={(e) => setT({ ...t, slip_late_days: Number(e.target.value) })}
+            value={t.worsen_gap}
+            onChange={(e) => setT({ ...t, worsen_gap: Number(e.target.value) })}
               disabled={!isAdmin}
             />
           </div>

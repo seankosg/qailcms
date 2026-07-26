@@ -49,7 +49,7 @@ const routeApi = getRouteApi("/_authenticated/closure/task-management/dashboard"
 const DELAY_FILTER_OPTIONS = [
   { value: "all", label: "전체" },
   { value: "delayed", label: "지연만" },
-  { value: "risk", label: "위험만" },
+  { value: "risk", label: "악화만" },
 ] as const;
 
 function isOwnerDim(v: string): v is OwnerDim {
@@ -145,8 +145,8 @@ export function TmDashboardPage() {
     const base = scopedByTaskScope;
     if (search.delayFilter === "all") return base;
     return base.filter((it) => {
-      if (search.delayFilter === "risk") return it.auto_judgment === "위험";
-      if (it.auto_judgment === "지연" || it.auto_judgment === "위험") return true;
+      if (search.delayFilter === "risk") return it.auto_judgment === "악화";
+      if (it.auto_judgment === "지연" || it.auto_judgment === "악화") return true;
       for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
         if (isTaskStageDelayedAsOf(it, st, asOfDate)) return true;
       }

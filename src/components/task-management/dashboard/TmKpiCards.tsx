@@ -206,7 +206,7 @@ export function TmKpiCards({
           tone="danger"
           onClick={() => goRaw("critical")}
           breakdown={toBreakdownRows("critical", breakdown.criticalDelay)}
-          formula={`In Delay ∩ (gap < ${t.behind_late_gap})`}
+          formula={`In Delay ∩ (gap < ${t.worsen_gap}) → '악화'`}
         />
         <RiskKpiCard
           label="Behind Schedule"
