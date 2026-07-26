@@ -228,13 +228,9 @@ export function AbdRawDataPage() {
     );
     return valid;
   }, [urlSearch.status]);
-  // RPC의 _status_group 슬롯은 approved/in_progress/not_started 3종만 안전하게 처리한다.
-  // 그 외 세분화 상태값(under_review, rs_delay 등)은 서버 필터(status_group in [...])로 좁힌다.
-  const RPC_STATUS_SET = new Set(["approved", "in_progress", "not_started"]);
-  const statusGroup: AbdStatusGroup =
-    selectedStatuses.length === 1 && RPC_STATUS_SET.has(selectedStatuses[0])
-      ? selectedStatuses[0]
-      : "all";
+  // RPC의 _status_group 슬롯은 확장 어휘(approved/in_progress/not_started + under_review/drafting/rs_delay/sb_delay/ds_delay/no_plan/delayed)를 모두 처리한다.
+  // 단일 선택 시 그 값을, 그 외는 "all".
+  const statusGroup: AbdStatusGroup = selectedStatuses.length === 1 ? selectedStatuses[0] : "all";
   const toggleStatus = useCallback((v: Exclude<AbdStatusGroup, "all">) => {
     const set = new Set(selectedStatuses);
     if (set.has(v)) set.delete(v);
@@ -340,18 +336,13 @@ export function AbdRawDataPage() {
 
   const serverFilters = useMemo(() => {
     const base = toServerFilters(columnFilters);
-    // statusGroup이 "all"로 fallback된 상황(=RPC 슬롯을 못 쓴 경우)에서만 서버 필터로 좁힌다.
-    // "delayed"는 4종 지연 상태(rs_delay/sb_delay/ds_delay/no_plan) 합집합으로 전개.
-    if (statusGroup !== "all" || selectedStatuses.length === 0) return base;
-    const expanded: string[] = [];
-    for (const s of selectedStatuses) {
-      if (s === "delayed") expanded.push("rs_delay", "sb_delay", "ds_delay", "no_plan");
-      else expanded.push(s);
+    // UI 탭에서 2개(approved/in_progress/not_started 중) 다중 선택된 경우에만 서버측 in-절로 좁힘.
+    // 단일 선택은 RPC의 _status_group 슬롯이 처리하고, 확장 상태값은 UI 탭에 없으므로 여기 해당 없음.
+    if (selectedStatuses.length >= 2 && selectedStatuses.length < ALL_STATUS_VALUES.length) {
+      return [{ column: "status_group", op: "in" as const, value: selectedStatuses }, ...base];
     }
-    const uniq = Array.from(new Set(expanded));
-    if (uniq.length === 0) return base;
-    return [{ column: "status_group", op: "in" as const, value: uniq }, ...base];
-  }, [columnFilters, selectedStatuses, statusGroup]);
+    return base;
+  }, [columnFilters, selectedStatuses]);
   const serverSort = useMemo(() => toServerSort(sorting), [sorting]);
   const q = (urlSearch.q ?? "").trim();
 
