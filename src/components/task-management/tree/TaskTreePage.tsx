@@ -347,13 +347,13 @@ export function TaskTreePage() {
     const mainTasks: Row[] = [];
     const subsByMain = new Map<string, Row[]>();
     const mainTaskNos = new Set<string>();
-    for (const r of data) {
+    for (const r of effData) {
       if (r.level === "main") {
         mainTasks.push(r);
         mainTaskNos.add(r.task_no);
       }
     }
-    for (const r of data) {
+    for (const r of effData) {
       if (r.level === "sub") {
         const parentTaskNo =
           r.main_task_no && mainTaskNos.has(r.main_task_no)
@@ -366,7 +366,7 @@ export function TaskTreePage() {
       }
     }
     return { mainTasks, subsByMain };
-  }, [data]);
+  }, [effData]);
 
   // discipline 이 바뀌거나 데이터가 새로 로드되었을 때 — 해당 discipline 이
   // 아직 사용자에게 조정되지 않았다면 기본값(전체 펴기 + "악화" 필터) 적용.
@@ -475,13 +475,13 @@ export function TaskTreePage() {
     };
     let noStart = 0;
     let noEnd = 0;
-    for (const r of data) {
+    for (const r of effData) {
       if (!matchPic(r)) continue;
       if (!r.plan_start) noStart += 1;
       if (!r.plan_end) noEnd += 1;
     }
     return { noStart, noEnd };
-  }, [data, picFilter]);
+  }, [effData, picFilter]);
 
   // 판정별 카운트 — P.Start/P.Finish 없음과 동일 스코프(현재 discipline + PIC 필터).
   const judgmentCounts = useMemo(() => {
@@ -492,7 +492,7 @@ export function TaskTreePage() {
       return v === picFilter;
     };
     const counts: Record<string, number> = { 정상: 0, 주의: 0, 지연: 0, 악화: 0 };
-    for (const r of data) {
+    for (const r of effData) {
       if (!matchPic(r)) continue;
       const j = r.level === "main"
         ? resolveMainJudgment(r, subsByMain.get(r.task_no) ?? [], thresholds, asOfDate)
@@ -500,7 +500,7 @@ export function TaskTreePage() {
       if (j && j in counts) counts[j] += 1;
     }
     return counts;
-  }, [data, picFilter, asOfDate, subsByMain, thresholds]);
+  }, [effData, picFilter, asOfDate, subsByMain, thresholds]);
 
   function goToRawDataMissing(kind: "no_plan_start" | "no_plan_end") {
     const searchParams: Record<string, string> = {
