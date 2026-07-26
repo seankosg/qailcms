@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { Search, Upload, Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import {
+  ABD_TEAMS,
   ABD_COLUMNS,
   ABD_STATUSES,
   PLOT_COLORS,
@@ -39,7 +40,6 @@ import {
   type AbdTeam,
 } from "@/hooks/useAbdItems";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useTeamOptions } from "@/lib/team/team-master";
 import { canEditRawRow } from "@/lib/auth/roles";
 import { EMPTY_TOKEN, DATE_FILTER_FIELDS } from "@/lib/abd/filter-fns";
 import { getOriginHeaderStyle } from "@/lib/abd/origin-header-style";
@@ -161,26 +161,21 @@ export function AbdRawDataPage() {
   const urlSearch = AbdRawDataRoute.useSearch();
   const { data: user } = useCurrentUser();
   const isAdmin = !!user?.isAdmin;
-  const { data: teamOptions = [] } = useTeamOptions();
   const canEditRow = useCallback(
     (row: AbdItem) => canEditRawRow(user ?? null, "abd_items_raw", row as unknown as Record<string, any>),
     [user],
   );
   const invalidate = useInvalidateAbd();
 
-  // team_master 기반 동적 탭. 미매칭 시 첫 옵션 폴백.
-  // ABD는 도면 관련 팀만 노출: PRJC/SUPP 제외
-  const abdTeamOptions = useMemo(
-    () => teamOptions.filter((t) => !["PRJC", "SUPP"].includes(t.code.toUpperCase())),
-    [teamOptions],
-  );
+  // ABD Raw Data는 ABD 전용 팀 탭만 사용한다. team_master의 DESN/PRJC/SUPP 등 공용 팀을 섞으면
+  // 데이터가 없는 탭이 선택되어 전체 Raw Data가 사라진 것처럼 보일 수 있다.
   const teamTabs = useMemo(
-    () => abdTeamOptions.map((t) => ({ value: t.code, label: t.code })),
-    [abdTeamOptions],
+    () => ABD_TEAMS.map((t) => ({ value: t.value, label: t.label })),
+    [],
   );
   const rawTab = String(urlSearch.tab ?? "").toUpperCase();
-  const matchedTeam = abdTeamOptions.find((t) => t.code.toUpperCase() === rawTab);
-  const team: AbdTeam = ((matchedTeam?.code ?? abdTeamOptions[0]?.code ?? "MECH") as unknown) as AbdTeam;
+  const matchedTeam = teamTabs.find((t) => t.value.toUpperCase() === rawTab);
+  const team: AbdTeam = ((matchedTeam?.value ?? "MECH") as unknown) as AbdTeam;
   // 다중 선택 지원: 콤마로 구분된 status 문자열. "all" | "" → 전체
   const selectedStatuses: Array<Exclude<AbdStatusGroup, "all">> = useMemo(() => {
     const raw = String(urlSearch.status ?? "").trim();
