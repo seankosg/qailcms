@@ -602,7 +602,7 @@ export function TaskManagementRawDataPage() {
       if (!parent) continue;
       if (!mainKeys.has(`${disc}::${parent}`)) continue;
       if (matchedIds.has((r as any).id)) continue;
-      // 정상/완료 Sub는 제외 (주의/지연/위험 등 이슈 Sub만 함께 노출)
+      // 정상/완료 Sub는 제외 (주의/지연/악화 등 이슈 Sub만 함께 노출)
       const j = (r as any).auto_judgment as string | null | undefined;
       if (j === "정상" || j === "완료") continue;
       extraSubs.push(r);
