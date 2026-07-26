@@ -51,20 +51,14 @@ import { useModuleGuard } from "@/hooks/useModuleGuard";
 import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 import { DateIssuesPanel } from "@/components/import/DateIssuesPanel";
 import type { DateIssue } from "@/lib/import/date-audit";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Columns3 } from "lucide-react";
 import { AbdAconexImportPage } from "./AbdAconexImportPage";
 import { useAbdFieldConfig } from "@/hooks/useAbdFieldConfig";
-import { ABD_ACONEX_SYNC_FIELDS } from "@/components/admin/AbdImportPresetTable";
-
-type AconexSyncKey =
-  | "latest_status"
-  | "latest_rev"
-  | "approval_date"
-  | "aconex_status_raw"
-  | "aconex_review_status_raw"
-  | "aconex_date_modified";
+import {
+  ColumnSelectDialog,
+  type ColumnSelectHelpers,
+} from "@/components/import/ColumnSelectDialog";
 
 type ImportMode = "hdec" | "aconex";
 
@@ -94,6 +88,8 @@ interface FileEntry {
   progress?: number;
   allowDuplicates?: boolean;
   dateOverrides?: Record<string, string>;
+  /** 이 파일에서 임포트 시 제외할 canonical field 목록 (기본 = 전체 포함). */
+  excludedFields?: string[];
 }
 
 const statusBadge: Record<Status, { label: string; cls: string }> = {
