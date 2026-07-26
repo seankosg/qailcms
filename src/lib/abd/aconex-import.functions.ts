@@ -340,6 +340,28 @@ const META_FIELDS = new Set([
   "updated_by",
 ]);
 
+function resolveActiveRound(existing: any): 1 | 2 | 3 {
+  let n: 1 | 2 | 3 = (existing?.active_round as 1 | 2 | 3) ?? 1;
+  if (!existing?.active_round) {
+    if (
+      existing?.r3_submission_actual ||
+      existing?.r3_dar_actual ||
+      existing?.r2_response_result === "B" ||
+      existing?.r2_response_result === "C"
+    )
+      n = 3;
+    else if (
+      existing?.r2_submission_actual ||
+      existing?.r2_dar_actual ||
+      existing?.r1_response_result === "B" ||
+      existing?.r1_response_result === "C"
+    )
+      n = 2;
+    else n = 1;
+  }
+  return n;
+}
+
 function computePatch(
   r: z.infer<typeof RowSchema>,
   existing: any,
@@ -358,30 +380,30 @@ function computePatch(
   const iso = r.date_modified;
 
   if (semantic === "EXCLUDED_TERMINATED" || semantic === "EXCLUDED_CANCELLED") {
-    if (allowed.has("is_terminated")) patch.is_terminated = true;
-    if (allowed.has("latest_status"))
-      patch.latest_status = r.status_code ?? r.status_raw ?? null;
+    // 재정의: Termination = HDEC 이 Submission 을 withdraw → 동일 라운드 재제출 대기.
+    //  - 해당 라운드의 Submission/DAR actual 및 Response 결과를 리셋
+    //  - DS/DF actual 이 비어있으면 date_modified 또는 plan 으로 자동 완료 채움
+    //  - is_terminated = false (통계 포함), latest_status = null (Submission 전 상태)
+    //  - active_round 는 유지 (증가시키지 않음)
+    const n = resolveActiveRound(existing);
+    if (allowed.has("round_actual")) {
+      patch[`r${n}_submission_actual`] = null;
+      patch[`r${n}_dar_actual`] = null;
+      patch[`r${n}_response_result`] = null;
+      if (!existing?.[`r${n}_ds_actual`]) {
+        patch[`r${n}_ds_actual`] = iso ?? existing?.[`r${n}_ds_plan`] ?? null;
+      }
+      if (!existing?.[`r${n}_df_actual`]) {
+        patch[`r${n}_df_actual`] = iso ?? existing?.[`r${n}_df_plan`] ?? null;
+      }
+    }
+    if (allowed.has("is_terminated")) patch.is_terminated = false;
+    if (allowed.has("latest_status")) patch.latest_status = null;
+    if (allowed.has("approval_date")) patch.approval_date = null;
     return patch;
   }
 
-  let n: 1 | 2 | 3 = (existing.active_round as 1 | 2 | 3) ?? 1;
-  if (!existing.active_round) {
-    if (
-      existing.r3_submission_actual ||
-      existing.r3_dar_actual ||
-      existing.r2_response_result === "B" ||
-      existing.r2_response_result === "C"
-    )
-      n = 3;
-    else if (
-      existing.r2_submission_actual ||
-      existing.r2_dar_actual ||
-      existing.r1_response_result === "B" ||
-      existing.r1_response_result === "C"
-    )
-      n = 2;
-    else n = 1;
-  }
+  const n = resolveActiveRound(existing);
 
   if (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B") {
     if (allowed.has("round_actual") && iso) {
