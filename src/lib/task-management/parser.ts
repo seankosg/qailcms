@@ -733,7 +733,10 @@ export async function parseTaskManagementExcel(
     let parentNo: string | null = null;
     if (!isParent) {
       const cand = parentCandidateOf(a);
-      const derivedParent = cand && parentSet.has(cand) ? cand : null;
+      // 파일 내 부모 행이 없어도 task_no 가 `<prefix>-<digits>` 형태이면
+      // prefix 를 main_task_no 후보로 채택한다. 실제 부모 존재 검증은 DB 트리거가 수행.
+      const tailIsNumeric = cand && /^\d+$/.test(a.slice(cand.length + 1));
+      const derivedParent = cand && (parentSet.has(cand) || tailIsNumeric) ? cand : null;
       const structParent = curParent?.task_no ?? null;
       if (structParent && derivedParent && structParent !== derivedParent) {
         // 접두어 mismatch → 구조적 부모 + 마지막 세그먼트로 재조합
