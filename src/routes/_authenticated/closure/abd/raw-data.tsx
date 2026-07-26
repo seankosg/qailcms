@@ -8,7 +8,7 @@ const abdRawDataSearchSchema = z.object({
   plot: fallback(z.enum(["all", "C", "D"]), "all").default("all"),
   status: fallback(z.string(), "all").default("all"),
   page: fallback(z.number().int(), 1).default(1),
-  pageSize: fallback(z.number().int(), 100).default(100),
+  pageSize: fallback(z.union([z.number().int(), z.literal("all")]), 100).default(100),
   sort: fallback(z.string(), "").default(""),
   q: fallback(z.string(), "").default(""),
   filters: fallback(z.string(), "").default(""),
