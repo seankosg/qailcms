@@ -105,6 +105,8 @@ const ImportBatchSchema = z.object({
   inactivate_missing: z.boolean().default(true),
   allow_duplicates: z.boolean().default(false),
   note: z.string().nullable().optional(),
+  /** payload에서 제외할 필드 목록 (기존 DB 값 보존). 시스템 키는 서버에서 강제 필터. */
+  excluded_fields: z.array(z.string()).optional(),
 });
 
 export const importAbdBatch = createServerFn({ method: "POST" })
@@ -113,6 +115,25 @@ export const importAbdBatch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertEditor(context);
     const supa = context.supabase as any;
+
+    // 시스템 키는 excluded_fields 로 절대 제외되지 않음 (매칭/메타/upsert 필수)
+    const NEVER_EXCLUDE = new Set<string>([
+      "team",
+      "abd_number",
+      "plot",
+      "is_active",
+      "inactive_reason",
+      "field_mismatch",
+      "mismatch_fields",
+      "raw_payload",
+      "source_import_log_id",
+      "data_date",
+      "updated_at",
+      "updated_by",
+    ]);
+    const excluded = new Set<string>(
+      (data.excluded_fields ?? []).filter((f) => !NEVER_EXCLUDE.has(f)),
+    );
 
     // 파일 내 중복 처리:
     //  - 불허(default): 즉시 차단
@@ -253,6 +274,12 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           updated_at: new Date().toISOString(),
           updated_by: context.userId,
         };
+        // 사용자가 제외한 필드는 payload에서 삭제 → upsert 시 기존 DB 값 유지
+        if (excluded.size > 0) {
+          for (const k of Object.keys(row)) {
+            if (excluded.has(k)) delete (row as any)[k];
+          }
+        }
         return stripNullExcept(row, ABD_FORCE_KEYS);
       });
 
