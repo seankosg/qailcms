@@ -93,10 +93,15 @@ import {
   computeDailyDiff,
 } from "@/lib/task-management/derived";
 import { todayIso } from "@/lib/task-management/schedule-utils";
-import { type TaskScope } from "@/lib/task-management/kpi-utils";
+import {
+  type TaskScope,
+  isCompleted,
+  isCriticalDelay,
+  isBehindSchedule,
+  gapAt,
+} from "@/lib/task-management/kpi-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
-import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
-import { useTmJudgmentAtDate, mergeTmJudgment } from "@/hooks/useTmJudgmentAtDate";
+import { DEFAULT_THRESHOLDS, type TaskThresholds } from "@/lib/task-management/derived";
 import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
