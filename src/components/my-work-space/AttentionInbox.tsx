@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, Clock, CalendarClock, ChevronDown, ChevronUp, ArrowRight, CheckCheck } from "lucide-react";
+import { AlertTriangle, Clock, CalendarClock, ChevronDown, ChevronRight, ArrowRight, CheckCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,7 +29,7 @@ function rowStamp(r: AbdAttentionRow): string { return `${r.updated_at ?? ""}|${
 export function AttentionInbox({ userId, scope, filterValue, isAdmin }: Props) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("needs_plan");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const { data: rows = [], isLoading, isFetching } = useAbdAttentionInbox({ isAdmin, scope, filterValue, userId });
   const { isRead, markRead, markManyRead } = useCommentInboxRead(userId);
@@ -57,6 +57,15 @@ export function AttentionInbox({ userId, scope, filterValue, isAdmin }: Props) {
   return (
     <section className="rounded-lg border bg-card">
       <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 -ml-1"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-label={collapsed ? "펼치기" : "접기"}
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
         <AlertTriangle className="h-4 w-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold">ABD Attention</h2>
         {counts.unreadTotal > 0 && (
@@ -68,12 +77,11 @@ export function AttentionInbox({ userId, scope, filterValue, isAdmin }: Props) {
           총 {counts.total}건{isFetching && !isLoading ? " · 갱신중" : ""}
         </span>
         <div className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={markAllShown} disabled={shown.length === 0}>
-            <CheckCheck className="h-3.5 w-3.5 mr-1" /> 모두 읽음
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsed((v) => !v)} aria-label={collapsed ? "펼치기" : "접기"}>
-            {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-          </Button>
+          {!collapsed && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={markAllShown} disabled={shown.length === 0}>
+              <CheckCheck className="h-3.5 w-3.5 mr-1" /> 모두 읽음
+            </Button>
+          )}
         </div>
       </div>
 
@@ -108,7 +116,7 @@ export function AttentionInbox({ userId, scope, filterValue, isAdmin }: Props) {
             })}
           </div>
 
-          <ScrollArea className="max-h-[360px]">
+          <ScrollArea className="h-[260px]">
             <ul className="divide-y">
               {isLoading && <li className="px-4 py-6 text-center text-xs text-muted-foreground">불러오는 중…</li>}
               {!isLoading && shown.length === 0 && (
