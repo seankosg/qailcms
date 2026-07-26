@@ -786,8 +786,6 @@ export function DefectRawDataPage() {
           <p className="text-sm text-muted-foreground">Issue No and subcontractor issue tracking data.</p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "snag" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
-          {isAdmin && <AiClassifyButton selectedRows={selectedRows as any} onDone={() => { invalidateDefects(); refetch(); }} />}
           <DefectColumnOrderMenu
             order={order}
             visibility={visibility as Record<string, boolean>}
@@ -802,7 +800,9 @@ export function DefectRawDataPage() {
             onServerVisibility={onServerVisibility}
             onServerLabel={onServerLabel}
           />
-          <Button variant="default" size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
+          {isAdmin && <AiClassifyButton selectedRows={selectedRows as any} onDone={() => { invalidateDefects(); refetch(); }} />}
+          <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "snag" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
+          <Button size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
           {tab === "unclosed" && (
             <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
               <AlertDialogTrigger asChild>

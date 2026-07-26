@@ -502,9 +502,6 @@ export function SparePartRawDataPage() {
           <Button variant="outline" size="sm" className="h-8" onClick={resetAll}>
             <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
           </Button>
-          <Button variant="outline" size="sm" className="h-8" onClick={() => refetch()}>
-            Refresh
-          </Button>
           <Button
             variant="outline"
             size="sm"
