@@ -618,8 +618,13 @@ export function TaskManagementRawDataPage() {
     asOf: string,
     th: TaskThresholds,
   ): string {
+    // Dashboard 와 동일한 기준: isCompleted 는 stored auto_judgment + actual_progress,
+    // gap 은 plan_progress(임포트값)가 아닌 계획일 기반 누계 계획(computeTPlan)으로 산출.
+    // Dashboard 쿼리는 plan_progress 를 SELECT 하지 않으므로 항상 날짜 기준으로 계산됨.
     if (isCompleted(row as any)) return "완료";
-    const gap = gapAt(row as any, asOf);
+    const actual = cumActualProgress(row as any);
+    const plan = computeTPlan(row as any, asOf) ?? 0;
+    const gap = actual - plan;
     if (gap < th.worsen_gap) return "악화";
     if (gap < 0) return "지연";
     if (gap < th.caution_gap_buffer) return "주의";
