@@ -245,7 +245,8 @@ export function TaskTreePage() {
           "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, plan_days, actual_start, actual_finish, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
         )
         .eq("discipline", discipline)
-        .order("sort_order", { ascending: true })
+        .order("main_task_no", { ascending: true, nullsFirst: true })
+        .order("task_no", { ascending: true })
         .limit(10000);
       if (error) throw error;
       return (data ?? []) as Row[];
