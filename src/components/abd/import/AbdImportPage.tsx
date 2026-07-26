@@ -441,7 +441,7 @@ export function AbdImportPage() {
               inactivate_missing: true,
               allow_duplicates: !!e.allowDuplicates,
               note: formatUnresolvedNamesNote(unresolvedNames) || null,
-              excluded_fields: hdecExcludedFields,
+              excluded_fields: e.excludedFields ?? [],
             } as any,
           });
           agg.inserted += res.inserted;
