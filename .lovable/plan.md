@@ -1,81 +1,46 @@
-# TM KPI ↔ Raw Data 정합성 — SHAW 방식 단순화
+목표
+- Dashboard KPI 카드 숫자와 Raw Data 행 수가 정확히 일치하도록 로직을 단순화합니다.
+- SHAW PROJECT CMS의 방식처럼 "배지 삭제, 카드 숫자 = 테이블 행 수" 구조로 통일합니다.
 
-## 현재 상태 확인 (root cause)
+현재 상황
+- `TaskManagementRawDataPage.tsx`에서 기존 수동 `kpiSelection`/`delayFilteredRows`/`visibleRows` 로직을 TanStack Table `columnFilters` 기반으로 일부 전환했습니다.
+- `modeToColumnFilters` 유틸을 추가하고 `useTmJudgmentAtDate`로 과거 Data Date 재판정을 병합했습니다.
+- `bunx tsc --noEmit` 통과 상태이나, 불필요한 import/상태 정리가 남아 있습니다.
 
-- **Dashboard 데이터 흐름**: `src/hooks/useTaskDashboardData.ts:18` 에서 `team`, `discipline`, `plot`, `hdecPic`, `hdecEng`, `q` 를 서버 쿼리에 적용한 뒤, `TmDashboardPage.tsx:113` 에서 과거 Data Date 시 `tm_judge_at_date` 를 병합하고, `TmKpiCards.tsx:64` 에서 `computeKpi()` 로 KPI 를 계산. KPI 값은 **이미 필터된 데이터 + Data Date 재판정** 위에서 나온다.
-- **Raw Data 데이터 흐름**: `TaskManagementRawDataPage.tsx:453` 에서 **전체 행**(`select("*")` + 1,000건 페이징)을 가져온 뒤, `kpiSelection`(`TaskManagementRawDataPage.tsx:567`) 이 먼저 실행되고, 그 다음 `columnFilters`로 팀/담당자 등이 필터링. 이 때문에:
-  - KPI 카드(51) = Dashboard 의 필터 후 집계
-  - `kpiSelection` 매치(61) = KPI 조건 만족하는 전체 팀 행
-  - 테이블 행(27) = 매치에 팀 컬럼 필터 추가 적용
-  - 컨텍스트 Sub(+6) = 별도 추가 병합 로직
-  이렇게 **4단계 필터 게이트**가 서로 다른 시점에 적용되어 숫자가 어긋남.
+단계
+1. KPI 조건 매핑 검증
+   - `src/lib/task-management/kpi-utils.ts`의 Dashboard 산식과 `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`의 `modeToColumnFilters`를 항목별로 비교(diff)하여 불일치를 수정합니다.
+   - 각 mode(`completed`, `wip`, `not_started`, `planned_started`, `actual_started`, `in_delay`, `behind`, `start_delayed`, `completion_overdue`, `critical`, `no_plan_start`, `no_plan_end`)가 정확히 동일한 유니버스를 산출하는지 확인합니다.
 
-## SHAW 가 해결한 방식 (확인된 사실)
+2. TM Raw Data 파일 정리
+   - 더 이상 사용하지 않는 `delayMode`, `kpiMode`, `hideContextSubs`, `kpiSelection`, `kpiIsCompleted`, `kpiIsStarted`, `kpiIsPlannedStartedBy`, `kpiIsInDelay`, `kpiIsStartDelayed`, `kpiIsCompletionOverdue`, `kpiIsCriticalDelay`, `kpiIsBehindSchedule`, `scopeItems`, `TaskItem`, `ALL_TASK_TIMELINE_STAGE_KEYS`, `isTaskStageDelayedAsOf` 등의 import 및 상태를 제거합니다.
+   - `renderRows`를 통해 collapse(접기) 상태는 UI에만 반영되고 집계에는 영향을 주지 않도록 유지합니다.
 
-`src/components/defect-management/dashboard/DeSnagDashboardPage.tsx:117` 의 `goRaw`:
-- 이미 적용 중인 Dashboard 필터(`team`, `roomGroup`, `plan_group`)를 그대로 query string 에 실음.
-- KPI/셀 클릭 시에는 **status = "Open" 같은 실제 컬럼 값**만 추가로 덧붙임.
-- Raw Data 는 이 query string 을 컬럼 필터로 해석하여 **이미 동일한 유니버스**에서 추가 필터만 적용 → 카드값 = 행 수.
+3. SM Raw Data에 동일 패턴 적용
+   - `SM Raw Data` 페이지에서 동일한 "manual KPI filter + match/context badge" 패턴이 존재하는지 확인합니다.
+   - 존재할 경우 `modeToColumnFilters`(`SM`용)와 `useSmJudgmentAtDate` 또는 서버 판정 병합 로직을 적용하여 동일하게 단순화합니다.
+   - SM Dashboard → Raw Data 딥링크 파라미터를 구체적 필터 값으로 변경합니다.
 
-TM 에도 동일 원칙을 적용하면 됨.
+4. ABD Raw Data 점검(필요 시)
+   - ABD Raw Data에도 동일한 배지/수동 필터링이 남아 있다면 `ABD`용 `modeToColumnFilters`와 `abd_judge_at_date` 병합으로 통일합니다.
+   - ABD는 현재 요청 범위 외이므로, TM/SM 이후 남은 시간에 처리합니다.
 
-## 수정 방향 (UI 변경 최소화)
+5. Dashboard → Raw Data 딥링크 파라미터 점검
+   - `TmDashboardPage.tsx`, `SmDashboardPage.tsx`(또는 해당 컴포넌트)에서 KPI 카드 클릭 시 전달하는 `search` 파라미터가 `mode`, `asOf`, `taskScope`만 포함되도록 확인합니다.
+   - `mode=behind` 같은 추상적 값은 그대로 두되, Raw Data에서 실제 `auto_judgment` 등 컬럼 필터로 풀어내야 합니다.
 
-### 삭제할 것
-- `TaskManagementRawDataPage.tsx` 의 `delayMode`, `kpiMode`, `kpiSelection`, `delayFilteredRows`, `kpiFilteredRows`, `hideContextSubs`, "매치/컨텍스트 Sub" 배지 및 토글.
+6. 프리뷰 검증
+   - TM Dashboard의 "Behind Schedule · ELEC" 카드(또는 사용자가 제기한 51/27건 사례)를 클릭합니다.
+   - Raw Data 페이지 상단 뱃지가 `행 수 / 전체`로만 표시되고, 카드 숫자와 테이블 행 수가 일치하는지 확인합니다.
+   - 필터 칩에 "매치 · 컨텍스트" 같은 배지가 남아 있지 않은지 확인합니다.
+   - SM에도 동일한 시나리오로 1건 이상 검증합니다.
 
-### 유지할 것 (UI 변경 억제)
-- Dashboard → Raw Data URL 은 그대로 `mode`, `asOf`, `taskScope`, `team`, `discipline`, `plot`, `hdec_pic_name`, `hdec_eng_name`, `q` 를 사용. 주소창 변화 없음.
-- Raw Data 헤더는 기존 `X / Y` 형식 유지. 단, **"매치 · 컨텍스트" 배지만 제거**.
+7. 최종 타입체크 및 빌드 검증
+   - `bunx tsc --noEmit` 재실행
+   - 개발 서버 HMR 플러시 및 주요 화면 스크린샷 확인
 
-### 핵심 변경
-Dashboard 에서 넘어온 `mode`를 내부에서 **TanStack `ColumnFilters`로 변환**해 `columnFilters` 초기값에 한꺼번에 넣는다. 그러면:
-- KPI 조건(`auto_judgment`, `plan_start`, `plan_end`, `actual_start`, `actual_progress`)과
-- ownerContext 필터(`team`, `discipline`, `plot`, `hdec_pic_name`, `hdec_eng_name`, `q`)
-- `taskScope`(`level`)
-
-모두 테이블의 필터 모델에 들어가 **한 번에 적용**. 이후 `getFilteredRowModel()`의 결과가 곧 카드값이 됨.
-
-### `mode` → 컬럼 필터 매핑
-
-| Dashboard 카드/세그먼트 | 변환된 컬럼 필터 | 이유 |
-|---|---|---|
-| completed | `auto_judgment: ['완료']` 또는 `actual_progress: [1, 1]` | `isCompleted` 와 동일 |
-| wip | `actual_start: NOT_EMPTY` + `auto_judgment: ['정상','주의','지연','악화']` | started & not completed |
-| not_started | `actual_start: EMPTY` + `auto_judgment: ['정상','주의','지연','악화']` | not started & not completed |
-| planned_started | `plan_start: ≤ asOf` | `isPlannedStartedBy` |
-| actual_started | `actual_start: NOT_EMPTY` | `isStarted` |
-| in_delay / behind | `auto_judgment: ['지연','악화']` | `isInDelay`/`isBehindSchedule` 동일 |
-| start_delayed | `auto_judgment: ['지연','악화']` + `actual_start: EMPTY` + `plan_start: ≤ asOf` | InDelay ∩ StartDelayed |
-| completion_overdue | `auto_judgment: ['지연','악화']` + `plan_end: < asOf` | InDelay ∩ CompletionOverdue |
-| critical | `auto_judgment: ['악화']` | Critical = 악화 |
-| taskScope | `level: ['main']` 또는 `['sub']` | `scopeItems` 동일 |
-
-- Data Date 일치: `asOf` 값을 `useTmDataDate` 의 공유 상태로 설정하고, `useTmJudgmentAtDate` 결과를 행에 병합. Dashboard 의 `effectiveItems` 병합과 완전히 동일한 방식으로 `auto_judgment` 등을 asOf 시점으로 재판정.
-
-## 영향 파일
-
-1. `src/components/task-management/raw-data/TaskManagementRawDataPage.tsx`
-   - `kpiMode`, `delayMode`, `kpiSelection`, `delayFilteredRows`, `kpiFilteredRows`, `hideContextSubs` 상태 및 JSX 삭제.
-   - `mode → ColumnFilters` 변환 함수 추가.
-   - Dashboard 딥링크 `useEffect`에서 `columnFilters` 초기값에 KPI 필터 포함.
-   - `useTmJudgmentAtDate` + `mergeTmJudgment` 도입하여 Data Date 재판정.
-   - "매치 · 컨텍스트 Sub" 배지/토글 제거.
-2. `src/components/task-management/dashboard/TmKpiCards.tsx`
-   - 변경 없음. 기존 `mode`/`asOf`/`taskScope`/`ownerContext` 전달이 그대로 사용됨.
-3. `src/routes/_authenticated/closure/task-management/raw-data.tsx`
-   - 변경 없음. 기존 search schema 가 SHAW 방식의 ownerContext 필터를 이미 수용함.
-
-## UI 변경 정리
-
-- **Raw Data 헤더**: 기존 `27 / 1,440` 유지. "매치 61건 · 컨텍스트 Sub 6건" 배지 삭제.
-- **URL**: 주소창에 `mode=behind` 등 기존 파라미터 그대로 유지.
-- **테이블 행**: KPI 카드 숫자(51)와 정확히 일치하게 됨.
-- **Data Date**: Raw Data 진입 시 Dashboard 와 동일한 Data Date가 자동 선택됨.
-
-## 검증 시나리오
-
-1. Dashboard: Team=ELEC, Behind 클릭 → Raw Data: 헤더 `51 / 1,440` (기존 `27 / 1,440`와 다른 값이 정답).
-2. Dashboard: 필터 없음, In Delay 클릭 → Raw Data: 카드값과 동일한 행 수 표시.
-3. Dashboard: 과거 Data Date 선택, Critical 클릭 → Raw Data: Data Date가 동일하게 설정되고 `auto_judgment='악화'` 필터 결과가 Dashboard 와 일치.
-4. Raw Data 진입 후 사용자가 추가로 컬럼 필터를 조작하면, 그 값은 `columnFilters`에 누적되어 `표시 / 전체`만 변하고 Dashboard 기준 값은 보존됨.
+결과물
+- `TaskManagementRawDataPage.tsx`에서 KPI/지연 모드 관련 중복 필터링 제거
+- `SmRawDataPage.tsx`(또는 동일 파일)에서 동일 구조로 단순화
+- Dashboard → Raw Data 딥링크에서 카드 숫자 = 테이블 행 수 일치
+- 불필요한 match/context 배지 완전 제거
