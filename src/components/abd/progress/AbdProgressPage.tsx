@@ -23,14 +23,11 @@ import { ABD_TEAMS, type AbdTeam } from "@/lib/abd/columns";
 import {
   ALL_GROUP_BY,
   ALL_STAGES,
-  ALL_ROUNDS,
   GROUP_LABELS,
   STAGE_SHORT_LABELS,
-  ROUND_LABELS,
   type Bucket,
   type GroupBy,
   type PlanMode,
-  type RoundKey,
   type Stage,
   addDays,
   assembleMatrix,
@@ -73,7 +70,7 @@ export function AbdProgressPage() {
 
   const plot = search.plot;
   const teams = parseCsv<AbdTeam>(search.teams, TEAM_VALUES);
-  const round: RoundKey = search.round;
+  const round = "all" as const;
   const bucket: Bucket = search.bucket;
   const groupBy = parseCsv<GroupBy>(search.groupBy, ALL_GROUP_BY);
   const effectiveGroupBy: GroupBy[] = groupBy.length > 0 ? groupBy : ["team"];
@@ -175,12 +172,10 @@ export function AbdProgressPage() {
 
   const buckets = useMemo(() => buildBucketRange(rpcStart, rpcEnd, bucket), [rpcStart, rpcEnd, bucket]);
 
-  // S-Curve: round==='all' 이면 R1/R2/R3 각각의 cells 를 별도로 로드.
-  // 단일 라운드일 때는 cellsQ 재사용.
-  const activeRounds: Array<Exclude<RoundKey, "all">> =
-    round === "all" ? ["R1", "R2", "R3"] : [round];
+  // S-Curve: R1/R2/R3 각각의 cells 를 별도로 로드.
+  const activeRounds: Array<"R1" | "R2" | "R3"> = ["R1", "R2", "R3"];
   const perRoundQueries = useQueries({
-    queries: (round === "all" ? (["R1", "R2", "R3"] as const) : []).map((r) => ({
+    queries: (["R1", "R2", "R3"] as const).map((r) => ({
       queryKey: [
         "abd-progress-cells",
         plot,
@@ -212,17 +207,13 @@ export function AbdProgressPage() {
       enabled: scurveOpen,
     })),
   });
-  const cellsByRound: Partial<Record<Exclude<RoundKey, "all">, CellRaw[]>> = useMemo(() => {
-    if (round !== "all") {
-      return { [round]: cellsQ.data ?? [] } as Partial<Record<Exclude<RoundKey, "all">, CellRaw[]>>;
-    }
-    const rounds: Array<Exclude<RoundKey, "all">> = ["R1", "R2", "R3"];
-    const out: Partial<Record<Exclude<RoundKey, "all">, CellRaw[]>> = {};
-    rounds.forEach((r, i) => {
+  const cellsByRound: Partial<Record<"R1" | "R2" | "R3", CellRaw[]>> = useMemo(() => {
+    const out: Partial<Record<"R1" | "R2" | "R3", CellRaw[]>> = {};
+    (["R1", "R2", "R3"] as const).forEach((r, i) => {
       out[r] = (perRoundQueries[i]?.data ?? []) as CellRaw[];
     });
     return out;
-  }, [round, cellsQ.data, perRoundQueries]);
+  }, [perRoundQueries]);
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
@@ -343,7 +334,7 @@ export function AbdProgressPage() {
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Plot {plot} · Round {ROUND_LABELS[round]} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} ·
+            Plot {plot} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} ·
             As-of {asOfLabel} ({asOfDate}) · Plan: {planMode === "remaining" ? "Remaining" : "Baseline"} · Range {rangeDays}d
           </p>
         </div>
@@ -397,20 +388,25 @@ export function AbdProgressPage() {
               </div>
             </ToolbarGroup>
 
-            <ToolbarGroup label="Round">
+            <ToolbarGroup label="Stage">
               <ToggleGroup
-                type="single"
-                value={round}
-                onValueChange={(v) => v && setSearch({ round: v as RoundKey })}
+                type="multiple"
+                value={isAllStages ? [...ALL_STAGES] : effectiveStages}
+                onValueChange={(v) => {
+                  const next = (v as Stage[]).filter((x) => (ALL_STAGES as string[]).includes(x));
+                  if (next.length === 0) return;
+                  const sorted = ALL_STAGES.filter((k) => next.includes(k));
+                  setSearch({ stageView: sorted.join(",") });
+                }}
                 className="gap-1"
               >
-                {ALL_ROUNDS.map((r) => (
+                {ALL_STAGES.map((s) => (
                   <ToggleGroupItem
-                    key={r}
-                    value={r}
+                    key={s}
+                    value={s}
                     className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                   >
-                    {ROUND_LABELS[r]}
+                    {STAGE_SHORT_LABELS[s]}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
@@ -455,28 +451,19 @@ export function AbdProgressPage() {
               </div>
             </ToolbarGroup>
 
-            <ToolbarGroup label="Stage">
-              <ToggleGroup
-                type="multiple"
-                value={isAllStages ? [...ALL_STAGES] : effectiveStages}
-                onValueChange={(v) => {
-                  const next = (v as Stage[]).filter((x) => (ALL_STAGES as string[]).includes(x));
-                  if (next.length === 0) return;
-                  const sorted = ALL_STAGES.filter((k) => next.includes(k));
-                  setSearch({ stageView: sorted.join(",") });
-                }}
-                className="gap-1"
-              >
-                {ALL_STAGES.map((s) => (
-                  <ToggleGroupItem
-                    key={s}
-                    value={s}
-                    className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                  >
-                    {STAGE_SHORT_LABELS[s]}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
+            <ToolbarGroup label="Range">
+              <Select value={String(rangeDays)} onValueChange={(v) => setSearch({ range: Number(v) })}>
+                <SelectTrigger className="h-8 w-24 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[30, 60, 90, 180].map((n) => (
+                    <SelectItem key={n} value={String(n)} className="text-xs">
+                      {n} days
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </ToolbarGroup>
 
             <ToolbarGroup label="Bucket">
@@ -493,21 +480,6 @@ export function AbdProgressPage() {
                   Week
                 </ToggleGroupItem>
               </ToggleGroup>
-            </ToolbarGroup>
-
-            <ToolbarGroup label="Range">
-              <Select value={String(rangeDays)} onValueChange={(v) => setSearch({ range: Number(v) })}>
-                <SelectTrigger className="h-8 w-24 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[30, 60, 90, 180].map((n) => (
-                    <SelectItem key={n} value={String(n)} className="text-xs">
-                      {n} days
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </ToolbarGroup>
 
             <div className="flex items-center gap-2">
