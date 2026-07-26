@@ -168,11 +168,11 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         count: b.count,
         onClick: () =>
           onOpenRaw({
-            ...(statusGroup ? { status_group: statusGroup } : {}),
+            ...(statusGroup ? { status: statusGroup } : {}),
             team: b.team,
           }),
       }))}
-      onClick={() => onOpenRaw(statusGroup ? { status_group: statusGroup } : {})}
+      onClick={() => onOpenRaw(statusGroup ? { status: statusGroup } : {})}
     />
   );
 
@@ -243,9 +243,9 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
       breakdown={sortByTeamOrder(byTeam.get(key) ?? []).map((b) => ({
         team: b.team,
         count: b.count,
-        onClick: () => onOpenRaw({ status_group: statusGroup, team: b.team }),
+        onClick: () => onOpenRaw({ status: statusGroup, team: b.team }),
       }))}
-      onClick={() => onOpenRaw({ status_group: statusGroup })}
+      onClick={() => onOpenRaw({ status: statusGroup })}
     />
   );
 
@@ -258,9 +258,9 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         breakdown={totalDelayByTeam.map((b) => ({
           team: b.team,
           count: b.count,
-          onClick: () => onOpenRaw({ status_group: "delayed", team: b.team }),
+          onClick: () => onOpenRaw({ status: "delayed", team: b.team }),
         }))}
-        onClick={() => onOpenRaw({ status_group: "delayed" })}
+        onClick={() => onOpenRaw({ status: "delayed" })}
       />
       {mk("Response Delay", "RS_DELAY", "rs_delay")}
       {mk("Submission Delay", "SB_DELAY", "sb_delay")}

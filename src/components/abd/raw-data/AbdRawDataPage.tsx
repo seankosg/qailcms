@@ -164,7 +164,15 @@ const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = 
   { value: "in_progress", label: "In Progress" },
   { value: "not_started", label: "Not Started" },
 ];
-const ALL_STATUS_VALUES = STATUS_TABS.map((s) => s.value);
+// UI 탭에 노출되는 3종 + Dashboard 딥링크로만 들어오는 세분화 상태값들.
+// URL 파라미터 파싱 시 유효값 판정에 사용된다.
+const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
+  "under_review", "drafting", "rs_delay", "sb_delay", "ds_delay", "no_plan", "delayed",
+];
+const ALL_STATUS_VALUES = [
+  ...STATUS_TABS.map((s) => s.value),
+  ...DEEP_LINK_STATUS_VALUES,
+];
 
 export function AbdRawDataPage() {
   const navigate = useNavigate();
@@ -220,7 +228,8 @@ export function AbdRawDataPage() {
     );
     return valid;
   }, [urlSearch.status]);
-  // 하위 쿼리(facets 등)에 넘길 단일값: 정확히 1개 선택 시에만 그 값을, 그 외는 "all"
+  // RPC의 _status_group 슬롯은 확장 어휘(approved/in_progress/not_started + under_review/drafting/rs_delay/sb_delay/ds_delay/no_plan/delayed)를 모두 처리한다.
+  // 단일 선택 시 그 값을, 그 외는 "all".
   const statusGroup: AbdStatusGroup = selectedStatuses.length === 1 ? selectedStatuses[0] : "all";
   const toggleStatus = useCallback((v: Exclude<AbdStatusGroup, "all">) => {
     const set = new Set(selectedStatuses);
@@ -327,7 +336,8 @@ export function AbdRawDataPage() {
 
   const serverFilters = useMemo(() => {
     const base = toServerFilters(columnFilters);
-    // 2개 선택된 경우에만 서버측 필터로 in-절 주입. (1개는 _status_group, 0/3개는 all)
+    // UI 탭에서 2개(approved/in_progress/not_started 중) 다중 선택된 경우에만 서버측 in-절로 좁힘.
+    // 단일 선택은 RPC의 _status_group 슬롯이 처리하고, 확장 상태값은 UI 탭에 없으므로 여기 해당 없음.
     if (selectedStatuses.length >= 2 && selectedStatuses.length < ALL_STATUS_VALUES.length) {
       return [{ column: "status_group", op: "in" as const, value: selectedStatuses }, ...base];
     }
