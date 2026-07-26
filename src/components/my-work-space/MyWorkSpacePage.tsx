@@ -456,12 +456,10 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           onTabChange={setAbdTab}
           counts={{ today: abdStats.today, all: abdStats.total, risk: abdStats.delayed, upcoming: abdStats.upcoming }}
           filterRow={(r, tab) =>
-            (abdOnlyNeedsPlan ? abdNeedsPlanning(r) : true) && (
-              tab === "all" ? true
-              : tab === "risk" ? abdIsDelayed(r, t)
-              : tab === "today" ? abdIsToday(r, t)
-              : abdIsUpcoming(r, t)
-            )
+            tab === "all" ? true
+            : tab === "risk" ? abdIsDelayed(r, t)
+            : tab === "today" ? abdIsToday(r, t)
+            : abdIsUpcoming(r, t)
           }
           rowKey={(r) => r.id}
           onRowClick={(r) => setAbdDetailId(r.id)}
