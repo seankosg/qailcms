@@ -312,7 +312,7 @@ export function AbdScheduleMatrix({
                               st === "dar" && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
                             )}
                           >
-                            {STAGE_LABELS[st]}
+                            {STAGE_SHORT_LABELS[st]}
                           </span>
                         </div>
                         <div className="flex">
