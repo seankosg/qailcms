@@ -164,7 +164,15 @@ const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = 
   { value: "in_progress", label: "In Progress" },
   { value: "not_started", label: "Not Started" },
 ];
-const ALL_STATUS_VALUES = STATUS_TABS.map((s) => s.value);
+// UI 탭에 노출되는 3종 + Dashboard 딥링크로만 들어오는 세분화 상태값들.
+// URL 파라미터 파싱 시 유효값 판정에 사용된다.
+const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
+  "under_review", "drafting", "rs_delay", "sb_delay", "ds_delay", "no_plan", "delayed",
+];
+const ALL_STATUS_VALUES = [
+  ...STATUS_TABS.map((s) => s.value),
+  ...DEEP_LINK_STATUS_VALUES,
+];
 
 export function AbdRawDataPage() {
   const navigate = useNavigate();
@@ -220,8 +228,13 @@ export function AbdRawDataPage() {
     );
     return valid;
   }, [urlSearch.status]);
-  // 하위 쿼리(facets 등)에 넘길 단일값: 정확히 1개 선택 시에만 그 값을, 그 외는 "all"
-  const statusGroup: AbdStatusGroup = selectedStatuses.length === 1 ? selectedStatuses[0] : "all";
+  // RPC의 _status_group 슬롯은 approved/in_progress/not_started 3종만 안전하게 처리한다.
+  // 그 외 세분화 상태값(under_review, rs_delay 등)은 서버 필터(status_group in [...])로 좁힌다.
+  const RPC_STATUS_SET = new Set(["approved", "in_progress", "not_started"]);
+  const statusGroup: AbdStatusGroup =
+    selectedStatuses.length === 1 && RPC_STATUS_SET.has(selectedStatuses[0])
+      ? selectedStatuses[0]
+      : "all";
   const toggleStatus = useCallback((v: Exclude<AbdStatusGroup, "all">) => {
     const set = new Set(selectedStatuses);
     if (set.has(v)) set.delete(v);
@@ -327,12 +340,18 @@ export function AbdRawDataPage() {
 
   const serverFilters = useMemo(() => {
     const base = toServerFilters(columnFilters);
-    // 2개 선택된 경우에만 서버측 필터로 in-절 주입. (1개는 _status_group, 0/3개는 all)
-    if (selectedStatuses.length >= 2 && selectedStatuses.length < ALL_STATUS_VALUES.length) {
-      return [{ column: "status_group", op: "in" as const, value: selectedStatuses }, ...base];
+    // statusGroup이 "all"로 fallback된 상황(=RPC 슬롯을 못 쓴 경우)에서만 서버 필터로 좁힌다.
+    // "delayed"는 4종 지연 상태(rs_delay/sb_delay/ds_delay/no_plan) 합집합으로 전개.
+    if (statusGroup !== "all" || selectedStatuses.length === 0) return base;
+    const expanded: string[] = [];
+    for (const s of selectedStatuses) {
+      if (s === "delayed") expanded.push("rs_delay", "sb_delay", "ds_delay", "no_plan");
+      else expanded.push(s);
     }
-    return base;
-  }, [columnFilters, selectedStatuses]);
+    const uniq = Array.from(new Set(expanded));
+    if (uniq.length === 0) return base;
+    return [{ column: "status_group", op: "in" as const, value: uniq }, ...base];
+  }, [columnFilters, selectedStatuses, statusGroup]);
   const serverSort = useMemo(() => toServerSort(sorting), [sorting]);
   const q = (urlSearch.q ?? "").trim();
 
