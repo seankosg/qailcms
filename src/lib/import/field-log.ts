@@ -91,7 +91,7 @@ export async function flushFieldLogs(
   uploadId: string,
   userId: string | null | undefined,
   logs: PendingFieldLog[],
-  chunkSize = 500,
+  chunkSize = 1000,
 ): Promise<void> {
   if (!uploadId || logs.length === 0) return;
   const rows = logs.map((b) => ({
