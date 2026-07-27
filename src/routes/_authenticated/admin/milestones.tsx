@@ -158,6 +158,16 @@ function Page() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {grouped.map(([plot, plotRows]) => {
             const byKind = new Map(plotRows.map((r) => [r.kind, r]));
+            // Plot별로 target_date 오름차순 정렬. 날짜 없는 Kind는 뒤로,
+            // 동률/미설정 사이에서는 전역 kindOrder(sort_order)로 안정 정렬.
+            const sortedKinds = [...kindOrder].sort((a, b) => {
+              const da = byKind.get(a)?.target_date ?? null;
+              const db = byKind.get(b)?.target_date ?? null;
+              if (da && db) return da.localeCompare(db);
+              if (da) return -1;
+              if (db) return 1;
+              return kindOrder.indexOf(a) - kindOrder.indexOf(b);
+            });
             return (
               <Card key={plot}>
                 <CardHeader>
@@ -165,7 +175,7 @@ function Page() {
                   <CardDescription>Raw 데이터 항목 수를 옆에 함께 표시</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {kindOrder.map((kind) => {
+                  {sortedKinds.map((kind) => {
                     const row = byKind.get(kind);
                     const key = `${plot}::${kind}`;
                     const cnt = distMap.get(key) ?? 0;
