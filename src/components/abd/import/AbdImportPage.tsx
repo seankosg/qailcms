@@ -54,6 +54,7 @@ import { Switch } from "@/components/ui/switch";
 import { RefreshCw, Columns3 } from "lucide-react";
 import { AbdAconexImportPage } from "./AbdAconexImportPage";
 import { useAbdFieldConfig } from "@/hooks/useAbdFieldConfig";
+import { AbdDataDatePicker } from "./AbdDataDatePicker";
 import {
   ColumnSelectDialog,
   type ColumnSelectHelpers,
@@ -89,6 +90,8 @@ interface FileEntry {
   dateOverrides?: Record<string, string>;
   /** 이 파일에서 임포트 시 제외할 canonical field 목록 (기본 = 전체 포함). */
   excludedFields?: string[];
+  /** 이 파일에 기록할 Data Date (YYYY-MM-DD). null/undefined = 오늘(Doha). */
+  dataDate?: string | null;
 }
 
 const statusBadge: Record<Status, { label: string; cls: string }> = {
@@ -443,7 +446,7 @@ export function AbdImportPage() {
               team: e.team,
               plot: sheet.plot,
               sheet_name: sheet.sheet_name,
-              data_date: todayInDoha(),
+          data_date: e.dataDate || todayInDoha(),
               rows,
               inactivate_missing: true,
               allow_duplicates: !!e.allowDuplicates,
