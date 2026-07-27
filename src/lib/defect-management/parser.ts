@@ -264,82 +264,14 @@ function columnSampleIsUuid(
   return isUuidLike(entry?.sample);
 }
 
+// Tier1 #8: delegate to the shared strictParseDateValue (identical logic —
+// verified by diff against ABD/TM copies).
 function toIsoDate(v: unknown): string | null {
   try {
-  if (v == null || v === "") return null;
-  if (v instanceof Date) {
-    if (Number.isNaN(v.getTime())) return null;
-    // TZ-independent: read UTC components. With cellDates:false (default),
-    // SheetJS never produces a Date here; this branch only handles Date
-    // objects from other sources (date pickers, tests).
-    const y = v.getUTCFullYear();
-    const mo = v.getUTCMonth() + 1;
-    const da = v.getUTCDate();
-    if (!y || mo < 1 || mo > 12 || da < 1 || da > 31) return null;
-    return `${y}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
-  }
-  if (typeof v === "number") {
-    if (!Number.isFinite(v) || v <= 0) return null;
-    const parsed = XLSX.SSF?.parse_date_code?.(v);
-    if (parsed && parsed.y && parsed.m && parsed.d) {
-      const mo = parsed.m, da = parsed.d;
-      if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
-      return `${parsed.y}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
-    }
-  }
-  if (typeof v === "string") {
-    const s = v.trim();
-    if (!s) return null;
-    const upper = s.toUpperCase();
-    if (
-      upper === "TBD" || upper === "TBA" || upper === "PENDING" ||
-      upper === "N/A" || upper === "NA" || upper === "#N/A" ||
-      upper === "-" || upper === "--" || upper === "0"
-    ) return null;
-    // YYYY-MM-DD: treat as Doha calendar date directly.
-    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (iso) {
-      const mo = Number(iso[2]), da = Number(iso[3]);
-      if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
-      return `${iso[1]}-${iso[2]}-${iso[3]}`;
-    }
-    // dd/mm/yyyy or dd-mm-yyyy (dd first, mm second).
-    const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
-    if (dmy) {
-      const da = Number(dmy[1]), mo = Number(dmy[2]);
-      if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
-      const yy = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
-      if (yy < 1900 || yy > 2999) return null;
-      return `${yy}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
-    }
-    // dd-MMM-yyyy / MMM dd yyyy (TZ-independent).
-    const MONTHS: Record<string, number> = {
-      jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12,
-    };
-    const dMonY = s.match(/^(\d{1,2})[\s\-\/.]+([A-Za-z]{3,4})[\s\-\/.]+(\d{2,4})$/);
-    if (dMonY) {
-      const da = Number(dMonY[1]);
-      const mo = MONTHS[dMonY[2].toLowerCase()];
-      const yy = dMonY[3].length === 2 ? 2000 + Number(dMonY[3]) : Number(dMonY[3]);
-      if (mo && da >= 1 && da <= 31 && yy >= 1900 && yy <= 2999) {
-        return `${yy}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
-      }
-    }
-    const monDY = s.match(/^([A-Za-z]{3,4})[\s\-\/.]+(\d{1,2})[\s,\-\/.]+(\d{2,4})$/);
-    if (monDY) {
-      const mo = MONTHS[monDY[1].toLowerCase()];
-      const da = Number(monDY[2]);
-      const yy = monDY[3].length === 2 ? 2000 + Number(monDY[3]) : Number(monDY[3]);
-      if (mo && da >= 1 && da <= 31 && yy >= 1900 && yy <= 2999) {
-        return `${yy}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
-      }
-    }
-    // No further fallback: NEVER call new Date(string) or toDohaDateKey(s) here,
-    // both introduce browser/worker TZ shifts that produce -1 day errors.
+    return strictParseDateValue(v);
+  } catch {
     return null;
   }
-  return null;
-  } catch { return null; }
 }
 
 function toIsoDateTime(v: unknown): string | null {
