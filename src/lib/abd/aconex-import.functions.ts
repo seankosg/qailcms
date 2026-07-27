@@ -299,16 +299,8 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       console.warn("[abd_aconex flushFieldLogs]", e),
     );
 
-    // 실제 updated 카운트 반영 (row-level fields는 서버에서 계산됨)
-    if (updated !== matched.length) {
-      await supa
-        .from("abd_import_logs")
-        .update({ updated })
-        .eq("id", batchId);
-    } else {
-      // matched 전량 성공한 통상 케이스에서도 updated 값을 갱신
-      await supa.from("abd_import_logs").update({ updated }).eq("id", batchId);
-    }
+    // 실제 updated 카운트 반영
+    await supa.from("abd_import_logs").update({ updated }).eq("id", batchId);
 
     return { ...preview, updated, batch_id: batchId };
   });
