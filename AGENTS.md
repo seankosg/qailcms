@@ -33,13 +33,18 @@
 
 ### RPC 반환 계약 규칙
 
-원칙: 목록 조회 RPC는 **행별 반환**(`RETURNS TABLE`, 한 record = 한 row)을 기본으로 한다. 한 번의 `jsonb_agg`로 전체 결과를 감싼 "단일 jsonb 배열" 반환은 금지 — 클라이언트가 조용히 잘림(silent truncation)을 놓치고, PostgREST 응답 상한(1,000행) 트리거 시 청크 루프도 불가능해진다.
+확정 정책 (2026-07-27 실측 검증):
 
-**표준 예외 — "페이지 행수 가변 검색" RPC**:
-`RETURNS TABLE(rows jsonb, total_count bigint)` 형태(record당 하나의 `to_jsonb(원행)` + 전체 총계 동반)는 허용된다. 사유:
+1. **행수 상한(1,000 미만)이 보장되는 조회 = 행별 반환 허용.**
+   - `RETURNS TABLE(...)` 사용. 예: facets RPC(축당 ≤ 수십~수백), 마스터 리스트 등.
+   - 상한이 SQL 내부 `limit` 로 명확히 보장되어야 함.
 
-1. 한 번의 호출로 페이지 행 + 총계를 원자적으로 반환해 프론트가 pagination/UX(총건수·잘림 감시)를 안정적으로 수행할 수 있음
-2. `rows`는 여전히 record-per-row(하나의 원본 행)이므로 PostgREST 상한과 청크 루프 계약이 유지됨
-3. 클라이언트는 `rows.length` vs `total_count` 대조로 잘림을 감시해야 하며(`src/lib/data/assertNoSilentTruncation.ts`), `rows`가 배열/`null`/비-object로 오면 즉시 실패 처리한다
+2. **페이지 행수 가변 검색·대량 조회 = jsonb 단일 값 반환.**
+   - `RETURNS jsonb` 로 `{rows, total_count, ...}` 등을 스칼라로 반환.
+   - scalar 반환이므로 PostgREST 응답 행 상한(1,000)이 비적용됨(2026-07-27 실측 검증 완료).
+   - 페이지 행수가 필터에 따라 가변이거나, 매칭 ID 전체를 반환해야 하는 경우가 대상.
+   - 선례: `abd_items_search`(rows/total_count), `defect_items_search`, `tm_items_search`(rows/total_count/main_count), `defect_items_search_ids`, `tm_items_search_ids`(id 문자열 배열).
 
-선례: `abd_items_search`, `defect_items_search`, `tm_items_search`.
+3. 클라이언트 잘림 감시 의무는 유지된다.
+   - jsonb 스칼라 응답이라도 `rows.length` vs `total_count` 대조, 배열/`null`/비-object 형식 실패 처리(`src/lib/data/assertNoSilentTruncation.ts`).
+   - 상한이 보장되는 행별 반환 RPC도 상한 근접 시 경보를 남긴다.

@@ -4375,10 +4375,7 @@ export type Database = {
           _q?: string
           _sort?: Json
         }
-        Returns: {
-          rows: Json
-          total_count: number
-        }[]
+        Returns: Json
       }
       tm_items_search_ids: {
         Args: {
@@ -4387,9 +4384,7 @@ export type Database = {
           _limit?: number
           _q?: string
         }
-        Returns: {
-          id: string
-        }[]
+        Returns: Json
       }
       tm_judge_at_date: {
         Args: { p_data_date: string; p_task_ids?: string[] }
