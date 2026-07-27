@@ -21,7 +21,7 @@ export const getAbdProgressCells = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => CellsInputSchema.parse(v))
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as any).rpc("abd_progress_cells", {
+    const { data: payload, error } = await (context.supabase as any).rpc("abd_progress_cells_json", {
       _plots: data.plots.length ? data.plots : null,
       _teams: data.teams.length ? data.teams : null,
       _group_by: data.groupBy,
@@ -33,7 +33,8 @@ export const getAbdProgressCells = createServerFn({ method: "POST" })
       _round: data.round,
     });
     if (error) throw new Error(error.message);
-    return (rows ?? []).map((r: any) => ({
+    const rows = Array.isArray(payload) ? payload : [];
+    return rows.map((r: any) => ({
       group_key: (r.group_key ?? []) as string[],
       bucket_iso: r.bucket_iso ? String(r.bucket_iso).slice(0, 10) : null,
       stage: r.stage as "draft" | "submission" | "dar",
@@ -46,7 +47,7 @@ export const getAbdProgressTotals = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => InputSchema.parse(v))
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as any).rpc("abd_progress_totals", {
+    const { data: payload, error } = await (context.supabase as any).rpc("abd_progress_totals_json", {
       _plots: data.plots.length ? data.plots : null,
       _teams: data.teams.length ? data.teams : null,
       _group_by: data.groupBy,
@@ -55,7 +56,8 @@ export const getAbdProgressTotals = createServerFn({ method: "POST" })
       _round: data.round,
     });
     if (error) throw new Error(error.message);
-    return (rows ?? []).map((r: any) => ({
+    const rows = Array.isArray(payload) ? payload : [];
+    return rows.map((r: any) => ({
       group_key: (r.group_key ?? []) as string[],
       stage: r.stage as "draft" | "submission" | "dar",
       total: Number(r.total) || 0,
