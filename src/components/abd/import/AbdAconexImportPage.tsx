@@ -423,15 +423,45 @@ export function AbdAconexImportPage() {
                         {e.parsed && <span>· {e.parsed.rows.length} rows</span>}
                         {e.preview && (
                           <>
-                            <Badge variant="secondary" className="font-mono text-[10px]">
+                            <Badge
+                              variant="secondary"
+                              className="font-mono text-[10px]"
+                              title="DB(abd_items_raw)에 존재하여 상태 동기화 대상"
+                            >
                               matched {e.preview.matched}
                             </Badge>
-                            <Badge variant="outline" className="font-mono text-[10px]">
-                              unmatched {e.preview.unmatched}
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[10px]"
+                              title="파일에는 있으나 DB(abd_items_raw)에 없음 — 신규 생성하지 않음"
+                            >
+                              unmatched_not exist DB {e.preview.unmatched}
                             </Badge>
-                            {e.preview.excluded > 0 && (
-                              <Badge variant="outline" className="font-mono text-[10px]">
-                                excluded {e.preview.excluded}
+                            {e.preview.terminated_reset_count > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[10px] border-amber-400/60 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                                title="Review Status=Terminated — 해당 라운드 Submission/DAR/Response 리셋 후 재제출 대기"
+                              >
+                                Terminated-round reset {e.preview.terminated_reset_count}
+                              </Badge>
+                            )}
+                            {e.preview.cancelled_excluded_count > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[10px] border-zinc-400/60 bg-zinc-100 text-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-200"
+                                title="Status=Cancelled — 통계에서 제외"
+                              >
+                                Cancelled-excluded {e.preview.cancelled_excluded_count}
+                              </Badge>
+                            )}
+                            {e.preview.other_excluded_count > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[10px] border-dashed text-muted-foreground"
+                                title="예외 케이스 — 원본 status/review 조합 확인 필요"
+                              >
+                                other-excluded {e.preview.other_excluded_count}
                               </Badge>
                             )}
                           </>
@@ -479,7 +509,7 @@ export function AbdAconexImportPage() {
                       {e.preview && (e.preview.terminated_reset?.length ?? 0) > 0 && (
                         <details className="mt-2 rounded border border-zinc-400/40 bg-zinc-400/10 p-2 text-[11px]" open>
                           <summary className="cursor-pointer font-medium text-zinc-700 dark:text-zinc-300">
-                            Termination 리셋 ({e.preview.terminated_reset.length}건) — 해당 라운드 재제출 대기로 되돌림
+                            Terminated-round reset ({e.preview.terminated_reset.length}건) — 해당 라운드 재제출 대기로 되돌림
                           </summary>
                           <div className="mt-1 max-h-56 overflow-auto">
                             <table className="w-full border-collapse text-[10px]">
