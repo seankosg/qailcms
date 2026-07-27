@@ -759,6 +759,36 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_resp_result_restore_snapshot_20260727: {
+        Row: {
+          abd_item_id: string | null
+          before_r1: string | null
+          before_r2: string | null
+          before_r3: string | null
+          field: string | null
+          restore_value: string | null
+          snapshot_at: string | null
+        }
+        Insert: {
+          abd_item_id?: string | null
+          before_r1?: string | null
+          before_r2?: string | null
+          before_r3?: string | null
+          field?: string | null
+          restore_value?: string | null
+          snapshot_at?: string | null
+        }
+        Update: {
+          abd_item_id?: string | null
+          before_r1?: string | null
+          before_r2?: string | null
+          before_r3?: string | null
+          field?: string | null
+          restore_value?: string | null
+          snapshot_at?: string | null
+        }
+        Relationships: []
+      }
       abd_settings: {
         Row: {
           ds_gap_after_rs_days: number

@@ -440,20 +440,13 @@ function computePatch(
 
   if (semantic === "EXCLUDED_TERMINATED" || semantic === "EXCLUDED_CANCELLED") {
     // §1(b) Terminated: 합의된 철회 → 동일 라운드 재제출 대기.
-    //   ① Submission/DAR actual 및 response_result 리셋 (재제출 대상)
-    //   ② Draft 데이터는 절대 건드리지 않음 (재작성 불필요)
-    //   ③ latest_status 는 절대 덮어쓰지 않음 (마지막 실수신 회신 결과 보존)
-    //   ④ approval_date 도 덮어쓰지 않음
-    //   ⑤ is_terminated=true 로 마킹 → stage 판정에서 '재제출 대기'로 오버라이드
-    //   ⑥ 통계에는 포함 (재제출 예정 물량)
+    //   ① 실적 필드(actual/response_result)는 절대 리셋하지 않음 (실수신 회신 이력 보존)
+    //   ② Draft 데이터도 절대 건드리지 않음 (재작성 불필요)
+    //   ③ latest_status / approval_date 도 덮어쓰지 않음
+    //   ④ is_terminated=true 로 마킹 → stage 판정에서 '재제출 대기'로 오버라이드
+    //   ⑤ 통계에는 포함 (재제출 예정 물량)
     // §1(c) Cancelled: HDEC 자체 폐기 → 통계 완전 제외. latest_status 이력 보존.
-    const n = resolveActiveRound(existing);
     if (semantic === "EXCLUDED_TERMINATED") {
-      if (allowed.has("round_actual")) {
-        patch[`r${n}_submission_actual`] = null;
-        patch[`r${n}_dar_actual`] = null;
-        patch[`r${n}_response_result`] = null;
-      }
       if (allowed.has("is_terminated")) patch.is_terminated = true;
     } else {
       // Cancelled: 통계 완전 제외 플래그 (is_active=false).
