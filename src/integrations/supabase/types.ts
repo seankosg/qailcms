@@ -3840,9 +3840,7 @@ export type Database = {
           _q?: string
           _status_group?: string
         }
-        Returns: {
-          id: string
-        }[]
+        Returns: Json
       }
       defect_snag_dashboard_matrix: {
         Args: {
