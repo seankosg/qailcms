@@ -51,6 +51,8 @@ import {
   TEAM_COLORS,
   GROUP_HEADER_BG,
   PLOT_COLORS,
+  MILESTONE_COLORS,
+  OVERDUE_COLORS,
   RISK_COLORS,
   ROW_TYPE_COLORS,
   STATUS_COLORS,
@@ -142,6 +144,9 @@ function renderBadge(key: string, value: string) {
     plot: PLOT_COLORS,
     discipline: DISCIPLINE_COLORS,
     team: TEAM_COLORS,
+    milestone: MILESTONE_COLORS,
+    plan_overdue: OVERDUE_COLORS,
+    actual_overdue: OVERDUE_COLORS,
   };
   const colors = map[key];
   const cls = colors?.[value] ?? "bg-muted text-foreground";
@@ -507,7 +512,8 @@ export function TaskManagementRawDataPage() {
       // Paged fetch to bypass PostgREST default 1000-row cap
       while (true) {
         const { data, error } = await (supabase as any)
-          .from("task_management_raw")
+          // v_task_management_raw_derived: base 컬럼 + milestone/plan_overdue/actual_overdue/expected_finish 파생 필드
+          .from("v_task_management_raw_derived")
           .select("*")
           .order("discipline", { ascending: true })
           .order("sort_order", { ascending: true })

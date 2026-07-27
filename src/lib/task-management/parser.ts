@@ -31,6 +31,8 @@ export interface ParsedTaskRow {
   actual_finish: string | null;
   slip_days: number | null;
   auto_judgment: string | null;
+  /** Milestone: HO | COC | DLP (H/O → HO 정규화). 미지정/비인식은 null. */
+  milestone: string | null;
   sort_order: number;
 }
 
@@ -89,6 +91,7 @@ export const TASK_TARGET_FIELDS = [
   "forecast_end",
   "slip_days",
   "auto_judgment",
+  "milestone",
 ] as const;
 export type TaskTargetField = (typeof TASK_TARGET_FIELDS)[number];
 
@@ -130,6 +133,7 @@ const TASK_FIELD_ALIASES: Record<TaskTargetField, string[]> = {
   forecast_end: ["예상 완료", "Forecast End"],
   slip_days: ["차이 (일)", "차이(일)", "Slip"],
   auto_judgment: ["자동 판정", "Auto Judgment"],
+  milestone: ["Milestone", "milestone", "마일스톤", "M/S", "MS"],
 };
 
 export function isKnownTaskField(field: string): boolean {
@@ -581,6 +585,7 @@ export async function parseTaskManagementExcel(
     forecast_end: pick("forecast_end", ["예상 완료"], 18),
     slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 19),
     auto_judgment: pick("auto_judgment", ["자동 판정"], 20),
+    milestone: pick("milestone", ["Milestone", "마일스톤"], 21),
   };
 
   // ---- 사용자가 체크 해제한 헤더 처리 ----
@@ -624,6 +629,7 @@ export async function parseTaskManagementExcel(
   clampField("forecast_end", "forecast_end");
   clampField("slip_days", "slip_days");
   clampField("auto_judgment", "auto_judgment");
+  clampField("milestone", "milestone");
 
   // 단일 "담당" 컬럼만 있고 HDEC ENG가 별도로 매핑되지 않은 경우 자동 분배
   const singlePicColumn =
@@ -651,6 +657,7 @@ export async function parseTaskManagementExcel(
     forecast_end: cols.forecast_end,
     slip_days: cols.slip_days,
     auto_judgment: cols.auto_judgment,
+    milestone: cols.milestone,
   };
 
   // Iterate data rows (dataStart~)
@@ -852,6 +859,14 @@ export async function parseTaskManagementExcel(
         return n == null ? null : Math.round(n);
       })(),
       auto_judgment: toStr(getCell(sheet, r, cols.auto_judgment)),
+      milestone: (() => {
+        const raw = toStr(getCell(sheet, r, cols.milestone));
+        if (!raw) return null;
+        const up = raw.trim().toUpperCase().replace(/\s+/g, "");
+        // H/O, H_O, H-O 모두 HO로 정규화
+        const norm = up === "H/O" || up === "H_O" || up === "H-O" ? "HO" : up;
+        return norm === "HO" || norm === "COC" || norm === "DLP" ? norm : null;
+      })(),
       sort_order: sort++,
     });
   }
