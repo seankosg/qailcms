@@ -599,6 +599,17 @@ export function AbdAconexImportPage() {
                             </span>
                           )}
                         </Button>
+                        <span className="ml-2 inline-flex align-middle">
+                          <AbdDataDatePicker
+                            value={e.dataDate ?? null}
+                            onChange={(v) =>
+                              setEntries((p) =>
+                                p.map((x) => (x.id === e.id ? { ...x, dataDate: v } : x)),
+                              )
+                            }
+                            disabled={busy || e.status === "importing" || e.status === "done"}
+                          />
+                        </span>
                       </div>
                     </div>
                   </div>
