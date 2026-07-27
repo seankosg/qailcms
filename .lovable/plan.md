@@ -1,36 +1,43 @@
-## 원인 (확정)
-- DB에서 `abd_items_search('MECH,ELEC,ARCH', ..., _limit=1000000)` 직접 호출 → **6,715행 반환**.
-- 클라이언트에서 같은 RPC 호출 → **정확히 1,000행에서 잘림**.
-- 원인: Supabase Data API(PostgREST) 응답 상한이 1,000행. `_limit` 값과 무관하게 게이트웨이가 상단에서 자름. Lovable Cloud에서는 설정으로 상한을 늘릴 수 없음.
-- 결과: ALL 페이지도 실제로는 1,000행만 로드되고 있었고 Export는 그 1,000행만 파일로 씀.
+## 목표
+현재 TM > Import Logs > **Import Record** 탭의 사용자×일자 매트릭스에, 각 사용자의 **일별 수동 편집(manual edits)** 집계를 **같은 셀에 병기**한다. 대상 사용자·기간·팀 필터 등 기존 UX는 유지.
 
-## 계획 A — 청크 루프 페칭 하나만 도입 (최소 변경)
+## 데이터 소스
+- 편집 소스: `public.task_management_status_history` where `source = 'manual'`
+- 집계 축:
+  - `changed_by` → `profiles.id` (HDEC PIC 사용자)
+  - Doha(Asia/Qatar) 로컬 날짜 = `date_trunc('day', changed_at AT TIME ZONE 'Asia/Qatar')`
+- 두 지표를 셀에 모두 표시:
+  - **필드 변경 건수** = `count(*)` (status_history 행 수)
+  - **수정 Task 수** = `count(distinct (discipline, task_no))`
 
-### 변경 파일: `src/hooks/useAbdItems.ts`
-`useAbdItemsQuery`의 queryFn 만 수정:
+## 서버 RPC 신설
+`public.tm_edit_record_daily(p_from date, p_to date)` → `TABLE(user_id uuid, date_key date, edits_count int, tasks_count int)`
+- security definer, `search_path=public`, admin/super만 실행 가능하도록 초입에서 `is_admin_or_super(auth.uid())` 체크 후 아니면 raise
+- `changed_at`을 Doha TZ로 변환하여 그룹핑, `p_from ~ p_to`(포함) 범위
+- 인덱스: 기존 `tmsh_changed_at_idx` 활용
+- GRANT EXECUTE TO authenticated
 
-1. `CHUNK = 1000` 상수 정의.
-2. `p.pageSize <= CHUNK` → 지금과 동일하게 단일 호출(성능 영향 없음).
-3. `p.pageSize > CHUNK` (실질적으로 ALL만 해당) → 다음 로직 수행:
-   - `_offset = p.page 기반 offset` (ALL은 0), `_limit = CHUNK` 로 첫 배치 호출.
-   - 첫 배치 응답에서 `total_count` 확보.
-   - `while (fetched < min(total_count, p.pageSize))` 반복해 `_offset += CHUNK` 로 후속 배치 호출, 계약 검증(현재의 `rows` 객체 여부 체크)은 배치마다 유지.
-   - 모든 배치의 `rows`를 합쳐 `{ rows, total: total_count }` 반환.
-4. 안전 상한: 최대 반복 회수 = `Math.ceil(pageSize / CHUNK)` (ALL=1,000,000 → 최대 1,000회지만 total_count에서 조기 종료). 무한루프 방지 가드로 `fetched`가 진행되지 않으면 즉시 throw.
-5. 계약 위반 시 throw 는 현재 로직 그대로 유지 (`shape mismatch` 에러).
+## 프론트엔드 수정: `src/components/import-log/task-management/TmImportRecordTab.tsx`
+1. 신규 쿼리 `edits-record-daily` 추가 → RPC 호출
+2. `editMap: Map<"userId|dateKey", {edits: number; tasks: number}>` 구성
+3. `MatrixTables` 셀 렌더 변경:
+   - 업로드 있음: 기존 `Check` 아이콘 유지
+   - 그 아래(또는 옆) 작은 뱃지로 `E{edits}/T{tasks}` (편집이 0이면 표시 안 함)
+   - 셀 tooltip: `업로드 N건 · 편집 E필드 / T Task`
+   - 셀 최소 폭이 좁으므로 세로로 2줄(1줄: ✓/✗, 2줄: `E·T` 소형 텍스트)로 배치
+4. 팀 헤더 뱃지에 "오늘 편집 X명" 추가
+5. 사용자 행 우측 합계 컬럼에 "업로드 N일 / 편집 M일" 병기
 
-`AbdItemsQueryParams`, 반환 타입(`{ rows, total }`), queryKey 구조는 **변경 없음** → 호출부(`AbdRawDataPage`, Export Dialog) 코드 수정 불필요.
+## Excel 내보내기: `exportTmImportRecord.ts`
+- 시그니처에 `editMap` 추가
+- 각 날짜 셀에 `"✓" | ""` 대신 `"U | E{n}/T{m}"` 형태로 결합, 또는 컬럼을 2개(업로드/편집)로 분리해 병기
+- (구현은 단일 셀 문자열 병기 방식 채택하여 컬럼 폭 폭증 회피)
 
-### 부수적으로 하지 않을 것
-- Export Dialog UI/포맷 개편, 스코프 라디오 (다음 요청 시)
-- Facet/Counts RPC 는 그대로 (집계 단일 행 반환이라 상한 무관)
-- `defect_items_search`/`spare_parts` 등 타 모듈 (이번 스코프 아님, 필요 시 별도 요청)
-- DB 함수 수정 (반환 shape 원복 상태 유지)
+## 권한/영향 범위
+- Import Record 탭 자체가 admin/superuser 전용이라 신규 RPC 접근도 동일 게이트
+- 다른 모듈(SM/ABD/DMR) Import Logs UI에는 영향 없음
 
-### 검증 절차
-1. `/closure/abd/raw-data?tab=MECH,ELEC&plot=all&pageSize=all`
-   - 헤더 카운트 `6,715 / 6,715` 표시.
-   - 테이블 실제 렌더 행 수 6,715.
-2. 같은 화면에서 Export 실행 → 엑셀 데이터 행 6,715.
-3. `pageSize=100` 기본 페이지에서 단일 호출로 100행 로드, 네트워크 탭에 `abd_items_search` 호출 1회 확인 (회귀 없음).
-4. 필터 1~2개 적용 후 ALL 재조회 → 상단 카운트와 렌더 행 수 일치 확인.
+## 기술 세부
+- 편집 카운트에서 시스템 rollup/import 소스는 제외(사용자 답변 반영: manual만)
+- 필드 변경 다수(예: plan_start/plan_end/forecast_end 3개 동시 저장) 시 3건으로 계산 — status_history가 필드 단위 row로 남는 구조를 그대로 사용
+- 대량 편집 이력이 있을 수 있으므로 클라이언트에서 페이지네이션 대신 RPC 서버측 GROUP BY로 집계 결과만 전송(경량)
