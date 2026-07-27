@@ -4354,6 +4354,43 @@ export type Database = {
         }
         Returns: string
       }
+      tm_items_facets: {
+        Args: {
+          _column: string
+          _filters?: Json
+          _include_inactive?: boolean
+          _q?: string
+        }
+        Returns: {
+          cnt: number
+          value: string
+        }[]
+      }
+      tm_items_search: {
+        Args: {
+          _filters?: Json
+          _include_inactive?: boolean
+          _limit?: number
+          _offset?: number
+          _q?: string
+          _sort?: Json
+        }
+        Returns: {
+          rows: Json
+          total_count: number
+        }[]
+      }
+      tm_items_search_ids: {
+        Args: {
+          _filters?: Json
+          _include_inactive?: boolean
+          _limit?: number
+          _q?: string
+        }
+        Returns: {
+          id: string
+        }[]
+      }
       tm_judge_at_date: {
         Args: { p_data_date: string; p_task_ids?: string[] }
         Returns: Json
