@@ -31,6 +31,7 @@ import {
   type ColumnRequirement,
 } from "@/components/import/ColumnSelectDialog";
 import { ABD_ACONEX_SYNC_FIELDS } from "@/components/admin/AbdImportPresetTable";
+import { AbdDataDatePicker } from "./AbdDataDatePicker";
 
 type Status = "queued" | "parsing" | "ready" | "previewing" | "preview" | "importing" | "done" | "error";
 
@@ -95,6 +96,8 @@ interface Entry {
   fileHeaders?: string[];
   /** 각 헤더 첫 데이터 행 샘플. */
   sampleRow?: Record<string, unknown>;
+  /** 이 파일에 기록할 Data Date (YYYY-MM-DD). null/undefined = 오늘(Doha). */
+  dataDate?: string | null;
 }
 
 function formatSize(b: number) {
@@ -319,7 +322,7 @@ export function AbdAconexImportPage() {
         const result = await importAbdAconexBatch({
           data: {
             file_name: e.file.name,
-            data_date: todayInDoha(),
+            data_date: e.dataDate || todayInDoha(),
             rows: e.parsed.rows.map((r) => ({
               document_no: r.document_no,
               revision: r.revision,
@@ -596,6 +599,17 @@ export function AbdAconexImportPage() {
                             </span>
                           )}
                         </Button>
+                        <span className="ml-2 inline-flex align-middle">
+                          <AbdDataDatePicker
+                            value={e.dataDate ?? null}
+                            onChange={(v) =>
+                              setEntries((p) =>
+                                p.map((x) => (x.id === e.id ? { ...x, dataDate: v } : x)),
+                              )
+                            }
+                            disabled={busy || e.status === "importing" || e.status === "done"}
+                          />
+                        </span>
                       </div>
                     </div>
                   </div>

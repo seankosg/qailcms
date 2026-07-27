@@ -54,6 +54,7 @@ import { Switch } from "@/components/ui/switch";
 import { RefreshCw, Columns3 } from "lucide-react";
 import { AbdAconexImportPage } from "./AbdAconexImportPage";
 import { useAbdFieldConfig } from "@/hooks/useAbdFieldConfig";
+import { AbdDataDatePicker } from "./AbdDataDatePicker";
 import {
   ColumnSelectDialog,
   type ColumnSelectHelpers,
@@ -89,6 +90,8 @@ interface FileEntry {
   dateOverrides?: Record<string, string>;
   /** 이 파일에서 임포트 시 제외할 canonical field 목록 (기본 = 전체 포함). */
   excludedFields?: string[];
+  /** 이 파일에 기록할 Data Date (YYYY-MM-DD). null/undefined = 오늘(Doha). */
+  dataDate?: string | null;
 }
 
 const statusBadge: Record<Status, { label: string; cls: string }> = {
@@ -381,6 +384,8 @@ export function AbdImportPage() {
     setEntries((p) => p.filter((x) => x.id !== id));
   const setTeam = (id: string, team: string) =>
     setEntries((p) => p.map((x) => (x.id === id ? { ...x, team } : x)));
+  const setDataDate = (id: string, v: string | null) =>
+    setEntries((p) => p.map((x) => (x.id === id ? { ...x, dataDate: v } : x)));
   const clearAll = () => setEntries([]);
 
   // 파싱 완료된 파일 중 미등록 team 코드 수집
@@ -443,7 +448,7 @@ export function AbdImportPage() {
               team: e.team,
               plot: sheet.plot,
               sheet_name: sheet.sheet_name,
-              data_date: todayInDoha(),
+          data_date: e.dataDate || todayInDoha(),
               rows,
               inactivate_missing: true,
               allow_duplicates: !!e.allowDuplicates,
@@ -621,6 +626,7 @@ export function AbdImportPage() {
                 onOpenDuplicates={() => setDupOpenId(e.id)}
                 onDateOverridesApply={(ovr) => reparseWithOverrides(e.id, ovr)}
                 onOpenColumnSelect={() => setColumnFileId(e.id)}
+                onDataDateChange={(v) => setDataDate(e.id, v)}
               />
             ))}
           </CardContent>
@@ -685,6 +691,7 @@ function FileRow({
   onOpenDuplicates,
   onDateOverridesApply,
   onOpenColumnSelect,
+  onDataDateChange,
 }: {
   entry: FileEntry;
   isRunning: boolean;
@@ -693,6 +700,7 @@ function FileRow({
   onOpenDuplicates: () => void;
   onDateOverridesApply: (overrides: Record<string, string>) => void | Promise<void>;
   onOpenColumnSelect: () => void;
+  onDataDateChange: (v: string | null) => void;
 }) {
   const { data: teamOptions = [] } = useTeamOptions();
   const badge = statusBadge[e.status];
@@ -747,6 +755,11 @@ function FileRow({
                   </span>
                 )}
               </Button>
+              <AbdDataDatePicker
+                value={e.dataDate ?? null}
+                onChange={onDataDateChange}
+                disabled={disabled}
+              />
             </div>
             {e.parsed && e.parsed.sheets.length > 0 && (
               <p className="mt-1 text-[11px] text-muted-foreground">
