@@ -187,7 +187,7 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       if (axis === "none") {
         await streamXlsxExport({
           ...commonWriterOpts,
-          filename: `task-management_${format}_${ts}.xlsx`,
+          filename: `CMS_TM_${format}_${ts}.xlsx`,
           header: buildHeader(),
           fetchPage: pagerFor(derivedRows),
         });
@@ -222,12 +222,12 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
           const rs = groups.get(key)!;
           const { buffer } = await streamXlsxExport({
             ...commonWriterOpts,
-            filename: `${axisTag}-${sanitize(key)}.xlsx`,
+            filename: `CMS_TM_${axisTag}-${sanitize(key)}.xlsx`,
             header: buildHeader(`Split: ${axisLabel} = ${key}`),
             fetchPage: pagerFor(rs),
             output: "buffer",
           });
-          if (buffer) zip.file(`task-management_${format}_${axisTag}-${sanitize(key)}_${ts}.xlsx`, buffer);
+          if (buffer) zip.file(`CMS_TM_${format}_${axisTag}-${sanitize(key)}_${ts}.xlsx`, buffer);
           groups.set(key, []);
           done += 1;
           toast.loading(`ZIP 생성 중 ${done} / ${sortedKeys.length}`, { id: toastId });
@@ -241,7 +241,7 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
           const rs = groups.get(key)!;
           await streamXlsxExport({
             ...commonWriterOpts,
-            filename: `task-management_${format}_${axisTag}-${sanitize(key)}_${ts}.xlsx`,
+            filename: `CMS_TM_${format}_${axisTag}-${sanitize(key)}_${ts}.xlsx`,
             header: buildHeader(`Split: ${axisLabel} = ${key}`),
             fetchPage: pagerFor(rs),
           });
