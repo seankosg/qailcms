@@ -102,6 +102,19 @@
 
 ---
 
+## 10. TM today_actual / today_gap 서버 정렬 통합 (LATERAL)  `[동결]` `[설계확정]`
+
+- **동결 사유**: 2026-07-27 사용자 결정 "페이지 스코프 정렬로 충분, 필요해지면 그때 (a)로". C1 페이지 교체 라운드에서도 페이지 내 정렬을 유지한다.
+- **문제**: `today_actual`(as-of 기준 실적%)과 `today_gap`(T.Plan 대비 갭)은 시점(as_of) 파라미터에 의존하는 파생값이라 `v_task_management_raw_derived` 뷰의 정적 컬럼으로 통합 불가. 현재 서버 정렬 화이트리스트에는 미등재.
+- **확정 설계** (재개 시 그대로 시행):
+  - `tm_items_search` RPC 시그니처에 `_as_of date default null` 파라미터 추가. null 시 서버가 `current_date at time zone 'Asia/Qatar'` 로 대체.
+  - 검색 CTE 에 LATERAL 서브쿼리로 `today_actual`, `today_gap` 을 as_of 시점 기준 계산해 붙임. 기존 뷰는 손대지 않고 RPC 내부에서만 파생.
+  - 정렬 화이트리스트에 두 컬럼 추가. facets/필터 화이트리스트에는 추가하지 않음(값 무한).
+  - `useTmServerItems` 어댑터에 `asOf` 옵션 추가 및 페이지 컴포넌트에서 shared data date 와 연동.
+- **재개 조건**: 페이지 스코프 정렬이 부족한 사용자 시나리오 발견 시(예: 데이터셋 규모가 페이지 크기를 크게 초과하고 오늘 실적 기준 상위 N 조회가 반복 요청됨).
+
+---
+
 ## 부록 — 확정 상수/규칙
 
 - 정규 latest_status 코드: `A / B / C / NYS` (4종 고정)
