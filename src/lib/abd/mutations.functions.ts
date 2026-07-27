@@ -207,6 +207,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           status: "in_progress",
           started_at: new Date().toISOString(),
           imported_by: context.userId,
+          build_id: typeof __APP_BUILD_ID__ === "string" ? __APP_BUILD_ID__ : null,
           note: data.note ?? null,
         })
         .select("id").single();
