@@ -67,21 +67,30 @@ export function useAbdAttentionInbox({ isAdmin, scope, filterValue, userId }: Op
         "r3_draft_finish_plan,r3_draft_finish_actual,r3_submission_plan,r3_submission_actual,r3_dar_plan,r3_dar_actual",
       ].join(",");
 
-      // 상한: MWS 창 성능. Attention 항목만 대상이라 실무상 넉넉.
-      const LIMIT = 5000;
-      let q = (supabase as any)
-        .from("abd_items_raw")
-        .select(cols)
-        .eq("is_active", true)
-        .neq("is_terminated", true)
-        .neq("latest_status", "A")
-        .limit(LIMIT);
-      if (!isAdmin) {
-        q = q.eq(scope === "team" ? "team" : "hdec_pic_name", filterValue);
+      // PostgREST 응답 상한(1,000행) 우회를 위한 청크 루프.
+      // Attention 항목 특성상 실무 상한을 넉넉히 20k로 방어.
+      const PAGE = 1000;
+      const MAX_ROWS = 20_000;
+      const rows: any[] = [];
+      for (let from = 0; from < MAX_ROWS; from += PAGE) {
+        const to = Math.min(from + PAGE, MAX_ROWS) - 1;
+        let q = (supabase as any)
+          .from("abd_items_raw")
+          .select(cols)
+          .eq("is_active", true)
+          .neq("is_terminated", true)
+          .neq("latest_status", "A")
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (!isAdmin) {
+          q = q.eq(scope === "team" ? "team" : "hdec_pic_name", filterValue);
+        }
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        const chunk = (data ?? []) as any[];
+        rows.push(...chunk);
+        if (chunk.length < PAGE) break;
       }
-      const { data, error } = await q;
-      if (error) throw new Error(error.message);
-      const rows = (data ?? []) as any[];
 
       const out: AbdAttentionRow[] = [];
       for (const r of rows) {
