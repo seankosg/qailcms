@@ -78,37 +78,68 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
   return useQuery({
     queryKey: ["abd", "items", p],
     queryFn: async () => {
-      const offset = Math.max(0, (p.page - 1) * p.pageSize);
-      const { data, error } = await (supabase as any).rpc("abd_items_search", {
-        _team: p.team,
-        _status_group: p.statusGroup === "all" ? null : p.statusGroup,
-        _include_inactive: p.includeInactive,
-        _q: p.q && p.q.trim() ? p.q.trim() : null,
-        _filters: p.filters ?? [],
-        _sort: p.sort ?? [],
-        _offset: offset,
-        _limit: p.pageSize,
-        _plot: p.plot ?? null,
-        _excluded_mode: p.excludedMode ?? "hide",
-      });
-      if (error) throw new Error(error.message);
-      const arr = (data ?? []) as { rows: any; total_count: number | string }[];
-      // Contract: abd_items_search returns one row per record (rows = to_jsonb(record)).
-      // Matches SM/Defect (defect_items_search). If a jsonb_agg-style shape sneaks back in,
-      // fail loudly here instead of silently rendering empty cells.
-      if (arr.length > 0) {
-        const first = arr[0] as any;
-        const rowsVal = first?.rows;
-        if (Array.isArray(rowsVal) || rowsVal === null || typeof rowsVal !== "object") {
-          throw new Error(
-            "abd_items_search RPC contract mismatch: expected row-per-record { rows: object, total_count }, got rows=" +
-              (Array.isArray(rowsVal) ? "array" : rowsVal === null ? "null" : typeof rowsVal),
-          );
+      // PostgREST 응답 상한(1,000행)을 우회하기 위해 pageSize > CHUNK 일 때 청크 루프 페칭.
+      const CHUNK = 1000;
+      const baseOffset = Math.max(0, (p.page - 1) * p.pageSize);
+      const callRpc = async (offset: number, limit: number) => {
+        const { data, error } = await (supabase as any).rpc("abd_items_search", {
+          _team: p.team,
+          _status_group: p.statusGroup === "all" ? null : p.statusGroup,
+          _include_inactive: p.includeInactive,
+          _q: p.q && p.q.trim() ? p.q.trim() : null,
+          _filters: p.filters ?? [],
+          _sort: p.sort ?? [],
+          _offset: offset,
+          _limit: limit,
+          _plot: p.plot ?? null,
+          _excluded_mode: p.excludedMode ?? "hide",
+        });
+        if (error) throw new Error(error.message);
+        const arr = (data ?? []) as { rows: any; total_count: number | string }[];
+        // Contract: abd_items_search returns one row per record (rows = to_jsonb(record)).
+        // Matches SM/Defect (defect_items_search). If a jsonb_agg-style shape sneaks back in,
+        // fail loudly here instead of silently rendering empty cells.
+        if (arr.length > 0) {
+          const first = arr[0] as any;
+          const rowsVal = first?.rows;
+          if (Array.isArray(rowsVal) || rowsVal === null || typeof rowsVal !== "object") {
+            throw new Error(
+              "abd_items_search RPC contract mismatch: expected row-per-record { rows: object, total_count }, got rows=" +
+                (Array.isArray(rowsVal) ? "array" : rowsVal === null ? "null" : typeof rowsVal),
+            );
+          }
+        }
+        return arr;
+      };
+
+      // 단일 호출로 충분한 경우 (기본 페이지 50~500).
+      if (p.pageSize <= CHUNK) {
+        const arr = await callRpc(baseOffset, p.pageSize);
+        const rows: AbdItem[] = arr.map((r) => r.rows as AbdItem);
+        const total = Number(arr[0]?.total_count ?? 0);
+        return { rows, total };
+      }
+
+      // ALL 등 대용량: CHUNK 단위 루프.
+      const firstBatch = await callRpc(baseOffset, CHUNK);
+      const total = Number(firstBatch[0]?.total_count ?? 0);
+      const target = Math.min(total - baseOffset, p.pageSize);
+      const collected: AbdItem[] = firstBatch.map((r) => r.rows as AbdItem);
+      const maxIterations = Math.ceil(p.pageSize / CHUNK) + 1;
+      let iterations = 1;
+      while (collected.length < target) {
+        if (++iterations > maxIterations) {
+          throw new Error(`abd_items_search chunk loop exceeded ${maxIterations} iterations`);
+        }
+        const prev = collected.length;
+        const batch = await callRpc(baseOffset + collected.length, CHUNK);
+        if (batch.length === 0) break;
+        for (const r of batch) collected.push(r.rows as AbdItem);
+        if (collected.length === prev) {
+          throw new Error("abd_items_search chunk loop stalled (no progress)");
         }
       }
-      const rows: AbdItem[] = arr.map((r) => r.rows as AbdItem);
-      const total = Number(arr[0]?.total_count ?? 0);
-      return { rows, total };
+      return { rows: collected.slice(0, target), total };
     },
     staleTime: 30_000,
     gcTime: 5 * 60_000,
