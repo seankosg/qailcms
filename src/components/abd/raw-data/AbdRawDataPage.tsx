@@ -759,6 +759,18 @@ export function AbdRawDataPage() {
         </div>
       </div>
 
+      <AbdBulkEditBar
+        selectedRows={selectedRowObjects as unknown as Record<string, unknown>[]}
+        exportColumns={selectedExportColumns}
+        canEdit={canBulkEdit}
+        onClear={() => setRowSelection({})}
+        onMutated={() => {
+          setRowSelection({});
+          refetch();
+          invalidate();
+        }}
+      />
+
       <AbdRawTableView
         table={table}
         tableRef={tableRef}
