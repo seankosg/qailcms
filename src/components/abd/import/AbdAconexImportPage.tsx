@@ -476,6 +476,23 @@ export function AbdAconexImportPage() {
                         )}
                         {e.status === "done" && <CheckCircle2 className="h-3 w-3 text-emerald-600" />}
                       </div>
+                      {e.result?.null_overwrites &&
+                        Object.keys(e.result.null_overwrites).length > 0 && (
+                          <div className="mt-2 rounded-md border border-red-300 bg-red-50 px-2 py-1.5 text-[11px] text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                            <div className="font-semibold">
+                              ⚠ 사후 검증: non-null → null 덮어쓰기 감지
+                            </div>
+                            <div className="mt-0.5 font-mono">
+                              {Object.entries(e.result.null_overwrites)
+                                .map(([f, n]) => `${f}=${n}`)
+                                .join(", ")}
+                            </div>
+                            <div className="mt-0.5 text-[10px] opacity-80">
+                              upload_id={e.result.batch_id ?? "-"} — change_log 기반 계측이므로
+                              스테일 클라이언트 실행 여부와 무관하게 신뢰 가능.
+                            </div>
+                          </div>
+                        )}
                       {e.preview && e.preview.by_status.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {e.preview.by_status.map((s) => (
