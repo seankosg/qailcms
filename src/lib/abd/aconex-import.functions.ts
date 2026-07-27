@@ -98,6 +98,11 @@ export type AconexImportResult = AconexImportPreview & {
   batch_id: string | null;
 };
 
+/** status_code='D' 는 현재 DB/실파일 모두 0건 관측 — 등장 시 매핑 확정 전까지 임포트 에러로 보고. */
+function isDCode(r: { status_code?: string | null }): boolean {
+  return String(r.status_code ?? "").toUpperCase() === "D";
+}
+
 async function assertEditor(ctx: any) {
   const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
     ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" }),
