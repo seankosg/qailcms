@@ -122,25 +122,35 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
       }
 
       // ALL 등 대용량: CHUNK 단위 루프.
+      // 표준안: offset 전진은 collected.length(= 실제 반환 batch.length 누적) 기반.
+      //         종료 조건은 target 도달, batch.length === 0, 또는 batch.length < CHUNK.
       const firstBatch = await callRpc(baseOffset, CHUNK);
       const total = Number(firstBatch[0]?.total_count ?? 0);
       const target = Math.min(total - baseOffset, p.pageSize);
       const collected: AbdItem[] = firstBatch.map((r) => r.rows as AbdItem);
       const maxIterations = Math.ceil(p.pageSize / CHUNK) + 1;
       let iterations = 1;
+      let lastBatchLen = firstBatch.length;
       while (collected.length < target) {
+        if (lastBatchLen < CHUNK) break; // 마지막 페이지 도달
         if (++iterations > maxIterations) {
           throw new Error(`abd_items_search chunk loop exceeded ${maxIterations} iterations`);
         }
         const prev = collected.length;
         const batch = await callRpc(baseOffset + collected.length, CHUNK);
+        lastBatchLen = batch.length;
         if (batch.length === 0) break;
         for (const r of batch) collected.push(r.rows as AbdItem);
         if (collected.length === prev) {
           throw new Error("abd_items_search chunk loop stalled (no progress)");
         }
       }
-      return { rows: collected.slice(0, target), total };
+      const finalRows = collected.slice(0, target);
+      // ALL(=pageSize>=total) 사용 시 잘림 감시. 부분 페이지에서는 target < total 이 정상.
+      if (p.pageSize >= total) {
+        assertNoTruncation("abd_items_search(ALL)", finalRows, total);
+      }
+      return { rows: finalRows, total };
     },
     staleTime: 30_000,
     gcTime: 5 * 60_000,
