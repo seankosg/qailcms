@@ -293,33 +293,12 @@ function KindManager({ kinds }: { kinds: Kind[] }) {
     }
   }
 
-  async function removeKind(code: string) {
-    if (!confirm(`Milestone 종류 '${code}'를 삭제하시겠습니까?\n(관련 Plot × Kind 설정 행도 함께 정리됩니다)`)) return;
-    setBusy(code);
-    try {
-      const { error: e1 } = await (supabase as any)
-        .from("tm_milestone_kinds")
-        .update({ deleted_at: new Date().toISOString(), is_active: false })
-        .eq("kind_code", code);
-      if (e1) throw e1;
-      // 매트릭스 config의 해당 kind 행도 정리
-      await (supabase as any).from("tm_milestone_config").delete().eq("kind", code);
-      toast.success(`${code} 삭제됨`);
-      qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
-      qc.invalidateQueries({ queryKey: ["tm_milestone_config"] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "삭제 실패");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Milestone 종류 관리</CardTitle>
         <CardDescription>
-          Milestone 종류(HO, COC, DLP 등)를 추가/삭제합니다. 추가 시 모든 Plot 카드에 새 열이 자동으로 나타납니다.
+          새로운 Milestone 종류(HO, COC, DLP 등)를 추가합니다. 삭제는 각 Plot 카드의 Milestone 행 오른쪽 휴지통 버튼을 사용하세요.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -335,20 +314,6 @@ function KindManager({ kinds }: { kinds: Kind[] }) {
               {k.label !== k.kind_code && (
                 <span className="text-xs text-muted-foreground">{k.label}</span>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                disabled={busy === k.kind_code}
-                onClick={() => removeKind(k.kind_code)}
-                title={`${k.kind_code} 삭제`}
-              >
-                {busy === k.kind_code ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                )}
-              </Button>
             </div>
           ))}
           {kinds.length === 0 && (
