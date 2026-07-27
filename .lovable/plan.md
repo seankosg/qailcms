@@ -1,57 +1,36 @@
-## 목표
-`abd_items_search` 반환 shape만 SM/Defect와 동일한 행별 반환으로 원복. 상태 그룹/딜레이 버킷 매핑 로직(173246의 의도된 변경)은 그대로 유지.
+## 원인 (확정)
+- DB에서 `abd_items_search('MECH,ELEC,ARCH', ..., _limit=1000000)` 직접 호출 → **6,715행 반환**.
+- 클라이언트에서 같은 RPC 호출 → **정확히 1,000행에서 잘림**.
+- 원인: Supabase Data API(PostgREST) 응답 상한이 1,000행. `_limit` 값과 무관하게 게이트웨이가 상단에서 자름. Lovable Cloud에서는 설정으로 상한을 늘릴 수 없음.
+- 결과: ALL 페이지도 실제로는 1,000행만 로드되고 있었고 Export는 그 1,000행만 파일로 씀.
 
-## 173246 vs 172932 diff 결과 (사전 검증)
-- 총 45라인 차이, 전부 `delay_bucket` 배열 값 매핑(RS_DELAY→RS, SB_DELAY→SB, DS_DELAY→DS, needs_planning→NoPlan)뿐.
-- 정렬 기본값 `sl_no asc NULLS LAST`, OFFSET/LIMIT, 필터 파서, 컬럼 화이트리스트, GRANT — 모두 동일.
-- 즉 반환부(`SELECT coalesce(jsonb_agg(...))`)만 손대면 되고, 부수적으로 되돌려야 할 것은 없음.
+## 계획 A — 청크 루프 페칭 하나만 도입 (최소 변경)
 
-## 변경
+### 변경 파일: `src/hooks/useAbdItems.ts`
+`useAbdItemsQuery`의 queryFn 만 수정:
 
-### 1. 새 migration 1개 — `abd_items_search` 반환 shape만 원복
-현재 173246 함수 정의를 그대로 복제하고 마지막 SELECT를 아래로 교체:
+1. `CHUNK = 1000` 상수 정의.
+2. `p.pageSize <= CHUNK` → 지금과 동일하게 단일 호출(성능 영향 없음).
+3. `p.pageSize > CHUNK` (실질적으로 ALL만 해당) → 다음 로직 수행:
+   - `_offset = p.page 기반 offset` (ALL은 0), `_limit = CHUNK` 로 첫 배치 호출.
+   - 첫 배치 응답에서 `total_count` 확보.
+   - `while (fetched < min(total_count, p.pageSize))` 반복해 `_offset += CHUNK` 로 후속 배치 호출, 계약 검증(현재의 `rows` 객체 여부 체크)은 배치마다 유지.
+   - 모든 배치의 `rows`를 합쳐 `{ rows, total: total_count }` 반환.
+4. 안전 상한: 최대 반복 회수 = `Math.ceil(pageSize / CHUNK)` (ALL=1,000,000 → 최대 1,000회지만 total_count에서 조기 종료). 무한루프 방지 가드로 `fetched`가 진행되지 않으면 즉시 throw.
+5. 계약 위반 시 throw 는 현재 로직 그대로 유지 (`shape mismatch` 에러).
 
-```sql
-_sql := format($q$
-  WITH filtered AS (
-    SELECT * FROM abd_items_raw WHERE %s
-  ), counted AS (
-    SELECT count(*)::bigint AS c FROM filtered
-  ), paged AS (
-    SELECT * FROM filtered ORDER BY %s OFFSET %s LIMIT %s
-  )
-  SELECT to_jsonb(p.*) AS rows, (SELECT c FROM counted) AS total_count
-  FROM paged p
-$q$, _where, _sort_sql, _offset, _limit);
-```
+`AbdItemsQueryParams`, 반환 타입(`{ rows, total }`), queryKey 구조는 **변경 없음** → 호출부(`AbdRawDataPage`, Export Dialog) 코드 수정 불필요.
 
-함수 상단에 한 줄 주석 추가:
-> Returns one row per item. `rows` = to_jsonb(record), `total_count` repeated on every row. Matches defect_items_search / SM contract. Do not change this shape without also updating useAbdItems.ts.
+### 부수적으로 하지 않을 것
+- Export Dialog UI/포맷 개편, 스코프 라디오 (다음 요청 시)
+- Facet/Counts RPC 는 그대로 (집계 단일 행 반환이라 상한 무관)
+- `defect_items_search`/`spare_parts` 등 타 모듈 (이번 스코프 아님, 필요 시 별도 요청)
+- DB 함수 수정 (반환 shape 원복 상태 유지)
 
-그 외 로직(상태 그룹 매핑, 딜레이 버킷 매핑, 필터, 정렬, 컬럼 화이트리스트)은 173246과 100% 동일하게 유지.
-
-### 2. `src/hooks/useAbdItems.ts` — 엄격 검증만 추가
-`useAbdItemsQuery` queryFn에서 응답 파싱 직전에:
-```ts
-if (Array.isArray(data) && data.length > 0) {
-  const first = data[0] as any;
-  if (first && typeof first.rows !== "object") {
-    throw new Error(
-      "abd_items_search RPC contract mismatch: expected row-per-record { rows: object, total_count }, got rows=" +
-      (Array.isArray(first.rows) ? "array" : typeof first.rows)
-    );
-  }
-}
-```
-기존 `arr.map((r) => r.rows as AbdItem)` 로직은 유지. normalizer는 도입하지 않음.
-
-## 하지 않을 것
-- 양쪽 shape 수용 normalizer.
-- ABD 외 훅/컴포넌트 수정, 딥링크·컬럼 설정 방어 로직.
-- 173246의 딜레이 버킷 매핑 로직 손대기.
-
-## 검증
-1. `/closure/abd/raw-data?tab=MECH&pageSize=100`: 첫 행에 ABD Number/Plot/DIS/Latest Status 실제 값 표시 + 카운트 `2,606 records` 일치.
-2. 같은 화면 pageSize=ALL: 렌더/카운트 일치.
-
-두 확인만 통과하면 종료.
+### 검증 절차
+1. `/closure/abd/raw-data?tab=MECH,ELEC&plot=all&pageSize=all`
+   - 헤더 카운트 `6,715 / 6,715` 표시.
+   - 테이블 실제 렌더 행 수 6,715.
+2. 같은 화면에서 Export 실행 → 엑셀 데이터 행 6,715.
+3. `pageSize=100` 기본 페이지에서 단일 호출로 100행 로드, 네트워크 탭에 `abd_items_search` 호출 1회 확인 (회귀 없음).
+4. 필터 1~2개 적용 후 ALL 재조회 → 상단 카운트와 렌더 행 수 일치 확인.
