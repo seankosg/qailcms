@@ -547,7 +547,13 @@ export function AbdRawDataPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [orderedKeys, visibility, labelOf],
   );
-  const canBulkEdit = !!user && (isAdmin || user.role === "senior_user" || user.role === "d_superuser" || user.role === "superuser");
+  const canBulkEdit = !!user && (
+    isAdmin ||
+    (Array.isArray((user as any).roles) &&
+      (user as any).roles.some((r: string) =>
+        ["senior_user", "d_superuser", "superuser", "admin"].includes(r),
+      ))
+  );
 
   const activeChips = useMemo(() => {
     const chips: { id: string; label: string; onClear: () => void }[] = [];
