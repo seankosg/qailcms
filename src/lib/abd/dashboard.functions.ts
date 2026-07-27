@@ -57,11 +57,11 @@ export const getAbdDashboardAttentionLists = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => FilterSchema.extend({ limit: z.number().int().default(20) }).parse(v))
   .handler(async ({ data, context }) => {
-    const { data: payload, error } = await (context.supabase as any).rpc("abd_dashboard_attention_lists", {
-      _plots: toArrOrNull(data.plots),
-      _teams: toArrOrNull(data.teams),
+    const { data: payload, error } = await context.supabase.rpc("abd_dashboard_attention_lists", {
+      _plots: toArrOrNull(data.plots) ?? undefined,
+      _teams: toArrOrNull(data.teams) ?? undefined,
       _limit: data.limit,
-      _batch_no: toArrOrNull(data.batch_no),
+      _batch_no: toArrOrNull(data.batch_no) ?? undefined,
     });
     if (error) throw new Error(error.message);
     if (!Array.isArray(payload)) {
