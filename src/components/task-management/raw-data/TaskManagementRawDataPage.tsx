@@ -81,6 +81,13 @@ import { AlarmBadge } from "./AlarmBadge";
 import { TaskStageProgress } from "./TaskStageProgress";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmInfiniteItems } from "@/hooks/useTmInfiniteItems";
+import {
+  columnFiltersToServer,
+  sortingToServer,
+  CLIENT_ONLY_FILTER_COLUMNS,
+  CLIENT_ONLY_SORT_COLUMNS,
+} from "@/lib/task-management/server-bridge";
 import { canEditRawRow } from "@/lib/auth/roles";
 import { EditCellPopover } from "./EditCellPopover";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
@@ -319,6 +326,8 @@ export function TaskManagementRawDataPage() {
   const [frozenExtras, setFrozenExtras] = useState<string[]>(DEFAULT_FROZEN_EXTRAS);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportRows, setExportRows] = useState<Row[] | null>(null);
+  const [exportPreparing, setExportPreparing] = useState(false);
   const [historyTask, setHistoryTask] = useState<{ discipline: string; task_no: string; task_name?: string | null } | null>(null);
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [addChildParent, setAddChildParent] = useState<ParentSeed | null>(null);
@@ -503,37 +512,50 @@ export function TaskManagementRawDataPage() {
     viewPref,
   ]);
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["task-management-raw"],
-    queryFn: async () => {
-      const pageSize = 1000;
-      const out: Row[] = [];
-      let from = 0;
-      // Paged fetch to bypass PostgREST default 1000-row cap
-      while (true) {
-        const { data, error } = await (supabase as any)
-          // v_task_management_raw_derived: base 컬럼 + milestone/plan_overdue/actual_overdue/expected_finish 파생 필드
-          .from("v_task_management_raw_derived")
-          .select("*")
-          .order("discipline", { ascending: true })
-          .order("sort_order", { ascending: true })
-          .range(from, from + pageSize - 1);
-        if (error) throw error;
-        const rows = (data ?? []) as Row[];
-        out.push(...rows);
-        if (rows.length < pageSize) break;
-        from += pageSize;
-        if (from > 200000) break; // safety
-      }
-      return out;
-    },
-    // Tier1 #5: full-table fetch is expensive; align with the 30s stale used by
-    // the sibling queries below and stop refetching on every focus swap.
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
+  // C1-b: 서버 페이지네이션(Main 100/페이지) + 무한 스크롤로 데이터 소스 스왑.
+  // - 서버가 이해하는 필터/정렬은 RPC 로 넘기고, 클라이언트 전용 파생 필드
+  //   (stage_progress/today_*/progress_variance)에 필터/정렬이 걸리면 자동 ALL 모드.
+  // - React Table 은 그대로 client-side filter/sort/globalFilter 를 accumulated rows 위에서 수행 → UI 불변.
+  const { server: serverFilters } = useMemo(
+    () => columnFiltersToServer(columnFilters),
+    [columnFilters],
+  );
+  const { server: serverSort } = useMemo(
+    () => sortingToServer(sorting),
+    [sorting],
+  );
+  const forceAll = useMemo(() => {
+    for (const f of columnFilters) if (CLIENT_ONLY_FILTER_COLUMNS.has(f.id)) return true;
+    for (const s of sorting) if (CLIENT_ONLY_SORT_COLUMNS.has(s.id)) return true;
+    return false;
+  }, [columnFilters, sorting]);
+
+  const {
+    rows: serverRows,
+    totalCount: serverTotal,
+    mainCount: serverMainCount,
+    loadedMains,
+    hasMore,
+    isInitialLoading,
+    isFetchingMore,
+    loadMore,
+    refetch: refetchServer,
+    fetchAllIds,
+  } = useTmInfiniteItems<Row>({
+    q: globalFilter || "",
+    serverFilters,
+    serverSort,
+    forceAll,
+    includeInactive: false,
+    pageSizeMains: 100,
   });
 
-  const rows = useMemo(() => data ?? [], [data]);
+  const rows = serverRows;
+  const isLoading = isInitialLoading;
+  const isFetching = isInitialLoading || isFetchingMore;
+  const refetch = useCallback(() => {
+    void refetchServer();
+  }, [refetchServer]);
 
   // 댓글 수/최종 갱신 시각 조회 — 현재 로드된 행 기준
   const { data: commentCounts } = useQuery({
@@ -1107,6 +1129,27 @@ export function TaskManagementRawDataPage() {
     overscan: 12,
   });
 
+  // 무한 스크롤: 하단 근접 시 loadMore().
+  // - 클라이언트 필터가 있어도 accumulated rows 만 filter 되므로,
+  //   실제 총량은 서버 mainCount 기준. 렌더 rows 가 얼마 안 남았을 때가 아니라
+  //   스크롤 위치가 하단에 도달했을 때 트리거하여 UX 를 자연스럽게 유지.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (!hasMore || isFetchingMore) return;
+      const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (remaining < 480) loadMore();
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    // 초기: 데이터가 뷰포트를 채우지 못한 경우 즉시 추가 로드
+    if (hasMore && !isFetchingMore) {
+      const canScroll = el.scrollHeight > el.clientHeight + 40;
+      if (!canScroll) loadMore();
+    }
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [hasMore, isFetchingMore, loadMore, renderRows.length]);
+
   const totalWidth = table.getTotalSize();
   const frozenColIds = ["__select", "__comments", "task_no", ...frozenExtras];
   const frozenWidth = table
@@ -1239,7 +1282,41 @@ export function TaskManagementRawDataPage() {
           >
             <Upload className="mr-1 h-3.5 w-3.5" /> Import
           </Button>
-          <Button size="sm" className="h-8" onClick={() => setExportOpen(true)}>
+          <Button
+            size="sm"
+            className="h-8"
+            disabled={exportPreparing}
+            onClick={async () => {
+              // C1-c: Export ALL — 서버 필터/정렬 그대로 전체(파생 컬럼 포함) 재조회.
+              // 클라이언트 전용 필터/정렬이 있으면 이미 ALL 모드라 accumulated 사용.
+              if (forceAll || !hasMore) {
+                setExportRows(null);
+                setExportOpen(true);
+                return;
+              }
+              setExportPreparing(true);
+              const t = toast.loading("전체 데이터 불러오는 중…");
+              try {
+                const { data, error } = await (supabase as any).rpc("tm_items_search", {
+                  _q: globalFilter || null,
+                  _filters: serverFilters,
+                  _sort: serverSort,
+                  _offset: 0,
+                  _limit: 5000,
+                  _include_inactive: false,
+                });
+                if (error) throw error;
+                const payload = (data ?? {}) as { rows?: unknown[] };
+                setExportRows(((payload.rows ?? []) as Row[]));
+                toast.success("전체 데이터 준비 완료", { id: t });
+                setExportOpen(true);
+              } catch (e: any) {
+                toast.error("Export 준비 실패", { id: t, description: e?.message ?? String(e) });
+              } finally {
+                setExportPreparing(false);
+              }
+            }}
+          >
             <Download className="mr-1 h-3.5 w-3.5" /> Export
           </Button>
           {canEdit && (
@@ -1464,8 +1541,13 @@ export function TaskManagementRawDataPage() {
 
       <ExportDialog
         open={exportOpen}
-        onOpenChange={setExportOpen}
-        rows={filteredRowsForExport as Record<string, unknown>[]}
+        onOpenChange={(o) => {
+          setExportOpen(o);
+          if (!o) setExportRows(null);
+        }}
+        rows={
+          (exportRows ?? (filteredRowsForExport as Row[])) as Record<string, unknown>[]
+        }
         visibleKeys={visibleKeysForExport}
       />
 
