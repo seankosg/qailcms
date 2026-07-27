@@ -11,6 +11,7 @@ import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { canEditRawRow } from "@/lib/auth/roles";
 import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "@/components/abd/dashboard/AbdAgingSettingsPopover";
+import { formatAbdStage } from "@/lib/abd/columns";
 
 interface AbdItemRow {
   id: string;
