@@ -93,6 +93,19 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
       });
       if (error) throw new Error(error.message);
       const arr = (data ?? []) as { rows: any; total_count: number | string }[];
+      // Contract: abd_items_search returns one row per record (rows = to_jsonb(record)).
+      // Matches SM/Defect (defect_items_search). If a jsonb_agg-style shape sneaks back in,
+      // fail loudly here instead of silently rendering empty cells.
+      if (arr.length > 0) {
+        const first = arr[0] as any;
+        const rowsVal = first?.rows;
+        if (Array.isArray(rowsVal) || rowsVal === null || typeof rowsVal !== "object") {
+          throw new Error(
+            "abd_items_search RPC contract mismatch: expected row-per-record { rows: object, total_count }, got rows=" +
+              (Array.isArray(rowsVal) ? "array" : rowsVal === null ? "null" : typeof rowsVal),
+          );
+        }
+      }
       const rows: AbdItem[] = arr.map((r) => r.rows as AbdItem);
       const total = Number(arr[0]?.total_count ?? 0);
       return { rows, total };
