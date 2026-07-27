@@ -1127,6 +1127,27 @@ export function TaskManagementRawDataPage() {
     overscan: 12,
   });
 
+  // 무한 스크롤: 하단 근접 시 loadMore().
+  // - 클라이언트 필터가 있어도 accumulated rows 만 filter 되므로,
+  //   실제 총량은 서버 mainCount 기준. 렌더 rows 가 얼마 안 남았을 때가 아니라
+  //   스크롤 위치가 하단에 도달했을 때 트리거하여 UX 를 자연스럽게 유지.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (!hasMore || isFetchingMore) return;
+      const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (remaining < 480) loadMore();
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    // 초기: 데이터가 뷰포트를 채우지 못한 경우 즉시 추가 로드
+    if (hasMore && !isFetchingMore) {
+      const canScroll = el.scrollHeight > el.clientHeight + 40;
+      if (!canScroll) loadMore();
+    }
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [hasMore, isFetchingMore, loadMore, renderRows.length]);
+
   const totalWidth = table.getTotalSize();
   const frozenColIds = ["__select", "__comments", "task_no", ...frozenExtras];
   const frozenWidth = table
