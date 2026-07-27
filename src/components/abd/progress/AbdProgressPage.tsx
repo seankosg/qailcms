@@ -583,8 +583,8 @@ export function AbdProgressPage() {
       {/* KPI Strip — Progress 전용 재설계 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <AbdKpiCard
-          label={`Progress (${kpis.doneStages}/${kpis.totalStages})`}
-          count={Math.round(kpis.progressPct * 10) / 10 as unknown as number}
+          label={`Progress % — ${kpis.doneStages}/${kpis.totalStages} · Δ ${kpis.gapPct >= 0 ? "+" : ""}${kpis.gapPct.toFixed(1)}pp`}
+          count={Math.round(kpis.progressPct * 10) / 10}
           tone={
             kpis.gapPct >= 0 ? "ok" : kpis.gapPct >= -5 ? "warn" : "danger"
           }
