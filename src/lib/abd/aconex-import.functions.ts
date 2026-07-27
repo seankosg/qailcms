@@ -128,19 +128,30 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     const other_excluded_count = Math.max(0, excludedCount - terminated_reset_count - cancelled_excluded_count);
 
     // 2) 매칭 검사: RPC 를 청크 호출.
-    // PostgREST 는 RPC(TABLE 반환) 응답을 기본 1000 행으로 잘라내므로,
-    // 입력을 2000 개씩 나눠 여러 번 호출해 잘림을 회피한다.
+    // 청크 분할은 요청 payload 크기와 함수 실행 타임아웃 관리를 위함.
+    // 응답 잘림 회피 목적이 아님 — abd_items_by_numbers 는 jsonb 단일 값(배열)을
+    // 반환하므로 Data API 행 상한(1,000) 비적용.
+    // 중복 abd_number 정책: 배열에 여러 건이 있으면 첫 건만 채택(뒤는 무시).
     const docNos = Array.from(new Set(data.rows.map((r) => r.document_no)));
     const existingRows = new Map<string, any>();
     const CHUNK = 2000;
     for (let i = 0; i < docNos.length; i += CHUNK) {
       const slice = docNos.slice(i, i + CHUNK);
       try {
-        const { data: rows, error } = await supa.rpc("abd_items_by_numbers", {
+        const { data: rpcData, error } = await supa.rpc("abd_items_by_numbers", {
           _nums: slice,
         });
         if (error) throw new Error(error.message);
-        for (const row of rows ?? []) existingRows.set(row.abd_number, row);
+        if (!Array.isArray(rpcData)) {
+          throw new Error("abd_items_by_numbers RPC contract mismatch");
+        }
+        for (const row of rpcData as any[]) {
+          if (!row || typeof row !== "object") continue;
+          const key = row.abd_number as string | undefined;
+          if (!key) continue;
+          // 첫 건 채택 정책
+          if (!existingRows.has(key)) existingRows.set(key, row);
+        }
       } catch (e: any) {
         const msg = e?.cause?.message ?? e?.message ?? String(e);
         throw new Error(
