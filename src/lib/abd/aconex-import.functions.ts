@@ -167,6 +167,17 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     const matched = data.rows.filter((r) => existingRows.has(r.document_no));
     const unmatched = data.rows.filter((r) => !existingRows.has(r.document_no));
 
+    // §1(a) D-코드 감지: 임포트 에러로 기록만 하고 latest_status 반영 금지.
+    const dCodeRows = data.rows.filter((r) => isDCode(r));
+    if (dCodeRows.length > 0) {
+      console.warn(
+        `[aconex] D-code detected in ${dCodeRows.length} row(s) — latest_status write blocked. Samples: ${dCodeRows
+          .slice(0, 5)
+          .map((r) => r.document_no)
+          .join(", ")}`,
+      );
+    }
+
     // 어떤 필드가 실제 반영되는지 결정 (apply_fields 미지정 시 전체).
     const allowed = new Set<string>(
       data.apply_fields && data.apply_fields.length > 0
