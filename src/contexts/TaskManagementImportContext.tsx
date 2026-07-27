@@ -772,6 +772,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         slip_days: null as number | null,
         auto_judgment: null as string | null,
         auto_judgment_import: p.auto_judgment,
+        // Milestone: 파일에 컬럼이 있고 정규화 성공 시에만 값이 있음. null이면 기존 DB 값 유지(stripNullExcept).
+        milestone: p.milestone ?? null,
         data_date: f.dataDateOverride ?? f.dataDate ?? null,
         sort_order: p.sort_order,
         source_file: f.name,
