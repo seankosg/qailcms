@@ -3574,37 +3574,7 @@ export type Database = {
               status: string
             }[]
           }
-      abd_items_by_numbers: {
-        Args: { _nums: string[] }
-        Returns: {
-          abd_number: string
-          active_round: number
-          is_terminated: boolean
-          latest_status: string
-          latest_status_norm: string
-          r1_dar_actual: string
-          r1_draft_finish_actual: string
-          r1_draft_finish_plan: string
-          r1_draft_start_actual: string
-          r1_draft_start_plan: string
-          r1_response_result: string
-          r1_submission_actual: string
-          r2_dar_actual: string
-          r2_draft_finish_actual: string
-          r2_draft_finish_plan: string
-          r2_draft_start_actual: string
-          r2_draft_start_plan: string
-          r2_response_result: string
-          r2_submission_actual: string
-          r3_dar_actual: string
-          r3_draft_finish_actual: string
-          r3_draft_finish_plan: string
-          r3_draft_start_actual: string
-          r3_draft_start_plan: string
-          r3_response_result: string
-          r3_submission_actual: string
-        }[]
-      }
+      abd_items_by_numbers: { Args: { _nums: string[] }; Returns: Json }
       abd_items_counts: {
         Args: { _include_inactive?: boolean; _plot?: string; _team?: string }
         Returns: {
