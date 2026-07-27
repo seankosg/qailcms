@@ -395,28 +395,28 @@ function computePatch(
   const iso = r.date_modified;
 
   if (semantic === "EXCLUDED_TERMINATED" || semantic === "EXCLUDED_CANCELLED") {
-    // 재정의: Termination = HDEC 이 Submission 을 withdraw → 동일 라운드 재제출 대기.
-    //  - 해당 라운드의 Submission/DAR actual 및 Response 결과를 리셋
-    //  - DS/DF actual 이 비어있으면 date_modified 또는 plan 으로 자동 완료 채움
-    //  - is_terminated = false (통계 포함), latest_status = null (Submission 전 상태)
-    //  - active_round 는 유지 (증가시키지 않음)
+    // §1(b) Terminated: 합의된 철회 → 동일 라운드 재제출 대기.
+    //   ① Submission/DAR actual 및 response_result 리셋 (재제출 대상)
+    //   ② Draft 데이터는 절대 건드리지 않음 (재작성 불필요)
+    //   ③ latest_status 는 절대 덮어쓰지 않음 (마지막 실수신 회신 결과 보존)
+    //   ④ approval_date 도 덮어쓰지 않음
+    //   ⑤ is_terminated=true 로 마킹 → stage 판정에서 '재제출 대기'로 오버라이드
+    //   ⑥ 통계에는 포함 (재제출 예정 물량)
+    // §1(c) Cancelled: HDEC 자체 폐기 → 통계 완전 제외. latest_status 이력 보존.
     const n = resolveActiveRound(existing);
-    if (allowed.has("round_actual")) {
-      patch[`r${n}_submission_actual`] = null;
-      patch[`r${n}_dar_actual`] = null;
-      patch[`r${n}_response_result`] = null;
-      if (!existing?.[`r${n}_draft_start_actual`]) {
-        patch[`r${n}_draft_start_actual`] =
-          iso ?? existing?.[`r${n}_draft_start_plan`] ?? null;
+    if (semantic === "EXCLUDED_TERMINATED") {
+      if (allowed.has("round_actual")) {
+        patch[`r${n}_submission_actual`] = null;
+        patch[`r${n}_dar_actual`] = null;
+        patch[`r${n}_response_result`] = null;
       }
-      if (!existing?.[`r${n}_draft_finish_actual`]) {
-        patch[`r${n}_draft_finish_actual`] =
-          iso ?? existing?.[`r${n}_draft_finish_plan`] ?? null;
-      }
+      if (allowed.has("is_terminated")) patch.is_terminated = true;
+    } else {
+      // Cancelled: 통계 완전 제외 플래그 (is_active=false).
+      patch.is_active = false;
+      patch.inactive_reason = "aconex_cancelled";
     }
-    if (allowed.has("is_terminated")) patch.is_terminated = false;
-    if (allowed.has("latest_status")) patch.latest_status = null;
-    if (allowed.has("approval_date")) patch.approval_date = null;
+    // latest_status / approval_date: 두 케이스 모두 덮어쓰기 금지 (§1(b)③, §1(c))
     return patch;
   }
 
@@ -433,12 +433,16 @@ function computePatch(
     if (allowed.has("latest_status"))
       patch.latest_status = semantic === "DAR_APPROVED_A" ? "A" : "B";
   } else if (semantic === "DAR_REJECTED") {
+    // §1(a) D-코드: 매핑 미확정 → latest_status/response_result 에 쓰지 않고 skip.
+    if (isDCode(r)) {
+      // meta 필드만 유지, 상태 계열은 비움 (호출부에서 배치 warning 이미 로그됨)
+      return patch;
+    }
     if (allowed.has("round_actual") && iso) {
       patch[`r${n}_dar_actual`] = iso;
-      patch[`r${n}_response_result`] = r.status_code === "D" ? "D" : "C";
+      patch[`r${n}_response_result`] = "C";
     }
-    if (allowed.has("latest_status"))
-      patch.latest_status = r.status_code === "D" ? "D" : "C";
+    if (allowed.has("latest_status")) patch.latest_status = "C";
   } else if (semantic === "SUBMITTED") {
     const submissionCol = `r${n}_submission_actual`;
     if (allowed.has("round_actual") && iso && !existing[submissionCol]) {
