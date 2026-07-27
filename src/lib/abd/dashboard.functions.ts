@@ -18,26 +18,26 @@ export const getAbdDashboardRow1 = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => FilterSchema.parse(v))
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_row1", {
+    const { data: payload, error } = await (context.supabase as any).rpc("abd_dashboard_row1_json", {
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
-    return (rows ?? []) as RowOut[];
+    return (Array.isArray(payload) ? payload : []) as RowOut[];
   });
 
 export const getAbdDashboardRow2 = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => FilterSchema.parse(v))
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_row2", {
+    const { data: payload, error } = await (context.supabase as any).rpc("abd_dashboard_row2_json", {
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
-    return (rows ?? []) as RowOut[];
+    return (Array.isArray(payload) ? payload : []) as RowOut[];
   });
 
 export const getAbdDashboardStatusDist = createServerFn({ method: "POST" })
