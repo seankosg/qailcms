@@ -121,7 +121,7 @@ export function DmrBulkEditBar({ selectedIds, sampleRows, canEdit, onClearSelect
       exportDmrToXlsx({
         rows: sampleRows,
         columns: DMR_EXPORT_COLUMNS,
-        fileName: `dmr-selected-${stamp}.xlsx`,
+        fileName: `CMS_DMR_selected_${stamp}.xlsx`,
       });
       toast.success('엑셀 다운로드', { description: `${sampleRows.length}건 내보내기 완료 (현재 페이지)` });
     } catch (e: any) {
