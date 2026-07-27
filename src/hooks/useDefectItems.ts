@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { assertNoTruncation } from "@/lib/data/assertNoSilentTruncation";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 export type DefectStatusGroup = "unclosed" | "closed" | "all";
@@ -71,20 +72,55 @@ export function useDefectItemsQuery(p: DefectItemsQueryParams) {
     queryKey: ["defect", "items", p],
     queryFn: async () => {
       const offset = Math.max(0, (p.page - 1) * p.pageSize);
-      const { data, error } = await (supabase as any).rpc("defect_items_search", {
-        _status_group: p.statusGroup,
-        _include_inactive: p.includeInactive,
-        _q: p.q && p.q.trim() ? p.q.trim() : null,
-        _filters: p.filters ?? [],
-        _sort: p.sort ?? [],
-        _offset: offset,
-        _limit: p.pageSize,
-      });
-      if (error) throw new Error(error.message);
-      const arr = (data ?? []) as { rows: any; total_count: number | string }[];
-      const rows: DefectItem[] = arr.map((r) => r.rows as DefectItem);
-      const total = Number(arr[0]?.total_count ?? 0);
-      return { rows, total };
+      const CHUNK = 999; // 청크 == 상한(1,000) 금지 원칙: 999 고정
+      const callRpc = async (off: number, lim: number) => {
+        const { data, error } = await (supabase as any).rpc("defect_items_search", {
+          _status_group: p.statusGroup,
+          _include_inactive: p.includeInactive,
+          _q: p.q && p.q.trim() ? p.q.trim() : null,
+          _filters: p.filters ?? [],
+          _sort: p.sort ?? [],
+          _offset: off,
+          _limit: lim,
+        });
+        if (error) throw new Error(error.message);
+        return (data ?? []) as { rows: any; total_count: number | string }[];
+      };
+
+      if (p.pageSize <= CHUNK) {
+        const arr = await callRpc(offset, p.pageSize);
+        const rows: DefectItem[] = arr.map((r) => r.rows as DefectItem);
+        const total = Number(arr[0]?.total_count ?? 0);
+        return { rows, total };
+      }
+
+      // ALL 등 대용량: CHUNK 단위 루프. offset 전진은 batch.length 기반.
+      const firstBatch = await callRpc(offset, CHUNK);
+      const total = Number(firstBatch[0]?.total_count ?? 0);
+      const target = Math.min(Math.max(0, total - offset), p.pageSize);
+      const collected: DefectItem[] = firstBatch.map((r) => r.rows as DefectItem);
+      const maxIterations = Math.ceil(p.pageSize / CHUNK) + 2;
+      let iterations = 1;
+      let lastBatchLen = firstBatch.length;
+      while (collected.length < target) {
+        if (lastBatchLen < CHUNK) break;
+        if (++iterations > maxIterations) {
+          throw new Error(`defect_items_search chunk loop exceeded ${maxIterations} iterations`);
+        }
+        const prev = collected.length;
+        const batch = await callRpc(offset + collected.length, CHUNK);
+        lastBatchLen = batch.length;
+        if (batch.length === 0) break;
+        for (const r of batch) collected.push(r.rows as DefectItem);
+        if (collected.length === prev) {
+          throw new Error("defect_items_search chunk loop stalled (no progress)");
+        }
+      }
+      const finalRows = collected.slice(0, target);
+      if (p.pageSize >= total) {
+        assertNoTruncation("defect_items_search(ALL)", finalRows, total);
+      }
+      return { rows: finalRows, total };
     },
     staleTime: 30_000,
     gcTime: 5 * 60_000,
