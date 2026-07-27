@@ -767,6 +767,8 @@ export function TaskTreePage() {
             (k) => (computeVariance(k, asOfDate) ?? 0) < -0.05,
           ).length;
           const pGap = computeVariance(p, asOfDate) ?? 0;
+          const pTodayPlan = cumPlanProgress(p, asOfDate);
+          const pPic = (p.hdec_pic_name ?? p.hdec_eng_name ?? "-") || "-";
           return (
             <Card key={p.id} className={cn("overflow-hidden", isDone && "bg-muted/60 text-muted-foreground opacity-70")}> 
               <CardHeader
@@ -801,6 +803,24 @@ export function TaskTreePage() {
                   {behindCount > 0 && (
                     <Badge className="bg-rose-500/15 text-rose-700">지연 {behindCount}</Badge>
                   )}
+                  <span
+                    className="text-[10px] text-muted-foreground"
+                    title="담당 (HDEC PIC / ENG)"
+                  >
+                    담당 <span className="font-medium text-foreground">{pPic}</span>
+                  </span>
+                  <span
+                    className="text-[10px] tabular-nums text-muted-foreground"
+                    title="계획 (P.Start ~ P.Finish)"
+                  >
+                    계획 {p.plan_start ?? "-"} ~ {p.plan_end ?? "-"}
+                  </span>
+                  <span
+                    className="text-[10px] tabular-nums text-muted-foreground"
+                    title="오늘 계획 (T.Plan%)"
+                  >
+                    오늘 계획 <span className="font-medium text-foreground">{(pTodayPlan * 100).toFixed(0)}%</span>
+                  </span>
                   {mainJudgment && (
                     <Badge
                       className={cn(
