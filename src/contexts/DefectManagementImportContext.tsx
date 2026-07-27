@@ -443,6 +443,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         return cur;
       });
       try {
+        const { parseDefectExcel } = await loadDefectParser();
         const parsed = await parseDefectExcel(file, {
           extraAliases,
           sheetName,
@@ -516,6 +517,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
     for (const item of next) {
       try {
+        const { getDefectExcelSheetNames, getDefectExcelHeaders } =
+          await loadDefectParser();
         const sheetNames = await getDefectExcelSheetNames(item.file);
         setFiles((cur) =>
           cur.map((f) => (f.id === item.id ? { ...f, sheetNames } : f)),
@@ -611,6 +614,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       });
       if (!target) return;
       try {
+        const { getDefectExcelHeaders } = await loadDefectParser();
         const headerInfo = await getDefectExcelHeaders(target.file, sheetName);
         if (headerInfo) {
           setFiles((cur) =>
@@ -1629,6 +1633,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
    */
   const refreshAliases = useCallback(async (): Promise<number> => {
     const extraAliases = await fetchAliases();
+    const { toDefectFieldName } = await loadDefectParser();
     let aliasCount = 0;
     for (const list of Object.values(extraAliases)) aliasCount += list.length;
     setFiles((cur) =>
