@@ -4035,6 +4035,15 @@ export type Database = {
         }
         Returns: Json
       }
+      tm_edit_record_daily: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          date_key: string
+          edits_count: number
+          tasks_count: number
+          user_id: string
+        }[]
+      }
       tm_judge_at_date: {
         Args: { p_data_date: string; p_task_ids?: string[] }
         Returns: {
