@@ -4356,12 +4356,13 @@ export type Database = {
       }
       tm_items_facets: {
         Args: {
-          _column: string
+          _columns: string[]
           _filters?: Json
           _include_inactive?: boolean
           _q?: string
         }
         Returns: {
+          axis: string
           cnt: number
           value: string
         }[]
