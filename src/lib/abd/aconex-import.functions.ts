@@ -120,17 +120,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
 
     // 2) 매칭 검사: chunked IN
     const docNos = Array.from(new Set(data.rows.map((r) => r.document_no)));
-    const existing = new Set<string>();
-    const CHUNK = 500;
-    for (let i = 0; i < docNos.length; i += CHUNK) {
-      const slice = docNos.slice(i, i + CHUNK);
-      const { data: rows, error } = await supa
-        .from("abd_items_raw")
-        .select("abd_number")
-        .in("abd_number", slice);
-      if (error) throw new Error(error.message);
-      for (const row of rows ?? []) existing.add(row.abd_number);
-    }
+    const CHUNK = 200; // URL 길이 한도(Cloudflare Worker subrequest) 고려
     // 라운드 라우팅을 위해 기존 행의 라운드별 값을 함께 로드.
     const existingRows = new Map<string, any>();
     const roundCols =
