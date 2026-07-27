@@ -108,8 +108,27 @@ function Page() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> 로딩 중…
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+                <div className="mt-2 h-3 w-40 animate-pulse rounded bg-muted/70" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {KIND_ORDER.map((k) => (
+                  <div key={k} className="flex items-center gap-2">
+                    <div className="h-6 w-12 animate-pulse rounded bg-muted" />
+                    <div className="h-9 flex-1 animate-pulse rounded bg-muted/70" />
+                    <div className="h-8 w-14 animate-pulse rounded bg-muted/70" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+          <div className="col-span-full flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Milestone 설정을 불러오는 중…
+          </div>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
