@@ -1,55 +1,104 @@
-## B 목록 정밀 감사 결과
+## 병목 진단 (실측 근거)
 
-파일별 실측(코드 라인 인용 포함):
+`src/lib/abd/aconex-import.functions.ts` 를 라인 단위로 감사한 결과, 겉으로 "무한 진행"으로 보이는 원인은 **Cloudflare Worker의 subrequest 한도 & 순차 라운드트립 폭증** 두 가지의 합작입니다.
 
-| # | 파일 | 실측 결과 | 상한 위반? |
+| # | 위치 | 실측 | 요청 수 (matched=2,915 기준) |
 |---|---|---|---|
-| 1 | `src/hooks/useAbdAttentionInbox.ts` L71–78 | `const LIMIT = 5000; …select().limit(LIMIT)` — 단일 요청 | **YES.** PostgREST가 1,000행에서 잘라 Attention 리스트가 최대 1,000건까지만 표시됨 |
-| 2 | `src/components/task-management/tree/TaskTreePage.tsx` L273–280 | `from("task_management_raw").select(…).limit(10000)` — 단일 요청 | **YES.** Task 총량이 1,000 초과 시 트리에 일부 태스크가 아예 안 뜸(부모/자식 매칭 깨짐) |
-| 3 | `src/hooks/useMyWorkspaceData.ts` L20–41 | 자체 `fetchAll()` 1,000행 청크 루프(MAX 200k) | NO. 이미 A방식 |
-| 4 | `src/components/import/ImportLogsPage.tsx` L191/224/250/277 | 의도적 `.limit(100)`; profiles `.in(unique)` 는 ≤100 로그의 유저 id set | NO. 안전 |
-| 5 | `src/components/task-management/schedule-revision/TaskScheduleRevisionPage.tsx` L474/519 | `RECENT_LIMIT=500`, UI에 "최근 500건" 명시 | NO. 의도적 캡 |
-| 6 | `src/lib/abd/bulk-actions.ts` / `src/lib/task-management/bulk-actions.ts` / `src/lib/spare-part/bulk-actions.ts` / `src/lib/spare-part/bulk-edit.ts` | `.in(slice)` slice 크기 100–500 (chunk 루프) | NO. 안전 |
-| 7 | `src/lib/defect-management/classifier/bulk-classify.functions.ts` L43–49 | `CHUNK=500` 청크 루프 | NO. 안전 |
-| 8 | `src/components/spare-part/detail/SparePartStatusHistory.tsx`, `src/components/shared/CommentsThread.tsx` | 단일 부모(태스크/문서) 스레드 조회. 현실적으로 스레드당 < 1,000. profiles `.in(authorIds)` 도 소량 | 저위험. 표준화 대상 아님 |
-| 9 | `src/routes/api/public/backup/archive-download.ts` L28 | `.limit(1)` | NO |
-| 10 | ABD `abd_progress_cells/totals` 등 서버 집계 RPC | 서버 사이드 GROUP BY | NO. 상한 무관 |
+| ① | L127–141 `abd_items_by_numbers` RPC | 800개 청크 루프 | 약 5회 |
+| ② | **L249–298 개별 UPDATE 루프** | `for (const d of diffs) { await supa.from("abd_items_raw").update(patch).eq("abd_number", ...) }` — 매 diff마다 한 번씩 순차 UPDATE | **약 2,915회** |
+| ③ | L301 `flushFieldLogs` (백그라운드) | 500개 청크 INSERT, 하지만 매 diff마다 unchanged 필드 포함 로그 축적 → 수천~수만 행 | 수십 회 |
+| ④ | 최종 `abd_import_logs` UPDATE | 1회 | 1 |
 
-**결론:** 실제 상한 위반은 2건 — `useAbdAttentionInbox`, `TaskTreePage`.
+합계 ≈ **3,000+ 서브요청**. Cloudflare Worker(nodejs_compat) subrequest 한도는 workers.dev 기본 50, 유료 플랜 1,000 — 어떤 조건에서도 이 규모는 위험합니다. 실제 관찰된 현상(응답이 안 오고 "무한" 대기 → 새로고침하면 어느새 완료됨)은 subrequest 한도/서버 응답 타임아웃의 전형적 증상입니다. 클라이언트는 응답이 안 오는 동안 `await` 만 걸어두고 스피너를 돌리므로 "무한처럼 보임".
+
+**핵심 결론:** 진도바를 붙여도 subrequest 폭증 자체가 안 풀리면 결국 실패합니다. 우선 요청 수를 O(N)에서 **O(chunks)**로 축소해야 합니다.
 
 ---
 
-## 표준화 패치 계획
+## 최적화 전략 — 요청 수를 3,000회 → 10회 미만으로
 
-두 지점을 A방식(1,000행 청크 루프)으로 통일합니다. 신규 유틸을 만들지 않고 기존 `fetchAll()` 패턴(`useMyWorkspaceData.ts`)과 동일한 구조를 각 파일 내에 인라인으로 도입하여 사이드이펙트를 최소화합니다.
+### 1) 개별 UPDATE 루프 → **단일 벌크 RPC로 치환** (가장 큰 효과)
 
-### 패치 1 — `src/hooks/useAbdAttentionInbox.ts`
-- 기존 `.limit(5000)` 단일 요청을 **1,000행 청크 루프**로 교체.
-- 안전 상한: `MAX_ROWS = 20_000`(현실 상한 초과 방어). 초과 시 마지막 페이지에서 중단하고 UI 상단에 "일부만 표시됨" 힌트를 남길 수 있는 값을 반환(추가 UI 필요 없으면 로그만).
-- 정렬/필터 조건은 그대로 유지, 각 페이지에서 동일 `select`, `order`, 필터 재적용.
-- 반환 계약(배열)은 동일 → 호출부(`AttentionInbox` 등) 무수정.
+신규 DB 함수 `abd_aconex_apply_diffs(_batch_id uuid, _patches jsonb)` 를 도입.
 
-### 패치 2 — `src/components/task-management/tree/TaskTreePage.tsx`
-- 로컬 `fetchAllTasks()` 헬퍼 추가(같은 파일 내 상단 함수). `useMyWorkspaceData`의 `fetchAll` 시그니처를 그대로 채용.
-  - `PAGE=1000`, `MAX_PAGES=200`(=20만행 안전상한, TM 현 규모 대비 여유), `order("task_no", asc)` 유지.
-- `.limit(10000)` 호출을 이 헬퍼로 대체.
-- 반환 shape(배열) 동일 → 이후 트리 빌드/롤업 로직 무수정.
-- 정합성 검증 QA:
-  1) 총 태스크 수 `select("id",{count:"exact",head:true})`로 얻은 값과 로드된 배열 길이 일치 확인(개발 콘솔 로그로 임시).
-  2) Main/Sub 카운트가 대시보드 KPI 총계와 일치하는지 육안 확인.
-  3) 상용 반영 전 로그 제거.
+```
+UPDATE abd_items_raw t
+SET  latest_status         = COALESCE((p->>'latest_status'), t.latest_status),
+     latest_rev            = COALESCE((p->>'latest_rev'), t.latest_rev),
+     approval_date         = COALESCE(NULLIF(p->>'approval_date','')::date, t.approval_date),
+     aconex_status_raw     = COALESCE(p->>'aconex_status_raw', t.aconex_status_raw),
+     aconex_review_status_raw = COALESCE(p->>'aconex_review_status_raw', t.aconex_review_status_raw),
+     aconex_date_modified  = COALESCE(NULLIF(p->>'aconex_date_modified','')::timestamptz, t.aconex_date_modified),
+     round_actual          = COALESCE((p->>'round_actual')::int, t.round_actual),
+     is_terminated         = COALESCE((p->>'is_terminated')::bool, t.is_terminated),
+     aconex_last_synced_at = now(),
+     source_import_log_id  = _batch_id,
+     updated_at            = now(),
+     updated_by            = auth.uid()
+FROM   jsonb_array_elements(_patches) AS p
+WHERE  t.abd_number = p->>'document_no';
+```
 
-### 안전 강화(옵션, 이번 계획엔 미포함)
-- 공용 `paginatedSelect(table, opts)` 유틸을 `src/lib/supabase/paginate.ts`에 신설하는 안은 위험 지점이 2곳뿐이라 이번엔 보류. 향후 유사 케이스가 3건 이상 나오면 리팩터링.
-- `CommentsThread`/`SparePartStatusHistory`는 스레드당 1,000건 초과가 발생하는 순간만 문제이므로, 관찰 후 필요 시 별도 패치.
+- 라운드트립: 2,915 → **1회**. (또는 안전 마진으로 1,000건 청크 3회 분할)
+- 트랜잭션 원자성 확보 (기존은 부분 실패 시 절반만 반영됨).
+- 반환값: `updated int` — 서버 함수는 그대로 `updated` 카운트에 사용.
+
+### 2) `flushFieldLogs` 볼륨 축소
+
+- 현재 L282–297 `changes.length === 0` 인 경우에도 `latest_status` unchanged 로그를 남김 → matched의 대부분이 unchanged라 로그 수천 건 발생.
+- 조치: **unchanged 로그 기록을 제거**. Aconex 임포트의 감사 목적은 "실제 변경"이면 충분. `abd_change_log` 트리거가 이미 존재하므로 unchanged 라인을 별도 남길 필요 없음.
+- applied 로그는 유지하되, 파일당 필드 변경이 통상 수백 건 이내로 축소됨.
+
+### 3) `abd_items_by_numbers` 청크 크기 확대
+
+- 현재 800 청크 5회 → 필요 컬럼만 반환하는 현행 RPC로 응답이 이미 가벼움. 청크를 **2,000**으로 늘려 3,000건짜리 파일에서 라운드트립을 2→1회로 축소. (Postgres jsonb 파라미터로 문서번호 전달 → URL 길이 이슈 없음)
+- 안전 상한 20,000 유지 (RowSchema 최대치와 동일).
+
+### 4) `abd_import_logs` 이중 UPDATE 제거
+
+- L231 INSERT("in_progress") → L305 UPDATE("success") 두 번의 라운드트립을 한 번의 INSERT("success", updated=?)로 병합. 단, 실패 흔적을 위해 실패 케이스에서만 UPDATE("failed") 남기도록 조정.
+
+### 5) `flushFieldLogs`는 계속 백그라운드로 유지 + 실패 관용
+
+- 이미 `void ... .catch(...)` 로 응답 지연에 영향 없음 → 유지.
+- 다만 field_log INSERT 청크가 subrequest 한도를 잠식하지 않도록 청크 크기를 500 → **1,000**으로 상향, 총 INSERT 횟수 절반으로.
 
 ---
 
-## 검증 절차 (패치 후)
-1. `bun run typecheck` 통과.
-2. ABD Attention 인박스: DB에 Attention 대상 1,000건 초과인 팀 계정으로 확인 → 카운트가 서버 count와 일치.
-3. TM Task Tree: 전체 태스크 수 > 1,000인 상태에서 트리 로드 → 루트 및 리프 개수와 KPI 총계 일치.
-4. Raw Data / MWS / 대시보드에 회귀 없는지 스팟체크.
+## 예상 효과 (matched=2,915 파일 기준)
 
-## 롤아웃
-- 두 파일만 단일 커밋으로 수정. DB 변경 없음. RPC 변경 없음.
+| 항목 | 현재 | 개선 후 |
+|---|---:|---:|
+| 매칭 조회 RPC | 5회 | 1~2회 |
+| 데이터 UPDATE | **2,915회** | **1~3회** |
+| import_logs 로그 | 2회 | 1회 |
+| field_log INSERT | ~20회 | ~5회 |
+| **총 subrequest** | **~3,000+** | **~10** |
+| 체감 소요 시간 | 수십 초~ 미완료 | 수 초 |
+
+subrequest 한도(50/1,000)와 무관한 안전 마진 확보. "무한 진행" 착시 자체가 사라짐.
+
+---
+
+## 구현 순서 (build 모드 진입 후)
+
+1. **Migration** — `abd_aconex_apply_diffs(uuid, jsonb) returns int` 함수 생성 + GRANT EXECUTE TO authenticated. `SECURITY DEFINER` + `SET search_path = public`. 함수 본문에서 `has_role(auth.uid(), 'admin')` OR `has_role(..., 'superuser')` 를 명시적으로 재검증.
+2. **`aconex-import.functions.ts` 수정**
+   - L127–141: 청크 크기 800 → 2,000.
+   - L249–298: 개별 UPDATE 루프 제거 → `supa.rpc("abd_aconex_apply_diffs", { _batch_id, _patches })` 1회(또는 1,000 청크). 반환값을 `updated`로 사용.
+   - L282–297: unchanged latest_status 로그 삽입 블록 삭제.
+   - L231/L305: `in_progress` → `success` 병합 (실패 경로에서만 별도 UPDATE("failed") 유지).
+3. **`flushFieldLogs`**: 청크 크기 500 → 1,000 (해당 유틸의 기본값만 조정).
+4. **회귀 QA**
+   - 소형 파일 (100행 이하) 임포트 → 기존과 동일한 변경 반영/카운트.
+   - 대형 파일(3,000+행) 임포트 → 수 초 내 완료, `abd_change_log` 트리거로 변경 이력 정상 기록.
+   - Termination/Cancelled → `round_actual` 리셋 정상.
+   - 서버 로그(`stack_modern--server-function-logs`)에 subrequest 관련 경고 없는지 확인.
+
+---
+
+## 명시적 비-목표
+
+- 진행률 UI 는 이번 범위 밖. 벌크화로 실제 완료가 수 초 단위로 떨어지면 스피너만으로 충분.
+- HDEC 임포트 흐름, TM/SM/DMR 임포트, 정합성 로직 무변경.
+- 취소/롤백 UI 무변경(기존 `rollback_abd_import` RPC 유지).
