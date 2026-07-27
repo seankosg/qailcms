@@ -691,6 +691,7 @@ function FileRow({
   onOpenDuplicates,
   onDateOverridesApply,
   onOpenColumnSelect,
+  onDataDateChange,
 }: {
   entry: FileEntry;
   isRunning: boolean;
@@ -699,6 +700,7 @@ function FileRow({
   onOpenDuplicates: () => void;
   onDateOverridesApply: (overrides: Record<string, string>) => void | Promise<void>;
   onOpenColumnSelect: () => void;
+  onDataDateChange: (v: string | null) => void;
 }) {
   const { data: teamOptions = [] } = useTeamOptions();
   const badge = statusBadge[e.status];
@@ -753,6 +755,11 @@ function FileRow({
                   </span>
                 )}
               </Button>
+              <AbdDataDatePicker
+                value={e.dataDate ?? null}
+                onChange={onDataDateChange}
+                disabled={disabled}
+              />
             </div>
             {e.parsed && e.parsed.sheets.length > 0 && (
               <p className="mt-1 text-[11px] text-muted-foreground">
