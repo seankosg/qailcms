@@ -3630,14 +3630,7 @@ export type Database = {
       }
       abd_judge_at_date: {
         Args: { _as_of?: string; _ids: string[] }
-        Returns: {
-          active_round: number
-          bucket_top: string
-          current_stage: string
-          delay_bucket: string[]
-          id: string
-          ur_aging_days: number
-        }[]
+        Returns: Json
       }
       abd_progress_cells:
         | {
