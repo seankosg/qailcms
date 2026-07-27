@@ -507,7 +507,8 @@ export function TaskManagementRawDataPage() {
       // Paged fetch to bypass PostgREST default 1000-row cap
       while (true) {
         const { data, error } = await (supabase as any)
-          .from("task_management_raw")
+          // v_task_management_raw_derived: base 컬럼 + milestone/plan_overdue/actual_overdue/expected_finish 파생 필드
+          .from("v_task_management_raw_derived")
           .select("*")
           .order("discipline", { ascending: true })
           .order("sort_order", { ascending: true })
