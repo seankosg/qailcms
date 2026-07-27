@@ -4039,8 +4039,6 @@ export type Database = {
         Args: { p_from: string; p_to: string }
         Returns: {
           date_key: string
-          edits_count: number
-          tasks_count: number
           user_id: string
         }[]
       }
