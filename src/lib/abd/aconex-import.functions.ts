@@ -120,26 +120,18 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
 
     // 2) 매칭 검사: chunked IN
     const docNos = Array.from(new Set(data.rows.map((r) => r.document_no)));
-    const CHUNK = 200; // URL 길이 한도(Cloudflare Worker subrequest) 고려
-    // 라운드 라우팅을 위해 기존 행의 라운드별 값을 함께 로드.
     const existingRows = new Map<string, any>();
-    const roundCols =
-      "abd_number,latest_status,latest_status_norm,is_terminated,active_round," +
-      "r1_submission_actual,r2_submission_actual,r3_submission_actual," +
-      "r1_dar_actual,r2_dar_actual,r3_dar_actual," +
-      "r1_response_result,r2_response_result,r3_response_result," +
-      "r1_draft_start_actual,r2_draft_start_actual,r3_draft_start_actual," +
-      "r1_draft_finish_actual,r2_draft_finish_actual,r3_draft_finish_actual," +
-      "r1_draft_start_plan,r2_draft_start_plan,r3_draft_start_plan," +
-      "r1_draft_finish_plan,r2_draft_finish_plan,r3_draft_finish_plan";
-    for (let i = 0; i < docNos.length; i += CHUNK) {
-      const slice = docNos.slice(i, i + CHUNK);
-      const { data: rows, error } = await supa
-        .from("abd_items_raw")
-        .select(roundCols)
-        .in("abd_number", slice);
+    // 대량 docNos(수천 건) 를 청크 GET 으로 나누면 Worker fetch 실패가 발생하기 쉬워,
+    // 단일 RPC(POST body 전달) 로 일괄 조회한다.
+    try {
+      const { data: rows, error } = await supa.rpc("abd_items_by_numbers", {
+        _nums: docNos,
+      });
       if (error) throw new Error(error.message);
       for (const row of rows ?? []) existingRows.set(row.abd_number, row);
+    } catch (e: any) {
+      const msg = e?.cause?.message ?? e?.message ?? String(e);
+      throw new Error(`abd_items_by_numbers 조회 실패 (docNos=${docNos.length}): ${msg}`);
     }
     const matched = data.rows.filter((r) => existingRows.has(r.document_no));
     const unmatched = data.rows.filter((r) => !existingRows.has(r.document_no));
