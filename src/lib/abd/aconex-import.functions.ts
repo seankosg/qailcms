@@ -123,6 +123,9 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       bySemantic.set(sem, (bySemantic.get(sem) ?? 0) + 1);
     }
     const excludedCount = data.rows.filter((r) => r.is_excluded).length;
+    const terminated_reset_count = data.rows.filter((r) => r.semantic === "EXCLUDED_TERMINATED").length;
+    const cancelled_excluded_count = data.rows.filter((r) => r.semantic === "EXCLUDED_CANCELLED").length;
+    const other_excluded_count = Math.max(0, excludedCount - terminated_reset_count - cancelled_excluded_count);
 
     // 2) 매칭 검사: RPC 를 청크 호출.
     // PostgREST 는 RPC(TABLE 반환) 응답을 기본 1000 행으로 잘라내므로,
@@ -206,6 +209,9 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       matched: matched.length,
       unmatched: unmatched.length,
       excluded: excludedCount,
+      terminated_reset_count,
+      cancelled_excluded_count,
+      other_excluded_count,
       by_status: Array.from(byStatus.entries())
         .map(([code, count]) => ({ code, count }))
         .sort((a, b) => b.count - a.count),
