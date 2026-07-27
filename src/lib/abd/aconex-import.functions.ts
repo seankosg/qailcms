@@ -64,6 +64,12 @@ export type AconexImportPreview = {
   matched: number;
   unmatched: number;
   excluded: number;
+  /** semantic === "EXCLUDED_TERMINATED" 건수 — 라운드 리셋 대상 */
+  terminated_reset_count: number;
+  /** semantic === "EXCLUDED_CANCELLED" 건수 — 통계 제외 */
+  cancelled_excluded_count: number;
+  /** is_excluded 지만 두 semantic 어디에도 속하지 않는 예외 케이스 (실측 0건 기대) */
+  other_excluded_count: number;
   by_status: Array<{ code: string; count: number }>;
   by_semantic: Array<{ semantic: string; count: number }>;
   unmatched_samples: string[];
