@@ -2796,6 +2796,13 @@ export type Database = {
             referencedRelation: "task_management_raw"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "task_comments_task_raw_id_fkey"
+            columns: ["task_raw_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_management_raw_derived"
+            referencedColumns: ["id"]
+          },
         ]
       }
       task_management_field_config: {
@@ -3027,6 +3034,7 @@ export type Database = {
           level: string
           location: string | null
           main_task_no: string | null
+          milestone: string | null
           owner_user_id: string | null
           plan_days: number | null
           plan_end: string | null
@@ -3075,6 +3083,7 @@ export type Database = {
           level: string
           location?: string | null
           main_task_no?: string | null
+          milestone?: string | null
           owner_user_id?: string | null
           plan_days?: number | null
           plan_end?: string | null
@@ -3123,6 +3132,7 @@ export type Database = {
           level?: string
           location?: string | null
           main_task_no?: string | null
+          milestone?: string | null
           owner_user_id?: string | null
           plan_days?: number | null
           plan_end?: string | null
@@ -3223,6 +3233,13 @@ export type Database = {
             columns: ["task_raw_id"]
             isOneToOne: false
             referencedRelation: "task_management_raw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_management_status_history_task_raw_id_fkey"
+            columns: ["task_raw_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_management_raw_derived"
             referencedColumns: ["id"]
           },
           {
@@ -3408,6 +3425,81 @@ export type Database = {
         }
         Relationships: []
       }
+      tm_alarm_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value_int: number | null
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value_int?: number | null
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value_int?: number | null
+        }
+        Relationships: []
+      }
+      tm_milestone_config: {
+        Row: {
+          kind: string
+          plot: string
+          target_date: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          kind: string
+          plot: string
+          target_date?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          kind?: string
+          plot?: string
+          target_date?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      tm_milestone_config_audit: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          kind: string
+          new_date: string | null
+          old_date: string | null
+          plot: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          kind: string
+          new_date?: string | null
+          old_date?: string | null
+          plot: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          kind?: string
+          new_date?: string | null
+          old_date?: string | null
+          plot?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -3474,6 +3566,70 @@ export type Database = {
           updated_at: string | null
         }
         Relationships: []
+      }
+      v_task_management_raw_derived: {
+        Row: {
+          actual_duration: number | null
+          actual_finish: string | null
+          actual_overdue: string | null
+          actual_progress: number | null
+          actual_start: string | null
+          alarm_reason: string | null
+          auto_judgment: string | null
+          auto_judgment_import: string | null
+          category: string | null
+          created_at: string | null
+          cum_actual_pct: number | null
+          cum_plan_pct: number | null
+          data_date: string | null
+          delay_days: number | null
+          discipline: string | null
+          expected_finish: string | null
+          floor_level: string | null
+          forecast_end: string | null
+          gap_pct: number | null
+          hdec_eng_name: string | null
+          hdec_pic_name: string | null
+          id: string | null
+          imported_at: string | null
+          imported_by: string | null
+          is_active: boolean | null
+          is_rollup: boolean | null
+          level: string | null
+          location: string | null
+          main_task_no: string | null
+          milestone: string | null
+          milestone_date: string | null
+          owner_user_id: string | null
+          plan_days: number | null
+          plan_end: string | null
+          plan_overdue: string | null
+          plan_progress: number | null
+          plan_start: string | null
+          plot: string | null
+          progress_variance: number | null
+          risk: string | null
+          row_type: string | null
+          slip_days: number | null
+          sort_order: number | null
+          source_file: string | null
+          source_import_log_id: string | null
+          status_manual: string | null
+          sub_task_desc: string | null
+          task_name: string | null
+          task_no: string | null
+          team: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_management_raw_source_import_log_id_fkey"
+            columns: ["source_import_log_id"]
+            isOneToOne: false
+            referencedRelation: "task_management_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -4136,6 +4292,10 @@ export type Database = {
           status_raw: string
         }[]
       }
+      tm_classify_overdue: {
+        Args: { buffer_days: number; mstone: string; target: string }
+        Returns: string
+      }
       tm_compute_derived: {
         Args: {
           _actual_finish: string
@@ -4154,6 +4314,15 @@ export type Database = {
           date_key: string
           user_id: string
         }[]
+      }
+      tm_expected_finish: {
+        Args: {
+          actual_finish: string
+          actual_progress: number
+          actual_start: string
+          data_date: string
+        }
+        Returns: string
       }
       tm_judge_at_date: {
         Args: { p_data_date: string; p_task_ids?: string[] }
