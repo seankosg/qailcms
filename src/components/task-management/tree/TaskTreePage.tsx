@@ -815,12 +815,14 @@ export function TaskTreePage() {
                   >
                     계획 {p.plan_start ?? "-"} ~ {p.plan_end ?? "-"}
                   </span>
+                  <ProgressBar v={p.actual_progress} />
                   <span
                     className="text-[10px] tabular-nums text-muted-foreground"
                     title="오늘 계획 (T.Plan%)"
                   >
                     오늘 계획 <span className="font-medium text-foreground">{(pTodayPlan * 100).toFixed(0)}%</span>
                   </span>
+                  <GapCell gap={pGap} />
                   {mainJudgment && (
                     <Badge
                       className={cn(
@@ -832,8 +834,6 @@ export function TaskTreePage() {
                       {mainJudgment}
                     </Badge>
                   )}
-                  <ProgressBar v={p.actual_progress} />
-                  <GapCell gap={pGap} />
                   <MiniProgressChart
                     planPoints={chartMap.get(p.task_no)?.plan_points}
                     actualPoints={chartMap.get(p.task_no)?.actual_points}
