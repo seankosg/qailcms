@@ -62,7 +62,7 @@ function timestamp(): string {
 
 export function exportSingle(rows: RowLike[], visibleKeys: string[], format: ExportFormat) {
   const wb = buildWb(rows, visibleKeys, format);
-  saveStyledWorkbook(wb, `spare-part_raw_${format}_${timestamp()}.xlsx`);
+  saveStyledWorkbook(wb, `CMS_ST_raw_${format}_${timestamp()}.xlsx`);
 }
 
 export async function exportGrouped(
@@ -90,13 +90,13 @@ export async function exportGrouped(
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `spare-part_by-${groupBy}_${format}_${timestamp()}.zip`;
+    a.download = `CMS_ST_by-${groupBy}_${format}_${timestamp()}.zip`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } else {
     for (const [name, groupRows] of entries) {
       const wb = buildWb(groupRows, visibleKeys, format, `${groupBy}: ${name}`);
-      saveStyledWorkbook(wb, `spare-part_${groupBy}-${safeName(name)}_${format}_${timestamp()}.xlsx`);
+      saveStyledWorkbook(wb, `CMS_ST_${groupBy}-${safeName(name)}_${format}_${timestamp()}.xlsx`);
     }
   }
 }
