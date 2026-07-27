@@ -33,8 +33,6 @@ interface LogRow {
 interface EditDaily {
   user_id: string;
   date_key: string;
-  edits_count: number;
-  tasks_count: number;
 }
 
 function toKstDateKey(iso: string): string {
@@ -162,13 +160,12 @@ export function TmImportRecordTab() {
   }, [logsQuery.data]);
 
   const editMap = useMemo(() => {
-    const map = new Map<string, { edits: number; tasks: number }>();
+    const set = new Set<string>();
     for (const row of editsQuery.data ?? []) {
       if (!row.user_id) continue;
-      const key = `${row.user_id}|${row.date_key}`;
-      map.set(key, { edits: row.edits_count, tasks: row.tasks_count });
+      set.add(`${row.user_id}|${row.date_key}`);
     }
-    return map;
+    return set;
   }, [editsQuery.data]);
 
   const teams = useMemo(() => {
@@ -328,7 +325,7 @@ function MatrixTables({
   dates: string[];
   groups: [string, PicUser[]][];
   countMap: Map<string, number>;
-  editMap: Map<string, { edits: number; tasks: number }>;
+  editMap: Set<string>;
   today: string;
 }) {
   if (groups.length === 0) {
@@ -346,7 +343,7 @@ function MatrixTables({
       {groups.map(([team, users]) => {
         const todayCount = users.filter((u) => (countMap.get(`${u.id}|${today}`) ?? 0) > 0).length;
         const missing = users.length - todayCount;
-        const todayEditors = users.filter((u) => (editMap.get(`${u.id}|${today}`)?.edits ?? 0) > 0).length;
+        const todayEditors = users.filter((u) => editMap.has(`${u.id}|${today}`)).length;
         return (
           <div key={team} className="rounded-md border bg-card">
             <div className="flex items-center gap-2 border-b px-3 py-2">
@@ -400,15 +397,15 @@ function MatrixTables({
                         </td>
                         {displayDates.map((d) => {
                           const c = countMap.get(`${u.id}|${d}`) ?? 0;
-                          const e = editMap.get(`${u.id}|${d}`);
+                          const hasEdit = editMap.has(`${u.id}|${d}`);
                           const wk = isWeekend(d);
                           if (c > 0) count++;
-                          if ((e?.edits ?? 0) > 0) editDays++;
+                          if (hasEdit) editDays++;
                           const isToday = d === today;
                           return (
                             <td
                               key={d}
-                              title={`${d}: 업로드 ${c}건${e ? ` · 편집 ${e.edits}필드 / ${e.tasks} Task` : ""}`}
+                              title={`${d}: 업로드 ${c > 0 ? "O" : "X"} · 편집 ${hasEdit ? "O" : "X"}`}
                               className={`border-b border-r px-1 py-0.5 text-center ${
                                 wk ? "bg-muted/30" : ""
                               } ${isToday ? "bg-primary/5" : ""}`}
@@ -419,12 +416,10 @@ function MatrixTables({
                                 ) : (
                                   <X className="h-3.5 w-3.5 text-red-400" />
                                 )}
-                                {e && e.edits > 0 ? (
-                                  <span className="mt-0.5 text-[9px] font-medium text-sky-700">
-                                    {e.edits}/{e.tasks}
-                                  </span>
+                                {hasEdit ? (
+                                  <Check className="mt-0.5 h-3 w-3 text-sky-600" />
                                 ) : (
-                                  <span className="mt-0.5 text-[9px] text-transparent">·</span>
+                                  <X className="mt-0.5 h-3 w-3 text-slate-300" />
                                 )}
                               </div>
                             </td>
@@ -432,8 +427,8 @@ function MatrixTables({
                         })}
                         <td className="border-b border-l-2 border-r px-2 py-1 text-center font-medium whitespace-nowrap">
                           <div className="leading-tight">
-                            <div>{count} / {dates.length}</div>
-                            <div className="text-[10px] font-normal text-sky-700">편집 {editDays}일</div>
+                            <div>업로드 {count}/{dates.length}</div>
+                            <div className="text-[10px] font-normal text-sky-700">편집 {editDays}/{dates.length}</div>
                           </div>
                         </td>
                       </tr>

@@ -1,43 +1,55 @@
-## 목표
-현재 TM > Import Logs > **Import Record** 탭의 사용자×일자 매트릭스에, 각 사용자의 **일별 수동 편집(manual edits)** 집계를 **같은 셀에 병기**한다. 대상 사용자·기간·팀 필터 등 기존 UX는 유지.
+## 문제 요약
+캡처의 "편집 0"은 실제 편집이 없었던 게 아니라 **`changed_by`가 항상 NULL**로 들어가서 사용자 매핑이 깨진 결과입니다.
 
-## 데이터 소스
-- 편집 소스: `public.task_management_status_history` where `source = 'manual'`
-- 집계 축:
-  - `changed_by` → `profiles.id` (HDEC PIC 사용자)
-  - Doha(Asia/Qatar) 로컬 날짜 = `date_trunc('day', changed_at AT TIME ZONE 'Asia/Qatar')`
-- 두 지표를 셀에 모두 표시:
-  - **필드 변경 건수** = `count(*)` (status_history 행 수)
-  - **수정 Task 수** = `count(distinct (discipline, task_no))`
+- `task_management_status_history` 에 `source='manual'` 행이 지난 30일간 **82,538건** 실존.
+- 그러나 모든 행의 `changed_by`가 NULL → RPC `tm_edit_record_daily`가 `changed_by IS NOT NULL` 필터에서 전부 탈락 → UI 0.
+- 원인: 트리거 `trg_task_history`가 `current_setting('app.change_user')`만 읽는데 브라우저 UPDATE 어느 경로도 이 GUC를 세팅하지 않음.
 
-## 서버 RPC 신설
-`public.tm_edit_record_daily(p_from date, p_to date)` → `TABLE(user_id uuid, date_key date, edits_count int, tasks_count int)`
-- security definer, `search_path=public`, admin/super만 실행 가능하도록 초입에서 `is_admin_or_super(auth.uid())` 체크 후 아니면 raise
-- `changed_at`을 Doha TZ로 변환하여 그룹핑, `p_from ~ p_to`(포함) 범위
-- 인덱스: 기존 `tmsh_changed_at_idx` 활용
-- GRANT EXECUTE TO authenticated
+## 수정 계획
 
-## 프론트엔드 수정: `src/components/import-log/task-management/TmImportRecordTab.tsx`
-1. 신규 쿼리 `edits-record-daily` 추가 → RPC 호출
-2. `editMap: Map<"userId|dateKey", {edits: number; tasks: number}>` 구성
-3. `MatrixTables` 셀 렌더 변경:
-   - 업로드 있음: 기존 `Check` 아이콘 유지
-   - 그 아래(또는 옆) 작은 뱃지로 `E{edits}/T{tasks}` (편집이 0이면 표시 안 함)
-   - 셀 tooltip: `업로드 N건 · 편집 E필드 / T Task`
-   - 셀 최소 폭이 좁으므로 세로로 2줄(1줄: ✓/✗, 2줄: `E·T` 소형 텍스트)로 배치
-4. 팀 헤더 뱃지에 "오늘 편집 X명" 추가
-5. 사용자 행 우측 합계 컬럼에 "업로드 N일 / 편집 M일" 병기
+### 1) DB 마이그레이션 — 트리거 함수 보강
+`trg_task_history` 함수에 `auth.uid()` 폴백 추가.
+```
+uid := nullif(current_setting('app.change_user', true), '')::uuid;
+if uid is null and src <> 'import' then
+  uid := auth.uid();
+end if;
+```
+- import 경로(`app.change_source='import'`)는 폴백 미적용 → 오탐 없음.
+- 이후 모든 UI 편집은 `changed_by`가 자동으로 채워짐.
+- 과거 82,538건은 원천에 사용자 정보가 없어 **소급 복원 불가**.
 
-## Excel 내보내기: `exportTmImportRecord.ts`
-- 시그니처에 `editMap` 추가
-- 각 날짜 셀에 `"✓" | ""` 대신 `"U | E{n}/T{m}"` 형태로 결합, 또는 컬럼을 2개(업로드/편집)로 분리해 병기
-- (구현은 단일 셀 문자열 병기 방식 채택하여 컬럼 폭 폭증 회피)
+### 2) RPC 단순화 — `tm_edit_record_daily`
+반환 컬럼을 `edits_count/tasks_count` 대신 **존재 여부만** 반환.
+```
+RETURN QUERY
+SELECT h.changed_by AS user_id,
+       ((h.changed_at AT TIME ZONE 'Asia/Qatar')::date) AS date_key
+FROM public.task_management_status_history h
+WHERE h.source='manual'
+  AND h.changed_by IS NOT NULL
+  AND ((h.changed_at AT TIME ZONE 'Asia/Qatar')::date) BETWEEN p_from AND p_to
+GROUP BY 1,2;
+```
 
-## 권한/영향 범위
-- Import Record 탭 자체가 admin/superuser 전용이라 신규 RPC 접근도 동일 게이트
-- 다른 모듈(SM/ABD/DMR) Import Logs UI에는 영향 없음
+### 3) 프론트 — `TmImportRecordTab.tsx`
+- `editMap`을 `Map<"userId|dateKey", true>` (Set 형태)로 단순화.
+- 매트릭스 셀 렌더:
+  - **업로드 유/무**: 위쪽 ✓/✗ (기존)
+  - **편집 유/무**: 아래쪽 ✓/✗ (색만 구분, 예: 편집 있음 sky-600, 없음 slate-300)
+  - 숫자(E/T) 표시 제거.
+  - tooltip: `업로드 O/X · 편집 O/X`
+- 팀 헤더 뱃지의 "오늘 편집 N명"은 유지(사람 수 카운트).
+- 사용자 행 우측 합계: "업로드 N/30 · 편집 M/30".
 
-## 기술 세부
-- 편집 카운트에서 시스템 rollup/import 소스는 제외(사용자 답변 반영: manual만)
-- 필드 변경 다수(예: plan_start/plan_end/forecast_end 3개 동시 저장) 시 3건으로 계산 — status_history가 필드 단위 row로 남는 구조를 그대로 사용
-- 대량 편집 이력이 있을 수 있으므로 클라이언트에서 페이지네이션 대신 RPC 서버측 GROUP BY로 집계 결과만 전송(경량)
+### 4) Excel 내보내기 — `exportTmImportRecord.ts`
+- 셀 표기: `"U/E"`, `"U/-"`, `"-/E"`, `"-/-"` 4가지 조합의 단일 문자열.
+- `editMap` 시그니처는 `Set<string>`로 변경.
+
+### 5) 검증
+- 마이그레이션 승인 → 임의 Task 편집 → DB SELECT로 `changed_by` 채워짐 확인 → 매트릭스 오늘 열의 편집 ✓ 표시 확인.
+
+## 영향 범위
+- DB: 함수 2개(`trg_task_history`, `tm_edit_record_daily`) 재정의.
+- 코드: `TmImportRecordTab.tsx`, `exportTmImportRecord.ts` 2개 파일.
+- 다른 모듈(ABD/SM/DMR) 영향 없음.

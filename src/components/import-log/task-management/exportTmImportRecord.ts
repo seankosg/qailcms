@@ -20,7 +20,7 @@ export async function exportTmImportRecord(opts: {
   dates: string[];
   groups: [string, PicUser[]][];
   countMap: Map<string, number>;
-  editMap: Map<string, { edits: number; tasks: number }>;
+  editMap: Set<string>;
   teamFilter: string;
   exportedBy: string;
 }) {
@@ -29,7 +29,7 @@ export async function exportTmImportRecord(opts: {
   const ws = wb.addWorksheet("TM Import Record");
 
   const fixedCols = 3; // 팀, 이름, 로그인ID
-  const totalCols = fixedCols + dates.length + 5; // + 업로드일수, 미업로드(주말제외), 최근업로드일, 편집일수, 편집합계(필드/Task)
+  const totalCols = fixedCols + dates.length + 4; // + 업로드일수, 미업로드(주말제외), 최근업로드일, 편집일수
 
   const FONT = "Calibri";
   const FILL_TITLE = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FF1E3A5F" } };
@@ -62,7 +62,7 @@ export async function exportTmImportRecord(opts: {
     `Source: task_management_import_logs`,
     `Range: ${from} ~ ${to} (Doha)`,
     `Team filter: ${teamFilter === "__all" ? "전체" : teamFilter}`,
-    `기준: 업로드=import log 1건 이상 · 편집=수동편집 필드/Task 수 (Doha 기준일)`,
+    `기준: 업로드=import log 1건 이상 · 편집=수동편집 1건 이상 (Doha 기준일)`,
   ];
   for (let i = 0; i < 5; i++) {
     const r = 2 + i;
@@ -83,7 +83,7 @@ export async function exportTmImportRecord(opts: {
     "팀", "이름", "로그인 ID",
     ...dates.map((d) => formatDdMmm(d)),
     "업로드일수", "미업로드(주말제외)", "최근 업로드일",
-    "편집일수", "편집합계(필드/Task)",
+    "편집일수",
   ];
   for (let c = 0; c < headers.length; c++) {
     const cell = ws.getCell(headerRow, c + 1);
@@ -104,11 +104,10 @@ export async function exportTmImportRecord(opts: {
   ws.getColumn(2).width = 14;
   ws.getColumn(3).width = 14;
   for (let i = 0; i < dates.length; i++) ws.getColumn(fixedCols + 1 + i).width = 9;
-  ws.getColumn(totalCols - 4).width = 12; // 업로드일수
-  ws.getColumn(totalCols - 3).width = 16; // 미업로드
-  ws.getColumn(totalCols - 2).width = 14; // 최근 업로드일
-  ws.getColumn(totalCols - 1).width = 10; // 편집일수
-  ws.getColumn(totalCols).width = 18;     // 편집합계
+  ws.getColumn(totalCols - 3).width = 12; // 업로드일수
+  ws.getColumn(totalCols - 2).width = 16; // 미업로드
+  ws.getColumn(totalCols - 1).width = 14; // 최근 업로드일
+  ws.getColumn(totalCols).width = 10;     // 편집일수
 
   let rowIdx = headerRow + 1;
   for (const [team, users] of groups) {
@@ -139,17 +138,15 @@ export async function exportTmImportRecord(opts: {
       let missingBiz = 0;
       let latest = "";
       let editDays = 0;
-      let editFieldsTotal = 0;
-      let editTasksTotal = 0;
       for (let i = 0; i < dates.length; i++) {
         const d = dates[i];
         const c = countMap.get(`${u.id}|${d}`) ?? 0;
-        const e = editMap.get(`${u.id}|${d}`);
+        const hasEdit = editMap.has(`${u.id}|${d}`);
         const col = fixedCols + 1 + i;
         const cell = row.getCell(col);
         const upMark = c > 0 ? "O" : "X";
-        const editMark = e && e.edits > 0 ? ` ${e.edits}/${e.tasks}` : "";
-        cell.value = `${upMark}${editMark}`;
+        const editMark = hasEdit ? "O" : "X";
+        cell.value = `${upMark}/${editMark}`;
         cell.font = { name: FONT, size: 10, bold: c > 0, color: { argb: c > 0 ? "FF065F46" : "FF991B1B" } };
         cell.alignment = { vertical: "middle", horizontal: "center" };
         cell.border = BORDER;
@@ -161,42 +158,32 @@ export async function exportTmImportRecord(opts: {
         } else if (!wk) {
           missingBiz++;
         }
-        if (e && e.edits > 0) {
-          editDays++;
-          editFieldsTotal += e.edits;
-          editTasksTotal += e.tasks;
-        }
+        if (hasEdit) editDays++;
       }
 
-      const sumCell = row.getCell(totalCols - 4);
+      const sumCell = row.getCell(totalCols - 3);
       sumCell.value = uploadDays;
       sumCell.font = { name: FONT, size: 10, bold: true };
       sumCell.alignment = { vertical: "middle", horizontal: "center" };
       sumCell.border = BORDER;
 
-      const missCell = row.getCell(totalCols - 3);
+      const missCell = row.getCell(totalCols - 2);
       missCell.value = missingBiz;
       missCell.font = { name: FONT, size: 10, color: { argb: missingBiz > 0 ? "FF991B1B" : "FF111827" } };
       missCell.alignment = { vertical: "middle", horizontal: "center" };
       missCell.border = BORDER;
 
-      const latestCell = row.getCell(totalCols - 2);
+      const latestCell = row.getCell(totalCols - 1);
       latestCell.value = latest;
       latestCell.font = { name: FONT, size: 10 };
       latestCell.alignment = { vertical: "middle", horizontal: "center" };
       latestCell.border = BORDER;
 
-      const editDaysCell = row.getCell(totalCols - 1);
+      const editDaysCell = row.getCell(totalCols);
       editDaysCell.value = editDays;
       editDaysCell.font = { name: FONT, size: 10, bold: editDays > 0, color: { argb: "FF075985" } };
       editDaysCell.alignment = { vertical: "middle", horizontal: "center" };
       editDaysCell.border = BORDER;
-
-      const editSumCell = row.getCell(totalCols);
-      editSumCell.value = editDays > 0 ? `${editFieldsTotal} / ${editTasksTotal}` : "";
-      editSumCell.font = { name: FONT, size: 10, color: { argb: "FF075985" } };
-      editSumCell.alignment = { vertical: "middle", horizontal: "center" };
-      editSumCell.border = BORDER;
 
       row.height = 18;
       rowIdx++;
