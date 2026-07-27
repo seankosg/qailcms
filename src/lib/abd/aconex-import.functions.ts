@@ -118,20 +118,26 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     }
     const excludedCount = data.rows.filter((r) => r.is_excluded).length;
 
-    // 2) 매칭 검사: chunked IN
+    // 2) 매칭 검사: RPC 를 청크 호출.
+    // PostgREST 는 RPC(TABLE 반환) 응답을 기본 1000 행으로 잘라내므로,
+    // 입력을 800 개씩 나눠 여러 번 호출해 잘림을 회피한다.
     const docNos = Array.from(new Set(data.rows.map((r) => r.document_no)));
     const existingRows = new Map<string, any>();
-    // 대량 docNos(수천 건) 를 청크 GET 으로 나누면 Worker fetch 실패가 발생하기 쉬워,
-    // 단일 RPC(POST body 전달) 로 일괄 조회한다.
-    try {
-      const { data: rows, error } = await supa.rpc("abd_items_by_numbers", {
-        _nums: docNos,
-      });
-      if (error) throw new Error(error.message);
-      for (const row of rows ?? []) existingRows.set(row.abd_number, row);
-    } catch (e: any) {
-      const msg = e?.cause?.message ?? e?.message ?? String(e);
-      throw new Error(`abd_items_by_numbers 조회 실패 (docNos=${docNos.length}): ${msg}`);
+    const CHUNK = 800;
+    for (let i = 0; i < docNos.length; i += CHUNK) {
+      const slice = docNos.slice(i, i + CHUNK);
+      try {
+        const { data: rows, error } = await supa.rpc("abd_items_by_numbers", {
+          _nums: slice,
+        });
+        if (error) throw new Error(error.message);
+        for (const row of rows ?? []) existingRows.set(row.abd_number, row);
+      } catch (e: any) {
+        const msg = e?.cause?.message ?? e?.message ?? String(e);
+        throw new Error(
+          `abd_items_by_numbers 조회 실패 (chunk ${i}-${i + slice.length}, docNos=${docNos.length}): ${msg}`,
+        );
+      }
     }
     const matched = data.rows.filter((r) => existingRows.has(r.document_no));
     const unmatched = data.rows.filter((r) => !existingRows.has(r.document_no));
