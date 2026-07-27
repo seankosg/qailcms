@@ -1,28 +1,57 @@
-## 목적
-업로드한 두 엑셀(ABD_Status_ELEC_260726, ABD_Status_MECH_260726)과 `abd_items_raw` DB를 Document No. 기준으로 비교하여 정합성 리포트 생성.
+## 목표
+`abd_items_search` 반환 shape만 SM/Defect와 동일한 행별 반환으로 원복. 상태 그룹/딜레이 버킷 매핑 로직(173246의 의도된 변경)은 그대로 유지.
 
-## 비교 범위 (사용자 확정)
-1. **존재 여부**: 엑셀에만 / DB에만 있는 Document No.
-2. **Latest Status 차이**: A / B / C / 공란 값 diff
+## 173246 vs 172932 diff 결과 (사전 검증)
+- 총 45라인 차이, 전부 `delay_bucket` 배열 값 매핑(RS_DELAY→RS, SB_DELAY→SB, DS_DELAY→DS, needs_planning→NoPlan)뿐.
+- 정렬 기본값 `sl_no asc NULLS LAST`, OFFSET/LIMIT, 필터 파서, 컬럼 화이트리스트, GRANT — 모두 동일.
+- 즉 반환부(`SELECT coalesce(jsonb_agg(...))`)만 손대면 되고, 부수적으로 되돌려야 할 것은 없음.
 
-## 처리 절차
-1. 엑셀 파싱 (openpyxl)
-   - ELEC: `ABD Plot 4` 시트, 2,090행 → 헤더 2행 병합 처리, Document Number 열 + LATEST(Status) 열 추출
-   - MECH: `ABD Plot 3` 시트, 1,308행 → 동일 방식
-2. DB 조회 (`abd_items_raw`)
-   - Plot=4 (ELEC), Plot=3 (MECH) 각각 `source_issue_no`(=Document No.)와 `latest_status` 로드
-3. Document No. 기준 outer join → 3개 버킷 산출
-   - `only_excel`: 엑셀에만 존재
-   - `only_db`: DB에만 존재  
-   - `diff`: 양쪽 모두 있지만 Latest Status 불일치 (공란 vs 값 포함)
-4. 엑셀 리포트 저장 (`/mnt/documents/abd_status_diff_260727.xlsx`)
-   - Summary 탭: Plot별 행수, only_excel/only_db/diff 카운트
-   - 6개 상세 탭: `ELEC_only_excel`, `ELEC_only_db`, `ELEC_diff`, `MECH_only_excel`, `MECH_only_db`, `MECH_diff`
-   - diff 탭 컬럼: Document No. | Excel Status | DB Status
-5. 결과 요약을 채팅으로 리포트 + `<presentation-artifact>` 링크 제공
+## 변경
 
-## 비고
-- Plot/Team/Discipline 매핑은 파일명(ELEC→Electrical, MECH→Mechanical) + 시트명(Plot 4/3) 사용.
-- Document No. 정규화: 앞뒤 공백 제거, 대소문자 통일 후 매칭.
-- DB에서 다른 Plot의 동일 문서번호가 있는지도 부수 체크(있으면 diff 탭 비고에 표기).
-- 소요 시간: 약 3~5분.
+### 1. 새 migration 1개 — `abd_items_search` 반환 shape만 원복
+현재 173246 함수 정의를 그대로 복제하고 마지막 SELECT를 아래로 교체:
+
+```sql
+_sql := format($q$
+  WITH filtered AS (
+    SELECT * FROM abd_items_raw WHERE %s
+  ), counted AS (
+    SELECT count(*)::bigint AS c FROM filtered
+  ), paged AS (
+    SELECT * FROM filtered ORDER BY %s OFFSET %s LIMIT %s
+  )
+  SELECT to_jsonb(p.*) AS rows, (SELECT c FROM counted) AS total_count
+  FROM paged p
+$q$, _where, _sort_sql, _offset, _limit);
+```
+
+함수 상단에 한 줄 주석 추가:
+> Returns one row per item. `rows` = to_jsonb(record), `total_count` repeated on every row. Matches defect_items_search / SM contract. Do not change this shape without also updating useAbdItems.ts.
+
+그 외 로직(상태 그룹 매핑, 딜레이 버킷 매핑, 필터, 정렬, 컬럼 화이트리스트)은 173246과 100% 동일하게 유지.
+
+### 2. `src/hooks/useAbdItems.ts` — 엄격 검증만 추가
+`useAbdItemsQuery` queryFn에서 응답 파싱 직전에:
+```ts
+if (Array.isArray(data) && data.length > 0) {
+  const first = data[0] as any;
+  if (first && typeof first.rows !== "object") {
+    throw new Error(
+      "abd_items_search RPC contract mismatch: expected row-per-record { rows: object, total_count }, got rows=" +
+      (Array.isArray(first.rows) ? "array" : typeof first.rows)
+    );
+  }
+}
+```
+기존 `arr.map((r) => r.rows as AbdItem)` 로직은 유지. normalizer는 도입하지 않음.
+
+## 하지 않을 것
+- 양쪽 shape 수용 normalizer.
+- ABD 외 훅/컴포넌트 수정, 딥링크·컬럼 설정 방어 로직.
+- 173246의 딜레이 버킷 매핑 로직 손대기.
+
+## 검증
+1. `/closure/abd/raw-data?tab=MECH&pageSize=100`: 첫 행에 ABD Number/Plot/DIS/Latest Status 실제 값 표시 + 카운트 `2,606 records` 일치.
+2. 같은 화면 pageSize=ALL: 렌더/카운트 일치.
+
+두 확인만 통과하면 종료.
