@@ -21,7 +21,19 @@ export type PageSizeMode = number | "ALL";
 
 export interface ServerFilter {
   column: string;
-  op: "in" | "in_or_empty" | "empty" | "range" | "text";
+  /**
+   * RPC `_filters` 연산자 화이트리스트 (SQL 규약 정합).
+   * SQL 정의: `tm_items_search` / `tm_items_search_ids` / `tm_items_facets`.
+   */
+  op:
+    | "in"
+    | "in_or_empty"
+    | "empty"
+    | "not_empty"
+    | "text"
+    | "date_range"
+    | "num_range"
+    | "bool";
   value?: unknown;
 }
 
