@@ -877,7 +877,9 @@ export async function parseTaskManagementExcel(
         const up = raw.trim().toUpperCase().replace(/\s+/g, "");
         // H/O, H_O, H-O 모두 HO로 정규화
         const norm = up === "H/O" || up === "H_O" || up === "H-O" ? "HO" : up;
-        return norm === "HO" || norm === "COC" || norm === "DLP" ? norm : null;
+        // Kind 화이트리스트는 tm_milestone_kinds로 이관 — 파서는 정규화만 수행.
+        // 미등록 Kind는 Admin의 "Plot 미지정 점검"에서 검출됨.
+        return norm || null;
       })(),
       sort_order: sort++,
     });
