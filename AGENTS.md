@@ -30,3 +30,16 @@
 ### 참조 프로젝트 실측 원칙
 
 "X와 동일하게 / 이식 / 포팅" 유형 지시는 반드시 참조 프로젝트 원본 파일을 **파일:라인 인용**으로 실측한 뒤 현재 구현 대비 diff 표를 제출한다. 파일 존재 확인만으로 "구현 완료" 판정 금지. 참조 프로젝트명은 사용자 화면(UI 문구·카드명·툴팁)에 노출하지 않는다.
+
+### RPC 반환 계약 규칙
+
+원칙: 목록 조회 RPC는 **행별 반환**(`RETURNS TABLE`, 한 record = 한 row)을 기본으로 한다. 한 번의 `jsonb_agg`로 전체 결과를 감싼 "단일 jsonb 배열" 반환은 금지 — 클라이언트가 조용히 잘림(silent truncation)을 놓치고, PostgREST 응답 상한(1,000행) 트리거 시 청크 루프도 불가능해진다.
+
+**표준 예외 — "페이지 행수 가변 검색" RPC**:
+`RETURNS TABLE(rows jsonb, total_count bigint)` 형태(record당 하나의 `to_jsonb(원행)` + 전체 총계 동반)는 허용된다. 사유:
+
+1. 한 번의 호출로 페이지 행 + 총계를 원자적으로 반환해 프론트가 pagination/UX(총건수·잘림 감시)를 안정적으로 수행할 수 있음
+2. `rows`는 여전히 record-per-row(하나의 원본 행)이므로 PostgREST 상한과 청크 루프 계약이 유지됨
+3. 클라이언트는 `rows.length` vs `total_count` 대조로 잘림을 감시해야 하며(`src/lib/data/assertNoSilentTruncation.ts`), `rows`가 배열/`null`/비-object로 오면 즉시 실패 처리한다
+
+선례: `abd_items_search`, `defect_items_search`, `tm_items_search`.
