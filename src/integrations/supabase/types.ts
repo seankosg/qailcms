@@ -3615,6 +3615,7 @@ export type Database = {
           delay_days: number | null
           discipline: string | null
           expected_finish: string | null
+          expected_progress_today: number | null
           floor_level: string | null
           forecast_end: string | null
           gap_pct: number | null
@@ -3644,6 +3645,8 @@ export type Database = {
           sort_order: number | null
           source_file: string | null
           source_import_log_id: string | null
+          stage_finish: string | null
+          stage_start: string | null
           status_manual: string | null
           sub_task_desc: string | null
           task_name: string | null
