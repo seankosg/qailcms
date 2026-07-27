@@ -25,6 +25,7 @@ import { Route as AuthenticatedImportLogImportRouteImport } from './routes/_auth
 import { Route as AuthenticatedCloseoutDashboardRouteImport } from './routes/_authenticated/closeout/dashboard'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminTaskThresholdsRouteImport } from './routes/_authenticated/admin/task-thresholds'
+import { Route as AuthenticatedAdminMilestonesRouteImport } from './routes/_authenticated/admin/milestones'
 import { Route as AuthenticatedAdminMastersRouteImport } from './routes/_authenticated/admin/masters'
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
 import { Route as AuthenticatedAdminBackupRouteImport } from './routes/_authenticated/admin/backup'
@@ -147,6 +148,12 @@ const AuthenticatedAdminTaskThresholdsRoute =
   AuthenticatedAdminTaskThresholdsRouteImport.update({
     id: '/task-thresholds',
     path: '/task-thresholds',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminMilestonesRoute =
+  AuthenticatedAdminMilestonesRouteImport.update({
+    id: '/milestones',
+    path: '/milestones',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
 const AuthenticatedAdminMastersRoute =
@@ -376,6 +383,7 @@ export interface FileRoutesByFullPath {
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
+  '/admin/milestones': typeof AuthenticatedAdminMilestonesRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
@@ -428,6 +436,7 @@ export interface FileRoutesByTo {
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
+  '/admin/milestones': typeof AuthenticatedAdminMilestonesRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
@@ -483,6 +492,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/_authenticated/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/_authenticated/admin/masters': typeof AuthenticatedAdminMastersRoute
+  '/_authenticated/admin/milestones': typeof AuthenticatedAdminMilestonesRoute
   '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
@@ -538,6 +548,7 @@ export interface FileRouteTypes {
     | '/admin/backup'
     | '/admin/mapping'
     | '/admin/masters'
+    | '/admin/milestones'
     | '/admin/task-thresholds'
     | '/admin/users'
     | '/closeout/dashboard'
@@ -590,6 +601,7 @@ export interface FileRouteTypes {
     | '/admin/backup'
     | '/admin/mapping'
     | '/admin/masters'
+    | '/admin/milestones'
     | '/admin/task-thresholds'
     | '/admin/users'
     | '/closeout/dashboard'
@@ -644,6 +656,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/backup'
     | '/_authenticated/admin/mapping'
     | '/_authenticated/admin/masters'
+    | '/_authenticated/admin/milestones'
     | '/_authenticated/admin/task-thresholds'
     | '/_authenticated/admin/users'
     | '/_authenticated/closeout/dashboard'
@@ -811,6 +824,13 @@ declare module '@tanstack/react-router' {
       path: '/task-thresholds'
       fullPath: '/admin/task-thresholds'
       preLoaderRoute: typeof AuthenticatedAdminTaskThresholdsRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/milestones': {
+      id: '/_authenticated/admin/milestones'
+      path: '/milestones'
+      fullPath: '/admin/milestones'
+      preLoaderRoute: typeof AuthenticatedAdminMilestonesRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/admin/masters': {
@@ -1072,6 +1092,7 @@ interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminBackupRoute: typeof AuthenticatedAdminBackupRoute
   AuthenticatedAdminMappingRoute: typeof AuthenticatedAdminMappingRoute
   AuthenticatedAdminMastersRoute: typeof AuthenticatedAdminMastersRoute
+  AuthenticatedAdminMilestonesRoute: typeof AuthenticatedAdminMilestonesRoute
   AuthenticatedAdminTaskThresholdsRoute: typeof AuthenticatedAdminTaskThresholdsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -1082,6 +1103,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
     AuthenticatedAdminBackupRoute: AuthenticatedAdminBackupRoute,
     AuthenticatedAdminMappingRoute: AuthenticatedAdminMappingRoute,
     AuthenticatedAdminMastersRoute: AuthenticatedAdminMastersRoute,
+    AuthenticatedAdminMilestonesRoute: AuthenticatedAdminMilestonesRoute,
     AuthenticatedAdminTaskThresholdsRoute:
       AuthenticatedAdminTaskThresholdsRoute,
     AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
