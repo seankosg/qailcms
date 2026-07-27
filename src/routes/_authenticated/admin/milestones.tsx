@@ -6,12 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Row = { plot: string; kind: string; target_date: string | null; updated_at: string };
+type Kind = { kind_code: string; label: string; sort_order: number; is_active: boolean };
 
-const KIND_ORDER = ["HO", "COC", "DLP"] as const;
+const FALLBACK_KINDS: Kind[] = [
+  { kind_code: "HO", label: "HO", sort_order: 10, is_active: true },
+  { kind_code: "COC", label: "COC", sort_order: 20, is_active: true },
+  { kind_code: "DLP", label: "DLP", sort_order: 30, is_active: true },
+];
 
 export const Route = createFileRoute("/_authenticated/admin/milestones")({
   head: () => ({ meta: [{ title: "Admin — Milestone 일정" }] }),
@@ -20,6 +25,21 @@ export const Route = createFileRoute("/_authenticated/admin/milestones")({
 
 function Page() {
   const qc = useQueryClient();
+
+  const { data: kinds = FALLBACK_KINDS } = useQuery<Kind[]>({
+    queryKey: ["tm_milestone_kinds"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tm_milestone_kinds")
+        .select("kind_code, label, sort_order, is_active")
+        .is("deleted_at", null)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Kind[];
+    },
+  });
+
+  const kindOrder = useMemo(() => kinds.map((k) => k.kind_code), [kinds]);
 
   const { data: rows = [], isLoading } = useQuery<Row[]>({
     queryKey: ["tm_milestone_config"],
@@ -61,6 +81,8 @@ function Page() {
       arr.push(r);
       g.set(r.plot, arr);
     }
+    // 기존 Plot 목록이 하나도 없어도 '공통' 카드는 노출 (신규 프로젝트 초기 상태 지원)
+    if (g.size === 0) g.set("공통", []);
     return Array.from(g.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [rows]);
 
@@ -107,6 +129,8 @@ function Page() {
         </p>
       </div>
 
+      <KindManager kinds={kinds} />
+
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -116,7 +140,7 @@ function Page() {
                 <div className="mt-2 h-3 w-40 animate-pulse rounded bg-muted/70" />
               </CardHeader>
               <CardContent className="space-y-3">
-                {KIND_ORDER.map((k) => (
+                {kindOrder.map((k) => (
                   <div key={k} className="flex items-center gap-2">
                     <div className="h-6 w-12 animate-pulse rounded bg-muted" />
                     <div className="h-9 flex-1 animate-pulse rounded bg-muted/70" />
@@ -141,7 +165,7 @@ function Page() {
                   <CardDescription>Raw 데이터 항목 수를 옆에 함께 표시</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {KIND_ORDER.map((kind) => {
+                  {kindOrder.map((kind) => {
                     const row = byKind.get(kind);
                     const key = `${plot}::${kind}`;
                     const cnt = distMap.get(key) ?? 0;
@@ -155,7 +179,6 @@ function Page() {
                             type="date"
                             value={draft[key] ?? ""}
                             onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-                            disabled={!row}
                           />
                         </div>
                         <div className="w-16 text-right text-xs text-muted-foreground">
@@ -164,7 +187,7 @@ function Page() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={!row || saving === key}
+                          disabled={saving === key}
                           onClick={() => saveCell(plot, kind)}
                         >
                           {saving === key && (
@@ -194,6 +217,129 @@ function Page() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function KindManager({ kinds }: { kinds: Kind[] }) {
+  const qc = useQueryClient();
+  const [newCode, setNewCode] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function addKind() {
+    const code = newCode.trim().toUpperCase().replace(/\s+/g, "");
+    if (!code) return toast.error("Kind 코드를 입력하세요");
+    if (!/^[A-Z0-9_-]{1,16}$/.test(code)) return toast.error("영문/숫자/-/_ 1~16자만 허용");
+    setBusy("add");
+    try {
+      const nextOrder = (kinds[kinds.length - 1]?.sort_order ?? 0) + 10;
+      const { error } = await (supabase as any)
+        .from("tm_milestone_kinds")
+        .insert({ kind_code: code, label: newLabel.trim() || code, sort_order: nextOrder });
+      if (error) throw error;
+      toast.success(`${code} 추가됨`);
+      setNewCode("");
+      setNewLabel("");
+      qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "추가 실패");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function removeKind(code: string) {
+    if (!confirm(`Milestone 종류 '${code}'를 삭제하시겠습니까?\n(관련 Plot × Kind 설정 행도 함께 정리됩니다)`)) return;
+    setBusy(code);
+    try {
+      const { error: e1 } = await (supabase as any)
+        .from("tm_milestone_kinds")
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq("kind_code", code);
+      if (e1) throw e1;
+      // 매트릭스 config의 해당 kind 행도 정리
+      await (supabase as any).from("tm_milestone_config").delete().eq("kind", code);
+      toast.success(`${code} 삭제됨`);
+      qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
+      qc.invalidateQueries({ queryKey: ["tm_milestone_config"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "삭제 실패");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Milestone 종류 관리</CardTitle>
+        <CardDescription>
+          Milestone 종류(HO, COC, DLP 등)를 추가/삭제합니다. 추가 시 모든 Plot 카드에 새 열이 자동으로 나타납니다.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {kinds.map((k) => (
+            <div
+              key={k.kind_code}
+              className="flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1 text-sm"
+            >
+              <Badge variant="secondary" className="font-mono">
+                {k.kind_code}
+              </Badge>
+              {k.label !== k.kind_code && (
+                <span className="text-xs text-muted-foreground">{k.label}</span>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={busy === k.kind_code}
+                onClick={() => removeKind(k.kind_code)}
+                title={`${k.kind_code} 삭제`}
+              >
+                {busy === k.kind_code ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3 w-3 text-destructive" />
+                )}
+              </Button>
+            </div>
+          ))}
+          {kinds.length === 0 && (
+            <span className="text-sm text-muted-foreground">등록된 Kind가 없습니다.</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-end gap-2 border-t pt-3">
+          <div className="w-32">
+            <label className="text-xs text-muted-foreground">Kind 코드</label>
+            <Input
+              value={newCode}
+              onChange={(e) => setNewCode(e.target.value)}
+              placeholder="PAC"
+              maxLength={16}
+              className="font-mono uppercase"
+            />
+          </div>
+          <div className="w-48">
+            <label className="text-xs text-muted-foreground">표시명 (선택)</label>
+            <Input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="Provisional Acceptance"
+            />
+          </div>
+          <Button onClick={addKind} disabled={busy === "add" || !newCode.trim()}>
+            {busy === "add" ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <Plus className="mr-1 h-3 w-3" />
+            )}
+            추가
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
