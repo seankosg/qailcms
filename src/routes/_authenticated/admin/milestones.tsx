@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Row = { plot: string; kind: string; target_date: string | null; updated_at: string };
 type Kind = { kind_code: string; label: string; sort_order: number; is_active: boolean };
@@ -25,25 +26,39 @@ export const Route = createFileRoute("/_authenticated/admin/milestones")({
 
 function Page() {
   const qc = useQueryClient();
-  const [deletingKind, setDeletingKind] = useState<string | null>(null);
+  const [deletingCell, setDeletingCell] = useState<string | null>(null);
 
-  async function deleteKind(code: string) {
-    if (!confirm(`Milestone 종류 '${code}'를 삭제하시겠습니까?\n(모든 Plot의 해당 열과 설정 값이 함께 삭제됩니다)`)) return;
-    setDeletingKind(code);
+  // 특정 Plot의 특정 Milestone 행만 삭제 (다른 Plot의 동일 Kind는 유지)
+  async function deletePlotKind(plot: string, kind: string) {
+    const key = `${plot}::${kind}`;
+    if (!confirm(`Plot ${plot} 의 Milestone '${kind}' 를 삭제하시겠습니까?\n(다른 Plot의 동일 Milestone 설정은 유지됩니다)`)) return;
+    setDeletingCell(key);
     try {
-      const { error: e1 } = await (supabase as any)
-        .from("tm_milestone_kinds")
-        .update({ deleted_at: new Date().toISOString(), is_active: false })
-        .eq("kind_code", code);
-      if (e1) throw e1;
-      await (supabase as any).from("tm_milestone_config").delete().eq("kind", code);
-      toast.success(`${code} 삭제됨`);
-      qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
+      const { error } = await (supabase as any)
+        .from("tm_milestone_config")
+        .delete()
+        .eq("plot", plot)
+        .eq("kind", kind);
+      if (error) throw error;
+      // 어떤 Plot에도 남아있지 않으면 Kind 자체도 소프트 삭제
+      const { data: remain } = await (supabase as any)
+        .from("tm_milestone_config")
+        .select("plot")
+        .eq("kind", kind)
+        .limit(1);
+      if (!remain || remain.length === 0) {
+        await (supabase as any)
+          .from("tm_milestone_kinds")
+          .update({ deleted_at: new Date().toISOString(), is_active: false })
+          .eq("kind_code", kind);
+        qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
+      }
+      toast.success(`Plot ${plot} · ${kind} 삭제됨`);
       qc.invalidateQueries({ queryKey: ["tm_milestone_config"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "삭제 실패");
     } finally {
-      setDeletingKind(null);
+      setDeletingCell(null);
     }
   }
 
@@ -107,6 +122,8 @@ function Page() {
     return Array.from(g.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [rows]);
 
+  const plotList = useMemo(() => grouped.map(([p]) => p), [grouped]);
+
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -150,7 +167,7 @@ function Page() {
         </p>
       </div>
 
-      <KindManager kinds={kinds} />
+      <KindManager kinds={kinds} plots={plotList} />
 
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -179,9 +196,10 @@ function Page() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {grouped.map(([plot, plotRows]) => {
             const byKind = new Map(plotRows.map((r) => [r.kind, r]));
-            // Plot별로 target_date 오름차순 정렬. 날짜 없는 Kind는 뒤로,
-            // 동률/미설정 사이에서는 전역 kindOrder(sort_order)로 안정 정렬.
-            const sortedKinds = [...kindOrder].sort((a, b) => {
+            // 이 Plot에 지정된 Milestone만 노출. 날짜 오름차순, 미설정 뒤로,
+            // 동률 시 전역 kindOrder(sort_order) 기준으로 안정 정렬.
+            const plotKinds = kindOrder.filter((k) => byKind.has(k));
+            const sortedKinds = [...plotKinds].sort((a, b) => {
               const da = byKind.get(a)?.target_date ?? null;
               const db = byKind.get(b)?.target_date ?? null;
               if (da && db) return da.localeCompare(db);
@@ -196,6 +214,11 @@ function Page() {
                   <CardDescription>Raw 데이터 항목 수를 옆에 함께 표시</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {sortedKinds.length === 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      이 Plot에 지정된 Milestone이 없습니다. 상단 “Milestone 종류 관리”에서 Plot을 선택해 추가하세요.
+                    </div>
+                  )}
                   {sortedKinds.map((kind) => {
                     const row = byKind.get(kind);
                     const key = `${plot}::${kind}`;
@@ -230,11 +253,11 @@ function Page() {
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8"
-                          disabled={deletingKind === kind}
-                          onClick={() => deleteKind(kind)}
-                          title={`Milestone 종류 '${kind}' 삭제 (모든 Plot 공통)`}
+                          disabled={deletingCell === key}
+                          onClick={() => deletePlotKind(plot, kind)}
+                          title={`Plot ${plot} · ${kind} 삭제`}
                         >
-                          {deletingKind === kind ? (
+                          {deletingCell === key ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
                             <Trash2 className="h-3 w-3 text-destructive" />
@@ -265,27 +288,56 @@ function Page() {
   );
 }
 
-function KindManager({ kinds }: { kinds: Kind[] }) {
+function KindManager({ kinds, plots }: { kinds: Kind[]; plots: string[] }) {
   const qc = useQueryClient();
   const [newCode, setNewCode] = useState("");
   const [newLabel, setNewLabel] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [selectedPlots, setSelectedPlots] = useState<string[]>([]);
+
+  function togglePlot(p: string) {
+    setSelectedPlots((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  }
+  function toggleAll() {
+    setSelectedPlots((prev) => (prev.length === plots.length ? [] : [...plots]));
+  }
 
   async function addKind() {
     const code = newCode.trim().toUpperCase().replace(/\s+/g, "");
     if (!code) return toast.error("Kind 코드를 입력하세요");
     if (!/^[A-Z0-9_-]{1,16}$/.test(code)) return toast.error("영문/숫자/-/_ 1~16자만 허용");
+    if (selectedPlots.length === 0) return toast.error("적용할 Plot을 최소 1개 선택하세요");
     setBusy("add");
     try {
       const nextOrder = (kinds[kinds.length - 1]?.sort_order ?? 0) + 10;
+      // Kind는 upsert (이미 존재하면 재사용), 삭제된 Kind는 복원
       const { error } = await (supabase as any)
         .from("tm_milestone_kinds")
-        .insert({ kind_code: code, label: newLabel.trim() || code, sort_order: nextOrder });
+        .upsert(
+          {
+            kind_code: code,
+            label: newLabel.trim() || code,
+            sort_order: nextOrder,
+            is_active: true,
+            deleted_at: null,
+          },
+          { onConflict: "kind_code" },
+        );
       if (error) throw error;
+      // 선택된 Plot마다 config 행 upsert (target_date는 null로 시작)
+      const { error: e2 } = await (supabase as any)
+        .from("tm_milestone_config")
+        .upsert(
+          selectedPlots.map((p) => ({ plot: p, kind: code, target_date: null })),
+          { onConflict: "plot,kind", ignoreDuplicates: true },
+        );
+      if (e2) throw e2;
       toast.success(`${code} 추가됨`);
       setNewCode("");
       setNewLabel("");
+      setSelectedPlots([]);
       qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
+      qc.invalidateQueries({ queryKey: ["tm_milestone_config"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "추가 실패");
     } finally {
@@ -298,7 +350,7 @@ function KindManager({ kinds }: { kinds: Kind[] }) {
       <CardHeader>
         <CardTitle className="text-base">Milestone 종류 관리</CardTitle>
         <CardDescription>
-          새로운 Milestone 종류(HO, COC, DLP 등)를 추가합니다. 삭제는 각 Plot 카드의 Milestone 행 오른쪽 휴지통 버튼을 사용하세요.
+          새 Milestone 종류(HO, COC, DLP 등)를 <b>선택한 Plot에만</b> 추가합니다. 삭제는 각 Plot 카드의 Milestone 행 오른쪽 휴지통 버튼을 사용하세요.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -320,7 +372,34 @@ function KindManager({ kinds }: { kinds: Kind[] }) {
             <span className="text-sm text-muted-foreground">등록된 Kind가 없습니다.</span>
           )}
         </div>
-        <div className="flex flex-wrap items-end gap-2 border-t pt-3">
+        <div className="space-y-2 border-t pt-3">
+          <div>
+            <label className="text-xs text-muted-foreground">적용 Plot 선택</label>
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              {plots.length === 0 && (
+                <span className="text-xs text-muted-foreground">사용 가능한 Plot이 없습니다.</span>
+              )}
+              {plots.length > 0 && (
+                <label className="flex items-center gap-1 text-xs">
+                  <Checkbox
+                    checked={selectedPlots.length === plots.length}
+                    onCheckedChange={toggleAll}
+                  />
+                  <span className="font-medium">전체</span>
+                </label>
+              )}
+              {plots.map((p) => (
+                <label key={p} className="flex items-center gap-1 text-xs">
+                  <Checkbox
+                    checked={selectedPlots.includes(p)}
+                    onCheckedChange={() => togglePlot(p)}
+                  />
+                  <span>Plot {p}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
           <div className="w-32">
             <label className="text-xs text-muted-foreground">Kind 코드</label>
             <Input
@@ -339,7 +418,10 @@ function KindManager({ kinds }: { kinds: Kind[] }) {
               placeholder="Provisional Acceptance"
             />
           </div>
-          <Button onClick={addKind} disabled={busy === "add" || !newCode.trim()}>
+            <Button
+              onClick={addKind}
+              disabled={busy === "add" || !newCode.trim() || selectedPlots.length === 0}
+            >
             {busy === "add" ? (
               <Loader2 className="mr-1 h-3 w-3 animate-spin" />
             ) : (
@@ -347,6 +429,7 @@ function KindManager({ kinds }: { kinds: Kind[] }) {
             )}
             추가
           </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
