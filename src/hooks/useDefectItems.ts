@@ -116,7 +116,12 @@ export async function fetchDefectItemIds(params: {
     _limit: params.limit ?? 100_000,
   });
   if (error) throw new Error(error.message);
-  return ((data ?? []) as Array<{ id: string }>).map((r) => String(r.id));
+  // 반환 계약: jsonb 배열 (id 문자열 배열). Data API 행 상한 비적용.
+  if (data == null) return [];
+  if (!Array.isArray(data)) {
+    throw new Error("defect_items_search_ids RPC contract mismatch: expected jsonb array");
+  }
+  return (data as unknown[]).map((v) => String(v));
 }
 
 export function useDefectFacet(
