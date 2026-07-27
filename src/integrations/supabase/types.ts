@@ -294,6 +294,7 @@ export type Database = {
       }
       abd_import_logs: {
         Row: {
+          build_id: string | null
           created_at: string
           errors: Json | null
           file_name: string
@@ -319,6 +320,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          build_id?: string | null
           created_at?: string
           errors?: Json | null
           file_name: string
@@ -344,6 +346,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          build_id?: string | null
           created_at?: string
           errors?: Json | null
           file_name?: string
