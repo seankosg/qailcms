@@ -1084,7 +1084,7 @@ export function TaskManagementRawDataPage() {
     getFilteredRowModel: getFilteredRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-    columnResizeMode: "onChange",
+    columnResizeMode: "onEnd", // Tier1 #6: avoid per-mouse-move pipeline reruns
     enableMultiSort: true,
   });
 

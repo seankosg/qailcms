@@ -369,7 +369,7 @@ export function DmrRawDataPage() {
     manualSorting: true,
     manualFiltering: true,
     manualPagination: true,
-    columnResizeMode: 'onChange',
+    columnResizeMode: 'onEnd', // Tier1 #6: unify resize mode across raw-data tables
     getCoreRowModel: getCoreRowModel(),
     getRowId: (r) => r.id,
   });
