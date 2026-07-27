@@ -24,7 +24,11 @@ export function useTmJudgmentAtDate(asOf: string, enabled: boolean) {
         { p_data_date: asOf },
       );
       if (error) throw new Error(error.message);
-      const rows = (data ?? []) as TmJudgmentRow[];
+      // 반환 계약: jsonb 배열 (행 상한 비적용).
+      if (data != null && !Array.isArray(data)) {
+        throw new Error("tm_judge_at_date RPC contract mismatch: expected jsonb array");
+      }
+      const rows = ((data ?? []) as unknown[]) as TmJudgmentRow[];
       const map = new Map<string, TmJudgmentRow>();
       for (const r of rows) map.set(r.id, r);
       return map;
