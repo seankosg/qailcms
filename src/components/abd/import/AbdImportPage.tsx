@@ -424,10 +424,18 @@ export function AbdImportPage() {
       );
       try {
         const agg = { inserted: 0, updated: 0, inactivated: 0, total: 0 };
-        for (const sheet of e.parsed.sheets) {
-          if (cancelRequestedRef.current) {
-            throw new Error("__CANCELLED__");
-          }
+        // 파일당 로그 1건 — 첫 호출에서 log_id를 발급받아 이후 호출은 append.
+        let logId: string | null = null;
+        const sheets = e.parsed.sheets;
+        const fileTotal = sheets.reduce((s, sh) => s + sh.rows.length, 0);
+        const finalizeScope = sheets.map((sh) => ({
+          plot: sh.plot ?? null,
+          abd_numbers: sh.rows.map((r) => r.abd_number),
+        }));
+        for (let i = 0; i < sheets.length; i++) {
+          if (cancelRequestedRef.current) throw new Error("__CANCELLED__");
+          const sheet = sheets[i];
+          const isLast = i === sheets.length - 1;
           const rows = sheet.rows.map((r) => ({ ...r, plot: r.plot ?? sheet.plot ?? null }));
           const res = await importAbdBatch({
             data: {
@@ -441,12 +449,21 @@ export function AbdImportPage() {
               allow_duplicates: !!e.allowDuplicates,
               note: formatUnresolvedNamesNote(unresolvedNames) || null,
               excluded_fields: e.excludedFields ?? [],
+              log_id: logId,
+              file_total_rows: fileTotal,
+              finalize: isLast,
+              finalize_scope: isLast ? finalizeScope : undefined,
             } as any,
           });
+          if (!logId) logId = res.batch_id;
           agg.inserted += res.inserted;
           agg.updated += res.updated;
           agg.inactivated += res.inactivated;
           agg.total += res.total;
+          const pct = 10 + Math.round(((i + 1) / sheets.length) * 85);
+          setEntries((p) =>
+            p.map((x) => (x.id === e.id ? { ...x, progress: pct } : x)),
+          );
         }
         setEntries((p) =>
           p.map((x) =>

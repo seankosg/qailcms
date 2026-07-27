@@ -107,6 +107,21 @@ const ImportBatchSchema = z.object({
   note: z.string().nullable().optional(),
   /** payload에서 제외할 필드 목록 (기존 DB 값 보존). 시스템 키는 서버에서 강제 필터. */
   excluded_fields: z.array(z.string()).optional(),
+  /** append 모드: 기존 abd_import_logs 행을 재사용. 없으면 새 로그 생성. */
+  log_id: z.string().uuid().nullable().optional(),
+  /** 파일 전체의 예상 총 행수(첫 호출에서 total_rows에 저장) */
+  file_total_rows: z.number().int().nonnegative().optional(),
+  /** 마지막 호출 여부. true일 때만 inactivate_missing 수행 및 log finalize. */
+  finalize: z.boolean().default(false),
+  /** finalize=true일 때 inactivate_missing 판정 스코프: 파일 전체에서 본 (plot, abd_numbers). */
+  finalize_scope: z
+    .array(
+      z.object({
+        plot: z.string().nullable(),
+        abd_numbers: z.array(z.string()),
+      }),
+    )
+    .optional(),
 });
 
 export const importAbdBatch = createServerFn({ method: "POST" })
@@ -175,23 +190,29 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       }
     }
 
-    // 1) create import log
-    const { data: logRow, error: logErr } = await supa
-      .from("abd_import_logs")
-      .insert({
-        file_name: data.file_name,
-        team: data.team,
-        plot: data.plot ?? null,
-        sheet_name: data.sheet_name ?? null,
-        total_rows: data.rows.length,
-        status: "in_progress",
-        started_at: new Date().toISOString(),
-        imported_by: context.userId,
-        note: data.note ?? null,
-      })
-      .select("id").single();
-    if (logErr) throw new Error(logErr.message);
-    const batchId = logRow.id as string;
+    // 1) create or reuse import log (파일당 1건)
+    let batchId: string;
+    if (data.log_id) {
+      batchId = data.log_id;
+    } else {
+      const { data: logRow, error: logErr } = await supa
+        .from("abd_import_logs")
+        .insert({
+          file_name: data.file_name,
+          team: data.team,
+          // 파일 단위 로그이므로 시트별 plot/sheet_name은 저장하지 않음
+          plot: null,
+          sheet_name: null,
+          total_rows: data.file_total_rows ?? data.rows.length,
+          status: "in_progress",
+          started_at: new Date().toISOString(),
+          imported_by: context.userId,
+          note: data.note ?? null,
+        })
+        .select("id").single();
+      if (logErr) throw new Error(logErr.message);
+      batchId = logRow.id as string;
+    }
 
     // 2) upsert rows in chunks
     let inserted = 0, updated = 0;
@@ -335,15 +356,37 @@ export const importAbdBatch = createServerFn({ method: "POST" })
 
     // 3) inactivate missing rows in same team+plot
     let inactivated = 0;
-    if (data.inactivate_missing && seenNumbers.size > 0) {
+    // finalize=true인 마지막 호출에서만 파일 전체 스코프로 inactivate 수행.
+    // append 모드가 아닌 legacy 단일 호출(log_id 없음 + finalize 미지정)에도 하위 호환 유지.
+    const isLegacySingle = !data.log_id && !data.finalize;
+    const shouldInactivate =
+      data.inactivate_missing && (data.finalize || isLegacySingle);
+    if (shouldInactivate) {
+      // finalize_scope 우선. 없으면 이 호출의 seenNumbers/plot으로 대체 (legacy).
+      const scope: Array<{ plot: string | null; abd_numbers: string[] }> =
+        data.finalize_scope && data.finalize_scope.length > 0
+          ? data.finalize_scope
+          : [{ plot: data.plot ?? null, abd_numbers: Array.from(seenNumbers) }];
       const { data: allActive } = await supa
         .from("abd_items_raw")
         .select("id, abd_number, plot")
         .eq("team", data.team)
         .eq("is_active", true);
-      const scopeRows = (allActive ?? []).filter((r: any) => (data.plot ? r.plot === data.plot : true));
-      const missing = scopeRows.filter((r: any) => !seenNumbers.has(r.abd_number));
-      const missingIds = missing.map((r: any) => r.id);
+      const missing: any[] = [];
+      for (const s of scope) {
+        const seenSet = new Set(s.abd_numbers);
+        const scopeRows = (allActive ?? []).filter((r: any) =>
+          s.plot ? r.plot === s.plot : true,
+        );
+        for (const r of scopeRows) {
+          if (!seenSet.has(r.abd_number)) missing.push(r);
+        }
+      }
+      // dedupe by id
+      const uniqMissing = Array.from(
+        new Map(missing.map((m: any) => [m.id, m])).values(),
+      );
+      const missingIds = uniqMissing.map((r: any) => r.id);
       if (missingIds.length > 0) {
         const { error: inaErr } = await supa
           .from("abd_items_raw")
@@ -356,7 +399,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           .in("id", missingIds);
         if (inaErr) throw new Error(inaErr.message);
         inactivated = missingIds.length;
-        for (const m of missing) {
+        for (const m of uniqMissing) {
           rowLogs.push({
             upload_id: batchId,
             team: data.team,
@@ -389,15 +432,41 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     // 3.6) persist field logs
     await flushFieldLogs(supa, batchId, context.userId, pendingFieldLogs);
 
-    // 4) finalize log
-    await supa
-      .from("abd_import_logs")
-      .update({
-        inserted, updated, inactivated, mismatched: 0,
-        status: "success",
-        finished_at: new Date().toISOString(),
-      })
-      .eq("id", batchId);
+    // 4) finalize log — 파일 마지막 호출에서만 성공 마감.
+    //    append 모드 중간 호출에서는 누적 값을 원자적으로 더한다.
+    if (data.finalize || isLegacySingle) {
+      // 누적된 카운트를 읽어와 이번 호출분과 합산 후 마감
+      const { data: cur } = await supa
+        .from("abd_import_logs")
+        .select("inserted, updated")
+        .eq("id", batchId)
+        .single();
+      await supa
+        .from("abd_import_logs")
+        .update({
+          inserted: (cur?.inserted ?? 0) + inserted,
+          updated: (cur?.updated ?? 0) + updated,
+          inactivated,
+          mismatched: 0,
+          status: "success",
+          finished_at: new Date().toISOString(),
+        })
+        .eq("id", batchId);
+    } else {
+      // 중간 호출: 누적만 갱신 (finished/status 건드리지 않음)
+      const { data: cur } = await supa
+        .from("abd_import_logs")
+        .select("inserted, updated")
+        .eq("id", batchId)
+        .single();
+      await supa
+        .from("abd_import_logs")
+        .update({
+          inserted: (cur?.inserted ?? 0) + inserted,
+          updated: (cur?.updated ?? 0) + updated,
+        })
+        .eq("id", batchId);
+    }
 
     return { batch_id: batchId, inserted, updated, inactivated, total: rowsToImport.length };
   });
