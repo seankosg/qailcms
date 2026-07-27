@@ -1,66 +1,55 @@
-# ABD Import — 로그 중복 · 진도율 정지 원인 및 수정 계획
+## B 목록 정밀 감사 결과
 
-## 원인 분석 (확인된 사실)
+파일별 실측(코드 라인 인용 포함):
 
-### 1) 로그 2건 발생 — "시트별 로그" 구조가 근본 원인
-- `AbdImportPage.startImport()` (src/components/abd/import/AbdImportPage.tsx:427-450)에서 파일을 **시트 단위로 순회**하며 각 시트마다 `importAbdBatch()`를 별도 호출.
-- `importAbdBatch` (src/lib/abd/mutations.functions.ts:179-192)는 호출될 때마다 **`abd_import_logs` 행을 새로 INSERT**함.
-- ABD Status_ELEC_260727.xlsx는 "ABD Plot 3", "ABD Plot 4" 두 시트를 가지므로 → 로그 2행 생성.
-- DB 확인: 어제 260726 파일도 동일한 패턴으로 Plot 3 / Plot 4 로그가 각각 존재 (started_at 2건 확인).
+| # | 파일 | 실측 결과 | 상한 위반? |
+|---|---|---|---|
+| 1 | `src/hooks/useAbdAttentionInbox.ts` L71–78 | `const LIMIT = 5000; …select().limit(LIMIT)` — 단일 요청 | **YES.** PostgREST가 1,000행에서 잘라 Attention 리스트가 최대 1,000건까지만 표시됨 |
+| 2 | `src/components/task-management/tree/TaskTreePage.tsx` L273–280 | `from("task_management_raw").select(…).limit(10000)` — 단일 요청 | **YES.** Task 총량이 1,000 초과 시 트리에 일부 태스크가 아예 안 뜸(부모/자식 매칭 깨짐) |
+| 3 | `src/hooks/useMyWorkspaceData.ts` L20–41 | 자체 `fetchAll()` 1,000행 청크 루프(MAX 200k) | NO. 이미 A방식 |
+| 4 | `src/components/import/ImportLogsPage.tsx` L191/224/250/277 | 의도적 `.limit(100)`; profiles `.in(unique)` 는 ≤100 로그의 유저 id set | NO. 안전 |
+| 5 | `src/components/task-management/schedule-revision/TaskScheduleRevisionPage.tsx` L474/519 | `RECENT_LIMIT=500`, UI에 "최근 500건" 명시 | NO. 의도적 캡 |
+| 6 | `src/lib/abd/bulk-actions.ts` / `src/lib/task-management/bulk-actions.ts` / `src/lib/spare-part/bulk-actions.ts` / `src/lib/spare-part/bulk-edit.ts` | `.in(slice)` slice 크기 100–500 (chunk 루프) | NO. 안전 |
+| 7 | `src/lib/defect-management/classifier/bulk-classify.functions.ts` L43–49 | `CHUNK=500` 청크 루프 | NO. 안전 |
+| 8 | `src/components/spare-part/detail/SparePartStatusHistory.tsx`, `src/components/shared/CommentsThread.tsx` | 단일 부모(태스크/문서) 스레드 조회. 현실적으로 스레드당 < 1,000. profiles `.in(authorIds)` 도 소량 | 저위험. 표준화 대상 아님 |
+| 9 | `src/routes/api/public/backup/archive-download.ts` L28 | `.limit(1)` | NO |
+| 10 | ABD `abd_progress_cells/totals` 등 서버 집계 RPC | 서버 사이드 GROUP BY | NO. 상한 무관 |
 
-### 2) "총 갯수가 틀림"
-- Import Logs 테이블은 각 로그 행의 `total_rows`(=해당 시트 행수)를 그대로 표시.
-- 사용자는 "파일 1건 = 총합"으로 인식하는데 화면은 시트별로 쪼개진 숫자를 보여줌.
+**결론:** 실제 상한 위반은 2건 — `useAbdAttentionInbox`, `TaskTreePage`.
 
-### 3) 진도율 바가 중간에 멈춤
-- `startImport()`의 진행률 갱신 로직은 단 두 지점: 시작 시 `progress: 20`, 전체 시트 완료 후 `progress: 100`.
-- 시트 루프 안에서는 진행률을 갱신하지 않음 → 시트 1이 처리되는 동안(2,000행 upsert + row-log/field-log flush) 20%에서 정지 상태로 보임.
-- Aconex 스냅샷 + 대용량 upsert가 겹치면 수 분 대기가 발생.
-- 사용자가 "새로 고침"하면 DB에는 이미 status='success'로 finalize되어 있어 완료로 보임.
+---
 
-## 수정 방향
+## 표준화 패치 계획
 
-### A. 파일당 로그 1건 (핵심)
-- `importAbdBatch` 서명에 `sheets` 배열 파라미터 추가 (하위 호환 위해 기존 `rows`도 유지).
-- 서버 핸들러:
-  1. `abd_import_logs`에 **한 번만** INSERT (plot=null 또는 "MULTI", sheet_name=null, total_rows=Σ)
-  2. 시트별 payload를 **동일 batchId**로 순차 upsert
-  3. `inactivate_missing`은 **team 단위로 한 번만** 수행 (현재 시트별 반복 시 뒤 시트가 앞 시트 데이터를 비활성화하는 잠재 버그도 함께 해소됨)
-  4. 마지막에 하나의 log 행에 집계 결과 UPDATE
-- 클라이언트 `startImport`: `for sheet ...` 루프 제거, 시트 배열을 한 번에 전달.
+두 지점을 A방식(1,000행 청크 루프)으로 통일합니다. 신규 유틸을 만들지 않고 기존 `fetchAll()` 패턴(`useMyWorkspaceData.ts`)과 동일한 구조를 각 파일 내에 인라인으로 도입하여 사이드이펙트를 최소화합니다.
 
-### B. 진행률 서버 콜백
-- 서버는 단일 호출이므로 클라이언트에서 세밀한 progress를 받기 어려움. 대신:
-  1. 클라이언트에서 **시트별로 서버 호출**하되(단일 batchId를 첫 호출에 생성해 반환, 이후 호출은 append 모드) 각 호출 완료마다 `progress = round((done/total)*80) + 10`으로 갱신.
-  2. 또는 위 A 통합 호출 + 클라이언트 예상 진행률(예: 파일 크기·행수에 기반한 부드러운 애니메이션) 대체.
-- 채택: **A + append 모드**. `importAbdBatch({ log_id?, sheet_index, total_sheets, rows, ...finalize? })` 형태.
-  - `log_id`가 없으면 새 로그 생성 및 반환.
-  - `finalize=true`인 마지막 호출에서만 inactivate_missing 수행 및 status='success' 마감.
-  - 클라이언트는 시트마다 호출하며 진행률 UI 갱신.
+### 패치 1 — `src/hooks/useAbdAttentionInbox.ts`
+- 기존 `.limit(5000)` 단일 요청을 **1,000행 청크 루프**로 교체.
+- 안전 상한: `MAX_ROWS = 20_000`(현실 상한 초과 방어). 초과 시 마지막 페이지에서 중단하고 UI 상단에 "일부만 표시됨" 힌트를 남길 수 있는 값을 반환(추가 UI 필요 없으면 로그만).
+- 정렬/필터 조건은 그대로 유지, 각 페이지에서 동일 `select`, `order`, 필터 재적용.
+- 반환 계약(배열)은 동일 → 호출부(`AttentionInbox` 등) 무수정.
 
-### C. Import Logs 화면 표시 개선(경미)
-- 파일당 그룹핑(collapsible)까지는 이번 스코프 외로 두고, 우선 로그가 1건만 남게 하는 것으로 사용자 불편 해소.
+### 패치 2 — `src/components/task-management/tree/TaskTreePage.tsx`
+- 로컬 `fetchAllTasks()` 헬퍼 추가(같은 파일 내 상단 함수). `useMyWorkspaceData`의 `fetchAll` 시그니처를 그대로 채용.
+  - `PAGE=1000`, `MAX_PAGES=200`(=20만행 안전상한, TM 현 규모 대비 여유), `order("task_no", asc)` 유지.
+- `.limit(10000)` 호출을 이 헬퍼로 대체.
+- 반환 shape(배열) 동일 → 이후 트리 빌드/롤업 로직 무수정.
+- 정합성 검증 QA:
+  1) 총 태스크 수 `select("id",{count:"exact",head:true})`로 얻은 값과 로드된 배열 길이 일치 확인(개발 콘솔 로그로 임시).
+  2) Main/Sub 카운트가 대시보드 KPI 총계와 일치하는지 육안 확인.
+  3) 상용 반영 전 로그 제거.
 
-## 기술 세부 (변경 파일)
+### 안전 강화(옵션, 이번 계획엔 미포함)
+- 공용 `paginatedSelect(table, opts)` 유틸을 `src/lib/supabase/paginate.ts`에 신설하는 안은 위험 지점이 2곳뿐이라 이번엔 보류. 향후 유사 케이스가 3건 이상 나오면 리팩터링.
+- `CommentsThread`/`SparePartStatusHistory`는 스레드당 1,000건 초과가 발생하는 순간만 문제이므로, 관찰 후 필요 시 별도 패치.
 
-- **src/lib/abd/mutations.functions.ts**
-  - `ImportBatchSchema`에 `log_id?: uuid`, `sheet_index?: number`, `total_sheets?: number`, `finalize?: boolean`, `all_sheet_numbers?: string[]` 추가.
-  - handler:
-    - `log_id`가 있으면 재사용, 없으면 INSERT (total_rows는 우선 0 또는 알려진 총합).
-    - upsert/row-log/field-log는 매 호출 실행.
-    - `finalize=true`일 때만 inactivate_missing(전체 시트에서 본 abd_number 집합 사용) + finish/status 업데이트.
-- **src/components/abd/import/AbdImportPage.tsx**
-  - `startImport()`에서 파일 진입 시 `logId=null`, 시트 루프에서 순차 호출:
-    - 첫 호출로 `logId` 획득
-    - 각 호출 후 `progress = 10 + Math.round(((i+1)/sheets.length) * 80)`
-    - 마지막 호출에 `finalize=true`, `all_sheet_numbers=[...seen]`
-  - `agg` 집계는 그대로 유지.
-- **회귀 확인**
-  - `abd_import_row_logs`는 upload_id=batchId로 계속 append → OK.
-  - Rollback (`preview_rollback_abd_import`, `rollback_abd_import`)이 batchId 하나로 동작하므로 파일 단위 롤백이 자연스러워짐(오히려 개선).
-  - 백업 스냅샷(`takePreImportSnapshotWithFeedback`)은 파일 루프 진입 전 1회 → 변화 없음.
+---
 
-## 확인 방법
-1. 260727 ELEC 파일 재임포트 → `abd_import_logs`에 파일당 1행, total_rows = Σ(시트 행수).
-2. 진행률 바가 시트 완료마다 10%→~90%로 이동, 마지막 100%.
-3. Raw Data 총 건수 = 두 Plot 합계와 일치.
+## 검증 절차 (패치 후)
+1. `bun run typecheck` 통과.
+2. ABD Attention 인박스: DB에 Attention 대상 1,000건 초과인 팀 계정으로 확인 → 카운트가 서버 count와 일치.
+3. TM Task Tree: 전체 태스크 수 > 1,000인 상태에서 트리 로드 → 루트 및 리프 개수와 KPI 총계 일치.
+4. Raw Data / MWS / 대시보드에 회귀 없는지 스팟체크.
+
+## 롤아웃
+- 두 파일만 단일 커밋으로 수정. DB 변경 없음. RPC 변경 없음.

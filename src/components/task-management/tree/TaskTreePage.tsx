@@ -269,17 +269,28 @@ export function TaskTreePage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["task-tree", discipline],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("task_management_raw")
-        .select(
-          "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, plan_days, actual_start, actual_finish, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
-        )
-        .eq("discipline", discipline)
-        .order("main_task_no", { ascending: true, nullsFirst: true })
-        .order("task_no", { ascending: true })
-        .limit(10000);
-      if (error) throw error;
-      return (data ?? []) as Row[];
+      // PostgREST 응답 상한(1,000행) 우회를 위한 청크 루프.
+      // TM discipline별 태스크 총량이 1,000을 초과할 수 있어 전량 로드가 필수.
+      const PAGE = 1000;
+      const MAX_PAGES = 200; // 안전상한 20만행
+      const out: Row[] = [];
+      for (let from = 0; from < MAX_PAGES * PAGE; from += PAGE) {
+        const to = from + PAGE - 1;
+        const { data, error } = await (supabase as any)
+          .from("task_management_raw")
+          .select(
+            "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, plan_days, actual_start, actual_finish, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
+          )
+          .eq("discipline", discipline)
+          .order("main_task_no", { ascending: true, nullsFirst: true })
+          .order("task_no", { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        const chunk = (data ?? []) as Row[];
+        out.push(...chunk);
+        if (chunk.length < PAGE) break;
+      }
+      return out;
     },
   });
 
