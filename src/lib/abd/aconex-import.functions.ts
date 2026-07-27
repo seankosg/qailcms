@@ -64,6 +64,12 @@ export type AconexImportPreview = {
   matched: number;
   unmatched: number;
   excluded: number;
+  /** semantic === "EXCLUDED_TERMINATED" 건수 — 라운드 리셋 대상 */
+  terminated_reset_count: number;
+  /** semantic === "EXCLUDED_CANCELLED" 건수 — 통계 제외 */
+  cancelled_excluded_count: number;
+  /** is_excluded 지만 두 semantic 어디에도 속하지 않는 예외 케이스 (실측 0건 기대) */
+  other_excluded_count: number;
   by_status: Array<{ code: string; count: number }>;
   by_semantic: Array<{ semantic: string; count: number }>;
   unmatched_samples: string[];
@@ -117,6 +123,9 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       bySemantic.set(sem, (bySemantic.get(sem) ?? 0) + 1);
     }
     const excludedCount = data.rows.filter((r) => r.is_excluded).length;
+    const terminated_reset_count = data.rows.filter((r) => r.semantic === "EXCLUDED_TERMINATED").length;
+    const cancelled_excluded_count = data.rows.filter((r) => r.semantic === "EXCLUDED_CANCELLED").length;
+    const other_excluded_count = Math.max(0, excludedCount - terminated_reset_count - cancelled_excluded_count);
 
     // 2) 매칭 검사: RPC 를 청크 호출.
     // PostgREST 는 RPC(TABLE 반환) 응답을 기본 1000 행으로 잘라내므로,
@@ -200,6 +209,9 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       matched: matched.length,
       unmatched: unmatched.length,
       excluded: excludedCount,
+      terminated_reset_count,
+      cancelled_excluded_count,
+      other_excluded_count,
       by_status: Array.from(byStatus.entries())
         .map(([code, count]) => ({ code, count }))
         .sort((a, b) => b.count - a.count),
