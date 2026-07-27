@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { dohaWallToUtcIso, toDohaDateKey, dohaDateOnly } from "@/lib/time/doha";
 import type { Discipline } from "./columns";
-import { makeDateAudit, toCellRef, type DateIssue } from "@/lib/import/date-audit";
+import { makeDateAudit, toCellRef, strictParseDateValue, type DateIssue } from "@/lib/import/date-audit";
 
 export interface ParsedTaskRow {
   rawRowNo: number;

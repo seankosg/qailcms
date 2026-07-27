@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import type { DefectTeam } from "./columns";
 import { dohaWallToUtcIso, toDohaDateKey, dohaDateOnly } from "@/lib/time/doha";
-import { makeDateAudit, toCellRef, type DateIssue } from "@/lib/import/date-audit";
+import { makeDateAudit, toCellRef, strictParseDateValue, type DateIssue } from "@/lib/import/date-audit";
 
 /** Re-import 마커 헤더 — Raw Data에서 재수출한 파일에만 존재. */
 export const REIMPORT_MARKER_HEADER = "QAIL_DEFECT_REIMPORT_V1";
