@@ -96,6 +96,8 @@ export type AconexImportPreview = {
 export type AconexImportResult = AconexImportPreview & {
   updated: number;
   batch_id: string | null;
+  /** Step 4 사후 검증: upload_id 기준 change_log 에서 non-null → null 로 덮어쓴 필드별 건수. */
+  null_overwrites?: Record<string, number>;
 };
 
 /** status_code='D' 는 현재 DB/실파일 모두 0건 관측 — 등장 시 매핑 확정 전까지 임포트 에러로 보고. */
@@ -342,7 +344,48 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     // 실제 updated 카운트 반영
     await supa.from("abd_import_logs").update({ updated }).eq("id", batchId);
 
-    return { ...preview, updated, batch_id: batchId };
+    // Step 4 사후 검증 — 클라이언트 diffs 가 아닌 서버 change_log(upload_id 기준)로
+    // non-null → null 덮어쓰기 건수를 field 별로 집계. 스테일 인스턴스가 실행돼도
+    // 트리거가 남긴 흔적이 곧 진실이므로 이 방식이 유일하게 신뢰 가능하다.
+    const WATCH_NULL_FIELDS = [
+      "latest_status",
+      "latest_rev",
+      "approval_date",
+      "r1_response_result",
+      "r2_response_result",
+      "r3_response_result",
+    ];
+    const nullOverwrites: Record<string, number> = {};
+    try {
+      const { data: audit, error: auditErr } = await supa
+        .from("abd_change_log")
+        .select("field")
+        .eq("upload_id", batchId)
+        .in("field", WATCH_NULL_FIELDS)
+        .not("old_value", "is", null)
+        .is("new_value", null);
+      if (auditErr) throw new Error(auditErr.message);
+      for (const row of audit ?? []) {
+        const f = (row as any).field as string;
+        nullOverwrites[f] = (nullOverwrites[f] ?? 0) + 1;
+      }
+      const total = Object.values(nullOverwrites).reduce((a, b) => a + b, 0);
+      if (total > 0) {
+        const summary = Object.entries(nullOverwrites)
+          .map(([f, n]) => `${f}=${n}`)
+          .join(", ");
+        await supa
+          .from("abd_import_logs")
+          .update({
+            note: `Aconex sync — matched=${matched.length} unmatched=${unmatched.length} ⚠ null_overwrites: ${summary}`,
+          })
+          .eq("id", batchId);
+      }
+    } catch (e) {
+      console.warn("[abd_aconex postAudit]", e);
+    }
+
+    return { ...preview, updated, batch_id: batchId, null_overwrites: nullOverwrites };
   });
 
 // ------------------------------------------------------------------
