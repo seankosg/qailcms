@@ -102,7 +102,7 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
   function handleExportXlsx() {
     try {
       const stamp = todayInDoha();
-      exportSelectedToXlsx({ rows: selectedRows, columns: exportColumns, fileName: `defect-selected-${stamp}.xlsx` });
+      exportSelectedToXlsx({ rows: selectedRows, columns: exportColumns, fileName: `CMS_SM_selected_${stamp}.xlsx` });
       toast.success("Export ready", { description: `${count} rows exported.` });
     } catch (e: any) {
       toast.error("Export failed", { description: e?.message ?? String(e) });
