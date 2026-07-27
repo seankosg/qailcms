@@ -4047,15 +4047,7 @@ export type Database = {
       }
       tm_judge_at_date: {
         Args: { p_data_date: string; p_task_ids?: string[] }
-        Returns: {
-          alarm_reason: string
-          auto_judgment: string
-          cum_actual_pct: number
-          cum_plan_pct: number
-          delay_days: number
-          gap_pct: number
-          id: string
-        }[]
+        Returns: Json
       }
       tm_judge_snapshot_at_date: {
         Args: { p_data_date: string; p_task_ids?: string[] }
@@ -4072,10 +4064,7 @@ export type Database = {
       }
       tm_today_actual: {
         Args: { _as_of: string; _ids: string[] }
-        Returns: {
-          id: string
-          t_actual: number
-        }[]
+        Returns: Json
       }
       update_task_summary: {
         Args: { _discipline: string; _parent_task_no: string }
