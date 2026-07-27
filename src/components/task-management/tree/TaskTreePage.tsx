@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,7 +30,13 @@ import { exportTaskSummary } from "./exportTaskSummary";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { MiniProgressChart } from "./MiniProgressChart";
-import { TaskProgressChartDialog } from "./TaskProgressChartDialog";
+// recharts (~130KB gzip) is only needed when the drill-down chart opens.
+// Lazy-load so the tree page's initial render doesn't pull the chart library.
+const TaskProgressChartDialog = lazy(() =>
+  import("./TaskProgressChartDialog").then((m) => ({
+    default: m.TaskProgressChartDialog,
+  })),
+);
 import { useServerFn } from "@tanstack/react-start";
 import { getTaskProgressChartsBulk, type TaskChartCache } from "@/lib/task-management/progress-chart.functions";
 import { useTmDataDate } from "@/hooks/useTmDataDate";
@@ -937,13 +943,17 @@ export function TaskTreePage() {
         </div>
       )}
 
-      <TaskProgressChartDialog
-        open={!!chartTask}
-        onClose={() => setChartTask(null)}
-        discipline={discipline}
-        taskNo={chartTask?.task_no ?? null}
-        taskName={chartTask?.task_name ?? null}
-      />
+      {chartTask && (
+        <Suspense fallback={null}>
+          <TaskProgressChartDialog
+            open={!!chartTask}
+            onClose={() => setChartTask(null)}
+            discipline={discipline}
+            taskNo={chartTask?.task_no ?? null}
+            taskName={chartTask?.task_name ?? null}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
