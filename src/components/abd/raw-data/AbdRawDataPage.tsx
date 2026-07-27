@@ -305,6 +305,7 @@ export function AbdRawDataPage() {
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   useEffect(() => {
     if (urlSearch.source === "progress") {
@@ -441,13 +442,48 @@ export function AbdRawDataPage() {
   const orderedKeys = useMemo(() => {
     const frozenSet = new Set(frozenExtras);
     const rest = order.filter((k) => !frozenSet.has(k));
-    return [...frozenExtras, ...rest];
+    return ["__select", ...frozenExtras, ...rest];
   }, [order, frozenExtras]);
 
   const columns = useMemo<ColumnDef<AbdItem>[]>(() => {
     const byKey = new Map(ABD_COLUMNS.map((c) => [c.key, c] as const));
     const cols: ColumnDef<AbdItem>[] = [];
     for (const id of orderedKeys) {
+      if (id === "__select") {
+        cols.push({
+          id: "__select",
+          size: 32,
+          enableSorting: false,
+          enableColumnFilter: false,
+          enableResizing: false,
+          header: ({ table }) => (
+            <span onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+              <Checkbox
+                checked={
+                  table.getIsAllRowsSelected()
+                    ? true
+                    : table.getIsSomeRowsSelected()
+                      ? "indeterminate"
+                      : false
+                }
+                onCheckedChange={(v) => table.toggleAllRowsSelected(!!v)}
+                className="h-3.5 w-3.5"
+              />
+            </span>
+          ),
+          cell: ({ row }) => (
+            <span onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+              <Checkbox
+                checked={row.getIsSelected()}
+                onCheckedChange={(v) => row.toggleSelected(!!v)}
+                className="h-3.5 w-3.5"
+              />
+            </span>
+          ),
+          meta: { origin: "system" },
+        });
+        continue;
+      }
       const c = byKey.get(id);
       if (!c) continue;
       cols.push(buildDataColumn(c, team, statusGroup, includeInactive, plotFilter, canEditRow, () => refetch()));
@@ -470,10 +506,12 @@ export function AbdRawDataPage() {
   const table = useReactTable<AbdItem>({
     data: rows,
     columns,
-    state: { sorting, columnFilters, columnSizing, columnVisibility },
+    state: { sorting, columnFilters, columnSizing, columnVisibility, rowSelection },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnSizingChange: setColumnSizing,
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection: true,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     manualSorting: true,
@@ -488,6 +526,28 @@ export function AbdRawDataPage() {
     defaultColumn: { minSize: 50, maxSize: 640 },
     getRowId: (r) => r.id,
   });
+
+  const selectedIds = useMemo(
+    () => Object.keys(rowSelection).filter((k) => rowSelection[k]),
+    [rowSelection],
+  );
+  const selectedRowObjects = useMemo(() => {
+    const set = new Set(selectedIds);
+    return rows.filter((r) => set.has(String(r.id)));
+  }, [rows, selectedIds]);
+  const selectedExportColumns = useMemo(
+    () =>
+      table
+        .getVisibleLeafColumns()
+        .filter((c) => c.id !== "__select")
+        .map((c) => ({
+          key: c.id,
+          label: labelOf(c.id) ?? String((c.columnDef.header as any) ?? c.id),
+        })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orderedKeys, visibility, labelOf],
+  );
+  const canBulkEdit = !!user && (isAdmin || user.role === "senior_user" || user.role === "d_superuser" || user.role === "superuser");
 
   const activeChips = useMemo(() => {
     const chips: { id: string; label: string; onClear: () => void }[] = [];
@@ -697,7 +757,7 @@ export function AbdRawDataPage() {
         table={table}
         tableRef={tableRef}
         loading={!stateLoaded || isFetching}
-        frozenColIds={frozenExtras}
+        frozenColIds={["__select", ...frozenExtras]}
         onRowClick={(id) => setUrl({ detail: id })}
         q={q}
         serverFilters={serverFilters}
