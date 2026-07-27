@@ -491,6 +491,7 @@ export type Database = {
           r1_draft_start_actual: string | null
           r1_draft_start_plan: string | null
           r1_response_result: string | null
+          r1_response_source: string | null
           r1_submission_actual: string | null
           r1_submission_plan: string | null
           r2_dar_actual: string | null
@@ -500,6 +501,7 @@ export type Database = {
           r2_draft_start_actual: string | null
           r2_draft_start_plan: string | null
           r2_response_result: string | null
+          r2_response_source: string | null
           r2_submission_actual: string | null
           r2_submission_plan: string | null
           r3_dar_actual: string | null
@@ -509,6 +511,7 @@ export type Database = {
           r3_draft_start_actual: string | null
           r3_draft_start_plan: string | null
           r3_response_result: string | null
+          r3_response_source: string | null
           r3_submission_actual: string | null
           r3_submission_plan: string | null
           raw_payload: Json
@@ -571,6 +574,7 @@ export type Database = {
           r1_draft_start_actual?: string | null
           r1_draft_start_plan?: string | null
           r1_response_result?: string | null
+          r1_response_source?: string | null
           r1_submission_actual?: string | null
           r1_submission_plan?: string | null
           r2_dar_actual?: string | null
@@ -580,6 +584,7 @@ export type Database = {
           r2_draft_start_actual?: string | null
           r2_draft_start_plan?: string | null
           r2_response_result?: string | null
+          r2_response_source?: string | null
           r2_submission_actual?: string | null
           r2_submission_plan?: string | null
           r3_dar_actual?: string | null
@@ -589,6 +594,7 @@ export type Database = {
           r3_draft_start_actual?: string | null
           r3_draft_start_plan?: string | null
           r3_response_result?: string | null
+          r3_response_source?: string | null
           r3_submission_actual?: string | null
           r3_submission_plan?: string | null
           raw_payload?: Json
@@ -651,6 +657,7 @@ export type Database = {
           r1_draft_start_actual?: string | null
           r1_draft_start_plan?: string | null
           r1_response_result?: string | null
+          r1_response_source?: string | null
           r1_submission_actual?: string | null
           r1_submission_plan?: string | null
           r2_dar_actual?: string | null
@@ -660,6 +667,7 @@ export type Database = {
           r2_draft_start_actual?: string | null
           r2_draft_start_plan?: string | null
           r2_response_result?: string | null
+          r2_response_source?: string | null
           r2_submission_actual?: string | null
           r2_submission_plan?: string | null
           r3_dar_actual?: string | null
@@ -669,6 +677,7 @@ export type Database = {
           r3_draft_start_actual?: string | null
           r3_draft_start_plan?: string | null
           r3_response_result?: string | null
+          r3_response_source?: string | null
           r3_submission_actual?: string | null
           r3_submission_plan?: string | null
           raw_payload?: Json
@@ -3451,6 +3460,15 @@ export type Database = {
       abd_approved_round: {
         Args: { _row: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
         Returns: number
+      }
+      abd_backfill_response_results: {
+        Args: never
+        Returns: {
+          item_id: string
+          r1_set: string
+          r2_set: string
+          r3_set: string
+        }[]
       }
       abd_dashboard_approval_trend:
         | {
