@@ -527,13 +527,29 @@ export function TaskManagementRawDataPage() {
       }
       return out;
     },
+    // Tier1 #5: full-table fetch is expensive; align with the 30s stale used by
+    // the sibling queries below and stop refetching on every focus swap.
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 
   const rows = useMemo(() => data ?? [], [data]);
 
   // 댓글 수/최종 갱신 시각 조회 — 현재 로드된 행 기준
   const { data: commentCounts } = useQuery({
-    queryKey: ["tm-comment-counts", rows.length],
+    // Tier1 #7: row count alone can't invalidate stale badges when rows churn
+    // in place (edits/imports keep length identical). Key on the sorted id set
+    // so any membership change busts the cache.
+    queryKey: [
+      "tm-comment-counts",
+      (() => {
+        const ids = rows
+          .map((r) => String((r as any).id))
+          .filter(Boolean)
+          .sort();
+        return ids.length ? `${ids.length}:${ids[0]}:${ids[ids.length - 1]}:${ids.join(",").length}` : "0";
+      })(),
+    ],
     queryFn: async () => {
       const ids = rows.map((r) => String((r as any).id)).filter(Boolean);
       if (!ids.length) return {} as Record<string, { count: number; lastUpdatedAt: string }>;
@@ -1068,7 +1084,7 @@ export function TaskManagementRawDataPage() {
     getFilteredRowModel: getFilteredRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-    columnResizeMode: "onChange",
+    columnResizeMode: "onEnd", // Tier1 #6: avoid per-mouse-move pipeline reruns
     enableMultiSort: true,
   });
 

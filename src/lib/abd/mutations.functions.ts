@@ -305,28 +305,30 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         return stripNullExcept(row, ABD_FORCE_KEYS);
       });
 
-      // Which existed before?
+      // Tier1 #9: single select covers both existence check (diff) and source
+      // stamp guard (Aconex source protection). In-memory branching below.
       const nums = chunk.map((r) => r.abd_number);
+      const combinedSelect =
+        "abd_number," +
+        ABD_TRACKED_FIELDS.join(",") +
+        ",r1_response_source,r2_response_source,r3_response_source";
       const { data: existingRows } = await supa
         .from("abd_items_raw")
-        .select("abd_number," + ABD_TRACKED_FIELDS.join(","))
+        .select(combinedSelect)
         .eq("team", data.team)
         .in("abd_number", nums);
       const existingMap = new Map<string, any>();
-      for (const e of (existingRows ?? []) as any[]) existingMap.set(e.abd_number, e);
+      const srcMap = new Map<string, any>();
+      for (const e of (existingRows ?? []) as any[]) {
+        existingMap.set(e.abd_number, e);
+        srcMap.set(e.abd_number, e);
+      }
       const existingSet = new Set(existingMap.keys());
 
       // Aconex 정본 가드: 기존 행의 r{n}_response_source='imported' 이면
       // HDEC 파서가 해당 라운드의 r{n}_response_result 를 덮어쓰지 못하게 payload에서 제거
       // 추가 정책: 기존 소스가 'backfill' 인데 HDEC 이 실제 값을 채워 넣는 경우,
       //           덮어쓰기를 허용하되 r{n}_response_source 를 'hdec' 로 명시 갱신한다.
-      const { data: srcRows } = await supa
-        .from("abd_items_raw")
-        .select("abd_number,r1_response_source,r2_response_source,r3_response_source")
-        .eq("team", data.team)
-        .in("abd_number", nums);
-      const srcMap = new Map<string, any>();
-      for (const s of (srcRows ?? []) as any[]) srcMap.set(s.abd_number, s);
       for (const row of payload) {
         const src = srcMap.get((row as any).abd_number);
         for (const n of [1, 2, 3] as const) {

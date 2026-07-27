@@ -10,15 +10,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { todayInDoha } from "@/lib/time/doha";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  getDefectExcelSheetNames,
-  getDefectExcelHeaders,
-  parseDefectExcel,
-  toDefectFieldName,
-  type DefectSheetHeader,
-  type DefectTargetField,
-  type ParsedDefectRow,
+// Parser statically imports the `xlsx` package (~425KB gzip 177KB) via
+// `src/lib/defect-management/parser.ts`. This Provider is mounted from
+// `__root.tsx`, so any static import here pulls xlsx into the entry chunk
+// and every unauthenticated route (including /auth) pays the download cost.
+// Types are erased at build time — safe to static-import. Runtime callables
+// are loaded on demand via `await import()` inside the async handlers below.
+import type {
+  DefectSheetHeader,
+  DefectTargetField,
+  ParsedDefectRow,
 } from "@/lib/defect-management/parser";
+type DefectParserModule = typeof import("@/lib/defect-management/parser");
+let defectParserPromise: Promise<DefectParserModule> | null = null;
+function loadDefectParser(): Promise<DefectParserModule> {
+  if (!defectParserPromise) {
+    defectParserPromise = import("@/lib/defect-management/parser");
+  }
+  return defectParserPromise;
+}
 import { deriveRectifiedStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
 import {
   resolvePlotFromPlanGroup,
@@ -433,6 +443,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         return cur;
       });
       try {
+        const { parseDefectExcel } = await loadDefectParser();
         const parsed = await parseDefectExcel(file, {
           extraAliases,
           sheetName,
@@ -506,6 +517,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
 
     for (const item of next) {
       try {
+        const { getDefectExcelSheetNames, getDefectExcelHeaders } =
+          await loadDefectParser();
         const sheetNames = await getDefectExcelSheetNames(item.file);
         setFiles((cur) =>
           cur.map((f) => (f.id === item.id ? { ...f, sheetNames } : f)),
@@ -601,6 +614,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       });
       if (!target) return;
       try {
+        const { getDefectExcelHeaders } = await loadDefectParser();
         const headerInfo = await getDefectExcelHeaders(target.file, sheetName);
         if (headerInfo) {
           setFiles((cur) =>
@@ -1619,6 +1633,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
    */
   const refreshAliases = useCallback(async (): Promise<number> => {
     const extraAliases = await fetchAliases();
+    const { toDefectFieldName } = await loadDefectParser();
     let aliasCount = 0;
     for (const list of Object.values(extraAliases)) aliasCount += list.length;
     setFiles((cur) =>

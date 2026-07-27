@@ -382,7 +382,7 @@ export function SparePartRawDataPage() {
     getFilteredRowModel: getFilteredRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-    columnResizeMode: "onChange",
+    columnResizeMode: "onEnd", // Tier1 #6: unify resize mode across raw-data tables
     enableMultiSort: true,
   });
 
