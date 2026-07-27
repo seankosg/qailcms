@@ -7,6 +7,7 @@ import {
   type ColumnDef,
   type ColumnFiltersState,
   type ColumnSizingState,
+  type RowSelectionState,
   type SortingState,
   type VisibilityState,
   useReactTable,
@@ -48,6 +49,7 @@ import { TopHorizontalScrollbar } from "@/components/defect-management/raw-data/
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { AbdExportDialog } from "./AbdExportDialog";
 import { AbdDetailSheet } from "./AbdDetailSheet";
+import { AbdBulkEditBar } from "./AbdBulkEditBar";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import { AbdColumnOrderMenu } from "./AbdColumnOrderMenu";
 import {
