@@ -326,6 +326,8 @@ export function TaskManagementRawDataPage() {
   const [frozenExtras, setFrozenExtras] = useState<string[]>(DEFAULT_FROZEN_EXTRAS);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportRows, setExportRows] = useState<Row[] | null>(null);
+  const [exportPreparing, setExportPreparing] = useState(false);
   const [historyTask, setHistoryTask] = useState<{ discipline: string; task_no: string; task_name?: string | null } | null>(null);
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [addChildParent, setAddChildParent] = useState<ParentSeed | null>(null);
@@ -1280,7 +1282,41 @@ export function TaskManagementRawDataPage() {
           >
             <Upload className="mr-1 h-3.5 w-3.5" /> Import
           </Button>
-          <Button size="sm" className="h-8" onClick={() => setExportOpen(true)}>
+          <Button
+            size="sm"
+            className="h-8"
+            disabled={exportPreparing}
+            onClick={async () => {
+              // C1-c: Export ALL — 서버 필터/정렬 그대로 전체(파생 컬럼 포함) 재조회.
+              // 클라이언트 전용 필터/정렬이 있으면 이미 ALL 모드라 accumulated 사용.
+              if (forceAll || !hasMore) {
+                setExportRows(null);
+                setExportOpen(true);
+                return;
+              }
+              setExportPreparing(true);
+              const t = toast.loading("전체 데이터 불러오는 중…");
+              try {
+                const { data, error } = await (supabase as any).rpc("tm_items_search", {
+                  _q: globalFilter || null,
+                  _filters: serverFilters,
+                  _sort: serverSort,
+                  _offset: 0,
+                  _limit: 5000,
+                  _include_inactive: false,
+                });
+                if (error) throw error;
+                const payload = (data ?? {}) as { rows?: unknown[] };
+                setExportRows(((payload.rows ?? []) as Row[]));
+                toast.success("전체 데이터 준비 완료", { id: t });
+                setExportOpen(true);
+              } catch (e: any) {
+                toast.error("Export 준비 실패", { id: t, description: e?.message ?? String(e) });
+              } finally {
+                setExportPreparing(false);
+              }
+            }}
+          >
             <Download className="mr-1 h-3.5 w-3.5" /> Export
           </Button>
           {canEdit && (
@@ -1505,8 +1541,13 @@ export function TaskManagementRawDataPage() {
 
       <ExportDialog
         open={exportOpen}
-        onOpenChange={setExportOpen}
-        rows={filteredRowsForExport as Record<string, unknown>[]}
+        onOpenChange={(o) => {
+          setExportOpen(o);
+          if (!o) setExportRows(null);
+        }}
+        rows={
+          (exportRows ?? (filteredRowsForExport as Row[])) as Record<string, unknown>[]
+        }
         visibleKeys={visibleKeysForExport}
       />
 
