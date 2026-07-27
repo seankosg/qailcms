@@ -1,63 +1,66 @@
-# ABD Raw Data — TM Bulk Edit 이식
+# ABD Import — 로그 중복 · 진도율 정지 원인 및 수정 계획
 
-TM Raw Data(TMRD)의 mass 편집 UX(선택 체크박스 + BulkEditBar + Bulk Confirm/Delete 다이얼로그 + Export/Copy TSV)를 ABD Raw Data에 그대로 이식합니다. UI 문구, 색상, 배치, 동작 흐름을 TMRD와 동일하게 유지합니다.
+## 원인 분석 (확인된 사실)
 
-## 대상 UI (TMRD와 동일)
+### 1) 로그 2건 발생 — "시트별 로그" 구조가 근본 원인
+- `AbdImportPage.startImport()` (src/components/abd/import/AbdImportPage.tsx:427-450)에서 파일을 **시트 단위로 순회**하며 각 시트마다 `importAbdBatch()`를 별도 호출.
+- `importAbdBatch` (src/lib/abd/mutations.functions.ts:179-192)는 호출될 때마다 **`abd_import_logs` 행을 새로 INSERT**함.
+- ABD Status_ELEC_260727.xlsx는 "ABD Plot 3", "ABD Plot 4" 두 시트를 가지므로 → 로그 2행 생성.
+- DB 확인: 어제 260726 파일도 동일한 패턴으로 Plot 3 / Plot 4 로그가 각각 존재 (started_at 2건 확인).
 
-- 좌측 첫 번째 sticky 컬럼: 헤더/행에 체크박스(`__select`), sticky 처리 및 100% 불투명 배경 규칙 준수 (mem: sticky-columns-opaque).
-- 툴바 우측 "Task 추가"류 버튼 옆에 `{n} selected` 뱃지 표시.
-- 툴바 아래 `AbdBulkEditBar` (선택 시에만 표시):
-  - Field select(그룹핑) → Value 입력(select/date/number/text) → Blank 토글 → Apply
-  - Export(.xlsx / Copy TSV) 드롭다운
-  - More 메뉴: Delete permanently / Clear selection
-  - 진행 토스트, 500개 청크 배치 및 "batch i/N" 안내
-- `BulkConfirmDialog` / `BulkDeleteDialog` (TMRD 그대로 재사용 컴포넌트를 ABD용으로 복제).
+### 2) "총 갯수가 틀림"
+- Import Logs 테이블은 각 로그 행의 `total_rows`(=해당 시트 행수)를 그대로 표시.
+- 사용자는 "파일 1건 = 총합"으로 인식하는데 화면은 시트별로 쪼개진 숫자를 보여줌.
 
-## Bulk 편집 가능 필드
+### 3) 진도율 바가 중간에 멈춤
+- `startImport()`의 진행률 갱신 로직은 단 두 지점: 시작 시 `progress: 20`, 전체 시트 완료 후 `progress: 100`.
+- 시트 루프 안에서는 진행률을 갱신하지 않음 → 시트 1이 처리되는 동안(2,000행 upsert + row-log/field-log flush) 20%에서 정지 상태로 보임.
+- Aconex 스냅샷 + 대용량 upsert가 겹치면 수 분 대기가 발생.
+- 사용자가 "새로 고침"하면 DB에는 이미 status='success'로 finalize되어 있어 완료로 보임.
 
-`ABD_COLUMNS`에서 `editable && editorType` 인 컬럼을 자동 노출 (기존 인라인 편집과 동일 대상):
+## 수정 방향
 
-- Identity: Batch No.
-- Content: Document Title, HDEC PIC, HDEC ENG
-- Latest: Latest Rev, Latest Status(select A/B/C/UR/NOT YET/CX/TM), Approval(date)
-- Round1/2/3 각 8개 날짜(DS/DF/Sub/DAR × Plan/Actual) + Response Result(A/B/C)
+### A. 파일당 로그 1건 (핵심)
+- `importAbdBatch` 서명에 `sheets` 배열 파라미터 추가 (하위 호환 위해 기존 `rows`도 유지).
+- 서버 핸들러:
+  1. `abd_import_logs`에 **한 번만** INSERT (plot=null 또는 "MULTI", sheet_name=null, total_rows=Σ)
+  2. 시트별 payload를 **동일 batchId**로 순차 upsert
+  3. `inactivate_missing`은 **team 단위로 한 번만** 수행 (현재 시트별 반복 시 뒤 시트가 앞 시트 데이터를 비활성화하는 잠재 버그도 함께 해소됨)
+  4. 마지막에 하나의 log 행에 집계 결과 UPDATE
+- 클라이언트 `startImport`: `for sheet ...` 루프 제거, 시트 배열을 한 번에 전달.
 
-`isPercent` 필드 없음. 그룹 라벨은 `AbdGroupKey` → 한글/영문 라벨 매핑.
+### B. 진행률 서버 콜백
+- 서버는 단일 호출이므로 클라이언트에서 세밀한 progress를 받기 어려움. 대신:
+  1. 클라이언트에서 **시트별로 서버 호출**하되(단일 batchId를 첫 호출에 생성해 반환, 이후 호출은 append 모드) 각 호출 완료마다 `progress = round((done/total)*80) + 10`으로 갱신.
+  2. 또는 위 A 통합 호출 + 클라이언트 예상 진행률(예: 파일 크기·행수에 기반한 부드러운 애니메이션) 대체.
+- 채택: **A + append 모드**. `importAbdBatch({ log_id?, sheet_index, total_sheets, rows, ...finalize? })` 형태.
+  - `log_id`가 없으면 새 로그 생성 및 반환.
+  - `finalize=true`인 마지막 호출에서만 inactivate_missing 수행 및 status='success' 마감.
+  - 클라이언트는 시트마다 호출하며 진행률 UI 갱신.
 
-## 파일 변경
+### C. Import Logs 화면 표시 개선(경미)
+- 파일당 그룹핑(collapsible)까지는 이번 스코프 외로 두고, 우선 로그가 1건만 남게 하는 것으로 사용자 불편 해소.
 
-### 신규
-- `src/lib/abd/bulk-actions.ts`
-  - `applyAbdBulkUpdate({ ids, field, value })`: 100건 청크, `abd_items_raw` 직접 update, `{ attempted, succeeded, failed, errors }` 반환.
-  - `applyAbdBulkHardDelete(ids)`: 200건 청크 delete.
-  - `getAbdBulkEditableFields()`: `ABD_COLUMNS` → `BulkEditableField[]` (TM과 동형 인터페이스).
-  - `exportRowsToXlsx`, `copyRowsAsTsv`: TM `bulk-actions.ts`와 동일 시그니처로 재작성 (styled-workbook 사용).
-- `src/components/abd/raw-data/AbdBulkEditBar.tsx` — TM `BulkEditBar.tsx` 복사 후 import 경로/타입만 ABD용으로 치환. 문구/스타일 그대로.
-- `src/components/abd/raw-data/dialogs/AbdBulkConfirmDialog.tsx` — TM `BulkConfirmDialog` 이식.
-- `src/components/abd/raw-data/dialogs/AbdBulkDeleteDialog.tsx` — TM `BulkDeleteDialog` 이식 (DELETE 확인 문구 동일).
+## 기술 세부 (변경 파일)
 
-### 수정
-- `src/components/abd/raw-data/AbdRawDataPage.tsx`
-  - `rowSelection: RowSelectionState` state + `getRowId: (r) => String(r.id)` 추가.
-  - `__select` 컬럼 ColumnDef 삽입(맨 왼쪽, sticky, size 36, enableResizing/Sorting false, 헤더는 현재 페이지 rows 기준 전체선택).
-  - 툴바에 `{n} selected` 뱃지 + `AbdBulkEditBar` 렌더.
-  - Sticky offset 계산에 `__select` 포함, 배경 불투명(디자인 메모 준수).
-  - Export/TSV 컬럼 리스트에서 `__select` 제외.
-  - Bulk 반영 후 `useInvalidateAbd()` 호출 + 선택 해제.
+- **src/lib/abd/mutations.functions.ts**
+  - `ImportBatchSchema`에 `log_id?: uuid`, `sheet_index?: number`, `total_sheets?: number`, `finalize?: boolean`, `all_sheet_numbers?: string[]` 추가.
+  - handler:
+    - `log_id`가 있으면 재사용, 없으면 INSERT (total_rows는 우선 0 또는 알려진 총합).
+    - upsert/row-log/field-log는 매 호출 실행.
+    - `finalize=true`일 때만 inactivate_missing(전체 시트에서 본 abd_number 집합 사용) + finish/status 업데이트.
+- **src/components/abd/import/AbdImportPage.tsx**
+  - `startImport()`에서 파일 진입 시 `logId=null`, 시트 루프에서 순차 호출:
+    - 첫 호출로 `logId` 획득
+    - 각 호출 후 `progress = 10 + Math.round(((i+1)/sheets.length) * 80)`
+    - 마지막 호출에 `finalize=true`, `all_sheet_numbers=[...seen]`
+  - `agg` 집계는 그대로 유지.
+- **회귀 확인**
+  - `abd_import_row_logs`는 upload_id=batchId로 계속 append → OK.
+  - Rollback (`preview_rollback_abd_import`, `rollback_abd_import`)이 batchId 하나로 동작하므로 파일 단위 롤백이 자연스러워짐(오히려 개선).
+  - 백업 스냅샷(`takePreImportSnapshotWithFeedback`)은 파일 루프 진입 전 1회 → 변화 없음.
 
-## 권한
-
-- `canEditRawRow(currentUser)` (이미 사용 중) 결과를 `canEdit` prop으로 전달 → Apply/Delete 비활성화. RLS는 `abd_items_raw` 정책이 그대로 적용됨.
-
-## 데이터/서버 계약
-
-- 기존 `updateAbdField` server function은 단일 셀 편집용이므로 유지. Bulk update는 성능 위해 client-side chunked update(TM 동일 패턴)로 처리하고 `updated_at`도 함께 세팅. Latest Status/Response Result/날짜 변경 시 derived 트리거(`abd_compute_derived`)가 DB에서 이미 자동 재계산하므로 별도 처리 불필요.
-- Delete는 hard delete (TM과 동일 정책). RLS로 권한 없는 사용자는 실패 → 토스트 노출.
-
-## 검증
-
-- 타입체크, ABD Raw Data 화면 진입 → 3~5행 선택 → 필드/값 지정/Apply 성공 토스트, DB 반영, 라운드 파생값 갱신 확인.
-- 5000행 이상 대량 필터 후 Bulk Edit(500 청크) 시 진행 토스트/부분실패 리포트 확인.
-- Delete permanently 시 "DELETE" 타이핑 게이트, 삭제 후 목록 갱신 확인.
-- Export .xlsx / Copy TSV 결과가 현재 표시 컬럼과 일치.
-- Sticky 첫 컬럼(체크박스) 배경 불투명 유지 (Raw Data 스크롤 시 뒤 컬럼 비침 없음).
+## 확인 방법
+1. 260727 ELEC 파일 재임포트 → `abd_import_logs`에 파일당 1행, total_rows = Σ(시트 행수).
+2. 진행률 바가 시트 완료마다 10%→~90%로 이동, 마지막 100%.
+3. Raw Data 총 건수 = 두 Plot 합계와 일치.
