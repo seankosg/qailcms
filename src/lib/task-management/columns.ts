@@ -207,6 +207,10 @@ export const TM_AUTO_CALCULATED: string[] = [
   "slip_days",
   "auto_judgment",
   "actual_duration",
+  // 뷰 파생 필드 — 임포트 매핑 대상 아님 (참고용)
+  "plan_overdue",
+  "actual_overdue",
+  "expected_finish",
 ];
 
 // ---------------------------------------------------------------------------
