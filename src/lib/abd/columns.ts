@@ -171,3 +171,37 @@ export const GROUP_HEADER_BG: Record<AbdGroupKey, string> = {
   flags: "bg-orange-100/60 dark:bg-orange-900/20",
   audit: "bg-neutral-100/60 dark:bg-neutral-900/20",
 };
+
+/**
+ * ABD `current_stage` 코드값 타입 정의.
+ * DB `abd_compute_derived` 트리거가 채우는 값. UI 라벨은 `ABD_STAGE_LABELS` 로 매핑.
+ *   - `NS`     Not Started
+ *   - `DS{n}`  Draft in progress, round n
+ *   - `RS{n}`  Ready to Submit, round n
+ *   - `UR{n}`  Under Review, round n
+ *   - `RESUBMIT{n}` Terminated 로 인해 라운드 n 재제출 대기
+ *   - `Approved` 최종 승인
+ */
+export type AbdStageCode =
+  | "NS"
+  | "DS1" | "DS2" | "DS3"
+  | "RS1" | "RS2" | "RS3"
+  | "UR1" | "UR2" | "UR3"
+  | "RESUBMIT1" | "RESUBMIT2" | "RESUBMIT3"
+  | "Approved";
+
+export const ABD_STAGE_LABELS: Record<AbdStageCode, string> = {
+  NS: "Not Started",
+  DS1: "Draft R1", DS2: "Draft R2", DS3: "Draft R3",
+  RS1: "Ready-to-Submit R1", RS2: "Ready-to-Submit R2", RS3: "Ready-to-Submit R3",
+  UR1: "Under Review R1", UR2: "Under Review R2", UR3: "Under Review R3",
+  RESUBMIT1: "Awaiting Resubmit R1",
+  RESUBMIT2: "Awaiting Resubmit R2",
+  RESUBMIT3: "Awaiting Resubmit R3",
+  Approved: "Approved",
+};
+
+export function formatAbdStage(code: string | null | undefined): string {
+  if (!code) return "—";
+  return ABD_STAGE_LABELS[code as AbdStageCode] ?? code;
+}
