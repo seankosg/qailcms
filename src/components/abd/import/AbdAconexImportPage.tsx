@@ -90,6 +90,7 @@ interface Entry {
   preview?: AconexImportPreview;
   result?: AconexImportPreview & {
     updated: number;
+    batch_id: string | null;
     null_overwrites?: Record<string, number>;
   };
   error?: string;
