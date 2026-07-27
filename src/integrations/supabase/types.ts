@@ -3441,42 +3441,15 @@ export type Database = {
               team: string
             }[]
           }
-      abd_dashboard_attention_lists:
-        | {
-            Args: { _limit?: number; _plots?: string[]; _teams?: string[] }
-            Returns: {
-              abd_number: string
-              current_stage: string
-              document_title: string
-              hdec_pic_name: string
-              id: string
-              latest_status: string
-              list_kind: string
-              plot: string
-              team: string
-              ur_aging_days: number
-            }[]
-          }
-        | {
-            Args: {
-              _batch_no?: string[]
-              _limit?: number
-              _plots?: string[]
-              _teams?: string[]
-            }
-            Returns: {
-              abd_number: string
-              current_stage: string
-              document_title: string
-              hdec_pic_name: string
-              id: string
-              latest_status: string
-              list_kind: string
-              plot: string
-              team: string
-              ur_aging_days: number
-            }[]
-          }
+      abd_dashboard_attention_lists: {
+        Args: {
+          _batch_no?: string[]
+          _limit?: number
+          _plots?: string[]
+          _teams?: string[]
+        }
+        Returns: Json
+      }
       abd_dashboard_crosscut:
         | {
             Args: { _plots?: string[]; _teams?: string[] }

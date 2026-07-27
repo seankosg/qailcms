@@ -57,14 +57,17 @@ export const getAbdDashboardAttentionLists = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => FilterSchema.extend({ limit: z.number().int().default(20) }).parse(v))
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as any).rpc("abd_dashboard_attention_lists", {
+    const { data: payload, error } = await (context.supabase as any).rpc("abd_dashboard_attention_lists", {
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _limit: data.limit,
       _batch_no: toArrOrNull(data.batch_no),
     });
     if (error) throw new Error(error.message);
-    return (rows ?? []) as Array<{
+    if (!Array.isArray(payload)) {
+      throw new Error("[abd_dashboard_attention_lists] jsonb 배열 계약 위반: 응답이 배열이 아님");
+    }
+    return payload as Array<{
       list_kind: "needs_planning" | "ur_aging" | "status_mismatch";
       id: string; team: string | null; plot: string | null; abd_number: string | null;
       document_title: string | null; current_stage: string | null; ur_aging_days: number | null;
