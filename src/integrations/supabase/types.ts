@@ -3500,6 +3500,36 @@ export type Database = {
         }
         Relationships: []
       }
+      tm_milestone_kinds: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          is_active: boolean
+          kind_code: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          is_active?: boolean
+          kind_code: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          is_active?: boolean
+          kind_code?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
