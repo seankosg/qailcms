@@ -10,15 +10,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { todayInDoha } from "@/lib/time/doha";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  getDefectExcelSheetNames,
-  getDefectExcelHeaders,
-  parseDefectExcel,
-  toDefectFieldName,
-  type DefectSheetHeader,
-  type DefectTargetField,
-  type ParsedDefectRow,
+// Parser statically imports the `xlsx` package (~425KB gzip 177KB) via
+// `src/lib/defect-management/parser.ts`. This Provider is mounted from
+// `__root.tsx`, so any static import here pulls xlsx into the entry chunk
+// and every unauthenticated route (including /auth) pays the download cost.
+// Types are erased at build time — safe to static-import. Runtime callables
+// are loaded on demand via `await import()` inside the async handlers below.
+import type {
+  DefectSheetHeader,
+  DefectTargetField,
+  ParsedDefectRow,
 } from "@/lib/defect-management/parser";
+type DefectParserModule = typeof import("@/lib/defect-management/parser");
+let defectParserPromise: Promise<DefectParserModule> | null = null;
+function loadDefectParser(): Promise<DefectParserModule> {
+  if (!defectParserPromise) {
+    defectParserPromise = import("@/lib/defect-management/parser");
+  }
+  return defectParserPromise;
+}
 import { deriveRectifiedStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
 import {
   resolvePlotFromPlanGroup,
