@@ -1,0 +1,1 @@
+ALTER TABLE public.tm_milestone_config DROP CONSTRAINT IF EXISTS tm_milestone_config_kind_check;
