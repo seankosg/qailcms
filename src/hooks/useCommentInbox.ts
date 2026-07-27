@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { assertNoTruncation } from "@/lib/data/assertNoSilentTruncation";
 
 export type InboxModule = "tm" | "sm" | "abd" | "sp";
 
@@ -36,11 +37,34 @@ async function fetchOwnedParentIds(scope: InboxScope) {
     labelCols: string,
     filter: (q: any) => any,
   ): Promise<Array<Record<string, any>>> {
-    let q = (supabase as any).from(table).select(`${idCol},${labelCols}`).limit(5000);
-    q = filter(q);
-    const { data, error } = await q;
-    if (error) throw error;
-    return (data ?? []) as any[];
+    // range 루프 표준안: offset += batch.length. 종료 조건: batch.length < CHUNK.
+    // 이전 .limit(5000) 은 PostgREST 상한(1,000)에 먼저 잘려 조용한 데이터 손실 발생.
+    const CHUNK = 1000;
+    const MAX_ITER = 50; // 안전선: 최대 50,000행
+    const collected: any[] = [];
+    let offset = 0;
+    let iter = 0;
+    // count는 정확도 위해 exact. 최대 1회만 요청.
+    let total: number | null = null;
+    while (true) {
+      if (++iter > MAX_ITER) {
+        throw new Error(`useCommentInbox idsFrom(${table}) 청크 루프 상한 초과`);
+      }
+      let q = (supabase as any)
+        .from(table)
+        .select(`${idCol},${labelCols}`, iter === 1 ? { count: "exact" } : undefined)
+        .range(offset, offset + CHUNK - 1);
+      q = filter(q);
+      const { data, error, count } = await q;
+      if (error) throw error;
+      const batch = (data ?? []) as any[];
+      if (iter === 1 && typeof count === "number") total = count;
+      collected.push(...batch);
+      if (batch.length < CHUNK) break;
+      offset += batch.length;
+    }
+    assertNoTruncation(`useCommentInbox.idsFrom(${table})`, collected, total);
+    return collected;
   }
 
   const tmParents = isAdmin
