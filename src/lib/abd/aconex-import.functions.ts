@@ -244,7 +244,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       .from("abd_import_logs")
       .insert({
         file_name: data.file_name,
-        team: "MECH", // Aconex 는 team 무관, NOT NULL 스키마 회피
+        team: null, // Aconex 는 team 개념 없음 — 로그 화면에서 "—" 표시
         plot: null,
         sheet_name: "Docs (Aconex)",
         total_rows: data.rows.length,
