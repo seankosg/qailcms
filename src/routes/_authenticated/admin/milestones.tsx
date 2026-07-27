@@ -165,9 +165,9 @@ function Page() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">ALSMK 체크</CardTitle>
+          <CardTitle className="text-base">Plot 미지정 점검</CardTitle>
           <CardDescription>
-            Config에 없는 (plot × milestone) 조합이 Raw Data에 존재하는지 검증합니다.
+            Config에 없는 (plot × milestone) 조합이 Raw Data에 존재하는지 검증합니다. plot이 비어있는 항목은 여기서 경보로 노출됩니다.
           </CardDescription>
         </CardHeader>
         <CardContent>
