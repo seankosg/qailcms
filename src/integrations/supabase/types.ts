@@ -3411,6 +3411,10 @@ export type Database = {
         }
         Returns: string
       }
+      abd_aconex_apply_diffs: {
+        Args: { _batch_id: string; _patches: Json }
+        Returns: number
+      }
       abd_approved_round: {
         Args: { _row: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
         Returns: number
