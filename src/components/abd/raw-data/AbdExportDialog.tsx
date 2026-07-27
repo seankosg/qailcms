@@ -14,7 +14,7 @@ interface Props {
   filenamePrefix?: string;
 }
 
-export function AbdExportDialog({ open, onOpenChange, getRows, columnHeaders, filenamePrefix = "abd-raw" }: Props) {
+export function AbdExportDialog({ open, onOpenChange, getRows, columnHeaders, filenamePrefix = "CMS_ABD_raw" }: Props) {
   const [busy, setBusy] = useState(false);
   const exportNow = async () => {
     setBusy(true);

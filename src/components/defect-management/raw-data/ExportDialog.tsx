@@ -81,7 +81,7 @@ export function ExportDialog({
           label: format === "reimport" ? h.key : h.label,
         }));
         const { count } = await streamXlsxExport({
-          filename: `defect-raw-${stamp}-${timestamp}.xlsx`,
+          filename: `CMS_SM_raw_${stamp}_${timestamp}.xlsx`,
           sheetName: "Snags",
           columns: cols,
           chunkSize: 1000,
@@ -120,7 +120,7 @@ export function ExportDialog({
           label: format === "reimport" ? h.key : h.label,
         }));
         await streamXlsxExport({
-          filename: `defect-raw-${stamp}-${timestamp}.xlsx`,
+          filename: `CMS_SM_raw_${stamp}_${timestamp}.xlsx`,
           sheetName: "Snags",
           columns: cols,
           chunkSize: 1000,
@@ -159,7 +159,7 @@ export function ExportDialog({
               dateFields: DEFECT_DATE_FIELDS,
               datetimeFields: DEFECT_DATETIME_FIELDS,
             });
-            zip.file(`${sanitize(key)}-${stamp}.xlsx`, buf);
+            zip.file(`CMS_SM_${sanitize(key)}_${stamp}.xlsx`, buf);
             // free the group's rows after writing this sheet
             groups.set(key, []);
             await new Promise((r) => setTimeout(r, 0));
@@ -170,7 +170,7 @@ export function ExportDialog({
         } else {
           for (const [key, rs] of groups.entries()) {
             await streamXlsxExport({
-              filename: `defect-raw-${sanitize(key)}-${stamp}-${timestamp}.xlsx`,
+              filename: `CMS_SM_raw_${sanitize(key)}_${stamp}_${timestamp}.xlsx`,
               sheetName: "Snags",
               columns: cols,
               chunkSize: 1000,

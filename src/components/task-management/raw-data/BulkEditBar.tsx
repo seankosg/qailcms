@@ -162,7 +162,7 @@ export function BulkEditBar({
       exportRowsToXlsx({
         rows: selectedRows,
         columns: exportColumns,
-        fileName: `task-management_selected_${stamp}.xlsx`,
+        fileName: `CMS_TM_selected_${stamp}.xlsx`,
       });
       toast.success("Export 완료", { description: `${count} rows exported.` });
     } catch (e: any) {

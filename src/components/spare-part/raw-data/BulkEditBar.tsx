@@ -175,7 +175,7 @@ export function BulkEditBar({
       exportSelectedToXlsx({
         rows: selectedRows,
         columns: exportColumns,
-        fileName: `spare-part_selected_${stamp}.xlsx`,
+        fileName: `CMS_ST_selected_${stamp}.xlsx`,
       });
       toast.success("Export 완료", { description: `${count} rows exported.` });
     } catch (e: any) {

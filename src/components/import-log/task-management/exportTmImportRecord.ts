@@ -210,7 +210,7 @@ export async function exportTmImportRecord(opts: {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `tm-import-record_${from}_${to}.xlsx`;
+  a.download = `CMS_TM_ImportRecord_${from}_${to}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();
