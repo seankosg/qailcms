@@ -384,6 +384,8 @@ export function AbdImportPage() {
     setEntries((p) => p.filter((x) => x.id !== id));
   const setTeam = (id: string, team: string) =>
     setEntries((p) => p.map((x) => (x.id === id ? { ...x, team } : x)));
+  const setDataDate = (id: string, v: string | null) =>
+    setEntries((p) => p.map((x) => (x.id === id ? { ...x, dataDate: v } : x)));
   const clearAll = () => setEntries([]);
 
   // 파싱 완료된 파일 중 미등록 team 코드 수집
@@ -624,6 +626,7 @@ export function AbdImportPage() {
                 onOpenDuplicates={() => setDupOpenId(e.id)}
                 onDateOverridesApply={(ovr) => reparseWithOverrides(e.id, ovr)}
                 onOpenColumnSelect={() => setColumnFileId(e.id)}
+                onDataDateChange={(v) => setDataDate(e.id, v)}
               />
             ))}
           </CardContent>
