@@ -120,10 +120,10 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
 
     // 2) 매칭 검사: RPC 를 청크 호출.
     // PostgREST 는 RPC(TABLE 반환) 응답을 기본 1000 행으로 잘라내므로,
-    // 입력을 800 개씩 나눠 여러 번 호출해 잘림을 회피한다.
+    // 입력을 2000 개씩 나눠 여러 번 호출해 잘림을 회피한다.
     const docNos = Array.from(new Set(data.rows.map((r) => r.document_no)));
     const existingRows = new Map<string, any>();
-    const CHUNK = 800;
+    const CHUNK = 2000;
     for (let i = 0; i < docNos.length; i += CHUNK) {
       const slice = docNos.slice(i, i + CHUNK);
       try {
