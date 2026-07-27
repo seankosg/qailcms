@@ -3542,6 +3542,10 @@ export type Database = {
               team: string
             }[]
           }
+      abd_dashboard_row1_json: {
+        Args: { _batch_no: string[]; _plots: string[]; _teams: string[] }
+        Returns: Json
+      }
       abd_dashboard_row2:
         | {
             Args: { _plots?: string[]; _teams?: string[] }
@@ -3559,6 +3563,10 @@ export type Database = {
               team: string
             }[]
           }
+      abd_dashboard_row2_json: {
+        Args: { _batch_no: string[]; _plots: string[]; _teams: string[] }
+        Returns: Json
+      }
       abd_dashboard_status_dist:
         | {
             Args: { _plots?: string[]; _teams?: string[] }
@@ -3669,6 +3677,20 @@ export type Database = {
               stage: string
             }[]
           }
+      abd_progress_cells_json: {
+        Args: {
+          _as_of_date: string
+          _bucket: string
+          _group_by: string[]
+          _plan_mode: string
+          _plots: string[]
+          _range_end: string
+          _range_start: string
+          _round: string
+          _teams: string[]
+        }
+        Returns: Json
+      }
       abd_progress_totals:
         | {
             Args: {
@@ -3704,6 +3726,17 @@ export type Database = {
               total: number
             }[]
           }
+      abd_progress_totals_json: {
+        Args: {
+          _as_of_date: string
+          _group_by: string[]
+          _plan_mode: string
+          _plots: string[]
+          _round: string
+          _teams: string[]
+        }
+        Returns: Json
+      }
       abd_round_stage_dates: {
         Args: {
           _round: number
