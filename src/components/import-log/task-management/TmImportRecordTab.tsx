@@ -30,6 +30,13 @@ interface LogRow {
   started_at: string;
 }
 
+interface EditDaily {
+  user_id: string;
+  date_key: string;
+  edits_count: number;
+  tasks_count: number;
+}
+
 function toKstDateKey(iso: string): string {
   // Doha (Asia/Qatar, UTC+3) calendar date key.
   return toDohaDateKey(iso);
@@ -127,6 +134,20 @@ export function TmImportRecordTab() {
     },
   });
 
+  const editsQuery = useQuery({
+    queryKey: ["tm-import-record", "edits", from, to],
+    enabled: allowed,
+    staleTime: 30_000,
+    queryFn: async (): Promise<EditDaily[]> => {
+      const { data, error } = await supabase.rpc("tm_edit_record_daily", {
+        p_from: from,
+        p_to: to,
+      });
+      if (error) throw error;
+      return (data ?? []) as EditDaily[];
+    },
+  });
+
   const dates = useMemo(() => buildDateRange(from, to), [from, to]);
 
   const countMap = useMemo(() => {
@@ -139,6 +160,16 @@ export function TmImportRecordTab() {
     }
     return map;
   }, [logsQuery.data]);
+
+  const editMap = useMemo(() => {
+    const map = new Map<string, { edits: number; tasks: number }>();
+    for (const row of editsQuery.data ?? []) {
+      if (!row.user_id) continue;
+      const key = `${row.user_id}|${row.date_key}`;
+      map.set(key, { edits: row.edits_count, tasks: row.tasks_count });
+    }
+    return map;
+  }, [editsQuery.data]);
 
   const teams = useMemo(() => {
     const set = new Set<string>();
@@ -178,7 +209,7 @@ export function TmImportRecordTab() {
     );
   }
 
-  const isLoading = usersQuery.isLoading || logsQuery.isLoading;
+  const isLoading = usersQuery.isLoading || logsQuery.isLoading || editsQuery.isLoading;
 
   const handleExport = async () => {
     try {
@@ -188,6 +219,7 @@ export function TmImportRecordTab() {
         dates,
         groups: grouped,
         countMap,
+        editMap,
         teamFilter,
         exportedBy: me?.name ?? me?.email ?? "",
       });
@@ -280,7 +312,7 @@ export function TmImportRecordTab() {
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 불러오는 중...
         </div>
       ) : (
-        <MatrixTables dates={dates} groups={grouped} countMap={countMap} today={today} />
+        <MatrixTables dates={dates} groups={grouped} countMap={countMap} editMap={editMap} today={today} />
       )}
     </div>
   );
@@ -290,11 +322,13 @@ function MatrixTables({
   dates,
   groups,
   countMap,
+  editMap,
   today,
 }: {
   dates: string[];
   groups: [string, PicUser[]][];
   countMap: Map<string, number>;
+  editMap: Map<string, { edits: number; tasks: number }>;
   today: string;
 }) {
   if (groups.length === 0) {
@@ -312,6 +346,7 @@ function MatrixTables({
       {groups.map(([team, users]) => {
         const todayCount = users.filter((u) => (countMap.get(`${u.id}|${today}`) ?? 0) > 0).length;
         const missing = users.length - todayCount;
+        const todayEditors = users.filter((u) => (editMap.get(`${u.id}|${today}`)?.edits ?? 0) > 0).length;
         return (
           <div key={team} className="rounded-md border bg-card">
             <div className="flex items-center gap-2 border-b px-3 py-2">
@@ -321,6 +356,7 @@ function MatrixTables({
               <Badge className={missing > 0 ? "bg-red-100 text-red-800" : "bg-slate-100"}>
                 오늘 미업로드 {missing}
               </Badge>
+              <Badge className="bg-sky-100 text-sky-800">오늘 편집 {todayEditors}명</Badge>
             </div>
             <div className="overflow-auto">
               <table className="w-max min-w-full border-collapse text-xs">
@@ -353,6 +389,7 @@ function MatrixTables({
                 <tbody>
                   {users.map((u) => {
                     let count = 0;
+                    let editDays = 0;
                     return (
                       <tr key={u.id} className="hover:bg-muted/30">
                         <td className="sticky left-0 z-10 whitespace-nowrap border-b border-r bg-background px-2 py-1">
@@ -363,27 +400,41 @@ function MatrixTables({
                         </td>
                         {displayDates.map((d) => {
                           const c = countMap.get(`${u.id}|${d}`) ?? 0;
+                          const e = editMap.get(`${u.id}|${d}`);
                           const wk = isWeekend(d);
                           if (c > 0) count++;
+                          if ((e?.edits ?? 0) > 0) editDays++;
                           const isToday = d === today;
                           return (
                             <td
                               key={d}
-                              title={`${d}: ${c}건`}
-                              className={`border-b border-r px-1 py-1 text-center ${
+                              title={`${d}: 업로드 ${c}건${e ? ` · 편집 ${e.edits}필드 / ${e.tasks} Task` : ""}`}
+                              className={`border-b border-r px-1 py-0.5 text-center ${
                                 wk ? "bg-muted/30" : ""
                               } ${isToday ? "bg-primary/5" : ""}`}
                             >
-                              {c > 0 ? (
-                                <Check className="mx-auto h-3.5 w-3.5 text-emerald-600" />
-                              ) : (
-                                <X className="mx-auto h-3.5 w-3.5 text-red-400" />
-                              )}
+                              <div className="flex flex-col items-center leading-tight">
+                                {c > 0 ? (
+                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                ) : (
+                                  <X className="h-3.5 w-3.5 text-red-400" />
+                                )}
+                                {e && e.edits > 0 ? (
+                                  <span className="mt-0.5 text-[9px] font-medium text-sky-700">
+                                    {e.edits}/{e.tasks}
+                                  </span>
+                                ) : (
+                                  <span className="mt-0.5 text-[9px] text-transparent">·</span>
+                                )}
+                              </div>
                             </td>
                           );
                         })}
-                        <td className="border-b border-l-2 border-r px-2 py-1 text-center font-medium">
-                          {count} / {dates.length}
+                        <td className="border-b border-l-2 border-r px-2 py-1 text-center font-medium whitespace-nowrap">
+                          <div className="leading-tight">
+                            <div>{count} / {dates.length}</div>
+                            <div className="text-[10px] font-normal text-sky-700">편집 {editDays}일</div>
+                          </div>
                         </td>
                       </tr>
                     );
