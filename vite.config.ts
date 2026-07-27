@@ -13,6 +13,9 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    // Enable route-level automatic code splitting so each of the 49+ route files
+    // ships its component in its own chunk, keeping the entry chunk lean.
+    router: { autoCodeSplitting: true },
   },
   vite: {
     define: {
