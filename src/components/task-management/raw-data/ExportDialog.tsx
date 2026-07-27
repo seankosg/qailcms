@@ -110,7 +110,10 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
           _as_of: dd,
         });
         if (error) throw error;
-        for (const row of (data ?? []) as Array<{ id: string; t_actual: number }>) {
+        if (data != null && !Array.isArray(data)) {
+          throw new Error("tm_today_actual RPC contract mismatch: expected jsonb array");
+        }
+        for (const row of ((data ?? []) as unknown[]) as Array<{ id: string; t_actual: number }>) {
           tActualMap.set(String(row.id), Number(row.t_actual) || 0);
         }
       }

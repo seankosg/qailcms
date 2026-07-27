@@ -587,7 +587,10 @@ export function TaskManagementRawDataPage() {
         _as_of: selectedDataDate,
       });
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; t_actual: number }>;
+      if (data != null && !Array.isArray(data)) {
+        throw new Error("tm_today_actual RPC contract mismatch: expected jsonb array");
+      }
+      return ((data ?? []) as unknown[]) as Array<{ id: string; t_actual: number }>;
     },
     enabled: rowIds.length > 0 && !!selectedDataDate,
     staleTime: 60_000,
