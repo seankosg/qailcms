@@ -138,10 +138,10 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       "r1_submission_actual,r2_submission_actual,r3_submission_actual," +
       "r1_dar_actual,r2_dar_actual,r3_dar_actual," +
       "r1_response_result,r2_response_result,r3_response_result," +
-      "r1_ds_actual,r2_ds_actual,r3_ds_actual," +
-      "r1_df_actual,r2_df_actual,r3_df_actual," +
-      "r1_ds_plan,r2_ds_plan,r3_ds_plan," +
-      "r1_df_plan,r2_df_plan,r3_df_plan";
+      "r1_draft_start_actual,r2_draft_start_actual,r3_draft_start_actual," +
+      "r1_draft_finish_actual,r2_draft_finish_actual,r3_draft_finish_actual," +
+      "r1_draft_start_plan,r2_draft_start_plan,r3_draft_start_plan," +
+      "r1_draft_finish_plan,r2_draft_finish_plan,r3_draft_finish_plan";
     for (let i = 0; i < docNos.length; i += CHUNK) {
       const slice = docNos.slice(i, i + CHUNK);
       const { data: rows, error } = await supa
@@ -390,11 +390,13 @@ function computePatch(
       patch[`r${n}_submission_actual`] = null;
       patch[`r${n}_dar_actual`] = null;
       patch[`r${n}_response_result`] = null;
-      if (!existing?.[`r${n}_ds_actual`]) {
-        patch[`r${n}_ds_actual`] = iso ?? existing?.[`r${n}_ds_plan`] ?? null;
+      if (!existing?.[`r${n}_draft_start_actual`]) {
+        patch[`r${n}_draft_start_actual`] =
+          iso ?? existing?.[`r${n}_draft_start_plan`] ?? null;
       }
-      if (!existing?.[`r${n}_df_actual`]) {
-        patch[`r${n}_df_actual`] = iso ?? existing?.[`r${n}_df_plan`] ?? null;
+      if (!existing?.[`r${n}_draft_finish_actual`]) {
+        patch[`r${n}_draft_finish_actual`] =
+          iso ?? existing?.[`r${n}_draft_finish_plan`] ?? null;
       }
     }
     if (allowed.has("is_terminated")) patch.is_terminated = false;
