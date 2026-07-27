@@ -158,6 +158,7 @@ const NAV: NavSection[] = [
       { to: "/admin/masters", label: "마스터", icon: iconDatabase, adminOnly: true },
       { to: "/admin/mapping", label: "Mapping", icon: iconLink, adminOnly: true },
       { to: "/admin/task-thresholds", label: "Task 임계값", icon: iconSlider, adminOnly: true },
+      { to: "/admin/milestones", label: "Milestone", icon: iconCalendar, adminOnly: true },
     ],
   },
 ];
