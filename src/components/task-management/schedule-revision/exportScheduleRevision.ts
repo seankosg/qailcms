@@ -333,6 +333,6 @@ export function buildScheduleRevisionWorkbook(opts: ExportOptions): XLSX.WorkBoo
 }
 
 export function saveScheduleRevisionWorkbook(wb: XLSX.WorkBook, fileName?: string): void {
-  const name = fileName ?? `Task__Schedule_Revision__${dohaStampCompact()}.xlsx`;
+  const name = fileName ?? `CMS_TM_ScheduleRevision_${dohaStampCompact()}.xlsx`;
   XLSX.writeFile(wb, name);
 }
