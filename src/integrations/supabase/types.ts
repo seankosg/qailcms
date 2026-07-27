@@ -687,6 +687,39 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_latest_status_restore_snapshot_20260727: {
+        Row: {
+          abd_item_id: string
+          abd_number: string | null
+          id: string
+          note: string | null
+          prev_latest_status: string | null
+          restored: boolean
+          restored_to: string | null
+          snapshot_at: string
+        }
+        Insert: {
+          abd_item_id: string
+          abd_number?: string | null
+          id?: string
+          note?: string | null
+          prev_latest_status?: string | null
+          restored?: boolean
+          restored_to?: string | null
+          snapshot_at?: string
+        }
+        Update: {
+          abd_item_id?: string
+          abd_number?: string | null
+          id?: string
+          note?: string | null
+          prev_latest_status?: string | null
+          restored?: boolean
+          restored_to?: string | null
+          snapshot_at?: string
+        }
+        Relationships: []
+      }
       abd_settings: {
         Row: {
           ds_gap_after_rs_days: number
