@@ -148,7 +148,7 @@ export function AbdDetailSheet({ id, onOpenChange, focusSection }: { id: string 
                 <span className="font-mono">{item.abd_number}</span>
                 {!item.is_active && <Badge variant="secondary">Inactive</Badge>}
                 {item.current_stage && (
-                  <Badge variant="outline" className="text-[10px]">{item.current_stage}</Badge>
+                  <Badge variant="outline" className="text-[10px]">{formatAbdStage(item.current_stage)}</Badge>
                 )}
                 {typeof aging === "number" && aging > 0 && (
                   <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold", AGING_TONE_CLASS[tone])}>
