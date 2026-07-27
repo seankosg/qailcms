@@ -87,7 +87,7 @@ function exportUsersXlsx(rows: any[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `users_${todayInDoha()}.csv`;
+  a.download = `CMS_Users_${todayInDoha()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
