@@ -787,7 +787,19 @@ export async function parseTaskManagementExcel(
       main_task_no: parentNo,
       level,
       category: cat ?? propagate?.category ?? null,
-      plot: plot ?? propagate?.plot ?? null,
+      plot: (() => {
+        const resolved = plot ?? propagate?.plot ?? null;
+        if (resolved) return resolved;
+        // 방어: plot 공란인데 task_no 두 번째 세그먼트가 C/D 이면 자동 유도
+        const seg = taskNo.split("-")[1];
+        if (seg === "C" || seg === "D") {
+          warnings.push(
+            `행 ${r}: plot 공란 → task_no '${taskNo}'의 세그먼트 '${seg}'에서 자동 유도`,
+          );
+          return seg;
+        }
+        return null;
+      })(),
       task_name: taskName ?? propagate?.task_name ?? null,
       risk: risk ?? propagate?.risk ?? null,
       sub_task_desc: toStr(getCell(sheet, r, cols.sub_task_desc)),
