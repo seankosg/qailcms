@@ -10,6 +10,7 @@ import {
   getAbdDashboardAttentionLists,
   getAbdDashboardCrosscut,
 } from "@/lib/abd/dashboard.functions";
+import { formatAbdStage } from "@/lib/abd/columns";
 
 interface BaseProps {
   plots?: string[];
@@ -125,7 +126,7 @@ function AttentionRows({
               ) : null}
             </div>
             <div className="text-[11px] text-muted-foreground">
-              {[it.team, it.plot, it.hdec_pic_name, `Stage: ${it.current_stage ?? "—"}`]
+              {[it.team, it.plot, it.hdec_pic_name, `Stage: ${formatAbdStage(it.current_stage)}`]
                 .filter(Boolean)
                 .join(" · ")}
             </div>

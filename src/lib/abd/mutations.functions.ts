@@ -315,6 +315,27 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       for (const e of (existingRows ?? []) as any[]) existingMap.set(e.abd_number, e);
       const existingSet = new Set(existingMap.keys());
 
+      // Aconex 정본 가드: 기존 행의 r{n}_response_source='imported' 이면
+      // HDEC 파서가 해당 라운드의 r{n}_response_result 를 덮어쓰지 못하게 payload에서 제거
+      const { data: srcRows } = await supa
+        .from("abd_items_raw")
+        .select("abd_number,r1_response_source,r2_response_source,r3_response_source")
+        .eq("team", data.team)
+        .in("abd_number", nums);
+      const srcMap = new Map<string, any>();
+      for (const s of (srcRows ?? []) as any[]) srcMap.set(s.abd_number, s);
+      for (const row of payload) {
+        const src = srcMap.get((row as any).abd_number);
+        if (!src) continue;
+        for (const n of [1, 2, 3] as const) {
+          const key = `r${n}_response_result`;
+          const srcKey = `r${n}_response_source`;
+          if (src[srcKey] === "imported" && key in (row as any)) {
+            delete (row as any)[key];
+          }
+        }
+      }
+
       const { error: upErr } = await supa
         .from("abd_items_raw")
         .upsert(payload, { onConflict: "team,abd_number" });
