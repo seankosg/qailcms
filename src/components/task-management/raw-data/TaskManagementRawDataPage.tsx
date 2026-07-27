@@ -51,6 +51,8 @@ import {
   TEAM_COLORS,
   GROUP_HEADER_BG,
   PLOT_COLORS,
+  MILESTONE_COLORS,
+  OVERDUE_COLORS,
   RISK_COLORS,
   ROW_TYPE_COLORS,
   STATUS_COLORS,
@@ -142,6 +144,9 @@ function renderBadge(key: string, value: string) {
     plot: PLOT_COLORS,
     discipline: DISCIPLINE_COLORS,
     team: TEAM_COLORS,
+    milestone: MILESTONE_COLORS,
+    plan_overdue: OVERDUE_COLORS,
+    actual_overdue: OVERDUE_COLORS,
   };
   const colors = map[key];
   const cls = colors?.[value] ?? "bg-muted text-foreground";
