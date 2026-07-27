@@ -282,6 +282,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
         inactivated: 0,
         mismatched: unmatched.length,
         imported_by: context.userId,
+        build_id: typeof __APP_BUILD_ID__ === "string" ? __APP_BUILD_ID__ : null,
         note: `Aconex sync — matched=${matched.length} unmatched=${unmatched.length}`,
       })
       .select("id")
