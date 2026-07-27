@@ -66,6 +66,42 @@
 
 ---
 
+## 7. needs_planning 조건 확대  `[동결]` `[설계확정]`
+
+- **동결 사유**: 현행 트리거는 R1 착수 전(모든 라운드 계획 부재) 케이스만 `needs_planning=true`. R2/R3 라운드 진입 후 부분 계획만 존재하는 케이스(DS만 있고 DF/SB 없음, 또는 SB만 있고 DS/DF 없음)는 어텐션에서 누락.
+- **확정 설계**:
+  - 판정 확장: 활성 라운드(current_stage 소속)의 DS/DF/SB **3종 계획 완전성** 검사. 하나라도 결측이면 `needs_planning=true`.
+  - 트리거 위치: `abd_compute_derived` 내 기존 `needs_planning` 블록에 활성 라운드 3종 결측 검사 추가. Approval(latest_status='A') 및 `is_terminated=true`는 제외.
+  - Attention Inbox 라벨: 기존 "계획필요" 탭에 병합 (하위 사유 태그 `partial_plan` 부여).
+  - 예상 영향 규모: 사전 조사 필요(rough estimate: 활성 R2/R3 항목 중 ~400-600건).
+- **재개 조건**: 사용자 명시적 승인.
+
+---
+
+## 8. terminated_replan 어텐션  `[동결]` `[설계확정]`
+
+- **동결 사유**: Terminated 항목이 후속 재발주(re-plan)로 다시 활성화되는 케이스에 대한 감지 로직 부재. 현재는 `is_terminated=true` 세팅 이후 상태 전이 감시 없음.
+- **확정 설계**:
+  - 조건: `is_terminated=true` && (`latest_status` IN ('A','B','C') OR 신규 라운드 계획일자 신규 입력됨) → `terminated_replan=true` 플래그 세팅.
+  - 트리거: `abd_items_raw` AFTER UPDATE에서 `is_terminated` unchanged=true인데 상태/계획 변경 감지 시 `terminated_replan` 세팅. 임포트/수동 편집 모두 커버.
+  - Attention Inbox 신규 탭: "Terminated 재계획" (아이콘 RefreshCcw, tone info). 관리자가 검토 후 `is_terminated=false`로 되돌리는 액션 버튼.
+  - RPC 확장: `abd_dashboard_attention_lists`에 `terminated_replan` 섹션 추가.
+- **재개 조건**: 첫 재발주 사례 발견 시 즉시 재개.
+
+---
+
+## 9. 비활성 3건 수동 검토  `[동결]` `[설계확정]`
+
+- **동결 사유**: `is_active=false`이면서 `is_terminated=false`인 3건은 어느 파이프라인 룰에도 부합하지 않는 예외 케이스. 자동 판정 불가.
+- **확정 설계**:
+  - 대상 특정 쿼리: `SELECT id, abd_number, document_title, latest_status, updated_at FROM abd_items_raw WHERE is_active=false AND is_terminated=false;` (현재 3건)
+  - 검토 산출물: 각 건별 (a) 원본 파일에서의 상태, (b) 비활성화된 계기(Import log 추적), (c) 조치안: 재활성화 / Terminated 전환 / 유지.
+  - 조치 방식: 관리자 UI에서 수동 편집 (Bulk 편집 대상 아님).
+  - 재발 방지: 임포트 파이프라인에서 `is_active=false && is_terminated=false` 상태로 진입하는 경로가 있는지 감사 로그 확인.
+- **재개 조건**: 사용자가 수동 검토 착수 지시.
+
+---
+
 ## 부록 — 확정 상수/규칙
 
 - 정규 latest_status 코드: `A / B / C / NYS` (4종 고정)
