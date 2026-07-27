@@ -25,6 +25,27 @@ export const Route = createFileRoute("/_authenticated/admin/milestones")({
 
 function Page() {
   const qc = useQueryClient();
+  const [deletingKind, setDeletingKind] = useState<string | null>(null);
+
+  async function deleteKind(code: string) {
+    if (!confirm(`Milestone 종류 '${code}'를 삭제하시겠습니까?\n(모든 Plot의 해당 열과 설정 값이 함께 삭제됩니다)`)) return;
+    setDeletingKind(code);
+    try {
+      const { error: e1 } = await (supabase as any)
+        .from("tm_milestone_kinds")
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq("kind_code", code);
+      if (e1) throw e1;
+      await (supabase as any).from("tm_milestone_config").delete().eq("kind", code);
+      toast.success(`${code} 삭제됨`);
+      qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
+      qc.invalidateQueries({ queryKey: ["tm_milestone_config"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "삭제 실패");
+    } finally {
+      setDeletingKind(null);
+    }
+  }
 
   const { data: kinds = FALLBACK_KINDS } = useQuery<Kind[]>({
     queryKey: ["tm_milestone_kinds"],
@@ -204,6 +225,20 @@ function Page() {
                             <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                           )}
                           저장
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          disabled={deletingKind === kind}
+                          onClick={() => deleteKind(kind)}
+                          title={`Milestone 종류 '${kind}' 삭제 (모든 Plot 공통)`}
+                        >
+                          {deletingKind === kind ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          )}
                         </Button>
                       </div>
                     );
