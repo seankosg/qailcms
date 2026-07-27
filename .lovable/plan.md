@@ -1,77 +1,54 @@
-# ABD 대시보드 ↔ Raw Data 정합성 개선 계획
+## 목표
 
-## 1. 실측 검증 결과
+`AbdProgressPage.tsx` 상단의 KPI 스트립(현재 6개: Cum Plan / Cum Actual / Variance / Done Stages / Progress / Range)을 **Progress 전용 신규 세트**로 교체. 툴바 전체 필터 반영, 카드 클릭 시 Dashboard와 동일 규칙으로 Raw Data 딥링크.
 
-Playwright로 SM/ABD 대시보드 카드 클릭 → Raw Data 이동 시 총합(뱃지) 비교.
+## 새 KPI 카드 세트 (총 6개)
 
-### SM (정합)
-- Dashboard(Plot C) **OPEN 24,179** → Raw Data 총합 **24,179**. 일치.
-- 헤더 뱃지가 이미 `현재페이지 / 총계` 단일 형태(`1–100 / 24,179`)로 TM의 "매치/컨텍스트" 문제 없음.
-- **결론: SM은 손대지 않음.**
+`totalsQ.data` 및 `cellsQ.data` 기반으로 As-of Date(툴바) 시점 집계. Plot/Team/Stage/As-of/Plan Mode 툴바 상태 전체 반영.
 
-### ABD (심각 — 딥링크 대부분 무효)
-| 카드 | URL 파라미터 | Raw Data 총합 |
-|---|---|---|
-| Under Review | `status_group=under_review` | 2,606 (전체) |
-| Response Delay | `status_group=rs_delay` | 2,606 (전체) |
-| Draft Start Delay | `status_group=ds_delay` | 2,606 (전체) |
-| No Plan | `status_group=no_plan` | 2,606 (전체) |
+| # | 카드 | 값 | 서브 라인 | Tone | 클릭 딥링크 |
+|---|---|---|---|---|---|
+| 1 | **Progress** | `done / total` (%) | `Δ vs Plan: ±N pp` | ok/warn/danger | — (표시 전용) |
+| 2 | **On Track** | Actual ≥ Plan 인 스테이지 건수 | `x% of scope` | ok | Raw Data (status=in_progress) |
+| 3 | **Behind Plan** | Plan 대비 미달 스테이지 수 (`plan_upto - actual_upto`, 음수 제외) | `x pp gap` | warn | Raw Data (status=in_progress, delay filter) |
+| 4 | **Response Delay** | RS 지연 카운트 (row2 RPC `RS`) | 팀별 breakdown | danger | Raw Data `status=rs_delay` |
+| 5 | **Submission Delay** | SB 지연 카운트 | 팀별 breakdown | danger | Raw Data `status=sb_delay` |
+| 6 | **Draft Delay** | DS+DF 지연 카운트 합 | 팀별 breakdown | danger | Raw Data `status=ds_delay` |
 
-모든 카드가 동일한 MECH 전체 카운트를 표시 → **필터가 전혀 적용되지 않음**.
+- 지연 3종(4~6)은 Dashboard의 `abd_dashboard_row2` RPC를 재사용하되, 툴바 Plot/Team 필터를 파라미터로 전달.
+- Progress/On Track/Behind Plan은 기존 `getAbdProgressTotals` 결과에서 파생 (Stage 필터 반영).
+- 각 카드는 `AbdKpiCard`(`src/components/abd/dashboard/AbdKpiRows.tsx`)를 재사용해 대시보드와 시각적 일관성 유지 (breakdown, tone, hover, stackBar 옵션).
 
-## 2. 근본 원인 (파일:라인 인용)
+## 클릭 딥링크 규칙 (Dashboard와 동일)
 
-원인이 3중으로 겹쳐 있음.
+`AbdKpiRows.tsx`의 `buildRawUrl` 헬퍼와 동일 파라미터 스키마 사용:
+- `plot`, `tab`(팀), `status`(under_review/rs_delay/sb_delay/ds_delay/in_progress 등)
+- `source=progress` 마커 유지
+- Stage 필터는 URL `stage=` 로 전달
 
-**(A) URL 파라미터 key 불일치**
-- `src/components/abd/dashboard/AbdKpiRows.tsx:171,175,246,248,261,263`: `status_group`으로 전달.
-- `src/routes/_authenticated/closure/abd/raw-data.tsx:9`: 스키마는 `status`만 정의. `status_group`은 zod에서 버려짐.
+## 파일 변경
 
-**(B) 값 어휘 불일치**
-- `src/components/abd/raw-data/AbdRawDataPage.tsx:162-167`의 `STATUS_TABS`는 `approved | in_progress | not_started` 3개만.
-- Dashboard는 `approved | under_review | drafting | not_started | rs_delay | sb_delay | ds_delay | no_plan | delayed` 9개를 사용(DB `status_group` 컬럼 값).
+1. **`src/components/abd/progress/AbdProgressPage.tsx`**
+   - 하단 로컬 `KpiCard` 컴포넌트 제거.
+   - `kpis` useMemo 확장: On Track / Behind / gap 계산 추가.
+   - Dashboard row2 RPC 쿼리 추가 (`useServerFn(getAbdDashboardRow2)`) → 지연 3종 카운트.
+   - KPI 스트립을 `AbdKpiCard` 6장으로 재구성, `grid-cols-2 md:grid-cols-3 lg:grid-cols-6`.
+   - 각 카드 `onClick` → `/closure/abd/raw-data?...` 이동.
 
-**(C) RPC 타입 제약**
-- `src/hooks/useAbdItems.ts:4`: `AbdStatusGroup = approved | in_progress | not_started | all`로 좁게 선언.
-- `abd_items_search(_status_group)`는 단일 값 슬롯이며 위 3종 외에는 처리 불명확.
+2. **`src/components/abd/dashboard/AbdKpiRows.tsx`**
+   - `AbdKpiCard` export 확인 (이미 export 되어 있음, 수정 불필요 예상).
+   - 딥링크 URL 빌더가 별도 헬퍼면 export, 아니면 Progress 페이지 내부에 동일 로직 복제.
 
-## 3. 개선 방식 (SM/TM와 동일: "카드 숫자 = 총합" 단일 원칙)
+3. **레이아웃**: Toolbar 카드 아래에 KPI 스트립 배치 (현재 위치 유지).
 
-TM에서 도입한 원칙과 동일하게, **Dashboard 카드 값 = Raw Data 헤더 총합**을 보장.
+## 검증 (build 모드 진입 후)
 
-### 변경 1: 딥링크 파라미터 통일 (`AbdKpiRows.tsx`)
-- 모든 `onOpenRaw({ status_group: X, ... })` 호출을 `{ status: X, ... }`로 교체 (6곳).
-- `AbdRow2Kpis`의 `delayed` 카드도 `status=delayed`로 전달.
+- Playwright: `/closure/abd/progress` 접속 → 6개 카드 렌더 확인, 각 카드 클릭 시 Raw Data 배지 숫자와 카드 숫자 일치.
+- 툴바에서 Team=MECH, Plot=C 선택 시 카드가 필터 반영해 리렌더 확인.
+- Stage 토글 변경 시 Progress/On Track/Behind가 재계산되는지 확인.
 
-### 변경 2: Raw Data가 전체 `status_group` 어휘 수용 (`AbdRawDataPage.tsx`)
-- `STATUS_TABS`를 확장하지 않고(=UI 탭은 기존 3개 유지), **`ALL_STATUS_VALUES`만 확장**하여 URL 파라미터로 들어오는 9개 값을 모두 유효값으로 인정.
-- `selectedStatuses` → `status_group in [...]` 서버 필터 push 조건을 **`>=1` 선택 시**로 변경(현재는 `>=2`부터만 push).
-- `statusGroup`(RPC 단일 슬롯)에는 `approved|in_progress|not_started` 3종만 매핑, 그 외 값은 항상 `all`로 두고 서버 필터로 좁힘 → 카운트/데이터 모두 정합.
+## 기술 세부
 
-### 변경 3: `AbdStatusGroup` 타입 완화 (`useAbdItems.ts`)
-- 타입만 문자열 union 확장. RPC 인자 자체는 그대로. Raw Data 컴포넌트 내부에서 위 매핑으로 안전 처리.
-
-### 변경 4: 헤더 뱃지 표기 확인
-- ABD Raw Data 헤더는 이미 `1–100 / 2,606` 단일 총계 표기 → SM/TM과 동일 원칙. **추가 개편 불필요.**
-
-## 4. 변경 대상 파일 (총 3개)
-
-| 파일 | 변경 내용 |
-|---|---|
-| `src/components/abd/dashboard/AbdKpiRows.tsx` | `status_group` → `status` 파라미터 rename (6곳) |
-| `src/components/abd/raw-data/AbdRawDataPage.tsx` | `ALL_STATUS_VALUES` 9종 확장, 서버 필터 push 조건 완화, `statusGroup` 안전 매핑 |
-| `src/hooks/useAbdItems.ts` | `AbdStatusGroup` 타입 union 확장 |
-
-**손대지 않음**: SM 모듈 전반, ABD RPC(`abd_items_search`), 라우트 스키마(이미 `status` 이름 사용).
-
-## 5. 검증 체크리스트
-
-`/tmp/browser/consistency/check2.py`에 카드 4종을 추가하여 실측:
-- [ ] Under Review 카드 값 = Raw Data 총합
-- [ ] Response Delay 카드 값 = Raw Data 총합
-- [ ] Draft Start Delay 카드 값 = Raw Data 총합
-- [ ] No Plan 카드 값 = Raw Data 총합
-- [ ] Approved 카드 값 = Raw Data 총합(회귀 확인)
-- [ ] 다중 카드 조합/팀 변경 시에도 유지
-
-승인 시 위 3개 파일만 순서대로 수정하고 Playwright로 실측 결과를 첨부하겠습니다.
+- 지연 3종은 `abd_dashboard_row2` RPC 재활용 → 신규 RPC 불필요.
+- 상태값 매핑(rs_delay/sb_delay/ds_delay)은 이전 턴 ABD 딥링크 정합 작업 결과 그대로 동작 (검증 완료된 파라미터 사용).
+- `Range` 카드 삭제(툴바에 이미 노출되어 중복).

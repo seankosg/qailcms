@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarDays, TrendingUp } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,6 +41,8 @@ import {
   getAbdProgressCells,
   getAbdProgressTotals,
 } from "@/lib/abd/progress.functions";
+import { getAbdDashboardRow2, pivotRows } from "@/lib/abd/dashboard.functions";
+import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import { AbdScheduleMatrix } from "./AbdScheduleMatrix";
 import { Route } from "@/routes/_authenticated/closure/abd/progress";
 import { AbdPlanVsActualCard } from "./AbdPlanVsActualCard";
@@ -253,12 +255,62 @@ export function AbdProgressPage() {
       doneStages += t.done_upto;
       totalStages += t.total;
     }
-    const variance = cumPlan > 0 ? ((cumActual - cumPlan) / cumPlan) * 100 : 0;
+    const planPct = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
     const progressPct = totalStages > 0 ? (doneStages / totalStages) * 100 : 0;
-    return { cumPlan, cumActual, variance, doneStages, totalStages, progressPct };
+    const gapPct = progressPct - planPct;
+    const behindCount = Math.max(0, cumPlan - cumActual);
+    const onTrackCount = Math.max(0, cumActual);
+    return {
+      cumPlan,
+      cumActual,
+      doneStages,
+      totalStages,
+      progressPct,
+      planPct,
+      gapPct,
+      behindCount,
+      onTrackCount,
+    };
   }, [totalsQ.data, effectiveStages]);
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
+
+  // Dashboard row2 (지연 3종) 재사용: Plot/Team 필터 반영
+  const row2Fn = useServerFn(getAbdDashboardRow2);
+  const plotsForDash = plot === "all" ? [] : [plot];
+  const row2Q = useQuery({
+    queryKey: ["abd-progress-row2", plotsForDash.join(","), teamsKey],
+    queryFn: () =>
+      row2Fn({ data: { plots: plotsForDash, teams, batch_no: [] } }),
+    staleTime: 30_000,
+  });
+  const row2Pivot = useMemo(() => pivotRows(row2Q.data ?? []), [row2Q.data]);
+
+  const openRaw = (params: Record<string, string> = {}) => {
+    const s: Record<string, string> = { source: "progress", ...params };
+    if (plot !== "all" && !("plot" in s)) s.plot = plot;
+    if (teams.length > 0 && !("team" in s)) s.team = teams.join(",");
+    navigate({ to: "/closure/abd/raw-data", search: s as any });
+  };
+
+  const TEAM_ORDER = ["MECH", "ELEC"];
+  const sortTeams = <T extends { team: string }>(xs: T[]) =>
+    [...xs].sort((a, b) => {
+      const ia = TEAM_ORDER.indexOf(a.team);
+      const ib = TEAM_ORDER.indexOf(b.team);
+      if (ia !== -1 || ib !== -1) {
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      }
+      return a.team.localeCompare(b.team);
+    });
+  const teamBreak = (key: string, statusGroup: string) =>
+    sortTeams(row2Pivot.byTeam.get(key) ?? []).map((b) => ({
+      team: b.team,
+      count: b.count,
+      onClick: () => openRaw({ status: statusGroup, team: b.team }),
+    }));
 
   const setSearch = (patch: Partial<typeof search>) => {
     navigate({
@@ -528,18 +580,50 @@ export function AbdProgressPage() {
         </CardContent>
       </Card>
 
-      {/* KPI Strip */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <KpiCard label="Cum. Plan" value={kpis.cumPlan} />
-        <KpiCard label="Cum. Actual" value={kpis.cumActual} />
-        <KpiCard
-          label="Variance"
-          value={`${kpis.variance > 0 ? "+" : ""}${kpis.variance.toFixed(1)}%`}
-          accent={kpis.variance < 0 ? "text-schedule-short" : kpis.variance > 0 ? "text-schedule-over" : ""}
+      {/* KPI Strip — Progress 전용 재설계 */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <AbdKpiCard
+          label={`Progress % — ${kpis.doneStages}/${kpis.totalStages} · Δ ${kpis.gapPct >= 0 ? "+" : ""}${kpis.gapPct.toFixed(1)}pp`}
+          count={Math.round(kpis.progressPct * 10) / 10}
+          tone={
+            kpis.gapPct >= 0 ? "ok" : kpis.gapPct >= -5 ? "warn" : "danger"
+          }
         />
-        <KpiCard label="Done Stages" value={`${kpis.doneStages} / ${kpis.totalStages}`} />
-        <KpiCard label="Progress" value={`${kpis.progressPct.toFixed(1)}%`} icon={TrendingUp} />
-        <KpiCard label="Range" value={`${rangeDays}d`} />
+        <AbdKpiCard
+          label="On Track (Actual)"
+          count={kpis.onTrackCount}
+          total={kpis.totalStages || undefined}
+          tone="ok"
+          onClick={() => openRaw({ status: "in_progress" })}
+        />
+        <AbdKpiCard
+          label="Behind Plan"
+          count={kpis.behindCount}
+          total={kpis.totalStages || undefined}
+          tone={kpis.behindCount > 0 ? "warn" : "neutral"}
+          onClick={() => openRaw({ status: "in_progress" })}
+        />
+        <AbdKpiCard
+          label="Response Delay"
+          count={row2Pivot.totals.get("RS_DELAY") ?? 0}
+          tone="danger"
+          breakdown={teamBreak("RS_DELAY", "rs_delay")}
+          onClick={() => openRaw({ status: "rs_delay" })}
+        />
+        <AbdKpiCard
+          label="Submission Delay"
+          count={row2Pivot.totals.get("SB_DELAY") ?? 0}
+          tone="danger"
+          breakdown={teamBreak("SB_DELAY", "sb_delay")}
+          onClick={() => openRaw({ status: "sb_delay" })}
+        />
+        <AbdKpiCard
+          label="Draft Delay"
+          count={row2Pivot.totals.get("DS_DELAY") ?? 0}
+          tone="danger"
+          breakdown={teamBreak("DS_DELAY", "ds_delay")}
+          onClick={() => openRaw({ status: "ds_delay" })}
+        />
       </div>
 
       {error ? (
@@ -603,29 +687,5 @@ function ToolbarGroup({ label, children }: { label: string; children: React.Reac
       <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
       {children}
     </div>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  accent,
-  icon: Icon,
-}: {
-  label: string;
-  value: number | string;
-  accent?: string;
-  icon?: typeof TrendingUp;
-}) {
-  return (
-    <Card>
-      <CardContent className="flex flex-col gap-1 p-3">
-        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-          {Icon ? <Icon className="h-3 w-3" /> : null}
-          {label}
-        </div>
-        <div className={cn("text-xl font-semibold tabular-nums", accent)}>{value}</div>
-      </CardContent>
-    </Card>
   );
 }
