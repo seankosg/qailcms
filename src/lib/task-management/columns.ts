@@ -92,6 +92,20 @@ export const AUTO_JUDGMENT_COLORS: Record<string, string> = {
   "악화": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
 };
 
+// Milestone 코드 색상 (Handover / Certificate of Completion / Defect Liability Period)
+export const MILESTONE_COLORS: Record<string, string> = {
+  HO: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  COC: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  DLP: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+};
+
+// Plan/Actual Overdue 3단계 색상 (SAFE / WARNING / RISK)
+export const OVERDUE_COLORS: Record<string, string> = {
+  SAFE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  WARNING: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  RISK: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+};
+
 export const PLOT_COLORS: Record<string, string> = {
   C: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   D: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
@@ -132,9 +146,12 @@ export const TM_COLUMNS: TmColumnDef[] = [
   { key: "team", label: "Team", type: "badge", width: 100, group: "id" },
   { key: "category", label: "Category", type: "text", width: 130, group: "task", editable: true, editorType: "text" },
   { key: "plot", label: "Plot", type: "badge", width: 70, group: "task" },
+  { key: "milestone", label: "Milestone", type: "badge", width: 90, group: "task" },
   { key: "location", label: "Location", type: "text", width: 130, group: "task", editable: true, editorType: "text" },
   { key: "floor_level", label: "Level", type: "text", width: 90, group: "task", editable: true, editorType: "text" },
   { key: "auto_judgment", label: "Alarm", type: "badge", width: 100, group: "status" },
+  { key: "plan_overdue", label: "Plan Overdue", type: "badge", width: 110, group: "status" },
+  { key: "actual_overdue", label: "Actual Overdue", type: "badge", width: 120, group: "status" },
   { key: "task_name", label: "Task", type: "text", width: 240, group: "task", editable: true, editorType: "text" },
   { key: "risk", label: "Risk", type: "badge", width: 100, group: "task", editable: true, editorType: "select", options: [...RISK_LEVELS] },
   { key: "sub_task_desc", label: "Sub-Task", type: "text", width: 220, group: "task", editable: true, editorType: "text" },
@@ -155,6 +172,7 @@ export const TM_COLUMNS: TmColumnDef[] = [
   { key: "today_actual", label: "T.Actual", type: "percent", width: 100, group: "forecast" },
   { key: "today_gap", label: "T.Diff", type: "percent", width: 100, group: "forecast" },
   { key: "forecast_end", label: "Revised Finish", type: "date", width: 130, group: "forecast", editable: true, editorType: "date" },
+  { key: "expected_finish", label: "Expected Finish", type: "date", width: 130, group: "forecast" },
   { key: "slip_days", label: "Slip (days)", type: "number", width: 100, group: "forecast" },
   { key: "data_date", label: "Data Date", type: "date", width: 110, group: "system" },
   { key: "source_file", label: "Source File", type: "text", width: 200, group: "system" },
