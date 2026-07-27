@@ -88,7 +88,10 @@ interface Entry {
   status: Status;
   parsed?: ParsedAconexFile;
   preview?: AconexImportPreview;
-  result?: AconexImportPreview & { updated: number };
+  result?: AconexImportPreview & {
+    updated: number;
+    null_overwrites?: Record<string, number>;
+  };
   error?: string;
   /** 이 파일에서 체크 해제된 Excel 헤더 목록 (기본 = 전체 포함). */
   excludedHeaders?: string[];
