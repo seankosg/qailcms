@@ -226,7 +226,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       return { ...preview, updated: 0, batch_id: null };
     }
 
-    // 3) import log
+    // 3) import log — 처음부터 success 로 기록 (실패 경로만 별도 UPDATE)
     const nowIso = new Date().toISOString();
     const { data: logRow, error: logErr } = await supa
       .from("abd_import_logs")
@@ -236,8 +236,12 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
         plot: null,
         sheet_name: "Docs (Aconex)",
         total_rows: data.rows.length,
-        status: "in_progress",
+        status: "success",
         started_at: nowIso,
+        finished_at: nowIso,
+        inserted: 0,
+        inactivated: 0,
+        mismatched: unmatched.length,
         imported_by: context.userId,
         note: `Aconex sync — matched=${matched.length} unmatched=${unmatched.length}`,
       })
@@ -246,25 +250,35 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     if (logErr) throw new Error(logErr.message);
     const batchId = logRow.id as string;
 
-    // 4) 개별 UPDATE + 필드 변경 로그 축적 (T6)
-    const pendingLogs: PendingFieldLog[] = [];
+    // 4) 벌크 UPDATE — 개별 UPDATE 루프(N회 라운드트립)를 단일 RPC 호출로 대체.
+    //    matched 수천 건에서 subrequest 폭증으로 인한 Worker fetch 실패를 근본 해결.
+    //    안전 마진으로 1,000건씩 청크 분할 호출.
+    const APPLY_CHUNK = 1000;
     let updated = 0;
-    for (const d of diffs) {
-      const existing = existingRows.get(d.document_no) ?? {};
-      const patch = {
-        ...d.patch,
-        aconex_last_synced_at: nowIso,
-        source_import_log_id: batchId,
-        updated_at: nowIso,
-        updated_by: context.userId,
-      };
-      const { error: upErr } = await supa
-        .from("abd_items_raw")
-        .update(patch)
-        .eq("abd_number", d.document_no);
-      if (upErr) throw new Error(upErr.message);
-      updated++;
+    try {
+      for (let i = 0; i < diffs.length; i += APPLY_CHUNK) {
+        const slice = diffs.slice(i, i + APPLY_CHUNK);
+        const patches = slice.map((d) => ({ document_no: d.document_no, ...d.patch }));
+        const { data: n, error: applyErr } = await supa.rpc("abd_aconex_apply_diffs", {
+          _batch_id: batchId,
+          _patches: patches,
+        });
+        if (applyErr) throw new Error(applyErr.message);
+        updated += Number(n ?? 0);
+      }
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      await supa
+        .from("abd_import_logs")
+        .update({ status: "failed", note: `Aconex sync FAILED — ${msg}`, finished_at: new Date().toISOString() })
+        .eq("id", batchId);
+      throw new Error(msg);
+    }
 
+    // 4b) 실제 변경된 필드에 대해서만 감사 로그 축적 (unchanged 로그는 제거 — 볼륨 90%+ 감소).
+    //     `abd_change_log` 트리거가 이미 row 단위 이력을 남기므로 unchanged 라인은 불필요.
+    const pendingLogs: PendingFieldLog[] = [];
+    for (const d of diffs) {
       for (const ch of d.changes) {
         pendingLogs.push(
           buildFieldLog("abd", {
@@ -279,40 +293,22 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
           }),
         );
       }
-      // 변경 없이 스킵된 필드 (unchanged) 도 축약 기록 - 라운드 라우팅 감사용
-      const cur = String(existing.latest_status ?? "").toUpperCase();
-      if (d.changes.length === 0) {
-        pendingLogs.push(
-          buildFieldLog("abd", {
-            rawRowNo: d.excel_row,
-            field: "latest_status",
-            outcome: "unchanged",
-            raw: cur,
-            applied: cur,
-            previous: cur,
-            code: "aconex_no_change",
-            detail: `document_no=${d.document_no} semantic=${d.semantic}`,
-          }),
-        );
-      }
     }
-
     // 필드 변경 로그 flush (실패 시 임포트는 성공 처리)
     void flushFieldLogs(supa, batchId, context.userId, pendingLogs).catch((e) =>
       console.warn("[abd_aconex flushFieldLogs]", e),
     );
 
-    await supa
-      .from("abd_import_logs")
-      .update({
-        inserted: 0,
-        updated,
-        inactivated: 0,
-        mismatched: unmatched.length,
-        status: "success",
-        finished_at: new Date().toISOString(),
-      })
-      .eq("id", batchId);
+    // 실제 updated 카운트 반영 (row-level fields는 서버에서 계산됨)
+    if (updated !== matched.length) {
+      await supa
+        .from("abd_import_logs")
+        .update({ updated })
+        .eq("id", batchId);
+    } else {
+      // matched 전량 성공한 통상 케이스에서도 updated 값을 갱신
+      await supa.from("abd_import_logs").update({ updated }).eq("id", batchId);
+    }
 
     return { ...preview, updated, batch_id: batchId };
   });
