@@ -81,6 +81,13 @@ import { AlarmBadge } from "./AlarmBadge";
 import { TaskStageProgress } from "./TaskStageProgress";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmInfiniteItems } from "@/hooks/useTmInfiniteItems";
+import {
+  columnFiltersToServer,
+  sortingToServer,
+  CLIENT_ONLY_FILTER_COLUMNS,
+  CLIENT_ONLY_SORT_COLUMNS,
+} from "@/lib/task-management/server-bridge";
 import { canEditRawRow } from "@/lib/auth/roles";
 import { EditCellPopover } from "./EditCellPopover";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
