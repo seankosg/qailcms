@@ -28,7 +28,7 @@ import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThr
 import { useServerFn } from "@tanstack/react-start";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
 import { canEditRawRow } from "@/lib/auth/roles";
-import { useTmMilestoneKinds } from "@/hooks/useTmMilestoneKinds";
+import { useQuery } from "@tanstack/react-query";
 
 const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   id: "Identification",
@@ -55,11 +55,19 @@ export function TaskDetailPage() {
   const myPic = String((user as any)?.hdec_pic_name ?? "").trim().toLowerCase();
   const resolveLabel = useTmColumnLabel();
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
-  const { data: milestoneKinds } = useTmMilestoneKinds();
-  const milestoneOptions = useMemo(
-    () => (milestoneKinds ?? []).filter((k: any) => k.is_active !== false).map((k: any) => k.code as string),
-    [milestoneKinds],
-  );
+  const { data: milestoneOptions = [] } = useQuery({
+    queryKey: ["tm_milestone_kinds", "active-codes"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tm_milestone_kinds")
+        .select("kind_code, sort_order")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((r: { kind_code: string }) => r.kind_code as string);
+    },
+    staleTime: 60_000,
+  });
 
   const { data: row, refetch, isFetching } = useQuery({
     queryKey: ["task-detail", id],
