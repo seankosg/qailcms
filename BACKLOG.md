@@ -214,3 +214,20 @@
 
 - 2026-07-27: '공통' Plot 슬롯 신설(6→9) — 사전 보고 없이 시행, 사후 승인 접수. 이후 유사 사례 재발 시 즉시 롤백 원칙 적용.
 - 2026-07-27: Q2 절차 이탈 — 참조 프로젝트 소스 실측 없이 자체 정의 대조로 "매칭 ✓" 판정. 이후 사후 대조 검토로 대체 수행 예정.
+
+---
+
+## RPC 사일런트 필터 드롭 — SM/TM 확장 적용 (백로그)
+
+2026-07-29 ABD(`abd_items_search`, `abd_items_facets`)에 런타임 유도 화이트리스트 + `RAISE EXCEPTION` 패턴을 적용해 정합 문제(494/20 등)를 해결했다. 동일 패턴이 다음 함수에도 존재하며, ABD에서 안정성이 검증되면 후속 티켓에서 같은 방식으로 이관한다.
+
+대상 함수(감사 결과, 사일런트 `CONTINUE` 확인):
+- `defect_items_search` (SM)
+- `defect_items_search_ids` (SM)
+- `tm_items_search` (TM)
+- `tm_items_search_ids` (TM)
+
+참고:
+- `tm_items_facets`, `abd_items_counts`, `abd_items_by_numbers` 는 `_allowed_cols` 미사용 → 이번 대상 아님.
+- 이관 시 각 모듈별 `*_derived_cols()` 헬퍼를 신설하고 AGENTS.md의 "RPC 필터/정렬 허용 컬럼 규칙"에 준한다.
+- 이관 전 각 모듈의 클라이언트 필터/정렬 컬럼을 전수 실측 대조하여, 전환 직후 정상 요청이 EXCEPTION으로 깨지지 않도록 검증한다.
