@@ -260,6 +260,7 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
 
   const patchRow = useCallback((id: string, patch: Record<string, unknown>) => {
     let touched = false;
+    const isDrop = (patch as any)?.__drop === true;
     for (let i = 0; i < loadedPageCount; i++) {
       const pageKey = String(i);
       const slice = pageRowsRef.current.get(pageKey);
@@ -267,15 +268,24 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
       const idx = slice.findIndex((r: any) => String((r as any)?.id) === id);
       if (idx === -1) continue;
       const next = slice.slice();
-      next[idx] = { ...(slice[idx] as any), ...patch } as TRow;
+      if (isDrop) {
+        next.splice(idx, 1);
+      } else {
+        next[idx] = { ...(slice[idx] as any), ...patch } as TRow;
+      }
       pageRowsRef.current.set(pageKey, next);
       // react-query 캐시도 동기 갱신
       const key = pageKeys[i] as unknown as readonly unknown[];
       const cached = qc.getQueryData<{ rows: TRow[]; totalCount: number; mainCount: number }>(key);
       if (cached) {
-        qc.setQueryData(key, { ...cached, rows: next });
+        qc.setQueryData(key, {
+          ...cached,
+          rows: next,
+          totalCount: isDrop ? Math.max(0, cached.totalCount - 1) : cached.totalCount,
+        });
       }
       touched = true;
+      if (isDrop) break;
     }
     if (touched) setPatchRev((v) => v + 1);
   }, [loadedPageCount, pageKeys, qc]);
