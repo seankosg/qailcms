@@ -46,6 +46,8 @@ export interface UseTmInfiniteItemsResult<TRow = Record<string, unknown>> {
   refetch: () => Promise<void>;
   /** 필터된 전체 ID (tm_items_search_ids). ALL 모드에서도 안전 호출. */
   fetchAllIds: () => Promise<string[]>;
+  /** 특정 행(id) 부분 패치 — 캐시 + 누적 배열에 즉시 반영. 네트워크 미발생. */
+  patchRow: (id: string, patch: Record<string, unknown>) => void;
 }
 
 const DEFAULT_PAGE_MAINS = 100;
@@ -136,6 +138,8 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
   //   기존 행을 재계산하지 않고 신규 구간만 measure 하도록 함.
   const pageRowsRef = useRef<Map<string, TRow[]>>(new Map());
   const [loadedPageCount, setLoadedPageCount] = useState(0);
+  // R4: 부분 패치용 리비전 (accumulated 재계산 트리거).
+  const [patchRev, setPatchRev] = useState(0);
   // sig 변경 시 slice 캐시/카운트 리셋
   useEffect(() => {
     pageRowsRef.current = new Map();
@@ -171,7 +175,7 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     }
     return { rows: out, totalCount: total, mainCount: mains };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig, loadedPageCount]);
+  }, [sig, loadedPageCount, patchRev]);
 
   const loadedMains = forceAll
     ? accumulated.mainCount
@@ -210,6 +214,28 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     return arr.map(String);
   }, [q, serverFilters, includeInactive]);
 
+  const patchRow = useCallback((id: string, patch: Record<string, unknown>) => {
+    let touched = false;
+    for (let i = 0; i < loadedPageCount; i++) {
+      const pageKey = String(i);
+      const slice = pageRowsRef.current.get(pageKey);
+      if (!slice || slice.length === 0) continue;
+      const idx = slice.findIndex((r: any) => String((r as any)?.id) === id);
+      if (idx === -1) continue;
+      const next = slice.slice();
+      next[idx] = { ...(slice[idx] as any), ...patch } as TRow;
+      pageRowsRef.current.set(pageKey, next);
+      // react-query 캐시도 동기 갱신
+      const key = pageKeys[i] as unknown as readonly unknown[];
+      const cached = qc.getQueryData<{ rows: TRow[]; totalCount: number; mainCount: number }>(key);
+      if (cached) {
+        qc.setQueryData(key, { ...cached, rows: next });
+      }
+      touched = true;
+    }
+    if (touched) setPatchRev((v) => v + 1);
+  }, [loadedPageCount, pageKeys, qc]);
+
   return {
     rows: accumulated.rows,
     totalCount: accumulated.totalCount,
@@ -224,5 +250,6 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     reset,
     refetch,
     fetchAllIds,
+    patchRow,
   };
 }
