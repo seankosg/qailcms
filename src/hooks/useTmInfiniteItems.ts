@@ -60,7 +60,7 @@ export interface UseTmInfiniteItemsResult<TRow = Record<string, unknown>> {
    * 반환값: 서버가 반환한 행(auto_judgment 포함). 매칭 없으면 null.
    * (편집 결과 파생값·판정 뱃지 즉시 반영용)
    */
-  refetchRow: (id: string) => Promise<Record<string, unknown> | null>;
+  refetchRow: (id: string, opts?: { applyKpiMode?: boolean }) => Promise<Record<string, unknown> | null>;
 }
 
 const DEFAULT_PAGE_MAINS = 100;
