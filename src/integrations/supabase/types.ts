@@ -3720,6 +3720,7 @@ export type Database = {
         Args: { _batch_id: string; _patches: Json }
         Returns: number
       }
+      abd_allowed_cols: { Args: never; Returns: string[] }
       abd_approved_round: {
         Args: { _row: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
         Returns: number
@@ -3869,6 +3870,7 @@ export type Database = {
               status: string
             }[]
           }
+      abd_derived_cols: { Args: never; Returns: string[] }
       abd_items_by_numbers: { Args: { _nums: string[] }; Returns: Json }
       abd_items_counts: {
         Args: { _include_inactive?: boolean; _plot?: string; _team?: string }
