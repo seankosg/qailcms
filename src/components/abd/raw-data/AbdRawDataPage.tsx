@@ -594,6 +594,7 @@ export function AbdRawDataPage() {
 
   return (
     <div className="space-y-3">
+      <div data-marker="ABD_JUDGE_V1_2026_07_29" hidden aria-hidden="true" />
       <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">ABD Raw Data</h1>
