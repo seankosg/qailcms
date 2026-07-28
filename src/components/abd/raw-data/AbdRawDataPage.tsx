@@ -163,14 +163,26 @@ function formatDdMmm(v: any): string {
 
 const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = [
   { value: "approved", label: "Approved (A)" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "not_started", label: "Not Started" },
+  { value: "unapproved", label: "Unapproved" },
 ];
 // UI 탭에 노출되는 3종 + Dashboard 딥링크로만 들어오는 세분화 상태값들.
 // URL 파라미터 파싱 시 유효값 판정에 사용된다.
 const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
+  "in_progress", "not_started",
   "under_review", "drafting", "rs_delay", "sb_delay", "ds_delay", "no_plan", "delayed",
 ];
+// 딥링크 status 값 → 사용자에게 보여줄 판정 라벨 (필터 칩)
+const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
+  in_progress: "In Progress",
+  not_started: "Not Started",
+  under_review: "Under Review",
+  drafting: "Draft Start",
+  rs_delay: "Response Delay",
+  sb_delay: "Submission Delay",
+  ds_delay: "Draft Start Delay",
+  no_plan: "No Plan",
+  delayed: "Delayed",
+};
 const ALL_STATUS_VALUES = [
   ...STATUS_TABS.map((s) => s.value),
   ...DEEP_LINK_STATUS_VALUES,
@@ -582,6 +594,7 @@ export function AbdRawDataPage() {
 
   return (
     <div className="space-y-3">
+      <div data-marker="ABD_JUDGE_V1_2026_07_29" hidden aria-hidden="true" />
       <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">ABD Raw Data</h1>
@@ -663,7 +676,12 @@ export function AbdRawDataPage() {
         </button>
         {STATUS_TABS.map((s) => {
           const active = selectedStatuses.includes(s.value);
-          const count = s.value === "approved" ? approvedCount : s.value === "in_progress" ? inProgressCount : notStartedCount;
+          const count =
+            s.value === "approved"
+              ? approvedCount
+              : s.value === "unapproved"
+                ? inProgressCount + notStartedCount
+                : 0;
           return (
             <button
               key={s.value}
@@ -683,6 +701,25 @@ export function AbdRawDataPage() {
             </button>
           );
         })}
+        {selectedStatuses
+          .filter((v) => DEEP_LINK_STATUS_LABEL[v])
+          .map((v) => (
+            <span
+              key={`chip-${v}`}
+              className="inline-flex h-6 items-center gap-1 rounded bg-amber-500/15 px-2 text-[11px] text-amber-800 dark:text-amber-200"
+              title={`대시보드 드릴다운 판정: ${DEEP_LINK_STATUS_LABEL[v]}`}
+            >
+              판정: {DEEP_LINK_STATUS_LABEL[v]}
+              <button
+                type="button"
+                onClick={() => toggleStatus(v)}
+                aria-label="필터 제거"
+                className="ml-0.5 rounded px-1 hover:bg-amber-500/25"
+              >
+                ×
+              </button>
+            </span>
+          ))}
         <button
           type="button"
           onClick={() => setUrl({ excluded: excludedMode === "only" ? "hide" : "only", page: 1 })}
@@ -932,7 +969,8 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
   // React 커밋 0회 → Profiler 검증 통과.
   const stickyBg = (row: AbdItem): string => {
     const inactive = !row.is_active;
-    const approved = row.status_group === "approved" || String(row.latest_status ?? "").toUpperCase() === "A";
+    // ABD_JUDGE_V1_2026_07_29: 서버 정본(bucket_top) 소비. latest_status='A' 클라 오버라이드 폐기.
+    const approved = (row as any).bucket_top === "Approved";
     // 스티키 컬럼은 항상 완전 불투명이어야 스크롤 시 뒤 컬럼이 비쳐 보이지 않는다.
     if (inactive)
       return "color-mix(in oklab, var(--muted) 45%, var(--background))";
@@ -1003,7 +1041,8 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
                 {vRows.map((vr) => {
                   const row = rowsModel[vr.index];
                   const r = row.original;
-                  const approved = r.status_group === "approved" || String(r.latest_status ?? "").toUpperCase() === "A";
+                  // ABD_JUDGE_V1_2026_07_29: 서버 정본 bucket_top 사용
+                  const approved = (r as any).bucket_top === "Approved";
                   return (
                     <TableRow
                       key={row.id}
