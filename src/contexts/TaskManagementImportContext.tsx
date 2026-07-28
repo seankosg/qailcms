@@ -200,6 +200,22 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     return out;
   }, []);
 
+  const fetchAllowedMilestoneCodes = useCallback(async (): Promise<string[]> => {
+    try {
+      const { data } = await (supabase as any)
+        .from("tm_milestone_kinds")
+        .select("kind_code")
+        .is("deleted_at", null);
+      const codes = (data ?? [])
+        .map((r: { kind_code: string }) => r.kind_code)
+        .filter(Boolean);
+      // fallback: 목록이 비어있으면 기본 3종
+      return codes.length > 0 ? codes : ["HO", "COC", "DLP"];
+    } catch {
+      return ["HO", "COC", "DLP"];
+    }
+  }, []);
+
   const parseAndApply = useCallback(
     async (
       id: string,
@@ -208,6 +224,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       excludedHeaders?: string[],
     ) => {
       const extraAliases = await fetchAliases();
+      const allowedMilestoneCodes = await fetchAllowedMilestoneCodes();
       let currentOverride: string | null = null;
       let currentDateOverrides: Record<string, string> = {};
       setFiles((cur) => {
@@ -225,6 +242,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           excludedHeaders,
           dataDateOverride: currentOverride,
           dateOverrides: currentDateOverrides,
+          allowedMilestoneCodes,
         });
         setFiles((cur) =>
           cur.map((f) => {
