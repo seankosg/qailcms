@@ -1032,6 +1032,7 @@ export function TaskManagementRawDataPage() {
           const canEditOwnerFields = dyn.canEditOwnerFieldsBase || isOwner;
           const isTeamOverride = c.key === "team";
           const isDataDateOverride = c.key === "data_date";
+          const isMilestoneOverride = c.key === "milestone";
           let effectiveColumn: TmColumnDef = c;
           let effectiveCanEdit = canEdit;
           let useOwnerSave = false;
@@ -1043,6 +1044,14 @@ export function TaskManagementRawDataPage() {
             effectiveColumn = { ...c, editable: true, editorType: "date" };
             effectiveCanEdit = canEditOwnerFields;
             useOwnerSave = true;
+          } else if (isMilestoneOverride) {
+            // Milestone은 tm_milestone_kinds(active) 기준 동적 옵션. 일반 편집 권한 규칙을 따른다.
+            effectiveColumn = {
+              ...c,
+              editable: true,
+              editorType: "select",
+              options: [...(dyn.milestoneOptions ?? [])],
+            };
           }
           const editableInline =
             !!effectiveColumn.editable &&
