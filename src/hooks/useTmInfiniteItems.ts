@@ -185,10 +185,16 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     setPage((p) => p + 1);
   }, [forceAll, current.isFetching, loadedMains, accumulated.mainCount]);
 
-  const reset = useCallback(() => setPage(0), []);
+  const reset = useCallback(() => {
+    pageRowsRef.current = new Map();
+    setLoadedPageCount(0);
+    setPage(0);
+  }, []);
 
   const refetch = useCallback(async () => {
     await qc.invalidateQueries({ queryKey: ["tm-inf", sig] });
+    pageRowsRef.current = new Map();
+    setLoadedPageCount(0);
     setPage(0);
   }, [qc, sig]);
 
