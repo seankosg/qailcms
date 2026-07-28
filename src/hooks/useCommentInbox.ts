@@ -18,7 +18,7 @@ export interface InboxComment {
   parent_id: string; // task_raw_id / defect_raw_id / abd_item_id / doc_ref
   parent_ref: string | null; // 표시용 short id (task_no, source_issue_no, abd_number, doc_ref)
   parent_label: string | null; // 표시용 부제 (task_name, location_raw 등)
-  author_is_vp_pd: boolean; // 작성자가 admin 역할이거나 user_type in (pm_pd) 일 때 true
+  author_is_vp_pd: boolean; // 작성자 user_type이 'admin' 또는 'pm_pd'일 때 true
 }
 
 interface InboxScope {
