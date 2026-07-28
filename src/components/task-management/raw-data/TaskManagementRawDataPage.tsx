@@ -508,6 +508,7 @@ export function TaskManagementRawDataPage() {
     refetch: refetchServer,
     fetchAllIds,
     patchRow,
+    refetchRow,
   } = useTmInfiniteItems<Row>({
     q: globalFilter || "",
     serverFilters,
@@ -696,6 +697,9 @@ export function TaskManagementRawDataPage() {
     toggleCollapse,
     setAddChildParent,
     milestoneOptions,
+    patchRow,
+    refetchRow,
+    kpiMode,
   });
   cellDynRef.current = {
     commentCounts,
@@ -711,6 +715,9 @@ export function TaskManagementRawDataPage() {
     toggleCollapse,
     setAddChildParent,
     milestoneOptions,
+    patchRow,
+    refetchRow,
+    kpiMode,
   };
 
   const columns = useMemo<ColumnDef<Row>[]>(() => {
@@ -1065,7 +1072,32 @@ export function TaskManagementRawDataPage() {
               column={effectiveColumn}
               currentValue={val}
               canEdit={effectiveCanEdit}
-              onSaved={() => dyn.refetch()}
+              onSaved={async () => {
+                const d = cellDynRef.current;
+                try {
+                  const km = d.kpiMode;
+                  if (km) {
+                    const gated = await d.refetchRow(String(rr.id), { applyKpiMode: true });
+                    if (!gated) {
+                      d.patchRow(String(rr.id), { __drop: true } as any);
+                      const { toast } = await import("sonner");
+                      toast.info("편집 결과로 현재 필터를 벗어나 목록에서 제외되었습니다.");
+                      return;
+                    }
+                    d.patchRow(String(rr.id), gated);
+                    return;
+                  }
+                  const fresh = await d.refetchRow(String(rr.id));
+                  if (!fresh) {
+                    d.patchRow(String(rr.id), { __drop: true } as any);
+                    return;
+                  }
+                  d.patchRow(String(rr.id), fresh);
+                } catch (e) {
+                  console.warn("[TM] refetchRow failed, falling back to full refetch", e);
+                  d.refetch();
+                }
+              }}
               onSave={
                 useOwnerSave
                   ? async (value) => {

@@ -55,6 +55,12 @@ export interface UseTmInfiniteItemsResult<TRow = Record<string, unknown>> {
   fetchAllIds: () => Promise<string[]>;
   /** 특정 행(id) 부분 패치 — 캐시 + 누적 배열에 즉시 반영. 네트워크 미발생. */
   patchRow: (id: string, patch: Record<string, unknown>) => void;
+  /**
+   * 서버에서 해당 행 1건을 현재와 동일한 _as_of/_thresholds 로 재조회 후 캐시 패치.
+   * 반환값: 서버가 반환한 행(auto_judgment 포함). 매칭 없으면 null.
+   * (편집 결과 파생값·판정 뱃지 즉시 반영용)
+   */
+  refetchRow: (id: string, opts?: { applyKpiMode?: boolean }) => Promise<Record<string, unknown> | null>;
 }
 
 const DEFAULT_PAGE_MAINS = 100;
@@ -254,6 +260,7 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
 
   const patchRow = useCallback((id: string, patch: Record<string, unknown>) => {
     let touched = false;
+    const isDrop = (patch as any)?.__drop === true;
     for (let i = 0; i < loadedPageCount; i++) {
       const pageKey = String(i);
       const slice = pageRowsRef.current.get(pageKey);
@@ -261,18 +268,55 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
       const idx = slice.findIndex((r: any) => String((r as any)?.id) === id);
       if (idx === -1) continue;
       const next = slice.slice();
-      next[idx] = { ...(slice[idx] as any), ...patch } as TRow;
+      if (isDrop) {
+        next.splice(idx, 1);
+      } else {
+        next[idx] = { ...(slice[idx] as any), ...patch } as TRow;
+      }
       pageRowsRef.current.set(pageKey, next);
       // react-query 캐시도 동기 갱신
       const key = pageKeys[i] as unknown as readonly unknown[];
       const cached = qc.getQueryData<{ rows: TRow[]; totalCount: number; mainCount: number }>(key);
       if (cached) {
-        qc.setQueryData(key, { ...cached, rows: next });
+        qc.setQueryData(key, {
+          ...cached,
+          rows: next,
+          totalCount: isDrop ? Math.max(0, cached.totalCount - 1) : cached.totalCount,
+        });
       }
       touched = true;
+      if (isDrop) break;
     }
     if (touched) setPatchRev((v) => v + 1);
   }, [loadedPageCount, pageKeys, qc]);
+
+  const refetchRow = useCallback(async (id: string, opts?: { applyKpiMode?: boolean }) => {
+    const { data, error } = await (supabase as any).rpc("tm_items_search", {
+      _q: null,
+      _filters: [],
+      _sort: [],
+      _offset: 0,
+      _limit: 5,
+      _include_inactive: true,
+      _kpi_mode: opts?.applyKpiMode ? (kpiMode ?? null) : null,
+      _as_of: asOf ?? null,
+      _thresholds: thresholds
+        ? { worsen_gap: thresholds.worsen_gap, caution_gap_buffer: thresholds.caution_gap_buffer }
+        : null,
+      _ids: [id],
+    });
+    if (error) throw error;
+    const payload = (data ?? {}) as { rows?: any[] };
+    const raw = (payload.rows ?? [])[0];
+    if (!raw) return null;
+    // derived_auto_judgment 승격 (list 응답과 동일 규칙)
+    let mapped: Record<string, unknown> = raw;
+    if (Object.prototype.hasOwnProperty.call(raw, "derived_auto_judgment")) {
+      const { derived_auto_judgment, ...rest } = raw;
+      mapped = { ...rest, auto_judgment: derived_auto_judgment ?? rest.auto_judgment };
+    }
+    return mapped;
+  }, [asOf, thresholds, kpiMode]);
 
   return {
     rows: accumulated.rows,
@@ -289,5 +333,6 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     refetch,
     fetchAllIds,
     patchRow,
+    refetchRow,
   };
 }
