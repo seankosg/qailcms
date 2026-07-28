@@ -163,6 +163,11 @@
 - 대상: `useAbdItemsQuery`(`abd_items_search`), `useDefectItemsQuery`(`defect_items_search`).
 - 변경: ALL 모드에서 첫 청크로 total 확보 후, 나머지 청크 오프셋을 `Promise.all` 로 병렬 페치. 순차 루프 → 병렬 페치로 대기시간 단축.
 - UI 불변: 반환 형태·순서(offset asc) 동일, 잘림 감시(`assertNoTruncation`) 유지.
+- 실측(Data API 경유, `_excluded_mode='all'`/`_include_inactive=true`, 3회 평균):
+  - ABD MECH (2,598행, 3청크): before(seq) 778ms → after(par) 579ms · 1.34×
+  - ABD ELEC (4,090행, 5청크): before(seq) 1,153ms → after(par) 823ms · 1.40×
+  - SM ALL (116,234행, 117청크): before(seq) 45,467ms → after(par) 20,189ms · 2.25×
+  - 반환 행수 before=after 완전 일치(3회 전 구간).
 
 ---
 
