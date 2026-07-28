@@ -1219,7 +1219,25 @@ export function TaskManagementRawDataPage() {
     [rowModel.rows],
   );
 
-  const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
+  const kpiModeLabel = useMemo(() => {
+    if (!kpiMode) return null;
+    const map: Record<string, string> = {
+      normal: "정상",
+      caution: "주의",
+      delayed: "지연",
+      at_risk: "위험",
+      deteriorating: "악화",
+      completed: "완료",
+    };
+    return map[kpiMode] ?? kpiMode;
+  }, [kpiMode]);
+  const asOfChipLabel =
+    sharedDataDate && sharedDataDate !== latestDataDate ? sharedDataDate : null;
+  const activeFilterCount =
+    columnFilters.length +
+    (globalFilter ? 1 : 0) +
+    (kpiModeLabel ? 1 : 0) +
+    (asOfChipLabel ? 1 : 0);
   const allCollapsed = parentKeys.length > 0 && collapsedParents.size >= parentKeys.length;
 
   return (
