@@ -6,7 +6,7 @@ import {
   useMyTasksCounts, useMyTasksBucket, useMyAbdCounts, useMyAbdBucket,
   tmIsCompleted, tmIsStarted, tmIsDelayed, tmJudgment, tmIsUpcoming, tmIsToday, tmTodayKinds,
   smTodayKinds,
-  abdIsApproved, abdIsInProgress, abdIsDelayed, abdIsUpcoming, abdIsToday, abdTodayKind, abdStage, abdCurrentPlanDate,
+  abdIsApproved, abdTodayKind, abdStage, abdCurrentPlanDate,
   abdNeedsPlanning, abdNextPlanRoundLabel,
   today,
   type TmMyRow, type SmMyRow, type AbdMyRow,
