@@ -1072,7 +1072,34 @@ export function TaskManagementRawDataPage() {
               column={effectiveColumn}
               currentValue={val}
               canEdit={effectiveCanEdit}
-              onSaved={() => dyn.refetch()}
+              onSaved={async () => {
+                const d = cellDynRef.current;
+                try {
+                  const fresh = await d.refetchRow(String(rr.id));
+                  if (!fresh) {
+                    // 서버에서 사라진 행 (soft-delete 등): 목록에서 splice
+                    d.patchRow(String(rr.id), { __drop: true } as any);
+                    return;
+                  }
+                  // 현재 _kpi_mode 필터가 활성이고 편집 결과 판정이 이탈하면 splice + 토스트
+                  const km = d.kpiMode;
+                  if (km) {
+                    const jd = String((fresh as any).auto_judgment ?? "");
+                    const inBucket = tmJudgmentMatchesKpiMode(km, jd);
+                    if (!inBucket) {
+                      d.patchRow(String(rr.id), { __drop: true } as any);
+                      const { toast } = await import("sonner");
+                      toast.info("편집 결과로 현재 필터를 벗어나 목록에서 제외되었습니다.");
+                      return;
+                    }
+                  }
+                  d.patchRow(String(rr.id), fresh);
+                } catch (e) {
+                  // 재조회 실패 시 안전 폴백: 기존 refetch
+                  console.warn("[TM] refetchRow failed, falling back to full refetch", e);
+                  d.refetch();
+                }
+              }}
               onSave={
                 useOwnerSave
                   ? async (value) => {
