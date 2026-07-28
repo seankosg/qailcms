@@ -318,6 +318,12 @@ export interface ParseTaskManagementOptions {
   dataDateOverride?: string | null;
   /** 날짜 오류 셀에 대한 사용자 수정값. { cellRef → 'YYYY-MM-DD' } */
   dateOverrides?: Record<string, string>;
+  /**
+   * 허용된 Milestone 코드 목록 (tm_milestone_kinds에서 주입).
+   * 미지정/빈 배열이면 fallback으로 ['HO','COC','DLP'] 사용.
+   * 목록에 없는 값은 null로 저장되며 warnings에 요약 경보가 남는다.
+   */
+  allowedMilestoneCodes?: string[];
 }
 
 /** 워크북의 시트 이름 리스트. */
@@ -391,6 +397,15 @@ export async function parseTaskManagementExcel(
   const extraAliases = opts.extraAliases;
   const excludedHeadersInput = opts.excludedHeaders ?? [];
   const dateOverrides = opts.dateOverrides ?? {};
+  const allowedMilestoneSet = new Set<string>(
+    (opts.allowedMilestoneCodes && opts.allowedMilestoneCodes.length > 0
+      ? opts.allowedMilestoneCodes
+      : ["HO", "COC", "DLP"]
+    )
+      .map((c) => String(c).trim().toUpperCase())
+      .filter(Boolean),
+  );
+  const unknownMilestoneCounts = new Map<string, number>();
   const { audit, read: readDateCell } = makeDateAudit(dateOverrides);
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
@@ -811,14 +826,16 @@ export async function parseTaskManagementExcel(
       milestone: (() => {
         // Milestone 컬럼이 없는 파일도 임포트 가능해야 하므로,
         // 헤더 미탐지(cols.milestone === 0) 및 미등록 값은 안전하게 null 처리.
-        // DB 체크 제약(task_management_raw_milestone_chk)은 HO/COC/DLP/NULL만 허용.
+        // DB FK(task_management_raw_milestone_fk → tm_milestone_kinds.kind_code)만 허용.
         if (!cols.milestone) return null;
         const raw = toStr(getCell(sheet, r, cols.milestone));
         if (!raw) return null;
         const up = raw.trim().toUpperCase().replace(/\s+/g, "");
         const norm = up === "H/O" || up === "H_O" || up === "H-O" ? "HO" : up;
-        // 화이트리스트 밖 값은 null (임포트 실패 방지). 미등록 Kind는 Admin에서 관리.
-        return norm === "HO" || norm === "COC" || norm === "DLP" ? norm : null;
+        // Admin에 등록된 kind만 허용. 미등록 값은 null 치환 + 경보 집계.
+        if (allowedMilestoneSet.has(norm)) return norm;
+        unknownMilestoneCounts.set(norm, (unknownMilestoneCounts.get(norm) ?? 0) + 1);
+        return null;
       })(),
       sort_order: sort++,
     });
@@ -827,6 +844,17 @@ export async function parseTaskManagementExcel(
   const parentCount = rows.filter((r) => r.level === "main").length;
   const childCount = rows.length - parentCount;
   const disciplineHint = rows.length > 0 ? inferDiscipline(rows[0].task_no) : null;
+
+  if (unknownMilestoneCounts.size > 0) {
+    const total = Array.from(unknownMilestoneCounts.values()).reduce((a, b) => a + b, 0);
+    const detail = Array.from(unknownMilestoneCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([v, c]) => `${v}:${c}`)
+      .join(", ");
+    warnings.push(
+      `미등록 마일스톤 값 ${total}건 (${detail}) — Admin에서 등록 후 재임포트해야 값이 저장됩니다.`,
+    );
+  }
 
   return {
     dataDate,

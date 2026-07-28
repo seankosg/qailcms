@@ -47,11 +47,30 @@ function Page() {
         .eq("kind", kind)
         .limit(1);
       if (!remain || remain.length === 0) {
-        await (supabase as any)
-          .from("tm_milestone_kinds")
-          .update({ deleted_at: new Date().toISOString(), is_active: false })
-          .eq("kind_code", kind);
-        qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
+        // Raw Data에서 사용 중인지 확인 (FK로 하드 삭제는 이미 차단됨).
+        // 사용 중이면 종류 자체는 유지하고 안내만 노출.
+        const { count: usedCount } = await (supabase as any)
+          .from("task_management_raw")
+          .select("id", { count: "exact", head: true })
+          .eq("milestone", kind);
+        if ((usedCount ?? 0) > 0) {
+          toast.info(
+            `'${kind}' 는 Raw Data ${usedCount}건에서 사용 중이라 종류 자체는 삭제되지 않았습니다.`,
+          );
+        } else {
+          const { error: eKind } = await (supabase as any)
+            .from("tm_milestone_kinds")
+            .update({ deleted_at: new Date().toISOString(), is_active: false })
+            .eq("kind_code", kind);
+          if (eKind) {
+            // FK RESTRICT 등으로 실패한 경우 안내
+            toast.info(
+              `'${kind}' 는 사용 중인 마일스톤이라 종류 자체는 삭제되지 않았습니다.`,
+            );
+          } else {
+            qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
+          }
+        }
       }
       toast.success(`Plot ${plot} · ${kind} 삭제됨`);
       qc.invalidateQueries({ queryKey: ["tm_milestone_config"] });

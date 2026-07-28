@@ -52,6 +52,7 @@ import {
   GROUP_HEADER_BG,
   PLOT_COLORS,
   MILESTONE_COLORS,
+  milestoneColorClass,
   OVERDUE_COLORS,
   RISK_COLORS,
   ROW_TYPE_COLORS,
@@ -155,8 +156,13 @@ function renderBadge(key: string, value: string) {
     plan_overdue: OVERDUE_COLORS,
     actual_overdue: OVERDUE_COLORS,
   };
-  const colors = map[key];
-  const cls = colors?.[value] ?? "bg-muted text-foreground";
+  let cls: string;
+  if (key === "milestone") {
+    cls = milestoneColorClass(value);
+  } else {
+    const colors = map[key];
+    cls = colors?.[value] ?? "bg-muted text-foreground";
+  }
   return (
     <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", cls)}>
       {value}
