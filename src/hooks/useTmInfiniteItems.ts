@@ -129,25 +129,49 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     },
   });
 
-  // 이전 페이지 결과들을 캐시에서 수집
+  // R1: 누적 배열 참조 안정화
+  // - 각 페이지 slice(pageRowsRef)는 해당 페이지 fetch 완료 시 1회만 갱신되고 이후 동일 참조 유지
+  // - accumulated.rows 는 [sig, loadedPageCount] 에만 의존 → 신규 페이지가 실제로 착지한 순간에만
+  //   새 배열 생성. 이전 페이지의 row 객체 identity 는 그대로 유지되어 하위 memo/virtualizer 가
+  //   기존 행을 재계산하지 않고 신규 구간만 measure 하도록 함.
+  const pageRowsRef = useRef<Map<string, TRow[]>>(new Map());
+  const [loadedPageCount, setLoadedPageCount] = useState(0);
+  // sig 변경 시 slice 캐시/카운트 리셋
+  useEffect(() => {
+    pageRowsRef.current = new Map();
+    setLoadedPageCount(0);
+  }, [sig]);
+  // 현재 페이지 fetch 완료 시 slice 등록 (동일 페이지 재-fetch 시 참조가 새로 잡히지 않도록 pageKey 단위)
+  useEffect(() => {
+    if (!current.data) return;
+    const pageKey = String(page);
+    const prev = pageRowsRef.current.get(pageKey);
+    // rows 배열 참조가 바뀐 경우에만 교체 (react-query 는 동일 응답 시 동일 참조 유지)
+    if (prev !== current.data.rows) {
+      pageRowsRef.current.set(pageKey, current.data.rows);
+    }
+    const nextCount = Math.max(loadedPageCount, page + 1);
+    if (nextCount !== loadedPageCount) setLoadedPageCount(nextCount);
+  }, [current.data, page, loadedPageCount]);
+
   const accumulated = useMemo(() => {
     const out: TRow[] = [];
     let total = 0;
     let mains = 0;
-    for (let i = 0; i <= page; i++) {
+    for (let i = 0; i < loadedPageCount; i++) {
+      const slice = pageRowsRef.current.get(String(i));
+      if (slice && slice.length) out.push(...slice);
       const cached = qc.getQueryData<{ rows: TRow[]; totalCount: number; mainCount: number }>(
         pageKeys[i] as unknown as readonly unknown[],
       );
       if (cached) {
-        out.push(...cached.rows);
         total = cached.totalCount;
         mains = cached.mainCount;
       }
     }
     return { rows: out, totalCount: total, mainCount: mains };
-    // page + current.data 로 재계산 트리거
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, current.data, sig, qc]);
+  }, [sig, loadedPageCount]);
 
   const loadedMains = forceAll
     ? accumulated.mainCount
