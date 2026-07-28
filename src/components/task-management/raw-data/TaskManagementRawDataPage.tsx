@@ -199,16 +199,6 @@ function chipValue(v: unknown): string {
   return String(v);
 }
 
-function previousDay(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() - 1);
-  const yy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
-}
-
 function modeToColumnFilters(
   mode: string | undefined,
   asOf: string,
