@@ -508,6 +508,7 @@ export function TaskManagementRawDataPage() {
     refetch: refetchServer,
     fetchAllIds,
     patchRow,
+    refetchRow,
   } = useTmInfiniteItems<Row>({
     q: globalFilter || "",
     serverFilters,
