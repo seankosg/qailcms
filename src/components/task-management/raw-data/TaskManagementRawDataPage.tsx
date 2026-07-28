@@ -700,6 +700,7 @@ export function TaskManagementRawDataPage() {
     patchRow,
     refetchRow,
     kpiMode,
+    canEditRow,
   });
   cellDynRef.current = {
     commentCounts,
@@ -718,6 +719,7 @@ export function TaskManagementRawDataPage() {
     patchRow,
     refetchRow,
     kpiMode,
+    canEditRow,
   };
 
   const columns = useMemo<ColumnDef<Row>[]>(() => {
@@ -1034,25 +1036,18 @@ export function TaskManagementRawDataPage() {
           const rr = row.original as any;
           const isMain = rr.level === "main";
           const dyn = cellDynRef.current;
-          const rowOwner = String(rr?.hdec_pic_name ?? "").trim().toLowerCase();
-          const isOwner = !!dyn.myPic && !!rowOwner && dyn.myPic === rowOwner;
-          const canEditOwnerFields = dyn.canEditOwnerFieldsBase || isOwner;
+          // 통합 편집 규칙: canEditRawRow 만으로 판단 (역할 rank / d_superuser team / user PIC).
+          const rowCanEdit = dyn.canEditRow(rr as Record<string, unknown>);
           const isTeamOverride = c.key === "team";
           const isDataDateOverride = c.key === "data_date";
           const isMilestoneOverride = c.key === "milestone";
           let effectiveColumn: TmColumnDef = c;
-          let effectiveCanEdit = canEdit;
-          let useOwnerSave = false;
+          let effectiveCanEdit = rowCanEdit;
           if (isTeamOverride) {
             effectiveColumn = { ...c, editable: true, editorType: "select", options: [...DISCIPLINES] };
-            effectiveCanEdit = canEditOwnerFields;
-            useOwnerSave = true;
           } else if (isDataDateOverride) {
             effectiveColumn = { ...c, editable: true, editorType: "date" };
-            effectiveCanEdit = canEditOwnerFields;
-            useOwnerSave = true;
           } else if (isMilestoneOverride) {
-            // Milestone은 tm_milestone_kinds(active) 기준 동적 옵션. 일반 편집 권한 규칙을 따른다.
             effectiveColumn = {
               ...c,
               editable: true,
@@ -1098,19 +1093,16 @@ export function TaskManagementRawDataPage() {
                   d.refetch();
                 }
               }}
-              onSave={
-                useOwnerSave
-                  ? async (value) => {
-                      await dyn.updateOwnerFieldFn({
-                        data: {
-                          id: String(rr.id),
-                          field: effectiveColumn.key,
-                          value: value ?? null,
-                        },
-                      });
-                    }
-                  : undefined
-              }
+              onSave={async (value) => {
+                // TM_OWNER_MUTATIONS_V2_2026_07_28 — 모든 편집을 서버 함수 경유로 통일
+                await dyn.updateOwnerFieldFn({
+                  data: {
+                    id: String(rr.id),
+                    field: effectiveColumn.key,
+                    value: value ?? null,
+                  },
+                });
+              }}
             >
               {rendered}
             </EditCellPopover>
@@ -1406,6 +1398,7 @@ export function TaskManagementRawDataPage() {
         selectedRows={selectedRowObjects}
         exportColumns={selectedExportColumns}
         canEdit={canEdit}
+        canEditRow={canEditRow as (row: Record<string, unknown>) => boolean}
         onClear={() => setRowSelection({})}
         onMutated={() => {
           setRowSelection({});

@@ -52,6 +52,8 @@ interface Props {
   canEdit: boolean;
   onClear: () => void;
   onMutated: () => void;
+  /** 행 단위 편집 권한 예측자 — canEditRawRow 규칙과 동일해야 함 */
+  canEditRow?: (row: Record<string, unknown>) => boolean;
 }
 
 export function BulkEditBar({
@@ -60,6 +62,7 @@ export function BulkEditBar({
   canEdit,
   onClear,
   onMutated,
+  canEditRow,
 }: Props) {
   const fields = useMemo(() => getBulkEditableFields(), []);
   const resolveLabel = useTmColumnLabel();
@@ -90,9 +93,15 @@ export function BulkEditBar({
   );
 
   const count = selectedRows.length;
+  // TM_OWNER_MUTATIONS_V2_2026_07_28 — 편집 불가 행은 skip
+  const editableRows = useMemo(
+    () => (canEditRow ? selectedRows.filter((r) => canEditRow(r)) : selectedRows),
+    [selectedRows, canEditRow],
+  );
+  const skippedCount = selectedRows.length - editableRows.length;
   const ids = useMemo(
-    () => selectedRows.map((r) => String(r.id ?? "")).filter(Boolean),
-    [selectedRows],
+    () => editableRows.map((r) => String(r.id ?? "")).filter(Boolean),
+    [editableRows],
   );
 
   if (count === 0) return null;
@@ -144,7 +153,7 @@ export function BulkEditBar({
         failed += r.failed;
       }
       toast.success(failed > 0 ? "부분 반영" : "저장 완료", {
-        description: `${ok} updated${failed > 0 ? ` · ${failed} 실패` : ""}`,
+        description: `${ok} updated${failed > 0 ? ` · ${failed} 실패` : ""}${skippedCount > 0 ? ` · ${skippedCount} 권한없음 skip` : ""}`,
       });
       setConfirmOpen(false);
       reset();
