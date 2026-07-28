@@ -968,7 +968,8 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
   // React 커밋 0회 → Profiler 검증 통과.
   const stickyBg = (row: AbdItem): string => {
     const inactive = !row.is_active;
-    const approved = row.status_group === "approved" || String(row.latest_status ?? "").toUpperCase() === "A";
+    // ABD_JUDGE_V1_2026_07_29: 서버 정본(bucket_top) 소비. latest_status='A' 클라 오버라이드 폐기.
+    const approved = (row as any).bucket_top === "Approved";
     // 스티키 컬럼은 항상 완전 불투명이어야 스크롤 시 뒤 컬럼이 비쳐 보이지 않는다.
     if (inactive)
       return "color-mix(in oklab, var(--muted) 45%, var(--background))";
@@ -1039,7 +1040,8 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
                 {vRows.map((vr) => {
                   const row = rowsModel[vr.index];
                   const r = row.original;
-                  const approved = r.status_group === "approved" || String(r.latest_status ?? "").toUpperCase() === "A";
+                  // ABD_JUDGE_V1_2026_07_29: 서버 정본 bucket_top 사용
+                  const approved = (r as any).bucket_top === "Approved";
                   return (
                     <TableRow
                       key={row.id}
