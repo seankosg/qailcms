@@ -4405,39 +4405,94 @@ export type Database = {
         }
         Returns: string
       }
-      tm_items_facets: {
+      tm_items_counts_by_bucket: {
         Args: {
-          _columns: string[]
+          _as_of?: string
           _filters?: Json
           _include_inactive?: boolean
           _q?: string
-        }
-        Returns: {
-          axis: string
-          cnt: number
-          value: string
-        }[]
-      }
-      tm_items_search: {
-        Args: {
-          _filters?: Json
-          _include_inactive?: boolean
-          _limit?: number
-          _offset?: number
-          _q?: string
-          _sort?: Json
+          _thresholds?: Json
         }
         Returns: Json
       }
-      tm_items_search_ids: {
-        Args: {
-          _filters?: Json
-          _include_inactive?: boolean
-          _limit?: number
-          _q?: string
-        }
-        Returns: Json
-      }
+      tm_items_facets:
+        | {
+            Args: {
+              _columns: string[]
+              _filters?: Json
+              _include_inactive?: boolean
+              _q?: string
+            }
+            Returns: {
+              axis: string
+              cnt: number
+              value: string
+            }[]
+          }
+        | {
+            Args: {
+              _as_of?: string
+              _columns: string[]
+              _filters?: Json
+              _include_inactive?: boolean
+              _kpi_mode?: string
+              _q?: string
+              _thresholds?: Json
+            }
+            Returns: {
+              axis: string
+              cnt: number
+              value: string
+            }[]
+          }
+      tm_items_search:
+        | {
+            Args: {
+              _filters?: Json
+              _include_inactive?: boolean
+              _limit?: number
+              _offset?: number
+              _q?: string
+              _sort?: Json
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _as_of?: string
+              _filters?: Json
+              _include_inactive?: boolean
+              _kpi_mode?: string
+              _limit?: number
+              _offset?: number
+              _q?: string
+              _sort?: Json
+              _thresholds?: Json
+            }
+            Returns: Json
+          }
+      tm_items_search_ids:
+        | {
+            Args: {
+              _filters?: Json
+              _include_inactive?: boolean
+              _limit?: number
+              _q?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _as_of?: string
+              _filters?: Json
+              _include_inactive?: boolean
+              _kpi_mode?: string
+              _limit?: number
+              _q?: string
+              _thresholds?: Json
+            }
+            Returns: Json
+          }
       tm_judge_at_date: {
         Args: { p_data_date: string; p_task_ids?: string[] }
         Returns: Json
@@ -4454,6 +4509,42 @@ export type Database = {
           gap_pct: number
           id: string
         }[]
+      }
+      tm_kpi_bucket_matches: {
+        Args: {
+          _actual_progress: number
+          _actual_start: string
+          _as_of: string
+          _auto_judgment: string
+          _bucket: string
+          _plan_days: number
+          _plan_end: string
+          _plan_progress: number
+          _plan_start: string
+          _worsen_gap: number
+        }
+        Returns: boolean
+      }
+      tm_kpi_gap: {
+        Args: {
+          _actual_progress: number
+          _as_of: string
+          _plan_days: number
+          _plan_end: string
+          _plan_progress: number
+          _plan_start: string
+        }
+        Returns: number
+      }
+      tm_kpi_norm_actual: { Args: { _v: number }; Returns: number }
+      tm_kpi_tplan: {
+        Args: {
+          _as_of: string
+          _plan_days: number
+          _plan_end: string
+          _plan_start: string
+        }
+        Returns: number
       }
       tm_my_workspace_counts: {
         Args: { _filter_value: string; _mode: string; _today: string }
