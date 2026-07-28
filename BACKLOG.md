@@ -6,6 +6,18 @@
 
 ---
 
+## 0. hdec_pic_master / hdec_eng_master 뷰 SECURITY DEFINER 해소  `[동결]` `[설계확정]`
+
+- **동결 사유**: 두 뷰는 `profiles`(RLS: `id = auth.uid() OR is_admin_or_super`)를 UNION하는 구조. `security_invoker=on`으로 전환 시 비관리자 authenticated 사용자에게 profiles 파트가 자기 1행만 노출되어 임포트 매핑 다이얼로그·MWS PIC/ENG 선택 옵션이 대량 소실(회귀). 실측: profiles 31행 중 자기 1행만 조회 가능해짐.
+- **확정 설계**:
+  - profiles를 우회하는 SECURITY DEFINER 함수 `list_hdec_pic_names()` / `list_hdec_eng_names()` 신설 (search_path 고정, authenticated에만 EXECUTE 허용, 활성 profiles + name_master UNION 결과 반환).
+  - `useMasterOptions.ts`, `AbdImportPage.tsx` 등 뷰 소비처를 RPC 호출로 전환.
+  - 두 뷰 DROP.
+  - 카운트 실측: 전환 전후 각 사용자 유형별 조회 행수 동일함 확인 후 배포.
+- **재개 조건**: 사용자 명시적 승인.
+
+---
+
 ## 1. Step 5 — latest_status 정규화 (A/B/C/NYS 통합)  `[동결]` `[설계확정]`
 
 - **동결 사유**: 사용자 최종 결정 "Step 5 진행하지 않는다 — 동결이 최종 결정" (2026-07-27).
