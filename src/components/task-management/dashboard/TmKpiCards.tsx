@@ -17,6 +17,7 @@ import {
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { EMPTY_TOKEN } from "@/lib/task-management/filters";
+import { useTmItemsCounts, type TmCountsByTeamEntry } from "@/hooks/useTmItemsCounts";
 
 interface Props {
   items: TaskItem[];
@@ -61,11 +62,59 @@ export function TmKpiCards({
   const t = thresholds ?? DEFAULT_THRESHOLDS;
 
   const scoped = useMemo(() => scopeItems(items, taskScope), [items, taskScope]);
-  const kpi = useMemo(() => computeKpi(scoped, asOfDate, t), [scoped, asOfDate, t]);
-  const breakdown = useMemo(
+  const clientKpi = useMemo(() => computeKpi(scoped, asOfDate, t), [scoped, asOfDate, t]);
+  const clientBreakdown = useMemo(
     () => computeKpiBreakdownByTeam(scoped, asOfDate, t),
     [scoped, asOfDate, t],
   );
+
+  // 서버 정본 카운트 — KPI 카드 숫자와 드릴다운 리스트 건수 정합성 보장.
+  const { counts: serverCounts, byTeam: serverByTeam } = useTmItemsCounts({
+    filters: {
+      team: ownerContext?.team,
+      hdec_pic_name: ownerContext?.hdec_pic_name,
+      hdec_eng_name: ownerContext?.hdec_eng_name,
+      discipline: ownerContext?.discipline,
+      plot: ownerContext?.plot,
+      q: ownerContext?.q,
+    },
+    taskScope,
+    asOfDate,
+    thresholds: t,
+  });
+
+  // 카운트: 서버 값 우선, 미도착 시 클라이언트 값 폴백. 가중 진도(%)는 클라이언트에서 계속 계산.
+  const kpi = useMemo(() => {
+    if (!serverCounts) return clientKpi;
+    return {
+      ...clientKpi,
+      total: serverCounts.total,
+      completed: serverCounts.completed,
+      wip: serverCounts.wip,
+      notStarted: serverCounts.not_started,
+      plannedStartedByAsOf: serverCounts.planned_started,
+      actuallyStarted: serverCounts.actual_started,
+      inDelay: serverCounts.in_delay,
+      startDelayed: serverCounts.start_delayed,
+      completionOverdue: serverCounts.completion_overdue,
+      criticalDelay: serverCounts.critical,
+      behindSchedule: serverCounts.behind,
+    };
+  }, [serverCounts, clientKpi]);
+
+  const mapTeam = (list: TmCountsByTeamEntry[] | undefined) =>
+    (list ?? []).map((e) => ({ team: e.team, isNull: e.isNull, count: e.count }));
+
+  const breakdown = useMemo(() => {
+    if (!serverByTeam) return clientBreakdown;
+    return {
+      inDelay: mapTeam(serverByTeam.in_delay),
+      startDelayed: mapTeam(serverByTeam.start_delayed),
+      completionOverdue: mapTeam(serverByTeam.completion_overdue),
+      criticalDelay: mapTeam(serverByTeam.critical_delay),
+      behindSchedule: mapTeam(serverByTeam.behind_schedule),
+    };
+  }, [serverByTeam, clientBreakdown]);
 
   const goRaw = (mode: TmKpiMode) => {
     const s: Record<string, string> = {
