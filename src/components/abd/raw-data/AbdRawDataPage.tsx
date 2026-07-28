@@ -675,7 +675,12 @@ export function AbdRawDataPage() {
         </button>
         {STATUS_TABS.map((s) => {
           const active = selectedStatuses.includes(s.value);
-          const count = s.value === "approved" ? approvedCount : s.value === "in_progress" ? inProgressCount : notStartedCount;
+          const count =
+            s.value === "approved"
+              ? approvedCount
+              : s.value === "unapproved"
+                ? inProgressCount + notStartedCount
+                : 0;
           return (
             <button
               key={s.value}
@@ -695,6 +700,25 @@ export function AbdRawDataPage() {
             </button>
           );
         })}
+        {selectedStatuses
+          .filter((v) => DEEP_LINK_STATUS_LABEL[v])
+          .map((v) => (
+            <span
+              key={`chip-${v}`}
+              className="inline-flex h-6 items-center gap-1 rounded bg-amber-500/15 px-2 text-[11px] text-amber-800 dark:text-amber-200"
+              title={`대시보드 드릴다운 판정: ${DEEP_LINK_STATUS_LABEL[v]}`}
+            >
+              판정: {DEEP_LINK_STATUS_LABEL[v]}
+              <button
+                type="button"
+                onClick={() => toggleStatus(v)}
+                aria-label="필터 제거"
+                className="ml-0.5 rounded px-1 hover:bg-amber-500/25"
+              >
+                ×
+              </button>
+            </span>
+          ))}
         <button
           type="button"
           onClick={() => setUrl({ excluded: excludedMode === "only" ? "hide" : "only", page: 1 })}
