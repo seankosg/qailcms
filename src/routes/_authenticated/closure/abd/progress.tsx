@@ -16,6 +16,7 @@ const searchSchema = z.object({
   planMode: fallback(z.enum(["baseline", "remaining"]), "baseline").default("baseline"),
   matrixOpen: fallback(z.union([z.literal(0), z.literal(1)]), 1).default(1),
   scurveOpen: fallback(z.union([z.literal(0), z.literal(1)]), 1).default(1),
+  round: fallback(z.enum(["all", "R1", "R2", "R3"]), "all").default("all"),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/abd/progress")({
