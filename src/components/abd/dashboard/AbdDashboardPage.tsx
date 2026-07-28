@@ -101,13 +101,23 @@ export function AbdDashboardPage() {
 
   const openRawData = (params: Record<string, string> = {}) => {
     const search: Record<string, string> = { ...params };
+    // Row1/Row2 breakdown 클릭 시 `team`으로 전달되나 Raw Data는 `tab`을 소비.
+    // 매핑하지 않으면 tab이 비어 기본값(MECH)로 잘려 나가 카드 카운트와 불일치.
+    if (search.team && !search.tab) {
+      search.tab = search.team;
+    }
+    delete search.team;
+    // 카드 본문 클릭(팀 지정 없음)은 ABD 전 팀을 포함해야 카드 카운트와 일치.
+    if (!search.tab) {
+      search.tab = "MECH,ELEC,ARCH";
+    }
     if (batchFilter.length && !("batch" in search)) {
       search.batch = batchFilter.join(",");
     }
     if (plotFilter.length && !("plot" in search)) {
       search.plot = plotFilter.join(",");
     }
-    const progressKeys = ["team", "dis", "service", "hdec_pic_name", "hdec_eng_name", "docAx", "docAxx", "batch"];
+    const progressKeys = ["tab", "dis", "service", "hdec_pic_name", "hdec_eng_name", "docAx", "docAxx", "batch"];
     if (progressKeys.some((k) => k in search) && !("source" in search)) {
       search.source = "progress";
     }
