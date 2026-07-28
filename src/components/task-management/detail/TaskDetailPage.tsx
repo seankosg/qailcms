@@ -26,8 +26,11 @@ import { formatDdMmm } from "@/lib/defect-management/stage-utils";
 import { cn } from "@/lib/utils";
 import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThread";
 import { useServerFn } from "@tanstack/react-start";
-import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
+import { updateTaskOwnerField, TM_OWNER_MUTATIONS_MARKER } from "@/lib/task-management/owner-mutations.functions";
 import { canEditRawRow } from "@/lib/auth/roles";
+
+// Runtime reference to keep the deploy marker in the client bundle (tree-shake guard)
+if (typeof window !== "undefined") (window as any).__TM_MARK__ = TM_OWNER_MUTATIONS_MARKER;
 
 const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   id: "Identification",
