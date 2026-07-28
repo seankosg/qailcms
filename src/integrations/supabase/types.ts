@@ -4483,6 +4483,7 @@ export type Database = {
         Args: {
           _as_of?: string
           _filters?: Json
+          _ids?: string[]
           _include_inactive?: boolean
           _kpi_mode?: string
           _limit?: number
