@@ -7,12 +7,13 @@ export function useSnagDashboardMatrix(plot: PlotKey, teams: TeamKey[], asOfDate
   return useQuery<MatrixRawRow[]>({
     queryKey: ["snag-dashboard-matrix", plot, [...teams].sort().join(","), asOfDate ?? ""],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("defect_snag_dashboard_matrix", {
+      const { data, error } = await (supabase as any).rpc("defect_snag_dashboard_matrix_json", {
         _plan_groups: planGroupsForPlot(plot),
         _teams: teams.length ? teams : null,
         _as_of_date: asOfDate || null,
       });
       if (error) throw new Error(error.message);
+      if (!Array.isArray(data)) throw new Error("defect_snag_dashboard_matrix_json RPC contract mismatch");
       return (data ?? []).map((r: any) => ({
         plan_group: r.plan_group ?? null,
         building: r.building ?? null,
