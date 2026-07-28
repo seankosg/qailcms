@@ -260,10 +260,10 @@ export function SnagProgressPage() {
   }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket]);
 
   const kpis = useMemo(() => {
-    const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number }> = {
-      start: { plan: 0, actual: 0, done: 0, total: 0 },
-      rectified: { plan: 0, actual: 0, done: 0, total: 0 },
-      closure: { plan: 0, actual: 0, done: 0, total: 0 },
+    const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number; noPlan: number }> = {
+      start: { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 },
+      rectified: { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 },
+      closure: { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 },
     };
     for (const t of (totalsQ.data ?? []) as Array<{
       stage: Stage;
@@ -271,12 +271,14 @@ export function SnagProgressPage() {
       actual_upto: number;
       done_upto: number;
       total: number;
+      no_plan: number;
     }>) {
       if (!effectiveStages.includes(t.stage)) continue;
       byStage[t.stage].plan += t.plan_upto;
       byStage[t.stage].actual += t.actual_upto;
       byStage[t.stage].done += t.done_upto;
       byStage[t.stage].total += t.total;
+      byStage[t.stage].noPlan += t.no_plan;
     }
     let cumPlan = 0, cumActual = 0, doneStages = 0, totalStages = 0;
     for (const s of effectiveStages) {
@@ -292,7 +294,8 @@ export function SnagProgressPage() {
     const totalPct = totalStages > 0 ? 100 : 0;
     const planPctOfTotal = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
     const actualPctOfTotal = totalStages > 0 ? (cumActual / totalStages) * 100 : 0;
-    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct, totalPct, planPctOfTotal, actualPctOfTotal };
+    const noPlanTotal = effectiveStages.reduce((s, st) => s + byStage[st].noPlan, 0);
+    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct, totalPct, planPctOfTotal, actualPctOfTotal, noPlanTotal };
   }, [totalsQ.data, effectiveStages]);
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
