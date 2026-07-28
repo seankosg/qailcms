@@ -121,28 +121,21 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
         return { rows, total };
       }
 
-      // ALL 등 대용량: CHUNK 단위 루프.
-      // 표준안: offset 전진은 collected.length(= 실제 반환 batch.length 누적) 기반.
-      //         종료 조건은 target 도달, batch.length === 0, 또는 batch.length < CHUNK.
+      // ALL 등 대용량: 1) 첫 청크로 total 확보, 2) 나머지 청크를 병렬 페치 (R3).
       const firstBatch = await callRpc(baseOffset, CHUNK);
       const total = Number(firstBatch[0]?.total_count ?? 0);
-      const target = Math.min(total - baseOffset, p.pageSize);
+      const target = Math.min(Math.max(0, total - baseOffset), p.pageSize);
       const collected: AbdItem[] = firstBatch.map((r) => r.rows as AbdItem);
-      const maxIterations = Math.ceil(p.pageSize / CHUNK) + 1;
-      let iterations = 1;
-      let lastBatchLen = firstBatch.length;
-      while (collected.length < target) {
-        if (lastBatchLen < CHUNK) break; // 마지막 페이지 도달
-        if (++iterations > maxIterations) {
-          throw new Error(`abd_items_search chunk loop exceeded ${maxIterations} iterations`);
+      if (target > collected.length && firstBatch.length === CHUNK) {
+        const remaining = target - collected.length;
+        const extraChunks = Math.ceil(remaining / CHUNK);
+        const offsets: number[] = [];
+        for (let i = 1; i <= extraChunks; i++) {
+          offsets.push(baseOffset + i * CHUNK);
         }
-        const prev = collected.length;
-        const batch = await callRpc(baseOffset + collected.length, CHUNK);
-        lastBatchLen = batch.length;
-        if (batch.length === 0) break;
-        for (const r of batch) collected.push(r.rows as AbdItem);
-        if (collected.length === prev) {
-          throw new Error("abd_items_search chunk loop stalled (no progress)");
+        const batches = await Promise.all(offsets.map((off) => callRpc(off, CHUNK)));
+        for (const batch of batches) {
+          for (const r of batch) collected.push(r.rows as AbdItem);
         }
       }
       const finalRows = collected.slice(0, target);
