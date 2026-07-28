@@ -397,6 +397,15 @@ export async function parseTaskManagementExcel(
   const extraAliases = opts.extraAliases;
   const excludedHeadersInput = opts.excludedHeaders ?? [];
   const dateOverrides = opts.dateOverrides ?? {};
+  const allowedMilestoneSet = new Set<string>(
+    (opts.allowedMilestoneCodes && opts.allowedMilestoneCodes.length > 0
+      ? opts.allowedMilestoneCodes
+      : ["HO", "COC", "DLP"]
+    )
+      .map((c) => String(c).trim().toUpperCase())
+      .filter(Boolean),
+  );
+  const unknownMilestoneCounts = new Map<string, number>();
   const { audit, read: readDateCell } = makeDateAudit(dateOverrides);
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
