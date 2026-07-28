@@ -697,6 +697,9 @@ export function TaskManagementRawDataPage() {
     toggleCollapse,
     setAddChildParent,
     milestoneOptions,
+    patchRow,
+    refetchRow,
+    kpiMode,
   });
   cellDynRef.current = {
     commentCounts,
@@ -712,6 +715,9 @@ export function TaskManagementRawDataPage() {
     toggleCollapse,
     setAddChildParent,
     milestoneOptions,
+    patchRow,
+    refetchRow,
+    kpiMode,
   };
 
   const columns = useMemo<ColumnDef<Row>[]>(() => {
