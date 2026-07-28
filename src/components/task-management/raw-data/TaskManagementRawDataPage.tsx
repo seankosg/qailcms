@@ -1398,6 +1398,7 @@ export function TaskManagementRawDataPage() {
         selectedRows={selectedRowObjects}
         exportColumns={selectedExportColumns}
         canEdit={canEdit}
+        canEditRow={canEditRow as (row: Record<string, unknown>) => boolean}
         onClear={() => setRowSelection({})}
         onMutated={() => {
           setRowSelection({});
