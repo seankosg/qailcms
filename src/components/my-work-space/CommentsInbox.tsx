@@ -149,9 +149,10 @@ export function CommentsInbox({ userId, scope, filterValue, isAdmin }: Props) {
                   className={cn(
                     "h-7 rounded-md border px-2.5 text-xs font-medium transition-colors flex items-center gap-1.5",
                     isVp
-                      ? tab === k
-                        ? "border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
-                        : "border-neutral-900 bg-background text-neutral-900 hover:bg-neutral-900 hover:text-white dark:border-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-100 dark:hover:text-neutral-900"
+                      ? cn(
+                          "border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-800",
+                          tab === k ? "bg-neutral-950" : "bg-neutral-900",
+                        )
                       : tab === k
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border bg-background text-muted-foreground hover:bg-muted",
