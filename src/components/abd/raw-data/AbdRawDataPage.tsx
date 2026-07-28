@@ -93,6 +93,8 @@ function serializeFilters(f: ColumnFiltersState): string {
   return JSON.stringify(obj);
 }
 
+const MULTI_DATE_RANGE_ID = "__abd_date_range_or__";
+
 function buildFiltersFromProgressContext(urlSearch: any): ColumnFiltersState {
   const filters: ColumnFiltersState = [];
   const addMulti = (id: string, value: string) => {
@@ -107,7 +109,16 @@ function buildFiltersFromProgressContext(urlSearch: any): ColumnFiltersState {
   addMulti("doc_ax", urlSearch.docAx);
   addMulti("doc_axx", urlSearch.docAxx);
   addMulti("batch_no", urlSearch.batch);
-  if (urlSearch.dateStart && urlSearch.dateEnd && urlSearch.dateField) {
+  // dateFields (콤마 목록) 우선 — 다중 컬럼 OR 범위 (round=all 드릴다운)
+  if (urlSearch.dateFields && (urlSearch.dateStart || urlSearch.dateEnd)) {
+    const cols = String(urlSearch.dateFields).split(",").map((s: string) => s.trim()).filter(Boolean);
+    if (cols.length > 0) {
+      filters.push({
+        id: MULTI_DATE_RANGE_ID,
+        value: { columns: cols, from: urlSearch.dateStart ?? "", to: urlSearch.dateEnd ?? "" },
+      });
+    }
+  } else if (urlSearch.dateStart && urlSearch.dateEnd && urlSearch.dateField) {
     filters.push({ id: urlSearch.dateField, value: { from: urlSearch.dateStart, to: urlSearch.dateEnd } });
   }
   return filters;
@@ -119,6 +130,17 @@ function toServerFilters(f: ColumnFiltersState): AbdServerFilter[] {
     const id = cf.id;
     const v: any = cf.value;
     if (v == null) continue;
+    // 다중 컬럼 OR 날짜 범위 (Progress round=all 드릴다운 전용)
+    if (id === MULTI_DATE_RANGE_ID && typeof v === "object" && Array.isArray(v.columns)) {
+      if ((v.from || v.to) && v.columns.length > 0) {
+        out.push({
+          column: "__multi__",
+          op: "date_range_or",
+          value: { columns: v.columns, from: v.from ?? "", to: v.to ?? "" },
+        });
+      }
+      continue;
+    }
     if (Array.isArray(v)) {
       if (v.length === 0) continue;
       const hasEmpty = v.includes(EMPTY_TOKEN);
@@ -337,6 +359,7 @@ export function AbdRawDataPage() {
         dateStart: "",
         dateEnd: "",
         dateField: "",
+        dateFields: "",
         stage: "",
         round: "",
         filters: serializeFilters(built),
