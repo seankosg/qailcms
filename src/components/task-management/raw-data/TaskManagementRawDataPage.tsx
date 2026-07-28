@@ -199,16 +199,6 @@ function chipValue(v: unknown): string {
   return String(v);
 }
 
-function previousDay(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() - 1);
-  const yy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
-}
-
 function modeToColumnFilters(
   mode: string | undefined,
   asOf: string,
@@ -218,53 +208,12 @@ function modeToColumnFilters(
   if (scope !== "all") {
     out.push({ id: "level", value: [scope] });
   }
+  // KPI 딥링크 mode 는 서버 _kpi_mode 파라미터로 전달 (정본 tm_kpi_bucket_matches).
+  // 수동 컬럼 필터로서의 auto_judgment 필터는 사용자가 UI에서 직접 걸 때만 유지.
+  // no_plan_* 만 컬럼 empty 필터로 매핑 (bucket 과 등가).
   if (!mode) return out;
-
-  const notCompleted = ["정상", "주의", "지연", "악화", EMPTY_TOKEN];
-  const delayOnly = ["지연", "악화"];
-
-  switch (mode) {
-    case "completed":
-      out.push({ id: "auto_judgment", value: ["완료"] });
-      break;
-    case "wip":
-      out.push({ id: "actual_start", value: { notEmptyOnly: true } });
-      out.push({ id: "auto_judgment", value: notCompleted });
-      break;
-    case "not_started":
-      out.push({ id: "actual_start", value: { emptyOnly: true } });
-      out.push({ id: "auto_judgment", value: notCompleted });
-      break;
-    case "planned_started":
-      out.push({ id: "plan_start", value: { to: asOf } });
-      break;
-    case "actual_started":
-      out.push({ id: "actual_start", value: { notEmptyOnly: true } });
-      break;
-    case "in_delay":
-    case "behind":
-    case "delay":
-      out.push({ id: "auto_judgment", value: delayOnly });
-      break;
-    case "start_delayed":
-      out.push({ id: "auto_judgment", value: delayOnly });
-      out.push({ id: "actual_start", value: { emptyOnly: true } });
-      out.push({ id: "plan_start", value: { to: asOf } });
-      break;
-    case "completion_overdue":
-      out.push({ id: "auto_judgment", value: delayOnly });
-      out.push({ id: "plan_end", value: { to: previousDay(asOf) } });
-      break;
-    case "critical":
-      out.push({ id: "auto_judgment", value: ["악화"] });
-      break;
-    case "no_plan_start":
-      out.push({ id: "plan_start", value: { emptyOnly: true } });
-      break;
-    case "no_plan_end":
-      out.push({ id: "plan_end", value: { emptyOnly: true } });
-      break;
-  }
+  if (mode === "no_plan_start") out.push({ id: "plan_start", value: { emptyOnly: true } });
+  else if (mode === "no_plan_end") out.push({ id: "plan_end", value: { emptyOnly: true } });
   return out;
 }
 
@@ -332,6 +281,8 @@ export function TaskManagementRawDataPage() {
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [addChildParent, setAddChildParent] = useState<ParentSeed | null>(null);
   const [addMainOpen, setAddMainOpen] = useState(false);
+  // 대시보드 KPI 딥링크 mode → 서버 _kpi_mode 로 전달 (정본 tm_kpi_bucket_matches 통과)
+  const [kpiMode, setKpiMode] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // initial load from server-backed view preference (with local cache fallback)
@@ -480,6 +431,9 @@ export function TaskManagementRawDataPage() {
     // SHAW 방식: mode 를 TanStack ColumnFilters 로 변환하여 한꺼번에 적용
     const kpiFilters = modeToColumnFilters(s.mode, asOf, scope);
     setColumnFilters([...next, ...kpiFilters]);
+    // KPI 모드는 서버 _kpi_mode 로 전달 — auto_judgment stored 컬럼 필터 대체.
+    const m = (s.mode ?? "").trim();
+    setKpiMode(m && m !== "no_plan_start" && m !== "no_plan_end" ? m : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateLoaded, search]);
 
@@ -557,6 +511,7 @@ export function TaskManagementRawDataPage() {
     pageSizeMains: 100,
     asOf: serverAsOf,
     thresholds: serverThresholds,
+    kpiMode,
   });
 
   const rows = serverRows;

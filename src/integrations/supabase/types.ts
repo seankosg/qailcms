@@ -4543,19 +4543,6 @@ export type Database = {
         }
         Returns: number
       }
-      tm_kpi_dashboard_judgment: {
-        Args: {
-          _actual_progress: number
-          _as_of: string
-          _auto_judgment: string
-          _caution_gap_buffer: number
-          _plan_days: number
-          _plan_end: string
-          _plan_start: string
-          _worsen_gap: number
-        }
-        Returns: string
-      }
       tm_kpi_gap: {
         Args: {
           _actual_progress: number

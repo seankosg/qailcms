@@ -33,6 +33,8 @@ export interface UseTmInfiniteItemsParams {
   asOf?: string | null;
   /** Dashboard 정본 판정용 임계값. asOf 와 함께 지정되어야 서버 판정이 활성화됨. */
   thresholds?: TaskThresholds | null;
+  /** Dashboard KPI 딥링크 진입 시 서버에서 tm_kpi_bucket_matches 로 필터. null 이면 미적용. */
+  kpiMode?: string | null;
 }
 
 export interface UseTmInfiniteItemsResult<TRow = Record<string, unknown>> {
@@ -66,8 +68,9 @@ function keySignature(
   pageSize: number,
   asOf: string | null,
   thresholds: TaskThresholds | null,
+  kpiMode: string | null,
 ): string {
-  return JSON.stringify({ q, filters, sort, includeInactive, forceAll, pageSize, asOf, thresholds });
+  return JSON.stringify({ q, filters, sort, includeInactive, forceAll, pageSize, asOf, thresholds, kpiMode });
 }
 
 export function useTmInfiniteItems<TRow = Record<string, unknown>>(
@@ -83,12 +86,13 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     enabled = true,
     asOf = null,
     thresholds = null,
+    kpiMode = null,
   } = params;
 
   const qc = useQueryClient();
   const sig = useMemo(
-    () => keySignature(q, serverFilters, serverSort, includeInactive, forceAll, pageSizeMains, asOf, thresholds),
-    [q, serverFilters, serverSort, includeInactive, forceAll, pageSizeMains, asOf, thresholds],
+    () => keySignature(q, serverFilters, serverSort, includeInactive, forceAll, pageSizeMains, asOf, thresholds, kpiMode),
+    [q, serverFilters, serverSort, includeInactive, forceAll, pageSizeMains, asOf, thresholds, kpiMode],
   );
 
   // 검색/필터/정렬/모드 변경 시 페이지 리셋
@@ -122,6 +126,7 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
         _offset: offset,
         _limit: limit,
         _include_inactive: includeInactive,
+        _kpi_mode: kpiMode ?? null,
         _as_of: asOf ?? null,
         _thresholds: thresholds
           ? {
@@ -233,6 +238,7 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
       _filters: serverFilters,
       _include_inactive: includeInactive,
       _limit: 100000,
+      _kpi_mode: kpiMode ?? null,
       _as_of: asOf ?? null,
       _thresholds: thresholds
         ? {
@@ -244,7 +250,7 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     if (error) throw error;
     const arr = Array.isArray(data) ? (data as unknown[]) : [];
     return arr.map(String);
-  }, [q, serverFilters, includeInactive, asOf, thresholds]);
+  }, [q, serverFilters, includeInactive, asOf, thresholds, kpiMode]);
 
   const patchRow = useCallback((id: string, patch: Record<string, unknown>) => {
     let touched = false;
