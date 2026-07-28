@@ -3905,6 +3905,21 @@ export type Database = {
         Args: { _as_of?: string; _ids: string[] }
         Returns: Json
       }
+      abd_my_workspace_counts: {
+        Args: { _filter_value: string; _mode: string; _today: string }
+        Returns: Json
+      }
+      abd_my_workspace_rows: {
+        Args: {
+          _bucket: string
+          _filter_value: string
+          _limit?: number
+          _mode: string
+          _offset?: number
+          _today: string
+        }
+        Returns: Json
+      }
       abd_progress_cells:
         | {
             Args: {
@@ -4439,6 +4454,21 @@ export type Database = {
           gap_pct: number
           id: string
         }[]
+      }
+      tm_my_workspace_counts: {
+        Args: { _filter_value: string; _mode: string; _today: string }
+        Returns: Json
+      }
+      tm_my_workspace_rows: {
+        Args: {
+          _bucket: string
+          _filter_value: string
+          _limit?: number
+          _mode: string
+          _offset?: number
+          _today: string
+        }
+        Returns: Json
       }
       tm_today_actual: {
         Args: { _as_of: string; _ids: string[] }

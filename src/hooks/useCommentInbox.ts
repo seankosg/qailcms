@@ -67,26 +67,21 @@ async function fetchOwnedParentIds(scope: InboxScope) {
     return collected;
   }
 
-  const tmParents = isAdmin
-    ? null
-    : await idsFrom("task_management_raw", "id", "task_no,task_name", (q) =>
-        mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
-      );
-  const smParents = isAdmin
-    ? null
-    : await idsFrom("defect_items_raw", "id", "source_issue_no,location_raw", (q) =>
-        mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
-      );
-  const abdParents = isAdmin
-    ? null
-    : await idsFrom("abd_items_raw", "id", "abd_number,document_title", (q) =>
-        mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
-      );
-  const spParents = isAdmin
-    ? null
-    : await idsFrom("spare_parts_raw", "doc_ref", "subject,plot", (q) =>
-        mode === "team" ? q.eq("team", filterValue) : q.eq("owner_user_id", userId ?? "__none__"),
-      );
+  // R4: 4개 모듈 부모 ID 조회 병렬화 (Promise.all).
+  const [tmParents, smParents, abdParents, spParents] = await Promise.all([
+    isAdmin ? Promise.resolve(null) : idsFrom("task_management_raw", "id", "task_no,task_name", (q) =>
+      mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
+    ),
+    isAdmin ? Promise.resolve(null) : idsFrom("defect_items_raw", "id", "source_issue_no,location_raw", (q) =>
+      mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
+    ),
+    isAdmin ? Promise.resolve(null) : idsFrom("abd_items_raw", "id", "abd_number,document_title", (q) =>
+      mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
+    ),
+    isAdmin ? Promise.resolve(null) : idsFrom("spare_parts_raw", "doc_ref", "subject,plot", (q) =>
+      mode === "team" ? q.eq("team", filterValue) : q.eq("owner_user_id", userId ?? "__none__"),
+    ),
+  ]);
 
   const map = (rows: Array<Record<string, any>> | null, idKey: string, refKey: string, labelKey: string) => {
     if (!rows) return null;

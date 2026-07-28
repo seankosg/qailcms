@@ -187,6 +187,10 @@ function smRpcMode(isAdmin: boolean, scope: MwsScope): "admin" | "pic" | "team" 
   return scope === "team" ? "team" : "pic";
 }
 
+function mwsRpcMode(isAdmin: boolean, scope: MwsScope): "admin" | "pic" | "team" {
+  return smRpcMode(isAdmin, scope);
+}
+
 export function useMyDefectsCounts(
   filterValue: string | null,
   isAdmin: boolean,
@@ -243,6 +247,141 @@ export function useMyDefectsBucket(
       });
       if (error) throw new Error(error.message);
       return (data ?? []) as SmMyRow[];
+    },
+  });
+}
+
+// ============ R4: TM/ABD 서버 판정 RPC 훅 ============
+export type TmBucket = "today" | "delayed" | "upcoming" | "in_progress" | "completed" | "all";
+export type AbdBucket = "today" | "delayed" | "upcoming" | "in_progress" | "completed" | "needs_planning" | "all";
+
+export interface TmMyCounts {
+  today_count: number;
+  delayed_count: number;
+  upcoming_count: number;
+  in_progress_count: number;
+  completed_count: number;
+  total_count: number;
+}
+export interface AbdMyCounts extends TmMyCounts { needs_planning_count: number; }
+
+export function useMyTasksCounts(
+  filterValue: string | null,
+  isAdmin: boolean,
+  scope: MwsScope,
+  todayIso: string,
+  opts?: { enabled?: boolean },
+) {
+  const mode = mwsRpcMode(isAdmin, scope);
+  return useQuery<TmMyCounts>({
+    queryKey: ["my-workspace", "tm-counts", mode, filterValue, todayIso],
+    enabled: (isAdmin || !!filterValue) && (opts?.enabled !== false),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("tm_my_workspace_counts", {
+        _mode: mode,
+        _filter_value: mode === "admin" ? null : filterValue,
+        _today: todayIso,
+      });
+      if (error) throw new Error(error.message);
+      const row = (data ?? {}) as any;
+      return {
+        today_count: Number(row.today_count ?? 0),
+        delayed_count: Number(row.delayed_count ?? 0),
+        upcoming_count: Number(row.upcoming_count ?? 0),
+        in_progress_count: Number(row.in_progress_count ?? 0),
+        completed_count: Number(row.completed_count ?? 0),
+        total_count: Number(row.total_count ?? 0),
+      };
+    },
+  });
+}
+
+export function useMyTasksBucket(
+  filterValue: string | null,
+  isAdmin: boolean,
+  scope: MwsScope,
+  todayIso: string,
+  bucket: TmBucket | null,
+  opts?: { limit?: number; enabled?: boolean },
+) {
+  const mode = mwsRpcMode(isAdmin, scope);
+  return useQuery<TmMyRow[]>({
+    queryKey: ["my-workspace", "tm-bucket", mode, filterValue, todayIso, bucket, opts?.limit ?? 5000],
+    enabled: (isAdmin || !!filterValue) && !!bucket && (opts?.enabled !== false),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("tm_my_workspace_rows", {
+        _mode: mode,
+        _filter_value: mode === "admin" ? null : filterValue,
+        _today: todayIso,
+        _bucket: bucket,
+        _limit: opts?.limit ?? 5000,
+        _offset: 0,
+      });
+      if (error) throw new Error(error.message);
+      return (Array.isArray(data) ? data : []) as TmMyRow[];
+    },
+  });
+}
+
+export function useMyAbdCounts(
+  filterValue: string | null,
+  isAdmin: boolean,
+  scope: MwsScope,
+  todayIso: string,
+  opts?: { enabled?: boolean },
+) {
+  const mode = mwsRpcMode(isAdmin, scope);
+  return useQuery<AbdMyCounts>({
+    queryKey: ["my-workspace", "abd-counts", mode, filterValue, todayIso],
+    enabled: (isAdmin || !!filterValue) && (opts?.enabled !== false),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("abd_my_workspace_counts", {
+        _mode: mode,
+        _filter_value: mode === "admin" ? null : filterValue,
+        _today: todayIso,
+      });
+      if (error) throw new Error(error.message);
+      const row = (data ?? {}) as any;
+      return {
+        today_count: Number(row.today_count ?? 0),
+        delayed_count: Number(row.delayed_count ?? 0),
+        upcoming_count: Number(row.upcoming_count ?? 0),
+        in_progress_count: Number(row.in_progress_count ?? 0),
+        completed_count: Number(row.completed_count ?? 0),
+        needs_planning_count: Number(row.needs_planning_count ?? 0),
+        total_count: Number(row.total_count ?? 0),
+      };
+    },
+  });
+}
+
+export function useMyAbdBucket(
+  filterValue: string | null,
+  isAdmin: boolean,
+  scope: MwsScope,
+  todayIso: string,
+  bucket: AbdBucket | null,
+  opts?: { limit?: number; enabled?: boolean },
+) {
+  const mode = mwsRpcMode(isAdmin, scope);
+  return useQuery<AbdMyRow[]>({
+    queryKey: ["my-workspace", "abd-bucket", mode, filterValue, todayIso, bucket, opts?.limit ?? 5000],
+    enabled: (isAdmin || !!filterValue) && !!bucket && (opts?.enabled !== false),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("abd_my_workspace_rows", {
+        _mode: mode,
+        _filter_value: mode === "admin" ? null : filterValue,
+        _today: todayIso,
+        _bucket: bucket,
+        _limit: opts?.limit ?? 5000,
+        _offset: 0,
+      });
+      if (error) throw new Error(error.message);
+      return (Array.isArray(data) ? data : []) as AbdMyRow[];
     },
   });
 }

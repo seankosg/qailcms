@@ -24,6 +24,8 @@ interface Props {
   children: React.ReactNode;
   /** 커스텀 저장 경로 (제공 시 supabase 직접 update 대신 호출됨) */
   onSave?: (value: unknown) => Promise<void>;
+  /** 저장 성공 시 로컬 캐시 부분 패치 (제공 시 페이지 refetch 대체) */
+  onLocalPatch?: (value: unknown) => void;
 }
 
 export function EditCellPopover({
@@ -34,6 +36,7 @@ export function EditCellPopover({
   onSaved,
   children,
   onSave,
+  onLocalPatch,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState<string>(
@@ -89,6 +92,7 @@ export function EditCellPopover({
       }
       toast.success("저장 완료", { description: displayLabel });
       setOpen(false);
+      if (onLocalPatch) onLocalPatch(payload);
       onSaved();
     } catch (e: any) {
       toast.error("저장 실패", { description: e?.message ?? String(e) });
