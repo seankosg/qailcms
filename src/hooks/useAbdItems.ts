@@ -6,6 +6,7 @@ export type AbdStatusGroup =
   | "approved"
   | "in_progress"
   | "not_started"
+  | "unapproved"
   | "under_review"
   | "drafting"
   | "rs_delay"
