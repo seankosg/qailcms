@@ -14,13 +14,19 @@ export const Route = createFileRoute("/api/public/backup/run-queued-snapshot")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
-        if (!SUPABASE_PUBLISHABLE_KEY) {
+        const BACKUP_TRIGGER_SECRET = process.env.BACKUP_TRIGGER_SECRET;
+        if (!BACKUP_TRIGGER_SECRET) {
           return new Response(JSON.stringify({ error: "Server misconfiguration" }), { status: 500 });
         }
-        const apiKey = request.headers.get("apikey") ?? "";
-        if (apiKey !== SUPABASE_PUBLISHABLE_KEY) {
-          return new Response(JSON.stringify({ error: "Invalid apikey" }), { status: 401 });
+        const provided = request.headers.get("x-backup-secret") ?? "";
+        const a = Buffer.from(provided);
+        const b = Buffer.from(BACKUP_TRIGGER_SECRET);
+        if (a.length !== b.length) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+        }
+        const { timingSafeEqual } = await import("crypto");
+        if (!timingSafeEqual(a, b)) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

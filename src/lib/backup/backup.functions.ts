@@ -333,13 +333,13 @@ export const enqueuePreImportSnapshot = createServerFn({ method: "POST" })
 
     // Best-effort: poke the runner immediately so the queue drains without
     // waiting for the next cron minute. Failure is fine — pg_cron will pick it up.
-    const apiKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-    if (apiKey) {
+    const backupSecret = process.env.BACKUP_TRIGGER_SECRET;
+    if (backupSecret) {
       const url = "https://project--c5d84672-611a-4a97-92e3-1b90576d9b68.lovable.app/api/public/backup/run-queued-snapshot";
       // Fire-and-forget: don't await, don't block the response.
       fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: apiKey },
+        headers: { "Content-Type": "application/json", "x-backup-secret": backupSecret },
         body: "{}",
       }).catch((err) => {
         console.warn("[enqueuePreImportSnapshot] runner poke failed", err);
