@@ -3899,6 +3899,7 @@ export type Database = {
       }
       abd_items_search: {
         Args: {
+          _bucket?: string[]
           _excluded_mode?: string
           _filters?: Json
           _include_inactive?: boolean
@@ -3917,6 +3918,13 @@ export type Database = {
       }
       abd_judge_at_date: {
         Args: { _as_of?: string; _ids: string[] }
+        Returns: Json
+      }
+      abd_judge_v1: {
+        Args: {
+          _as_of?: string
+          _row: Database["public"]["Tables"]["abd_items_raw"]["Row"]
+        }
         Returns: Json
       }
       abd_my_workspace_counts: {
