@@ -296,7 +296,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         );
       }
     },
-    [fetchAliases],
+    [fetchAliases, fetchAllowedMilestoneCodes],
   );
 
   const addFiles = useCallback(async (selected: File[]) => {
