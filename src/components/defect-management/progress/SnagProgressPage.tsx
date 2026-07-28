@@ -650,7 +650,6 @@ export function SnagProgressPage() {
           })}
         />
         <KpiCard
-          label="PROGRESS"
           label="NO PLAN"
           value={kpis.noPlanTotal.toLocaleString()}
           tone="danger"
