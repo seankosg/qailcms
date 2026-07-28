@@ -16,7 +16,7 @@ interface Props {
   isAdmin: boolean;
 }
 
-type TabKey = "all" | InboxModule;
+type TabKey = "all" | "vp_pd" | InboxModule;
 
 const MODULE_META: Record<InboxModule, { label: string; tone: string }> = {
   tm: { label: "TM", tone: "border-info text-info" },
@@ -50,18 +50,29 @@ export function CommentsInbox({ userId, scope, filterValue, isAdmin }: Props) {
     const c = { tm: 0, sm: 0, abd: 0, sp: 0 } as Record<InboxModule, number>;
     let unreadTotal = 0;
     const unreadPerMod = { tm: 0, sm: 0, abd: 0, sp: 0 } as Record<InboxModule, number>;
+    let vpTotal = 0;
+    let vpUnread = 0;
     for (const r of rows) {
       c[r.module] += 1;
       if (!isRead(r.id, r.updated_at)) {
         unreadTotal += 1;
         unreadPerMod[r.module] += 1;
       }
+      if (r.author_is_vp_pd) {
+        vpTotal += 1;
+        if (!isRead(r.id, r.updated_at)) vpUnread += 1;
+      }
     }
-    return { counts: c, total: rows.length, unreadTotal, unreadPerMod };
+    return { counts: c, total: rows.length, unreadTotal, unreadPerMod, vpTotal, vpUnread };
   }, [rows, isRead]);
 
   const shown = useMemo(
-    () => (tab === "all" ? rows : rows.filter((r) => r.module === tab)),
+    () =>
+      tab === "all"
+        ? rows
+        : tab === "vp_pd"
+          ? rows.filter((r) => r.author_is_vp_pd)
+          : rows.filter((r) => r.module === tab),
     [rows, tab],
   );
 
@@ -115,19 +126,35 @@ export function CommentsInbox({ userId, scope, filterValue, isAdmin }: Props) {
         <>
           {/* Tabs */}
           <div className="flex flex-wrap gap-1 px-3 pt-2">
-            {(["all", "tm", "sm", "abd", "sp"] as TabKey[]).map((k) => {
-              const total = k === "all" ? perModule.total : perModule.counts[k as InboxModule];
-              const unread = k === "all" ? perModule.unreadTotal : perModule.unreadPerMod[k as InboxModule];
-              const label = k === "all" ? "전체" : MODULE_META[k as InboxModule].label;
+            {(["all", "vp_pd", "tm", "sm", "abd", "sp"] as TabKey[]).map((k) => {
+              const total =
+                k === "all"
+                  ? perModule.total
+                  : k === "vp_pd"
+                    ? perModule.vpTotal
+                    : perModule.counts[k as InboxModule];
+              const unread =
+                k === "all"
+                  ? perModule.unreadTotal
+                  : k === "vp_pd"
+                    ? perModule.vpUnread
+                    : perModule.unreadPerMod[k as InboxModule];
+              const label =
+                k === "all" ? "전체" : k === "vp_pd" ? "VP/PD" : MODULE_META[k as InboxModule].label;
+              const isVp = k === "vp_pd";
               return (
                 <button
                   key={k}
                   onClick={() => setTab(k)}
                   className={cn(
                     "h-7 rounded-md border px-2.5 text-xs font-medium transition-colors flex items-center gap-1.5",
-                    tab === k
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:bg-muted",
+                    isVp
+                      ? tab === k
+                        ? "border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
+                        : "border-neutral-900 bg-background text-neutral-900 hover:bg-neutral-900 hover:text-white dark:border-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-100 dark:hover:text-neutral-900"
+                      : tab === k
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted",
                   )}
                 >
                   {label}

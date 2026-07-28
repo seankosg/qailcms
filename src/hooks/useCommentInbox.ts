@@ -18,6 +18,7 @@ export interface InboxComment {
   parent_id: string; // task_raw_id / defect_raw_id / abd_item_id / doc_ref
   parent_ref: string | null; // 표시용 short id (task_no, source_issue_no, abd_number, doc_ref)
   parent_label: string | null; // 표시용 부제 (task_name, location_raw 등)
+  author_is_vp_pd: boolean; // 작성자가 admin 역할이거나 user_type in (pm_pd) 일 때 true
 }
 
 interface InboxScope {
@@ -187,6 +188,7 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
         parent_id: pid,
         parent_ref: meta?.ref ?? null,
         parent_label: meta?.label ?? null,
+        author_is_vp_pd: false,
       };
     });
   }
@@ -246,14 +248,27 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
   if (authorIds.length > 0) {
     const { data: profs } = await (supabase as any)
       .from("profiles")
-      .select("id,name,display_name,login_id")
+      .select("id,name,display_name,login_id,user_type")
       .in("id", authorIds);
     const nm = new Map<string, string>();
+    const typeMap = new Map<string, string | null>();
     for (const p of profs ?? []) {
       nm.set(String(p.id), p.name ?? p.display_name ?? p.login_id ?? "user");
+      typeMap.set(String(p.id), (p.user_type ?? null) as string | null);
     }
+    // admin 역할 보유자 조회
+    const { data: adminRoles } = await (supabase as any)
+      .from("user_roles")
+      .select("user_id,role")
+      .in("user_id", authorIds)
+      .in("role", ["admin", "d_superuser"]);
+    const adminSet = new Set<string>((adminRoles ?? []).map((r: any) => String(r.user_id)));
     for (const c of all) {
-      if (c.author_user_id) c.author_name = nm.get(c.author_user_id) ?? null;
+      if (c.author_user_id) {
+        c.author_name = nm.get(c.author_user_id) ?? null;
+        const t = typeMap.get(c.author_user_id);
+        c.author_is_vp_pd = adminSet.has(c.author_user_id) || t === "pm_pd";
+      }
     }
   }
 
