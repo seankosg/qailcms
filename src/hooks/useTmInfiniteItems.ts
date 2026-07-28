@@ -280,6 +280,34 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     if (touched) setPatchRev((v) => v + 1);
   }, [loadedPageCount, pageKeys, qc]);
 
+  const refetchRow = useCallback(async (id: string) => {
+    const { data, error } = await (supabase as any).rpc("tm_items_search", {
+      _q: null,
+      _filters: [],
+      _sort: [],
+      _offset: 0,
+      _limit: 5,
+      _include_inactive: true,
+      _kpi_mode: null,
+      _as_of: asOf ?? null,
+      _thresholds: thresholds
+        ? { worsen_gap: thresholds.worsen_gap, caution_gap_buffer: thresholds.caution_gap_buffer }
+        : null,
+      _ids: [id],
+    });
+    if (error) throw error;
+    const payload = (data ?? {}) as { rows?: any[] };
+    const raw = (payload.rows ?? [])[0];
+    if (!raw) return null;
+    // derived_auto_judgment 승격 (list 응답과 동일 규칙)
+    let mapped: Record<string, unknown> = raw;
+    if (Object.prototype.hasOwnProperty.call(raw, "derived_auto_judgment")) {
+      const { derived_auto_judgment, ...rest } = raw;
+      mapped = { ...rest, auto_judgment: derived_auto_judgment ?? rest.auto_judgment };
+    }
+    return mapped;
+  }, [asOf, thresholds]);
+
   return {
     rows: accumulated.rows,
     totalCount: accumulated.totalCount,
@@ -295,5 +323,6 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     refetch,
     fetchAllIds,
     patchRow,
+    refetchRow,
   };
 }
