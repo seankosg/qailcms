@@ -28,6 +28,7 @@ import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThr
 import { useServerFn } from "@tanstack/react-start";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
 import { canEditRawRow } from "@/lib/auth/roles";
+import { useTmMilestoneKinds } from "@/hooks/useTmMilestoneKinds";
 
 const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   id: "Identification",
@@ -39,6 +40,7 @@ const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   system: "System",
 };
 
+// TM_OWNER_MUTATIONS_V2_2026_07_28 — Detail도 Raw Data와 동일하게 서버 함수 경유
 const OWNER_FIELDS = new Set(["team", "data_date"]);
 
 export function TaskDetailPage() {
@@ -53,6 +55,11 @@ export function TaskDetailPage() {
   const myPic = String((user as any)?.hdec_pic_name ?? "").trim().toLowerCase();
   const resolveLabel = useTmColumnLabel();
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
+  const { data: milestoneKinds } = useTmMilestoneKinds();
+  const milestoneOptions = useMemo(
+    () => (milestoneKinds ?? []).filter((k: any) => k.is_active !== false).map((k: any) => k.code as string),
+    [milestoneKinds],
+  );
 
   const { data: row, refetch, isFetching } = useQuery({
     queryKey: ["task-detail", id],
@@ -82,9 +89,6 @@ export function TaskDetailPage() {
   }
 
   const isParent = row.level === "main";
-  const rowOwner = String(row?.hdec_pic_name ?? "").trim().toLowerCase();
-  const isOwner = !!myPic && !!rowOwner && myPic === rowOwner;
-  const canEditOwnerFields = canEditOwnerFieldsBase || isOwner;
   const canEditRow = canEditRawRow(user as any, "task_management_raw", row);
 
   const onFieldSaved = () => {
@@ -176,23 +180,17 @@ export function TaskDetailPage() {
               <dl className="grid grid-cols-1 gap-x-3 gap-y-0.5 md:grid-cols-2 xl:grid-cols-3">
                 {cols.map((c) => {
                   const v = row[c.key];
-                  const isTaskNoOverride = c.key === "task_no" && canEditTaskNo;
-                  const isTeamOverride = c.key === "team" && canEditOwnerFields;
-                  const isDataDateOverride = c.key === "data_date" && canEditOwnerFields;
                   let effectiveColumn: TmColumnDef = c;
                   let effectiveCanEdit = canEditRow;
-                  let useOwnerSave = false;
-                  if (isTaskNoOverride) {
+                  if (c.key === "task_no") {
                     effectiveColumn = { ...c, editable: true, editorType: "text" };
                     effectiveCanEdit = canEditTaskNo;
-                  } else if (isTeamOverride) {
+                  } else if (c.key === "team") {
                     effectiveColumn = { ...c, editable: true, editorType: "select", options: [...DISCIPLINES] };
-                    effectiveCanEdit = canEditOwnerFields;
-                    useOwnerSave = true;
-                  } else if (isDataDateOverride) {
+                  } else if (c.key === "data_date") {
                     effectiveColumn = { ...c, editable: true, editorType: "date" };
-                    effectiveCanEdit = canEditOwnerFields;
-                    useOwnerSave = true;
+                  } else if (c.key === "milestone") {
+                    effectiveColumn = { ...c, editable: true, editorType: "select", options: milestoneOptions };
                   }
                   const editable =
                     !!effectiveColumn.editable &&
@@ -234,19 +232,15 @@ export function TaskDetailPage() {
                               currentValue={v}
                               canEdit={effectiveCanEdit}
                               onSaved={onFieldSaved}
-                              onSave={
-                                useOwnerSave
-                                  ? async (value) => {
-                                      await updateOwnerFieldFn({
-                                        data: {
-                                          id: String(row.id),
-                                          field: effectiveColumn.key,
-                                          value: value ?? null,
-                                        },
-                                      });
-                                    }
-                                  : undefined
-                              }
+                              onSave={async (value) => {
+                                await updateOwnerFieldFn({
+                                  data: {
+                                    id: String(row.id),
+                                    field: effectiveColumn.key,
+                                    value: value ?? null,
+                                  },
+                                });
+                              }}
                             >
                               <span className="block min-w-0 truncate">{display}</span>
                             </EditCellPopover>
