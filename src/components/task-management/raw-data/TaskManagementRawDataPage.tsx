@@ -530,6 +530,12 @@ export function TaskManagementRawDataPage() {
     return false;
   }, [columnFilters, sorting]);
 
+  // 서버 정본 판정용 컨텍스트 — 훅 호출 전에 확보해야 첫 페이지부터 derived_auto_judgment 가 계산됨.
+  // sharedDataDate 가 비어 있으면 서버가 Asia/Qatar 기준 오늘로 default.
+  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
+  const serverAsOf = sharedDataDate || null;
+  const serverThresholds = kpiThresholds ?? DEFAULT_THRESHOLDS;
+
   const {
     rows: serverRows,
     totalCount: serverTotal,
@@ -549,6 +555,8 @@ export function TaskManagementRawDataPage() {
     forceAll,
     includeInactive: false,
     pageSizeMains: 100,
+    asOf: serverAsOf,
+    thresholds: serverThresholds,
   });
 
   const rows = serverRows;
