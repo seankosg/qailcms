@@ -1,0 +1,1 @@
+ALTER TABLE public._tm_date_shift_backup_20260725 ENABLE ROW LEVEL SECURITY;
