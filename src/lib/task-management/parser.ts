@@ -826,14 +826,16 @@ export async function parseTaskManagementExcel(
       milestone: (() => {
         // Milestone 컬럼이 없는 파일도 임포트 가능해야 하므로,
         // 헤더 미탐지(cols.milestone === 0) 및 미등록 값은 안전하게 null 처리.
-        // DB 체크 제약(task_management_raw_milestone_chk)은 HO/COC/DLP/NULL만 허용.
+        // DB FK(task_management_raw_milestone_fk → tm_milestone_kinds.kind_code)만 허용.
         if (!cols.milestone) return null;
         const raw = toStr(getCell(sheet, r, cols.milestone));
         if (!raw) return null;
         const up = raw.trim().toUpperCase().replace(/\s+/g, "");
         const norm = up === "H/O" || up === "H_O" || up === "H-O" ? "HO" : up;
-        // 화이트리스트 밖 값은 null (임포트 실패 방지). 미등록 Kind는 Admin에서 관리.
-        return norm === "HO" || norm === "COC" || norm === "DLP" ? norm : null;
+        // Admin에 등록된 kind만 허용. 미등록 값은 null 치환 + 경보 집계.
+        if (allowedMilestoneSet.has(norm)) return norm;
+        unknownMilestoneCounts.set(norm, (unknownMilestoneCounts.get(norm) ?? 0) + 1);
+        return null;
       })(),
       sort_order: sort++,
     });
