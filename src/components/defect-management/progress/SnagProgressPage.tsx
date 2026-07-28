@@ -260,10 +260,10 @@ export function SnagProgressPage() {
   }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket]);
 
   const kpis = useMemo(() => {
-    const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number }> = {
-      start: { plan: 0, actual: 0, done: 0, total: 0 },
-      rectified: { plan: 0, actual: 0, done: 0, total: 0 },
-      closure: { plan: 0, actual: 0, done: 0, total: 0 },
+    const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number; noPlan: number }> = {
+      start: { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 },
+      rectified: { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 },
+      closure: { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 },
     };
     for (const t of (totalsQ.data ?? []) as Array<{
       stage: Stage;
@@ -271,12 +271,14 @@ export function SnagProgressPage() {
       actual_upto: number;
       done_upto: number;
       total: number;
+      no_plan: number;
     }>) {
       if (!effectiveStages.includes(t.stage)) continue;
       byStage[t.stage].plan += t.plan_upto;
       byStage[t.stage].actual += t.actual_upto;
       byStage[t.stage].done += t.done_upto;
       byStage[t.stage].total += t.total;
+      byStage[t.stage].noPlan += t.no_plan;
     }
     let cumPlan = 0, cumActual = 0, doneStages = 0, totalStages = 0;
     for (const s of effectiveStages) {
@@ -292,7 +294,8 @@ export function SnagProgressPage() {
     const totalPct = totalStages > 0 ? 100 : 0;
     const planPctOfTotal = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
     const actualPctOfTotal = totalStages > 0 ? (cumActual / totalStages) * 100 : 0;
-    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct, totalPct, planPctOfTotal, actualPctOfTotal };
+    const noPlanTotal = effectiveStages.reduce((s, st) => s + byStage[st].noPlan, 0);
+    return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct, totalPct, planPctOfTotal, actualPctOfTotal, noPlanTotal };
   }, [totalsQ.data, effectiveStages]);
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
@@ -647,27 +650,14 @@ export function SnagProgressPage() {
           })}
         />
         <KpiCard
-          label="PROGRESS"
-          value={`${kpis.progressPct.toFixed(1)}%`}
-          icon={TrendingUp}
-          onClick={() => handleKpiClick("done", "all")}
-          tone="emerald"
-          suffix={
-            <span className="text-[10px] tabular-nums text-muted-foreground">
-              (P {kpis.planPct.toFixed(1)}%)
-            </span>
-          }
-          stageBreakdown={effectiveStages.map((s) => {
-            const total = kpis.byStage[s].total;
-            const actualPct = total > 0 ? (kpis.byStage[s].done / total) * 100 : null;
-            const planPct = total > 0 ? (kpis.byStage[s].plan / total) * 100 : null;
-            return {
-              stage: s,
-              value: actualPct === null ? "—" : `${actualPct.toFixed(1)}%`,
-              suffix: actualPct === null ? undefined : `(P ${planPct?.toFixed(1)}%)`,
-              onClick: () => handleKpiClick("done", s),
-            };
-          })}
+          label="NO PLAN"
+          value={kpis.noPlanTotal.toLocaleString()}
+          tone="danger"
+          stageBreakdown={effectiveStages.map((s) => ({
+            stage: s,
+            label: s === "start" ? "No Start" : s === "rectified" ? "No Rect" : "No Closure",
+            value: kpis.byStage[s].noPlan.toLocaleString(),
+          }))}
         />
       </div>
 
@@ -753,6 +743,7 @@ function KpiCard({
   suffix?: React.ReactNode;
   stageBreakdown?: Array<{
     stage: Stage;
+    label?: string;
     value: string;
     suffix?: string;
     tone?: "short" | "over";
@@ -812,7 +803,9 @@ function KpiCard({
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
+                    <span className={cn("truncate", tone === "danger" ? TONE_CLASSES.danger : "text-muted-foreground")}>
+                      {b.label ?? STAGE_LABELS[b.stage]}
+                    </span>
                     <span
                       className={cn(
                         "font-medium",
