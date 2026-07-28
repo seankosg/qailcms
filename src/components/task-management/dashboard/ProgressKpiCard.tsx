@@ -19,7 +19,8 @@ interface Props {
 }
 
 export function ProgressKpiCard({ label, percent, sub, barTone = "emerald", onClick }: Props) {
-  const raw = Number.isFinite(percent) ? percent : 0;
+  const known = Number.isFinite(percent);
+  const raw = known ? (percent as number) : 0;
   const pct = Math.max(0, Math.min(100, raw));
   const isNegative = raw < 0;
   return (
@@ -37,7 +38,7 @@ export function ProgressKpiCard({ label, percent, sub, barTone = "emerald", onCl
             isNegative && "text-destructive",
           )}
         >
-          {pct.toFixed(1)}%
+          {known ? `${pct.toFixed(1)}%` : "—"}
         </div>
         <Progress value={pct} className={cn("h-1.5", BAR[barTone])} />
         {sub && <div className="text-[11px] text-muted-foreground tabular-nums">{sub}</div>}
