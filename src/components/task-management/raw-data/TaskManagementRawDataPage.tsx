@@ -651,13 +651,36 @@ export function TaskManagementRawDataPage() {
   // KPI 카드 숫자와 Raw Data 행 수가 일치하지 않는 경우가 있음.
   // 따라서 Raw Data 에서도 Dashboard 와 동일한 kpi-utils 로직(gap + thresholds)으로
   // 현재 선택된 Data Date 기준 auto_judgment 를 다시 매긴 뒤 필터/표시에 사용.
+  // R1: 행 객체 참조 안정화
+  // - append 시 이전 행의 파생 결과(auto_judgment)까지 매번 다시 spread 하면
+  //   TanStack table 의 cell memo/hook 이 전부 무효화됨.
+  // - 동일 (row identity, asOf, thresholds) 조합은 캐시에서 재사용하고
+  //   신규/변경된 행만 새 객체를 만든다.
+  const effectiveCacheRef = useRef<{
+    key: string;
+    map: WeakMap<Row, Row>;
+  }>({ key: "", map: new WeakMap() });
   const effectiveRows = useMemo(() => {
     const asOf = selectedDataDate || todayIso();
     const th = kpiThresholds ?? DEFAULT_THRESHOLDS;
-    return rows.map((r) => ({
-      ...r,
-      auto_judgment: computeDashboardAutoJudgment(r, asOf, th),
-    }));
+    const key = `${asOf}|${th.worsen_gap}|${th.caution_gap_buffer}`;
+    if (effectiveCacheRef.current.key !== key) {
+      effectiveCacheRef.current = { key, map: new WeakMap<Row, Row>() };
+    }
+    const cache = effectiveCacheRef.current.map;
+    const out: Row[] = new Array(rows.length);
+    for (let i = 0; i < rows.length; i++) {
+      const src = rows[i];
+      const cached = cache.get(src);
+      if (cached) {
+        out[i] = cached;
+      } else {
+        const next = { ...src, auto_judgment: computeDashboardAutoJudgment(src, asOf, th) };
+        cache.set(src, next);
+        out[i] = next;
+      }
+    }
+    return out;
   }, [rows, selectedDataDate, kpiThresholds]);
 
   function computeDashboardAutoJudgment(
