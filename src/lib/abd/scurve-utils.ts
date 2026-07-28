@@ -4,6 +4,10 @@
 
 import type { CellRaw, Stage, RoundKey } from "./progress-utils";
 
+export type SCurveBaselines = Partial<
+  Record<Exclude<RoundKey, "all">, Partial<Record<Stage, { plan: number; actual: number }>>>
+>;
+
 export interface SCurveRoundStageSeries {
   round: Exclude<RoundKey, "all">;
   stage: Stage;
@@ -32,8 +36,11 @@ export function buildAbdSCurve(opts: {
   buckets: string[];
   stages: Stage[];
   today: string;
+  /** (round,stage) 별 range 시작 직전(rangeStart-1) 시점의 누계.
+   *  cumPlan/cumActual 의 초기 오프셋으로 사용된다. */
+  baselinesByRound?: SCurveBaselines;
 }): AbdSCurveResult {
-  const { cellsByRound, buckets, stages, today } = opts;
+  const { cellsByRound, buckets, stages, today, baselinesByRound } = opts;
   const n = buckets.length;
   const idx = new Map<string, number>();
   buckets.forEach((b, i) => idx.set(b, i));
@@ -70,8 +77,9 @@ export function buildAbdSCurve(opts: {
       const dailyActual: (number | null)[] = d.a.slice();
       const cumPlan: number[] = new Array(n).fill(0);
       const cumActual: (number | null)[] = new Array(n).fill(0);
-      let cP = 0;
-      let cA = 0;
+      const base = baselinesByRound?.[r]?.[st];
+      let cP = base?.plan ?? 0;
+      let cA = base?.actual ?? 0;
       for (let i = 0; i < n; i++) {
         cP += dailyPlan[i];
         cumPlan[i] = cP;
