@@ -55,6 +55,12 @@ export interface UseTmInfiniteItemsResult<TRow = Record<string, unknown>> {
   fetchAllIds: () => Promise<string[]>;
   /** 특정 행(id) 부분 패치 — 캐시 + 누적 배열에 즉시 반영. 네트워크 미발생. */
   patchRow: (id: string, patch: Record<string, unknown>) => void;
+  /**
+   * 서버에서 해당 행 1건을 현재와 동일한 _as_of/_thresholds 로 재조회 후 캐시 패치.
+   * 반환값: 서버가 반환한 행(auto_judgment 포함). 매칭 없으면 null.
+   * (편집 결과 파생값·판정 뱃지 즉시 반영용)
+   */
+  refetchRow: (id: string) => Promise<Record<string, unknown> | null>;
 }
 
 const DEFAULT_PAGE_MAINS = 100;
