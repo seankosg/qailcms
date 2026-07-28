@@ -36,6 +36,7 @@ import {
   ABD_STAGE_COLORS,
   ROUND_DASH,
   ROUND_PLAN_DASH,
+  type SCurveBaselines,
 } from "@/lib/abd/scurve-utils";
 
 type Round = Exclude<RoundKey, "all">;
@@ -49,6 +50,8 @@ export interface AbdPlanVsActualCardProps {
   today: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** rangeStart-1 시점의 누계 오프셋 (라운드×스테이지) */
+  baselinesByRound?: SCurveBaselines;
 }
 
 export function AbdPlanVsActualCard({
@@ -59,10 +62,11 @@ export function AbdPlanVsActualCard({
   today,
   open,
   onOpenChange,
+  baselinesByRound,
 }: AbdPlanVsActualCardProps) {
   const scurve = useMemo(
-    () => buildAbdSCurve({ cellsByRound, buckets, stages, today }),
-    [cellsByRound, buckets, stages, today],
+    () => buildAbdSCurve({ cellsByRound, buckets, stages, today, baselinesByRound }),
+    [cellsByRound, buckets, stages, today, baselinesByRound],
   );
 
   const [hidden, setHidden] = useState<Set<string>>(new Set());
