@@ -290,7 +290,7 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     if (touched) setPatchRev((v) => v + 1);
   }, [loadedPageCount, pageKeys, qc]);
 
-  const refetchRow = useCallback(async (id: string) => {
+  const refetchRow = useCallback(async (id: string, opts?: { applyKpiMode?: boolean }) => {
     const { data, error } = await (supabase as any).rpc("tm_items_search", {
       _q: null,
       _filters: [],
@@ -298,7 +298,7 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
       _offset: 0,
       _limit: 5,
       _include_inactive: true,
-      _kpi_mode: null,
+      _kpi_mode: opts?.applyKpiMode ? (kpiMode ?? null) : null,
       _as_of: asOf ?? null,
       _thresholds: thresholds
         ? { worsen_gap: thresholds.worsen_gap, caution_gap_buffer: thresholds.caution_gap_buffer }
@@ -316,7 +316,7 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
       mapped = { ...rest, auto_judgment: derived_auto_judgment ?? rest.auto_judgment };
     }
     return mapped;
-  }, [asOf, thresholds]);
+  }, [asOf, thresholds, kpiMode]);
 
   return {
     rows: accumulated.rows,
