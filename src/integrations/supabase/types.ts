@@ -4449,84 +4449,48 @@ export type Database = {
         }
         Returns: Json
       }
-      tm_items_facets:
-        | {
-            Args: {
-              _columns: string[]
-              _filters?: Json
-              _include_inactive?: boolean
-              _q?: string
-            }
-            Returns: {
-              axis: string
-              cnt: number
-              value: string
-            }[]
-          }
-        | {
-            Args: {
-              _as_of?: string
-              _columns: string[]
-              _filters?: Json
-              _include_inactive?: boolean
-              _kpi_mode?: string
-              _q?: string
-              _thresholds?: Json
-            }
-            Returns: {
-              axis: string
-              cnt: number
-              value: string
-            }[]
-          }
-      tm_items_search:
-        | {
-            Args: {
-              _filters?: Json
-              _include_inactive?: boolean
-              _limit?: number
-              _offset?: number
-              _q?: string
-              _sort?: Json
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _as_of?: string
-              _filters?: Json
-              _include_inactive?: boolean
-              _kpi_mode?: string
-              _limit?: number
-              _offset?: number
-              _q?: string
-              _sort?: Json
-              _thresholds?: Json
-            }
-            Returns: Json
-          }
-      tm_items_search_ids:
-        | {
-            Args: {
-              _filters?: Json
-              _include_inactive?: boolean
-              _limit?: number
-              _q?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _as_of?: string
-              _filters?: Json
-              _include_inactive?: boolean
-              _kpi_mode?: string
-              _limit?: number
-              _q?: string
-              _thresholds?: Json
-            }
-            Returns: Json
-          }
+      tm_items_facets: {
+        Args: {
+          _as_of?: string
+          _columns: string[]
+          _filters?: Json
+          _include_inactive?: boolean
+          _kpi_mode?: string
+          _q?: string
+          _thresholds?: Json
+        }
+        Returns: {
+          axis: string
+          cnt: number
+          value: string
+        }[]
+      }
+      tm_items_search: {
+        Args: {
+          _as_of?: string
+          _filters?: Json
+          _include_inactive?: boolean
+          _kpi_mode?: string
+          _limit?: number
+          _offset?: number
+          _q?: string
+          _sort?: Json
+          _thresholds?: Json
+        }
+        Returns: Json
+      }
+      tm_items_search_ids: {
+        Args: {
+          _as_of?: string
+          _filters?: Json
+          _include_inactive?: boolean
+          _kpi_mode?: string
+          _limit?: number
+          _q?: string
+          _thresholds?: Json
+        }
+        Returns: Json
+      }
       tm_items_weighted_progress: {
         Args: {
           _as_of?: string
