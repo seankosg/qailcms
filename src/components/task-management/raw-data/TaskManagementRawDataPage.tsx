@@ -527,6 +527,21 @@ export function TaskManagementRawDataPage() {
     void refetchServer();
   }, [refetchServer]);
 
+  // 활성 Milestone 종류 목록 — Admin 페이지에서 관리 (동적)
+  const { data: milestoneOptions = [] } = useQuery({
+    queryKey: ["tm_milestone_kinds", "active-codes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tm_milestone_kinds")
+        .select("kind_code, sort_order")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((r: { kind_code: string }) => r.kind_code);
+    },
+    staleTime: 60_000,
+  });
+
   // 댓글 수/최종 갱신 시각 조회 — 현재 로드된 행 기준
   const { data: commentCounts } = useQuery({
     // Tier1 #7: row count alone can't invalidate stale badges when rows churn
@@ -680,6 +695,7 @@ export function TaskManagementRawDataPage() {
     refetch,
     toggleCollapse,
     setAddChildParent,
+    milestoneOptions,
   });
   cellDynRef.current = {
     commentCounts,
@@ -694,6 +710,7 @@ export function TaskManagementRawDataPage() {
     refetch,
     toggleCollapse,
     setAddChildParent,
+    milestoneOptions,
   };
 
   const columns = useMemo<ColumnDef<Row>[]>(() => {
@@ -1015,6 +1032,7 @@ export function TaskManagementRawDataPage() {
           const canEditOwnerFields = dyn.canEditOwnerFieldsBase || isOwner;
           const isTeamOverride = c.key === "team";
           const isDataDateOverride = c.key === "data_date";
+          const isMilestoneOverride = c.key === "milestone";
           let effectiveColumn: TmColumnDef = c;
           let effectiveCanEdit = canEdit;
           let useOwnerSave = false;
@@ -1026,6 +1044,14 @@ export function TaskManagementRawDataPage() {
             effectiveColumn = { ...c, editable: true, editorType: "date" };
             effectiveCanEdit = canEditOwnerFields;
             useOwnerSave = true;
+          } else if (isMilestoneOverride) {
+            // Milestone은 tm_milestone_kinds(active) 기준 동적 옵션. 일반 편집 권한 규칙을 따른다.
+            effectiveColumn = {
+              ...c,
+              editable: true,
+              editorType: "select",
+              options: [...(dyn.milestoneOptions ?? [])],
+            };
           }
           const editableInline =
             !!effectiveColumn.editable &&
