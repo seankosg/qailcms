@@ -76,3 +76,7 @@
 ### today_actual/today_gap 서버 정렬 처리 (확정)
 
 오늘 실적/갭 컬럼의 서버 정렬 통합은 페이지 스코프 정렬로 충분하다는 실측 판단 하에 **현행 클라이언트 페이지 내 정렬을 유지**한다. LATERAL 조인을 통한 뷰/RPC 통합안(`_as_of` 파라미터 도입)은 `BACKLOG.md` 항목 #10에 등재하며, 페이지 스코프 정렬로 부족한 시나리오 발견 시에만 재개한다.
+
+### RPC 필터/정렬 허용 컬럼 규칙 (확정)
+
+검색/패싯 계열 RPC(`*_items_search`, `*_items_facets`, `*_items_search_ids`)의 필터·정렬 컬럼 검증은 **하드코딩 `_allowed_cols` 배열을 두지 않는다**. `information_schema.columns`에서 대상 원본 테이블의 컬럼을 런타임 유도한 목록에 파생 컬럼 화이트리스트(예: `public.abd_derived_cols()`)를 합쳐 사용한다. 목록에 없는 컬럼이 오면 **조용히 무시하지 말고 `RAISE EXCEPTION`으로 즉시 실패**시켜 클라이언트에 표면화한다. 파생 컬럼 추가/제거 시 해당 모듈의 `*_derived_cols()` 배열을 반드시 갱신한다(각 함수 상단 주석에도 동일 규칙 명시). 2026-07-29 ABD(`abd_items_search`, `abd_items_facets`)에 최초 적용.
