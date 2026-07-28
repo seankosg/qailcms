@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { CalendarDays } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,6 +48,7 @@ import { AbdScheduleMatrix } from "./AbdScheduleMatrix";
 import { Route } from "@/routes/_authenticated/closure/abd/progress";
 import { AbdPlanVsActualCard } from "./AbdPlanVsActualCard";
 import type { CellRaw } from "@/lib/abd/progress-utils";
+import type { SCurveBaselines } from "@/lib/abd/scurve-utils";
 import { ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
 import {
   Collapsible,
@@ -116,6 +118,7 @@ export function AbdProgressPage() {
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
   const rpcStart = bucket === "week" ? weekStartIso(rangeStart) : rangeStart;
   const rpcEnd = rangeEnd;
+  const baselineAsOf = useMemo(() => addDays(rpcStart, -1), [rpcStart]);
 
   const cellsFn = useServerFn(getAbdProgressCells);
   const totalsFn = useServerFn(getAbdProgressTotals);
@@ -216,6 +219,54 @@ export function AbdProgressPage() {
     });
     return out;
   }, [perRoundQueries]);
+
+  // S-Curve 누적 시작 오프셋: rangeStart-1 시점의 totals 를 라운드별로 로드하여
+  // cumPlan/cumActual 의 초기값으로 깔아 KPI 누계와 곡선 끝값이 일치하도록 한다.
+  const baselineQueries = useQueries({
+    queries: (["R1", "R2", "R3"] as const).map((r) => ({
+      queryKey: [
+        "abd-progress-totals-baseline",
+        plot,
+        teamsKey,
+        r,
+        groupKey,
+        baselineAsOf,
+        planMode,
+      ],
+      queryFn: () =>
+        totalsFn({
+          data: {
+            plots: plot === "all" ? [] : [plot],
+            teams,
+            groupBy: effectiveGroupBy,
+            asOfDate: baselineAsOf,
+            planMode,
+            round: r,
+          },
+        }),
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+      enabled: scurveOpen,
+    })),
+  });
+  const baselinesByRound: SCurveBaselines = useMemo(() => {
+    const out: SCurveBaselines = {};
+    (["R1", "R2", "R3"] as const).forEach((r, i) => {
+      const rows = (baselineQueries[i]?.data ?? []) as Array<{
+        stage: Stage; plan_upto: number; actual_upto: number;
+      }>;
+      const perStage: Partial<Record<Stage, { plan: number; actual: number }>> = {};
+      for (const row of rows) {
+        const prev = perStage[row.stage] ?? { plan: 0, actual: 0 };
+        perStage[row.stage] = {
+          plan: prev.plan + (Number(row.plan_upto) || 0),
+          actual: prev.actual + (Number(row.actual_upto) || 0),
+        };
+      }
+      out[r] = perStage;
+    });
+    return out;
+  }, [baselineQueries]);
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
@@ -325,6 +376,16 @@ export function AbdProgressPage() {
     stage: Stage | "all",
     field: "planned" | "actual",
   ) => {
+    // 매트릭스는 R1+R2+R3 통합 집계인데 드릴다운은 단일 라운드 date 컬럼밖에
+    // 걸 수 없다. round='all' 상태로 R1 컬럼만 걸면 R2/R3 이벤트가 누락된다.
+    // 서버 필터 DSL 확장(or-그룹)이 필요하므로, 안전 우선으로 안내 후 중단한다.
+    if (round === "all") {
+      toast.info(
+        "이 매트릭스는 R1·R2·R3 통합 집계입니다. 단일 라운드 드릴다운이 지원되면 활성화됩니다.",
+      );
+      return;
+    }
+
     const filterObj: Record<string, any> = {};
     const g = groupKeyToRawParams(effectiveGroupBy, groupKeyRaw);
     for (const [k, v] of Object.entries(g)) {
@@ -338,8 +399,13 @@ export function AbdProgressPage() {
 
     const params = new URLSearchParams();
     params.set("source", "progress");
-    params.set("tab", teams[0] ?? "MECH");
+    // 팀 미지정 시 전 팀 포함(대시보드 openRawData 와 동일 패턴).
+    // 지정 시 선택 팀 전체 전달.
+    params.set("tab", teams.length > 0 ? teams.join(",") : "MECH,ELEC,ARCH");
     params.set("plot", plot);
+    // Progress 집계는 Terminated 포함이 업무 규칙. Raw 기본은 hide 라 모집단이
+    // 어긋나므로 명시적으로 all 을 지정한다.
+    params.set("excluded", "all");
     // Raw Data 페이지에서 JSON 파싱 문제를 피하고자 필터는 개별 파라미터로 전달
     for (const [k, v] of Object.entries(filterObj)) {
       if (v == null) continue;
@@ -674,6 +740,7 @@ export function AbdProgressPage() {
             today={today}
             open={scurveOpen}
             onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
+            baselinesByRound={baselinesByRound}
           />
         </>
       )}
