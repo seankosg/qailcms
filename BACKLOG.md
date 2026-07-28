@@ -119,7 +119,7 @@
 
 - **등재 사유**: 2026-07-28 사용자 승인. TM 라운드(카드↔드릴다운 불일치 수정)와 동일 원인 구조를 SM/ABD도 보유. 이번 턴 착수 금지, 별도 승인 시 재개.
 - **원인 구조**:
-  - ABD (**차기 1순위 후보**): (a) 임포트 시 `abd_compute_derived` 트리거가 판정 저장 → (b) Dashboard/Progress SQL RPC(`abd_dashboard_*_json`)가 저장값·재계산 혼합 → (c) Raw Data는 저장값 + Latest Status 클라 오버라이드(`AbdRawDataPage.tsx:233,343,935,1006`). Dashboard→Raw Data 딥링크 존재(`AbdDashboardPage.tsx:102-114 openRawData()`) → TM과 동일 불일치 잠재.
+  - ABD (**차기 1순위, TM 검증 통과 직후 착수 검토**): (a) 임포트 시 `abd_compute_derived` 트리거가 판정 저장 → (b) Dashboard/Progress SQL RPC(`abd_dashboard_*_json`)가 저장값·재계산 혼합 → (c) Raw Data는 저장값 + Latest Status 클라 오버라이드(`AbdRawDataPage.tsx:233,343,935,1006`). Dashboard→Raw Data 딥링크 존재 확정(`AbdDashboardPage.tsx:102-114 openRawData()`, 2026-07-28 실측) → TM과 동일 구조의 카드↔드릴다운 불일치 노출 위험을 이미 보유. 착수는 여전히 별도 승인 필요.
   - SM (**후순위**): (a) Raw Data 표시=클라 재계산(`stage-utils.ts:isStageDelayedAsOf/classifyDefectStage`) (b) Dashboard/Progress=SQL RPC(`defect_snag_*_json`). 판정 사본 이원화되어 있으나 카드→Raw Data 딥링크 부재. 잠재 위험만.
 - **원칙**: TM 라운드에서 확립될 "판정 정본은 SQL 한 벌, 클라이언트는 서버 결과를 소비만" 규약을 SM/ABD로 확장. ABD는 저장값과 재계산 혼재를 어느 방향으로 통일할지(재계산 우위 vs 저장값 우위) 착수 전 결정 필요.
 - **재개 조건**: TM 라운드 완료(kpi-utils.ts 술어 제거 및 서버 counts 전환) 후 사용자 명시적 승인.

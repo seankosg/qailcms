@@ -4415,6 +4415,16 @@ export type Database = {
         }
         Returns: Json
       }
+      tm_items_counts_by_bucket_by_team: {
+        Args: {
+          _as_of?: string
+          _filters?: Json
+          _include_inactive?: boolean
+          _q?: string
+          _thresholds?: Json
+        }
+        Returns: Json
+      }
       tm_items_facets:
         | {
             Args: {
@@ -4493,6 +4503,15 @@ export type Database = {
             }
             Returns: Json
           }
+      tm_items_weighted_progress: {
+        Args: {
+          _as_of?: string
+          _filters?: Json
+          _include_inactive?: boolean
+          _q?: string
+        }
+        Returns: Json
+      }
       tm_judge_at_date: {
         Args: { p_data_date: string; p_task_ids?: string[] }
         Returns: Json
@@ -4524,6 +4543,29 @@ export type Database = {
           _worsen_gap: number
         }
         Returns: boolean
+      }
+      tm_kpi_cum_plan: {
+        Args: {
+          _as_of: string
+          _plan_days: number
+          _plan_end: string
+          _plan_progress: number
+          _plan_start: string
+        }
+        Returns: number
+      }
+      tm_kpi_dashboard_judgment: {
+        Args: {
+          _actual_progress: number
+          _as_of: string
+          _auto_judgment: string
+          _caution_gap_buffer: number
+          _plan_days: number
+          _plan_end: string
+          _plan_start: string
+          _worsen_gap: number
+        }
+        Returns: string
       }
       tm_kpi_gap: {
         Args: {
