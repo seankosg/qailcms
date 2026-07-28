@@ -515,7 +515,14 @@ export async function parseTaskManagementExcel(
     forecast_end: pick("forecast_end", ["예상 완료"], 18),
     slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 19),
     auto_judgment: pick("auto_judgment", ["자동 판정"], 20),
-    milestone: pick("milestone", ["Milestone", "마일스톤"], 21),
+    // Milestone은 선택 컬럼: 헤더가 없으면 21열 폴백을 쓰지 않고 스킵(0).
+    milestone: (() => {
+      for (const name of withAlias("milestone", ["Milestone", "마일스톤"])) {
+        const idx = headerMap[normalizeHeader(name)];
+        if (idx) return idx;
+      }
+      return 0;
+    })(),
   };
 
   // ---- 사용자가 체크 해제한 헤더 처리 ----
