@@ -248,3 +248,14 @@
     display: none;
   }
 }
+
+/*
+ * R2: Raw Data 행 hover 최적화.
+ * hoveredIndex React state 대신 CSS `:hover` + CSS 변수 캐스케이드로 처리.
+ * 스티키(고정) 컬럼 배경을 `var(--sticky-bg)` 로 참조하여, 행 hover 시
+ * 변수 값만 바뀌면 React 리렌더 없이 스티키 셀 배경이 즉시 전환된다.
+ * 완전 불투명 보장을 위해 color-mix 두 operand 모두 불투명이어야 함.
+ */
+tr.raw-hover-row:hover {
+  --sticky-bg: color-mix(in oklab, var(--muted) 95%, var(--background));
+}
