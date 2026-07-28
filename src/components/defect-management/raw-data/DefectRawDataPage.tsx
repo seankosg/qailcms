@@ -365,6 +365,11 @@ export function DefectRawDataPage() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [searchInput, setSearchInput] = useState(urlSearch.q ?? "");
   const [criticalPending, setCriticalPending] = useState<Map<string, boolean>>(new Map());
+  // R2: 셀 렌더 시 최신 criticalPending 을 읽기 위한 ref. columns useMemo 가
+  // criticalPending 상태에 의존하면 체크 1회로 전체 컬럼/셀 memo 무효화 →
+  // 스크롤 시 전체 재렌더. ref 로 우회하고 컬럼 배열 identity 를 안정화한다.
+  const criticalPendingRef = useRef(criticalPending);
+  criticalPendingRef.current = criticalPending;
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [visibility, setVisibility] = useState<VisibilityState>({});
