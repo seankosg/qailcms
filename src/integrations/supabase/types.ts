@@ -4405,6 +4405,18 @@ export type Database = {
         }
         Returns: string
       }
+      tm_items_counts: {
+        Args: {
+          _as_of?: string
+          _caution_buffer?: number
+          _filters?: Json
+          _include_inactive?: boolean
+          _q?: string
+          _task_scope?: string
+          _worsen_gap?: number
+        }
+        Returns: Json
+      }
       tm_items_counts_by_bucket: {
         Args: {
           _as_of?: string
@@ -4531,11 +4543,12 @@ export type Database = {
       }
       tm_kpi_bucket_matches: {
         Args: {
+          _actual_finish: string
           _actual_progress: number
           _actual_start: string
           _as_of: string
-          _auto_judgment: string
           _bucket: string
+          _caution_buffer: number
           _plan_days: number
           _plan_end: string
           _plan_progress: number
@@ -4577,6 +4590,21 @@ export type Database = {
           _plan_start: string
         }
         Returns: number
+      }
+      tm_kpi_judgment: {
+        Args: {
+          _actual_finish: string
+          _actual_progress: number
+          _actual_start: string
+          _as_of: string
+          _caution_buffer: number
+          _plan_days: number
+          _plan_end: string
+          _plan_progress: number
+          _plan_start: string
+          _worsen_gap: number
+        }
+        Returns: string
       }
       tm_kpi_norm_actual: { Args: { _v: number }; Returns: number }
       tm_kpi_tplan: {
