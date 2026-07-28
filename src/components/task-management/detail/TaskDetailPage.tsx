@@ -28,7 +28,6 @@ import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThr
 import { useServerFn } from "@tanstack/react-start";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
 import { canEditRawRow } from "@/lib/auth/roles";
-import { useQuery } from "@tanstack/react-query";
 
 const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   id: "Identification",
