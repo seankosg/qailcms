@@ -21,7 +21,7 @@ export const getSnagProgressCells = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => CellsInputSchema.parse(v))
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as any).rpc("defect_snag_progress_cells", {
+    const { data: payload, error } = await (context.supabase as any).rpc("defect_snag_progress_cells_json", {
       _plan_groups: data.planGroups.length ? data.planGroups : null,
       _teams: data.teams.length ? data.teams : null,
       _room_groups: data.roomGroups.length ? data.roomGroups : null,
@@ -33,6 +33,8 @@ export const getSnagProgressCells = createServerFn({ method: "POST" })
       _plan_mode: data.planMode,
     });
     if (error) throw new Error(error.message);
+    if (!Array.isArray(payload)) throw new Error("defect_snag_progress_cells_json RPC contract mismatch");
+    const rows = payload;
     return (rows ?? []).map((r: any) => ({
       group_key: (r.group_key ?? []) as string[],
       bucket_iso: r.bucket_iso ? String(r.bucket_iso).slice(0, 10) : null,
@@ -46,7 +48,7 @@ export const getSnagProgressTotals = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => InputSchema.parse(v))
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as any).rpc("defect_snag_progress_totals", {
+    const { data: payload, error } = await (context.supabase as any).rpc("defect_snag_progress_totals_json", {
       _plan_groups: data.planGroups.length ? data.planGroups : null,
       _teams: data.teams.length ? data.teams : null,
       _room_groups: data.roomGroups.length ? data.roomGroups : null,
@@ -55,6 +57,8 @@ export const getSnagProgressTotals = createServerFn({ method: "POST" })
       _plan_mode: data.planMode,
     });
     if (error) throw new Error(error.message);
+    if (!Array.isArray(payload)) throw new Error("defect_snag_progress_totals_json RPC contract mismatch");
+    const rows = payload;
     return (rows ?? []).map((r: any) => ({
       group_key: (r.group_key ?? []) as string[],
       stage: r.stage as "start" | "rectified" | "closure",
