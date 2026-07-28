@@ -613,7 +613,7 @@ export function TaskTreePage() {
 
   return (
     <div className="space-y-3">
-      <div className="sticky top-0 z-30 -mx-4 px-4 py-2 space-y-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b">
+      <div className="sticky top-0 z-30 -mx-4 px-4 py-2 space-y-2 bg-background border-b">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Task Tree</h1>
         {latestDataDate && (
