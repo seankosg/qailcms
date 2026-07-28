@@ -4437,6 +4437,18 @@ export type Database = {
         }
         Returns: Json
       }
+      tm_items_counts_by_team: {
+        Args: {
+          _as_of?: string
+          _caution_buffer?: number
+          _filters?: Json
+          _include_inactive?: boolean
+          _q?: string
+          _task_scope?: string
+          _worsen_gap?: number
+        }
+        Returns: Json
+      }
       tm_items_facets:
         | {
             Args: {
