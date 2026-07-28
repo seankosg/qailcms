@@ -42,6 +42,11 @@ export interface TmCountsByTeam {
   behind_schedule: TmCountsByTeamEntry[];
 }
 
+export interface TmWeightedProgress {
+  planned: number; // 0..100
+  actual: number; // 0..100
+}
+
 function buildFilters(f: TmCountsFilters) {
   const arr: Array<{ column: string; op: "in"; value: string[] }> = [];
   const push = (col: string, v?: string[]) => {
@@ -98,10 +103,48 @@ export function useTmItemsCounts(params: {
     },
   });
 
+  // 가중 진도(%) — 서버 정본 (tm_items_weighted_progress).
+  const weightedArgs = {
+    _q: q || null,
+    _filters: (() => {
+      // taskScope 를 서버 필터에 포함시켜 total/counts 와 동일 스코프 보장.
+      const base = [...filterArr];
+      if (taskScope !== "all") {
+        base.push({
+          column: "level",
+          op: "in",
+          value: [taskScope === "main" ? "main" : "sub"],
+        } as any);
+      }
+      return base as unknown as any;
+    })(),
+    _include_inactive: false,
+    _as_of: asOfDate,
+  };
+  const weightedQ = useQuery({
+    queryKey: ["tm-items-weighted", weightedArgs],
+    enabled,
+    staleTime: 30_000,
+    queryFn: async (): Promise<TmWeightedProgress> => {
+      const { data, error } = await (supabase as any).rpc(
+        "tm_items_weighted_progress",
+        weightedArgs,
+      );
+      if (error) throw new Error(error.message);
+      const obj = (data ?? {}) as { planned?: number; actual?: number };
+      return {
+        planned: Number(obj.planned ?? 0),
+        actual: Number(obj.actual ?? 0),
+      };
+    },
+  });
+
   return {
     counts: countsQ.data,
     byTeam: teamQ.data,
-    isLoading: countsQ.isLoading || teamQ.isLoading,
-    error: countsQ.error ?? teamQ.error,
+    weighted: weightedQ.data,
+    isLoading: countsQ.isLoading || teamQ.isLoading || weightedQ.isLoading,
+    isError: countsQ.isError || teamQ.isError || weightedQ.isError,
+    error: countsQ.error ?? teamQ.error ?? weightedQ.error,
   };
 }

@@ -18,6 +18,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { ServerFilter } from "@/hooks/useServerSearchItems";
 import type { ServerSortEntry } from "@/lib/task-management/server-bridge";
+import type { TaskThresholds } from "@/lib/task-management/derived";
 
 export interface UseTmInfiniteItemsParams {
   q: string;
@@ -28,6 +29,10 @@ export interface UseTmInfiniteItemsParams {
   includeInactive?: boolean;
   pageSizeMains?: number;
   enabled?: boolean;
+  /** Dashboard 정본 판정용 as_of 날짜(YYYY-MM-DD). 지정 시 서버가 derived_auto_judgment 를 계산해 반환. */
+  asOf?: string | null;
+  /** Dashboard 정본 판정용 임계값. asOf 와 함께 지정되어야 서버 판정이 활성화됨. */
+  thresholds?: TaskThresholds | null;
 }
 
 export interface UseTmInfiniteItemsResult<TRow = Record<string, unknown>> {
@@ -59,8 +64,10 @@ function keySignature(
   includeInactive: boolean,
   forceAll: boolean,
   pageSize: number,
+  asOf: string | null,
+  thresholds: TaskThresholds | null,
 ): string {
-  return JSON.stringify({ q, filters, sort, includeInactive, forceAll, pageSize });
+  return JSON.stringify({ q, filters, sort, includeInactive, forceAll, pageSize, asOf, thresholds });
 }
 
 export function useTmInfiniteItems<TRow = Record<string, unknown>>(
@@ -74,12 +81,14 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
     includeInactive = false,
     pageSizeMains = DEFAULT_PAGE_MAINS,
     enabled = true,
+    asOf = null,
+    thresholds = null,
   } = params;
 
   const qc = useQueryClient();
   const sig = useMemo(
-    () => keySignature(q, serverFilters, serverSort, includeInactive, forceAll, pageSizeMains),
-    [q, serverFilters, serverSort, includeInactive, forceAll, pageSizeMains],
+    () => keySignature(q, serverFilters, serverSort, includeInactive, forceAll, pageSizeMains, asOf, thresholds),
+    [q, serverFilters, serverSort, includeInactive, forceAll, pageSizeMains, asOf, thresholds],
   );
 
   // 검색/필터/정렬/모드 변경 시 페이지 리셋
@@ -113,6 +122,13 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
         _offset: offset,
         _limit: limit,
         _include_inactive: includeInactive,
+        _as_of: asOf ?? null,
+        _thresholds: thresholds
+          ? {
+              worsen_gap: thresholds.worsen_gap,
+              caution_gap_buffer: thresholds.caution_gap_buffer,
+            }
+          : null,
       });
       if (error) throw error;
       if (data == null || Array.isArray(data) || typeof data !== "object") {
@@ -123,8 +139,17 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
         total_count?: number;
         main_count?: number;
       };
+      // 서버가 계산한 derived_auto_judgment 를 auto_judgment 로 승격 → 셀 뱃지/필터 정합성 보장.
+      const rawRows = (payload.rows ?? []) as any[];
+      const mapped: TRow[] = rawRows.map((r) => {
+        if (r && Object.prototype.hasOwnProperty.call(r, "derived_auto_judgment")) {
+          const { derived_auto_judgment, ...rest } = r;
+          return { ...rest, auto_judgment: derived_auto_judgment ?? rest.auto_judgment } as TRow;
+        }
+        return r as TRow;
+      });
       return {
-        rows: (payload.rows ?? []) as TRow[],
+        rows: mapped,
         totalCount: Number(payload.total_count ?? 0),
         mainCount: Number(payload.main_count ?? 0),
       };
@@ -208,11 +233,18 @@ export function useTmInfiniteItems<TRow = Record<string, unknown>>(
       _filters: serverFilters,
       _include_inactive: includeInactive,
       _limit: 100000,
+      _as_of: asOf ?? null,
+      _thresholds: thresholds
+        ? {
+            worsen_gap: thresholds.worsen_gap,
+            caution_gap_buffer: thresholds.caution_gap_buffer,
+          }
+        : null,
     });
     if (error) throw error;
     const arr = Array.isArray(data) ? (data as unknown[]) : [];
     return arr.map(String);
-  }, [q, serverFilters, includeInactive]);
+  }, [q, serverFilters, includeInactive, asOf, thresholds]);
 
   const patchRow = useCallback((id: string, patch: Record<string, unknown>) => {
     let touched = false;

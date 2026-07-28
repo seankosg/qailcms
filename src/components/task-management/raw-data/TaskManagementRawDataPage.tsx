@@ -530,6 +530,12 @@ export function TaskManagementRawDataPage() {
     return false;
   }, [columnFilters, sorting]);
 
+  // 서버 정본 판정용 컨텍스트 — 훅 호출 전에 확보해야 첫 페이지부터 derived_auto_judgment 가 계산됨.
+  // sharedDataDate 가 비어 있으면 서버가 Asia/Qatar 기준 오늘로 default.
+  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
+  const serverAsOf = sharedDataDate || null;
+  const serverThresholds = kpiThresholds ?? DEFAULT_THRESHOLDS;
+
   const {
     rows: serverRows,
     totalCount: serverTotal,
@@ -549,6 +555,8 @@ export function TaskManagementRawDataPage() {
     forceAll,
     includeInactive: false,
     pageSizeMains: 100,
+    asOf: serverAsOf,
+    thresholds: serverThresholds,
   });
 
   const rows = serverRows;
@@ -615,7 +623,7 @@ export function TaskManagementRawDataPage() {
   }, [rows]);
 
   // Data Date 는 Dashboard 의 설정을 세션 전역으로 공유. Raw Data 자체 픽커는 폐기.
-  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
+  // sharedDataDate/setSharedDataDate 는 이미 훅 호출부 위에서 확보되어 있음(파생 판정 컨텍스트 용).
   const selectedDataDate = sharedDataDate || (latestDataDate ?? "");
 
   // T.Actual (오늘 실적) — 서버 RPC로 (오늘 누계 − 어제 누계) 일괄 조회.
@@ -646,61 +654,10 @@ export function TaskManagementRawDataPage() {
     return m;
   }, [tActualRows]);
 
-  // Dashboard KPI 카드와 동일한 판정 기준으로 auto_judgment 를 재계산.
-  // Dashboard 는 gap(Actual% − Cum.Plan%) 축 하나로 지연/악화를 산정하며,
-  // DB에 저장된 auto_judgment 는 임포트 시점/설정에 따라 달라질 수 있어
-  // KPI 카드 숫자와 Raw Data 행 수가 일치하지 않는 경우가 있음.
-  // 따라서 Raw Data 에서도 Dashboard 와 동일한 kpi-utils 로직(gap + thresholds)으로
-  // 현재 선택된 Data Date 기준 auto_judgment 를 다시 매긴 뒤 필터/표시에 사용.
-  // R1: 행 객체 참조 안정화
-  // - append 시 이전 행의 파생 결과(auto_judgment)까지 매번 다시 spread 하면
-  //   TanStack table 의 cell memo/hook 이 전부 무효화됨.
-  // - 동일 (row identity, asOf, thresholds) 조합은 캐시에서 재사용하고
-  //   신규/변경된 행만 새 객체를 만든다.
-  const effectiveCacheRef = useRef<{
-    key: string;
-    map: WeakMap<Row, Row>;
-  }>({ key: "", map: new WeakMap() });
-  const effectiveRows = useMemo(() => {
-    const asOf = selectedDataDate || todayIso();
-    const th = kpiThresholds ?? DEFAULT_THRESHOLDS;
-    const key = `${asOf}|${th.worsen_gap}|${th.caution_gap_buffer}`;
-    if (effectiveCacheRef.current.key !== key) {
-      effectiveCacheRef.current = { key, map: new WeakMap<Row, Row>() };
-    }
-    const cache = effectiveCacheRef.current.map;
-    const out: Row[] = new Array(rows.length);
-    for (let i = 0; i < rows.length; i++) {
-      const src = rows[i];
-      const cached = cache.get(src);
-      if (cached) {
-        out[i] = cached;
-      } else {
-        const next = { ...src, auto_judgment: computeDashboardAutoJudgment(src, asOf, th) };
-        cache.set(src, next);
-        out[i] = next;
-      }
-    }
-    return out;
-  }, [rows, selectedDataDate, kpiThresholds]);
-
-  function computeDashboardAutoJudgment(
-    row: Row,
-    asOf: string,
-    th: TaskThresholds,
-  ): string {
-    // Dashboard 와 동일한 기준: isCompleted 는 stored auto_judgment + actual_progress,
-    // gap 은 plan_progress(임포트값)가 아닌 계획일 기반 누계 계획(computeTPlan)으로 산출.
-    // Dashboard 쿼리는 plan_progress 를 SELECT 하지 않으므로 항상 날짜 기준으로 계산됨.
-    if (isCompleted(row as any)) return "완료";
-    const actual = cumActualProgress(row as any);
-    const plan = computeTPlan(row as any, asOf) ?? 0;
-    const gap = actual - plan;
-    if (gap < th.worsen_gap) return "악화";
-    if (gap < 0) return "지연";
-    if (gap < th.caution_gap_buffer) return "주의";
-    return "정상";
-  }
+  // Dashboard 정본 판정(derived_auto_judgment)은 tm_items_search RPC 가 서버에서 계산해
+  // 각 행에 실어 반환한다(useTmInfiniteItems 에서 auto_judgment 로 승격).
+  // 별도 클라이언트 재계산 없음 — 카드/드릴다운/셀 뱃지 정합성 단일 소스.
+  const effectiveRows = rows;
 
   const parentKeys = useMemo(() => {
     const keys: string[] = [];
@@ -1370,10 +1327,25 @@ export function TaskManagementRawDataPage() {
                   _offset: 0,
                   _limit: 5000,
                   _include_inactive: false,
+                  _as_of: serverAsOf,
+                  _thresholds: serverThresholds
+                    ? {
+                        worsen_gap: serverThresholds.worsen_gap,
+                        caution_gap_buffer: serverThresholds.caution_gap_buffer,
+                      }
+                    : null,
                 });
                 if (error) throw error;
                 const payload = (data ?? {}) as { rows?: unknown[] };
-                setExportRows(((payload.rows ?? []) as Row[]));
+                // 서버 derived_auto_judgment 를 auto_judgment 로 승격하여 export 정합성 유지.
+                const mapped = ((payload.rows ?? []) as any[]).map((r) => {
+                  if (r && Object.prototype.hasOwnProperty.call(r, "derived_auto_judgment")) {
+                    const { derived_auto_judgment, ...rest } = r;
+                    return { ...rest, auto_judgment: derived_auto_judgment ?? rest.auto_judgment } as Row;
+                  }
+                  return r as Row;
+                });
+                setExportRows(mapped);
                 toast.success("전체 데이터 준비 완료", { id: t });
                 setExportOpen(true);
               } catch (e: any) {
