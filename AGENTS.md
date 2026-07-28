@@ -50,6 +50,16 @@
    - jsonb 스칼라 응답이라도 `rows.length` vs `total_count` 대조, 배열/`null`/비-object 형식 실패 처리(`src/lib/data/assertNoSilentTruncation.ts`).
    - 상한이 보장되는 행별 반환 RPC도 상한 근접 시 경보를 남긴다.
 
+### RPC 시그니처 변경 규칙 (필수)
+
+기존 RPC에 파라미터를 추가/삭제/타입 변경할 때는 **같은 마이그레이션에 구 시그니처 DROP FUNCTION 을 반드시 포함**한다.
+
+- `CREATE OR REPLACE FUNCTION` 은 시그니처가 다르면 새 함수를 만들고 옛 함수를 남긴다. 두 오버로드가 공존하면 PostgREST 는 후보를 결정하지 못해 `PGRST203` (ambiguous function) 로 실패한다.
+- 마이그레이션은 다음 순서로 작성한다: (1) `DROP FUNCTION IF EXISTS public.<name>(<옛 인자 시그니처>);` (2) 신 시그니처 `CREATE OR REPLACE FUNCTION`.
+- 새 파라미터는 기본값(default)을 부여해 기존 클라이언트 호출이 신버전 하나에만 유일 매칭되도록 한다.
+- 배포 후 `select proname, pg_get_function_identity_arguments(oid) from pg_proc where proname = '<name>'` 로 오버로드가 1건인지 실측 확인.
+- 선례: 2026-07-28 `tm_items_search` / `tm_items_search_ids` / `tm_items_facets` 확장 시 구 시그니처 DROP 누락으로 TM Raw Data 로딩 중단 → 후속 마이그레이션으로 복구.
+
 ### 효율화 라운드 UI 불변 원칙 (필수)
 
 효율화(성능/서버 페이지네이션/RPC 리팩터 등) 라운드 중에는 **UI 요소·배치·문구·상호작용을 절대 변경하지 않는다**. 목적은 내부 데이터 파이프라인 교체이며, 사용자가 관찰 가능한 표면은 100% 동등해야 한다.
