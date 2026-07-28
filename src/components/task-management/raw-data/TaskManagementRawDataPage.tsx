@@ -1217,7 +1217,7 @@ export function TaskManagementRawDataPage() {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Task-Raw Data</h1>
         <Badge variant="secondary" className="ml-1">
-          {rowModel.rows.length.toLocaleString()} / {rows.length.toLocaleString()}
+          {rowModel.rows.length.toLocaleString()} / {serverTotal.toLocaleString()}
         </Badge>
         {selectedIds.length > 0 && (
           <Badge variant="default" className="tabular-nums">
