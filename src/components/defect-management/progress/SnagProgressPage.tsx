@@ -651,26 +651,14 @@ export function SnagProgressPage() {
         />
         <KpiCard
           label="PROGRESS"
-          value={`${kpis.progressPct.toFixed(1)}%`}
-          icon={TrendingUp}
-          onClick={() => handleKpiClick("done", "all")}
-          tone="emerald"
-          suffix={
-            <span className="text-[10px] tabular-nums text-muted-foreground">
-              (P {kpis.planPct.toFixed(1)}%)
-            </span>
-          }
-          stageBreakdown={effectiveStages.map((s) => {
-            const total = kpis.byStage[s].total;
-            const actualPct = total > 0 ? (kpis.byStage[s].done / total) * 100 : null;
-            const planPct = total > 0 ? (kpis.byStage[s].plan / total) * 100 : null;
-            return {
-              stage: s,
-              value: actualPct === null ? "—" : `${actualPct.toFixed(1)}%`,
-              suffix: actualPct === null ? undefined : `(P ${planPct?.toFixed(1)}%)`,
-              onClick: () => handleKpiClick("done", s),
-            };
-          })}
+          label="NO PLAN"
+          value={kpis.noPlanTotal.toLocaleString()}
+          tone="danger"
+          stageBreakdown={effectiveStages.map((s) => ({
+            stage: s,
+            label: s === "start" ? "No Start" : s === "rectified" ? "No Rect" : "No Closure",
+            value: kpis.byStage[s].noPlan.toLocaleString(),
+          }))}
         />
       </div>
 
@@ -756,6 +744,7 @@ function KpiCard({
   suffix?: React.ReactNode;
   stageBreakdown?: Array<{
     stage: Stage;
+    label?: string;
     value: string;
     suffix?: string;
     tone?: "short" | "over";
@@ -815,7 +804,9 @@ function KpiCard({
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-muted-foreground">{STAGE_LABELS[b.stage]}</span>
+                    <span className={cn("truncate", tone === "danger" ? TONE_CLASSES.danger : "text-muted-foreground")}>
+                      {b.label ?? STAGE_LABELS[b.stage]}
+                    </span>
                     <span
                       className={cn(
                         "font-medium",
