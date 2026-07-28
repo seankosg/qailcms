@@ -1327,10 +1327,25 @@ export function TaskManagementRawDataPage() {
                   _offset: 0,
                   _limit: 5000,
                   _include_inactive: false,
+                  _as_of: serverAsOf,
+                  _thresholds: serverThresholds
+                    ? {
+                        worsen_gap: serverThresholds.worsen_gap,
+                        caution_gap_buffer: serverThresholds.caution_gap_buffer,
+                      }
+                    : null,
                 });
                 if (error) throw error;
                 const payload = (data ?? {}) as { rows?: unknown[] };
-                setExportRows(((payload.rows ?? []) as Row[]));
+                // 서버 derived_auto_judgment 를 auto_judgment 로 승격하여 export 정합성 유지.
+                const mapped = ((payload.rows ?? []) as any[]).map((r) => {
+                  if (r && Object.prototype.hasOwnProperty.call(r, "derived_auto_judgment")) {
+                    const { derived_auto_judgment, ...rest } = r;
+                    return { ...rest, auto_judgment: derived_auto_judgment ?? rest.auto_judgment } as Row;
+                  }
+                  return r as Row;
+                });
+                setExportRows(mapped);
                 toast.success("전체 데이터 준비 완료", { id: t });
                 setExportOpen(true);
               } catch (e: any) {
