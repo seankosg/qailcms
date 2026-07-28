@@ -700,6 +700,7 @@ export function TaskManagementRawDataPage() {
     patchRow,
     refetchRow,
     kpiMode,
+    canEditRow,
   });
   cellDynRef.current = {
     commentCounts,
@@ -718,6 +719,7 @@ export function TaskManagementRawDataPage() {
     patchRow,
     refetchRow,
     kpiMode,
+    canEditRow,
   };
 
   const columns = useMemo<ColumnDef<Row>[]>(() => {
