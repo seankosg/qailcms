@@ -377,16 +377,6 @@ export function AbdProgressPage() {
     stage: Stage | "all",
     field: "planned" | "actual",
   ) => {
-    // 매트릭스는 R1+R2+R3 통합 집계인데 드릴다운은 단일 라운드 date 컬럼밖에
-    // 걸 수 없다. round='all' 상태로 R1 컬럼만 걸면 R2/R3 이벤트가 누락된다.
-    // 서버 필터 DSL 확장(or-그룹)이 필요하므로, 안전 우선으로 안내 후 중단한다.
-    if (round === "all") {
-      toast.info(
-        "이 매트릭스는 R1·R2·R3 통합 집계입니다. 단일 라운드 드릴다운이 지원되면 활성화됩니다.",
-      );
-      return;
-    }
-
     const filterObj: Record<string, any> = {};
     const g = groupKeyToRawParams(effectiveGroupBy, groupKeyRaw);
     for (const [k, v] of Object.entries(g)) {
@@ -395,8 +385,6 @@ export function AbdProgressPage() {
     }
     const dateFrom = bucketIso;
     const dateTo = bucket === "week" ? addDays(bucketIso, 6) : bucketIso;
-    const dateField = stageDateField(stage, field, round);
-    filterObj[dateField] = { from: dateFrom, to: dateTo };
 
     const params = new URLSearchParams();
     params.set("source", "progress");
@@ -407,6 +395,17 @@ export function AbdProgressPage() {
     // Progress 집계는 Terminated 포함이 업무 규칙. Raw 기본은 hide 라 모집단이
     // 어긋나므로 명시적으로 all 을 지정한다.
     params.set("excluded", "all");
+    // round='all' 이면 R1·R2·R3 동일 스테이지 날짜 컬럼을 date_range_or 로 묶어 전달.
+    // 단일 라운드는 기존 dateField 단수 경로(하위호환) 유지.
+    if (round === "all") {
+      const cols = (["R1", "R2", "R3"] as const).map((r) => stageDateField(stage, field, r));
+      params.set("dateStart", dateFrom);
+      params.set("dateEnd", dateTo);
+      params.set("dateFields", cols.join(","));
+    } else {
+      const dateField = stageDateField(stage, field, round);
+      filterObj[dateField] = { from: dateFrom, to: dateTo };
+    }
     // Raw Data 페이지에서 JSON 파싱 문제를 피하고자 필터는 개별 파라미터로 전달
     for (const [k, v] of Object.entries(filterObj)) {
       if (v == null) continue;
@@ -598,6 +597,25 @@ export function AbdProgressPage() {
                 <ToggleGroupItem value="week" className="h-8 px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
                   Week
                 </ToggleGroupItem>
+              </ToggleGroup>
+            </ToolbarGroup>
+
+            <ToolbarGroup label="Round">
+              <ToggleGroup
+                type="single"
+                value={round}
+                onValueChange={(v) => v && setSearch({ round: v as RoundKey })}
+                className="gap-1"
+              >
+                {(["all", "R1", "R2", "R3"] as const).map((r) => (
+                  <ToggleGroupItem
+                    key={r}
+                    value={r}
+                    className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    {r === "all" ? "All" : r}
+                  </ToggleGroupItem>
+                ))}
               </ToggleGroup>
             </ToolbarGroup>
 
