@@ -154,6 +154,16 @@
 
 전 항목 500행 미만 또는 파라미터로 상한 강제. 추가 전환 불필요. 데이터 성장에 따라 재점검 대상은 `abd_dashboard_crosscut`(현 123, 축 확장 시 위험).
 
+### 성장 감시 대상
+
+- `abd_dashboard_crosscut` — 현행 무필터 123행. 축 확장/데이터 성장 시 1,000행 상한 근접 여부 정기 실측 필요. 근접 발견 시 `_json` 스칼라 반환으로 즉시 전환.
+
+### R3 · pageSize=ALL 병렬 페치 (2026-07-28 시행 완료)
+
+- 대상: `useAbdItemsQuery`(`abd_items_search`), `useDefectItemsQuery`(`defect_items_search`).
+- 변경: ALL 모드에서 첫 청크로 total 확보 후, 나머지 청크 오프셋을 `Promise.all` 로 병렬 페치. 순차 루프 → 병렬 페치로 대기시간 단축.
+- UI 불변: 반환 형태·순서(offset asc) 동일, 잘림 감시(`assertNoTruncation`) 유지.
+
 ---
 
 ## 운영 원칙 — 설계 변경 사전 보고 (필수)
