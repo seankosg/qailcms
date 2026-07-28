@@ -66,5 +66,6 @@ export const getSnagProgressTotals = createServerFn({ method: "POST" })
       done_upto: Number(r.done_upto) || 0,
       plan_upto: Number(r.plan_upto) || 0,
       actual_upto: Number(r.actual_upto) || 0,
+      no_plan: Number(r.no_plan) || 0,
     }));
   });
