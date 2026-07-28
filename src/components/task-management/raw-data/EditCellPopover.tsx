@@ -63,7 +63,8 @@ export function EditCellPopover({
   async function save() {
     setBusy(true);
     try {
-      let payload: unknown = val === "" ? null : val;
+      // Radix Select는 빈 문자열 value 를 금지하므로 "__BLANK__" 를 null 센티널로 사용
+      let payload: unknown = val === "" || val === "__BLANK__" ? null : val;
       if (isPercent && payload != null) {
         const n = Number(val);
         if (!Number.isFinite(n)) {
@@ -132,7 +133,7 @@ export function EditCellPopover({
               <SelectValue placeholder="선택" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">(Blank)</SelectItem>
+              <SelectItem value="__BLANK__">(Blank)</SelectItem>
               {(column.options ?? []).map((opt) => (
                 <SelectItem key={opt} value={opt}>
                   {opt}
