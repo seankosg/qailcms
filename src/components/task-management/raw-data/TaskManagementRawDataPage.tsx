@@ -511,6 +511,7 @@ export function TaskManagementRawDataPage() {
     pageSizeMains: 100,
     asOf: serverAsOf,
     thresholds: serverThresholds,
+    kpiMode,
   });
 
   const rows = serverRows;
