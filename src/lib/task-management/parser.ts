@@ -845,6 +845,17 @@ export async function parseTaskManagementExcel(
   const childCount = rows.length - parentCount;
   const disciplineHint = rows.length > 0 ? inferDiscipline(rows[0].task_no) : null;
 
+  if (unknownMilestoneCounts.size > 0) {
+    const total = Array.from(unknownMilestoneCounts.values()).reduce((a, b) => a + b, 0);
+    const detail = Array.from(unknownMilestoneCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([v, c]) => `${v}:${c}`)
+      .join(", ");
+    warnings.push(
+      `미등록 마일스톤 값 ${total}건 (${detail}) — Admin에서 등록 후 재임포트해야 값이 저장됩니다.`,
+    );
+  }
+
   return {
     dataDate,
     dataDateCell,
