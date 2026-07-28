@@ -218,53 +218,12 @@ function modeToColumnFilters(
   if (scope !== "all") {
     out.push({ id: "level", value: [scope] });
   }
+  // KPI 딥링크 mode 는 서버 _kpi_mode 파라미터로 전달 (정본 tm_kpi_bucket_matches).
+  // 수동 컬럼 필터로서의 auto_judgment 필터는 사용자가 UI에서 직접 걸 때만 유지.
+  // no_plan_* 만 컬럼 empty 필터로 매핑 (bucket 과 등가).
   if (!mode) return out;
-
-  const notCompleted = ["정상", "주의", "지연", "악화", EMPTY_TOKEN];
-  const delayOnly = ["지연", "악화"];
-
-  switch (mode) {
-    case "completed":
-      out.push({ id: "auto_judgment", value: ["완료"] });
-      break;
-    case "wip":
-      out.push({ id: "actual_start", value: { notEmptyOnly: true } });
-      out.push({ id: "auto_judgment", value: notCompleted });
-      break;
-    case "not_started":
-      out.push({ id: "actual_start", value: { emptyOnly: true } });
-      out.push({ id: "auto_judgment", value: notCompleted });
-      break;
-    case "planned_started":
-      out.push({ id: "plan_start", value: { to: asOf } });
-      break;
-    case "actual_started":
-      out.push({ id: "actual_start", value: { notEmptyOnly: true } });
-      break;
-    case "in_delay":
-    case "behind":
-    case "delay":
-      out.push({ id: "auto_judgment", value: delayOnly });
-      break;
-    case "start_delayed":
-      out.push({ id: "auto_judgment", value: delayOnly });
-      out.push({ id: "actual_start", value: { emptyOnly: true } });
-      out.push({ id: "plan_start", value: { to: asOf } });
-      break;
-    case "completion_overdue":
-      out.push({ id: "auto_judgment", value: delayOnly });
-      out.push({ id: "plan_end", value: { to: previousDay(asOf) } });
-      break;
-    case "critical":
-      out.push({ id: "auto_judgment", value: ["악화"] });
-      break;
-    case "no_plan_start":
-      out.push({ id: "plan_start", value: { emptyOnly: true } });
-      break;
-    case "no_plan_end":
-      out.push({ id: "plan_end", value: { emptyOnly: true } });
-      break;
-  }
+  if (mode === "no_plan_start") out.push({ id: "plan_start", value: { emptyOnly: true } });
+  else if (mode === "no_plan_end") out.push({ id: "plan_end", value: { emptyOnly: true } });
   return out;
 }
 
