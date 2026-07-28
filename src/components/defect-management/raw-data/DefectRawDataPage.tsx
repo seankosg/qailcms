@@ -365,6 +365,11 @@ export function DefectRawDataPage() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [searchInput, setSearchInput] = useState(urlSearch.q ?? "");
   const [criticalPending, setCriticalPending] = useState<Map<string, boolean>>(new Map());
+  // R2: 셀 렌더 시 최신 criticalPending 을 읽기 위한 ref. columns useMemo 가
+  // criticalPending 상태에 의존하면 체크 1회로 전체 컬럼/셀 memo 무효화 →
+  // 스크롤 시 전체 재렌더. ref 로 우회하고 컬럼 배열 identity 를 안정화한다.
+  const criticalPendingRef = useRef(criticalPending);
+  criticalPendingRef.current = criticalPending;
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [visibility, setVisibility] = useState<VisibilityState>({});
@@ -567,7 +572,7 @@ export function DefectRawDataPage() {
       cell: ({ row }) => {
         const id = row.original.id;
         const original = !!(row.original as any).is_critical;
-        const pv = criticalPending.get(id);
+        const pv = criticalPendingRef.current.get(id);
         const checked = pv !== undefined ? pv : original;
         const pending = pv !== undefined && pv !== original;
         return (
@@ -618,7 +623,7 @@ export function DefectRawDataPage() {
       cols.push(buildDataColumn(c, tab, includeInactive, dataDate, canEditRow, teamCodesForEdit, patchLocalItem, () => refetch(), labelOf(c.key)));
     }
     return cols;
-  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, canEditRow, teamCodesForEdit, patchLocalItem, refetch, labelOf]);
+  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, canEditRow, teamCodesForEdit, patchLocalItem, refetch, labelOf]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = { __select: true };
@@ -1162,8 +1167,9 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
   const vRows = rowVirtualizer.getVirtualItems();
   const paddingTop = vRows.length > 0 ? vRows[0].start : 0;
   const paddingBottom = vRows.length > 0 ? rowVirtualizer.getTotalSize() - vRows[vRows.length - 1].end : 0;
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-
+  // R2: hoveredIndex React state 제거. hover 배경은 CSS `:hover` + `--sticky-bg`
+  // 변수로 처리 (styles.css `.raw-hover-row:hover` 참조). 행 위 마우스 이동 시
+  // React 커밋 0회 → Profiler 검증 통과.
   const autoSizeColumn = (columnId: string) => {
     const container = tableRef.current;
     if (!container) return;
@@ -1179,17 +1185,10 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
     table.setColumnSizing((prev) => ({ ...prev, [columnId]: Math.min(Math.ceil(max) + 18, 640) }));
   };
 
-  const stickyBgFor = (row: DefectItem, index: number): string => {
+  const stickyBgFor = (row: DefectItem): string => {
     const closed = Boolean((row as any).actual_closure_date) || /closed|complete|done/i.test(`${(row as any).closure_status ?? ""} ${(row as any).status_raw ?? ""}`);
     const overdue = isOverdueDefect(row as any, dataDate);
     // 스티키 컬럼은 항상 완전 불투명이어야 스크롤 시 뒤 컬럼이 비쳐 보이지 않는다.
-    // 주의:
-    //  - 프로젝트 컬러 토큰은 oklch(...) 리터럴이므로 hsl(var(--token)) 래핑은 무효값이 되어 painting 되지 않는다. var(--token) 을 그대로 사용.
-    //  - `background: <color>, linear-gradient(...)` 다중 레이어 문법은 첫 레이어가 <bg-image> 여야 유효하므로,
-    //    color-mix() 결과를 그냥 나열하면 declaration 전체가 무효가 된다. 단일 색상 값으로 반환한다.
-    //  - 두 operand 모두 완전 불투명이므로 color-mix 결과도 완전 불투명이다.
-    if (hoveredIndex === index)
-      return "color-mix(in oklab, var(--muted) 95%, var(--background))";
     if (overdue && !closed)
       return "color-mix(in oklab, var(--destructive) 6%, var(--background))";
     if (closed)
@@ -1265,9 +1264,7 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                     <TableRow
                       key={row.id}
                       style={{ height: 36 }}
-                      className={cn("cursor-pointer", closed && "bg-muted/30 text-muted-foreground", overdue && !closed && "bg-destructive/5", "hover:bg-muted/50")}
-                      onMouseEnter={() => setHoveredIndex(vr.index)}
-                      onMouseLeave={() => setHoveredIndex(null)}
+                      className={cn("cursor-pointer raw-hover-row", closed && "bg-muted/30 text-muted-foreground", overdue && !closed && "bg-destructive/5", "hover:bg-muted/50")}
                       onClick={() => onRowClick(row.original)}
                     >
                       {row.getVisibleCells().map((cell, i) => {
@@ -1283,7 +1280,7 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                               height: 36,
                               maxHeight: 36,
                               overflow: "hidden",
-                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: stickyBgFor(row.original, vr.index) } : {}),
+                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: "var(--sticky-bg)", ["--sticky-bg" as any]: stickyBgFor(row.original) } : {}),
                             }}
                             className={cn("truncate whitespace-nowrap py-2 text-xs", isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                           >

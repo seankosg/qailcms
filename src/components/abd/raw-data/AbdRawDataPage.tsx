@@ -927,19 +927,13 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
   const vRows = rowVirtualizer.getVirtualItems();
   const paddingTop = vRows.length > 0 ? vRows[0].start : 0;
   const paddingBottom = vRows.length > 0 ? rowVirtualizer.getTotalSize() - vRows[vRows.length - 1].end : 0;
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-
-  const stickyBg = (row: AbdItem, index: number): string => {
+  // R2: hoveredIndex React state 제거. hover 배경은 CSS `:hover` + `--sticky-bg`
+  // 변수로 처리 (styles.css `.raw-hover-row:hover` 참조). 행 위 마우스 이동 시
+  // React 커밋 0회 → Profiler 검증 통과.
+  const stickyBg = (row: AbdItem): string => {
     const inactive = !row.is_active;
     const approved = row.status_group === "approved" || String(row.latest_status ?? "").toUpperCase() === "A";
     // 스티키 컬럼은 항상 완전 불투명이어야 스크롤 시 뒤 컬럼이 비쳐 보이지 않는다.
-    // 주의:
-    //  - 프로젝트 컬러 토큰은 oklch(...) 리터럴이므로 hsl(var(--token)) 래핑은 무효값이 되어 painting 되지 않는다. var(--token) 을 그대로 사용.
-    //  - `background: <color>, linear-gradient(...)` 다중 레이어 문법은 첫 레이어가 <bg-image> 여야 유효하므로,
-    //    color-mix() 결과를 그냥 나열하면 declaration 전체가 무효가 된다. 단일 색상 값으로 반환한다.
-    //  - 두 operand 모두 완전 불투명이므로 color-mix 결과도 완전 불투명이다.
-    if (hoveredIndex === index)
-      return "color-mix(in oklab, var(--muted) 95%, var(--background))";
     if (inactive)
       return "color-mix(in oklab, var(--muted) 45%, var(--background))";
     if (approved)
@@ -1015,13 +1009,11 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
                       key={row.id}
                       style={{ height: 34 }}
                       className={cn(
-                        "cursor-default",
+                        "cursor-default raw-hover-row",
                         !r.is_active && "bg-muted/30 text-muted-foreground",
                         approved && r.is_active && "bg-muted/40 text-muted-foreground/70",
                         "hover:bg-muted/50",
                       )}
-                      onMouseEnter={() => setHoveredIndex(vr.index)}
-                      onMouseLeave={() => setHoveredIndex(null)}
                       onClick={(e) => {
                         const t = e.target as HTMLElement;
                         if (t.closest('button, a, input, [role="button"], [role="menuitem"], [data-radix-popper-content-wrapper]')) return;
@@ -1039,7 +1031,7 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
                             style={{
                               width: cell.column.getSize(), minWidth: cell.column.getSize(), maxWidth: cell.column.getSize(),
                               height: 34, maxHeight: 34, overflow: "hidden",
-                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: stickyBg(r, vr.index) } : {}),
+                              ...(isSticky ? { position: "sticky", left: leftPx, zIndex: 1, background: "var(--sticky-bg)", ["--sticky-bg" as any]: stickyBg(r) } : {}),
                             }}
                             className={cn("truncate whitespace-nowrap py-1.5 text-xs px-3", isLastFrozen && "shadow-[2px_0_4px_-2px_hsl(var(--border))]")}
                           >
