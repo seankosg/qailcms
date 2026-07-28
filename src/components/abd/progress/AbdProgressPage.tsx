@@ -30,6 +30,7 @@ import {
   type GroupBy,
   type PlanMode,
   type Stage,
+  type RoundKey,
   addDays,
   assembleMatrix,
   buildBucketRange,
@@ -74,7 +75,7 @@ export function AbdProgressPage() {
 
   const plot = search.plot;
   const teams = parseCsv<AbdTeam>(search.teams, TEAM_VALUES);
-  const round = "all" as const;
+  const round: RoundKey = search.round;
   const bucket: Bucket = search.bucket;
   const groupBy = parseCsv<GroupBy>(search.groupBy, ALL_GROUP_BY);
   const effectiveGroupBy: GroupBy[] = groupBy.length > 0 ? groupBy : ["team"];
