@@ -50,8 +50,6 @@ export function TaskDetailPage() {
   const isSuperUser = !!(user as any)?.isSuperUser;
   const isDSuperUser = !!(user as any)?.isDSuperUser;
   const canEditTaskNo = isAdmin || isDSuperUser;
-  const canEditOwnerFieldsBase = isAdmin || isSuperUser; // d_superuser 제외
-  const myPic = String((user as any)?.hdec_pic_name ?? "").trim().toLowerCase();
   const resolveLabel = useTmColumnLabel();
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
   const { data: milestoneOptions = [] } = useQuery({
