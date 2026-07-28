@@ -572,7 +572,7 @@ export function DefectRawDataPage() {
       cell: ({ row }) => {
         const id = row.original.id;
         const original = !!(row.original as any).is_critical;
-        const pv = criticalPending.get(id);
+        const pv = criticalPendingRef.current.get(id);
         const checked = pv !== undefined ? pv : original;
         const pending = pv !== undefined && pv !== original;
         return (
@@ -623,7 +623,7 @@ export function DefectRawDataPage() {
       cols.push(buildDataColumn(c, tab, includeInactive, dataDate, canEditRow, teamCodesForEdit, patchLocalItem, () => refetch(), labelOf(c.key)));
     }
     return cols;
-  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, criticalPending, canEditRow, teamCodesForEdit, patchLocalItem, refetch, labelOf]);
+  }, [orderedKeys, hiddenByTab, tab, includeInactive, dataDate, canEditRow, teamCodesForEdit, patchLocalItem, refetch, labelOf]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = { __select: true };
