@@ -26,6 +26,7 @@ const abdRawDataSearchSchema = z.object({
   dateStart: fallback(z.string(), "").default(""),
   dateEnd: fallback(z.string(), "").default(""),
   dateField: fallback(z.string(), "").default(""),
+  dateFields: fallback(z.string(), "").default(""),
   stage: fallback(z.string(), "").default(""),
   round: fallback(z.enum(["R1", "R2", "R3", "all"]), "all").default("all"),
   excluded: fallback(z.enum(["hide", "only", "all"]), "hide").default("hide"),

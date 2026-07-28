@@ -17,7 +17,15 @@ export type AbdStatusGroup =
   | "all";
 export type AbdTeam = "MECH" | "ELEC" | "ARCH" | "DESN" | "PRJC";
 
-export type AbdServerFilterOp = "in" | "in_or_empty" | "text" | "empty" | "date_range" | "num_range" | "bool";
+export type AbdServerFilterOp =
+  | "in"
+  | "in_or_empty"
+  | "text"
+  | "empty"
+  | "date_range"
+  | "date_range_or"
+  | "num_range"
+  | "bool";
 
 export interface AbdServerFilter {
   column: string;
