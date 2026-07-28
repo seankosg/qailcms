@@ -163,14 +163,26 @@ function formatDdMmm(v: any): string {
 
 const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = [
   { value: "approved", label: "Approved (A)" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "not_started", label: "Not Started" },
+  { value: "unapproved", label: "Unapproved" },
 ];
 // UI 탭에 노출되는 3종 + Dashboard 딥링크로만 들어오는 세분화 상태값들.
 // URL 파라미터 파싱 시 유효값 판정에 사용된다.
 const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
+  "in_progress", "not_started",
   "under_review", "drafting", "rs_delay", "sb_delay", "ds_delay", "no_plan", "delayed",
 ];
+// 딥링크 status 값 → 사용자에게 보여줄 판정 라벨 (필터 칩)
+const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
+  in_progress: "In Progress",
+  not_started: "Not Started",
+  under_review: "Under Review",
+  drafting: "Draft Start",
+  rs_delay: "Response Delay",
+  sb_delay: "Submission Delay",
+  ds_delay: "Draft Start Delay",
+  no_plan: "No Plan",
+  delayed: "Delayed",
+};
 const ALL_STATUS_VALUES = [
   ...STATUS_TABS.map((s) => s.value),
   ...DEEP_LINK_STATUS_VALUES,
