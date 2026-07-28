@@ -1393,6 +1393,18 @@ export function TaskManagementRawDataPage() {
               }}
             />
           )}
+          {kpiModeLabel && (
+            <FilterChip
+              label={`KPI: ${kpiModeLabel}`}
+              onClear={() => setKpiMode(null)}
+            />
+          )}
+          {asOfChipLabel && (
+            <FilterChip
+              label={`As of: ${asOfChipLabel}`}
+              onClear={() => setSharedDataDate("")}
+            />
+          )}
           {columnFilters.map((f) => (
             <FilterChip
               key={f.id}
