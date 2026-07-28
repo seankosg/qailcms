@@ -281,6 +281,8 @@ export function TaskManagementRawDataPage() {
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [addChildParent, setAddChildParent] = useState<ParentSeed | null>(null);
   const [addMainOpen, setAddMainOpen] = useState(false);
+  // 대시보드 KPI 딥링크 mode → 서버 _kpi_mode 로 전달 (정본 tm_kpi_bucket_matches 통과)
+  const [kpiMode, setKpiMode] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // initial load from server-backed view preference (with local cache fallback)
@@ -429,6 +431,9 @@ export function TaskManagementRawDataPage() {
     // SHAW 방식: mode 를 TanStack ColumnFilters 로 변환하여 한꺼번에 적용
     const kpiFilters = modeToColumnFilters(s.mode, asOf, scope);
     setColumnFilters([...next, ...kpiFilters]);
+    // KPI 모드는 서버 _kpi_mode 로 전달 — auto_judgment stored 컬럼 필터 대체.
+    const m = (s.mode ?? "").trim();
+    setKpiMode(m && m !== "no_plan_start" && m !== "no_plan_end" ? m : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateLoaded, search]);
 
