@@ -711,7 +711,7 @@ export function TaskManagementRawDataPage() {
     return keys;
   }, [rows]);
 
-  function toggleCollapse(disc: string, taskNo: string) {
+  const toggleCollapse = useCallback((disc: string, taskNo: string) => {
     const key = `${disc}::${taskNo}`;
     setCollapsedParents((prev) => {
       const next = new Set(prev);
@@ -724,7 +724,7 @@ export function TaskManagementRawDataPage() {
       }
       return next;
     });
-  }
+  }, []);
 
   function setAllCollapsed(collapsed: boolean) {
     const next = collapsed ? new Set(parentKeys) : new Set<string>();
@@ -741,6 +741,41 @@ export function TaskManagementRawDataPage() {
     const rest = order.filter((k) => !frozenSet.has(k) && k !== "task_no");
     return ["__select", "__comments", "task_no", ...frozenExtras, ...rest];
   }, [order, frozenExtras]);
+
+  // R2: 셀 렌더 시점에 참조되는 "동적" 값들을 ref 로 격리한다.
+  //  - columns useMemo 가 이 값들에 의존하면, 값 하나만 바뀌어도 columns 배열
+  //    전체가 새 identity 로 재생성 → TanStack Table 이 모든 컬럼/셀 memo 를
+  //    무효화하며 append 시 9~14 초대의 렌더 폭주가 발생함.
+  //  - 셀 함수는 ref.current 를 통해 최신 값을 읽고, 부모 리렌더 시점에
+  //    자동으로 재실행되므로 UI 동작·표시값에는 변화가 없다.
+  const cellDynRef = useRef({
+    commentCounts: commentCounts as typeof commentCounts | undefined,
+    tActualMap,
+    collapsedParents,
+    selectedDataDate,
+    isRead,
+    kpiThresholds,
+    canEditOwnerFieldsBase,
+    myPic,
+    updateOwnerFieldFn,
+    refetch,
+    toggleCollapse,
+    setAddChildParent,
+  });
+  cellDynRef.current = {
+    commentCounts,
+    tActualMap,
+    collapsedParents,
+    selectedDataDate,
+    isRead,
+    kpiThresholds,
+    canEditOwnerFieldsBase,
+    myPic,
+    updateOwnerFieldFn,
+    refetch,
+    toggleCollapse,
+    setAddChildParent,
+  };
 
   const columns = useMemo<ColumnDef<Row>[]>(() => {
     const cols: ColumnDef<Row>[] = [];
@@ -796,11 +831,12 @@ export function TaskManagementRawDataPage() {
           cell: ({ row }) => {
             const rr = row.original as Row;
             const rid = String(rr.id);
-            const info = commentCounts?.[rid];
+            const dyn = cellDynRef.current;
+            const info = dyn.commentCounts?.[rid];
             if (!info || info.count <= 0) {
               return <span className="flex w-full items-center justify-center text-muted-foreground/30">—</span>;
             }
-            const read = isRead(rid, info.lastUpdatedAt);
+            const read = dyn.isRead(rid, info.lastUpdatedAt);
             return (
               <span
                 className={cn(
@@ -834,7 +870,7 @@ export function TaskManagementRawDataPage() {
           meta: { group: c.group, filterType: "stage-progress" as const },
           cell: ({ row }) => {
             const rr = row.original as Row;
-            const dd = selectedDataDate || ((rr as any).data_date ?? null);
+            const dd = cellDynRef.current.selectedDataDate || ((rr as any).data_date ?? null);
             return (
               <span className="flex w-full items-center justify-center">
                 <TaskStageProgress row={rr as any} dataDate={dd} />
@@ -863,10 +899,10 @@ export function TaskManagementRawDataPage() {
               return computeDailyPlan(r as any) ?? 0;
             }
             if (c.key === "today_actual") {
-              return tActualMap.get(String((r as any).id)) ?? 0;
+              return cellDynRef.current.tActualMap.get(String((r as any).id)) ?? 0;
             }
             // today_gap = T.Diff(일할) = T.Actual − T.Plan
-            const ta = tActualMap.get(String((r as any).id)) ?? 0;
+            const ta = cellDynRef.current.tActualMap.get(String((r as any).id)) ?? 0;
             return computeDailyDiff(r as any, ta) ?? 0;
           },
           header: labelOverrides[c.key] ?? c.label,
@@ -895,7 +931,6 @@ export function TaskManagementRawDataPage() {
       // Cum. Diff — 누계 실적(Actual %) − 누계 계획(Plan %) 파생 계산.
       // DB 저장값(임포트값)은 표시에 사용하지 않는다.
       if (c.key === "progress_variance") {
-        const th = kpiThresholds ?? DEFAULT_THRESHOLDS;
         cols.push({
           id: c.key,
           size: c.width,
@@ -905,7 +940,7 @@ export function TaskManagementRawDataPage() {
           enableColumnFilter: true,
           filterFn: numberRangeFilterFn,
           accessorFn: (r: Row) =>
-            computeVariance(r as any, selectedDataDate || undefined),
+            computeVariance(r as any, cellDynRef.current.selectedDataDate || undefined),
           header: labelOverrides[c.key] ?? c.label,
           meta: { filterType: "number-range" as const, group: c.group },
           cell: ({ getValue }) => {
@@ -913,6 +948,7 @@ export function TaskManagementRawDataPage() {
             if (raw == null)
               return <span className="text-muted-foreground/40">—</span>;
             const v = Number(raw);
+            const th = cellDynRef.current.kpiThresholds ?? DEFAULT_THRESHOLDS;
             const cls =
               v < th.worsen_gap
                 ? "text-rose-600 font-semibold"
@@ -972,7 +1008,7 @@ export function TaskManagementRawDataPage() {
               <AlarmBadge
                 value={String(val)}
                 todayGap={
-                  computeDailyDiff(rr as any, tActualMap.get(String(rr.id)) ?? 0) ?? 0
+                  computeDailyDiff(rr as any, cellDynRef.current.tActualMap.get(String(rr.id)) ?? 0) ?? 0
                 }
                 slipDays={rr.slip_days != null ? Number(rr.slip_days) : null}
                 actualProgress={
@@ -987,7 +1023,8 @@ export function TaskManagementRawDataPage() {
             const isChild = !!(rr as any).main_task_no;
             const disc = String(rr.discipline);
             const collapseKey = `${disc}::${rr.task_no}`;
-            const isCollapsed = collapsedParents.has(collapseKey);
+            const dyn = cellDynRef.current;
+            const isCollapsed = dyn.collapsedParents.has(collapseKey);
             const ap = Number((rr as any).actual_progress ?? 0);
             const aj = (rr as any).auto_judgment;
             const isDone = ap >= 0.999 || aj === "완료";
@@ -998,7 +1035,7 @@ export function TaskManagementRawDataPage() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleCollapse(disc, String(rr.task_no));
+                      dyn.toggleCollapse(disc, String(rr.task_no));
                     }}
                     className={cn(
                       "rounded p-0.5 hover:bg-muted",
@@ -1028,7 +1065,7 @@ export function TaskManagementRawDataPage() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setAddChildParent({
+                      dyn.setAddChildParent({
                         task_no: String(rr.task_no),
                         discipline: disc as ParentSeed["discipline"],
                         task_name: (rr as any).task_name ?? null,
@@ -1053,9 +1090,10 @@ export function TaskManagementRawDataPage() {
           }
           const rr = row.original as any;
           const isMain = rr.level === "main";
+          const dyn = cellDynRef.current;
           const rowOwner = String(rr?.hdec_pic_name ?? "").trim().toLowerCase();
-          const isOwner = !!myPic && !!rowOwner && myPic === rowOwner;
-          const canEditOwnerFields = canEditOwnerFieldsBase || isOwner;
+          const isOwner = !!dyn.myPic && !!rowOwner && dyn.myPic === rowOwner;
+          const canEditOwnerFields = dyn.canEditOwnerFieldsBase || isOwner;
           const isTeamOverride = c.key === "team";
           const isDataDateOverride = c.key === "data_date";
           let effectiveColumn: TmColumnDef = c;
@@ -1082,11 +1120,11 @@ export function TaskManagementRawDataPage() {
               column={effectiveColumn}
               currentValue={val}
               canEdit={effectiveCanEdit}
-              onSaved={() => refetch()}
+              onSaved={() => dyn.refetch()}
               onSave={
                 useOwnerSave
                   ? async (value) => {
-                      await updateOwnerFieldFn({
+                      await dyn.updateOwnerFieldFn({
                         data: {
                           id: String(rr.id),
                           field: effectiveColumn.key,
@@ -1104,7 +1142,11 @@ export function TaskManagementRawDataPage() {
       });
     }
     return cols;
-  }, [canEdit, canEditRow, refetch, orderedKeys, labelOverrides, collapsedParents, selectedDataDate, kpiThresholds, tActualMap, canEditOwnerFieldsBase, myPic, updateOwnerFieldFn, commentCounts, isRead]);
+  }, [canEdit, canEditRow, orderedKeys, labelOverrides]);
+  // R2: 위 5개는 "구조" 의존성만 남긴다. 나머지 동적 값(commentCounts, tActualMap,
+  // collapsedParents, selectedDataDate, kpiThresholds, isRead, myPic,
+  // canEditOwnerFieldsBase, updateOwnerFieldFn, refetch, setAddChildParent,
+  // toggleCollapse)은 cellDynRef.current 에서 최신값을 읽는다.
 
   const table = useReactTable({
     data: effectiveRows,
