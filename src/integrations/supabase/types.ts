@@ -4156,6 +4156,14 @@ export type Database = {
           status_raw: string
         }[]
       }
+      defect_snag_dashboard_matrix_json: {
+        Args: {
+          _as_of_date?: string
+          _plan_groups?: string[]
+          _teams?: string[]
+        }
+        Returns: Json
+      }
       defect_snag_progress_cells: {
         Args: {
           _as_of_date: string
@@ -4176,6 +4184,20 @@ export type Database = {
           stage: string
         }[]
       }
+      defect_snag_progress_cells_json: {
+        Args: {
+          _as_of_date: string
+          _bucket: string
+          _group_by: string[]
+          _plan_groups: string[]
+          _plan_mode: string
+          _range_end: string
+          _range_start: string
+          _room_groups: string[]
+          _teams: string[]
+        }
+        Returns: Json
+      }
       defect_snag_progress_totals: {
         Args: {
           _as_of_date: string
@@ -4193,6 +4215,17 @@ export type Database = {
           stage: string
           total: number
         }[]
+      }
+      defect_snag_progress_totals_json: {
+        Args: {
+          _as_of_date: string
+          _group_by: string[]
+          _plan_groups: string[]
+          _plan_mode: string
+          _room_groups: string[]
+          _teams: string[]
+        }
+        Returns: Json
       }
       delete_abd_import_batch: { Args: { _batch_id: string }; Returns: Json }
       delete_defect_import_batch: { Args: { _batch_id: string }; Returns: Json }
