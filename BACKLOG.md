@@ -124,6 +124,38 @@
 
 ---
 
+## 부록 — RPC 반환 계약 감사 (2026-07-28 갱신)
+
+### 시행 완료 (동결 해제)
+
+- **A15 · `defect_snag_progress_cells` → `_json` 전환**: `RETURNS jsonb` 스칼라 반환으로 재작성. 180d/day/team 호출 실측 1,171셀 전량 수신 확인 (PostgREST 1,000행 상한 회피). 원인은 SM Progress 매트릭스에서 Range 확장 시 계획값 유실(예: ELEC·7/29·Rect 64→0)로 실사용 발현.
+- **A16 · `defect_snag_progress_totals` / `defect_snag_dashboard_matrix` → `_json` 전환**: 동일 상한 위험(그룹 카디널리티 × stage). 세 함수 모두 `_json` 래퍼 신설 + 클라이언트 언랩(`src/lib/defect-management/progress.functions.ts`, `src/hooks/useSnagDashboardMatrix.ts`) + 배열 shape 검증 완료.
+- **증빙(2026-07-28 UTC 07:43)**: 60d/180d 겹치는 전 구간 전수 diff = 0 mismatch. Data API 경유 scalar jsonb 응답 shape 확인.
+
+### 상한 잘림의 세 번째 실사용 발현
+
+선례: (1) TM `tm_items_search`(C1 라운드), (2) ABD `abd_progress_cells`(정규화 라운드), (3) SM `defect_snag_progress_cells`(본 건). AGENTS.md 규칙 2("행수 상한 비보장 조회 = jsonb 단일 반환")를 위반하는 신규 RPC 작성 금지.
+
+### 잔여 `RETURNS TABLE` RPC 실측 (2026-07-28)
+
+| RPC | 무필터 행수 | 위험 |
+| --- | --- | --- |
+| `abd_dashboard_crosscut` | 123 | LOW |
+| `tm_items_facets` (17축 일괄) | 73 | LOW |
+| `abd_dashboard_approval_trend` (12mo) | 21 | LOW |
+| `abd_dashboard_row1` | 13 | LOW |
+| `abd_dashboard_row2` | 6 | LOW |
+| `abd_dashboard_status_dist` | 4 | LOW |
+| `abd_dashboard_judgment_mix` | 4 | LOW |
+| `abd_dashboard_overdue_heatmap` | 3 | LOW |
+| `abd_items_facets` / `defect_items_facets` / `dmr_facets` | `_limit` 파라미터 상한 | LOW |
+| `abd_items_search` / `defect_items_search` / `tm_judge_snapshot_at_date` | rows 필드가 jsonb 페이로드 | LOW |
+| `sm_my_workspace_rows` / `sm_my_workspace_counts` | 사용자별 스코프 소규모 | LOW |
+
+전 항목 500행 미만 또는 파라미터로 상한 강제. 추가 전환 불필요. 데이터 성장에 따라 재점검 대상은 `abd_dashboard_crosscut`(현 123, 축 확장 시 위험).
+
+---
+
 ## 운영 원칙 — 설계 변경 사전 보고 (필수)
 
 승인된 설계·범위의 어떠한 변경도 **시행 전 사용자 확인**을 거친다. 사후 승인이 필요한 상태로 시행하는 것은 원칙 위반이며, 발견 시 롤백 또는 사후 승인 절차를 반드시 남긴다.
