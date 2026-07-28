@@ -318,6 +318,12 @@ export interface ParseTaskManagementOptions {
   dataDateOverride?: string | null;
   /** 날짜 오류 셀에 대한 사용자 수정값. { cellRef → 'YYYY-MM-DD' } */
   dateOverrides?: Record<string, string>;
+  /**
+   * 허용된 Milestone 코드 목록 (tm_milestone_kinds에서 주입).
+   * 미지정/빈 배열이면 fallback으로 ['HO','COC','DLP'] 사용.
+   * 목록에 없는 값은 null로 저장되며 warnings에 요약 경보가 남는다.
+   */
+  allowedMilestoneCodes?: string[];
 }
 
 /** 워크북의 시트 이름 리스트. */
