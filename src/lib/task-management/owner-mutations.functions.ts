@@ -65,7 +65,6 @@ export const updateTaskOwnerField = createServerFn({ method: "POST" })
 
     const patch: Record<string, unknown> = {
       [data.field]: value,
-      updated_by: context.userId,
       updated_at: new Date().toISOString(),
     };
 
