@@ -447,6 +447,11 @@ function resolveActiveRound(existing: any): 1 | 2 | 3 {
   //   - 임포트측(여기): SB actual 최고 라운드만 신뢰 — Aconex 회신을 계획만 있는
   //     빈 라운드에 잘못 귀속시키는 것을 방지.
   // 두 규칙의 차이는 무결성 검사 시 반드시 상호 참조.
+  //
+  // NOTE (2026-07-29): Progress 집계(public.abd_progress_cells / abd_progress_totals)는
+  //   또 다른 기준을 쓴다 — 실적(r{n}_*_actual)은 "영구히 라운드 n 의 사건"이므로
+  //   active_round 로 슬라이스하지 않고 컬럼이 라운드를 결정한다.
+  //   현재 라운드 개념은 잔여/예정(plan) 산정에만 쓰이며 정본 abd_judge_v1 을 경유한다.
   if (existing?.r3_submission_actual) return 3;
   if (existing?.r2_submission_actual) return 2;
   return 1;
