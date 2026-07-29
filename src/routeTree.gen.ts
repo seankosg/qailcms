@@ -62,6 +62,7 @@ import { Route as AuthenticatedClosureSparePartImportLogsRouteImport } from './r
 import { Route as AuthenticatedClosureSnagManagementImportLogsRouteImport } from './routes/_authenticated/closure/snag-management/import.logs'
 import { Route as AuthenticatedClosureSnagManagementDetailIdRouteImport } from './routes/_authenticated/closure/snag-management/detail.$id'
 import { Route as AuthenticatedClosureAbdImportLogsRouteImport } from './routes/_authenticated/closure/abd/import.logs'
+import { Route as AuthenticatedClosureAbdDetailIdRouteImport } from './routes/_authenticated/closure/abd/detail.$id'
 
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
   id: '/change-password',
@@ -372,6 +373,12 @@ const AuthenticatedClosureAbdImportLogsRoute =
     path: '/logs',
     getParentRoute: () => AuthenticatedClosureAbdImportRoute,
   } as any)
+const AuthenticatedClosureAbdDetailIdRoute =
+  AuthenticatedClosureAbdDetailIdRouteImport.update({
+    id: '/closure/abd/detail/$id',
+    path: '/closure/abd/detail/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -418,6 +425,7 @@ export interface FileRoutesByFullPath {
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
   '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
+  '/closure/abd/detail/$id': typeof AuthenticatedClosureAbdDetailIdRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
   '/closure/snag-management/import/logs': typeof AuthenticatedClosureSnagManagementImportLogsRoute
@@ -471,6 +479,7 @@ export interface FileRoutesByTo {
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
   '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
+  '/closure/abd/detail/$id': typeof AuthenticatedClosureAbdDetailIdRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
   '/closure/snag-management/import/logs': typeof AuthenticatedClosureSnagManagementImportLogsRoute
@@ -527,6 +536,7 @@ export interface FileRoutesById {
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
   '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
+  '/_authenticated/closure/abd/detail/$id': typeof AuthenticatedClosureAbdDetailIdRoute
   '/_authenticated/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/_authenticated/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
   '/_authenticated/closure/snag-management/import/logs': typeof AuthenticatedClosureSnagManagementImportLogsRoute
@@ -583,6 +593,7 @@ export interface FileRouteTypes {
     | '/api/public/backup/auto-snapshot'
     | '/api/public/backup/run-queued-snapshot'
     | '/closure/dashboard/'
+    | '/closure/abd/detail/$id'
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
     | '/closure/snag-management/import/logs'
@@ -636,6 +647,7 @@ export interface FileRouteTypes {
     | '/api/public/backup/auto-snapshot'
     | '/api/public/backup/run-queued-snapshot'
     | '/closure/dashboard'
+    | '/closure/abd/detail/$id'
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
     | '/closure/snag-management/import/logs'
@@ -691,6 +703,7 @@ export interface FileRouteTypes {
     | '/api/public/backup/auto-snapshot'
     | '/api/public/backup/run-queued-snapshot'
     | '/_authenticated/closure/dashboard/'
+    | '/_authenticated/closure/abd/detail/$id'
     | '/_authenticated/closure/abd/import/logs'
     | '/_authenticated/closure/snag-management/detail/$id'
     | '/_authenticated/closure/snag-management/import/logs'
@@ -1085,6 +1098,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureAbdImportLogsRouteImport
       parentRoute: typeof AuthenticatedClosureAbdImportRoute
     }
+    '/_authenticated/closure/abd/detail/$id': {
+      id: '/_authenticated/closure/abd/detail/$id'
+      path: '/closure/abd/detail/$id'
+      fullPath: '/closure/abd/detail/$id'
+      preLoaderRoute: typeof AuthenticatedClosureAbdDetailIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -1176,6 +1196,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedResourceDmrDashboardRoute: typeof AuthenticatedResourceDmrDashboardRoute
   AuthenticatedResourceDmrRawDataRoute: typeof AuthenticatedResourceDmrRawDataRoute
   AuthenticatedClosureDashboardIndexRoute: typeof AuthenticatedClosureDashboardIndexRoute
+  AuthenticatedClosureAbdDetailIdRoute: typeof AuthenticatedClosureAbdDetailIdRoute
   AuthenticatedClosureSnagManagementDetailIdRoute: typeof AuthenticatedClosureSnagManagementDetailIdRoute
   AuthenticatedClosureSnagManagementImportLogsRoute: typeof AuthenticatedClosureSnagManagementImportLogsRoute
   AuthenticatedClosureSparePartRecordsDocRefRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRoute
@@ -1234,6 +1255,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedResourceDmrRawDataRoute: AuthenticatedResourceDmrRawDataRoute,
   AuthenticatedClosureDashboardIndexRoute:
     AuthenticatedClosureDashboardIndexRoute,
+  AuthenticatedClosureAbdDetailIdRoute: AuthenticatedClosureAbdDetailIdRoute,
   AuthenticatedClosureSnagManagementDetailIdRoute:
     AuthenticatedClosureSnagManagementDetailIdRoute,
   AuthenticatedClosureSnagManagementImportLogsRoute:
