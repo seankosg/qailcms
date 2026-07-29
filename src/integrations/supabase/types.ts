@@ -760,6 +760,7 @@ export type Database = {
           current_stage: string | null
           data_date: string | null
           delay_bucket: string[]
+          delay_late: string[]
           dis: string | null
           doc_ax: string | null
           doc_axx: string | null
@@ -784,6 +785,7 @@ export type Database = {
           needs_revise: boolean
           owner_user_id: string | null
           plot: string | null
+          primary_delay: string | null
           r1_dar_actual: string | null
           r1_dar_plan: string | null
           r1_draft_finish_actual: string | null
@@ -843,6 +845,7 @@ export type Database = {
           current_stage?: string | null
           data_date?: string | null
           delay_bucket?: string[]
+          delay_late?: string[]
           dis?: string | null
           doc_ax?: string | null
           doc_axx?: string | null
@@ -867,6 +870,7 @@ export type Database = {
           needs_revise?: boolean
           owner_user_id?: string | null
           plot?: string | null
+          primary_delay?: string | null
           r1_dar_actual?: string | null
           r1_dar_plan?: string | null
           r1_draft_finish_actual?: string | null
@@ -926,6 +930,7 @@ export type Database = {
           current_stage?: string | null
           data_date?: string | null
           delay_bucket?: string[]
+          delay_late?: string[]
           dis?: string | null
           doc_ax?: string | null
           doc_axx?: string | null
@@ -950,6 +955,7 @@ export type Database = {
           needs_revise?: boolean
           owner_user_id?: string | null
           plot?: string | null
+          primary_delay?: string | null
           r1_dar_actual?: string | null
           r1_dar_plan?: string | null
           r1_draft_finish_actual?: string | null
