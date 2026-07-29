@@ -437,8 +437,9 @@ function computePatch(
   r: z.infer<typeof RowSchema>,
   existing: any,
   allowed: Set<string>,
-): Record<string, any> {
+): { patch: Record<string, any>; guard: null | "skipped_r2_no_sb" | "skipped_r3_no_sb" | "legacy_r1_attribution" } {
   const patch: Record<string, any> = {};
+  let guard: null | "skipped_r2_no_sb" | "skipped_r3_no_sb" | "legacy_r1_attribution" = null;
 
   if (allowed.has("aconex_status_raw")) patch.aconex_status_raw = r.status_raw ?? null;
   if (allowed.has("aconex_review_status_raw"))
@@ -466,13 +467,22 @@ function computePatch(
       patch.inactive_reason = "aconex_cancelled";
     }
     // latest_status / approval_date: 두 케이스 모두 덮어쓰기 금지 (§1(b)③, §1(c))
-    return patch;
+    return { patch, guard };
   }
 
   const n = resolveActiveRound(existing);
+  // 방어: n∈{2,3}에서 존재하지 않는 SB actual에 회신 귀속 금지
+  if ((n === 2 || n === 3) && !existing?.[`r${n}_submission_actual`]) {
+    guard = n === 3 ? "skipped_r3_no_sb" : "skipped_r2_no_sb";
+    // 상태 필드는 latest_status만 반영 (아래 분기에서 처리)
+  } else if (n === 1 && !existing?.r1_submission_actual && (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B" || semantic === "DAR_REJECTED")) {
+    guard = "legacy_r1_attribution";
+  }
+
+  const canWriteRound = guard !== "skipped_r2_no_sb" && guard !== "skipped_r3_no_sb";
 
   if (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B") {
-    if (allowed.has("dar_response") && iso) {
+    if (canWriteRound && allowed.has("dar_response") && iso) {
       patch[`r${n}_dar_actual`] = iso;
       patch[`r${n}_response_result`] = semantic === "DAR_APPROVED_A" ? "A" : "B";
     }
@@ -485,9 +495,9 @@ function computePatch(
     // §1(a) D-코드: 매핑 미확정 → latest_status/response_result 에 쓰지 않고 skip.
     if (isDCode(r)) {
       // meta 필드만 유지, 상태 계열은 비움 (호출부에서 배치 warning 이미 로그됨)
-      return patch;
+      return { patch, guard };
     }
-    if (allowed.has("dar_response") && iso) {
+    if (canWriteRound && allowed.has("dar_response") && iso) {
       patch[`r${n}_dar_actual`] = iso;
       patch[`r${n}_response_result`] = "C";
     }
@@ -503,5 +513,5 @@ function computePatch(
       patch.latest_status = "UR";
     }
   }
-  return patch;
+  return { patch, guard };
 }
