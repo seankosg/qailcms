@@ -25,6 +25,7 @@ type SortKey =
   | "hdecPic"
   | "plannedDate"
   | "daysLate"
+  | "gap"
   | "planPct"
   | "actualPct"
   | "diffPp"
@@ -35,7 +36,7 @@ interface SortSpec {
   dir: "asc" | "desc";
 }
 
-const NUMERIC: SortKey[] = ["daysLate", "planPct", "actualPct", "diffPp"];
+const NUMERIC: SortKey[] = ["daysLate", "gap", "planPct", "actualPct", "diffPp"];
 
 function getVal(r: DelayTopItem, k: SortKey): string | number {
   switch (k) {
@@ -53,6 +54,8 @@ function getVal(r: DelayTopItem, k: SortKey): string | number {
       return r.plannedDate ?? "";
     case "daysLate":
       return r.daysLate;
+    case "gap":
+      return r.gap;
     case "planPct":
       return r.planPct;
     case "actualPct":
@@ -81,7 +84,11 @@ function compareBy(a: DelayTopItem, b: DelayTopItem, specs: SortSpec[]): number 
 
 export function DelayTopTable({ items, limit = 20 }: Props) {
   const navigate = useNavigate();
-  const [sorts, setSorts] = useState<SortSpec[]>([{ key: "daysLate", dir: "desc" }]);
+  // 정본 정렬: gap 오름차순(가장 나쁜 격차 상단). 동률 시 daysLate 큰 순.
+  const [sorts, setSorts] = useState<SortSpec[]>([
+    { key: "gap", dir: "asc" },
+    { key: "daysLate", dir: "desc" },
+  ]);
 
   const rows = useMemo(() => {
     const sorted = sorts.length ? [...items].sort((a, b) => compareBy(a, b, sorts)) : items;
@@ -176,10 +183,11 @@ export function DelayTopTable({ items, limit = 20 }: Props) {
                   <Th k="discipline">공종</Th>
                   <Th k="team" sticky>Team</Th>
                   <Th k="taskNo">Task</Th>
-                  <Th k="stage">Stage</Th>
+                  <Th k="stage">대표 Stage</Th>
                   <Th k="hdecPic">HDEC PIC</Th>
                   <Th k="plannedDate" align="right">계획일</Th>
-                  <Th k="daysLate" align="right">지연일</Th>
+                  <Th k="gap" align="right">Gap(pp)</Th>
+                  <Th k="daysLate" align="right">지연일(참고)</Th>
                   <Th k="planPct" align="right">계획 %</Th>
                   <Th k="actualPct" align="right">실적 %</Th>
                   <Th k="diffPp" align="right">차이(pp)</Th>
@@ -189,7 +197,7 @@ export function DelayTopTable({ items, limit = 20 }: Props) {
               <tbody>
                 {rows.map((r) => (
                   <tr
-                    key={`${r.id}-${r.stage}`}
+                    key={r.id}
                     className="cursor-pointer border-t hover:bg-accent/30"
                     onClick={() =>
                       navigate({
@@ -227,8 +235,17 @@ export function DelayTopTable({ items, limit = 20 }: Props) {
                     <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
                       {r.plannedDate}
                     </td>
+                    <td
+                      className={cn(
+                        "px-2 py-1 text-right tabular-nums font-semibold",
+                        r.gap < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400",
+                      )}
+                    >
+                      {r.gap >= 0 ? "+" : ""}
+                      {r.gap.toFixed(1)}
+                    </td>
                     <td className="px-2 py-1 text-right">
-                      <span className="tabular-nums font-semibold text-destructive">
+                      <span className="tabular-nums text-muted-foreground">
                         {r.daysLate}d
                       </span>
                     </td>
