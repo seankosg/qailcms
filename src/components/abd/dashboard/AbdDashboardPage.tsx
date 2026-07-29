@@ -20,7 +20,7 @@ import {
 import { AbdAgingSettingsPopover, useAbdSettingsQuery } from "./AbdAgingSettingsPopover";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { AbdDetailSheet } from "@/components/abd/raw-data/AbdDetailSheet";
+// AbdDetailSheet 제거 → /closure/abd/detail/$id 전용 라우트로 이동
 import { AbdStatusMixDonut } from "./AbdStatusMixDonut";
 import { AbdJudgmentDonut } from "./AbdJudgmentDonut";
 import { AbdJudgmentStageBreakdown } from "./AbdJudgmentStageBreakdown";
@@ -46,7 +46,6 @@ export function AbdDashboardPage() {
   }, [asOf]);
   const [plotFilter, setPlotFilter] = useState<string[]>([]);
   const [batchFilter, setBatchFilter] = useState<string[]>([]);
-  const [detail, setDetail] = useState<{ id: string; focus?: "rounds" | "aconex" | "comments" } | null>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
   // SSOT: 대시보드 필터 옵션 — abd_items_facets 로 조회
@@ -224,15 +223,17 @@ export function AbdDashboardPage() {
           plots={plotFilter}
           batchNo={batchFilter}
           onOpenRaw={openRawData}
-          onOpenDetail={(id, focus) => setDetail({ id, focus })}
+          onOpenDetail={(id, focus) =>
+            navigate({
+              to: "/closure/abd/detail/$id",
+              params: { id },
+              search: focus ? { focus } : {},
+            })
+          }
         />
         <AbdRow6Crosscut plots={plotFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
       </div>
-      <AbdDetailSheet
-        id={detail?.id ?? null}
-        focusSection={detail?.focus ?? null}
-        onOpenChange={(open) => { if (!open) setDetail(null); }}
-      />
+      {/* ABD detail drilldown → 전용 라우트 */}
     </div>
   );
 }

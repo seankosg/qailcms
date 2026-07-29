@@ -51,7 +51,7 @@ export function AttentionInbox({ userId, scope, filterValue, isAdmin }: Props) {
 
   function openRow(r: AbdAttentionRow) {
     markRead(rowKey(r), rowStamp(r));
-    navigate({ to: "/closure/abd/raw-data", search: { detail: r.id } as any });
+    navigate({ to: "/closure/abd/detail/$id", params: { id: r.id } as any });
   }
   function markAllShown() {
     markManyRead(shown.map((r) => ({ id: rowKey(r), updated_at: rowStamp(r) })));

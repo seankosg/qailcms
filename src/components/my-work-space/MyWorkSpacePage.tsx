@@ -15,7 +15,7 @@ import { ModuleKpiCard, type KpiTone } from "./ModuleKpiCard";
 import { ModuleRowList, type RowColumn, type RowListTab } from "./ModuleRowList";
 import { MwsColumnOrderMenu } from "./MwsColumnOrderMenu";
 import { useMwsColumnPrefs } from "@/hooks/useMwsColumnPrefs";
-import { AbdDetailSheet } from "@/components/abd/raw-data/AbdDetailSheet";
+// AbdDetailSheet removed — navigate to full-page /closure/abd/detail/$id
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { dohaStamp, formatDdMmmYyyy } from "@/lib/time/doha";
@@ -82,7 +82,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   const [tmTab, setTmTab] = useState<RowListTab>("today");
   const [smTab, setSmTab] = useState<RowListTab>("today");
   const [abdTab, setAbdTab] = useState<RowListTab>("today");
-  const [abdDetailId, setAbdDetailId] = useState<string | null>(null);
+  // ABD detail은 전용 라우트로 이동
 
   const latestToday = today();
   const [dataDate, setDataDate, resetDataDate] = useTmDataDate();
@@ -516,7 +516,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           filterRow={() => true}
           emptyText={abdBucketQ.isLoading ? "불러오는 중…" : "표시할 항목이 없습니다."}
           rowKey={(r) => r.id}
-          onRowClick={(r) => setAbdDetailId(r.id)}
+          onRowClick={(r) => navigate({ to: "/closure/abd/detail/$id", params: { id: r.id } })}
           columns={abdColumns}
           order={abdPrefs.order}
           visibility={abdPrefs.visibility}
@@ -546,7 +546,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
         isAdmin={isAdmin}
       />
 
-      <AbdDetailSheet id={abdDetailId} onOpenChange={(open) => { if (!open) setAbdDetailId(null); }} />
+      {/* ABD detail drilldown moved to /closure/abd/detail/$id */}
     </div>
   );
 }
