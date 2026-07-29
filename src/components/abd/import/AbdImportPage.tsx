@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { todayInDoha } from "@/lib/time/doha";
@@ -48,6 +48,12 @@ import type { ParsedAbdRow } from "@/lib/abd/parser";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useModuleGuard } from "@/hooks/useModuleGuard";
 import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
+import { useAbdSourceGuard } from "@/hooks/useAbdSourceGuard";
+import { AbdSourceGuardDialog } from "./AbdSourceGuardDialog";
+import {
+  emitAbdImportHandoff,
+  subscribeAbdImportHandoff,
+} from "@/lib/abd/import-handoff";
 import { DateIssuesPanel } from "@/components/import/DateIssuesPanel";
 import type { DateIssue } from "@/lib/import/date-audit";
 import { Switch } from "@/components/ui/switch";
@@ -222,9 +228,30 @@ export function AbdImportPage() {
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const masterOptions = useAllMasterOptions();
 
-  const guard = useModuleGuard("abd", (fs) => {
-    void handleFiles(fs);
+  const sourceGuard = useAbdSourceGuard({
+    mode: "hdec",
+    onAccepted: (fs) => {
+      void handleFiles(fs);
+    },
+    onSwitchMode: (target, fs) => {
+      setMode(target);
+      emitAbdImportHandoff(target, fs);
+      toast.info(
+        `${target === "aconex" ? "Aconex" : "HDEC"} 모드로 전환하고 ${fs.length}개 파일을 넘겼습니다`,
+      );
+    },
   });
+  const guard = useModuleGuard("abd", (fs) => {
+    void sourceGuard.receive(fs);
+  });
+  // 다른 모드에서 넘어온 HDEC 파일 자동 수신 (지문 재검증 생략 — 소스 확정 상태)
+  useEffect(() => {
+    return subscribeAbdImportHandoff("hdec", (fs) => {
+      void handleFiles(fs);
+    });
+    // handleFiles 는 useCallback([]) 이라 안정 참조
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const nameSpecs: NameFieldSpec<ParsedAbdRow>[] = [
     {
@@ -661,6 +688,7 @@ export function AbdImportPage() {
         onRegistered={() => { /* team_master invalidation via qc; entries의 team 문자열은 유지 */ }}
       />
       <ModuleGuardDialog {...guard.dialogProps} />
+      <AbdSourceGuardDialog {...sourceGuard.dialogProps} />
         </>
       )}
       {columnFile && (

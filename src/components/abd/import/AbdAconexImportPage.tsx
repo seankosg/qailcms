@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -32,6 +32,12 @@ import {
 } from "@/components/import/ColumnSelectDialog";
 import { ABD_ACONEX_SYNC_FIELDS } from "@/components/admin/AbdImportPresetTable";
 import { AbdDataDatePicker } from "./AbdDataDatePicker";
+import { useAbdSourceGuard } from "@/hooks/useAbdSourceGuard";
+import { AbdSourceGuardDialog } from "./AbdSourceGuardDialog";
+import {
+  emitAbdImportHandoff,
+  subscribeAbdImportHandoff,
+} from "@/lib/abd/import-handoff";
 
 type Status = "queued" | "parsing" | "ready" | "previewing" | "preview" | "importing" | "done" | "error";
 
@@ -295,17 +301,43 @@ export function AbdAconexImportPage() {
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      void handleFiles(Array.from(e.dataTransfer.files));
+      void sourceGuard.receive(Array.from(e.dataTransfer.files));
     },
-    [handleFiles],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
   const onSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      void handleFiles(e.target.files ? Array.from(e.target.files) : []);
+      void sourceGuard.receive(
+        e.target.files ? Array.from(e.target.files) : [],
+      );
       if (inputRef.current) inputRef.current.value = "";
     },
-    [handleFiles],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
+
+  const sourceGuard = useAbdSourceGuard({
+    mode: "aconex",
+    onAccepted: (fs) => {
+      void handleFiles(fs);
+    },
+    onSwitchMode: (target, fs) => {
+      // Aconex 페이지 안에서는 HDEC 모드로 전환할 방법이 없으므로 (부모 페이지 제어),
+      // 핸드오프 버퍼에 담아두고 사용자에게 안내한다.
+      emitAbdImportHandoff(target, fs);
+      toast.info(
+        `HDEC 파일 ${fs.length}개를 감지했습니다. 상단 토글을 HDEC 로 전환하면 자동 로드됩니다.`,
+      );
+    },
+  });
+  // HDEC 페이지에서 Aconex 파일이 넘어오면 자동 로드
+  useEffect(() => {
+    return subscribeAbdImportHandoff("aconex", (fs) => {
+      void handleFiles(fs);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const readyEntries = useMemo(
     () => entries.filter((e) => e.status === "preview" && e.parsed && e.preview),
@@ -689,6 +721,7 @@ export function AbdAconexImportPage() {
           lockRequired
         />
       )}
+      <AbdSourceGuardDialog {...sourceGuard.dialogProps} />
     </div>
   );
 }
