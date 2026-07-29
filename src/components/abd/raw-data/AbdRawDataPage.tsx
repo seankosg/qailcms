@@ -192,7 +192,7 @@ const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = 
 // URL 파라미터 파싱 시 유효값 판정에 사용된다.
 const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
   "in_progress", "not_started",
-  "under_review", "drafting", "rs_delay", "sb_delay", "ds_delay", "no_plan", "delayed",
+  "under_review", "drafting", "rs_delay", "sb_delay", "df_delay", "ds_delay", "no_plan", "delayed",
 ];
 // 딥링크 status 값 → 사용자에게 보여줄 판정 라벨 (필터 칩)
 const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
@@ -202,6 +202,7 @@ const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
   drafting: "Draft Start",
   rs_delay: "Response Delay",
   sb_delay: "Submission Delay",
+  df_delay: "Draft Finish Delay",
   ds_delay: "Draft Start Delay",
   no_plan: "No Plan",
   delayed: "Delayed",
