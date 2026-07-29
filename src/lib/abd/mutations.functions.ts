@@ -406,7 +406,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         .select("id, abd_number, plot")
         .eq("team", data.team)
         .eq("is_active", true);
-      if (scope.length > 0 && scopePlots.length === scope.length) {
+      if (scopePlots.length > 0 && scope.every((s) => !!s.plot)) {
         activeQuery = activeQuery.in("plot", scopePlots);
       }
       const { data: allActive } = await activeQuery;
