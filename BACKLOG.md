@@ -242,3 +242,17 @@
 - 범위: `DelayTopTable`, `OwnerLeaderboardCard`, `TmKpiCards`, `JudgmentStageBreakdown` 등 TM 대시보드 위젯 및 MWS 카운트.
 - 선행: `tm_items_search` 에 `_as_of` 파라미터를 정식 지원하고 응답 스키마에 파생 필드 4종을 확정. 과거 Data Date 재판정을 서버 단일 소스로 통일.
 - 재개 조건: 별도 승인 없이 후속 라운드에서 진행 가능.
+
+---
+
+## ABD Progress 스트립 — Draft Finish Delay 카드 추가  `[보류]`
+
+2026-07-29 지시로 **추가하지 않음**을 확정. Progress 페이지 KPI 스트립은 현행 3카드(Response / Submission / Draft Delay) 배치를 유지한다.
+대시보드(`AbdKpiRows.tsx`)에만 `DF_DELAY` 카드가 존재하므로 두 화면의 카드 구성이 의도적으로 다르다.
+재개 조건: 별도 지시로 Progress 스트립 UI 변경이 승인될 때.
+
+## ABD 계획 순서 이상(선행 계획 미래 ∧ 후속 계획 과거) — HDEC 파일 수정 후보  `[보고 완료]`
+
+2026-07-29 실측 4건. 데이터 수정 금지, 원본 파일 정정 사안.
+- `9207-BP12D-HDEC-ABD-ME-NS-B04-41101` ~ `41104` (current_stage `DF2`)
+  - `r2_draft_finish_plan` 2026-07-30(미래)인데 후속 `r2_submission_plan` 2026-07-27(과거) → 선후 역전.
