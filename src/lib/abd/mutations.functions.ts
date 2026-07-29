@@ -128,6 +128,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => ImportBatchSchema.parse(data))
   .handler(async ({ data, context }) => {
+   try {
     await assertEditor(context);
     const supa = context.supabase as any;
 
@@ -389,7 +390,9 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     let inactivated = 0;
     // finalize=true인 마지막 호출에서만 파일 전체 스코프로 inactivate 수행.
     // append 모드가 아닌 legacy 단일 호출(log_id 없음 + finalize 미지정)에도 하위 호환 유지.
-    const isLegacySingle = !data.log_id && !data.finalize;
+    // 청크 append 모드는 첫 호출에서 log_id 없이 시작하지만 file_total_rows 를 함께 보낸다.
+    // legacy 단일 호출(비-청크)은 file_total_rows 도 없다.
+    const isLegacySingle = !data.log_id && !data.finalize && data.file_total_rows === undefined;
     const shouldInactivate =
       data.inactivate_missing && (data.finalize || isLegacySingle);
     if (shouldInactivate) {
@@ -507,4 +510,10 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     }
 
     return { batch_id: batchId, inserted, updated, inactivated, total: rowsToImport.length };
+   } catch (err: any) {
+     const msg = err?.message ?? String(err);
+     const stack = err?.stack ? String(err.stack).split("\n").slice(0, 4).join(" | ") : "";
+     console.error("[importAbdBatch] failed:", msg, stack);
+     throw new Error(`ABD 임포트 실패: ${msg}${stack ? ` [${stack}]` : ""}`);
+   }
   });
