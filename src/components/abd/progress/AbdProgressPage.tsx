@@ -42,8 +42,7 @@ import {
   getAbdProgressCells,
   getAbdProgressTotals,
 } from "@/lib/abd/progress.functions";
-import { getAbdDashboardRow2, pivotRows } from "@/lib/abd/dashboard.functions";
-import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
+import { AbdStageGroupStrip } from "@/components/abd/progress/AbdStageGroupStrip";
 import { AbdScheduleMatrix } from "./AbdScheduleMatrix";
 import { Route } from "@/routes/_authenticated/closure/abd/progress";
 import { AbdPlanVsActualCard } from "./AbdPlanVsActualCard";
@@ -326,42 +325,16 @@ export function AbdProgressPage() {
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
 
-  // Dashboard row2 (지연 3종) 재사용: Plot/Team 필터 반영
-  const row2Fn = useServerFn(getAbdDashboardRow2);
   const plotsForDash = plot === "all" ? [] : [plot];
-  const row2Q = useQuery({
-    queryKey: ["abd-progress-row2", plotsForDash.join(","), teamsKey],
-    queryFn: () =>
-      row2Fn({ data: { plots: plotsForDash, teams, batch_no: [] } }),
-    staleTime: 30_000,
-  });
-  const row2Pivot = useMemo(() => pivotRows(row2Q.data ?? []), [row2Q.data]);
 
   const openRaw = (params: Record<string, string> = {}) => {
     const s: Record<string, string> = { source: "progress", ...params };
     if (plot !== "all" && !("plot" in s)) s.plot = plot;
-    if (teams.length > 0 && !("team" in s)) s.team = teams.join(",");
+    if (!("tab" in s)) s.tab = teams.length > 0 ? teams.join(",") : "MECH,ELEC,ARCH";
+    // Progress 모집단(Terminated 포함)과 동일하게 맞춘다.
+    if (!("excluded" in s)) s.excluded = "all";
     navigate({ to: "/closure/abd/raw-data", search: s as any });
   };
-
-  const TEAM_ORDER = ["MECH", "ELEC"];
-  const sortTeams = <T extends { team: string }>(xs: T[]) =>
-    [...xs].sort((a, b) => {
-      const ia = TEAM_ORDER.indexOf(a.team);
-      const ib = TEAM_ORDER.indexOf(b.team);
-      if (ia !== -1 || ib !== -1) {
-        if (ia === -1) return 1;
-        if (ib === -1) return -1;
-        return ia - ib;
-      }
-      return a.team.localeCompare(b.team);
-    });
-  const teamBreak = (key: string, statusGroup: string) =>
-    sortTeams(row2Pivot.byTeam.get(key) ?? []).map((b) => ({
-      team: b.team,
-      count: b.count,
-      onClick: () => openRaw({ status: statusGroup, team: b.team }),
-    }));
 
   const setSearch = (patch: Partial<typeof search>) => {
     navigate({
@@ -664,51 +637,14 @@ export function AbdProgressPage() {
         </CardContent>
       </Card>
 
-      {/* KPI Strip — Progress 전용 재설계 */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <AbdKpiCard
-          label={`Progress % — ${kpis.doneStages}/${kpis.totalStages} · Δ ${kpis.gapPct >= 0 ? "+" : ""}${kpis.gapPct.toFixed(1)}pp`}
-          count={Math.round(kpis.progressPct * 10) / 10}
-          tone={
-            kpis.gapPct >= 0 ? "ok" : kpis.gapPct >= -5 ? "warn" : "danger"
-          }
-        />
-        <AbdKpiCard
-          label="On Track (Actual)"
-          count={kpis.onTrackCount}
-          total={kpis.totalStages || undefined}
-          tone="ok"
-          onClick={() => openRaw({ status: "in_progress" })}
-        />
-        <AbdKpiCard
-          label="Behind Plan"
-          count={kpis.behindCount}
-          total={kpis.totalStages || undefined}
-          tone={kpis.behindCount > 0 ? "warn" : "neutral"}
-          onClick={() => openRaw({ status: "in_progress" })}
-        />
-        <AbdKpiCard
-          label="Response Delay"
-          count={row2Pivot.totals.get("RS_DELAY") ?? 0}
-          tone="danger"
-          breakdown={teamBreak("RS_DELAY", "rs_delay")}
-          onClick={() => openRaw({ status: "rs_delay" })}
-        />
-        <AbdKpiCard
-          label="Submission Delay"
-          count={row2Pivot.totals.get("SB_DELAY") ?? 0}
-          tone="danger"
-          breakdown={teamBreak("SB_DELAY", "sb_delay")}
-          onClick={() => openRaw({ status: "sb_delay" })}
-        />
-        <AbdKpiCard
-          label="Draft Delay"
-          count={row2Pivot.totals.get("DS_DELAY") ?? 0}
-          tone="danger"
-          breakdown={teamBreak("DS_DELAY", "ds_delay")}
-          onClick={() => openRaw({ status: "ds_delay" })}
-        />
-      </div>
+      {/* KPI Strip — stage_group 7카드 (재고 · 지연 · 팀 분해) */}
+      <AbdStageGroupStrip
+        plots={plotsForDash}
+        teams={teams}
+        onOpenRaw={({ status, team }) =>
+          openRaw(team ? { status, tab: team } : { status })
+        }
+      />
 
       {error ? (
         <Card>
