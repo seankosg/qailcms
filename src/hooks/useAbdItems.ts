@@ -11,6 +11,7 @@ export type AbdStatusGroup =
   | "drafting"
   | "rs_delay"
   | "sb_delay"
+  | "df_delay"
   | "ds_delay"
   | "no_plan"
   | "delayed"
