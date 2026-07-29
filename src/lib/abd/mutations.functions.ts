@@ -370,12 +370,12 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           const incoming = (r as any)[fname] ?? null;
           const previous = prior[fname] ?? null;
           const cls = classifyChange(incoming, previous);
-          if (cls === "empty") continue;
+          if (cls === "empty" || cls === "unchanged") continue;
           pendingFieldLogs.push(
             buildFieldLog("abd", {
               rawRowNo: rowIndex,
               field: fname,
-              outcome: cls === "applied" ? (wasExisting ? "applied" : "applied") : "unchanged",
+              outcome: "applied",
               raw: incoming,
               applied: incoming,
               previous: wasExisting ? previous : null,

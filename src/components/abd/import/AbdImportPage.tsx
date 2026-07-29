@@ -464,9 +464,9 @@ export function AbdImportPage() {
           plot: sh.plot ?? null,
           abd_numbers: sh.rows.map((r) => r.abd_number),
         }));
-        // CF Worker CPU 한도 초과 방지: 시트 rows를 HTTP-청크(500)로 잘라 호출.
+        // CF Worker CPU 한도 초과 방지: 시트 rows를 작은 HTTP 청크로 잘라 호출.
         // log_id append 로 파일당 로그 1건 유지. finalize/finalize_scope 는 파일 최종 호출에서만 true.
-        const HTTP_CHUNK = 500;
+        const HTTP_CHUNK = 100;
         const plan: Array<{ sheetIdx: number; start: number; end: number }> = [];
         sheets.forEach((sh, sIdx) => {
           const n = sh.rows.length;
@@ -523,7 +523,10 @@ export function AbdImportPage() {
           `${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성`,
         );
       } catch (err: any) {
-        const msg = err?.message ?? String(err);
+        const rawMsg = err?.message ?? String(err);
+        const msg = /internal server error|worker exceeded cpu|cpu time|\b502\b/i.test(rawMsg)
+          ? "서버 처리 시간이 초과되었습니다. 임포트 청크를 줄여 다시 처리하도록 수정 중입니다. 잠시 후 다시 시도하세요."
+          : rawMsg;
         const cancelled = msg === "__CANCELLED__";
         setEntries((p) =>
           p.map((x) =>
