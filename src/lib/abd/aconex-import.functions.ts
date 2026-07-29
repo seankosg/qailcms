@@ -93,6 +93,13 @@ export type AconexImportPreview = {
     date_modified: string | null;
     semantic: "EXCLUDED_TERMINATED" | "EXCLUDED_CANCELLED";
   }>;
+  /** Round attribution 방어 카운터 */
+  round_guard: {
+    skipped_r2_no_sb: number;
+    skipped_r3_no_sb: number;
+    legacy_r1_attribution: number;
+    skipped_samples: string[];
+  };
 };
 
 export type AconexImportResult = AconexImportPreview & {
