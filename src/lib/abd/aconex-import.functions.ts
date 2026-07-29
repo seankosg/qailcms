@@ -147,7 +147,9 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     // 청크 분할은 요청 payload 크기와 함수 실행 타임아웃 관리를 위함.
     // 응답 잘림 회피 목적이 아님 — abd_items_by_numbers 는 jsonb 단일 값(배열)을
     // 반환하므로 Data API 행 상한(1,000) 비적용.
-    // 중복 abd_number 정책: 배열에 여러 건이 있으면 첫 건만 채택(뒤는 무시).
+    // 중복 abd_number 정책: 결정적 규칙 — 동일 abd_number 로 여러 행이 돌아오면
+    //   최신 aconex_date_modified 우선(동률 시 updated_at 최신). 실측 중복 0건이지만
+    //   규칙은 결정적이어야 하므로 명시.
     const docNos = Array.from(new Set(data.rows.map((r) => r.document_no)));
     const existingRows = new Map<string, any>();
     const CHUNK = 2000;
@@ -165,8 +167,13 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
           if (!row || typeof row !== "object") continue;
           const key = row.abd_number as string | undefined;
           if (!key) continue;
-          // 첫 건 채택 정책
-          if (!existingRows.has(key)) existingRows.set(key, row);
+          const prev = existingRows.get(key);
+          if (!prev) {
+            existingRows.set(key, row);
+            continue;
+          }
+          const pick = pickNewer(prev, row);
+          existingRows.set(key, pick);
         }
       } catch (e: any) {
         const msg = e?.cause?.message ?? e?.message ?? String(e);
@@ -423,6 +430,12 @@ const META_FIELDS = new Set([
   "updated_at",
   "updated_by",
 ]);
+
+function pickNewer(a: any, b: any): any {
+  const ad = a?.aconex_date_modified ?? a?.updated_at ?? "";
+  const bd = b?.aconex_date_modified ?? b?.updated_at ?? "";
+  return String(bd) > String(ad) ? b : a;
+}
 
 function resolveActiveRound(existing: any): 1 | 2 | 3 {
   // Option B: active_round(계획 라벨 파생)는 신뢰하지 않는다.
