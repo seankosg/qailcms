@@ -14,6 +14,11 @@ export interface BulkUpdateRequest {
   ids: string[]; // task_management_raw.id (uuid)
   field: string;
   value: string | number | boolean | null;
+  /**
+   * 제공 시 chunked update 대신 id 별로 이 함수를 호출한다.
+   * 서버 함수 경유가 필요한 필드(task_no / team / data_date / milestone 등)에서 사용.
+   */
+  perIdUpdate?: (id: string, field: string, value: unknown) => Promise<void>;
 }
 
 export interface BulkUpdateResult {
@@ -24,9 +29,23 @@ export interface BulkUpdateResult {
 }
 
 export async function applyBulkUpdate(req: BulkUpdateRequest): Promise<BulkUpdateResult> {
-  const { ids, field, value } = req;
+  const { ids, field, value, perIdUpdate } = req;
   const result: BulkUpdateResult = { attempted: ids.length, succeeded: 0, failed: 0, errors: [] };
   if (ids.length === 0) return result;
+
+  if (perIdUpdate) {
+    for (const id of ids) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await perIdUpdate(id, field, value);
+        result.succeeded += 1;
+      } catch (e: any) {
+        result.failed += 1;
+        result.errors.push({ id, message: e?.message ?? String(e) });
+      }
+    }
+    return result;
+  }
 
   for (let i = 0; i < ids.length; i += UPDATE_CHUNK) {
     const slice = ids.slice(i, i + UPDATE_CHUNK);
