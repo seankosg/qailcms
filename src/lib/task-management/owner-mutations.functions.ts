@@ -6,7 +6,13 @@ import { canEditRawRow } from "@/lib/auth/roles";
 import { ROLE_RANK, type AppRole } from "@/types/enums";
 
 // task_no 는 columns.ts 의 편집 목록엔 없지만 admin/d_superuser 전용으로 별도 허용.
-const ALLOWED_FIELDS = new Set<string>([...TM_EDITABLE_FIELDS, "task_no", "team", "data_date"]);
+const ALLOWED_FIELDS = new Set<string>([
+  ...TM_EDITABLE_FIELDS,
+  "task_no",
+  "team",
+  "data_date",
+  "milestone",
+]);
 
 // 배포 검증용 마커 — published 번들에서 grep 으로 확인.
 export const TM_OWNER_MUTATIONS_MARKER = "TM_OWNER_MUTATIONS_V2_2026_07_28";
