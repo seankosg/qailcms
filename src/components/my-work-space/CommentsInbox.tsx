@@ -32,7 +32,7 @@ function detailHref(c: InboxComment): { to: string; params?: any; search?: any }
     case "sm":
       return { to: "/closure/snag-management/detail/$id", params: { id: c.parent_id } };
     case "abd":
-      return { to: "/closure/abd/raw-data", search: { detail: c.parent_id } };
+      return { to: "/closure/abd/detail/$id", params: { id: c.parent_id }, search: { focus: "comments" } };
     case "sp":
       return { to: "/closure/spare-part/records/$docRef", params: { docRef: c.parent_id } };
   }
