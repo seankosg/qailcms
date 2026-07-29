@@ -59,3 +59,10 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
 
 - MWS ABD 섹션에서 항목 클릭 → `AbdDetailSheet` 열림.
 - Attention Inbox 항목 클릭 → `/closure/abd/raw-data?detail=<id>` 로 이동해 상세 시트 자동 오픈.
+## 데이터 정합성 기록 (2026-07-29)
+
+- **backfill 적용**: `abd_backfill_response_results(false)` 실행 — 61개 도면, 총 62개 스탬프(r1 61 · r2 1, 한 도면은 r1/r2 동시). `r*_response_source='backfill'`.
+- **잔여 기준선**: `r1_dar_actual` 존재 & `r1_response_result` NULL = **432건**(그중 `r2_submission_actual` 존재 **268건**), r2 = 23건, r3 = 0건. 현 시점 미조치.
+- **중복 도면 기록 확정**: Plot C Aconex 파일은 **파일 내 중복 1건**(3,124행 / unique 3,123)이 사실이며, "실측 중복 0건"은 **DB 측 abd_number 중복이 0건**이라는 별개 사실이었다. 파일 중복은 `pickNewer`(aconex_date_modified 최신 우선, 동률 시 updated_at 최신) 규칙으로 결정적으로 처리한다.
+- **v_active 적용 시 1행 차이**: dry-run 예측(1→2: 1건)과 적용 결과의 1행 차이는 **추정**(스캔~UPDATE 사이 타 트리거 상태 변화)이며, 불변식 통과로 추적을 종료한다.
+- **원본 파일 오타(사용자 조치 필요)**: HDEC Status 파일의 `9206-BP12C-HDEC-ABD-TL-P3-L03-75525Z` 는 접미사 `Z` 때문에 Aconex `…-75525` 와 영구 미매칭. 원본 수정 필요.
