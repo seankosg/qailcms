@@ -100,3 +100,15 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
 - `delay_late` (지연이행): actual > plan 인 단계 배열. 지연 카운트와 무관한 별도 지표.
 - 불변식: ΣDS+DF+SB+RS 지연 카드 = `primary_delay` 보유 도면 수. NoPlan 은 계획 부재 알람으로 별도.
 - `bucket_top` 은 Row1 카드 계약 유지를 위해 NS/DS/UR/Approved/RESUBMIT 어휘를 그대로 사용(RS 단계 → `UR`).
+
+## 완전 분할 불변식 — stage_group (2026-07-29 확정)
+
+- **불변식**: Σ stage_group(NS+DS+DF+SB+RS+RESUBMIT+Approved) = Raw Data 전체 항목수.
+  모집단 통일 기준 = `is_active = true` (현재 6,659). `excluded`(Terminated hide 등) 기본 필터 **적용 이전** 모집단이다.
+- `current_stage` NULL·미지 값은 **0건이어야 한다**. 발견 시 분류 누락 버그로 간주하고 `RAISE EXCEPTION`.
+- 일일 운영 체크 편입 항목: blank 85 · all-NULL 3 기준선과 동일 반열.
+- 지연 교차 불변식: 각 stage_group 의 `primary_delay` 보유 수 ≤ 해당 stage_group 재고 수.
+- **NS 흡수**: 신 스테이지 체계에서 NS(=R1 실적 전무)는 별도 코드가 아니라 `DS1` 로 흡수된다.
+  구 분류 NS 786 + DS 239 = 신 DS 1,025 로 일치한다.
+- **NS 도면의 지연 판정 규칙**: NS 코호트(R1 실적 전무)의 `primary_delay` 는 **`DS1` 계획(`r1_draft_start_plan`) 기준**으로 판정한다.
+  신 스테이지 분포상 DS1 이 별도 표기되지 않아도 이 규칙에 따라 `primary_delay = 'DS1'` 이 발생할 수 있다.
