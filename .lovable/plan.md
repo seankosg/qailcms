@@ -1,49 +1,67 @@
-# ABD 판정 단일 소스화 계획 (2026-07-29)
+## 확인된 현재 상태
 
-## 원자 마이그레이션 M1 — 정본 함수 + 계약 전환
-1. `public.abd_judge_v1(<라운드별 plan/actual 필드 26개>, latest_status, is_terminated, _as_of date)`
-   `RETURNS jsonb`, `IMMUTABLE SECURITY INVOKER search_path=public`.
-   반환 키: `active_round`, `current_stage`, `bucket_top`, `delay_bucket[]`,
-   `excluded`(=Cancelled), `needs_planning`, `needs_revise`,
-   `revise_source_round`, `rs_result_missing`, `ur_aging_days`.
-   `abd_compute_derived` 트리거의 현행 로직을 그대로 1:1 이식(의미 무변경).
-2. `abd_compute_derived` 트리거: 내부 계산 삭제 후 `abd_judge_v1` 결과를
-   NEW.* 파생 컬럼에 매핑(저장 동작 유지).
-3. `abd_judge_at_date(_ids, _as_of)` 재작성: `abd_judge_v1(...)` 호출로 통일.
-4. 대시보드 RPC 버킷 계산부(row1/row2/status_dist/judgment_mix/attention/
-   crosscut/overdue_heatmap) 전부 `abd_judge_v1(...) _as_of := $as_of` 기준으로
-   교체. 시그니처 추가/변경 시 구 시그니처 `DROP FUNCTION` 동시 포함.
-5. `abd_items_search` `_status_group` 어휘를 정본 버킷(All/Approved/Unapproved)
-   + 옵션 `_bucket text[]`(NS/DS/UR/Approved/RESUBMIT/NoPlan/Delayed…)로 재정의.
-   `_bucket` 파라미터 추가는 default NULL 로 하위호환.
-6. 백필: `abd_judge_v1` 결과와 stored 4컬럼 diff 를 카운트 후 diff 행에만 UPDATE.
-   결과가 전체 30% 초과면 중단·보고.
+- 서버 로그에 같은 시각대 `Worker exceeded CPU time limit` 502가 재발했습니다.
+- 현재 클라이언트는 이미 `rows`를 500행 HTTP 청크로 나누지만, 서버 함수 한 번당 여전히 다음 작업을 모두 수행합니다.
+  - 기존 행 조회
+  - upsert
+  - 행 로그(`abd_import_row_logs`) 생성
+  - 필드 로그(`import_field_logs`) 대량 생성
+  - 마지막 청크에서 `inactivate_missing` 전체 스코프 처리
+- ELEC 파일은 약 4,063행이고, ABD tracked field가 약 40개라서 500행 청크 1회에도 필드 로그가 최대 약 20,000건까지 생성될 수 있습니다. 따라서 단순 row 청크만으로 CPU 한계가 해결되지 않은 상태입니다.
 
-## 코드 패치 P1 — 콜사이트/UI/클라 사본 제거
-- `src/lib/abd/dashboard-data.ts` 의 판정 함수(isApproved/deriveStage/…) 제거,
-  대신 서버 반환 필드 소비.
-- `src/components/abd/raw-data/AbdRawDataPage.tsx`
-  - status 탭: All / Approved / Unapproved (+ Excluded) 로 축약.
-  - URL search `status=not_started|in_progress` → `bucket=NS|DS,UR,RESUBMIT,…` 매핑 어댑터.
-  - `latest_status='A'` 클라 오버라이드 코드(:935,:1006) 삭제.
-- 대시보드 카드 클릭: 링크 파라미터를 `status=unapproved&bucket=<정본버킷>` 로
-  전달, Raw Data 상단에 필터 칩(판정: <라벨>) 노출(TM KPI 뱃지 동일 패턴).
-- 배포 마커 `ABD_JUDGE_V1_2026_07_29` 를 `AbdRawDataPage.tsx` 런타임 참조에 삽입.
+## 수정 계획
 
-## 완료 보고 항목
-- 수정 전/후 실측표: 전 버킷 × (카드 숫자, 드릴다운 건수) — 재현 케이스 Plot C NS MECH 포함.
-- stored vs 정본 diff 백필 건수 + 방향별 이동 요약.
-- 클라 사본 grep 0건 + published 번들 마커 검출.
-- 범위 밖 발견 사항 BACKLOG 등재 목록.
+### 1. 서버 함수 청크 크기 축소
+- `AbdImportPage.tsx`의 HTTP 청크를 500행에서 더 작은 단위로 낮춥니다.
+- 1차 목표는 100행입니다.
+- 이유: 서버 함수 1회가 처리하는 diff 계산, upsert payload, 로그 생성량을 확실히 줄여 Worker CPU 한계를 피합니다.
 
-## 턴 간 호환성 (M1 필수)
-- `abd_items_search._status_group` 은 신규 어휘(All/Approved/Unapproved) + 구 어휘(not_started/in_progress/…) 를 **모두 수용**. 내부에서 신규 버킷으로 매핑. 구 어휘 제거는 P1 배포 확인 후 별도 마이그레이션.
-- 시그니처 확장되는 모든 RPC(`abd_items_search`, `abd_judge_at_date`, 대시보드 RPC 7종)의 신규 파라미터(`_bucket`, `_as_of` 등)는 **DEFAULT NULL** 을 부여하여 구 콜사이트(named-arg) 가 신 시그니처에만 유일 매칭되도록 한다. 구 시그니처는 같은 마이그레이션에서 `DROP FUNCTION` (TM PGRST203 예방).
-- M1 적용 직후 운영 화면(대시보드/Raw Data) 정상 동작 확인 후 턴 2 진행.
+### 2. ABD 필드 로그 생성량 제한
+- `importAbdBatch`에서 필드 로그는 모든 `unchanged`까지 기록하지 않고, 실제 변경/적용된 값 중심으로 축소합니다.
+- 유지:
+  - `applied`
+  - inactivate info
+  - 오류/충돌성 로그가 생기는 경우
+- 제외:
+  - 대량 `unchanged` 필드 로그
+- 목적: 4,000행 × 수십 필드의 로그 폭증을 제거합니다.
+- Import Record의 핵심 추적성은 유지하되, “변경 없는 필드 전부”를 남기느라 임포트가 실패하는 구조를 제거합니다.
 
-## 백필 가드
-- diff 대상 건수를 `RAISE NOTICE` 로 로그. 전체 30% 초과 시 UPDATE 만 SKIP 하고 함수/트리거/RPC 교체는 계속. 완료 보고에 diff 요약 첨부.
+### 3. 마지막 finalize 병목 분리
+- `finalize=true` 호출에서만 수행되는 `inactivate_missing`가 전체 active row를 읽고 비교합니다.
+- 이 부분이 여전히 길어질 수 있으므로, 이번 수정에서는 다음 방어를 추가합니다.
+  - finalize 호출도 작은 청크 payload만 포함하도록 유지
+  - inactivate 로그/필드 로그 삽입도 작은 단위로 유지
+  - 에러 메시지가 502일 때 화면에 원인을 더 명확히 표시
 
-## 실행 순서
-- 턴 1 (현재): M1 마이그레이션 제출 → 승인·실행 → typegen 자동 재생성 → 운영 화면 정상 확인.
-- 턴 2 (연속): P1 코드 패치(클라 사본 제거, 탭 축약, `_bucket` 배선, 마커 삽입) → 재배포 → 마커 검출 + 전 버킷 정합 실측표 보고.
+### 4. UI 에러 메시지 개선
+- 현재 화면에는 서버의 502가 `Internal server error`로만 보입니다.
+- 클라이언트 catch에서 502/CPU timeout 계열 메시지를 감지하면 다음처럼 표시합니다.
+  - “서버 처리 시간이 초과되었습니다. 더 작은 청크로 자동 재시도하거나 다시 실행하세요.”
+- 단, 자동 재시도는 같은 실패를 반복할 수 있으므로 이번에는 청크 축소 + 원인 표시까지만 적용합니다.
+
+### 5. 수정 금지 범위 준수
+이번 작업에서는 아래 로직은 변경하지 않습니다.
+- `aconex-import.functions.ts` 적용 로직
+- `computePatch`, Terminated 가드, WATCH_NULL_FIELDS 감사, build_id
+- `abd_judge_v1`, `abd_items_search`, 트리거, Dashboard/Progress RPC
+- ABD 판정/대시보드/Progress 정합성 산출물
+
+### 6. 검증
+- 배포 전 코드 경로 확인:
+  - HTTP 청크가 100행으로 낮아졌는지
+  - `unchanged` 필드 로그가 대량 생성되지 않는지
+  - 파일당 `abd_import_logs` 1건 유지 및 `log_id` append 흐름이 유지되는지
+- 서버 로그 확인:
+  - 동일 작업 직후 `Worker exceeded CPU time limit` 재발 여부 확인
+- 가능하면 업로드된 ELEC 파일과 동일 조건으로 재시도하여:
+  - Failed가 아닌 Done 상태 도달
+  - Import Log에 inserted/updated 누적값 기록
+  - 마지막 finalize에서 inactivated 값 기록 여부 확인
+
+## 완료 보고 형식
+
+완료 후에는 아래 2가지만 보고합니다.
+
+1. 원인 및 수정 요약
+2. 검증 결과: Worker CPU timeout 재발 여부 / 임포트 완료 여부
