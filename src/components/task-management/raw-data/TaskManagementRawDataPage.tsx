@@ -1163,25 +1163,43 @@ export function TaskManagementRawDataPage() {
     overscan: 12,
   });
 
-  // 무한 스크롤: 하단 근접 시 loadMore().
-  // - 클라이언트 필터가 있어도 accumulated rows 만 filter 되므로,
-  //   실제 총량은 서버 mainCount 기준. 렌더 rows 가 얼마 안 남았을 때가 아니라
-  //   스크롤 위치가 하단에 도달했을 때 트리거하여 UX 를 자연스럽게 유지.
+  // 무한 스크롤: 하단 근접 시 loadMore(). 추가로 뷰포트에 여백이 있으면
+  // 스크롤과 무관하게 연속 로드하여, 사용자가 스크롤하지 않아도 매트릭스가
+  // 뷰포트를 가득 채울 때까지 다음 페이지를 자동으로 이어붙인다.
+  // - 트리거 원: scroll / resize(창·컨텐츠) / 데이터 변경 / 매 fill 이후 rAF.
+  // - 조건: hasMore && !isFetchingMore && (여백 존재 || 하단 근접).
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const onScroll = () => {
+    let rafId = 0;
+    const tryFill = () => {
+      rafId = 0;
       if (!hasMore || isFetchingMore) return;
       const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
-      if (remaining < 480) loadMore();
+      // 여백(스크롤 불가) 또는 하단 근접 시 로드. 임계값은 대략 한 화면 절반.
+      const threshold = Math.max(480, el.clientHeight * 0.5);
+      const notScrollable = el.scrollHeight <= el.clientHeight + 40;
+      if (notScrollable || remaining < threshold) loadMore();
     };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    // 초기: 데이터가 뷰포트를 채우지 못한 경우 즉시 추가 로드
-    if (hasMore && !isFetchingMore) {
-      const canScroll = el.scrollHeight > el.clientHeight + 40;
-      if (!canScroll) loadMore();
-    }
-    return () => el.removeEventListener("scroll", onScroll);
+    const schedule = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(tryFill);
+    };
+    el.addEventListener("scroll", schedule, { passive: true });
+    const ro = new ResizeObserver(schedule);
+    ro.observe(el);
+    // 컨텐츠 높이 변화(가상 리스트 스페이서 성장 포함) 감지.
+    const inner = el.firstElementChild as HTMLElement | null;
+    if (inner) ro.observe(inner);
+    window.addEventListener("resize", schedule);
+    // 즉시 1회 시도 — 데이터/렌더 변경 후 여백이 남았는지 확인.
+    schedule();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      el.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      ro.disconnect();
+    };
   }, [hasMore, isFetchingMore, loadMore, renderRows.length]);
 
   const totalWidth = table.getTotalSize();
