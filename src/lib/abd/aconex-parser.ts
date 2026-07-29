@@ -18,7 +18,7 @@ export type AconexApprovalCode = "A" | "B" | "C" | "D" | "UR" | "CX" | "TM";
  *  DAR_APPROVED_B  B/Approved with Comments       → 현재 라운드 rN_dar_actual + approval_date
  *  DAR_REJECTED    C/Revise & Resubmit, D/Reject  → 현재 라운드 rN_dar_actual (반려일)
  *  SUBMITTED       For Review / Submitted /
- *                  Under Workflow Review          → 현재 라운드 rN_submission_actual (HDEC 우선)
+ *                  Under Workflow Review          → 실적 필드 기록 금지, latest_status='UR' 만
  *  EXCLUDED_TERMINATED  For Review / Terminated   → 통계 제외 (is_terminated)
  *  EXCLUDED_CANCELLED   Cancelled                 → 통계 제외 (is_terminated)
  *  UNKNOWN         분류 실패                       → 아무 필드도 갱신하지 않음
