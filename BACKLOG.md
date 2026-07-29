@@ -231,3 +231,14 @@
 - `tm_items_facets`, `abd_items_counts`, `abd_items_by_numbers` 는 `_allowed_cols` 미사용 → 이번 대상 아님.
 - 이관 시 각 모듈별 `*_derived_cols()` 헬퍼를 신설하고 AGENTS.md의 "RPC 필터/정렬 허용 컬럼 규칙"에 준한다.
 - 이관 전 각 모듈의 클라이언트 필터/정렬 컬럼을 전수 실측 대조하여, 전환 직후 정상 요청이 EXCEPTION으로 깨지지 않도록 검증한다.
+
+---
+
+## TM Dashboard 위젯: derived_auto_judgment(_as_of) 소비 전환  `[승인]`
+
+2026-07-29 지연 Top 20 개편 및 리더보드 지연 축 통일을 시행하면서, 위젯 계산은 클라이언트 미러(`computeJudgment` / `cumPlanProgress` / `cumActualProgress` / `computeVariance`)에 의존하고 있다. stored `auto_judgment` 우선 + 클라 미러 폴백은 **과도기 조치**로만 수용한다.
+
+- 목표: 대시보드 위젯 행이 `tm_items_search(_as_of=selectedDataDate)` 응답의 서버 파생 필드(`derived_auto_judgment`, `derived_gap_pct`, `derived_delay_days`, `derived_cum_plan_pct` 등)만 소비하도록 전환하고, 클라이언트 미러 코드(`derived.ts` 판정/누계 함수)를 위젯 경로에서 제거.
+- 범위: `DelayTopTable`, `OwnerLeaderboardCard`, `TmKpiCards`, `JudgmentStageBreakdown` 등 TM 대시보드 위젯 및 MWS 카운트.
+- 선행: `tm_items_search` 에 `_as_of` 파라미터를 정식 지원하고 응답 스키마에 파생 필드 4종을 확정. 과거 Data Date 재판정을 서버 단일 소스로 통일.
+- 재개 조건: 별도 승인 없이 후속 라운드에서 진행 가능.
