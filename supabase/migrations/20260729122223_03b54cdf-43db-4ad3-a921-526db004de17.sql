@@ -1,0 +1,1 @@
+ALTER TABLE public.abd_items_raw ENABLE TRIGGER trg_abd_compute_derived;
