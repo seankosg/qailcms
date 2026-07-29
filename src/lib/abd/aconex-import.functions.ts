@@ -93,6 +93,13 @@ export type AconexImportPreview = {
     date_modified: string | null;
     semantic: "EXCLUDED_TERMINATED" | "EXCLUDED_CANCELLED";
   }>;
+  /** Round attribution 방어 카운터 */
+  round_guard: {
+    skipped_r2_no_sb: number;
+    skipped_r3_no_sb: number;
+    legacy_r1_attribution: number;
+    skipped_samples: string[];
+  };
 };
 
 export type AconexImportResult = AconexImportPreview & {
@@ -200,9 +207,24 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     const fieldDiffCounts = new Map<string, number>();
     const diffs: Diff[] = [];
     const terminatedReset: AconexImportPreview["terminated_reset"] = [];
+    const roundGuard = {
+      skipped_r2_no_sb: 0,
+      skipped_r3_no_sb: 0,
+      legacy_r1_attribution: 0,
+      skipped_samples: [] as string[],
+    };
     for (const r of matched) {
       const existing = existingRows.get(r.document_no) ?? {};
-      const patch = computePatch(r, existing, allowed);
+      const { patch, guard } = computePatch(r, existing, allowed);
+      if (guard === "skipped_r2_no_sb") {
+        roundGuard.skipped_r2_no_sb += 1;
+        if (roundGuard.skipped_samples.length < 20) roundGuard.skipped_samples.push(r.document_no);
+      } else if (guard === "skipped_r3_no_sb") {
+        roundGuard.skipped_r3_no_sb += 1;
+        if (roundGuard.skipped_samples.length < 20) roundGuard.skipped_samples.push(r.document_no);
+      } else if (guard === "legacy_r1_attribution") {
+        roundGuard.legacy_r1_attribution += 1;
+      }
       if (r.semantic === "EXCLUDED_TERMINATED" || r.semantic === "EXCLUDED_CANCELLED") {
         const n = resolveActiveRound(existing);
         terminatedReset.push({
@@ -263,6 +285,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
           changes,
         })),
       terminated_reset: terminatedReset,
+      round_guard: roundGuard,
     };
 
     if (!data.apply) {
@@ -402,33 +425,21 @@ const META_FIELDS = new Set([
 ]);
 
 function resolveActiveRound(existing: any): 1 | 2 | 3 {
-  let n: 1 | 2 | 3 = (existing?.active_round as 1 | 2 | 3) ?? 1;
-  if (!existing?.active_round) {
-    if (
-      existing?.r3_submission_actual ||
-      existing?.r3_dar_actual ||
-      existing?.r2_response_result === "B" ||
-      existing?.r2_response_result === "C"
-    )
-      n = 3;
-    else if (
-      existing?.r2_submission_actual ||
-      existing?.r2_dar_actual ||
-      existing?.r1_response_result === "B" ||
-      existing?.r1_response_result === "C"
-    )
-      n = 2;
-    else n = 1;
-  }
-  return n;
+  // Option B: active_round(계획 라벨 파생)는 신뢰하지 않는다.
+  // 실제 SB actual이 기록된 최고 라운드에만 회신을 귀속시킨다.
+  // 레거시 R1(SB actual 없이 승인/거절) 케이스는 컴퓨트 단계에서 별도 카운팅.
+  if (existing?.r3_submission_actual) return 3;
+  if (existing?.r2_submission_actual) return 2;
+  return 1;
 }
 
 function computePatch(
   r: z.infer<typeof RowSchema>,
   existing: any,
   allowed: Set<string>,
-): Record<string, any> {
+): { patch: Record<string, any>; guard: null | "skipped_r2_no_sb" | "skipped_r3_no_sb" | "legacy_r1_attribution" } {
   const patch: Record<string, any> = {};
+  let guard: null | "skipped_r2_no_sb" | "skipped_r3_no_sb" | "legacy_r1_attribution" = null;
 
   if (allowed.has("aconex_status_raw")) patch.aconex_status_raw = r.status_raw ?? null;
   if (allowed.has("aconex_review_status_raw"))
@@ -456,13 +467,22 @@ function computePatch(
       patch.inactive_reason = "aconex_cancelled";
     }
     // latest_status / approval_date: 두 케이스 모두 덮어쓰기 금지 (§1(b)③, §1(c))
-    return patch;
+    return { patch, guard };
   }
 
   const n = resolveActiveRound(existing);
+  // 방어: n∈{2,3}에서 존재하지 않는 SB actual에 회신 귀속 금지
+  if ((n === 2 || n === 3) && !existing?.[`r${n}_submission_actual`]) {
+    guard = n === 3 ? "skipped_r3_no_sb" : "skipped_r2_no_sb";
+    // 상태 필드는 latest_status만 반영 (아래 분기에서 처리)
+  } else if (n === 1 && !existing?.r1_submission_actual && (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B" || semantic === "DAR_REJECTED")) {
+    guard = "legacy_r1_attribution";
+  }
+
+  const canWriteRound = guard !== "skipped_r2_no_sb" && guard !== "skipped_r3_no_sb";
 
   if (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B") {
-    if (allowed.has("dar_response") && iso) {
+    if (canWriteRound && allowed.has("dar_response") && iso) {
       patch[`r${n}_dar_actual`] = iso;
       patch[`r${n}_response_result`] = semantic === "DAR_APPROVED_A" ? "A" : "B";
     }
@@ -475,9 +495,9 @@ function computePatch(
     // §1(a) D-코드: 매핑 미확정 → latest_status/response_result 에 쓰지 않고 skip.
     if (isDCode(r)) {
       // meta 필드만 유지, 상태 계열은 비움 (호출부에서 배치 warning 이미 로그됨)
-      return patch;
+      return { patch, guard };
     }
-    if (allowed.has("dar_response") && iso) {
+    if (canWriteRound && allowed.has("dar_response") && iso) {
       patch[`r${n}_dar_actual`] = iso;
       patch[`r${n}_response_result`] = "C";
     }
@@ -493,5 +513,5 @@ function computePatch(
       patch.latest_status = "UR";
     }
   }
-  return patch;
+  return { patch, guard };
 }
