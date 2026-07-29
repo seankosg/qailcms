@@ -175,26 +175,29 @@ export const GROUP_HEADER_BG: Record<AbdGroupKey, string> = {
 /**
  * ABD `current_stage` 코드값 타입 정의.
  * DB `abd_compute_derived` 트리거가 채우는 값. UI 라벨은 `ABD_STAGE_LABELS` 로 매핑.
- *   - `NS`     Not Started
- *   - `DS{n}`  Draft in progress, round n
- *   - `RS{n}`  Ready to Submit, round n
- *   - `UR{n}`  Under Review, round n
+ *   - `NS`     Not Started (레거시 값 — 신 체계에서는 생성되지 않음)
+ *   - `DS{n}`  Draft Start, round n (초안 착수 대기)
+ *   - `DF{n}`  Draft Finish, round n (초안 진행 중)
+ *   - `SB{n}`  Submission, round n (제출 대기)
+ *   - `RS{n}`  Response, round n (회신 대기)
  *   - `RESUBMIT{n}` Terminated 로 인해 라운드 n 재제출 대기
  *   - `Approved` 최종 승인
  */
 export type AbdStageCode =
   | "NS"
   | "DS1" | "DS2" | "DS3"
+  | "DF1" | "DF2" | "DF3"
+  | "SB1" | "SB2" | "SB3"
   | "RS1" | "RS2" | "RS3"
-  | "UR1" | "UR2" | "UR3"
   | "RESUBMIT1" | "RESUBMIT2" | "RESUBMIT3"
   | "Approved";
 
 export const ABD_STAGE_LABELS: Record<AbdStageCode, string> = {
   NS: "Not Started",
-  DS1: "Draft R1", DS2: "Draft R2", DS3: "Draft R3",
-  RS1: "Ready-to-Submit R1", RS2: "Ready-to-Submit R2", RS3: "Ready-to-Submit R3",
-  UR1: "Under Review R1", UR2: "Under Review R2", UR3: "Under Review R3",
+  DS1: "Draft Start R1", DS2: "Draft Start R2", DS3: "Draft Start R3",
+  DF1: "Draft Finish R1", DF2: "Draft Finish R2", DF3: "Draft Finish R3",
+  SB1: "Submission R1", SB2: "Submission R2", SB3: "Submission R3",
+  RS1: "Response R1", RS2: "Response R2", RS3: "Response R3",
   RESUBMIT1: "Awaiting Resubmit R1",
   RESUBMIT2: "Awaiting Resubmit R2",
   RESUBMIT3: "Awaiting Resubmit R3",
