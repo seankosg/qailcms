@@ -1,18 +1,24 @@
 import {
-  ALL_TASK_STAGE_KEYS,
   ALL_TASK_TIMELINE_STAGE_KEYS,
   addDays,
   daysBetween,
   getTaskStagePlannedDate,
   isTaskStageActualUpTo,
   isTaskStageDelayedAsOf,
-  isTaskStageDone,
   isTaskStagePlannedUpTo,
   weekStartIso,
   type TaskItem,
   type TaskScheduleStage,
 } from "./schedule-utils";
-import { cumPlanProgress, cumActualProgress, getStageJudgment, isTaskDelayed, computeVariance } from "./derived";
+import {
+  cumPlanProgress,
+  cumActualProgress,
+  getStageJudgment,
+  isTaskDelayed,
+  computeVariance,
+  computeJudgment,
+} from "./derived";
+import { ALL_TASK_STAGE_KEYS } from "./schedule-utils";
 
 export type OwnerDim = "team" | "hdec_pic_name" | "hdec_eng_name";
 
@@ -24,16 +30,23 @@ export interface DelayTopItem {
   team: string;
   hdecPic: string;
   hdecEng: string;
-  stage: TaskScheduleStage;
+  stage: TaskScheduleStage; // 대표(현재 진행/지연) 스테이지 — 표시용
   plannedDate: string;
-  daysLate: number;
-  judgment: string | null;
+  daysLate: number;         // 대표 스테이지의 지연일 — 참고 컬럼
+  judgment: string | null;  // 태스크 단위 통합 판정 ('지연' | '악화')
   actualProgress: number;
   planPct: number;
   actualPct: number;
   diffPp: number;
+  gap: number;              // 정렬 정본: computeVariance ×100 (pp). 음수일수록 나쁨.
 }
 
+/**
+ * 지연 Top N — 태스크 단위(중복 등장 없음).
+ * 모집단: 통합 판정 `computeJudgment` 결과가 '지연' 또는 '악화'인 태스크.
+ * 정렬 정본: gap 오름차순(가장 나쁜 격차 순). 동률 시 delayDays 큰 순.
+ * `daysLate` 는 참고 컬럼으로만 표시 — 정렬 키로 사용하지 않음.
+ */
 export function computeDelayTopN(
   items: TaskItem[],
   asOfDate: string,
@@ -41,41 +54,65 @@ export function computeDelayTopN(
 ): DelayTopItem[] {
   const out: DelayTopItem[] = [];
   for (const it of items) {
-    // task-level plan/actual percentage across all stages
-    // Plan% = T.Plan (Data Date 당일 일할 계획진도율), Actual% = actual_progress 누계.
-    // Plan% = Cum. Plan (plan_progress 우선, NULL 시 T.Plan 폴백), Actual% = 누계 실적.
+    // 태스크 단위 통합 판정 정본
+    const taskJ = computeJudgment(it, undefined, asOfDate);
+    if (taskJ !== "지연" && taskJ !== "악화") continue;
+
     const planPct = cumPlanProgress(it, asOfDate) * 100;
     const actualPct = cumActualProgress(it) * 100;
     const variance = computeVariance(it, asOfDate);
     const diffPp = variance != null ? variance * 100 : actualPct - planPct;
-    // 스테이지별 지연 항목 나열. WIP 는 날짜가 없어 plannedDate 는 plan_start 로 대체.
+
+    // 대표 스테이지: 지연/악화인 스테이지 중 daysLate 가 가장 큰 것.
+    // 없으면(gap 축만 지연) start→wip→finish 중 미완료 첫 스테이지.
+    let bestStage: TaskScheduleStage = "wip";
+    let bestPlanned = "";
+    let bestDays = -Infinity;
     for (const st of ALL_TASK_STAGE_KEYS) {
       const stageJ = getStageJudgment(it, st, undefined, asOfDate);
       if (stageJ !== "지연" && stageJ !== "악화") continue;
-      const plannedDate =
+      const planned =
         st === "wip"
           ? (it.plan_start ? it.plan_start.slice(0, 10) : asOfDate)
           : getTaskStagePlannedDate(it, st) ?? asOfDate;
-      out.push({
-        id: it.id,
-        taskNo: it.task_no ?? "",
-        taskName: it.task_name ?? "",
-        discipline: it.discipline ?? "",
-        team: it.team ?? "",
-        hdecPic: it.hdec_pic_name ?? "",
-        hdecEng: it.hdec_eng_name ?? "",
-        stage: st,
-        plannedDate,
-        daysLate: daysBetween(plannedDate, asOfDate),
-        judgment: stageJ,
-        actualProgress: Number(it.actual_progress ?? 0),
-        planPct,
-        actualPct,
-        diffPp,
-      });
+      const d = daysBetween(planned, asOfDate);
+      if (d > bestDays) {
+        bestDays = d;
+        bestStage = st;
+        bestPlanned = planned;
+      }
     }
+    if (bestDays === -Infinity) {
+      // gap 축 판정만 지연 — 대표는 finish(plan_end) 로 표시.
+      bestStage = "finish";
+      bestPlanned = getTaskStagePlannedDate(it, "finish") ?? (it.plan_end ? it.plan_end.slice(0, 10) : asOfDate);
+      bestDays = Math.max(0, daysBetween(bestPlanned, asOfDate));
+    }
+
+    out.push({
+      id: it.id,
+      taskNo: it.task_no ?? "",
+      taskName: it.task_name ?? "",
+      discipline: it.discipline ?? "",
+      team: it.team ?? "",
+      hdecPic: it.hdec_pic_name ?? "",
+      hdecEng: it.hdec_eng_name ?? "",
+      stage: bestStage,
+      plannedDate: bestPlanned,
+      daysLate: bestDays,
+      judgment: taskJ,
+      actualProgress: Number(it.actual_progress ?? 0),
+      planPct,
+      actualPct,
+      diffPp,
+      gap: diffPp,
+    });
   }
-  out.sort((a, b) => b.daysLate - a.daysLate);
+  // 정렬 정본: gap asc (가장 나쁜 격차 상단), 동률 시 daysLate desc.
+  out.sort((a, b) => {
+    if (a.gap !== b.gap) return a.gap - b.gap;
+    return b.daysLate - a.daysLate;
+  });
   return out.slice(0, limit);
 }
 
@@ -83,7 +120,8 @@ export interface OwnerLeaderboardRow {
   key: string;
   totalStages: number;
   doneStages: number;
-  delayedStages: number;
+  delayedStages: number;   // 하위 호환용 필드 — 값은 delayedTasks 와 동일하도록 채운다.
+  delayedTasks: number;    // 정본: 통합 판정('지연'|'악화') 태스크 수
   plannedStages: number; // 계획상 asOf 시점까지 도달해야 할 스테이지 수
   planPct: number; // plannedStages / totalStages
   actualPct: number; // doneStages / totalStages
@@ -109,6 +147,7 @@ export function computeOwnerLeaderboard(
         totalStages: 0,
         doneStages: 0,
         delayedStages: 0,
+        delayedTasks: 0,
         plannedStages: 0,
         planPct: 0,
         actualPct: 0,
@@ -119,12 +158,12 @@ export function computeOwnerLeaderboard(
       map.set(key, row);
     }
     row.taskCount++;
-    // 타임라인 스테이지(Start/Finish) 도달률 기반 stage count.
+    // 타임라인 스테이지(Start/Finish) 도달률 — 평균 진도 참고용 유지.
     for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
       row.totalStages++;
       if (isTaskStagePlannedUpTo(it, st, asOfDate)) row.plannedStages++;
       if (isTaskStageActualUpTo(it, st, asOfDate)) row.doneStages++;
-      if (isTaskStageDelayedAsOf(it, st, asOfDate)) row.delayedStages++;
+      // 스테이지 단위 지연 카운트 제거 — 정본은 태스크 단위(isTaskDelayed).
     }
     if (isTaskDelayed(it, undefined, asOfDate)) row.delayedTaskIds.add(it.id);
   }
@@ -147,6 +186,9 @@ export function computeOwnerLeaderboard(
       r.actualPct = (m.actual / m.n) * 100;
     }
     r.diffPp = r.actualPct - r.planPct;
+    // 정본 지연 태스크 수 = delayedTaskIds.size. delayedStages 는 하위 호환용으로 동일 값 보관.
+    r.delayedTasks = r.delayedTaskIds.size;
+    r.delayedStages = r.delayedTaskIds.size;
   }
   rows.sort((a, b) => a.diffPp - b.diffPp); // 가장 뒤처진 담당자 상단
   return rows;
