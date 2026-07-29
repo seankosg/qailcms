@@ -4382,6 +4382,14 @@ export type Database = {
           pdate: string
         }[]
       }
+      abd_stage_group: {
+        Args: { _row: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
+        Returns: string
+      }
+      abd_stage_group_counts: {
+        Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
+        Returns: Json
+      }
       allocate_main_task_no: { Args: { _discipline: string }; Returns: string }
       allocate_task_no: {
         Args: { _discipline: string; _main_task_no: string }

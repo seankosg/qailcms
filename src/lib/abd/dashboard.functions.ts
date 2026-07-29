@@ -106,6 +106,35 @@ export function pivotRows(rows: RowOut[]) {
 
 export type AbdRowOut = RowOut;
 
+export type AbdStageGroupCount = {
+  stage_group: string;
+  team: string;
+  total: number;
+  delayed: number;
+};
+
+/** Progress KPI 스트립 정본: stage_group × team 재고/지연 카운트 (RPC 1회) */
+export const getAbdStageGroupCounts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => FilterSchema.parse(v))
+  .handler(async ({ data, context }) => {
+    const { data: payload, error } = await (context.supabase as any).rpc("abd_stage_group_counts", {
+      _plots: toArrOrNull(data.plots),
+      _teams: toArrOrNull(data.teams),
+      _batch_no: toArrOrNull(data.batch_no),
+    });
+    if (error) throw new Error(error.message);
+    if (!Array.isArray(payload)) {
+      throw new Error("[abd_stage_group_counts] jsonb 배열 계약 위반: 응답이 배열이 아님");
+    }
+    return (payload as any[]).map((r) => ({
+      stage_group: String(r.stage_group ?? ""),
+      team: String(r.team ?? ""),
+      total: Number(r.total ?? 0),
+      delayed: Number(r.delayed ?? 0),
+    })) as AbdStageGroupCount[];
+  });
+
 export type AbdJudgmentMixRow = {
   stage: "NS" | "DS" | "UR" | "Approved";
   total: number;
