@@ -29,7 +29,6 @@ import {
   type GroupBy,
   type PlanMode,
   type Stage,
-  type RoundKey,
   addDays,
   assembleMatrix,
   buildBucketRange,
@@ -46,7 +45,6 @@ import { AbdStageGroupStrip } from "@/components/abd/progress/AbdStageGroupStrip
 import { AbdScheduleMatrix } from "./AbdScheduleMatrix";
 import { Route } from "@/routes/_authenticated/closure/abd/progress";
 import { AbdPlanVsActualCard } from "./AbdPlanVsActualCard";
-import type { CellRaw } from "@/lib/abd/progress-utils";
 import type { SCurveBaselines } from "@/lib/abd/scurve-utils";
 import { ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
 import {
@@ -55,7 +53,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { CardHeader, CardTitle } from "@/components/ui/card";
-import { useQueries } from "@tanstack/react-query";
 
 const TEAM_VALUES = ABD_TEAMS.map((t) => t.value);
 
@@ -73,7 +70,9 @@ export function AbdProgressPage() {
 
   const plot = search.plot;
   const teams = parseCsv<AbdTeam>(search.teams, TEAM_VALUES);
-  const round: RoundKey = search.round;
+  // Round 필터 제거 — 항상 전 라운드(컬럼 UNION) 집계.
+  // RPC 시그니처 호환을 위해 _round 파라미터는 유지하되 항상 "all" 로 호출한다.
+  const round = "all" as const;
   const bucket: Bucket = search.bucket;
   const groupBy = parseCsv<GroupBy>(search.groupBy, ALL_GROUP_BY);
   const effectiveGroupBy: GroupBy[] = groupBy.length > 0 ? groupBy : ["team"];
@@ -176,96 +175,37 @@ export function AbdProgressPage() {
 
   const buckets = useMemo(() => buildBucketRange(rpcStart, rpcEnd, bucket), [rpcStart, rpcEnd, bucket]);
 
-  // S-Curve: R1/R2/R3 각각의 cells 를 별도로 로드.
-  const activeRounds: Array<"R1" | "R2" | "R3"> = ["R1", "R2", "R3"];
-  const perRoundQueries = useQueries({
-    queries: (["R1", "R2", "R3"] as const).map((r) => ({
-      queryKey: [
-        "abd-progress-cells",
-        plot,
-        teamsKey,
-        r,
-        groupKey,
-        bucket,
-        rpcStart,
-        rpcEnd,
-        asOfDate,
-        planMode,
-      ],
-      queryFn: () =>
-        cellsFn({
-          data: {
-            plots: plot === "all" ? [] : [plot],
-            teams,
-            groupBy: effectiveGroupBy,
-            bucket,
-            rangeStart: rpcStart,
-            rangeEnd: rpcEnd,
-            asOfDate,
-            planMode,
-            round: r,
-          },
-        }),
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-      enabled: scurveOpen,
-    })),
+  // S-Curve: 메인 cellsQ(전 라운드 통합) 재사용 + baseline totals 1회.
+  const baselineQ = useQuery({
+    queryKey: ["abd-progress-totals-baseline", plot, teamsKey, groupKey, baselineAsOf, planMode],
+    queryFn: () =>
+      totalsFn({
+        data: {
+          plots: plot === "all" ? [] : [plot],
+          teams,
+          groupBy: effectiveGroupBy,
+          asOfDate: baselineAsOf,
+          planMode,
+          round,
+        },
+      }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    enabled: scurveOpen,
   });
-  const cellsByRound: Partial<Record<"R1" | "R2" | "R3", CellRaw[]>> = useMemo(() => {
-    const out: Partial<Record<"R1" | "R2" | "R3", CellRaw[]>> = {};
-    (["R1", "R2", "R3"] as const).forEach((r, i) => {
-      out[r] = (perRoundQueries[i]?.data ?? []) as CellRaw[];
-    });
-    return out;
-  }, [perRoundQueries]);
-
-  // S-Curve 누적 시작 오프셋: rangeStart-1 시점의 totals 를 라운드별로 로드하여
-  // cumPlan/cumActual 의 초기값으로 깔아 KPI 누계와 곡선 끝값이 일치하도록 한다.
-  const baselineQueries = useQueries({
-    queries: (["R1", "R2", "R3"] as const).map((r) => ({
-      queryKey: [
-        "abd-progress-totals-baseline",
-        plot,
-        teamsKey,
-        r,
-        groupKey,
-        baselineAsOf,
-        planMode,
-      ],
-      queryFn: () =>
-        totalsFn({
-          data: {
-            plots: plot === "all" ? [] : [plot],
-            teams,
-            groupBy: effectiveGroupBy,
-            asOfDate: baselineAsOf,
-            planMode,
-            round: r,
-          },
-        }),
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-      enabled: scurveOpen,
-    })),
-  });
-  const baselinesByRound: SCurveBaselines = useMemo(() => {
+  const scurveBaselines: SCurveBaselines = useMemo(() => {
     const out: SCurveBaselines = {};
-    (["R1", "R2", "R3"] as const).forEach((r, i) => {
-      const rows = (baselineQueries[i]?.data ?? []) as Array<{
-        stage: Stage; plan_upto: number; actual_upto: number;
-      }>;
-      const perStage: Partial<Record<Stage, { plan: number; actual: number }>> = {};
-      for (const row of rows) {
-        const prev = perStage[row.stage] ?? { plan: 0, actual: 0 };
-        perStage[row.stage] = {
-          plan: prev.plan + (Number(row.plan_upto) || 0),
-          actual: prev.actual + (Number(row.actual_upto) || 0),
-        };
-      }
-      out[r] = perStage;
-    });
+    for (const row of (baselineQ.data ?? []) as Array<{
+      stage: Stage; plan_upto: number; actual_upto: number;
+    }>) {
+      const prev = out[row.stage] ?? { plan: 0, actual: 0 };
+      out[row.stage] = {
+        plan: prev.plan + (Number(row.plan_upto) || 0),
+        actual: prev.actual + (Number(row.actual_upto) || 0),
+      };
+    }
     return out;
-  }, [baselineQueries]);
+  }, [baselineQ.data]);
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
@@ -283,12 +223,9 @@ export function AbdProgressPage() {
     const rows = result.rows.map((r) => ({
       ...r,
       combined: r.combined.slice(startIdx),
-      stages: {
-        draft_start:  { ...r.stages.draft_start,  cells: r.stages.draft_start.cells.slice(startIdx) },
-        draft_finish: { ...r.stages.draft_finish, cells: r.stages.draft_finish.cells.slice(startIdx) },
-        submission:   { ...r.stages.submission,   cells: r.stages.submission.cells.slice(startIdx) },
-        dar:          { ...r.stages.dar,          cells: r.stages.dar.cells.slice(startIdx) },
-      },
+      stages: Object.fromEntries(
+        ALL_STAGES.map((st) => [st, { ...r.stages[st], cells: r.stages[st].cells.slice(startIdx) }]),
+      ) as typeof r.stages,
     }));
     return { buckets: newBuckets, rows };
   }, [cellsQ.data, totalsQ.data, buckets, effectiveStages, hidePast, today]);
@@ -339,16 +276,17 @@ export function AbdProgressPage() {
     // Progress 집계는 Terminated 포함이 업무 규칙. Raw 기본은 hide 라 모집단이
     // 어긋나므로 명시적으로 all 을 지정한다.
     params.set("excluded", "all");
-    // round='all' 이면 R1·R2·R3 동일 스테이지 날짜 컬럼을 date_range_or 로 묶어 전달.
-    // 단일 라운드는 기존 dateField 단수 경로(하위호환) 유지.
-    if (round === "all") {
+    // 항상 전 라운드 경로: R1·R2·R3 동일 스테이지 날짜 컬럼을 date_range_or 로 묶어 전달.
+    // AP(Approval)는 문서 단위 이벤트이므로 approval_date 단일 컬럼 경로.
+    if (stage === "approval") {
+      params.set("dateStart", dateFrom);
+      params.set("dateEnd", dateTo);
+      params.set("dateField", "approval_date");
+    } else {
       const cols = (["R1", "R2", "R3"] as const).map((r) => stageDateField(stage, field, r));
       params.set("dateStart", dateFrom);
       params.set("dateEnd", dateTo);
       params.set("dateFields", cols.join(","));
-    } else {
-      const dateField = stageDateField(stage, field, round);
-      filterObj[dateField] = { from: dateFrom, to: dateTo };
     }
     // Raw Data 페이지에서 JSON 파싱 문제를 피하고자 필터는 개별 파라미터로 전달
     for (const [k, v] of Object.entries(filterObj)) {
@@ -361,7 +299,6 @@ export function AbdProgressPage() {
         params.set(k, v.join(","));
       }
     }
-    params.set("round", round);
     if (stage !== "all") params.set("stage", stage);
     window.location.assign(`/closure/abd/raw-data?${params.toString()}`);
   };
@@ -544,25 +481,6 @@ export function AbdProgressPage() {
               </ToggleGroup>
             </ToolbarGroup>
 
-            <ToolbarGroup label="Round">
-              <ToggleGroup
-                type="single"
-                value={round}
-                onValueChange={(v) => v && setSearch({ round: v as RoundKey })}
-                className="gap-1"
-              >
-                {(["all", "R1", "R2", "R3"] as const).map((r) => (
-                  <ToggleGroupItem
-                    key={r}
-                    value={r}
-                    className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                  >
-                    {r === "all" ? "All" : r}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </ToolbarGroup>
-
             <div className="flex items-center gap-2">
               <Switch
                 id="hidepast-abd"
@@ -659,14 +577,13 @@ export function AbdProgressPage() {
             </Collapsible>
           </Card>
           <AbdPlanVsActualCard
-            cellsByRound={cellsByRound}
-            activeRounds={activeRounds}
+            cells={cellsQ.data ?? []}
             buckets={buckets}
             stages={effectiveStages}
             today={today}
             open={scurveOpen}
             onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
-            baselinesByRound={baselinesByRound}
+            baselines={scurveBaselines}
           />
         </>
       )}
