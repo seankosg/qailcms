@@ -28,6 +28,7 @@ import {
   ABD_STATUSES,
   PLOT_COLORS,
   STATUS_COLORS,
+  formatAbdStage,
   type AbdColumnDef,
 } from "@/lib/abd/columns";
 import {
@@ -916,7 +917,14 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
       key.startsWith("DS") || key.startsWith("DF") ? "bg-violet-500/15 text-violet-700 dark:text-violet-300" :
       key === "SB" ? "bg-orange-500/15 text-orange-700 dark:text-orange-300" :
       "bg-zinc-500/15 text-zinc-700";
-    return <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold", cls)}>{String(v)}</span>;
+    return (
+      <span
+        title={String(v)}
+        className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap", cls)}
+      >
+        {formatAbdStage(String(v))}
+      </span>
+    );
   }
   if (c.key === "ur_aging_days") {
     const n = Number(v);

@@ -94,7 +94,7 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "latest_rev", label: "Latest Rev", type: "text", width: 90, group: "latest", editable: true, editorType: "text", origin: "latest" },
   { key: "latest_status", label: "Latest Status", type: "badge", width: 110, group: "latest", editable: true, editorType: "select", options: [...ABD_STATUSES], origin: "latest" },
   { key: "approval_date", label: "Approval", type: "date", width: 100, group: "latest", editable: true, editorType: "date", origin: "latest" },
-  { key: "current_stage", label: "Current Stage", type: "badge", width: 120, group: "latest", origin: "system" },
+  { key: "current_stage", label: "Current Stage", type: "badge", width: 160, group: "latest", origin: "system" },
   { key: "ur_aging_days", label: "UR Aging (d)", type: "number", width: 110, group: "latest", origin: "system" },
 
   // Round 1
