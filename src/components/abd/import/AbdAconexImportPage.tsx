@@ -54,11 +54,11 @@ const ACONEX_HEADER_TO_FIELDS: Record<string, string[]> = {
     "latest_status",
     "approval_date",
     "aconex_status_raw",
-    "round_actual",
+    "dar_response",
     "is_terminated",
   ],
-  "Review Status": ["aconex_review_status_raw", "round_actual", "is_terminated"],
-  "Date Modified": ["aconex_date_modified", "round_actual", "approval_date"],
+  "Review Status": ["aconex_review_status_raw", "dar_response", "is_terminated"],
+  "Date Modified": ["aconex_date_modified", "dar_response", "approval_date"],
 };
 const ACONEX_UNIQUE_HEADER = "Document No";
 /** 파일에 실제 위 헤더가 없을 때 대체 인식 (대문자/공백 정규화 후 비교). */

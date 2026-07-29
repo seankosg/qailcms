@@ -8,7 +8,9 @@ import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } f
  * - 매칭 키: abd_number = document_no
  * - 갱신 컬럼: latest_status, latest_rev, approval_date,
  *   aconex_status_raw, aconex_review_status_raw, aconex_date_modified,
+ *   rN_dar_actual, rN_response_result,
  *   aconex_last_synced_at
+ * - Aconex 는 r*_submission_actual / r*_draft_*_actual 을 절대 쓰지 않음.
  * - 미매칭 문서는 INSERT 하지 않음 (unmatched 로 리포트).
  * - CX / TM (Cancelled / Terminated) 은 latest_status 를 그대로 반영하되
  *   파생 트리거가 상태 분류에서 제외 처리.
@@ -44,7 +46,7 @@ const SYNC_FIELD_KEYS = [
   "aconex_status_raw",
   "aconex_review_status_raw",
   "aconex_date_modified",
-  "round_actual",
+  "dar_response",
   "is_terminated",
 ] as const;
 export type AconexSyncField = (typeof SYNC_FIELD_KEYS)[number];
@@ -460,7 +462,7 @@ function computePatch(
   const n = resolveActiveRound(existing);
 
   if (semantic === "DAR_APPROVED_A" || semantic === "DAR_APPROVED_B") {
-    if (allowed.has("round_actual") && iso) {
+    if (allowed.has("dar_response") && iso) {
       patch[`r${n}_dar_actual`] = iso;
       patch[`r${n}_response_result`] = semantic === "DAR_APPROVED_A" ? "A" : "B";
     }
@@ -475,7 +477,7 @@ function computePatch(
       // meta 필드만 유지, 상태 계열은 비움 (호출부에서 배치 warning 이미 로그됨)
       return patch;
     }
-    if (allowed.has("round_actual") && iso) {
+    if (allowed.has("dar_response") && iso) {
       patch[`r${n}_dar_actual`] = iso;
       patch[`r${n}_response_result`] = "C";
     }
