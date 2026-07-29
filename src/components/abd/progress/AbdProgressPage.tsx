@@ -293,7 +293,9 @@ export function AbdProgressPage() {
     return { buckets: newBuckets, rows };
   }, [cellsQ.data, totalsQ.data, buckets, effectiveStages, hidePast, today]);
 
-  const kpis = useMemo(() => {
+  // KPI 스트립은 stage_group 정본(abd_stage_group_counts)으로 전환됨.
+  // 매트릭스 하단 요약 등 파생 계산은 유지.
+  void useMemo(() => {
     let cumPlan = 0;
     let cumActual = 0;
     let doneStages = 0;
