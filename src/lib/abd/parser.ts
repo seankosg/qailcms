@@ -601,6 +601,17 @@ export async function parseAbdFile(
     });
   }
 
+  // ── 2차 방어: HDEC 구조 신호 결핍 시 명시적 실패 ──────────
+  // findHeader 는 Aconex "Document No" 도 ABD NUMBER 별칭으로 인식하기 때문에,
+  // 시트가 파싱되었더라도 Sl.No / ROUND 밴드 신호가 없으면 Aconex 파일을 잘못
+  // 올린 것으로 간주하고 사일런트 매칭을 막는다. (1차 방어 = 소스 가드 다이얼로그)
+  const hasHdecStructure = result.sheets.length > 0; // sheets 는 findHeader 통과 + row 존재를 의미
+  if (!hasHdecStructure && result.ignored_sheets.length > 0) {
+    throw new Error(
+      "HDEC 원본 형식이 아닙니다. 상단 토글에서 Aconex 로 전환하거나 올바른 HDEC 원본을 선택하세요.",
+    );
+  }
+
   result.dateIssues = audit.issues;
   return result;
 }
