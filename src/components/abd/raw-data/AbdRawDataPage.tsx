@@ -296,7 +296,7 @@ export function AbdRawDataPage() {
   const plotSel: "all" | "C" | "D" = (["all", "C", "D"].includes(String(urlSearch.plot ?? "")) ? (urlSearch.plot as any) : "all");
   const plotFilter: "C" | "D" | null = plotSel === "all" ? null : plotSel;
   const excludedMode: "hide" | "only" | "all" =
-    ["hide", "only", "all"].includes(String(urlSearch.excluded ?? "")) ? (urlSearch.excluded as any) : "hide";
+    ["hide", "only", "all"].includes(String(urlSearch.excluded ?? "")) ? (urlSearch.excluded as any) : "all";
   // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
   const includeInactive = false;
   const rawPageSize = String(urlSearch.pageSize ?? "");
