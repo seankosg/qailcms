@@ -481,10 +481,11 @@ function computePatch(
     }
     if (allowed.has("latest_status")) patch.latest_status = "C";
   } else if (semantic === "SUBMITTED") {
-    const submissionCol = `r${n}_submission_actual`;
-    if (allowed.has("round_actual") && iso && !existing[submissionCol]) {
-      patch[submissionCol] = iso;
-    }
+    // §1(d) Under Workflow Review / For Review / Submitted:
+    //   Aconex Date Modified 는 워크플로우 이동 시각일 뿐 HDEC 실제 제출일이
+    //   아니므로 어떤 실적 필드(r*_submission_actual / r*_dar_actual / r*_draft_*_actual)
+    //   에도 기록 금지. latest_status 만 UR 로 표기하되 기존 확정 회신 A/B/C/D 는 보호.
+    //   (2026-07-29 오염 재발 방지 — backfill 확정 1,385건 원인 지점.)
     const cur = String(existing.latest_status ?? "").toUpperCase();
     if (allowed.has("latest_status") && !["A", "B", "C", "D"].includes(cur)) {
       patch.latest_status = "UR";
