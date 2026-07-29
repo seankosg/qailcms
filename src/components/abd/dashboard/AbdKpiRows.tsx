@@ -216,15 +216,18 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
   });
   const { totals, byTeam } = useMemo(() => pivotRows(data ?? []), [data]);
 
+  // 지연 단일 귀속 원칙(2026-07-29): 카드는 primary_delay 정본 기준이므로 중복 없음.
+  // ΣDS+DF+SB+RS = 지연 도면 총수. NoPlan 은 지연이 아닌 계획 부재 알람으로 별도 합산.
   const totalDelay =
     (totals.get("RS_DELAY") ?? 0) +
     (totals.get("SB_DELAY") ?? 0) +
+    (totals.get("DF_DELAY") ?? 0) +
     (totals.get("DS_DELAY") ?? 0) +
     (totals.get("NO_PLAN") ?? 0);
 
   const totalDelayByTeam = useMemo(() => {
     const acc = new Map<string, number>();
-    for (const k of ["RS_DELAY", "SB_DELAY", "DS_DELAY", "NO_PLAN"]) {
+    for (const k of ["RS_DELAY", "SB_DELAY", "DF_DELAY", "DS_DELAY", "NO_PLAN"]) {
       for (const b of byTeam.get(k) ?? []) {
         acc.set(b.team, (acc.get(b.team) ?? 0) + b.count);
       }
@@ -250,7 +253,7 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
   );
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
       <AbdKpiCard
         label="Total Delay"
         count={totalDelay}
@@ -264,6 +267,7 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
       />
       {mk("Response Delay", "RS_DELAY", "rs_delay")}
       {mk("Submission Delay", "SB_DELAY", "sb_delay")}
+      {mk("Draft Finish Delay", "DF_DELAY", "df_delay")}
       {mk("Draft Start Delay", "DS_DELAY", "ds_delay")}
       {mk("No Plan", "NO_PLAN", "no_plan")}
     </div>
