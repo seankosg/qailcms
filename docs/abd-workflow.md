@@ -66,3 +66,27 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
 - **중복 도면 기록 확정**: Plot C Aconex 파일은 **파일 내 중복 1건**(3,124행 / unique 3,123)이 사실이며, "실측 중복 0건"은 **DB 측 abd_number 중복이 0건**이라는 별개 사실이었다. 파일 중복은 `pickNewer`(aconex_date_modified 최신 우선, 동률 시 updated_at 최신) 규칙으로 결정적으로 처리한다.
 - **v_active 적용 시 1행 차이**: dry-run 예측(1→2: 1건)과 적용 결과의 1행 차이는 **추정**(스캔~UPDATE 사이 타 트리거 상태 변화)이며, 불변식 통과로 추적을 종료한다.
 - **원본 파일 오타(사용자 조치 필요)**: HDEC Status 파일의 `9206-BP12C-HDEC-ABD-TL-P3-L03-75525Z` 는 접미사 `Z` 때문에 Aconex `…-75525` 와 영구 미매칭. 원본 수정 필요.
+
+## 라운드 생애주기 확정 정의 (2026-07-29)
+
+- **개시**: `r{n}_draft_start_actual`
+- **진행**: `r{n}_draft_finish_actual` → `r{n}_submission_actual` (제출 후 심사 대기 = UR(n))
+- **종결**: `r{n}_dar_actual` + `r{n}_response_result` 기록 시점 — **회신 도착이 라운드 종결**.
+  - `A` → 문서 종결, 다음 라운드 없음
+  - `B`/`C` → 라운드만 종결, 다음 라운드 개시
+  - 회신 전 → 라운드 열림(UR(n))
+- **예외 Terminated**: 회신 없는 합의 철회. 라운드 종결이 아니며 같은 라운드 재제출(RESUBMIT(n)).
+  실적 필드 보존, **통계 포함**.
+- `dar_actual` 은 있으나 `response_result` 가 없는 코호트(R1 432 · R2 23)는 **종결로 집계하되 결과 미상**으로 분류한다(삭제·추정 금지).
+
+## Progress 집계 기준 — 실적 vs 잔여 (2026-07-29 정합화)
+
+| 구분 | 기준 | 비고 |
+|---|---|---|
+| 실적(actual) | `r{n}_*_actual` 컬럼이 라운드를 **영구 결정** | `active_round`·`approved_round`·`*_plan` 완전 배제. `_round` 는 "어느 컬럼을 볼 것인가"이며 All = 3개 컬럼 UNION |
+| 잔여/예정(plan·remaining) | 현재 라운드 = 정본 `abd_judge_v1(row, as_of)->>'active_round'` | 자체 계산 금지. remaining 모드에서만 승인 도면 제외 |
+
+- `latest_status='A'`, `is_terminated=true` 항목의 **과거 실적은 소급 삭제하지 않는다**(Progress 는 `excluded=all`).
+- 집계 대상 날짜 컬럼은 전부 `date` 타입이므로 UTC 경계 밀림 없음(표준시 Asia/Qatar).
+- Matrix 와 S-Curve 는 동일 RPC(`abd_progress_cells_json` / `abd_progress_totals_json`)를 사용하므로 본 정정이 양쪽에 동시 적용된다.
+- **회귀 기준(S-curve 단조성)**: 동일 구간 누계는 as-of 가 뒤로 갈수록 감소하지 않는다. 2026-07-20/24/28 실측 통과(SB 1,688 → 1,797 → 2,024).
