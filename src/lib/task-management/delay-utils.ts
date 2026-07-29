@@ -17,6 +17,8 @@ import {
   isTaskDelayed,
   computeVariance,
   computeJudgment,
+  DEFAULT_THRESHOLDS,
+  type TaskThresholds,
 } from "./derived";
 import { ALL_TASK_STAGE_KEYS } from "./schedule-utils";
 
@@ -51,11 +53,12 @@ export function computeDelayTopN(
   items: TaskItem[],
   asOfDate: string,
   limit = 20,
+  thresholds: TaskThresholds = DEFAULT_THRESHOLDS,
 ): DelayTopItem[] {
   const out: DelayTopItem[] = [];
   for (const it of items) {
     // 태스크 단위 통합 판정 정본
-    const taskJ = computeJudgment(it, undefined, asOfDate);
+    const taskJ = computeJudgment(it, thresholds, asOfDate);
     if (taskJ !== "지연" && taskJ !== "악화") continue;
 
     const planPct = cumPlanProgress(it, asOfDate) * 100;
@@ -69,7 +72,7 @@ export function computeDelayTopN(
     let bestPlanned = "";
     let bestDays = -Infinity;
     for (const st of ALL_TASK_STAGE_KEYS) {
-      const stageJ = getStageJudgment(it, st, undefined, asOfDate);
+      const stageJ = getStageJudgment(it, st, thresholds, asOfDate);
       if (stageJ !== "지연" && stageJ !== "악화") continue;
       const planned =
         st === "wip"
@@ -134,6 +137,7 @@ export function computeOwnerLeaderboard(
   items: TaskItem[],
   asOfDate: string,
   dim: OwnerDim,
+  thresholds: TaskThresholds = DEFAULT_THRESHOLDS,
 ): OwnerLeaderboardRow[] {
   const map = new Map<string, OwnerLeaderboardRow>();
   const NONE = "(미지정)";
@@ -165,7 +169,7 @@ export function computeOwnerLeaderboard(
       if (isTaskStageActualUpTo(it, st, asOfDate)) row.doneStages++;
       // 스테이지 단위 지연 카운트 제거 — 정본은 태스크 단위(isTaskDelayed).
     }
-    if (isTaskDelayed(it, undefined, asOfDate)) row.delayedTaskIds.add(it.id);
+    if (isTaskDelayed(it, thresholds, asOfDate)) row.delayedTaskIds.add(it.id);
   }
   const rows = Array.from(map.values());
   // planPct/actualPct 는 T.Plan / Actual% 의 담당자 평균으로 계산 (스테이지 수 대비 아님).

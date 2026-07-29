@@ -11,6 +11,7 @@ import {
   type OwnerLeaderboardRow,
 } from "@/lib/task-management/delay-utils";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
+import type { TaskThresholds } from "@/lib/task-management/derived";
 
 const DIM_LABEL: Record<OwnerDim, string> = {
   team: "Team",
@@ -32,9 +33,10 @@ interface Props {
   row: OwnerLeaderboardRow | null;
   items: TaskItem[];
   asOfDate: string;
+  thresholds?: TaskThresholds;
 }
 
-export function OwnerDetailDialog({ open, onOpenChange, dim, ownerKey, row, items, asOfDate }: Props) {
+export function OwnerDetailDialog({ open, onOpenChange, dim, ownerKey, row, items, asOfDate, thresholds }: Props) {
   const navigate = useNavigate();
 
   const ownerItems = useMemo(() => {
@@ -46,8 +48,8 @@ export function OwnerDetailDialog({ open, onOpenChange, dim, ownerKey, row, item
   }, [items, dim, ownerKey]);
 
   const delayTop = useMemo(
-    () => computeDelayTopN(ownerItems, asOfDate, 50),
-    [ownerItems, asOfDate],
+    () => computeDelayTopN(ownerItems, asOfDate, 50, thresholds),
+    [ownerItems, asOfDate, thresholds],
   );
 
   const goRawData = () => {

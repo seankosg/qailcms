@@ -12,6 +12,7 @@ import {
   type OwnerDim,
   type OwnerLeaderboardRow,
 } from "@/lib/task-management/delay-utils";
+import type { TaskThresholds } from "@/lib/task-management/derived";
 
 interface Props {
   items: TaskItem[];
@@ -19,6 +20,7 @@ interface Props {
   defaultDim?: OwnerDim;
   onDimChange?: (dim: OwnerDim) => void;
   onOwnerClick?: (dim: OwnerDim, key: string, row: OwnerLeaderboardRow) => void;
+  thresholds?: TaskThresholds;
 }
 
 const DIM_LABEL: Record<OwnerDim, string> = {
@@ -27,12 +29,15 @@ const DIM_LABEL: Record<OwnerDim, string> = {
   hdec_eng_name: "HDEC ENG",
 };
 
-export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_name", onDimChange, onOwnerClick }: Props) {
+export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_name", onDimChange, onOwnerClick, thresholds }: Props) {
   const [dim, setDim] = useState<OwnerDim>(defaultDim);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
 
-  const rows = useMemo(() => computeOwnerLeaderboard(items, asOfDate, dim), [items, asOfDate, dim]);
+  const rows = useMemo(
+    () => computeOwnerLeaderboard(items, asOfDate, dim, thresholds),
+    [items, asOfDate, dim, thresholds],
+  );
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     if (!qq) return rows;
