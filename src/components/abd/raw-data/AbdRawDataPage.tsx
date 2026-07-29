@@ -48,7 +48,7 @@ import { AbdColumnFilterDropdown } from "./AbdColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "@/components/defect-management/raw-data/TopHorizontalScrollbar";
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { AbdExportDialog } from "./AbdExportDialog";
-import { AbdDetailSheet } from "./AbdDetailSheet";
+// ABD detail은 /closure/abd/detail/$id 라우트로 이동 (TM 방식)
 import { AbdBulkEditBar } from "./AbdBulkEditBar";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import { AbdColumnOrderMenu } from "./AbdColumnOrderMenu";
@@ -836,7 +836,7 @@ export function AbdRawDataPage() {
         tableRef={tableRef}
         loading={!stateLoaded || isFetching}
         frozenColIds={["__select", ...frozenExtras]}
-        onRowClick={(id) => setUrl({ detail: id })}
+        onRowClick={(id) => navigate({ to: "/closure/abd/detail/$id", params: { id } })}
         q={q}
         serverFilters={serverFilters}
       />
@@ -848,10 +848,7 @@ export function AbdRawDataPage() {
         columnHeaders={ABD_COLUMNS.map((c) => ({ key: c.key, label: c.label }))}
         filenamePrefix={plotFilter ? `abd-${team}-plot${plotFilter}` : `abd-${team}`}
       />
-      <AbdDetailSheet
-        id={(urlSearch.detail as string) || null}
-        onOpenChange={(open) => { if (!open) setUrl({ detail: "" }); }}
-      />
+      {/* ABD detail drilldown → 전용 라우트 */}
     </div>
   );
 }
