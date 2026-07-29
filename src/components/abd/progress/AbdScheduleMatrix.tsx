@@ -310,6 +310,7 @@ export function AbdScheduleMatrix({
                               st === "draft_finish" && "bg-violet-500/15 text-violet-700 dark:text-violet-400",
                               st === "submission" && "bg-primary/20 text-primary",
                               st === "dar" && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+                              st === "approval" && "bg-green-600/15 text-green-700 dark:text-green-400",
                             )}
                           >
                             {STAGE_SHORT_LABELS[st]}

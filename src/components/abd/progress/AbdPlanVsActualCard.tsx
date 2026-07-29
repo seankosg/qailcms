@@ -28,45 +28,39 @@ import {
   ALL_STAGES,
   STAGE_LABELS,
   type CellRaw,
-  type RoundKey,
   type Stage,
 } from "@/lib/abd/progress-utils";
 import {
   buildAbdSCurve,
   ABD_STAGE_COLORS,
-  ROUND_DASH,
-  ROUND_PLAN_DASH,
+  PLAN_DASH,
   type SCurveBaselines,
 } from "@/lib/abd/scurve-utils";
 
-type Round = Exclude<RoundKey, "all">;
-
 export interface AbdPlanVsActualCardProps {
-  /** round==='all' 이면 R1/R2/R3 각각의 cells, 그 외에는 해당 라운드 하나만 */
-  cellsByRound: Partial<Record<Round, CellRaw[]>>;
-  activeRounds: Round[];
+  /** 전 라운드 통합 cells (메인 매트릭스 쿼리 재사용) */
+  cells: CellRaw[];
   buckets: string[];
   stages: Stage[];
   today: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  /** rangeStart-1 시점의 누계 오프셋 (라운드×스테이지) */
-  baselinesByRound?: SCurveBaselines;
+  /** rangeStart-1 시점의 누계 오프셋 (스테이지별) */
+  baselines?: SCurveBaselines;
 }
 
 export function AbdPlanVsActualCard({
-  cellsByRound,
-  activeRounds,
+  cells,
   buckets,
   stages,
   today,
   open,
   onOpenChange,
-  baselinesByRound,
+  baselines,
 }: AbdPlanVsActualCardProps) {
   const scurve = useMemo(
-    () => buildAbdSCurve({ cellsByRound, buckets, stages, today, baselinesByRound }),
-    [cellsByRound, buckets, stages, today, baselinesByRound],
+    () => buildAbdSCurve({ cells, buckets, stages, today, baselines }),
+    [cells, buckets, stages, today, baselines],
   );
 
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -78,15 +72,8 @@ export function AbdPlanVsActualCard({
       return next;
     });
 
-  const stageLabelShort: Record<Stage, string> = {
-    draft_start:  STAGE_LABELS.draft_start,
-    draft_finish: STAGE_LABELS.draft_finish,
-    submission:   STAGE_LABELS.submission,
-    dar:          STAGE_LABELS.dar,
-  };
-
-  const seriesByKey = new Map<string, (typeof scurve.series)[number]>();
-  for (const s of scurve.series) seriesByKey.set(`${s.round}_${s.stage}`, s);
+  const seriesByStage = new Map<Stage, (typeof scurve.series)[number]>();
+  for (const s of scurve.series) seriesByStage.set(s.stage, s);
 
   const data = scurve.bucketLabels.map((label, i) => {
     const row: Record<string, unknown> = {
@@ -95,19 +82,17 @@ export function AbdPlanVsActualCard({
     };
     let varSum: number | null = 0;
     let anyNull = false;
-    for (const r of activeRounds) {
-      for (const st of stages) {
-        const ser = seriesByKey.get(`${r}_${st}`);
-        if (!ser) continue;
-        row[`planInc_${r}_${st}`] = ser.dailyPlan[i];
-        row[`actualInc_${r}_${st}`] = ser.dailyActual[i];
-        row[`cumPlan_${r}_${st}`] = ser.cumPlan[i];
-        row[`cumActual_${r}_${st}`] = ser.cumActual[i];
-        const a = ser.dailyActual[i];
-        const p = ser.dailyPlan[i];
-        if (a == null) anyNull = true;
-        else if (varSum != null) varSum += a - p;
-      }
+    for (const st of stages) {
+      const ser = seriesByStage.get(st);
+      if (!ser) continue;
+      row[`planInc_${st}`] = ser.dailyPlan[i];
+      row[`actualInc_${st}`] = ser.dailyActual[i];
+      row[`cumPlan_${st}`] = ser.cumPlan[i];
+      row[`cumActual_${st}`] = ser.cumActual[i];
+      const a = ser.dailyActual[i];
+      const p = ser.dailyPlan[i];
+      if (a == null) anyNull = true;
+      else if (varSum != null) varSum += a - p;
     }
     row.variance = anyNull ? null : varSum;
     return row;
@@ -117,34 +102,30 @@ export function AbdPlanVsActualCard({
     scurve.todayIndex >= 0 ? scurve.bucketLabels[scurve.todayIndex] ?? null : null;
 
   const cfg: ChartConfig = Object.fromEntries(
-    activeRounds.flatMap((r) =>
-      stages.flatMap((s) => [
-        [`planInc_${r}_${s}`, { label: `${r} · ${stageLabelShort[s]} Plan (daily)`, color: ABD_STAGE_COLORS[s].bar }],
-        [`actualInc_${r}_${s}`, { label: `${r} · ${stageLabelShort[s]} Actual (daily)`, color: ABD_STAGE_COLORS[s].line }],
-        [`cumPlan_${r}_${s}`, { label: `${r} · ${stageLabelShort[s]} Plan (cum)`, color: ABD_STAGE_COLORS[s].line }],
-        [`cumActual_${r}_${s}`, { label: `${r} · ${stageLabelShort[s]} Actual (cum)`, color: ABD_STAGE_COLORS[s].line }],
-      ]),
-    ),
+    stages.flatMap((s) => [
+      [`planInc_${s}`, { label: `${STAGE_LABELS[s]} Plan (daily)`, color: ABD_STAGE_COLORS[s].bar }],
+      [`actualInc_${s}`, { label: `${STAGE_LABELS[s]} Actual (daily)`, color: ABD_STAGE_COLORS[s].line }],
+      [`cumPlan_${s}`, { label: `${STAGE_LABELS[s]} Plan (cum)`, color: ABD_STAGE_COLORS[s].line }],
+      [`cumActual_${s}`, { label: `${STAGE_LABELS[s]} Actual (cum)`, color: ABD_STAGE_COLORS[s].line }],
+    ]),
   ) as ChartConfig;
 
   const varianceCfg: ChartConfig = {
     variance: { label: "Δ Actual − Plan", color: "hsl(var(--destructive))" },
   };
 
-  const hasData = buckets.length > 0 && activeRounds.length > 0 && stages.length > 0;
+  const hasData = buckets.length > 0 && stages.length > 0;
 
-  // KPI: 오늘 시점, 각 라운드×스테이지 P/A/Δ (compact)
+  // KPI: 오늘 시점, 스테이지별 P/A/Δ (compact)
   const idxForKpi = scurve.todayIndex >= 0 ? scurve.todayIndex : buckets.length - 1;
-  const kpis = activeRounds.flatMap((r) =>
-    stages.map((s) => {
-      const ser = seriesByKey.get(`${r}_${s}`);
-      const plan = ser?.cumPlan[idxForKpi] ?? 0;
-      const actual = (ser?.cumActual[idxForKpi] ?? 0) as number;
-      const delta = actual - plan;
-      const pct = plan > 0 ? (delta / plan) * 100 : 0;
-      return { round: r, stage: s, plan, actual, delta, pct };
-    }),
-  );
+  const kpis = stages.map((s) => {
+    const ser = seriesByStage.get(s);
+    const plan = ser?.cumPlan[idxForKpi] ?? 0;
+    const actual = (ser?.cumActual[idxForKpi] ?? 0) as number;
+    const delta = actual - plan;
+    const pct = plan > 0 ? (delta / plan) * 100 : 0;
+    return { stage: s, plan, actual, delta, pct };
+  });
 
   return (
     <Card>
@@ -162,7 +143,6 @@ export function AbdPlanVsActualCard({
                 <CardTitle className="text-sm">Plan vs Actual — S-Curve</CardTitle>
               </div>
               <span className="text-[11px] text-muted-foreground">
-                {activeRounds.join(" · ")} ·{" "}
                 {ALL_STAGES.filter((s) => stages.includes(s)).map((s) => STAGE_LABELS[s]).join(" / ")}
               </span>
             </button>
@@ -185,12 +165,12 @@ export function AbdPlanVsActualCard({
                     const sign = k.delta > 0 ? "+" : "";
                     return (
                       <div
-                        key={`${k.round}_${k.stage}`}
+                        key={k.stage}
                         className="flex flex-col gap-0.5 rounded border-l-4 px-3 py-1"
                         style={{ borderLeftColor: ABD_STAGE_COLORS[k.stage].line }}
                       >
                         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          {k.round} · {STAGE_LABELS[k.stage]}
+                          {STAGE_LABELS[k.stage]}
                         </span>
                         <span className="text-xs tabular-nums">
                           <span className="text-muted-foreground">P</span> {k.plan.toLocaleString()}{" "}
@@ -228,67 +208,58 @@ export function AbdPlanVsActualCard({
                         label={{ value: "Today", fontSize: 10, fill: "hsl(var(--destructive))" }}
                       />
                     )}
-                    {activeRounds.flatMap((r) =>
-                      stages.map((s) => (
-                        <Bar
-                          key={`plan-${r}-${s}`}
-                          yAxisId="bar"
-                          dataKey={`planInc_${r}_${s}`}
-                          stackId={`plan_${r}`}
-                          fill={ABD_STAGE_COLORS[s].bar}
-                          name={`${r} · ${stageLabelShort[s]} Plan (daily)`}
-                          barSize={8}
-                          hide={hidden.has(`planInc_${r}_${s}`)}
-                        />
-                      )),
-                    )}
-                    {activeRounds.flatMap((r) =>
-                      stages.map((s) => (
-                        <Bar
-                          key={`actual-${r}-${s}`}
-                          yAxisId="bar"
-                          dataKey={`actualInc_${r}_${s}`}
-                          stackId={`actual_${r}`}
-                          fill={ABD_STAGE_COLORS[s].line}
-                          name={`${r} · ${stageLabelShort[s]} Actual (daily)`}
-                          barSize={8}
-                          hide={hidden.has(`actualInc_${r}_${s}`)}
-                        />
-                      )),
-                    )}
-                    {activeRounds.flatMap((r) =>
-                      stages.map((s) => (
-                        <Line
-                          key={`cumPlan-${r}-${s}`}
-                          yAxisId="cum"
-                          type="monotone"
-                          dataKey={`cumPlan_${r}_${s}`}
-                          stroke={ABD_STAGE_COLORS[s].line}
-                          strokeDasharray={ROUND_PLAN_DASH[r]}
-                          strokeWidth={1.5}
-                          dot={false}
-                          name={`${r} · ${stageLabelShort[s]} Plan (cum)`}
-                          hide={hidden.has(`cumPlan_${r}_${s}`)}
-                        />
-                      )),
-                    )}
-                    {activeRounds.flatMap((r) =>
-                      stages.map((s) => (
-                        <Line
-                          key={`cumActual-${r}-${s}`}
-                          yAxisId="cum"
-                          type="monotone"
-                          dataKey={`cumActual_${r}_${s}`}
-                          stroke={ABD_STAGE_COLORS[s].line}
-                          strokeDasharray={ROUND_DASH[r]}
-                          strokeWidth={2.5}
-                          dot={false}
-                          name={`${r} · ${stageLabelShort[s]} Actual (cum)`}
-                          connectNulls={false}
-                          hide={hidden.has(`cumActual_${r}_${s}`)}
-                        />
-                      )),
-                    )}
+                    {stages.map((s) => (
+                      <Bar
+                        key={`plan-${s}`}
+                        yAxisId="bar"
+                        dataKey={`planInc_${s}`}
+                        stackId="plan"
+                        fill={ABD_STAGE_COLORS[s].bar}
+                        name={`${STAGE_LABELS[s]} Plan (daily)`}
+                        barSize={8}
+                        hide={hidden.has(`planInc_${s}`)}
+                      />
+                    ))}
+                    {stages.map((s) => (
+                      <Bar
+                        key={`actual-${s}`}
+                        yAxisId="bar"
+                        dataKey={`actualInc_${s}`}
+                        stackId="actual"
+                        fill={ABD_STAGE_COLORS[s].line}
+                        name={`${STAGE_LABELS[s]} Actual (daily)`}
+                        barSize={8}
+                        hide={hidden.has(`actualInc_${s}`)}
+                      />
+                    ))}
+                    {stages.map((s) => (
+                      <Line
+                        key={`cumPlan-${s}`}
+                        yAxisId="cum"
+                        type="monotone"
+                        dataKey={`cumPlan_${s}`}
+                        stroke={ABD_STAGE_COLORS[s].line}
+                        strokeDasharray={PLAN_DASH}
+                        strokeWidth={1.5}
+                        dot={false}
+                        name={`${STAGE_LABELS[s]} Plan (cum)`}
+                        hide={hidden.has(`cumPlan_${s}`)}
+                      />
+                    ))}
+                    {stages.map((s) => (
+                      <Line
+                        key={`cumActual-${s}`}
+                        yAxisId="cum"
+                        type="monotone"
+                        dataKey={`cumActual_${s}`}
+                        stroke={ABD_STAGE_COLORS[s].line}
+                        strokeWidth={2.5}
+                        dot={false}
+                        name={`${STAGE_LABELS[s]} Actual (cum)`}
+                        connectNulls={false}
+                        hide={hidden.has(`cumActual_${s}`)}
+                      />
+                    ))}
                   </ComposedChart>
                 </ChartContainer>
 
