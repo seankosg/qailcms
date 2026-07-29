@@ -996,6 +996,30 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_judge_v_active_snapshot_20260729: {
+        Row: {
+          ar_before: number | null
+          bt_before: string | null
+          cs_before: string | null
+          id: string | null
+          latest_status: string | null
+        }
+        Insert: {
+          ar_before?: number | null
+          bt_before?: string | null
+          cs_before?: string | null
+          id?: string | null
+          latest_status?: string | null
+        }
+        Update: {
+          ar_before?: number | null
+          bt_before?: string | null
+          cs_before?: string | null
+          id?: string | null
+          latest_status?: string | null
+        }
+        Relationships: []
+      }
       abd_latest_status_restore_snapshot_20260727: {
         Row: {
           abd_item_id: string

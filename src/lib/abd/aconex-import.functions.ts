@@ -428,6 +428,12 @@ function resolveActiveRound(existing: any): 1 | 2 | 3 {
   // Option B: active_round(계획 라벨 파생)는 신뢰하지 않는다.
   // 실제 SB actual이 기록된 최고 라운드에만 회신을 귀속시킨다.
   // 레거시 R1(SB actual 없이 승인/거절) 케이스는 컴퓨트 단계에서 별도 카운팅.
+  //
+  // NOTE (2026-07-29): 판정측 v_active (public.abd_judge_v1) 는 이와 의도적으로 다르다.
+  //   - 판정측: 다음 라운드 실적(actual) 또는 이전 라운드 회신(B/C) 존재 시 승격.
+  //   - 임포트측(여기): SB actual 최고 라운드만 신뢰 — Aconex 회신을 계획만 있는
+  //     빈 라운드에 잘못 귀속시키는 것을 방지.
+  // 두 규칙의 차이는 무결성 검사 시 반드시 상호 참조.
   if (existing?.r3_submission_actual) return 3;
   if (existing?.r2_submission_actual) return 2;
   return 1;
