@@ -127,6 +127,14 @@ function formatSize(b: number) {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function formatEta(sec: number): string {
+  if (!Number.isFinite(sec) || sec <= 0) return "곧 완료";
+  if (sec < 60) return `${sec}초`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return s ? `${m}분 ${s}초` : `${m}분`;
+}
+
 export function AbdImportPage() {
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [mode, setMode] = useState<ImportMode>("hdec");
