@@ -193,6 +193,9 @@ const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = 
 const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
   "in_progress", "not_started",
   "under_review", "drafting", "rs_delay", "sb_delay", "df_delay", "ds_delay", "no_plan", "delayed",
+  // stage_group 축 (Progress KPI 스트립 드릴다운): 재고 sg_*, 지연 sgd_*
+  "sg_ns", "sg_ds", "sg_df", "sg_sb", "sg_rs", "sg_resubmit", "sg_approved",
+  "sgd_ns", "sgd_ds", "sgd_df", "sgd_sb", "sgd_rs",
 ];
 // 딥링크 status 값 → 사용자에게 보여줄 판정 라벨 (필터 칩)
 const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
@@ -206,6 +209,18 @@ const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
   ds_delay: "Draft Start Delay",
   no_plan: "No Plan",
   delayed: "Delayed",
+  sg_ns: "Not Started",
+  sg_ds: "Draft Start",
+  sg_df: "Draft Finish",
+  sg_sb: "Submission",
+  sg_rs: "Response",
+  sg_resubmit: "Resubmit",
+  sg_approved: "Approved",
+  sgd_ns: "Not Started · 지연",
+  sgd_ds: "Draft Start · 지연",
+  sgd_df: "Draft Finish · 지연",
+  sgd_sb: "Submission · 지연",
+  sgd_rs: "Response · 지연",
 };
 const ALL_STATUS_VALUES = [
   ...STATUS_TABS.map((s) => s.value),
