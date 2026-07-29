@@ -721,6 +721,7 @@ export function AbdAconexImportPage() {
           lockRequired
         />
       )}
+      <AbdSourceGuardDialog {...sourceGuard.dialogProps} />
     </div>
   );
 }
