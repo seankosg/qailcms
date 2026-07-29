@@ -128,6 +128,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => ImportBatchSchema.parse(data))
   .handler(async ({ data, context }) => {
+   try {
     await assertEditor(context);
     const supa = context.supabase as any;
 
@@ -507,4 +508,10 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     }
 
     return { batch_id: batchId, inserted, updated, inactivated, total: rowsToImport.length };
+   } catch (err: any) {
+     const msg = err?.message ?? String(err);
+     const stack = err?.stack ? String(err.stack).split("\n").slice(0, 4).join(" | ") : "";
+     console.error("[importAbdBatch] failed:", msg, stack);
+     throw new Error(`ABD 임포트 실패: ${msg}${stack ? ` [${stack}]` : ""}`);
+   }
   });
