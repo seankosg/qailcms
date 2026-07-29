@@ -42,7 +42,7 @@ export const ABD_ACONEX_SYNC_FIELDS: Array<{ field: string; label: string }> = [
   { field: "aconex_status_raw", label: "Aconex Status (원본)" },
   { field: "aconex_review_status_raw", label: "Aconex Review Status (원본)" },
   { field: "aconex_date_modified", label: "Aconex Date Modified" },
-  { field: "round_actual", label: "라운드 Actual (Submission / DAR)" },
+  { field: "dar_response", label: "라운드 Actual (Submission / DAR)" },
   { field: "is_terminated", label: "Terminated/Cancelled 통계 제외" },
 ];
 
@@ -58,11 +58,11 @@ export const ABD_ACONEX_CANONICAL_HEADER_TO_FIELDS: Record<string, string[]> = {
     "latest_status",
     "approval_date",
     "aconex_status_raw",
-    "round_actual",
+    "dar_response",
     "is_terminated",
   ],
-  "Review Status": ["aconex_review_status_raw", "round_actual", "is_terminated"],
-  "Date Modified": ["aconex_date_modified", "round_actual", "approval_date"],
+  "Review Status": ["aconex_review_status_raw", "dar_response", "is_terminated"],
+  "Date Modified": ["aconex_date_modified", "dar_response", "approval_date"],
 };
 const ABD_ACONEX_UNIQUE_HEADER = "Document No";
 /** Aconex 계열로 인정할 시스템 target_field 집합. */
@@ -73,7 +73,7 @@ const ABD_ACONEX_TARGET_FIELDS = new Set<string>([
   "aconex_status_raw",
   "aconex_review_status_raw",
   "aconex_date_modified",
-  "round_actual",
+  "dar_response",
   "is_terminated",
 ]);
 function isAconexRoundActual(field: string): boolean {
