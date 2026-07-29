@@ -90,3 +90,13 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
 - 집계 대상 날짜 컬럼은 전부 `date` 타입이므로 UTC 경계 밀림 없음(표준시 Asia/Qatar).
 - Matrix 와 S-Curve 는 동일 RPC(`abd_progress_cells_json` / `abd_progress_totals_json`)를 사용하므로 본 정정이 양쪽에 동시 적용된다.
 - **회귀 기준(S-curve 단조성)**: 동일 구간 누계는 as-of 가 뒤로 갈수록 감소하지 않는다. 2026-07-20/24/28 실측 통과(SB 1,688 → 1,797 → 2,024).
+
+## 지연 단일 귀속 원칙 (2026-07-29 확정)
+
+- 스테이지(축1): `DS{n}`(Draft Start) → `DF{n}`(Draft Finish) → `SB{n}`(Submission) → `RS{n}`(Response by dar).
+  `current_stage` = 활성 라운드에서 아직 완료되지 않은 가장 앞선 단계. 구 `UR{n}`/Ready-to-Submit 의미의 `RS{n}` 폐기.
+- `primary_delay` (KPI 정본): `current_stage` 단계의 plan < today AND actual 없음일 때만 해당 단계 코드(`DS2` 등). **도면당 0 또는 1개.**
+- `delay_bucket` (인지용): 계획일이 지난 모든 미이행 단계 배열(+ `NoPlan`). **KPI 집계 사용 금지** — 상세/툴팁 전용.
+- `delay_late` (지연이행): actual > plan 인 단계 배열. 지연 카운트와 무관한 별도 지표.
+- 불변식: ΣDS+DF+SB+RS 지연 카드 = `primary_delay` 보유 도면 수. NoPlan 은 계획 부재 알람으로 별도.
+- `bucket_top` 은 Row1 카드 계약 유지를 위해 NS/DS/UR/Approved/RESUBMIT 어휘를 그대로 사용(RS 단계 → `UR`).
