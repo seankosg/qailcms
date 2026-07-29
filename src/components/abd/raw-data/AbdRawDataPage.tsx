@@ -296,7 +296,7 @@ export function AbdRawDataPage() {
   const plotSel: "all" | "C" | "D" = (["all", "C", "D"].includes(String(urlSearch.plot ?? "")) ? (urlSearch.plot as any) : "all");
   const plotFilter: "C" | "D" | null = plotSel === "all" ? null : plotSel;
   const excludedMode: "hide" | "only" | "all" =
-    ["hide", "only", "all"].includes(String(urlSearch.excluded ?? "")) ? (urlSearch.excluded as any) : "hide";
+    ["hide", "only", "all"].includes(String(urlSearch.excluded ?? "")) ? (urlSearch.excluded as any) : "all";
   // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
   const includeInactive = false;
   const rawPageSize = String(urlSearch.pageSize ?? "");
@@ -762,7 +762,7 @@ export function AbdRawDataPage() {
           ))}
         <button
           type="button"
-          onClick={() => setUrl({ excluded: excludedMode === "only" ? "hide" : "only", page: 1 })}
+          onClick={() => setUrl({ excluded: excludedMode === "only" ? "all" : "only", page: 1 })}
           className={cn(
             "ml-auto inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] transition-colors",
             excludedMode === "only"
@@ -770,7 +770,7 @@ export function AbdRawDataPage() {
               : "text-muted-foreground hover:bg-background/60",
           )}
           aria-pressed={excludedMode === "only"}
-          title="Terminated / Cancelled — 통계 제외 · 클릭 시 해당 항목만 보기"
+          title="Terminated / Cancelled — 기본 모집단에 포함 · 클릭 시 해당 항목만 보기"
         >
           Excluded
           <Badge variant={excludedMode === "only" ? "outline" : "secondary"} className="ml-1 h-4 px-1 text-[10px]">

@@ -29,7 +29,8 @@ const abdRawDataSearchSchema = z.object({
   dateFields: fallback(z.string(), "").default(""),
   stage: fallback(z.string(), "").default(""),
   round: fallback(z.enum(["R1", "R2", "R3", "all"]), "all").default("all"),
-  excluded: fallback(z.enum(["hide", "only", "all"]), "hide").default("hide"),
+  // 모집단 정본: Terminated 포함 전수(6,659). Progress·Dashboard 와 동일 기준.
+  excluded: fallback(z.enum(["hide", "only", "all"]), "all").default("all"),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/abd/raw-data")({
