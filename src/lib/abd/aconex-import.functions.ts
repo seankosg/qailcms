@@ -431,6 +431,12 @@ const META_FIELDS = new Set([
   "updated_by",
 ]);
 
+function pickNewer(a: any, b: any): any {
+  const ad = a?.aconex_date_modified ?? a?.updated_at ?? "";
+  const bd = b?.aconex_date_modified ?? b?.updated_at ?? "";
+  return String(bd) > String(ad) ? b : a;
+}
+
 function resolveActiveRound(existing: any): 1 | 2 | 3 {
   // Option B: active_round(계획 라벨 파생)는 신뢰하지 않는다.
   // 실제 SB actual이 기록된 최고 라운드에만 회신을 귀속시킨다.
