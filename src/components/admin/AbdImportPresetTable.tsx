@@ -73,7 +73,7 @@ const ABD_ACONEX_TARGET_FIELDS = new Set<string>([
   "aconex_status_raw",
   "aconex_review_status_raw",
   "aconex_date_modified",
-  "round_actual",
+  "dar_response",
   "is_terminated",
 ]);
 function isAconexRoundActual(field: string): boolean {
