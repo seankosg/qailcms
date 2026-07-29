@@ -762,7 +762,7 @@ export function AbdRawDataPage() {
           ))}
         <button
           type="button"
-          onClick={() => setUrl({ excluded: excludedMode === "only" ? "hide" : "only", page: 1 })}
+          onClick={() => setUrl({ excluded: excludedMode === "only" ? "all" : "only", page: 1 })}
           className={cn(
             "ml-auto inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] transition-colors",
             excludedMode === "only"
@@ -770,7 +770,7 @@ export function AbdRawDataPage() {
               : "text-muted-foreground hover:bg-background/60",
           )}
           aria-pressed={excludedMode === "only"}
-          title="Terminated / Cancelled — 통계 제외 · 클릭 시 해당 항목만 보기"
+          title="Terminated / Cancelled — 기본 모집단에 포함 · 클릭 시 해당 항목만 보기"
         >
           Excluded
           <Badge variant={excludedMode === "only" ? "outline" : "secondary"} className="ml-1 h-4 px-1 text-[10px]">
