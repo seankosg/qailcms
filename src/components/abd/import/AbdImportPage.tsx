@@ -464,18 +464,35 @@ export function AbdImportPage() {
           plot: sh.plot ?? null,
           abd_numbers: sh.rows.map((r) => r.abd_number),
         }));
-        for (let i = 0; i < sheets.length; i++) {
+        // CF Worker CPU 한도 초과 방지: 시트 rows를 HTTP-청크(500)로 잘라 호출.
+        // log_id append 로 파일당 로그 1건 유지. finalize/finalize_scope 는 파일 최종 호출에서만 true.
+        const HTTP_CHUNK = 500;
+        const plan: Array<{ sheetIdx: number; start: number; end: number }> = [];
+        sheets.forEach((sh, sIdx) => {
+          const n = sh.rows.length;
+          if (n === 0) {
+            plan.push({ sheetIdx: sIdx, start: 0, end: 0 });
+            return;
+          }
+          for (let s = 0; s < n; s += HTTP_CHUNK) {
+            plan.push({ sheetIdx: sIdx, start: s, end: Math.min(s + HTTP_CHUNK, n) });
+          }
+        });
+        for (let idx = 0; idx < plan.length; idx++) {
           if (cancelRequestedRef.current) throw new Error("__CANCELLED__");
-          const sheet = sheets[i];
-          const isLast = i === sheets.length - 1;
-          const rows = sheet.rows.map((r) => ({ ...r, plot: r.plot ?? sheet.plot ?? null }));
+          const { sheetIdx, start, end } = plan[idx];
+          const sheet = sheets[sheetIdx];
+          const isLast = idx === plan.length - 1;
+          const rows = sheet.rows
+            .slice(start, end)
+            .map((r) => ({ ...r, plot: r.plot ?? sheet.plot ?? null }));
           const res = await importAbdBatch({
             data: {
               file_name: e.file.name,
               team: e.team,
               plot: sheet.plot,
               sheet_name: sheet.sheet_name,
-          data_date: e.dataDate || todayInDoha(),
+              data_date: e.dataDate || todayInDoha(),
               rows,
               inactivate_missing: true,
               allow_duplicates: !!e.allowDuplicates,
@@ -492,7 +509,7 @@ export function AbdImportPage() {
           agg.updated += res.updated;
           agg.inactivated += res.inactivated;
           agg.total += res.total;
-          const pct = 10 + Math.round(((i + 1) / sheets.length) * 85);
+          const pct = 10 + Math.round(((idx + 1) / plan.length) * 85);
           setEntries((p) =>
             p.map((x) => (x.id === e.id ? { ...x, progress: pct } : x)),
           );
