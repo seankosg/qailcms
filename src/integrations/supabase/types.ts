@@ -4023,9 +4023,11 @@ export type Database = {
         Returns: number
       }
       abd_backfill_response_results: {
-        Args: never
+        Args: { _dry_run?: boolean }
         Returns: {
+          abd_number: string
           item_id: string
+          last_round: number
           r1_set: string
           r2_set: string
           r3_set: string
