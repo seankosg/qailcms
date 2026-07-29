@@ -402,25 +402,12 @@ const META_FIELDS = new Set([
 ]);
 
 function resolveActiveRound(existing: any): 1 | 2 | 3 {
-  let n: 1 | 2 | 3 = (existing?.active_round as 1 | 2 | 3) ?? 1;
-  if (!existing?.active_round) {
-    if (
-      existing?.r3_submission_actual ||
-      existing?.r3_dar_actual ||
-      existing?.r2_response_result === "B" ||
-      existing?.r2_response_result === "C"
-    )
-      n = 3;
-    else if (
-      existing?.r2_submission_actual ||
-      existing?.r2_dar_actual ||
-      existing?.r1_response_result === "B" ||
-      existing?.r1_response_result === "C"
-    )
-      n = 2;
-    else n = 1;
-  }
-  return n;
+  // Option B: active_round(계획 라벨 파생)는 신뢰하지 않는다.
+  // 실제 SB actual이 기록된 최고 라운드에만 회신을 귀속시킨다.
+  // 레거시 R1(SB actual 없이 승인/거절) 케이스는 컴퓨트 단계에서 별도 카운팅.
+  if (existing?.r3_submission_actual) return 3;
+  if (existing?.r2_submission_actual) return 2;
+  return 1;
 }
 
 function computePatch(
