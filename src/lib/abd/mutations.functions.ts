@@ -128,6 +128,16 @@ export const importAbdBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => ImportBatchSchema.parse(data))
   .handler(async ({ data, context }) => {
+    try {
+      return await importAbdBatchImpl({ data, context });
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      console.error("[importAbdBatch] failed:", msg, err?.stack);
+      throw new Error(`ABD 임포트 실패: ${msg}`);
+    }
+  });
+
+async function importAbdBatchImpl({ data, context }: { data: any; context: any }) {
     await assertEditor(context);
     const supa = context.supabase as any;
 
