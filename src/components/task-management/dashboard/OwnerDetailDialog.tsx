@@ -81,7 +81,7 @@ export function OwnerDetailDialog({ open, onOpenChange, dim, ownerKey, row, item
             <StatCard label="담당 Task" value={row.taskCount} />
             <StatCard label="총 스테이지" value={row.totalStages} />
             <StatCard label="완료" value={row.doneStages} tone="success" />
-            <StatCard label="지연 스테이지" value={row.delayedStages} tone="destructive" />
+            <StatCard label="지연 Task" value={row.delayedTasks} tone="destructive" />
             <StatCard
               label="Plan vs Actual"
               value={`${row.actualPct.toFixed(0)}% / ${row.planPct.toFixed(0)}%`}

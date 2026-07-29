@@ -51,7 +51,7 @@ export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_n
     onOwnerClick?.(dim, r.key, r);
   };
 
-  const delayedOwnerCount = rows.filter((r) => r.delayedStages > 0).length;
+  const delayedOwnerCount = rows.filter((r) => r.delayedTasks > 0).length;
 
   return (
     <Card>
@@ -104,9 +104,9 @@ export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_n
               <tr>
                 <th className="px-2 py-1 text-left">{DIM_LABEL[dim]}</th>
                 <th className="px-2 py-1 text-right">Task</th>
-                <th className="px-2 py-1 text-right">지연</th>
-                <th className="px-2 py-1">계획 %</th>
-                <th className="px-2 py-1">실적 %</th>
+                <th className="px-2 py-1 text-right" title="통합 판정('지연'|'악화') 태스크 수">지연 Task</th>
+                <th className="px-2 py-1" title="평균 진도(계획) — 판정 지표 아님">평균 진도(계획)</th>
+                <th className="px-2 py-1" title="평균 진도(실적) — 판정 지표 아님">평균 진도(실적)</th>
                 <th className="px-2 py-1 text-right">차이(%p)</th>
               </tr>
             </thead>
@@ -129,7 +129,7 @@ export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_n
                     </td>
                     <td className="px-2 py-1 text-right tabular-nums">{r.taskCount}</td>
                     <td className="px-2 py-1 text-right tabular-nums font-semibold text-destructive">
-                      {r.delayedStages || "—"}
+                      {r.delayedTasks || "—"}
                     </td>
                     <td className="px-2 py-1">
                       <ProgressBar pct={r.planPct} color="bg-schedule-plan" />
