@@ -398,11 +398,18 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         data.finalize_scope && data.finalize_scope.length > 0
           ? data.finalize_scope
           : [{ plot: data.plot ?? null, abd_numbers: Array.from(seenNumbers) }];
-      const { data: allActive } = await supa
+      const scopePlots = Array.from(
+        new Set(scope.map((s) => s.plot).filter((plot): plot is string => !!plot)),
+      );
+      let activeQuery = supa
         .from("abd_items_raw")
         .select("id, abd_number, plot")
         .eq("team", data.team)
         .eq("is_active", true);
+      if (scope.length > 0 && scopePlots.length === scope.length) {
+        activeQuery = activeQuery.in("plot", scopePlots);
+      }
+      const { data: allActive } = await activeQuery;
       const missing: any[] = [];
       for (const s of scope) {
         const seenSet = new Set(s.abd_numbers);
