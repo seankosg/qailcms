@@ -207,9 +207,24 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     const fieldDiffCounts = new Map<string, number>();
     const diffs: Diff[] = [];
     const terminatedReset: AconexImportPreview["terminated_reset"] = [];
+    const roundGuard = {
+      skipped_r2_no_sb: 0,
+      skipped_r3_no_sb: 0,
+      legacy_r1_attribution: 0,
+      skipped_samples: [] as string[],
+    };
     for (const r of matched) {
       const existing = existingRows.get(r.document_no) ?? {};
-      const patch = computePatch(r, existing, allowed);
+      const { patch, guard } = computePatch(r, existing, allowed);
+      if (guard === "skipped_r2_no_sb") {
+        roundGuard.skipped_r2_no_sb += 1;
+        if (roundGuard.skipped_samples.length < 20) roundGuard.skipped_samples.push(r.document_no);
+      } else if (guard === "skipped_r3_no_sb") {
+        roundGuard.skipped_r3_no_sb += 1;
+        if (roundGuard.skipped_samples.length < 20) roundGuard.skipped_samples.push(r.document_no);
+      } else if (guard === "legacy_r1_attribution") {
+        roundGuard.legacy_r1_attribution += 1;
+      }
       if (r.semantic === "EXCLUDED_TERMINATED" || r.semantic === "EXCLUDED_CANCELLED") {
         const n = resolveActiveRound(existing);
         terminatedReset.push({
@@ -270,6 +285,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
           changes,
         })),
       terminated_reset: terminatedReset,
+      round_guard: roundGuard,
     };
 
     if (!data.apply) {
