@@ -1,21 +1,23 @@
 // ABD Progress 매트릭스 클라이언트 유틸.
 // DB 사전 집계(RPC) 결과를 UI 매트릭스 형태로 조립하는 순수 함수 모음.
 
-export type Stage = "draft_start" | "draft_finish" | "submission" | "dar";
-export const ALL_STAGES: Stage[] = ["draft_start", "draft_finish", "submission", "dar"];
+export type Stage = "draft_start" | "draft_finish" | "submission" | "dar" | "approval";
+export const ALL_STAGES: Stage[] = ["draft_start", "draft_finish", "submission", "dar", "approval"];
 export const STAGE_LABELS: Record<Stage, string> = {
   draft_start: "DS",
   draft_finish: "DF",
   submission: "Submission",
   dar: "DAR",
+  approval: "AP",
 };
 
-/** 매트릭스/툴바 전용 단축 라벨 (DS/DF/SB/RS) */
+/** 매트릭스/툴바 전용 단축 라벨 (DS/DF/SB/RS/AP) */
 export const STAGE_SHORT_LABELS: Record<Stage, string> = {
   draft_start: "DS",
   draft_finish: "DF",
   submission: "SB",
   dar: "RS",
+  approval: "AP",
 };
 
 export type Bucket = "day" | "week";
@@ -241,6 +243,7 @@ export function assembleMatrix(opts: {
           draft_finish: emptyStageRow(buckets, "draft_finish", 0),
           submission: emptyStageRow(buckets, "submission", 0),
           dar: emptyStageRow(buckets, "dar", 0),
+          approval: emptyStageRow(buckets, "approval", 0),
         },
         combined: buckets.map((b) => ({ bucket: b, plan: 0, actual: 0 })),
         groupKeyRaw: [...groupKeyRaw],
@@ -253,6 +256,7 @@ export function assembleMatrix(opts: {
   for (const t of totals) {
     const row = ensureRow(t.group_key ?? []);
     const sr = row.stages[t.stage];
+    if (!sr) continue;
     sr.total = t.total;
     sr.totalDone = t.done_upto;
     sr.cumPlan = t.plan_upto;
@@ -265,6 +269,7 @@ export function assembleMatrix(opts: {
     const i = bucketIdx.get(c.bucket_iso);
     if (i === undefined) continue;
     const sr = row.stages[c.stage];
+    if (!sr) continue;
     sr.cells[i].plan += c.plan_cnt;
     sr.cells[i].actual += c.actual_cnt;
   }
@@ -314,6 +319,8 @@ export function groupKeyToRawParams(groupBy: GroupBy[], groupKeyRaw: string[]): 
 
 /** 스테이지 → dateField 매핑. round='all'이면 기본 R1 컬럼 사용 */
 export function stageDateField(stage: Stage | "all", field: "planned" | "actual", round: RoundKey = "R1"): string {
+  // AP(Approval)는 문서 단위 이벤트 — 라운드 컬럼이 아니라 approval_date 단일 경로.
+  if (stage === "approval") return "approval_date";
   const rn = round === "all" ? "r1" : round.toLowerCase();
   if (stage === "all") {
     return `${rn}_dar_${field === "planned" ? "plan" : "actual"}`;
@@ -323,6 +330,7 @@ export function stageDateField(stage: Stage | "all", field: "planned" | "actual"
     draft_finish: { planned: "draft_finish_plan", actual: "draft_finish_actual" },
     submission: { planned: "submission_plan", actual: "submission_actual" },
     dar: { planned: "dar_plan", actual: "dar_actual" },
+    approval: { planned: "dar_plan", actual: "dar_actual" },
   };
   return `${rn}_${map[stage][field]}`;
 }
