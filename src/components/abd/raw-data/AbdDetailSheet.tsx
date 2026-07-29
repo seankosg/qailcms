@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,7 +77,11 @@ function isLate(plan: string | null, actual: string | null): boolean {
   return new Date(actual).getTime() > new Date(plan).getTime();
 }
 
-export function AbdDetailSheet({ id, onOpenChange, focusSection }: { id: string | null; onOpenChange: (open: boolean) => void; focusSection?: "rounds" | "aconex" | "comments" | null }) {
+/**
+ * Body-only detail view (no Sheet/Dialog wrapper). Used by the full-page
+ * TM-style detail route. Renders nothing when id is null.
+ */
+export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSection?: "rounds" | "aconex" | "comments" | null }) {
   const [item, setItem] = useState<AbdItemRow | null>(null);
   const [changes, setChanges] = useState<ChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -140,10 +143,9 @@ export function AbdDetailSheet({ id, onOpenChange, focusSection }: { id: string 
   const tone = agingTone(aging ?? null, settings);
 
   return (
-    <Sheet open={!!id} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="text-base">
+    <div className="space-y-3">
+      <div className="rounded-md border bg-card p-3">
+        <div className="text-base font-semibold">
             {item ? (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono">{item.abd_number}</span>
@@ -158,8 +160,8 @@ export function AbdDetailSheet({ id, onOpenChange, focusSection }: { id: string 
                 )}
               </div>
             ) : "Loading..."}
-          </SheetTitle>
-        </SheetHeader>
+        </div>
+      </div>
 
         {loading && !item ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
@@ -386,7 +388,6 @@ export function AbdDetailSheet({ id, onOpenChange, focusSection }: { id: string 
           </div>
           );
         })()}
-      </SheetContent>
-    </Sheet>
+    </div>
   );
 }
