@@ -136,6 +136,48 @@ export type Database = {
           },
         ]
       }
+      abd_change_log_preserve_20260729: {
+        Row: {
+          abd_item_id: string | null
+          abd_number: string | null
+          changed_at: string | null
+          changed_by: string | null
+          field: string | null
+          id: string | null
+          new_value: string | null
+          old_value: string | null
+          source: string | null
+          team: string | null
+          upload_id: string | null
+        }
+        Insert: {
+          abd_item_id?: string | null
+          abd_number?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          field?: string | null
+          id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          source?: string | null
+          team?: string | null
+          upload_id?: string | null
+        }
+        Update: {
+          abd_item_id?: string | null
+          abd_number?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          field?: string | null
+          id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          source?: string | null
+          team?: string | null
+          upload_id?: string | null
+        }
+        Relationships: []
+      }
       abd_cleanup_snapshot_20260729: {
         Row: {
           abd_number: string | null

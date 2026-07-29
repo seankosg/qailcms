@@ -125,6 +125,7 @@ const STAGE_TO_KEY: Record<string, StageKey> = {
   "DAR RESPONSE": "dar",
   "DAR": "dar",
   "RS": "dar",
+  "DR": "dar",
   "RESPONSE": "dar",
 };
 
@@ -333,7 +334,7 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
     const stageBand = stageBands[c - range.s.c] || "";
     let round: number | null = null;
     let stage: StageKey | null = null;
-    const stageDigit = stageBand.match(/^(DS|DF|SB|RS)\s*([1-3])$/i);
+    const stageDigit = stageBand.match(/^(DS|DF|SB|RS|DR)\s*([1-3])$/i);
     if (stageDigit) {
       stage = STAGE_TO_KEY[stageDigit[1].toUpperCase()] ?? null;
       round = Number(stageDigit[2]);
