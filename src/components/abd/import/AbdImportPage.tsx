@@ -92,6 +92,15 @@ interface FileEntry {
     total: number;
   };
   progress?: number;
+  /** 임포트 진행 상세 (현재 시트/청크/ETA) */
+  progressInfo?: {
+    sheetName: string | null;
+    sheetIdx: number;   // 1-based
+    sheetCount: number;
+    chunkIdx: number;   // 1-based
+    chunkTotal: number;
+    etaSec: number | null;
+  };
   allowDuplicates?: boolean;
   dateOverrides?: Record<string, string>;
   /** 이 파일에서 임포트 시 제외할 canonical field 목록 (기본 = 전체 포함). */
@@ -478,11 +487,43 @@ export function AbdImportPage() {
             plan.push({ sheetIdx: sIdx, start: s, end: Math.min(s + HTTP_CHUNK, n) });
           }
         });
+        const startedAt = Date.now();
         for (let idx = 0; idx < plan.length; idx++) {
           if (cancelRequestedRef.current) throw new Error("__CANCELLED__");
           const { sheetIdx, start, end } = plan[idx];
           const sheet = sheets[sheetIdx];
           const isLast = idx === plan.length - 1;
+          // 시트별 청크 번호(1-based)와 시트 내 총 청크 수 계산
+          const sameSheetChunks = plan.filter((p) => p.sheetIdx === sheetIdx);
+          const chunkIdxInSheet =
+            sameSheetChunks.findIndex((p) => p.start === start) + 1;
+          setEntries((p) =>
+            p.map((x) =>
+              x.id === e.id
+                ? {
+                    ...x,
+                    progressInfo: {
+                      sheetName: sheet.sheet_name ?? sheet.plot ?? null,
+                      sheetIdx: sheetIdx + 1,
+                      sheetCount: sheets.length,
+                      chunkIdx: chunkIdxInSheet,
+                      chunkTotal: sameSheetChunks.length,
+                      etaSec:
+                        idx > 0
+                          ? Math.max(
+                              1,
+                              Math.round(
+                                ((Date.now() - startedAt) / idx) *
+                                  (plan.length - idx) /
+                                  1000,
+                              ),
+                            )
+                          : null,
+                    },
+                  }
+                : x,
+            ),
+          );
           const rows = sheet.rows
             .slice(start, end)
             .map((r) => ({ ...r, plot: r.plot ?? sheet.plot ?? null }));
@@ -516,7 +557,9 @@ export function AbdImportPage() {
         }
         setEntries((p) =>
           p.map((x) =>
-            x.id === e.id ? { ...x, status: "done", result: agg, progress: 100 } : x,
+            x.id === e.id
+              ? { ...x, status: "done", result: agg, progress: 100, progressInfo: undefined }
+              : x,
           ),
         );
         toast.success(
@@ -886,7 +929,23 @@ function FileRow({
         </div>
       </div>
       {e.status === "importing" && (
-        <Progress value={e.progress ?? 40} className="mt-2 h-1.5" />
+        <div className="mt-2 space-y-1">
+          <Progress value={e.progress ?? 40} className="h-1.5" />
+          {e.progressInfo && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+              <span>
+                시트 {e.progressInfo.sheetIdx}/{e.progressInfo.sheetCount}
+                {e.progressInfo.sheetName ? ` · ${e.progressInfo.sheetName}` : ""}
+                {" · "}청크 {e.progressInfo.chunkIdx}/{e.progressInfo.chunkTotal}
+              </span>
+              <span>
+                {e.progressInfo.etaSec != null
+                  ? `남은 예상 ${formatEta(e.progressInfo.etaSec)}`
+                  : "남은 예상 계산 중…"}
+              </span>
+            </div>
+          )}
+        </div>
       )}
       {e.result && (
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
