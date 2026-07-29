@@ -298,7 +298,9 @@ const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
   system: "System",
 };
 
-export function getBulkEditableFields(): BulkEditableField[] {
+export function getBulkEditableFields(opts?: {
+  milestoneOptions?: string[];
+}): BulkEditableField[] {
   const out: BulkEditableField[] = [];
   for (const c of TM_COLUMNS) {
     if (!c.editable || !c.editorType) continue;
@@ -311,5 +313,33 @@ export function getBulkEditableFields(): BulkEditableField[] {
       group: GROUP_LABELS[c.group] ?? c.group,
     });
   }
+  // Detail 페이지에서 편집 가능한 항목이지만 TM_COLUMNS 상 editable=false 인 필드들도
+  // Bulk Edit 대상에 포함시킨다. (task_no / team / data_date / milestone)
+  out.push({
+    field: "task_no",
+    label: "Task No",
+    inputType: "text",
+    group: GROUP_LABELS.id,
+  });
+  out.push({
+    field: "team",
+    label: "Team",
+    inputType: "select",
+    options: [...DISCIPLINES].map((v) => ({ value: v, label: v })),
+    group: GROUP_LABELS.id,
+  });
+  out.push({
+    field: "data_date",
+    label: "Data Date",
+    inputType: "date",
+    group: GROUP_LABELS.system,
+  });
+  out.push({
+    field: "milestone",
+    label: "Milestone",
+    inputType: "select",
+    options: (opts?.milestoneOptions ?? []).map((v) => ({ value: v, label: v })),
+    group: GROUP_LABELS.task,
+  });
   return out;
 }
