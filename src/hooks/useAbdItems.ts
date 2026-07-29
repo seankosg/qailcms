@@ -15,6 +15,19 @@ export type AbdStatusGroup =
   | "ds_delay"
   | "no_plan"
   | "delayed"
+  // stage_group 축 (Progress KPI 스트립): 재고 sg_*, 지연 sgd_*
+  | "sg_ns"
+  | "sg_ds"
+  | "sg_df"
+  | "sg_sb"
+  | "sg_rs"
+  | "sg_resubmit"
+  | "sg_approved"
+  | "sgd_ns"
+  | "sgd_ds"
+  | "sgd_df"
+  | "sgd_sb"
+  | "sgd_rs"
   | "all";
 export type AbdTeam = "MECH" | "ELEC" | "ARCH" | "DESN" | "PRJC";
 
