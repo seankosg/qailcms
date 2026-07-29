@@ -193,7 +193,6 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
               <div><span className="text-muted-foreground">HDEC ENG</span><div className="font-medium">{item.hdec_eng_name ?? "—"}</div></div>
               <div><span className="text-muted-foreground">Latest Rev</span><div className="font-medium">{item.latest_rev ?? "—"}</div></div>
               <div><span className="text-muted-foreground">Latest Status</span><div className="font-medium">{item.latest_status ?? "—"}</div></div>
-              <div><span className="text-muted-foreground">Current Stage</span><div className="font-medium">{formatAbdStage(item.current_stage)}</div></div>
               <div><span className="text-muted-foreground">Approval Date</span><div className="font-medium">{fmtDate(item.approval_date)}</div></div>
             </section>
 
