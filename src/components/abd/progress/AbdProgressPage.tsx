@@ -282,6 +282,10 @@ export function AbdProgressPage() {
       params.set("dateStart", dateFrom);
       params.set("dateEnd", dateTo);
       params.set("dateField", "approval_date");
+      // AP actual = approval_date AND stage_group='APPROVED' (현재 승인 유효분).
+      // 재개봉(과거 승인 → 현재 B/C/UR)·Terminated 는 집계에서 제외되므로
+      // 드릴다운도 동일 렌즈를 적용해 카드·매트릭스·리스트 삼자 일치를 유지한다.
+      if (field === "actual") params.set("status", "sg_approved");
     } else {
       const cols = (["R1", "R2", "R3"] as const).map((r) => stageDateField(stage, field, r));
       params.set("dateStart", dateFrom);
