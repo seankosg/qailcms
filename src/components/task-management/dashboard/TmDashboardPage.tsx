@@ -44,6 +44,8 @@ import { JudgmentStageBreakdown } from "./JudgmentStageBreakdown";
 import { JudgmentDonut } from "./JudgmentDonut";
 import { computeJudgmentStageBreakdown } from "@/lib/task-management/delay-utils";
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
+import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
+import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/dashboard");
 
@@ -133,6 +135,10 @@ export function TmDashboardPage() {
 
   const scopedByTaskScope = useMemo(() => scopeItems(effectiveItems, taskScope), [effectiveItems, taskScope]);
 
+  // 정본 thresholds — KPI/Raw Data 와 동일 소스. 미전달 시 DEFAULT 폴백으로 판정이 어긋남.
+  const { data: thresholdsData } = useTaskManagementSettings();
+  const thresholds = thresholdsData ?? DEFAULT_THRESHOLDS;
+
   const [ownerDetail, setOwnerDetail] = useState<{
     dim: OwnerDim;
     key: string;
@@ -157,7 +163,10 @@ export function TmDashboardPage() {
     });
   }, [scopedByTaskScope, search.delayFilter, asOfDate]);
 
-  const delayTop = useMemo(() => computeDelayTopN(scopedItems, asOfDate, 20), [scopedItems, asOfDate]);
+  const delayTop = useMemo(
+    () => computeDelayTopN(scopedItems, asOfDate, 20, thresholds),
+    [scopedItems, asOfDate, thresholds],
+  );
 
   const patch = (obj: Record<string, unknown>) =>
     navigate({
@@ -371,6 +380,7 @@ export function TmDashboardPage() {
               defaultDim={ownerDim}
               onDimChange={(dim) => patch({ ownerDim: dim })}
               onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
+              thresholds={thresholds}
             />
           </div>
         </>
@@ -384,6 +394,7 @@ export function TmDashboardPage() {
         row={ownerDetail?.row ?? null}
         items={scopedItems}
         asOfDate={asOfDate}
+        thresholds={thresholds}
       />
     </div>
   );
