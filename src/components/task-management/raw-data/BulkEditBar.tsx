@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
 import { todayInDoha } from "@/lib/time/doha";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
+import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
 import {
   ChevronDown,
   ClipboardCopy,
@@ -64,7 +68,24 @@ export function BulkEditBar({
   onMutated,
   canEditRow,
 }: Props) {
-  const fields = useMemo(() => getBulkEditableFields(), []);
+  const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
+  const { data: milestoneOptions = [] } = useQuery({
+    queryKey: ["tm_milestone_kinds", "active-codes"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tm_milestone_kinds")
+        .select("kind_code, sort_order")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((r: { kind_code: string }) => r.kind_code as string);
+    },
+    staleTime: 60_000,
+  });
+  const fields = useMemo(
+    () => getBulkEditableFields({ milestoneOptions }),
+    [milestoneOptions],
+  );
   const resolveLabel = useTmColumnLabel();
   const displayFields = useMemo(
     () => fields.map((f) => ({ ...f, label: resolveLabel(f.field) })),
@@ -131,6 +152,9 @@ export function BulkEditBar({
     setSetBlank(false);
   }
 
+  // Detail 과 동일하게 서버 함수 경유가 필요한 필드
+  const OWNER_ROUTED = new Set(["task_no", "team", "data_date", "milestone"]);
+
   async function handleApply() {
     if (!field) return;
     setSubmitting(true);
@@ -139,6 +163,7 @@ export function BulkEditBar({
       for (let i = 0; i < ids.length; i += CHUNK) batches.push(ids.slice(i, i + CHUNK));
       let ok = 0;
       let failed = 0;
+      const useServerFnRoute = OWNER_ROUTED.has(field.field);
       for (let i = 0; i < batches.length; i++) {
         if (batches.length > 1) {
           toast.info(`Applying… (batch ${i + 1}/${batches.length})`);
@@ -148,6 +173,13 @@ export function BulkEditBar({
           ids: batches[i],
           field: field.field,
           value: computedValue,
+          perIdUpdate: useServerFnRoute
+            ? async (id, f, v) => {
+                await updateOwnerFieldFn({
+                  data: { id, field: f, value: (v as any) ?? null },
+                });
+              }
+            : undefined,
         });
         ok += r.succeeded;
         failed += r.failed;
