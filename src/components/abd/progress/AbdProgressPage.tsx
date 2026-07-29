@@ -293,37 +293,7 @@ export function AbdProgressPage() {
     return { buckets: newBuckets, rows };
   }, [cellsQ.data, totalsQ.data, buckets, effectiveStages, hidePast, today]);
 
-  // KPI 스트립은 stage_group 정본(abd_stage_group_counts)으로 전환됨.
-  // 매트릭스 하단 요약 등 파생 계산은 유지.
-  void useMemo(() => {
-    let cumPlan = 0;
-    let cumActual = 0;
-    let doneStages = 0;
-    let totalStages = 0;
-    for (const t of totalsQ.data ?? []) {
-      if (!effectiveStages.includes(t.stage)) continue;
-      cumPlan += t.plan_upto;
-      cumActual += t.actual_upto;
-      doneStages += t.done_upto;
-      totalStages += t.total;
-    }
-    const planPct = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
-    const progressPct = totalStages > 0 ? (doneStages / totalStages) * 100 : 0;
-    const gapPct = progressPct - planPct;
-    const behindCount = Math.max(0, cumPlan - cumActual);
-    const onTrackCount = Math.max(0, cumActual);
-    return {
-      cumPlan,
-      cumActual,
-      doneStages,
-      totalStages,
-      progressPct,
-      planPct,
-      gapPct,
-      behindCount,
-      onTrackCount,
-    };
-  }, [totalsQ.data, effectiveStages]);
+  // KPI 스트립은 stage_group 정본(abd_stage_group_counts, RPC 1회)으로 전환됨.
 
   const groupHeader = effectiveGroupBy.map((g) => GROUP_LABELS[g]).join(" · ");
 
