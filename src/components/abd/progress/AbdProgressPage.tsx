@@ -40,11 +40,12 @@ import {
   getAbdProgressCells,
   getAbdProgressTotals,
 } from "@/lib/abd/progress.functions";
+import { getAbdProgressCum } from "@/lib/abd/progress.functions";
 import { AbdStageGroupStrip } from "@/components/abd/progress/AbdStageGroupStrip";
 import { AbdScheduleMatrix } from "./AbdScheduleMatrix";
 import { Route } from "@/routes/_authenticated/closure/abd/progress";
 import { AbdPlanVsActualCard } from "./AbdPlanVsActualCard";
-import type { SCurveBaselines } from "@/lib/abd/scurve-utils";
+import type { SCurveBaselines, SCurveCum } from "@/lib/abd/scurve-utils";
 import { ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
 import {
   Collapsible,
@@ -205,6 +206,28 @@ export function AbdProgressPage() {
     }
     return out;
   }, [baselineQ.data]);
+
+  // S-커브 누적 정본: 기간 내 문서 distinct(서버). 종점 = 행 totals.
+  const cumFn = useServerFn(getAbdProgressCum);
+  const cumQ = useQuery({
+    queryKey: ["abd-progress-cum", plot, teamsKey, roundKey, bucket, rpcStart, rpcEnd, asOfDate, planMode],
+    queryFn: () =>
+      cumFn({
+        data: {
+          plots: plot === "all" ? [] : [plot],
+          teams,
+          bucket,
+          rangeStart: rpcStart,
+          rangeEnd: rpcEnd,
+          asOfDate,
+          planMode,
+          round,
+        },
+      }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    enabled: scurveOpen,
+  });
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
