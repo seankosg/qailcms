@@ -80,6 +80,7 @@ import { EditCellPopover } from "./EditCellPopover";
 import { DefectStageProgress, DefectStageProgressLegend, classifyStage } from "./DefectStageProgress";
 import { DefectColumnOrderMenu } from "./DefectColumnOrderMenu";
 import { todayIso } from "@/lib/defect-management/stage-utils";
+import { useSnagAsOf } from "@/hooks/useSnagAsOf";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import {
   AlertDialog,
