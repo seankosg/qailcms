@@ -200,7 +200,8 @@ const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
 // 딥링크 status 값 → 사용자에게 보여줄 판정 라벨 (필터 칩)
 const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
   in_progress: "In Progress",
-  not_started: "Not Started",
+  // 2026-07-30 NS 폐지: 구 딥링크 키 유지, 대상은 R1 DS(코드 DS1)
+  not_started: "R1 DS",
   // 키 'under_review' = 회신 대기(RS). 딥링크 하위호환으로 키 유지, 라벨만 정정.
   under_review: "Awaiting Response",
   drafting: "Draft Start",
@@ -210,14 +211,14 @@ const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
   ds_delay: "Draft Start Delay",
   no_plan: "No Plan",
   delayed: "Delayed",
-  sg_ns: "Not Started",
+  sg_ns: "R1 DS",
   sg_ds: "Draft Start",
   sg_df: "Draft Finish",
   sg_sb: "Submission",
   sg_rs: "Response",
   sg_resubmit: "Resubmit",
   sg_approved: "Approved",
-  sgd_ns: "Not Started · 지연",
+  sgd_ns: "R1 DS · 지연",
   sgd_ds: "Draft Start · 지연",
   sgd_df: "Draft Finish · 지연",
   sgd_sb: "Submission · 지연",
@@ -928,7 +929,6 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
     const key = String(v).toUpperCase();
     const cls =
       key === "APPROVED" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
-      key === "NS" ? "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300" :
       key.startsWith("UR") ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" :
       key.startsWith("RS") ? "bg-blue-500/15 text-blue-700 dark:text-blue-300" :
       key.startsWith("DS") || key.startsWith("DF") ? "bg-violet-500/15 text-violet-700 dark:text-violet-300" :
