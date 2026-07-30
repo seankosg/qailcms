@@ -385,6 +385,15 @@ export function AbdRawDataPage() {
   const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
+  // 매트릭스가 보던 As-of 를 URL 로 넘겨받으면 세션 값보다 우선한다.
+  const [sharedAbdDateRaw, setSharedAbdDate] = useAbdDataDate();
+  const urlAsOf = String(urlSearch.asOf ?? "");
+  const effectiveAsOf = urlAsOf || sharedAbdDateRaw;
+  useEffect(() => {
+    if (urlAsOf && urlAsOf !== sharedAbdDateRaw) setSharedAbdDate(urlAsOf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlAsOf]);
+
   useEffect(() => {
     if (urlSearch.source === "progress") {
       const built = buildFiltersFromProgressContext(urlSearch);
@@ -406,6 +415,12 @@ export function AbdRawDataPage() {
         dateFields: "",
         stage: "",
         round: "",
+        cellStage: "",
+        cellField: "",
+        cellFrom: "",
+        cellTo: "",
+        cellMode: "",
+        asOf: "",
         filters: serializeFilters(built),
       });
     } else {
