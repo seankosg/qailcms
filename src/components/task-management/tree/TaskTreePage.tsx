@@ -1127,7 +1127,11 @@ export function TaskTreePage() {
                                     </td>
                                   );
                                 default:
-                                  return null;
+                                  return (
+                                    <td key={c} className="px-2 py-1 tabular-nums">
+                                      {formatExtraValue(c, (k as Row)[c])}
+                                    </td>
+                                  );
                               }
                             })}
                           </tr>
