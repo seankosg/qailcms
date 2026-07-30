@@ -109,7 +109,8 @@ export function TmDashboardPage() {
      
   }, [selectedDataDate, latestDataDate]);
   const asOfDate = selectedDataDate;
-  const asOfLabel = "Data Date";
+  // 판정 기준일 라벨. 행별 관측 컷오프(data_date)와 구분한다.
+  const asOfLabel = "As of";
 
   // 과거 Data Date 선택 시 서버측 재판정 RPC(tm_judge_at_date) 결과를 병합.
   // Actual% 는 절대 덮어쓰지 않는다 — Plan/gap/judgment 만 as-of 재계산.
@@ -202,12 +203,12 @@ export function TmDashboardPage() {
       {/* Unified Toolbar */}
       <Card className="bg-background">
         <CardContent className="flex flex-col gap-2 p-3">
-          {/* Row 1: Data Date · Task · Discipline · Delay · Search */}
+          {/* Row 1: As of · Task · Discipline · Delay · Search */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="flex items-center gap-1">
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <CalendarDays className="h-3 w-3" />
-                Data Date
+                As of
               </span>
               <Select
                 value={selectedDataDate}
@@ -233,7 +234,7 @@ export function TmDashboardPage() {
                   variant="ghost"
                   className="h-7 w-7"
                   onClick={() => patch({ dataDate: "" })}
-                  aria-label="최신 Data Date로 초기화"
+                  aria-label="최신 As of로 초기화"
                   title="최신으로"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
