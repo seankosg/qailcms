@@ -46,6 +46,7 @@ import { computeJudgmentStageBreakdown } from "@/lib/task-management/delay-utils
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
+import { todayInDoha } from "@/lib/time/doha";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/dashboard");
 
@@ -96,8 +97,10 @@ export function TmDashboardPage() {
 
   // 세션 전역 Data Date (Raw Data/MWS 등과 공유)
   const [sharedDataDate, setSharedDataDate] = useTmDataDate();
+  // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
   const selectedDataDate =
-    (search.dataDate && search.dataDate.length ? search.dataDate : sharedDataDate) || latestDataDate;
+    (search.dataDate && search.dataDate.length ? search.dataDate : sharedDataDate) ||
+    todayInDoha();
 
   // 세션 상태 동기화 — 선택이 최신과 다르면 저장, 최신이면 초기화
   useEffect(() => {

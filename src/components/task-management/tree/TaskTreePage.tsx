@@ -40,6 +40,8 @@ const TaskProgressChartDialog = lazy(() =>
 import { useServerFn } from "@tanstack/react-start";
 import { getTaskProgressChartsBulk, type TaskChartCache } from "@/lib/task-management/progress-chart.functions";
 import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
+import { todayInDoha } from "@/lib/time/doha";
 import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
@@ -127,11 +129,12 @@ function ProgressBar({ v }: { v: number | null | undefined }) {
   );
 }
 
-function GapCell({ gap }: { gap: number }) {
+function GapCell({ gap, buffer }: { gap: number; buffer: number }) {
+  // 색상 강조 경계도 임계값 단일 소스(caution_gap_buffer)를 사용.
   const cls =
-    gap < -0.05
+    gap < -buffer
       ? "text-rose-600"
-      : gap > 0.05
+      : gap > buffer
         ? "text-emerald-600"
         : "text-muted-foreground";
   const sign = gap > 0 ? "+" : "";
@@ -300,18 +303,9 @@ export function TaskTreePage() {
     },
   });
 
-  const { data: thresholds = DEFAULT_THRESHOLDS } = useQuery({
-    queryKey: ["task-management-thresholds"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("task_management_settings")
-        .select("caution_gap_buffer, worsen_gap")
-        .eq("id", "default")
-        .maybeSingle();
-      if (error) throw error;
-      return (data ?? DEFAULT_THRESHOLDS) as TaskThresholds;
-    },
-  });
+  // 임계값 단일 소스(tm_thresholds RPC) — 판정과 색상 강조가 같은 값을 쓴다.
+  const { data: thresholdsData } = useTaskManagementSettings();
+  const thresholds: TaskThresholds = thresholdsData ?? DEFAULT_THRESHOLDS;
 
   const fetchChartsBulk = useServerFn(getTaskProgressChartsBulk);
   const { data: chartRows = [] } = useQuery({
@@ -358,7 +352,8 @@ export function TaskTreePage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeSearch.dataDate]);
-  const asOfDate = sharedDataDate || latestDataDate || undefined;
+  // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
+  const asOfDate = sharedDataDate || todayInDoha();
   const isPastAsOf =
     !!asOfDate && !!latestDataDate && asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
   const judge = useTmJudgmentAtDate(asOfDate ?? "", isPastAsOf);
@@ -602,6 +597,7 @@ export function TaskTreePage() {
         filtersLabel,
         searchLabel: search.trim(),
         asOfDate,
+        thresholds,
       });
       toast.success(`엑셀 내보내기 완료 — ${n.toLocaleString()} rows`);
     } catch (e) {
@@ -770,7 +766,7 @@ export function TaskTreePage() {
           const isDone = Number(p.actual_progress ?? 0) >= 1;
           const mainJudgment = resolveMainJudgment(p, kids, thresholds, asOfForJudge);
           const behindCount = kids.filter(
-            (k) => (computeVariance(k, asOfDate) ?? 0) < -0.05,
+            (k) => (computeVariance(k, asOfDate) ?? 0) < -thresholds.caution_gap_buffer,
           ).length;
           const pGap = computeVariance(p, asOfDate) ?? 0;
           const pTodayPlan = cumPlanProgress(p, asOfDate);
@@ -828,7 +824,7 @@ export function TaskTreePage() {
                   >
                     오늘 계획 <span className="font-medium text-foreground">{(pTodayPlan * 100).toFixed(0)}%</span>
                   </span>
-                  <GapCell gap={pGap} />
+                  <GapCell gap={pGap} buffer={thresholds.caution_gap_buffer} />
                   {mainJudgment && (
                     <Badge
                       className={cn(
@@ -903,7 +899,7 @@ export function TaskTreePage() {
                               {(cumPlanProgress(k, asOfDate) * 100).toFixed(0)}%
                             </td>
                             <td className="px-2 py-1">
-                              <GapCell gap={gap} />
+                              <GapCell gap={gap} buffer={thresholds.caution_gap_buffer} />
                             </td>
                             <td className="px-2 py-1">
                               {j && (

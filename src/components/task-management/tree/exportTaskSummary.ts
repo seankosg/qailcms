@@ -28,6 +28,8 @@ export interface ExportTaskSummaryOpts {
   searchLabel: string;
   sortLabel?: string;
   asOfDate?: string;
+  /** 임계값 단일 소스에서 전달 (색상 강조 경계) */
+  thresholds?: { caution_gap_buffer: number; worsen_gap: number };
 }
 
 // SHAW/앱 통일 팔레트 (ARGB)
@@ -142,8 +144,9 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
       if (key === "gap") {
         const g = row.gap as number | null;
         if (g == null) return null;
-        if (g < -0.05) return "FFFECACA"; // 지연
-        if (g > 0.05) return "FFD1FAE5"; // 선행
+        const buf = opts.thresholds?.caution_gap_buffer ?? 0.05;
+        if (g < -buf) return "FFFECACA"; // 지연
+        if (g > buf) return "FFD1FAE5"; // 선행
       }
       return null;
     },

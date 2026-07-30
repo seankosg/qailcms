@@ -44,9 +44,11 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   rows: Record<string, unknown>[];
   visibleKeys: string[];
+  /** 판정 기준일(As-of). 미지정 시 오늘(Asia/Qatar). */
+  asOf?: string;
 }
 
-import { dohaStampCompact, dohaDateTime } from "@/lib/time/doha";
+import { dohaStampCompact, dohaDateTime, todayInDoha } from "@/lib/time/doha";
 function timestamp() {
   // Doha (Asia/Qatar) — YYYYMMDD_HHmm
   const s = dohaStampCompact(); // YYYYMMDDHHmm
@@ -80,7 +82,8 @@ const JUDGMENT_FILL: Record<string, string> = {
   Completed: "FFD9E1F2",     // 완료 — 파랑
 };
 
-export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
+export function ExportDialog({ open, onOpenChange, rows, visibleKeys, asOf }: Props) {
+  const exportAsOf = asOf && asOf.length ? asOf : todayInDoha();
   const [format, setFormat] = useState<ExportFormat>("view");
   const [axis, setAxis] = useState<SplitAxis>("none");
   const [busy, setBusy] = useState(false);
@@ -93,35 +96,29 @@ export function ExportDialog({ open, onOpenChange, rows, visibleKeys }: Props) {
       const isView = format === "view";
       const keys = isView ? visibleKeys : TM_COLUMNS.map((c) => c.key);
 
-      // T.Actual (오늘 실적) — data_date 별로 그룹화해 서버 RPC 배치 조회.
-      const idsByDate = new Map<string, string[]>();
-      for (const r of rows) {
-        const id = String((r as any).id ?? "");
-        const d = ((r as any).data_date as string | null) ?? "";
-        if (!id || !d) continue;
-        const dd = String(d).slice(0, 10);
-        if (!idsByDate.has(dd)) idsByDate.set(dd, []);
-        idsByDate.get(dd)!.push(id);
-      }
+      // T.Actual (일별 실적 증분) — 판정 기준일(As-of) 단일 값으로 서버 RPC 1회 배치 조회.
+      // 계산은 status_history 직전 관측치와의 차분(tm_today_actual) — 사본 로직 없음.
       const tActualMap = new Map<string, number>();
-      for (const [dd, ids] of idsByDate) {
-        const { data, error } = await (supabase as any).rpc("tm_today_actual", {
-          _ids: ids,
-          _as_of: dd,
-        });
-        if (error) throw error;
-        if (data != null && !Array.isArray(data)) {
-          throw new Error("tm_today_actual RPC contract mismatch: expected jsonb array");
-        }
-        for (const row of ((data ?? []) as unknown[]) as Array<{ id: string; t_actual: number }>) {
-          tActualMap.set(String(row.id), Number(row.t_actual) || 0);
+      {
+        const ids = rows.map((r) => String((r as any).id ?? "")).filter(Boolean);
+        if (ids.length) {
+          const { data, error } = await (supabase as any).rpc("tm_today_actual", {
+            _ids: ids,
+            _as_of: exportAsOf,
+          });
+          if (error) throw error;
+          if (data != null && !Array.isArray(data)) {
+            throw new Error("tm_today_actual RPC contract mismatch: expected jsonb array");
+          }
+          for (const row of ((data ?? []) as unknown[]) as Array<{ id: string; t_actual: number }>) {
+            tActualMap.set(String(row.id), Number(row.t_actual) || 0);
+          }
         }
       }
 
       // Cum. Diff / T.Plan / T.Actual / T.Diff 모두 파생 계산으로 덮어쓴다 (임포트값 무시).
       const derivedRows = rows.map((r) => {
-        const asOf = ((r as any).data_date as string | null) ?? undefined;
-        const cumDiff = computeVariance(r as any, asOf);
+        const cumDiff = computeVariance(r as any, exportAsOf);
         const tPlan = computeDailyPlan(r as any);
         const tActual = tActualMap.get(String((r as any).id)) ?? 0;
         const tDiff = computeDailyDiff(r as any, tActual);

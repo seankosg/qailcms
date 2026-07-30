@@ -17,6 +17,7 @@ import {
 } from "@/lib/task-management/derived";
 import { AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
 import { saveTaskThresholds } from "@/lib/task-management/settings.functions";
+import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { runRecalcAutoJudgment } from "@/lib/task-management/rollup.functions";
 import { cn } from "@/lib/utils";
 
@@ -30,18 +31,8 @@ function Page() {
   const save = useServerFn(saveTaskThresholds);
   const recalcAll = useServerFn(runRecalcAutoJudgment);
 
-  const { data: settings } = useQuery({
-    queryKey: ["task-settings"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("task_management_settings")
-        .select("*")
-        .eq("id", "default")
-        .maybeSingle();
-      if (error) throw error;
-      return data ?? DEFAULT_THRESHOLDS;
-    },
-  });
+  // 임계값 단일 소스: tm_thresholds() RPC
+  const { data: settings } = useTaskManagementSettings();
 
   const { data: rows = [] } = useQuery<Array<Record<string, unknown>>>({
     queryKey: ["task-preview-rows"],
