@@ -362,15 +362,30 @@ export function TaskTreePage() {
     !!asOfDate && !!latestDataDate && asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
   const judge = useTmJudgmentAtDate(asOfDate ?? "", isPastAsOf);
 
-  // 서버 판정을 rows 에 병합 — Actual 은 절대 덮어쓰지 않는다.
+  // 과거 As-of: 서버 정본(tm_judge_at_date)의 그 시점 판정과 함께
+  // 표시용 Actual 도 그 시점 관측치로 치환한다.
+  // (판정만 as-of 로 바꾸고 Actual 은 현재값을 보여주면
+  //  "실적 100% / 차이 0%p 인데 악화" 같은 표시-판정 불일치가 발생한다.)
   const effData = useMemo<Row[]>(() => {
     if (!isPastAsOf || judge.map.size === 0) return data;
+    const cut = asOfDate.slice(0, 10);
+    const maskDate = (d: string | null) =>
+      d && String(d).slice(0, 10) > cut ? null : d;
     return data.map((r) => {
       const j = judge.map.get(r.id);
       if (!j) return r;
-      return { ...r, auto_judgment: j.auto_judgment ?? null } as Row;
+      const rawA = j.cum_actual_pct;
+      const asOfActual =
+        rawA == null ? 0 : Number(rawA) > 1 ? Number(rawA) / 100 : Number(rawA);
+      return {
+        ...r,
+        auto_judgment: j.auto_judgment ?? null,
+        actual_progress: asOfActual,
+        actual_start: asOfActual > 0 ? maskDate(r.actual_start) : null,
+        actual_finish: asOfActual >= 1 ? maskDate(r.actual_finish) : null,
+      } as Row;
     });
-  }, [data, isPastAsOf, judge.map]);
+  }, [data, isPastAsOf, judge.map, asOfDate]);
 
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
