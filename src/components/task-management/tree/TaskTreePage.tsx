@@ -47,8 +47,28 @@ import { asOfHeaderLabel, stalenessLabel } from "@/lib/task-management/as-of";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { todayInDoha } from "@/lib/time/doha";
 import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
+import { MwsColumnOrderMenu } from "@/components/my-work-space/MwsColumnOrderMenu";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
+
+/** Task Summary(요약 표) 컬럼 정의 — Raw Data 의 Columns 메뉴와 동일 UI 로 제어 */
+const SUMMARY_COLUMN_LABELS: Record<string, string> = {
+  task_no: "Task No",
+  sub_task_desc: "Sub Task 설명",
+  pic: "담당",
+  plan: "계획",
+  actual: "실적",
+  today_plan: "오늘 계획",
+  gap: "차이",
+  judgment: "판정",
+  chart: "진도 차트",
+};
+const SUMMARY_DEFAULT_ORDER = Object.keys(SUMMARY_COLUMN_LABELS);
+const SUMMARY_DEFAULT_FROZEN = ["task_no"];
+const SUMMARY_DEFAULT_VISIBILITY: Record<string, boolean> = Object.fromEntries(
+  SUMMARY_DEFAULT_ORDER.map((k) => [k, true]),
+);
+const SUMMARY_COLS_KEY = "tm-task-summary-columns-v1";
 
 interface Row {
   id: string;
