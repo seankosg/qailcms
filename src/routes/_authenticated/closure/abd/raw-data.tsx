@@ -28,6 +28,14 @@ const abdRawDataSearchSchema = z.object({
   dateField: fallback(z.string(), "").default(""),
   dateFields: fallback(z.string(), "").default(""),
   stage: fallback(z.string(), "").default(""),
+  // Progress Matrix 셀 드릴다운 전용(술어 정본 = abd_progress_events)
+  cellStage: fallback(z.string(), "").default(""),
+  cellField: fallback(z.string(), "").default(""),
+  cellFrom: fallback(z.string(), "").default(""),
+  cellTo: fallback(z.string(), "").default(""),
+  cellMode: fallback(z.string(), "").default(""),
+  // 매트릭스가 보던 As-of 를 명시 전달(세션 공유에 의존하지 않음)
+  asOf: fallback(z.string(), "").default(""),
   round: fallback(z.enum(["R1", "R2", "R3", "all"]), "all").default("all"),
   // 모집단 정본: Terminated 포함 전수(6,659). Progress·Dashboard 와 동일 기준.
   excluded: fallback(z.enum(["hide", "only", "all"]), "all").default("all"),
