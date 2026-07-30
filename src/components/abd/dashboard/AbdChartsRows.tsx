@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAbdDataDate } from "@/hooks/useAbdDataDate";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -23,9 +24,10 @@ interface BaseProps {
 /** Row 5 — Attention Lists (needs_planning / ur_aging / status_mismatch) */
 export function AbdRow6Attention({ plots = [], teams = [], batchNo = [], onOpenRaw, onOpenDetail }: BaseProps) {
   const fn = useServerFn(getAbdDashboardAttentionLists);
+  const [asOf] = useAbdDataDate();
   const { data } = useQuery({
-    queryKey: ["abd-dash-attention", plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, limit: 20, batch_no: batchNo } }),
+    queryKey: ["abd-dash-attention", asOf, plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, limit: 20, batch_no: batchNo, as_of: asOf || null } }}),
     staleTime: 30_000,
   });
   const rows = data ?? [];
@@ -159,9 +161,10 @@ function AttentionRows({
 /** Row 6b — DIS × Service Cross-cut */
 export function AbdRow6Crosscut({ plots = [], teams = [], batchNo = [], onOpenRaw }: BaseProps) {
   const fn = useServerFn(getAbdDashboardCrosscut);
+  const [asOf] = useAbdDataDate();
   const { data } = useQuery({
-    queryKey: ["abd-dash-crosscut", plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
+    queryKey: ["abd-dash-crosscut", asOf, plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo, as_of: asOf || null } }}),
     staleTime: 30_000,
   });
   const rows = data ?? [];

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAbdDataDate } from "@/hooks/useAbdDataDate";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,9 +16,10 @@ const ORDER: { key: Seg; label: string; color: string }[] = [
 
 export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; plots?: string[] }) {
   const fn = useServerFn(getAbdDashboardJudgmentMix);
+  const [asOf] = useAbdDataDate();
   const q = useQuery({
-    queryKey: ["abd-dash-judgment-mix", plots.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { batch_no: batchNo, plots } }),
+    queryKey: ["abd-dash-judgment-mix", asOf, plots.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { batch_no: batchNo, plots, as_of: asOf || null } }}),
     staleTime: 60_000,
   });
 
