@@ -16,7 +16,11 @@ import {
 } from "@/components/ui/select";
 import { ChevronDown, ChevronRight, Download, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DISCIPLINES, AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
+import { DISCIPLINES, AUTO_JUDGMENT_COLORS, TM_COLUMNS } from "@/lib/task-management/columns";
+import {
+  useTaskManagementFieldConfig,
+  buildTmLabelOverrides,
+} from "@/hooks/useTaskManagementFieldConfig";
 import type { Discipline } from "@/lib/task-management/columns";
 import {
   DEFAULT_THRESHOLDS,
@@ -251,6 +255,17 @@ export function TaskTreePage() {
   const [exporting, setExporting] = useState(false);
 
   // ── Columns 메뉴 상태 (localStorage 유지) ─────────────────────────────
+  const { data: tmFieldConfig } = useTaskManagementFieldConfig();
+  const summaryColumnLabels = useMemo(() => {
+    const overrides = buildTmLabelOverrides(tmFieldConfig);
+    const out: Record<string, string> = {};
+    for (const [key, src] of Object.entries(SUMMARY_COLUMN_SOURCE)) {
+      out[key] = src
+        ? overrides[src] ?? TM_COLUMNS.find((c) => c.key === src)?.label ?? src
+        : SUMMARY_FALLBACK_LABELS[key] ?? key;
+    }
+    return out;
+  }, [tmFieldConfig]);
   const [colOrder, setColOrder] = useState<string[]>(SUMMARY_DEFAULT_ORDER);
   const [colVisibility, setColVisibility] = useState<Record<string, boolean>>(
     SUMMARY_DEFAULT_VISIBILITY,
