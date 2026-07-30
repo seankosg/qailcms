@@ -4277,6 +4277,13 @@ export type Database = {
         }
         Returns: Json
       }
+      abd_mask_future_actuals: {
+        Args: {
+          _as_of: string
+          _row: Database["public"]["Tables"]["abd_items_raw"]["Row"]
+        }
+        Returns: Json
+      }
       abd_my_workspace_counts: {
         Args: { _filter_value: string; _mode: string; _today: string }
         Returns: Json
