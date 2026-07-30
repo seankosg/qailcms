@@ -71,10 +71,30 @@ const SUMMARY_COLUMN_SOURCE: Record<string, string | null> = {
   chart: null,
 };
 const SUMMARY_FALLBACK_LABELS: Record<string, string> = { chart: "진도 차트" };
-const SUMMARY_DEFAULT_ORDER = Object.keys(SUMMARY_COLUMN_SOURCE);
+/** 위 요약 컬럼이 이미 표시 중인 Raw Data 필드 (중복 노출 방지) */
+const SUMMARY_COVERED_FIELDS = new Set<string>([
+  "task_no",
+  "sub_task_desc",
+  "hdec_pic_name",
+  "plan_progress",
+  "actual_progress",
+  "expected_progress_today",
+  "today_gap",
+  "auto_judgment",
+  "plan_start",
+  "plan_end",
+]);
+/** Raw Data 의 나머지 모든 헤더 — 기본 숨김, Columns 메뉴에서 켜면 표시 */
+const SUMMARY_EXTRA_KEYS = TM_COLUMNS.map((c) => c.key).filter(
+  (k) => !SUMMARY_COVERED_FIELDS.has(k),
+);
+const SUMMARY_DEFAULT_ORDER = [
+  ...Object.keys(SUMMARY_COLUMN_SOURCE),
+  ...SUMMARY_EXTRA_KEYS,
+];
 const SUMMARY_DEFAULT_FROZEN = ["task_no"];
 const SUMMARY_DEFAULT_VISIBILITY: Record<string, boolean> = Object.fromEntries(
-  SUMMARY_DEFAULT_ORDER.map((k) => [k, true]),
+  SUMMARY_DEFAULT_ORDER.map((k) => [k, !SUMMARY_EXTRA_KEYS.includes(k)]),
 );
 const SUMMARY_COLS_KEY = "tm-task-summary-columns-v1";
 
@@ -99,6 +119,21 @@ interface Row {
   sub_task_desc: string | null;
   sort_order: number | null;
   data_date: string | null;
+  [key: string]: unknown;
+}
+
+/** Raw Data 추가 컬럼용 범용 셀 포맷터 */
+function formatExtraValue(key: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "-";
+  const def = TM_COLUMNS.find((c) => c.key === key);
+  if (def?.type === "percent") {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "-";
+    return `${((n > 1 ? n / 100 : n) * 100).toFixed(0)}%`;
+  }
+  if (def?.type === "date") return String(value).slice(0, 10);
+  if (def?.type === "boolean") return value ? "Y" : "N";
+  return String(value);
 }
 
 /** as-of 기준 재판정이 정본. 저장 판정(auto_judgment) 우선 분기는 제거되었다. */
