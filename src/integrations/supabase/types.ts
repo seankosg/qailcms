@@ -4363,6 +4363,15 @@ export type Database = {
         }
         Returns: Json
       }
+      abd_progress_events: {
+        Args: { _as_of_date: string; _plan_mode?: string; _round?: string }
+        Returns: {
+          edate: string
+          field: string
+          item_id: string
+          stage: string
+        }[]
+      }
       abd_progress_totals:
         | {
             Args: {
