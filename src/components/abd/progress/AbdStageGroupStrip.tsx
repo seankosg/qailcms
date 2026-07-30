@@ -5,9 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getAbdStageGroupCounts } from "@/lib/abd/dashboard.functions";
 
-/** 생애주기 순 7카드 — stage_group 정본 축. 라운드 접힘 축이므로 R 접두 없음. */
+/** 생애주기 순 6카드 — stage_group 정본 축. 라운드 접힘 축이므로 R 접두 없음.
+ *  2026-07-30 NS 폐지: 실적 전무 도면은 R1 DS(코드 DS1)로 DS 카드에 귀속. */
 const GROUPS: Array<{ code: string; label: string }> = [
-  { code: "NS", label: "Not Started" },
   { code: "DS", label: "Awaiting Draft Start" },
   { code: "DF", label: "Awaiting Draft Finish" },
   { code: "SB", label: "Awaiting Submission" },
@@ -33,14 +33,24 @@ export function AbdStageGroupStrip({ plots, teams, onOpenRaw }: Props) {
     staleTime: 30_000,
   });
 
-  const { byGroup, grandTotal, grandDelay } = useMemo(() => {
+  const { byGroup, byGroupStage, grandTotal, grandDelay } = useMemo(() => {
     const map = new Map<string, Array<{ team: string; total: number; delayed: number }>>();
+    const stageMap = new Map<string, Map<string, number>>();
     let gt = 0;
     let gd = 0;
     for (const r of data ?? []) {
       const arr = map.get(r.stage_group) ?? [];
-      arr.push({ team: r.team, total: r.total, delayed: r.delayed });
+      const found = arr.find((x) => x.team === r.team);
+      if (found) {
+        found.total += r.total;
+        found.delayed += r.delayed;
+      } else {
+        arr.push({ team: r.team, total: r.total, delayed: r.delayed });
+      }
       map.set(r.stage_group, arr);
+      const sm = stageMap.get(r.stage_group) ?? new Map<string, number>();
+      sm.set(r.stage, (sm.get(r.stage) ?? 0) + r.total);
+      stageMap.set(r.stage_group, sm);
       gt += r.total;
       gd += r.delayed;
     }
@@ -59,17 +69,23 @@ export function AbdStageGroupStrip({ plots, teams, onOpenRaw }: Props) {
         }),
       );
     }
-    return { byGroup: map, grandTotal: gt, grandDelay: gd };
+    return { byGroup: map, byGroupStage: stageMap, grandTotal: gt, grandDelay: gd };
   }, [data]);
 
   return (
     <div className="space-y-1">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {GROUPS.map(({ code, label }) => {
           const rows = byGroup.get(code) ?? [];
           const total = rows.reduce((s, r) => s + r.total, 0);
           const delayed = rows.reduce((s, r) => s + r.delayed, 0);
           const sgCode = code.toLowerCase();
+          const roundRows =
+            code === "DS"
+              ? [...(byGroupStage.get(code) ?? new Map<string, number>()).entries()]
+                  .filter(([s]) => /^DS\d$/.test(s))
+                  .sort((a, b) => a[0].localeCompare(b[0]))
+              : [];
           const sub =
             code === "APPROVED" ? (
               <span className="text-muted-foreground">
@@ -138,6 +154,15 @@ export function AbdStageGroupStrip({ plots, teams, onOpenRaw }: Props) {
                   )}
                 </div>
                 <div className="mt-1.5 text-[11px] tabular-nums">{sub}</div>
+                {roundRows.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-x-2 text-[11px] tabular-nums text-muted-foreground">
+                    {roundRows.map(([stage, cnt]) => (
+                      <span key={stage}>
+                        {formatAbdStage(stage, "short")} {cnt.toLocaleString()}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
