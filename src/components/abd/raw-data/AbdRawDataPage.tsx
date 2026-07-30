@@ -95,6 +95,8 @@ function serializeFilters(f: ColumnFiltersState): string {
 }
 
 const MULTI_DATE_RANGE_ID = "__abd_date_range_or__";
+/** Progress Matrix 셀 드릴다운 전용 필터. 술어 정본 = public.abd_progress_events(). */
+const CELL_RANGE_ID = "__abd_cell_range__";
 
 function buildFiltersFromProgressContext(urlSearch: any): ColumnFiltersState {
   const filters: ColumnFiltersState = [];
@@ -110,6 +112,20 @@ function buildFiltersFromProgressContext(urlSearch: any): ColumnFiltersState {
   addMulti("doc_ax", urlSearch.docAx);
   addMulti("doc_axx", urlSearch.docAxx);
   addMulti("batch_no", urlSearch.batch);
+  // Progress Matrix 셀 드릴다운 — 라운드 인식(rn ≤/= v_active) · AP는 ap_plan 술어.
+  if (urlSearch.cellStage && urlSearch.cellFrom) {
+    filters.push({
+      id: CELL_RANGE_ID,
+      value: {
+        stage: String(urlSearch.cellStage),
+        field: urlSearch.cellField === "actual" ? "actual" : "planned",
+        from: String(urlSearch.cellFrom),
+        to: String(urlSearch.cellTo || urlSearch.cellFrom),
+        planMode: urlSearch.cellMode === "remaining" ? "remaining" : "baseline",
+      },
+    });
+    return filters;
+  }
   // dateFields (콤마 목록) 우선 — 다중 컬럼 OR 범위 (round=all 드릴다운)
   if (urlSearch.dateFields && (urlSearch.dateStart || urlSearch.dateEnd)) {
     const cols = String(urlSearch.dateFields).split(",").map((s: string) => s.trim()).filter(Boolean);
@@ -131,6 +147,15 @@ function toServerFilters(f: ColumnFiltersState): AbdServerFilter[] {
     const id = cf.id;
     const v: any = cf.value;
     if (v == null) continue;
+    // Progress Matrix 셀 드릴다운 (집계와 동일 술어)
+    if (id === CELL_RANGE_ID && typeof v === "object" && v.stage && v.from) {
+      out.push({
+        column: "__cell__",
+        op: v.field === "actual" ? "stage_actual_range" : "stage_plan_range",
+        value: { stage: v.stage, field: v.field, from: v.from, to: v.to ?? v.from, planMode: v.planMode ?? "baseline" },
+      });
+      continue;
+    }
     // 다중 컬럼 OR 날짜 범위 (Progress round=all 드릴다운 전용)
     if (id === MULTI_DATE_RANGE_ID && typeof v === "object" && Array.isArray(v.columns)) {
       if ((v.from || v.to) && v.columns.length > 0) {
