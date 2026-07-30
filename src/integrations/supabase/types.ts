@@ -4096,6 +4096,7 @@ export type Database = {
           }
       abd_dashboard_attention_lists: {
         Args: {
+          _as_of?: string
           _batch_no?: string[]
           _limit?: number
           _plots?: string[]
@@ -4103,27 +4104,22 @@ export type Database = {
         }
         Returns: Json
       }
-      abd_dashboard_crosscut:
-        | {
-            Args: { _plots?: string[]; _teams?: string[] }
-            Returns: {
-              bucket: string
-              cnt: number
-              dis: string
-              service: string
-            }[]
-          }
-        | {
-            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
-            Returns: {
-              bucket: string
-              cnt: number
-              dis: string
-              service: string
-            }[]
-          }
+      abd_dashboard_crosscut: {
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
+        Returns: {
+          bucket: string
+          cnt: number
+          dis: string
+          service: string
+        }[]
+      }
       abd_dashboard_judgment_mix: {
-        Args: { _batch_no?: string[]; _plots?: string[] }
+        Args: { _as_of?: string; _batch_no?: string[]; _plots?: string[] }
         Returns: {
           approved: number
           caution: number
@@ -4169,7 +4165,12 @@ export type Database = {
             }[]
           }
       abd_dashboard_row1_json: {
-        Args: { _batch_no: string[]; _plots: string[]; _teams: string[] }
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
         Returns: Json
       }
       abd_dashboard_row2:
@@ -4190,28 +4191,35 @@ export type Database = {
             }[]
           }
       abd_dashboard_row2_json: {
-        Args: { _batch_no: string[]; _plots: string[]; _teams: string[] }
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
         Returns: Json
       }
-      abd_dashboard_status_dist:
-        | {
-            Args: { _plots?: string[]; _teams?: string[] }
-            Returns: {
-              cnt: number
-              status: string
-            }[]
-          }
-        | {
-            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
-            Returns: {
-              cnt: number
-              status: string
-            }[]
-          }
+      abd_dashboard_status_dist: {
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
+        Returns: {
+          cnt: number
+          status: string
+        }[]
+      }
       abd_derived_cols: { Args: never; Returns: string[] }
       abd_items_by_numbers: { Args: { _nums: string[] }; Returns: Json }
       abd_items_counts: {
-        Args: { _include_inactive?: boolean; _plot?: string; _team?: string }
+        Args: {
+          _as_of?: string
+          _include_inactive?: boolean
+          _plot?: string
+          _team?: string
+        }
         Returns: {
           approved_count: number
           excluded_count: number
@@ -4223,6 +4231,7 @@ export type Database = {
       }
       abd_items_facets: {
         Args: {
+          _as_of?: string
           _column: string
           _filters?: Json
           _include_inactive?: boolean
@@ -4239,6 +4248,7 @@ export type Database = {
       }
       abd_items_search: {
         Args: {
+          _as_of?: string
           _bucket?: string[]
           _excluded_mode?: string
           _filters?: Json
@@ -4492,7 +4502,12 @@ export type Database = {
         Returns: string
       }
       abd_stage_group_counts: {
-        Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
         Returns: Json
       }
       allocate_main_task_no: { Args: { _discipline: string }; Returns: string }
