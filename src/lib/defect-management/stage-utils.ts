@@ -8,37 +8,11 @@ export function todayIso(): string {
 type Row = Record<string, any>;
 
 export function isStageDone(row: Row, stage: "start" | "rectified" | "closure"): boolean {
-  const sr = String(row.status_raw ?? "").trim().toLowerCase();
-  const isRectifiedFamily =
-    sr === "rectified" ||
-    sr === "complete" ||
-    sr === "completed" ||
-    sr === "closed" ||
-    sr === "verified";
-  const isClosedFamily = sr === "closed" || sr === "verified";
-  if (stage === "closure") {
-    if (row.actual_closure_date) return true;
-    if (isClosedFamily) return true;
-    const cs = String(row.closure_status ?? "").trim().toLowerCase();
-    if (cs === "closed" || cs === "verified") return true;
-    return false;
-  }
-  if (stage === "rectified") {
-    if (row.actual_rectified_date) return true;
-    const p = Number(row.actual_progress_pct ?? 0);
-    if ((p > 1 ? p : p * 100) >= 100) return true;
-    if (row.actual_closure_date) return true;
-    if (isRectifiedFamily) return true;
-    const rs = String(row.rectified_status ?? "").trim().toLowerCase();
-    if (rs === "rectified") return true;
-    return false;
-  }
-  // start
-  if (isRectifiedFamily) return true;
-  if (row.actual_start_date) return true;
-  const p = Number(row.actual_progress_pct ?? 0);
-  if (p > 0) return true;
-  return Boolean(row.actual_rectified_date || row.actual_closure_date);
+  // A안(2026-07-30 확정): done 은 해당 스테이지 '자기 실적일' 만 인정.
+  // 캐스케이드(후행 스테이지 날짜)·상태 스칼라(status_raw / progress_pct) 인정 제거.
+  if (stage === "closure") return Boolean(row.actual_closure_date);
+  if (stage === "rectified") return Boolean(row.actual_rectified_date);
+  return Boolean(row.actual_start_date);
 }
 
 export function isStageDelayedAsOf(row: Row, stage: "start" | "rectified" | "closure", asOf: string | null | undefined): boolean {
