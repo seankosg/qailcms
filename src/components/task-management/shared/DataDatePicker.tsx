@@ -22,6 +22,8 @@ export interface DataDatePickerProps {
   showDataDateChip?: boolean;
   /** 팀별 최신 컷오프가 갈릴 때만 병기 (예: [{label:"MECH",date:"2026-07-30"}]). */
   dataDateByTeam?: { label: string; date: string }[];
+  /** "asof"(기본): 기준=오늘, 리셋=오늘로. "datadate": 기준=latest, 리셋=최신으로. */
+  mode?: "asof" | "datadate";
 }
 
 /** As of(판정 기준일) 캘린더 선택기.
@@ -40,12 +42,13 @@ export function DataDatePicker({
   className,
   showDataDateChip = false,
   dataDateByTeam,
+  mode = "asof",
 }: DataDatePickerProps) {
   const [open, setOpen] = useState(false);
-  const today = todayInDoha();
+  const today = mode === "datadate" ? latest || todayInDoha() : todayInDoha();
   // As-of 기본값은 오늘(Asia/Qatar). latest(data_date)로 폴백하지 않는다.
   const active = value || today;
-  const offset = asOfOffsetLabel(active, today);
+  const offset = mode === "datadate" ? "" : asOfOffsetLabel(active, today);
 
   const teamChip =
     dataDateByTeam && dataDateByTeam.length > 1
@@ -94,7 +97,9 @@ export function DataDatePicker({
               {formatDdMmmYyyy(active) || "날짜 선택"}
             </span>
             {active === today && (
-              <span className="ml-auto text-[10px] text-muted-foreground">오늘</span>
+              <span className="ml-auto text-[10px] text-muted-foreground">
+                {mode === "datadate" ? "최신" : "오늘"}
+              </span>
             )}
           </Button>
         </PopoverTrigger>
@@ -124,10 +129,10 @@ export function DataDatePicker({
           variant="ghost"
           className="h-7 px-2 text-[11px]"
           onClick={onReset}
-          title="오늘로 리셋"
+          title={mode === "datadate" ? "최신으로 리셋" : "오늘로 리셋"}
         >
           <RotateCcw className="mr-1 h-3 w-3" />
-          오늘
+          {mode === "datadate" ? "최신" : "오늘"}
         </Button>
       )}
       {showDataDateChip && latest && (
