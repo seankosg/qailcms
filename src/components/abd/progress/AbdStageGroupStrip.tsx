@@ -22,15 +22,17 @@ const TEAM_ORDER = ["MECH", "ELEC"];
 interface Props {
   plots: string[];
   teams: string[];
+  /** 판정 기준일(As of, YYYY-MM-DD). 미지정 = 오늘(Doha). */
+  asOf?: string | null;
   /** 드릴다운: status(=sg_/sgd_ 코드) + 선택적 team */
   onOpenRaw: (params: { status: string; team?: string }) => void;
 }
 
-export function AbdStageGroupStrip({ plots, teams, onOpenRaw }: Props) {
+export function AbdStageGroupStrip({ plots, teams, asOf, onOpenRaw }: Props) {
   const fn = useServerFn(getAbdStageGroupCounts);
   const { data } = useQuery({
-    queryKey: ["abd-stage-group-counts", plots.join(","), teams.join(",")],
-    queryFn: () => fn({ data: { plots, teams, batch_no: [] } }),
+    queryKey: ["abd-stage-group-counts", asOf ?? "", plots.join(","), teams.join(",")],
+    queryFn: () => fn({ data: { plots, teams, batch_no: [], as_of: asOf || null } }),
     staleTime: 30_000,
   });
 
