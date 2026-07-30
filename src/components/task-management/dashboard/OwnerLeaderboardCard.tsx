@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -29,10 +29,26 @@ const DIM_LABEL: Record<OwnerDim, string> = {
   hdec_eng_name: "HDEC ENG",
 };
 
+type SortKey = "key" | "taskCount" | "delayedTasks" | "planPct" | "actualPct" | "diffPp";
+type SortDir = "asc" | "desc";
+
 export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_name", onDimChange, onOwnerClick, thresholds }: Props) {
   const [dim, setDim] = useState<OwnerDim>(defaultDim);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  // 기본 정렬: 기존 동작(가장 뒤처진 담당자 상단) 유지 = diffPp 오름차순
+  const [sortKey, setSortKey] = useState<SortKey>("diffPp");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const toggleSort = (k: SortKey) => {
+    if (k === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(k);
+      // 이름은 오름차순, 수치는 큰 값 우선이 자연스러움
+      setSortDir(k === "key" ? "asc" : "desc");
+    }
+  };
 
   const rows = useMemo(
     () => computeOwnerLeaderboard(items, asOfDate, dim, thresholds),
@@ -40,9 +56,16 @@ export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_n
   );
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    if (!qq) return rows;
-    return rows.filter((r) => r.key.toLowerCase().includes(qq));
-  }, [rows, q]);
+    const base = qq ? rows.filter((r) => r.key.toLowerCase().includes(qq)) : rows;
+    const sign = sortDir === "asc" ? 1 : -1;
+    return [...base].sort((a, b) => {
+      if (sortKey === "key") return sign * a.key.localeCompare(b.key, "ko");
+      const av = a[sortKey] as number;
+      const bv = b[sortKey] as number;
+      if (av === bv) return a.key.localeCompare(b.key, "ko");
+      return sign * (av - bv);
+    });
+  }, [rows, q, sortKey, sortDir]);
 
   const handle = (v: string) => {
     if (v === "team" || v === "hdec_pic_name" || v === "hdec_eng_name") {
@@ -107,12 +130,12 @@ export function OwnerLeaderboardCard({ items, asOfDate, defaultDim = "hdec_pic_n
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-muted/60">
               <tr>
-                <th className="px-2 py-1 text-left">{DIM_LABEL[dim]}</th>
-                <th className="px-2 py-1 text-right">Task</th>
-                <th className="px-2 py-1 text-right" title="통합 판정('지연'|'악화') 태스크 수">지연 Task</th>
-                <th className="px-2 py-1" title="평균 진도(계획) — 판정 지표 아님">평균 진도(계획)</th>
-                <th className="px-2 py-1" title="평균 진도(실적) — 판정 지표 아님">평균 진도(실적)</th>
-                <th className="px-2 py-1 text-right">차이(%p)</th>
+                <SortTh label={DIM_LABEL[dim]} k="key" align="left" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortTh label="Task" k="taskCount" align="right" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortTh label="지연 Task" k="delayedTasks" align="right" title="통합 판정('지연'|'악화') 태스크 수" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortTh label="평균 진도(계획)" k="planPct" align="left" title="평균 진도(계획) — 판정 지표 아님" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortTh label="평균 진도(실적)" k="actualPct" align="left" title="평균 진도(실적) — 판정 지표 아님" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortTh label="차이(%p)" k="diffPp" align="right" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               </tr>
             </thead>
             <tbody>
@@ -176,5 +199,43 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
         {pct.toFixed(0)}
       </span>
     </div>
+  );
+}
+
+function SortTh({
+  label,
+  k,
+  align,
+  title,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  label: string;
+  k: SortKey;
+  align: "left" | "right";
+  title?: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (k: SortKey) => void;
+}) {
+  const active = sortKey === k;
+  const Icon = !active ? ArrowUpDown : sortDir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th className={cn("px-2 py-1", align === "right" ? "text-right" : "text-left")} title={title}>
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+        className={cn(
+          "inline-flex items-center gap-1 rounded px-1 -mx-1 hover:bg-accent/40",
+          active && "text-foreground font-semibold",
+          align === "right" && "flex-row-reverse",
+        )}
+      >
+        <span>{label}</span>
+        <Icon className={cn("h-3 w-3", active ? "opacity-100" : "opacity-40")} />
+      </button>
+    </th>
   );
 }
