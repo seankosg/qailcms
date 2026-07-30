@@ -124,6 +124,7 @@ export function AbdAconexImportPage() {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [columnFileId, setColumnFileId] = useState<string | null>(null);
+  const presetsRef = useRef<Array<{ id: string; label: string; fields: string[] }>>([]);
 
   const syncFieldKeys = useMemo(
     () => ABD_ACONEX_SYNC_FIELDS.map((o) => o.field),
@@ -152,6 +153,7 @@ export function AbdAconexImportPage() {
     },
     staleTime: 10_000,
   });
+  presetsRef.current = aconexPresets;
 
   const helpers = useMemo<ColumnSelectHelpers>(() => {
     return {
@@ -253,6 +255,7 @@ export function AbdAconexImportPage() {
       id: crypto.randomUUID(),
       file: f,
       status: "queued",
+      dataDate: parseDataDateFromFileName(f.name),
     }));
     setEntries((prev) => [...prev, ...created]);
     for (const e of created) {
@@ -261,10 +264,20 @@ export function AbdAconexImportPage() {
         const parsed = await parseAconexFile(e.file);
         // 파일의 원본 헤더 & 첫 데이터 행 샘플 추출 (컬럼 선택 다이얼로그용).
         const { fileHeaders, sampleRow } = await readFileHeaders(e.file);
+        // 기본 매핑 선택 = "Aconex Status Update" 프리셋
+        const presets = presetsRef.current;
+        const defPreset =
+          presets.find((p) => p.label.trim().toLowerCase() === DEFAULT_ACONEX_PRESET_LABEL) ??
+          presets[0];
+        let excludedHeaders: string[] = [];
+        if (defPreset && fileHeaders.length > 0) {
+          const keep = new Set(buildPresetHeaders(fileHeaders, defPreset.fields));
+          excludedHeaders = fileHeaders.filter((h) => !keep.has(h));
+        }
         setEntries((p) =>
           p.map((x) =>
             x.id === e.id
-              ? { ...x, parsed, fileHeaders, sampleRow, status: "previewing" }
+              ? { ...x, parsed, fileHeaders, sampleRow, excludedHeaders, status: "previewing" }
               : x,
           ),
         );
