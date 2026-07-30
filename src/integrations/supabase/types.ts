@@ -4096,6 +4096,7 @@ export type Database = {
           }
       abd_dashboard_attention_lists: {
         Args: {
+          _as_of?: string
           _batch_no?: string[]
           _limit?: number
           _plots?: string[]
@@ -4103,27 +4104,22 @@ export type Database = {
         }
         Returns: Json
       }
-      abd_dashboard_crosscut:
-        | {
-            Args: { _plots?: string[]; _teams?: string[] }
-            Returns: {
-              bucket: string
-              cnt: number
-              dis: string
-              service: string
-            }[]
-          }
-        | {
-            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
-            Returns: {
-              bucket: string
-              cnt: number
-              dis: string
-              service: string
-            }[]
-          }
+      abd_dashboard_crosscut: {
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
+        Returns: {
+          bucket: string
+          cnt: number
+          dis: string
+          service: string
+        }[]
+      }
       abd_dashboard_judgment_mix: {
-        Args: { _batch_no?: string[]; _plots?: string[] }
+        Args: { _as_of?: string; _batch_no?: string[]; _plots?: string[] }
         Returns: {
           approved: number
           caution: number
@@ -4169,7 +4165,12 @@ export type Database = {
             }[]
           }
       abd_dashboard_row1_json: {
-        Args: { _batch_no: string[]; _plots: string[]; _teams: string[] }
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
         Returns: Json
       }
       abd_dashboard_row2:
@@ -4190,28 +4191,35 @@ export type Database = {
             }[]
           }
       abd_dashboard_row2_json: {
-        Args: { _batch_no: string[]; _plots: string[]; _teams: string[] }
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
         Returns: Json
       }
-      abd_dashboard_status_dist:
-        | {
-            Args: { _plots?: string[]; _teams?: string[] }
-            Returns: {
-              cnt: number
-              status: string
-            }[]
-          }
-        | {
-            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
-            Returns: {
-              cnt: number
-              status: string
-            }[]
-          }
+      abd_dashboard_status_dist: {
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
+        Returns: {
+          cnt: number
+          status: string
+        }[]
+      }
       abd_derived_cols: { Args: never; Returns: string[] }
       abd_items_by_numbers: { Args: { _nums: string[] }; Returns: Json }
       abd_items_counts: {
-        Args: { _include_inactive?: boolean; _plot?: string; _team?: string }
+        Args: {
+          _as_of?: string
+          _include_inactive?: boolean
+          _plot?: string
+          _team?: string
+        }
         Returns: {
           approved_count: number
           excluded_count: number
@@ -4223,6 +4231,7 @@ export type Database = {
       }
       abd_items_facets: {
         Args: {
+          _as_of?: string
           _column: string
           _filters?: Json
           _include_inactive?: boolean
@@ -4239,6 +4248,7 @@ export type Database = {
       }
       abd_items_search: {
         Args: {
+          _as_of?: string
           _bucket?: string[]
           _excluded_mode?: string
           _filters?: Json
@@ -4263,6 +4273,13 @@ export type Database = {
       abd_judge_v1: {
         Args: {
           _as_of?: string
+          _row: Database["public"]["Tables"]["abd_items_raw"]["Row"]
+        }
+        Returns: Json
+      }
+      abd_mask_future_actuals: {
+        Args: {
+          _as_of: string
           _row: Database["public"]["Tables"]["abd_items_raw"]["Row"]
         }
         Returns: Json
@@ -4391,12 +4408,113 @@ export type Database = {
           pdate: string
         }[]
       }
+      abd_rows_as_of: {
+        Args: { _as_of?: string }
+        Returns: {
+          abd_number: string
+          abd_ocs_no: string | null
+          aconex_date_modified: string | null
+          aconex_last_synced_at: string | null
+          aconex_review_status_raw: string | null
+          aconex_status_raw: string | null
+          active_round: number | null
+          approval_date: string | null
+          batch_no: string | null
+          bucket_top: string | null
+          completed_stage: string | null
+          completed_stage_group: string | null
+          created_at: string
+          current_stage: string | null
+          data_date: string | null
+          delay_bucket: string[]
+          delay_late: string[]
+          dis: string | null
+          doc_ax: string | null
+          doc_axx: string | null
+          doc_n: string | null
+          doc_nn1: string | null
+          doc_nn2: string | null
+          document_title: string | null
+          extra_rounds: Json | null
+          field_mismatch: boolean
+          has_r4_plus: boolean
+          hdec_eng_name: string | null
+          hdec_pic_name: string | null
+          id: string
+          inactive_reason: string | null
+          is_active: boolean
+          is_terminated: boolean
+          latest_rev: string | null
+          latest_status: string | null
+          latest_status_norm: string | null
+          mismatch_fields: Json
+          needs_planning: boolean
+          needs_revise: boolean
+          owner_user_id: string | null
+          plot: string | null
+          primary_delay: string | null
+          r1_dar_actual: string | null
+          r1_dar_plan: string | null
+          r1_draft_finish_actual: string | null
+          r1_draft_finish_plan: string | null
+          r1_draft_start_actual: string | null
+          r1_draft_start_plan: string | null
+          r1_response_result: string | null
+          r1_response_source: string | null
+          r1_submission_actual: string | null
+          r1_submission_plan: string | null
+          r2_dar_actual: string | null
+          r2_dar_plan: string | null
+          r2_draft_finish_actual: string | null
+          r2_draft_finish_plan: string | null
+          r2_draft_start_actual: string | null
+          r2_draft_start_plan: string | null
+          r2_response_result: string | null
+          r2_response_source: string | null
+          r2_submission_actual: string | null
+          r2_submission_plan: string | null
+          r3_dar_actual: string | null
+          r3_dar_plan: string | null
+          r3_draft_finish_actual: string | null
+          r3_draft_finish_plan: string | null
+          r3_draft_start_actual: string | null
+          r3_draft_start_plan: string | null
+          r3_response_result: string | null
+          r3_response_source: string | null
+          r3_submission_actual: string | null
+          r3_submission_plan: string | null
+          raw_payload: Json
+          revise_source_round: number | null
+          row_version: number
+          rs_result_missing: boolean
+          service: string | null
+          sl_no: number | null
+          source_import_log_id: string | null
+          status_group: string | null
+          status_mismatch: boolean
+          team: string
+          updated_at: string
+          updated_by: string | null
+          ur_aging_days: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "abd_items_raw"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       abd_stage_group: {
         Args: { _row: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
         Returns: string
       }
       abd_stage_group_counts: {
-        Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
+        Args: {
+          _as_of?: string
+          _batch_no?: string[]
+          _plots?: string[]
+          _teams?: string[]
+        }
         Returns: Json
       }
       allocate_main_task_no: { Args: { _discipline: string }; Returns: string }

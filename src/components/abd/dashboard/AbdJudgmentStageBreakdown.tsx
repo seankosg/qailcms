@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAbdDataDate } from "@/hooks/useAbdDataDate";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAbdDashboardJudgmentMix } from "@/lib/abd/dashboard.functions";
@@ -22,9 +23,10 @@ const COLOR: Record<string, string> = {
 
 export function AbdJudgmentStageBreakdown({ batchNo, plots = [] }: { batchNo: string[]; plots?: string[] }) {
   const fn = useServerFn(getAbdDashboardJudgmentMix);
+  const [asOf] = useAbdDataDate();
   const q = useQuery({
-    queryKey: ["abd-dash-judgment-mix", plots.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { batch_no: batchNo, plots } }),
+    queryKey: ["abd-dash-judgment-mix", asOf, plots.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { batch_no: batchNo, plots, as_of: asOf || null } }),
     staleTime: 60_000,
   });
   const byStage = new Map((q.data ?? []).map((r) => [r.stage, r] as const));

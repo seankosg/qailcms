@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAbdDataDate } from "@/hooks/useAbdDataDate";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -134,9 +135,10 @@ interface Props {
 /** Row 1: 배타적 4분류 (Total, Approved, UR, DS). 2026-07-30 NS 폐지 — 실적 전무는 DS(R1 DS)에 포함. */
 export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }: Props) {
   const fn = useServerFn(getAbdDashboardRow1);
+  const [asOf] = useAbdDataDate();
   const { data } = useQuery({
-    queryKey: ["abd-dash-row1", plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
+    queryKey: ["abd-dash-row1", asOf, plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo, as_of: asOf || null } }),
     staleTime: 30_000,
   });
   const { totals, byTeam } = useMemo(() => pivotRows(data ?? []), [data]);
@@ -208,9 +210,10 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
 /** Row 2: 지연 카드 (RS/SB/DS 지연 · No Plan) */
 export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }: Props) {
   const fn = useServerFn(getAbdDashboardRow2);
+  const [asOf] = useAbdDataDate();
   const { data } = useQuery({
-    queryKey: ["abd-dash-row2", plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo } }),
+    queryKey: ["abd-dash-row2", asOf, plots.join(","), teams.join(","), batchNo.join(",")],
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo, as_of: asOf || null } }),
     staleTime: 30_000,
   });
   const { totals, byTeam } = useMemo(() => pivotRows(data ?? []), [data]);

@@ -110,7 +110,7 @@ export function AbdProgressPage() {
   const latestDataDate = dataDateOptions[0] ?? "";
   const effectiveDataDate = search.dataDate || latestDataDate;
   const asOfDate = asofMode === "today" || !effectiveDataDate ? today : effectiveDataDate;
-  const asOfLabel = asofMode === "today" ? "Today" : "Data Date";
+  const asOfLabel = asofMode === "today" ? "Today" : "As of";
 
   const rangeStart = useMemo(() => addDays(today, -14), [today]);
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
@@ -505,7 +505,7 @@ export function AbdProgressPage() {
                 className="gap-1"
               >
                 <ToggleGroupItem value="dataDate" className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                  Data Date
+                  As of
                 </ToggleGroupItem>
                 <ToggleGroupItem value="today" className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
                   Today
@@ -536,6 +536,7 @@ export function AbdProgressPage() {
       <AbdStageGroupStrip
         plots={plotsForDash}
         teams={teams}
+        asOf={asOfDate === today ? null : asOfDate}
         onOpenRaw={({ status, team }) =>
           openRaw(team ? { status, tab: team } : { status })
         }
