@@ -19,7 +19,8 @@ export interface DataDatePickerProps {
   className?: string;
 }
 
-/** Data Date 캘린더 선택기.
+/** As of(판정 기준일) 캘린더 선택기.
+ *  주의: 여기서 고르는 값은 판정 기준일(as_of)이며, 행별 관측 컷오프(data_date)와 다른 개념이다.
  *  options 에 포함된 날짜만 선택 가능(그 외 날짜는 disabled 처리).
  *  value: 실제 표시 중인 값. 비어있으면 latest 사용.
  *  latest: rows 최신 data_date.
@@ -62,7 +63,7 @@ export function DataDatePicker({
     <div className={"flex flex-wrap items-center gap-2 " + (className ?? "")}>
       <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         <CalendarDays className="h-3 w-3" />
-        Data Date
+        As of
       </span>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
