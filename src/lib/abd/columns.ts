@@ -94,7 +94,9 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "latest_rev", label: "Latest Rev", type: "text", width: 90, group: "latest", editable: true, editorType: "text", origin: "latest" },
   { key: "latest_status", label: "Latest Status", type: "badge", width: 110, group: "latest", editable: true, editorType: "select", options: [...ABD_STATUSES], origin: "latest" },
   { key: "approval_date", label: "Approval", type: "date", width: 100, group: "latest", editable: true, editorType: "date", origin: "latest" },
+  { key: "completed_stage", label: "Completed Stage", type: "badge", width: 140, group: "latest", origin: "system" },
   { key: "current_stage", label: "Current Stage", type: "badge", width: 160, group: "latest", origin: "system" },
+  // 의미 = 회신 대기(RS) 경과일. 내부 키 개명은 백로그(딥링크·RPC 하위호환).
   { key: "ur_aging_days", label: "UR Aging (d)", type: "number", width: 110, group: "latest", origin: "system" },
 
   // Round 1
@@ -155,7 +157,7 @@ export function inferAbdFilterType(t: AbdFieldType, key?: string): AbdFilterType
   if (
     key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status" ||
     key === "batch_no" || key === "hdec_pic_name" || key === "hdec_eng_name" ||
-    key === "current_stage"
+    key === "current_stage" || key === "completed_stage"
   ) return "multi-select";
   return "text";
 }
@@ -175,12 +177,13 @@ export const GROUP_HEADER_BG: Record<AbdGroupKey, string> = {
 /**
  * ABD `current_stage` 코드값 타입 정의.
  * DB `abd_compute_derived` 트리거가 채우는 값. UI 라벨은 `ABD_STAGE_LABELS` 로 매핑.
- *   - `NS`     Not Started (레거시 값 — 신 체계에서는 생성되지 않음)
+ *   - `NS`     Not Started (실적 전무 도면 — 존치되는 유효 값. stage_group 축에서 산출)
  *   - `DS{n}`  Draft Start, round n (초안 착수 대기)
  *   - `DF{n}`  Draft Finish, round n (초안 진행 중)
  *   - `SB{n}`  Submission, round n (제출 대기)
- *   - `RS{n}`  Response, round n (회신 대기)
+ *   - `RS{n}`  Response (by dar), round n (회신 대기). Ready-to-Submit 아님 — 해당 오용은 폐기됨.
  *   - `RESUBMIT{n}` Terminated 로 인해 라운드 n 재제출 대기
+ *   - `TM{n}`  Terminated, round n (completed_stage 전용. Task Management 모듈 약어와 무관)
  *   - `Approved` 최종 승인
  */
 export type AbdStageCode =
@@ -190,21 +193,65 @@ export type AbdStageCode =
   | "SB1" | "SB2" | "SB3"
   | "RS1" | "RS2" | "RS3"
   | "RESUBMIT1" | "RESUBMIT2" | "RESUBMIT3"
+  | "TM1" | "TM2" | "TM3"
   | "Approved";
 
-export const ABD_STAGE_LABELS: Record<AbdStageCode, string> = {
-  NS: "Not Started",
-  DS1: "Draft Start R1", DS2: "Draft Start R2", DS3: "Draft Start R3",
-  DF1: "Draft Finish R1", DF2: "Draft Finish R2", DF3: "Draft Finish R3",
-  SB1: "Submission R1", SB2: "Submission R2", SB3: "Submission R3",
-  RS1: "Response R1", RS2: "Response R2", RS3: "Response R3",
-  RESUBMIT1: "Awaiting Resubmit R1",
-  RESUBMIT2: "Awaiting Resubmit R2",
-  RESUBMIT3: "Awaiting Resubmit R3",
-  Approved: "Approved",
+/** 어순 표준 = 라운드 선행. 단계 약어 → 단계명 (Current 문맥 / Completed 문맥). */
+const STAGE_KIND_SHORT: Record<string, string> = {
+  DS: "DS", DF: "DF", SB: "SB", RS: "RS", RESUBMIT: "RSB", TM: "TM",
+};
+const STAGE_KIND_CURRENT_LONG: Record<string, string> = {
+  DS: "Draft Start", DF: "Draft Finish", SB: "Submission", RS: "Response", RESUBMIT: "Resubmit", TM: "Terminated",
+};
+const STAGE_KIND_COMPLETED_LONG: Record<string, string> = {
+  DS: "Draft Started", DF: "Draft Finished", SB: "Submitted", RS: "Response Received",
+  RESUBMIT: "Resubmit", TM: "Terminated",
 };
 
-export function formatAbdStage(code: string | null | undefined): string {
+export type AbdStageLabelVariant = "short" | "long" | "completed-short" | "completed-long";
+
+function splitStage(code: string): { kind: string; round: string | null } {
+  const m = /^([A-Za-z]+)(\d*)$/.exec(code);
+  if (!m) return { kind: code, round: null };
+  return { kind: m[1].toUpperCase(), round: m[2] || null };
+}
+
+/**
+ * ABD 스테이지 코드 → 표시 라벨 단일 소스.
+ * 어순 표준: 라운드 선행 ("R2 DF" / "Awaiting R2 Draft Finish" / "R2 Draft Finished").
+ * 라운드 없는 값(NS / Approved)은 Awaiting·R 접두 없음.
+ */
+export function formatAbdStage(
+  code: string | null | undefined,
+  variant: AbdStageLabelVariant = "long",
+): string {
   if (!code) return "—";
-  return ABD_STAGE_LABELS[code as AbdStageCode] ?? code;
+  const raw = String(code).trim();
+  if (!raw) return "—";
+  const upper = raw.toUpperCase();
+  if (upper === "NS") return variant === "short" || variant === "completed-short" ? "NS" : "Not Started";
+  if (upper === "APPROVED") return "Approved";
+
+  const { kind, round } = splitStage(raw);
+  const isCompleted = variant === "completed-short" || variant === "completed-long";
+  const short = variant === "short" || variant === "completed-short";
+  const prefix = round ? `R${round} ` : "";
+
+  if (short) {
+    const k = STAGE_KIND_SHORT[kind];
+    return k ? `${prefix}${k}` : raw;
+  }
+  const k = (isCompleted ? STAGE_KIND_COMPLETED_LONG : STAGE_KIND_CURRENT_LONG)[kind];
+  if (!k) return raw;
+  return isCompleted ? `${prefix}${k}` : `Awaiting ${prefix}${k}`;
+}
+
+/** stage_group(라운드 접힘) 라벨. R 접두 없음. */
+export function formatAbdStageGroup(kind: string | null | undefined): string {
+  if (!kind) return "—";
+  const k = kind.toUpperCase();
+  if (k === "NS") return "Not Started";
+  if (k === "APPROVED") return "Approved";
+  const label = STAGE_KIND_CURRENT_LONG[k];
+  return label ? `Awaiting ${label}` : kind;
 }
