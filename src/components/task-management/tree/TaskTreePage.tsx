@@ -299,6 +299,9 @@ export function TaskTreePage() {
         ? overrides[src] ?? TM_COLUMNS.find((c) => c.key === src)?.label ?? src
         : SUMMARY_FALLBACK_LABELS[key] ?? key;
     }
+    for (const key of SUMMARY_EXTRA_KEYS) {
+      out[key] = overrides[key] ?? TM_COLUMNS.find((c) => c.key === key)?.label ?? key;
+    }
     return out;
   }, [tmFieldConfig]);
   const [colOrder, setColOrder] = useState<string[]>(SUMMARY_DEFAULT_ORDER);
