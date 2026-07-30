@@ -403,17 +403,18 @@ export function AbdRawDataPage() {
   const serverSort = useMemo(() => toServerSort(sorting), [sorting]);
   const q = (urlSearch.q ?? "").trim();
 
+  // 판정 기준일(As of) — 세션 전역 공유. 빈 값이면 오늘(Doha).
+  const [sharedAbdDate] = useAbdDataDate();
   const { data: itemsData, isFetching, refetch } = useAbdItemsQuery({
     team, statusGroup, includeInactive, plot: plotFilter, q, filters: serverFilters, sort: serverSort, page, pageSize, excludedMode,
+    asOf: sharedAbdDate || null,
   });
   const rows = itemsData?.rows ?? [];
   const total = itemsData?.total ?? 0;
   const pageCount = isAllPage ? 1 : Math.max(1, Math.ceil(total / pageSize));
 
-  const { data: counts } = useAbdCounts({ team, includeInactive, plot: plotFilter });
+  const { data: counts } = useAbdCounts({ team, includeInactive, plot: plotFilter, asOf: sharedAbdDate || null });
   const dataDate = counts?.latest_data_date ?? null;
-  // Dashboard 에서 지정된 Data Date 를 참조(정보 표시용). 세션 전역 공유.
-  const [sharedAbdDate] = useAbdDataDate();
 
   // Restore view preferences
   useEffect(() => {
