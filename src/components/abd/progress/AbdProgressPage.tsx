@@ -276,21 +276,25 @@ export function AbdProgressPage() {
     // Progress 집계는 Terminated 포함이 업무 규칙. Raw 기본은 hide 라 모집단이
     // 어긋나므로 명시적으로 all 을 지정한다.
     params.set("excluded", "all");
-    // 항상 전 라운드 경로: R1·R2·R3 동일 스테이지 날짜 컬럼을 date_range_or 로 묶어 전달.
-    // AP(Approval)는 문서 단위 이벤트이므로 approval_date 단일 컬럼 경로.
-    if (stage === "approval") {
+    // 매트릭스가 보던 As-of 를 명시 전달(세션 공유 의존 금지).
+    params.set("asOf", asOfDate);
+    // AP(Approval) 실적만 approval_date + sg_approved 경로 유지.
+    // 그 외(P 전부 + 라운드 스테이지 A)는 셀 술어 정본(abd_progress_events) 경유.
+    if (stage === "approval" && field === "actual") {
       params.set("dateStart", dateFrom);
       params.set("dateEnd", dateTo);
       params.set("dateField", "approval_date");
       // AP actual = approval_date AND stage_group='APPROVED' (현재 승인 유효분).
       // 재개봉(과거 승인 → 현재 B/C/UR)·Terminated 는 집계에서 제외되므로
       // 드릴다운도 동일 렌즈를 적용해 카드·매트릭스·리스트 삼자 일치를 유지한다.
-      if (field === "actual") params.set("status", "sg_approved");
-    } else {
-      const cols = (["R1", "R2", "R3"] as const).map((r) => stageDateField(stage, field, r));
-      params.set("dateStart", dateFrom);
-      params.set("dateEnd", dateTo);
-      params.set("dateFields", cols.join(","));
+      params.set("status", "sg_approved");
+    } else if (stage !== "all") {
+      // 술어 정본 = abd_progress_events (rn ≤/= v_active, AP는 ap_plan 이동 예측).
+      params.set("cellStage", stage);
+      params.set("cellField", field);
+      params.set("cellFrom", dateFrom);
+      params.set("cellTo", dateTo);
+      params.set("cellMode", planMode);
     }
     // Raw Data 페이지에서 JSON 파싱 문제를 피하고자 필터는 개별 파라미터로 전달
     for (const [k, v] of Object.entries(filterObj)) {
