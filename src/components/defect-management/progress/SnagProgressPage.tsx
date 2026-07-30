@@ -22,6 +22,7 @@ import { DeSnagRoomGroupFilterBar } from "@/components/defect-management/dashboa
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
 import { useSnagAsOf } from "@/hooks/useSnagAsOf";
+import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import {
   ALL_TEAMS,
   ROOM_GROUP_ORDER,
