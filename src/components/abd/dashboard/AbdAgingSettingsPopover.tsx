@@ -70,9 +70,9 @@ export function AbdAgingSettingsPopover() {
       </PopoverTrigger>
       <PopoverContent className="w-80 p-4" align="end">
         <div className="space-y-1">
-          <div className="text-sm font-semibold">UR Aging 임계값</div>
+          <div className="text-sm font-semibold">Response Aging 임계값</div>
           <p className="text-[11px] text-muted-foreground">
-            Under Review 경과일에 따라 Attention·Raw Data 배지 색을 결정합니다.
+            회신 대기(RS) 경과일에 따라 Attention·Raw Data 배지 색을 결정합니다.
           </p>
         </div>
         <div className="mt-3 space-y-3">
