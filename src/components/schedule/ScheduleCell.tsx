@@ -9,6 +9,8 @@ interface ScheduleCellProps {
   width: number;
   onPlanClick?: () => void;
   onActualClick?: () => void;
+  /** 검증용 식별자(선택). DOM data 속성으로만 노출되며 시각 변화 없음. */
+  cellId?: string;
 }
 
 /**
@@ -22,12 +24,14 @@ function ScheduleCellInner({
   width,
   onPlanClick,
   onActualClick,
+  cellId,
 }: ScheduleCellProps) {
   const empty = plan === 0 && actual === 0;
 
   if (empty) {
     return (
       <div
+        data-cell-id={cellId}
         className={
           isToday
             ? "h-full border-r border-l-2 border-l-primary border-border/60 bg-primary/5"
@@ -55,6 +59,7 @@ function ScheduleCellInner({
 
   return (
     <div
+      data-cell-id={cellId}
       className={cn(
         "flex h-full flex-col justify-center gap-0.5 px-1 py-0.5 text-[10px] tabular-nums border-r border-border/60",
         isToday && "border-l-2 border-l-primary bg-primary/5",
@@ -62,6 +67,8 @@ function ScheduleCellInner({
       style={{ width, minWidth: width }}
     >
       <div
+        data-cell-part="plan"
+        data-cell-value={plan}
         role={planClickable ? "button" : undefined}
         aria-label={planClickable ? `Plan ${plan} 필터로 열기` : undefined}
         onClick={planClickable ? (e) => { stop(e); onPlanClick!(); } : undefined}
@@ -84,6 +91,8 @@ function ScheduleCellInner({
       </div>
 
       <div
+        data-cell-part="actual"
+        data-cell-value={actual}
         role={actualClickable ? "button" : undefined}
         aria-label={actualClickable ? `Actual ${actual} 필터로 열기` : undefined}
         onClick={actualClickable ? (e) => { stop(e); onActualClick!(); } : undefined}
