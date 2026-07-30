@@ -23,6 +23,9 @@ import {
   computeJudgment,
   cumPlanProgress,
   computeVariance,
+  mainCumPlanProgress,
+  mainVariance,
+  judgeFromGap,
   worstJudgment,
 } from "@/lib/task-management/derived";
 import type { TaskThresholds } from "@/lib/task-management/derived";
@@ -70,15 +73,13 @@ interface Row {
   data_date: string | null;
 }
 
-/** as-of 기준 재판정이 정본. asOfDate 미지정(=과거 스냅샷 병합 경로)일 때만
- *  병합된 스냅샷 판정(auto_judgment)을 우선한다. */
+/** as-of 기준 재판정이 정본. 저장 판정(auto_judgment) 우선 분기는 제거되었다. */
 function resolveRowJudgment(
   r: Row,
   thresholds: TaskThresholds,
   asOfDate?: string,
 ): string {
-  if (!asOfDate) return r.auto_judgment || computeJudgment(r, thresholds, asOfDate) || "";
-  return computeJudgment(r, thresholds, asOfDate) || r.auto_judgment || "";
+  return computeJudgment(r, thresholds, asOfDate) || "";
 }
 
 function resolveMainJudgment(
@@ -88,8 +89,8 @@ function resolveMainJudgment(
   asOfDate?: string,
 ): string {
   if (kids.length === 0) {
-    if (!asOfDate) return main.auto_judgment || computeJudgment(main, thresholds, asOfDate) || "";
-    return computeJudgment(main, thresholds, asOfDate) || main.auto_judgment || "";
+    // 하위 없는 Main = 자기 창 선형 tplan vs 자기 Actual
+    return computeJudgment(main, thresholds, asOfDate) || "";
   }
 
   const clamp01 = (v: unknown) => {
@@ -110,7 +111,9 @@ function resolveMainJudgment(
     actual_finish: allDone ? (main.actual_finish ?? main.plan_end) : null,
     auto_judgment: allDone ? "완료" : null,
   };
-  const j = computeJudgment(syntheticMain, thresholds, asOfDate);
+  // 동종 비교: 하위 가중 누계 계획(Σwₖ·tplanₖ/Σwₖ) vs 동일 가중 실적(롤업 Actual)
+  const gap = mainVariance(syntheticMain, kids, asOfDate);
+  const j = judgeFromGap(syntheticMain, gap, thresholds, asOfDate);
   // 하위 하나라도 미완이면 상위는 어떤 경우에도 "완료"가 될 수 없음.
   if (!allDone && j === "완료") {
     const kidJudgments = kids.map((k) => resolveRowJudgment(k, thresholds, asOfDate));
@@ -464,9 +467,9 @@ export function TaskTreePage() {
     if (!picOptions.names.includes(picFilter)) setPicFilter("__all__");
   }, [picFilter, picOptions.names]);
 
-  // 과거 as-of 모드일 때는 이미 서버 판정을 병합했으므로 asOf 를 넘기지 않아야
-  // computeJudgment 가 병합된 auto_judgment 를 그대로 사용한다.
-  const asOfForJudge = isPastAsOf ? undefined : asOfDate;
+  // 판정은 항상 as-of 기준 재계산(단일 정의). 과거 모드에서도 effData 의
+  // as-of 실적으로 같은 식을 적용한다.
+  const asOfForJudge = asOfDate;
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
     return mainTasks.filter((p) => {
@@ -789,8 +792,10 @@ export function TaskTreePage() {
           const behindCount = kids.filter(
             (k) => (computeVariance(k, asOfDate) ?? 0) < -thresholds.caution_gap_buffer,
           ).length;
-          const pGap = computeVariance(p, asOfDate) ?? 0;
-          const pTodayPlan = cumPlanProgress(p, asOfDate);
+          const pGap =
+            (kids.length > 0 ? mainVariance(p, kids, asOfDate) : computeVariance(p, asOfDate)) ?? 0;
+          const pTodayPlan =
+            kids.length > 0 ? mainCumPlanProgress(p, kids, asOfDate) : cumPlanProgress(p, asOfDate);
           const pPic = (p.hdec_pic_name ?? p.hdec_eng_name ?? "-") || "-";
           return (
             <Card key={p.id} className={cn("overflow-hidden", isDone && "bg-muted/60 text-muted-foreground opacity-70")}> 

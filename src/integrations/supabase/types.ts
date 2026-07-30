@@ -5078,6 +5078,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      tm_kpi_bucket_matches_g: {
+        Args: {
+          _actual_finish: string
+          _actual_progress: number
+          _actual_start: string
+          _as_of: string
+          _bucket: string
+          _caution_buffer?: number
+          _gap: number
+          _plan_end: string
+          _plan_start: string
+          _worsen_gap?: number
+        }
+        Returns: boolean
+      }
       tm_kpi_cum_plan: {
         Args: {
           _as_of: string
@@ -5114,6 +5129,19 @@ export type Database = {
         }
         Returns: string
       }
+      tm_kpi_judgment_g: {
+        Args: {
+          _actual_finish: string
+          _actual_progress: number
+          _actual_start: string
+          _as_of: string
+          _caution_buffer?: number
+          _gap: number
+          _plan_start: string
+          _worsen_gap?: number
+        }
+        Returns: string
+      }
       tm_kpi_norm_actual: { Args: { _v: number }; Returns: number }
       tm_kpi_tplan: {
         Args: {
@@ -5122,6 +5150,10 @@ export type Database = {
           _plan_end: string
           _plan_start: string
         }
+        Returns: number
+      }
+      tm_main_tplan: {
+        Args: { _as_of: string; _discipline: string; _task_no: string }
         Returns: number
       }
       tm_my_workspace_counts: {
@@ -5141,6 +5173,31 @@ export type Database = {
       }
       tm_resolve_caution: { Args: { _v: number }; Returns: number }
       tm_resolve_worsen: { Args: { _v: number }; Returns: number }
+      tm_row_gap: {
+        Args: {
+          _actual_progress: number
+          _as_of: string
+          _discipline: string
+          _level: string
+          _plan_days: number
+          _plan_end: string
+          _plan_start: string
+          _task_no: string
+        }
+        Returns: number
+      }
+      tm_row_tplan: {
+        Args: {
+          _as_of: string
+          _discipline: string
+          _level: string
+          _plan_days: number
+          _plan_end: string
+          _plan_start: string
+          _task_no: string
+        }
+        Returns: number
+      }
       tm_rows_as_of: {
         Args: { _as_of: string }
         Returns: {
