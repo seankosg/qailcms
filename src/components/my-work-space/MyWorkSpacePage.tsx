@@ -28,6 +28,7 @@ import { CommentsInbox } from "./CommentsInbox";
 import { AttentionInbox } from "./AttentionInbox";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
+import { useTmLatestDataDate } from "@/hooks/useTmLatestDataDate";
 import { useTmJudgmentAtDate, mergeTmJudgment } from "@/hooks/useTmJudgmentAtDate";
 
 function fmtDate(d?: string | null): string {
@@ -87,6 +88,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
 
   const latestToday = today();
   const [dataDate, setDataDate, resetDataDate] = useTmAsOf();
+  const { data: tmLatestDataDate = "" } = useTmLatestDataDate();
   const t = dataDate || latestToday;
 
   // 과거 Data Date 선택 시 서버측 재판정 병합 (Actual 유지, Plan/gap/judgment 만 as-of).
@@ -382,7 +384,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           <DataDatePicker
             showDataDateChip
             value={dataDate}
-            latest={latestToday}
+            latest={tmLatestDataDate}
             options={[]}
             onChange={setDataDate}
             onReset={resetDataDate}
