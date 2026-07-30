@@ -23,6 +23,9 @@ import {
   computeJudgment,
   cumPlanProgress,
   computeVariance,
+  mainCumPlanProgress,
+  mainVariance,
+  judgeFromGap,
   worstJudgment,
 } from "@/lib/task-management/derived";
 import type { TaskThresholds } from "@/lib/task-management/derived";
@@ -70,15 +73,13 @@ interface Row {
   data_date: string | null;
 }
 
-/** as-of 기준 재판정이 정본. asOfDate 미지정(=과거 스냅샷 병합 경로)일 때만
- *  병합된 스냅샷 판정(auto_judgment)을 우선한다. */
+/** as-of 기준 재판정이 정본. 저장 판정(auto_judgment) 우선 분기는 제거되었다. */
 function resolveRowJudgment(
   r: Row,
   thresholds: TaskThresholds,
   asOfDate?: string,
 ): string {
-  if (!asOfDate) return r.auto_judgment || computeJudgment(r, thresholds, asOfDate) || "";
-  return computeJudgment(r, thresholds, asOfDate) || r.auto_judgment || "";
+  return computeJudgment(r, thresholds, asOfDate) || "";
 }
 
 function resolveMainJudgment(
@@ -88,8 +89,8 @@ function resolveMainJudgment(
   asOfDate?: string,
 ): string {
   if (kids.length === 0) {
-    if (!asOfDate) return main.auto_judgment || computeJudgment(main, thresholds, asOfDate) || "";
-    return computeJudgment(main, thresholds, asOfDate) || main.auto_judgment || "";
+    // 하위 없는 Main = 자기 창 선형 tplan vs 자기 Actual
+    return computeJudgment(main, thresholds, asOfDate) || "";
   }
 
   const clamp01 = (v: unknown) => {
@@ -110,7 +111,9 @@ function resolveMainJudgment(
     actual_finish: allDone ? (main.actual_finish ?? main.plan_end) : null,
     auto_judgment: allDone ? "완료" : null,
   };
-  const j = computeJudgment(syntheticMain, thresholds, asOfDate);
+  // 동종 비교: 하위 가중 누계 계획(Σwₖ·tplanₖ/Σwₖ) vs 동일 가중 실적(롤업 Actual)
+  const gap = mainVariance(syntheticMain, kids, asOfDate);
+  const j = judgeFromGap(syntheticMain, gap, thresholds, asOfDate);
   // 하위 하나라도 미완이면 상위는 어떤 경우에도 "완료"가 될 수 없음.
   if (!allDone && j === "완료") {
     const kidJudgments = kids.map((k) => resolveRowJudgment(k, thresholds, asOfDate));
