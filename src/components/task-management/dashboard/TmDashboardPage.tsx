@@ -1,19 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, CalendarDays, RotateCcw, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Search } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import {
@@ -98,16 +93,14 @@ export function TmDashboardPage() {
   // 세션 전역 Data Date (Raw Data/MWS 등과 공유)
   const [sharedDataDate, setSharedDataDate] = useTmAsOf();
   // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
-  const selectedDataDate =
-    (search.dataDate && search.dataDate.length ? search.dataDate : sharedDataDate) ||
-    todayInDoha();
+  const today = todayInDoha();
+  const selectedDataDate = sharedDataDate || today;
 
-  // 세션 상태 동기화 — 선택이 최신과 다르면 저장, 최신이면 초기화
+  // 구 딥링크 URL ?dataDate= 는 수용 후 무시(U5).
   useEffect(() => {
-    const next = selectedDataDate === latestDataDate ? "" : selectedDataDate;
-    if (next !== sharedDataDate) setSharedDataDate(next);
-     
-  }, [selectedDataDate, latestDataDate]);
+    if (search.dataDate) patch({ dataDate: "" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.dataDate]);
   const asOfDate = selectedDataDate;
   // 판정 기준일 라벨. 행별 관측 컷오프(data_date)와 구분한다.
   const asOfLabel = "As of";
@@ -195,9 +188,14 @@ export function TmDashboardPage() {
             Task Management Dashboard
           </h1>
         </div>
-        <span className="text-[11px] text-muted-foreground tabular-nums">
-          {totalItems.toLocaleString()} items
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+            {asOfHeaderLabel(selectedDataDate, today)}
+          </span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {totalItems.toLocaleString()} items
+          </span>
+        </div>
       </div>
 
       {/* Unified Toolbar */}
@@ -205,42 +203,14 @@ export function TmDashboardPage() {
         <CardContent className="flex flex-col gap-2 p-3">
           {/* Row 1: As of · Task · Discipline · Delay · Search */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <div className="flex items-center gap-1">
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <CalendarDays className="h-3 w-3" />
-                As of
-              </span>
-              <Select
-                value={selectedDataDate}
-                onValueChange={(v) => patch({ dataDate: v })}
-              >
-                <SelectTrigger className="h-8 w-[150px] text-xs">
-                  <SelectValue placeholder={latestDataDate} />
-                </SelectTrigger>
-                <SelectContent>
-                  {(dataDateOptions.length ? dataDateOptions : [latestDataDate]).map((d) => (
-                    <SelectItem key={d} value={d} className="text-xs">
-                      {d}
-                      {d === latestDataDate && (
-                        <span className="ml-1 text-[10px] text-muted-foreground">(최신)</span>
-                      )}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedDataDate !== latestDataDate && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => patch({ dataDate: "" })}
-                  aria-label="최신 As of로 초기화"
-                  title="최신으로"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
+            <DataDatePicker
+              value={sharedDataDate}
+              latest={latestDataDate}
+              options={dataDateOptions}
+              onChange={(v) => setSharedDataDate(v === today ? "" : v)}
+              onReset={() => setSharedDataDate("")}
+              showDataDateChip
+            />
 
             <span className="h-5 w-px bg-border" aria-hidden />
 
