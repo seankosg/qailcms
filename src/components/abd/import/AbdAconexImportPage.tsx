@@ -116,6 +116,9 @@ function formatSize(b: number) {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** Aconex 임포트에서 기본 선택할 프리셋 라벨. */
+const DEFAULT_ACONEX_PRESET_LABEL = "aconex status update";
+
 export function AbdAconexImportPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [busy, setBusy] = useState(false);
