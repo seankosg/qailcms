@@ -83,17 +83,22 @@ export function SnagProgressPage() {
   const effectiveStages: Stage[] = stageView.length > 0 ? stageView : ["start", "rectified"];
   const rangeDays = search.range;
   const hidePast = search.hidePast === 1;
-  const asofMode = search.asofMode;
   const planMode: PlanMode = search.planMode;
   const matrixOpen = search.matrixOpen === 1;
   const scurveOpen = search.scurveOpen === 1;
 
   const today = todayIso();
   const { options: dataDateOptions, latest: latestDataDate } = useDefectLatestDataDate();
-  const effectiveDataDate =
-    (search.dataDate as string) || latestDataDate || today;
-  const asOfDate = asofMode === "today" ? today : effectiveDataDate;
-  const asOfLabel = asofMode === "today" ? "Today" : effectiveDataDate;
+  // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
+  // (구 asofMode 파라미터는 URL 수용 후 무시)
+  const [sharedAsOf, setSharedAsOf] = useSnagAsOf();
+  const asOfDate = (search.dataDate as string) || sharedAsOf || today;
+  const asOfLabel = asOfDate;
+  useEffect(() => {
+    const v = (search.dataDate as string) || "";
+    if (v !== sharedAsOf) setSharedAsOf(v);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.dataDate]);
 
   const rangeStart = useMemo(() => addDays(today, -14), [today]);
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
