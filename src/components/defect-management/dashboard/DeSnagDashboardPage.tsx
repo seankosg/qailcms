@@ -172,11 +172,10 @@ export function DeSnagDashboardPage() {
             <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
               {asOfHeaderLabel(effectiveDataDate)}
             </span>
-            {latestDataDate && (
-              <DataDatePicker
+            <DataDatePicker
                 showDataDateChip
                 value={effectiveDataDate}
-                latest={latestDataDate}
+                latest={latestDataDate ?? ""}
                 options={dataDateOptions}
                 onChange={(v) =>
                   navigate({
@@ -193,7 +192,6 @@ export function DeSnagDashboardPage() {
                   })
                 }
               />
-            )}
           </div>
           <p className="text-xs text-muted-foreground">
             Plot · Building · Level × Room Group 매트릭스. 셀·헤더 클릭 시 Raw Data 드릴다운.
