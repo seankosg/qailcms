@@ -16,7 +16,11 @@ import {
 } from "@/components/ui/select";
 import { ChevronDown, ChevronRight, Download, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DISCIPLINES, AUTO_JUDGMENT_COLORS } from "@/lib/task-management/columns";
+import { DISCIPLINES, AUTO_JUDGMENT_COLORS, TM_COLUMNS } from "@/lib/task-management/columns";
+import {
+  useTaskManagementFieldConfig,
+  buildTmLabelOverrides,
+} from "@/hooks/useTaskManagementFieldConfig";
 import type { Discipline } from "@/lib/task-management/columns";
 import {
   DEFAULT_THRESHOLDS,
@@ -51,19 +55,23 @@ import { MwsColumnOrderMenu } from "@/components/my-work-space/MwsColumnOrderMen
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
 
-/** Task Summary(요약 표) 컬럼 정의 — Raw Data 의 Columns 메뉴와 동일 UI 로 제어 */
-const SUMMARY_COLUMN_LABELS: Record<string, string> = {
-  task_no: "Task No",
-  sub_task_desc: "Sub Task 설명",
-  pic: "담당",
-  plan: "계획",
-  actual: "실적",
-  today_plan: "오늘 계획",
-  gap: "차이",
-  judgment: "판정",
-  chart: "진도 차트",
+/**
+ * Task Summary(요약 표) 컬럼 정의 — Raw Data 의 Columns 메뉴와 동일 UI 로 제어.
+ * 라벨은 Raw Data 헤더(TM_COLUMNS + Field Config 오버라이드)를 정본으로 사용한다.
+ */
+const SUMMARY_COLUMN_SOURCE: Record<string, string | null> = {
+  task_no: "task_no",
+  sub_task_desc: "sub_task_desc",
+  pic: "hdec_pic_name",
+  plan: "plan_progress",
+  actual: "actual_progress",
+  today_plan: "expected_progress_today",
+  gap: "today_gap",
+  judgment: "auto_judgment",
+  chart: null,
 };
-const SUMMARY_DEFAULT_ORDER = Object.keys(SUMMARY_COLUMN_LABELS);
+const SUMMARY_FALLBACK_LABELS: Record<string, string> = { chart: "진도 차트" };
+const SUMMARY_DEFAULT_ORDER = Object.keys(SUMMARY_COLUMN_SOURCE);
 const SUMMARY_DEFAULT_FROZEN = ["task_no"];
 const SUMMARY_DEFAULT_VISIBILITY: Record<string, boolean> = Object.fromEntries(
   SUMMARY_DEFAULT_ORDER.map((k) => [k, true]),
@@ -247,6 +255,17 @@ export function TaskTreePage() {
   const [exporting, setExporting] = useState(false);
 
   // ── Columns 메뉴 상태 (localStorage 유지) ─────────────────────────────
+  const { data: tmFieldConfig } = useTaskManagementFieldConfig();
+  const summaryColumnLabels = useMemo(() => {
+    const overrides = buildTmLabelOverrides(tmFieldConfig);
+    const out: Record<string, string> = {};
+    for (const [key, src] of Object.entries(SUMMARY_COLUMN_SOURCE)) {
+      out[key] = src
+        ? overrides[src] ?? TM_COLUMNS.find((c) => c.key === src)?.label ?? src
+        : SUMMARY_FALLBACK_LABELS[key] ?? key;
+    }
+    return out;
+  }, [tmFieldConfig]);
   const [colOrder, setColOrder] = useState<string[]>(SUMMARY_DEFAULT_ORDER);
   const [colVisibility, setColVisibility] = useState<Record<string, boolean>>(
     SUMMARY_DEFAULT_VISIBILITY,
@@ -758,7 +777,7 @@ export function TaskTreePage() {
             visibility={colVisibility}
             frozen={colFrozen}
             forcedFrozen={["task_no"]}
-            labels={SUMMARY_COLUMN_LABELS}
+            labels={summaryColumnLabels}
             defaultOrder={SUMMARY_DEFAULT_ORDER}
             defaultVisibility={SUMMARY_DEFAULT_VISIBILITY}
             defaultFrozen={SUMMARY_DEFAULT_FROZEN}
@@ -972,7 +991,7 @@ export function TaskTreePage() {
                       <tr>
                         {visibleCols.map((c) => (
                           <th key={c} className="px-2 py-1 text-left">
-                            {c === "chart" ? "" : SUMMARY_COLUMN_LABELS[c]}
+                            {c === "chart" ? "" : summaryColumnLabels[c]}
                           </th>
                         ))}
                       </tr>
