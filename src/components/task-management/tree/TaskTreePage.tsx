@@ -1018,6 +1018,20 @@ export function TaskTreePage() {
                     title="클릭하여 진도율 상세 차트 보기"
                   />
                   )}
+                  {visibleCols
+                    .filter((c) => SUMMARY_EXTRA_KEYS.includes(c))
+                    .map((c) => (
+                      <span
+                        key={c}
+                        className="text-[10px] tabular-nums text-muted-foreground"
+                        title={summaryColumnLabels[c]}
+                      >
+                        {summaryColumnLabels[c]}{" "}
+                        <span className="font-medium text-foreground">
+                          {formatExtraValue(c, (p as Row)[c])}
+                        </span>
+                      </span>
+                    ))}
                 </div>
               </CardHeader>
               {isOpen && (
