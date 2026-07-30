@@ -69,13 +69,15 @@ interface Row {
   data_date: string | null;
 }
 
-/** Sub Task는 저장 판정 우선, Main Task는 화면에 로드된 Sub Task 실적 롤업 기준으로 재판정. */
+/** as-of 기준 재판정이 정본. asOfDate 미지정(=과거 스냅샷 병합 경로)일 때만
+ *  병합된 스냅샷 판정(auto_judgment)을 우선한다. */
 function resolveRowJudgment(
   r: Row,
   thresholds: TaskThresholds,
   asOfDate?: string,
 ): string {
-  return r.auto_judgment || computeJudgment(r, thresholds, asOfDate) || "";
+  if (!asOfDate) return r.auto_judgment || computeJudgment(r, thresholds, asOfDate) || "";
+  return computeJudgment(r, thresholds, asOfDate) || r.auto_judgment || "";
 }
 
 function resolveMainJudgment(
@@ -85,6 +87,7 @@ function resolveMainJudgment(
   asOfDate?: string,
 ): string {
   if (kids.length === 0) {
+    if (!asOfDate) return main.auto_judgment || computeJudgment(main, thresholds, asOfDate) || "";
     return computeJudgment(main, thresholds, asOfDate) || main.auto_judgment || "";
   }
 
