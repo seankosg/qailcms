@@ -10,7 +10,7 @@ const searchSchema = z.object({
   team: fallback(z.array(z.string()), []).default([]),
   bucket: fallback(z.string(), "day").default("day"),
   stageView: fallback(z.array(z.string()), []).default([]),
-  asofMode: fallback(z.string(), "dataDate").default("dataDate"),
+  asofMode: fallback(z.string(), "today").default("today"),
   planMode: fallback(z.string(), "remaining").default("remaining"),
   range: fallback(z.number().int(), 60).default(60),
   hidePast: fallback(z.boolean(), false).default(false),
