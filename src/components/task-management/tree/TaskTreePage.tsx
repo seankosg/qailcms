@@ -246,6 +246,53 @@ export function TaskTreePage() {
   const [chartTask, setChartTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  // ── Columns 메뉴 상태 (localStorage 유지) ─────────────────────────────
+  const [colOrder, setColOrder] = useState<string[]>(SUMMARY_DEFAULT_ORDER);
+  const [colVisibility, setColVisibility] = useState<Record<string, boolean>>(
+    SUMMARY_DEFAULT_VISIBILITY,
+  );
+  const [colFrozen, setColFrozen] = useState<string[]>(SUMMARY_DEFAULT_FROZEN);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(SUMMARY_COLS_KEY);
+      if (!raw) return;
+      const p = JSON.parse(raw) as {
+        order?: string[];
+        visibility?: Record<string, boolean>;
+        frozen?: string[];
+      };
+      const known = (arr?: string[]) =>
+        (arr ?? []).filter((k) => SUMMARY_DEFAULT_ORDER.includes(k));
+      const order = known(p.order);
+      setColOrder([...order, ...SUMMARY_DEFAULT_ORDER.filter((k) => !order.includes(k))]);
+      setColVisibility({ ...SUMMARY_DEFAULT_VISIBILITY, ...(p.visibility ?? {}) });
+      const frozen = known(p.frozen);
+      setColFrozen(frozen.includes("task_no") ? frozen : ["task_no", ...frozen]);
+    } catch {
+      // ignore
+    }
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        SUMMARY_COLS_KEY,
+        JSON.stringify({ order: colOrder, visibility: colVisibility, frozen: colFrozen }),
+      );
+    } catch {
+      // ignore
+    }
+  }, [colOrder, colVisibility, colFrozen]);
+
+  /** 고정 컬럼 먼저, 이어서 나머지 순서대로. 숨김 컬럼 제외. */
+  const visibleCols = useMemo(() => {
+    const frozen = colFrozen.filter((k) => SUMMARY_DEFAULT_ORDER.includes(k));
+    const rest = colOrder.filter((k) => !frozen.includes(k));
+    return [...frozen, ...rest].filter((k) => colVisibility[k] !== false || k === "task_no");
+  }, [colOrder, colVisibility, colFrozen]);
+  const showCol = (k: string) => visibleCols.includes(k);
+
   // 상태 변경 시 sessionStorage 로 저장 (현재 discipline 슬롯만 갱신).
   useEffect(() => {
     if (typeof window === "undefined") return;
