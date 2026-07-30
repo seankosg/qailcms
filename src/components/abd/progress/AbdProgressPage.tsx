@@ -268,10 +268,12 @@ export function AbdProgressPage() {
 
     const params = new URLSearchParams();
     params.set("source", "progress");
-    // 팀 미지정 시 전 팀 포함(대시보드 openRawData 와 동일 패턴).
-    // 지정 시 선택 팀 전체 전달.
-    params.set("tab", teams.length > 0 ? teams.join(",") : "MECH,ELEC,ARCH");
-    params.set("plot", plot);
+    // 셀의 그룹 행이 team/plot 으로 좁혀져 있으면 전역 선택값보다 행 값을 우선한다.
+    // 그렇지 않으면 MECH 행 클릭도 선택된 전체 팀으로 열려 Matrix보다 과대 조회된다.
+    const rowTeam = g.team && g.team !== "__EMPTY__" ? g.team : null;
+    const rowPlot = g.plot === "C" || g.plot === "D" ? g.plot : null;
+    params.set("tab", rowTeam ?? (teams.length > 0 ? teams.join(",") : "MECH,ELEC,ARCH"));
+    params.set("plot", rowPlot ?? plot);
     // Progress 집계는 Terminated 포함이 업무 규칙. Raw 기본은 hide 라 모집단이
     // 어긋나므로 명시적으로 all 을 지정한다.
     params.set("excluded", "all");
