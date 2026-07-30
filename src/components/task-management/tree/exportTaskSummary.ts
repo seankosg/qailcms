@@ -144,6 +144,7 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
       if (key === "gap") {
         const g = row.gap as number | null;
         if (g == null) return null;
+        // 0.05 = 서버 임계값(tm_thresholds) 로딩 전 임시 표시용 폴백. 판정에는 개입하지 않음(셀 색상 전용).
         const buf = opts.thresholds?.caution_gap_buffer ?? 0.05;
         if (g < -buf) return "FFFECACA"; // 지연
         if (g > buf) return "FFD1FAE5"; // 선행
@@ -162,7 +163,7 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
 function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean, asOf?: string): Record<string, unknown> & { __isMain: boolean; __zebra: boolean } {
   const gap = computeVariance(r, asOf) ?? 0;
   const expected = cumPlanProgress(r, asOf);
-  // Main Task는 Data Date 기반 클라이언트 재계산 우선; Sub는 DB값 우선.
+  // Main Task는 as-of 기반 클라이언트 재계산 우선; Sub는 DB값 우선.
   const judgment = isMain
     ? computeJudgment(r, undefined, asOf) || r.auto_judgment || ""
     : r.auto_judgment || computeJudgment(r, undefined, asOf) || "";
