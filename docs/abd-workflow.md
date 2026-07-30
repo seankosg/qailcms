@@ -135,3 +135,11 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
 - **NS 흡수**: NS(=R1 실적 전무)는 별도 코드가 아니라 `DS1` 로 흡수된다(구 NS 특례 문구 삭제).
   R1 DS 의 지연 판정은 일반 규칙 그대로 — `r1_draft_start_plan` < today AND actual 없음.
 - **불변식(2026-07-30)**: current = `DS1`(실적 전무) ⟺ completed = `—`(NULL). 실측 229 = 229.
+
+## NS 폐지 이후 재귀속 기록 정정 (2026-07-30, D절)
+
+- 정정 문구: **"NS 선행 분기 제거로 `v_active` 노출 → 회신 이력 보유 실적전무 도면들이 R2 DS로 재귀속(+557), R1 DS 잔류 229."**
+- 재귀속 코호트(556 실측)는 `r1_response_result` 가 100% B(124)/C(432) 이며
+  `r1_submission_actual` 100% NULL · `r1_dar_actual` 100% 존재 — 레거시 R1 귀속(회신만 기록) 코호트다.
+- 결함이 아니라 **가시화 개선**: 반려 후 재작업 대기 물량이 NS(미착수)에 숨어 있다가 R2 DS 큐로 드러났다.
+- 분모 인지: R2 DS 재고 788 중 지연(`primary_delay='DS2'`) 78 · DS3 5 · DS1 0 = DS 지연 83.
