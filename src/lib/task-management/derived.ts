@@ -119,7 +119,8 @@ export function judgeFromGap(
 ): string {
   const actual = normActual(row.actual_progress);
   if (actual >= 1 || row.actual_finish) return "완료";
-  const started = !!row.actual_start || actual > 0;
+  // 서버 정본(tm_kpi_judgment_g)과 동일: 착수 여부는 실적%만으로 판단한다.
+  const started = actual > 0;
   const ps = parseDate(row.plan_start);
   const asOfD = resolveAsOf(row, asOf);
   if (ps && ps.getTime() > asOfD.getTime() && !started) return "정상";
@@ -262,10 +263,12 @@ export function getStageJudgment(
   asOf?: string,
 ): string {
   const actual = normActual(row.actual_progress);
-  const started = !!row.actual_start || actual > 0;
+  const started = actual > 0;
+  // Start 스테이지 완료 판단만 실착수일도 인정한다(스테이지 정의상 실적일 기준).
+  const startedForStage = !!row.actual_start || actual > 0;
 
   if (stage === "start") {
-    if (started || row.auto_judgment === "완료") return "완료";
+    if (startedForStage || row.auto_judgment === "완료") return "완료";
     const sj = getStartJudgment(row, asOf);
     return sj === "지연진행" ? "지연" : "정상";
   }
@@ -298,7 +301,7 @@ export function computeJudgment(
   // 항상 as-of(미지정 시 오늘·Asia/Qatar) 기준으로 재계산한다.
   const actual = normActual(row.actual_progress);
   if (actual >= 1) return "완료";
-  const started = !!row.actual_start || actual > 0;
+  const started = actual > 0;
   if (!started) {
     // 미착수: 서버 정본 tm_kpi_judgment 와 동일 의미론.
     // 계획 착수일이 아직 도래하지 않았으면 '정상',
