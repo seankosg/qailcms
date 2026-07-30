@@ -44,9 +44,9 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
 - **Import HDEC** 모드: 전체 필드 프리셋. 유니크 키는 `id` 또는 `source_issue_no`.
 - 자동 스케줄 없음. 사용자가 Aconex에서 XLSX Export → 업로드.
 
-## UR Aging (Under Review Aging)
+## Response Aging (내부 키 `ur_aging_days` — 의미 = 회신 대기(RS) 경과일)
 
-- Aconex 상태가 Submitted/Under Review 계열에 머문 기간.
+- 제출 후 회신(dar) 을 기다린 기간. "Under Review" 어휘는 폐기하며 회신 대기는 **RS{n}** 으로 표기한다.
 - 임계값은 Admin > ABD Settings 팝오버에서 관리 (`abd_settings.ur_thresholds`).
 - Raw Data `ur_aging_days` 컬럼 뱃지가 임계값에 따라 tone 변경 (info/warning/destructive).
 
@@ -70,11 +70,11 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
 ## 라운드 생애주기 확정 정의 (2026-07-29)
 
 - **개시**: `r{n}_draft_start_actual`
-- **진행**: `r{n}_draft_finish_actual` → `r{n}_submission_actual` (제출 후 심사 대기 = UR(n))
+- **진행**: `r{n}_draft_finish_actual` → `r{n}_submission_actual` (제출 후 회신 대기 = RS(n))
 - **종결**: `r{n}_dar_actual` + `r{n}_response_result` 기록 시점 — **회신 도착이 라운드 종결**.
   - `A` → 문서 종결, 다음 라운드 없음
   - `B`/`C` → 라운드만 종결, 다음 라운드 개시
-  - 회신 전 → 라운드 열림(UR(n))
+  - 회신 전 → 라운드 열림(RS(n))
 - **예외 Terminated**: 회신 없는 합의 철회. 라운드 종결이 아니며 같은 라운드 재제출(RESUBMIT(n)).
   실적 필드 보존, **통계 포함**.
 - `dar_actual` 은 있으나 `response_result` 가 없는 코호트(R1 432 · R2 23)는 **종결로 집계하되 결과 미상**으로 분류한다(삭제·추정 금지).
@@ -99,7 +99,8 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
 - `delay_bucket` (인지용): 계획일이 지난 모든 미이행 단계 배열(+ `NoPlan`). **KPI 집계 사용 금지** — 상세/툴팁 전용.
 - `delay_late` (지연이행): actual > plan 인 단계 배열. 지연 카운트와 무관한 별도 지표.
 - 불변식: ΣDS+DF+SB+RS 지연 카드 = `primary_delay` 보유 도면 수. NoPlan 은 계획 부재 알람으로 별도.
-- `bucket_top` 은 Row1 카드 계약 유지를 위해 NS/DS/UR/Approved/RESUBMIT 어휘를 그대로 사용(RS 단계 → `UR`).
+- `bucket_top` 은 Row1 카드 계약 유지를 위해 NS/DS/UR/Approved/RESUBMIT **키**를 그대로 사용(RS 단계 → 키 `UR`).
+  키 `UR` 의 의미는 **회신 대기(RS)** 이며 화면 라벨은 "Awaiting Response". 키 개명은 백로그.
 
 ## 완전 분할 불변식 — stage_group (2026-07-29 확정)
 
@@ -108,6 +109,24 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
 - `current_stage` NULL·미지 값은 **0건이어야 한다**. 발견 시 분류 누락 버그로 간주하고 `RAISE EXCEPTION`.
 - 일일 운영 체크 편입 항목: blank 85 · all-NULL 3 기준선과 동일 반열.
 - 지연 교차 불변식: 각 stage_group 의 `primary_delay` 보유 수 ≤ 해당 stage_group 재고 수.
+
+## 어휘·표기 표준 (2026-07-29 확정)
+
+- **RS = Response (by dar), 회신.** Ready-to-Submit 오용은 폐기되었고 되살리지 않는다.
+- **UR(Under Review) 어휘 폐기.** 회신 대기는 RS{n}. 내부 키(`bucket_top='UR'`·`ur_aging_days`·
+  status_group `under_review`)는 딥링크·RPC 하위호환으로 **키만 유지**하고 화면 라벨은 정정한다(개명은 백로그).
+- **NS 존치.** 실적 전무 도면 분류값이며 "생성되지 않음"이 아니다.
+- **TM = Terminated (ABD 스테이지 코드).** Task Management 모듈 약어와 네임스페이스가 분리된다.
+- **어순 표준 = 라운드 선행.** 축약 `R2 DF`, 장형 `Awaiting R2 Draft Finish`, 완료형 `R2 Draft Finished`.
+  라운드 없는 값(NS·Approved)은 Awaiting·R 접두 없음. 단일 소스 = `formatAbdStage(code, variant)`.
+
+## Completed Stage (2026-07-29 신설)
+
+- 정본 `abd_judge_v1` 파생: `completed_stage` / `completed_stage_group` (클라이언트 계산 금지, `abd_derived_cols()` 등록 완료).
+- 우선순위: `is_terminated` → `TM{n}` · 유효 승인 → `Approved` · 그 외 `r{n}_dar_actual` → `RS{n}` →
+  `submission_actual` → `SB{n}` → `draft_finish_actual` → `DF{n}` → `draft_start_actual` → `DS{n}` · 실적 전무 → NULL(`—`).
+  라운드는 높은 것 우선, 같은 라운드 내 후행 단계 우선.
+- 판정 로직(`v_active`·스테이지 조건·`primary_delay`)은 무변경이며 본 항목은 파생 추가에 한정된다.
 - **NS 흡수**: 신 스테이지 체계에서 NS(=R1 실적 전무)는 별도 코드가 아니라 `DS1` 로 흡수된다.
   구 분류 NS 786 + DS 239 = 신 DS 1,025 로 일치한다.
 - **NS 도면의 지연 판정 규칙**: NS 코호트(R1 실적 전무)의 `primary_delay` 는 **`DS1` 계획(`r1_draft_start_plan`) 기준**으로 판정한다.
