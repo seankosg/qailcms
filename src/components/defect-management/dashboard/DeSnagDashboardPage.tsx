@@ -10,6 +10,7 @@ import { DeSnagRoomGroupCards } from "./DeSnagRoomGroupCards";
 import { DeSnagRoomGroupFilterBar } from "./DeSnagRoomGroupFilterBar";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
+import { useSnagAsOf } from "@/hooks/useSnagAsOf";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { todayInDoha } from "@/lib/time/doha";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
@@ -53,8 +54,14 @@ export function DeSnagDashboardPage() {
   );
 
   const { options: dataDateOptions, latest: latestDataDate } = useDefectLatestDataDate();
+  const [sharedAsOf, setSharedAsOf] = useSnagAsOf();
   // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
-  const effectiveDataDate = (search.dataDate as string) || todayInDoha();
+  const effectiveDataDate = (search.dataDate as string) || sharedAsOf || todayInDoha();
+  useEffect(() => {
+    const v = (search.dataDate as string) || "";
+    if (v !== sharedAsOf) setSharedAsOf(v);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.dataDate]);
 
   // Plot/Team은 스테이징: 변경해도 서버 재호출 없음, '재계산' 버튼으로 적용
   const [stagedPlot, setStagedPlot] = useState<PlotKey>(appliedPlot);
@@ -172,11 +179,10 @@ export function DeSnagDashboardPage() {
             <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
               {asOfHeaderLabel(effectiveDataDate)}
             </span>
-            {latestDataDate && (
-              <DataDatePicker
+            <DataDatePicker
                 showDataDateChip
                 value={effectiveDataDate}
-                latest={latestDataDate}
+                latest={latestDataDate ?? ""}
                 options={dataDateOptions}
                 onChange={(v) =>
                   navigate({
@@ -193,7 +199,6 @@ export function DeSnagDashboardPage() {
                   })
                 }
               />
-            )}
           </div>
           <p className="text-xs text-muted-foreground">
             Plot · Building · Level × Room Group 매트릭스. 셀·헤더 클릭 시 Raw Data 드릴다운.

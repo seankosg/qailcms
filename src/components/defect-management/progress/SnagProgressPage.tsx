@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -21,6 +21,8 @@ import { DeSnagToolbar } from "@/components/defect-management/dashboard/DeSnagTo
 import { DeSnagRoomGroupFilterBar } from "@/components/defect-management/dashboard/DeSnagRoomGroupFilterBar";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
+import { useSnagAsOf } from "@/hooks/useSnagAsOf";
+import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import {
   ALL_TEAMS,
   ROOM_GROUP_ORDER,
@@ -83,17 +85,22 @@ export function SnagProgressPage() {
   const effectiveStages: Stage[] = stageView.length > 0 ? stageView : ["start", "rectified"];
   const rangeDays = search.range;
   const hidePast = search.hidePast === 1;
-  const asofMode = search.asofMode;
   const planMode: PlanMode = search.planMode;
   const matrixOpen = search.matrixOpen === 1;
   const scurveOpen = search.scurveOpen === 1;
 
   const today = todayIso();
   const { options: dataDateOptions, latest: latestDataDate } = useDefectLatestDataDate();
-  const effectiveDataDate =
-    (search.dataDate as string) || latestDataDate || today;
-  const asOfDate = asofMode === "today" ? today : effectiveDataDate;
-  const asOfLabel = asofMode === "today" ? "Today" : effectiveDataDate;
+  // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
+  // (구 asofMode 파라미터는 URL 수용 후 무시)
+  const [sharedAsOf, setSharedAsOf] = useSnagAsOf();
+  const asOfDate = (search.dataDate as string) || sharedAsOf || today;
+  const asOfLabel = asOfDate;
+  useEffect(() => {
+    const v = (search.dataDate as string) || "";
+    if (v !== sharedAsOf) setSharedAsOf(v);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.dataDate]);
 
   const rangeStart = useMemo(() => addDays(today, -14), [today]);
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
@@ -157,11 +164,11 @@ export function SnagProgressPage() {
     refetchOnWindowFocus: false,
   });
 
-  // Day 뷰의 "Up to 21-Jul" 누계 컬럼용: 서버가 계산한 7/21 기준 누계값을 그대로 사용.
-  // 이렇게 하면 카드/우측 총합(actual_upto)과 셀 합계가 정확히 일치.
-  const LEGACY_CUM_ISO = "2026-07-21";
+  // Day 뷰 좌측 누계 컬럼: 표시 구간 시작 하루 전까지의 누계를 서버 값으로 사용.
+  // (하드코딩 날짜 제거 — 구간에서 파생)
+  const cumIso = useMemo(() => addDays(rangeStart, -1), [rangeStart]);
   const totalsCumQ = useQuery({
-    queryKey: ["snag-progress-totals-cum", plot, teamsKey, roomKey, groupKey, planMode],
+    queryKey: ["snag-progress-totals-cum", plot, teamsKey, roomKey, groupKey, planMode, cumIso],
     queryFn: () =>
       totalsFn({
         data: {
@@ -169,7 +176,7 @@ export function SnagProgressPage() {
           teams,
           roomGroups,
           groupBy: effectiveGroupBy,
-          asOfDate: LEGACY_CUM_ISO,
+          asOfDate: cumIso,
           planMode,
         },
       }),
@@ -178,9 +185,8 @@ export function SnagProgressPage() {
     refetchOnWindowFocus: false,
   });
 
-  // Day 뷰에서는 셀 RPC 범위를 7/22 이후로만 잡는다. 7/21 이전 누계는 totalsCumQ가 제공.
-  const CUTOFF_ISO = "2026-07-22";
-  const effectiveRpcStart = bucket === "day" && rpcStart < CUTOFF_ISO ? CUTOFF_ISO : rpcStart;
+  // Day 뷰 셀 RPC 범위는 표시 구간 시작일부터. 그 이전 누계는 totalsCumQ 가 제공.
+  const effectiveRpcStart = bucket === "day" && rpcStart < rangeStart ? rangeStart : rpcStart;
   const buckets = useMemo(
     () => buildBucketRange(effectiveRpcStart, rpcEnd, bucket),
     [effectiveRpcStart, rpcEnd, bucket],
@@ -195,9 +201,9 @@ export function SnagProgressPage() {
       buckets,
       stagesToShow: effectiveStages,
     });
-    // Day 뷰: 서버가 계산한 7/21 누계를 별도 컬럼으로 prepend
+    // Day 뷰: 서버가 계산한 구간 이전 누계를 별도 컬럼으로 prepend
     if (bucket === "day") {
-      const CUM_ISO = "2026-07-21";
+      const CUM_ISO = cumIso;
       let visStart = 0;
       if (hidePast) {
         const t = result.buckets.findIndex((b) => b >= today);
@@ -257,7 +263,7 @@ export function SnagProgressPage() {
       },
     }));
     return { buckets: newBuckets, rows };
-  }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket]);
+  }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket, cumIso]);
 
   const kpis = useMemo(() => {
     const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number; noPlan: number }> = {
@@ -318,6 +324,7 @@ export function SnagProgressPage() {
     params.set("plan_group", planGroups.join(","));
     if (teams.length) params.set("team", teams.join(","));
     if (roomGroups.length) params.set("roomGroup", roomGroups.join(","));
+    params.set("tab", "all");
     const g = groupKeyToRawParams(effectiveGroupBy, groupKeyRaw);
     for (const [k, v] of Object.entries(g)) params.set(k, v);
     const dateFrom = bucketIso;
@@ -335,6 +342,8 @@ export function SnagProgressPage() {
   ) => {
     const params = new URLSearchParams();
     params.set("source", "progress-kpi");
+    // 진척 집계 모집단 = 활성 전체(종결 포함) → 드릴다운 탭도 all 로 고정
+    params.set("tab", "all");
     params.set("plan_group", planGroups.join(","));
     if (teams.length) params.set("team", teams.join(","));
     if (roomGroups.length) params.set("roomGroup", roomGroups.join(","));
@@ -366,21 +375,20 @@ export function SnagProgressPage() {
               <CalendarDays className="h-5 w-5 text-primary" />
               Snag Progress Status
             </h1>
-            {latestDataDate && (
-              <DataDatePicker
-                mode="datadate"
-                value={effectiveDataDate}
-                latest={latestDataDate}
-                options={dataDateOptions}
-                onChange={(v) =>
-                  setSearch({ dataDate: v === latestDataDate ? "" : v })
-                }
-                onReset={() => setSearch({ dataDate: "" })}
-              />
-            )}
+            <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+              {asOfHeaderLabel(asOfDate)}
+            </span>
+            <DataDatePicker
+              showDataDateChip
+              value={asOfDate}
+              latest={latestDataDate ?? ""}
+              options={dataDateOptions}
+              onChange={(v) => setSearch({ dataDate: v === today ? "" : v })}
+              onReset={() => setSearch({ dataDate: "" })}
+            />
           </div>
           <p className="text-xs text-muted-foreground">
-            Plot {plot} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} · As-of {asOfLabel} ({asOfDate}) ·
+            Plot {plot} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} · As of {asOfDate} ·
             Plan: {planMode === "remaining" ? "Remaining" : "Baseline"} · Range {rangeDays}d
           </p>
         </div>
@@ -518,22 +526,6 @@ export function SnagProgressPage() {
                 Hide past
               </Label>
             </div>
-
-            <ToolbarGroup label="As-of">
-              <ToggleGroup
-                type="single"
-                value={asofMode}
-                onValueChange={(v) => v && setSearch({ asofMode: v as "dataDate" | "today" })}
-                className="gap-1"
-              >
-                <ToggleGroupItem value="dataDate" className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                  Data Date
-                </ToggleGroupItem>
-                <ToggleGroupItem value="today" className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                  Today
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </ToolbarGroup>
 
             <ToolbarGroup label="Plan">
               <ToggleGroup
