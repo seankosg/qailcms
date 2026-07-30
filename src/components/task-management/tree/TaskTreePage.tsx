@@ -418,9 +418,7 @@ export function TaskTreePage() {
         const to = from + PAGE - 1;
         const { data, error } = await (supabase as any)
           .from("task_management_raw")
-          .select(
-            "id, task_no, main_task_no, level, discipline, task_name, actual_progress, plan_progress, plan_start, plan_end, plan_days, actual_start, actual_finish, slip_days, auto_judgment, hdec_pic_name, hdec_eng_name, sub_task_desc, sort_order, data_date",
-          )
+          .select("*")
           .eq("discipline", discipline)
           .order("main_task_no", { ascending: true, nullsFirst: true })
           .order("task_no", { ascending: true })
