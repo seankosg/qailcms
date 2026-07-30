@@ -924,7 +924,7 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
     const key = String(v).toUpperCase();
     return <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold", STATUS_COLORS[key] ?? "bg-zinc-500/15 text-zinc-700")}>{v}</span>;
   }
-  if (c.key === "current_stage") {
+  if (c.key === "current_stage" || c.key === "completed_stage") {
     const key = String(v).toUpperCase();
     const cls =
       key === "APPROVED" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
@@ -934,12 +934,13 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
       key.startsWith("DS") || key.startsWith("DF") ? "bg-violet-500/15 text-violet-700 dark:text-violet-300" :
       key === "SB" ? "bg-orange-500/15 text-orange-700 dark:text-orange-300" :
       "bg-zinc-500/15 text-zinc-700";
+    const variant = c.key === "completed_stage" ? "completed-short" : "short";
     return (
       <span
-        title={String(v)}
+        title={formatAbdStage(String(v), c.key === "completed_stage" ? "completed-long" : "long")}
         className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap", cls)}
       >
-        {formatAbdStage(String(v))}
+        {formatAbdStage(String(v), variant)}
       </span>
     );
   }
