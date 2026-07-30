@@ -960,15 +960,11 @@ export function TaskTreePage() {
                   <table className="w-full text-xs">
                     <thead className="bg-muted/40">
                       <tr>
-                        <th className="px-2 py-1 text-left">Task No</th>
-                       <th className="px-2 py-1 text-left">Sub Task 설명</th>
-                        <th className="px-2 py-1 text-left">담당</th>
-                        <th className="px-2 py-1 text-left">계획</th>
-                        <th className="px-2 py-1 text-left">실적</th>
-                        <th className="px-2 py-1 text-left">오늘 계획</th>
-                        <th className="px-2 py-1 text-left">차이</th>
-                        <th className="px-2 py-1 text-left">판정</th>
-                        <th className="px-2 py-1"></th>
+                        {visibleCols.map((c) => (
+                          <th key={c} className="px-2 py-1 text-left">
+                            {c === "chart" ? "" : SUMMARY_COLUMN_LABELS[c]}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
@@ -990,50 +986,85 @@ export function TaskTreePage() {
                               })
                             }
                           >
-                            <td className="px-2 py-1 font-mono text-primary underline-offset-2 hover:underline">
-                              {k.task_no}
-                            </td>
-                            <td className="px-2 py-1">
-                              {k.sub_task_desc ?? "-"}
-                              {stalenessLabel(k.data_date) && (
-                                <span className="ml-1 text-[10px] tabular-nums text-muted-foreground">
-                                  {stalenessLabel(k.data_date)}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-2 py-1">{k.hdec_pic_name ?? k.hdec_eng_name ?? "-"}</td>
-                            <td className="px-2 py-1 text-[10px] tabular-nums">
-                              {k.plan_start ?? "-"} ~ {k.plan_end ?? "-"}
-                            </td>
-                            <td className="px-2 py-1">
-                              <ProgressBar v={k.actual_progress} />
-                            </td>
-                            <td className="px-2 py-1 tabular-nums text-[10px]">
-                              {(cumPlanProgress(k, asOfDate) * 100).toFixed(0)}%
-                            </td>
-                            <td className="px-2 py-1">
-                              <GapCell gap={gap} buffer={thresholds.caution_gap_buffer} />
-                            </td>
-                            <td className="px-2 py-1">
-                              {j && (
-                                <Badge className={AUTO_JUDGMENT_COLORS[j] ?? "bg-muted"}>
-                                  {j}
-                                </Badge>
-                              )}
-                            </td>
-                            <td className="px-2 py-1">
-                              <MiniProgressChart
-                                planPoints={chartMap.get(k.task_no)?.plan_points}
-                                actualPoints={chartMap.get(k.task_no)?.actual_points}
-                                xStart={chartMap.get(k.task_no)?.x_start ?? null}
-                                xEnd={chartMap.get(k.task_no)?.x_end ?? null}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setChartTask({ task_no: k.task_no, task_name: k.task_name });
-                                }}
-                                title="클릭하여 진도율 상세 차트 보기"
-                              />
-                            </td>
+                            {visibleCols.map((c) => {
+                              switch (c) {
+                                case "task_no":
+                                  return (
+                                    <td key={c} className="px-2 py-1 font-mono text-primary underline-offset-2 hover:underline">
+                                      {k.task_no}
+                                    </td>
+                                  );
+                                case "sub_task_desc":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      {k.sub_task_desc ?? "-"}
+                                      {stalenessLabel(k.data_date) && (
+                                        <span className="ml-1 text-[10px] tabular-nums text-muted-foreground">
+                                          {stalenessLabel(k.data_date)}
+                                        </span>
+                                      )}
+                                    </td>
+                                  );
+                                case "pic":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      {k.hdec_pic_name ?? k.hdec_eng_name ?? "-"}
+                                    </td>
+                                  );
+                                case "plan":
+                                  return (
+                                    <td key={c} className="px-2 py-1 text-[10px] tabular-nums">
+                                      {k.plan_start ?? "-"} ~ {k.plan_end ?? "-"}
+                                    </td>
+                                  );
+                                case "actual":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      <ProgressBar v={k.actual_progress} />
+                                    </td>
+                                  );
+                                case "today_plan":
+                                  return (
+                                    <td key={c} className="px-2 py-1 tabular-nums text-[10px]">
+                                      {(cumPlanProgress(k, asOfDate) * 100).toFixed(0)}%
+                                    </td>
+                                  );
+                                case "gap":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      <GapCell gap={gap} buffer={thresholds.caution_gap_buffer} />
+                                    </td>
+                                  );
+                                case "judgment":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      {j && (
+                                        <Badge className={AUTO_JUDGMENT_COLORS[j] ?? "bg-muted"}>
+                                          {j}
+                                        </Badge>
+                                      )}
+                                    </td>
+                                  );
+                                case "chart":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      <MiniProgressChart
+                                        planPoints={chartMap.get(k.task_no)?.plan_points}
+                                        actualPoints={chartMap.get(k.task_no)?.actual_points}
+                                        xStart={chartMap.get(k.task_no)?.x_start ?? null}
+                                        xEnd={chartMap.get(k.task_no)?.x_end ?? null}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setChartTask({ task_no: k.task_no, task_name: k.task_name });
+                                        }}
+                                        title="클릭하여 진도율 상세 차트 보기"
+                                      />
+                                    </td>
+                                  );
+                                default:
+                                  return null;
+                              }
+                            })}
                           </tr>
                         );
                       })}
