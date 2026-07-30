@@ -61,6 +61,7 @@ import { RefreshCw, Columns3 } from "lucide-react";
 import { AbdAconexImportPage } from "./AbdAconexImportPage";
 import { useAbdFieldConfig } from "@/hooks/useAbdFieldConfig";
 import { AbdDataDatePicker } from "./AbdDataDatePicker";
+import { parseDataDateFromFileName } from "@/lib/abd/filename-date";
 import {
   ColumnSelectDialog,
   type ColumnSelectHelpers,
@@ -323,6 +324,7 @@ export function AbdImportPage() {
       file: f,
       status: "queued",
       team: detectTeamFromFilename(f.name, teamOptions),
+      dataDate: parseDataDateFromFileName(f.name),
     }));
     setEntries((prev) => [...prev, ...newEntries]);
     for (const e of newEntries) {
