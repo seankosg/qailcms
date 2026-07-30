@@ -262,7 +262,7 @@ export function SnagProgressPage() {
       },
     }));
     return { buckets: newBuckets, rows };
-  }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket]);
+  }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket, cumIso]);
 
   const kpis = useMemo(() => {
     const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number; noPlan: number }> = {
@@ -371,18 +371,17 @@ export function SnagProgressPage() {
               <CalendarDays className="h-5 w-5 text-primary" />
               Snag Progress Status
             </h1>
-            {latestDataDate && (
-              <DataDatePicker
-                mode="datadate"
-                value={effectiveDataDate}
-                latest={latestDataDate}
-                options={dataDateOptions}
-                onChange={(v) =>
-                  setSearch({ dataDate: v === latestDataDate ? "" : v })
-                }
-                onReset={() => setSearch({ dataDate: "" })}
-              />
-            )}
+            <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+              {asOfHeaderLabel(asOfDate)}
+            </span>
+            <DataDatePicker
+              showDataDateChip
+              value={asOfDate}
+              latest={latestDataDate ?? ""}
+              options={dataDateOptions}
+              onChange={(v) => setSearch({ dataDate: v === today ? "" : v })}
+              onReset={() => setSearch({ dataDate: "" })}
+            />
           </div>
           <p className="text-xs text-muted-foreground">
             Plot {plot} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} · As-of {asOfLabel} ({asOfDate}) ·
@@ -523,22 +522,6 @@ export function SnagProgressPage() {
                 Hide past
               </Label>
             </div>
-
-            <ToolbarGroup label="As-of">
-              <ToggleGroup
-                type="single"
-                value={asofMode}
-                onValueChange={(v) => v && setSearch({ asofMode: v as "dataDate" | "today" })}
-                className="gap-1"
-              >
-                <ToggleGroupItem value="dataDate" className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                  Data Date
-                </ToggleGroupItem>
-                <ToggleGroupItem value="today" className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                  Today
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </ToolbarGroup>
 
             <ToolbarGroup label="Plan">
               <ToggleGroup
