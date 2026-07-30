@@ -414,12 +414,14 @@ export function DefectRawDataPage() {
 
   const { data: counts } = useDefectStatusCounts({ includeInactive });
   const { data: summary } = useDefectDashboardSummary({ includeInactive });
-  const dataDate = summary?.latest_data_date ?? null;
+  // As-of 단일 규칙: 세션 공유 선택값이 없으면 오늘(Asia/Qatar).
+  // row.data_date(관측 컷오프)는 표기 전용이며 as-of 폴백에 쓰지 않는다.
+  const [sharedAsOf] = useSnagAsOf();
+  const dataDate = sharedAsOf || todayIso();
 
   // 파생 start_status 컬럼 값 주입 (렌더/셀 접근용)
   const enrichedRows = useMemo(() => {
-    const asOf = dataDate ?? todayIso();
-    return rows.map((r) => ({ ...r, start_status: startStatusLabel(classifyStage(r as any, "start", asOf)) }));
+    return rows.map((r) => ({ ...r, start_status: startStatusLabel(classifyStage(r as any, "start", dataDate)) }));
   }, [rows, dataDate]);
 
   // ── Restore view pref (per-tab: order/visibility/frozenExtras/columnSizing) ─
