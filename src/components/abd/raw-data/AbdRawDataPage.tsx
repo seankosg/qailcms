@@ -444,7 +444,7 @@ export function AbdRawDataPage() {
   const q = (urlSearch.q ?? "").trim();
 
   // 판정 기준일(As of) — 세션 전역 공유. 빈 값이면 오늘(Doha).
-  const [sharedAbdDate] = useAbdDataDate();
+  const sharedAbdDate = effectiveAsOf;
   const { data: itemsData, isFetching, refetch } = useAbdItemsQuery({
     team, statusGroup, includeInactive, plot: plotFilter, q, filters: serverFilters, sort: serverSort, page, pageSize, excludedMode,
     asOf: sharedAbdDate || null,
