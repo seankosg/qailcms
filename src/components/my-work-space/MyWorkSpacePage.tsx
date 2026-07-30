@@ -26,7 +26,9 @@ import { DataDatePicker } from "@/components/task-management/shared/DataDatePick
 import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
 import { CommentsInbox } from "./CommentsInbox";
 import { AttentionInbox } from "./AttentionInbox";
-import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmAsOf } from "@/hooks/useTmAsOf";
+import { asOfHeaderLabel } from "@/lib/task-management/as-of";
+import { useTmLatestDataDate } from "@/hooks/useTmLatestDataDate";
 import { useTmJudgmentAtDate, mergeTmJudgment } from "@/hooks/useTmJudgmentAtDate";
 
 function fmtDate(d?: string | null): string {
@@ -85,7 +87,8 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   // ABD detail은 전용 라우트로 이동
 
   const latestToday = today();
-  const [dataDate, setDataDate, resetDataDate] = useTmDataDate();
+  const [dataDate, setDataDate, resetDataDate] = useTmAsOf();
+  const { data: tmLatestDataDate = "" } = useTmLatestDataDate();
   const t = dataDate || latestToday;
 
   // 과거 Data Date 선택 시 서버측 재판정 병합 (Actual 유지, Plan/gap/judgment 만 as-of).
@@ -373,12 +376,15 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
                 ? `Team · ${team}`
                 : `HDEC PIC · ${pic}`}
             {" · Data as of "}{dohaStamp()}
+            {" · "}
+            <span className="font-medium">{asOfHeaderLabel(t)}</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <DataDatePicker
+            showDataDateChip
             value={dataDate}
-            latest={latestToday}
+            latest={tmLatestDataDate}
             options={[]}
             onChange={setDataDate}
             onReset={resetDataDate}

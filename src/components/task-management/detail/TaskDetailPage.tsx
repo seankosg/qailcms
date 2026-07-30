@@ -36,7 +36,7 @@ import {
   computeJudgment,
 } from "@/lib/task-management/derived";
 import { todayIso } from "@/lib/task-management/schedule-utils";
-import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmAsOf } from "@/hooks/useTmAsOf";
 
 // Runtime reference to keep the deploy marker in the client bundle (tree-shake guard)
 if (typeof window !== "undefined") (window as any).__TM_MARK__ = TM_OWNER_MUTATIONS_MARKER;
@@ -98,7 +98,7 @@ export function TaskDetailPage() {
   }, []);
 
   // Forecast 그룹은 Raw Data 와 동일한 파생 함수·RPC 로 계산한다(저장값 렌더 금지).
-  const [sharedAsOf] = useTmDataDate();
+  const [sharedAsOf] = useTmAsOf();
   const asOf = sharedAsOf || todayIso();
   const { data: tActual } = useQuery({
     queryKey: ["tm-today-actual-detail", id, asOf],

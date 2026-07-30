@@ -8,7 +8,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { formatDdMmmYyyy } from "@/lib/time/doha";
+import { formatDdMmmYyyy, todayInDoha } from "@/lib/time/doha";
+import { asOfOffsetLabel } from "@/lib/task-management/as-of";
 
 export interface DataDatePickerProps {
   value: string;
@@ -17,6 +18,12 @@ export interface DataDatePickerProps {
   onChange: (v: string) => void;
   onReset: () => void;
   className?: string;
+  /** 읽기 전용 Data Date 칩 표시 (최신 컷오프). 미지정 시 latest 사용. 숨기려면 false. */
+  showDataDateChip?: boolean;
+  /** 팀별 최신 컷오프가 갈릴 때만 병기 (예: [{label:"MECH",date:"2026-07-30"}]). */
+  dataDateByTeam?: { label: string; date: string }[];
+  /** "asof"(기본): 기준=오늘, 리셋=오늘로. "datadate": 기준=latest, 리셋=최신으로. */
+  mode?: "asof" | "datadate";
 }
 
 /** As of(판정 기준일) 캘린더 선택기.
@@ -33,9 +40,20 @@ export function DataDatePicker({
   onChange,
   onReset,
   className,
+  showDataDateChip = false,
+  dataDateByTeam,
+  mode = "asof",
 }: DataDatePickerProps) {
   const [open, setOpen] = useState(false);
-  const active = value || latest || "";
+  const today = mode === "datadate" ? latest || todayInDoha() : todayInDoha();
+  // As-of 기본값은 오늘(Asia/Qatar). latest(data_date)로 폴백하지 않는다.
+  const active = value || today;
+  const offset = mode === "datadate" ? "" : asOfOffsetLabel(active, today);
+
+  const teamChip =
+    dataDateByTeam && dataDateByTeam.length > 1
+      ? dataDateByTeam.map((t) => `${t.label} ${t.date.slice(5, 10)}`).join(" · ")
+      : "";
 
   // 데이터 유무와 무관하게 모든 날짜 선택 허용.
   // options/latest 는 defaultMonth 힌트로만 사용.
@@ -78,8 +96,10 @@ export function DataDatePicker({
             <span className="truncate">
               {formatDdMmmYyyy(active) || "날짜 선택"}
             </span>
-            {active && active === latest && (
-              <span className="ml-auto text-[10px] text-muted-foreground">최신</span>
+            {active === today && (
+              <span className="ml-auto text-[10px] text-muted-foreground">
+                {mode === "datadate" ? "최신" : "오늘"}
+              </span>
             )}
           </Button>
         </PopoverTrigger>
@@ -98,16 +118,31 @@ export function DataDatePicker({
           />
         </PopoverContent>
       </Popover>
-      {value && value !== latest && (
+      {offset && (
+        <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+          {offset}
+        </span>
+      )}
+      {active !== today && (
         <Button
           size="sm"
           variant="ghost"
           className="h-7 px-2 text-[11px]"
           onClick={onReset}
+          title={mode === "datadate" ? "최신으로 리셋" : "오늘로 리셋"}
         >
           <RotateCcw className="mr-1 h-3 w-3" />
-          최신
+          {mode === "datadate" ? "최신" : "오늘"}
         </Button>
+      )}
+      {showDataDateChip && latest && (
+        <span
+          className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground"
+          title="데이터 관측 컷오프 (읽기 전용)"
+        >
+          Data Date: {latest.slice(0, 10)} (최신)
+          {teamChip && <span className="text-muted-foreground/80">· {teamChip}</span>}
+        </span>
       )}
     </div>
   );

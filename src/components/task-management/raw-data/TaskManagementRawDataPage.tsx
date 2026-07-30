@@ -81,7 +81,7 @@ import { AddMainTaskDialog } from "./AddMainTaskDialog";
 import { AlarmBadge } from "./AlarmBadge";
 import { TaskStageProgress } from "./TaskStageProgress";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { useTmInfiniteItems } from "@/hooks/useTmInfiniteItems";
 import {
   columnFiltersToServer,
@@ -493,7 +493,7 @@ export function TaskManagementRawDataPage() {
 
   // 서버 정본 판정용 컨텍스트 — 훅 호출 전에 확보해야 첫 페이지부터 derived_auto_judgment 가 계산됨.
   // sharedDataDate 가 비어 있으면 서버가 Asia/Qatar 기준 오늘로 default.
-  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
+  const [sharedDataDate, setSharedDataDate] = useTmAsOf();
   const serverAsOf = sharedDataDate || null;
   const serverThresholds = kpiThresholds ?? DEFAULT_THRESHOLDS;
 

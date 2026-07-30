@@ -324,6 +324,7 @@ export function AbdProgressPage() {
               ABD Progress Status
             </h1>
             <DataDatePicker
+              mode="datadate"
               value={effectiveDataDate}
               latest={latestDataDate}
               options={dataDateOptions}
