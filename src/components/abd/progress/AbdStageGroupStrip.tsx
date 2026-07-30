@@ -5,14 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getAbdStageGroupCounts } from "@/lib/abd/dashboard.functions";
 
-/** 생애주기 순 7카드 — stage_group 정본 축 */
+/** 생애주기 순 7카드 — stage_group 정본 축. 라운드 접힘 축이므로 R 접두 없음. */
 const GROUPS: Array<{ code: string; label: string }> = [
   { code: "NS", label: "Not Started" },
-  { code: "DS", label: "Draft Start" },
-  { code: "DF", label: "Draft Finish" },
-  { code: "SB", label: "Submission" },
-  { code: "RS", label: "Response" },
-  { code: "RESUBMIT", label: "Resubmit" },
+  { code: "DS", label: "Awaiting Draft Start" },
+  { code: "DF", label: "Awaiting Draft Finish" },
+  { code: "SB", label: "Awaiting Submission" },
+  { code: "RS", label: "Awaiting Response" },
+  { code: "RESUBMIT", label: "Awaiting Resubmit" },
   { code: "APPROVED", label: "Approved" },
 ];
 

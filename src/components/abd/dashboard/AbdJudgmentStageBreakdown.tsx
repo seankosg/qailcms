@@ -8,7 +8,8 @@ const STAGE_ORDER: Array<"NS" | "DS" | "UR" | "Approved"> = ["NS", "DS", "UR", "
 const STAGE_LABEL: Record<string, string> = {
   NS: "NS (Not Started)",
   DS: "DS (Draft)",
-  UR: "UR (Under Review)",
+  // 'UR' 은 내부 stage 키(의미 = 회신 대기(RS)). 화면 라벨만 정정.
+  UR: "RS (Awaiting Response)",
   Approved: "Approved",
 };
 const COLOR: Record<string, string> = {

@@ -199,7 +199,8 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         onClick={() => onOpenRaw({})}
       />
       {mk("Approved", "Approved", "ok", "approved")}
-      {mk("Under Review", "UR", "info", "under_review")}
+      {/* 'UR' 은 내부 bucket_top 키(의미 = 회신 대기(RS)). 화면 라벨만 정정. */}
+      {mk("Awaiting Response", "UR", "info", "under_review")}
       {mk("Draft Start", "DS", "warn", "drafting")}
       {mk("Not Started", "NS", "danger", "not_started")}
     </div>

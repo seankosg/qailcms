@@ -256,3 +256,20 @@
 2026-07-29 실측 4건. 데이터 수정 금지, 원본 파일 정정 사안.
 - `9207-BP12D-HDEC-ABD-ME-NS-B04-41101` ~ `41104` (current_stage `DF2`)
   - `r2_draft_finish_plan` 2026-07-30(미래)인데 후속 `r2_submission_plan` 2026-07-27(과거) → 선후 역전.
+
+## ABD 완료 기준 KPI 카드 (completed_stage_group)  `[등재만 · 착수 금지]`
+
+2026-07-29 Completed Stage 파생 신설과 함께 등재. `completed_stage_group`(NS/DS/DF/SB/RS/TM/APPROVED)을
+기존 stage_group 7카드 패턴으로 재사용하는 "완료 기준" KPI 스트립. 이번 라운드는 컬럼·표기까지만 시행하고
+카드 UI 는 착수하지 않는다. 재개 조건: 별도 지시.
+
+## ABD 내부 키 개명 (UR 어휘 잔재)  `[등재만 · 착수 금지]`
+
+화면 라벨은 2026-07-29 라운드에서 "Awaiting Response" 등으로 정정 완료. 다음 내부 키는 딥링크·RPC
+하위호환 때문에 유지한다.
+- `bucket_top = 'UR'` (의미 = 회신 대기 RS)
+- `abd_items_raw.ur_aging_days` (의미 = 회신 대기 경과일)
+- `abd_settings.ur_aging_warn_days` / `ur_aging_late_days`
+- status_group 딥링크 키 `under_review`
+- `rs_result_missing` (의미 = 회신 도착했으나 결과 코드 A/B/C 누락 — RS 의미로 이미 정합)
+재개 조건: 딥링크 어댑터(구 키 → 신 키 리다이렉트) 설계 승인 후.

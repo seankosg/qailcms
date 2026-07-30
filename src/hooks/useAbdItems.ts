@@ -79,6 +79,9 @@ export interface AbdItem {
   is_active: boolean;
   status_group: "approved" | "in_progress" | "not_started";
   current_stage: string | null;
+  completed_stage: string | null;
+  completed_stage_group: string | null;
+  /** 의미 = 회신 대기(RS) 경과일. 내부 키 개명은 백로그(딥링크·RPC 하위호환). */
   ur_aging_days: number | null;
   data_date: string | null;
   updated_at: string | null;
