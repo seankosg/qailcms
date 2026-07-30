@@ -47,8 +47,28 @@ import { asOfHeaderLabel, stalenessLabel } from "@/lib/task-management/as-of";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { todayInDoha } from "@/lib/time/doha";
 import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
+import { MwsColumnOrderMenu } from "@/components/my-work-space/MwsColumnOrderMenu";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
+
+/** Task Summary(요약 표) 컬럼 정의 — Raw Data 의 Columns 메뉴와 동일 UI 로 제어 */
+const SUMMARY_COLUMN_LABELS: Record<string, string> = {
+  task_no: "Task No",
+  sub_task_desc: "Sub Task 설명",
+  pic: "담당",
+  plan: "계획",
+  actual: "실적",
+  today_plan: "오늘 계획",
+  gap: "차이",
+  judgment: "판정",
+  chart: "진도 차트",
+};
+const SUMMARY_DEFAULT_ORDER = Object.keys(SUMMARY_COLUMN_LABELS);
+const SUMMARY_DEFAULT_FROZEN = ["task_no"];
+const SUMMARY_DEFAULT_VISIBILITY: Record<string, boolean> = Object.fromEntries(
+  SUMMARY_DEFAULT_ORDER.map((k) => [k, true]),
+);
+const SUMMARY_COLS_KEY = "tm-task-summary-columns-v1";
 
 interface Row {
   id: string;
@@ -225,6 +245,53 @@ export function TaskTreePage() {
   );
   const [chartTask, setChartTask] = useState<{ task_no: string; task_name: string | null } | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  // ── Columns 메뉴 상태 (localStorage 유지) ─────────────────────────────
+  const [colOrder, setColOrder] = useState<string[]>(SUMMARY_DEFAULT_ORDER);
+  const [colVisibility, setColVisibility] = useState<Record<string, boolean>>(
+    SUMMARY_DEFAULT_VISIBILITY,
+  );
+  const [colFrozen, setColFrozen] = useState<string[]>(SUMMARY_DEFAULT_FROZEN);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(SUMMARY_COLS_KEY);
+      if (!raw) return;
+      const p = JSON.parse(raw) as {
+        order?: string[];
+        visibility?: Record<string, boolean>;
+        frozen?: string[];
+      };
+      const known = (arr?: string[]) =>
+        (arr ?? []).filter((k) => SUMMARY_DEFAULT_ORDER.includes(k));
+      const order = known(p.order);
+      setColOrder([...order, ...SUMMARY_DEFAULT_ORDER.filter((k) => !order.includes(k))]);
+      setColVisibility({ ...SUMMARY_DEFAULT_VISIBILITY, ...(p.visibility ?? {}) });
+      const frozen = known(p.frozen);
+      setColFrozen(frozen.includes("task_no") ? frozen : ["task_no", ...frozen]);
+    } catch {
+      // ignore
+    }
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        SUMMARY_COLS_KEY,
+        JSON.stringify({ order: colOrder, visibility: colVisibility, frozen: colFrozen }),
+      );
+    } catch {
+      // ignore
+    }
+  }, [colOrder, colVisibility, colFrozen]);
+
+  /** 고정 컬럼 먼저, 이어서 나머지 순서대로. 숨김 컬럼 제외. */
+  const visibleCols = useMemo(() => {
+    const frozen = colFrozen.filter((k) => SUMMARY_DEFAULT_ORDER.includes(k));
+    const rest = colOrder.filter((k) => !frozen.includes(k));
+    return [...frozen, ...rest].filter((k) => colVisibility[k] !== false || k === "task_no");
+  }, [colOrder, colVisibility, colFrozen]);
+  const showCol = (k: string) => visibleCols.includes(k);
 
   // 상태 변경 시 sessionStorage 로 저장 (현재 discipline 슬롯만 갱신).
   useEffect(() => {
@@ -686,6 +753,19 @@ export function TaskTreePage() {
           <Button size="sm" variant="outline" className="h-8" onClick={collapseAll}>
             접기
           </Button>
+          <MwsColumnOrderMenu
+            order={colOrder}
+            visibility={colVisibility}
+            frozen={colFrozen}
+            forcedFrozen={["task_no"]}
+            labels={SUMMARY_COLUMN_LABELS}
+            defaultOrder={SUMMARY_DEFAULT_ORDER}
+            defaultVisibility={SUMMARY_DEFAULT_VISIBILITY}
+            defaultFrozen={SUMMARY_DEFAULT_FROZEN}
+            onOrderChange={setColOrder}
+            onVisibilityChange={setColVisibility}
+            onFrozenChange={setColFrozen}
+          />
           <Button
             size="sm"
             className="h-8"
@@ -831,27 +911,35 @@ export function TaskTreePage() {
                   {behindCount > 0 && (
                     <Badge className="bg-rose-500/15 text-rose-700">지연 {behindCount}</Badge>
                   )}
-                  <span
-                    className="text-[10px] text-muted-foreground"
-                    title="담당 (HDEC PIC / ENG)"
-                  >
-                    담당 <span className="font-medium text-foreground">{pPic}</span>
-                  </span>
-                  <span
-                    className="text-[10px] tabular-nums text-muted-foreground"
-                    title="계획 (P.Start ~ P.Finish)"
-                  >
-                    계획 {p.plan_start ?? "-"} ~ {p.plan_end ?? "-"}
-                  </span>
-                  <ProgressBar v={p.actual_progress} />
-                  <span
-                    className="text-[10px] tabular-nums text-muted-foreground"
-                    title="오늘 계획 (T.Plan%)"
-                  >
-                    오늘 계획 <span className="font-medium text-foreground">{(pTodayPlan * 100).toFixed(0)}%</span>
-                  </span>
-                  <GapCell gap={pGap} buffer={thresholds.caution_gap_buffer} />
-                  {mainJudgment && (
+                  {showCol("pic") && (
+                    <span
+                      className="text-[10px] text-muted-foreground"
+                      title="담당 (HDEC PIC / ENG)"
+                    >
+                      담당 <span className="font-medium text-foreground">{pPic}</span>
+                    </span>
+                  )}
+                  {showCol("plan") && (
+                    <span
+                      className="text-[10px] tabular-nums text-muted-foreground"
+                      title="계획 (P.Start ~ P.Finish)"
+                    >
+                      계획 {p.plan_start ?? "-"} ~ {p.plan_end ?? "-"}
+                    </span>
+                  )}
+                  {showCol("actual") && <ProgressBar v={p.actual_progress} />}
+                  {showCol("today_plan") && (
+                    <span
+                      className="text-[10px] tabular-nums text-muted-foreground"
+                      title="오늘 계획 (T.Plan%)"
+                    >
+                      오늘 계획 <span className="font-medium text-foreground">{(pTodayPlan * 100).toFixed(0)}%</span>
+                    </span>
+                  )}
+                  {showCol("gap") && (
+                    <GapCell gap={pGap} buffer={thresholds.caution_gap_buffer} />
+                  )}
+                  {showCol("judgment") && mainJudgment && (
                     <Badge
                       className={cn(
                         "rounded-none border border-black/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider shadow-sm",
@@ -862,6 +950,7 @@ export function TaskTreePage() {
                       {mainJudgment}
                     </Badge>
                   )}
+                  {showCol("chart") && (
                   <MiniProgressChart
                     planPoints={chartMap.get(p.task_no)?.plan_points}
                     actualPoints={chartMap.get(p.task_no)?.actual_points}
@@ -873,6 +962,7 @@ export function TaskTreePage() {
                     }}
                     title="클릭하여 진도율 상세 차트 보기"
                   />
+                  )}
                 </div>
               </CardHeader>
               {isOpen && (
@@ -880,15 +970,11 @@ export function TaskTreePage() {
                   <table className="w-full text-xs">
                     <thead className="bg-muted/40">
                       <tr>
-                        <th className="px-2 py-1 text-left">Task No</th>
-                       <th className="px-2 py-1 text-left">Sub Task 설명</th>
-                        <th className="px-2 py-1 text-left">담당</th>
-                        <th className="px-2 py-1 text-left">계획</th>
-                        <th className="px-2 py-1 text-left">실적</th>
-                        <th className="px-2 py-1 text-left">오늘 계획</th>
-                        <th className="px-2 py-1 text-left">차이</th>
-                        <th className="px-2 py-1 text-left">판정</th>
-                        <th className="px-2 py-1"></th>
+                        {visibleCols.map((c) => (
+                          <th key={c} className="px-2 py-1 text-left">
+                            {c === "chart" ? "" : SUMMARY_COLUMN_LABELS[c]}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
@@ -910,50 +996,85 @@ export function TaskTreePage() {
                               })
                             }
                           >
-                            <td className="px-2 py-1 font-mono text-primary underline-offset-2 hover:underline">
-                              {k.task_no}
-                            </td>
-                            <td className="px-2 py-1">
-                              {k.sub_task_desc ?? "-"}
-                              {stalenessLabel(k.data_date) && (
-                                <span className="ml-1 text-[10px] tabular-nums text-muted-foreground">
-                                  {stalenessLabel(k.data_date)}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-2 py-1">{k.hdec_pic_name ?? k.hdec_eng_name ?? "-"}</td>
-                            <td className="px-2 py-1 text-[10px] tabular-nums">
-                              {k.plan_start ?? "-"} ~ {k.plan_end ?? "-"}
-                            </td>
-                            <td className="px-2 py-1">
-                              <ProgressBar v={k.actual_progress} />
-                            </td>
-                            <td className="px-2 py-1 tabular-nums text-[10px]">
-                              {(cumPlanProgress(k, asOfDate) * 100).toFixed(0)}%
-                            </td>
-                            <td className="px-2 py-1">
-                              <GapCell gap={gap} buffer={thresholds.caution_gap_buffer} />
-                            </td>
-                            <td className="px-2 py-1">
-                              {j && (
-                                <Badge className={AUTO_JUDGMENT_COLORS[j] ?? "bg-muted"}>
-                                  {j}
-                                </Badge>
-                              )}
-                            </td>
-                            <td className="px-2 py-1">
-                              <MiniProgressChart
-                                planPoints={chartMap.get(k.task_no)?.plan_points}
-                                actualPoints={chartMap.get(k.task_no)?.actual_points}
-                                xStart={chartMap.get(k.task_no)?.x_start ?? null}
-                                xEnd={chartMap.get(k.task_no)?.x_end ?? null}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setChartTask({ task_no: k.task_no, task_name: k.task_name });
-                                }}
-                                title="클릭하여 진도율 상세 차트 보기"
-                              />
-                            </td>
+                            {visibleCols.map((c) => {
+                              switch (c) {
+                                case "task_no":
+                                  return (
+                                    <td key={c} className="px-2 py-1 font-mono text-primary underline-offset-2 hover:underline">
+                                      {k.task_no}
+                                    </td>
+                                  );
+                                case "sub_task_desc":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      {k.sub_task_desc ?? "-"}
+                                      {stalenessLabel(k.data_date) && (
+                                        <span className="ml-1 text-[10px] tabular-nums text-muted-foreground">
+                                          {stalenessLabel(k.data_date)}
+                                        </span>
+                                      )}
+                                    </td>
+                                  );
+                                case "pic":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      {k.hdec_pic_name ?? k.hdec_eng_name ?? "-"}
+                                    </td>
+                                  );
+                                case "plan":
+                                  return (
+                                    <td key={c} className="px-2 py-1 text-[10px] tabular-nums">
+                                      {k.plan_start ?? "-"} ~ {k.plan_end ?? "-"}
+                                    </td>
+                                  );
+                                case "actual":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      <ProgressBar v={k.actual_progress} />
+                                    </td>
+                                  );
+                                case "today_plan":
+                                  return (
+                                    <td key={c} className="px-2 py-1 tabular-nums text-[10px]">
+                                      {(cumPlanProgress(k, asOfDate) * 100).toFixed(0)}%
+                                    </td>
+                                  );
+                                case "gap":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      <GapCell gap={gap} buffer={thresholds.caution_gap_buffer} />
+                                    </td>
+                                  );
+                                case "judgment":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      {j && (
+                                        <Badge className={AUTO_JUDGMENT_COLORS[j] ?? "bg-muted"}>
+                                          {j}
+                                        </Badge>
+                                      )}
+                                    </td>
+                                  );
+                                case "chart":
+                                  return (
+                                    <td key={c} className="px-2 py-1">
+                                      <MiniProgressChart
+                                        planPoints={chartMap.get(k.task_no)?.plan_points}
+                                        actualPoints={chartMap.get(k.task_no)?.actual_points}
+                                        xStart={chartMap.get(k.task_no)?.x_start ?? null}
+                                        xEnd={chartMap.get(k.task_no)?.x_end ?? null}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setChartTask({ task_no: k.task_no, task_name: k.task_name });
+                                        }}
+                                        title="클릭하여 진도율 상세 차트 보기"
+                                      />
+                                    </td>
+                                  );
+                                default:
+                                  return null;
+                              }
+                            })}
                           </tr>
                         );
                       })}
