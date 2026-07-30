@@ -385,7 +385,7 @@ export function SnagProgressPage() {
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Plot {plot} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} · As-of {asOfLabel} ({asOfDate}) ·
+            Plot {plot} · {groupHeader} · {bucket === "day" ? "Daily" : "Weekly"} · As of {asOfDate} ·
             Plan: {planMode === "remaining" ? "Remaining" : "Baseline"} · Range {rangeDays}d
           </p>
         </div>
