@@ -193,27 +193,6 @@ export function AbdProgressPage() {
     refetchOnWindowFocus: false,
     enabled: scurveOpen,
   });
-  const scurveCum: SCurveCum = useMemo(() => {
-    const rows = (cumQ.data ?? []) as Array<{
-      bucket_iso: string; stage: Stage; cum_plan: number; cum_actual: number;
-    }>;
-    if (rows.length === 0) return {};
-    const idx = new Map<string, number>();
-    buckets.forEach((b, i) => idx.set(b, i));
-    const out: SCurveCum = {};
-    for (const r of rows) {
-      const i = idx.get(r.bucket_iso);
-      if (i === undefined) continue;
-      let slot = out[r.stage];
-      if (!slot) {
-        slot = { plan: new Array(buckets.length).fill(0), actual: new Array(buckets.length).fill(0) };
-        out[r.stage] = slot;
-      }
-      slot.plan[i] = r.cum_plan;
-      slot.actual[i] = r.cum_actual;
-    }
-    return out;
-  }, [cumQ.data, buckets]);
   const scurveBaselines: SCurveBaselines = useMemo(() => {
     const out: SCurveBaselines = {};
     for (const row of (baselineQ.data ?? []) as Array<{
@@ -249,6 +228,28 @@ export function AbdProgressPage() {
     refetchOnWindowFocus: false,
     enabled: scurveOpen,
   });
+
+  const scurveCum: SCurveCum = useMemo(() => {
+    const rows = (cumQ.data ?? []) as Array<{
+      bucket_iso: string; stage: Stage; cum_plan: number; cum_actual: number;
+    }>;
+    if (rows.length === 0) return {};
+    const idx = new Map<string, number>();
+    buckets.forEach((b, i) => idx.set(b, i));
+    const out: SCurveCum = {};
+    for (const r of rows) {
+      const i = idx.get(r.bucket_iso);
+      if (i === undefined) continue;
+      let slot = out[r.stage];
+      if (!slot) {
+        slot = { plan: new Array(buckets.length).fill(0), actual: new Array(buckets.length).fill(0) };
+        out[r.stage] = slot;
+      }
+      slot.plan[i] = r.cum_plan;
+      slot.actual[i] = r.cum_actual;
+    }
+    return out;
+  }, [cumQ.data, buckets]);
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
