@@ -10,6 +10,7 @@ import { DeSnagRoomGroupCards } from "./DeSnagRoomGroupCards";
 import { DeSnagRoomGroupFilterBar } from "./DeSnagRoomGroupFilterBar";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
+import { useSnagAsOf } from "@/hooks/useSnagAsOf";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { todayInDoha } from "@/lib/time/doha";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
