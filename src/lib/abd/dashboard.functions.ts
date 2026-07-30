@@ -6,12 +6,18 @@ const FilterSchema = z.object({
   plots: z.array(z.string()).default([]),
   teams: z.array(z.string()).default([]),
   batch_no: z.array(z.string()).default([]),
+  /** 판정 기준일(As of). 빈 값/미지정 = 오늘(Doha). */
+  as_of: z.string().nullable().optional(),
 });
 
 type RowOut = { bucket: string; team: string | null; cnt: number };
 
 function toArrOrNull(a: string[]) {
   return a && a.length ? a : null;
+}
+
+function asOfOrNull(v?: string | null) {
+  return v && v.trim() ? v.trim() : null;
 }
 
 export const getAbdDashboardRow1 = createServerFn({ method: "POST" })
@@ -22,6 +28,7 @@ export const getAbdDashboardRow1 = createServerFn({ method: "POST" })
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _batch_no: toArrOrNull(data.batch_no),
+      _as_of: asOfOrNull(data.as_of),
     });
     if (error) throw new Error(error.message);
     return (Array.isArray(payload) ? payload : []) as RowOut[];
@@ -35,6 +42,7 @@ export const getAbdDashboardRow2 = createServerFn({ method: "POST" })
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _batch_no: toArrOrNull(data.batch_no),
+      _as_of: asOfOrNull(data.as_of),
     });
     if (error) throw new Error(error.message);
     return (Array.isArray(payload) ? payload : []) as RowOut[];
@@ -48,6 +56,7 @@ export const getAbdDashboardStatusDist = createServerFn({ method: "POST" })
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _batch_no: toArrOrNull(data.batch_no),
+      _as_of: asOfOrNull(data.as_of),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []) as Array<{ status: string; cnt: number }>;
@@ -62,6 +71,7 @@ export const getAbdDashboardAttentionLists = createServerFn({ method: "POST" })
       _teams: toArrOrNull(data.teams) ?? undefined,
       _limit: data.limit,
       _batch_no: toArrOrNull(data.batch_no) ?? undefined,
+      _as_of: asOfOrNull(data.as_of) ?? undefined,
     });
     if (error) throw new Error(error.message);
     if (!Array.isArray(payload)) {
@@ -83,6 +93,7 @@ export const getAbdDashboardCrosscut = createServerFn({ method: "POST" })
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _batch_no: toArrOrNull(data.batch_no),
+      _as_of: asOfOrNull(data.as_of),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []) as Array<{ dis: string; service: string; bucket: string; cnt: number }>;
@@ -124,6 +135,7 @@ export const getAbdStageGroupCounts = createServerFn({ method: "POST" })
       _plots: toArrOrNull(data.plots),
       _teams: toArrOrNull(data.teams),
       _batch_no: toArrOrNull(data.batch_no),
+      _as_of: asOfOrNull(data.as_of),
     });
     if (error) throw new Error(error.message);
     if (!Array.isArray(payload)) {
@@ -139,7 +151,7 @@ export const getAbdStageGroupCounts = createServerFn({ method: "POST" })
   });
 
 export type AbdJudgmentMixRow = {
-  stage: "NS" | "DS" | "UR" | "Approved";
+  stage: "NS" | "DS" | "UR" | "Approved" | "NO_HISTORY";
   total: number;
   approved: number;
   normal: number;
@@ -154,6 +166,7 @@ export const getAbdDashboardJudgmentMix = createServerFn({ method: "POST" })
     z.object({
       batch_no: z.array(z.string()).default([]),
       plots: z.array(z.string()).default([]),
+      as_of: z.string().nullable().optional(),
     }).parse(v),
   )
   .handler(async ({ data, context }) => {
@@ -162,6 +175,7 @@ export const getAbdDashboardJudgmentMix = createServerFn({ method: "POST" })
       {
         _batch_no: toArrOrNull(data.batch_no),
         _plots: toArrOrNull(data.plots),
+        _as_of: asOfOrNull(data.as_of),
       },
     );
     if (error) throw new Error(error.message);
