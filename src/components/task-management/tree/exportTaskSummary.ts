@@ -163,8 +163,8 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
 function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean, asOf?: string): Record<string, unknown> & { __isMain: boolean; __zebra: boolean } {
   const gap = computeVariance(r, asOf) ?? 0;
   const expected = cumPlanProgress(r, asOf);
-  // Main Task는 as-of 기반 클라이언트 재계산 우선; Sub는 DB값 우선.
-  const judgment = isMain
+  // as-of 재계산이 정본. asOf 미지정(과거 스냅샷 경로)일 때만 병합된 저장 판정을 우선.
+  const judgment = asOf
     ? computeJudgment(r, undefined, asOf) || r.auto_judgment || ""
     : r.auto_judgment || computeJudgment(r, undefined, asOf) || "";
   return {
