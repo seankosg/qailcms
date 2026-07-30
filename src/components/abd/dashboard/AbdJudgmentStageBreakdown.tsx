@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAbdDashboardJudgmentMix } from "@/lib/abd/dashboard.functions";
 
 const JUDGMENT_KEY_ORDER = ["완료", "정상", "주의", "지연", "악화"] as const;
-const STAGE_ORDER: Array<"NS" | "DS" | "UR" | "Approved"> = ["NS", "DS", "UR", "Approved"];
+// 2026-07-30 NS 폐지 — 실적 전무는 DS(R1 DS)에 흡수.
+const STAGE_ORDER: Array<"DS" | "UR" | "Approved"> = ["DS", "UR", "Approved"];
 const STAGE_LABEL: Record<string, string> = {
-  NS: "NS (Not Started)",
-  DS: "DS (Draft)",
+  DS: "DS (Awaiting Draft Start)",
   // 'UR' 은 내부 stage 키(의미 = 회신 대기(RS)). 화면 라벨만 정정.
   UR: "RS (Awaiting Response)",
   Approved: "Approved",
