@@ -4376,6 +4376,19 @@ export type Database = {
         }
         Returns: Json
       }
+      abd_progress_cum_json: {
+        Args: {
+          _as_of_date: string
+          _bucket: string
+          _plan_mode: string
+          _plots: string[]
+          _range_end: string
+          _range_start: string
+          _round: string
+          _teams: string[]
+        }
+        Returns: Json
+      }
       abd_progress_events: {
         Args: { _as_of_date: string; _plan_mode?: string; _round?: string }
         Returns: {

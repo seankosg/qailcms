@@ -35,6 +35,7 @@ import {
   ABD_STAGE_COLORS,
   PLAN_DASH,
   type SCurveBaselines,
+  type SCurveCum,
 } from "@/lib/abd/scurve-utils";
 
 export interface AbdPlanVsActualCardProps {
@@ -47,6 +48,8 @@ export interface AbdPlanVsActualCardProps {
   onOpenChange: (v: boolean) => void;
   /** rangeStart-1 시점의 누계 오프셋 (스테이지별) */
   baselines?: SCurveBaselines;
+  /** 서버 정본 누적(문서 distinct). 종점 = 행 totals */
+  cum?: SCurveCum;
 }
 
 export function AbdPlanVsActualCard({
@@ -57,10 +60,11 @@ export function AbdPlanVsActualCard({
   open,
   onOpenChange,
   baselines,
+  cum,
 }: AbdPlanVsActualCardProps) {
   const scurve = useMemo(
-    () => buildAbdSCurve({ cells, buckets, stages, today, baselines }),
-    [cells, buckets, stages, today, baselines],
+    () => buildAbdSCurve({ cells, buckets, stages, today, baselines, cum }),
+    [cells, buckets, stages, today, baselines, cum],
   );
 
   const [hidden, setHidden] = useState<Set<string>>(new Set());
