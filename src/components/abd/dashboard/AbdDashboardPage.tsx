@@ -132,7 +132,14 @@ export function AbdDashboardPage() {
   const batchOptions = useMemo(() => {
     const set = new Set<string>(batchFilter);
     for (const v of batchListQ.data ?? []) set.add(v);
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+    // Empty(데이터 없음) 칩은 항상 가장 오른쪽에 배치
+    return Array.from(set).sort((a, b) => {
+      const aEmpty = a === "__EMPTY__";
+      const bEmpty = b === "__EMPTY__";
+      if (aEmpty && !bEmpty) return 1;
+      if (!aEmpty && bEmpty) return -1;
+      return a.localeCompare(b);
+    });
   }, [batchListQ.data, batchFilter]);
 
   const toggleIn = (list: string[], v: string) =>
