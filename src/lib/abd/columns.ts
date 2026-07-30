@@ -176,7 +176,7 @@ export const GROUP_HEADER_BG: Record<AbdGroupKey, string> = {
 
 /**
  * ABD `current_stage` 코드값 타입 정의.
- * DB `abd_compute_derived` 트리거가 채우는 값. UI 라벨은 `ABD_STAGE_LABELS` 로 매핑.
+ * DB `abd_compute_derived` 트리거가 채우는 값. UI 라벨은 `formatAbdStage()` 단일 소스로 매핑.
  *   - `NS`     Not Started (실적 전무 도면 — 존치되는 유효 값. stage_group 축에서 산출)
  *   - `DS{n}`  Draft Start, round n (초안 착수 대기)
  *   - `DF{n}`  Draft Finish, round n (초안 진행 중)
