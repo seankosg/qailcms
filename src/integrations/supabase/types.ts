@@ -4023,6 +4023,18 @@ export type Database = {
         }
         Returns: string
       }
+      _snag_done_asof: {
+        Args: {
+          _acd: string
+          _as_of: string
+          _asd: string
+          _axd: string
+          _pnorm: number
+          _sr: string
+          _stage: string
+        }
+        Returns: boolean
+      }
       _snag_group_val: {
         Args: {
           _dim: string
@@ -4714,6 +4726,7 @@ export type Database = {
           actual_upto: number
           done_upto: number
           group_key: string[]
+          no_plan: number
           plan_upto: number
           stage: string
           total: number
