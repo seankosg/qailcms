@@ -70,12 +70,14 @@ export function computeTPlan(row: JudgmentRow, asOf?: string): number | null {
   if (!start) return null;
   const asOfD = resolveAsOf(row, asOf);
   let durationDays: number | null = null;
-  const pd = row.plan_days == null ? null : Number(row.plan_days);
-  if (pd != null && !Number.isNaN(pd) && pd > 0) {
-    durationDays = pd;
+  // 정본: 자기 계획창(plan_end - plan_start + 1). plan_days 는 날짜 결손 시에만 폴백.
+  // (Main 의 plan_days 는 하위 합산치라 자기 창 평가에 쓰면 계획%가 과소평가된다.)
+  const endForDur = parseDate(row.plan_end);
+  if (endForDur) {
+    durationDays = Math.max(1, daysDiff(start, endForDur) + 1);
   } else {
-    const end = parseDate(row.plan_end);
-    if (end) durationDays = Math.max(1, daysDiff(start, end) + 1);
+    const pd = row.plan_days == null ? null : Number(row.plan_days);
+    if (pd != null && !Number.isNaN(pd) && pd > 0) durationDays = pd;
   }
   if (!durationDays) return null;
   const end = parseDate(row.plan_end);
@@ -83,6 +85,71 @@ export function computeTPlan(row: JudgmentRow, asOf?: string): number | null {
   if (end && asOfD.getTime() >= end.getTime()) return 1;
   const elapsedInc = daysDiff(start, asOfD) + 1; // +1 = DB 공식과 일치
   return Math.max(0, Math.min(1, elapsedInc / durationDays));
+}
+
+/** 하위 가중치 w — 실적 롤업(update_task_summary)과 동일: max(plan_end-plan_start+1, 1). */
+function subWeight(row: JudgmentRow): number {
+  const s = parseDate(row.plan_start);
+  const e = parseDate(row.plan_end);
+  if (!s || !e) return 1;
+  return Math.max(1, daysDiff(s, e) + 1);
+}
+
+/** 하위 보유 Main 의 누계 계획% = Σ wₖ·tplanₖ / Σ wₖ (실적과 동일 가중 체계).
+ *  하위가 없거나 평가 불가하면 null. 서버 tm_main_tplan 과 동일 정의. */
+export function computeWeightedTPlan(kids: JudgmentRow[], asOf?: string): number | null {
+  if (!kids || kids.length === 0) return null;
+  let num = 0;
+  let den = 0;
+  for (const k of kids) {
+    const w = subWeight(k);
+    den += w;
+    num += w * (computeTPlan(k, asOf) ?? 0);
+  }
+  if (den <= 0) return null;
+  return Math.max(0, Math.min(1, num / den));
+}
+
+/** gap 주입형 판정 사다리 — 서버 tm_kpi_judgment_g 와 동일. */
+export function judgeFromGap(
+  row: JudgmentRow,
+  gap: number | null,
+  t: TaskThresholds = DEFAULT_THRESHOLDS,
+  asOf?: string,
+): string {
+  const actual = normActual(row.actual_progress);
+  if (actual >= 1 || row.actual_finish) return "완료";
+  const started = !!row.actual_start || actual > 0;
+  const ps = parseDate(row.plan_start);
+  const asOfD = resolveAsOf(row, asOf);
+  if (ps && ps.getTime() > asOfD.getTime() && !started) return "정상";
+  if (gap == null) return "정상";
+  if (gap < t.worsen_gap) return "악화";
+  if (gap < 0) return "지연";
+  if (gap < t.caution_gap_buffer) return "주의";
+  return "정상";
+}
+
+/** 하위 보유 Main 의 누계 계획% (없으면 자기 창 tplan). */
+export function mainCumPlanProgress(
+  main: JudgmentRow,
+  kids: JudgmentRow[],
+  asOf?: string,
+): number {
+  const w = computeWeightedTPlan(kids, asOf);
+  if (w != null) return w;
+  return computeTPlan(main, asOf) ?? 0;
+}
+
+/** 하위 보유 Main 의 Cum.Diff (동일 가중 실적 − 동일 가중 계획). */
+export function mainVariance(
+  main: JudgmentRow,
+  kids: JudgmentRow[],
+  asOf?: string,
+): number | null {
+  const plan = kids.length > 0 ? computeWeightedTPlan(kids, asOf) : computeTPlan(main, asOf);
+  if (plan == null) return null;
+  return normActual(main.actual_progress) - plan;
 }
 
 /** actual_progress 를 [0,1] 로 정규화. DB 오염(30 저장 등)에도 안전. */
