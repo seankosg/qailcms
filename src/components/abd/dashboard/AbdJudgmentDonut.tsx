@@ -34,7 +34,7 @@ export function AbdJudgmentDonut({ batchNo, plots = [] }: { batchNo: string[]; p
   const [asOf] = useAbdDataDate();
   const q = useQuery({
     queryKey: ["abd-dash-judgment-mix", asOf, plots.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { batch_no: batchNo, plots, as_of: asOf || null } }}),
+    queryFn: () => fn({ data: { batch_no: batchNo, plots, as_of: asOf || null } }),
     staleTime: 60_000,
   });
   const counts = useMemo(() => sumJudgmentMix(q.data), [q.data]);

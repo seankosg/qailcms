@@ -26,7 +26,7 @@ export function AbdJudgmentStageBreakdown({ batchNo, plots = [] }: { batchNo: st
   const [asOf] = useAbdDataDate();
   const q = useQuery({
     queryKey: ["abd-dash-judgment-mix", asOf, plots.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { batch_no: batchNo, plots, as_of: asOf || null } }}),
+    queryFn: () => fn({ data: { batch_no: batchNo, plots, as_of: asOf || null } }),
     staleTime: 60_000,
   });
   const byStage = new Map((q.data ?? []).map((r) => [r.stage, r] as const));

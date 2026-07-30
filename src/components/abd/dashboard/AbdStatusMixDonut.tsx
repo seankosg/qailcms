@@ -19,7 +19,7 @@ export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; 
   const [asOf] = useAbdDataDate();
   const q = useQuery({
     queryKey: ["abd-dash-judgment-mix", asOf, plots.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { batch_no: batchNo, plots, as_of: asOf || null } }}),
+    queryFn: () => fn({ data: { batch_no: batchNo, plots, as_of: asOf || null } }),
     staleTime: 60_000,
   });
 

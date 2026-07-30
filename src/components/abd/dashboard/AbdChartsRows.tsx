@@ -27,7 +27,7 @@ export function AbdRow6Attention({ plots = [], teams = [], batchNo = [], onOpenR
   const [asOf] = useAbdDataDate();
   const { data } = useQuery({
     queryKey: ["abd-dash-attention", asOf, plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, limit: 20, batch_no: batchNo, as_of: asOf || null } }}),
+    queryFn: () => fn({ data: { plots, teams, limit: 20, batch_no: batchNo, as_of: asOf || null } }),
     staleTime: 30_000,
   });
   const rows = data ?? [];
@@ -164,7 +164,7 @@ export function AbdRow6Crosscut({ plots = [], teams = [], batchNo = [], onOpenRa
   const [asOf] = useAbdDataDate();
   const { data } = useQuery({
     queryKey: ["abd-dash-crosscut", asOf, plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo, as_of: asOf || null } }}),
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo, as_of: asOf || null } }),
     staleTime: 30_000,
   });
   const rows = data ?? [];

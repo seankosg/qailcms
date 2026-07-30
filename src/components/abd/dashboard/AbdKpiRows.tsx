@@ -138,7 +138,7 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
   const [asOf] = useAbdDataDate();
   const { data } = useQuery({
     queryKey: ["abd-dash-row1", asOf, plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo, as_of: asOf || null } }}),
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo, as_of: asOf || null } }),
     staleTime: 30_000,
   });
   const { totals, byTeam } = useMemo(() => pivotRows(data ?? []), [data]);
@@ -213,7 +213,7 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
   const [asOf] = useAbdDataDate();
   const { data } = useQuery({
     queryKey: ["abd-dash-row2", asOf, plots.join(","), teams.join(","), batchNo.join(",")],
-    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo, as_of: asOf || null } }}),
+    queryFn: () => fn({ data: { plots, teams, batch_no: batchNo, as_of: asOf || null } }),
     staleTime: 30_000,
   });
   const { totals, byTeam } = useMemo(() => pivotRows(data ?? []), [data]);
