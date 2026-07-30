@@ -17,6 +17,36 @@ const CellsInputSchema = InputSchema.extend({
   rangeEnd: z.string(),
 });
 
+const CumInputSchema = CellsInputSchema.omit({ groupBy: true });
+
+/**
+ * S-커브 누적 정본: abd_progress_events 기반 "기간 내 문서 distinct".
+ * 종점(as-of 버킷) = abd_progress_totals 와 P·A 각각 일치한다.
+ */
+export const getAbdProgressCum = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => CumInputSchema.parse(v))
+  .handler(async ({ data, context }) => {
+    const { data: payload, error } = await (context.supabase as any).rpc("abd_progress_cum_json", {
+      _plots: data.plots.length ? data.plots : null,
+      _teams: data.teams.length ? data.teams : null,
+      _bucket: data.bucket,
+      _range_start: data.rangeStart,
+      _range_end: data.rangeEnd,
+      _as_of_date: data.asOfDate,
+      _plan_mode: data.planMode,
+      _round: data.round,
+    });
+    if (error) throw new Error(error.message);
+    const rows = Array.isArray(payload) ? payload : [];
+    return rows.map((r: any) => ({
+      bucket_iso: r.bucket_iso ? String(r.bucket_iso).slice(0, 10) : "",
+      stage: r.stage as import("./progress-utils").Stage,
+      cum_plan: Number(r.cum_plan) || 0,
+      cum_actual: Number(r.cum_actual) || 0,
+    }));
+  });
+
 export const getAbdProgressCells = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => CellsInputSchema.parse(v))
