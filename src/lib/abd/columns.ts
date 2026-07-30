@@ -177,8 +177,8 @@ export const GROUP_HEADER_BG: Record<AbdGroupKey, string> = {
 /**
  * ABD `current_stage` 코드값 타입 정의.
  * DB `abd_compute_derived` 트리거가 채우는 값. UI 라벨은 `formatAbdStage()` 단일 소스로 매핑.
- *   - `NS`     Not Started (실적 전무 도면 — 존치되는 유효 값. stage_group 축에서 산출)
- *   - `DS{n}`  Draft Start, round n (초안 착수 대기)
+ *   - `DS{n}`  Draft Start, round n (라운드 n 초안 착수 대기).
+ *              실적 전무 도면 = `DS1` (2026-07-30 NS 코드 폐지 — 'NS' 산출은 결함).
  *   - `DF{n}`  Draft Finish, round n (초안 진행 중)
  *   - `SB{n}`  Submission, round n (제출 대기)
  *   - `RS{n}`  Response (by dar), round n (회신 대기). Ready-to-Submit 아님 — 해당 오용은 폐기됨.
@@ -187,7 +187,6 @@ export const GROUP_HEADER_BG: Record<AbdGroupKey, string> = {
  *   - `Approved` 최종 승인
  */
 export type AbdStageCode =
-  | "NS"
   | "DS1" | "DS2" | "DS3"
   | "DF1" | "DF2" | "DF3"
   | "SB1" | "SB2" | "SB3"
@@ -219,17 +218,19 @@ function splitStage(code: string): { kind: string; round: string | null } {
 /**
  * ABD 스테이지 코드 → 표시 라벨 단일 소스.
  * 어순 표준: 라운드 선행 ("R2 DF" / "Awaiting R2 Draft Finish" / "R2 Draft Finished").
- * 라운드 없는 값(NS / Approved)은 Awaiting·R 접두 없음.
+ * 라운드 없는 값(Approved)은 Awaiting·R 접두 없음.
+ * 하위호환: 폐지된 'NS' 입력은 'DS1'(= R1 DS) 로 매핑한다.
  */
 export function formatAbdStage(
   code: string | null | undefined,
   variant: AbdStageLabelVariant = "long",
 ): string {
   if (!code) return "—";
-  const raw = String(code).trim();
+  let raw = String(code).trim();
   if (!raw) return "—";
-  const upper = raw.toUpperCase();
-  if (upper === "NS") return variant === "short" || variant === "completed-short" ? "NS" : "Not Started";
+  let upper = raw.toUpperCase();
+  // 하위호환 어댑터: 폐지 코드 'NS' → 'DS1'
+  if (upper === "NS" || upper === "NOT_STARTED") { raw = "DS1"; upper = "DS1"; }
   if (upper === "APPROVED") return "Approved";
 
   const { kind, round } = splitStage(raw);
@@ -250,7 +251,7 @@ export function formatAbdStage(
 export function formatAbdStageGroup(kind: string | null | undefined): string {
   if (!kind) return "—";
   const k = kind.toUpperCase();
-  if (k === "NS") return "Not Started";
+  if (k === "NS") return "Awaiting Draft Start"; // 폐지 코드 하위호환 (DS 그룹으로 흡수)
   if (k === "APPROVED") return "Approved";
   const label = STAGE_KIND_CURRENT_LONG[k];
   return label ? `Awaiting ${label}` : kind;

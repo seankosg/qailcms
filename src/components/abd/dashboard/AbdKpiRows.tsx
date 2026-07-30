@@ -131,7 +131,7 @@ interface Props {
   onOpenRaw: (params: Record<string, string>) => void;
 }
 
-/** Row 1: 배타적 5분류 (Total, Approved, UR, DS, NS) */
+/** Row 1: 배타적 4분류 (Total, Approved, UR, DS). 2026-07-30 NS 폐지 — 실적 전무는 DS(R1 DS)에 포함. */
 export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }: Props) {
   const fn = useServerFn(getAbdDashboardRow1);
   const { data } = useQuery({
@@ -146,7 +146,7 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
   // 4개 스테이지 팀별 카운트를 합산해 fallback으로 구성.
   const totalByTeam = useMemo(() => {
     const agg = new Map<string, number>();
-    for (const key of ["Approved", "UR", "DS", "NS"]) {
+    for (const key of ["Approved", "UR", "DS"]) {
       for (const b of byTeam.get(key) ?? []) {
         agg.set(b.team, (agg.get(b.team) ?? 0) + b.count);
       }
@@ -180,11 +180,10 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
     { key: "Approved", label: "Approved", count: totals.get("Approved") ?? 0, colorClass: "bg-emerald-500" },
     { key: "UR", label: "UR", count: totals.get("UR") ?? 0, colorClass: "bg-blue-500" },
     { key: "DS", label: "DS", count: totals.get("DS") ?? 0, colorClass: "bg-amber-500" },
-    { key: "NS", label: "NS", count: totals.get("NS") ?? 0, colorClass: "bg-red-500" },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <AbdKpiCard
         key="TOTAL"
         label="Total"
@@ -202,7 +201,6 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
       {/* 'UR' 은 내부 bucket_top 키(의미 = 회신 대기(RS)). 화면 라벨만 정정. */}
       {mk("Awaiting Response", "UR", "info", "under_review")}
       {mk("Draft Start", "DS", "warn", "drafting")}
-      {mk("Not Started", "NS", "danger", "not_started")}
     </div>
   );
 }

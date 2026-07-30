@@ -5,13 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getAbdDashboardJudgmentMix } from "@/lib/abd/dashboard.functions";
 
-type Seg = "Approved" | "UR" | "DS" | "NS";
+type Seg = "Approved" | "UR" | "DS";
 
 const ORDER: { key: Seg; label: string; color: string }[] = [
   { key: "Approved", label: "Approved", color: "var(--schedule-actual)" },
   { key: "UR", label: "UR", color: "var(--warning)" },
   { key: "DS", label: "DS", color: "var(--schedule-plan)" },
-  { key: "NS", label: "NS", color: "hsl(var(--muted-foreground))" },
 ];
 
 export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; plots?: string[] }) {
@@ -23,11 +22,14 @@ export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; 
   });
 
   const values = useMemo(() => {
-    const m: Record<Seg, number> = { Approved: 0, UR: 0, DS: 0, NS: 0 };
-    for (const r of q.data ?? []) m[r.stage as Seg] = Number(r.total ?? 0);
+    const m: Record<Seg, number> = { Approved: 0, UR: 0, DS: 0 };
+    for (const r of q.data ?? []) {
+      const k = (r.stage === "NS" ? "DS" : r.stage) as Seg; // NS 폐지 하위호환
+      if (k in m) m[k] += Number(r.total ?? 0);
+    }
     return m;
   }, [q.data]);
-  const total = values.Approved + values.UR + values.DS + values.NS;
+  const total = values.Approved + values.UR + values.DS;
 
   const R = 60, CX = 80, CY = 80;
   const CIRC = 2 * Math.PI * R;
