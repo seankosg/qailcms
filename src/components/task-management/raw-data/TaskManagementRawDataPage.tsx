@@ -111,7 +111,7 @@ import {
   gapAt,
 } from "@/lib/task-management/kpi-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
-import { DEFAULT_THRESHOLDS, type TaskThresholds } from "@/lib/task-management/derived";
+import { DEFAULT_THRESHOLDS, cumPlanProgress, type TaskThresholds } from "@/lib/task-management/derived";
 import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
