@@ -285,7 +285,7 @@ export function AbdAconexImportPage() {
         const preview = await importAbdAconexBatch({
           data: {
             file_name: e.file.name,
-            data_date: todayInDoha(),
+            data_date: e.dataDate || todayInDoha(),
             rows: parsed.rows.map((r) => ({
               document_no: r.document_no,
               revision: r.revision,
