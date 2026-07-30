@@ -4743,6 +4743,14 @@ export type Database = {
           status_raw: string
         }[]
       }
+      tm_actual_at_date: {
+        Args: { _as_of: string; _ids?: string[] }
+        Returns: {
+          actual_source: string
+          hist_actual: number
+          id: string
+        }[]
+      }
       tm_classify_overdue: {
         Args: { buffer_days: number; mstone: string; target: string }
         Returns: string
@@ -4967,6 +4975,71 @@ export type Database = {
       }
       tm_resolve_caution: { Args: { _v: number }; Returns: number }
       tm_resolve_worsen: { Args: { _v: number }; Returns: number }
+      tm_rows_as_of: {
+        Args: { _as_of: string }
+        Returns: {
+          actual_duration: number | null
+          actual_finish: string | null
+          actual_overdue: string | null
+          actual_progress: number | null
+          actual_start: string | null
+          alarm_reason: string | null
+          auto_judgment: string | null
+          auto_judgment_import: string | null
+          category: string | null
+          created_at: string | null
+          cum_actual_pct: number | null
+          cum_plan_pct: number | null
+          data_date: string | null
+          delay_days: number | null
+          discipline: string | null
+          expected_finish: string | null
+          expected_progress_today: number | null
+          floor_level: string | null
+          forecast_end: string | null
+          gap_pct: number | null
+          hdec_eng_name: string | null
+          hdec_pic_name: string | null
+          id: string | null
+          imported_at: string | null
+          imported_by: string | null
+          is_active: boolean | null
+          is_rollup: boolean | null
+          level: string | null
+          location: string | null
+          main_task_no: string | null
+          milestone: string | null
+          milestone_date: string | null
+          owner_user_id: string | null
+          plan_days: number | null
+          plan_end: string | null
+          plan_overdue: string | null
+          plan_progress: number | null
+          plan_start: string | null
+          plot: string | null
+          progress_variance: number | null
+          risk: string | null
+          row_type: string | null
+          slip_days: number | null
+          sort_order: number | null
+          source_file: string | null
+          source_import_log_id: string | null
+          stage_finish: string | null
+          stage_start: string | null
+          status_manual: string | null
+          sub_task_desc: string | null
+          task_name: string | null
+          task_no: string | null
+          team: string | null
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "v_task_management_raw_derived"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       tm_thresholds: { Args: never; Returns: Json }
       tm_today_actual: {
         Args: { _as_of: string; _ids: string[] }

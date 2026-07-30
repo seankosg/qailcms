@@ -233,8 +233,18 @@ export function computeJudgment(
   if (actual >= 1) return "완료";
   const started = !!row.actual_start || actual > 0;
   if (!started) {
-    // 미착수: Start 스테이지 결과가 곧 통합 판정 (지연진행 → 지연, 그 외 → 정상)
-    return getStageJudgment(row, "start", t, asOf);
+    // 미착수: 서버 정본 tm_kpi_judgment 와 동일 의미론.
+    // 계획 착수일이 아직 도래하지 않았으면 '정상',
+    // 도래했다면 gap 축(주의/지연/악화)으로 판정한다. (무조건 '지연' 고정 분기 폐지)
+    const ps = parseDate(row.plan_start);
+    const asOfD = resolveAsOf(row, asOf);
+    if (!ps || ps.getTime() > asOfD.getTime()) return "정상";
+    const gap = computeVariance(row, asOf);
+    if (gap == null) return "정상";
+    if (gap < t.worsen_gap) return "악화";
+    if (gap < 0) return "지연";
+    if (gap < t.caution_gap_buffer) return "주의";
+    return "정상";
   }
   // 착수 이후: WIP/Finish 는 동일 gap 축이므로 WIP 결과가 곧 통합 판정.
   return getStageJudgment(row, "wip", t, asOf);

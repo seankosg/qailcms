@@ -1,0 +1,65 @@
+CREATE OR REPLACE FUNCTION public.tm_rows_as_of(_as_of date)
+RETURNS SETOF public.v_task_management_raw_derived
+LANGUAGE sql STABLE SET search_path TO 'public' AS $fn$
+  WITH p AS (
+    SELECT (_as_of IS NOT NULL AND _as_of < (current_timestamp AT TIME ZONE 'Asia/Qatar')::date) AS past
+  )
+  SELECT
+    v.id,
+    v.task_no,
+    v.main_task_no,
+    v.level,
+    v.discipline,
+    v.category,
+    v.plot,
+    v.task_name,
+    v.risk,
+    v.sub_task_desc,
+    v.row_type,
+    v.status_manual,
+    v.plan_start,
+    v.plan_end,
+    v.plan_days,
+    case when p.past then case when coalesce(r.hist_actual,0) > 0 then v.actual_start end else v.actual_start end as actual_start,
+    case when p.past then case when r.hist_actual is null then null else r.hist_actual end else v.actual_progress end as actual_progress,
+    v.plan_progress,
+    v.progress_variance,
+    v.forecast_end,
+    v.slip_days,
+    case when p.past then case when r.hist_actual is null then null else public.tm_kpi_judgment(r.hist_actual, case when r.hist_actual >= 1 then v.actual_finish end, case when r.hist_actual > 0 then v.actual_start end, v.plan_start, v.plan_end, v.plan_days, v.plan_progress, _as_of, null, null) end else v.auto_judgment end as auto_judgment,
+    v.data_date,
+    v.sort_order,
+    v.source_file,
+    v.imported_at,
+    v.imported_by,
+    v.created_at,
+    v.updated_at,
+    v.auto_judgment_import,
+    v.is_rollup,
+    v.source_import_log_id,
+    v.is_active,
+    v.team,
+    v.location,
+    v.floor_level,
+    case when p.past then case when coalesce(r.hist_actual,0) >= 1 then v.actual_finish end else v.actual_finish end as actual_finish,
+    v.actual_duration,
+    v.owner_user_id,
+    v.hdec_pic_name,
+    v.hdec_eng_name,
+    case when p.past then case when r.hist_actual is null then null else public.tm_kpi_tplan(v.plan_start, v.plan_end, v.plan_days, _as_of) end else v.cum_plan_pct end as cum_plan_pct,
+    case when p.past then case when r.hist_actual is null then null else public.tm_kpi_norm_actual(r.hist_actual) end else v.cum_actual_pct end as cum_actual_pct,
+    case when p.past then case when r.hist_actual is null then null else public.tm_kpi_gap(r.hist_actual, v.plan_progress, v.plan_start, v.plan_end, v.plan_days, _as_of) end else v.gap_pct end as gap_pct,
+    v.delay_days,
+    case when p.past then case when r.hist_actual is null then '이력 없음' else v.alarm_reason end else v.alarm_reason end as alarm_reason,
+    v.milestone,
+    v.milestone_date,
+    v.plan_overdue,
+    v.expected_finish,
+    v.actual_overdue,
+    v.stage_start,
+    v.stage_finish,
+    v.expected_progress_today
+  FROM public.v_task_management_raw_derived v
+  CROSS JOIN p
+  LEFT JOIN public.tm_actual_at_date(_as_of) r ON p.past AND r.id = v.id
+$fn$;
