@@ -911,27 +911,35 @@ export function TaskTreePage() {
                   {behindCount > 0 && (
                     <Badge className="bg-rose-500/15 text-rose-700">지연 {behindCount}</Badge>
                   )}
-                  <span
-                    className="text-[10px] text-muted-foreground"
-                    title="담당 (HDEC PIC / ENG)"
-                  >
-                    담당 <span className="font-medium text-foreground">{pPic}</span>
-                  </span>
-                  <span
-                    className="text-[10px] tabular-nums text-muted-foreground"
-                    title="계획 (P.Start ~ P.Finish)"
-                  >
-                    계획 {p.plan_start ?? "-"} ~ {p.plan_end ?? "-"}
-                  </span>
-                  <ProgressBar v={p.actual_progress} />
-                  <span
-                    className="text-[10px] tabular-nums text-muted-foreground"
-                    title="오늘 계획 (T.Plan%)"
-                  >
-                    오늘 계획 <span className="font-medium text-foreground">{(pTodayPlan * 100).toFixed(0)}%</span>
-                  </span>
-                  <GapCell gap={pGap} buffer={thresholds.caution_gap_buffer} />
-                  {mainJudgment && (
+                  {showCol("pic") && (
+                    <span
+                      className="text-[10px] text-muted-foreground"
+                      title="담당 (HDEC PIC / ENG)"
+                    >
+                      담당 <span className="font-medium text-foreground">{pPic}</span>
+                    </span>
+                  )}
+                  {showCol("plan") && (
+                    <span
+                      className="text-[10px] tabular-nums text-muted-foreground"
+                      title="계획 (P.Start ~ P.Finish)"
+                    >
+                      계획 {p.plan_start ?? "-"} ~ {p.plan_end ?? "-"}
+                    </span>
+                  )}
+                  {showCol("actual") && <ProgressBar v={p.actual_progress} />}
+                  {showCol("today_plan") && (
+                    <span
+                      className="text-[10px] tabular-nums text-muted-foreground"
+                      title="오늘 계획 (T.Plan%)"
+                    >
+                      오늘 계획 <span className="font-medium text-foreground">{(pTodayPlan * 100).toFixed(0)}%</span>
+                    </span>
+                  )}
+                  {showCol("gap") && (
+                    <GapCell gap={pGap} buffer={thresholds.caution_gap_buffer} />
+                  )}
+                  {showCol("judgment") && mainJudgment && (
                     <Badge
                       className={cn(
                         "rounded-none border border-black/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider shadow-sm",
@@ -942,6 +950,7 @@ export function TaskTreePage() {
                       {mainJudgment}
                     </Badge>
                   )}
+                  {showCol("chart") && (
                   <MiniProgressChart
                     planPoints={chartMap.get(p.task_no)?.plan_points}
                     actualPoints={chartMap.get(p.task_no)?.actual_points}
@@ -953,6 +962,7 @@ export function TaskTreePage() {
                     }}
                     title="클릭하여 진도율 상세 차트 보기"
                   />
+                  )}
                 </div>
               </CardHeader>
               {isOpen && (
