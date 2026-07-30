@@ -33,6 +33,7 @@ import {
   computeVariance,
   computeDailyPlan,
   computeDailyDiff,
+  computeJudgment,
 } from "@/lib/task-management/derived";
 import { todayIso } from "@/lib/task-management/schedule-utils";
 import { useTmDataDate } from "@/hooks/useTmDataDate";
@@ -126,6 +127,12 @@ export function TaskDetailPage() {
     } as Record<string, number | null>;
   }, [row, asOf, tActual]);
 
+  // 판정도 as-of 재계산이 정본 (저장 auto_judgment 렌더 금지).
+  const derivedJudgment = useMemo(
+    () => (row ? computeJudgment(row as any, undefined, asOf) : ""),
+    [row, asOf],
+  );
+
   if (!row) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
@@ -195,9 +202,9 @@ export function TaskDetailPage() {
             {row.status_manual}
           </Badge>
         )}
-        {row.auto_judgment && (
-          <Badge className={cn("h-5 text-[10px]", AUTO_JUDGMENT_COLORS[String(row.auto_judgment)] ?? TEAM_FALLBACK_COLOR)}>
-            {row.auto_judgment}
+        {derivedJudgment && (
+          <Badge className={cn("h-5 text-[10px]", AUTO_JUDGMENT_COLORS[derivedJudgment] ?? TEAM_FALLBACK_COLOR)}>
+            {derivedJudgment}
           </Badge>
         )}
       </div>
@@ -226,7 +233,11 @@ export function TaskDetailPage() {
               <dl className="grid grid-cols-1 gap-x-3 gap-y-0.5 md:grid-cols-2 xl:grid-cols-3">
                 {cols.map((c) => {
                   const v =
-                    c.key in derivedForecast ? derivedForecast[c.key] : row[c.key];
+                    c.key === "auto_judgment"
+                      ? derivedJudgment
+                      : c.key in derivedForecast
+                        ? derivedForecast[c.key]
+                        : row[c.key];
                   let effectiveColumn: TmColumnDef = c;
                   let effectiveCanEdit = canEditRow;
                   if (c.key === "task_no") {
