@@ -357,6 +357,7 @@ export function AbdScheduleMatrix({
                           key={c.bucket}
                           plan={c.plan}
                           actual={c.actual}
+                          cellId={`${row.key}|all|${c.bucket}`}
                           isFuture={vc.index > todayBucketIdx}
                           isToday={vc.index === todayBucketIdx}
                           width={cellWidth}
@@ -393,6 +394,7 @@ export function AbdScheduleMatrix({
                                 key={c.bucket}
                                 plan={c.plan}
                                 actual={c.actual}
+                                cellId={`${row.key}|${st}|${c.bucket}`}
                                 isFuture={vc.index > todayBucketIdx}
                                 isToday={vc.index === todayBucketIdx}
                                 width={cellWidth}
