@@ -154,7 +154,7 @@ export function AbdDashboardPage() {
             As-Built Drawing Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
-            NS · DS · UR · Approved 5분류와 라운드 진척을 한눈에.
+            DS · DF · SB · RS · RESUBMIT · Approved 생애주기 6분류와 라운드 진척을 한눈에.
           </p>
         </div>
         <div className="flex items-center gap-2">
