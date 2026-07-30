@@ -39,7 +39,10 @@ export type AbdServerFilterOp =
   | "date_range"
   | "date_range_or"
   | "num_range"
-  | "bool";
+  | "bool"
+  // Progress Matrix 셀 드릴다운 전용(술어 정본 = public.abd_progress_events)
+  | "stage_plan_range"
+  | "stage_actual_range";
 
 export interface AbdServerFilter {
   column: string;

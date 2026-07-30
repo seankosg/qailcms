@@ -4311,6 +4311,19 @@ export type Database = {
         }
         Returns: Json
       }
+      abd_progress_cell_ids: {
+        Args: {
+          _as_of?: string
+          _field: string
+          _from: string
+          _plan_mode?: string
+          _stage: string
+          _to: string
+        }
+        Returns: {
+          item_id: string
+        }[]
+      }
       abd_progress_cells:
         | {
             Args: {
@@ -4362,6 +4375,15 @@ export type Database = {
           _teams: string[]
         }
         Returns: Json
+      }
+      abd_progress_events: {
+        Args: { _as_of_date: string; _plan_mode?: string; _round?: string }
+        Returns: {
+          edate: string
+          field: string
+          item_id: string
+          stage: string
+        }[]
       }
       abd_progress_totals:
         | {
