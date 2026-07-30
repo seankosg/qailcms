@@ -108,6 +108,8 @@ export type AbdRowOut = RowOut;
 
 export type AbdStageGroupCount = {
   stage_group: string;
+  /** current_stage 코드값 (DS1/DF2/RS3/RESUBMIT1/Approved …). 라운드 소계용. */
+  stage: string;
   team: string;
   total: number;
   delayed: number;
@@ -129,6 +131,7 @@ export const getAbdStageGroupCounts = createServerFn({ method: "POST" })
     }
     return (payload as any[]).map((r) => ({
       stage_group: String(r.stage_group ?? ""),
+      stage: String(r.stage ?? ""),
       team: String(r.team ?? ""),
       total: Number(r.total ?? 0),
       delayed: Number(r.delayed ?? 0),
