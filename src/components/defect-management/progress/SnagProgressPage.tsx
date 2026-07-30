@@ -368,6 +368,7 @@ export function SnagProgressPage() {
             </h1>
             {latestDataDate && (
               <DataDatePicker
+                mode="datadate"
                 value={effectiveDataDate}
                 latest={latestDataDate}
                 options={dataDateOptions}

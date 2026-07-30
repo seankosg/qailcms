@@ -40,6 +40,7 @@ const TaskProgressChartDialog = lazy(() =>
 import { useServerFn } from "@tanstack/react-start";
 import { getTaskProgressChartsBulk, type TaskChartCache } from "@/lib/task-management/progress-chart.functions";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
+import { asOfHeaderLabel, stalenessLabel } from "@/lib/task-management/as-of";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { todayInDoha } from "@/lib/time/doha";
 import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
@@ -344,10 +345,10 @@ export function TaskTreePage() {
   // URL 의 dataDate 쿼리 파라미터(딥링크)는 진입 시 1회 세션으로 흡수한 뒤 URL에서 제거해,
   // 이후 Dashboard 등에서 세션 값을 바꾸면 그 값이 그대로 반영되도록 한다.
   const [sharedDataDate, setSharedDataDate] = useTmAsOf();
+  // 구 딥링크 URL ?dataDate= 는 수용 후 무시(U5) — URL 에서만 제거한다.
   useEffect(() => {
     const urlDate = routeSearch.dataDate ? String(routeSearch.dataDate).slice(0, 10) : "";
     if (!urlDate) return;
-    if (urlDate !== sharedDataDate) setSharedDataDate(urlDate);
     navigate({
       to: "/closure/task-management/tree",
       search: (prev: Record<string, unknown>) => ({ ...prev, dataDate: "" }) as any,
@@ -615,15 +616,17 @@ export function TaskTreePage() {
       <div className="sticky top-0 z-30 -mx-4 px-4 py-2 space-y-2 bg-background border-b">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Task Tree</h1>
-        {latestDataDate && (
-          <DataDatePicker
-            value={sharedDataDate}
-            latest={latestDataDate}
-            options={dataDateOptions}
-            onChange={(v) => setSharedDataDate(v === latestDataDate ? "" : v)}
-            onReset={() => setSharedDataDate("")}
-          />
-        )}
+        <DataDatePicker
+          showDataDateChip
+          value={sharedDataDate}
+          latest={latestDataDate}
+          options={dataDateOptions}
+          onChange={(v) => setSharedDataDate(v === todayInDoha() ? "" : v)}
+          onReset={() => setSharedDataDate("")}
+        />
+        <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+          {asOfHeaderLabel(asOfDate)}
+        </span>
         <Tabs value={discipline} onValueChange={(v) => setDiscipline(v as Discipline)}>
           <TabsList>
             {DISCIPLINES.map((d) => (
@@ -890,7 +893,14 @@ export function TaskTreePage() {
                             <td className="px-2 py-1 font-mono text-primary underline-offset-2 hover:underline">
                               {k.task_no}
                             </td>
-                            <td className="px-2 py-1">{k.sub_task_desc ?? "-"}</td>
+                            <td className="px-2 py-1">
+                              {k.sub_task_desc ?? "-"}
+                              {stalenessLabel(k.data_date) && (
+                                <span className="ml-1 text-[10px] tabular-nums text-muted-foreground">
+                                  {stalenessLabel(k.data_date)}
+                                </span>
+                              )}
+                            </td>
                             <td className="px-2 py-1">{k.hdec_pic_name ?? k.hdec_eng_name ?? "-"}</td>
                             <td className="px-2 py-1 text-[10px] tabular-nums">
                               {k.plan_start ?? "-"} ~ {k.plan_end ?? "-"}

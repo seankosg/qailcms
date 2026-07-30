@@ -27,6 +27,7 @@ import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
 import { CommentsInbox } from "./CommentsInbox";
 import { AttentionInbox } from "./AttentionInbox";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
+import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import { useTmJudgmentAtDate, mergeTmJudgment } from "@/hooks/useTmJudgmentAtDate";
 
 function fmtDate(d?: string | null): string {
@@ -373,10 +374,13 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
                 ? `Team · ${team}`
                 : `HDEC PIC · ${pic}`}
             {" · Data as of "}{dohaStamp()}
+            {" · "}
+            <span className="font-medium">{asOfHeaderLabel(t)}</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <DataDatePicker
+            showDataDateChip
             value={dataDate}
             latest={latestToday}
             options={[]}

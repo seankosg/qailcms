@@ -168,6 +168,7 @@ export function DeSnagDashboardPage() {
             <h1 className="text-xl font-semibold tracking-tight">Snagging List Dashboard</h1>
             {latestDataDate && (
               <DataDatePicker
+                showDataDateChip
                 value={effectiveDataDate}
                 latest={latestDataDate}
                 options={dataDateOptions}
