@@ -8,6 +8,8 @@ export interface TaskThresholds {
   worsen_gap: number;
 }
 
+/** 서버값(tm_thresholds RPC) 로딩 전 임시 표시용 폴백.
+ *  판정 정본은 항상 서버 tm_thresholds() 이며, 이 리터럴은 판정 결과에 개입하지 않는다. */
 export const DEFAULT_THRESHOLDS: TaskThresholds = {
   caution_gap_buffer: 0.05,
   worsen_gap: -0.15,
@@ -91,7 +93,7 @@ function normActual(v: unknown): number {
   return Math.max(0, Math.min(1, scaled));
 }
 
-/** asOf(또는 오늘) 기준 T.Plan. asOf 미지정 시 row.data_date → today 순으로 폴백. */
+/** asOf(또는 오늘·Asia/Qatar) 기준 T.Plan. row.data_date 는 개입하지 않는다. */
 export function expectedProgressToday(row: JudgmentRow, asOf?: string): number {
   return computeTPlan(row, asOf) ?? 0;
 }
@@ -102,13 +104,10 @@ export function todayGap(row: JudgmentRow, asOf?: string): number {
   return actual - expectedProgressToday(row, asOf);
 }
 
-/** 누계 계획진도율 (Cum. Plan) — plan_progress 우선, NULL 시 computeTPlan 폴백.
+/** 누계 계획진도율 (Cum. Plan) — 정본은 "현재본 계획(plan_start/end/days)을 as-of 로 평가한 값".
+ *  저장된 plan_progress 는 임포트 시점 스냅샷일 뿐이므로 표시·판정 소스로 쓰지 않는다.
  *  computeVariance 와 동일한 분모. 대시보드/트리/리더보드 공통 사용. */
 export function cumPlanProgress(row: JudgmentRow, asOf?: string): number {
-  const rawPlan = row.plan_progress;
-  if (rawPlan != null && !Number.isNaN(Number(rawPlan))) {
-    return Math.max(0, Math.min(1, Number(rawPlan)));
-  }
   return computeTPlan(row, asOf) ?? 0;
 }
 
@@ -117,18 +116,12 @@ export function cumActualProgress(row: JudgmentRow): number {
   return normActual(row.actual_progress);
 }
 
-/** Cum. Diff — 누계 실적(Actual %) − 누계 계획(Plan %, row.plan_progress).
+/** Cum. Diff — 누계 실적(Actual %) − 누계 계획(as-of 평가 Plan %).
  *  단일 소스: Variance(=Cum. Diff), Alarm(WIP), Behind Schedule, Critical Delay 모두 이 값 사용.
- *  plan_progress 가 NULL 이면 computeTPlan(시간경과율)으로 폴백. 둘 다 없으면 null 반환. */
+ *  계획 정보(plan_start + 기간)가 없어 평가 불가하면 null 반환. */
 export function computeVariance(row: JudgmentRow, asOf?: string): number | null {
   const actual = normActual(row.actual_progress);
-  const rawPlan = row.plan_progress;
-  let plan: number | null;
-  if (rawPlan != null && !Number.isNaN(Number(rawPlan))) {
-    plan = Math.max(0, Math.min(1, Number(rawPlan) > 1 ? Number(rawPlan) / 100 : Number(rawPlan)));
-  } else {
-    plan = computeTPlan(row, asOf);
-  }
+  const plan = computeTPlan(row, asOf);
   if (plan == null) return null;
   return actual - plan;
 }
