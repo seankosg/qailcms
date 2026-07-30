@@ -99,6 +99,8 @@ export interface AbdItemsQueryParams {
   page: number;
   pageSize: number;
   excludedMode?: "hide" | "only" | "all";
+  /** 판정 기준일(As of, YYYY-MM-DD). 빈 값 = 오늘(Doha). */
+  asOf?: string | null;
 }
 
 export function useAbdItemsQuery(p: AbdItemsQueryParams) {
@@ -120,6 +122,7 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
           _limit: limit,
           _plot: p.plot ?? null,
           _excluded_mode: p.excludedMode ?? "hide",
+          _as_of: p.asOf && p.asOf.trim() ? p.asOf.trim() : null,
         });
         if (error) throw new Error(error.message);
         const arr = (data ?? []) as { rows: any; total_count: number | string }[];
@@ -190,17 +193,19 @@ export function useAbdFacet(
     enabled?: boolean;
     q?: string;
     filters?: AbdServerFilter[];
+    asOf?: string | null;
   },
 ) {
   // 크로스 필터링: 자기 자신 컬럼 필터는 제외해 정확한 queryKey/카운트 산출.
   const qNorm = (opts.q ?? "").trim();
+  const asOfNorm = (opts.asOf ?? "").trim() || null;
   const otherFilters = (opts.filters ?? []).filter((f) => f.column !== column);
   return useQuery<AbdFacetItem[]>({
     queryKey: [
       "abd",
       "facet",
       column,
-      { team: opts.team, statusGroup: opts.statusGroup, includeInactive: opts.includeInactive, plot: opts.plot ?? null, q: qNorm, filters: otherFilters },
+      { team: opts.team, statusGroup: opts.statusGroup, includeInactive: opts.includeInactive, plot: opts.plot ?? null, q: qNorm, filters: otherFilters, asOf: asOfNorm },
     ],
     queryFn: async () => {
       if (!column) return [];
@@ -212,6 +217,7 @@ export function useAbdFacet(
         _plot: opts.plot ?? null,
         _q: qNorm.length > 0 ? qNorm : null,
         _filters: otherFilters,
+        _as_of: asOfNorm,
       });
       if (error) throw new Error(error.message);
       return ((data ?? []) as any[]).map((r) => ({ value: String(r.value), cnt: Number(r.cnt) }));
@@ -232,7 +238,7 @@ export interface AbdCounts {
   latest_data_date: string | null;
 }
 
-export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean; plot?: "C" | "D" | null }) {
+export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean; plot?: "C" | "D" | null; asOf?: string | null }) {
   return useQuery<AbdCounts>({
     queryKey: ["abd", "counts", opts],
     queryFn: async () => {
@@ -240,6 +246,7 @@ export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean; pl
         _team: opts.team,
         _include_inactive: opts.includeInactive,
         _plot: opts.plot ?? null,
+        _as_of: opts.asOf && opts.asOf.trim() ? opts.asOf.trim() : null,
       });
       if (error) throw new Error(error.message);
       const r = (data ?? [])[0] ?? {};
