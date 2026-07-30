@@ -232,8 +232,6 @@ export function formatAbdStage(
   // 하위호환 어댑터: 폐지 코드 'NS' → 'DS1'
   if (upper === "NS" || upper === "NOT_STARTED") { raw = "DS1"; upper = "DS1"; }
   if (upper === "APPROVED") return "Approved";
-  // R1 DS 는 "실적 전무" 상태 — 장형 자리에서는 Not Started 라벨을 허용한다.
-  if (upper === "DS1" && variant === "long") return "Not Started";
 
   const { kind, round } = splitStage(raw);
   const isCompleted = variant === "completed-short" || variant === "completed-long";
