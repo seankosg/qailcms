@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getAbdStageGroupCounts } from "@/lib/abd/dashboard.functions";
+import { formatAbdStage } from "@/lib/abd/columns";
 
 /** 생애주기 순 6카드 — stage_group 정본 축. 라운드 접힘 축이므로 R 접두 없음.
  *  2026-07-30 NS 폐지: 실적 전무 도면은 R1 DS(코드 DS1)로 DS 카드에 귀속. */
