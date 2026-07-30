@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
-import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmAsOf } from "@/hooks/useTmAsOf";
 import {
   ALL_TASK_TIMELINE_STAGE_KEYS,
   isTaskStageDelayedAsOf,
@@ -96,7 +96,7 @@ export function TmDashboardPage() {
   }, [items]);
 
   // 세션 전역 Data Date (Raw Data/MWS 등과 공유)
-  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
+  const [sharedDataDate, setSharedDataDate] = useTmAsOf();
   // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
   const selectedDataDate =
     (search.dataDate && search.dataDate.length ? search.dataDate : sharedDataDate) ||

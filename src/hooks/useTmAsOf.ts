@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * TM 전 페이지가 공유하는 Data Date 상태 (sessionStorage 기반).
- * - null/빈 문자열 = "최신 Data Date" (DB의 저장된 파생 컬럼을 그대로 사용)
- * - 문자열(YYYY-MM-DD) = 사용자가 지정한 특정 Data Date.
- *   호출자는 이 값을 tm_judge_at_date RPC 에 넘겨 즉석 재판정 결과를 사용해야 함.
+ * TM 전 페이지가 공유하는 As-of(판정 기준일) 상태 (sessionStorage 기반).
+ * - 빈 문자열 = 오늘(Asia/Qatar) 기준 판정
+ * - 문자열(YYYY-MM-DD) = 사용자가 지정한 판정 기준일(과거=이력 재판정, 미래=전망)
+ * 구 키 `tm_data_date` 는 폐기됨(U5).
  */
-const KEY = "tm_data_date";
+const KEY = "tm_as_of";
+const LEGACY_KEY = "tm_data_date";
 
 function read(): string {
   if (typeof window === "undefined") return "";
   try {
+    // 구 키가 남아 있으면 제거만 하고 값은 승계하지 않는다(As-of 기본값=오늘).
+    window.sessionStorage.removeItem(LEGACY_KEY);
     return window.sessionStorage.getItem(KEY) ?? "";
   } catch {
     return "";
@@ -29,7 +32,7 @@ function broadcast(v: string) {
   });
 }
 
-export function useTmDataDate(): [string, (v: string) => void, () => void] {
+export function useTmAsOf(): [string, (v: string) => void, () => void] {
   const [value, setValue] = useState<string>(() => read());
 
   useEffect(() => {

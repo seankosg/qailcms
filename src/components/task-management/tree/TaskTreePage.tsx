@@ -39,7 +39,7 @@ const TaskProgressChartDialog = lazy(() =>
 );
 import { useServerFn } from "@tanstack/react-start";
 import { getTaskProgressChartsBulk, type TaskChartCache } from "@/lib/task-management/progress-chart.functions";
-import { useTmDataDate } from "@/hooks/useTmDataDate";
+import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { todayInDoha } from "@/lib/time/doha";
 import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
@@ -343,7 +343,7 @@ export function TaskTreePage() {
   // Data Date 소스: 세션 공유값 > 최신값.
   // URL 의 dataDate 쿼리 파라미터(딥링크)는 진입 시 1회 세션으로 흡수한 뒤 URL에서 제거해,
   // 이후 Dashboard 등에서 세션 값을 바꾸면 그 값이 그대로 반영되도록 한다.
-  const [sharedDataDate, setSharedDataDate] = useTmDataDate();
+  const [sharedDataDate, setSharedDataDate] = useTmAsOf();
   useEffect(() => {
     const urlDate = routeSearch.dataDate ? String(routeSearch.dataDate).slice(0, 10) : "";
     if (!urlDate) return;
