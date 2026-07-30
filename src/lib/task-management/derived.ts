@@ -264,9 +264,11 @@ export function getStageJudgment(
 ): string {
   const actual = normActual(row.actual_progress);
   const started = actual > 0;
+  // Start 스테이지 완료 판단만 실착수일도 인정한다(스테이지 정의상 실적일 기준).
+  const startedForStage = !!row.actual_start || actual > 0;
 
   if (stage === "start") {
-    if (started || row.auto_judgment === "완료") return "완료";
+    if (startedForStage || row.auto_judgment === "완료") return "완료";
     const sj = getStartJudgment(row, asOf);
     return sj === "지연진행" ? "지연" : "정상";
   }
