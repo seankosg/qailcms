@@ -288,9 +288,10 @@ export function AbdProgressPage() {
       // 재개봉(과거 승인 → 현재 B/C/UR)·Terminated 는 집계에서 제외되므로
       // 드릴다운도 동일 렌즈를 적용해 카드·매트릭스·리스트 삼자 일치를 유지한다.
       params.set("status", "sg_approved");
-    } else if (stage !== "all") {
+    } else {
       // 술어 정본 = abd_progress_events (rn ≤/= v_active, AP는 ap_plan 이동 예측).
-      params.set("cellStage", stage);
+      // 집계행(stage='all')은 화면에 표시 중인 스테이지 조합을 그대로 전달한다.
+      params.set("cellStage", stage === "all" ? effectiveStages.join(",") : stage);
       params.set("cellField", field);
       params.set("cellFrom", dateFrom);
       params.set("cellTo", dateTo);
