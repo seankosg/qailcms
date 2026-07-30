@@ -1301,7 +1301,7 @@ export function TaskManagementRawDataPage() {
         )}
         {latestDataDate && (
           <span className="text-xs text-muted-foreground">
-            Data Date: <span className="font-medium">{selectedDataDate}</span>
+            As of: <span className="font-medium">{selectedDataDate}</span>
             {sharedDataDate && sharedDataDate !== latestDataDate && (
               <span className="ml-1 text-amber-600">
                 (Dashboard 지정 · 최신 {latestDataDate})
