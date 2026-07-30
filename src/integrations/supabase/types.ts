@@ -756,6 +756,8 @@ export type Database = {
           approval_date: string | null
           batch_no: string | null
           bucket_top: string | null
+          completed_stage: string | null
+          completed_stage_group: string | null
           created_at: string
           current_stage: string | null
           data_date: string | null
@@ -841,6 +843,8 @@ export type Database = {
           approval_date?: string | null
           batch_no?: string | null
           bucket_top?: string | null
+          completed_stage?: string | null
+          completed_stage_group?: string | null
           created_at?: string
           current_stage?: string | null
           data_date?: string | null
@@ -926,6 +930,8 @@ export type Database = {
           approval_date?: string | null
           batch_no?: string | null
           bucket_top?: string | null
+          completed_stage?: string | null
+          completed_stage_group?: string | null
           created_at?: string
           current_stage?: string | null
           data_date?: string | null
