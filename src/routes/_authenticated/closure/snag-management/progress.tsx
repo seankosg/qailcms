@@ -14,7 +14,7 @@ const searchSchema = z.object({
   hidePast: fallback(z.union([z.literal(0), z.literal(1)]), 0).default(0),
   // 구 파라미터: URL 수용 후 무시 (As-of 기본은 항상 오늘)
   asofMode: fallback(z.string(), "today").default("today"),
-  planMode: fallback(z.enum(["baseline", "remaining"]), "baseline").default("baseline"),
+  planMode: fallback(z.enum(["baseline", "remaining"]), "remaining").default("remaining"),
   matrixOpen: fallback(z.union([z.literal(0), z.literal(1)]), 1).default(1),
   scurveOpen: fallback(z.union([z.literal(0), z.literal(1)]), 1).default(1),
   dataDate: fallback(z.string(), "").default(""),
