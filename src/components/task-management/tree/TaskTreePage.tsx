@@ -467,9 +467,9 @@ export function TaskTreePage() {
     if (!picOptions.names.includes(picFilter)) setPicFilter("__all__");
   }, [picFilter, picOptions.names]);
 
-  // 과거 as-of 모드일 때는 이미 서버 판정을 병합했으므로 asOf 를 넘기지 않아야
-  // computeJudgment 가 병합된 auto_judgment 를 그대로 사용한다.
-  const asOfForJudge = isPastAsOf ? undefined : asOfDate;
+  // 판정은 항상 as-of 기준 재계산(단일 정의). 과거 모드에서도 effData 의
+  // as-of 실적으로 같은 식을 적용한다.
+  const asOfForJudge = asOfDate;
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
     return mainTasks.filter((p) => {
@@ -792,8 +792,10 @@ export function TaskTreePage() {
           const behindCount = kids.filter(
             (k) => (computeVariance(k, asOfDate) ?? 0) < -thresholds.caution_gap_buffer,
           ).length;
-          const pGap = computeVariance(p, asOfDate) ?? 0;
-          const pTodayPlan = cumPlanProgress(p, asOfDate);
+          const pGap =
+            (kids.length > 0 ? mainVariance(p, kids, asOfDate) : computeVariance(p, asOfDate)) ?? 0;
+          const pTodayPlan =
+            kids.length > 0 ? mainCumPlanProgress(p, kids, asOfDate) : cumPlanProgress(p, asOfDate);
           const pPic = (p.hdec_pic_name ?? p.hdec_eng_name ?? "-") || "-";
           return (
             <Card key={p.id} className={cn("overflow-hidden", isDone && "bg-muted/60 text-muted-foreground opacity-70")}> 
