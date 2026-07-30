@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Data Date 시맨틱: Actual% 는 현재값 유지, Plan/gap/judgment 만 as-of 재계산.
- * 서버 RPC `tm_judge_at_date` 결과를 그대로 반환한다. (스냅샷/Actual 이동 아님)
+ * 과거 판정(As-of 과거 선택) = "지금의 계획에 비추면 그때 어디였나".
+ * - Plan%  : 현재본 계획을 p_data_date 까지 평가 (계획 버전 소급 없음 = 재계획 존중 원칙)
+ * - Actual%: status_history 의 그 시점 관측치. 이력이 없으면 actual_source='none'.
+ * 서버 RPC `tm_judge_at_date` 결과를 그대로 반환한다.
  */
 export interface TmJudgmentRow {
   id: string;
@@ -13,6 +15,8 @@ export interface TmJudgmentRow {
   auto_judgment: string | null;
   delay_days: number | null;
   alarm_reason: string | null;
+  /** 'history' | 'none' — 'none' 이면 그 시점 관측 이력이 없음 */
+  actual_source?: string | null;
 }
 
 export function useTmJudgmentAtDate(asOf: string, enabled: boolean) {

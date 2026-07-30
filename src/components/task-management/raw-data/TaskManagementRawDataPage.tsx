@@ -426,7 +426,8 @@ export function TaskManagementRawDataPage() {
     setSearchInput(q);
     setCollapsedParents(new Set());
 
-    const asOf = s.asOf && s.asOf.length ? s.asOf : latestDataDate || todayIso();
+    // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
+    const asOf = s.asOf && s.asOf.length ? s.asOf : todayIso();
     const scope: TaskScope =
       s.taskScope === "main" || s.taskScope === "sub" ? s.taskScope : "all";
 
@@ -601,7 +602,8 @@ export function TaskManagementRawDataPage() {
 
   // Data Date 는 Dashboard 의 설정을 세션 전역으로 공유. Raw Data 자체 픽커는 폐기.
   // sharedDataDate/setSharedDataDate 는 이미 훅 호출부 위에서 확보되어 있음(파생 판정 컨텍스트 용).
-  const selectedDataDate = sharedDataDate || (latestDataDate ?? "");
+  // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar).
+  const selectedDataDate = sharedDataDate || todayIso();
 
   // T.Actual (오늘 실적) — 서버 RPC로 (오늘 누계 − 어제 누계) 일괄 조회.
   const rowIds = useMemo(
@@ -861,7 +863,10 @@ export function TaskManagementRawDataPage() {
                 </span>
               );
             }
-            const cls = v < -0.05 ? "text-rose-600" : v > 0.05 ? "text-emerald-600" : "text-muted-foreground";
+            const buf =
+              (cellDynRef.current.kpiThresholds ?? DEFAULT_THRESHOLDS).caution_gap_buffer;
+            const cls =
+              v < -buf ? "text-rose-600" : v > buf ? "text-emerald-600" : "text-muted-foreground";
             const sign = v > 0 ? "+" : "";
             return (
               <span className={cn("w-full text-right tabular-nums", cls)}>
@@ -1639,6 +1644,7 @@ export function TaskManagementRawDataPage() {
 
       <ExportDialog
         open={exportOpen}
+        asOf={selectedDataDate}
         onOpenChange={(o) => {
           setExportOpen(o);
           if (!o) setExportRows(null);

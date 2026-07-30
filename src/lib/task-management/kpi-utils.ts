@@ -2,6 +2,7 @@
 import type { TaskItem } from "./schedule-utils";
 import type { TaskThresholds } from "./derived";
 import { cumPlanProgress, cumActualProgress, computeVariance } from "./derived";
+import { todayInDoha } from "@/lib/time/doha";
 
 function parseDate(v: unknown): number | null {
   if (!v) return null;
@@ -11,8 +12,9 @@ function parseDate(v: unknown): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
+/** As-of 해석 규칙은 derived.ts 와 동일: 선택값 없으면 오늘(Asia/Qatar). */
 function asOfMs(asOf: string): number {
-  return parseDate(asOf) ?? Date.now();
+  return parseDate(asOf) ?? (parseDate(todayInDoha()) as number);
 }
 
 /** asOfDate 기준 누계 계획 진도율 (Cum. Plan, 0..1) — plan_progress 우선, NULL 시 computeTPlan 폴백. */

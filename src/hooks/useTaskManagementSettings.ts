@@ -4,16 +4,13 @@ import { DEFAULT_THRESHOLDS, type TaskThresholds } from "@/lib/task-management/d
 
 export const TASK_SETTINGS_QUERY_KEY = ["task-settings"] as const;
 
-/** task_management_settings 단일 행을 로드한다. 없으면 기본값. */
+/** TM 임계값 단일 소스(tm_alarm_settings → tm_thresholds RPC)를 로드한다.
+ *  판정(서버 RPC)·색상 강조(클라이언트) 모두 이 값을 경유해야 한다. */
 export function useTaskManagementSettings() {
   return useQuery<TaskThresholds>({
     queryKey: TASK_SETTINGS_QUERY_KEY,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("task_management_settings")
-        .select("*")
-        .eq("id", "default")
-        .maybeSingle();
+      const { data, error } = await (supabase as any).rpc("tm_thresholds");
       if (error) throw error;
       if (!data) return { ...DEFAULT_THRESHOLDS };
       return {

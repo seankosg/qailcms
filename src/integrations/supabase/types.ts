@@ -3771,18 +3771,21 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           value_int: number | null
+          value_num: number | null
         }
         Insert: {
           key: string
           updated_at?: string
           updated_by?: string | null
           value_int?: number | null
+          value_num?: number | null
         }
         Update: {
           key?: string
           updated_at?: string
           updated_by?: string | null
           value_int?: number | null
+          value_num?: number | null
         }
         Relationships: []
       }
@@ -4962,6 +4965,9 @@ export type Database = {
         }
         Returns: Json
       }
+      tm_resolve_caution: { Args: { _v: number }; Returns: number }
+      tm_resolve_worsen: { Args: { _v: number }; Returns: number }
+      tm_thresholds: { Args: never; Returns: Json }
       tm_today_actual: {
         Args: { _as_of: string; _ids: string[] }
         Returns: Json

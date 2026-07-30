@@ -48,8 +48,12 @@ function todayUtc(): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-function resolveAsOf(row: JudgmentRow, asOf?: string): Date {
-  return parseDate(asOf) ?? parseDate(row.data_date ?? null) ?? todayUtc();
+/** As-of(판정 기준일) 해석 — 단일 규칙.
+ *  선택값(asOf)이 정본이며, 없으면 오늘(Asia/Qatar).
+ *  row.data_date(실적 관측 컷오프)는 판정 계산에 개입하지 않는다.
+ *  Actual% 값 자체가 그 시점 관측치라는 형태로만 반영된다. */
+function resolveAsOf(_row: JudgmentRow, asOf?: string): Date {
+  return parseDate(asOf) ?? todayUtc();
 }
 
 function daysDiff(a: Date, b: Date): number {
