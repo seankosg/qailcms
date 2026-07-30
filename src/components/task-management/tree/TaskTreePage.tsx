@@ -777,7 +777,7 @@ export function TaskTreePage() {
             visibility={colVisibility}
             frozen={colFrozen}
             forcedFrozen={["task_no"]}
-            labels={SUMMARY_COLUMN_LABELS}
+            labels={summaryColumnLabels}
             defaultOrder={SUMMARY_DEFAULT_ORDER}
             defaultVisibility={SUMMARY_DEFAULT_VISIBILITY}
             defaultFrozen={SUMMARY_DEFAULT_FROZEN}
@@ -991,7 +991,7 @@ export function TaskTreePage() {
                       <tr>
                         {visibleCols.map((c) => (
                           <th key={c} className="px-2 py-1 text-left">
-                            {c === "chart" ? "" : SUMMARY_COLUMN_LABELS[c]}
+                            {c === "chart" ? "" : summaryColumnLabels[c]}
                           </th>
                         ))}
                       </tr>
