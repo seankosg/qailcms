@@ -227,8 +227,8 @@ export function computeJudgment(
   t: TaskThresholds = DEFAULT_THRESHOLDS,
   asOf?: string,
 ): string {
-  // asOf 미지정 시 DB가 계산한 표준 판정을 그대로 신뢰 (단일 진실원)
-  if (!asOf && row.auto_judgment) return row.auto_judgment;
+  // 저장 판정(auto_judgment)은 임포트 시점 스냅샷이므로 읽기 시 판정 소스로 쓰지 않는다.
+  // 항상 as-of(미지정 시 오늘·Asia/Qatar) 기준으로 재계산한다.
   const actual = normActual(row.actual_progress);
   if (actual >= 1) return "완료";
   const started = !!row.actual_start || actual > 0;
