@@ -11,6 +11,8 @@ import { DeSnagRoomGroupFilterBar } from "./DeSnagRoomGroupFilterBar";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+import { todayInDoha } from "@/lib/time/doha";
+import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import {
   ALL_TEAMS,
   buildMatrix,
@@ -51,7 +53,8 @@ export function DeSnagDashboardPage() {
   );
 
   const { options: dataDateOptions, latest: latestDataDate } = useDefectLatestDataDate();
-  const effectiveDataDate = (search.dataDate as string) || latestDataDate || "";
+  // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
+  const effectiveDataDate = (search.dataDate as string) || todayInDoha();
 
   // Plot/Team은 스테이징: 변경해도 서버 재호출 없음, '재계산' 버튼으로 적용
   const [stagedPlot, setStagedPlot] = useState<PlotKey>(appliedPlot);
@@ -166,6 +169,9 @@ export function DeSnagDashboardPage() {
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-xl font-semibold tracking-tight">Snagging List Dashboard</h1>
+            <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+              {asOfHeaderLabel(effectiveDataDate)}
+            </span>
             {latestDataDate && (
               <DataDatePicker
                 showDataDateChip
@@ -176,7 +182,7 @@ export function DeSnagDashboardPage() {
                   navigate({
                     to: "/closure/snag-management/dashboard",
                     search: (prev: Record<string, unknown>) =>
-                      ({ ...prev, dataDate: v === latestDataDate ? "" : v }) as any,
+                      ({ ...prev, dataDate: v === todayInDoha() ? "" : v }) as any,
                   })
                 }
                 onReset={() =>
