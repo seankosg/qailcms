@@ -131,10 +131,15 @@ export function useTmItemsCounts(params: {
         weightedArgs,
       );
       if (error) throw new Error(error.message);
-      const obj = (data ?? {}) as { planned?: number; actual?: number };
+      const obj = (data ?? {}) as {
+        planned?: number;
+        actual?: number;
+        planned_pct?: number;
+        actual_pct?: number;
+      };
       return {
-        planned: Number(obj.planned ?? 0),
-        actual: Number(obj.actual ?? 0),
+        planned: Number(obj.planned_pct ?? obj.planned ?? 0),
+        actual: Number(obj.actual_pct ?? obj.actual ?? 0),
       };
     },
   });
