@@ -168,7 +168,7 @@ export function TaskStageProgress({
     }
   }
   const title = [
-    `Data Date: ${fmtDdMmm(asOf)}`,
+    `As of: ${fmtDdMmm(asOf)}`,
     `Start: ${STATE_LABEL[start]}${startInfo}`,
     `Alarm: ${ALARM_LABEL[alarm]}`,
     `Finish: ${STATE_LABEL[finish]}${finishInfo}`,

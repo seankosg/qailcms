@@ -80,7 +80,8 @@ export function TaskDashboardPage({ compact = false }: Props) {
 
   const latestDataDate = getLatestDataDate(items) ?? today;
   const asOfDate = asOfMode === "dataDate" ? latestDataDate : today;
-  const asOfLabel = asOfMode === "dataDate" ? "Data Date" : "Today";
+  // 라벨 통일: 판정 기준일은 값의 출처와 무관하게 "As of" 로 표기(값은 실제 기준일).
+  const asOfLabel = asOfDate;
 
   const rangeStart = useMemo(() => addDays(today, -14), [today]);
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
@@ -369,7 +370,7 @@ export function TaskDashboardPage({ compact = false }: Props) {
             <Tabs value={asOfMode} onValueChange={(v) => patch({ asofMode: v })}>
               <TabsList className="h-8">
                 <TabsTrigger value="dataDate" className="h-6 px-2 text-xs">
-                  Data Date
+                  As of
                 </TabsTrigger>
                 <TabsTrigger value="today" className="h-6 px-2 text-xs">
                   Today

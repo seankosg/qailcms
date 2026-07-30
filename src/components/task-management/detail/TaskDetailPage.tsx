@@ -28,6 +28,14 @@ import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThr
 import { useServerFn } from "@tanstack/react-start";
 import { updateTaskOwnerField, TM_OWNER_MUTATIONS_MARKER } from "@/lib/task-management/owner-mutations.functions";
 import { canEditRawRow } from "@/lib/auth/roles";
+import {
+  cumPlanProgress,
+  computeVariance,
+  computeDailyPlan,
+  computeDailyDiff,
+} from "@/lib/task-management/derived";
+import { todayIso } from "@/lib/task-management/schedule-utils";
+import { useTmDataDate } from "@/hooks/useTmDataDate";
 
 // Runtime reference to keep the deploy marker in the client bundle (tree-shake guard)
 if (typeof window !== "undefined") (window as any).__TM_MARK__ = TM_OWNER_MUTATIONS_MARKER;
@@ -87,6 +95,36 @@ export function TaskDetailPage() {
     for (const c of TM_COLUMNS) (g[c.group] ??= []).push(c);
     return g;
   }, []);
+
+  // Forecast 그룹은 Raw Data 와 동일한 파생 함수·RPC 로 계산한다(저장값 렌더 금지).
+  const [sharedAsOf] = useTmDataDate();
+  const asOf = sharedAsOf || todayIso();
+  const { data: tActual } = useQuery({
+    queryKey: ["tm-today-actual-detail", id, asOf],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("tm_today_actual", {
+        _ids: [id],
+        _as_of: asOf,
+      });
+      if (error) throw error;
+      const arr = (Array.isArray(data) ? data : []) as Array<{ id: string; t_actual: number }>;
+      return Number(arr[0]?.t_actual ?? 0);
+    },
+    enabled: !!id && !!asOf,
+    staleTime: 60_000,
+  });
+
+  const derivedForecast = useMemo(() => {
+    if (!row) return {} as Record<string, number | null>;
+    const r = row as any;
+    return {
+      plan_progress: cumPlanProgress(r, asOf),
+      progress_variance: computeVariance(r, asOf),
+      expected_progress_today: computeDailyPlan(r),
+      today_actual: tActual ?? 0,
+      today_gap: computeDailyDiff(r, tActual ?? 0),
+    } as Record<string, number | null>;
+  }, [row, asOf, tActual]);
 
   if (!row) {
     return (
@@ -187,7 +225,8 @@ export function TaskDetailPage() {
               </div>
               <dl className="grid grid-cols-1 gap-x-3 gap-y-0.5 md:grid-cols-2 xl:grid-cols-3">
                 {cols.map((c) => {
-                  const v = row[c.key];
+                  const v =
+                    c.key in derivedForecast ? derivedForecast[c.key] : row[c.key];
                   let effectiveColumn: TmColumnDef = c;
                   let effectiveCanEdit = canEditRow;
                   if (c.key === "task_no") {

@@ -10,7 +10,6 @@ const searchSchema = z.object({
   hdecPic: fallback(z.array(z.string()), []).default([]),
   hdecEng: fallback(z.array(z.string()), []).default([]),
   ownerDim: fallback(z.string(), "hdec_pic_name").default("hdec_pic_name"),
-  asofMode: fallback(z.string(), "dataDate").default("dataDate"),
   dataDate: fallback(z.string(), "").default(""),
   delayFilter: fallback(z.string(), "all").default("all"),
   taskScope: fallback(z.string(), "all").default("all"),

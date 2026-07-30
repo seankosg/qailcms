@@ -111,7 +111,7 @@ import {
   gapAt,
 } from "@/lib/task-management/kpi-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
-import { DEFAULT_THRESHOLDS, type TaskThresholds } from "@/lib/task-management/derived";
+import { DEFAULT_THRESHOLDS, cumPlanProgress, type TaskThresholds } from "@/lib/task-management/derived";
 import {
   useTaskManagementFieldConfig,
   buildTmLabelOverrides,
@@ -880,6 +880,24 @@ export function TaskManagementRawDataPage() {
       }
       // Cum. Diff — 누계 실적(Actual %) − 누계 계획(Plan %) 파생 계산.
       // DB 저장값(임포트값)은 표시에 사용하지 않는다.
+      // Plan % — as-of 기준 현재본 계획 평가값. 저장된 plan_progress(임포트 스냅샷)는 표시 소스가 아니다.
+      if (c.key === "plan_progress") {
+        cols.push({
+          id: c.key,
+          size: c.width,
+          minSize: 60,
+          maxSize: 240,
+          enableSorting: true,
+          enableColumnFilter: true,
+          filterFn: numberRangeFilterFn,
+          accessorFn: (r: Row) =>
+            cumPlanProgress(r as any, cellDynRef.current.selectedDataDate || undefined),
+          header: labelOverrides[c.key] ?? c.label,
+          meta: { filterType: "number-range" as const, group: c.group },
+          cell: ({ getValue }) => renderCell(c, getValue()),
+        });
+        continue;
+      }
       if (c.key === "progress_variance") {
         cols.push({
           id: c.key,
