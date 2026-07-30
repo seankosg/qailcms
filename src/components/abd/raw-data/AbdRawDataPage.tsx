@@ -201,7 +201,8 @@ const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
 const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
   in_progress: "In Progress",
   not_started: "Not Started",
-  under_review: "Under Review",
+  // 키 'under_review' = 회신 대기(RS). 딥링크 하위호환으로 키 유지, 라벨만 정정.
+  under_review: "Awaiting Response",
   drafting: "Draft Start",
   rs_delay: "Response Delay",
   sb_delay: "Submission Delay",
