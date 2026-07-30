@@ -323,6 +323,7 @@ export function AbdImportPage() {
       file: f,
       status: "queued",
       team: detectTeamFromFilename(f.name, teamOptions),
+      dataDate: parseDataDateFromFileName(f.name),
     }));
     setEntries((prev) => [...prev, ...newEntries]);
     for (const e of newEntries) {
