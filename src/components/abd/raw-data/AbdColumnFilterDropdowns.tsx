@@ -6,6 +6,7 @@ import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EMPTY_TOKEN } from "@/lib/abd/filter-fns";
 import { useAbdFacet, type AbdStatusGroup, type AbdTeam, type AbdServerFilter } from "@/hooks/useAbdItems";
+import { useAbdDataDate } from "@/hooks/useAbdDataDate";
 
 export function AbdMultiSelectDropdown({
   column,
@@ -30,6 +31,7 @@ export function AbdMultiSelectDropdown({
   const plot: "C" | "D" | null = (meta.plot as "C" | "D" | null) ?? null;
   // 크로스 필터링: props로 부모의 최신 검색어/서버 필터를 받아 자기 자신은 훅에서 제외.
   const activeFilters: AbdServerFilter[] = serverFilters ?? [];
+  const [asOf] = useAbdDataDate();
   const { data: serverFacet, isFetching: facetLoading } = useAbdFacet(open ? serverFacetCol : null, {
     team,
     statusGroup,
@@ -37,6 +39,7 @@ export function AbdMultiSelectDropdown({
     plot,
     q,
     filters: activeFilters,
+    asOf: asOf || null,
     enabled: open && !!serverFacetCol,
   });
   const labelMap = useMemo(() => new Map(options.map((o) => [o.value, o.label])), [options]);
