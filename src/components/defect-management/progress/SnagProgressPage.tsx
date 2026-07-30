@@ -324,6 +324,7 @@ export function SnagProgressPage() {
     params.set("plan_group", planGroups.join(","));
     if (teams.length) params.set("team", teams.join(","));
     if (roomGroups.length) params.set("roomGroup", roomGroups.join(","));
+    params.set("tab", "all");
     const g = groupKeyToRawParams(effectiveGroupBy, groupKeyRaw);
     for (const [k, v] of Object.entries(g)) params.set(k, v);
     const dateFrom = bucketIso;
@@ -341,6 +342,8 @@ export function SnagProgressPage() {
   ) => {
     const params = new URLSearchParams();
     params.set("source", "progress-kpi");
+    // 진척 집계 모집단 = 활성 전체(종결 포함) → 드릴다운 탭도 all 로 고정
+    params.set("tab", "all");
     params.set("plan_group", planGroups.join(","));
     if (teams.length) params.set("team", teams.join(","));
     if (roomGroups.length) params.set("roomGroup", roomGroups.join(","));
