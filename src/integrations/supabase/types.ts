@@ -4391,6 +4391,102 @@ export type Database = {
           pdate: string
         }[]
       }
+      abd_rows_as_of: {
+        Args: { _as_of?: string }
+        Returns: {
+          abd_number: string
+          abd_ocs_no: string | null
+          aconex_date_modified: string | null
+          aconex_last_synced_at: string | null
+          aconex_review_status_raw: string | null
+          aconex_status_raw: string | null
+          active_round: number | null
+          approval_date: string | null
+          batch_no: string | null
+          bucket_top: string | null
+          completed_stage: string | null
+          completed_stage_group: string | null
+          created_at: string
+          current_stage: string | null
+          data_date: string | null
+          delay_bucket: string[]
+          delay_late: string[]
+          dis: string | null
+          doc_ax: string | null
+          doc_axx: string | null
+          doc_n: string | null
+          doc_nn1: string | null
+          doc_nn2: string | null
+          document_title: string | null
+          extra_rounds: Json | null
+          field_mismatch: boolean
+          has_r4_plus: boolean
+          hdec_eng_name: string | null
+          hdec_pic_name: string | null
+          id: string
+          inactive_reason: string | null
+          is_active: boolean
+          is_terminated: boolean
+          latest_rev: string | null
+          latest_status: string | null
+          latest_status_norm: string | null
+          mismatch_fields: Json
+          needs_planning: boolean
+          needs_revise: boolean
+          owner_user_id: string | null
+          plot: string | null
+          primary_delay: string | null
+          r1_dar_actual: string | null
+          r1_dar_plan: string | null
+          r1_draft_finish_actual: string | null
+          r1_draft_finish_plan: string | null
+          r1_draft_start_actual: string | null
+          r1_draft_start_plan: string | null
+          r1_response_result: string | null
+          r1_response_source: string | null
+          r1_submission_actual: string | null
+          r1_submission_plan: string | null
+          r2_dar_actual: string | null
+          r2_dar_plan: string | null
+          r2_draft_finish_actual: string | null
+          r2_draft_finish_plan: string | null
+          r2_draft_start_actual: string | null
+          r2_draft_start_plan: string | null
+          r2_response_result: string | null
+          r2_response_source: string | null
+          r2_submission_actual: string | null
+          r2_submission_plan: string | null
+          r3_dar_actual: string | null
+          r3_dar_plan: string | null
+          r3_draft_finish_actual: string | null
+          r3_draft_finish_plan: string | null
+          r3_draft_start_actual: string | null
+          r3_draft_start_plan: string | null
+          r3_response_result: string | null
+          r3_response_source: string | null
+          r3_submission_actual: string | null
+          r3_submission_plan: string | null
+          raw_payload: Json
+          revise_source_round: number | null
+          row_version: number
+          rs_result_missing: boolean
+          service: string | null
+          sl_no: number | null
+          source_import_log_id: string | null
+          status_group: string | null
+          status_mismatch: boolean
+          team: string
+          updated_at: string
+          updated_by: string | null
+          ur_aging_days: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "abd_items_raw"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       abd_stage_group: {
         Args: { _row: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
         Returns: string
