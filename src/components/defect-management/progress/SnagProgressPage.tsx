@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -21,6 +21,7 @@ import { DeSnagToolbar } from "@/components/defect-management/dashboard/DeSnagTo
 import { DeSnagRoomGroupFilterBar } from "@/components/defect-management/dashboard/DeSnagRoomGroupFilterBar";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
+import { useSnagAsOf } from "@/hooks/useSnagAsOf";
 import {
   ALL_TEAMS,
   ROOM_GROUP_ORDER,
@@ -162,11 +163,11 @@ export function SnagProgressPage() {
     refetchOnWindowFocus: false,
   });
 
-  // Day 뷰의 "Up to 21-Jul" 누계 컬럼용: 서버가 계산한 7/21 기준 누계값을 그대로 사용.
-  // 이렇게 하면 카드/우측 총합(actual_upto)과 셀 합계가 정확히 일치.
-  const LEGACY_CUM_ISO = "2026-07-21";
+  // Day 뷰 좌측 누계 컬럼: 표시 구간 시작 하루 전까지의 누계를 서버 값으로 사용.
+  // (하드코딩 날짜 제거 — 구간에서 파생)
+  const cumIso = useMemo(() => addDays(rangeStart, -1), [rangeStart]);
   const totalsCumQ = useQuery({
-    queryKey: ["snag-progress-totals-cum", plot, teamsKey, roomKey, groupKey, planMode],
+    queryKey: ["snag-progress-totals-cum", plot, teamsKey, roomKey, groupKey, planMode, cumIso],
     queryFn: () =>
       totalsFn({
         data: {
@@ -174,7 +175,7 @@ export function SnagProgressPage() {
           teams,
           roomGroups,
           groupBy: effectiveGroupBy,
-          asOfDate: LEGACY_CUM_ISO,
+          asOfDate: cumIso,
           planMode,
         },
       }),
