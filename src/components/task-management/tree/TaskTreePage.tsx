@@ -753,6 +753,19 @@ export function TaskTreePage() {
           <Button size="sm" variant="outline" className="h-8" onClick={collapseAll}>
             접기
           </Button>
+          <MwsColumnOrderMenu
+            order={colOrder}
+            visibility={colVisibility}
+            frozen={colFrozen}
+            forcedFrozen={["task_no"]}
+            labels={SUMMARY_COLUMN_LABELS}
+            defaultOrder={SUMMARY_DEFAULT_ORDER}
+            defaultVisibility={SUMMARY_DEFAULT_VISIBILITY}
+            defaultFrozen={SUMMARY_DEFAULT_FROZEN}
+            onOrderChange={setColOrder}
+            onVisibilityChange={setColVisibility}
+            onFrozenChange={setColFrozen}
+          />
           <Button
             size="sm"
             className="h-8"
