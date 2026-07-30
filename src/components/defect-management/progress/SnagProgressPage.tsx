@@ -184,9 +184,8 @@ export function SnagProgressPage() {
     refetchOnWindowFocus: false,
   });
 
-  // Day 뷰에서는 셀 RPC 범위를 7/22 이후로만 잡는다. 7/21 이전 누계는 totalsCumQ가 제공.
-  const CUTOFF_ISO = "2026-07-22";
-  const effectiveRpcStart = bucket === "day" && rpcStart < CUTOFF_ISO ? CUTOFF_ISO : rpcStart;
+  // Day 뷰 셀 RPC 범위는 표시 구간 시작일부터. 그 이전 누계는 totalsCumQ 가 제공.
+  const effectiveRpcStart = bucket === "day" && rpcStart < rangeStart ? rangeStart : rpcStart;
   const buckets = useMemo(
     () => buildBucketRange(effectiveRpcStart, rpcEnd, bucket),
     [effectiveRpcStart, rpcEnd, bucket],
@@ -201,9 +200,9 @@ export function SnagProgressPage() {
       buckets,
       stagesToShow: effectiveStages,
     });
-    // Day 뷰: 서버가 계산한 7/21 누계를 별도 컬럼으로 prepend
+    // Day 뷰: 서버가 계산한 구간 이전 누계를 별도 컬럼으로 prepend
     if (bucket === "day") {
-      const CUM_ISO = "2026-07-21";
+      const CUM_ISO = cumIso;
       let visStart = 0;
       if (hidePast) {
         const t = result.buckets.findIndex((b) => b >= today);
