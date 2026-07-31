@@ -503,7 +503,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
           sidebarCollapsed={collapsed}
         />
         <UpdateAvailableBanner />
-        <main className="flex-1 overflow-x-clip p-4 lg:p-6">{children}</main>
+        <main className="flex-1 overflow-x-clip p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:p-6">
+          {children}
+        </main>
       </div>
     </div>
     </TooltipProvider>
