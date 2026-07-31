@@ -355,7 +355,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <aside
         id="app-sidebar"
         className={cn(
-          "fixed inset-y-0 left-0 z-30 flex flex-col border-r bg-card transition-[transform,width] duration-200 motion-reduce:transition-none lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-30 flex flex-col border-r bg-card pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] transition-[transform,width] duration-200 motion-reduce:transition-none lg:translate-x-0 lg:pb-0 lg:pl-0",
           sidebarWidth,
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
@@ -503,7 +503,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           sidebarCollapsed={collapsed}
         />
         <UpdateAvailableBanner />
-        <main className="flex-1 overflow-x-clip p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:p-6">
+        <main className="flex-1 min-w-0 overflow-x-clip p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] sm:p-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] lg:p-6">
           {children}
         </main>
       </div>
