@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -124,6 +125,9 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+  const currentHref = useRouterState({
+    select: (state) => state.location.href,
+  });
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
@@ -136,11 +140,16 @@ function RootComponent() {
 
   // 현재 경로 저장 — 화면 회전 등으로 재로드돼도 같은 페이지로 복귀
   useEffect(() => {
-    saveLastRoute(router.state.location.href);
-    return router.subscribe("onResolved", () => {
-      saveLastRoute(router.state.location.href);
-    });
-  }, [router]);
+    saveLastRoute(currentHref);
+
+    const preserveCurrentRoute = () => saveLastRoute(currentHref);
+    window.addEventListener("pagehide", preserveCurrentRoute);
+    window.addEventListener("orientationchange", preserveCurrentRoute);
+    return () => {
+      window.removeEventListener("pagehide", preserveCurrentRoute);
+      window.removeEventListener("orientationchange", preserveCurrentRoute);
+    };
+  }, [currentHref]);
 
   return (
     <QueryClientProvider client={queryClient}>

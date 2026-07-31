@@ -39,7 +39,7 @@ function NewVersionButton() {
 
 export function TopBrandHeader({ onMobileMenu, onToggleSidebar, sidebarCollapsed }: Props) {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-card px-3 lg:px-4">
+    <header className="sticky top-0 z-20 flex min-h-14 items-center gap-3 border-b bg-card pb-0 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] lg:px-4 lg:pt-0">
       <Button
         variant="ghost"
         size="icon"
