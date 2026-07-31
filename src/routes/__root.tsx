@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { DefectManagementImportProvider } from "@/contexts/DefectManagementImportContext";
+import { saveLastRoute } from "@/lib/last-route";
 
 function NotFoundComponent() {
   return (
@@ -80,7 +81,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "QAIL CMS" },
       { name: "description", content: "Completion Management System of Lusail Tower Project [Code Name : QAIL]" },
       { property: "og:title", content: "QAIL CMS" },
@@ -132,6 +133,14 @@ function RootComponent() {
     });
     return () => sub.subscription.unsubscribe();
   }, [router, queryClient]);
+
+  // 현재 경로 저장 — 화면 회전 등으로 재로드돼도 같은 페이지로 복귀
+  useEffect(() => {
+    saveLastRoute(router.state.location.href);
+    return router.subscribe("onResolved", () => {
+      saveLastRoute(router.state.location.href);
+    });
+  }, [router]);
 
   return (
     <QueryClientProvider client={queryClient}>

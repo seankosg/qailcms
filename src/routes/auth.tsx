@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { resolveLoginEmail } from "@/lib/auth/resolveLoginEmail.functions";
+import { loadLastRoute } from "@/lib/last-route";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — QAIL Closure Document" }] }),
@@ -25,7 +26,10 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/closure/spare-part/raw-data", replace: true });
+      if (!data.session) return;
+      const last = loadLastRoute();
+      if (last) navigate({ href: last, replace: true });
+      else navigate({ to: "/my-work-space", replace: true });
     });
   }, [navigate]);
 
@@ -37,7 +41,9 @@ function AuthPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       toast.success("로그인되었습니다");
-      navigate({ to: "/closure/spare-part/raw-data", replace: true });
+      const last = loadLastRoute();
+      if (last) navigate({ href: last, replace: true });
+      else navigate({ to: "/my-work-space", replace: true });
     } catch (err: any) {
       toast.error(err?.message ?? "로그인에 실패했습니다");
     } finally {
