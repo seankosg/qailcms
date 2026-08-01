@@ -1,0 +1,1 @@
+ALTER VIEW public.spl_precedence_violations SET (security_invoker = on);
