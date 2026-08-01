@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Route as DashboardRoute } from "@/routes/_authenticated/closure/snag-management/dashboard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeSnagToolbar } from "./DeSnagToolbar";
-import { DeSnagMatrixBlock } from "./DeSnagMatrixBlock";
+import { DeSnagMatrixBlock, type MatrixMode } from "./DeSnagMatrixBlock";
 import { DeSnagGrandTotalCards } from "./DeSnagGrandTotalCards";
 import { DeSnagRoomGroupCards } from "./DeSnagRoomGroupCards";
 import { DeSnagRoomGroupFilterBar } from "./DeSnagRoomGroupFilterBar";
@@ -90,6 +90,7 @@ export function DeSnagDashboardPage() {
 
   const teamsStr = search.teams ?? "";
   const rgStr = search.roomGroups ?? "";
+  const matrixMode: MatrixMode = (search as any).matrixMode === "pct" ? "pct" : "count";
 
   const teamKey = (t: TeamKey[]) => [...t].sort().join(",");
   const isDirty =
@@ -116,6 +117,14 @@ export function DeSnagDashboardPage() {
     navigate({
       to: "/closure/snag-management/dashboard",
       search: { plot: appliedPlot, teams: teamsStr, roomGroups: rgs.join(",") },
+    });
+
+  // 개수/% 토글 — 상단 필터 탭과 완전 독립 (다른 파라미터 보존)
+  const setMatrixMode = (m: MatrixMode) =>
+    navigate({
+      to: "/closure/snag-management/dashboard",
+      search: (prev: Record<string, unknown>) =>
+        ({ ...prev, matrixMode: m === "count" ? "" : m }) as any,
     });
 
   function roomGroupParam(col: RoomGroupCol): string {
@@ -145,6 +154,10 @@ export function DeSnagDashboardPage() {
       ...(rgParam ? { roomGroup: rgParam } : {}),
       ...params,
     };
+    // 정본 동치 드릴다운: 실적일 스테이지 셀은 as-of 를 상한으로 건다.
+    if (merged.dateField) merged.dateEnd = effectiveDataDate;
+    // Issued/Rect 셀은 Closed 항목도 포함하므로 전체 탭으로 진입해야 숫자가 일치한다.
+    if (!merged.tab) merged.tab = "all";
     navigate({ to: "/closure/snag-management/raw-data", search: merged as any });
   };
 
@@ -256,11 +269,24 @@ export function DeSnagDashboardPage() {
         <p className="text-sm text-muted-foreground">해당 조건의 데이터가 없습니다.</p>
       )}
 
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <Tabs value={matrixMode} onValueChange={(v) => setMatrixMode(v as MatrixMode)}>
+          <TabsList className="h-8">
+            <TabsTrigger value="count" className="text-xs">개수</TabsTrigger>
+            <TabsTrigger value="pct" className="text-xs">%</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <span className="text-[11px] text-muted-foreground">
+          Rect% · Closed% = 같은 팀의 Issued 대비. 팀별 최저 비율이 차상위보다 15%p 이상 낮으면 병목 강조.
+        </span>
+      </div>
+
       <div className="flex flex-col gap-4">
         {matrix.blocks.map((block) => (
           <DeSnagMatrixBlock
             key={block.kind}
             block={block}
+            mode={matrixMode}
             presentBuildings={block.kind === "podium" ? presentPodiumBuildings : []}
             onNavigate={goRaw}
           />
@@ -268,8 +294,7 @@ export function DeSnagDashboardPage() {
       </div>
 
       <p className="text-[10px] text-muted-foreground">
-        각 셀 = ISSUED · Open · Rectified · Re-Open · Closed · Closure%. 비율 = ISSUED 대비. Closure% =
-        Closed ÷ ISSUED.
+        각 셀 = Room Group × (Issued · Rect · Closed) × (Elec · Mech · Arch). Rect/Closed 는 정본(자기 실적일 ≤ 기준일) 기준.
       </p>
     </div>
   );

@@ -339,7 +339,12 @@ export function DefectRawDataPage() {
     [qc],
   );
 
-  const tab: DefectStatusGroup = (urlSearch.tab === "closed" ? "closed" : "unclosed") as DefectStatusGroup;
+  // "all" 은 대시보드 드릴다운 전용 (Unclosed/Closed 양쪽을 포함해야 셀 숫자와 일치)
+  const tab: DefectStatusGroup = (urlSearch.tab === "closed"
+    ? "closed"
+    : urlSearch.tab === "all"
+      ? "all"
+      : "unclosed") as DefectStatusGroup;
   // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
   const includeInactive = false;
   const isAllPage = urlSearch.pageSize === "all";
