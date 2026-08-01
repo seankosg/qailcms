@@ -4,8 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
  * SPL 화면 데이터 정본 경유 진입점.
- * 표시·집계 수치는 전부 `spl_rows_as_of`(→ `spl_stage_state` / `spl_judge_v1`)를 거친다.
+ * 표시·집계 수치는 전부 `spl_rows_as_of`(→ `spl_eval_as_of` → `spl_stage_state` / `spl_judge_v2`)를 거친다.
  * 원시 테이블 직조회 + 클라이언트 재계산 금지.
+ * 판정·대표지연은 읽기 시 서버 재계산 결과이며, 저장 판정 컬럼은 존재하지 않는다.
  */
 
 export type SplStageCell = {
@@ -25,6 +26,18 @@ export type SplCatalogEntry = {
   value_type: "flag" | "single" | "range";
   actual_authority: "HDEC" | "ACONEX";
   sort_order: number;
+  /** 순차 사슬·판정 모집단에서 제외되는 단계(SPL REQUIRED_DOC) */
+  chain_excluded?: boolean;
+};
+
+export type SplStageRef = {
+  stage_code: string;
+  label: string;
+  band: string;
+  round_no?: number | null;
+  state?: string;
+  days?: number;
+  authority?: string;
 };
 
 export type SplRow = {
@@ -44,13 +57,25 @@ export type SplRow = {
   approval_status_raw: string | null;
   revision: string | null;
   data_date: string | null;
+  is_excluded: boolean;
+  exclusion_reason: string | null;
   stages: Record<string, SplStageCell>;
   na_count: number;
   done: number;
   delayed: number;
   denom: number;
+  /** Required Doc 충족률 (판정 모집단 비포함, 병렬 지표) */
+  req_doc_done: number;
+  req_doc_total: number;
+  active_band: string | null;
+  completed_stage: SplStageRef | null;
+  current_stage: SplStageRef | null;
+  /** 활성 밴드 내 HDEC 귀책 최선행 지연 1개 */
+  primary_delay: SplStageRef | null;
+  /** 후행 밴드 지연 — 인지용, KPI 지연 카드 미합산 */
+  delay_bucket: SplStageRef[];
   progress_pct: number | null;
-  judgment: "완료" | "정상" | "지연" | "미분류";
+  judgment: "제외" | "완료" | "정상" | "지연" | "미분류";
 };
 
 export type SplRowsAsOf = {
@@ -59,6 +84,8 @@ export type SplRowsAsOf = {
   rows: SplRow[];
   total_count: number;
   judgment_counts: Record<string, number>;
+  /** Required Doc 충족 단계 수별 문서 건수 (키 = 0..5) */
+  req_doc_counts: Record<string, number>;
   violations: { total: number; from_last_import: number; last_batch_id: string | null };
 };
 
