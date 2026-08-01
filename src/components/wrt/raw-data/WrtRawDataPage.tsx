@@ -265,6 +265,24 @@ export function WrtRawDataPage() {
         ))}
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] text-muted-foreground">밴드별 대표 지연</span>
+        {delayBands.map(([band, n]) => (
+          <Button
+            key={band}
+            size="sm"
+            variant={search.delayBand === band ? "default" : "outline"}
+            className="h-7 text-[11px]"
+            onClick={() => setSearch({ delayBand: search.delayBand === band ? "" : band, judgment: "all" })}
+          >
+            {BAND_LABEL[band] ?? band} {n}
+          </Button>
+        ))}
+        <Badge variant="outline" className="text-[11px]">
+          회신 대기 지연 {responseWaitItems}건 (Aconex 귀책 · 지연 카드 미합산)
+        </Badge>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
