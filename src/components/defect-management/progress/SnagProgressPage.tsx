@@ -329,9 +329,15 @@ export function SnagProgressPage() {
     for (const [k, v] of Object.entries(g)) params.set(k, v);
     const dateFrom = bucketIso;
     const dateTo = bucket === "week" ? addDays(bucketIso, 6) : bucketIso;
-    params.set("dateStart", dateFrom);
-    params.set("dateEnd", dateTo);
-    params.set("dateField", stageDateField(stage, field));
+    // 술어 정본 = public.snag_progress_events (셀 집계와 동일 소스).
+    // 집계행(stage='all')은 화면에 표시 중인 스테이지 조합을 그대로 전달한다.
+    params.set("cellStage", stage === "all" ? effectiveStages.join(",") : stage);
+    params.set("cellField", field);
+    params.set("cellFrom", dateFrom);
+    params.set("cellTo", dateTo);
+    params.set("cellMode", planMode);
+    // 매트릭스가 보던 As-of 를 명시 전달(세션 공유 의존 금지).
+    params.set("asOf", asOfDate);
     if (stage !== "all") params.set("stage", stage);
     window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
   };
