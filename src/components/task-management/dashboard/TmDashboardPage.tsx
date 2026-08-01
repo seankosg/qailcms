@@ -148,18 +148,15 @@ export function TmDashboardPage() {
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
+  // 지연 필터 3종 분할: 전체(지연+악화) ⊃ 지연만 + 악화만
   const scopedItems = useMemo(() => {
     const base = scopedByTaskScope;
-    if (search.delayFilter === "all") return base;
-    return base.filter((it) => {
-      if (search.delayFilter === "risk") return it.auto_judgment === "악화";
-      if (it.auto_judgment === "지연" || it.auto_judgment === "악화") return true;
-      for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
-        if (isTaskStageDelayedAsOf(it, st, asOfDate)) return true;
-      }
-      return false;
-    });
-  }, [scopedByTaskScope, search.delayFilter, asOfDate]);
+    const j = (it: TaskItem) => String(it.auto_judgment ?? "").trim();
+    if (search.delayFilter === "risk") return base.filter((it) => j(it) === "악화");
+    if (search.delayFilter === "delayed") return base.filter((it) => j(it) === "지연");
+    // 전체 = 지연 + 악화
+    return base.filter((it) => j(it) === "지연" || j(it) === "악화");
+  }, [scopedByTaskScope, search.delayFilter]);
 
   const delayTop = useMemo(
     () => computeDelayTopN(scopedItems, asOfDate, 20, thresholds),
