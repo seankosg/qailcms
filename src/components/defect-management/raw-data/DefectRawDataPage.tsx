@@ -136,6 +136,9 @@ function serializeFilters(f: ColumnFiltersState): string {
   return JSON.stringify(obj);
 }
 
+/** Progress Matrix 셀 드릴다운 전용 필터. 술어 정본 = public.snag_progress_events(). */
+const CELL_RANGE_ID = "__snag_cell_range__";
+
 // TanStack Table columnFilters → server filter payload
 function toServerFilters(f: ColumnFiltersState): DefectServerFilter[] {
   const out: DefectServerFilter[] = [];
