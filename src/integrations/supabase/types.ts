@@ -4719,6 +4719,7 @@ export type Database = {
           _as_of_date: string
           _bucket: string
           _group_by: string[]
+          _include_agg?: boolean
           _plan_groups: string[]
           _plan_mode: string
           _range_end: string
@@ -4739,6 +4740,7 @@ export type Database = {
           _as_of_date: string
           _bucket: string
           _group_by: string[]
+          _include_agg?: boolean
           _plan_groups: string[]
           _plan_mode: string
           _range_end: string
