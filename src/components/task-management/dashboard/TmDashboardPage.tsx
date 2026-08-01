@@ -12,8 +12,6 @@ import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import {
-  ALL_TASK_TIMELINE_STAGE_KEYS,
-  isTaskStageDelayedAsOf,
   todayIso,
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
@@ -41,7 +39,7 @@ import { JudgmentDonut } from "./JudgmentDonut";
 import { computeJudgmentStageBreakdown } from "@/lib/task-management/delay-utils";
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
-import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
+import { DEFAULT_THRESHOLDS, isTaskDelayed, computeJudgment } from "@/lib/task-management/derived";
 import { todayInDoha } from "@/lib/time/doha";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/dashboard");
@@ -148,18 +146,16 @@ export function TmDashboardPage() {
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
+  // 지연 필터 3종 분할 — 정본 computeJudgment/isTaskDelayed 사용 (auto_judgment 저장값 아님)
   const scopedItems = useMemo(() => {
     const base = scopedByTaskScope;
-    if (search.delayFilter === "all") return base;
-    return base.filter((it) => {
-      if (search.delayFilter === "risk") return it.auto_judgment === "악화";
-      if (it.auto_judgment === "지연" || it.auto_judgment === "악화") return true;
-      for (const st of ALL_TASK_TIMELINE_STAGE_KEYS) {
-        if (isTaskStageDelayedAsOf(it, st, asOfDate)) return true;
-      }
-      return false;
-    });
-  }, [scopedByTaskScope, search.delayFilter, asOfDate]);
+    if (search.delayFilter === "risk")
+      return base.filter((it) => computeJudgment(it, thresholds, asOfDate) === "악화");
+    if (search.delayFilter === "delayed")
+      return base.filter((it) => computeJudgment(it, thresholds, asOfDate) === "지연");
+    // 전체 = 지연 + 악화 (isTaskDelayed)
+    return base.filter((it) => isTaskDelayed(it, thresholds, asOfDate));
+  }, [scopedByTaskScope, search.delayFilter, thresholds, asOfDate]);
 
   const delayTop = useMemo(
     () => computeDelayTopN(scopedItems, asOfDate, 20, thresholds),

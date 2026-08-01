@@ -88,6 +88,9 @@ export function OwnerProgressChart({
     };
   }, [rows]);
 
+  // 지연 필터로 사전 필터링된 모집단이면 모든 항목이 지연 → ▼카운트·"지연" 배지 중복 제거
+  const allDelayed = summary.delayed === summary.tasks;
+
   const needsScroll = data.length > 10;
   const chartWidth = needsScroll ? data.length * 72 : undefined;
 
@@ -116,7 +119,9 @@ export function OwnerProgressChart({
       <g>
         <text x={x + width / 2} y={y - 33} textAnchor="middle" fontSize={9} fontWeight={700}>
           <tspan fill="var(--muted-foreground)">{r.taskCount}건</tspan>
-          {r.delayedTasks > 0 && <tspan fill={COLOR_BEHIND}> ▼{r.delayedTasks}</tspan>}
+          {!allDelayed && r.delayedTasks > 0 && (
+            <tspan fill={COLOR_BEHIND}> ▼{r.delayedTasks}</tspan>
+          )}
         </text>
         <text
           x={x + width / 2}
@@ -150,9 +155,11 @@ export function OwnerProgressChart({
             <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
               전체 {summary.tasks.toLocaleString()}건
             </Badge>
-            <Badge variant="destructive" className="h-5 px-1.5 text-[10px] tabular-nums">
-              지연 {summary.delayed.toLocaleString()}건
-            </Badge>
+            {!allDelayed && (
+              <Badge variant="destructive" className="h-5 px-1.5 text-[10px] tabular-nums">
+                지연 {summary.delayed.toLocaleString()}건
+              </Badge>
+            )}
             <Badge variant="outline" className="h-5 px-1.5 text-[10px] tabular-nums">
               진도율 {summary.actualPct.toFixed(1)}% / 계획 {summary.planPct.toFixed(1)}%
             </Badge>
@@ -305,7 +312,8 @@ export function OwnerProgressChart({
           <span className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-sm bg-destructive" /> Actual (지연)
           </span>
-          <span className="flex items-center gap-1">▼ 지연 태스크 수 · n건 = 전체 태스크 수</span>
+          {!allDelayed && <span className="flex items-center gap-1">▼ 지연 태스크 수 · n건 = 전체 태스크 수</span>}
+          {allDelayed && <span className="flex items-center gap-1">n건 = 지연 태스크 수</span>}
         </div>
       </CardContent>
     </Card>
