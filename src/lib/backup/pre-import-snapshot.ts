@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { enqueuePreImportSnapshot } from "./backup.functions";
 
-export type PreImportModule = "abd" | "sm" | "tm" | "spare-part";
+export type PreImportModule = "abd" | "sm" | "tm" | "spl";
 
 /**
  * 사전 스냅샷을 백그라운드 잡으로 큐잉합니다. 큐 등록 자체는 1-2초 내에 끝나며,

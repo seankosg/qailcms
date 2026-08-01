@@ -250,7 +250,7 @@ function RestoreButton({ snapshots, onRestored }: { snapshots: any[]; onRestored
   const restore = useServerFn(restoreSnapshot);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string>("");
-  const [tables, setTables] = useState<BackupTableName[]>(["abd_items_raw", "defect_items_raw", "task_management_raw", "spare_parts_raw", "dmr_entries"]);
+  const [tables, setTables] = useState<BackupTableName[]>(["abd_items_raw", "defect_items_raw", "task_management_raw", "spl_items", "spl_stage_progress", "dmr_entries"]);
   const [destructive, setDestructive] = useState(false);
   const [loading, setLoading] = useState(false);
 
