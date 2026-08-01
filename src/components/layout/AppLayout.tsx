@@ -124,15 +124,6 @@ const NAV: NavSection[] = [
           { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: iconDatabase },
         ],
       },
-      {
-        label: "__unused_warranty_placeholder",
-        icon: iconCertificate,
-        matchPrefix: "/closure/warranty-unused",
-        adminOnly: true,
-        items: [
-          { label: "Coming soon", icon: iconCertificate, disabled: true, badge: "Soon" },
-        ],
-      },
     ],
   },
   {
