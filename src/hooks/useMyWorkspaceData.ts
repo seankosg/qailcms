@@ -64,26 +64,11 @@ export interface TmMyRow {
 
 export type MwsScope = "pic" | "team";
 
-export function useMyTasks(filterValue: string | null, isAdmin: boolean, mode: MwsScope = "pic") {
-  return useQuery({
-    queryKey: ["my-workspace", "tm", mode, filterValue, isAdmin],
-    enabled: isAdmin || !!filterValue,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const rows = await fetchAll<TmMyRow>(
-        "task_management_raw",
-        "id,task_no,main_task_no,task_name,level,hdec_pic_name,plan_end,actual_progress,auto_judgment,plan_start,plan_days,plan_progress,data_date,actual_start,actual_finish,slip_days,created_at",
-        (q) => (isAdmin ? q : q.eq(mode === "team" ? "team" : "hdec_pic_name", filterValue)),
-        { col: "task_no", asc: true },
-        null,
-      );
-      return rows;
-    },
-  });
-}
-
+/** @deprecated 원시 테이블 직조회 경로. MWS TM 은 tm_my_workspace_* RPC(정본) 만 사용한다. */
+/** 완료 판정 — 서버 정본 판정(auto_judgment)이 있으면 그것을 따른다. */
 export function tmIsCompleted(r: TmMyRow): boolean {
-  return (Number(r.actual_progress ?? 0) >= 1) || r.auto_judgment === "완료";
+  if (r.auto_judgment) return r.auto_judgment === "완료";
+  return Number(r.actual_progress ?? 0) >= 1;
 }
 export function tmIsStarted(r: TmMyRow): boolean {
   return !tmIsCompleted(r) && Number(r.actual_progress ?? 0) > 0;

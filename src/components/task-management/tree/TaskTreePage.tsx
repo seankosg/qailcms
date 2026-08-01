@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useTmAsOfRows } from "@/hooks/useTmRowsAsOf";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,7 +51,6 @@ import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { asOfHeaderLabel, stalenessLabel } from "@/lib/task-management/as-of";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { todayInDoha } from "@/lib/time/doha";
-import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
 import { MwsColumnOrderMenu } from "@/components/my-work-space/MwsColumnOrderMenu";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/tree");
@@ -410,31 +410,36 @@ export function TaskTreePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["task-tree", discipline],
-    queryFn: async () => {
-      // PostgREST 응답 상한(1,000행) 우회를 위한 청크 루프.
-      // TM discipline별 태스크 총량이 1,000을 초과할 수 있어 전량 로드가 필수.
-      const PAGE = 1000;
-      const MAX_PAGES = 200; // 안전상한 20만행
-      const out: Row[] = [];
-      for (let from = 0; from < MAX_PAGES * PAGE; from += PAGE) {
-        const to = from + PAGE - 1;
-        const { data, error } = await (supabase as any)
-          .from("task_management_raw")
-          .select("*")
-          .eq("discipline", discipline)
-          .order("main_task_no", { ascending: true, nullsFirst: true })
-          .order("task_no", { ascending: true })
-          .range(from, to);
-        if (error) throw error;
-        const chunk = (data ?? []) as Row[];
-        out.push(...chunk);
-        if (chunk.length < PAGE) break;
-      }
-      return out;
-    },
-  });
+  // Data Date 소스: 세션 공유값 > 최신값.
+  // URL 의 dataDate 쿼리 파라미터(딥링크)는 진입 시 1회 세션으로 흡수한 뒤 URL에서 제거해,
+  // 이후 Dashboard 등에서 세션 값을 바꾸면 그 값이 그대로 반영되도록 한다.
+  const [sharedDataDate, setSharedDataDate] = useTmAsOf();
+  // 구 딥링크 URL ?dataDate= 는 수용 후 무시(U5) — URL 에서만 제거한다.
+  useEffect(() => {
+    const urlDate = routeSearch.dataDate ? String(routeSearch.dataDate).slice(0, 10) : "";
+    if (!urlDate) return;
+    navigate({
+      to: "/closure/task-management/tree",
+      search: (prev: Record<string, unknown>) => ({ ...prev, dataDate: "" }) as any,
+      replace: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeSearch.dataDate]);
+  // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
+  const asOfDate = sharedDataDate || todayInDoha();
+
+  // 행 소스 = 정본 tm_rows_as_of(as-of) 단일. task_management_raw 직조회 금지.
+  const asOfRowsQ = useTmAsOfRows(asOfDate);
+  const isLoading = asOfRowsQ.isLoading;
+  const data = useMemo<Row[]>(
+    () => ((asOfRowsQ.data ?? []) as unknown as Row[])
+      .filter((r) => r.discipline === discipline)
+      .sort((a, b) =>
+        String(a.main_task_no ?? "").localeCompare(String(b.main_task_no ?? "")) ||
+        String(a.task_no ?? "").localeCompare(String(b.task_no ?? "")),
+      ),
+    [asOfRowsQ.data, discipline],
+  );
 
   // 임계값 단일 소스(tm_thresholds RPC) — 판정과 색상 강조가 같은 값을 쓴다.
   const { data: thresholdsData } = useTaskManagementSettings();
@@ -470,51 +475,8 @@ export function TaskTreePage() {
     return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [data]);
 
-  // Data Date 소스: 세션 공유값 > 최신값.
-  // URL 의 dataDate 쿼리 파라미터(딥링크)는 진입 시 1회 세션으로 흡수한 뒤 URL에서 제거해,
-  // 이후 Dashboard 등에서 세션 값을 바꾸면 그 값이 그대로 반영되도록 한다.
-  const [sharedDataDate, setSharedDataDate] = useTmAsOf();
-  // 구 딥링크 URL ?dataDate= 는 수용 후 무시(U5) — URL 에서만 제거한다.
-  useEffect(() => {
-    const urlDate = routeSearch.dataDate ? String(routeSearch.dataDate).slice(0, 10) : "";
-    if (!urlDate) return;
-    navigate({
-      to: "/closure/task-management/tree",
-      search: (prev: Record<string, unknown>) => ({ ...prev, dataDate: "" }) as any,
-      replace: true,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeSearch.dataDate]);
-  // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
-  const asOfDate = sharedDataDate || todayInDoha();
-  const isPastAsOf =
-    !!asOfDate && !!latestDataDate && asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
-  const judge = useTmJudgmentAtDate(asOfDate ?? "", isPastAsOf);
+  const effData = data;
 
-  // 과거 As-of: 서버 정본(tm_judge_at_date)의 그 시점 판정과 함께
-  // 표시용 Actual 도 그 시점 관측치로 치환한다.
-  // (판정만 as-of 로 바꾸고 Actual 은 현재값을 보여주면
-  //  "실적 100% / 차이 0%p 인데 악화" 같은 표시-판정 불일치가 발생한다.)
-  const effData = useMemo<Row[]>(() => {
-    if (!isPastAsOf || judge.map.size === 0) return data;
-    const cut = asOfDate.slice(0, 10);
-    const maskDate = (d: string | null) =>
-      d && String(d).slice(0, 10) > cut ? null : d;
-    return data.map((r) => {
-      const j = judge.map.get(r.id);
-      if (!j) return r;
-      const rawA = j.cum_actual_pct;
-      const asOfActual =
-        rawA == null ? 0 : Number(rawA) > 1 ? Number(rawA) / 100 : Number(rawA);
-      return {
-        ...r,
-        auto_judgment: j.auto_judgment ?? null,
-        actual_progress: asOfActual,
-        actual_start: asOfActual > 0 ? maskDate(r.actual_start) : null,
-        actual_finish: asOfActual >= 1 ? maskDate(r.actual_finish) : null,
-      } as Row;
-    });
-  }, [data, isPastAsOf, judge.map, asOfDate]);
 
   const { mainTasks, subsByMain } = useMemo(() => {
     const mainTasks: Row[] = [];
