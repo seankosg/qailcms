@@ -146,15 +146,16 @@ export function TmDashboardPage() {
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
-  // 지연 필터 3종 분할: 전체(지연+악화) ⊃ 지연만 + 악화만
+  // 지연 필터 3종 분할 — 정본 computeJudgment/isTaskDelayed 사용 (auto_judgment 저장값 아님)
   const scopedItems = useMemo(() => {
     const base = scopedByTaskScope;
-    const j = (it: TaskItem) => String(it.auto_judgment ?? "").trim();
-    if (search.delayFilter === "risk") return base.filter((it) => j(it) === "악화");
-    if (search.delayFilter === "delayed") return base.filter((it) => j(it) === "지연");
-    // 전체 = 지연 + 악화
-    return base.filter((it) => j(it) === "지연" || j(it) === "악화");
-  }, [scopedByTaskScope, search.delayFilter]);
+    if (search.delayFilter === "risk")
+      return base.filter((it) => computeJudgment(it, thresholds, asOfDate) === "악화");
+    if (search.delayFilter === "delayed")
+      return base.filter((it) => computeJudgment(it, thresholds, asOfDate) === "지연");
+    // 전체 = 지연 + 악화 (isTaskDelayed)
+    return base.filter((it) => isTaskDelayed(it, thresholds, asOfDate));
+  }, [scopedByTaskScope, search.delayFilter, thresholds, asOfDate]);
 
   const delayTop = useMemo(
     () => computeDelayTopN(scopedItems, asOfDate, 20, thresholds),
