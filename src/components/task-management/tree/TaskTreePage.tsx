@@ -964,9 +964,7 @@ export function TaskTreePage() {
                     >
                       {summaryColumnLabels["plan"]}{" "}
                       <span className="font-medium text-foreground">
-                        {p.plan_progress == null
-                          ? "-"
-                          : `${(Number(p.plan_progress) * 100).toFixed(0)}%`}
+                        {`${(resolvePlanPct(p as never, asOfDate) * 100).toFixed(0)}%`}
                       </span>
                     </span>
                   )}
@@ -1087,9 +1085,7 @@ export function TaskTreePage() {
                                 case "plan":
                                   return (
                                     <td key={c} className="px-2 py-1 tabular-nums text-[10px]">
-                                      {k.plan_progress == null
-                                        ? "-"
-                                        : `${(Number(k.plan_progress) * 100).toFixed(0)}%`}
+                                      {`${(resolvePlanPct(k as never, asOfDate) * 100).toFixed(0)}%`}
                                     </td>
                                   );
                                 case "actual":
