@@ -370,7 +370,7 @@ export function WrtRawDataPage() {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={8 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={10 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
                         조건에 맞는 행이 없습니다.
                       </td>
                     </tr>

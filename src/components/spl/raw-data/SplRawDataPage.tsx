@@ -326,7 +326,7 @@ export function SplRawDataPage() {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={6 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={9 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
                         조건에 맞는 행이 없습니다.
                       </td>
                     </tr>
