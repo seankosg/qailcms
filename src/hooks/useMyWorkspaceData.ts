@@ -64,33 +64,14 @@ export interface TmMyRow {
 
 export type MwsScope = "pic" | "team";
 
-/** @deprecated 원시 테이블 직조회 경로. MWS TM 은 tm_my_workspace_* RPC(정본) 만 사용한다. */
-/** 완료 판정 — 서버 정본 판정(auto_judgment)이 있으면 그것을 따른다. */
+/** 완료 판정 — 정본 정의(실적 100% 또는 실적 종료일 존재). 판정 문자열은 참조하지 않는다. */
 export function tmIsCompleted(r: TmMyRow): boolean {
-  if (r.auto_judgment) return r.auto_judgment === "완료";
-  return Number(r.actual_progress ?? 0) >= 1;
+  return Number(r.actual_progress ?? 0) >= 1 || !!r.actual_finish;
 }
 export function tmIsStarted(r: TmMyRow): boolean {
   return !tmIsCompleted(r) && Number(r.actual_progress ?? 0) > 0;
 }
-/** MWS 지연 판정 — TM Dashboard/Task Summary와 동일한 런타임 소스(computeJudgment) 사용.
- *  저장된 auto_judgment 문자열은 stale 가능성이 있으므로 직접 참조하지 않는다. */
-export function tmIsDelayed(
-  r: TmMyRow,
-  thresholds: TaskThresholds = DEFAULT_THRESHOLDS,
-  asOf?: string,
-): boolean {
-  if (tmIsCompleted(r)) return false;
-  return isTaskDelayed(r as JudgmentRow, thresholds, asOf);
-}
-/** MWS 알람 판정 — 런타임 computeJudgment 결과. */
-export function tmJudgment(
-  r: TmMyRow,
-  thresholds: TaskThresholds = DEFAULT_THRESHOLDS,
-  asOf?: string,
-): string {
-  return computeJudgment(r as JudgmentRow, thresholds, asOf);
-}
+// 지연/판정 사본 제거: MWS 는 서버 정본(tm_rows_as_of → auto_judgment)만 사용한다.
 export function tmIsUpcoming(r: TmMyRow, today: string, days = 3): boolean {
   if (tmIsCompleted(r)) return false;
   if (!r.plan_end) return false;

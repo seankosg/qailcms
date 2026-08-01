@@ -4,7 +4,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   useMyDefectsCounts, useMyDefectsBucket,
   useMyTasksCounts, useMyTasksBucket, useMyAbdCounts, useMyAbdBucket,
-  tmIsCompleted, tmIsStarted, tmIsDelayed, tmJudgment, tmIsUpcoming, tmIsToday, tmTodayKinds,
+  tmTodayKinds,
   smTodayKinds,
   abdIsApproved, abdTodayKind, abdStage, abdCurrentPlanDate,
   abdNeedsPlanning, abdNextPlanRoundLabel,
@@ -273,7 +273,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
       return <span className={cn("tabular-nums font-medium", pct < 0 ? "text-destructive" : pct > 0 ? "text-success" : "text-muted-foreground")}>{pct > 0 ? "+" : ""}{pct}%</span>;
     } },
     { key: "j", label: "Alarm", width: "70px", render: (r) => {
-      const j = r.auto_judgment ?? tmJudgment(r, tmThresholds, t);
+      const j = r.auto_judgment ?? "";
       return <Badge variant="outline" className={cn("text-[10px]", j === "악화" || j === "지연" ? "border-destructive text-destructive" : j === "주의" ? "border-warning text-warning" : j === "완료" ? "border-success text-success" : "")}>{j || "-"}</Badge>;
     } },
   ];
