@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
+import { useTmAsOfRows } from "@/hooks/useTmRowsAsOf";
 
 export interface TaskDashboardFilters {
   disciplines: string[];
@@ -12,58 +12,40 @@ export interface TaskDashboardFilters {
   q: string;
 }
 
-const SELECT_COLS =
-  "id, task_no, task_name, discipline, team, plot, hdec_pic_name, hdec_eng_name, category, floor_level, risk, level, status_manual, auto_judgment, plan_start, plan_end, plan_days, plan_progress, actual_start, actual_finish, actual_progress, slip_days, data_date";
-
-async function fetchAll(filters: TaskDashboardFilters): Promise<TaskItem[]> {
-  const pageSize = 1000;
-  const out: TaskItem[] = [];
-  let from = 0;
-  let latestDataDate: string | null = null;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    let query = (supabase as any)
-      .from("task_management_raw")
-      .select(SELECT_COLS)
-      .order("id", { ascending: true })
-      .range(from, from + pageSize - 1);
-
-    if (filters.level !== "all") query = query.eq("level", filters.level);
-    if (filters.disciplines.length) query = query.in("discipline", filters.disciplines);
-    if (filters.plots.length) query = query.in("plot", filters.plots);
-    if (filters.teams.length) query = query.in("team", filters.teams);
-    if (filters.hdecPic && filters.hdecPic.length) query = query.in("hdec_pic_name", filters.hdecPic);
-    if (filters.hdecEng && filters.hdecEng.length) query = query.in("hdec_eng_name", filters.hdecEng);
-    if (filters.q.trim()) {
-      const q = filters.q.trim().replace(/[%,]/g, "");
-      query = query.or(
-        `task_no.ilike.%${q}%,task_name.ilike.%${q}%,hdec_pic_name.ilike.%${q}%,hdec_eng_name.ilike.%${q}%,category.ilike.%${q}%`,
-      );
-    }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    const rows = (data ?? []) as (TaskItem & { data_date?: string | null })[];
-    for (const r of rows) {
-      if (r.data_date && (!latestDataDate || r.data_date > latestDataDate)) {
-        latestDataDate = String(r.data_date).slice(0, 10);
-      }
-    }
-    out.push(...rows);
-    if (rows.length < pageSize) break;
-    from += pageSize;
-    if (from > 20000) break; // safety
+function matches(r: any, f: TaskDashboardFilters): boolean {
+  if (f.level !== "all" && String(r.level ?? "") !== f.level) return false;
+  if (f.disciplines.length && !f.disciplines.includes(r.discipline)) return false;
+  if (f.plots.length && !f.plots.includes(r.plot)) return false;
+  if (f.teams.length && !f.teams.includes(r.team)) return false;
+  if (f.hdecPic?.length && !f.hdecPic.includes(r.hdec_pic_name)) return false;
+  if (f.hdecEng?.length && !f.hdecEng.includes(r.hdec_eng_name)) return false;
+  const q = f.q.trim().toLowerCase();
+  if (q) {
+    const hay = [r.task_no, r.task_name, r.hdec_pic_name, r.hdec_eng_name, r.category]
+      .map((v) => String(v ?? "").toLowerCase())
+      .join("|");
+    if (!hay.includes(q)) return false;
   }
-  (out as any).latestDataDate = latestDataDate;
-  return out;
+  return true;
 }
 
-export function useTaskDashboardData(filters: TaskDashboardFilters) {
-  return useQuery({
-    queryKey: ["task-dashboard", filters],
-    queryFn: () => fetchAll(filters),
-    staleTime: 30_000,
-  });
+/**
+ * TM 대시보드 행 소스 = 정본 `tm_rows_as_of(_as_of)` 단일.
+ * 필터는 클라이언트에서 적용한다(원시 테이블 직조회 금지).
+ */
+export function useTaskDashboardData(filters: TaskDashboardFilters, asOf: string) {
+  const q = useTmAsOfRows(asOf);
+  const data = useMemo(() => {
+    const rows = (q.data ?? []).filter((r) => matches(r, filters)) as unknown as TaskItem[];
+    let latest: string | null = null;
+    for (const r of q.data ?? []) {
+      const d = r.data_date ? String(r.data_date).slice(0, 10) : "";
+      if (d && (!latest || d > latest)) latest = d;
+    }
+    (rows as any).latestDataDate = latest;
+    return rows;
+  }, [q.data, filters]);
+  return { ...q, data: q.data ? data : undefined };
 }
 
 export function getLatestDataDate(items: TaskItem[] | undefined): string | null {

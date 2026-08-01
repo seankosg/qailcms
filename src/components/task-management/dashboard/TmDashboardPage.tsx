@@ -65,15 +65,25 @@ export function TmDashboardPage() {
   const search = routeApi.useSearch();
   const navigate = useNavigate();
 
-  const { data: items = [], isLoading } = useTaskDashboardData({
-    disciplines: search.discipline,
-    plots: search.plot,
-    teams: search.team,
-    hdecPic: search.hdecPic,
-    hdecEng: search.hdecEng,
-    level: "all",
-    q: search.q,
-  });
+  // 세션 전역 As-of (Raw Data/Task Summary/MWS 등과 공유)
+  const [sharedDataDate, setSharedDataDate] = useTmAsOf();
+  const today = todayInDoha();
+  const selectedDataDate = sharedDataDate || today;
+  const asOfDate = selectedDataDate;
+
+  // 행 소스 = 정본 tm_rows_as_of(as-of) 단일. 실적 마스킹·정본 판정·Main 가중 계획 포함.
+  const { data: items = [], isLoading } = useTaskDashboardData(
+    {
+      disciplines: search.discipline,
+      plots: search.plot,
+      teams: search.team,
+      hdecPic: search.hdecPic,
+      hdecEng: search.hdecEng,
+      level: "all",
+      q: search.q,
+    },
+    asOfDate,
+  );
 
   const latestDataDate = getLatestDataDate(items) ?? todayIso();
 
@@ -87,46 +97,16 @@ export function TmDashboardPage() {
     return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [items]);
 
-  // 세션 전역 Data Date (Raw Data/MWS 등과 공유)
-  const [sharedDataDate, setSharedDataDate] = useTmAsOf();
-  // As-of 단일 규칙: 선택값 없으면 오늘(Asia/Qatar). data_date 폴백 금지.
-  const today = todayInDoha();
-  const selectedDataDate = sharedDataDate || today;
-
   // 구 딥링크 URL ?dataDate= 는 수용 후 무시(U5).
   useEffect(() => {
     if (search.dataDate) patch({ dataDate: "" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.dataDate]);
-  const asOfDate = selectedDataDate;
   // 판정 기준일 라벨. 행별 관측 컷오프(data_date)와 구분한다.
   const asOfLabel = "As of";
 
-  // 정본 소스: 서버 tm_rows_as_of (실적 마스킹 + 정본 판정 + Main 가중 계획).
-  // 과거/오늘 구분 없이 항상 경유한다. 클라 재계산은 폴백용.
-  const asOfRows = useTmRowsAsOf(asOfDate, true);
-  const effectiveItems = useMemo(() => {
-    if (!asOfRows.ready) return items;
-    return items.map((it) => {
-      const j = asOfRows.map.get(it.id);
-      if (!j) return it;
-      const actual = j.cum_actual_pct == null ? null : Number(j.cum_actual_pct);
-      return {
-        ...it,
-        auto_judgment: j.auto_judgment ?? null,
-        gap_pct: j.gap_pct ?? null,
-        cum_plan_pct: j.cum_plan_pct ?? null,
-        delay_days: j.delay_days ?? null,
-        alarm_reason: j.alarm_reason ?? null,
-        actual_progress: actual ?? it.actual_progress,
-        actual_start: j.actual_start ?? null,
-        actual_finish: j.actual_finish ?? null,
-        srv_judgment: j.auto_judgment ?? "이력 없음",
-        srv_plan_pct: j.cum_plan_pct == null ? null : Number(j.cum_plan_pct),
-        srv_actual_pct: actual,
-      } as typeof it;
-    });
-  }, [items, asOfRows.ready, asOfRows.map]);
+  // 행에는 이미 srv_judgment/srv_plan_pct/srv_actual_pct 가 부착되어 있다(useTmAsOfRows).
+  const effectiveItems = items;
 
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
 

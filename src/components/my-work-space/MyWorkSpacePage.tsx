@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
-  useMyTasks, useMyDefectsCounts, useMyDefectsBucket,
+  useMyDefectsCounts, useMyDefectsBucket,
   useMyTasksCounts, useMyTasksBucket, useMyAbdCounts, useMyAbdBucket,
   tmIsCompleted, tmIsStarted, tmIsDelayed, tmJudgment, tmIsUpcoming, tmIsToday, tmTodayKinds,
   smTodayKinds,
@@ -29,7 +29,6 @@ import { AttentionInbox } from "./AttentionInbox";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import { useTmLatestDataDate } from "@/hooks/useTmLatestDataDate";
-import { useTmJudgmentAtDate, mergeTmJudgment } from "@/hooks/useTmJudgmentAtDate";
 
 function fmtDate(d?: string | null): string {
   if (!d) return "-";
@@ -91,25 +90,14 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   const { data: tmLatestDataDate = "" } = useTmLatestDataDate();
   const t = dataDate || latestToday;
 
-  // 과거 Data Date 선택 시 서버측 재판정 병합 (Actual 유지, Plan/gap/judgment 만 as-of).
-  const isPastDate = !!dataDate && dataDate.slice(0, 10) < latestToday.slice(0, 10);
-
-  // TM: 과거 시점은 기존 client 판정 경로 유지, 오늘은 서버 counts+bucket 사용.
-  const tmPastRows = useMyTasks(filterValue, isAdmin, scope);
-  const judge = useTmJudgmentAtDate(dataDate, isPastDate);
-  const effTmData = useMemo(
-    () => mergeTmJudgment((tmPastRows.data ?? []) as any[], judge.map) as TmMyRow[],
-    [tmPastRows.data, judge.map],
-  );
-
-  const tmCountsQ = useMyTasksCounts(filterValue, isAdmin, scope, t, { enabled: !isPastDate });
+  // TM: 과거·오늘 구분 없이 서버 정본(tm_rows_as_of 기반 counts+bucket) 단일 경로.
+  const tmCountsQ = useMyTasksCounts(filterValue, isAdmin, scope, t);
   const tmBucketKind: "today" | "delayed" | "upcoming" | "all" =
     tmTab === "today" ? "today"
     : tmTab === "risk" ? "delayed"
     : tmTab === "upcoming" ? "upcoming"
     : "all";
   const tmBucketQ = useMyTasksBucket(filterValue, isAdmin, scope, t, tmBucketKind, {
-    enabled: !isPastDate,
     limit: tmBucketKind === "all" ? 20000 : 5000,
   });
 
@@ -154,29 +142,16 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
   };
 
   const tmStats = useMemo(() => {
-    if (!isPastDate && tmCountsQ.data) {
-      const c = tmCountsQ.data;
-      return {
-        total: c.total_count,
-        inProgress: c.in_progress_count,
-        delayed: c.delayed_count,
-        upcoming: c.upcoming_count,
-        completed: c.completed_count,
-        today: c.today_count,
-      };
-    }
-    const rows = effTmData;
+    const c = tmCountsQ.data;
     return {
-      total: rows.length,
-      inProgress: rows.filter(tmIsStarted).length,
-      delayed: rows.filter((r) =>
-        isPastDate ? (r.auto_judgment === "지연" || r.auto_judgment === "악화") : tmIsDelayed(r, tmThresholds, t),
-      ).length,
-      upcoming: rows.filter((r) => tmIsUpcoming(r, t)).length,
-      completed: rows.filter(tmIsCompleted).length,
-      today: rows.filter((r) => tmIsToday(r, t)).length,
+      total: c?.total_count ?? 0,
+      inProgress: c?.in_progress_count ?? 0,
+      delayed: c?.delayed_count ?? 0,
+      upcoming: c?.upcoming_count ?? 0,
+      completed: c?.completed_count ?? 0,
+      today: c?.today_count ?? 0,
     };
-  }, [effTmData, t, tmThresholds, isPastDate, tmCountsQ.data]);
+  }, [tmCountsQ.data]);
 
   const abdStats = useMemo(() => {
     const c = abdCountsQ.data;
@@ -190,8 +165,8 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
     };
   }, [abdCountsQ.data]);
 
-  // 표시용 rows: 오늘 기준이면 서버 버킷, 과거 기준이면 client 필터 소스.
-  const tmRowsForList: TmMyRow[] = isPastDate ? effTmData : (tmBucketQ.data ?? []);
+  // 표시용 rows: 항상 서버 정본 버킷.
+  const tmRowsForList: TmMyRow[] = tmBucketQ.data ?? [];
   const abdRowsForList: AbdMyRow[] = abdBucketQ.data ?? [];
 
   const setTabFromKpi = (setter: (v: RowListTab) => void, kind: "risk" | "upcoming") => () => setter(kind);
@@ -298,7 +273,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
       return <span className={cn("tabular-nums font-medium", pct < 0 ? "text-destructive" : pct > 0 ? "text-success" : "text-muted-foreground")}>{pct > 0 ? "+" : ""}{pct}%</span>;
     } },
     { key: "j", label: "Alarm", width: "70px", render: (r) => {
-      const j = isPastDate ? (r.auto_judgment ?? "") : tmJudgment(r, tmThresholds, t);
+      const j = r.auto_judgment ?? tmJudgment(r, tmThresholds, t);
       return <Badge variant="outline" className={cn("text-[10px]", j === "악화" || j === "지연" ? "border-destructive text-destructive" : j === "주의" ? "border-warning text-warning" : j === "완료" ? "border-success text-success" : "")}>{j || "-"}</Badge>;
     } },
   ];
@@ -421,13 +396,8 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           activeTab={tmTab}
           onTabChange={setTmTab}
           counts={{ today: tmStats.today, all: tmStats.total, risk: tmStats.delayed, upcoming: tmStats.upcoming }}
-          filterRow={(r, tab) => isPastDate ? (
-            tab === "all" ? true
-            : tab === "risk" ? (isPastDate ? (r.auto_judgment === "지연" || r.auto_judgment === "악화") : tmIsDelayed(r, tmThresholds, t))
-            : tab === "today" ? tmIsToday(r, t)
-            : tmIsUpcoming(r, t)
-          ) : true}
-          emptyText={!isPastDate && tmBucketQ.isLoading ? "불러오는 중…" : "표시할 항목이 없습니다."}
+          filterRow={() => true}
+          emptyText={tmBucketQ.isLoading ? "불러오는 중…" : "표시할 항목이 없습니다."}
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate({ to: "/closure/task-management/detail/$id", params: { id: r.id } })}
           columns={tmColumns}

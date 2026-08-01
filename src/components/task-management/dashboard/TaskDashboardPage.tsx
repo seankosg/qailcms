@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
+import { useTmLatestDataDate } from "@/hooks/useTmLatestDataDate";
 import {
   ALL_TASK_GROUP_KEYS,
   ALL_TASK_STAGE_KEYS,
@@ -70,16 +71,21 @@ export function TaskDashboardPage({ compact = false }: Props) {
   const hidePast = search.hidePast;
   const showRiskPanel = search.riskPanel;
 
-  const { data: items = [], isLoading } = useTaskDashboardData({
-    disciplines: search.discipline,
-    plots: search.plot,
-    teams: search.team,
-    level: "sub",
-    q: search.q,
-  });
+  const { data: latestDataDateSrv = "" } = useTmLatestDataDate();
+  const asOfDate = asOfMode === "dataDate" ? (latestDataDateSrv || today) : today;
+
+  const { data: items = [], isLoading } = useTaskDashboardData(
+    {
+      disciplines: search.discipline,
+      plots: search.plot,
+      teams: search.team,
+      level: "sub",
+      q: search.q,
+    },
+    asOfDate,
+  );
 
   const latestDataDate = getLatestDataDate(items) ?? today;
-  const asOfDate = asOfMode === "dataDate" ? latestDataDate : today;
   // 라벨 통일: 판정 기준일은 값의 출처와 무관하게 "As of" 로 표기(값은 실제 기준일).
   const asOfLabel = asOfDate;
 
