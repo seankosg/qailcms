@@ -702,6 +702,7 @@ export function AbdAconexImportPage() {
                         <span className="ml-2 inline-flex align-middle">
                           <AbdDataDatePicker
                             value={e.dataDate ?? null}
+                            fileDate={parseDataDateFromFileName(e.file.name)}
                             onChange={(v) =>
                               setEntries((p) =>
                                 p.map((x) => (x.id === e.id ? { ...x, dataDate: v } : x)),
