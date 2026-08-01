@@ -79,6 +79,10 @@ export type WrtRowsAsOf = {
     pending_hdec: number;
     pending_hdec_r1: number;
     pending_hdec_r2: number;
+    /** pending_hdec 의 문서(아이템) distinct 수 — 위 3개는 라운드 기준 쌍 수 */
+    pending_hdec_items: number;
+    /** 위반 검사 모집단 — HDEC 제출 실적을 1건 이상 보유한 활성 문서 수 */
+    inspected_items: number;
     from_last_import: number;
     last_batch_id: string | null;
   };
