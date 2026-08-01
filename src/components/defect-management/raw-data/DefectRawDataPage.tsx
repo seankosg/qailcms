@@ -307,6 +307,7 @@ const DRILLDOWN_PARAMS = [
   "asOf", "stage", "remaining_stage", "remaining_asof", "capturedByGroup", "notClosureDone", "catADispute",
   "hdecVerification", "hdecReason", ...Object.keys(URL_MAP), "dateStart", "dateEnd", "dateField",
   "cellStage", "cellField", "cellFrom", "cellTo", "cellMode",
+  "noPlanStages",
 ];
 
 /** 셀 드릴다운 조건은 URL 에 상주해야 하므로 progress 진입 정리 시 보존한다. */
@@ -438,9 +439,22 @@ export function DefectRawDataPage() {
       },
     } as DefectServerFilter;
   }, [urlSearch.cellStage, urlSearch.cellField, urlSearch.cellFrom, urlSearch.cellTo, urlSearch.cellMode, urlSearch.asOf]);
+  // NO PLAN KPI 드릴다운 술어 (URL 파생) — totals 의 no_plan 정의(계획일 NULL AND 실적일 NULL)와 동일
+  const noPlanServerFilter = useMemo<DefectServerFilter | null>(() => {
+    const raw = String(urlSearch.noPlanStages || "").trim();
+    if (!raw) return null;
+    const stages = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    if (!stages.length) return null;
+    return { column: "__noplan__", op: "stage_no_plan", value: { stages: stages.join(",") } } as DefectServerFilter;
+  }, [urlSearch.noPlanStages]);
   const serverFilters = useMemo(
-    () => (cellServerFilter ? [...toServerFilters(columnFilters), cellServerFilter] : toServerFilters(columnFilters)),
-    [columnFilters, cellServerFilter],
+    () => {
+      const out = toServerFilters(columnFilters);
+      if (cellServerFilter) out.push(cellServerFilter);
+      if (noPlanServerFilter) out.push(noPlanServerFilter);
+      return out;
+    },
+    [columnFilters, cellServerFilter, noPlanServerFilter],
   );
   const serverSort = useMemo(() => toServerSort(sorting), [sorting]);
   const q = (urlSearch.q ?? "").trim();
@@ -823,6 +837,9 @@ export function DefectRawDataPage() {
       });
     }
     if (urlSearch.catADispute === "xor") chips.push({ label: "Cat A Dispute (LL ≠ HDEC)", clears: ["catADispute"] });
+    if (urlSearch.noPlanStages) {
+      chips.push({ label: `No Plan: ${String(urlSearch.noPlanStages).split(",").join(" / ")}`, clears: ["noPlanStages"] });
+    }
     if (urlSearch.hdecReason) chips.push({ label: `HDEC Reason: ${urlSearch.hdecReason === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecReason}`, clears: ["hdecReason"] });
     return chips;
   }, [urlSearch, helpers]);

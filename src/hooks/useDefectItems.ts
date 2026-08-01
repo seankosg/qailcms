@@ -13,7 +13,8 @@ export type DefectServerFilterOp =
   | "num_range"
   | "bool"
   | "stage_plan_range"
-  | "stage_actual_range";
+  | "stage_actual_range"
+  | "stage_no_plan";
 
 export interface DefectServerFilter {
   column: string;

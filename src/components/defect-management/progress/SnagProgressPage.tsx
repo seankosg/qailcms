@@ -343,7 +343,7 @@ export function SnagProgressPage() {
   };
 
   const handleKpiClick = (
-    kind: "plan" | "actual" | "done",
+    kind: "plan" | "actual" | "done" | "noplan",
     stage: Stage | "all",
   ) => {
     const params = new URLSearchParams();
@@ -354,12 +354,17 @@ export function SnagProgressPage() {
     if (teams.length) params.set("team", teams.join(","));
     if (roomGroups.length) params.set("roomGroup", roomGroups.join(","));
     if (stage !== "all") params.set("stage", stage);
+    params.set("asOf", asOfDate);
     if (kind === "plan") {
       params.set("dateField", stageDateField(stage, "planned"));
       params.set("dateEnd", asOfDate);
     } else if (kind === "actual") {
       params.set("dateField", stageDateField(stage, "actual"));
       params.set("dateEnd", asOfDate);
+    } else if (kind === "noplan") {
+      // NO PLAN: 해당 스테이지 계획일 NULL(실적일도 NULL) — totals 의 no_plan 정의와 동일.
+      // 총계는 표시 중인 스테이지 조합의 합집합(OR) = 문서 distinct 기준.
+      params.set("noPlanStages", stage === "all" ? effectiveStages.join(",") : stage);
     }
     // 'done' 카드 총계 클릭 시: 활성 전체 리스트 (dateField 미지정)
     window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
@@ -651,11 +656,13 @@ export function SnagProgressPage() {
         <KpiCard
           label="NO PLAN"
           value={kpis.noPlanTotal.toLocaleString()}
+          onClick={() => handleKpiClick("noplan", "all")}
           tone="danger"
           stageBreakdown={effectiveStages.map((s) => ({
             stage: s,
             label: s === "start" ? "No Start" : s === "rectified" ? "No Rect" : "No Closure",
             value: kpis.byStage[s].noPlan.toLocaleString(),
+            onClick: () => handleKpiClick("noplan", s),
           }))}
         />
       </div>

@@ -49,6 +49,8 @@ const rawDataSearchSchema = z.object({
   cellFrom: z.string().optional(),
   cellTo: z.string().optional(),
   cellMode: z.string().optional(),
+  // NO PLAN KPI 드릴다운 (스테이지 계획일 NULL)
+  noPlanStages: z.string().optional(),
   critical: z.string().optional(),
   priority: z.string().optional(),
   hdecVerification: z.string().optional(),
