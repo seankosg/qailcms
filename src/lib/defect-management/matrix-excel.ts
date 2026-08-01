@@ -221,15 +221,10 @@ export function exportSnagMatrixToXlsx(args: {
     ws["!merges"] = merges;
     ws["!cols"] = [{ wch: 16 }, { wch: 14 }, ...Array.from({ length: totalCols - 2 }, () => ({ wch: 7 }))];
     ws["!rows"] = [{ hpt: 22 }, { hpt: 18 }, { hpt: 6 }, { hpt: 20 }, { hpt: 16 }, { hpt: 16 }];
-    ws["!freeze"] = { xSplit: 2, ySplit: DATA };
-    (ws as any)["!panes"] = undefined;
-    ws["!autofilter"] = undefined as any;
-    delete (ws as any)["!autofilter"];
+    (ws as any)["!freeze"] = XLSX.utils.encode_cell({ r: DATA, c: 2 });
 
     const sheetName = block.title.replace(/[\\/?*[\]:]/g, "-").slice(0, 28) || block.kind;
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    const wsAny = wb.Sheets[sheetName] as any;
-    wsAny["!freeze"] = { xSplit: 2, ySplit: DATA };
   }
 
   const fileName = `CMS_SM_Dashboard_Matrix_PLOT-${matrix.plot}_${mode === "pct" ? "PCT" : "COUNT"}_${asOf}.xlsx`;
