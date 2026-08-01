@@ -28,7 +28,7 @@ const TASK_SCOPE_OPTIONS = [
   { value: "sub", label: "Sub Task" },
 ] as const;
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
-import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
+import { useTmRowsAsOf } from "@/hooks/useTmRowsAsOf";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { OwnerProgressChart } from "./OwnerProgressChart";
 import { JudgmentStageBreakdown } from "./JudgmentStageBreakdown";
@@ -36,7 +36,8 @@ import { JudgmentDonut } from "./JudgmentDonut";
 import { computeJudgmentStageBreakdown } from "@/lib/task-management/delay-utils";
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
-import { DEFAULT_THRESHOLDS, isTaskDelayed, computeJudgment } from "@/lib/task-management/derived";
+import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
+import { resolveJudgment, resolveIsDelayed } from "@/lib/task-management/delay-utils";
 import { todayInDoha } from "@/lib/time/doha";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/dashboard");
@@ -101,15 +102,15 @@ export function TmDashboardPage() {
   // 판정 기준일 라벨. 행별 관측 컷오프(data_date)와 구분한다.
   const asOfLabel = "As of";
 
-  // 과거 Data Date 선택 시 서버측 재판정 RPC(tm_judge_at_date) 결과를 병합.
-  // Actual% 는 절대 덮어쓰지 않는다 — Plan/gap/judgment 만 as-of 재계산.
-  const isPastDate = asOfDate.slice(0, 10) < latestDataDate.slice(0, 10);
-  const judge = useTmJudgmentAtDate(asOfDate, isPastDate);
+  // 정본 소스: 서버 tm_rows_as_of (실적 마스킹 + 정본 판정 + Main 가중 계획).
+  // 과거/오늘 구분 없이 항상 경유한다. 클라 재계산은 폴백용.
+  const asOfRows = useTmRowsAsOf(asOfDate, true);
   const effectiveItems = useMemo(() => {
-    if (!isPastDate || !judge.ready) return items;
+    if (!asOfRows.ready) return items;
     return items.map((it) => {
-      const j = judge.map.get(it.id);
+      const j = asOfRows.map.get(it.id);
       if (!j) return it;
+      const actual = j.cum_actual_pct == null ? null : Number(j.cum_actual_pct);
       return {
         ...it,
         auto_judgment: j.auto_judgment ?? null,
@@ -117,9 +118,15 @@ export function TmDashboardPage() {
         cum_plan_pct: j.cum_plan_pct ?? null,
         delay_days: j.delay_days ?? null,
         alarm_reason: j.alarm_reason ?? null,
+        actual_progress: actual ?? it.actual_progress,
+        actual_start: j.actual_start ?? null,
+        actual_finish: j.actual_finish ?? null,
+        srv_judgment: j.auto_judgment ?? null,
+        srv_plan_pct: j.cum_plan_pct == null ? null : Number(j.cum_plan_pct),
+        srv_actual_pct: actual,
       } as typeof it;
     });
-  }, [items, isPastDate, judge.ready, judge.map]);
+  }, [items, asOfRows.ready, asOfRows.map]);
 
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
 
@@ -143,15 +150,15 @@ export function TmDashboardPage() {
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
-  // 지연 필터 3종 분할 — 정본 computeJudgment/isTaskDelayed 사용 (auto_judgment 저장값 아님)
+  // 지연 필터 3종 분할 — 서버 as-of 정본 판정 사용 (없으면 클라 폴백)
   const scopedItems = useMemo(() => {
     const base = scopedByTaskScope;
     if (search.delayFilter === "risk")
-      return base.filter((it) => computeJudgment(it, thresholds, asOfDate) === "악화");
+      return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "악화");
     if (search.delayFilter === "delayed")
-      return base.filter((it) => computeJudgment(it, thresholds, asOfDate) === "지연");
-    // 전체 = 지연 + 악화 (isTaskDelayed)
-    return base.filter((it) => isTaskDelayed(it, thresholds, asOfDate));
+      return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "지연");
+    // 전체 = 지연 + 악화
+    return base.filter((it) => resolveIsDelayed(it, thresholds, asOfDate));
   }, [scopedByTaskScope, search.delayFilter, thresholds, asOfDate]);
 
   const patch = (obj: Record<string, unknown>) =>
