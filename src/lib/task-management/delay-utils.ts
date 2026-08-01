@@ -311,6 +311,7 @@ const JUDGMENT_KEYS = ["완료", "정상", "주의", "지연", "악화"] as cons
 export function computeJudgmentStageBreakdown(
   items: TaskItem[],
   asOfDate: string,
+  thresholds?: TaskThresholds,
 ): JudgmentStageBreakdown {
   const judgmentCounts: Record<string, number> = {
     완료: 0,
@@ -320,7 +321,8 @@ export function computeJudgmentStageBreakdown(
     악화: 0,
   };
   for (const it of items) {
-    const j = String(it.auto_judgment ?? "").trim();
+    // 정본 판정(srv_judgment) → 없으면 클라 판정. 저장된 auto_judgment 스냅샷 사용 금지.
+    const j = String(resolveJudgment(it, thresholds, asOfDate) ?? "").trim();
     if (j in judgmentCounts) judgmentCounts[j]++;
   }
   const stageJudgment = ALL_TASK_STAGE_KEYS.map((stage) => {
