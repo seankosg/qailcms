@@ -56,7 +56,10 @@ export function SplRawDataPage() {
 
   type SplSearch = typeof search;
   const setSearch = (patch: Partial<SplSearch>) =>
-    navigate({ search: (prev: SplSearch) => ({ ...prev, ...patch }) });
+    (navigate as (opts: unknown) => void)({
+      to: "/closure/spare-part/raw-data",
+      search: (prev: SplSearch) => ({ ...prev, ...patch }),
+    });
 
   const catalog: SplCatalogEntry[] = data?.catalog ?? [];
   const bands = useMemo(() => {
