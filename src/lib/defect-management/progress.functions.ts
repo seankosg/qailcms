@@ -31,6 +31,8 @@ export const getSnagProgressCells = createServerFn({ method: "POST" })
       _range_end: data.rangeEnd,
       _as_of_date: data.asOfDate,
       _plan_mode: data.planMode,
+      // 문서 단위 집계행(`all|...`)은 신버전 매트릭스에서만 사용한다(구 배포본 하위호환).
+      _include_agg: true,
     });
     if (error) throw new Error(error.message);
     if (!Array.isArray(payload)) throw new Error("defect_snag_progress_cells_json RPC contract mismatch");
