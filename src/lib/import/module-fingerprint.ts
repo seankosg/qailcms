@@ -5,20 +5,18 @@ import * as XLSX from "xlsx";
  * 파일 선택 직후(파싱 이전)에 호출되어 잘못된 모듈 파일을 사전에 차단한다.
  */
 
-export type ModuleId = "abd" | "sm" | "tm" | "spare_part";
+export type ModuleId = "abd" | "sm" | "tm";
 
 export const MODULE_LABELS: Record<ModuleId, string> = {
   abd: "As Built Drawing",
   sm: "Snag Management",
   tm: "Task Management",
-  spare_part: "Spare Part",
 };
 
 export const MODULE_IMPORT_ROUTES: Record<ModuleId, string> = {
   abd: "/closure/abd/import",
   sm: "/closure/snag-management/import",
   tm: "/closure/task-management/import",
-  spare_part: "/closure/spare-part/import",
 };
 
 interface ModuleFingerprint {
@@ -172,32 +170,6 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
     ],
     filenameHints: [/task/i, /\btm\b/i, /schedule/i],
   },
-  spare_part: {
-    anchors: [
-      "Part No",
-      "Part Number",
-      "System",
-      "Q'ty",
-      "Qty",
-      "Quantity",
-    ],
-    signature: [
-      "Part No",
-      "Part Number",
-      "System",
-      "Sub Contractor",
-      "Subcontractor",
-      "Q'ty",
-      "Qty",
-      "Quantity",
-      "Manufacturer",
-      "Model",
-      "Description",
-      "Doc Ref",
-      "Status",
-    ],
-    filenameHints: [/spare/i, /part/i],
-  },
 };
 
 export interface DetectionResult {
@@ -221,13 +193,11 @@ export function detectModule(
     abd: 0,
     sm: 0,
     tm: 0,
-    spare_part: 0,
   };
   const anchorsHit: Record<ModuleId, number> = {
     abd: 0,
     sm: 0,
     tm: 0,
-    spare_part: 0,
   };
 
   (Object.keys(MODULE_FINGERPRINTS) as ModuleId[]).forEach((mod) => {
@@ -455,8 +425,8 @@ export async function evaluateFilesForModule(
           detected: target,
           detection: {
             top: target,
-            scores: { abd: 0, sm: 0, tm: 0, spare_part: 0 },
-            anchorsHit: { abd: 0, sm: 0, tm: 0, spare_part: 0 },
+            scores: { abd: 0, sm: 0, tm: 0 },
+            anchorsHit: { abd: 0, sm: 0, tm: 0 },
             confidenceGap: 0,
             totalHeaders: 0,
           },
@@ -479,8 +449,8 @@ export async function evaluateFilesForModule(
           detected: target,
           detection: {
             top: target,
-            scores: { abd: 0, sm: 0, tm: 0, spare_part: 0 },
-            anchorsHit: { abd: 0, sm: 0, tm: 0, spare_part: 0 },
+            scores: { abd: 0, sm: 0, tm: 0 },
+            anchorsHit: { abd: 0, sm: 0, tm: 0 },
             confidenceGap: 0,
             totalHeaders: 0,
           },

@@ -12,7 +12,7 @@ export type FieldLogOutcome =
   | "rejected_conflict"
   | "info";
 
-export type FieldLogKind = "task_management" | "defect" | "abd" | "spare_part";
+export type FieldLogKind = "task_management" | "defect" | "abd" | "spl";
 
 export interface PendingFieldLog {
   upload_id?: string;

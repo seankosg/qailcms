@@ -75,7 +75,7 @@ import { BulkEditBar } from "./BulkEditBar";
 import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { ExportDialog } from "./ExportDialog";
 import { HistoryDrawer } from "./HistoryDrawer";
-import { TopHorizontalScrollbar } from "@/components/spare-part/raw-data/TopHorizontalScrollbar";
+import { TopHorizontalScrollbar } from "@/components/common/TopHorizontalScrollbar";
 import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
 import { AddMainTaskDialog } from "./AddMainTaskDialog";
 import { AlarmBadge } from "./AlarmBadge";

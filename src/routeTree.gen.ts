@@ -39,16 +39,12 @@ import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './ro
 import { Route as AuthenticatedClosureTaskManagementScheduleRevisionRouteImport } from './routes/_authenticated/closure/task-management/schedule-revision'
 import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from './routes/_authenticated/closure/task-management/raw-data'
 import { Route as AuthenticatedClosureTaskManagementDashboardRouteImport } from './routes/_authenticated/closure/task-management/dashboard'
-import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './routes/_authenticated/closure/spare-part/raw-data'
-import { Route as AuthenticatedClosureSparePartImportRouteImport } from './routes/_authenticated/closure/spare-part/import'
-import { Route as AuthenticatedClosureSparePartAconexSyncRouteImport } from './routes/_authenticated/closure/spare-part/aconex-sync'
 import { Route as AuthenticatedClosureSnagManagementSettingsRouteImport } from './routes/_authenticated/closure/snag-management/settings'
 import { Route as AuthenticatedClosureSnagManagementRawDataRouteImport } from './routes/_authenticated/closure/snag-management/raw-data'
 import { Route as AuthenticatedClosureSnagManagementProgressRouteImport } from './routes/_authenticated/closure/snag-management/progress'
 import { Route as AuthenticatedClosureSnagManagementDashboardRouteImport } from './routes/_authenticated/closure/snag-management/dashboard'
 import { Route as AuthenticatedClosureDashboardWarrantyRouteImport } from './routes/_authenticated/closure/dashboard/warranty'
 import { Route as AuthenticatedClosureDashboardTaskRouteImport } from './routes/_authenticated/closure/dashboard/task'
-import { Route as AuthenticatedClosureDashboardSparePartRouteImport } from './routes/_authenticated/closure/dashboard/spare-part'
 import { Route as AuthenticatedClosureDashboardAsBuiltRouteImport } from './routes/_authenticated/closure/dashboard/as-built'
 import { Route as AuthenticatedClosureAbdRawDataRouteImport } from './routes/_authenticated/closure/abd/raw-data'
 import { Route as AuthenticatedClosureAbdProgressRouteImport } from './routes/_authenticated/closure/abd/progress'
@@ -57,8 +53,6 @@ import { Route as AuthenticatedClosureAbdDashboardRouteImport } from './routes/_
 import { Route as AuthenticatedClosureSnagManagementImportIndexRouteImport } from './routes/_authenticated/closure/snag-management/import.index'
 import { Route as AuthenticatedClosureTaskManagementImportLogsRouteImport } from './routes/_authenticated/closure/task-management/import.logs'
 import { Route as AuthenticatedClosureTaskManagementDetailIdRouteImport } from './routes/_authenticated/closure/task-management/detail.$id'
-import { Route as AuthenticatedClosureSparePartRecordsDocRefRouteImport } from './routes/_authenticated/closure/spare-part/records.$docRef'
-import { Route as AuthenticatedClosureSparePartImportLogsRouteImport } from './routes/_authenticated/closure/spare-part/import.logs'
 import { Route as AuthenticatedClosureSnagManagementImportLogsRouteImport } from './routes/_authenticated/closure/snag-management/import.logs'
 import { Route as AuthenticatedClosureSnagManagementDetailIdRouteImport } from './routes/_authenticated/closure/snag-management/detail.$id'
 import { Route as AuthenticatedClosureAbdImportLogsRouteImport } from './routes/_authenticated/closure/abd/import.logs'
@@ -235,24 +229,6 @@ const AuthenticatedClosureTaskManagementDashboardRoute =
     path: '/closure/task-management/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedClosureSparePartRawDataRoute =
-  AuthenticatedClosureSparePartRawDataRouteImport.update({
-    id: '/closure/spare-part/raw-data',
-    path: '/closure/spare-part/raw-data',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedClosureSparePartImportRoute =
-  AuthenticatedClosureSparePartImportRouteImport.update({
-    id: '/closure/spare-part/import',
-    path: '/closure/spare-part/import',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedClosureSparePartAconexSyncRoute =
-  AuthenticatedClosureSparePartAconexSyncRouteImport.update({
-    id: '/closure/spare-part/aconex-sync',
-    path: '/closure/spare-part/aconex-sync',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedClosureSnagManagementSettingsRoute =
   AuthenticatedClosureSnagManagementSettingsRouteImport.update({
     id: '/closure/snag-management/settings',
@@ -287,12 +263,6 @@ const AuthenticatedClosureDashboardTaskRoute =
   AuthenticatedClosureDashboardTaskRouteImport.update({
     id: '/closure/dashboard/task',
     path: '/closure/dashboard/task',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedClosureDashboardSparePartRoute =
-  AuthenticatedClosureDashboardSparePartRouteImport.update({
-    id: '/closure/dashboard/spare-part',
-    path: '/closure/dashboard/spare-part',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedClosureDashboardAsBuiltRoute =
@@ -342,18 +312,6 @@ const AuthenticatedClosureTaskManagementDetailIdRoute =
     id: '/closure/task-management/detail/$id',
     path: '/closure/task-management/detail/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedClosureSparePartRecordsDocRefRoute =
-  AuthenticatedClosureSparePartRecordsDocRefRouteImport.update({
-    id: '/closure/spare-part/records/$docRef',
-    path: '/closure/spare-part/records/$docRef',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedClosureSparePartImportLogsRoute =
-  AuthenticatedClosureSparePartImportLogsRouteImport.update({
-    id: '/logs',
-    path: '/logs',
-    getParentRoute: () => AuthenticatedClosureSparePartImportRoute,
   } as any)
 const AuthenticatedClosureSnagManagementImportLogsRoute =
   AuthenticatedClosureSnagManagementImportLogsRouteImport.update({
@@ -405,16 +363,12 @@ export interface FileRoutesByFullPath {
   '/closure/abd/progress': typeof AuthenticatedClosureAbdProgressRoute
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
   '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
-  '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/closure/snag-management/dashboard': typeof AuthenticatedClosureSnagManagementDashboardRoute
   '/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
-  '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
-  '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
-  '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
@@ -429,8 +383,6 @@ export interface FileRoutesByFullPath {
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
   '/closure/snag-management/import/logs': typeof AuthenticatedClosureSnagManagementImportLogsRoute
-  '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
-  '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   '/closure/task-management/detail/$id': typeof AuthenticatedClosureTaskManagementDetailIdRoute
   '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
   '/closure/snag-management/import/': typeof AuthenticatedClosureSnagManagementImportIndexRoute
@@ -459,16 +411,12 @@ export interface FileRoutesByTo {
   '/closure/abd/progress': typeof AuthenticatedClosureAbdProgressRoute
   '/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
   '/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
-  '/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/closure/snag-management/dashboard': typeof AuthenticatedClosureSnagManagementDashboardRoute
   '/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
-  '/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
-  '/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
-  '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
@@ -483,8 +431,6 @@ export interface FileRoutesByTo {
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
   '/closure/snag-management/import/logs': typeof AuthenticatedClosureSnagManagementImportLogsRoute
-  '/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
-  '/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   '/closure/task-management/detail/$id': typeof AuthenticatedClosureTaskManagementDetailIdRoute
   '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
   '/closure/snag-management/import': typeof AuthenticatedClosureSnagManagementImportIndexRoute
@@ -516,16 +462,12 @@ export interface FileRoutesById {
   '/_authenticated/closure/abd/progress': typeof AuthenticatedClosureAbdProgressRoute
   '/_authenticated/closure/abd/raw-data': typeof AuthenticatedClosureAbdRawDataRoute
   '/_authenticated/closure/dashboard/as-built': typeof AuthenticatedClosureDashboardAsBuiltRoute
-  '/_authenticated/closure/dashboard/spare-part': typeof AuthenticatedClosureDashboardSparePartRoute
   '/_authenticated/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/_authenticated/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/_authenticated/closure/snag-management/dashboard': typeof AuthenticatedClosureSnagManagementDashboardRoute
   '/_authenticated/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/_authenticated/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/_authenticated/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
-  '/_authenticated/closure/spare-part/aconex-sync': typeof AuthenticatedClosureSparePartAconexSyncRoute
-  '/_authenticated/closure/spare-part/import': typeof AuthenticatedClosureSparePartImportRouteWithChildren
-  '/_authenticated/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/_authenticated/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
@@ -540,8 +482,6 @@ export interface FileRoutesById {
   '/_authenticated/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/_authenticated/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
   '/_authenticated/closure/snag-management/import/logs': typeof AuthenticatedClosureSnagManagementImportLogsRoute
-  '/_authenticated/closure/spare-part/import/logs': typeof AuthenticatedClosureSparePartImportLogsRoute
-  '/_authenticated/closure/spare-part/records/$docRef': typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   '/_authenticated/closure/task-management/detail/$id': typeof AuthenticatedClosureTaskManagementDetailIdRoute
   '/_authenticated/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
   '/_authenticated/closure/snag-management/import/': typeof AuthenticatedClosureSnagManagementImportIndexRoute
@@ -573,16 +513,12 @@ export interface FileRouteTypes {
     | '/closure/abd/progress'
     | '/closure/abd/raw-data'
     | '/closure/dashboard/as-built'
-    | '/closure/dashboard/spare-part'
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
     | '/closure/snag-management/dashboard'
     | '/closure/snag-management/progress'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
-    | '/closure/spare-part/aconex-sync'
-    | '/closure/spare-part/import'
-    | '/closure/spare-part/raw-data'
     | '/closure/task-management/dashboard'
     | '/closure/task-management/raw-data'
     | '/closure/task-management/schedule-revision'
@@ -597,8 +533,6 @@ export interface FileRouteTypes {
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
     | '/closure/snag-management/import/logs'
-    | '/closure/spare-part/import/logs'
-    | '/closure/spare-part/records/$docRef'
     | '/closure/task-management/detail/$id'
     | '/closure/task-management/import/logs'
     | '/closure/snag-management/import/'
@@ -627,16 +561,12 @@ export interface FileRouteTypes {
     | '/closure/abd/progress'
     | '/closure/abd/raw-data'
     | '/closure/dashboard/as-built'
-    | '/closure/dashboard/spare-part'
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
     | '/closure/snag-management/dashboard'
     | '/closure/snag-management/progress'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
-    | '/closure/spare-part/aconex-sync'
-    | '/closure/spare-part/import'
-    | '/closure/spare-part/raw-data'
     | '/closure/task-management/dashboard'
     | '/closure/task-management/raw-data'
     | '/closure/task-management/schedule-revision'
@@ -651,8 +581,6 @@ export interface FileRouteTypes {
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
     | '/closure/snag-management/import/logs'
-    | '/closure/spare-part/import/logs'
-    | '/closure/spare-part/records/$docRef'
     | '/closure/task-management/detail/$id'
     | '/closure/task-management/import/logs'
     | '/closure/snag-management/import'
@@ -683,16 +611,12 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/abd/progress'
     | '/_authenticated/closure/abd/raw-data'
     | '/_authenticated/closure/dashboard/as-built'
-    | '/_authenticated/closure/dashboard/spare-part'
     | '/_authenticated/closure/dashboard/task'
     | '/_authenticated/closure/dashboard/warranty'
     | '/_authenticated/closure/snag-management/dashboard'
     | '/_authenticated/closure/snag-management/progress'
     | '/_authenticated/closure/snag-management/raw-data'
     | '/_authenticated/closure/snag-management/settings'
-    | '/_authenticated/closure/spare-part/aconex-sync'
-    | '/_authenticated/closure/spare-part/import'
-    | '/_authenticated/closure/spare-part/raw-data'
     | '/_authenticated/closure/task-management/dashboard'
     | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/task-management/schedule-revision'
@@ -707,8 +631,6 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/abd/import/logs'
     | '/_authenticated/closure/snag-management/detail/$id'
     | '/_authenticated/closure/snag-management/import/logs'
-    | '/_authenticated/closure/spare-part/import/logs'
-    | '/_authenticated/closure/spare-part/records/$docRef'
     | '/_authenticated/closure/task-management/detail/$id'
     | '/_authenticated/closure/task-management/import/logs'
     | '/_authenticated/closure/snag-management/import/'
@@ -937,27 +859,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureTaskManagementDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/closure/spare-part/raw-data': {
-      id: '/_authenticated/closure/spare-part/raw-data'
-      path: '/closure/spare-part/raw-data'
-      fullPath: '/closure/spare-part/raw-data'
-      preLoaderRoute: typeof AuthenticatedClosureSparePartRawDataRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/closure/spare-part/import': {
-      id: '/_authenticated/closure/spare-part/import'
-      path: '/closure/spare-part/import'
-      fullPath: '/closure/spare-part/import'
-      preLoaderRoute: typeof AuthenticatedClosureSparePartImportRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/closure/spare-part/aconex-sync': {
-      id: '/_authenticated/closure/spare-part/aconex-sync'
-      path: '/closure/spare-part/aconex-sync'
-      fullPath: '/closure/spare-part/aconex-sync'
-      preLoaderRoute: typeof AuthenticatedClosureSparePartAconexSyncRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/closure/snag-management/settings': {
       id: '/_authenticated/closure/snag-management/settings'
       path: '/closure/snag-management/settings'
@@ -998,13 +899,6 @@ declare module '@tanstack/react-router' {
       path: '/closure/dashboard/task'
       fullPath: '/closure/dashboard/task'
       preLoaderRoute: typeof AuthenticatedClosureDashboardTaskRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/closure/dashboard/spare-part': {
-      id: '/_authenticated/closure/dashboard/spare-part'
-      path: '/closure/dashboard/spare-part'
-      fullPath: '/closure/dashboard/spare-part'
-      preLoaderRoute: typeof AuthenticatedClosureDashboardSparePartRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/closure/dashboard/as-built': {
@@ -1062,20 +956,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/closure/task-management/detail/$id'
       preLoaderRoute: typeof AuthenticatedClosureTaskManagementDetailIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/closure/spare-part/records/$docRef': {
-      id: '/_authenticated/closure/spare-part/records/$docRef'
-      path: '/closure/spare-part/records/$docRef'
-      fullPath: '/closure/spare-part/records/$docRef'
-      preLoaderRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/closure/spare-part/import/logs': {
-      id: '/_authenticated/closure/spare-part/import/logs'
-      path: '/logs'
-      fullPath: '/closure/spare-part/import/logs'
-      preLoaderRoute: typeof AuthenticatedClosureSparePartImportLogsRouteImport
-      parentRoute: typeof AuthenticatedClosureSparePartImportRoute
     }
     '/_authenticated/closure/snag-management/import/logs': {
       id: '/_authenticated/closure/snag-management/import/logs'
@@ -1150,21 +1030,6 @@ const AuthenticatedClosureAbdImportRouteWithChildren =
     AuthenticatedClosureAbdImportRouteChildren,
   )
 
-interface AuthenticatedClosureSparePartImportRouteChildren {
-  AuthenticatedClosureSparePartImportLogsRoute: typeof AuthenticatedClosureSparePartImportLogsRoute
-}
-
-const AuthenticatedClosureSparePartImportRouteChildren: AuthenticatedClosureSparePartImportRouteChildren =
-  {
-    AuthenticatedClosureSparePartImportLogsRoute:
-      AuthenticatedClosureSparePartImportLogsRoute,
-  }
-
-const AuthenticatedClosureSparePartImportRouteWithChildren =
-  AuthenticatedClosureSparePartImportRoute._addFileChildren(
-    AuthenticatedClosureSparePartImportRouteChildren,
-  )
-
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
   AuthenticatedMyTeamWorkSpaceRoute: typeof AuthenticatedMyTeamWorkSpaceRoute
@@ -1179,16 +1044,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureAbdProgressRoute: typeof AuthenticatedClosureAbdProgressRoute
   AuthenticatedClosureAbdRawDataRoute: typeof AuthenticatedClosureAbdRawDataRoute
   AuthenticatedClosureDashboardAsBuiltRoute: typeof AuthenticatedClosureDashboardAsBuiltRoute
-  AuthenticatedClosureDashboardSparePartRoute: typeof AuthenticatedClosureDashboardSparePartRoute
   AuthenticatedClosureDashboardTaskRoute: typeof AuthenticatedClosureDashboardTaskRoute
   AuthenticatedClosureDashboardWarrantyRoute: typeof AuthenticatedClosureDashboardWarrantyRoute
   AuthenticatedClosureSnagManagementDashboardRoute: typeof AuthenticatedClosureSnagManagementDashboardRoute
   AuthenticatedClosureSnagManagementProgressRoute: typeof AuthenticatedClosureSnagManagementProgressRoute
   AuthenticatedClosureSnagManagementRawDataRoute: typeof AuthenticatedClosureSnagManagementRawDataRoute
   AuthenticatedClosureSnagManagementSettingsRoute: typeof AuthenticatedClosureSnagManagementSettingsRoute
-  AuthenticatedClosureSparePartAconexSyncRoute: typeof AuthenticatedClosureSparePartAconexSyncRoute
-  AuthenticatedClosureSparePartImportRoute: typeof AuthenticatedClosureSparePartImportRouteWithChildren
-  AuthenticatedClosureSparePartRawDataRoute: typeof AuthenticatedClosureSparePartRawDataRoute
   AuthenticatedClosureTaskManagementDashboardRoute: typeof AuthenticatedClosureTaskManagementDashboardRoute
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
   AuthenticatedClosureTaskManagementScheduleRevisionRoute: typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
@@ -1199,7 +1060,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureAbdDetailIdRoute: typeof AuthenticatedClosureAbdDetailIdRoute
   AuthenticatedClosureSnagManagementDetailIdRoute: typeof AuthenticatedClosureSnagManagementDetailIdRoute
   AuthenticatedClosureSnagManagementImportLogsRoute: typeof AuthenticatedClosureSnagManagementImportLogsRoute
-  AuthenticatedClosureSparePartRecordsDocRefRoute: typeof AuthenticatedClosureSparePartRecordsDocRefRoute
   AuthenticatedClosureTaskManagementDetailIdRoute: typeof AuthenticatedClosureTaskManagementDetailIdRoute
   AuthenticatedClosureTaskManagementImportLogsRoute: typeof AuthenticatedClosureTaskManagementImportLogsRoute
   AuthenticatedClosureSnagManagementImportIndexRoute: typeof AuthenticatedClosureSnagManagementImportIndexRoute
@@ -1222,8 +1082,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedClosureAbdRawDataRoute: AuthenticatedClosureAbdRawDataRoute,
   AuthenticatedClosureDashboardAsBuiltRoute:
     AuthenticatedClosureDashboardAsBuiltRoute,
-  AuthenticatedClosureDashboardSparePartRoute:
-    AuthenticatedClosureDashboardSparePartRoute,
   AuthenticatedClosureDashboardTaskRoute:
     AuthenticatedClosureDashboardTaskRoute,
   AuthenticatedClosureDashboardWarrantyRoute:
@@ -1236,12 +1094,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureSnagManagementRawDataRoute,
   AuthenticatedClosureSnagManagementSettingsRoute:
     AuthenticatedClosureSnagManagementSettingsRoute,
-  AuthenticatedClosureSparePartAconexSyncRoute:
-    AuthenticatedClosureSparePartAconexSyncRoute,
-  AuthenticatedClosureSparePartImportRoute:
-    AuthenticatedClosureSparePartImportRouteWithChildren,
-  AuthenticatedClosureSparePartRawDataRoute:
-    AuthenticatedClosureSparePartRawDataRoute,
   AuthenticatedClosureTaskManagementDashboardRoute:
     AuthenticatedClosureTaskManagementDashboardRoute,
   AuthenticatedClosureTaskManagementRawDataRoute:
@@ -1260,8 +1112,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureSnagManagementDetailIdRoute,
   AuthenticatedClosureSnagManagementImportLogsRoute:
     AuthenticatedClosureSnagManagementImportLogsRoute,
-  AuthenticatedClosureSparePartRecordsDocRefRoute:
-    AuthenticatedClosureSparePartRecordsDocRefRoute,
   AuthenticatedClosureTaskManagementDetailIdRoute:
     AuthenticatedClosureTaskManagementDetailIdRoute,
   AuthenticatedClosureTaskManagementImportLogsRoute:

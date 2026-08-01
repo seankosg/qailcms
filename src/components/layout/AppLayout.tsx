@@ -108,16 +108,6 @@ const NAV: NavSection[] = [
         ],
       },
       {
-        label: "Spare Part",
-        icon: iconBox,
-        matchPrefix: "/closure/spare-part",
-        adminOnly: true,
-        items: [
-          { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: iconDatabase },
-          { to: "/closure/spare-part/aconex-sync", label: "Aconex Sync", icon: iconRefresh, editorOnly: true },
-        ],
-      },
-      {
         label: "Warranty & License",
         icon: iconCertificate,
         matchPrefix: "/closure/warranty",

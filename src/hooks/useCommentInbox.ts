@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { assertNoTruncation } from "@/lib/data/assertNoSilentTruncation";
 
-export type InboxModule = "tm" | "sm" | "abd" | "sp";
+export type InboxModule = "tm" | "sm" | "abd";
 
 export interface InboxComment {
   id: string;
@@ -69,7 +69,7 @@ async function fetchOwnedParentIds(scope: InboxScope) {
   }
 
   // R4: 4개 모듈 부모 ID 조회 병렬화 (Promise.all).
-  const [tmParents, smParents, abdParents, spParents] = await Promise.all([
+  const [tmParents, smParents, abdParents] = await Promise.all([
     isAdmin ? Promise.resolve(null) : idsFrom("task_management_raw", "id", "task_no,task_name", (q) =>
       mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
     ),
@@ -78,9 +78,6 @@ async function fetchOwnedParentIds(scope: InboxScope) {
     ),
     isAdmin ? Promise.resolve(null) : idsFrom("abd_items_raw", "id", "abd_number,document_title", (q) =>
       mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
-    ),
-    isAdmin ? Promise.resolve(null) : idsFrom("spare_parts_raw", "doc_ref", "subject,plot", (q) =>
-      mode === "team" ? q.eq("team", filterValue) : q.eq("owner_user_id", userId ?? "__none__"),
     ),
   ]);
 
@@ -100,7 +97,6 @@ async function fetchOwnedParentIds(scope: InboxScope) {
     tm: map(tmParents, "id", "task_no", "task_name"),
     sm: map(smParents, "id", "source_issue_no", "location_raw"),
     abd: map(abdParents, "id", "abd_number", "document_title"),
-    sp: map(spParents, "doc_ref", "subject", "plot"),
   };
 }
 
@@ -116,13 +112,11 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
     parentMap: Map<string, { ref: string | null; label: string | null }> | null,
   ): Promise<InboxComment[]> {
     if (parentMap && parentMap.size === 0) return [];
-    // spare_part_comments 는 author_id, edited 컬럼 없음. 그 외는 author_user_id/edited 존재.
-    const isSp = table === "spare_part_comments";
-    const authorCol = isSp ? "author_id" : "author_user_id";
+    const authorCol = "author_user_id";
     const colList = ["id", parentCol, messageCol];
     if (categoryCol) colList.push(categoryCol);
     colList.push(authorCol);
-    if (!isSp) colList.push("edited");
+    colList.push("edited");
     colList.push("created_at", "updated_at");
     const cols = colList.join(",");
     if (parentMap) {
@@ -193,14 +187,13 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
     });
   }
 
-  const [tm, sm, abd, sp] = await Promise.all([
+  const [tm, sm, abd] = await Promise.all([
     loadTable("task_comments", "task_raw_id", "message", "category", "tm", parents.tm),
     loadTable("defect_comments", "defect_raw_id", "message", "category", "sm", parents.sm),
     loadTable("abd_comments", "abd_item_id", "message", "category", "abd", parents.abd),
-    loadTable("spare_part_comments", "doc_ref", "body", null, "sp", parents.sp),
   ]);
 
-  const all = [...tm, ...sm, ...abd, ...sp].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
+  const all = [...tm, ...sm, ...abd].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
 
   // Admin: 부모 메타(parent_ref/label)가 비어있는 항목들을 뒤에서 채워줌
   async function enrichParents(
@@ -240,7 +233,6 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
     enrichParents("tm", "task_management_raw", "id", "task_no", "task_name"),
     enrichParents("sm", "defect_items_raw", "id", "source_issue_no", "location_raw"),
     enrichParents("abd", "abd_items_raw", "id", "abd_number", "document_title"),
-    enrichParents("sp", "spare_parts_raw", "doc_ref", "subject", "plot"),
   ]);
 
   // 작성자 이름 해석
@@ -292,7 +284,6 @@ export function useCommentInbox(scope: InboxScope, limitPerTable = 100) {
       .on("postgres_changes", { event: "*", schema: "public", table: "task_comments" }, invalidate)
       .on("postgres_changes", { event: "*", schema: "public", table: "defect_comments" }, invalidate)
       .on("postgres_changes", { event: "*", schema: "public", table: "abd_comments" }, invalidate)
-      .on("postgres_changes", { event: "*", schema: "public", table: "spare_part_comments" }, invalidate)
       .subscribe();
     return () => {
       if (t) clearTimeout(t);

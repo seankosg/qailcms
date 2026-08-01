@@ -22,7 +22,6 @@ const MODULE_META: Record<InboxModule, { label: string; tone: string }> = {
   tm: { label: "TM", tone: "border-info text-info" },
   sm: { label: "SM", tone: "border-warning text-warning" },
   abd: { label: "ABD", tone: "border-success text-success" },
-  sp: { label: "SP", tone: "border-primary text-primary" },
 };
 
 function detailHref(c: InboxComment): { to: string; params?: any; search?: any } {
@@ -33,8 +32,6 @@ function detailHref(c: InboxComment): { to: string; params?: any; search?: any }
       return { to: "/closure/snag-management/detail/$id", params: { id: c.parent_id } };
     case "abd":
       return { to: "/closure/abd/detail/$id", params: { id: c.parent_id }, search: { focus: "comments" } };
-    case "sp":
-      return { to: "/closure/spare-part/records/$docRef", params: { docRef: c.parent_id } };
   }
 }
 
@@ -47,9 +44,9 @@ export function CommentsInbox({ userId, scope, filterValue, isAdmin }: Props) {
   const { isRead, markRead, markManyRead } = useCommentInboxRead(userId);
 
   const perModule = useMemo(() => {
-    const c = { tm: 0, sm: 0, abd: 0, sp: 0 } as Record<InboxModule, number>;
+    const c = { tm: 0, sm: 0, abd: 0 } as Record<InboxModule, number>;
     let unreadTotal = 0;
-    const unreadPerMod = { tm: 0, sm: 0, abd: 0, sp: 0 } as Record<InboxModule, number>;
+    const unreadPerMod = { tm: 0, sm: 0, abd: 0 } as Record<InboxModule, number>;
     let vpTotal = 0;
     let vpUnread = 0;
     for (const r of rows) {
@@ -126,7 +123,7 @@ export function CommentsInbox({ userId, scope, filterValue, isAdmin }: Props) {
         <>
           {/* Tabs */}
           <div className="flex flex-wrap gap-1 px-3 pt-2">
-            {(["all", "vp_pd", "tm", "sm", "abd", "sp"] as TabKey[]).map((k) => {
+            {(["all", "vp_pd", "tm", "sm", "abd"] as TabKey[]).map((k) => {
               const total =
                 k === "all"
                   ? perModule.total
