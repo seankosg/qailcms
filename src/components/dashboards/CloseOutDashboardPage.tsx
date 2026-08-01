@@ -1,4 +1,4 @@
-import { FileSpreadsheet, Package, ShieldCheck } from "lucide-react";
+import { FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { SectionDashboardCard } from "./SectionDashboardCard";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
@@ -22,21 +22,12 @@ export function CloseOutDashboardPage() {
           cta="ABD 열기"
         />
         {isAdmin && (
-          <>
-            <SectionDashboardCard
-              title="Spare Part"
-              description="예비품 목록 및 Aconex 동기화."
-              icon={Package}
-              to="/closure/spare-part/raw-data"
-              cta="Spare Part 열기"
-            />
-            <SectionDashboardCard
-              title="Warranty & License"
-              description="보증 및 라이선스 관리. 준비 중입니다."
-              icon={ShieldCheck}
-              status="coming-soon"
-            />
-          </>
+          <SectionDashboardCard
+            title="Warranty & License"
+            description="보증 및 라이선스 관리. 준비 중입니다."
+            icon={ShieldCheck}
+            status="coming-soon"
+          />
         )}
       </div>
     </div>
