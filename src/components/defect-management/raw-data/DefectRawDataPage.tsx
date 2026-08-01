@@ -574,7 +574,10 @@ export function DefectRawDataPage() {
     if (urlSearch.source !== "progress") return;
     progressCleanupDone.current = true;
     const patch: Record<string, any> = { filters: serializeFilters(columnFilters), page: 1 };
-    for (const key of DRILLDOWN_PARAMS) patch[key] = "";
+    for (const key of DRILLDOWN_PARAMS) {
+      if (CELL_PARAMS.includes(key)) continue; // 셀 조건은 URL 에 유지
+      patch[key] = "";
+    }
     setUrl(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSearch.source]);
