@@ -21,22 +21,29 @@ const SEG_COLOR: Record<string, string> = {
 };
 
 export function JudgmentDonut({ counts, population }: Props) {
-  const total = ORDER.reduce((s, k) => s + (counts[k] ?? 0), 0);
+  const classifiedTotal = ORDER.reduce((s, k) => s + (counts[k] ?? 0), 0);
   // 합계 = 모집단 검산(AGENTS.md). 저장 스냅샷 오독 시 조용히 작아지는 것을 막는다.
-  const unclassified = population == null ? 0 : Math.max(0, population - total);
+  const unclassified = population == null ? 0 : Math.max(0, population - classifiedTotal);
+  // 중앙 합계·비율·도넛 전체는 미분류까지 포함한 화면 모집단을 기준으로 한다.
+  const total = population == null ? classifiedTotal : Math.max(population, classifiedTotal);
   const R = 60;
   const CX = 80;
   const CY = 80;
   const CIRC = 2 * Math.PI * R;
   let acc = 0;
-  const segs = ORDER.map((k) => {
+  const segs = [...ORDER.map((k) => {
     const v = counts[k] ?? 0;
     const frac = total > 0 ? v / total : 0;
     const dash = frac * CIRC;
     const off = -acc;
     acc += dash;
     return { k, v, dash, off };
-  });
+  }), {
+    k: "미분류",
+    v: unclassified,
+    dash: total > 0 ? (unclassified / total) * CIRC : 0,
+    off: -acc,
+  }];
 
   return (
     <Card className="@container flex h-full flex-col">
@@ -55,7 +62,7 @@ export function JudgmentDonut({ counts, population }: Props) {
                   cy={CY}
                   r={R}
                   fill="none"
-                  stroke={SEG_COLOR[s.k]}
+                  stroke={SEG_COLOR[s.k] ?? "var(--muted)"}
                   strokeWidth="20"
                   strokeDasharray={`${s.dash} ${CIRC - s.dash}`}
                   strokeDashoffset={s.off}
@@ -84,7 +91,8 @@ export function JudgmentDonut({ counts, population }: Props) {
         </svg>
         <div
           className="flex w-full min-w-0 flex-1 flex-col gap-1 text-xs"
-          data-judgment-total={total}
+            data-judgment-total={total}
+            data-judgment-classified={classifiedTotal}
           data-judgment-population={population ?? ""}
         >
           {ORDER.map((k) => (
