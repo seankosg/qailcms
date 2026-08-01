@@ -5,12 +5,14 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import {
@@ -36,6 +38,11 @@ interface Props {
  * 수치 정본: computeOwnerLeaderboard (planPct/actualPct/diffPp/delayedTasks).
  * 이 컴포넌트는 자체 판정·자체 진도율 계산을 하지 않는다.
  */
+const COLOR_PLAN = "color-mix(in oklab, var(--muted-foreground) 35%, transparent)";
+const COLOR_ACTUAL = "var(--primary)";
+const COLOR_BEHIND = "var(--destructive)";
+const COLOR_AHEAD = "var(--success)";
+
 export function OwnerProgressChart({
   items,
   asOfDate,
@@ -55,6 +62,74 @@ export function OwnerProgressChart({
   // computeOwnerLeaderboard 는 diffPp 오름차순 정렬본을 반환한다 — 그대로 상위 N.
   const data = useMemo(() => rows.slice(0, limit), [rows, limit]);
 
+  // 요약치 — 정본 행값의 태스크수 가중 평균(= 태스크 단위 평균과 동일 정의). 별도 판정 계산 없음.
+  const summary = useMemo(() => {
+    let tasks = 0;
+    let delayed = 0;
+    let plan = 0;
+    let actual = 0;
+    for (const r of rows) {
+      tasks += r.taskCount;
+      delayed += r.delayedTasks;
+      plan += r.planPct * r.taskCount;
+      actual += r.actualPct * r.taskCount;
+    }
+    return {
+      tasks,
+      delayed,
+      planPct: tasks ? plan / tasks : 0,
+      actualPct: tasks ? actual / tasks : 0,
+    };
+  }, [rows]);
+
+  const needsScroll = data.length > 10;
+  const chartWidth = needsScroll ? data.length * 72 : undefined;
+
+  const renderPlanLabel = (props: any) => {
+    const { x, y, width, value } = props;
+    if (typeof value !== "number") return null;
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 5}
+        textAnchor="middle"
+        fontSize={10}
+        fill="var(--muted-foreground)"
+      >
+        {value.toFixed(0)}%
+      </text>
+    );
+  };
+
+  const renderActualLabel = (props: any) => {
+    const { x, y, width, value, index } = props;
+    const r = data[index];
+    if (!r || typeof value !== "number") return null;
+    const gapColor = r.diffPp >= 0 ? COLOR_AHEAD : COLOR_BEHIND;
+    return (
+      <g>
+        <text x={x + width / 2} y={y - 33} textAnchor="middle" fontSize={9} fontWeight={700}>
+          <tspan fill="var(--muted-foreground)">{r.taskCount}건</tspan>
+          {r.delayedTasks > 0 && <tspan fill={COLOR_BEHIND}> ▼{r.delayedTasks}</tspan>}
+        </text>
+        <text
+          x={x + width / 2}
+          y={y - 19}
+          textAnchor="middle"
+          fontSize={10}
+          fontWeight={600}
+          fill={gapColor}
+        >
+          {r.diffPp >= 0 ? "+" : ""}
+          {r.diffPp.toFixed(1)}pp
+        </text>
+        <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={10} fill="var(--foreground)">
+          {value.toFixed(0)}%
+        </text>
+      </g>
+    );
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
@@ -65,6 +140,27 @@ export function OwnerProgressChart({
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             Planned vs Actual — 막대 클릭 시 드릴다운
           </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
+              전체 {summary.tasks.toLocaleString()}건
+            </Badge>
+            <Badge variant="destructive" className="h-5 px-1.5 text-[10px] tabular-nums">
+              지연 {summary.delayed.toLocaleString()}건
+            </Badge>
+            <Badge variant="outline" className="h-5 px-1.5 text-[10px] tabular-nums">
+              진도율 {summary.actualPct.toFixed(1)}% / 계획 {summary.planPct.toFixed(1)}%
+            </Badge>
+            <span
+              className={
+                summary.actualPct - summary.planPct >= 0
+                  ? "text-[10px] font-semibold tabular-nums text-[var(--success)]"
+                  : "text-[10px] font-semibold tabular-nums text-destructive"
+              }
+            >
+              {summary.actualPct - summary.planPct >= 0 ? "+" : ""}
+              {(summary.actualPct - summary.planPct).toFixed(1)}pp
+            </span>
+          </div>
         </div>
         <ToggleGroup
           type="single"
@@ -97,27 +193,39 @@ export function OwnerProgressChart({
             표시할 데이터가 없습니다.
           </div>
         ) : (
-          <div className="h-[320px] w-full">
+          <div className={needsScroll ? "overflow-x-auto" : ""}>
+            <div
+              className="h-[360px]"
+              style={chartWidth ? { width: chartWidth, minWidth: "100%" } : { width: "100%" }}
+            >
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 48 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+              <BarChart
+                data={data}
+                barGap={2}
+                barCategoryGap="20%"
+                margin={{ top: 46, right: 8, left: -16, bottom: 8 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis
                   dataKey="key"
                   interval={0}
                   angle={-35}
                   textAnchor="end"
-                  height={60}
-                  tick={{ fontSize: 10 }}
-                  className="fill-muted-foreground"
+                  height={64}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                 />
                 <YAxis
                   domain={[0, 100]}
-                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                   tickFormatter={(v) => `${v}%`}
-                  className="fill-muted-foreground"
+                  width={44}
                 />
                 <Tooltip
-                  cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+                  cursor={{ fill: "color-mix(in oklab, var(--muted) 60%, transparent)", radius: 4 }}
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
                     const r = payload[0].payload as OwnerLeaderboardRow;
@@ -147,42 +255,43 @@ export function OwnerProgressChart({
                 <Bar
                   dataKey="planPct"
                   name="Plan"
-                  fill="hsl(var(--muted-foreground))"
-                  radius={[2, 2, 0, 0]}
-                  maxBarSize={22}
+                  fill={COLOR_PLAN}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={26}
                   onClick={(d: any) =>
                     onOwnerClick?.(dim, d?.payload?.key, d?.payload as OwnerLeaderboardRow)
                   }
                   className="cursor-pointer"
-                />
+                >
+                  <LabelList dataKey="planPct" content={renderPlanLabel} />
+                </Bar>
                 <Bar
                   dataKey="actualPct"
                   name="Actual"
-                  radius={[2, 2, 0, 0]}
-                  maxBarSize={22}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={26}
                   onClick={(d: any) =>
                     onOwnerClick?.(dim, d?.payload?.key, d?.payload as OwnerLeaderboardRow)
                   }
                   className="cursor-pointer"
                 >
                   {data.map((r) => (
-                    <Cell
-                      key={r.key}
-                      fill={
-                        r.diffPp < 0
-                          ? "hsl(var(--destructive))"
-                          : "hsl(var(--primary))"
-                      }
-                    />
+                    <Cell key={r.key} fill={r.diffPp < 0 ? COLOR_BEHIND : COLOR_ACTUAL} />
                   ))}
+                  <LabelList dataKey="actualPct" content={renderActualLabel} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </div>
         )}
         <div className="mt-2 flex items-center gap-4 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-sm bg-muted-foreground" /> Plan
+            <span
+              className="inline-block h-2 w-2 rounded-sm"
+              style={{ background: COLOR_PLAN }}
+            />{" "}
+            Plan
           </span>
           <span className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-sm bg-primary" /> Actual
@@ -190,6 +299,7 @@ export function OwnerProgressChart({
           <span className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-sm bg-destructive" /> Actual (지연)
           </span>
+          <span className="flex items-center gap-1">▼ 지연 태스크 수 · n건 = 전체 태스크 수</span>
         </div>
       </CardContent>
     </Card>
