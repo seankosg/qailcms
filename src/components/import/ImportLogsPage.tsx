@@ -95,19 +95,9 @@ const actionColor: Record<string, string> = {
 };
 
 const CFG = {
-  spare_part: {
-    title: "Spare Part — Import Logs",
-    backTo: "/closure/spare-part/import",
-    logsTable: "spare_parts_import_logs",
-    rowLogsTable: "spare_part_import_row_logs",
-    deleteFn: "delete_spare_part_import_batch",
-    keyLabel: "Doc Ref",
-    keyColumn: "doc_ref",
-    extraLabel: "Sheet",
-  },
   task_management: {
     title: "Task Management — Import Logs",
-    backTo: "/closure/spare-part/import",
+    backTo: "/import-log/import",
     logsTable: "task_management_import_logs",
     rowLogsTable: "task_management_import_row_logs",
     deleteFn: "delete_task_management_import_batch",
@@ -326,13 +316,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
     setFieldOutcomeFilter("all");
     try {
       const cols =
-        kind === "spare_part"
-          ? "id, raw_row_no, doc_ref, action_taken, reason_code, reason_detail, processed_at"
-          : kind === "task_management"
-            ? "id, raw_row_no, discipline, task_no, action_taken, reason_code, reason_detail, processed_at"
-            : kind === "defect_management"
-              ? "id, raw_row_no, team, source_issue_no, action_taken, reason_code, reason_detail, processed_at"
-              : "id, raw_row_no, team, abd_number, action_taken, reason_code, reason_detail, processed_at";
+        kind === "task_management"
+          ? "id, raw_row_no, discipline, task_no, action_taken, reason_code, reason_detail, processed_at"
+          : kind === "defect_management"
+            ? "id, raw_row_no, team, source_issue_no, action_taken, reason_code, reason_detail, processed_at"
+            : "id, raw_row_no, team, abd_number, action_taken, reason_code, reason_detail, processed_at";
       const rows = await fetchAllByUploadId<any>(cfg.rowLogsTable, cols, id);
       const mapped: RowLog[] = rows.map((r: any) => ({
         id: r.id,
@@ -341,13 +329,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         reason_code: r.reason_code,
         reason_detail: r.reason_detail,
         key_value:
-          kind === "spare_part"
-            ? r.doc_ref
-            : kind === "task_management"
-              ? r.task_no
-              : kind === "defect_management"
-                ? r.source_issue_no
-                : r.abd_number,
+          kind === "task_management"
+            ? r.task_no
+            : kind === "defect_management"
+              ? r.source_issue_no
+              : r.abd_number,
         processed_at: r.processed_at,
       }));
       setRowLogs(mapped);
@@ -358,9 +344,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
             ? "task_management"
             : kind === "defect_management"
               ? "defect"
-              : kind === "spare_part"
-                ? "spare_part"
-                : "abd";
+              : "abd";
         const { data: fl } = await (supabase as any)
           .from("import_field_logs")
           .select(

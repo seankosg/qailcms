@@ -64,9 +64,6 @@ export function ImportLogsHubPage() {
         <TabsContent value="snag" className="mt-4">
           <ImportLogsPage kind="defect_management" />
         </TabsContent>
-        <TabsContent value="spare-part" className="mt-4">
-          <ImportLogsPage kind="spare_part" />
-        </TabsContent>
         <TabsContent value="abd" className="mt-4">
           <ImportLogsPage kind="abd" />
         </TabsContent>
