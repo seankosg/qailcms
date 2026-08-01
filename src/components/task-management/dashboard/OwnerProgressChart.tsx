@@ -88,6 +88,9 @@ export function OwnerProgressChart({
     };
   }, [rows]);
 
+  // 지연 필터로 사전 필터링된 모집단이면 모든 항목이 지연 → ▼카운트·"지연" 배지 중복 제거
+  const allDelayed = summary.delayed === summary.tasks;
+
   const needsScroll = data.length > 10;
   const chartWidth = needsScroll ? data.length * 72 : undefined;
 
