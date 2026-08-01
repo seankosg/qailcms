@@ -30,6 +30,13 @@ const BAND_LABEL: Record<string, string> = {
 
 const JUDGMENTS = ["완료", "정상", "지연", "미분류", "제외"] as const;
 
+/** 라운드 선행 표기 — "R1 Submission" (ABD "R1 DS" 어휘 규칙 동일) */
+function stageLabel(s: { label: string; round_no?: number | null } | null | undefined) {
+  if (!s) return "—";
+  const base = s.label.replace(/\s*\(R\d\)\s*$/, "");
+  return s.round_no ? `R${s.round_no} ${base}` : base;
+}
+
 const STATE_CLASS: Record<WrtStageCell["st"], string> = {
   done: "text-emerald-700 dark:text-emerald-400 font-medium",
   delayed: "text-red-600 dark:text-red-400 font-medium",
@@ -96,12 +103,26 @@ export function WrtRawDataPage() {
       if (search.round && search.round !== "all" && String(r.active_round) !== search.round) return false;
       // 카드 = 드릴다운: 정본이 내려준 judgment 필드를 그대로 술어로 사용
       if (search.judgment && search.judgment !== "all" && r.judgment !== search.judgment) return false;
+      // 밴드 지연 셀 드릴다운 = 활성 밴드 + 대표 지연이 그 밴드
+      if (search.delayBand) {
+        if (r.active_band !== search.delayBand) return false;
+        if (r.primary_delay?.band !== search.delayBand) return false;
+      }
       if (!q) return true;
       return [r.wrt_number, r.title, r.team, r.pic, r.eng, r.dis, r.service]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [rows, search.q, search.plot, search.judgment, search.round]);
+  }, [rows, search.q, search.plot, search.judgment, search.round, search.delayBand]);
+
+  const delayBands = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of catalog) if (!s.chain_excluded) m.set(s.band, m.get(s.band) ?? 0);
+    for (const r of rows) if (r.primary_delay) m.set(r.primary_delay.band, (m.get(r.primary_delay.band) ?? 0) + 1);
+    return [...m.entries()];
+  }, [rows, catalog]);
+
+  const responseWaitItems = useMemo(() => rows.filter((r) => r.response_wait.length > 0).length, [rows]);
 
   // 합계 = 모집단 자체 검산 (불일치 시 미분류 노출)
   const counts = data?.judgment_counts ?? {};
@@ -130,7 +151,8 @@ export function WrtRawDataPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Warranty — Raw Data</h1>
           <p className="text-xs text-muted-foreground">
-            표시·집계 수치는 정본 함수(wrt_rows_as_of → wrt_judge_v1) 경유. 완료 판정은 Final Approved(A) 기준입니다.
+            표시·집계 수치는 정본 함수(wrt_rows_as_of → wrt_eval_as_of → wrt_judge_v2) 경유 · 읽기 시 재계산. 완료
+            판정은 Final Approved(A) 기준입니다.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -215,8 +237,8 @@ export function WrtRawDataPage() {
         <KpiCard
           label="모집단 (문서)"
           value={population}
-          active={(search.judgment ?? "all") === "all"}
-          onClick={() => setSearch({ judgment: "all" })}
+          active={(search.judgment ?? "all") === "all" && !search.delayBand}
+          onClick={() => setSearch({ judgment: "all", delayBand: "" })}
           note={reconOk ? "합계=모집단 ✓" : `검산 불일치: 합계 ${countsSum}`}
           tone={reconOk ? undefined : "warn"}
         />
@@ -225,8 +247,8 @@ export function WrtRawDataPage() {
             key={j}
             label={j}
             value={counts[j] ?? 0}
-            active={search.judgment === j}
-            onClick={() => setSearch({ judgment: search.judgment === j ? "all" : j })}
+            active={search.judgment === j && !search.delayBand}
+            onClick={() => setSearch({ judgment: search.judgment === j ? "all" : j, delayBand: "" })}
             note={
               j === "완료"
                 ? "Final Approved (A)"
@@ -234,11 +256,31 @@ export function WrtRawDataPage() {
                   ? "계획·실적 없음 (분모 0)"
                   : j === "제외"
                     ? "Cancelled — 통계 제외"
-                    : undefined
+                    : j === "지연"
+                      ? "대표 지연 보유 문서"
+                      : undefined
             }
             tone={j === "지연" ? "bad" : j === "미분류" ? "warn" : undefined}
           />
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] text-muted-foreground">밴드별 대표 지연</span>
+        {delayBands.map(([band, n]) => (
+          <Button
+            key={band}
+            size="sm"
+            variant={search.delayBand === band ? "default" : "outline"}
+            className="h-7 text-[11px]"
+            onClick={() => setSearch({ delayBand: search.delayBand === band ? "" : band, judgment: "all" })}
+          >
+            {BAND_LABEL[band] ?? band} {n}
+          </Button>
+        ))}
+        <Badge variant="outline" className="text-[11px]">
+          회신 대기 지연 {responseWaitItems}건 (Aconex 귀책 · 지연 카드 미합산)
+        </Badge>
       </div>
 
       <Card>
@@ -271,6 +313,12 @@ export function WrtRawDataPage() {
                     </StickyHead>
                     <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
                       Round
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      현재 단계
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      대표 지연
                     </th>
                     <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
                       Latest Status
@@ -322,7 +370,7 @@ export function WrtRawDataPage() {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={8 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={10 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
                         조건에 맞는 행이 없습니다.
                       </td>
                     </tr>
@@ -382,6 +430,28 @@ function WrtTableRow({
         </span>
       </StickyCell>
       <td className="whitespace-nowrap border-b border-l px-2 py-1 text-center">R{row.active_round}</td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1 text-muted-foreground">
+        {row.current_stage ? stageLabel(row.current_stage) : row.active_band ? "—" : "전 단계 완료/미발생"}
+      </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        {row.primary_delay ? (
+          <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
+            {stageLabel(row.primary_delay)} · {row.primary_delay.days}일
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+        {row.delay_bucket.length > 0 && (
+          <span className="ml-1 text-[9px] text-muted-foreground" title="후행 지연 — 인지용, 지연 카드 미합산">
+            +{row.delay_bucket.length}
+          </span>
+        )}
+        {row.response_wait.length > 0 && (
+          <span className="ml-1 text-[9px] text-amber-700" title="Aconex 회신 대기 — HDEC 귀책 아님">
+            회신대기
+          </span>
+        )}
+      </td>
       <td className="whitespace-nowrap border-b border-l px-2 py-1 text-center">{row.latest_status_raw ?? "—"}</td>
       <td className="whitespace-nowrap border-b border-l px-2 py-1 text-center">
         {row.is_final_approved ? (

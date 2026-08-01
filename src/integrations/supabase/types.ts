@@ -3300,6 +3300,7 @@ export type Database = {
         Row: {
           actual_authority: string
           band: string
+          chain_excluded: boolean
           created_at: string
           in_progress_denominator: boolean
           label: string
@@ -3313,6 +3314,7 @@ export type Database = {
         Insert: {
           actual_authority?: string
           band: string
+          chain_excluded?: boolean
           created_at?: string
           in_progress_denominator?: boolean
           label: string
@@ -3326,6 +3328,7 @@ export type Database = {
         Update: {
           actual_authority?: string
           band?: string
+          chain_excluded?: boolean
           created_at?: string
           in_progress_denominator?: boolean
           label?: string
@@ -4562,6 +4565,7 @@ export type Database = {
         Row: {
           actual_authority: string
           band: string
+          chain_excluded: boolean
           created_at: string
           in_progress_denominator: boolean
           label: string
@@ -4576,6 +4580,7 @@ export type Database = {
         Insert: {
           actual_authority?: string
           band: string
+          chain_excluded?: boolean
           created_at?: string
           in_progress_denominator?: boolean
           label: string
@@ -4590,6 +4595,7 @@ export type Database = {
         Update: {
           actual_authority?: string
           band?: string
+          chain_excluded?: boolean
           created_at?: string
           in_progress_denominator?: boolean
           label?: string
@@ -5724,6 +5730,26 @@ export type Database = {
           stage: string
         }[]
       }
+      spl_eval_as_of: {
+        Args: { _as_of?: string }
+        Returns: {
+          active_band: string
+          as_of: string
+          completed_stage: Json
+          current_stage: Json
+          delay_bucket: Json
+          delayed: number
+          denom: number
+          done: number
+          item_id: string
+          judgment: string
+          na_count: number
+          primary_delay: Json
+          req_doc_done: number
+          req_doc_total: number
+          stages: Json
+        }[]
+      }
       spl_hdec_apply: {
         Args: {
           _allow_deletes?: boolean
@@ -5733,11 +5759,11 @@ export type Database = {
         }
         Returns: Json
       }
-      spl_judge_v1: {
+      spl_judge_v2: {
         Args: {
-          _delayed: number
           _denom: number
-          _done: number
+          _has_primary_delay: boolean
+          _is_excluded: boolean
           _latest_status: string
         }
         Returns: string
@@ -6120,6 +6146,25 @@ export type Database = {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
       }
+      wrt_eval_as_of: {
+        Args: { _as_of?: string }
+        Returns: {
+          active_band: string
+          as_of: string
+          completed_stage: Json
+          current_stage: Json
+          delay_bucket: Json
+          delayed: number
+          denom: number
+          done: number
+          item_id: string
+          judgment: string
+          na_count: number
+          primary_delay: Json
+          response_wait: Json
+          stages: Json
+        }[]
+      }
       wrt_hdec_apply: {
         Args: {
           _allow_deletes?: boolean
@@ -6129,14 +6174,12 @@ export type Database = {
         }
         Returns: Json
       }
-      wrt_judge_v1: {
+      wrt_judge_v2: {
         Args: {
-          _delayed: number
           _denom: number
-          _done: number
+          _has_primary_delay: boolean
           _is_excluded: boolean
           _is_final_approved: boolean
-          _latest_response_code: string
         }
         Returns: string
       }

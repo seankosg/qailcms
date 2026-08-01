@@ -7,7 +7,9 @@ const searchSchema = z.object({
   asOf: z.string().optional().default(""),
   q: z.string().optional().default(""),
   plot: z.enum(["all", "C", "D"]).optional().default("all"),
-  judgment: z.enum(["all", "완료", "정상", "지연", "미분류"]).optional().default("all"),
+  judgment: z.enum(["all", "완료", "정상", "지연", "미분류", "제외"]).optional().default("all"),
+  /** 밴드별 대표 지연 셀 드릴다운 — 활성 밴드이면서 대표 지연이 그 밴드에 속한 행만 */
+  delayBand: z.string().optional().default(""),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/spare-part/raw-data")({
