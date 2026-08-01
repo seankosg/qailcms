@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 
 interface Props {
   counts: Record<string, number>;
+  /** 검산용 모집단(대상 행 수). 합계와 다르면 "미분류" 행으로 표면화한다. */
+  population?: number;
 }
 
 const ORDER = ["완료", "정상", "주의", "지연", "악화"] as const;
@@ -18,8 +20,10 @@ const SEG_COLOR: Record<string, string> = {
   악화: "var(--schedule-short)",
 };
 
-export function JudgmentDonut({ counts }: Props) {
+export function JudgmentDonut({ counts, population }: Props) {
   const total = ORDER.reduce((s, k) => s + (counts[k] ?? 0), 0);
+  // 합계 = 모집단 검산(AGENTS.md). 저장 스냅샷 오독 시 조용히 작아지는 것을 막는다.
+  const unclassified = population == null ? 0 : Math.max(0, population - total);
   const R = 60;
   const CX = 80;
   const CY = 80;
@@ -78,7 +82,11 @@ export function JudgmentDonut({ counts }: Props) {
             총 Task
           </text>
         </svg>
-        <div className="flex w-full min-w-0 flex-1 flex-col gap-1 text-xs">
+        <div
+          className="flex w-full min-w-0 flex-1 flex-col gap-1 text-xs"
+          data-judgment-total={total}
+          data-judgment-population={population ?? ""}
+        >
           {ORDER.map((k) => (
             <div key={k} className="flex min-w-0 items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1.5">
@@ -98,6 +106,20 @@ export function JudgmentDonut({ counts }: Props) {
               </span>
             </div>
           ))}
+          {unclassified > 0 && (
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span
+                  className="inline-block h-3 w-3 shrink-0 rounded-sm"
+                  style={{ background: "var(--muted)" }}
+                />
+                <Badge className="truncate bg-muted px-2 py-0 text-muted-foreground">미분류</Badge>
+              </div>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {unclassified.toLocaleString()}
+              </span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

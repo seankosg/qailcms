@@ -59,7 +59,8 @@ export function resolveIsDelayed(
   return j === "지연" || j === "악화";
 }
 
-function resolvePlanPct(it: TaskItem, asOfDate: string): number {
+/** 정본 계획%(있으면) → 없으면 클라 as-of 계산. */
+export function resolvePlanPct(it: TaskItem, asOfDate: string): number {
   const v = srvOf(it).srv_plan_pct;
   return v == null ? cumPlanProgress(it, asOfDate) : Number(v);
 }

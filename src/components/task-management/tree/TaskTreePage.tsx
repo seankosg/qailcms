@@ -35,6 +35,7 @@ import {
 } from "@/lib/task-management/derived";
 import type { TaskThresholds } from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
+import { resolveJudgment, resolvePlanPct } from "@/lib/task-management/delay-utils";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { MiniProgressChart } from "./MiniProgressChart";
@@ -140,13 +141,13 @@ function formatExtraValue(key: string, value: unknown): string {
   return String(value);
 }
 
-/** as-of 기준 재판정이 정본. 저장 판정(auto_judgment) 우선 분기는 제거되었다. */
+/** 정본 경유: 서버 병합 판정(srv_judgment) 우선, 없을 때만 as-of 클라 재판정. */
 function resolveRowJudgment(
   r: Row,
   thresholds: TaskThresholds,
   asOfDate?: string,
 ): string {
-  return computeJudgment(r, thresholds, asOfDate) || "";
+  return resolveJudgment(r as never, thresholds, asOfDate ?? "") || "";
 }
 
 function resolveMainJudgment(
@@ -155,6 +156,9 @@ function resolveMainJudgment(
   thresholds: TaskThresholds,
   asOfDate?: string,
 ): string {
+  // 정본 우선: 서버 tm_kpi_judgment_g(Main 가중 계획 tm_main_tplan 기준) 값이 있으면 그대로 사용.
+  const srv = (main as { srv_judgment?: string | null }).srv_judgment;
+  if (srv != null && srv !== "" && srv !== "이력 없음") return srv;
   if (kids.length === 0) {
     // 하위 없는 Main = 자기 창 선형 tplan vs 자기 Actual
     return computeJudgment(main, thresholds, asOfDate) || "";
@@ -963,9 +967,7 @@ export function TaskTreePage() {
                     >
                       {summaryColumnLabels["plan"]}{" "}
                       <span className="font-medium text-foreground">
-                        {p.plan_progress == null
-                          ? "-"
-                          : `${(Number(p.plan_progress) * 100).toFixed(0)}%`}
+                        {`${(resolvePlanPct(p as never, asOfDate) * 100).toFixed(0)}%`}
                       </span>
                     </span>
                   )}
@@ -1086,9 +1088,7 @@ export function TaskTreePage() {
                                 case "plan":
                                   return (
                                     <td key={c} className="px-2 py-1 tabular-nums text-[10px]">
-                                      {k.plan_progress == null
-                                        ? "-"
-                                        : `${(Number(k.plan_progress) * 100).toFixed(0)}%`}
+                                      {`${(resolvePlanPct(k as never, asOfDate) * 100).toFixed(0)}%`}
                                     </td>
                                   );
                                 case "actual":

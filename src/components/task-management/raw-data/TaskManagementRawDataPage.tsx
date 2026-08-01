@@ -890,8 +890,13 @@ export function TaskManagementRawDataPage() {
           enableSorting: true,
           enableColumnFilter: true,
           filterFn: numberRangeFilterFn,
-          accessorFn: (r: Row) =>
-            cumPlanProgress(r as any, cellDynRef.current.selectedDataDate || undefined),
+          // 정본 우선: 서버 tm_rows_as_of 의 cum_plan_pct, 없을 때만 클라 as-of 계산.
+          accessorFn: (r: Row) => {
+            const srv = (r as any).cum_plan_pct;
+            return srv == null
+              ? cumPlanProgress(r as any, cellDynRef.current.selectedDataDate || undefined)
+              : Number(srv);
+          },
           header: labelOverrides[c.key] ?? c.label,
           meta: { filterType: "number-range" as const, group: c.group },
           cell: ({ getValue }) => renderCell(c, getValue()),
@@ -1411,9 +1416,14 @@ export function TaskManagementRawDataPage() {
                 const mapped = ((payload.rows ?? []) as any[]).map((r) => {
                   if (r && Object.prototype.hasOwnProperty.call(r, "derived_auto_judgment")) {
                     const { derived_auto_judgment, ...rest } = r;
-                    return { ...rest, auto_judgment: derived_auto_judgment ?? rest.auto_judgment } as Row;
+                    return {
+                      ...rest,
+                      auto_judgment: derived_auto_judgment ?? rest.auto_judgment,
+                      // 정본 계획% 승격 — 저장 plan_progress(임포트 스냅샷) 내보내기 금지.
+                      plan_progress: rest.cum_plan_pct ?? rest.plan_progress,
+                    } as Row;
                   }
-                  return r as Row;
+                  return { ...r, plan_progress: r?.cum_plan_pct ?? r?.plan_progress } as Row;
                 });
                 setExportRows(mapped);
                 toast.success("전체 데이터 준비 완료", { id: t });

@@ -304,7 +304,9 @@ export function TmDashboardPage() {
           }
           statusMixLeftExtraSlot={
             <JudgmentDonut
-              counts={computeJudgmentStageBreakdown(scopedItems, asOfDate).judgmentCounts}
+              // 분포 패널은 지연 탭 필터를 타지 않는다 — 모집단(taskScope 적용 전체) 기준.
+              counts={computeJudgmentStageBreakdown(scopedByTaskScope, asOfDate).judgmentCounts}
+              population={scopedByTaskScope.length}
             />
           }
         />
