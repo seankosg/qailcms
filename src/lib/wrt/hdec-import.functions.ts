@@ -64,7 +64,22 @@ export type WrtHdecResult = WrtHdecPreview & {
   batch_id: string | null;
   items_updated: number;
   stages_upserted: number;
+  /** 임포트 후 감시 지표: pending_hdec(위반 아님, 감소해야 함) / violation(진짜 위반) */
+  integrity: { pending_hdec: number; pending_hdec_r1: number; pending_hdec_r2: number; violation: number };
 };
+
+async function readIntegrity(supa: any) {
+  const { data, error } = await supa.from("wrt_precedence_violations").select("violation_type, stage_code");
+  if (error) return { pending_hdec: 0, pending_hdec_r1: 0, pending_hdec_r2: 0, violation: 0 };
+  const rows = (data ?? []) as Array<{ violation_type: string; stage_code: string }>;
+  const pend = rows.filter((r) => r.violation_type === "pending_hdec");
+  return {
+    pending_hdec: pend.length,
+    pending_hdec_r1: pend.filter((r) => r.stage_code === "ROUND_1").length,
+    pending_hdec_r2: pend.filter((r) => r.stage_code === "ROUND_2").length,
+    violation: rows.length - pend.length,
+  };
+}
 
 async function assertEditor(ctx: any) {
   const [{ data: isAdmin }, { data: isSuper }, { data: isD }] = await Promise.all([
@@ -186,7 +201,14 @@ export const importWrtHdecBatch = createServerFn({ method: "POST" })
     };
 
     if (!data.apply) {
-      return { ...preview, applied: false, batch_id: null, items_updated: 0, stages_upserted: 0 };
+      return {
+        ...preview,
+        applied: false,
+        batch_id: null,
+        items_updated: 0,
+        stages_upserted: 0,
+        integrity: await readIntegrity(supa),
+      };
     }
     if (tripped && !data.allow_deletes) {
       throw new Error(
@@ -266,5 +288,12 @@ export const importWrtHdecBatch = createServerFn({ method: "POST" })
       })
       .eq("id", batchId);
 
-    return { ...preview, applied: true, batch_id: batchId, items_updated: itemsUpdated, stages_upserted: stagesUpserted };
+    return {
+      ...preview,
+      applied: true,
+      batch_id: batchId,
+      items_updated: itemsUpdated,
+      stages_upserted: stagesUpserted,
+      integrity: await readIntegrity(supa),
+    };
   });
