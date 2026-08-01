@@ -35,6 +35,7 @@ import { Route as ApiPublicBackupAutoSnapshotRouteImport } from './routes/api/pu
 import { Route as ApiPublicBackupArchiveDownloadRouteImport } from './routes/api/public/backup/archive-download'
 import { Route as AuthenticatedResourceDmrRawDataRouteImport } from './routes/_authenticated/resource/dmr/raw-data'
 import { Route as AuthenticatedResourceDmrDashboardRouteImport } from './routes/_authenticated/resource/dmr/dashboard'
+import { Route as AuthenticatedClosureWarrantyRawDataRouteImport } from './routes/_authenticated/closure/warranty/raw-data'
 import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './routes/_authenticated/closure/task-management/tree'
 import { Route as AuthenticatedClosureTaskManagementScheduleRevisionRouteImport } from './routes/_authenticated/closure/task-management/schedule-revision'
 import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from './routes/_authenticated/closure/task-management/raw-data'
@@ -204,6 +205,12 @@ const AuthenticatedResourceDmrDashboardRoute =
   AuthenticatedResourceDmrDashboardRouteImport.update({
     id: '/resource/dmr/dashboard',
     path: '/resource/dmr/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClosureWarrantyRawDataRoute =
+  AuthenticatedClosureWarrantyRawDataRouteImport.update({
+    id: '/closure/warranty/raw-data',
+    path: '/closure/warranty/raw-data',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedClosureTaskManagementTreeRoute =
@@ -381,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
   '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
   '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
@@ -430,6 +438,7 @@ export interface FileRoutesByTo {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
   '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
   '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
@@ -482,6 +491,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/_authenticated/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
   '/_authenticated/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
   '/_authenticated/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
@@ -534,6 +544,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/schedule-revision'
     | '/closure/task-management/tree'
+    | '/closure/warranty/raw-data'
     | '/resource/dmr/dashboard'
     | '/resource/dmr/raw-data'
     | '/api/public/backup/archive-download'
@@ -583,6 +594,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/schedule-revision'
     | '/closure/task-management/tree'
+    | '/closure/warranty/raw-data'
     | '/resource/dmr/dashboard'
     | '/resource/dmr/raw-data'
     | '/api/public/backup/archive-download'
@@ -634,6 +646,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/task-management/schedule-revision'
     | '/_authenticated/closure/task-management/tree'
+    | '/_authenticated/closure/warranty/raw-data'
     | '/_authenticated/resource/dmr/dashboard'
     | '/_authenticated/resource/dmr/raw-data'
     | '/api/public/backup/archive-download'
@@ -842,6 +855,13 @@ declare module '@tanstack/react-router' {
       path: '/resource/dmr/dashboard'
       fullPath: '/resource/dmr/dashboard'
       preLoaderRoute: typeof AuthenticatedResourceDmrDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/closure/warranty/raw-data': {
+      id: '/_authenticated/closure/warranty/raw-data'
+      path: '/closure/warranty/raw-data'
+      fullPath: '/closure/warranty/raw-data'
+      preLoaderRoute: typeof AuthenticatedClosureWarrantyRawDataRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/closure/task-management/tree': {
@@ -1075,6 +1095,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
   AuthenticatedClosureTaskManagementScheduleRevisionRoute: typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
   AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
+  AuthenticatedClosureWarrantyRawDataRoute: typeof AuthenticatedClosureWarrantyRawDataRoute
   AuthenticatedResourceDmrDashboardRoute: typeof AuthenticatedResourceDmrDashboardRoute
   AuthenticatedResourceDmrRawDataRoute: typeof AuthenticatedResourceDmrRawDataRoute
   AuthenticatedClosureDashboardIndexRoute: typeof AuthenticatedClosureDashboardIndexRoute
@@ -1125,6 +1146,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureTaskManagementScheduleRevisionRoute,
   AuthenticatedClosureTaskManagementTreeRoute:
     AuthenticatedClosureTaskManagementTreeRoute,
+  AuthenticatedClosureWarrantyRawDataRoute:
+    AuthenticatedClosureWarrantyRawDataRoute,
   AuthenticatedResourceDmrDashboardRoute:
     AuthenticatedResourceDmrDashboardRoute,
   AuthenticatedResourceDmrRawDataRoute: AuthenticatedResourceDmrRawDataRoute,
