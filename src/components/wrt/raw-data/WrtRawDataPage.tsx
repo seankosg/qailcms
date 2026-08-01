@@ -181,11 +181,24 @@ export function WrtRawDataPage() {
           </Button>
         ))}
         {viol && (
-          <Badge variant={viol.total > 0 ? "destructive" : "outline"} className="gap-1 text-[11px]">
-            <AlertTriangle className="h-3 w-3" />
-            선후관계 위반 {viol.precedence}건 · 유령 라운드 {viol.ghost_round}건
-            {viol.from_last_import > 0 && <span className="opacity-80">· 최근 임포트 발생 {viol.from_last_import}건</span>}
-          </Badge>
+          <>
+            <Badge variant={viol.total > 0 ? "destructive" : "outline"} className="gap-1 text-[11px]">
+              <AlertTriangle className="h-3 w-3" />
+              위반 {viol.total}건 (선후관계 {viol.precedence} · 라운드 귀속 {viol.ghost_round} · 회신선행{" "}
+              {viol.response_before_submission ?? 0})
+              {viol.from_last_import > 0 && (
+                <span className="opacity-80">· 최근 임포트 발생 {viol.from_last_import}건</span>
+              )}
+            </Badge>
+            <Badge
+              variant="outline"
+              className="text-[11px]"
+              title="HDEC 제출 실적이 전 라운드에 걸쳐 없는 상태에서 Aconex 회신만 존재 — 임포트 대기이며 위반 아님"
+            >
+              제출 대기(pending) {viol.pending_hdec ?? 0}건 · R1 {viol.pending_hdec_r1 ?? 0} / R2{" "}
+              {viol.pending_hdec_r2 ?? 0}
+            </Badge>
+          </>
         )}
       </div>
 
