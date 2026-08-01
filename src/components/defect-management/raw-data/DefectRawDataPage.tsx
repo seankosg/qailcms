@@ -198,21 +198,9 @@ function mergeUrlFilters(urlSearch: Record<string, any>, baseFilters: ColumnFilt
   if ((urlSearch.dateStart || urlSearch.dateEnd) && urlSearch.dateField && DATE_FILTER_FIELDS.has(urlSearch.dateField)) {
     overridden.add(urlSearch.dateField);
   }
+  // Progress Matrix 셀 드릴다운 조건은 TanStack Table 의 columnFilters 에 넣지 않는다.
+  // (미정의 컬럼 id 는 테이블이 상태에서 제거해 조건이 소실됨 → URL 파생 서버 필터로 별도 운반)
   const next = baseFilters.filter((filter) => !overridden.has(filter.id) && filter.id !== CELL_RANGE_ID);
-  // Progress Matrix 셀 드릴다운 — 스테이지 조합·remaining(NOT done) 조건까지 정본 경유.
-  if (urlSearch.cellStage && urlSearch.cellFrom) {
-    next.push({
-      id: CELL_RANGE_ID,
-      value: {
-        stage: String(urlSearch.cellStage),
-        field: urlSearch.cellField === "actual" ? "actual" : "planned",
-        from: String(urlSearch.cellFrom),
-        to: String(urlSearch.cellTo || urlSearch.cellFrom),
-        planMode: urlSearch.cellMode === "remaining" ? "remaining" : "baseline",
-        asOf: urlSearch.asOf ? String(urlSearch.asOf) : "",
-      },
-    });
-  }
   for (const [param, column] of Object.entries(URL_MAP)) {
     const value = urlSearch[param];
     if (!value) continue;
@@ -320,6 +308,9 @@ const DRILLDOWN_PARAMS = [
   "hdecVerification", "hdecReason", ...Object.keys(URL_MAP), "dateStart", "dateEnd", "dateField",
   "cellStage", "cellField", "cellFrom", "cellTo", "cellMode",
 ];
+
+/** 셀 드릴다운 조건은 URL 에 상주해야 하므로 progress 진입 정리 시 보존한다. */
+const CELL_PARAMS = ["cellStage", "cellField", "cellFrom", "cellTo", "cellMode", "asOf"];
 
 export function DefectRawDataPage() {
   const navigate = useNavigate();
@@ -430,7 +421,27 @@ export function DefectRawDataPage() {
   }, [tab, urlSearch.source]);
 
   // ── Server data ─────────────────────────────────────────────────────────
-  const serverFilters = useMemo(() => toServerFilters(columnFilters), [columnFilters]);
+  // Progress 셀 드릴다운 술어 (URL 파생) — 집계와 동일 소스(public.snag_progress_events)
+  const cellServerFilter = useMemo<DefectServerFilter | null>(() => {
+    if (!urlSearch.cellStage || !urlSearch.cellFrom) return null;
+    const field = urlSearch.cellField === "actual" ? "actual" : "planned";
+    return {
+      column: "__cell__",
+      op: field === "actual" ? "stage_actual_range" : "stage_plan_range",
+      value: {
+        stage: String(urlSearch.cellStage),
+        field,
+        from: String(urlSearch.cellFrom),
+        to: String(urlSearch.cellTo || urlSearch.cellFrom),
+        planMode: urlSearch.cellMode === "remaining" ? "remaining" : "baseline",
+        asOf: urlSearch.asOf ? String(urlSearch.asOf) : "",
+      },
+    } as DefectServerFilter;
+  }, [urlSearch.cellStage, urlSearch.cellField, urlSearch.cellFrom, urlSearch.cellTo, urlSearch.cellMode, urlSearch.asOf]);
+  const serverFilters = useMemo(
+    () => (cellServerFilter ? [...toServerFilters(columnFilters), cellServerFilter] : toServerFilters(columnFilters)),
+    [columnFilters, cellServerFilter],
+  );
   const serverSort = useMemo(() => toServerSort(sorting), [sorting]);
   const q = (urlSearch.q ?? "").trim();
   const {
@@ -563,7 +574,10 @@ export function DefectRawDataPage() {
     if (urlSearch.source !== "progress") return;
     progressCleanupDone.current = true;
     const patch: Record<string, any> = { filters: serializeFilters(columnFilters), page: 1 };
-    for (const key of DRILLDOWN_PARAMS) patch[key] = "";
+    for (const key of DRILLDOWN_PARAMS) {
+      if (CELL_PARAMS.includes(key)) continue; // 셀 조건은 URL 에 유지
+      patch[key] = "";
+    }
     setUrl(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSearch.source]);
@@ -800,6 +814,14 @@ export function DefectRawDataPage() {
     if (urlSearch.atRisk === "true") chips.push({ label: urlSearch.atRiskDays ? `At Risk (≤ ${urlSearch.atRiskDays}d)` : "At Risk", clears: ["atRisk", "atRiskDays"] });
     if (urlSearch.notClosureDone === "true") chips.push({ label: "Closure ≠ Done", clears: ["notClosureDone"] });
     if (urlSearch.hdecVerification) chips.push({ label: `HDEC Verification: ${urlSearch.hdecVerification === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecVerification}`, clears: ["hdecVerification"] });
+    if (urlSearch.cellStage && urlSearch.cellFrom) {
+      const f = urlSearch.cellField === "actual" ? "Actual" : "Plan";
+      const range = urlSearch.cellTo && urlSearch.cellTo !== urlSearch.cellFrom ? `${urlSearch.cellFrom} → ${urlSearch.cellTo}` : String(urlSearch.cellFrom);
+      chips.push({
+        label: `Cell: ${urlSearch.cellStage} ${f} ${range}${urlSearch.cellMode === "remaining" ? " (remaining)" : ""}`,
+        clears: CELL_PARAMS,
+      });
+    }
     if (urlSearch.catADispute === "xor") chips.push({ label: "Cat A Dispute (LL ≠ HDEC)", clears: ["catADispute"] });
     if (urlSearch.hdecReason) chips.push({ label: `HDEC Reason: ${urlSearch.hdecReason === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecReason}`, clears: ["hdecReason"] });
     return chips;
