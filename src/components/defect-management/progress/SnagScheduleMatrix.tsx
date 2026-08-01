@@ -377,6 +377,7 @@ export function SnagScheduleMatrix({
                           isFuture={vc.index > todayBucketIdx}
                           isToday={vc.index === todayBucketIdx}
                           width={cellWidth}
+                          cellId={`${row.key}|all|${c.bucket}`}
                           onPlanClick={
                             onCellClick
                               ? () => onCellClick(row.groupKeyRaw, c.bucket, aggregateStageArg, "planned")
@@ -413,6 +414,7 @@ export function SnagScheduleMatrix({
                                 isFuture={vc.index > todayBucketIdx}
                                 isToday={vc.index === todayBucketIdx}
                                 width={cellWidth}
+                                cellId={`${row.key}|${st}|${c.bucket}`}
                                 onPlanClick={
                                   onCellClick
                                     ? () => onCellClick(row.groupKeyRaw, c.bucket, st, "planned")
