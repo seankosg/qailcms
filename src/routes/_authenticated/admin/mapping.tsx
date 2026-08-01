@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FieldConfigTable } from "@/components/admin/FieldConfigTable";
-import { HeaderMappingTable } from "@/components/admin/HeaderMappingTable";
 import { TmFieldConfigTable } from "@/components/admin/TmFieldConfigTable";
 import { TmHeaderMappingTable } from "@/components/admin/TmHeaderMappingTable";
 import { DefectFieldConfigTable } from "@/components/admin/DefectFieldConfigTable";
@@ -27,7 +25,6 @@ function MappingPage() {
       <Tabs defaultValue="as-built" className="space-y-4">
         <TabsList>
           <TabsTrigger value="as-built">As Built Drawing</TabsTrigger>
-          <TabsTrigger value="spare-part">Spare Part</TabsTrigger>
           <TabsTrigger value="task-management">Task Management</TabsTrigger>
           <TabsTrigger value="defect-management">Snag List Management</TabsTrigger>
         </TabsList>
@@ -43,16 +40,6 @@ function MappingPage() {
             <TabsContent value="header-mapping"><AbdHeaderMappingTable /></TabsContent>
             <TabsContent value="preset-hdec"><AbdImportPresetTable mode="hdec" /></TabsContent>
             <TabsContent value="preset-aconex"><AbdImportPresetTable mode="aconex" /></TabsContent>
-          </Tabs>
-        </TabsContent>
-        <TabsContent value="spare-part" className="space-y-4">
-          <Tabs defaultValue="field-config" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="field-config">Field Config</TabsTrigger>
-              <TabsTrigger value="header-mapping">Header Mapping</TabsTrigger>
-            </TabsList>
-            <TabsContent value="field-config"><FieldConfigTable /></TabsContent>
-            <TabsContent value="header-mapping"><HeaderMappingTable /></TabsContent>
           </Tabs>
         </TabsContent>
         <TabsContent value="task-management" className="space-y-4">
