@@ -5335,7 +5335,12 @@ export type Database = {
         Returns: Json
       }
       spl_judge_v1: {
-        Args: { _delayed: number; _denom: number; _done: number }
+        Args: {
+          _delayed: number
+          _denom: number
+          _done: number
+          _latest_status: string
+        }
         Returns: string
       }
       spl_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
