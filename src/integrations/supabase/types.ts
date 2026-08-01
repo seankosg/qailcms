@@ -3036,6 +3036,252 @@ export type Database = {
         }
         Relationships: []
       }
+      spl_change_log: {
+        Row: {
+          action: string
+          batch_id: string | null
+          changed_at: string
+          changed_by: string | null
+          column_name: string | null
+          id: string
+          item_id: string | null
+          new_value: string | null
+          old_value: string | null
+          row_id: string
+          source: string
+          spl_number: string | null
+          stage_code: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          batch_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          column_name?: string | null
+          id?: string
+          item_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          row_id: string
+          source?: string
+          spl_number?: string | null
+          stage_code?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          batch_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          column_name?: string | null
+          id?: string
+          item_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          row_id?: string
+          source?: string
+          spl_number?: string | null
+          stage_code?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
+      spl_items: {
+        Row: {
+          approval_status_raw: string | null
+          created_at: string
+          created_by: string | null
+          data_date: string | null
+          dis: string | null
+          eng: string | null
+          eng_po: string | null
+          exclusion_reason: string | null
+          id: string
+          is_active: boolean
+          is_excluded: boolean
+          latest_status: string | null
+          latest_status_raw: string | null
+          pic: string | null
+          pic_po: string | null
+          plot: string
+          revision: string | null
+          service: string | null
+          source_file: string | null
+          spl_number: string
+          supplier: string | null
+          team: string | null
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          approval_status_raw?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          dis?: string | null
+          eng?: string | null
+          eng_po?: string | null
+          exclusion_reason?: string | null
+          id?: string
+          is_active?: boolean
+          is_excluded?: boolean
+          latest_status?: string | null
+          latest_status_raw?: string | null
+          pic?: string | null
+          pic_po?: string | null
+          plot: string
+          revision?: string | null
+          service?: string | null
+          source_file?: string | null
+          spl_number: string
+          supplier?: string | null
+          team?: string | null
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          approval_status_raw?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          dis?: string | null
+          eng?: string | null
+          eng_po?: string | null
+          exclusion_reason?: string | null
+          id?: string
+          is_active?: boolean
+          is_excluded?: boolean
+          latest_status?: string | null
+          latest_status_raw?: string | null
+          pic?: string | null
+          pic_po?: string | null
+          plot?: string
+          revision?: string | null
+          service?: string | null
+          source_file?: string | null
+          spl_number?: string
+          supplier?: string | null
+          team?: string | null
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      spl_stage_catalog: {
+        Row: {
+          actual_authority: string
+          band: string
+          created_at: string
+          in_progress_denominator: boolean
+          label: string
+          module: string
+          note: string | null
+          sort_order: number
+          stage_code: string
+          updated_at: string
+          value_type: string
+        }
+        Insert: {
+          actual_authority?: string
+          band: string
+          created_at?: string
+          in_progress_denominator?: boolean
+          label: string
+          module?: string
+          note?: string | null
+          sort_order: number
+          stage_code: string
+          updated_at?: string
+          value_type: string
+        }
+        Update: {
+          actual_authority?: string
+          band?: string
+          created_at?: string
+          in_progress_denominator?: boolean
+          label?: string
+          module?: string
+          note?: string | null
+          sort_order?: number
+          stage_code?: string
+          updated_at?: string
+          value_type?: string
+        }
+        Relationships: []
+      }
+      spl_stage_progress: {
+        Row: {
+          actual_finish: string | null
+          actual_start: string | null
+          created_at: string
+          created_by: string | null
+          data_date: string | null
+          flag_value: string | null
+          id: string
+          item_id: string
+          na_flag: boolean
+          plan_finish: string | null
+          plan_start: string | null
+          remarks: string | null
+          stage_code: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          flag_value?: string | null
+          id?: string
+          item_id: string
+          na_flag?: boolean
+          plan_finish?: string | null
+          plan_start?: string | null
+          remarks?: string | null
+          stage_code: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          flag_value?: string | null
+          id?: string
+          item_id?: string
+          na_flag?: boolean
+          plan_finish?: string | null
+          plan_start?: string | null
+          remarks?: string | null
+          stage_code?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_stage_progress_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_stage_progress_stage_code_fkey"
+            columns: ["stage_code"]
+            isOneToOne: false
+            referencedRelation: "spl_stage_catalog"
+            referencedColumns: ["stage_code"]
+          },
+        ]
+      }
       subcontractor_master: {
         Row: {
           created_at: string
@@ -3939,6 +4185,35 @@ export type Database = {
           updated_at: string | null
         }
         Relationships: []
+      }
+      spl_precedence_violations: {
+        Row: {
+          actual_date: string | null
+          item_id: string | null
+          label: string | null
+          missing_predecessors: number | null
+          plot: string | null
+          sort_order: number | null
+          spl_number: string | null
+          stage_code: string | null
+          team: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_stage_progress_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_stage_progress_stage_code_fkey"
+            columns: ["stage_code"]
+            isOneToOne: false
+            referencedRelation: "spl_stage_catalog"
+            referencedColumns: ["stage_code"]
+          },
+        ]
       }
       v_task_management_raw_derived: {
         Row: {
