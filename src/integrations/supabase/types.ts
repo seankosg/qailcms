@@ -4289,6 +4289,389 @@ export type Database = {
         }
         Relationships: []
       }
+      wrt_change_log: {
+        Row: {
+          action: string
+          batch_id: string | null
+          changed_at: string
+          changed_by: string | null
+          column_name: string | null
+          id: string
+          item_id: string | null
+          new_value: string | null
+          old_value: string | null
+          row_id: string
+          source: string
+          stage_code: string | null
+          table_name: string
+          wrt_number: string | null
+        }
+        Insert: {
+          action: string
+          batch_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          column_name?: string | null
+          id?: string
+          item_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          row_id: string
+          source?: string
+          stage_code?: string | null
+          table_name: string
+          wrt_number?: string | null
+        }
+        Update: {
+          action?: string
+          batch_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          column_name?: string | null
+          id?: string
+          item_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          row_id?: string
+          source?: string
+          stage_code?: string | null
+          table_name?: string
+          wrt_number?: string | null
+        }
+        Relationships: []
+      }
+      wrt_import_logs: {
+        Row: {
+          cleared_values: number
+          created_at: string
+          file_name: string
+          finished_at: string | null
+          id: string
+          imported_by: string | null
+          items_updated: number
+          matched: number
+          note: string | null
+          ocs_excluded: number
+          sheet_names: string[]
+          stages_upserted: number
+          started_at: string
+          status: string
+          total_rows: number
+          unmatched: number
+          updated_at: string
+        }
+        Insert: {
+          cleared_values?: number
+          created_at?: string
+          file_name: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          items_updated?: number
+          matched?: number
+          note?: string | null
+          ocs_excluded?: number
+          sheet_names?: string[]
+          stages_upserted?: number
+          started_at?: string
+          status?: string
+          total_rows?: number
+          unmatched?: number
+          updated_at?: string
+        }
+        Update: {
+          cleared_values?: number
+          created_at?: string
+          file_name?: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          items_updated?: number
+          matched?: number
+          note?: string | null
+          ocs_excluded?: number
+          sheet_names?: string[]
+          stages_upserted?: number
+          started_at?: string
+          status?: string
+          total_rows?: number
+          unmatched?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wrt_import_row_logs: {
+        Row: {
+          batch_id: string
+          changes: Json
+          code: string | null
+          created_at: string
+          detail: string | null
+          excel_row: number | null
+          id: string
+          outcome: string
+          sheet_name: string | null
+          wrt_number: string | null
+        }
+        Insert: {
+          batch_id: string
+          changes?: Json
+          code?: string | null
+          created_at?: string
+          detail?: string | null
+          excel_row?: number | null
+          id?: string
+          outcome: string
+          sheet_name?: string | null
+          wrt_number?: string | null
+        }
+        Update: {
+          batch_id?: string
+          changes?: Json
+          code?: string | null
+          created_at?: string
+          detail?: string | null
+          excel_row?: number | null
+          id?: string
+          outcome?: string
+          sheet_name?: string | null
+          wrt_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wrt_import_row_logs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "wrt_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wrt_items: {
+        Row: {
+          active_round: number | null
+          created_at: string
+          created_by: string | null
+          data_date: string | null
+          dis: string | null
+          eng: string | null
+          exclusion_reason: string | null
+          final_approved_raw: string | null
+          id: string
+          is_active: boolean
+          is_excluded: boolean
+          is_final_approved: boolean
+          latest_response_code: string | null
+          latest_status_raw: string | null
+          pic: string | null
+          plot: string
+          r1_response_code: string | null
+          r1_response_code_raw: string | null
+          r2_response_code: string | null
+          r2_response_code_raw: string | null
+          response_source: string
+          service: string | null
+          source_file: string | null
+          team: string | null
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+          wrt_number: string
+        }
+        Insert: {
+          active_round?: number | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          dis?: string | null
+          eng?: string | null
+          exclusion_reason?: string | null
+          final_approved_raw?: string | null
+          id?: string
+          is_active?: boolean
+          is_excluded?: boolean
+          is_final_approved?: boolean
+          latest_response_code?: string | null
+          latest_status_raw?: string | null
+          pic?: string | null
+          plot: string
+          r1_response_code?: string | null
+          r1_response_code_raw?: string | null
+          r2_response_code?: string | null
+          r2_response_code_raw?: string | null
+          response_source?: string
+          service?: string | null
+          source_file?: string | null
+          team?: string | null
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          wrt_number: string
+        }
+        Update: {
+          active_round?: number | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          dis?: string | null
+          eng?: string | null
+          exclusion_reason?: string | null
+          final_approved_raw?: string | null
+          id?: string
+          is_active?: boolean
+          is_excluded?: boolean
+          is_final_approved?: boolean
+          latest_response_code?: string | null
+          latest_status_raw?: string | null
+          pic?: string | null
+          plot?: string
+          r1_response_code?: string | null
+          r1_response_code_raw?: string | null
+          r2_response_code?: string | null
+          r2_response_code_raw?: string | null
+          response_source?: string
+          service?: string | null
+          source_file?: string | null
+          team?: string | null
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          wrt_number?: string
+        }
+        Relationships: []
+      }
+      wrt_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      wrt_stage_catalog: {
+        Row: {
+          actual_authority: string
+          band: string
+          created_at: string
+          in_progress_denominator: boolean
+          label: string
+          module: string
+          note: string | null
+          round_no: number | null
+          sort_order: number
+          stage_code: string
+          updated_at: string
+          value_type: string
+        }
+        Insert: {
+          actual_authority?: string
+          band: string
+          created_at?: string
+          in_progress_denominator?: boolean
+          label: string
+          module?: string
+          note?: string | null
+          round_no?: number | null
+          sort_order: number
+          stage_code: string
+          updated_at?: string
+          value_type: string
+        }
+        Update: {
+          actual_authority?: string
+          band?: string
+          created_at?: string
+          in_progress_denominator?: boolean
+          label?: string
+          module?: string
+          note?: string | null
+          round_no?: number | null
+          sort_order?: number
+          stage_code?: string
+          updated_at?: string
+          value_type?: string
+        }
+        Relationships: []
+      }
+      wrt_stage_progress: {
+        Row: {
+          actual_finish: string | null
+          actual_start: string | null
+          created_at: string
+          created_by: string | null
+          data_date: string | null
+          flag_value: string | null
+          id: string
+          item_id: string
+          na_flag: boolean
+          plan_finish: string | null
+          plan_start: string | null
+          remarks: string | null
+          stage_code: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          flag_value?: string | null
+          id?: string
+          item_id: string
+          na_flag?: boolean
+          plan_finish?: string | null
+          plan_start?: string | null
+          remarks?: string | null
+          stage_code: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          flag_value?: string | null
+          id?: string
+          item_id?: string
+          na_flag?: boolean
+          plan_finish?: string | null
+          plan_start?: string | null
+          remarks?: string | null
+          stage_code?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wrt_stage_progress_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "wrt_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wrt_stage_progress_stage_code_fkey"
+            columns: ["stage_code"]
+            isOneToOne: false
+            referencedRelation: "wrt_stage_catalog"
+            referencedColumns: ["stage_code"]
+          },
+        ]
+      }
     }
     Views: {
       hdec_eng_master: {
@@ -4413,6 +4796,22 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      wrt_precedence_violations: {
+        Row: {
+          actual_date: string | null
+          detail: string | null
+          item_id: string | null
+          label: string | null
+          missing_predecessors: number | null
+          plot: string | null
+          sort_order: number | null
+          stage_code: string | null
+          team: string | null
+          violation_type: string | null
+          wrt_number: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
@@ -5720,6 +6119,31 @@ export type Database = {
       update_task_summary: {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
+      }
+      wrt_judge_v1: {
+        Args: {
+          _delayed: number
+          _denom: number
+          _done: number
+          _is_excluded: boolean
+          _is_final_approved: boolean
+          _latest_response_code: string
+        }
+        Returns: string
+      }
+      wrt_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
+      wrt_stage_state: {
+        Args: {
+          _actual_finish: string
+          _actual_start: string
+          _as_of: string
+          _flag: string
+          _na: boolean
+          _plan_finish: string
+          _plan_start: string
+          _value_type: string
+        }
+        Returns: string
       }
     }
     Enums: {
