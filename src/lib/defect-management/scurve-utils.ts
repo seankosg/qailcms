@@ -59,7 +59,8 @@ export function buildSnagSCurve(opts: {
     if (!c.bucket_iso) continue;
     const i = idx.get(c.bucket_iso);
     if (i === undefined) continue;
-    const s = series[c.stage];
+    // 서버 집계행 토큰(`all|...`)은 S-커브에서 사용하지 않는다(스테이지별 계열만 누적).
+    const s = series[c.stage as Stage];
     if (!s) continue;
     s.dailyPlan[i] += c.plan_cnt;
     s.dailyActual[i] = (s.dailyActual[i] as number) + c.actual_cnt;
