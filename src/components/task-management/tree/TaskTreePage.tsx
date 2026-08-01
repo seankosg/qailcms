@@ -156,6 +156,9 @@ function resolveMainJudgment(
   thresholds: TaskThresholds,
   asOfDate?: string,
 ): string {
+  // 정본 우선: 서버 tm_kpi_judgment_g(Main 가중 계획 tm_main_tplan 기준) 값이 있으면 그대로 사용.
+  const srv = (main as { srv_judgment?: string | null }).srv_judgment;
+  if (srv != null && srv !== "" && srv !== "이력 없음") return srv;
   if (kids.length === 0) {
     // 하위 없는 Main = 자기 창 선형 tplan vs 자기 Actual
     return computeJudgment(main, thresholds, asOfDate) || "";
