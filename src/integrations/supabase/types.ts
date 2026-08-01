@@ -4909,6 +4909,28 @@ export type Database = {
           status_raw: string
         }[]
       }
+      snag_progress_cell_ids: {
+        Args: {
+          _as_of?: string
+          _field: string
+          _from: string
+          _plan_mode?: string
+          _stage: string
+          _to: string
+        }
+        Returns: {
+          item_id: string
+        }[]
+      }
+      snag_progress_events: {
+        Args: { _as_of_date: string; _plan_mode?: string }
+        Returns: {
+          edate: string
+          field: string
+          item_id: string
+          stage: string
+        }[]
+      }
       tm_actual_at_date: {
         Args: { _as_of: string; _ids?: string[] }
         Returns: {
