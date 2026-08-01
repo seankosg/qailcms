@@ -113,7 +113,7 @@ const NAV: NavSection[] = [
         matchPrefix: "/closure/warranty",
         adminOnly: true,
         items: [
-          { label: "Coming soon", icon: iconCertificate, disabled: true, badge: "Soon" },
+          { to: "/closure/warranty/raw-data", label: "Raw Data", icon: iconDatabase },
         ],
       },
       {
