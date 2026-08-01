@@ -6,9 +6,15 @@ export type MatrixRawRow = {
   building: string | null;
   level_name: string | null;
   room_group: string | null;
+  team: string | null;
   status_raw: string | null;
   cnt: number;
+  rect_cnt: number;
+  closed_cnt: number;
 };
+
+// 팀 분해 통계 — 정본(_snag_done_asof: 자기 실적일 ≤ as-of) 기준 rect/closed
+export type TeamStat = { issued: number; rect: number; closed: number };
 
 export type Stats = {
   open: number;
@@ -17,15 +23,7 @@ export type Stats = {
   closed: number;
   issued: number;
   closurePct: number | null; // null when issued=0
-};
-
-export const EMPTY_STATS: Stats = {
-  open: 0,
-  rectified: 0,
-  reopen: 0,
-  closed: 0,
-  issued: 0,
-  closurePct: null,
+  byTeam: Record<TeamKey, TeamStat>;
 };
 
 // ── Plot ──────────────────────────────────────────────────────────────
@@ -38,6 +36,32 @@ export function planGroupsForPlot(plot: PlotKey): string[] {
 // ── Teams ─────────────────────────────────────────────────────────────
 export const ALL_TEAMS = ["ARCH", "MECH", "ELEC"] as const;
 export type TeamKey = (typeof ALL_TEAMS)[number];
+
+// 매트릭스 팀 열 표시 순서 (지시: Elec · Mech · Arch)
+export const TEAM_COL_ORDER = ["ELEC", "MECH", "ARCH"] as const;
+
+export function normalizeTeam(v: string | null | undefined): TeamKey | null {
+  const s = (v ?? "").trim().toUpperCase();
+  return (ALL_TEAMS as readonly string[]).includes(s) ? (s as TeamKey) : null;
+}
+
+export function emptyTeamStats(): Record<TeamKey, TeamStat> {
+  return {
+    ARCH: { issued: 0, rect: 0, closed: 0 },
+    MECH: { issued: 0, rect: 0, closed: 0 },
+    ELEC: { issued: 0, rect: 0, closed: 0 },
+  };
+}
+
+export const EMPTY_STATS: Stats = {
+  open: 0,
+  rectified: 0,
+  reopen: 0,
+  closed: 0,
+  issued: 0,
+  closurePct: null,
+  byTeam: emptyTeamStats(),
+};
 
 // ── Room Group (열) ──────────────────────────────────────────────────
 export const ROOM_GROUP_ORDER = [
@@ -130,10 +154,18 @@ export function statusToStatKey(s: string | null | undefined): keyof Stats | nul
 
 export function addRow(stats: Stats, row: MatrixRawRow): void {
   const key = statusToStatKey(row.status_raw);
-  if (!key) return;
-  (stats as any)[key] += row.cnt;
-  stats.issued += row.cnt;
-  stats.closurePct = stats.issued > 0 ? stats.closed / stats.issued : null;
+  if (key) {
+    (stats as any)[key] += row.cnt;
+    stats.issued += row.cnt;
+    stats.closurePct = stats.issued > 0 ? stats.closed / stats.issued : null;
+  }
+  const team = normalizeTeam(row.team);
+  if (team) {
+    const t = stats.byTeam[team];
+    t.issued += row.cnt;
+    t.rect += row.rect_cnt;
+    t.closed += row.closed_cnt;
+  }
 }
 
 export function mergeStats(target: Stats, src: Stats): void {
@@ -143,10 +175,36 @@ export function mergeStats(target: Stats, src: Stats): void {
   target.closed += src.closed;
   target.issued += src.issued;
   target.closurePct = target.issued > 0 ? target.closed / target.issued : null;
+  for (const t of ALL_TEAMS) {
+    target.byTeam[t].issued += src.byTeam[t].issued;
+    target.byTeam[t].rect += src.byTeam[t].rect;
+    target.byTeam[t].closed += src.byTeam[t].closed;
+  }
 }
 
 export function newStats(): Stats {
-  return { open: 0, rectified: 0, reopen: 0, closed: 0, issued: 0, closurePct: null };
+  return { open: 0, rectified: 0, reopen: 0, closed: 0, issued: 0, closurePct: null, byTeam: emptyTeamStats() };
+}
+
+// ── 병목 팀 판정 ──────────────────────────────────────────────────────
+// 각 셀에서 팀별 비율(Rect% 또는 Closed%) 최저 팀이 차상위 팀보다
+// gapPp(기본 15%p) 이상 뒤처지면 병목으로 강조.
+export const BOTTLENECK_GAP_PP = 15;
+
+export function bottleneckTeam(
+  byTeam: Record<TeamKey, TeamStat>,
+  metric: "rect" | "closed",
+  gapPp: number = BOTTLENECK_GAP_PP,
+): TeamKey | null {
+  const entries = (TEAM_COL_ORDER as readonly TeamKey[])
+    .filter((t) => byTeam[t].issued > 0)
+    .map((t) => ({ team: t, pct: (byTeam[t][metric] / byTeam[t].issued) * 100 }));
+  if (entries.length < 2) return null;
+  entries.sort((a, b) => a.pct - b.pct);
+  const lowest = entries[0];
+  const next = entries[1];
+  if (next.pct - lowest.pct >= gapPp) return lowest.team;
+  return null;
 }
 
 // ── 매트릭스 형태 ────────────────────────────────────────────────────

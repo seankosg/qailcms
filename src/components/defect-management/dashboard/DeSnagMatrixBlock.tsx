@@ -1,132 +1,122 @@
 import { cn } from "@/lib/utils";
 import {
   ROOM_GROUP_ORDER,
+  TEAM_COL_ORDER,
+  bottleneckTeam,
+  newStats,
+  mergeStats,
   type MatrixBlock,
   type RoomGroupCol,
   type Stats,
-  metricSearchParams,
+  type TeamKey,
   basementLevelParam,
 } from "@/lib/defect-management/dashboard-shape";
 
-type MetricSlot = "issued" | "open" | "rectified" | "reopen" | "closed" | "closurePct";
+export type MatrixMode = "count" | "pct";
 
-// ── Metric column configuration ────────────────────────────────────────────
-const METRIC_COLS: Array<{ slot: MetricSlot; label: string; short: string }> = [
-  { slot: "issued", label: "Issued", short: "ISS" },
-  { slot: "open", label: "Open", short: "OPN" },
-  { slot: "rectified", label: "Rect", short: "RCT" },
-  { slot: "reopen", label: "Re-Op", short: "RO" },
-  { slot: "closed", label: "Closed", short: "CLS" },
-  { slot: "closurePct", label: "Cls%", short: "%" },
+type StatusSlot = "issued" | "rect" | "closed";
+
+const STATUS_COLS: Array<{ slot: StatusSlot; label: string }> = [
+  { slot: "issued", label: "Issued" },
+  { slot: "rect", label: "Rect" },
+  { slot: "closed", label: "Closed" },
 ];
 
-function fmtPct(pct: number | null): string {
-  if (pct == null || !Number.isFinite(pct)) return "–";
-  return `${Math.round(pct * 100)}%`;
-}
+const COLS_PER_GROUP = STATUS_COLS.length * TEAM_COL_ORDER.length; // 9
 
-function closurePctTone(pct: number | null): string {
+function pctTone(pct: number | null): string {
   if (pct == null) return "text-muted-foreground";
-  const p = pct * 100;
-  if (p < 40) return "text-destructive font-semibold";
-  if (p < 80) return "text-amber-600 dark:text-amber-400 font-semibold";
+  if (pct < 40) return "text-destructive font-semibold";
+  if (pct < 80) return "text-amber-600 dark:text-amber-400 font-semibold";
   return "text-emerald-600 dark:text-emerald-400 font-semibold";
 }
 
-function closurePctBg(pct: number | null): string {
-  if (pct == null) return "";
-  const p = pct * 100;
-  if (p < 40) return "bg-destructive/10";
-  if (p < 80) return "bg-amber-500/10";
-  return "bg-emerald-500/10";
-}
-
-/** Render 6 metric <td> cells for a single Stats block. */
-function MetricCells({
+/** Render 9 team-decomposed <td> cells (Issued/Rect/Closed × Elec/Mech/Arch). */
+function TeamCells({
   stats,
-  onMetric,
+  mode,
+  onCell,
   dim,
   groupIndex,
   isTotal,
   stickyTop,
 }: {
   stats: Stats;
-  onMetric: (m: MetricSlot) => void;
+  mode: MatrixMode;
+  onCell: (slot: StatusSlot, team: TeamKey) => void;
   dim?: boolean;
   groupIndex: number;
   isTotal?: boolean;
   stickyTop?: number;
 }) {
-  const groupBg = isTotal
-    ? "bg-primary/5"
-    : groupIndex % 2 === 0
-      ? "bg-transparent"
-      : "bg-muted/20";
+  const groupBg = isTotal ? "bg-primary/5" : groupIndex % 2 === 0 ? "bg-transparent" : "bg-muted/20";
   const stickyBg = isTotal
     ? "color-mix(in oklab, var(--primary) 12%, var(--card))"
     : groupIndex % 2 === 0
       ? "var(--card)"
       : "color-mix(in oklab, var(--muted) 25%, var(--card))";
+
+  const rectBottleneck = bottleneckTeam(stats.byTeam, "rect");
+  const closedBottleneck = bottleneckTeam(stats.byTeam, "closed");
+
   return (
     <>
-      {METRIC_COLS.map((mc, i) => {
-        const isFirst = i === 0;
-        const value =
-          mc.slot === "issued"
-            ? stats.issued
-            : mc.slot === "open"
-              ? stats.open
-              : mc.slot === "rectified"
-                ? stats.rectified
-                : mc.slot === "reopen"
-                  ? stats.reopen
-                  : mc.slot === "closed"
-                    ? stats.closed
-                    : null; // closurePct handled below
-        const isPct = mc.slot === "closurePct";
-        const pctTone = isPct ? closurePctTone(stats.closurePct) : "";
-        const pctBg = isPct ? closurePctBg(stats.closurePct) : "";
-        const zeroDim = !isPct && (value ?? 0) === 0 ? "text-muted-foreground/50" : "text-foreground";
-        const pctText = isPct ? fmtPct(stats.closurePct) : value!.toLocaleString();
-        const ratio =
-          !isPct && mc.slot !== "issued" && stats.issued > 0 && (value ?? 0) > 0
-            ? ` (${Math.round(((value ?? 0) / stats.issued) * 100)}%)`
-            : "";
-        return (
-          <td
-            key={mc.slot}
-            className={cn(
-              "h-7 border-b p-0 tabular-nums",
-              stickyTop === undefined && groupBg,
-              stickyTop !== undefined && "sticky z-20",
-              isFirst && "border-l-2 border-l-border",
-              !isFirst && "border-r border-r-border/40",
-              pctBg,
-              dim && "opacity-50",
-            )}
-            style={stickyTop !== undefined ? { top: stickyTop, background: stickyBg } : undefined}
-          >
-            <button
-              type="button"
-              onClick={() => onMetric(mc.slot)}
-              title={`${mc.label}: ${pctText}${ratio}`}
+      {STATUS_COLS.map((sc, sIdx) =>
+        TEAM_COL_ORDER.map((team, tIdx) => {
+          const t = stats.byTeam[team];
+          const count = sc.slot === "issued" ? t.issued : sc.slot === "rect" ? t.rect : t.closed;
+          const ratio = t.issued > 0 && sc.slot !== "issued" ? (count / t.issued) * 100 : null;
+          const showPct = mode === "pct" && sc.slot !== "issued";
+          const text = showPct
+            ? ratio == null
+              ? "–"
+              : `${Math.round(ratio)}%`
+            : count.toLocaleString();
+          const isBottleneck =
+            (sc.slot === "rect" && rectBottleneck === team) ||
+            (sc.slot === "closed" && closedBottleneck === team);
+          const isFirstOfGroup = sIdx === 0 && tIdx === 0;
+          const isFirstOfStatus = tIdx === 0;
+          const zeroDim = !showPct && count === 0 ? "text-muted-foreground/50" : "text-foreground";
+          return (
+            <td
+              key={`${sc.slot}-${team}`}
               className={cn(
-                "block h-full w-full px-1.5 text-right text-xs leading-none hover:bg-primary/10",
-                mc.slot === "issued" && "font-medium",
-                pctTone,
-                !isPct && zeroDim,
+                "h-7 border-b p-0 tabular-nums",
+                stickyTop === undefined && groupBg,
+                stickyTop !== undefined && "sticky z-20",
+                isFirstOfGroup && "border-l-2 border-l-border",
+                !isFirstOfGroup && isFirstOfStatus && "border-l border-l-border/70",
+                !isFirstOfStatus && "border-r border-r-border/30",
+                isBottleneck && "bg-destructive/15",
+                dim && "opacity-50",
               )}
+              style={stickyTop !== undefined ? { top: stickyTop, background: isBottleneck ? undefined : stickyBg } : undefined}
             >
-              {pctText}
-            </button>
-          </td>
-        );
-      })}
+              <button
+                type="button"
+                onClick={() => onCell(sc.slot, team)}
+                title={`${team} ${sc.label}: ${count.toLocaleString()}${
+                  ratio != null ? ` (${Math.round(ratio)}%)` : ""
+                }${isBottleneck ? " · 병목" : ""}`}
+                className={cn(
+                  "block h-full w-full px-1 text-right text-xs leading-none hover:bg-primary/10",
+                  sc.slot === "issued" && "font-medium",
+                  showPct ? pctTone(ratio) : zeroDim,
+                  isBottleneck && "font-semibold",
+                )}
+              >
+                {text}
+              </button>
+            </td>
+          );
+        }),
+      )}
     </>
   );
 }
 
-/** Two-row header: group names spanning 6 metric subcolumns each. */
+/** Three-row header: Room Group → Status → Team. */
 function MatrixHeader({
   block,
   buildingParam,
@@ -142,19 +132,27 @@ function MatrixHeader({
     ...ROOM_GROUP_ORDER.map((rg) => ({ key: rg, label: rg, isNa: rg === "N/A" })),
     { key: "__ROW_TOTAL__", label: "Row Total", isTotal: true },
   ];
+  const groupBg = (g: { isTotal?: boolean; isNa?: boolean }, idx: number) =>
+    g.isTotal
+      ? "color-mix(in oklab, var(--primary) 10%, var(--card))"
+      : g.isNa
+        ? "color-mix(in oklab, var(--muted) 50%, var(--card))"
+        : idx % 2 === 1
+          ? "color-mix(in oklab, var(--muted) 30%, var(--card))"
+          : "color-mix(in oklab, var(--muted) 50%, var(--card))";
   return (
     <thead>
-      {/* Row 1: sticky labels + group names */}
+      {/* Tier 1: Room Group */}
       <tr className="bg-muted/50">
         <th
-          rowSpan={2}
+          rowSpan={3}
           className="sticky left-0 top-0 z-40 min-w-[100px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
           style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
           Building
         </th>
         <th
-          rowSpan={2}
+          rowSpan={3}
           className="sticky left-[100px] top-0 z-40 min-w-[80px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
           style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
@@ -163,22 +161,9 @@ function MatrixHeader({
         {groups.map((g, idx) => (
           <th
             key={g.key}
-            colSpan={6}
-            className={cn(
-              "sticky top-0 z-30 border-b border-l-2 border-l-border px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide",
-              g.isTotal && "bg-primary/10",
-              g.isNa && "bg-muted/50 text-muted-foreground",
-              !g.isTotal && !g.isNa && idx % 2 === 1 && "bg-muted/30",
-            )}
-            style={{
-              background: g.isTotal
-                ? "color-mix(in oklab, var(--primary) 10%, var(--card))"
-                : g.isNa
-                  ? "color-mix(in oklab, var(--muted) 50%, var(--card))"
-                  : idx % 2 === 1
-                    ? "color-mix(in oklab, var(--muted) 30%, var(--card))"
-                    : "color-mix(in oklab, var(--muted) 50%, var(--card))",
-            }}
+            colSpan={COLS_PER_GROUP}
+            className="sticky top-0 z-30 border-b border-l-2 border-l-border px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide"
+            style={{ background: groupBg(g, idx) }}
           >
             {g.isTotal ? (
               <span>{g.label}</span>
@@ -199,56 +184,48 @@ function MatrixHeader({
           </th>
         ))}
       </tr>
-      {/* Row 2: metric subheaders repeating per group */}
+      {/* Tier 2: Status */}
       <tr>
-        {groups.map((g, idx) => (
-          <SubHeaderCells
-            key={g.key}
-            groupIndex={idx}
-            isTotal={g.isTotal}
-            isNa={g.isNa}
-          />
-        ))}
+        {groups.map((g, idx) =>
+          STATUS_COLS.map((sc, sIdx) => (
+            <th
+              key={`${g.key}-${sc.slot}`}
+              colSpan={TEAM_COL_ORDER.length}
+              className={cn(
+                "sticky top-[30px] z-30 h-6 border-b px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+                sIdx === 0 && "border-l-2 border-l-border",
+                sIdx !== 0 && "border-l border-l-border/70",
+              )}
+              style={{ background: groupBg(g, idx) }}
+            >
+              {sc.label}
+            </th>
+          )),
+        )}
+      </tr>
+      {/* Tier 3: Team */}
+      <tr>
+        {groups.map((g, idx) =>
+          STATUS_COLS.map((sc, sIdx) =>
+            TEAM_COL_ORDER.map((team, tIdx) => (
+              <th
+                key={`${g.key}-${sc.slot}-${team}`}
+                className={cn(
+                  "sticky top-[54px] z-30 h-6 min-w-[40px] border-b px-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+                  sIdx === 0 && tIdx === 0 && "border-l-2 border-l-border",
+                  !(sIdx === 0 && tIdx === 0) && tIdx === 0 && "border-l border-l-border/70",
+                  tIdx !== 0 && "border-r border-r-border/30",
+                )}
+                style={{ background: groupBg(g, idx) }}
+                title={`${sc.label} · ${team}`}
+              >
+                {team === "ELEC" ? "Elec" : team === "MECH" ? "Mech" : "Arch"}
+              </th>
+            )),
+          ),
+        )}
       </tr>
     </thead>
-  );
-}
-
-function SubHeaderCells({
-  groupIndex,
-  isTotal,
-  isNa,
-}: {
-  groupIndex: number;
-  isTotal?: boolean;
-  isNa?: boolean;
-}) {
-  const bgColor = isTotal
-    ? "color-mix(in oklab, var(--primary) 10%, var(--card))"
-    : isNa
-      ? "color-mix(in oklab, var(--muted) 40%, var(--card))"
-      : groupIndex % 2 === 1
-        ? "color-mix(in oklab, var(--muted) 30%, var(--card))"
-        : "color-mix(in oklab, var(--muted) 10%, var(--card))";
-  return (
-    <>
-      {METRIC_COLS.map((mc, i) => (
-        <th
-          key={mc.slot}
-          className={cn(
-            "sticky top-[30px] z-30 h-7 border-b px-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
-            i === 0 && "border-l-2 border-l-border",
-            i !== 0 && "border-r border-r-border/40",
-            mc.slot === "issued" && "min-w-[46px]",
-            mc.slot !== "issued" && "min-w-[40px]",
-          )}
-          style={{ background: bgColor }}
-          title={mc.label}
-        >
-          {mc.label}
-        </th>
-      ))}
-    </>
   );
 }
 
@@ -256,9 +233,11 @@ export function DeSnagMatrixBlock({
   block,
   onNavigate,
   presentBuildings,
+  mode,
 }: {
   block: MatrixBlock;
   presentBuildings: string[];
+  mode: MatrixMode;
   onNavigate: (params: Record<string, string>) => void;
 }) {
   const buildingMembers = (() => {
@@ -277,7 +256,8 @@ export function DeSnagMatrixBlock({
     rowBuilding: string | null,
     rowLevelDisp: string | null,
     col: RoomGroupCol | "__ROW_TOTAL__" | "__BUILDING_SUBTOTAL__",
-    slot: MetricSlot,
+    slot: StatusSlot,
+    team: TeamKey,
   ) => {
     const p: Record<string, string> = { ...basementParam };
     if (rowBuilding && block.kind !== "basement") p.building = rowBuilding;
@@ -286,7 +266,10 @@ export function DeSnagMatrixBlock({
     if (col === "FACADE") p.roomGroup = "FACADE,LANDSCAPE";
     else if (col === "N/A") p.roomGroup = "__EMPTY__";
     else if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.roomGroup = col;
-    Object.assign(p, metricSearchParams(slot));
+    p.team = team;
+    // 정본(_snag_done_asof) 동치: 자기 실적일 ≤ as-of. dateEnd 는 상위에서 as-of 로 채움.
+    if (slot === "rect") p.dateField = "actual_rectified_date";
+    else if (slot === "closed") p.dateField = "actual_closure_date";
     onNavigate(p);
   };
 
@@ -298,15 +281,10 @@ export function DeSnagMatrixBlock({
     for (const r of block.rows) {
       if (!cur || cur.building !== r.building) {
         if (cur) groups.push(cur);
-        cur = { building: r.building, rows: [], subtotal: { open: 0, rectified: 0, reopen: 0, closed: 0, issued: 0, closurePct: null } };
+        cur = { building: r.building, rows: [], subtotal: newStats() };
       }
       cur.rows.push(r);
-      cur.subtotal.open += r.rowTotal.open;
-      cur.subtotal.rectified += r.rowTotal.rectified;
-      cur.subtotal.reopen += r.rowTotal.reopen;
-      cur.subtotal.closed += r.rowTotal.closed;
-      cur.subtotal.issued += r.rowTotal.issued;
-      cur.subtotal.closurePct = cur.subtotal.issued > 0 ? cur.subtotal.closed / cur.subtotal.issued : null;
+      mergeStats(cur.subtotal, r.rowTotal);
     }
     if (cur) groups.push(cur);
   }
@@ -335,7 +313,7 @@ export function DeSnagMatrixBlock({
             {/* Column Total 행 — 헤더 바로 아래 고정 */}
             <tr className="font-medium">
               <td
-                className="sticky left-0 top-[58px] z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
+                className="sticky left-0 top-[78px] z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
                 colSpan={2}
                 style={{ background: "color-mix(in oklab, var(--primary) 14%, var(--card))" }}
               >
@@ -348,20 +326,22 @@ export function DeSnagMatrixBlock({
                 </button>
               </td>
               {ROOM_GROUP_ORDER.map((rg, idx) => (
-                <MetricCells
+                <TeamCells
                   key={rg}
                   stats={block.colTotals[rg]}
-                  onMetric={(m) => goCell(null, null, rg, m)}
+                  mode={mode}
+                  onCell={(slot, team) => goCell(null, null, rg, slot, team)}
                   groupIndex={idx}
-                  stickyTop={58}
+                  stickyTop={78}
                 />
               ))}
-              <MetricCells
+              <TeamCells
                 stats={block.blockTotal}
-                onMetric={(m) => goCell(null, null, "__ROW_TOTAL__", m)}
+                mode={mode}
+                onCell={(slot, team) => goCell(null, null, "__ROW_TOTAL__", slot, team)}
                 groupIndex={ROOM_GROUP_ORDER.length}
                 isTotal
-                stickyTop={58}
+                stickyTop={78}
               />
             </tr>
             {groups.map((grp) => (
@@ -369,8 +349,8 @@ export function DeSnagMatrixBlock({
                 key={grp.building}
                 group={grp}
                 block={block}
-                buildingParam={buildingParam}
                 basementParam={basementParam}
+                mode={mode}
                 onNavigate={onNavigate}
                 goCell={goCell}
               />
@@ -385,17 +365,23 @@ export function DeSnagMatrixBlock({
 function FragmentRows({
   group,
   block,
-  buildingParam,
   basementParam,
+  mode,
   onNavigate,
   goCell,
 }: {
   group: { building: string; rows: MatrixBlock["rows"]; subtotal: Stats };
   block: MatrixBlock;
-  buildingParam: Record<string, string>;
   basementParam: Record<string, string>;
+  mode: MatrixMode;
   onNavigate: (p: Record<string, string>) => void;
-  goCell: (b: string | null, l: string | null, c: RoomGroupCol | "__ROW_TOTAL__" | "__BUILDING_SUBTOTAL__", m: MetricSlot) => void;
+  goCell: (
+    b: string | null,
+    l: string | null,
+    c: RoomGroupCol | "__ROW_TOTAL__" | "__BUILDING_SUBTOTAL__",
+    slot: StatusSlot,
+    team: TeamKey,
+  ) => void;
 }) {
   const showBuildingSubtotal = block.kind === "podium" && group.rows.length > 1;
   return (
@@ -410,11 +396,11 @@ function FragmentRows({
             >
               <button
                 type="button"
-                  onClick={() => {
-                    const p: Record<string, string> =
-                      block.kind === "basement" ? { ...basementParam } : { building: r.building };
-                    onNavigate(p);
-                  }}
+                onClick={() => {
+                  const p: Record<string, string> =
+                    block.kind === "basement" ? { ...basementParam } : { building: r.building };
+                  onNavigate(p);
+                }}
                 className="hover:text-primary"
               >
                 {r.building}
@@ -439,17 +425,19 @@ function FragmentRows({
             </button>
           </td>
           {ROOM_GROUP_ORDER.map((rg, gIdx) => (
-            <MetricCells
+            <TeamCells
               key={rg}
               stats={r.cells[rg]}
-              onMetric={(m) => goCell(r.building, r.levelDisp, rg, m)}
+              mode={mode}
+              onCell={(slot, team) => goCell(r.building, r.levelDisp, rg, slot, team)}
               dim={r.cells[rg].issued === 0}
               groupIndex={gIdx}
             />
           ))}
-          <MetricCells
+          <TeamCells
             stats={r.rowTotal}
-            onMetric={(m) => goCell(r.building, r.levelDisp, "__ROW_TOTAL__", m)}
+            mode={mode}
+            onCell={(slot, team) => goCell(r.building, r.levelDisp, "__ROW_TOTAL__", slot, team)}
             groupIndex={ROOM_GROUP_ORDER.length}
             isTotal
           />
@@ -464,27 +452,22 @@ function FragmentRows({
             {group.building} 소계
           </td>
           {ROOM_GROUP_ORDER.map((rg, gIdx) => {
-            const sub: Stats = { open: 0, rectified: 0, reopen: 0, closed: 0, issued: 0, closurePct: null };
-            for (const r of group.rows) {
-              sub.open += r.cells[rg].open;
-              sub.rectified += r.cells[rg].rectified;
-              sub.reopen += r.cells[rg].reopen;
-              sub.closed += r.cells[rg].closed;
-              sub.issued += r.cells[rg].issued;
-            }
-            sub.closurePct = sub.issued > 0 ? sub.closed / sub.issued : null;
+            const sub = newStats();
+            for (const r of group.rows) mergeStats(sub, r.cells[rg]);
             return (
-              <MetricCells
+              <TeamCells
                 key={rg}
                 stats={sub}
-                onMetric={(m) => goCell(group.building, null, rg, m)}
+                mode={mode}
+                onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
                 groupIndex={gIdx}
               />
             );
           })}
-          <MetricCells
+          <TeamCells
             stats={group.subtotal}
-            onMetric={(m) => goCell(group.building, null, "__BUILDING_SUBTOTAL__", m)}
+            mode={mode}
+            onCell={(slot, team) => goCell(group.building, null, "__BUILDING_SUBTOTAL__", slot, team)}
             groupIndex={ROOM_GROUP_ORDER.length}
             isTotal
           />
