@@ -171,40 +171,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
 
   const fetchBatches = async () => {
     setLoading(true);
-    if (kind === "spare_part") {
-      const { data } = await supabase
-        .from("spare_parts_import_logs")
-        .select(
-          "id, file_name, status, executed_at, duration_ms, executed_by, data_date, row_counts, sheet_name, rolled_back_at",
-        )
-        .order("executed_at", { ascending: false })
-        .limit(100);
-      const list: Batch[] = (data ?? []).map((r: any) => {
-        const c = (r.row_counts ?? {}) as any;
-        const startedAt = r.executed_at;
-        const finishedAt = r.duration_ms
-          ? new Date(new Date(r.executed_at).getTime() + r.duration_ms).toISOString()
-          : null;
-        return {
-          id: r.id,
-          file_name: r.file_name,
-          status: r.status,
-          started_at: startedAt,
-          finished_at: finishedAt,
-          imported_by: r.executed_by,
-          data_date: r.data_date,
-          total: c.total ?? 0,
-          inserted: c.inserted ?? 0,
-          updated: c.updated ?? 0,
-          skipped: c.skipped ?? 0,
-          rejected: c.rejected ?? 0,
-          extra: r.sheet_name,
-          rolled_back_at: r.rolled_back_at,
-        };
-      });
-      setBatches(list);
-      await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
-    } else if (kind === "task_management") {
+    if (kind === "task_management") {
       const { data } = await supabase
         .from("task_management_import_logs")
         .select(
