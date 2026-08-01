@@ -6120,6 +6120,15 @@ export type Database = {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
       }
+      wrt_hdec_apply: {
+        Args: {
+          _allow_deletes?: boolean
+          _batch_id: string
+          _delete_count?: number
+          _patches: Json
+        }
+        Returns: Json
+      }
       wrt_judge_v1: {
         Args: {
           _delayed: number
