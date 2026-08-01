@@ -112,13 +112,11 @@ async function fetchComments(scope: InboxScope, limit: number): Promise<InboxCom
     parentMap: Map<string, { ref: string | null; label: string | null }> | null,
   ): Promise<InboxComment[]> {
     if (parentMap && parentMap.size === 0) return [];
-    // spare_part_comments 는 author_id, edited 컬럼 없음. 그 외는 author_user_id/edited 존재.
-    const isSp = table === "spare_part_comments";
-    const authorCol = isSp ? "author_id" : "author_user_id";
+    const authorCol = "author_user_id";
     const colList = ["id", parentCol, messageCol];
     if (categoryCol) colList.push(categoryCol);
     colList.push(authorCol);
-    if (!isSp) colList.push("edited");
+    colList.push("edited");
     colList.push("created_at", "updated_at");
     const cols = colList.join(",");
     if (parentMap) {
