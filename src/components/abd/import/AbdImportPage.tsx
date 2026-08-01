@@ -859,6 +859,7 @@ function FileRow({
               <AbdDataDatePicker
                 value={e.dataDate ?? null}
                 onChange={onDataDateChange}
+                fileDate={parseDataDateFromFileName(e.file.name)}
                 disabled={disabled}
               />
             </div>
