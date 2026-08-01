@@ -2,7 +2,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { TaskManagementImportPage } from "@/components/task-management/import/TaskManagementImportPage";
 import { DefectManagementImportPage } from "@/components/defect-management/import/DefectManagementImportPage";
-import { SparePartImportPage } from "@/components/spare-part/import/SparePartImportPage";
 import { AbdImportPage } from "@/components/abd/import/AbdImportPage";
 import { DmrImportPage } from "@/components/resource/dmr/DmrImportPage";
 import { getRouteApi } from "@tanstack/react-router";
@@ -27,7 +26,6 @@ export function ImportHubPage() {
         <TabsList>
           <TabsTrigger value="task">Task Management</TabsTrigger>
           <TabsTrigger value="snag">Snag List</TabsTrigger>
-          <TabsTrigger value="spare-part">Spare Part</TabsTrigger>
           <TabsTrigger value="abd">ABD</TabsTrigger>
           <TabsTrigger value="dmr">DMR</TabsTrigger>
           <TabsTrigger value="warranty">Warranty</TabsTrigger>
@@ -37,9 +35,6 @@ export function ImportHubPage() {
         </TabsContent>
         <TabsContent value="snag" className="mt-4">
           <DefectManagementImportPage />
-        </TabsContent>
-        <TabsContent value="spare-part" className="mt-4">
-          <SparePartImportPage />
         </TabsContent>
         <TabsContent value="abd" className="mt-4">
           <AbdImportPage />
