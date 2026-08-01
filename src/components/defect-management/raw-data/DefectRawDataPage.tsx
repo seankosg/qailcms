@@ -421,7 +421,27 @@ export function DefectRawDataPage() {
   }, [tab, urlSearch.source]);
 
   // ── Server data ─────────────────────────────────────────────────────────
-  const serverFilters = useMemo(() => toServerFilters(columnFilters), [columnFilters]);
+  // Progress 셀 드릴다운 술어 (URL 파생) — 집계와 동일 소스(public.snag_progress_events)
+  const cellServerFilter = useMemo<DefectServerFilter | null>(() => {
+    if (!urlSearch.cellStage || !urlSearch.cellFrom) return null;
+    const field = urlSearch.cellField === "actual" ? "actual" : "planned";
+    return {
+      column: "__cell__",
+      op: field === "actual" ? "stage_actual_range" : "stage_plan_range",
+      value: {
+        stage: String(urlSearch.cellStage),
+        field,
+        from: String(urlSearch.cellFrom),
+        to: String(urlSearch.cellTo || urlSearch.cellFrom),
+        planMode: urlSearch.cellMode === "remaining" ? "remaining" : "baseline",
+        asOf: urlSearch.asOf ? String(urlSearch.asOf) : "",
+      },
+    } as DefectServerFilter;
+  }, [urlSearch.cellStage, urlSearch.cellField, urlSearch.cellFrom, urlSearch.cellTo, urlSearch.cellMode, urlSearch.asOf]);
+  const serverFilters = useMemo(
+    () => (cellServerFilter ? [...toServerFilters(columnFilters), cellServerFilter] : toServerFilters(columnFilters)),
+    [columnFilters, cellServerFilter],
+  );
   const serverSort = useMemo(() => toServerSort(sorting), [sorting]);
   const q = (urlSearch.q ?? "").trim();
   const {
