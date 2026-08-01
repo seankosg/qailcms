@@ -35,6 +35,7 @@ import {
 } from "@/lib/task-management/derived";
 import type { TaskThresholds } from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
+import { resolveJudgment, resolvePlanPct } from "@/lib/task-management/delay-utils";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { MiniProgressChart } from "./MiniProgressChart";
@@ -140,13 +141,13 @@ function formatExtraValue(key: string, value: unknown): string {
   return String(value);
 }
 
-/** as-of 기준 재판정이 정본. 저장 판정(auto_judgment) 우선 분기는 제거되었다. */
+/** 정본 경유: 서버 병합 판정(srv_judgment) 우선, 없을 때만 as-of 클라 재판정. */
 function resolveRowJudgment(
   r: Row,
   thresholds: TaskThresholds,
   asOfDate?: string,
 ): string {
-  return computeJudgment(r, thresholds, asOfDate) || "";
+  return resolveJudgment(r as never, thresholds, asOfDate ?? "") || "";
 }
 
 function resolveMainJudgment(
