@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { assertNoTruncation } from "@/lib/data/assertNoSilentTruncation";
 
-export type InboxModule = "tm" | "sm" | "abd" | "sp";
+export type InboxModule = "tm" | "sm" | "abd";
 
 export interface InboxComment {
   id: string;
@@ -69,7 +69,7 @@ async function fetchOwnedParentIds(scope: InboxScope) {
   }
 
   // R4: 4개 모듈 부모 ID 조회 병렬화 (Promise.all).
-  const [tmParents, smParents, abdParents, spParents] = await Promise.all([
+  const [tmParents, smParents, abdParents] = await Promise.all([
     isAdmin ? Promise.resolve(null) : idsFrom("task_management_raw", "id", "task_no,task_name", (q) =>
       mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
     ),
@@ -78,9 +78,6 @@ async function fetchOwnedParentIds(scope: InboxScope) {
     ),
     isAdmin ? Promise.resolve(null) : idsFrom("abd_items_raw", "id", "abd_number,document_title", (q) =>
       mode === "team" ? q.eq("team", filterValue) : q.eq("hdec_pic_name", filterValue),
-    ),
-    isAdmin ? Promise.resolve(null) : idsFrom("spare_parts_raw", "doc_ref", "subject,plot", (q) =>
-      mode === "team" ? q.eq("team", filterValue) : q.eq("owner_user_id", userId ?? "__none__"),
     ),
   ]);
 
@@ -100,7 +97,6 @@ async function fetchOwnedParentIds(scope: InboxScope) {
     tm: map(tmParents, "id", "task_no", "task_name"),
     sm: map(smParents, "id", "source_issue_no", "location_raw"),
     abd: map(abdParents, "id", "abd_number", "document_title"),
-    sp: map(spParents, "doc_ref", "subject", "plot"),
   };
 }
 
