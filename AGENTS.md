@@ -80,3 +80,14 @@
 ### RPC 필터/정렬 허용 컬럼 규칙 (확정)
 
 검색/패싯 계열 RPC(`*_items_search`, `*_items_facets`, `*_items_search_ids`)의 필터·정렬 컬럼 검증은 **하드코딩 `_allowed_cols` 배열을 두지 않는다**. `information_schema.columns`에서 대상 원본 테이블의 컬럼을 런타임 유도한 목록에 파생 컬럼 화이트리스트(예: `public.abd_derived_cols()`)를 합쳐 사용한다. 목록에 없는 컬럼이 오면 **조용히 무시하지 말고 `RAISE EXCEPTION`으로 즉시 실패**시켜 클라이언트에 표면화한다. 파생 컬럼 추가/제거 시 해당 모듈의 `*_derived_cols()` 배열을 반드시 갱신한다(각 함수 상단 주석에도 동일 규칙 명시). 2026-07-29 ABD(`abd_items_search`, `abd_items_facets`)에 최초 적용.
+
+### TM 신규 화면 정본 경유 원칙 (필수, 2026-08-01)
+
+TM 모듈에 신규 카드·차트·필터·표를 추가할 때는 **반드시 `tm_rows_as_of`(또는 그 jsonb 래퍼 `tm_rows_as_of_json`) + 정본 판정 함수(`tm_row_gap` / `tm_kpi_judgment_g`)를 경유**한다.
+
+금지:
+- `task_management_raw` 또는 `v_task_management_raw_derived` 직조회 후 클라이언트에서 Plan%·Gap·판정을 재계산해 새 화면을 만드는 것
+- 저장된 `auto_judgment` 스냅샷을 판정 소스로 사용하는 것
+- Main 과업 판정에 자기 창(self-window) 계획을 쓰는 것 — Main 은 하위 가중 계획(`tm_main_tplan`) 정본을 따른다
+
+클라이언트 계산 함수(`derived.ts`)는 서버 정본 값이 없을 때의 **폴백 전용**이며, 서버 병합 필드(`srv_judgment`/`srv_plan_pct`/`srv_actual_pct`)가 있으면 항상 그것이 우선한다(`delay-utils.ts`의 `resolveJudgment`/`resolveIsDelayed`).
