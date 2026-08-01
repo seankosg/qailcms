@@ -814,6 +814,14 @@ export function DefectRawDataPage() {
     if (urlSearch.atRisk === "true") chips.push({ label: urlSearch.atRiskDays ? `At Risk (≤ ${urlSearch.atRiskDays}d)` : "At Risk", clears: ["atRisk", "atRiskDays"] });
     if (urlSearch.notClosureDone === "true") chips.push({ label: "Closure ≠ Done", clears: ["notClosureDone"] });
     if (urlSearch.hdecVerification) chips.push({ label: `HDEC Verification: ${urlSearch.hdecVerification === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecVerification}`, clears: ["hdecVerification"] });
+    if (urlSearch.cellStage && urlSearch.cellFrom) {
+      const f = urlSearch.cellField === "actual" ? "Actual" : "Plan";
+      const range = urlSearch.cellTo && urlSearch.cellTo !== urlSearch.cellFrom ? `${urlSearch.cellFrom} → ${urlSearch.cellTo}` : String(urlSearch.cellFrom);
+      chips.push({
+        label: `Cell: ${urlSearch.cellStage} ${f} ${range}${urlSearch.cellMode === "remaining" ? " (remaining)" : ""}`,
+        clears: CELL_PARAMS,
+      });
+    }
     if (urlSearch.catADispute === "xor") chips.push({ label: "Cat A Dispute (LL ≠ HDEC)", clears: ["catADispute"] });
     if (urlSearch.hdecReason) chips.push({ label: `HDEC Reason: ${urlSearch.hdecReason === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecReason}`, clears: ["hdecReason"] });
     return chips;
