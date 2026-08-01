@@ -127,6 +127,15 @@ export function TmDashboardPage() {
       } as typeof it;
     });
   }, [items, asOfRows.ready, asOfRows.map]);
+  if (typeof window !== "undefined") {
+    (window as any).__tmdbg = {
+      ready: asOfRows.ready,
+      mapSize: asOfRows.map.size,
+      items: items.length,
+      merged: effectiveItems.filter((x: any) => x.srv_judgment != null).length,
+      asOfDate,
+    };
+  }
 
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
 
