@@ -256,7 +256,9 @@ export function WrtRawDataPage() {
                   ? "계획·실적 없음 (분모 0)"
                   : j === "제외"
                     ? "Cancelled — 통계 제외"
-                    : undefined
+                    : j === "지연"
+                      ? "대표 지연 보유 문서"
+                      : undefined
             }
             tone={j === "지연" ? "bad" : j === "미분류" ? "warn" : undefined}
           />
