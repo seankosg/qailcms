@@ -307,6 +307,7 @@ const DRILLDOWN_PARAMS = [
   "asOf", "stage", "remaining_stage", "remaining_asof", "capturedByGroup", "notClosureDone", "catADispute",
   "hdecVerification", "hdecReason", ...Object.keys(URL_MAP), "dateStart", "dateEnd", "dateField",
   "cellStage", "cellField", "cellFrom", "cellTo", "cellMode",
+  "noPlanStages",
 ];
 
 /** 셀 드릴다운 조건은 URL 에 상주해야 하므로 progress 진입 정리 시 보존한다. */
