@@ -312,7 +312,8 @@ export function OwnerProgressChart({
           <span className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-sm bg-destructive" /> Actual (지연)
           </span>
-          <span className="flex items-center gap-1">▼ 지연 태스크 수 · n건 = 전체 태스크 수</span>
+          {!allDelayed && <span className="flex items-center gap-1">▼ 지연 태스크 수 · n건 = 전체 태스크 수</span>}
+          {allDelayed && <span className="flex items-center gap-1">n건 = 지연 태스크 수</span>}
         </div>
       </CardContent>
     </Card>
