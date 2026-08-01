@@ -4,8 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
  * WRT 화면 데이터 정본 경유 진입점.
- * 표시·집계 수치는 전부 `wrt_rows_as_of`(→ `wrt_stage_state` / `wrt_judge_v1`)를 거친다.
+ * 표시·집계 수치는 전부 `wrt_rows_as_of`(→ `wrt_eval_as_of` → `wrt_stage_state` / `wrt_judge_v2`)를 거친다.
  * 원시 테이블 직조회 + 클라이언트 재계산 금지.
+ * 판정·대표지연은 읽기 시 서버 재계산 결과이며, 저장 판정 컬럼은 존재하지 않는다.
  */
 
 export type WrtStageCell = {
@@ -26,6 +27,17 @@ export type WrtCatalogEntry = {
   actual_authority: "HDEC" | "ACONEX";
   round_no: number | null;
   sort_order: number;
+  chain_excluded?: boolean;
+};
+
+export type WrtStageRef = {
+  stage_code: string;
+  label: string;
+  band: string;
+  round_no?: number | null;
+  state?: string;
+  days?: number;
+  authority?: string;
 };
 
 export type WrtJudgment = "완료" | "정상" | "지연" | "미분류" | "제외";
@@ -55,6 +67,15 @@ export type WrtRow = {
   done: number;
   delayed: number;
   denom: number;
+  active_band: string | null;
+  completed_stage: WrtStageRef | null;
+  current_stage: WrtStageRef | null;
+  /** 활성 밴드 내 HDEC 귀책 최선행 지연 1개 (Aconex 회신 단계 제외) */
+  primary_delay: WrtStageRef | null;
+  /** 후행 밴드 지연 — 인지용, KPI 지연 카드 미합산 */
+  delay_bucket: WrtStageRef[];
+  /** Aconex 회신 대기 지연 — HDEC 귀책 아님, 별도 표기 전용 */
+  response_wait: WrtStageRef[];
   progress_pct: number | null;
   judgment: WrtJudgment;
 };
