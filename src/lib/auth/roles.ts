@@ -55,7 +55,6 @@ export function canAccessRoute(
 type RawTable =
   | "abd_items_raw"
   | "defect_items_raw"
-  | "spare_parts_raw"
   | "task_management_raw";
 
 /**
