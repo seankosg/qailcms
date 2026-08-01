@@ -309,6 +309,9 @@ const DRILLDOWN_PARAMS = [
   "cellStage", "cellField", "cellFrom", "cellTo", "cellMode",
 ];
 
+/** 셀 드릴다운 조건은 URL 에 상주해야 하므로 progress 진입 정리 시 보존한다. */
+const CELL_PARAMS = ["cellStage", "cellField", "cellFrom", "cellTo", "cellMode", "asOf"];
+
 export function DefectRawDataPage() {
   const navigate = useNavigate();
   const urlSearch = RawDataRoute.useSearch();
