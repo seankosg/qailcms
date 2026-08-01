@@ -39,7 +39,7 @@ import { JudgmentDonut } from "./JudgmentDonut";
 import { computeJudgmentStageBreakdown } from "@/lib/task-management/delay-utils";
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
-import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
+import { DEFAULT_THRESHOLDS, isTaskDelayed, computeJudgment } from "@/lib/task-management/derived";
 import { todayInDoha } from "@/lib/time/doha";
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/dashboard");
