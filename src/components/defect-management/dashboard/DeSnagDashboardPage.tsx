@@ -127,6 +127,15 @@ export function DeSnagDashboardPage() {
         ({ ...prev, matrixMode: m === "count" ? "" : m }) as any,
     });
 
+  // 매트릭스 상단 Plot 탭 — 즉시 적용 (다른 파라미터 보존)
+  const setPlotTab = (p: PlotKey) => {
+    setStagedPlot(p);
+    navigate({
+      to: "/closure/snag-management/dashboard",
+      search: (prev: Record<string, unknown>) => ({ ...prev, plot: p }) as any,
+    });
+  };
+
   function roomGroupParam(col: RoomGroupCol): string {
     if (col === "FACADE") return "FACADE,LANDSCAPE";
     if (col === "N/A") return "__EMPTY__";
@@ -270,6 +279,12 @@ export function DeSnagDashboardPage() {
       )}
 
       <div className="mt-1 flex flex-wrap items-center gap-2">
+        <Tabs value={appliedPlot} onValueChange={(v) => setPlotTab(v as PlotKey)}>
+          <TabsList className="h-8">
+            <TabsTrigger value="C" className="text-xs">PLOT C</TabsTrigger>
+            <TabsTrigger value="D" className="text-xs">PLOT D</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <Tabs value={matrixMode} onValueChange={(v) => setMatrixMode(v as MatrixMode)}>
           <TabsList className="h-8">
             <TabsTrigger value="count" className="text-xs">개수</TabsTrigger>
