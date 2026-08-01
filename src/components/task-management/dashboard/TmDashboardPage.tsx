@@ -16,7 +16,6 @@ import {
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
 import {
-  computeDelayTopN,
   type OwnerDim,
   type OwnerLeaderboardRow,
 } from "@/lib/task-management/delay-utils";
@@ -31,8 +30,6 @@ const TASK_SCOPE_OPTIONS = [
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
 import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
-import { DelayTopTable } from "./DelayTopTable";
-import { OwnerLeaderboardCard } from "./OwnerLeaderboardCard";
 import { OwnerProgressChart } from "./OwnerProgressChart";
 import { JudgmentStageBreakdown } from "./JudgmentStageBreakdown";
 import { JudgmentDonut } from "./JudgmentDonut";
@@ -156,11 +153,6 @@ export function TmDashboardPage() {
     // 전체 = 지연 + 악화 (isTaskDelayed)
     return base.filter((it) => isTaskDelayed(it, thresholds, asOfDate));
   }, [scopedByTaskScope, search.delayFilter, thresholds, asOfDate]);
-
-  const delayTop = useMemo(
-    () => computeDelayTopN(scopedItems, asOfDate, 20, thresholds),
-    [scopedItems, asOfDate, thresholds],
-  );
 
   const patch = (obj: Record<string, unknown>) =>
     navigate({
@@ -341,30 +333,14 @@ export function TmDashboardPage() {
           </CardContent>
         </Card>
       ) : (
-        <>
-          {/* Top row: 지연 Top + Owner Leaderboard */}
-          <div className="grid gap-4 xl:grid-cols-2">
-            <DelayTopTable items={delayTop} />
-            <OwnerLeaderboardCard
-              items={scopedItems}
-              asOfDate={asOfDate}
-              defaultDim={ownerDim}
-              onDimChange={(dim) => patch({ ownerDim: dim })}
-              onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
-              thresholds={thresholds}
-            />
-          </div>
-
-          {/* Bottom: Team / Individual Progress chart (수치 정본 = Owner Leaderboard 동일) */}
-          <OwnerProgressChart
-            items={scopedItems}
-            asOfDate={asOfDate}
-            dim={ownerDim}
-            onDimChange={(dim) => patch({ ownerDim: dim })}
-            onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
-            thresholds={thresholds}
-          />
-        </>
+        <OwnerProgressChart
+          items={scopedItems}
+          asOfDate={asOfDate}
+          dim={ownerDim}
+          onDimChange={(dim) => patch({ ownerDim: dim })}
+          onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
+          thresholds={thresholds}
+        />
       )}
 
       <OwnerDetailDialog
