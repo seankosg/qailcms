@@ -1,6 +1,7 @@
 import { dohaStampCompact } from "@/lib/time/doha";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
-import { cumPlanProgress, computeVariance, computeJudgment } from "@/lib/task-management/derived";
+import { cumPlanProgress, computeVariance } from "@/lib/task-management/derived";
+import { resolveJudgment, resolvePlanPct } from "@/lib/task-management/delay-utils";
 
 export interface TaskSummaryRow {
   id: string;
@@ -163,10 +164,10 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
 function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean, asOf?: string): Record<string, unknown> & { __isMain: boolean; __zebra: boolean } {
   const gap = computeVariance(r, asOf) ?? 0;
   const expected = cumPlanProgress(r, asOf);
-  // as-of 재계산이 정본. asOf 미지정(과거 스냅샷 경로)일 때만 병합된 저장 판정을 우선.
-  const judgment = asOf
-    ? computeJudgment(r, undefined, asOf) || r.auto_judgment || ""
-    : r.auto_judgment || computeJudgment(r, undefined, asOf) || "";
+  // 정본 경유: 서버 병합값(srv_judgment/srv_plan_pct) 우선, 없을 때만 클라 as-of 재계산.
+  const judgeAsOf = asOf ?? "";
+  const judgment = resolveJudgment(r as never, undefined, judgeAsOf) || "";
+  const planPct = resolvePlanPct(r as never, judgeAsOf);
   return {
     __isMain: isMain,
     __zebra: zebra,
@@ -179,7 +180,7 @@ function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean, asOf?: str
     hdec_eng_name: r.hdec_eng_name ?? "",
     plan_start: r.plan_start ?? "",
     plan_end: r.plan_end ?? "",
-    plan_progress: pct(r.plan_progress),
+    plan_progress: Number.isFinite(planPct) ? planPct : "",
     expected_today: Number.isFinite(expected) ? expected : "",
     actual_progress: pct(r.actual_progress),
     gap: Number.isFinite(gap) ? gap : "",
