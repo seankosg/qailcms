@@ -5759,15 +5759,6 @@ export type Database = {
         }
         Returns: Json
       }
-      spl_judge_v1: {
-        Args: {
-          _delayed: number
-          _denom: number
-          _done: number
-          _latest_status: string
-        }
-        Returns: string
-      }
       spl_judge_v2: {
         Args: {
           _denom: number
@@ -6182,17 +6173,6 @@ export type Database = {
           _patches: Json
         }
         Returns: Json
-      }
-      wrt_judge_v1: {
-        Args: {
-          _delayed: number
-          _denom: number
-          _done: number
-          _is_excluded: boolean
-          _is_final_approved: boolean
-          _latest_response_code: string
-        }
-        Returns: string
       }
       wrt_judge_v2: {
         Args: {
