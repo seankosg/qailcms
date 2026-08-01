@@ -12,8 +12,6 @@ import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import {
-  ALL_TASK_TIMELINE_STAGE_KEYS,
-  isTaskStageDelayedAsOf,
   todayIso,
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
