@@ -5334,6 +5334,24 @@ export type Database = {
         }
         Returns: Json
       }
+      spl_judge_v1: {
+        Args: { _delayed: number; _denom: number; _done: number }
+        Returns: string
+      }
+      spl_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
+      spl_stage_state: {
+        Args: {
+          _actual_finish: string
+          _actual_start: string
+          _as_of: string
+          _flag: string
+          _na: boolean
+          _plan_finish: string
+          _plan_start: string
+          _value_type: string
+        }
+        Returns: string
+      }
       tm_actual_at_date: {
         Args: { _as_of: string; _ids?: string[] }
         Returns: {

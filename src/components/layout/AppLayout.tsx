@@ -116,6 +116,14 @@ const NAV: NavSection[] = [
           { label: "Coming soon", icon: iconCertificate, disabled: true, badge: "Soon" },
         ],
       },
+      {
+        label: "Spare Part List",
+        icon: iconDatabase,
+        matchPrefix: "/closure/spare-part",
+        items: [
+          { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: iconDatabase },
+        ],
+      },
     ],
   },
   {

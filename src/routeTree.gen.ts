@@ -39,6 +39,7 @@ import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './ro
 import { Route as AuthenticatedClosureTaskManagementScheduleRevisionRouteImport } from './routes/_authenticated/closure/task-management/schedule-revision'
 import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from './routes/_authenticated/closure/task-management/raw-data'
 import { Route as AuthenticatedClosureTaskManagementDashboardRouteImport } from './routes/_authenticated/closure/task-management/dashboard'
+import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './routes/_authenticated/closure/spare-part/raw-data'
 import { Route as AuthenticatedClosureSnagManagementSettingsRouteImport } from './routes/_authenticated/closure/snag-management/settings'
 import { Route as AuthenticatedClosureSnagManagementRawDataRouteImport } from './routes/_authenticated/closure/snag-management/raw-data'
 import { Route as AuthenticatedClosureSnagManagementProgressRouteImport } from './routes/_authenticated/closure/snag-management/progress'
@@ -229,6 +230,12 @@ const AuthenticatedClosureTaskManagementDashboardRoute =
     path: '/closure/task-management/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureSparePartRawDataRoute =
+  AuthenticatedClosureSparePartRawDataRouteImport.update({
+    id: '/closure/spare-part/raw-data',
+    path: '/closure/spare-part/raw-data',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureSnagManagementSettingsRoute =
   AuthenticatedClosureSnagManagementSettingsRouteImport.update({
     id: '/closure/snag-management/settings',
@@ -369,6 +376,7 @@ export interface FileRoutesByFullPath {
   '/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
+  '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
@@ -417,6 +425,7 @@ export interface FileRoutesByTo {
   '/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
+  '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
@@ -468,6 +477,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/_authenticated/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/_authenticated/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
+  '/_authenticated/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/_authenticated/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
@@ -519,6 +529,7 @@ export interface FileRouteTypes {
     | '/closure/snag-management/progress'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
+    | '/closure/spare-part/raw-data'
     | '/closure/task-management/dashboard'
     | '/closure/task-management/raw-data'
     | '/closure/task-management/schedule-revision'
@@ -567,6 +578,7 @@ export interface FileRouteTypes {
     | '/closure/snag-management/progress'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
+    | '/closure/spare-part/raw-data'
     | '/closure/task-management/dashboard'
     | '/closure/task-management/raw-data'
     | '/closure/task-management/schedule-revision'
@@ -617,6 +629,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/snag-management/progress'
     | '/_authenticated/closure/snag-management/raw-data'
     | '/_authenticated/closure/snag-management/settings'
+    | '/_authenticated/closure/spare-part/raw-data'
     | '/_authenticated/closure/task-management/dashboard'
     | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/task-management/schedule-revision'
@@ -859,6 +872,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureTaskManagementDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/spare-part/raw-data': {
+      id: '/_authenticated/closure/spare-part/raw-data'
+      path: '/closure/spare-part/raw-data'
+      fullPath: '/closure/spare-part/raw-data'
+      preLoaderRoute: typeof AuthenticatedClosureSparePartRawDataRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/snag-management/settings': {
       id: '/_authenticated/closure/snag-management/settings'
       path: '/closure/snag-management/settings'
@@ -1050,6 +1070,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureSnagManagementProgressRoute: typeof AuthenticatedClosureSnagManagementProgressRoute
   AuthenticatedClosureSnagManagementRawDataRoute: typeof AuthenticatedClosureSnagManagementRawDataRoute
   AuthenticatedClosureSnagManagementSettingsRoute: typeof AuthenticatedClosureSnagManagementSettingsRoute
+  AuthenticatedClosureSparePartRawDataRoute: typeof AuthenticatedClosureSparePartRawDataRoute
   AuthenticatedClosureTaskManagementDashboardRoute: typeof AuthenticatedClosureTaskManagementDashboardRoute
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
   AuthenticatedClosureTaskManagementScheduleRevisionRoute: typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
@@ -1094,6 +1115,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureSnagManagementRawDataRoute,
   AuthenticatedClosureSnagManagementSettingsRoute:
     AuthenticatedClosureSnagManagementSettingsRoute,
+  AuthenticatedClosureSparePartRawDataRoute:
+    AuthenticatedClosureSparePartRawDataRoute,
   AuthenticatedClosureTaskManagementDashboardRoute:
     AuthenticatedClosureTaskManagementDashboardRoute,
   AuthenticatedClosureTaskManagementRawDataRoute:
