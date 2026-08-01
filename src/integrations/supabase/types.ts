@@ -5263,6 +5263,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      tm_rows_as_of_json: { Args: { p_as_of?: string }; Returns: Json }
       tm_thresholds: { Args: never; Returns: Json }
       tm_today_actual: {
         Args: { _as_of: string; _ids: string[] }
