@@ -35,6 +35,7 @@ import { useTmJudgmentAtDate } from "@/hooks/useTmJudgmentAtDate";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { DelayTopTable } from "./DelayTopTable";
 import { OwnerLeaderboardCard } from "./OwnerLeaderboardCard";
+import { OwnerProgressChart } from "./OwnerProgressChart";
 import { JudgmentStageBreakdown } from "./JudgmentStageBreakdown";
 import { JudgmentDonut } from "./JudgmentDonut";
 import { computeJudgmentStageBreakdown } from "@/lib/task-management/delay-utils";
@@ -357,6 +358,16 @@ export function TmDashboardPage() {
               thresholds={thresholds}
             />
           </div>
+
+          {/* Bottom: Team / Individual Progress chart (수치 정본 = Owner Leaderboard 동일) */}
+          <OwnerProgressChart
+            items={scopedItems}
+            asOfDate={asOfDate}
+            dim={ownerDim}
+            onDimChange={(dim) => patch({ ownerDim: dim })}
+            onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
+            thresholds={thresholds}
+          />
         </>
       )}
 
