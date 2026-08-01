@@ -54,8 +54,9 @@ export function SplRawDataPage() {
     queryFn: () => fetchRows({ data: { as_of: asOf } }),
   });
 
-  const setSearch = (patch: Record<string, unknown>) =>
-    navigate({ search: (prev: any) => ({ ...prev, ...patch }) });
+  type SplSearch = typeof search;
+  const setSearch = (patch: Partial<SplSearch>) =>
+    navigate({ search: (prev: SplSearch) => ({ ...prev, ...patch }) });
 
   const catalog: SplCatalogEntry[] = data?.catalog ?? [];
   const bands = useMemo(() => {
