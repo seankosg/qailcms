@@ -3087,6 +3087,113 @@ export type Database = {
         }
         Relationships: []
       }
+      spl_import_logs: {
+        Row: {
+          cleared_values: number
+          created_at: string
+          file_name: string
+          finished_at: string | null
+          id: string
+          imported_by: string | null
+          items_updated: number
+          matched: number
+          note: string | null
+          ocs_excluded: number
+          sheet_names: string[]
+          stages_upserted: number
+          started_at: string
+          status: string
+          total_rows: number
+          unmatched: number
+          updated_at: string
+        }
+        Insert: {
+          cleared_values?: number
+          created_at?: string
+          file_name: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          items_updated?: number
+          matched?: number
+          note?: string | null
+          ocs_excluded?: number
+          sheet_names?: string[]
+          stages_upserted?: number
+          started_at?: string
+          status?: string
+          total_rows?: number
+          unmatched?: number
+          updated_at?: string
+        }
+        Update: {
+          cleared_values?: number
+          created_at?: string
+          file_name?: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          items_updated?: number
+          matched?: number
+          note?: string | null
+          ocs_excluded?: number
+          sheet_names?: string[]
+          stages_upserted?: number
+          started_at?: string
+          status?: string
+          total_rows?: number
+          unmatched?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      spl_import_row_logs: {
+        Row: {
+          batch_id: string
+          changes: Json
+          code: string | null
+          created_at: string
+          detail: string | null
+          excel_row: number | null
+          id: string
+          outcome: string
+          sheet_name: string | null
+          spl_number: string | null
+        }
+        Insert: {
+          batch_id: string
+          changes?: Json
+          code?: string | null
+          created_at?: string
+          detail?: string | null
+          excel_row?: number | null
+          id?: string
+          outcome: string
+          sheet_name?: string | null
+          spl_number?: string | null
+        }
+        Update: {
+          batch_id?: string
+          changes?: Json
+          code?: string | null
+          created_at?: string
+          detail?: string | null
+          excel_row?: number | null
+          id?: string
+          outcome?: string
+          sheet_name?: string | null
+          spl_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_import_row_logs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "spl_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spl_items: {
         Row: {
           approval_status_raw: string | null
@@ -3168,6 +3275,24 @@ export type Database = {
           title?: string | null
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      spl_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
         }
         Relationships: []
       }
@@ -5199,6 +5324,15 @@ export type Database = {
           item_id: string
           stage: string
         }[]
+      }
+      spl_hdec_apply: {
+        Args: {
+          _allow_deletes?: boolean
+          _batch_id: string
+          _delete_count?: number
+          _patches: Json
+        }
+        Returns: Json
       }
       tm_actual_at_date: {
         Args: { _as_of: string; _ids?: string[] }
