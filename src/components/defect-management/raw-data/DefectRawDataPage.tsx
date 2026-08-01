@@ -198,21 +198,9 @@ function mergeUrlFilters(urlSearch: Record<string, any>, baseFilters: ColumnFilt
   if ((urlSearch.dateStart || urlSearch.dateEnd) && urlSearch.dateField && DATE_FILTER_FIELDS.has(urlSearch.dateField)) {
     overridden.add(urlSearch.dateField);
   }
+  // Progress Matrix 셀 드릴다운 조건은 TanStack Table 의 columnFilters 에 넣지 않는다.
+  // (미정의 컬럼 id 는 테이블이 상태에서 제거해 조건이 소실됨 → URL 파생 서버 필터로 별도 운반)
   const next = baseFilters.filter((filter) => !overridden.has(filter.id) && filter.id !== CELL_RANGE_ID);
-  // Progress Matrix 셀 드릴다운 — 스테이지 조합·remaining(NOT done) 조건까지 정본 경유.
-  if (urlSearch.cellStage && urlSearch.cellFrom) {
-    next.push({
-      id: CELL_RANGE_ID,
-      value: {
-        stage: String(urlSearch.cellStage),
-        field: urlSearch.cellField === "actual" ? "actual" : "planned",
-        from: String(urlSearch.cellFrom),
-        to: String(urlSearch.cellTo || urlSearch.cellFrom),
-        planMode: urlSearch.cellMode === "remaining" ? "remaining" : "baseline",
-        asOf: urlSearch.asOf ? String(urlSearch.asOf) : "",
-      },
-    });
-  }
   for (const [param, column] of Object.entries(URL_MAP)) {
     const value = urlSearch[param];
     if (!value) continue;
