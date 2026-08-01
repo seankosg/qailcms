@@ -1416,9 +1416,14 @@ export function TaskManagementRawDataPage() {
                 const mapped = ((payload.rows ?? []) as any[]).map((r) => {
                   if (r && Object.prototype.hasOwnProperty.call(r, "derived_auto_judgment")) {
                     const { derived_auto_judgment, ...rest } = r;
-                    return { ...rest, auto_judgment: derived_auto_judgment ?? rest.auto_judgment } as Row;
+                    return {
+                      ...rest,
+                      auto_judgment: derived_auto_judgment ?? rest.auto_judgment,
+                      // 정본 계획% 승격 — 저장 plan_progress(임포트 스냅샷) 내보내기 금지.
+                      plan_progress: rest.cum_plan_pct ?? rest.plan_progress,
+                    } as Row;
                   }
-                  return r as Row;
+                  return { ...r, plan_progress: r?.cum_plan_pct ?? r?.plan_progress } as Row;
                 });
                 setExportRows(mapped);
                 toast.success("전체 데이터 준비 완료", { id: t });
