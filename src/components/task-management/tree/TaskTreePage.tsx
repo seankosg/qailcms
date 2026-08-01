@@ -63,6 +63,7 @@ const SUMMARY_COLUMN_SOURCE: Record<string, string | null> = {
   task_no: "task_no",
   sub_task_desc: "sub_task_desc",
   pic: "hdec_pic_name",
+  plan_window: null,
   plan: "plan_progress",
   actual: "actual_progress",
   today_plan: "expected_progress_today",
@@ -70,7 +71,10 @@ const SUMMARY_COLUMN_SOURCE: Record<string, string | null> = {
   judgment: "auto_judgment",
   chart: null,
 };
-const SUMMARY_FALLBACK_LABELS: Record<string, string> = { chart: "진도 차트" };
+const SUMMARY_FALLBACK_LABELS: Record<string, string> = {
+  chart: "진도 차트",
+  plan_window: "계획 기간",
+};
 /** 위 요약 컬럼이 이미 표시 중인 Raw Data 필드 (중복 노출 방지) */
 const SUMMARY_COVERED_FIELDS = new Set<string>([
   "task_no",
@@ -974,12 +978,25 @@ export function TaskTreePage() {
                       담당 <span className="font-medium text-foreground">{pPic}</span>
                     </span>
                   )}
-                  {showCol("plan") && (
+                  {showCol("plan_window") && (
                     <span
                       className="text-[10px] tabular-nums text-muted-foreground"
                       title="계획 (P.Start ~ P.Finish)"
                     >
                       계획 {p.plan_start ?? "-"} ~ {p.plan_end ?? "-"}
+                    </span>
+                  )}
+                  {showCol("plan") && (
+                    <span
+                      className="text-[10px] tabular-nums text-muted-foreground"
+                      title={summaryColumnLabels["plan"]}
+                    >
+                      {summaryColumnLabels["plan"]}{" "}
+                      <span className="font-medium text-foreground">
+                        {p.plan_progress == null
+                          ? "-"
+                          : `${(Number(p.plan_progress) * 100).toFixed(0)}%`}
+                      </span>
                     </span>
                   )}
                   {showCol("actual") && <ProgressBar v={p.actual_progress} />}
@@ -1090,10 +1107,18 @@ export function TaskTreePage() {
                                       {k.hdec_pic_name ?? k.hdec_eng_name ?? "-"}
                                     </td>
                                   );
-                                case "plan":
+                                case "plan_window":
                                   return (
                                     <td key={c} className="px-2 py-1 text-[10px] tabular-nums">
                                       {k.plan_start ?? "-"} ~ {k.plan_end ?? "-"}
+                                    </td>
+                                  );
+                                case "plan":
+                                  return (
+                                    <td key={c} className="px-2 py-1 tabular-nums text-[10px]">
+                                      {k.plan_progress == null
+                                        ? "-"
+                                        : `${(Number(k.plan_progress) * 100).toFixed(0)}%`}
                                     </td>
                                   );
                                 case "actual":
