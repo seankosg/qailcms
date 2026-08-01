@@ -115,15 +115,18 @@ export function OwnerProgressChart({
     const r = data[index];
     if (!r || typeof value !== "number") return null;
     const gapColor = r.diffPp >= 0 ? COLOR_AHEAD : COLOR_BEHIND;
+    const topY = allDelayed ? -19 : -33;
     return (
       <g>
-        <text x={x + width / 2} y={y - 33} textAnchor="middle" fontSize={9} fontWeight={700}>
+        <text x={x + width / 2} y={y + topY} textAnchor="middle" fontSize={9} fontWeight={700}>
           <tspan fill="var(--muted-foreground)">{r.taskCount}건</tspan>
-          {r.delayedTasks > 0 && <tspan fill={COLOR_BEHIND}> ▼{r.delayedTasks}</tspan>}
+          {!allDelayed && r.delayedTasks > 0 && (
+            <tspan fill={COLOR_BEHIND}> ▼{r.delayedTasks}</tspan>
+          )}
         </text>
         <text
           x={x + width / 2}
-          y={y - 19}
+          y={y + (allDelayed ? -5 : -19)}
           textAnchor="middle"
           fontSize={10}
           fontWeight={600}
