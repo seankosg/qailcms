@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, ClipboardList, Package, ShieldCheck, FileText } from "lucide-react";
+import { ArrowRight, ClipboardList, ShieldCheck, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ComingSoonWidget } from "./ComingSoonWidget";
@@ -21,14 +21,6 @@ const DOMAINS: DomainCard[] = [
     to: "/closure/dashboard/task",
     icon: ClipboardList,
     status: "ready",
-  },
-  {
-    id: "spare-part",
-    title: "Spare Part",
-    description: "예비품 문서 관리 대시보드는 준비 중입니다.",
-    to: "/closure/dashboard/spare-part",
-    icon: Package,
-    status: "coming-soon",
   },
   {
     id: "warranty",
