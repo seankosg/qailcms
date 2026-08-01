@@ -4764,6 +4764,10 @@ export type Database = {
           done_upto: number
           group_key: string[]
           no_plan: number
+          np_rc: number
+          np_sc: number
+          np_sr: number
+          np_src: number
           plan_upto: number
           stage: string
           total: number

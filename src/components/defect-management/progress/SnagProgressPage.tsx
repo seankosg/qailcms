@@ -278,6 +278,11 @@ export function SnagProgressPage() {
       done_upto: number;
       total: number;
       no_plan: number;
+      group_key?: string[];
+      np_sr?: number;
+      np_sc?: number;
+      np_rc?: number;
+      np_src?: number;
     }>) {
       if (!effectiveStages.includes(t.stage)) continue;
       byStage[t.stage].plan += t.plan_upto;
@@ -300,7 +305,31 @@ export function SnagProgressPage() {
     const totalPct = totalStages > 0 ? 100 : 0;
     const planPctOfTotal = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
     const actualPctOfTotal = totalStages > 0 ? (cumActual / totalStages) * 100 : 0;
-    const noPlanTotal = effectiveStages.reduce((s, st) => s + byStage[st].noPlan, 0);
+    // NO PLAN 총계: 스테이지 이벤트 단순 합이 아니라 문서 distinct(합집합).
+    // 그룹별 교집합 카운트(np_sr/np_sc/np_rc/np_src)로 포함–배제 원리 적용.
+    const rowsAll = (totalsQ.data ?? []) as Array<any>;
+    let noPlanTotal = 0;
+    let noPlanSum = 0;
+    for (const r of rowsAll) {
+      if (r.stage !== "start") continue; // 그룹당 1행만 사용(np_* 는 3행 동일값)
+      const g = new Map<Stage, number>();
+      for (const s of ["start", "rectified", "closure"] as Stage[]) {
+        const row = rowsAll.find(
+          (x) => x.stage === s && String((x.group_key ?? []).join("\u0001")) === String((r.group_key ?? []).join("\u0001")),
+        );
+        g.set(s, Number(row?.no_plan) || 0);
+      }
+      const has = (s: Stage) => effectiveStages.includes(s);
+      let u = 0;
+      for (const s of effectiveStages) u += g.get(s) ?? 0;
+      if (has("start") && has("rectified")) u -= Number(r.np_sr) || 0;
+      if (has("start") && has("closure")) u -= Number(r.np_sc) || 0;
+      if (has("rectified") && has("closure")) u -= Number(r.np_rc) || 0;
+      if (has("start") && has("rectified") && has("closure")) u += Number(r.np_src) || 0;
+      noPlanTotal += u;
+      noPlanSum += effectiveStages.reduce((acc, s) => acc + (g.get(s) ?? 0), 0);
+    }
+    void noPlanSum;
     return { byStage, cumPlan, cumActual, diffAbs, variance, doneStages, totalStages, progressPct, planPct, totalPct, planPctOfTotal, actualPctOfTotal, noPlanTotal };
   }, [totalsQ.data, effectiveStages]);
 
