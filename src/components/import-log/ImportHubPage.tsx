@@ -4,6 +4,7 @@ import { TaskManagementImportPage } from "@/components/task-management/import/Ta
 import { DefectManagementImportPage } from "@/components/defect-management/import/DefectManagementImportPage";
 import { AbdImportPage } from "@/components/abd/import/AbdImportPage";
 import { DmrImportPage } from "@/components/resource/dmr/DmrImportPage";
+import { SplImportPage } from "@/components/spl/import/SplImportPage";
 import { getRouteApi } from "@tanstack/react-router";
 
 const routeApi = getRouteApi("/_authenticated/import-log/import");
@@ -28,6 +29,7 @@ export function ImportHubPage() {
           <TabsTrigger value="snag">Snag List</TabsTrigger>
           <TabsTrigger value="abd">ABD</TabsTrigger>
           <TabsTrigger value="dmr">DMR</TabsTrigger>
+          <TabsTrigger value="spl">Spare Parts</TabsTrigger>
           <TabsTrigger value="warranty">Warranty</TabsTrigger>
         </TabsList>
         <TabsContent value="task" className="mt-4">
@@ -41,6 +43,9 @@ export function ImportHubPage() {
         </TabsContent>
         <TabsContent value="dmr" className="mt-4">
           <DmrImportPage />
+        </TabsContent>
+        <TabsContent value="spl" className="mt-4">
+          <SplImportPage />
         </TabsContent>
         <TabsContent value="warranty" className="mt-4">
           <ComingSoonCard />
