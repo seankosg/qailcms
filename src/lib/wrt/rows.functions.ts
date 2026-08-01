@@ -69,6 +69,16 @@ export type WrtRowsAsOf = {
     total: number;
     precedence: number;
     ghost_round: number;
+    /** 회신일이 제출 실적일보다 앞선 진짜 위반 */
+    response_before_submission: number;
+    /**
+     * pending_hdec — 위반 아님.
+     * 해당 문서의 HDEC 제출 실적이 전 라운드에 걸쳐 전무한 상태에서 Aconex 회신(회신일/회신코드)만 존재하는 건.
+     * HDEC 계획·실적 임포트가 진행되면 감소해야 하는 감시 지표이며 `total`(위반 집계)에서 제외된다.
+     */
+    pending_hdec: number;
+    pending_hdec_r1: number;
+    pending_hdec_r2: number;
     from_last_import: number;
     last_batch_id: string | null;
   };
