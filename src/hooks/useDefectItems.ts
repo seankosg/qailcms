@@ -11,7 +11,9 @@ export type DefectServerFilterOp =
   | "empty"
   | "date_range"
   | "num_range"
-  | "bool";
+  | "bool"
+  | "stage_plan_range"
+  | "stage_actual_range";
 
 export interface DefectServerFilter {
   column: string;

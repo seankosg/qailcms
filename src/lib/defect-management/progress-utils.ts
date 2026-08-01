@@ -130,7 +130,8 @@ const NONE_LABEL = "(None)";
 export type CellRaw = {
   group_key: string[];
   bucket_iso: string | null;
-  stage: Stage;
+  /** 스테이지 셀 | 문서 단위 집계행 토큰 `all|<stage,stage,...>` */
+  stage: Stage | string;
   plan_cnt: number;
   actual_cnt: number;
 };
@@ -195,6 +196,12 @@ function emptyStageRow(buckets: string[], stage: Stage, total: number): StageRow
   };
 }
 
+/** 서버 집계행 토큰 — 문서(항목) 단위 DISTINCT 집계. 스테이지 조합 정렬 규약은 ALL_STAGES 순서. */
+export function aggregateStageToken(stages: Stage[]): string {
+  const ordered = ALL_STAGES.filter((s) => stages.includes(s));
+  return `all|${ordered.join(",")}`;
+}
+
 export function assembleMatrix(opts: {
   cells: CellRaw[];
   totals: TotalRaw[];
@@ -206,6 +213,9 @@ export function assembleMatrix(opts: {
   buckets.forEach((b, i) => bucketIdx.set(b, i));
 
   const rowMap = new Map<string, GroupRow>();
+  // 서버가 제공하는 문서 단위 집계행(row key → bucket index → cell)
+  const aggToken = aggregateStageToken(stagesToShow);
+  const aggMap = new Map<string, Map<number, { plan: number; actual: number }>>();
 
   const ensureRow = (groupKeyRaw: string[]): GroupRow => {
     const key = keyOf(groupKeyRaw);
@@ -247,7 +257,16 @@ export function assembleMatrix(opts: {
     const row = ensureRow(c.group_key ?? []);
     const i = bucketIdx.get(c.bucket_iso);
     if (i === undefined) continue;
-    const sr = row.stages[c.stage];
+    if (typeof c.stage === "string" && c.stage.startsWith("all|")) {
+      if (c.stage !== aggToken) continue;
+      let m = aggMap.get(row.key);
+      if (!m) { m = new Map(); aggMap.set(row.key, m); }
+      const prev = m.get(i) ?? { plan: 0, actual: 0 };
+      m.set(i, { plan: prev.plan + c.plan_cnt, actual: prev.actual + c.actual_cnt });
+      continue;
+    }
+    const sr = row.stages[c.stage as Stage];
+    if (!sr) continue;
     sr.cells[i].plan += c.plan_cnt;
     sr.cells[i].actual += c.actual_cnt;
   }
@@ -277,6 +296,17 @@ export function assembleMatrix(opts: {
     row.doneCount = combDone;
     row.cumPlan = combCumPlan;
     row.cumActual = combCumActual;
+
+    // 집계행 셀은 서버의 문서 단위 DISTINCT 값을 우선 적용한다.
+    // (같은 문서가 한 버킷에서 복수 스테이지 이벤트를 가질 때 드릴다운 건수와 일치시킴)
+    const agg = aggMap.get(row.key);
+    if (agg) {
+      for (let i = 0; i < buckets.length; i++) {
+        const v = agg.get(i);
+        row.combined[i].plan = v?.plan ?? 0;
+        row.combined[i].actual = v?.actual ?? 0;
+      }
+    }
   }
 
   const rows = Array.from(rowMap.values()).sort((a, b) => a.label.localeCompare(b.label));

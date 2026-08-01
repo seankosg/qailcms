@@ -136,6 +136,9 @@ function serializeFilters(f: ColumnFiltersState): string {
   return JSON.stringify(obj);
 }
 
+/** Progress Matrix 셀 드릴다운 전용 필터. 술어 정본 = public.snag_progress_events(). */
+const CELL_RANGE_ID = "__snag_cell_range__";
+
 // TanStack Table columnFilters → server filter payload
 function toServerFilters(f: ColumnFiltersState): DefectServerFilter[] {
   const out: DefectServerFilter[] = [];
@@ -143,6 +146,22 @@ function toServerFilters(f: ColumnFiltersState): DefectServerFilter[] {
     const id = cf.id;
     const v: any = cf.value;
     if (v == null) continue;
+    // Progress Matrix 셀 드릴다운 (집계와 동일 술어 = public.snag_progress_events)
+    if (id === CELL_RANGE_ID && typeof v === "object" && v.stage && v.from) {
+      out.push({
+        column: "__cell__",
+        op: v.field === "actual" ? "stage_actual_range" : "stage_plan_range",
+        value: {
+          stage: v.stage,
+          field: v.field,
+          from: v.from,
+          to: v.to ?? v.from,
+          planMode: v.planMode ?? "baseline",
+          asOf: v.asOf ?? "",
+        },
+      });
+      continue;
+    }
     if (Array.isArray(v)) {
       if (v.length === 0) continue;
       const hasEmpty = v.includes(EMPTY_TOKEN);
@@ -179,7 +198,21 @@ function mergeUrlFilters(urlSearch: Record<string, any>, baseFilters: ColumnFilt
   if ((urlSearch.dateStart || urlSearch.dateEnd) && urlSearch.dateField && DATE_FILTER_FIELDS.has(urlSearch.dateField)) {
     overridden.add(urlSearch.dateField);
   }
-  const next = baseFilters.filter((filter) => !overridden.has(filter.id));
+  const next = baseFilters.filter((filter) => !overridden.has(filter.id) && filter.id !== CELL_RANGE_ID);
+  // Progress Matrix 셀 드릴다운 — 스테이지 조합·remaining(NOT done) 조건까지 정본 경유.
+  if (urlSearch.cellStage && urlSearch.cellFrom) {
+    next.push({
+      id: CELL_RANGE_ID,
+      value: {
+        stage: String(urlSearch.cellStage),
+        field: urlSearch.cellField === "actual" ? "actual" : "planned",
+        from: String(urlSearch.cellFrom),
+        to: String(urlSearch.cellTo || urlSearch.cellFrom),
+        planMode: urlSearch.cellMode === "remaining" ? "remaining" : "baseline",
+        asOf: urlSearch.asOf ? String(urlSearch.asOf) : "",
+      },
+    });
+  }
   for (const [param, column] of Object.entries(URL_MAP)) {
     const value = urlSearch[param];
     if (!value) continue;
@@ -285,6 +318,7 @@ const DRILLDOWN_PARAMS = [
   "source", "actualComplete", "closureComplete", "overdue", "atRisk", "atRiskDays", "dueOn", "unplannedActualOn",
   "asOf", "stage", "remaining_stage", "remaining_asof", "capturedByGroup", "notClosureDone", "catADispute",
   "hdecVerification", "hdecReason", ...Object.keys(URL_MAP), "dateStart", "dateEnd", "dateField",
+  "cellStage", "cellField", "cellFrom", "cellTo", "cellMode",
 ];
 
 export function DefectRawDataPage() {

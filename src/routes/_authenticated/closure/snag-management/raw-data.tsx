@@ -43,6 +43,12 @@ const rawDataSearchSchema = z.object({
   dateStart: z.string().optional(),
   dateEnd: z.string().optional(),
   dateField: z.string().optional(),
+  // Progress Matrix 셀 드릴다운 (술어 정본 = public.snag_progress_events)
+  cellStage: z.string().optional(),
+  cellField: z.string().optional(),
+  cellFrom: z.string().optional(),
+  cellTo: z.string().optional(),
+  cellMode: z.string().optional(),
   critical: z.string().optional(),
   priority: z.string().optional(),
   hdecVerification: z.string().optional(),
