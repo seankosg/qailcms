@@ -305,6 +305,7 @@ export function TmDashboardPage() {
           statusMixLeftExtraSlot={
             <JudgmentDonut
               counts={computeJudgmentStageBreakdown(scopedItems, asOfDate).judgmentCounts}
+              population={scopedItems.length}
             />
           }
         />
