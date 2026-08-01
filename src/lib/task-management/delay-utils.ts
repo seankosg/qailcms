@@ -24,6 +24,51 @@ import { ALL_TASK_STAGE_KEYS } from "./schedule-utils";
 
 export type OwnerDim = "team" | "hdec_pic_name" | "hdec_eng_name";
 
+/**
+ * 서버 정본(tm_rows_as_of) 병합 필드.
+ * 존재하면 클라 재계산보다 우선한다 — 판정식 불변, 소스만 정본 교체.
+ */
+interface SrvFields {
+  srv_judgment?: string | null;
+  srv_plan_pct?: number | null;   // 0..1
+  srv_actual_pct?: number | null; // 0..1
+}
+
+function srvOf(it: unknown): SrvFields {
+  return (it ?? {}) as SrvFields;
+}
+
+/** 정본 판정(있으면) → 없으면 클라 판정. */
+export function resolveJudgment(
+  it: TaskItem,
+  thresholds: TaskThresholds | undefined,
+  asOfDate: string,
+): string {
+  const s = srvOf(it).srv_judgment;
+  if (s != null && s !== "") return s;
+  return computeJudgment(it, thresholds ?? DEFAULT_THRESHOLDS, asOfDate);
+}
+
+/** 정본 지연(지연|악화). */
+export function resolveIsDelayed(
+  it: TaskItem,
+  thresholds: TaskThresholds | undefined,
+  asOfDate: string,
+): boolean {
+  const j = resolveJudgment(it, thresholds, asOfDate);
+  return j === "지연" || j === "악화";
+}
+
+function resolvePlanPct(it: TaskItem, asOfDate: string): number {
+  const v = srvOf(it).srv_plan_pct;
+  return v == null ? cumPlanProgress(it, asOfDate) : Number(v);
+}
+
+function resolveActualPct(it: TaskItem): number {
+  const v = srvOf(it).srv_actual_pct;
+  return v == null ? cumActualProgress(it) : Number(v);
+}
+
 export interface DelayTopItem {
   id: string;
   taskNo: string;
@@ -57,14 +102,13 @@ export function computeDelayTopN(
 ): DelayTopItem[] {
   const out: DelayTopItem[] = [];
   for (const it of items) {
-    // 태스크 단위 통합 판정 정본
-    const taskJ = computeJudgment(it, thresholds, asOfDate);
+    // 태스크 단위 통합 판정 정본 (서버 as-of 결과 우선)
+    const taskJ = resolveJudgment(it, thresholds, asOfDate);
     if (taskJ !== "지연" && taskJ !== "악화") continue;
 
-    const planPct = cumPlanProgress(it, asOfDate) * 100;
-    const actualPct = cumActualProgress(it) * 100;
-    const variance = computeVariance(it, asOfDate);
-    const diffPp = variance != null ? variance * 100 : actualPct - planPct;
+    const planPct = resolvePlanPct(it, asOfDate) * 100;
+    const actualPct = resolveActualPct(it) * 100;
+    const diffPp = actualPct - planPct;
 
     // 대표 스테이지: 지연/악화인 스테이지 중 daysLate 가 가장 큰 것.
     // 없으면(gap 축만 지연) start→wip→finish 중 미완료 첫 스테이지.
@@ -169,7 +213,7 @@ export function computeOwnerLeaderboard(
       if (isTaskStageActualUpTo(it, st, asOfDate)) row.doneStages++;
       // 스테이지 단위 지연 카운트 제거 — 정본은 태스크 단위(isTaskDelayed).
     }
-    if (isTaskDelayed(it, thresholds, asOfDate)) row.delayedTaskIds.add(it.id);
+    if (resolveIsDelayed(it, thresholds, asOfDate)) row.delayedTaskIds.add(it.id);
   }
   const rows = Array.from(map.values());
   // planPct/actualPct 는 T.Plan / Actual% 의 담당자 평균으로 계산 (스테이지 수 대비 아님).
@@ -178,8 +222,8 @@ export function computeOwnerLeaderboard(
     const raw = (it as any)[dim];
     const key = raw ? String(raw).trim() || NONE : NONE;
     const cur = memberSum.get(key) ?? { plan: 0, actual: 0, n: 0 };
-    cur.plan += cumPlanProgress(it, asOfDate);
-    cur.actual += cumActualProgress(it);
+    cur.plan += resolvePlanPct(it, asOfDate);
+    cur.actual += resolveActualPct(it);
     cur.n += 1;
     memberSum.set(key, cur);
   }
