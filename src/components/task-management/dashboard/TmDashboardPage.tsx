@@ -121,7 +121,7 @@ export function TmDashboardPage() {
         actual_progress: actual ?? it.actual_progress,
         actual_start: j.actual_start ?? null,
         actual_finish: j.actual_finish ?? null,
-        srv_judgment: j.auto_judgment ?? null,
+        srv_judgment: j.auto_judgment ?? "이력 없음",
         srv_plan_pct: j.cum_plan_pct == null ? null : Number(j.cum_plan_pct),
         srv_actual_pct: actual,
       } as typeof it;
