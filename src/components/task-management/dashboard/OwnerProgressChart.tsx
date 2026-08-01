@@ -155,9 +155,11 @@ export function OwnerProgressChart({
             <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
               전체 {summary.tasks.toLocaleString()}건
             </Badge>
-            <Badge variant="destructive" className="h-5 px-1.5 text-[10px] tabular-nums">
-              지연 {summary.delayed.toLocaleString()}건
-            </Badge>
+            {!allDelayed && (
+              <Badge variant="destructive" className="h-5 px-1.5 text-[10px] tabular-nums">
+                지연 {summary.delayed.toLocaleString()}건
+              </Badge>
+            )}
             <Badge variant="outline" className="h-5 px-1.5 text-[10px] tabular-nums">
               진도율 {summary.actualPct.toFixed(1)}% / 계획 {summary.planPct.toFixed(1)}%
             </Badge>
