@@ -315,6 +315,12 @@ export function WrtRawDataPage() {
                       Round
                     </th>
                     <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      현재 단계
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      대표 지연
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
                       Latest Status
                     </th>
                     <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
@@ -424,6 +430,28 @@ function WrtTableRow({
         </span>
       </StickyCell>
       <td className="whitespace-nowrap border-b border-l px-2 py-1 text-center">R{row.active_round}</td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1 text-muted-foreground">
+        {row.current_stage ? stageLabel(row.current_stage) : row.active_band ? "—" : "전 단계 완료/미발생"}
+      </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        {row.primary_delay ? (
+          <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
+            {stageLabel(row.primary_delay)} · {row.primary_delay.days}일
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+        {row.delay_bucket.length > 0 && (
+          <span className="ml-1 text-[9px] text-muted-foreground" title="후행 지연 — 인지용, 지연 카드 미합산">
+            +{row.delay_bucket.length}
+          </span>
+        )}
+        {row.response_wait.length > 0 && (
+          <span className="ml-1 text-[9px] text-amber-700" title="Aconex 회신 대기 — HDEC 귀책 아님">
+            회신대기
+          </span>
+        )}
+      </td>
       <td className="whitespace-nowrap border-b border-l px-2 py-1 text-center">{row.latest_status_raw ?? "—"}</td>
       <td className="whitespace-nowrap border-b border-l px-2 py-1 text-center">
         {row.is_final_approved ? (
