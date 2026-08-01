@@ -931,6 +931,9 @@ export function TaskTreePage() {
           const behindCount = kids.filter(
             (k) => (computeVariance(k, asOfDate) ?? 0) < -thresholds.caution_gap_buffer,
           ).length;
+          const worsenCount = kids.filter(
+            (k) => resolveRowJudgment(k, thresholds, asOfForJudge) === "악화",
+          ).length;
           const pGap =
             (kids.length > 0 ? mainVariance(p, kids, asOfDate) : computeVariance(p, asOfDate)) ?? 0;
           const pTodayPlan =
@@ -967,6 +970,11 @@ export function TaskTreePage() {
                 </button>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
                   <Badge variant="outline">Sub Task {kids.length}</Badge>
+                  {worsenCount > 0 && (
+                    <Badge className={AUTO_JUDGMENT_COLORS["악화"] ?? "bg-rose-600 text-white"}>
+                      악화 {worsenCount}
+                    </Badge>
+                  )}
                   {behindCount > 0 && (
                     <Badge className="bg-rose-500/15 text-rose-700">지연 {behindCount}</Badge>
                   )}
