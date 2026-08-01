@@ -890,8 +890,13 @@ export function TaskManagementRawDataPage() {
           enableSorting: true,
           enableColumnFilter: true,
           filterFn: numberRangeFilterFn,
-          accessorFn: (r: Row) =>
-            cumPlanProgress(r as any, cellDynRef.current.selectedDataDate || undefined),
+          // 정본 우선: 서버 tm_rows_as_of 의 cum_plan_pct, 없을 때만 클라 as-of 계산.
+          accessorFn: (r: Row) => {
+            const srv = (r as any).cum_plan_pct;
+            return srv == null
+              ? cumPlanProgress(r as any, cellDynRef.current.selectedDataDate || undefined)
+              : Number(srv);
+          },
           header: labelOverrides[c.key] ?? c.label,
           meta: { filterType: "number-range" as const, group: c.group },
           cell: ({ getValue }) => renderCell(c, getValue()),
