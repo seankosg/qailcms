@@ -59,8 +59,14 @@ export function OwnerProgressChart({
     [items, asOfDate, dim, thresholds],
   );
 
-  // computeOwnerLeaderboard 는 diffPp 오름차순 정렬본을 반환한다 — 그대로 상위 N.
-  const data = useMemo(() => rows.slice(0, limit), [rows, limit]);
+  // Team: 정본 정렬(diffPp 오름차순) 유지.
+  // Individual: 지연 건수 많은 순(내림차순) → 동률 시 diffPp 오름차순.
+  const data = useMemo(() => {
+    if (viewMode === "team") return rows.slice(0, limit);
+    return [...rows]
+      .sort((a, b) => b.delayedTasks - a.delayedTasks || a.diffPp - b.diffPp || a.key.localeCompare(b.key, "ko"))
+      .slice(0, limit);
+  }, [rows, limit, viewMode]);
 
   // 요약치 — 정본 행값의 태스크수 가중 평균(= 태스크 단위 평균과 동일 정의). 별도 판정 계산 없음.
   const summary = useMemo(() => {
