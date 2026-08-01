@@ -8,6 +8,9 @@ import { DeSnagMatrixBlock, type MatrixMode } from "./DeSnagMatrixBlock";
 import { DeSnagGrandTotalCards } from "./DeSnagGrandTotalCards";
 import { DeSnagRoomGroupCards } from "./DeSnagRoomGroupCards";
 import { DeSnagRoomGroupFilterBar } from "./DeSnagRoomGroupFilterBar";
+import { exportSnagMatrixToXlsx } from "@/lib/defect-management/matrix-excel";
+import { Download } from "lucide-react";
+import { toast } from "sonner";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
 import { useSnagAsOf } from "@/hooks/useSnagAsOf";
@@ -291,6 +294,30 @@ export function DeSnagDashboardPage() {
             <TabsTrigger value="pct" className="text-xs">%</TabsTrigger>
           </TabsList>
         </Tabs>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5 text-xs"
+          disabled={matrix.blocks.length === 0}
+          onClick={() => {
+            try {
+              exportSnagMatrixToXlsx({
+                matrix,
+                mode: matrixMode,
+                asOf: effectiveDataDate,
+                teams: appliedTeams,
+                roomGroupsFilter: appliedRoomGroups,
+              });
+              toast.success("매트릭스를 엑셀로 내보냈습니다.");
+            } catch (e) {
+              toast.error(`엑셀 내보내기 실패: ${(e as Error).message}`);
+            }
+          }}
+        >
+          <Download className="h-3.5 w-3.5" />
+          엑셀 다운로드
+        </Button>
         <span className="text-[11px] text-muted-foreground">
           Rect% · Closed% = 같은 팀의 Issued 대비. 팀별 최저 비율이 차상위보다 15%p 이상 낮으면 병목 강조.
         </span>
