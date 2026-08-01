@@ -2314,7 +2314,7 @@ export type Database = {
           },
         ]
       }
-      spare_part_change_log: {
+      spare_part_change_log_archived: {
         Row: {
           change_source: string
           changed_at: string
@@ -2353,12 +2353,12 @@ export type Database = {
             foreignKeyName: "spare_part_change_log_upload_id_fkey"
             columns: ["upload_id"]
             isOneToOne: false
-            referencedRelation: "spare_parts_import_logs"
+            referencedRelation: "spare_parts_import_logs_archived"
             referencedColumns: ["id"]
           },
         ]
       }
-      spare_part_comments: {
+      spare_part_comments_archived: {
         Row: {
           author_id: string
           body: string
@@ -2388,12 +2388,12 @@ export type Database = {
             foreignKeyName: "spare_part_comments_doc_ref_fkey"
             columns: ["doc_ref"]
             isOneToOne: false
-            referencedRelation: "spare_parts_raw"
+            referencedRelation: "spare_parts_raw_archived"
             referencedColumns: ["doc_ref"]
           },
         ]
       }
-      spare_part_custom_fields: {
+      spare_part_custom_fields_archived: {
         Row: {
           created_at: string
           created_by: string | null
@@ -2432,7 +2432,7 @@ export type Database = {
         }
         Relationships: []
       }
-      spare_part_field_config: {
+      spare_part_field_config_archived: {
         Row: {
           display_name: string
           editable_to_roles: Database["public"]["Enums"]["app_role"][]
@@ -2474,7 +2474,7 @@ export type Database = {
         }
         Relationships: []
       }
-      spare_part_header_mappings: {
+      spare_part_header_mappings_archived: {
         Row: {
           id: string
           is_active: boolean
@@ -2510,7 +2510,7 @@ export type Database = {
         }
         Relationships: []
       }
-      spare_part_import_row_logs: {
+      spare_part_import_row_logs_archived: {
         Row: {
           action_taken: string
           doc_ref: string | null
@@ -2546,12 +2546,12 @@ export type Database = {
             foreignKeyName: "spare_part_import_row_logs_upload_id_fkey"
             columns: ["upload_id"]
             isOneToOne: false
-            referencedRelation: "spare_parts_import_logs"
+            referencedRelation: "spare_parts_import_logs_archived"
             referencedColumns: ["id"]
           },
         ]
       }
-      spare_part_status_history: {
+      spare_part_status_history_archived: {
         Row: {
           author_user_id: string | null
           category: string
@@ -2596,19 +2596,19 @@ export type Database = {
             foreignKeyName: "spare_part_status_history_doc_ref_fkey"
             columns: ["doc_ref"]
             isOneToOne: false
-            referencedRelation: "spare_parts_raw"
+            referencedRelation: "spare_parts_raw_archived"
             referencedColumns: ["doc_ref"]
           },
           {
             foreignKeyName: "spare_part_status_history_parent_comment_id_fkey"
             columns: ["parent_comment_id"]
             isOneToOne: false
-            referencedRelation: "spare_part_status_history"
+            referencedRelation: "spare_part_status_history_archived"
             referencedColumns: ["id"]
           },
         ]
       }
-      spare_part_status_mapping: {
+      spare_part_status_mapping_archived: {
         Row: {
           approval_code: string
           approval_status: string
@@ -2632,7 +2632,7 @@ export type Database = {
         }
         Relationships: []
       }
-      spare_parts_import_logs: {
+      spare_parts_import_logs_archived: {
         Row: {
           data_date: string | null
           duration_ms: number | null
@@ -2713,7 +2713,7 @@ export type Database = {
         }
         Relationships: []
       }
-      spare_parts_raw: {
+      spare_parts_raw_archived: {
         Row: {
           action: string | null
           approval_code: string | null
@@ -2977,12 +2977,12 @@ export type Database = {
             foreignKeyName: "spare_parts_raw_source_import_log_id_fkey"
             columns: ["source_import_log_id"]
             isOneToOne: false
-            referencedRelation: "spare_parts_import_logs"
+            referencedRelation: "spare_parts_import_logs_archived"
             referencedColumns: ["id"]
           },
         ]
       }
-      spare_parts_sync_log: {
+      spare_parts_sync_log_archived: {
         Row: {
           applied: boolean
           changed: number | null
@@ -5061,10 +5061,6 @@ export type Database = {
       }
       delete_abd_import_batch: { Args: { _batch_id: string }; Returns: Json }
       delete_defect_import_batch: { Args: { _batch_id: string }; Returns: Json }
-      delete_spare_part_import_batch: {
-        Args: { _batch_id: string }
-        Returns: Json
-      }
       delete_task_management_import_batch: {
         Args: { _batch_id: string }
         Returns: Json
@@ -5116,10 +5112,6 @@ export type Database = {
         Args: { _batch_id: string }
         Returns: Json
       }
-      preview_rollback_spare_part_import: {
-        Args: { _batch_id: string }
-        Returns: Json
-      }
       preview_rollback_task_management_import: {
         Args: { _batch_id: string }
         Returns: Json
@@ -5139,10 +5131,6 @@ export type Database = {
         Returns: Json
       }
       rollback_defect_import: {
-        Args: { _batch_id: string; _force?: boolean }
-        Returns: Json
-      }
-      rollback_spare_part_import: {
         Args: { _batch_id: string; _force?: boolean }
         Returns: Json
       }
