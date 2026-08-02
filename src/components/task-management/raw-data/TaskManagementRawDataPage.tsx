@@ -431,9 +431,8 @@ export function TaskManagementRawDataPage() {
     const scope: TaskScope =
       s.taskScope === "main" || s.taskScope === "sub" ? s.taskScope : "all";
 
-    // Data Date 동기화: Dashboard 와 동일한 시점으로 공유 상태 설정
-    const nextShared = asOf === latestDataDate ? "" : asOf;
-    setSharedDataDate(nextShared);
+    // 기준일 동기화: Dashboard 와 동일한 시점으로 공유 상태 설정
+    setSharedDataDate(asOf);
 
     // SHAW 방식: mode 를 TanStack ColumnFilters 로 변환하여 한꺼번에 적용
     const kpiFilters = modeToColumnFilters(s.mode, asOf, scope);
@@ -1322,16 +1321,15 @@ export function TaskManagementRawDataPage() {
             {selectedIds.length} selected
           </Badge>
         )}
-        {latestDataDate && (
-          <span className="text-xs text-muted-foreground">
-            As of: <span className="font-medium">{selectedDataDate}</span>
-            {sharedDataDate && sharedDataDate !== latestDataDate && (
-              <span className="ml-1 text-amber-600">
-                (Dashboard 지정 · 최신 {latestDataDate})
-              </span>
-            )}
-          </span>
-        )}
+        <DataDatePicker
+          quickAsOf
+          showDataDateChip
+          value={sharedDataDate}
+          latest={latestDataDate}
+          options={[]}
+          onChange={(v) => setSharedDataDate(v)}
+          onReset={() => setSharedDataDate("")}
+        />
         {isFetching && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
 
         <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
