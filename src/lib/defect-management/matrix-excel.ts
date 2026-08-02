@@ -2,12 +2,13 @@
 import XLSX from "xlsx-js-style";
 import { dohaDateTime } from "@/lib/time/doha";
 import {
-  ROOM_GROUP_ORDER,
   TEAM_COL_ORDER,
   bottleneckTeam,
   mergeStats,
   newStats,
+  type MatrixBlock,
   type MatrixShape,
+  type RoomGroupCol,
   type Stats,
   type TeamKey,
 } from "./dashboard-shape";
@@ -79,7 +80,12 @@ function put(ws: XLSX.WorkSheet, r: number, c: number, v: unknown, s: Record<str
   else ws[addr] = { t: "s", v: v == null ? "" : String(v), s };
 }
 
-const groupCols = [...ROOM_GROUP_ORDER.map((rg) => ({ key: rg as string, label: rg as string, total: false })), { key: "__TOTAL__", label: "Row Total", total: true }];
+function groupColsFor(block: MatrixBlock) {
+  return [
+    ...block.columnKeys.map((rg) => ({ key: rg as string, label: rg as string, total: false })),
+    { key: "__TOTAL__", label: "Row Total", total: true },
+  ];
+}
 const PER_GROUP = SLOTS.length * TEAM_COL_ORDER.length; // 9
 
 export function exportSnagMatrixToXlsx(args: {
@@ -96,6 +102,8 @@ export function exportSnagMatrixToXlsx(args: {
   for (const block of matrix.blocks) {
     const ws: XLSX.WorkSheet = {};
     const merges: XLSX.Range[] = [];
+    const groupCols = groupColsFor(block);
+    const cols: RoomGroupCol[] = block.columnKeys;
     const totalCols = 2 + groupCols.length * PER_GROUP;
 
     // Title / meta
@@ -184,8 +192,8 @@ export function exportSnagMatrixToXlsx(args: {
     put(ws, r, 0, "Column Total", { ...sAxis, font: { ...sAxis.font, bold: true }, fill: { fgColor: { rgb: TOTAL_BG } } });
     put(ws, r, 1, "", { ...sAxis, fill: { fgColor: { rgb: TOTAL_BG } } });
     merges.push({ s: { r, c: 0 }, e: { r, c: 1 } });
-    ROOM_GROUP_ORDER.forEach((rg, gi) => writeStats(r, block.colTotals[rg], gi, false, true));
-    writeStats(r, block.blockTotal, ROOM_GROUP_ORDER.length, true, true);
+    cols.forEach((rg, gi) => writeStats(r, block.colTotals[rg], gi, false, true));
+    writeStats(r, block.blockTotal, cols.length, true, true);
     r++;
 
     // Building 그룹 (podium 소계 포함)
@@ -208,19 +216,19 @@ export function exportSnagMatrixToXlsx(args: {
       grp.rows.forEach((row) => {
         put(ws, r, 0, row.building, sAxis);
         put(ws, r, 1, row.levelDisp, sAxis);
-        ROOM_GROUP_ORDER.forEach((rg, gi) => writeStats(r, row.cells[rg], gi, false, false));
-        writeStats(r, row.rowTotal, ROOM_GROUP_ORDER.length, true, false);
+        cols.forEach((rg, gi) => writeStats(r, row.cells[rg], gi, false, false));
+        writeStats(r, row.rowTotal, cols.length, true, false);
         r++;
       });
       if (showSub) {
         put(ws, r, 0, grp.building, sAxis);
         put(ws, r, 1, `${grp.building} 소계`, { ...sAxis, font: { ...sAxis.font, bold: true }, fill: { fgColor: { rgb: TOTAL_BG } } });
-        ROOM_GROUP_ORDER.forEach((rg, gi) => {
+        cols.forEach((rg, gi) => {
           const sub = newStats();
           for (const row of grp.rows) mergeStats(sub, row.cells[rg]);
           writeStats(r, sub, gi, false, true);
         });
-        writeStats(r, grp.subtotal, ROOM_GROUP_ORDER.length, true, true);
+        writeStats(r, grp.subtotal, cols.length, true, true);
         r++;
       }
       const endR = r - 1;
