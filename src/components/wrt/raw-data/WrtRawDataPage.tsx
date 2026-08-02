@@ -111,6 +111,8 @@ export function WrtRawDataPage() {
       if (search.round && search.round !== "all" && String(r.active_round) !== search.round) return false;
       // 카드 = 드릴다운: 정본이 내려준 judgment 필드를 그대로 술어로 사용
       if (search.judgment && search.judgment !== "all" && r.judgment !== search.judgment) return false;
+      // HDEC 실적 미확보 드릴다운 — 판정과 독립된 술어
+      if (search.hdecMissing && (r.hdec_actual_count ?? 0) !== 0) return false;
       // 밴드 지연 셀 드릴다운 = 활성 밴드 + 대표 지연이 그 밴드
       if (search.delayBand) {
         if (r.active_band !== search.delayBand) return false;
@@ -121,7 +123,7 @@ export function WrtRawDataPage() {
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [rows, search.q, search.plot, search.judgment, search.round, search.delayBand]);
+  }, [rows, search.q, search.plot, search.judgment, search.round, search.delayBand, search.hdecMissing]);
 
   const delayBands = useMemo(() => {
     const m = new Map<string, number>();
@@ -305,6 +307,14 @@ export function WrtRawDataPage() {
         <Badge variant="outline" className="text-[11px]">
           회신 대기 지연 {responseWaitItems}건 (Aconex 귀책 · 지연 카드 미합산)
         </Badge>
+        <Button
+          size="sm"
+          variant={search.hdecMissing ? "default" : "outline"}
+          className="h-7 text-[11px]"
+          onClick={() => setSearch({ hdecMissing: !search.hdecMissing, delayBand: "" })}
+        >
+          HDEC 실적 미확보 {data?.hdec_missing_items ?? 0}건
+        </Button>
       </div>
 
       <Card>
@@ -432,7 +442,8 @@ function WrtTableRow({
           ? "bg-amber-100 text-amber-800"
           : row.judgment === "제외"
             ? "bg-muted text-muted-foreground"
-            : "bg-slate-100 text-slate-800";
+            : // 미착수 = 중립(회색). 지연색 사용 금지
+              "bg-slate-100 text-slate-800";
   return (
     <tr className="hover:bg-muted/30">
       <StickyCell left={0} width={250} className="font-mono">
@@ -446,6 +457,14 @@ function WrtTableRow({
       </StickyCell>
       <StickyCell left={400} width={90}>
         <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>{row.judgment}</span>
+        {(row.hdec_actual_count ?? 0) === 0 && (
+          <span
+            className="ml-1 rounded bg-muted px-1 text-[9px] text-muted-foreground"
+            title="HDEC 권한 단계 실적 보유 0건 — 판정과 독립된 자료 상태 표기"
+          >
+            HDEC 실적 미확보
+          </span>
+        )}
       </StickyCell>
       <StickyCell left={490} width={80} className="tabular-nums">
         {row.progress_pct == null ? "—" : `${row.progress_pct}%`}
