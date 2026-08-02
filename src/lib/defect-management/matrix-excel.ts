@@ -84,7 +84,7 @@ const PER_GROUP = SLOTS.length * TEAM_COL_ORDER.length; // 9
 
 export function exportSnagMatrixToXlsx(args: {
   matrix: MatrixShape;
-  mode: "count" | "pct";
+  mode: "count" | "pct" | "remain" | "remainPct";
   asOf: string;
   teams: TeamKey[];
   roomGroupsFilter?: string[];
@@ -103,7 +103,15 @@ export function exportSnagMatrixToXlsx(args: {
     merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
     const metaLine = [
       `As-of: ${asOf}`,
-      `표기: ${mode === "pct" ? "% (Rect/Closed = 같은 팀 Issued 대비)" : "개수"}`,
+      `표기: ${
+        mode === "pct"
+          ? "% (Rect/Closed = 같은 팀 Issued 대비)"
+          : mode === "remain"
+            ? "잔여 개수 (Issued − 실적)"
+            : mode === "remainPct"
+              ? "잔여 % (Issued 대비)"
+              : "개수"
+      }`,
       `Teams: ${args.teams.length ? args.teams.join(", ") : "ALL"}`,
       `Room Groups: ${args.roomGroupsFilter?.length ? args.roomGroupsFilter.join(", ") : "ALL"}`,
       `Exported: ${dohaDateTime()}${args.userName ? ` by ${args.userName}` : ""}`,
@@ -150,13 +158,19 @@ export function exportSnagMatrixToXlsx(args: {
       SLOTS.forEach((sc, si) => {
         TEAM_COL_ORDER.forEach((team, ti) => {
           const t = stats.byTeam[team];
-          const count = sc.slot === "issued" ? t.issued : sc.slot === "rect" ? t.rect : t.closed;
-          const showPct = mode === "pct" && sc.slot !== "issued";
+          const doneVal = sc.slot === "issued" ? t.issued : sc.slot === "rect" ? t.rect : t.closed;
+          const isRemain = mode === "remain" || mode === "remainPct";
+          const count =
+            isRemain && sc.slot !== "issued" ? Math.max(0, t.issued - doneVal) : doneVal;
+          const showPct = (mode === "pct" || mode === "remainPct") && sc.slot !== "issued";
           const ratio = t.issued > 0 ? count / t.issued : null;
           const bn = (sc.slot === "rect" && rectBn === team) || (sc.slot === "closed" && closedBn === team);
           const bg = bn ? BOTTLENECK_BG : isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2];
           let color = "FF111827";
-          if (showPct && ratio != null) color = ratio < 0.4 ? "FFB91C1C" : ratio < 0.8 ? "FFB45309" : "FF047857";
+          if (showPct && ratio != null) {
+            const g = isRemain ? 1 - ratio : ratio;
+            color = g < 0.4 ? "FFB91C1C" : g < 0.8 ? "FFB45309" : "FF047857";
+          }
           else if (!showPct && count === 0) color = "FF9CA3AF";
           const style = numCell({ bg, bold: emphasize || isTotalGroup || bn || sc.slot === "issued", color, pct: showPct });
           const v = showPct ? (ratio == null ? "–" : ratio) : count;
@@ -227,6 +241,8 @@ export function exportSnagMatrixToXlsx(args: {
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }
 
-  const fileName = `CMS_SM_Dashboard_Matrix_PLOT-${matrix.plot}_${mode === "pct" ? "PCT" : "COUNT"}_${asOf}.xlsx`;
+  const modeTag =
+    mode === "pct" ? "PCT" : mode === "remain" ? "REMAIN" : mode === "remainPct" ? "REMAIN-PCT" : "COUNT";
+  const fileName = `CMS_SM_Dashboard_Matrix_PLOT-${matrix.plot}_${modeTag}_${asOf}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }

@@ -12,7 +12,7 @@ import {
   basementLevelParam,
 } from "@/lib/defect-management/dashboard-shape";
 
-export type MatrixMode = "count" | "pct";
+export type MatrixMode = "count" | "pct" | "remain" | "remainPct";
 
 type StatusSlot = "issued" | "rect" | "closed";
 
@@ -29,6 +29,12 @@ function pctTone(pct: number | null): string {
   if (pct < 40) return "text-destructive font-semibold";
   if (pct < 80) return "text-amber-600 dark:text-amber-400 font-semibold";
   return "text-emerald-600 dark:text-emerald-400 font-semibold";
+}
+
+/** 잔여 비율은 높을수록 나쁨 — 완료 비율과 색 방향을 뒤집는다. */
+function remainPctTone(pct: number | null): string {
+  if (pct == null) return "text-muted-foreground";
+  return pctTone(100 - pct);
 }
 
 /** Render 9 team-decomposed <td> cells (Issued/Rect/Closed × Elec/Mech/Arch). */
@@ -64,9 +70,12 @@ function TeamCells({
       {STATUS_COLS.map((sc, sIdx) =>
         TEAM_COL_ORDER.map((team, tIdx) => {
           const t = stats.byTeam[team];
-          const count = sc.slot === "issued" ? t.issued : sc.slot === "rect" ? t.rect : t.closed;
+          const done = sc.slot === "issued" ? t.issued : sc.slot === "rect" ? t.rect : t.closed;
+          const isRemain = mode === "remain" || mode === "remainPct";
+          const count =
+            isRemain && sc.slot !== "issued" ? Math.max(0, t.issued - done) : done;
           const ratio = t.issued > 0 && sc.slot !== "issued" ? (count / t.issued) * 100 : null;
-          const showPct = mode === "pct" && sc.slot !== "issued";
+          const showPct = (mode === "pct" || mode === "remainPct") && sc.slot !== "issued";
           const text = showPct
             ? ratio == null
               ? "–"
@@ -102,7 +111,7 @@ function TeamCells({
                 className={cn(
                   "block h-full w-full px-1 text-right text-xs leading-none hover:bg-primary/10",
                   sc.slot === "issued" && "font-medium",
-                  showPct ? pctTone(ratio) : zeroDim,
+                  showPct ? (isRemain ? remainPctTone(ratio) : pctTone(ratio)) : zeroDim,
                   isBottleneck && "font-semibold",
                 )}
               >
