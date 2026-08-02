@@ -1140,6 +1140,10 @@ export function DefectRawDataPage() {
 }
 
 // ── Data column builder ────────────────────────────────────────────────────
+// 서버 RPC(defect_items_search / _facets / _search_ids)가 SQL 식으로 지원하는 파생 컬럼.
+// 이 목록의 컬럼은 DB 저장값이 없어도 서버 필터/facet 가 동작한다.
+const SERVER_DERIVED_FILTERABLE = new Set<string>(["start_status"]);
+
 function buildDataColumn(
   c: DefectColumnDef,
   statusGroup: DefectStatusGroup,
