@@ -35,24 +35,35 @@ export function MultiSelectDropdown({
   // 크로스 필터링: props로 부모의 최신 검색어/서버 필터를 받아 자기 자신은 훅에서 제외.
   // (기존 tableMeta 경로는 useReactTable options 갱신 타이밍 이슈로 stale 값이 남을 수 있어 폐기.)
   const activeFilters: DefectServerFilter[] = serverFilters ?? [];
-  const { data: serverFacet } = useDefectFacet(open ? serverFacetCol : null, {
+  const { data: serverFacet, isFetching: facetLoading } = useDefectFacet(open ? serverFacetCol : null, {
     statusGroup,
     includeInactive,
     q,
     filters: activeFilters,
     enabled: open && !!serverFacetCol,
   });
+  // 크로스필터 정합(TM/ABD 동일): 서버 facet가 반환한 값만 노출.
+  // 이미 선택된 값은 카운트 0이어도 해제 UX 위해 유지. (Empty)는 카운트>0 또는 선택 시에만 노출.
   const items = useMemo(() => {
     const counts = new Map<string, number>();
-    if (serverFacet && serverFacet.length) {
-      for (const f of serverFacet) counts.set(f.value, f.cnt);
-    }
-    selected.forEach((v) => { if (v !== EMPTY_TOKEN && !counts.has(v)) counts.set(v, 0); });
-    options.forEach((o) => { if (!counts.has(o.value)) counts.set(o.value, 0); });
-    const list = [...counts.entries()].map(([value, count]) => ({ value, label: labelMap.get(value) ?? value, count }));
-    list.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
-    return [{ value: EMPTY_TOKEN, label: "(Empty)", count: 0 }, ...list];
-  }, [serverFacet, options, labelMap, selected]);
+    if (serverFacet?.length) for (const f of serverFacet) counts.set(f.value, f.cnt);
+    for (const v of selected) if (!counts.has(v)) counts.set(v, 0);
+    const empty = counts.get(EMPTY_TOKEN) ?? 0;
+    counts.delete(EMPTY_TOKEN);
+    const list = [...counts.entries()].map(([value, count]) => ({
+      value,
+      label: labelMap.get(value) ?? value,
+      count,
+    }));
+    list.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+    });
+    const emptyVisible = empty > 0 || selected.includes(EMPTY_TOKEN);
+    return emptyVisible
+      ? [{ value: EMPTY_TOKEN, label: "(Empty)", count: empty }, ...list]
+      : list;
+  }, [serverFacet, labelMap, selected]);
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
@@ -77,14 +88,21 @@ export function MultiSelectDropdown({
           <button className="text-[11px] text-muted-foreground hover:underline" onClick={() => column.setFilterValue(undefined)}>Clear all</button>
         </div>
         <div className="max-h-64 overflow-auto">
-        {filteredItems.length === 0 && (<div className="py-4 text-center text-[11px] text-muted-foreground">일치하는 값 없음</div>)}
+        {facetLoading && filteredItems.length === 0 && (
+          <div className="py-4 text-center text-[11px] text-muted-foreground">로딩 중...</div>
+        )}
+        {!facetLoading && filteredItems.length === 0 && (
+          <div className="py-4 text-center text-[11px] text-muted-foreground">일치하는 값 없음</div>
+        )}
         {filteredItems.map((option) => (
           <label
             key={option.value}
-            className={cn("flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/50", option.count === 0 && !selected.includes(option.value) && "text-muted-foreground/60")}
+            className={cn("flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/50", option.count === 0 && "text-muted-foreground/60")}
           >
             <Checkbox checked={selected.includes(option.value)} onCheckedChange={() => toggle(option.value)} className="h-3.5 w-3.5" />
-            <span className="flex-1 truncate">{option.label}</span>
+            <span className="flex-1 truncate">
+              {option.value === EMPTY_TOKEN ? <em className="text-muted-foreground">(Empty)</em> : option.label}
+            </span>
             <span className="text-[10px] text-muted-foreground tabular-nums">{option.count}</span>
           </label>
         ))}
