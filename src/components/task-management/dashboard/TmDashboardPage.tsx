@@ -180,10 +180,11 @@ export function TmDashboardPage() {
           {/* Row 1: As of · Task · Discipline · Delay · Search */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <DataDatePicker
+              quickAsOf
               value={sharedDataDate}
               latest={latestDataDate}
               options={dataDateOptions}
-              onChange={(v) => setSharedDataDate(v === today ? "" : v)}
+              onChange={(v) => setSharedDataDate(v)}
               onReset={() => setSharedDataDate("")}
               showDataDateChip
             />

@@ -358,6 +358,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
         <div className="flex flex-wrap items-center gap-2">
           <DataDatePicker
             showDataDateChip
+            quickAsOf
             value={dataDate}
             latest={tmLatestDataDate}
             options={[]}

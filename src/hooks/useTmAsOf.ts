@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
+import { yesterdayInDoha } from "@/lib/time/doha";
 
 /**
- * TM 전 페이지가 공유하는 As-of(판정 기준일) 상태 (sessionStorage 기반).
- * - 빈 문자열 = 오늘(Asia/Qatar) 기준 판정
- * - 문자열(YYYY-MM-DD) = 사용자가 지정한 판정 기준일(과거=이력 재판정, 미래=전망)
- * 구 키 `tm_data_date` 는 폐기됨(U5).
+ * TM 전 페이지가 공유하는 기준일(cutoff) 상태 (sessionStorage 기반).
+ * - 기본값 = 어제(Asia/Qatar). 착수 첫날 하루치 요구 편향(tm_kpi_tplan) 상쇄.
+ * - 과거·오늘·미래 모두 선택 가능. 기준일은 계획%와 판정에만 작용하고
+ *   실적(actual_progress/start/finish)은 어떤 기준일에서도 원본 그대로다.
+ * 구 키 `tm_data_date` · `tm_as_of` 는 폐기됨(값 승계 금지).
  */
-const KEY = "tm_as_of";
-const LEGACY_KEY = "tm_data_date";
+const KEY = "tm_cutoff";
+const LEGACY_KEYS = ["tm_data_date", "tm_as_of"];
 
 function read(): string {
-  if (typeof window === "undefined") return "";
+  if (typeof window === "undefined") return yesterdayInDoha();
   try {
-    // 구 키가 남아 있으면 제거만 하고 값은 승계하지 않는다(As-of 기본값=오늘).
-    window.sessionStorage.removeItem(LEGACY_KEY);
-    return window.sessionStorage.getItem(KEY) ?? "";
+    // 구 키가 남아 있으면 제거만 하고 값은 승계하지 않는다(기본값=어제).
+    LEGACY_KEYS.forEach((k) => window.sessionStorage.removeItem(k));
+    return window.sessionStorage.getItem(KEY) || yesterdayInDoha();
   } catch {
-    return "";
+    return yesterdayInDoha();
   }
 }
 
@@ -44,16 +46,16 @@ export function useTmAsOf(): [string, (v: string) => void, () => void] {
   }, []);
 
   const set = useCallback((v: string) => {
+    const next = v || yesterdayInDoha();
     try {
-      if (v) window.sessionStorage.setItem(KEY, v);
-      else window.sessionStorage.removeItem(KEY);
+      window.sessionStorage.setItem(KEY, next);
     } catch {
       /* noop */
     }
-    broadcast(v);
+    broadcast(next);
   }, []);
 
-  const reset = useCallback(() => set(""), [set]);
+  const reset = useCallback(() => set(yesterdayInDoha()), [set]);
 
   return [value, set, reset];
 }
