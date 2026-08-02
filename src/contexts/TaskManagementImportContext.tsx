@@ -873,6 +873,20 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const importErrors: ImportErrorEntry[] = [];
       // 실패한 task_no와 사유. row_logs를 정확히 표시하기 위함.
       const rejectedByTaskNo = new Map<string, { reason_code: string; reason_detail?: string }>();
+      // 날짜 범위 위반으로 사전 거부된 행 반영
+      for (const r of dateRangeRejects) {
+        rejectedByTaskNo.set(r.task_no, {
+          reason_code: "DATE_RANGE_INVALID",
+          reason_detail: `날짜 범위 오류 (${DATE_MIN}~${DATE_MAX}): ${r.detail}`,
+        });
+        importErrors.push({
+          message: `날짜 범위 오류 — ${r.task_no}: ${r.detail}`,
+          code: "DATE_RANGE_INVALID",
+          batch: 0,
+          sampleTaskNo: r.task_no,
+        });
+      }
+      rejected += dateRangeRejects.length;
 
       try {
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
