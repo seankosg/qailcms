@@ -236,6 +236,18 @@ export function styleRoundtripSheet(
   }
 
   ws["!merges"] = merges;
-  ws["!freeze"] = { xSplit: freezeCols, ySplit: 4 };
-  ws["!panes"] = [{ state: "frozen", xSplit: freezeCols, ySplit: 4, topLeftCell: enc({ r: 4, c: freezeCols }) }];
+  // SheetJS 계열 라이브러리는 xlsx 쓰기 시 틀고정(pane)을 출력하지 않으므로
+  // 좌측 식별열은 폭·색 대비로 구분한다. (freezeCols 는 열 구분선 강조용)
+  for (let r = 4; r < 4 + rowCount; r++) {
+    const c = freezeCols - 1;
+    if (c < 0 || c >= cols.length) break;
+    const cell = at(r, c);
+    cell.s = { ...(cell.s ?? {}), border: { ...cellBorder, right: B("FF64748B", "medium") } };
+  }
+  for (let r = 0; r < 4; r++) {
+    const c = freezeCols - 1;
+    if (c < 0 || c >= cols.length) break;
+    const cell = at(r, c);
+    cell.s = { ...(cell.s ?? {}), border: { ...((cell.s as any)?.border ?? cellBorder), right: B("FF334155", "medium") } };
+  }
 }
