@@ -189,7 +189,14 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
               )}
               {field.inputType === "date" && <Input type="date" className="h-8 w-[160px]" value={setBlank ? "" : rawValue} disabled={setBlank} onChange={(e) => setRawValue(e.target.value)} />}
               {field.inputType === "number" && <Input type="number" className="h-8 w-[160px]" value={setBlank ? "" : rawValue} disabled={setBlank} onChange={(e) => setRawValue(e.target.value)} placeholder="0" />}
-              {field.inputType === "text" && <Input type="text" className="h-8 w-[220px]" value={setBlank ? "" : rawValue} disabled={setBlank} onChange={(e) => setRawValue(e.target.value)} placeholder="New value…" />}
+              {field.inputType === "text" && (
+                <TextValueCombobox
+                  value={setBlank ? "" : rawValue}
+                  disabled={setBlank}
+                  options={(field.options ?? []).map((o) => o.value)}
+                  onChange={setRawValue}
+                />
+              )}
               {field.inputType === "textarea" && (
                 <Popover>
                   <PopoverTrigger asChild><Button variant="outline" size="sm" className="h-8 w-[240px] justify-start truncate text-xs font-normal" disabled={setBlank}>{setBlank ? "(Blank)" : rawValue || "New value…"}</Button></PopoverTrigger>
@@ -305,4 +312,87 @@ function formatValue(value: unknown): string {
   if (value == null || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return String(value);
+}
+
+/** 텍스트 필드: 기존 값 목록에서 선택 + 자유 입력 동시 지원 */
+function TextValueCombobox({
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  options: string[];
+  disabled?: boolean;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const uniq = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const o of options) {
+      const s = (o ?? "").toString().trim();
+      if (!s || seen.has(s)) continue;
+      seen.add(s);
+      out.push(s);
+    }
+    return out.sort((a, b) => a.localeCompare(b));
+  }, [options]);
+  const filtered = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    const list = q ? uniq.filter((o) => o.toLowerCase().includes(q)) : uniq;
+    return list.slice(0, 200);
+  }, [uniq, value]);
+
+  return (
+    <Popover open={open && !disabled} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="relative w-[240px]">
+          <Input
+            type="text"
+            className="h-8 pr-7"
+            value={value}
+            disabled={disabled}
+            placeholder="New value… (기존값 선택/직접입력)"
+            onChange={(e) => {
+              onChange(e.target.value);
+              if (!open) setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+          />
+          <ChevronDown
+            className="absolute right-2 top-2 h-4 w-4 cursor-pointer text-muted-foreground"
+            onClick={() => setOpen((v) => !v)}
+          />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[280px] p-1"
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        {uniq.length === 0 ? (
+          <p className="px-2 py-2 text-xs text-muted-foreground">기존 값이 없습니다. 직접 입력하세요.</p>
+        ) : filtered.length === 0 ? (
+          <p className="px-2 py-2 text-xs text-muted-foreground">일치하는 기존 값 없음 — 입력값이 그대로 사용됩니다.</p>
+        ) : (
+          <div className="max-h-64 overflow-y-auto">
+            {filtered.map((o) => (
+              <button
+                key={o}
+                type="button"
+                className="block w-full truncate rounded px-2 py-1 text-left text-xs hover:bg-accent"
+                onClick={() => {
+                  onChange(o);
+                  setOpen(false);
+                }}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
