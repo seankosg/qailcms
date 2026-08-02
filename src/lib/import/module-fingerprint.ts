@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
  * 파일 선택 직후(파싱 이전)에 호출되어 잘못된 모듈 파일을 사전에 차단한다.
  */
 
+/** [F-3-4] SPL/WRT 편입을 대비해 확장 가능하게 둔다(앵커 예약: SPL NUMBER / WRT NUMBER). */
 export type ModuleId = "abd" | "sm" | "tm";
 
 export const MODULE_LABELS: Record<ModuleId, string> = {
@@ -63,17 +64,14 @@ function normSet(list: string[]): Set<string> {
 
 export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
   abd: {
+    // [F-3] 앵커 = 모듈 배타 신호만. 일반어(Round/Draft/Submission/Latest Status)는 signature 로만 유지.
     anchors: [
-      "Document No",
-      "Doc No",
-      "Round",
-      "Draft",
-      "Submission",
+      "ABD NUMBER",
+      "ABD OCS No.",
       "DAR Response",
-      "Latest Status",
-      // Aconex Export anchors — 같은 ABD 페이지로 유입 허용
       "Review Status",
       "Date Modified",
+      "Document No",
     ],
     signature: [
       "Document No",
@@ -95,6 +93,8 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Date Modified",
       "Created By",
       "Revision Date",
+      "ABD NUMBER",
+      "ABD OCS No.",
     ],
     filenameHints: [/abd/i, /as[\s_-]?built/i, /aconex/i, /exportdocs/i],
   },
@@ -103,8 +103,14 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Issue No",
       "Source Issue No",
       "Punch Category",
-      "Location",
       "Raised Date",
+      // 스내깅 원본(Dar Export / 내부 View Export) 배타 헤더 — 타 모듈 원본에 등장하지 않음
+      "PlanTitle",
+      "PlanGroup",
+      "LocationReference",
+      "Podium area",
+      "Snag No",
+      "UpdatedStatus",
     ],
     signature: [
       "Issue No",
@@ -119,31 +125,30 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Aconex",
       "Status",
       "Description",
+      "PlanTitle",
+      "PlanGroup",
+      "LocationReference",
+      "Classification",
+      "Podium area",
+      "CreatedBy",
+      "CreatedDate",
+      "UpdatedStatus",
+      "UpdatedDate",
     ],
     filenameHints: [/snag/i, /defect/i, /punch/i, /aconex/i],
   },
   tm: {
+    // [F-3-2] 'HDEC PIC'/'HDEC ENG' 는 ABD·SPL·WRT 원본에도 존재하는 전사 공용 헤더 → 앵커에서 제거.
     anchors: [
       "Task No",
       "Main Task No",
-      "Parent Task No",
       "Sub Task",
-      "Plan Start",
-      "Plan Finish",
-      "Actual Progress",
-      // Korean anchors (real files use these)
       "항목",
-      "계획 시작",
-      "계획 완료",
-      "계획 일수",
-      "실제 시작",
-      "실제 완료",
       "계획 진도율",
       "실적 진도율",
       "자동 판정",
-      "HDEC PIC",
-      "HDEC ENG",
-      "Data Date",
+      "단계별 세부 업무",
+      "계획 일수",
     ],
     signature: [
       "Task No",
