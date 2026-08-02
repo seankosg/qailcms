@@ -234,15 +234,7 @@ export function detectModule(
     for (const a of anchorSet) if (headerSet.has(a)) anchorMatches++;
     anchorsHit[mod] = anchorMatches;
     let score = jaccard + anchorMatches * 0.05;
-    // 파일명 힌트 가산점
-    if (fp.filenameHints && fname) {
-      for (const re of fp.filenameHints) {
-        if (re.test(fname)) {
-          score += 0.03;
-          break;
-        }
-      }
-    }
+    // [F-4-3] 파일명 가산점 제거 — 헤더만으로 판정한다.
     // 시트명 힌트 가산점
     if (fp.sheetHints) {
       const hintSet = normSet(fp.sheetHints);
@@ -294,7 +286,7 @@ export function evaluateImport(
   const targetScore = detection.scores[target];
   const topScore = detection.scores[detection.top];
 
-  // A. target 앵커가 하나도 없고, 시그니처 겹침도 미미하며, 파일명 힌트도 없을 때만 하드 블록
+  // [F-4-2] A. target 앵커 히트가 0이면 무조건 하드 블록 (앵커가 배타 신호이므로 안전)
   const targetFp = MODULE_FINGERPRINTS[target];
   const fnameLower = (filename ?? "").toLowerCase();
   const filenameMatch = !!(
@@ -302,7 +294,7 @@ export function evaluateImport(
     fnameLower &&
     targetFp.filenameHints.some((re) => re.test(fnameLower))
   );
-  if (targetAnchors === 0 && targetScore < 0.05 && !filenameMatch) {
+  if (targetAnchors === 0) {
     return {
       verdict: "block",
       target,
@@ -312,7 +304,9 @@ export function evaluateImport(
       hint:
         topAnchors > 0
           ? `${MODULE_LABELS[detection.top]} 원본 파일로 보입니다. ${MODULE_LABELS[detection.top]} 임포트 페이지에서 다시 시도하세요.`
-          : "형식을 확인할 수 없는 파일입니다.",
+          : filenameMatch
+            ? "파일명은 일치하지만 헤더에서 형식을 확인할 수 없습니다."
+            : "형식을 확인할 수 없는 파일입니다.",
     };
   }
 
