@@ -1,4 +1,6 @@
 // 임포트 시 필드 단위 로그를 만들기 위한 공용 헬퍼.
+import { dohaDateOnly } from "@/lib/time/doha";
+
 export type FieldLogOutcome =
   | "applied"
   | "unchanged"
