@@ -231,7 +231,7 @@ export function bottleneckTeam(
 // ── 매트릭스 형태 ────────────────────────────────────────────────────
 export type CellKey = string; // `${building}||${levelDisp}||${roomGroup}`
 
-export type BlockKey = "tower" | "podium" | "basement";
+export type BlockKey = "tower" | "podium" | "lg" | "basement";
 
 export type MatrixRow = {
   building: string;
@@ -245,6 +245,8 @@ export type MatrixBlock = {
   kind: BlockKey;
   title: string;
   rows: MatrixRow[]; // 정렬 완료
+  /** 이 블록이 렌더링할 열 키 (일반 블록 = ROOM_GROUP_ORDER, LG 블록 = Podium N) */
+  columnKeys: RoomGroupCol[];
   colTotals: Record<RoomGroupCol, Stats>;
   blockTotal: Stats;
 };
@@ -259,7 +261,7 @@ export type MatrixShape = {
 
 function emptyRoomGroupStats(): Record<RoomGroupCol, Stats> {
   const out = {} as Record<RoomGroupCol, Stats>;
-  for (const rg of ROOM_GROUP_ORDER) out[rg] = newStats();
+  for (const rg of ALL_ROOM_GROUPS) out[rg] = newStats();
   return out;
 }
 
@@ -272,6 +274,7 @@ export function buildMatrix(
   type RowsMap = Map<string, Map<string, { levelKind: LevelKind; sortIdx: number; cells: Record<RoomGroupCol, Stats> }>>;
   const tower: RowsMap = new Map();
   const podium: RowsMap = new Map();
+  const lg: RowsMap = new Map();
   const basement: RowsMap = new Map();
 
   const ensure = (m: RowsMap, building: string, levelDisp: string, levelKind: LevelKind, sortIdx: number) => {
@@ -289,7 +292,12 @@ export function buildMatrix(
     let block: RowsMap;
     let buildingLabel: string;
     let levelDisp: string;
-    if (lvl.kind === "basement") {
+    // LG 는 building='LG' 단독 판정 — level_name 판정보다 우선한다.
+    if (bld.kind === "lg") {
+      block = lg;
+      buildingLabel = "LG";
+      levelDisp = "LG";
+    } else if (lvl.kind === "basement") {
       block = basement;
       buildingLabel = "Basement"; // 공통
       levelDisp = `Level ${lvl.key}`;
@@ -318,6 +326,7 @@ export function buildMatrix(
     const buildingOrder = (() => {
       if (kind === "tower") return ["Tower"];
       if (kind === "basement") return ["Basement"];
+      if (kind === "lg") return ["LG"];
       // podium
       const known = PODIUM_ORDER.filter((b) => source.has(b));
       const others = Array.from(source.keys()).filter((b) => !PODIUM_ORDER.includes(b)).sort();
@@ -341,7 +350,7 @@ export function buildMatrix(
       });
       for (const [levelDisp, info] of levels) {
         const rowTotal = newStats();
-        for (const rg of ROOM_GROUP_ORDER) mergeStats(rowTotal, info.cells[rg]);
+        for (const rg of ALL_ROOM_GROUPS) mergeStats(rowTotal, info.cells[rg]);
         rows.push({
           building: bLabel,
           levelDisp,
@@ -355,16 +364,25 @@ export function buildMatrix(
     const colTotals = emptyRoomGroupStats();
     const blockTotal = newStats();
     for (const row of rows) {
-      for (const rg of ROOM_GROUP_ORDER) mergeStats(colTotals[rg], row.cells[rg]);
+      for (const rg of ALL_ROOM_GROUPS) mergeStats(colTotals[rg], row.cells[rg]);
       mergeStats(blockTotal, row.rowTotal);
     }
 
-    return { kind, title, rows, colTotals, blockTotal };
+    const columnKeys: RoomGroupCol[] =
+      kind === "lg"
+        ? (() => {
+            const present = LG_ROOM_GROUPS.filter((rg) => colTotals[rg].issued > 0);
+            return (present.length ? present : LG_ROOM_GROUPS.slice(0, 1)) as RoomGroupCol[];
+          })()
+        : [...ROOM_GROUP_ORDER];
+
+    return { kind, title, rows, columnKeys, colTotals, blockTotal };
   };
 
   const blocks: MatrixBlock[] = [];
   if (tower.size) blocks.push(buildBlock("tower", "Tower", tower));
   if (podium.size) blocks.push(buildBlock("podium", "Podium", podium));
+  if (lg.size) blocks.push(buildBlock("lg", "LG (Lower Ground)", lg));
   if (basement.size) blocks.push(buildBlock("basement", "Basement (지하)", basement));
 
   const plotTotal = newStats();
