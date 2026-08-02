@@ -1,92 +1,40 @@
-# SM 대시보드 LG 블록 신설 (마이그레이션 없음)
+## 목표
 
-## 0. 확정 규칙
+현재 SM 대시보드는 `LANDSCAPE` 와 `FACADE` 를 하나의 `FACADE` 열/카드로 병합해 집계한다. 이를 분리해 **Landscape 1장, Facade 1장** 의 독립 Room Group 카드로 만들고, 매트릭스 열·필터 칩·엑셀 출력까지 동일하게 분리한다.
 
-- **LG 블록 대상 = `building = 'LG'` 인 행 단독.** 현재 DB 실측 **1,129건**.
-- `building` 이 `Podium` / `Podium 1~4` / `Tower` / `BSM` / `NULL` 인 행은 **기존 로직 그대로 유지** (LG 대상 아님).
-- **LG = Lower Ground Level 을 뜻하는 독립 블록이며 `level_name` 의 `Level LG` 와 무관.** LG 대상이 아닌 `Level LG` 행은 기존대로 Basement 블록에 남는다.
-- **DB 데이터 변경(마이그레이션·UPDATE) 없음.** 순수 프런트엔드 표시 로직 변경.
+## 현재 상태 (실측)
 
-## 1. 사전 전수조사 결과 (실측)
+- `src/lib/defect-management/dashboard-shape.ts:101` — `if (s === "LANDSCAPE" || s === "FACADE") return "FACADE";` 병합 지점(단일 원인)
+- `src/lib/defect-management/dashboard-shape.ts:67-78` — `ROOM_GROUP_ORDER` 에 `FACADE` 만 존재, `LANDSCAPE` 없음
+- `src/components/defect-management/dashboard/DeSnagDashboardPage.tsx:151, 202` — 드릴다운 파라미터를 `"FACADE,LANDSCAPE"` 로 합쳐 전달
+- `src/components/defect-management/dashboard/DeSnagMatrixBlock.tsx:223, 315` — 셀/열 헤더 드릴다운도 `"FACADE,LANDSCAPE"` 전달
+- 필터 칩(`DeSnagRoomGroupFilterBar.tsx:41`)과 엑셀(`matrix-excel.ts`)은 `ROOM_GROUP_ORDER` / 블록 `cols` 를 그대로 순회하므로 상수 변경만으로 자동 반영
 
-### `building = 'LG'` 행의 `room_group` 분포 (총 1,129건)
-| plan_title | room_group | 건수 |
-|---|---|---|
-| Plot C Podium 1 | Podium 1 | 374 |
-| Plot C Podium 2 | Podium 2 | 305 |
-| Plot C Podium 3 | Podium 3 | 103 |
-| Plot C Podium 4 | Podium 4 | 123 |
-| Plot D Podium 1 | Podium 1 | 116 |
-| Plot D Podium 2 | Podium 2 | 15 |
-| Plot D Podium 3 | Podium 3 | 57 |
-| Plot D Podium 4 | Podium 4 | 36 |
+## 변경 내용
 
-→ **Plot C = 905건 · Plot D = 224건**, 컬럼은 양쪽 모두 `Podium 1~4`. `Podium 5` 데이터는 `building='LG'` 범위에 없음(현재 미노출, 향후 데이터 유입 시 자동 표시되도록 동적 처리).
+### 1. `dashboard-shape.ts`
+- `ROOM_GROUP_ORDER` 에 `"LANDSCAPE"` 추가 — 순서는 `... CORRIDOR, FACADE, LANDSCAPE, N/A` (Facade 바로 뒤)
+- `normalizeRoomGroup` 의 병합 분기 제거 → `LANDSCAPE` 는 `LANDSCAPE`, `FACADE` 는 `FACADE` 로 각각 반환. 기존 일반 매칭 루프가 두 값을 모두 처리하므로 특수 분기 자체를 삭제
 
-### 충돌 검사 결과
-- `building='LG'` 1,129건은 **전부** `room_group` 이 `Podium 1~4`. 다른 building 값에는 `Podium N` room_group 이 **0건**.
-- 역으로 `room_group IN ('Podium 1'..'Podium 4')` 인 행 1,129건도 **전부** `building='LG'`.
-- → **1:1 대응. 신규 블록 키 `lg` 및 신규 컬럼 키 `Podium N` 모두 기존 데이터와 충돌 없음.**
+### 2. `DeSnagDashboardPage.tsx`
+- `roomGroupParam()` 의 `FACADE → "FACADE,LANDSCAPE"` 분기 제거 (자기 값 그대로 전달)
+- `roomGroupEntries` 의 `param` 계산에서 동일 분기 제거 → Landscape 카드는 `roomGroup=LANDSCAPE`, Facade 카드는 `roomGroup=FACADE`
+- 카드는 기존 로직대로 `issued > 0` 인 그룹만 노출되므로 데이터가 있으면 자동으로 2장으로 표시
 
-### 기존 블록 영향
-`building='LG'` 행은 현재 `classifyBuilding()` 에서 `Others` 로 분류되어 **Podium 블록의 "Others" 행**에 표시되고 있음. LG 블록으로 이동하면 Podium 블록에서 1,129건이 빠진다. **Plot Grand Total 은 불변.**
+### 3. `DeSnagMatrixBlock.tsx`
+- 223행·315행의 `"FACADE,LANDSCAPE"` 병합 파라미터를 각 열 키 그대로 전달하도록 수정
 
----
+### 4. 필터 바 / 엑셀
+- 코드 변경 없음. `ROOM_GROUP_ORDER` 확장에 따라 필터 칩에 `LANDSCAPE` 가 추가되고, 엑셀 매트릭스도 열이 하나 늘어난 상태로 그대로 출력됨. 실제 렌더 결과는 시행 후 확인해 보고
 
-## 2단계 — 블록 분류 (`src/lib/defect-management/dashboard-shape.ts`)
+## 영향 / 주의
 
-- `BlockKind` / `BlockKey` 에 `"lg"` 추가
-- `classifyBuilding()` 에 `/^LG$/i` → `{ kind: "lg", label: "LG" }` 추가
-- `buildMatrix()` 라우팅에서 **`bld.kind === "lg"` 검사를 `lvl.kind === "basement"` 검사보다 먼저** 수행
-  - LG 대상이 아닌 행의 basement / tower / podium / Others 경로는 **완전 동일 유지**
-- LG 블록은 **단일 행** (building `LG`, level 표기 없음 — level 은 귀속과 무관)
-- 블록 배열 순서: Tower → Podium → **LG** → Basement
-- 블록 제목: `"LG (Lower Ground)"`
+- 매트릭스 일반 블록의 열이 10개 → 11개로 늘어난다(가로 폭 증가). 이는 "카드+열+필터+엑셀 전부 분리" 승인 범위 내
+- LG 블록(Podium 축)은 영향 없음
+- 기존 URL 딥링크 `roomGroup=FACADE,LANDSCAPE` 는 Raw Data 필터에서 여전히 두 값 OR 로 해석되므로 깨지지 않음
 
-## 3단계 — 컬럼 축 일반화
+## 검증
 
-- `LG_ROOM_GROUPS = ["Podium 1" … "Podium 5"]` 상수 추가, `RoomGroupCol` 타입에 포함(총 15종)
-- `normalizeRoomGroup()`: `PODIUM 1`~`PODIUM 5` 입력을 `Podium N` 으로 정규화 (기존 10종 매핑 동작 불변)
-- `MatrixBlock` 에 `columnKeys: RoomGroupCol[]` 필드 추가
-  - `lg` 블록 → 해당 Plot 에서 **실제 값이 존재하는 Podium 컬럼만** (현재 Plot C/D 모두 1~4)
-  - 그 외 블록 → 기존 `ROOM_GROUP_ORDER` 10종 (**표시 무변경**)
-
-## 4단계 — 매트릭스 렌더링 (`DeSnagMatrixBlock.tsx`)
-
-- 하드코딩된 `ROOM_GROUP_ORDER` 순회를 전부 `block.columnKeys` 로 교체
-  - 3단 헤더(Room Group > Status > Team) · 컬럼 총계 행 · 데이터 행 · 행 소계
-- 드릴다운은 기존 `roomGroup` 파라미터 그대로 (DB 에 실제 `Podium N` 값이 저장되어 있으므로 신규 파라미터 불필요)
-- 개수 / % / 잔여 개수 / 잔여 % 토글, 병목 팀 강조(15%p) 등 기존 동작 **전부 유지**
-
-## 5단계 — `LG Podium` 카드 신설
-
-- `DeSnagDashboardPage` 의 `roomGroupEntries` 계산에 Podium 1~5 합산 가상 엔트리 추가
-  - 라벨 **`LG Podium`**, 기존 10개 Room Group 카드 **뒤**에 배치
-  - 드릴다운 `roomGroup = "Podium 1,Podium 2,Podium 3,Podium 4"` (존재하는 컬럼만 결합)
-  - 스택 바 · 범례(Open · Re-Opened · Rectified · Closed) 구조는 기존 카드와 **100% 동일**
-- `DeSnagRoomGroupCards`: `col` 타입을 `string` 으로 완화하고 `{ col, label, param }` 으로 분리
-- `DeSnagRoomGroupFilterBar`: `LG Podium` 칩 1개 추가 (선택 시 Podium 1~N 전체 필터)
-
-## 6단계 — 엑셀 내보내기 (`matrix-excel.ts`)
-
-- 컬럼 생성 루프를 `block.columnKeys` 기반으로 교체 → LG 섹션이 Podium 1~N 헤더로 출력
-
-## 7단계 — 서버 RPC
-
-`defect_snag_dashboard_matrix_json` 은 `building` / `room_group` 을 그대로 GROUP BY 하므로 **수정 불필요**. 별도 RPC 신설도 불필요.
-
----
-
-## 셀프 체크리스트
-- [ ] DB 데이터 변경 0건 (UPDATE 미실행)
-- [ ] LG 블록 = `building='LG'` 1,129건 (Plot C 905 · Plot D 224)
-- [ ] LG 대상이 아닌 `Level LG` 행은 기존대로 Basement 유지
-- [ ] Podium 블록의 "Others" 행에서 LG 1,129건 제거 확인
-- [ ] 블록 순서 Tower → Podium → LG → Basement
-- [ ] LG 컬럼 = 실제 데이터가 있는 Podium 1~4
-- [ ] LG 셀 클릭 → Raw Data `roomGroup=Podium N` 건수 일치
-- [ ] `LG Podium` 카드 Issued = LG 블록 blockTotal.issued
-- [ ] Plot Grand Total 변경 전후 동일
-- [ ] 기존 Tower / Podium / Basement 블록 UI · 배치 · 문구 무변경
-- [ ] 엑셀 LG 섹션 정상 출력
-- [ ] 빌드 및 타입체크 통과
+- 대시보드에서 Landscape / Facade 카드 각 1장 노출 및 Issued 합이 기존 병합 카드 값과 일치하는지 대조
+- 각 카드 클릭 → Raw Data 건수가 카드 숫자와 일치하는지 확인
+- 매트릭스 열 헤더/셀 드릴다운, 필터 칩, 엑셀 다운로드 열 구성 확인
