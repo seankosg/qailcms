@@ -400,17 +400,12 @@ export async function extractHeadersFromFile(
         bestRow = r;
       }
     }
-    const chosen = rowValues[bestRow] ?? [];
-    if (chosen.length === 0) continue;
-    for (const s of chosen) collected.push(s);
-    // 헤더 후보가 데이터 행일 수 있으므로, 앵커 매칭이 발견된 행이 따로 있으면 그 행도 함께 수집
-    if (bestAnchor <= 0) {
-      for (let r = range.s.r; r <= scanEndRow; r++) {
-        const vals = rowValues[r] ?? [];
-        for (const s of vals) {
-          if (allAnchorSet.has(normalizeHeader(s))) collected.push(s);
-        }
-      }
+    // [F-1-2] 최적 헤더행까지의 상단 블록 전체를 합집합으로 수집한다.
+    // (다단 헤더에서 상위 밴드 행의 판정 신호가 버려지는 것을 방지)
+    // 데이터 행(bestRow 초과)은 수집하지 않는다.
+    for (let r = range.s.r; r <= bestRow; r++) {
+      const vals = rowValues[r] ?? [];
+      for (const s of vals) collected.push(s);
     }
   }
   return { headers: collected, sheetNames };
