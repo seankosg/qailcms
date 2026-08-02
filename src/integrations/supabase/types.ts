@@ -3730,6 +3730,7 @@ export type Database = {
         Row: {
           actual_duration: number | null
           actual_finish: string | null
+          actual_finish_source: string | null
           actual_progress: number | null
           actual_start: string | null
           alarm_reason: string | null
@@ -3779,6 +3780,7 @@ export type Database = {
         Insert: {
           actual_duration?: number | null
           actual_finish?: string | null
+          actual_finish_source?: string | null
           actual_progress?: number | null
           actual_start?: string | null
           alarm_reason?: string | null
@@ -3828,6 +3830,7 @@ export type Database = {
         Update: {
           actual_duration?: number | null
           actual_finish?: string | null
+          actual_finish_source?: string | null
           actual_progress?: number | null
           actual_start?: string | null
           alarm_reason?: string | null

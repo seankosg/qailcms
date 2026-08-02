@@ -758,6 +758,46 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         toast.info(`${f.name}: 개별 결정 ${resolvedByDecision}건 적용`);
       }
 
+      // ---- 날짜 범위 검증 (J-3) ----
+      // DB CHECK 제약(2020-01-01 ~ 2035-12-31)과 동일한 규칙.
+      // 실적 정합 제약(C1~C3)과 달리 범위 위반은 명백한 데이터 오류이므로 임포트에서 거부한다.
+      const DATE_MIN = "2020-01-01";
+      const DATE_MAX = "2035-12-31";
+      const DATE_FIELDS = [
+        "plan_start",
+        "plan_end",
+        "actual_start",
+        "actual_finish",
+        "forecast_end",
+      ] as const;
+      const dateRangeRejects: { task_no: string; detail: string }[] = [];
+      for (let i = applied.length - 1; i >= 0; i--) {
+        const p = applied[i] as unknown as Record<string, unknown>;
+        const bad: string[] = [];
+        for (const fname of DATE_FIELDS) {
+          const raw = p[fname];
+          if (raw == null || raw === "") continue;
+          const s = String(raw).slice(0, 10);
+          if (s < DATE_MIN || s > DATE_MAX) bad.push(`${fname}=${s}`);
+        }
+        if (bad.length > 0) {
+          dateRangeRejects.push({
+            task_no: String(p.task_no ?? ""),
+            detail: bad.join(", "),
+          });
+          applied.splice(i, 1);
+        }
+      }
+      if (dateRangeRejects.length > 0) {
+        const sample = dateRangeRejects
+          .slice(0, 3)
+          .map((r) => `${r.task_no}(${r.detail})`)
+          .join(", ");
+        toast.error(
+          `${f.name}: 날짜 범위 오류 ${dateRangeRejects.length}건 거부 — ${sample}. 원본 파일의 날짜를 ${DATE_MIN}~${DATE_MAX} 범위로 수정 후 재임포트하세요.`,
+        );
+      }
+
       const payloads = applied.map((p) => {
         const isParent = p.level === "main";
         const stripParent = isParent && rollupMode === "auto";
@@ -833,6 +873,20 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const importErrors: ImportErrorEntry[] = [];
       // 실패한 task_no와 사유. row_logs를 정확히 표시하기 위함.
       const rejectedByTaskNo = new Map<string, { reason_code: string; reason_detail?: string }>();
+      // 날짜 범위 위반으로 사전 거부된 행 반영
+      for (const r of dateRangeRejects) {
+        rejectedByTaskNo.set(r.task_no, {
+          reason_code: "DATE_RANGE_INVALID",
+          reason_detail: `날짜 범위 오류 (${DATE_MIN}~${DATE_MAX}): ${r.detail}`,
+        });
+        importErrors.push({
+          message: `날짜 범위 오류 — ${r.task_no}: ${r.detail}`,
+          code: "DATE_RANGE_INVALID",
+          batch: 0,
+          sampleTaskNo: r.task_no,
+        });
+      }
+      rejected += dateRangeRejects.length;
 
       try {
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {
@@ -937,6 +991,17 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 reason_detail: rej?.reason_detail ?? null,
               };
             });
+            for (const r of dateRangeRejects) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: r.task_no,
+                action_taken: "rejected",
+                reason_code: "DATE_RANGE_INVALID",
+                reason_detail: `날짜 범위 오류 (${DATE_MIN}~${DATE_MAX}): ${r.detail}`,
+              });
+            }
             for (let i = 0; i < rowLogRows.length; i += 500) {
               await (supabase as any)
                 .from("task_management_import_row_logs")
