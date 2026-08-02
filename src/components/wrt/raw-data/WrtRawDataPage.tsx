@@ -28,7 +28,15 @@ const BAND_LABEL: Record<string, string> = {
   SUBMISSION: "Submission Stage",
 };
 
-const JUDGMENTS = ["완료", "정상", "지연", "미분류", "제외"] as const;
+const JUDGMENTS = ["완료", "정상", "지연", "미착수", "미분류", "제외"] as const;
+
+/**
+ * ★ 계획일 임포트 직후 재실행 필수 검증 체크리스트 (D-4-3)
+ *  1. 지연 KPI 카드 클릭 → 드릴다운 목록 건수 == 카드값
+ *  2. 밴드별 대표 지연 칩 합계 == 지연 카드값
+ *  3. 아이템당 primary_delay ≤ 1
+ *  현재 상태: 불변식 I-1 / I-3 / I-5 는 지연 표본 0 위에서 관측된 것이므로 "미검증".
+ */
 
 /** 라운드 선행 표기 — "R1 Submission" (ABD "R1 DS" 어휘 규칙 동일) */
 function stageLabel(s: { label: string; round_no?: number | null } | null | undefined) {
@@ -103,6 +111,8 @@ export function WrtRawDataPage() {
       if (search.round && search.round !== "all" && String(r.active_round) !== search.round) return false;
       // 카드 = 드릴다운: 정본이 내려준 judgment 필드를 그대로 술어로 사용
       if (search.judgment && search.judgment !== "all" && r.judgment !== search.judgment) return false;
+      // HDEC 실적 미확보 드릴다운 — 판정과 독립된 술어
+      if (search.hdecMissing && (r.hdec_actual_count ?? 0) !== 0) return false;
       // 밴드 지연 셀 드릴다운 = 활성 밴드 + 대표 지연이 그 밴드
       if (search.delayBand) {
         if (r.active_band !== search.delayBand) return false;
@@ -113,7 +123,7 @@ export function WrtRawDataPage() {
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [rows, search.q, search.plot, search.judgment, search.round, search.delayBand]);
+  }, [rows, search.q, search.plot, search.judgment, search.round, search.delayBand, search.hdecMissing]);
 
   const delayBands = useMemo(() => {
     const m = new Map<string, number>();
@@ -151,7 +161,7 @@ export function WrtRawDataPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Warranty — Raw Data</h1>
           <p className="text-xs text-muted-foreground">
-            표시·집계 수치는 정본 함수(wrt_rows_as_of → wrt_eval_as_of → wrt_judge_v2) 경유 · 읽기 시 재계산. 완료
+            표시·집계 수치는 정본 함수(wrt_rows_as_of → wrt_eval_as_of → wrt_judge_v3) 경유 · 읽기 시 재계산. 완료
             판정은 Final Approved(A) 기준입니다.
           </p>
         </div>
@@ -229,7 +239,19 @@ export function WrtRawDataPage() {
               제출 대기 {viol.pending_hdec_items ?? 0}건 (라운드 기준 {viol.pending_hdec ?? 0}쌍 · R1{" "}
               {viol.pending_hdec_r1 ?? 0} / R2 {viol.pending_hdec_r2 ?? 0})
             </Badge>
+            <Badge
+              variant="outline"
+              className="text-[11px]"
+              title="선행 단계의 progress 행 자체가 없는 건 — HDEC 임포트 미완이며 실제 공정 역전이 아님"
+            >
+              자료 미유입 {viol.import_incomplete ?? 0}건
+            </Badge>
           </>
+        )}
+        {(data?.plan_items ?? 0) === 0 && (
+          <Badge variant="secondary" className="text-[11px]">
+            HDEC 계획일 미유입 — 지연 판정 미실시 (계획일 보유 아이템 {data?.plan_items ?? 0}건)
+          </Badge>
         )}
       </div>
 
@@ -248,17 +270,21 @@ export function WrtRawDataPage() {
             label={j}
             value={counts[j] ?? 0}
             active={search.judgment === j && !search.delayBand}
-            onClick={() => setSearch({ judgment: search.judgment === j ? "all" : j, delayBand: "" })}
+            onClick={() =>
+              setSearch({ judgment: search.judgment === j ? "all" : j, delayBand: "", hdecMissing: false })
+            }
             note={
               j === "완료"
-                ? "Final Approved (A)"
+                ? `Final Approved (A) · HDEC 실적 미확보 ${data?.hdec_missing_done ?? 0}건`
                 : j === "미분류"
                   ? "계획·실적 없음 (분모 0)"
                   : j === "제외"
                     ? "Cancelled — 통계 제외"
                     : j === "지연"
                       ? "대표 지연 보유 문서"
-                      : undefined
+                      : j === "미착수"
+                        ? "활성 밴드 판정대상 0단계"
+                        : undefined
             }
             tone={j === "지연" ? "bad" : j === "미분류" ? "warn" : undefined}
           />
@@ -281,6 +307,14 @@ export function WrtRawDataPage() {
         <Badge variant="outline" className="text-[11px]">
           회신 대기 지연 {responseWaitItems}건 (Aconex 귀책 · 지연 카드 미합산)
         </Badge>
+        <Button
+          size="sm"
+          variant={search.hdecMissing ? "default" : "outline"}
+          className="h-7 text-[11px]"
+          onClick={() => setSearch({ hdecMissing: !search.hdecMissing, delayBand: "" })}
+        >
+          HDEC 실적 미확보 {data?.hdec_missing_items ?? 0}건
+        </Button>
       </div>
 
       <Card>
@@ -408,7 +442,8 @@ function WrtTableRow({
           ? "bg-amber-100 text-amber-800"
           : row.judgment === "제외"
             ? "bg-muted text-muted-foreground"
-            : "bg-slate-100 text-slate-800";
+            : // 미착수 = 중립(회색). 지연색 사용 금지
+              "bg-slate-100 text-slate-800";
   return (
     <tr className="hover:bg-muted/30">
       <StickyCell left={0} width={250} className="font-mono">
@@ -422,6 +457,14 @@ function WrtTableRow({
       </StickyCell>
       <StickyCell left={400} width={90}>
         <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>{row.judgment}</span>
+        {(row.hdec_actual_count ?? 0) === 0 && (
+          <span
+            className="ml-1 rounded bg-muted px-1 text-[9px] text-muted-foreground"
+            title="HDEC 권한 단계 실적 보유 0건 — 판정과 독립된 자료 상태 표기"
+          >
+            HDEC 실적 미확보
+          </span>
+        )}
       </StickyCell>
       <StickyCell left={490} width={80} className="tabular-nums">
         {row.progress_pct == null ? "—" : `${row.progress_pct}%`}

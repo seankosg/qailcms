@@ -40,7 +40,7 @@ export type WrtStageRef = {
   authority?: string;
 };
 
-export type WrtJudgment = "완료" | "정상" | "지연" | "미분류" | "제외";
+export type WrtJudgment = "완료" | "정상" | "지연" | "미분류" | "제외" | "미착수";
 
 export type WrtRow = {
   id: string;
@@ -68,6 +68,13 @@ export type WrtRow = {
   delayed: number;
   denom: number;
   active_band: string | null;
+  /** 활성 밴드 상태 — 'empty'(미착수) | 'active'(진행). 전 밴드 완료 시 null */
+  active_band_state: "empty" | "active" | null;
+  band_states: Record<string, "empty" | "active" | "complete">;
+  /** actual_authority='HDEC' 단계 실적 보유 수 (0 = HDEC 실적 미확보) */
+  hdec_actual_count: number;
+  /** HDEC 단계 계획일 보유 여부 */
+  has_plan: boolean;
   completed_stage: WrtStageRef | null;
   current_stage: WrtStageRef | null;
   /** 활성 밴드 내 HDEC 귀책 최선행 지연 1개 (Aconex 회신 단계 제외) */
@@ -86,9 +93,15 @@ export type WrtRowsAsOf = {
   rows: WrtRow[];
   total_count: number;
   judgment_counts: Record<string, number>;
+  band_state_counts: Record<string, Record<string, number>>;
+  hdec_missing_items: number;
+  hdec_missing_done: number;
+  plan_items: number;
   violations: {
     total: number;
     precedence: number;
+    /** 선행 단계 자료 자체가 미유입 — 실제 공정 역전과 분리, pending_hdec 과 동일 취급 */
+    import_incomplete: number;
     ghost_round: number;
     /** 회신일이 제출 실적일보다 앞선 진짜 위반 */
     response_before_submission: number;

@@ -8,7 +8,9 @@ const searchSchema = z.object({
   q: z.string().optional().default(""),
   plot: z.enum(["all", "C", "D"]).optional().default("all"),
   round: z.enum(["all", "1", "2"]).optional().default("all"),
-  judgment: z.enum(["all", "완료", "정상", "지연", "미분류", "제외"]).optional().default("all"),
+  judgment: z.enum(["all", "완료", "정상", "지연", "미분류", "제외", "미착수"]).optional().default("all"),
+  /** HDEC 실적 미확보(HDEC 권한 단계 실적 0건) 드릴다운 */
+  hdecMissing: z.boolean().optional().default(false),
   /** 밴드별 대표 지연 셀 드릴다운 — 활성 밴드이면서 대표 지연이 그 밴드에 속한 행만 */
   delayBand: z.string().optional().default(""),
 });
