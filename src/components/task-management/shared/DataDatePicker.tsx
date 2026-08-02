@@ -8,7 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { formatDdMmmYyyy, todayInDoha } from "@/lib/time/doha";
+import { formatDdMmmYyyy, todayInDoha, yesterdayInDoha } from "@/lib/time/doha";
 import { asOfOffsetLabel } from "@/lib/task-management/as-of";
 
 export interface DataDatePickerProps {
@@ -24,6 +24,8 @@ export interface DataDatePickerProps {
   dataDateByTeam?: { label: string; date: string }[];
   /** "asof"(기본): 기준=오늘, 리셋=오늘로. "datadate": 기준=latest, 리셋=최신으로. */
   mode?: "asof" | "datadate";
+  /** TM 기준일: [어제][오늘] 퀵버튼 노출(기본값=어제). */
+  quickAsOf?: boolean;
 }
 
 /** As of(판정 기준일) 캘린더 선택기.
@@ -43,11 +45,13 @@ export function DataDatePicker({
   showDataDateChip = false,
   dataDateByTeam,
   mode = "asof",
+  quickAsOf = false,
 }: DataDatePickerProps) {
   const [open, setOpen] = useState(false);
   const today = mode === "datadate" ? latest || todayInDoha() : todayInDoha();
-  // As-of 기본값은 오늘(Asia/Qatar). latest(data_date)로 폴백하지 않는다.
-  const active = value || today;
+  const yesterday = yesterdayInDoha();
+  // 기준일 기본값: TM 은 어제, 그 외는 오늘. latest(data_date)로 폴백하지 않는다.
+  const active = value || (quickAsOf ? yesterday : today);
   const offset = mode === "datadate" ? "" : asOfOffsetLabel(active, today);
 
   const teamChip =
@@ -81,8 +85,28 @@ export function DataDatePicker({
     <div className={"flex flex-wrap items-center gap-2 " + (className ?? "")}>
       <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         <CalendarDays className="h-3 w-3" />
-        As of
+        {quickAsOf ? "기준일" : "As of"}
       </span>
+      {quickAsOf && (
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant={active === yesterday ? "secondary" : "ghost"}
+            className="h-7 px-2 text-[11px]"
+            onClick={() => onChange(yesterday)}
+          >
+            어제
+          </Button>
+          <Button
+            size="sm"
+            variant={active === today ? "secondary" : "ghost"}
+            className="h-7 px-2 text-[11px]"
+            onClick={() => onChange(today)}
+          >
+            오늘
+          </Button>
+        </div>
+      )}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -123,7 +147,7 @@ export function DataDatePicker({
           {offset}
         </span>
       )}
-      {active !== today && (
+      {!quickAsOf && active !== today && (
         <Button
           size="sm"
           variant="ghost"
