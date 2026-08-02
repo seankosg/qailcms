@@ -52,7 +52,8 @@ export function DeSnagDashboardPage() {
         .split(",")
         .map((s: string) => s.trim())
         .filter((s: string): s is RoomGroupCol =>
-          (ROOM_GROUP_ORDER as readonly string[]).includes(s),
+          (ROOM_GROUP_ORDER as readonly string[]).includes(s) ||
+          (LG_ROOM_GROUPS as readonly string[]).includes(s),
         ),
     [search.roomGroups],
   );
