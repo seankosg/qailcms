@@ -22,6 +22,7 @@ interface Props {
     inputType: NonNullable<DefectColumnDef["editorType"]>;
     options?: { value: string; label: string }[];
     group: string;
+    coerce?: "boolean";
   }>;
   exportColumns: ExportColumn[];
   canEdit: boolean;
@@ -59,10 +60,14 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
 
   if (count === 0) return null;
 
-  const computedValue: string | number | null = (() => {
+  const computedValue: string | number | boolean | null = (() => {
     if (setBlank) return null;
     if (!field) return null;
     if (field.inputType === "select" && rawValue === BLANK) return null;
+    if (field.coerce === "boolean") {
+      if (rawValue === "") return null;
+      return rawValue === "true";
+    }
     if (field.inputType === "number") {
       if (rawValue === "") return null;
       const n = Number(rawValue);
