@@ -772,14 +772,16 @@ export function DefectRawDataPage() {
       hdec_pic_name: uniqueOptions(rows, "hdec_pic_name"),
       hdec_eng_name: uniqueOptions(rows, "hdec_eng_name"),
     };
-    return DEFECT_COLUMNS.filter((c) => c.editable && c.editorType).map((c) => ({
+    // 파생 컬럼을 제외한 모든 헤더를 일괄 수정 대상으로 노출한다.
+    return DEFECT_COLUMNS.filter((c) => !c.derived).map((c) => ({
       field: c.key,
       label: helpers.getLabel(c.key),
-      inputType: c.editorType!,
+      inputType: resolveBulkEditorType(c),
       options: (c.key === "team"
         ? optionMap.team
-        : c.options?.map((value) => ({ value, label: value })) ?? optionMap[c.key]) as any,
+        : bulkOptionsFor(c) ?? optionMap[c.key] ?? uniqueOptions(rows, c.key)) as any,
       group: normalizeGroupLabel(c.group),
+      coerce: c.type === "boolean" ? ("boolean" as const) : undefined,
     }));
   }, [rows, helpers, teamCodesForEdit]);
   const exportColumns = useMemo(() => DEFECT_COLUMNS.map((c) => ({ key: c.key, label: helpers.getLabel(c.key) })), [helpers]);
