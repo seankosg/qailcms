@@ -93,7 +93,13 @@ export function DeSnagDashboardPage() {
 
   const teamsStr = search.teams ?? "";
   const rgStr = search.roomGroups ?? "";
-  const matrixMode: MatrixMode = (search as any).matrixMode === "pct" ? "pct" : "count";
+  const rawMode = (search as any).matrixMode as string;
+  const matrixMode: MatrixMode = (["pct", "remain", "remainPct"] as const).includes(
+    rawMode as any,
+  )
+    ? (rawMode as MatrixMode)
+    : "count";
+  const isRemainMode = matrixMode === "remain" || matrixMode === "remainPct";
 
   const teamKey = (t: TeamKey[]) => [...t].sort().join(",");
   const isDirty =
@@ -288,10 +294,32 @@ export function DeSnagDashboardPage() {
             <TabsTrigger value="D" className="text-xs">PLOT D</TabsTrigger>
           </TabsList>
         </Tabs>
-        <Tabs value={matrixMode} onValueChange={(v) => setMatrixMode(v as MatrixMode)}>
+        <Tabs
+          value={isRemainMode ? "" : matrixMode}
+          onValueChange={(v) => v && setMatrixMode(v as MatrixMode)}
+        >
           <TabsList className="h-8">
             <TabsTrigger value="count" className="text-xs">개수</TabsTrigger>
             <TabsTrigger value="pct" className="text-xs">%</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Tabs
+          value={isRemainMode ? matrixMode : ""}
+          onValueChange={(v) => v && setMatrixMode(v as MatrixMode)}
+        >
+          <TabsList className="h-8 bg-amber-500/15">
+            <TabsTrigger
+              value="remain"
+              className="text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-white"
+            >
+              잔여 개수
+            </TabsTrigger>
+            <TabsTrigger
+              value="remainPct"
+              className="text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-white"
+            >
+              잔여 %
+            </TabsTrigger>
           </TabsList>
         </Tabs>
         <Button
