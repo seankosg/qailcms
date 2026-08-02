@@ -38,7 +38,7 @@ export interface DefectColumnDef {
   width: number;
   group: DefectGroupKey;
   editable?: boolean;
-  editorType?: "text" | "select" | "date" | "number" | "textarea";
+  editorType?: "text" | "select" | "date" | "number" | "textarea" | "boolean";
   options?: string[];
   /** true면 DB 컬럼이 아닌 파생 값. 서버 정렬/필터 비활성. */
   derived?: boolean;
