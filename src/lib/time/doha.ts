@@ -33,6 +33,13 @@ export function todayInDoha(): string {
   return shiftToDoha(new Date()).toISOString().slice(0, 10);
 }
 
+/** Yesterday's calendar date in Doha, as `YYYY-MM-DD`. TM 기준일 기본값. */
+export function yesterdayInDoha(): string {
+  return new Date(shiftToDoha(new Date()).getTime() - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
 /** Convert any ISO/Date to the Doha calendar date key (`YYYY-MM-DD`). */
 export function toDohaDateKey(input: string | Date | null | undefined): string {
   if (input == null || input === "") return "";
