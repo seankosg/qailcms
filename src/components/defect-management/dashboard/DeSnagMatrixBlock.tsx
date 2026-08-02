@@ -65,6 +65,20 @@ function TeamCells({
   const rectBottleneck = bottleneckTeam(stats.byTeam, "rect");
   const closedBottleneck = bottleneckTeam(stats.byTeam, "closed");
 
+  // 잔여 모드 전용 Room Group 단위 상태 하이라이트
+  // Rect 잔여가 3개 팀 모두 0 → Ready for Inspection(하늘색)
+  // Closed 잔여가 3개 팀 모두 0 → Ready for Handover(초록색)
+  const isRemainMode = mode === "remain" || mode === "remainPct";
+  const totalIssued = TEAM_COL_ORDER.reduce((s, tk) => s + stats.byTeam[tk].issued, 0);
+  const rectReady =
+    isRemainMode &&
+    totalIssued > 0 &&
+    TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].rect <= 0);
+  const closedReady =
+    isRemainMode &&
+    totalIssued > 0 &&
+    TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].closed <= 0);
+
   return (
     <>
       {STATUS_COLS.map((sc, sIdx) =>
@@ -84,35 +98,60 @@ function TeamCells({
           const isBottleneck =
             (sc.slot === "rect" && rectBottleneck === team) ||
             (sc.slot === "closed" && closedBottleneck === team);
+          const readyTone =
+            sc.slot === "rect" && rectReady
+              ? "ready-inspection"
+              : sc.slot === "closed" && closedReady
+                ? "ready-handover"
+                : null;
           const isFirstOfGroup = sIdx === 0 && tIdx === 0;
           const isFirstOfStatus = tIdx === 0;
           const zeroDim = !showPct && count === 0 ? "text-muted-foreground/50" : "text-foreground";
+          const readyBg =
+            readyTone === "ready-inspection"
+              ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
+              : readyTone === "ready-handover"
+                ? "color-mix(in oklab, var(--color-emerald-400) 30%, var(--card))"
+                : null;
           return (
             <td
               key={`${sc.slot}-${team}`}
               className={cn(
                 "h-7 border-b p-0 tabular-nums",
-                stickyTop === undefined && groupBg,
+                stickyTop === undefined && !readyBg && groupBg,
                 stickyTop !== undefined && "sticky z-20",
                 isFirstOfGroup && "border-l-2 border-l-border",
                 !isFirstOfGroup && isFirstOfStatus && "border-l border-l-border/70",
                 !isFirstOfStatus && "border-r border-r-border/30",
-                isBottleneck && "bg-destructive/15",
+                isBottleneck && !readyBg && "bg-destructive/15",
                 dim && "opacity-50",
               )}
-              style={stickyTop !== undefined ? { top: stickyTop, background: isBottleneck ? undefined : stickyBg } : undefined}
+              style={
+                stickyTop !== undefined
+                  ? { top: stickyTop, background: readyBg ?? (isBottleneck ? undefined : stickyBg) }
+                  : readyBg
+                    ? { background: readyBg }
+                    : undefined
+              }
             >
               <button
                 type="button"
                 onClick={() => onCell(sc.slot, team)}
                 title={`${team} ${sc.label}: ${count.toLocaleString()}${
                   ratio != null ? ` (${Math.round(ratio)}%)` : ""
-                }${isBottleneck ? " · 병목" : ""}`}
+                }${isBottleneck ? " · 병목" : ""}${
+                  readyTone === "ready-inspection"
+                    ? " · Ready for Inspection"
+                    : readyTone === "ready-handover"
+                      ? " · Ready for Handover"
+                      : ""
+                }`}
                 className={cn(
                   "block h-full w-full px-1 text-right text-xs leading-none hover:bg-primary/10",
                   sc.slot === "issued" && "font-medium",
                   showPct ? (isRemain ? remainPctTone(ratio) : pctTone(ratio)) : zeroDim,
                   isBottleneck && "font-semibold",
+                  readyTone && "font-semibold text-foreground",
                 )}
               >
                 {text}
