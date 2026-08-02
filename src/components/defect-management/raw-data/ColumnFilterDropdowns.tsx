@@ -42,9 +42,14 @@ export function MultiSelectDropdown({
     filters: activeFilters,
     enabled: open && !!serverFacetCol,
   });
+  // 서버 facet 가 없는 컬럼(정적 옵션 보유 가상 컬럼 등)은 meta.filterOptions 를 그대로 노출.
+  const staticOnly = !serverFacetCol && options.length > 0;
   // 크로스필터 정합(TM/ABD 동일): 서버 facet가 반환한 값만 노출.
   // 이미 선택된 값은 카운트 0이어도 해제 UX 위해 유지. (Empty)는 카운트>0 또는 선택 시에만 노출.
   const items = useMemo(() => {
+    if (staticOnly) {
+      return options.map((o) => ({ value: o.value, label: o.label, count: -1 }));
+    }
     const counts = new Map<string, number>();
     if (serverFacet?.length) for (const f of serverFacet) counts.set(f.value, f.cnt);
     for (const v of selected) if (!counts.has(v)) counts.set(v, 0);
@@ -63,7 +68,7 @@ export function MultiSelectDropdown({
     return emptyVisible
       ? [{ value: EMPTY_TOKEN, label: "(Empty)", count: empty }, ...list]
       : list;
-  }, [serverFacet, labelMap, selected]);
+  }, [serverFacet, labelMap, selected, staticOnly, options]);
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
@@ -88,10 +93,10 @@ export function MultiSelectDropdown({
           <button className="text-[11px] text-muted-foreground hover:underline" onClick={() => column.setFilterValue(undefined)}>Clear all</button>
         </div>
         <div className="max-h-64 overflow-auto">
-        {facetLoading && filteredItems.length === 0 && (
+        {facetLoading && !staticOnly && filteredItems.length === 0 && (
           <div className="py-4 text-center text-[11px] text-muted-foreground">로딩 중...</div>
         )}
-        {!facetLoading && filteredItems.length === 0 && (
+        {(!facetLoading || staticOnly) && filteredItems.length === 0 && (
           <div className="py-4 text-center text-[11px] text-muted-foreground">일치하는 값 없음</div>
         )}
         {filteredItems.map((option) => (
@@ -103,7 +108,9 @@ export function MultiSelectDropdown({
             <span className="flex-1 truncate">
               {option.value === EMPTY_TOKEN ? <em className="text-muted-foreground">(Empty)</em> : option.label}
             </span>
-            <span className="text-[10px] text-muted-foreground tabular-nums">{option.count}</span>
+            {option.count >= 0 && (
+              <span className="text-[10px] text-muted-foreground tabular-nums">{option.count}</span>
+            )}
           </label>
         ))}
         </div>

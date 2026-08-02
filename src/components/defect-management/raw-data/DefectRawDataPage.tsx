@@ -684,8 +684,9 @@ export function DefectRawDataPage() {
     };
 
     // Stage progress virtual column
+    // Progress 는 클라이언트 파생(서버 RPC 미지원) — 필터를 노출하면 무동작이 되므로 비활성.
     const stageCol: ColumnDef<DefectItem> = {
-      id: "stage_progress", header: "Progress", size: 110, enableSorting: true, enableColumnFilter: true,
+      id: "stage_progress", header: "Progress", size: 110, enableSorting: true, enableColumnFilter: false,
       accessorFn: (r) => classifyDefectStage(r as any, dataDate),
       meta: {
         filterType: "multi-select",
@@ -1140,6 +1141,10 @@ export function DefectRawDataPage() {
 }
 
 // ── Data column builder ────────────────────────────────────────────────────
+// 서버 RPC(defect_items_search / _facets / _search_ids)가 SQL 식으로 지원하는 파생 컬럼.
+// 이 목록의 컬럼은 DB 저장값이 없어도 서버 필터/facet 가 동작한다.
+const SERVER_DERIVED_FILTERABLE = new Set<string>(["start_status"]);
+
 function buildDataColumn(
   c: DefectColumnDef,
   statusGroup: DefectStatusGroup,
@@ -1157,8 +1162,10 @@ function buildDataColumn(
     "multi-select";
   // multi-select 컬럼은 서버 facet 사용
   const serverFacet = filterType === "multi-select" ? c.key : null;
-  // 파생 컬럼(DB 저장값 없음)은 서버 정렬/필터 불가
+  // 파생 컬럼(DB 저장값 없음)은 서버 정렬 불가.
+  // 단, 서버 RPC(defect_items_search/_facets)가 식으로 지원하는 파생 컬럼은 필터 허용.
   const isDerived = !!c.derived;
+  const serverFilterable = !isDerived || SERVER_DERIVED_FILTERABLE.has(c.key);
   return {
     id: c.key,
     accessorKey: c.key,
@@ -1166,7 +1173,7 @@ function buildDataColumn(
     size: c.width,
     // manualFiltering=true 상태이므로 filterFn 불필요
     enableSorting: !isDerived && (!PROGRESS_FIELDS.has(c.key) || c.type === "percent"),
-    enableColumnFilter: !isDerived,
+    enableColumnFilter: serverFilterable,
     meta: { filterType, filterOptions: [], serverFacet, statusGroup, includeInactive },
     cell: ({ row, getValue }) => {
       const v: any = getValue();
