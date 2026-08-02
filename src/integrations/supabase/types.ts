@@ -3402,6 +3402,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "spl_stage_progress_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_precedence_violations"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "spl_stage_progress_stage_code_fkey"
+            columns: ["stage_code"]
+            isOneToOne: false
+            referencedRelation: "spl_precedence_violations"
+            referencedColumns: ["stage_code"]
+          },
+          {
             foreignKeyName: "spl_stage_progress_stage_code_fkey"
             columns: ["stage_code"]
             isOneToOne: false
@@ -4703,6 +4717,7 @@ export type Database = {
       spl_precedence_violations: {
         Row: {
           actual_date: string | null
+          detail: string | null
           item_id: string | null
           label: string | null
           missing_predecessors: number | null
@@ -4711,23 +4726,9 @@ export type Database = {
           spl_number: string | null
           stage_code: string | null
           team: string | null
+          violation_type: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "spl_stage_progress_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "spl_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "spl_stage_progress_stage_code_fkey"
-            columns: ["stage_code"]
-            isOneToOne: false
-            referencedRelation: "spl_stage_catalog"
-            referencedColumns: ["stage_code"]
-          },
-        ]
+        Relationships: []
       }
       v_task_management_raw_derived: {
         Row: {
@@ -5734,13 +5735,17 @@ export type Database = {
         Args: { _as_of?: string }
         Returns: {
           active_band: string
+          active_band_state: string
           as_of: string
+          band_states: Json
           completed_stage: Json
           current_stage: Json
           delay_bucket: Json
           delayed: number
           denom: number
           done: number
+          has_plan: boolean
+          hdec_actual_count: number
           item_id: string
           judgment: string
           na_count: number
@@ -5759,8 +5764,9 @@ export type Database = {
         }
         Returns: Json
       }
-      spl_judge_v2: {
+      spl_judge_v3: {
         Args: {
+          _band_state: string
           _denom: number
           _has_primary_delay: boolean
           _is_excluded: boolean
@@ -6150,13 +6156,17 @@ export type Database = {
         Args: { _as_of?: string }
         Returns: {
           active_band: string
+          active_band_state: string
           as_of: string
+          band_states: Json
           completed_stage: Json
           current_stage: Json
           delay_bucket: Json
           delayed: number
           denom: number
           done: number
+          has_plan: boolean
+          hdec_actual_count: number
           item_id: string
           judgment: string
           na_count: number
@@ -6174,8 +6184,9 @@ export type Database = {
         }
         Returns: Json
       }
-      wrt_judge_v2: {
+      wrt_judge_v3: {
         Args: {
+          _band_state: string
           _denom: number
           _has_primary_delay: boolean
           _is_excluded: boolean
