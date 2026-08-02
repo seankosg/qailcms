@@ -93,6 +93,10 @@ export function AbdBulkEditBar({
     if (setBlank) return null;
     if (!field) return null;
     if (field.inputType === "select" && rawValue === BLANK) return null;
+    if (field.isBoolean) {
+      if (rawValue === "") return null;
+      return rawValue === "true";
+    }
     if (field.inputType === "number") {
       if (rawValue === "") return null;
       const n = Number(rawValue);
