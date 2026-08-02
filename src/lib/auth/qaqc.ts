@@ -17,16 +17,13 @@ export function isQaqcRestricted(params: {
   return userType === "hdec_pic" || userType === "hdec_eng";
 }
 
-/** QAQC 제한 사용자가 접근 가능한 경로 prefix 목록. */
+/** QAQC 제한 사용자가 접근 가능한 경로 prefix 목록 (SM 섹션 전용). */
 export const QAQC_ALLOWED_PREFIXES = [
-  "/closeout",
-  "/closure/abd",
-  "/closure/warranty",
-  "/closure/spare-part",
+  "/closure/snag-management",
   "/change-password",
 ];
 
-export const QAQC_HOME = "/closeout/dashboard";
+export const QAQC_HOME = "/closure/snag-management/dashboard";
 
 export function isQaqcAllowedPath(pathname: string): boolean {
   return QAQC_ALLOWED_PREFIXES.some(
