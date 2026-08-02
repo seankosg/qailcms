@@ -76,12 +76,31 @@ export const ROOM_GROUP_ORDER = [
   "FACADE",
   "N/A",
 ] as const;
-export type RoomGroupCol = (typeof ROOM_GROUP_ORDER)[number];
+
+// LG (Lower Ground) 블록 전용 열 — building='LG' 행의 room_group 값
+export const LG_ROOM_GROUPS = [
+  "Podium 1",
+  "Podium 2",
+  "Podium 3",
+  "Podium 4",
+  "Podium 5",
+] as const;
+
+export const ALL_ROOM_GROUPS = [...ROOM_GROUP_ORDER, ...LG_ROOM_GROUPS] as const;
+
+export type RoomGroupCol = (typeof ALL_ROOM_GROUPS)[number];
+export type LgRoomGroupCol = (typeof LG_ROOM_GROUPS)[number];
+
+export function isLgRoomGroup(v: string): v is LgRoomGroupCol {
+  return (LG_ROOM_GROUPS as readonly string[]).includes(v);
+}
 
 export function normalizeRoomGroup(v: string | null | undefined): RoomGroupCol {
   const s = (v ?? "").trim().toUpperCase();
   if (!s) return "N/A";
   if (s === "LANDSCAPE" || s === "FACADE") return "FACADE";
+  const pm = /^PODIUM\s+([1-5])$/.exec(s);
+  if (pm) return `Podium ${pm[1]}` as RoomGroupCol;
   const hit = (ROOM_GROUP_ORDER as readonly string[]).find((k) => k.toUpperCase() === s);
   return (hit as RoomGroupCol) ?? "N/A";
 }
@@ -124,7 +143,7 @@ export function compareGroundLevelDesc(a: string, b: string): number {
 export const BASEMENT_ORDER = ["LG", "B1", "B2", "B3", "B4"];
 
 // ── Building ─────────────────────────────────────────────────────────
-export type BlockKind = "tower" | "podium" | "basement";
+export type BlockKind = "tower" | "podium" | "lg" | "basement";
 
 // 원본 building 값 → 정규화된 building 라벨 (표시용). Tower는 하나로 모음.
 export function classifyBuilding(b: string | null | undefined): {
@@ -133,6 +152,8 @@ export function classifyBuilding(b: string | null | undefined): {
 } {
   const s = (b ?? "").trim();
   if (!s) return { kind: "unknown", label: "Others" };
+  // LG = Lower Ground 독립 블록. level_name 의 'Level LG' 와 무관.
+  if (/^LG$/i.test(s)) return { kind: "lg", label: "LG" };
   if (/^Tower(\s+4)?$/i.test(s)) return { kind: "tower", label: "Tower" };
   if (/^Podium$/i.test(s)) return { kind: "podium", label: "Podium" };
   const pm = /^Podium\s+([1-4])$/i.exec(s);
@@ -210,7 +231,7 @@ export function bottleneckTeam(
 // ── 매트릭스 형태 ────────────────────────────────────────────────────
 export type CellKey = string; // `${building}||${levelDisp}||${roomGroup}`
 
-export type BlockKey = "tower" | "podium" | "basement";
+export type BlockKey = "tower" | "podium" | "lg" | "basement";
 
 export type MatrixRow = {
   building: string;
@@ -224,6 +245,8 @@ export type MatrixBlock = {
   kind: BlockKey;
   title: string;
   rows: MatrixRow[]; // 정렬 완료
+  /** 이 블록이 렌더링할 열 키 (일반 블록 = ROOM_GROUP_ORDER, LG 블록 = Podium N) */
+  columnKeys: RoomGroupCol[];
   colTotals: Record<RoomGroupCol, Stats>;
   blockTotal: Stats;
 };
@@ -238,7 +261,7 @@ export type MatrixShape = {
 
 function emptyRoomGroupStats(): Record<RoomGroupCol, Stats> {
   const out = {} as Record<RoomGroupCol, Stats>;
-  for (const rg of ROOM_GROUP_ORDER) out[rg] = newStats();
+  for (const rg of ALL_ROOM_GROUPS) out[rg] = newStats();
   return out;
 }
 
@@ -251,6 +274,7 @@ export function buildMatrix(
   type RowsMap = Map<string, Map<string, { levelKind: LevelKind; sortIdx: number; cells: Record<RoomGroupCol, Stats> }>>;
   const tower: RowsMap = new Map();
   const podium: RowsMap = new Map();
+  const lg: RowsMap = new Map();
   const basement: RowsMap = new Map();
 
   const ensure = (m: RowsMap, building: string, levelDisp: string, levelKind: LevelKind, sortIdx: number) => {
@@ -268,7 +292,12 @@ export function buildMatrix(
     let block: RowsMap;
     let buildingLabel: string;
     let levelDisp: string;
-    if (lvl.kind === "basement") {
+    // LG 는 building='LG' 단독 판정 — level_name 판정보다 우선한다.
+    if (bld.kind === "lg") {
+      block = lg;
+      buildingLabel = "LG";
+      levelDisp = "LG";
+    } else if (lvl.kind === "basement") {
       block = basement;
       buildingLabel = "Basement"; // 공통
       levelDisp = `Level ${lvl.key}`;
@@ -297,6 +326,7 @@ export function buildMatrix(
     const buildingOrder = (() => {
       if (kind === "tower") return ["Tower"];
       if (kind === "basement") return ["Basement"];
+      if (kind === "lg") return ["LG"];
       // podium
       const known = PODIUM_ORDER.filter((b) => source.has(b));
       const others = Array.from(source.keys()).filter((b) => !PODIUM_ORDER.includes(b)).sort();
@@ -320,7 +350,7 @@ export function buildMatrix(
       });
       for (const [levelDisp, info] of levels) {
         const rowTotal = newStats();
-        for (const rg of ROOM_GROUP_ORDER) mergeStats(rowTotal, info.cells[rg]);
+        for (const rg of ALL_ROOM_GROUPS) mergeStats(rowTotal, info.cells[rg]);
         rows.push({
           building: bLabel,
           levelDisp,
@@ -334,16 +364,25 @@ export function buildMatrix(
     const colTotals = emptyRoomGroupStats();
     const blockTotal = newStats();
     for (const row of rows) {
-      for (const rg of ROOM_GROUP_ORDER) mergeStats(colTotals[rg], row.cells[rg]);
+      for (const rg of ALL_ROOM_GROUPS) mergeStats(colTotals[rg], row.cells[rg]);
       mergeStats(blockTotal, row.rowTotal);
     }
 
-    return { kind, title, rows, colTotals, blockTotal };
+    const columnKeys: RoomGroupCol[] =
+      kind === "lg"
+        ? (() => {
+            const present = LG_ROOM_GROUPS.filter((rg) => colTotals[rg].issued > 0);
+            return (present.length ? present : LG_ROOM_GROUPS.slice(0, 1)) as RoomGroupCol[];
+          })()
+        : [...ROOM_GROUP_ORDER];
+
+    return { kind, title, rows, columnKeys, colTotals, blockTotal };
   };
 
   const blocks: MatrixBlock[] = [];
   if (tower.size) blocks.push(buildBlock("tower", "Tower", tower));
   if (podium.size) blocks.push(buildBlock("podium", "Podium", podium));
+  if (lg.size) blocks.push(buildBlock("lg", "LG (Lower Ground)", lg));
   if (basement.size) blocks.push(buildBlock("basement", "Basement (지하)", basement));
 
   const plotTotal = newStats();
@@ -377,6 +416,7 @@ export function metricSearchParams(m: MetricKey): Record<string, string> {
 export function buildingGroupMembers(kind: BlockKey, presentBuildings: string[]): string[] {
   if (kind === "tower") return ["Tower", "Tower 4"];
   if (kind === "basement") return []; // basement는 building 무관, level=B*로만 필터
+  if (kind === "lg") return ["LG"];
   // podium
   return presentBuildings; // 이미 정규화된 라벨 (예: Podium, Podium 1..4, Others)
 }

@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { RoomGroupCol, Stats } from "@/lib/defect-management/dashboard-shape";
+import type { Stats } from "@/lib/defect-management/dashboard-shape";
 
 type StatusSlot = "open" | "rectified" | "reopen" | "closed";
 
@@ -37,12 +37,6 @@ const STATUS_META: Record<
     statusParam: "Closed",
   },
 };
-
-function roomGroupParam(col: RoomGroupCol): string {
-  if (col === "FACADE") return "FACADE,LANDSCAPE";
-  if (col === "N/A") return "__EMPTY__";
-  return col;
-}
 
 const SLOT_ORDER: StatusSlot[] = ["open", "reopen", "rectified", "closed"];
 
@@ -125,7 +119,7 @@ export function DeSnagRoomGroupCards({
   entries,
   onNavigate,
 }: {
-  entries: Array<{ col: RoomGroupCol; stats: Stats }>;
+  entries: Array<{ col: string; label: string; param: string; stats: Stats }>;
   onNavigate: (params: Record<string, string>) => void;
 }) {
   const visible = entries.filter((e) => e.stats.issued > 0);
@@ -140,8 +134,7 @@ export function DeSnagRoomGroupCards({
         </p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {visible.map(({ col, stats }) => {
-          const rg = roomGroupParam(col);
+        {visible.map(({ col, label, param: rg, stats }) => {
           const pending = stats.open + stats.reopen;
           const pendingPct = stats.issued > 0 ? Math.round((pending / stats.issued) * 100) : 0;
           return (
@@ -153,7 +146,7 @@ export function DeSnagRoomGroupCards({
               <CardContent className="p-4">
                 <div className="mb-1 flex items-baseline justify-between gap-2">
                   <p className="truncate text-sm font-semibold uppercase tracking-wide text-foreground">
-                    {col}
+                    {label}
                   </p>
                   <p className="flex items-baseline gap-1.5 text-red-600 dark:text-red-500">
                     <span className="text-2xl font-bold tabular-nums">
