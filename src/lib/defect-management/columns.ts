@@ -228,11 +228,35 @@ export function inferDefectFilterType(t: DefectFieldType): DefectFilterType {
 }
 
 export function getDefectBulkEditableFields() {
-  return DEFECT_COLUMNS.filter((c) => c.editable && c.editorType).map((c) => ({
+  return DEFECT_COLUMNS.filter((c) => !c.derived).map((c) => ({
     field: c.key,
     label: c.label,
-    inputType: c.editorType!,
+    inputType: resolveBulkEditorType(c),
     options: c.options?.map((v) => ({ value: v, label: v })),
     group: c.group,
   }));
+}
+
+/**
+ * 일괄 수정(Mass edit)용 에디터 타입.
+ * 인라인 편집(`editable`)과 무관하게, 파생 컬럼을 제외한 모든 헤더가 대상이다.
+ */
+export function resolveBulkEditorType(c: DefectColumnDef): NonNullable<DefectColumnDef["editorType"]> {
+  if (c.editorType) return c.editorType;
+  switch (c.type) {
+    case "longtext":
+      return "textarea";
+    case "date":
+    case "datetime":
+      return "date";
+    case "number":
+    case "percent":
+      return "number";
+    case "boolean":
+      return "boolean";
+    case "badge":
+      return c.options?.length ? "select" : "text";
+    default:
+      return "text";
+  }
 }
