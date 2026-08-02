@@ -416,6 +416,7 @@ export function metricSearchParams(m: MetricKey): Record<string, string> {
 export function buildingGroupMembers(kind: BlockKey, presentBuildings: string[]): string[] {
   if (kind === "tower") return ["Tower", "Tower 4"];
   if (kind === "basement") return []; // basement는 building 무관, level=B*로만 필터
+  if (kind === "lg") return ["LG"];
   // podium
   return presentBuildings; // 이미 정규화된 라벨 (예: Podium, Podium 1..4, Others)
 }
