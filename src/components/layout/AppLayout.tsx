@@ -406,12 +406,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
             if (!hasContent) return null;
 
             return (
-              <div key={section.label} className={cn("first:mt-0", collapsed ? "mt-3" : "mt-4")}>
+              <div key={section.label} className={cn("first:mt-0", collapsed ? "mt-3" : "mt-5")}>
                 {collapsed ? (
-                  <div className="mx-2 mb-1 h-px bg-border/60" />
+                  <div className="mx-2 mb-1.5 h-px bg-border/60" />
                 ) : (
-                  <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                    {section.label}
+                  <div className="mb-1 mt-1 flex items-center gap-2 px-2">
+                    <span className="h-3.5 w-1 rounded-full bg-primary/70" />
+                    <span className="text-[13px] font-bold uppercase tracking-[0.16em] text-foreground/70">
+                      {section.label}
+                    </span>
                   </div>
                 )}
                 <div className={cn("space-y-0.5", collapsed ? "mt-0" : "mt-1")}>
