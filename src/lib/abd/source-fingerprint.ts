@@ -8,10 +8,10 @@ import { extractHeadersFromFile } from "@/lib/import/module-fingerprint";
  *   - Aconex = Document No 헤더 + (Review Status | Date Modified) + ABD NUMBER 부재
  * 2차: 점수제 — 1차 확정 실패 시 unknown 판별 보조로만 사용.
  *
- * 배포 마커: ABD_SOURCE_GUARD_V1_2026_07_29
+ * 배포 마커: ABD_SOURCE_GUARD_V2_2026_08_01
  */
 
-export const ABD_SOURCE_GUARD_MARKER = "ABD_SOURCE_GUARD_V1_2026_07_29";
+export const ABD_SOURCE_GUARD_MARKER = "ABD_SOURCE_GUARD_V2_2026_08_01";
 
 export type AbdSource = "hdec" | "aconex" | "unknown";
 

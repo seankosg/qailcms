@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
  * 파일 선택 직후(파싱 이전)에 호출되어 잘못된 모듈 파일을 사전에 차단한다.
  */
 
+/** [F-3-4] SPL/WRT 편입을 대비해 확장 가능하게 둔다(앵커 예약: SPL NUMBER / WRT NUMBER). */
 export type ModuleId = "abd" | "sm" | "tm";
 
 export const MODULE_LABELS: Record<ModuleId, string> = {
@@ -30,11 +31,26 @@ interface ModuleFingerprint {
   sheetHints?: string[];
 }
 
-/** 대소문자/공백/구두점 제거 정규화. */
+/**
+ * [F-2] 헤더 동의어 사전 — 정규화 이후 치환한다.
+ * 원본별 표기 차이(HDEC 'DOCUMENT NUMBER' vs Aconex 'Document No')를 흡수한다.
+ * 추가 시 module-fingerprint.test.ts 회귀 테스트를 반드시 갱신할 것.
+ */
+export const HEADER_SYNONYMS: Record<string, string> = {
+  documentnumber: "documentno",
+  docnumber: "documentno",
+  docno: "documentno",
+  abddocumentnumber: "abdnumber",
+  abddocumentno: "abdnumber",
+  abdno: "abdnumber",
+};
+
+/** 대소문자/공백/구두점 제거 정규화 + 동의어 치환. */
 function normalizeHeader(s: string): string {
-  return String(s ?? "")
+  const base = String(s ?? "")
     .toLowerCase()
     .replace(/[\s_\-().\[\]{}\/\\:;,'"`~!@#$%^&*+=?<>|]/g, "");
+  return HEADER_SYNONYMS[base] ?? base;
 }
 
 function normSet(list: string[]): Set<string> {
@@ -48,17 +64,14 @@ function normSet(list: string[]): Set<string> {
 
 export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
   abd: {
+    // [F-3] 앵커 = 모듈 배타 신호만. 일반어(Round/Draft/Submission/Latest Status)는 signature 로만 유지.
     anchors: [
-      "Document No",
-      "Doc No",
-      "Round",
-      "Draft",
-      "Submission",
+      "ABD NUMBER",
+      "ABD OCS No.",
       "DAR Response",
-      "Latest Status",
-      // Aconex Export anchors — 같은 ABD 페이지로 유입 허용
       "Review Status",
       "Date Modified",
+      "Document No",
     ],
     signature: [
       "Document No",
@@ -80,6 +93,8 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Date Modified",
       "Created By",
       "Revision Date",
+      "ABD NUMBER",
+      "ABD OCS No.",
     ],
     filenameHints: [/abd/i, /as[\s_-]?built/i, /aconex/i, /exportdocs/i],
   },
@@ -88,8 +103,14 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Issue No",
       "Source Issue No",
       "Punch Category",
-      "Location",
       "Raised Date",
+      // 스내깅 원본(Dar Export / 내부 View Export) 배타 헤더 — 타 모듈 원본에 등장하지 않음
+      "PlanTitle",
+      "PlanGroup",
+      "LocationReference",
+      "Podium area",
+      "Snag No",
+      "UpdatedStatus",
     ],
     signature: [
       "Issue No",
@@ -104,31 +125,30 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
       "Aconex",
       "Status",
       "Description",
+      "PlanTitle",
+      "PlanGroup",
+      "LocationReference",
+      "Classification",
+      "Podium area",
+      "CreatedBy",
+      "CreatedDate",
+      "UpdatedStatus",
+      "UpdatedDate",
     ],
     filenameHints: [/snag/i, /defect/i, /punch/i, /aconex/i],
   },
   tm: {
+    // [F-3-2] 'HDEC PIC'/'HDEC ENG' 는 ABD·SPL·WRT 원본에도 존재하는 전사 공용 헤더 → 앵커에서 제거.
     anchors: [
       "Task No",
       "Main Task No",
-      "Parent Task No",
       "Sub Task",
-      "Plan Start",
-      "Plan Finish",
-      "Actual Progress",
-      // Korean anchors (real files use these)
       "항목",
-      "계획 시작",
-      "계획 완료",
-      "계획 일수",
-      "실제 시작",
-      "실제 완료",
       "계획 진도율",
       "실적 진도율",
       "자동 판정",
-      "HDEC PIC",
-      "HDEC ENG",
-      "Data Date",
+      "단계별 세부 업무",
+      "계획 일수",
     ],
     signature: [
       "Task No",
@@ -214,15 +234,7 @@ export function detectModule(
     for (const a of anchorSet) if (headerSet.has(a)) anchorMatches++;
     anchorsHit[mod] = anchorMatches;
     let score = jaccard + anchorMatches * 0.05;
-    // 파일명 힌트 가산점
-    if (fp.filenameHints && fname) {
-      for (const re of fp.filenameHints) {
-        if (re.test(fname)) {
-          score += 0.03;
-          break;
-        }
-      }
-    }
+    // [F-4-3] 파일명 가산점 제거 — 헤더만으로 판정한다.
     // 시트명 힌트 가산점
     if (fp.sheetHints) {
       const hintSet = normSet(fp.sheetHints);
@@ -274,7 +286,7 @@ export function evaluateImport(
   const targetScore = detection.scores[target];
   const topScore = detection.scores[detection.top];
 
-  // A. target 앵커가 하나도 없고, 시그니처 겹침도 미미하며, 파일명 힌트도 없을 때만 하드 블록
+  // [F-4-2] A. target 앵커 히트가 0이면 무조건 하드 블록 (앵커가 배타 신호이므로 안전)
   const targetFp = MODULE_FINGERPRINTS[target];
   const fnameLower = (filename ?? "").toLowerCase();
   const filenameMatch = !!(
@@ -282,7 +294,7 @@ export function evaluateImport(
     fnameLower &&
     targetFp.filenameHints.some((re) => re.test(fnameLower))
   );
-  if (targetAnchors === 0 && targetScore < 0.05 && !filenameMatch) {
+  if (targetAnchors === 0) {
     return {
       verdict: "block",
       target,
@@ -292,7 +304,9 @@ export function evaluateImport(
       hint:
         topAnchors > 0
           ? `${MODULE_LABELS[detection.top]} 원본 파일로 보입니다. ${MODULE_LABELS[detection.top]} 임포트 페이지에서 다시 시도하세요.`
-          : "형식을 확인할 수 없는 파일입니다.",
+          : filenameMatch
+            ? "파일명은 일치하지만 헤더에서 형식을 확인할 수 없습니다."
+            : "형식을 확인할 수 없는 파일입니다.",
     };
   }
 
@@ -385,17 +399,12 @@ export async function extractHeadersFromFile(
         bestRow = r;
       }
     }
-    const chosen = rowValues[bestRow] ?? [];
-    if (chosen.length === 0) continue;
-    for (const s of chosen) collected.push(s);
-    // 헤더 후보가 데이터 행일 수 있으므로, 앵커 매칭이 발견된 행이 따로 있으면 그 행도 함께 수집
-    if (bestAnchor <= 0) {
-      for (let r = range.s.r; r <= scanEndRow; r++) {
-        const vals = rowValues[r] ?? [];
-        for (const s of vals) {
-          if (allAnchorSet.has(normalizeHeader(s))) collected.push(s);
-        }
-      }
+    // [F-1-2] 최적 헤더행까지의 상단 블록 전체를 합집합으로 수집한다.
+    // (다단 헤더에서 상위 밴드 행의 판정 신호가 버려지는 것을 방지)
+    // 데이터 행(bestRow 초과)은 수집하지 않는다.
+    for (let r = range.s.r; r <= bestRow; r++) {
+      const vals = rowValues[r] ?? [];
+      for (const s of vals) collected.push(s);
     }
   }
   return { headers: collected, sheetNames };
