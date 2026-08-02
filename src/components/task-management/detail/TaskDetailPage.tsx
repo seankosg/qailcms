@@ -37,6 +37,7 @@ import {
 } from "@/lib/task-management/derived";
 import { todayIso } from "@/lib/task-management/schedule-utils";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
+import { useTmRowsAsOf } from "@/hooks/useTmRowsAsOf";
 
 // Runtime reference to keep the deploy marker in the client bundle (tree-shake guard)
 if (typeof window !== "undefined") (window as any).__TM_MARK__ = TM_OWNER_MUTATIONS_MARKER;
@@ -78,7 +79,7 @@ export function TaskDetailPage() {
     staleTime: 60_000,
   });
 
-  const { data: row, refetch, isFetching } = useQuery({
+  const { data: rawRow, refetch, isFetching } = useQuery({
     queryKey: ["task-detail", id],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -100,6 +101,14 @@ export function TaskDetailPage() {
   // Forecast 그룹은 Raw Data 와 동일한 파생 함수·RPC 로 계산한다(저장값 렌더 금지).
   const [sharedAsOf] = useTmAsOf();
   const asOf = sharedAsOf || todayIso();
+  // 정본 경유: 상세도 Raw Data/대시보드와 동일하게 as-of 마스킹된 행을 사용한다.
+  // (raw 테이블 직조회 값은 as-of 이후 갱신분까지 포함되어 리스트와 불일치한다)
+  const { map: asOfMap } = useTmRowsAsOf(asOf);
+  const srvRow = asOfMap.get(String(id));
+  const row = useMemo(
+    () => (rawRow ? ({ ...rawRow, ...(srvRow ?? {}) } as Record<string, any>) : rawRow),
+    [rawRow, srvRow],
+  );
   const { data: tActual } = useQuery({
     queryKey: ["tm-today-actual-detail", id, asOf],
     queryFn: async () => {
@@ -119,18 +128,21 @@ export function TaskDetailPage() {
     if (!row) return {} as Record<string, number | null>;
     const r = row as any;
     return {
-      plan_progress: cumPlanProgress(r, asOf),
-      progress_variance: computeVariance(r, asOf),
+      plan_progress: (srvRow?.srv_plan_pct as number | null) ?? cumPlanProgress(r, asOf),
+      progress_variance:
+        srvRow?.srv_plan_pct != null && srvRow?.srv_actual_pct != null
+          ? Number(srvRow.srv_actual_pct) - Number(srvRow.srv_plan_pct)
+          : computeVariance(r, asOf),
       expected_progress_today: computeDailyPlan(r),
       today_actual: tActual ?? 0,
       today_gap: computeDailyDiff(r, tActual ?? 0),
     } as Record<string, number | null>;
-  }, [row, asOf, tActual]);
+  }, [row, asOf, tActual, srvRow]);
 
   // 판정도 as-of 재계산이 정본 (저장 auto_judgment 렌더 금지).
   const derivedJudgment = useMemo(
-    () => (row ? computeJudgment(row as any, undefined, asOf) : ""),
-    [row, asOf],
+    () => (srvRow?.srv_judgment as string | undefined) ?? (row ? computeJudgment(row as any, undefined, asOf) : ""),
+    [row, asOf, srvRow],
   );
 
   if (!row) {
