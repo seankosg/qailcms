@@ -188,7 +188,7 @@ export function makeDateAudit(overrides?: Record<string, string>): {
       const sug = suggestDateFix(v);
       const rawText =
         v instanceof Date
-          ? v.toISOString().slice(0, 10)
+          ? (dohaDateOnly(v) ?? String(v))
           : typeof v === "number"
             ? `${v} (엑셀 serial)`
             : String(v);
