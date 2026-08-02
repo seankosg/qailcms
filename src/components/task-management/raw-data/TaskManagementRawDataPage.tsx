@@ -1326,9 +1326,9 @@ export function TaskManagementRawDataPage() {
           quickAsOf
           showDataDateChip
           value={sharedDataDate}
-          latest={latestDataDate}
+          latest={latestDataDate ?? ""}
           options={[]}
-          onChange={(v) => setSharedDataDate(v)}
+          onChange={(v: string) => setSharedDataDate(v)}
           onReset={() => setSharedDataDate("")}
         />
         {isFetching && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
