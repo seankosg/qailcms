@@ -684,8 +684,9 @@ export function DefectRawDataPage() {
     };
 
     // Stage progress virtual column
+    // Progress 는 클라이언트 파생(서버 RPC 미지원) — 필터를 노출하면 무동작이 되므로 비활성.
     const stageCol: ColumnDef<DefectItem> = {
-      id: "stage_progress", header: "Progress", size: 110, enableSorting: true, enableColumnFilter: true,
+      id: "stage_progress", header: "Progress", size: 110, enableSorting: true, enableColumnFilter: false,
       accessorFn: (r) => classifyDefectStage(r as any, dataDate),
       meta: {
         filterType: "multi-select",
