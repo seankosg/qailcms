@@ -29,6 +29,8 @@ import {
   TEAM_COLORS,
   TEAM_FALLBACK_COLOR,
   PRIORITY_COLORS,
+  resolveBulkEditorType,
+  bulkOptionsFor,
   type DefectColumnDef,
 } from "@/lib/defect-management/columns";
 import {
