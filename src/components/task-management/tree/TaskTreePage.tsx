@@ -728,10 +728,11 @@ export function TaskTreePage() {
         <h1 className="text-xl font-semibold tracking-tight">Task Tree</h1>
         <DataDatePicker
           showDataDateChip
+          quickAsOf
           value={sharedDataDate}
           latest={latestDataDate}
           options={dataDateOptions}
-          onChange={(v) => setSharedDataDate(v === todayInDoha() ? "" : v)}
+          onChange={(v) => setSharedDataDate(v)}
           onReset={() => setSharedDataDate("")}
         />
         <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
