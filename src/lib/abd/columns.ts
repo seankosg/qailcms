@@ -23,6 +23,10 @@ export interface AbdColumnDef {
   editorType?: "text" | "select" | "date" | "number";
   options?: string[];
   origin?: "identity" | "r1" | "r2" | "r3" | "latest" | "system";
+  /** DB 트리거(abd_compute_derived)가 채우는 파생 컬럼 = 직접/일괄 수정 불가 */
+  derived?: boolean;
+  /** boolean 저장 컬럼 (일괄 수정 시 Yes/No 선택) */
+  boolish?: boolean;
   /** true 인 legacy 컬럼은 사용자 컬럼 설정에서 기본 숨김 처리 */
   legacy?: boolean;
   /** 기본 숨김 여부 (신규 legacy 컬럼용) */
@@ -94,10 +98,10 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "latest_rev", label: "Latest Rev", type: "text", width: 90, group: "latest", editable: true, editorType: "text", origin: "latest" },
   { key: "latest_status", label: "Latest Status", type: "badge", width: 110, group: "latest", editable: true, editorType: "select", options: [...ABD_STATUSES], origin: "latest" },
   { key: "approval_date", label: "Approval", type: "date", width: 100, group: "latest", editable: true, editorType: "date", origin: "latest" },
-  { key: "completed_stage", label: "Completed Stage", type: "badge", width: 140, group: "latest", origin: "system" },
-  { key: "current_stage", label: "Current Stage", type: "badge", width: 160, group: "latest", origin: "system" },
+  { key: "completed_stage", label: "Completed Stage", type: "badge", width: 140, group: "latest", origin: "system", derived: true },
+  { key: "current_stage", label: "Current Stage", type: "badge", width: 160, group: "latest", origin: "system", derived: true },
   // 의미 = 회신 대기(RS) 경과일. 내부 키 개명은 백로그(딥링크·RPC 하위호환).
-  { key: "ur_aging_days", label: "UR Aging (d)", type: "number", width: 110, group: "latest", origin: "system" },
+  { key: "ur_aging_days", label: "UR Aging (d)", type: "number", width: 110, group: "latest", origin: "system", derived: true },
 
   // Round 1
   { key: "r1_draft_start_plan",   label: "R1 DS P",  type: "date", width: 100, group: "round1", editable: true, editorType: "date", origin: "r1" },
@@ -140,9 +144,9 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "doc_nn2", label: "NN2", type: "text", width: 70, group: "segments", origin: "identity" },
 
   // Flags & audit
-  { key: "is_active", label: "Active", type: "badge", width: 80, group: "flags", origin: "system" },
+  { key: "is_active", label: "Active", type: "badge", width: 80, group: "flags", origin: "system", boolish: true },
   { key: "data_date", label: "Data Date", type: "date", width: 110, group: "audit", origin: "system" },
-  { key: "updated_at", label: "Updated", type: "date", width: 130, group: "audit", origin: "system" },
+  { key: "updated_at", label: "Updated", type: "date", width: 130, group: "audit", origin: "system", derived: true },
 ];
 
 export const ABD_SEARCH_FIELDS = [
