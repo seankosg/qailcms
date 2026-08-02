@@ -1,6 +1,7 @@
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 import type { SplCatalogEntry } from "./rows.functions";
 import { dohaStampCompact } from "@/lib/time/doha";
+import { styleRoundtripSheet, type RtColMeta } from "@/lib/excel/roundtrip-style";
 
 /**
  * SPL 왕복 임포트 양식 Export.
@@ -20,7 +21,15 @@ const BAND_LABEL: Record<string, string> = {
 type Col =
   | { kind: "item"; header: string; field: string }
   | { kind: "status"; header: string }
-  | { kind: "stage"; header: string; sub: string; stage_code: string; field: string };
+  | {
+      kind: "stage";
+      header: string;
+      sub: string;
+      stage_code: string;
+      field: string;
+      band: string;
+      authority: "HDEC" | "ACONEX";
+    };
 
 /** 임포트 원본 파일과 동일한 컬럼 배열을 카탈로그로부터 결정적으로 재현한다. */
 export function buildSplColumns(catalog: SplCatalogEntry[]): Col[] {
@@ -43,21 +52,24 @@ export function buildSplColumns(catalog: SplCatalogEntry[]): Col[] {
       cols.push({ kind: "item", header: "HDEC ENG (PO)", field: "eng_po" });
     }
     if (s.value_type === "flag") {
-      cols.push({ kind: "stage", header: s.label, sub: "", stage_code: s.stage_code, field: "flag_value" });
+      cols.push({ kind: "stage", header: s.label, sub: "", stage_code: s.stage_code, field: "flag_value", band: s.band, authority: s.actual_authority });
     } else if (s.value_type === "single") {
-      cols.push({ kind: "stage", header: s.label, sub: "Plan\nDate", stage_code: s.stage_code, field: "plan_start" });
+      cols.push({ kind: "stage", header: s.label, sub: "Plan\nDate", stage_code: s.stage_code, field: "plan_start", band: s.band, authority: s.actual_authority });
       cols.push({
         kind: "stage",
         header: s.label,
         sub: s.actual_authority === "ACONEX" ? "Actual\nDate\n(Aconex)" : "Actual\nDate",
         stage_code: s.stage_code,
         field: "actual_start",
+        band: s.band,
+        authority: s.actual_authority,
       });
     } else {
-      cols.push({ kind: "stage", header: s.label, sub: "Plan\nStart", stage_code: s.stage_code, field: "plan_start" });
-      cols.push({ kind: "stage", header: s.label, sub: "Actual\nStart", stage_code: s.stage_code, field: "actual_start" });
-      cols.push({ kind: "stage", header: s.label, sub: "Plan\nFinish", stage_code: s.stage_code, field: "plan_finish" });
-      cols.push({ kind: "stage", header: s.label, sub: "Actual\nFinish", stage_code: s.stage_code, field: "actual_finish" });
+      const base = { kind: "stage" as const, header: s.label, stage_code: s.stage_code, band: s.band, authority: s.actual_authority };
+      cols.push({ ...base, sub: "Plan\nStart", field: "plan_start" });
+      cols.push({ ...base, sub: "Actual\nStart", field: "actual_start" });
+      cols.push({ ...base, sub: "Plan\nFinish", field: "plan_finish" });
+      cols.push({ ...base, sub: "Actual\nFinish", field: "actual_finish" });
     }
   }
   return cols;
@@ -126,7 +138,7 @@ export function buildSplRoundtripWorkbook(payload: SplExportPayload): XLSX.WorkB
     }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = cols.map((c) => ({ wch: c.kind === "item" ? 18 : 12 }));
+    styleRoundtripSheet(ws, cols as unknown as RtColMeta[], rows.length, 4);
     XLSX.utils.book_append_sheet(wb, ws, PLOT_SHEET[plot]);
   }
   return wb;
