@@ -12,8 +12,10 @@ import { DMR_DISCIPLINES, DISCIPLINE_LABEL, type DmrDiscipline } from '@/lib/dmr
 import { cn } from '@/lib/utils';
 
 function subDays(iso: string, n: number) {
+  // A-3: ISO(UTC 자정) 기준 Date 에는 반드시 UTC 메서드를 쓴다.
+  // 로컬 메서드 혼용 시 음수 오프셋 브라우저에서 하루가 밀린다.
   const d = new Date(iso);
-  d.setDate(d.getDate() - n);
+  d.setUTCDate(d.getUTCDate() - n);
   return d.toISOString().slice(0, 10);
 }
 
