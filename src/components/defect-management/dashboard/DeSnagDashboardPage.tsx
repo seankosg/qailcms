@@ -148,7 +148,6 @@ export function DeSnagDashboardPage() {
   };
 
   function roomGroupParam(col: RoomGroupCol): string {
-    if (col === "FACADE") return "FACADE,LANDSCAPE";
     if (col === "N/A") return "__EMPTY__";
     return col;
   }
@@ -199,7 +198,7 @@ export function DeSnagDashboardPage() {
     const base = ROOM_GROUP_ORDER.map((col) => ({
       col: col as string,
       label: col as string,
-      param: col === "FACADE" ? "FACADE,LANDSCAPE" : col === "N/A" ? "__EMPTY__" : (col as string),
+      param: col === "N/A" ? "__EMPTY__" : (col as string),
       stats: totals[col],
     }));
     // LG (Lower Ground) — Podium 1~N 통합 카드

@@ -220,7 +220,7 @@ function MatrixHeader({
                 onClick={() => {
                   const p: Record<string, string> = { ...basementParam };
                   if (block.kind !== "basement") Object.assign(p, buildingParam);
-                  p.roomGroup = g.key === "FACADE" ? "FACADE,LANDSCAPE" : g.key === "N/A" ? "__EMPTY__" : g.key;
+                  p.roomGroup = g.key === "N/A" ? "__EMPTY__" : g.key;
                   onNavigate(p);
                 }}
                 className="hover:text-primary"
@@ -312,8 +312,7 @@ export function DeSnagMatrixBlock({
     else if (block.kind !== "basement") Object.assign(p, buildingParam);
     // LG 블록의 행 라벨은 level_name 이 아니므로 level 필터를 걸지 않는다.
     if (rowLevelDisp && block.kind !== "lg") p.level = rowLevelDisp;
-    if (col === "FACADE") p.roomGroup = "FACADE,LANDSCAPE";
-    else if (col === "N/A") p.roomGroup = "__EMPTY__";
+    if (col === "N/A") p.roomGroup = "__EMPTY__";
     else if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.roomGroup = col;
     p.team = team;
     // 정본(_snag_done_asof) 동치: 자기 실적일 ≤ as-of. dateEnd 는 상위에서 as-of 로 채움.
