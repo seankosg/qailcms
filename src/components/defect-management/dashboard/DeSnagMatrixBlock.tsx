@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import {
-  ROOM_GROUP_ORDER,
   TEAM_COL_ORDER,
   bottleneckTeam,
   newStats,
@@ -177,7 +176,7 @@ function MatrixHeader({
   onNavigate: (p: Record<string, string>) => void;
 }) {
   const groups: Array<{ key: string; label: string; isTotal?: boolean; isNa?: boolean }> = [
-    ...ROOM_GROUP_ORDER.map((rg) => ({ key: rg, label: rg, isNa: rg === "N/A" })),
+    ...block.columnKeys.map((rg) => ({ key: rg as string, label: rg as string, isNa: rg === "N/A" })),
     { key: "__ROW_TOTAL__", label: "Row Total", isTotal: true },
   ];
   const groupBg = (g: { isTotal?: boolean; isNa?: boolean }, idx: number) =>
@@ -291,6 +290,7 @@ export function DeSnagMatrixBlock({
   const buildingMembers = (() => {
     if (block.kind === "tower") return ["Tower", "Tower 4"];
     if (block.kind === "basement") return [] as string[];
+    if (block.kind === "lg") return ["LG"];
     return presentBuildings;
   })();
 
@@ -310,7 +310,8 @@ export function DeSnagMatrixBlock({
     const p: Record<string, string> = { ...basementParam };
     if (rowBuilding && block.kind !== "basement") p.building = rowBuilding;
     else if (block.kind !== "basement") Object.assign(p, buildingParam);
-    if (rowLevelDisp) p.level = rowLevelDisp;
+    // LG 블록의 행 라벨은 level_name 이 아니므로 level 필터를 걸지 않는다.
+    if (rowLevelDisp && block.kind !== "lg") p.level = rowLevelDisp;
     if (col === "FACADE") p.roomGroup = "FACADE,LANDSCAPE";
     else if (col === "N/A") p.roomGroup = "__EMPTY__";
     else if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.roomGroup = col;
@@ -373,7 +374,7 @@ export function DeSnagMatrixBlock({
                   Column Total
                 </button>
               </td>
-              {ROOM_GROUP_ORDER.map((rg, idx) => (
+              {block.columnKeys.map((rg, idx) => (
                 <TeamCells
                   key={rg}
                   stats={block.colTotals[rg]}
@@ -387,7 +388,7 @@ export function DeSnagMatrixBlock({
                 stats={block.blockTotal}
                 mode={mode}
                 onCell={(slot, team) => goCell(null, null, "__ROW_TOTAL__", slot, team)}
-                groupIndex={ROOM_GROUP_ORDER.length}
+                groupIndex={block.columnKeys.length}
                 isTotal
                 stickyTop={78}
               />
