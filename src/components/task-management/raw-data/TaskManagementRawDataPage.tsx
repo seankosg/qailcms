@@ -1097,6 +1097,9 @@ export function TaskManagementRawDataPage() {
               canEdit={effectiveCanEdit}
               onSaved={async () => {
                 const d = cellDynRef.current;
+                // P3-7d: 목록에서 편집하면 상세 캐시도 무효화한다.
+                qc.invalidateQueries({ queryKey: ["task-detail", String(rr.id)] });
+                qc.invalidateQueries({ queryKey: ["tm-rows-as-of"] });
                 try {
                   const km = d.kpiMode;
                   if (km) {

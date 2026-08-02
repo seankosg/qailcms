@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useParams, useRouter } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +65,7 @@ export function TaskDetailPage() {
   const canEditTaskNo = isAdmin || isDSuperUser;
   const resolveLabel = useTmColumnLabel();
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
+  const queryClient = useQueryClient();
   const { data: milestoneOptions = [] } = useQuery({
     queryKey: ["tm_milestone_kinds", "active-codes"],
     queryFn: async () => {
@@ -158,6 +159,9 @@ export function TaskDetailPage() {
 
   const onFieldSaved = () => {
     refetch();
+    // P3-7d: 상세에서 편집하면 목록/정본 캐시도 무효화한다.
+    queryClient.invalidateQueries({ queryKey: ["tm-inf"] });
+    queryClient.invalidateQueries({ queryKey: ["tm-rows-as-of"] });
   };
 
   return (

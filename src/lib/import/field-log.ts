@@ -1,4 +1,6 @@
 // 임포트 시 필드 단위 로그를 만들기 위한 공용 헬퍼.
+import { dohaDateOnly } from "@/lib/time/doha";
+
 export type FieldLogOutcome =
   | "applied"
   | "unchanged"
@@ -29,7 +31,8 @@ export interface PendingFieldLog {
 
 export const stringifyForLog = (v: unknown): string | null => {
   if (v === null || v === undefined) return null;
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  // T-4: 로그 표시용 날짜도 도하 wall-clock 기준(하루 밀림 방지).
+  if (v instanceof Date) return dohaDateOnly(v);
   if (typeof v === "string") return v;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   try {

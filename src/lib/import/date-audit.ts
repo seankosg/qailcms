@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { dohaDateOnly } from "@/lib/time/doha";
 
 /**
  * 임포트 파서에서 사용하는 날짜 감사(audit) 유틸.
@@ -188,7 +189,7 @@ export function makeDateAudit(overrides?: Record<string, string>): {
       const sug = suggestDateFix(v);
       const rawText =
         v instanceof Date
-          ? v.toISOString().slice(0, 10)
+          ? (dohaDateOnly(v) ?? String(v))
           : typeof v === "number"
             ? `${v} (엑셀 serial)`
             : String(v);
