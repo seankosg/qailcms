@@ -28,7 +28,15 @@ const BAND_LABEL: Record<string, string> = {
   PO: "PO Stage",
 };
 
-const JUDGMENTS = ["제외", "완료", "정상", "지연", "미분류"] as const;
+const JUDGMENTS = ["제외", "완료", "정상", "지연", "미착수", "미분류"] as const;
+
+/**
+ * ★ 계획일 임포트 직후 재실행 필수 검증 체크리스트 (D-4-3)
+ *  1. 지연 KPI 카드 클릭 → 드릴다운 목록 건수 == 카드값
+ *  2. 밴드별 대표 지연 칩 합계 == 지연 카드값
+ *  3. 아이템당 primary_delay ≤ 1 (서버 pd CTE DISTINCT ON 보증 — 실측 재확인)
+ *  현재 상태: 계획일 0건 → 지연 표본 0 → 불변식 I-1 / I-3 / I-5 는 "미검증".
+ */
 
 const STATE_CLASS: Record<SplStageCell["st"], string> = {
   done: "text-emerald-700 dark:text-emerald-400 font-medium",
@@ -362,7 +370,8 @@ function SplTableRow({
         ? "bg-emerald-100 text-emerald-800"
         : row.judgment === "미분류"
           ? "bg-amber-100 text-amber-800"
-          : "bg-slate-100 text-slate-800";
+          : // 미착수 = 중립(회색). 지연색 사용 금지
+            "bg-slate-100 text-slate-800";
   return (
     <tr className="hover:bg-muted/30">
       <StickyCell left={0} width={230} className="font-mono">
