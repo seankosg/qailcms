@@ -465,7 +465,8 @@ function FragmentRows({
               onClick={() => {
                 const p: Record<string, string> =
                   block.kind === "basement" ? { ...basementParam } : { building: r.building };
-                p.level = r.levelDisp;
+                // LG 블록 행 라벨은 level_name 이 아니므로 level 필터 제외
+                if (block.kind !== "lg") p.level = r.levelDisp;
                 onNavigate(p);
               }}
               className="hover:text-primary"
