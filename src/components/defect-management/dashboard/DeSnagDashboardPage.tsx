@@ -20,6 +20,7 @@ import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import {
   ALL_TEAMS,
   buildMatrix,
+  LG_ROOM_GROUPS,
   mergeStats,
   newStats,
   normalizeRoomGroup,
@@ -186,19 +187,33 @@ export function DeSnagDashboardPage() {
   }, [matrix]);
 
   const roomGroupEntries = useMemo(() => {
-    const totals: Record<RoomGroupCol, Stats> = ROOM_GROUP_ORDER.reduce(
-      (acc, rg) => {
-        acc[rg] = newStats();
-        return acc;
-      },
-      {} as Record<RoomGroupCol, Stats>,
-    );
+    const keys: RoomGroupCol[] = [...ROOM_GROUP_ORDER, ...LG_ROOM_GROUPS];
+    const totals = {} as Record<RoomGroupCol, Stats>;
+    for (const rg of keys) totals[rg] = newStats();
     for (const block of matrix.blocks) {
-      for (const rg of ROOM_GROUP_ORDER) {
+      for (const rg of keys) {
         mergeStats(totals[rg], block.colTotals[rg]);
       }
     }
-    return ROOM_GROUP_ORDER.map((col) => ({ col, stats: totals[col] }));
+    const base = ROOM_GROUP_ORDER.map((col) => ({
+      col: col as string,
+      label: col as string,
+      param: col === "FACADE" ? "FACADE,LANDSCAPE" : col === "N/A" ? "__EMPTY__" : (col as string),
+      stats: totals[col],
+    }));
+    // LG (Lower Ground) — Podium 1~N 통합 카드
+    const lgPresent = LG_ROOM_GROUPS.filter((rg) => totals[rg].issued > 0);
+    if (lgPresent.length > 0) {
+      const lgStats = newStats();
+      for (const rg of lgPresent) mergeStats(lgStats, totals[rg]);
+      base.push({
+        col: "__LG_PODIUM__",
+        label: "LG Podium",
+        param: lgPresent.join(","),
+        stats: lgStats,
+      });
+    }
+    return base;
   }, [matrix]);
 
   return (
