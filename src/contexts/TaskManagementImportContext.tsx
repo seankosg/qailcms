@@ -991,6 +991,17 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 reason_detail: rej?.reason_detail ?? null,
               };
             });
+            for (const r of dateRangeRejects) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: r.task_no,
+                action_taken: "rejected",
+                reason_code: "DATE_RANGE_INVALID",
+                reason_detail: `날짜 범위 오류 (${DATE_MIN}~${DATE_MAX}): ${r.detail}`,
+              });
+            }
             for (let i = 0; i < rowLogRows.length; i += 500) {
               await (supabase as any)
                 .from("task_management_import_row_logs")
