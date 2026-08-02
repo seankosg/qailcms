@@ -25,3 +25,11 @@ export function loadLastRoute(): string | null {
     return null;
   }
 }
+export function clearLastRoute() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(KEY);
+  } catch {
+    // ignore
+  }
+}

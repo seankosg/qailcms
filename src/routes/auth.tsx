@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { resolveLoginEmail } from "@/lib/auth/resolveLoginEmail.functions";
-import { loadLastRoute } from "@/lib/last-route";
+import { resolveLandingRoute } from "@/lib/auth/landing";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — QAIL Closure Document" }] }),
@@ -25,11 +25,10 @@ function AuthPage() {
   const resolve = useServerFn(resolveLoginEmail);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
-      const last = loadLastRoute();
-      if (last) navigate({ href: last, replace: true });
-      else navigate({ to: "/my-work-space", replace: true });
+      const href = await resolveLandingRoute(data.session.user.id);
+      navigate({ href, replace: true });
     });
   }, [navigate]);
 
@@ -38,12 +37,11 @@ function AuthPage() {
     setLoading(true);
     try {
       const { email } = await resolve({ data: { loginId: loginId.trim() } });
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data: signed, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       toast.success("로그인되었습니다");
-      const last = loadLastRoute();
-      if (last) navigate({ href: last, replace: true });
-      else navigate({ to: "/my-work-space", replace: true });
+      const href = await resolveLandingRoute(signed.user!.id);
+      navigate({ href, replace: true });
     } catch (err: any) {
       toast.error(err?.message ?? "로그인에 실패했습니다");
     } finally {

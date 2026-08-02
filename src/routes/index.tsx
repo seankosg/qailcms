@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { loadLastRoute } from "@/lib/last-route";
+import { resolveLandingRoute } from "@/lib/auth/landing";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -13,18 +13,15 @@ function IndexRedirect() {
   const navigate = useNavigate();
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (cancelled) return;
       if (!data.session) {
         navigate({ to: "/auth", replace: true });
         return;
       }
-      const last = loadLastRoute();
-      if (last) {
-        navigate({ href: last, replace: true });
-        return;
-      }
-      navigate({ to: "/my-work-space", replace: true });
+      const href = await resolveLandingRoute(data.session.user.id);
+      if (cancelled) return;
+      navigate({ href, replace: true });
     });
     return () => {
       cancelled = true;
