@@ -28,7 +28,15 @@ const BAND_LABEL: Record<string, string> = {
   SUBMISSION: "Submission Stage",
 };
 
-const JUDGMENTS = ["완료", "정상", "지연", "미분류", "제외"] as const;
+const JUDGMENTS = ["완료", "정상", "지연", "미착수", "미분류", "제외"] as const;
+
+/**
+ * ★ 계획일 임포트 직후 재실행 필수 검증 체크리스트 (D-4-3)
+ *  1. 지연 KPI 카드 클릭 → 드릴다운 목록 건수 == 카드값
+ *  2. 밴드별 대표 지연 칩 합계 == 지연 카드값
+ *  3. 아이템당 primary_delay ≤ 1
+ *  현재 상태: 불변식 I-1 / I-3 / I-5 는 지연 표본 0 위에서 관측된 것이므로 "미검증".
+ */
 
 /** 라운드 선행 표기 — "R1 Submission" (ABD "R1 DS" 어휘 규칙 동일) */
 function stageLabel(s: { label: string; round_no?: number | null } | null | undefined) {
