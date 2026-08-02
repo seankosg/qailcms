@@ -23,6 +23,10 @@ export interface AbdColumnDef {
   editorType?: "text" | "select" | "date" | "number";
   options?: string[];
   origin?: "identity" | "r1" | "r2" | "r3" | "latest" | "system";
+  /** DB 트리거(abd_compute_derived)가 채우는 파생 컬럼 = 직접/일괄 수정 불가 */
+  derived?: boolean;
+  /** boolean 저장 컬럼 (일괄 수정 시 Yes/No 선택) */
+  boolish?: boolean;
   /** true 인 legacy 컬럼은 사용자 컬럼 설정에서 기본 숨김 처리 */
   legacy?: boolean;
   /** 기본 숨김 여부 (신규 legacy 컬럼용) */
