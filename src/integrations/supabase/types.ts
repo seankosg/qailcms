@@ -3763,6 +3763,7 @@ export type Database = {
           plan_progress: number | null
           plan_start: string | null
           plot: string | null
+          progress_observed_at: string | null
           progress_variance: number | null
           risk: string | null
           row_type: string | null
@@ -3813,6 +3814,7 @@ export type Database = {
           plan_progress?: number | null
           plan_start?: string | null
           plot?: string | null
+          progress_observed_at?: string | null
           progress_variance?: number | null
           risk?: string | null
           row_type?: string | null
@@ -3863,6 +3865,7 @@ export type Database = {
           plan_progress?: number | null
           plan_start?: string | null
           plot?: string | null
+          progress_observed_at?: string | null
           progress_variance?: number | null
           risk?: string | null
           row_type?: string | null
@@ -6054,6 +6057,7 @@ export type Database = {
         }
         Returns: Json
       }
+      tm_norm_progress: { Args: { p: number }; Returns: number }
       tm_resolve_caution: { Args: { _v: number }; Returns: number }
       tm_resolve_worsen: { Args: { _v: number }; Returns: number }
       tm_row_gap: {
