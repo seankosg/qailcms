@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { QAQC_HOME } from "@/lib/auth/qaqc";
 import { useQueryClient } from "@tanstack/react-query";
 import { TopBrandHeader } from "@/components/layout/TopBrandHeader";
 import { UpdateAvailableBanner } from "@/components/layout/UpdateAvailableBanner";
@@ -239,6 +240,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const isVisible = (it: NavLeaf) => {
     if (it.adminOnly && !me?.isAdmin) return false;
     if (it.editorOnly && !me?.isEditor) return false;
+    if (me?.qaqcRestricted && !(it.to && it.to.startsWith("/closure/snag-management"))) return false;
     return true;
   };
 
@@ -397,12 +399,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
           {NAV.map((section) => {
             // Admin section gate
             if (section.label === "Admin" && !me?.isAdmin) return null;
+            // QAQC 팀 HDEC PIC/ENG: SM 섹션만 노출
+            if (me?.qaqcRestricted && section.label !== "Outstanding Work") return null;
 
             const modules = (section.modules ?? [])
+              .filter((m) => !me?.qaqcRestricted || m.matchPrefix === "/closure/snag-management")
               .filter((m) => !m.adminOnly || me?.isAdmin)
               .filter((m) => m.items.some(isVisible));
             const flatItems = (section.items ?? []).filter(isVisible);
-            const hasContent = !!section.dashboard || modules.length > 0 || flatItems.length > 0;
+            const sectionDashboard =
+              me?.qaqcRestricted ? undefined : section.dashboard;
+            const hasContent = !!sectionDashboard || modules.length > 0 || flatItems.length > 0;
             if (!hasContent) return null;
 
             return (
@@ -418,7 +425,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   </div>
                 )}
                 <div className={cn("space-y-0.5", collapsed ? "mt-0" : "mt-1")}>
-                  {section.dashboard && renderLeaf(section.dashboard, "dashboard")}
+                  {sectionDashboard && renderLeaf(sectionDashboard, "dashboard")}
                   {flatItems.map((it) => renderLeaf(it, "dashboard"))}
                   {modules.map((mod) => {
                     const key = section.label + "::" + mod.label;
