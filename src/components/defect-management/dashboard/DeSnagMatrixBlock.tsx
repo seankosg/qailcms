@@ -31,6 +31,12 @@ function pctTone(pct: number | null): string {
   return "text-emerald-600 dark:text-emerald-400 font-semibold";
 }
 
+/** 잔여 비율은 높을수록 나쁨 — 완료 비율과 색 방향을 뒤집는다. */
+function remainPctTone(pct: number | null): string {
+  if (pct == null) return "text-muted-foreground";
+  return pctTone(100 - pct);
+}
+
 /** Render 9 team-decomposed <td> cells (Issued/Rect/Closed × Elec/Mech/Arch). */
 function TeamCells({
   stats,
@@ -105,7 +111,7 @@ function TeamCells({
                 className={cn(
                   "block h-full w-full px-1 text-right text-xs leading-none hover:bg-primary/10",
                   sc.slot === "issued" && "font-medium",
-                  showPct ? pctTone(ratio) : zeroDim,
+                  showPct ? (isRemain ? remainPctTone(ratio) : pctTone(ratio)) : zeroDim,
                   isBottleneck && "font-semibold",
                 )}
               >
