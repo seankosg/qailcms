@@ -178,7 +178,7 @@ export const DEFECT_COLUMNS: DefectColumnDef[] = [
   // Stage sets: [P.Date | A.Date | Status] × Start → Rectified → Closure
   { key: "planned_start_date", label: "P.Start", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
   { key: "actual_start_date", label: "A.Start", type: "date", width: 110, group: "progress", editable: true, editorType: "date" },
-  { key: "start_status", label: "Start Status", type: "badge", width: 130, group: "progress" },
+  { key: "start_status", label: "Start Status", type: "badge", width: 130, group: "progress", derived: true },
   { key: "planned_rectified_date", label: "P.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
   { key: "actual_rectified_date", label: "A.Rectified", type: "date", width: 120, group: "progress", editable: true, editorType: "date" },
   { key: "rectified_status", label: "Rectified Status", type: "badge", width: 130, group: "progress", editable: true, editorType: "select", options: [...RECTIFIED_STATUSES] },
@@ -228,11 +228,46 @@ export function inferDefectFilterType(t: DefectFieldType): DefectFilterType {
 }
 
 export function getDefectBulkEditableFields() {
-  return DEFECT_COLUMNS.filter((c) => c.editable && c.editorType).map((c) => ({
+  return DEFECT_COLUMNS.filter((c) => !c.derived).map((c) => ({
     field: c.key,
     label: c.label,
-    inputType: c.editorType!,
-    options: c.options?.map((v) => ({ value: v, label: v })),
+    inputType: resolveBulkEditorType(c),
+    options: bulkOptionsFor(c),
     group: c.group,
+    coerce: c.type === "boolean" ? ("boolean" as const) : undefined,
   }));
+}
+
+/**
+ * 일괄 수정(Mass edit)용 에디터 타입.
+ * 인라인 편집(`editable`)과 무관하게, 파생 컬럼을 제외한 모든 헤더가 대상이다.
+ */
+export function resolveBulkEditorType(c: DefectColumnDef): NonNullable<DefectColumnDef["editorType"]> {
+  if (c.editorType) return c.editorType;
+  switch (c.type) {
+    case "longtext":
+      return "textarea";
+    case "date":
+    case "datetime":
+      return "date";
+    case "number":
+    case "percent":
+      return "number";
+    case "boolean":
+      return "select";
+    case "badge":
+      return c.options?.length ? "select" : "text";
+    default:
+      return "text";
+  }
+}
+
+export function bulkOptionsFor(c: DefectColumnDef): { value: string; label: string }[] | undefined {
+  if (c.type === "boolean") {
+    return [
+      { value: "true", label: "Yes" },
+      { value: "false", label: "No" },
+    ];
+  }
+  return c.options?.map((v) => ({ value: v, label: v }));
 }
