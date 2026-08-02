@@ -38,7 +38,7 @@ export interface DefectColumnDef {
   width: number;
   group: DefectGroupKey;
   editable?: boolean;
-  editorType?: "text" | "select" | "date" | "number" | "textarea" | "boolean";
+  editorType?: "text" | "select" | "date" | "number" | "textarea";
   options?: string[];
   /** true면 DB 컬럼이 아닌 파생 값. 서버 정렬/필터 비활성. */
   derived?: boolean;
@@ -232,8 +232,9 @@ export function getDefectBulkEditableFields() {
     field: c.key,
     label: c.label,
     inputType: resolveBulkEditorType(c),
-    options: c.options?.map((v) => ({ value: v, label: v })),
+    options: bulkOptionsFor(c),
     group: c.group,
+    coerce: c.type === "boolean" ? ("boolean" as const) : undefined,
   }));
 }
 
@@ -253,10 +254,20 @@ export function resolveBulkEditorType(c: DefectColumnDef): NonNullable<DefectCol
     case "percent":
       return "number";
     case "boolean":
-      return "boolean";
+      return "select";
     case "badge":
       return c.options?.length ? "select" : "text";
     default:
       return "text";
   }
+}
+
+export function bulkOptionsFor(c: DefectColumnDef): { value: string; label: string }[] | undefined {
+  if (c.type === "boolean") {
+    return [
+      { value: "true", label: "Yes" },
+      { value: "false", label: "No" },
+    ];
+  }
+  return c.options?.map((v) => ({ value: v, label: v }));
 }
