@@ -30,11 +30,26 @@ interface ModuleFingerprint {
   sheetHints?: string[];
 }
 
-/** 대소문자/공백/구두점 제거 정규화. */
+/**
+ * [F-2] 헤더 동의어 사전 — 정규화 이후 치환한다.
+ * 원본별 표기 차이(HDEC 'DOCUMENT NUMBER' vs Aconex 'Document No')를 흡수한다.
+ * 추가 시 module-fingerprint.test.ts 회귀 테스트를 반드시 갱신할 것.
+ */
+export const HEADER_SYNONYMS: Record<string, string> = {
+  documentnumber: "documentno",
+  docnumber: "documentno",
+  docno: "documentno",
+  abddocumentnumber: "abdnumber",
+  abddocumentno: "abdnumber",
+  abdno: "abdnumber",
+};
+
+/** 대소문자/공백/구두점 제거 정규화 + 동의어 치환. */
 function normalizeHeader(s: string): string {
-  return String(s ?? "")
+  const base = String(s ?? "")
     .toLowerCase()
     .replace(/[\s_\-().\[\]{}\/\\:;,'"`~!@#$%^&*+=?<>|]/g, "");
+  return HEADER_SYNONYMS[base] ?? base;
 }
 
 function normSet(list: string[]): Set<string> {
