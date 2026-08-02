@@ -68,6 +68,14 @@ export type SplRow = {
   req_doc_done: number;
   req_doc_total: number;
   active_band: string | null;
+  /** 활성 밴드 상태 — 'empty'(미착수) | 'active'(진행). 전 밴드 완료 시 null */
+  active_band_state: "empty" | "active" | null;
+  /** 밴드별 3값 상태 맵 */
+  band_states: Record<string, "empty" | "active" | "complete">;
+  /** actual_authority='HDEC' 단계 실적 보유 수 (0 = HDEC 실적 미확보) */
+  hdec_actual_count: number;
+  /** 계획일(plan_start/plan_finish) 보유 여부 */
+  has_plan: boolean;
   completed_stage: SplStageRef | null;
   current_stage: SplStageRef | null;
   /** 활성 밴드 내 HDEC 귀책 최선행 지연 1개 */
@@ -75,7 +83,7 @@ export type SplRow = {
   /** 후행 밴드 지연 — 인지용, KPI 지연 카드 미합산 */
   delay_bucket: SplStageRef[];
   progress_pct: number | null;
-  judgment: "제외" | "완료" | "정상" | "지연" | "미분류";
+  judgment: "제외" | "완료" | "정상" | "지연" | "미분류" | "미착수";
 };
 
 export type SplRowsAsOf = {
@@ -86,7 +94,20 @@ export type SplRowsAsOf = {
   judgment_counts: Record<string, number>;
   /** Required Doc 충족 단계 수별 문서 건수 (키 = 0..5) */
   req_doc_counts: Record<string, number>;
-  violations: { total: number; from_last_import: number; last_batch_id: string | null };
+  band_state_counts: Record<string, Record<string, number>>;
+  /** HDEC 실적 0건 아이템 수 / 그중 완료 판정 수 */
+  hdec_missing_items: number;
+  hdec_missing_done: number;
+  /** 계획일 보유 아이템 수 — 0이면 지연 판정 미실시 */
+  plan_items: number;
+  violations: {
+    total: number;
+    precedence: number;
+    /** 선행 단계 자료 자체가 미유입 — 실제 공정 역전과 분리 */
+    import_incomplete: number;
+    from_last_import: number;
+    last_batch_id: string | null;
+  };
 };
 
 export const getSplRowsAsOf = createServerFn({ method: "POST" })
