@@ -74,6 +74,7 @@ export const ROOM_GROUP_ORDER = [
   "CARPARK RAMP",
   "CORRIDOR",
   "FACADE",
+  "LANDSCAPE",
   "N/A",
 ] as const;
 
@@ -98,7 +99,6 @@ export function isLgRoomGroup(v: string): v is LgRoomGroupCol {
 export function normalizeRoomGroup(v: string | null | undefined): RoomGroupCol {
   const s = (v ?? "").trim().toUpperCase();
   if (!s) return "N/A";
-  if (s === "LANDSCAPE" || s === "FACADE") return "FACADE";
   const pm = /^PODIUM\s+([1-5])$/.exec(s);
   if (pm) return `Podium ${pm[1]}` as RoomGroupCol;
   const hit = (ROOM_GROUP_ORDER as readonly string[]).find((k) => k.toUpperCase() === s);
