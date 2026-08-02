@@ -772,7 +772,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       ] as const;
       const dateRangeRejects: { task_no: string; detail: string }[] = [];
       for (let i = applied.length - 1; i >= 0; i--) {
-        const p = applied[i] as Record<string, unknown>;
+        const p = applied[i] as unknown as Record<string, unknown>;
         const bad: string[] = [];
         for (const fname of DATE_FIELDS) {
           const raw = p[fname];
