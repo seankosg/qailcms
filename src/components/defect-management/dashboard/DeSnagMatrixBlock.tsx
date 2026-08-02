@@ -473,7 +473,7 @@ function FragmentRows({
               {r.levelDisp}
             </button>
           </td>
-          {ROOM_GROUP_ORDER.map((rg, gIdx) => (
+          {block.columnKeys.map((rg, gIdx) => (
             <TeamCells
               key={rg}
               stats={r.cells[rg]}
@@ -487,7 +487,7 @@ function FragmentRows({
             stats={r.rowTotal}
             mode={mode}
             onCell={(slot, team) => goCell(r.building, r.levelDisp, "__ROW_TOTAL__", slot, team)}
-            groupIndex={ROOM_GROUP_ORDER.length}
+            groupIndex={block.columnKeys.length}
             isTotal
           />
         </tr>
@@ -500,7 +500,7 @@ function FragmentRows({
           >
             {group.building} 소계
           </td>
-          {ROOM_GROUP_ORDER.map((rg, gIdx) => {
+          {block.columnKeys.map((rg, gIdx) => {
             const sub = newStats();
             for (const r of group.rows) mergeStats(sub, r.cells[rg]);
             return (
@@ -517,7 +517,7 @@ function FragmentRows({
             stats={group.subtotal}
             mode={mode}
             onCell={(slot, team) => goCell(group.building, null, "__BUILDING_SUBTOTAL__", slot, team)}
-            groupIndex={ROOM_GROUP_ORDER.length}
+            groupIndex={block.columnKeys.length}
             isTotal
           />
         </tr>
