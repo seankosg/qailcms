@@ -161,7 +161,7 @@ export function SplRawDataPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Spare Part List — Raw Data</h1>
           <p className="text-xs text-muted-foreground">
-            표시·집계 수치는 정본 함수(spl_rows_as_of → spl_eval_as_of → spl_judge_v2) 경유 · 읽기 시 재계산. 행별 Data
+            표시·집계 수치는 정본 함수(spl_rows_as_of → spl_eval_as_of → spl_judge_v3) 경유 · 읽기 시 재계산. 행별 Data
             Date 는 표기 전용입니다.
           </p>
         </div>
@@ -419,6 +419,14 @@ function SplTableRow({
       </StickyCell>
       <StickyCell left={380} width={90}>
         <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>{row.judgment}</span>
+        {(row.hdec_actual_count ?? 0) === 0 && (
+          <span
+            className="ml-1 rounded bg-muted px-1 text-[9px] text-muted-foreground"
+            title="HDEC 권한 단계 실적 보유 0건 — 판정과 독립된 자료 상태 표기"
+          >
+            HDEC 실적 미확보
+          </span>
+        )}
       </StickyCell>
       <StickyCell left={470} width={80} className="tabular-nums">
         {row.progress_pct == null ? "—" : `${row.progress_pct}%`}
