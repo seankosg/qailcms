@@ -1,6 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { assertNoTruncation } from "@/lib/data/assertNoSilentTruncation";
+import { todayInDoha } from "@/lib/time/doha";
+
+/** A-2: as_of 는 항상 클라이언트가 명시한다. 서버 폴백은 최후 방어선으로만 남긴다. */
+function resolveAsOf(v?: string | null): string {
+  return (v ?? "").trim() || todayInDoha();
+}
 
 export type AbdStatusGroup =
   | "approved"
@@ -125,7 +131,7 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
           _limit: limit,
           _plot: p.plot ?? null,
           _excluded_mode: p.excludedMode ?? "hide",
-          _as_of: p.asOf && p.asOf.trim() ? p.asOf.trim() : null,
+          _as_of: resolveAsOf(p.asOf),
         });
         if (error) throw new Error(error.message);
         const arr = (data ?? []) as { rows: any; total_count: number | string }[];
@@ -201,7 +207,7 @@ export function useAbdFacet(
 ) {
   // 크로스 필터링: 자기 자신 컬럼 필터는 제외해 정확한 queryKey/카운트 산출.
   const qNorm = (opts.q ?? "").trim();
-  const asOfNorm = (opts.asOf ?? "").trim() || null;
+  const asOfNorm = resolveAsOf(opts.asOf);
   const otherFilters = (opts.filters ?? []).filter((f) => f.column !== column);
   return useQuery<AbdFacetItem[]>({
     queryKey: [
@@ -249,7 +255,7 @@ export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean; pl
         _team: opts.team,
         _include_inactive: opts.includeInactive,
         _plot: opts.plot ?? null,
-        _as_of: opts.asOf && opts.asOf.trim() ? opts.asOf.trim() : null,
+        _as_of: resolveAsOf(opts.asOf),
       });
       if (error) throw new Error(error.message);
       const r = (data ?? [])[0] ?? {};
