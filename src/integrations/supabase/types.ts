@@ -5624,6 +5624,7 @@ export type Database = {
       }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }
       is_full_access: { Args: { _user_id: string }; Returns: boolean }
+      is_qaqc_readonly: { Args: { _user_id: string }; Returns: boolean }
       is_row_owner: {
         Args: {
           _hdec_eng: string
