@@ -118,7 +118,8 @@ export function judgeFromGap(
   asOf?: string,
 ): string {
   const actual = normActual(row.actual_progress);
-  if (actual >= 1 || row.actual_finish) return "완료";
+  // 완료 정본 단일화(2026-08-02): 실적 종료일(actual_finish) 존재만이 완료 근거다.
+  if (row.actual_finish) return "완료";
   // 서버 정본(tm_kpi_judgment_g)과 동일: 착수 여부는 실적%만으로 판단한다.
   const started = actual > 0;
   const ps = parseDate(row.plan_start);
@@ -274,7 +275,7 @@ export function getStageJudgment(
   }
 
   // WIP / Finish 는 동일 gap 축으로 판정 (완료 조건만 다름)
-  if (actual >= 1) return "완료";
+  if (row.actual_finish) return "완료";
 
   if (stage === "finish") {
     // 미완료 상태에서 plan_end 도래 전이면 정상 취급.
@@ -300,7 +301,7 @@ export function computeJudgment(
   // 저장 판정(auto_judgment)은 임포트 시점 스냅샷이므로 읽기 시 판정 소스로 쓰지 않는다.
   // 항상 as-of(미지정 시 오늘·Asia/Qatar) 기준으로 재계산한다.
   const actual = normActual(row.actual_progress);
-  if (actual >= 1) return "완료";
+  if (row.actual_finish) return "완료";
   const started = actual > 0;
   if (!started) {
     // 미착수: 서버 정본 tm_kpi_judgment 와 동일 의미론.

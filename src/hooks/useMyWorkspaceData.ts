@@ -64,9 +64,9 @@ export interface TmMyRow {
 
 export type MwsScope = "pic" | "team";
 
-/** 완료 판정 — 정본 정의(실적 100% 또는 실적 종료일 존재). 판정 문자열은 참조하지 않는다. */
+/** 완료 판정 — 정본 정의(실적 종료일 존재 단독). 판정 문자열·실적%는 참조하지 않는다. */
 export function tmIsCompleted(r: TmMyRow): boolean {
-  return Number(r.actual_progress ?? 0) >= 1 || !!r.actual_finish;
+  return !!r.actual_finish;
 }
 export function tmIsStarted(r: TmMyRow): boolean {
   return !tmIsCompleted(r) && Number(r.actual_progress ?? 0) > 0;
