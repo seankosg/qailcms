@@ -167,7 +167,9 @@ export function styleRoundtripSheet(
     };
   }
   bandStarts.forEach((start, i) => {
-    const end = (bandStarts[i + 1] ?? cols.length) - 1;
+    let end = (bandStarts[i + 1] ?? cols.length) - 1;
+    // 다음 밴드에 선행 배치된 식별/상태 열까지 물들이지 않도록 꼬리를 잘라낸다.
+    while (end > start && cols[end].kind !== "stage") end--;
     const label = String(ws[enc({ r: 1, c: start })].v);
     const band =
       cols[start].band ??
