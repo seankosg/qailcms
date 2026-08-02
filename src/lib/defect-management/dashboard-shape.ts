@@ -76,12 +76,31 @@ export const ROOM_GROUP_ORDER = [
   "FACADE",
   "N/A",
 ] as const;
-export type RoomGroupCol = (typeof ROOM_GROUP_ORDER)[number];
+
+// LG (Lower Ground) 블록 전용 열 — building='LG' 행의 room_group 값
+export const LG_ROOM_GROUPS = [
+  "Podium 1",
+  "Podium 2",
+  "Podium 3",
+  "Podium 4",
+  "Podium 5",
+] as const;
+
+export const ALL_ROOM_GROUPS = [...ROOM_GROUP_ORDER, ...LG_ROOM_GROUPS] as const;
+
+export type RoomGroupCol = (typeof ALL_ROOM_GROUPS)[number];
+export type LgRoomGroupCol = (typeof LG_ROOM_GROUPS)[number];
+
+export function isLgRoomGroup(v: string): v is LgRoomGroupCol {
+  return (LG_ROOM_GROUPS as readonly string[]).includes(v);
+}
 
 export function normalizeRoomGroup(v: string | null | undefined): RoomGroupCol {
   const s = (v ?? "").trim().toUpperCase();
   if (!s) return "N/A";
   if (s === "LANDSCAPE" || s === "FACADE") return "FACADE";
+  const pm = /^PODIUM\s+([1-5])$/.exec(s);
+  if (pm) return `Podium ${pm[1]}` as RoomGroupCol;
   const hit = (ROOM_GROUP_ORDER as readonly string[]).find((k) => k.toUpperCase() === s);
   return (hit as RoomGroupCol) ?? "N/A";
 }
@@ -124,7 +143,7 @@ export function compareGroundLevelDesc(a: string, b: string): number {
 export const BASEMENT_ORDER = ["LG", "B1", "B2", "B3", "B4"];
 
 // ── Building ─────────────────────────────────────────────────────────
-export type BlockKind = "tower" | "podium" | "basement";
+export type BlockKind = "tower" | "podium" | "lg" | "basement";
 
 // 원본 building 값 → 정규화된 building 라벨 (표시용). Tower는 하나로 모음.
 export function classifyBuilding(b: string | null | undefined): {
@@ -133,6 +152,8 @@ export function classifyBuilding(b: string | null | undefined): {
 } {
   const s = (b ?? "").trim();
   if (!s) return { kind: "unknown", label: "Others" };
+  // LG = Lower Ground 독립 블록. level_name 의 'Level LG' 와 무관.
+  if (/^LG$/i.test(s)) return { kind: "lg", label: "LG" };
   if (/^Tower(\s+4)?$/i.test(s)) return { kind: "tower", label: "Tower" };
   if (/^Podium$/i.test(s)) return { kind: "podium", label: "Podium" };
   const pm = /^Podium\s+([1-4])$/i.exec(s);
