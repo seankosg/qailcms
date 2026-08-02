@@ -12,7 +12,7 @@ import {
   basementLevelParam,
 } from "@/lib/defect-management/dashboard-shape";
 
-export type MatrixMode = "count" | "pct";
+export type MatrixMode = "count" | "pct" | "remain" | "remainPct";
 
 type StatusSlot = "issued" | "rect" | "closed";
 
@@ -64,9 +64,12 @@ function TeamCells({
       {STATUS_COLS.map((sc, sIdx) =>
         TEAM_COL_ORDER.map((team, tIdx) => {
           const t = stats.byTeam[team];
-          const count = sc.slot === "issued" ? t.issued : sc.slot === "rect" ? t.rect : t.closed;
+          const done = sc.slot === "issued" ? t.issued : sc.slot === "rect" ? t.rect : t.closed;
+          const isRemain = mode === "remain" || mode === "remainPct";
+          const count =
+            isRemain && sc.slot !== "issued" ? Math.max(0, t.issued - done) : done;
           const ratio = t.issued > 0 && sc.slot !== "issued" ? (count / t.issued) * 100 : null;
-          const showPct = mode === "pct" && sc.slot !== "issued";
+          const showPct = (mode === "pct" || mode === "remainPct") && sc.slot !== "issued";
           const text = showPct
             ? ratio == null
               ? "–"
