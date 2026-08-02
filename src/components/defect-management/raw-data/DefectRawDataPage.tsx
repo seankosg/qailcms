@@ -325,7 +325,7 @@ export function DefectRawDataPage() {
     (row: DefectItem) => canEditRawRow(user ?? null, "defect_items_raw", row as unknown as Record<string, any>),
     [user],
   );
-  const { data: fieldConfig = [] } = useDefectFieldConfig();
+  const { data: fieldConfig = [], isPending: fieldConfigPending } = useDefectFieldConfig();
   const helpers = useDefectFieldHelpers();
   const labelOf = useDefectColumnLabel();
   const { defaultOrder, defaultVisibility } = useDefectDefaults();
@@ -492,8 +492,19 @@ export function DefectRawDataPage() {
   }, [rows, dataDate]);
 
   // ── Restore view pref (per-tab: order/visibility/frozenExtras/columnSizing) ─
+  // 복원은 탭당 1회만. defaultOrder(=field_config 파생) 는 refetch 마다 identity 가
+  // 바뀌므로 deps 에 넣으면 매 로딩마다 재복원/재저장되어 설정이 흔들린다.
+  const restoredTabRef = useRef<string | null>(null);
+  const defaultOrderRef = useRef(defaultOrder);
+  defaultOrderRef.current = defaultOrder;
+  const defaultVisibilityRef = useRef(defaultVisibility);
+  defaultVisibilityRef.current = defaultVisibility;
   useEffect(() => {
-    if (!viewPref.ready) return;
+    if (!viewPref.ready || fieldConfigPending) return;
+    if (restoredTabRef.current === tab) return;
+    restoredTabRef.current = tab;
+    const defaultOrder = defaultOrderRef.current;
+    const defaultVisibility = defaultVisibilityRef.current;
     setStateLoaded(false);
     const s: any = viewPref.state ?? null;
     let baseSizing: ColumnSizingState = {};
@@ -536,12 +547,18 @@ export function DefectRawDataPage() {
     setFrozenExtras(baseFrozen);
     setStateLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewPref.ready, tab, defaultOrder]);
+  }, [viewPref.ready, fieldConfigPending, tab]);
 
   // Save view pref (columnSizing/order/visibility/frozenExtras)
+  // 값이 실제로 바뀐 경우에만 저장 (동일 내용 재저장으로 인한 캐시 churn 방지)
+  const lastSavedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!stateLoaded) return;
-    viewPref.save({ columnSizing, order, visibility, frozenExtras } as any);
+    const next = { columnSizing, order, visibility, frozenExtras };
+    const sig = JSON.stringify(next);
+    if (lastSavedRef.current === sig) return;
+    lastSavedRef.current = sig;
+    viewPref.save(next as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateLoaded, columnSizing, order, visibility, frozenExtras]);
 
