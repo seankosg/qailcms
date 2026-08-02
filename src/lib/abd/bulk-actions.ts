@@ -91,6 +91,7 @@ export interface BulkEditableField {
   label: string;
   inputType: "text" | "select" | "date" | "number";
   isPercent?: boolean;
+  isBoolean?: boolean;
   options?: { value: string; label: string }[];
   group: string;
 }
@@ -107,15 +108,35 @@ const GROUP_LABELS: Record<AbdGroupKey, string> = {
   audit: "Audit",
 };
 
+/** 컬럼 정의에 editorType 이 없을 때 타입으로 에디터를 유추한다. */
+function resolveAbdEditorType(c: (typeof ABD_COLUMNS)[number]): BulkEditableField["inputType"] {
+  if (c.editorType) return c.editorType;
+  if (c.boolish) return "select";
+  if (c.type === "date") return "date";
+  if (c.type === "number") return "number";
+  if (c.type === "badge" && c.options?.length) return "select";
+  return "text";
+}
+
+/**
+ * 일괄 수정 가능한 필드 = 파생(트리거 계산) 컬럼을 제외한 모든 저장 컬럼.
+ */
 export function getAbdBulkEditableFields(): BulkEditableField[] {
   const out: BulkEditableField[] = [];
   for (const c of ABD_COLUMNS) {
-    if (!c.editable || !c.editorType) continue;
+    if (c.derived) continue;
+    const inputType = resolveAbdEditorType(c);
     out.push({
       field: c.key,
       label: c.label,
-      inputType: c.editorType,
-      options: c.options?.map((v) => ({ value: v, label: v })),
+      inputType,
+      isBoolean: c.boolish,
+      options: c.boolish
+        ? [
+            { value: "true", label: "Yes" },
+            { value: "false", label: "No" },
+          ]
+        : c.options?.map((v) => ({ value: v, label: v })),
       group: GROUP_LABELS[c.group] ?? c.group,
     });
   }
