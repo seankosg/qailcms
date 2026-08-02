@@ -158,6 +158,9 @@ export function TaskDetailPage() {
 
   const onFieldSaved = () => {
     refetch();
+    // P3-7d: 상세에서 편집하면 목록/정본 캐시도 무효화한다.
+    queryClient.invalidateQueries({ queryKey: ["tm-inf"] });
+    queryClient.invalidateQueries({ queryKey: ["tm-rows-as-of"] });
   };
 
   return (
