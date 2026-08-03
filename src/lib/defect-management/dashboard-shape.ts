@@ -358,7 +358,7 @@ export function buildMatrix(
     let block: RowsMap;
     let buildingLabel: string;
     // 블록 배치는 building 컬럼 단독 판정. level_name 은 행(Level) 라벨에만 사용한다.
-    const levelDisp = lvl.kind === "unknown" ? "Level ?" : `Level ${lvl.key}`;
+    let levelDisp = lvl.kind === "unknown" ? "Level ?" : `Level ${lvl.key}`;
     if (bld.kind === "liftcabin") {
       const roomKey = (r.room ?? "").trim() || "N/A";
       const subKey = (r.subcontractor ?? "").trim() || "N/A";
@@ -368,6 +368,7 @@ export function buildMatrix(
     } else if (bld.kind === "lg") {
       block = lg;
       buildingLabel = "LG";
+      levelDisp = "LG"; // LG 블록은 단일 행 유지 (열 = Podium 1..5)
     } else if (bld.kind === "basement") {
       block = basement;
       buildingLabel = "BSM";
