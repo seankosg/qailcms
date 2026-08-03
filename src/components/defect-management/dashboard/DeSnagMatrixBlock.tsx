@@ -186,7 +186,7 @@ function MatrixHeader({
   return (
     <thead>
       {/* Tier 1: Room Group */}
-      <tr className="bg-muted/50">
+      <tr>
         <th
           rowSpan={3}
           className="sticky left-0 top-0 z-40 min-w-[100px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
@@ -346,7 +346,7 @@ export function DeSnagMatrixBlock({
 
   return (
     <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
+      <div className="flex items-center justify-between border-b bg-muted px-3 py-2">
         <h3 className="text-sm font-semibold">{block.title}</h3>
         <button
           type="button"
