@@ -377,3 +377,29 @@
 
 - 과거 파생 4종 이력 **69,013행(전체의 62%)**. 삭제하지 않고 보존 기간 정책과 함께 결정.
 - 현재 규모: **111,200행 / 27MB**.
+
+---
+
+## TM 파서 위치 폴백 잔존 필드 19종  `[등재 — 2026-08-03]`
+
+`src/lib/task-management/parser.ts:527~547` 의 `pick(target, aliases, canonical)` 3번째 인자는
+헤더 별칭 매칭 실패 시 **엑셀 열 위치로 강제 지정**하는 폴백이다.
+사람 이름 2종(`hdec_pic_name`, `hdec_eng_name`)은 2026-08-03 제거(→0)했고, 아래 19종은 잔존:
+
+| 필드 | 폴백 열 | 필드 | 폴백 열 |
+|---|---|---|---|
+| task_no | 1 | actual_start | 14 |
+| category | 2 | actual_progress | 15 |
+| plot | 3 | plan_progress | 16 |
+| task_name | 4 | progress_variance | 17 |
+| risk | 5 | forecast_end | 18 |
+| sub_task_desc | 6 | slip_days | 19 |
+| row_type | 9 | auto_judgment | 20 |
+| status_manual | 10 | | |
+| plan_start | 11 | | |
+| plan_end | 12 | | |
+| plan_days | 13 | | |
+
+- 위험도: 사람 이름/소유권 판정에는 무관(사람 축 2종은 이미 제거됨).
+- 잔여 위험: 열 순서가 다른 파일 임포트 시 값이 엉뚱한 컬럼으로 들어갈 수 있음.
+- 조치안: 별칭 매칭 실패 시 폴백 대신 컬럼 매핑 다이얼로그 강제 노출.
