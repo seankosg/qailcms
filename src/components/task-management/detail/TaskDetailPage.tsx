@@ -26,7 +26,12 @@ import { formatDdMmm } from "@/lib/defect-management/stage-utils";
 import { cn } from "@/lib/utils";
 import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThread";
 import { useServerFn } from "@tanstack/react-start";
-import { updateTaskOwnerField, TM_OWNER_MUTATIONS_MARKER } from "@/lib/task-management/owner-mutations.functions";
+import {
+  updateTaskOwnerField,
+  confirmActualFinishSource,
+  TM_OWNER_MUTATIONS_MARKER,
+} from "@/lib/task-management/owner-mutations.functions";
+import { toast } from "sonner";
 import { canEditRawRow } from "@/lib/auth/roles";
 import {
   cumPlanProgress,
@@ -65,6 +70,7 @@ export function TaskDetailPage() {
   const canEditTaskNo = isAdmin || isDSuperUser;
   const resolveLabel = useTmColumnLabel();
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
+  const confirmFinishSourceFn = useServerFn(confirmActualFinishSource);
   const queryClient = useQueryClient();
   const { data: milestoneOptions = [] } = useQuery({
     queryKey: ["tm_milestone_kinds", "active-codes"],
@@ -145,6 +151,20 @@ export function TaskDetailPage() {
     () => (srvRow?.srv_judgment as string | undefined) ?? (row ? computeJudgment(row as any, undefined, asOf) : ""),
     [row, asOf, srvRow],
   );
+
+  // R2-6(b): '완료일 미확인'(actual_finish_source='forecast') 전체 건수
+  const { data: unconfirmedCount = 0 } = useQuery({
+    queryKey: ["tm-unconfirmed-finish-count"],
+    queryFn: async () => {
+      const { count, error } = await (supabase as any)
+        .from("task_management_raw")
+        .select("id", { count: "exact", head: true })
+        .eq("actual_finish_source", "forecast");
+      if (error) throw error;
+      return Number(count ?? 0);
+    },
+    staleTime: 60_000,
+  });
 
   if (!row) {
     return (
