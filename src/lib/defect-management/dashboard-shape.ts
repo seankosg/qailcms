@@ -380,7 +380,8 @@ export function buildMatrix(
       if (!bMap) continue;
       const levels = Array.from(bMap.entries());
       // 정렬
-      levels.sort(([, a], [, b]) => {
+      levels.sort(([ka2, a], [kb2, b]) => {
+        if (kind === "liftcabin") return compareRoomNatural(ka2, kb2);
         if (kind === "basement") {
           // LG → B1 → B4
           const ka = a.sortIdx;
