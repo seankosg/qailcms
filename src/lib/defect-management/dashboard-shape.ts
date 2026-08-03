@@ -105,8 +105,21 @@ export function normalizeRoomGroup(v: string | null | undefined): RoomGroupCol {
   if (!s) return "N/A";
   const pm = /^PODIUM\s+([1-5])$/.exec(s);
   if (pm) return `Podium ${pm[1]}` as RoomGroupCol;
+  // 'LIFT CABIN' / 'LIFT LOBBY' 등 LIFT 계열 표기는 LIFT 열로 통합
+  if (/^LIFT\b/.test(s)) return "LIFT";
   const hit = (ROOM_GROUP_ORDER as readonly string[]).find((k) => k.toUpperCase() === s);
   return (hit as RoomGroupCol) ?? "N/A";
+}
+
+/** 카드 드릴다운용 — 정규화 열 → raw-data 필터에 넘길 원본 room_group 값 집합 */
+export function roomGroupSourceValues(col: string, rawValues: Iterable<string | null | undefined>): string[] {
+  const out = new Set<string>();
+  for (const v of rawValues) {
+    if (normalizeRoomGroup(v) !== col) continue;
+    const t = (v ?? "").trim();
+    out.add(t ? t : "__EMPTY__");
+  }
+  return Array.from(out);
 }
 
 // ── Level ─────────────────────────────────────────────────────────────
