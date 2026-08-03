@@ -830,12 +830,26 @@ export async function parseTaskManagementExcel(
             header: sheetHeaders.find((h) => h.col === cols.forecast_end)?.header || "예상 완료",
           })
         : null,
-      // A.Finish 자동 보정: 100% 완료면 Revise Finish(=forecast_end) → dataDate 폴백.
-      actual_finish: (() => {
-        const ap = toPct4(getCell(sheet, r, cols.actual_progress));
-        if (ap !== 1) return null;
-        const fe = toIsoDate(getCell(sheet, r, cols.forecast_end));
-        return fe ?? dataDate ?? null;
+      // P4-1/P4-2: 엑셀 '실제 완료' 열에서만 읽는다. 자동 보정(forecast_end/dataDate 폴백) 없음.
+      actual_finish: cols.actual_finish
+        ? readDateCell(getCell(sheet, r, cols.actual_finish), {
+            cellRef: toCellRef(r, cols.actual_finish),
+            row: r,
+            col: cols.actual_finish,
+            field: "actual_finish",
+            header:
+              sheetHeaders.find((h) => h.col === cols.actual_finish)?.header || "실제 완료",
+          })
+        : null,
+      actual_finish_cleared: (() => {
+        if (!cols.actual_finish) return false;
+        const v = getCell(sheet, r, cols.actual_finish);
+        return v == null || String(v).trim() === "";
+      })(),
+      progress_cell_present: (() => {
+        if (!cols.actual_progress) return false;
+        const v = getCell(sheet, r, cols.actual_progress);
+        return v != null && String(v).trim() !== "";
       })(),
       slip_days: (() => {
         const n = toNumber(getCell(sheet, r, cols.slip_days));
