@@ -33,23 +33,27 @@ export async function fetchAllFieldLogs<T>(
   kind: string,
   columns: string,
   pageSize = 1000,
+  outcome?: string,
+  maxRows = Infinity,
 ): Promise<T[]> {
   const out: T[] = [];
   let from = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const { data, error } = await (supabase as any)
+    let q = (supabase as any)
       .from("import_field_logs")
       .select(columns)
       .eq("upload_id", uploadId)
-      .eq("kind", kind)
+      .eq("kind", kind);
+    if (outcome) q = q.eq("outcome", outcome);
+    const { data, error } = await q
       .order("raw_row_no", { ascending: true, nullsFirst: true })
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) throw error;
     const rows = (data ?? []) as T[];
     out.push(...rows);
-    if (rows.length < pageSize) break;
+    if (rows.length < pageSize || out.length >= maxRows) break;
     from += pageSize;
   }
   return out;
