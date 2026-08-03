@@ -292,17 +292,16 @@ export function DeSnagMatrixBlock({
 }) {
   const buildingMembers = (() => {
     if (block.kind === "tower") return ["Tower", "Tower 4"];
-    if (block.kind === "basement") return [] as string[];
+    if (block.kind === "basement") return ["BSM"];
     if (block.kind === "lg") return ["LG"];
     if (block.kind === "liftcabin") return ["LIFT CABIN"];
+    if (block.kind === "unassigned") return ["__EMPTY__"];
     return presentBuildings;
   })();
 
   const buildingParam: Record<string, string> = buildingMembers.length
     ? { building: buildingMembers.join(",") }
     : {};
-  const basementParam: Record<string, string> =
-    block.kind === "basement" ? { level: basementLevelParam() } : {};
 
   const goCell = (
     rowBuilding: string | null,
@@ -311,9 +310,10 @@ export function DeSnagMatrixBlock({
     slot: StatusSlot,
     team: TeamKey,
   ) => {
-    const p: Record<string, string> = { ...basementParam };
-    if (rowBuilding && block.kind !== "basement") p.building = rowBuilding;
-    else if (block.kind !== "basement") Object.assign(p, buildingParam);
+    const p: Record<string, string> = {};
+    if (block.kind === "unassigned" || block.kind === "basement" || !rowBuilding)
+      Object.assign(p, buildingParam);
+    else p.building = rowBuilding;
     // LG · LIFT CABIN 블록의 행 라벨은 level_name 이 아니므로 level 필터를 걸지 않는다.
     if (block.kind === "liftcabin") {
       if (rowLevelDisp) p.room = rowLevelDisp === "N/A" ? "__EMPTY__" : rowLevelDisp;
