@@ -281,7 +281,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
     setReasonFilter("all");
     setRowSearch("");
     setRenderLimit(500);
-    setFieldLogs([]);
+    setFieldOutcomeCounts({});
+    setFieldLogCache({});
+    setFieldRowLoading(null);
     setExpandedRowNo(null);
     setFieldOutcomeFilter("all");
     try {
@@ -315,15 +317,26 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
             : kind === "defect_management"
               ? "defect"
               : "abd";
-        const fl = await fetchAllFieldLogs<FieldLog>(
-          id,
-          kindKey,
-          "id, raw_row_no, field_name, outcome, raw_value, applied_value, previous_value, reason_code, reason_detail",
+        setFieldKind(kindKey);
+        // 업로드당 필드 로그는 수십만 건까지 가능 → 전량 로드 금지.
+        // 요약은 outcome별 count(head), 상세는 행 확장 시 개별 조회.
+        const entries = await Promise.all(
+          FIELD_OUTCOMES.map(async (o) => {
+            const { count } = await (supabase as any)
+              .from("import_field_logs")
+              .select("id", { count: "exact", head: true })
+              .eq("upload_id", id)
+              .eq("kind", kindKey)
+              .eq("outcome", o);
+            return [o, (count ?? 0) as number] as const;
+          }),
         );
-        setFieldLogs(fl);
+        const counts: Record<string, number> = {};
+        for (const [o, c] of entries) if (c > 0) counts[o] = c;
+        setFieldOutcomeCounts(counts);
       } catch (e) {
         console.warn("field logs load failed", e);
-        setFieldLogs([]);
+        setFieldOutcomeCounts({});
       }
     } catch (e) {
       console.error("Row logs load failed", e);
