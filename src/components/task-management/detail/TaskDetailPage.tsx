@@ -139,11 +139,13 @@ export function TaskDetailPage() {
     if (!row) return {} as Record<string, number | null>;
     const r = row as any;
     return {
-      plan_progress: (srvRow?.srv_plan_pct as number | null) ?? cumPlanProgress(r, asOf),
-      progress_variance:
-        srvRow?.srv_plan_pct != null && srvRow?.srv_actual_pct != null
+      // R2-6(a): Plan% · Gap 은 정본(tm_rows_as_of)에서만 읽는다. 클라 재계산 폴백 금지.
+      plan_progress: srvRow ? ((srvRow.srv_plan_pct as number | null) ?? null) : null,
+      progress_variance: srvRow
+        ? srvRow.srv_plan_pct != null && srvRow.srv_actual_pct != null
           ? Number(srvRow.srv_actual_pct) - Number(srvRow.srv_plan_pct)
-          : computeVariance(r, asOf),
+          : null
+        : null,
       expected_progress_today: computeDailyPlan(r),
       today_actual: tActual ?? 0,
       today_gap: computeDailyDiff(r, tActual ?? 0),
@@ -152,8 +154,8 @@ export function TaskDetailPage() {
 
   // 판정도 as-of 재계산이 정본 (저장 auto_judgment 렌더 금지).
   const derivedJudgment = useMemo(
-    () => (srvRow?.srv_judgment as string | undefined) ?? (row ? computeJudgment(row as any, undefined, asOf) : ""),
-    [row, asOf, srvRow],
+    () => (srvRow ? ((srvRow.srv_judgment as string | undefined) ?? "") : ""),
+    [srvRow],
   );
 
   // R2-6(b): '완료일 미확인'(actual_finish_source='forecast') 전체 건수
