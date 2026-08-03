@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Search, Upload, Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useAbdTeamList } from "@/hooks/useAbdTeamList";
 import {
   ABD_TEAMS,
   ABD_COLUMNS,
@@ -271,9 +272,13 @@ export function AbdRawDataPage() {
 
   // ABD Raw Data는 ABD 전용 팀 탭만 사용한다. team_master의 DESN/PRJC/SUPP 등 공용 팀을 섞으면
   // 데이터가 없는 탭이 선택되어 전체 Raw Data가 사라진 것처럼 보일 수 있다.
+  const { data: teamList } = useAbdTeamList();
   const teamTabs = useMemo(
-    () => ABD_TEAMS.map((t) => ({ value: t.value, label: t.label })),
-    [],
+    () =>
+      teamList && teamList.length > 0
+        ? teamList.map((t) => ({ value: t, label: t }))
+        : ABD_TEAMS.map((t) => ({ value: t.value, label: t.label })),
+    [teamList],
   );
   const rawTab = String(urlSearch.tab ?? "").toUpperCase();
   // 다중 팀 선택: 콤마 구분(예: "MECH,ELEC"). 유효한 팀만 유지.

@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ABD_TEAMS, type AbdTeam } from "@/lib/abd/columns";
+import { useAbdTeamList } from "@/hooks/useAbdTeamList";
 import {
   ALL_GROUP_BY,
   ALL_STAGES,
@@ -54,7 +55,7 @@ import {
 } from "@/components/ui/collapsible";
 import { CardHeader, CardTitle } from "@/components/ui/card";
 
-const TEAM_VALUES = ABD_TEAMS.map((t) => t.value);
+const FALLBACK_TEAMS = ABD_TEAMS.map((t) => t.value) as string[];
 
 function parseCsv<T extends string>(v: string, allowed: readonly T[]): T[] {
   if (!v) return [];
@@ -69,6 +70,12 @@ export function AbdProgressPage() {
   const navigate = useNavigate({ from: Route.fullPath });
 
   const plot = search.plot;
+  // 팀 탭 정본: 실측 distinct(abd_team_list). 로딩 전에는 상수 폴백.
+  const { data: teamList } = useAbdTeamList();
+  const TEAM_VALUES = useMemo(
+    () => ((teamList && teamList.length > 0 ? teamList : FALLBACK_TEAMS) as AbdTeam[]),
+    [teamList],
+  );
   const teams = parseCsv<AbdTeam>(search.teams, TEAM_VALUES);
   // Round 필터 제거 — 항상 전 라운드(컬럼 UNION) 집계.
   // RPC 시그니처 호환을 위해 _round 파라미터는 유지하되 항상 "all" 로 호출한다.
@@ -283,7 +290,7 @@ export function AbdProgressPage() {
   const openRaw = (params: Record<string, string> = {}) => {
     const s: Record<string, string> = { source: "progress", ...params };
     if (plot !== "all" && !("plot" in s)) s.plot = plot;
-    if (!("tab" in s)) s.tab = teams.length > 0 ? teams.join(",") : "MECH,ELEC,ARCH";
+    if (!("tab" in s)) s.tab = teams.length > 0 ? teams.join(",") : TEAM_VALUES.join(",");
     // Progress 모집단(Terminated 포함)과 동일하게 맞춘다.
     navigate({ to: "/closure/abd/raw-data", search: s as any });
   };
@@ -316,7 +323,7 @@ export function AbdProgressPage() {
     // 그렇지 않으면 MECH 행 클릭도 선택된 전체 팀으로 열려 Matrix보다 과대 조회된다.
     const rowTeam = g.team && g.team !== "__EMPTY__" ? g.team : null;
     const rowPlot = g.plot === "C" || g.plot === "D" ? g.plot : null;
-    params.set("tab", rowTeam ?? (teams.length > 0 ? teams.join(",") : "MECH,ELEC,ARCH"));
+    params.set("tab", rowTeam ?? (teams.length > 0 ? teams.join(",") : TEAM_VALUES.join(",")));
     params.set("plot", rowPlot ?? plot);
     // Progress 집계는 Terminated 포함이 업무 규칙. Raw 기본은 hide 라 모집단이
     // 어긋나므로 명시적으로 all 을 지정한다.
@@ -422,18 +429,18 @@ export function AbdProgressPage() {
                   type="multiple"
                   value={teams}
                   onValueChange={(v) => {
-                    const next = (v as AbdTeam[]).filter((x) => TEAM_VALUES.includes(x));
+                    const next = (v as AbdTeam[]).filter((x) => (TEAM_VALUES as string[]).includes(x));
                     setSearch({ teams: next.join(",") });
                   }}
                   className="gap-1"
                 >
-                  {ABD_TEAMS.map((t) => (
+                  {TEAM_VALUES.map((t) => (
                     <ToggleGroupItem
-                      key={t.value}
-                      value={t.value}
+                      key={t}
+                      value={t}
                       className="h-8 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                     >
-                      {t.label}
+                      {t}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
