@@ -402,6 +402,7 @@ export function DeSnagMatrixBlock({
                 key={grp.building}
                 group={grp}
                 block={block}
+                buildingParam={buildingParam}
                     mode={mode}
                 onNavigate={onNavigate}
                 goCell={goCell}
