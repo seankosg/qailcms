@@ -26,6 +26,7 @@ import { AbdJudgmentDonut } from "./AbdJudgmentDonut";
 import { AbdJudgmentStageBreakdown } from "./AbdJudgmentStageBreakdown";
 
 export function AbdDashboardPage() {
+  const TEAM_OPTIONS = ["MECH", "ELEC"];
   // ABD Data Date 는 세션 전역(useAbdDataDate)에 저장 → Raw Data/Progress 등과 공유,
   // 페이지 이동 후 복귀해도 유지된다. 빈 값이면 오늘(Doha)로 간주.
   const [sharedDate, setSharedDate] = useAbdDataDate();
@@ -45,6 +46,7 @@ export function AbdDashboardPage() {
      
   }, [asOf]);
   const [plotFilter, setPlotFilter] = useState<string[]>([]);
+  const [teamFilter, setTeamFilter] = useState<string[]>([]);
   const [batchFilter, setBatchFilter] = useState<string[]>([]);
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -108,7 +110,7 @@ export function AbdDashboardPage() {
     delete search.team;
     // 카드 본문 클릭(팀 지정 없음)은 ABD 전 팀을 포함해야 카드 카운트와 일치.
     if (!search.tab) {
-      search.tab = "MECH,ELEC,ARCH";
+      search.tab = teamFilter.length ? teamFilter.join(",") : "MECH,ELEC";
     }
     if (batchFilter.length && !("batch" in search)) {
       search.batch = batchFilter.join(",");
@@ -189,17 +191,32 @@ export function AbdDashboardPage() {
         </div>
       </div>
 
-      {/* Filter bar — 탭형 다중선택 (Plot → Batch) */}
+      {/* Filter bar — 탭형 다중선택 (Plot · Team → Batch) */}
       <div className="space-y-2 rounded-md border bg-card p-3">
-        <FilterRow
-          label="Plot"
-          options={plotOptions}
-          selected={plotFilter}
-          onToggle={(v) => setPlotFilter((prev) => toggleIn(prev, v))}
-          onClear={() => setPlotFilter([])}
-          onAll={() => setPlotFilter([])}
-          emptyText="Plot 데이터 없음"
-        />
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-6">
+          <div className="lg:flex-1 lg:min-w-0">
+            <FilterRow
+              label="Plot"
+              options={plotOptions}
+              selected={plotFilter}
+              onToggle={(v) => setPlotFilter((prev) => toggleIn(prev, v))}
+              onClear={() => setPlotFilter([])}
+              onAll={() => setPlotFilter([])}
+              emptyText="Plot 데이터 없음"
+            />
+          </div>
+          <div className="lg:shrink-0">
+            <FilterRow
+              label="Team"
+              options={TEAM_OPTIONS}
+              selected={teamFilter}
+              onToggle={(v) => setTeamFilter((prev) => toggleIn(prev, v))}
+              onClear={() => setTeamFilter([])}
+              onAll={() => setTeamFilter([])}
+              emptyText="Team 데이터 없음"
+            />
+          </div>
+        </div>
         <FilterRow
           label="Batch"
           options={batchOptions}
@@ -212,10 +229,10 @@ export function AbdDashboardPage() {
       </div>
 
       {/* Row 1 — 배타적 5분류 (Total / Approved / UR / DS / NS) */}
-      <AbdRow1Kpis plots={plotFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
+      <AbdRow1Kpis plots={plotFilter} teams={teamFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
 
       {/* Row 2 — 지연 (Total / RS / SB / DS / No Plan) */}
-      <AbdRow2Kpis plots={plotFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
+      <AbdRow2Kpis plots={plotFilter} teams={teamFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
 
       {/* Row 2.5 — Status Mix / 자동 판정 분포 / 스테이지별 판정 스택 (TM 이식) */}
       <div className="grid gap-4 xl:grid-cols-3">
@@ -228,6 +245,7 @@ export function AbdDashboardPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <AbdRow6Attention
           plots={plotFilter}
+          teams={teamFilter}
           batchNo={batchFilter}
           onOpenRaw={openRawData}
           onOpenDetail={(id, focus) =>
@@ -238,7 +256,7 @@ export function AbdDashboardPage() {
             })
           }
         />
-        <AbdRow6Crosscut plots={plotFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
+        <AbdRow6Crosscut plots={plotFilter} teams={teamFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
       </div>
       {/* ABD detail drilldown → 전용 라우트 */}
     </div>
