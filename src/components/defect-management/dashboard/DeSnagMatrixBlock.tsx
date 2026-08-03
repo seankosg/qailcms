@@ -7,7 +7,6 @@ import {
   type MatrixBlock,
   type Stats,
   type TeamKey,
-  basementLevelParam,
 } from "@/lib/defect-management/dashboard-shape";
 
 export type MatrixMode = "count" | "pct" | "remain" | "remainPct";
@@ -166,12 +165,10 @@ function TeamCells({
 function MatrixHeader({
   block,
   buildingParam,
-  basementParam,
   onNavigate,
 }: {
   block: MatrixBlock;
   buildingParam: Record<string, string>;
-  basementParam: Record<string, string>;
   onNavigate: (p: Record<string, string>) => void;
 }) {
   const groups: Array<{ key: string; label: string; isTotal?: boolean; isNa?: boolean }> = [
@@ -217,8 +214,7 @@ function MatrixHeader({
               <button
                 type="button"
                 onClick={() => {
-                  const p: Record<string, string> = { ...basementParam };
-                  if (block.kind !== "basement") Object.assign(p, buildingParam);
+                  const p: Record<string, string> = { ...buildingParam };
                   if (block.kind === "liftcabin") {
                     p.subcontractor = g.key === "N/A" ? "__EMPTY__" : g.key;
                   } else {
@@ -292,17 +288,16 @@ export function DeSnagMatrixBlock({
 }) {
   const buildingMembers = (() => {
     if (block.kind === "tower") return ["Tower", "Tower 4"];
-    if (block.kind === "basement") return [] as string[];
+    if (block.kind === "basement") return ["BSM"];
     if (block.kind === "lg") return ["LG"];
     if (block.kind === "liftcabin") return ["LIFT CABIN"];
+    if (block.kind === "unassigned") return ["__EMPTY__"];
     return presentBuildings;
   })();
 
   const buildingParam: Record<string, string> = buildingMembers.length
     ? { building: buildingMembers.join(",") }
     : {};
-  const basementParam: Record<string, string> =
-    block.kind === "basement" ? { level: basementLevelParam() } : {};
 
   const goCell = (
     rowBuilding: string | null,
@@ -311,9 +306,10 @@ export function DeSnagMatrixBlock({
     slot: StatusSlot,
     team: TeamKey,
   ) => {
-    const p: Record<string, string> = { ...basementParam };
-    if (rowBuilding && block.kind !== "basement") p.building = rowBuilding;
-    else if (block.kind !== "basement") Object.assign(p, buildingParam);
+    const p: Record<string, string> = {};
+    if (block.kind === "unassigned" || block.kind === "basement" || !rowBuilding)
+      Object.assign(p, buildingParam);
+    else p.building = rowBuilding;
     // LG · LIFT CABIN 블록의 행 라벨은 level_name 이 아니므로 level 필터를 걸지 않는다.
     if (block.kind === "liftcabin") {
       if (rowLevelDisp) p.room = rowLevelDisp === "N/A" ? "__EMPTY__" : rowLevelDisp;
@@ -353,7 +349,7 @@ export function DeSnagMatrixBlock({
         <h3 className="text-sm font-semibold">{block.title}</h3>
         <button
           type="button"
-          onClick={() => onNavigate({ ...buildingParam, ...basementParam })}
+          onClick={() => onNavigate({ ...buildingParam })}
           className="text-[11px] text-muted-foreground hover:text-primary"
         >
           블록 전체 보기 →
@@ -364,7 +360,6 @@ export function DeSnagMatrixBlock({
           <MatrixHeader
             block={block}
             buildingParam={buildingParam}
-            basementParam={basementParam}
             onNavigate={onNavigate}
           />
           <tbody>
@@ -377,7 +372,7 @@ export function DeSnagMatrixBlock({
               >
                 <button
                   type="button"
-                  onClick={() => onNavigate({ ...buildingParam, ...basementParam })}
+                  onClick={() => onNavigate({ ...buildingParam })}
                   className="hover:text-primary"
                 >
                   Column Total
@@ -407,8 +402,8 @@ export function DeSnagMatrixBlock({
                 key={grp.building}
                 group={grp}
                 block={block}
-                basementParam={basementParam}
-                mode={mode}
+                buildingParam={buildingParam}
+                    mode={mode}
                 onNavigate={onNavigate}
                 goCell={goCell}
               />
@@ -423,14 +418,14 @@ export function DeSnagMatrixBlock({
 function FragmentRows({
   group,
   block,
-  basementParam,
+  buildingParam,
   mode,
   onNavigate,
   goCell,
 }: {
   group: { building: string; rows: MatrixBlock["rows"]; subtotal: Stats };
   block: MatrixBlock;
-  basementParam: Record<string, string>;
+  buildingParam: Record<string, string>;
   mode: MatrixMode;
   onNavigate: (p: Record<string, string>) => void;
   goCell: (
@@ -456,7 +451,7 @@ function FragmentRows({
                 type="button"
                 onClick={() => {
                   const p: Record<string, string> =
-                    block.kind === "basement" ? { ...basementParam } : { building: r.building };
+                    block.kind === "unassigned" ? { ...buildingParam } : { building: r.building };
                   onNavigate(p);
                 }}
                 className="hover:text-primary"
@@ -473,7 +468,7 @@ function FragmentRows({
               type="button"
               onClick={() => {
                 const p: Record<string, string> =
-                  block.kind === "basement" ? { ...basementParam } : { building: r.building };
+                  block.kind === "unassigned" ? { ...buildingParam } : { building: r.building };
                 // LG · LIFT CABIN 블록 행 라벨은 level_name 이 아니므로 level 필터 제외
                 if (block.kind === "liftcabin") p.room = r.levelDisp === "N/A" ? "__EMPTY__" : r.levelDisp;
                 else if (block.kind !== "lg") p.level = r.levelDisp;
