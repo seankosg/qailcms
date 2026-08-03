@@ -197,31 +197,27 @@ export function AbdDashboardPage() {
         </div>
       </div>
 
-      {/* Filter bar — 탭형 다중선택 (Plot · Team → Batch) */}
+      {/* Filter bar — 탭형 다중선택 (Plot · Team · Batch) */}
       <div className="space-y-2 rounded-md border bg-card p-3">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-6">
-          <div className="lg:flex-1 lg:min-w-0">
-            <FilterRow
-              label="Plot"
-              options={plotOptions}
-              selected={plotFilter}
-              onToggle={(v) => setPlotFilter((prev) => toggleIn(prev, v))}
-              onClear={() => setPlotFilter([])}
-              onAll={() => setPlotFilter([])}
-              emptyText="Plot 데이터 없음"
-            />
-          </div>
-          <div className="lg:shrink-0">
-            <FilterRow
-              label="Team"
-              options={TEAM_OPTIONS}
-              selected={teamFilter}
-              onToggle={(v) => setTeamFilter((prev) => toggleIn(prev, v))}
-              onClear={() => setTeamFilter([])}
-              onAll={() => setTeamFilter([])}
-              emptyText="Team 데이터 없음"
-            />
-          </div>
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-4">
+          <FilterRow
+            label="Plot"
+            options={plotOptions}
+            selected={plotFilter}
+            onToggle={(v) => setPlotFilter((prev) => toggleIn(prev, v))}
+            onClear={() => setPlotFilter([])}
+            onAll={() => setPlotFilter([])}
+            emptyText="Plot 데이터 없음"
+          />
+          <FilterRow
+            label="Team"
+            options={TEAM_OPTIONS}
+            selected={teamFilter}
+            onToggle={(v) => setTeamFilter((prev) => toggleIn(prev, v))}
+            onClear={() => setTeamFilter([])}
+            onAll={() => setTeamFilter([])}
+            emptyText="Team 데이터 없음"
+          />
         </div>
         <FilterRow
           label="Batch"
