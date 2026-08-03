@@ -179,6 +179,9 @@ export function TaskProgressChartDialog({
               </div>
             )}
           </div>
+          <p className="px-1 pb-1 text-[11px] text-muted-foreground">
+            실적 곡선은 착수일과 최근 관측치를 잇는 추정선입니다.
+          </p>
         </DialogContent>
       </Dialog>
 
