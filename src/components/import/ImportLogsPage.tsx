@@ -405,23 +405,67 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
 
   const visibleRowLogs = filteredRowLogs.slice(0, renderLimit);
 
-  // raw_row_no별 field log 그룹 & outcome 필터 적용
-  const fieldLogsByRow = useMemo(() => {
-    const m = new Map<number, FieldLog[]>();
-    for (const f of fieldLogs) {
-      if (fieldOutcomeFilter !== "all" && f.outcome !== fieldOutcomeFilter) continue;
-      const key = f.raw_row_no ?? -1;
-      if (!m.has(key)) m.set(key, []);
-      m.get(key)!.push(f);
-    }
-    return m;
-  }, [fieldLogs, fieldOutcomeFilter]);
+  const fieldLogTotal = useMemo(
+    () => Object.values(fieldOutcomeCounts).reduce((a, b) => a + b, 0),
+    [fieldOutcomeCounts],
+  );
 
-  const fieldOutcomeOptions = useMemo(() => {
-    const s = new Set<string>();
-    for (const f of fieldLogs) s.add(f.outcome);
-    return Array.from(s).sort();
-  }, [fieldLogs]);
+  const fieldOutcomeOptions = useMemo(
+    () => Object.keys(fieldOutcomeCounts).sort(),
+    [fieldOutcomeCounts],
+  );
+
+  /** 행 확장 시 해당 raw_row_no 의 필드 로그만 조회 (전량 로드 금지). */
+  const toggleRowFields = async (rowNo: number) => {
+    if (expandedRowNo === rowNo) {
+      setExpandedRowNo(null);
+      return;
+    }
+    setExpandedRowNo(rowNo);
+    if (fieldLogCache[rowNo] || !selected) return;
+    setFieldRowLoading(rowNo);
+    try {
+      let q = (supabase as any)
+        .from("import_field_logs")
+        .select(
+          "id, raw_row_no, field_name, outcome, raw_value, applied_value, previous_value, reason_code, reason_detail",
+        )
+        .eq("upload_id", selected)
+        .eq("kind", fieldKind)
+        .order("field_name", { ascending: true })
+        .limit(500);
+      q = rowNo === -1 ? q.is("raw_row_no", null) : q.eq("raw_row_no", rowNo);
+      const { data, error } = await q;
+      if (error) throw error;
+      setFieldLogCache((c) => ({ ...c, [rowNo]: (data ?? []) as FieldLog[] }));
+    } catch (e) {
+      console.warn("row field logs load failed", e);
+      setFieldLogCache((c) => ({ ...c, [rowNo]: [] }));
+    } finally {
+      setFieldRowLoading(null);
+    }
+  };
+
+  /** CSV 는 요청 시에만 페이지네이션 조회 (최대 100,000행). */
+  const exportFieldCsv = async () => {
+    if (!selected) return;
+    setCsvLoading(true);
+    try {
+      const rows = await fetchAllFieldLogs<FieldLog>(
+        selected,
+        fieldKind,
+        "id, raw_row_no, field_name, outcome, raw_value, applied_value, previous_value, reason_code, reason_detail",
+        1000,
+        fieldOutcomeFilter === "all" ? undefined : fieldOutcomeFilter,
+        100_000,
+      );
+      downloadFieldLevelCsv(rows, `${selectedBatch?.file_name ?? "field-logs"}.csv`);
+    } catch (e) {
+      console.error("field csv export failed", e);
+    } finally {
+      setCsvLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
