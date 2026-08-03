@@ -173,7 +173,7 @@ export function classifyBuilding(b: string | null | undefined): {
   if (/^LIFT\s*CABIN$/i.test(s)) return { kind: "liftcabin", label: "LIFT CABIN" };
   // LG = Lower Ground 독립 블록. level_name 의 'Level LG' 와 무관.
   if (/^LG$/i.test(s)) return { kind: "lg", label: "LG" };
-  if (/^Tower(\s+4)?$/i.test(s)) return { kind: "tower", label: "Tower" };
+  if (/^Tower(\s*[34])?$/i.test(s)) return { kind: "tower", label: "Tower" };
   if (/^Podium$/i.test(s)) return { kind: "podium", label: "Podium" };
   const pm = /^Podium\s+([1-4])$/i.exec(s);
   if (pm) return { kind: "podium", label: `Podium ${pm[1]}` };
@@ -515,7 +515,7 @@ export function metricSearchParams(m: MetricKey): Record<string, string> {
 
 // building 그룹 헤더 → members (콤마 결합해 raw-data 필터로 전달)
 export function buildingGroupMembers(kind: BlockKey, presentBuildings: string[]): string[] {
-  if (kind === "tower") return ["Tower", "Tower 4"];
+  if (kind === "tower") return ["Tower", "Tower 3", "Tower 4"];
   if (kind === "basement") return []; // basement는 building 무관, level=B*로만 필터
   if (kind === "lg") return ["LG"];
   // podium
