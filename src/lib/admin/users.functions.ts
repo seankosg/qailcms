@@ -82,6 +82,16 @@ export const createAppUser = createServerFn({ method: "POST" })
     if (!/^[a-z0-9._-]+$/.test(loginId)) {
       throw new Error("Login ID는 영문 소문자, 숫자, . _ - 만 사용할 수 있습니다.");
     }
+    // 이름은 사용자 식별 정본 키 — 필수 + 전역 유일.
+    const name = (data.name ?? "").trim();
+    if (!name) throw new Error("이름은 필수입니다. (사용자 식별 정본 키)");
+    const nameNorm = name.replace(/\s+/g, " ").toUpperCase();
+    const { data: dup } = await supabaseAdmin
+      .from("profiles")
+      .select("id,name")
+      .eq("name_norm" as any, nameNorm)
+      .maybeSingle();
+    if (dup) throw new Error(`이름 '${name}' 은(는) 이미 사용 중입니다. 이름은 중복될 수 없습니다.`);
     const email = `${loginId}@${DUMMY_EMAIL_DOMAIN}`;
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -90,7 +100,7 @@ export const createAppUser = createServerFn({ method: "POST" })
       user_metadata: {
         login_id: loginId,
         display_name: data.display_name,
-        name: data.name ?? data.display_name ?? null,
+        name,
         user_type: data.user_type,
         team: data.team ?? null,
         subcontractor_name: data.subcontractor_name ?? null,
@@ -108,7 +118,7 @@ export const createAppUser = createServerFn({ method: "POST" })
       await supabaseAdmin.from("user_roles").insert({ user_id: created.user.id, role: data.role });
       // metadata → profiles 반영이 신규 컬럼을 커버하지 않을 수 있어 명시적으로 보강.
       const patch: Record<string, any> = {};
-      if (data.name !== undefined) patch.name = data.name;
+      patch.name = name;
       if (data.team !== undefined) patch.team = data.team;
       if (data.subsub_name !== undefined) patch.subsub_name = data.subsub_name;
       if (data.hdec_eng_name !== undefined) patch.hdec_eng_name = data.hdec_eng_name;
@@ -189,6 +199,19 @@ export const updateUserProfileFields = createServerFn({ method: "POST" })
     const { user_id, ...rest } = data;
     const payload: any = {};
     for (const [k, v] of Object.entries(rest)) if (v !== undefined) payload[k] = v;
+    if (payload.name !== undefined) {
+      const nm = String(payload.name ?? "").trim();
+      if (!nm) throw new Error("이름은 필수입니다. (사용자 식별 정본 키)");
+      const nmNorm = nm.replace(/\s+/g, " ").toUpperCase();
+      const { data: dup } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("name_norm" as any, nmNorm)
+        .neq("id", user_id)
+        .maybeSingle();
+      if (dup) throw new Error(`이름 '${nm}' 은(는) 이미 사용 중입니다. 이름은 중복될 수 없습니다.`);
+      payload.name = nm;
+    }
     if (Object.keys(payload).length === 0) return { ok: true };
     const { error } = await supabaseAdmin.from("profiles").update(payload).eq("id", user_id);
     if (error) throw new Error(error.message);

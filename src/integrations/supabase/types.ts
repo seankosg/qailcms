@@ -2227,7 +2227,8 @@ export type Database = {
           is_active: boolean
           login_id: string
           must_change_password: boolean
-          name: string | null
+          name: string
+          name_norm: string | null
           subcontractor_name: string | null
           subsub_name: string | null
           team: string | null
@@ -2244,7 +2245,8 @@ export type Database = {
           is_active?: boolean
           login_id: string
           must_change_password?: boolean
-          name?: string | null
+          name: string
+          name_norm?: string | null
           subcontractor_name?: string | null
           subsub_name?: string | null
           team?: string | null
@@ -2261,7 +2263,8 @@ export type Database = {
           is_active?: boolean
           login_id?: string
           must_change_password?: boolean
-          name?: string | null
+          name?: string
+          name_norm?: string | null
           subcontractor_name?: string | null
           subsub_name?: string | null
           team?: string | null
@@ -5662,6 +5665,7 @@ export type Database = {
       }
       resolve_login_email: { Args: { _login_id: string }; Returns: string }
       resolve_owner_by_name: { Args: { _name: string }; Returns: string }
+      resolve_user_by_name: { Args: { _name: string }; Returns: string }
       rollback_abd_import: {
         Args: { _batch_id: string; _force?: boolean }
         Returns: Json
