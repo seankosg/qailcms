@@ -118,19 +118,23 @@ function LegendItem({
 export function DeSnagRoomGroupCards({
   entries,
   onNavigate,
+  totalGroups,
 }: {
   entries: Array<{ col: string; label: string; param: string; stats: Stats }>;
   onNavigate: (params: Record<string, string>) => void;
+  /** 데이터에 존재하는 전체 Room Group 수 (숨김 안내 문구용) */
+  totalGroups?: number;
 }) {
   const visible = entries.filter((e) => e.stats.issued > 0);
   if (visible.length === 0) return null;
+  const total = totalGroups ?? visible.length;
 
   return (
     <section className="rounded-xl border border-border/60 bg-muted/20 p-3 md:p-4">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="text-sm font-semibold tracking-tight">Room Group별 현황</h2>
         <p className="text-[11px] text-muted-foreground">
-          바 = 그룹 Issued 100% 기준 status 비중. 우측 붉은 숫자 = Open + Re-Opened.
+          표시 {visible.length} / {total} 그룹 · 바 = 그룹 Issued 100% 기준 status 비중. 우측 붉은 숫자 = Open + Re-Opened.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
