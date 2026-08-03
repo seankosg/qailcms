@@ -26,7 +26,12 @@ import { formatDdMmm } from "@/lib/defect-management/stage-utils";
 import { cn } from "@/lib/utils";
 import { CommentsThread, TASK_CATEGORIES } from "@/components/shared/CommentsThread";
 import { useServerFn } from "@tanstack/react-start";
-import { updateTaskOwnerField, TM_OWNER_MUTATIONS_MARKER } from "@/lib/task-management/owner-mutations.functions";
+import {
+  updateTaskOwnerField,
+  confirmActualFinishSource,
+  TM_OWNER_MUTATIONS_MARKER,
+} from "@/lib/task-management/owner-mutations.functions";
+import { toast } from "sonner";
 import { canEditRawRow } from "@/lib/auth/roles";
 import {
   cumPlanProgress,
@@ -55,6 +60,10 @@ const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
 // TM_OWNER_MUTATIONS_V2_2026_07_28 — Detail도 Raw Data와 동일하게 서버 함수 경유
 const OWNER_FIELDS = new Set(["team", "data_date"]);
 
+// R2-6(c): 실적 필드 편집 시 원본 동기화 경고 — 세션 1회
+const ACTUAL_FIELDS = new Set(["actual_progress", "actual_start", "actual_finish"]);
+let warnedActualEdit = false;
+
 export function TaskDetailPage() {
   const { id } = useParams({ from: "/_authenticated/closure/task-management/detail/$id" });
   const router = useRouter();
@@ -65,6 +74,7 @@ export function TaskDetailPage() {
   const canEditTaskNo = isAdmin || isDSuperUser;
   const resolveLabel = useTmColumnLabel();
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
+  const confirmFinishSourceFn = useServerFn(confirmActualFinishSource);
   const queryClient = useQueryClient();
   const { data: milestoneOptions = [] } = useQuery({
     queryKey: ["tm_milestone_kinds", "active-codes"],
@@ -146,6 +156,20 @@ export function TaskDetailPage() {
     [row, asOf, srvRow],
   );
 
+  // R2-6(b): '완료일 미확인'(actual_finish_source='forecast') 전체 건수
+  const { data: unconfirmedCount = 0 } = useQuery({
+    queryKey: ["tm-unconfirmed-finish-count"],
+    queryFn: async () => {
+      const { count, error } = await (supabase as any)
+        .from("task_management_raw")
+        .select("id", { count: "exact", head: true })
+        .eq("actual_finish_source", "forecast");
+      if (error) throw error;
+      return Number(count ?? 0);
+    },
+    staleTime: 60_000,
+  });
+
   if (!row) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
@@ -223,6 +247,14 @@ export function TaskDetailPage() {
             {derivedJudgment}
           </Badge>
         )}
+        {unconfirmedCount > 0 && (
+          <Badge
+            className="h-5 text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300"
+            title="'예상 완료' 열에서 들어온 완료일입니다. 확인해 주세요."
+          >
+            완료일 미확인 {unconfirmedCount}건
+          </Badge>
+        )}
       </div>
 
       {row.task_name && (
@@ -281,7 +313,7 @@ export function TaskDetailPage() {
                     >
                       <dt
                         className="flex w-[92px] shrink-0 items-center justify-end gap-1 text-right text-[10px] uppercase tracking-wide text-muted-foreground"
-                        title={label}
+                        title={c.note ? `${label} — ${c.note}` : label}
                       >
                         {isOwnerField && editable && (
                           <KeyRound className="h-2.5 w-2.5 text-primary/60" aria-label="권한 편집" />
@@ -307,6 +339,10 @@ export function TaskDetailPage() {
                               canEdit={effectiveCanEdit}
                               onSaved={onFieldSaved}
                               onSave={async (value) => {
+                                if (ACTUAL_FIELDS.has(effectiveColumn.key) && !warnedActualEdit) {
+                                  warnedActualEdit = true;
+                                  toast.warning("TM 엑셀 원본도 동일하게 수정하십시오.");
+                                }
                                 await updateOwnerFieldFn({
                                   data: {
                                     id: String(row.id),
@@ -325,11 +361,35 @@ export function TaskDetailPage() {
                         )}
                         {c.key === "actual_finish" &&
                           (row as any).actual_finish_source === "forecast" && (
-                            <span
-                              className="ml-1 shrink-0 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-semibold leading-none text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
-                              title="완료일 미확인 — '예상 완료' 열에서 들어온 값입니다. 확인해 주세요."
-                            >
-                              완료일 미확인
+                            <span className="ml-1 flex shrink-0 items-center gap-1">
+                              <span
+                                className="rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-semibold leading-none text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
+                                title="완료일 미확인 — '예상 완료' 열에서 들어온 값입니다. 확인해 주세요."
+                              >
+                                완료일 미확인
+                              </span>
+                              {canEditRow && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-4 px-1 text-[9px]"
+                                  title="날짜는 그대로 두고 확인 처리만 합니다."
+                                  onClick={async () => {
+                                    try {
+                                      await confirmFinishSourceFn({ data: { id: String(row.id) } });
+                                      toast.success("완료일을 확인 처리했습니다.");
+                                      queryClient.invalidateQueries({
+                                        queryKey: ["tm-unconfirmed-finish-count"],
+                                      });
+                                      onFieldSaved();
+                                    } catch (e: any) {
+                                      toast.error(e?.message ?? "확인 처리 실패");
+                                    }
+                                  }}
+                                >
+                                  <Check className="mr-0.5 h-2.5 w-2.5" /> 확인
+                                </Button>
+                              )}
                             </span>
                           )}
                       </dd>

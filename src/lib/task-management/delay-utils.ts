@@ -277,7 +277,10 @@ export function computeWeeklyDelayTrend(
     for (const it of items) {
       const key = it.id;
       const delayed = isTaskDelayed(it, undefined, asOf);
-      const done = Number(it.actual_progress ?? 0) >= 1;
+      // R2-2: 완료 정본 = actual_finish 단독 + 주차 날짜 게이트.
+      const done =
+        (it as any).actual_finish != null &&
+        String((it as any).actual_finish).slice(0, 10) <= asOf;
       const prevDelayed = stateBefore.get(key) ?? false;
       const prevDone = stateBeforeDone.get(key) ?? false;
       if (delayed && !prevDelayed) newDelays++;

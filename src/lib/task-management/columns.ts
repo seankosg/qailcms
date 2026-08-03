@@ -31,6 +31,8 @@ export interface TmColumnDef {
   editable?: boolean;
   editorType?: "text" | "select" | "date" | "number";
   options?: string[];
+  /** 헤더/필드 라벨 툴팁에 덧붙는 설명(엑셀 헤더에는 영향 없음). */
+  note?: string;
 }
 
 export const DISCIPLINES = ["ARCH", "ELEC", "MECH", "DESN", "PRJC"] as const;
@@ -196,7 +198,7 @@ export const TM_COLUMNS: TmColumnDef[] = [
   { key: "plan_progress", label: "Plan %", type: "percent", width: 120, group: "forecast" },
   { key: "progress_variance", label: "Cum. Diff", type: "percent", width: 120, group: "forecast" },
   { key: "expected_progress_today", label: "T.Plan", type: "percent", width: 100, group: "forecast" },
-  { key: "today_actual", label: "T.Actual", type: "percent", width: 100, group: "forecast" },
+  { key: "today_actual", label: "T.Actual", type: "percent", width: 100, group: "forecast", note: "입력일 기준 — 진도율이 CMS 에 입력된 날짜로 집계됩니다. 실제 작업일과 다를 수 있습니다." },
   { key: "today_gap", label: "T.Diff", type: "percent", width: 100, group: "forecast" },
   { key: "forecast_end", label: "Revised Finish", type: "date", width: 130, group: "forecast", editable: true, editorType: "date" },
   { key: "expected_finish", label: "Expected Finish", type: "date", width: 130, group: "forecast" },
