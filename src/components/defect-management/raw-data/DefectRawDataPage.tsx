@@ -302,6 +302,7 @@ const URL_MAP: Record<string, string> = {
   plan_group: "plan_group",
   building: "building",
   roomGroup: "room_group",
+  room: "room",
 };
 
 const DRILLDOWN_PARAMS = [
