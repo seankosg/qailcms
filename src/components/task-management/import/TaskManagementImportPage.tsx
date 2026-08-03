@@ -414,7 +414,13 @@ function ImportInner() {
               <CardTitle className="text-base">2. Files ({files.length})</CardTitle>
               <CardDescription>
                 {readyCount} ready · 임포트 대상 {totalMatched}행
-                {!isAdmin && ` · 스코프: ${effectiveScope === "mine" ? "본인 HDEC PIC만" : "전체(Super User)"}`}
+                {` · 스코프: ${
+                  isAdmin
+                    ? "전체(Admin — 강제)"
+                    : effectiveScope === "mine"
+                      ? "본인 HDEC PIC만"
+                      : "전체(Super User 선택)"
+                }`}
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -462,7 +468,7 @@ function ImportInner() {
               )}
               <Button
                 size="sm"
-                onClick={runStartImport}
+                onClick={onStartClick}
                 disabled={startDisabled || pendingImportAfterConflicts}
                 title={
                   !canImport
