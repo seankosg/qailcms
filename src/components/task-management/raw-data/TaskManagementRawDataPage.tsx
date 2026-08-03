@@ -610,8 +610,17 @@ export function TaskManagementRawDataPage() {
     () => rows.map((r) => String((r as any).id)).filter(Boolean),
     [rows],
   );
+  // 캐시 키는 id 집합 자체를 반영해야 한다. 과거엔 rowIds.length 만 썼기 때문에
+  // 행 수가 같은 다른 페이지/필터가 서로의 캐시를 재사용해 T.Actual 이 0.0% 로 보였다.
+  const rowIdsSig = useMemo(() => {
+    let h = 5381;
+    for (const id of [...rowIds].sort()) {
+      for (let i = 0; i < id.length; i++) h = ((h * 33) ^ id.charCodeAt(i)) >>> 0;
+    }
+    return `${rowIds.length}:${h.toString(36)}`;
+  }, [rowIds]);
   const { data: tActualRows } = useQuery({
-    queryKey: ["tm-today-actual", selectedDataDate, rowIds.length],
+    queryKey: ["tm-today-actual", selectedDataDate, rowIdsSig],
     queryFn: async () => {
       if (!rowIds.length || !selectedDataDate) return [] as Array<{ id: string; t_actual: number }>;
       const { data, error } = await (supabase as any).rpc("tm_today_actual", {
