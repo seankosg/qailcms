@@ -4902,6 +4902,7 @@ export type Database = {
           r3_set: string
         }[]
       }
+      abd_bucket_of: { Args: { _bucket_top: string }; Returns: string }
       abd_dashboard_approval_trend:
         | {
             Args: { _months?: number; _plots?: string[]; _teams?: string[] }
@@ -5052,11 +5053,11 @@ export type Database = {
         }
         Returns: {
           approved_count: number
-          excluded_count: number
-          in_progress_count: number
+          ds_count: number
           latest_data_date: string
-          not_started_count: number
+          resubmit_count: number
           total_count: number
+          ur_count: number
         }[]
       }
       abd_items_facets: {
@@ -5080,7 +5081,6 @@ export type Database = {
         Args: {
           _as_of?: string
           _bucket?: string[]
-          _excluded_mode?: string
           _filters?: Json
           _include_inactive?: boolean
           _limit?: number
@@ -5381,6 +5381,13 @@ export type Database = {
           _teams?: string[]
         }
         Returns: Json
+      }
+      abd_team_list: {
+        Args: never
+        Returns: {
+          cnt: number
+          team: string
+        }[]
       }
       allocate_main_task_no: { Args: { _discipline: string }; Returns: string }
       allocate_task_no: {
