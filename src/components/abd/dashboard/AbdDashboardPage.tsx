@@ -26,6 +26,7 @@ import { AbdJudgmentDonut } from "./AbdJudgmentDonut";
 import { AbdJudgmentStageBreakdown } from "./AbdJudgmentStageBreakdown";
 
 export function AbdDashboardPage() {
+  const TEAM_OPTIONS = ["MECH", "ELEC"];
   // ABD Data Date 는 세션 전역(useAbdDataDate)에 저장 → Raw Data/Progress 등과 공유,
   // 페이지 이동 후 복귀해도 유지된다. 빈 값이면 오늘(Doha)로 간주.
   const [sharedDate, setSharedDate] = useAbdDataDate();
