@@ -37,6 +37,7 @@ import { computeDailyPlan, computeDailyDiff } from "@/lib/task-management/derive
 import { todayIso } from "@/lib/task-management/schedule-utils";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { useTmRowsAsOf } from "@/hooks/useTmRowsAsOf";
+import { isUnconfirmedFinishSource, finishSourceTooltip } from "@/lib/task-management/finish-source";
 
 // Runtime reference to keep the deploy marker in the client bundle (tree-shake guard)
 if (typeof window !== "undefined") (window as any).__TM_MARK__ = TM_OWNER_MUTATIONS_MARKER;
@@ -156,14 +157,15 @@ export function TaskDetailPage() {
     [srvRow],
   );
 
-  // R2-6(b): '완료일 미확인'(actual_finish_source='forecast') 전체 건수
+  // R2-6(b) + P3-5 복원: '완료일 미확인' = source IS NOT NULL AND source NOT IN ('user','import')
   const { data: unconfirmedCount = 0 } = useQuery({
     queryKey: ["tm-unconfirmed-finish-count"],
     queryFn: async () => {
       const { count, error } = await (supabase as any)
         .from("task_management_raw")
         .select("id", { count: "exact", head: true })
-        .eq("actual_finish_source", "forecast");
+        .not("actual_finish_source", "is", null)
+        .not("actual_finish_source", "in", "(user,import)");
       if (error) throw error;
       return Number(count ?? 0);
     },
@@ -250,7 +252,7 @@ export function TaskDetailPage() {
         {unconfirmedCount > 0 && (
           <Badge
             className="h-5 text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300"
-            title="'예상 완료' 열에서 들어온 완료일입니다. 확인해 주세요."
+            title="'예상 완료'·마이그레이션 추정·자동 기록으로 들어온 완료일입니다. 확인해 주세요."
           >
             완료일 미확인 {unconfirmedCount}건
           </Badge>
@@ -362,11 +364,11 @@ export function TaskDetailPage() {
                           <span className="block min-w-0 truncate">{display}</span>
                         )}
                         {c.key === "actual_finish" &&
-                          (row as any).actual_finish_source === "forecast" && (
+                          isUnconfirmedFinishSource((row as any).actual_finish_source) && (
                             <span className="ml-1 flex shrink-0 items-center gap-1">
                               <span
                                 className="rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-semibold leading-none text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
-                                title="완료일 미확인 — '예상 완료' 열에서 들어온 값입니다. 확인해 주세요."
+                                title={finishSourceTooltip((row as any).actual_finish_source)}
                               >
                                 완료일 미확인
                               </span>
