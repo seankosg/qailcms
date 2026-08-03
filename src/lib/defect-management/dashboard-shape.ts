@@ -249,13 +249,13 @@ export function bottleneckTeam(
 // ── 매트릭스 형태 ────────────────────────────────────────────────────
 export type CellKey = string; // `${building}||${levelDisp}||${roomGroup}`
 
-export type BlockKey = "tower" | "podium" | "lg" | "basement";
+export type BlockKey = "tower" | "podium" | "lg" | "basement" | "liftcabin";
 
 export type MatrixRow = {
   building: string;
   levelDisp: string;
   levelKind: LevelKind;
-  cells: Record<RoomGroupCol, Stats>;
+  cells: Record<string, Stats>;
   rowTotal: Stats;
 };
 
@@ -264,8 +264,12 @@ export type MatrixBlock = {
   title: string;
   rows: MatrixRow[]; // 정렬 완료
   /** 이 블록이 렌더링할 열 키 (일반 블록 = ROOM_GROUP_ORDER, LG 블록 = Podium N) */
-  columnKeys: RoomGroupCol[];
-  colTotals: Record<RoomGroupCol, Stats>;
+  columnKeys: string[];
+  colTotals: Record<string, Stats>;
+  /** 좌측 고정 축 라벨 (일반 = Building/Level, LIFT CABIN = Block/Room) */
+  rowAxis: { primary: string; secondary: string };
+  /** 상단 1단 축 라벨 (일반 = Room Group, LIFT CABIN = Subcontractor) */
+  colAxisLabel: string;
   blockTotal: Stats;
 };
 
@@ -277,10 +281,15 @@ export type MatrixShape = {
   plotTotal: Stats;
 };
 
-function emptyRoomGroupStats(): Record<RoomGroupCol, Stats> {
-  const out = {} as Record<RoomGroupCol, Stats>;
+function emptyRoomGroupStats(): Record<string, Stats> {
+  const out = {} as Record<string, Stats>;
   for (const rg of ALL_ROOM_GROUPS) out[rg] = newStats();
   return out;
+}
+
+function cellFor(cells: Record<string, Stats>, key: string): Stats {
+  if (!cells[key]) cells[key] = newStats();
+  return cells[key];
 }
 
 export function buildMatrix(
