@@ -319,7 +319,11 @@ export function DeSnagDashboardPage() {
         }}
       />
 
-      <DeSnagRoomGroupCards entries={roomGroupEntries} onNavigate={goRaw} />
+      <DeSnagRoomGroupCards
+        entries={roomGroupEntries}
+        onNavigate={goRaw}
+        totalGroups={roomGroupTotalCount}
+      />
 
       {isLoading && <p className="text-sm text-muted-foreground">불러오는 중…</p>}
       {error && <p className="text-sm text-destructive">오류: {(error as Error).message}</p>}
