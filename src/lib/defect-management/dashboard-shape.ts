@@ -389,8 +389,11 @@ export function buildMatrix(
       block = basement;
       buildingLabel = "BSM";
     } else if (bld.kind === "vip") {
-      block = vip;
-      buildingLabel = VIP_BUILDING_LABEL;
+      // 열축 = room_group 원본 값 (동적 열)
+      const rgRaw = (r.room_group ?? "").trim() || "N/A";
+      const e = ensure(vip, VIP_BUILDING_LABEL, levelDisp, lvl.kind, lvl.sortIdx, true);
+      addRow(cellFor(e.cells, rgRaw), r);
+      continue;
     } else if (bld.kind === "tower") {
       block = tower;
       buildingLabel = "Tower";
@@ -455,7 +458,8 @@ export function buildMatrix(
       }
     }
 
-    const colTotals: Record<string, Stats> = kind === "liftcabin" ? {} : emptyRoomGroupStats();
+    const dynamicCols = kind === "liftcabin" || kind === "vip";
+    const colTotals: Record<string, Stats> = dynamicCols ? {} : emptyRoomGroupStats();
     const blockTotal = newStats();
     for (const row of rows) {
       for (const rg of Object.keys(row.cells)) mergeStats(cellFor(colTotals, rg), row.cells[rg]);
@@ -468,7 +472,7 @@ export function buildMatrix(
             const present = LG_ROOM_GROUPS.filter((rg) => colTotals[rg].issued > 0);
             return (present.length ? present : LG_ROOM_GROUPS.slice(0, 1)) as string[];
           })()
-        : kind === "liftcabin"
+        : dynamicCols
           ? (() => {
               const keys = Object.keys(colTotals).filter((k) => colTotals[k].issued > 0);
               const named = keys.filter((k) => k !== "N/A").sort((a, b) => a.localeCompare(b));
@@ -481,7 +485,7 @@ export function buildMatrix(
             })();
 
     // 동적 열 블록: 모든 행에 열 키를 채워 렌더 시 undefined 접근을 막는다
-    if (kind === "liftcabin") {
+    if (dynamicCols) {
       for (const row of rows) for (const k of columnKeys) cellFor(row.cells, k);
       for (const k of columnKeys) cellFor(colTotals, k);
     }
