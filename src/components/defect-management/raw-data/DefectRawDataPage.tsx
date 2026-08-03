@@ -1185,6 +1185,9 @@ function buildDataColumn(
         const locked =
           (c.key === "priority" && (row.original as any).priority_locked) ||
           (c.key === "hdec_verification" && (row.original as any).hdec_verification_locked);
+        const manualLocked = Array.isArray((row.original as any).manual_locked_fields)
+          ? ((row.original as any).manual_locked_fields as string[]).includes(c.key)
+          : false;
         const editorOptions = c.key === "team" ? teamCodesForEdit : c.options;
         return (
           <EditCellPopover
@@ -1195,6 +1198,7 @@ function buildDataColumn(
             options={editorOptions}
             currentValue={v}
             locked={locked}
+            manualLocked={manualLocked}
             onSaved={(nv) => { patchLocal(row.original.id, { [c.key]: nv }); refetch(); }}
           >{display}</EditCellPopover>
         );

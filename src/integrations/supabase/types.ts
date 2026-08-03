@@ -1674,6 +1674,8 @@ export type Database = {
           location_raw: string | null
           location_reference: string | null
           main_trade: string | null
+          manual_locked_at: string | null
+          manual_locked_fields: string[]
           owner_user_id: string | null
           plan_group: string | null
           plan_title: string | null
@@ -1759,6 +1761,8 @@ export type Database = {
           location_raw?: string | null
           location_reference?: string | null
           main_trade?: string | null
+          manual_locked_at?: string | null
+          manual_locked_fields?: string[]
           owner_user_id?: string | null
           plan_group?: string | null
           plan_title?: string | null
@@ -1844,6 +1848,8 @@ export type Database = {
           location_raw?: string | null
           location_reference?: string | null
           main_trade?: string | null
+          manual_locked_at?: string | null
+          manual_locked_fields?: string[]
           owner_user_id?: string | null
           plan_group?: string | null
           plan_title?: string | null
