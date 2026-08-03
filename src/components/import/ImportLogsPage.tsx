@@ -312,15 +312,12 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
             : kind === "defect_management"
               ? "defect"
               : "abd";
-        const { data: fl } = await (supabase as any)
-          .from("import_field_logs")
-          .select(
-            "id, raw_row_no, field_name, outcome, raw_value, applied_value, previous_value, reason_code, reason_detail",
-          )
-          .eq("upload_id", id)
-          .eq("kind", kindKey)
-          .order("raw_row_no", { ascending: true, nullsFirst: true });
-        setFieldLogs((fl ?? []) as FieldLog[]);
+        const fl = await fetchAllFieldLogs<FieldLog>(
+          id,
+          kindKey,
+          "id, raw_row_no, field_name, outcome, raw_value, applied_value, previous_value, reason_code, reason_detail",
+        );
+        setFieldLogs(fl);
       } catch (e) {
         console.warn("field logs load failed", e);
         setFieldLogs([]);
