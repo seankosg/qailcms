@@ -6,6 +6,10 @@ export type MatrixRawRow = {
   building: string | null;
   level_name: string | null;
   room_group: string | null;
+  /** LIFT CABIN 블록 전용 세로축 (그 외 블록은 null) */
+  room: string | null;
+  /** LIFT CABIN 블록 전용 가로축 (그 외 블록은 null) */
+  subcontractor: string | null;
   team: string | null;
   status_raw: string | null;
   cnt: number;
@@ -143,7 +147,7 @@ export function compareGroundLevelDesc(a: string, b: string): number {
 export const BASEMENT_ORDER = ["LG", "B1", "B2", "B3", "B4"];
 
 // ── Building ─────────────────────────────────────────────────────────
-export type BlockKind = "tower" | "podium" | "lg" | "basement";
+export type BlockKind = "tower" | "podium" | "lg" | "basement" | "liftcabin";
 
 // 원본 building 값 → 정규화된 building 라벨 (표시용). Tower는 하나로 모음.
 export function classifyBuilding(b: string | null | undefined): {
@@ -152,6 +156,8 @@ export function classifyBuilding(b: string | null | undefined): {
 } {
   const s = (b ?? "").trim();
   if (!s) return { kind: "unknown", label: "Others" };
+  // LIFT CABIN = 독립 블록 (세로축 room · 가로축 subcontractor)
+  if (/^LIFT\s*CABIN$/i.test(s)) return { kind: "liftcabin", label: "LIFT CABIN" };
   // LG = Lower Ground 독립 블록. level_name 의 'Level LG' 와 무관.
   if (/^LG$/i.test(s)) return { kind: "lg", label: "LG" };
   if (/^Tower(\s+4)?$/i.test(s)) return { kind: "tower", label: "Tower" };
@@ -162,6 +168,18 @@ export function classifyBuilding(b: string | null | undefined): {
 }
 
 export const PODIUM_ORDER = ["Podium", "Podium 1", "Podium 2", "Podium 3", "Podium 4"];
+
+/** LIFT CABIN Room 자연 정렬 — 접두어 그룹 → 숫자 오름차순 */
+export function compareRoomNatural(a: string, b: string): number {
+  const parse = (v: string) => {
+    const m = /^(.*?)(\d+)\s*$/.exec(v.trim());
+    return m ? { prefix: m[1].trim().toUpperCase(), num: Number(m[2]) } : { prefix: v.trim().toUpperCase(), num: -1 };
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  if (pa.prefix !== pb.prefix) return pa.prefix.localeCompare(pb.prefix);
+  return pa.num - pb.num;
+}
 
 // ── Status 매칭 ──────────────────────────────────────────────────────
 export function statusToStatKey(s: string | null | undefined): keyof Stats | null {
