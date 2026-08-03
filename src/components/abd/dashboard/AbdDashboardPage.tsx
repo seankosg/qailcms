@@ -24,9 +24,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { AbdStatusMixDonut } from "./AbdStatusMixDonut";
 import { AbdJudgmentDonut } from "./AbdJudgmentDonut";
 import { AbdJudgmentStageBreakdown } from "./AbdJudgmentStageBreakdown";
+import { useAbdTeamList } from "@/hooks/useAbdTeamList";
+import { ABD_TEAMS } from "@/lib/abd/columns";
 
 export function AbdDashboardPage() {
-  const TEAM_OPTIONS = ["MECH", "ELEC"];
+
   // ABD Data Date 는 세션 전역(useAbdDataDate)에 저장 → Raw Data/Progress 등과 공유,
   // 페이지 이동 후 복귀해도 유지된다. 빈 값이면 오늘(Doha)로 간주.
   const [sharedDate, setSharedDate] = useAbdDataDate();
@@ -47,6 +49,12 @@ export function AbdDashboardPage() {
   }, [asOf]);
   const [plotFilter, setPlotFilter] = useState<string[]>([]);
   const [teamFilter, setTeamFilter] = useState<string[]>([]);
+  // 팀 옵션 정본: 실측 distinct(abd_team_list) — 화면 필터와 무관한 전체 기준.
+  const { data: teamList } = useAbdTeamList();
+  const TEAM_OPTIONS = useMemo(
+    () => (teamList && teamList.length > 0 ? teamList : ABD_TEAMS.map((t) => t.value as string)),
+    [teamList],
+  );
   const [batchFilter, setBatchFilter] = useState<string[]>([]);
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -110,7 +118,7 @@ export function AbdDashboardPage() {
     delete search.team;
     // 카드 본문 클릭(팀 지정 없음)은 ABD 전 팀을 포함해야 카드 카운트와 일치.
     if (!search.tab) {
-      search.tab = teamFilter.length ? teamFilter.join(",") : "MECH,ELEC";
+      search.tab = teamFilter.length ? teamFilter.join(",") : TEAM_OPTIONS.join(",");
     }
     if (batchFilter.length && !("batch" in search)) {
       search.batch = batchFilter.join(",");
