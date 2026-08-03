@@ -104,7 +104,9 @@ export function TaskManagementImportPage() {
 function ImportInner() {
   const { data: me } = useCurrentUser();
   const canImport = !!me?.isEditor;
-  const isAdmin = !!me?.isAdmin;
+  // TM 임포트 전용 admin 판정 — superuser 는 제외한다(전역 useCurrentUser 는 수정하지 않음).
+  // superuser/d_superuser 는 스코프를 '드롭다운으로 선택'하는 것이 설계 의도다.
+  const isAdmin = (me?.roles ?? []).includes("admin");
   const isSuperUserLike = !!(me?.isSuperUser || me?.isDSuperUser);
   const {
     files,
@@ -147,7 +149,7 @@ function ImportInner() {
 
   // Sync importer identity/scope to context whenever user info changes
   const hdecPic = me?.hdec_pic_name ?? null;
-  const adminFlag = !!me?.isAdmin;
+  const adminFlag = isAdmin;
   useEffect(() => {
     setImporterHdecPicName(hdecPic);
     setIsImporterAdmin(adminFlag);
