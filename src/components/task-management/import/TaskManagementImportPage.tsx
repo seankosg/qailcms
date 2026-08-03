@@ -534,7 +534,11 @@ function ImportInner() {
                         {f.name} · {matchedByFile[f.id]?.matched ?? 0}행
                         {me?.hdec_pic_name
                           ? ` (본인 HDEC PIC 매칭 ${
-                              (f.parsed ?? []).filter((r) => matchesHdecPic(r)).length
+                              (f.parsed ?? []).filter(
+                                (r) =>
+                                  (r.hdec_pic_name ?? "").trim().toLowerCase() ===
+                                  (me.hdec_pic_name ?? "").trim().toLowerCase(),
+                              ).length
                             }행)`
                           : ""}
                       </li>
