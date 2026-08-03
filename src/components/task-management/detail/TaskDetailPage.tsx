@@ -33,13 +33,7 @@ import {
 } from "@/lib/task-management/owner-mutations.functions";
 import { toast } from "sonner";
 import { canEditRawRow } from "@/lib/auth/roles";
-import {
-  cumPlanProgress,
-  computeVariance,
-  computeDailyPlan,
-  computeDailyDiff,
-  computeJudgment,
-} from "@/lib/task-management/derived";
+import { computeDailyPlan, computeDailyDiff } from "@/lib/task-management/derived";
 import { todayIso } from "@/lib/task-management/schedule-utils";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { useTmRowsAsOf } from "@/hooks/useTmRowsAsOf";
@@ -62,6 +56,10 @@ const OWNER_FIELDS = new Set(["team", "data_date"]);
 
 // R2-6(c): 실적 필드 편집 시 원본 동기화 경고 — 세션 1회
 const ACTUAL_FIELDS = new Set(["actual_progress", "actual_start", "actual_finish"]);
+
+// R2-6(a): 판정 축 5값(Actual% · 완료일 · 판정 · Plan% · Gap)은 정본 tm_rows_as_of 에서만 읽는다.
+// task_management_raw 직조회 값은 편집용 원본 필드 렌더링에만 사용한다.
+const CANONICAL_ONLY_FIELDS = new Set(["actual_progress", "actual_finish"]);
 let warnedActualEdit = false;
 
 export function TaskDetailPage() {
@@ -287,7 +285,9 @@ export function TaskDetailPage() {
                       ? derivedJudgment
                       : c.key in derivedForecast
                         ? derivedForecast[c.key]
-                        : row[c.key];
+                        : CANONICAL_ONLY_FIELDS.has(c.key)
+                          ? (srvRow ? (srvRow[c.key] as unknown) : null)
+                          : row[c.key];
                   let effectiveColumn: TmColumnDef = c;
                   let effectiveCanEdit = canEditRow;
                   if (c.key === "task_no") {
