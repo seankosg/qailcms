@@ -294,6 +294,13 @@ function ImportInner() {
     readyCount === 0 ||
     !canImport ||
     (!isAdmin && totalMatched === 0);
+  const onStartClick = () => {
+    if (effectiveScope === "all") {
+      setConfirmAllOpen(true);
+      return;
+    }
+    void runStartImport();
+  };
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
   const columnFile = files.find((f) => f.id === mappingFileId) ?? null;
   const conflictFile = files.find((f) => f.id === conflictFileId) ?? null;
