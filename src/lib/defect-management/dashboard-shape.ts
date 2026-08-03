@@ -82,6 +82,7 @@ export const ROOM_GROUP_ORDER = [
   "CORRIDOR",
   "FACADE",
   "LANDSCAPE",
+  "VIP Drop Off (P5)",
   "N/A",
 ] as const;
 
@@ -117,6 +118,8 @@ export function normalizeRoomGroup(v: string | null | undefined): RoomGroupCol {
   if (/^CARPARK[\s./]+RAMP$/.test(s)) return "CARPARK / RAMP";
   // 'LIFT CABIN' / 'LIFT LOBBY' 등 LIFT 계열 표기는 LIFT 열로 통합
   if (/^LIFT\b/.test(s)) return "LIFT";
+  // VIP Drop Off (P5) 전용 열
+  if (/^VIP\s*DROP\s*OFF/.test(s)) return "VIP Drop Off (P5)";
   const hit = (ROOM_GROUP_ORDER as readonly string[]).find((k) => k.toUpperCase() === s);
   return (hit as RoomGroupCol) ?? "N/A";
 }
