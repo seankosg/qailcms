@@ -323,6 +323,15 @@ export function TaskDetailPage() {
                         ) : (
                           <span className="block min-w-0 truncate">{display}</span>
                         )}
+                        {c.key === "actual_finish" &&
+                          (row as any).actual_finish_source === "forecast" && (
+                            <span
+                              className="ml-1 shrink-0 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-semibold leading-none text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
+                              title="완료일 미확인 — '예상 완료' 열에서 들어온 값입니다. 확인해 주세요."
+                            >
+                              완료일 미확인
+                            </span>
+                          )}
                       </dd>
                     </div>
                   );
