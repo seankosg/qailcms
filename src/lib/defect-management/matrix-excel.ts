@@ -8,7 +8,6 @@ import {
   newStats,
   type MatrixBlock,
   type MatrixShape,
-  type RoomGroupCol,
   type Stats,
   type TeamKey,
 } from "./dashboard-shape";
