@@ -898,9 +898,18 @@ export function AbdRawDataPage() {
       <AbdExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
-        getRows={() => rows}
-        columnHeaders={ABD_COLUMNS.map((c) => ({ key: c.key, label: c.label }))}
-        filenamePrefix={plotFilter ? `abd-${team}-plot${plotFilter}` : `abd-${team}`}
+        total={total}
+        exportColumns={selectedExportColumns}
+        fetchParams={{
+          team,
+          statusGroup,
+          includeInactive,
+          plot: plotFilter,
+          q,
+          filters: serverFilters,
+          sort: serverSort,
+          asOf: sharedAbdDate || null,
+        }}
       />
       {/* ABD detail drilldown → 전용 라우트 */}
     </div>
