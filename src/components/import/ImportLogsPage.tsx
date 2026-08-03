@@ -704,7 +704,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 ))}
               </div>
               <div className="flex-1" />
-              {fieldLogs.length > 0 && (
+              {fieldLogTotal > 0 && (
                 <>
                   <Select
                     value={fieldOutcomeFilter}
@@ -726,16 +726,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                     variant="outline"
                     size="sm"
                     className="h-8 text-xs"
-                    onClick={() =>
-                      downloadFieldLevelCsv(
-                        fieldOutcomeFilter === "all"
-                          ? fieldLogs
-                          : fieldLogs.filter((f) => f.outcome === fieldOutcomeFilter),
-                        `${selectedBatch?.file_name ?? "field-logs"}.csv`,
-                      )
-                    }
+                    disabled={csvLoading}
+                    onClick={() => void exportFieldCsv()}
                   >
-                    <Download className="h-3.5 w-3.5 mr-1" /> Field-level CSV
+                    <Download className="h-3.5 w-3.5 mr-1" />
+                    {csvLoading ? "Exporting…" : "Field-level CSV"}
                   </Button>
                 </>
               )}
@@ -788,10 +783,10 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 className="h-8 w-[100px] text-xs"
               />
             </div>
-            {fieldLogs.length > 0 && (
+            {fieldLogTotal > 0 && (
               <div className="mb-2">
                 <FieldLogSummaryChips
-                  logs={fieldLogs}
+                  counts={fieldOutcomeCounts}
                   activeOutcome={fieldOutcomeFilter}
                   onSelect={(o) => setFieldOutcomeFilter(o)}
                 />
