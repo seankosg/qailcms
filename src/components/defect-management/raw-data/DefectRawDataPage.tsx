@@ -71,7 +71,7 @@ import { DefectStatusBadge } from "./DefectStatusBadge";
 import { CriticalPendingBar } from "./CriticalPendingBar";
 import { CriticalBulkBar } from "./CriticalBulkBar";
 import { BulkEditBar } from "./BulkEditBar";
-import { exportAllUnclosed } from "./exportAllUnclosed";
+import { exportAllByStatusGroup } from "./exportAllUnclosed";
 import { ExportDialog } from "./ExportDialog";
 import {
   inferSourceLabel,
@@ -912,29 +912,31 @@ export function DefectRawDataPage() {
           {isAdmin && <AiClassifyButton selectedRows={selectedRows as any} onDone={() => { invalidateDefects(); refetch(); }} />}
           <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "snag" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
           <Button size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
-          {tab === "unclosed" && (
+          {(tab === "unclosed" || tab === "closed") && (
             <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm" disabled={downloadingAll}>
-                  <Download className="mr-1.5 h-3.5 w-3.5" /> {downloadingAll ? "다운로드 중..." : "Unclosed 전체 XLSX"}
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> {downloadingAll ? "다운로드 중..." : `${tab === "closed" ? "Closed" : "Unclosed"} 전체 XLSX`}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Unclosed 전체 XLSX 다운로드</AlertDialogTitle>
+                  <AlertDialogTitle>{tab === "closed" ? "Closed" : "Unclosed"} 전체 XLSX 다운로드</AlertDialogTitle>
                   <AlertDialogDescription>
-                    현재 Unclosed 전체 {unclosedCount.toLocaleString()}건을 XLSX로 내보냅니다. 데이터 양에 따라 시간이 다소 소요될 수 있습니다. 진행하시겠습니까?
+                    현재 {tab === "closed" ? "Closed" : "Unclosed"} 전체 {(tab === "closed" ? closedCount : unclosedCount).toLocaleString()}건을 XLSX로 내보냅니다. 데이터 양에 따라 시간이 다소 소요될 수 있습니다. 진행하시겠습니까?
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>취소</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={async () => {
+                      const grp = tab === "closed" ? "closed" : "unclosed";
+                      const lbl = grp === "closed" ? "Closed" : "Unclosed";
                       setDownloadingAll(true);
-                      const toastId = toast.loading("Unclosed 전체 다운로드 준비 중...");
+                      const toastId = toast.loading(`${lbl} 전체 다운로드 준비 중...`);
                       try {
-                        const { count } = await exportAllUnclosed((fetched, total) => {
-                          toast.loading(`Unclosed 다운로드 ${fetched.toLocaleString()} / ${total.toLocaleString()}`, { id: toastId });
+                        const { count } = await exportAllByStatusGroup(grp, (fetched, total) => {
+                          toast.loading(`${lbl} 다운로드 ${fetched.toLocaleString()} / ${total.toLocaleString()}`, { id: toastId });
                         });
                         toast.success(`${count.toLocaleString()}건 XLSX 다운로드 완료`, { id: toastId });
                       } catch (e: any) {
