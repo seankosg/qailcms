@@ -292,6 +292,10 @@ export type MatrixShape = {
   teams: TeamKey[];
   blocks: MatrixBlock[];
   plotTotal: Stats;
+  /** 블록 배치와 무관하게 원본 room_group 기준으로 집계한 열 합계 (Room Group별 현황 카드용) */
+  roomGroupTotals: Record<string, Stats>;
+  /** 정규화 열 → 원본 room_group 값 목록 (드릴다운 필터용) */
+  roomGroupSourceMap: Record<string, string[]>;
 };
 
 function emptyRoomGroupStats(): Record<string, Stats> {
@@ -337,6 +341,11 @@ export function buildMatrix(
     const lvl = parseLevel(r.level_name);
     const bld = classifyBuilding(r.building);
     const rg = normalizeRoomGroup(r.room_group);
+
+    // Room Group 카드 집계는 블록 배치(LIFT CABIN 등)와 무관하게 항상 누적한다.
+    addRow(cellFor(roomGroupTotals, rg), r);
+    const srcVal = (r.room_group ?? "").trim() || "__EMPTY__";
+    (roomGroupSourceMap[rg] ??= new Set<string>()).add(srcVal);
 
     let block: RowsMap;
     let buildingLabel: string;
