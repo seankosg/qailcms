@@ -82,6 +82,7 @@ export const ROOM_GROUP_ORDER = [
   "CORRIDOR",
   "FACADE",
   "LANDSCAPE",
+  "Terrace",
   "VIP Drop Off (P5)",
   "N/A",
 ] as const;
