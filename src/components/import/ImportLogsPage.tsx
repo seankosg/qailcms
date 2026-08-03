@@ -46,6 +46,8 @@ import {
 import { Fragment } from "react";
 import { formatDdMmmYyyy, formatDdMmmYyyyHm } from "@/lib/time/doha";
 
+const FIELD_OUTCOMES = Object.keys(OUTCOME_LABELS);
+
 type Kind = RollbackKind;
 
 interface Batch {
@@ -157,6 +159,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
   const [fieldLogCache, setFieldLogCache] = useState<Record<number, FieldLog[]>>({});
   const [fieldRowLoading, setFieldRowLoading] = useState<number | null>(null);
   const [csvLoading, setCsvLoading] = useState(false);
+  const [fieldKind, setFieldKind] = useState<string>("defect");
   const [expandedRowNo, setExpandedRowNo] = useState<number | null>(null);
   const [fieldOutcomeFilter, setFieldOutcomeFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
