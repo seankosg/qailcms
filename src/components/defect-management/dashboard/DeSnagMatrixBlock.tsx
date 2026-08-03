@@ -5,7 +5,6 @@ import {
   newStats,
   mergeStats,
   type MatrixBlock,
-  type RoomGroupCol,
   type Stats,
   type TeamKey,
   basementLevelParam,
@@ -196,14 +195,14 @@ function MatrixHeader({
           className="sticky left-0 top-0 z-40 min-w-[100px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
           style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
-          Building
+          {block.rowAxis.primary}
         </th>
         <th
           rowSpan={3}
           className="sticky left-[100px] top-0 z-40 min-w-[80px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
           style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
-          Level
+          {block.rowAxis.secondary}
         </th>
         {groups.map((g, idx) => (
           <th
@@ -220,7 +219,11 @@ function MatrixHeader({
                 onClick={() => {
                   const p: Record<string, string> = { ...basementParam };
                   if (block.kind !== "basement") Object.assign(p, buildingParam);
-                  p.roomGroup = g.key === "N/A" ? "__EMPTY__" : g.key;
+                  if (block.kind === "liftcabin") {
+                    p.subcontractor = g.key === "N/A" ? "__EMPTY__" : g.key;
+                  } else {
+                    p.roomGroup = g.key === "N/A" ? "__EMPTY__" : g.key;
+                  }
                   onNavigate(p);
                 }}
                 className="hover:text-primary"
@@ -291,6 +294,7 @@ export function DeSnagMatrixBlock({
     if (block.kind === "tower") return ["Tower", "Tower 4"];
     if (block.kind === "basement") return [] as string[];
     if (block.kind === "lg") return ["LG"];
+    if (block.kind === "liftcabin") return ["LIFT CABIN"];
     return presentBuildings;
   })();
 
@@ -303,17 +307,23 @@ export function DeSnagMatrixBlock({
   const goCell = (
     rowBuilding: string | null,
     rowLevelDisp: string | null,
-    col: RoomGroupCol | "__ROW_TOTAL__" | "__BUILDING_SUBTOTAL__",
+    col: string,
     slot: StatusSlot,
     team: TeamKey,
   ) => {
     const p: Record<string, string> = { ...basementParam };
     if (rowBuilding && block.kind !== "basement") p.building = rowBuilding;
     else if (block.kind !== "basement") Object.assign(p, buildingParam);
-    // LG 블록의 행 라벨은 level_name 이 아니므로 level 필터를 걸지 않는다.
-    if (rowLevelDisp && block.kind !== "lg") p.level = rowLevelDisp;
-    if (col === "N/A") p.roomGroup = "__EMPTY__";
-    else if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.roomGroup = col;
+    // LG · LIFT CABIN 블록의 행 라벨은 level_name 이 아니므로 level 필터를 걸지 않는다.
+    if (block.kind === "liftcabin") {
+      if (rowLevelDisp) p.room = rowLevelDisp === "N/A" ? "__EMPTY__" : rowLevelDisp;
+      if (col === "N/A") p.subcontractor = "__EMPTY__";
+      else if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.subcontractor = col;
+    } else {
+      if (rowLevelDisp && block.kind !== "lg") p.level = rowLevelDisp;
+      if (col === "N/A") p.roomGroup = "__EMPTY__";
+      else if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.roomGroup = col;
+    }
     p.team = team;
     // 정본(_snag_done_asof) 동치: 자기 실적일 ≤ as-of. dateEnd 는 상위에서 as-of 로 채움.
     if (slot === "rect") p.dateField = "actual_rectified_date";
@@ -426,7 +436,7 @@ function FragmentRows({
   goCell: (
     b: string | null,
     l: string | null,
-    c: RoomGroupCol | "__ROW_TOTAL__" | "__BUILDING_SUBTOTAL__",
+    c: string,
     slot: StatusSlot,
     team: TeamKey,
   ) => void;
@@ -464,8 +474,9 @@ function FragmentRows({
               onClick={() => {
                 const p: Record<string, string> =
                   block.kind === "basement" ? { ...basementParam } : { building: r.building };
-                // LG 블록 행 라벨은 level_name 이 아니므로 level 필터 제외
-                if (block.kind !== "lg") p.level = r.levelDisp;
+                // LG · LIFT CABIN 블록 행 라벨은 level_name 이 아니므로 level 필터 제외
+                if (block.kind === "liftcabin") p.room = r.levelDisp === "N/A" ? "__EMPTY__" : r.levelDisp;
+                else if (block.kind !== "lg") p.level = r.levelDisp;
                 onNavigate(p);
               }}
               className="hover:text-primary"

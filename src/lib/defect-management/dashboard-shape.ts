@@ -6,6 +6,10 @@ export type MatrixRawRow = {
   building: string | null;
   level_name: string | null;
   room_group: string | null;
+  /** LIFT CABIN 블록 전용 세로축 (그 외 블록은 null) */
+  room: string | null;
+  /** LIFT CABIN 블록 전용 가로축 (그 외 블록은 null) */
+  subcontractor: string | null;
   team: string | null;
   status_raw: string | null;
   cnt: number;
@@ -143,7 +147,7 @@ export function compareGroundLevelDesc(a: string, b: string): number {
 export const BASEMENT_ORDER = ["LG", "B1", "B2", "B3", "B4"];
 
 // ── Building ─────────────────────────────────────────────────────────
-export type BlockKind = "tower" | "podium" | "lg" | "basement";
+export type BlockKind = "tower" | "podium" | "lg" | "basement" | "liftcabin";
 
 // 원본 building 값 → 정규화된 building 라벨 (표시용). Tower는 하나로 모음.
 export function classifyBuilding(b: string | null | undefined): {
@@ -152,6 +156,8 @@ export function classifyBuilding(b: string | null | undefined): {
 } {
   const s = (b ?? "").trim();
   if (!s) return { kind: "unknown", label: "Others" };
+  // LIFT CABIN = 독립 블록 (세로축 room · 가로축 subcontractor)
+  if (/^LIFT\s*CABIN$/i.test(s)) return { kind: "liftcabin", label: "LIFT CABIN" };
   // LG = Lower Ground 독립 블록. level_name 의 'Level LG' 와 무관.
   if (/^LG$/i.test(s)) return { kind: "lg", label: "LG" };
   if (/^Tower(\s+4)?$/i.test(s)) return { kind: "tower", label: "Tower" };
@@ -162,6 +168,18 @@ export function classifyBuilding(b: string | null | undefined): {
 }
 
 export const PODIUM_ORDER = ["Podium", "Podium 1", "Podium 2", "Podium 3", "Podium 4"];
+
+/** LIFT CABIN Room 자연 정렬 — 접두어 그룹 → 숫자 오름차순 */
+export function compareRoomNatural(a: string, b: string): number {
+  const parse = (v: string) => {
+    const m = /^(.*?)(\d+)\s*$/.exec(v.trim());
+    return m ? { prefix: m[1].trim().toUpperCase(), num: Number(m[2]) } : { prefix: v.trim().toUpperCase(), num: -1 };
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  if (pa.prefix !== pb.prefix) return pa.prefix.localeCompare(pb.prefix);
+  return pa.num - pb.num;
+}
 
 // ── Status 매칭 ──────────────────────────────────────────────────────
 export function statusToStatKey(s: string | null | undefined): keyof Stats | null {
@@ -231,13 +249,13 @@ export function bottleneckTeam(
 // ── 매트릭스 형태 ────────────────────────────────────────────────────
 export type CellKey = string; // `${building}||${levelDisp}||${roomGroup}`
 
-export type BlockKey = "tower" | "podium" | "lg" | "basement";
+export type BlockKey = "tower" | "podium" | "lg" | "basement" | "liftcabin";
 
 export type MatrixRow = {
   building: string;
   levelDisp: string;
   levelKind: LevelKind;
-  cells: Record<RoomGroupCol, Stats>;
+  cells: Record<string, Stats>;
   rowTotal: Stats;
 };
 
@@ -246,8 +264,12 @@ export type MatrixBlock = {
   title: string;
   rows: MatrixRow[]; // 정렬 완료
   /** 이 블록이 렌더링할 열 키 (일반 블록 = ROOM_GROUP_ORDER, LG 블록 = Podium N) */
-  columnKeys: RoomGroupCol[];
-  colTotals: Record<RoomGroupCol, Stats>;
+  columnKeys: string[];
+  colTotals: Record<string, Stats>;
+  /** 좌측 고정 축 라벨 (일반 = Building/Level, LIFT CABIN = Block/Room) */
+  rowAxis: { primary: string; secondary: string };
+  /** 상단 1단 축 라벨 (일반 = Room Group, LIFT CABIN = Subcontractor) */
+  colAxisLabel: string;
   blockTotal: Stats;
 };
 
@@ -259,10 +281,15 @@ export type MatrixShape = {
   plotTotal: Stats;
 };
 
-function emptyRoomGroupStats(): Record<RoomGroupCol, Stats> {
-  const out = {} as Record<RoomGroupCol, Stats>;
+function emptyRoomGroupStats(): Record<string, Stats> {
+  const out = {} as Record<string, Stats>;
   for (const rg of ALL_ROOM_GROUPS) out[rg] = newStats();
   return out;
+}
+
+function cellFor(cells: Record<string, Stats>, key: string): Stats {
+  if (!cells[key]) cells[key] = newStats();
+  return cells[key];
 }
 
 export function buildMatrix(
@@ -271,16 +298,25 @@ export function buildMatrix(
   rawRows: MatrixRawRow[],
 ): MatrixShape {
   // 임시 구조: kind → buildingLabel → levelDisp → RoomGroupCol → Stats
-  type RowsMap = Map<string, Map<string, { levelKind: LevelKind; sortIdx: number; cells: Record<RoomGroupCol, Stats> }>>;
+  type RowsMap = Map<string, Map<string, { levelKind: LevelKind; sortIdx: number; cells: Record<string, Stats> }>>;
   const tower: RowsMap = new Map();
   const podium: RowsMap = new Map();
   const lg: RowsMap = new Map();
   const basement: RowsMap = new Map();
+  const liftcabin: RowsMap = new Map();
 
-  const ensure = (m: RowsMap, building: string, levelDisp: string, levelKind: LevelKind, sortIdx: number) => {
+  const ensure = (
+    m: RowsMap,
+    building: string,
+    levelDisp: string,
+    levelKind: LevelKind,
+    sortIdx: number,
+    dynamicCells = false,
+  ) => {
     if (!m.has(building)) m.set(building, new Map());
     const b = m.get(building)!;
-    if (!b.has(levelDisp)) b.set(levelDisp, { levelKind, sortIdx, cells: emptyRoomGroupStats() });
+    if (!b.has(levelDisp))
+      b.set(levelDisp, { levelKind, sortIdx, cells: dynamicCells ? {} : emptyRoomGroupStats() });
     return b.get(levelDisp)!;
   };
 
@@ -292,8 +328,14 @@ export function buildMatrix(
     let block: RowsMap;
     let buildingLabel: string;
     let levelDisp: string;
-    // LG 는 building='LG' 단독 판정 — level_name 판정보다 우선한다.
-    if (bld.kind === "lg") {
+    // LIFT CABIN / LG 는 building 단독 판정 — level_name 판정보다 우선한다.
+    if (bld.kind === "liftcabin") {
+      const roomKey = (r.room ?? "").trim() || "N/A";
+      const subKey = (r.subcontractor ?? "").trim() || "N/A";
+      const e = ensure(liftcabin, "LIFT CABIN", roomKey, "unknown", 0, true);
+      addRow(cellFor(e.cells, subKey), r);
+      continue;
+    } else if (bld.kind === "lg") {
       block = lg;
       buildingLabel = "LG";
       levelDisp = "LG";
@@ -338,7 +380,8 @@ export function buildMatrix(
       if (!bMap) continue;
       const levels = Array.from(bMap.entries());
       // 정렬
-      levels.sort(([, a], [, b]) => {
+      levels.sort(([ka2, a], [kb2, b]) => {
+        if (kind === "liftcabin") return compareRoomNatural(ka2, kb2);
         if (kind === "basement") {
           // LG → B1 → B4
           const ka = a.sortIdx;
@@ -350,7 +393,7 @@ export function buildMatrix(
       });
       for (const [levelDisp, info] of levels) {
         const rowTotal = newStats();
-        for (const rg of ALL_ROOM_GROUPS) mergeStats(rowTotal, info.cells[rg]);
+        for (const rg of Object.keys(info.cells)) mergeStats(rowTotal, info.cells[rg]);
         rows.push({
           building: bLabel,
           levelDisp,
@@ -361,22 +404,41 @@ export function buildMatrix(
       }
     }
 
-    const colTotals = emptyRoomGroupStats();
+    const colTotals: Record<string, Stats> = kind === "liftcabin" ? {} : emptyRoomGroupStats();
     const blockTotal = newStats();
     for (const row of rows) {
-      for (const rg of ALL_ROOM_GROUPS) mergeStats(colTotals[rg], row.cells[rg]);
+      for (const rg of Object.keys(row.cells)) mergeStats(cellFor(colTotals, rg), row.cells[rg]);
       mergeStats(blockTotal, row.rowTotal);
     }
 
-    const columnKeys: RoomGroupCol[] =
+    const columnKeys: string[] =
       kind === "lg"
         ? (() => {
             const present = LG_ROOM_GROUPS.filter((rg) => colTotals[rg].issued > 0);
-            return (present.length ? present : LG_ROOM_GROUPS.slice(0, 1)) as RoomGroupCol[];
+            return (present.length ? present : LG_ROOM_GROUPS.slice(0, 1)) as string[];
           })()
-        : [...ROOM_GROUP_ORDER];
+        : kind === "liftcabin"
+          ? (() => {
+              const keys = Object.keys(colTotals).filter((k) => colTotals[k].issued > 0);
+              const named = keys.filter((k) => k !== "N/A").sort((a, b) => a.localeCompare(b));
+              const hasNa = keys.includes("N/A");
+              return hasNa ? [...named, "N/A"] : named;
+            })()
+          : [...ROOM_GROUP_ORDER];
 
-    return { kind, title, rows, columnKeys, colTotals, blockTotal };
+    // 동적 열 블록: 모든 행에 열 키를 채워 렌더 시 undefined 접근을 막는다
+    if (kind === "liftcabin") {
+      for (const row of rows) for (const k of columnKeys) cellFor(row.cells, k);
+      for (const k of columnKeys) cellFor(colTotals, k);
+    }
+
+    const rowAxis =
+      kind === "liftcabin"
+        ? { primary: "Block", secondary: "Room" }
+        : { primary: "Building", secondary: "Level" };
+    const colAxisLabel = kind === "liftcabin" ? "Subcontractor" : "Room Group";
+
+    return { kind, title, rows, columnKeys, colTotals, rowAxis, colAxisLabel, blockTotal };
   };
 
   const blocks: MatrixBlock[] = [];
@@ -384,6 +446,7 @@ export function buildMatrix(
   if (podium.size) blocks.push(buildBlock("podium", "Podium", podium));
   if (lg.size) blocks.push(buildBlock("lg", "LG (Lower Ground)", lg));
   if (basement.size) blocks.push(buildBlock("basement", "Basement (지하)", basement));
+  if (liftcabin.size) blocks.push(buildBlock("liftcabin", "LIFT CABIN", liftcabin));
 
   const plotTotal = newStats();
   for (const b of blocks) mergeStats(plotTotal, b.blockTotal);
