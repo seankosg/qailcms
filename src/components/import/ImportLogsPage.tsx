@@ -153,7 +153,10 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
   const [uploaderNames, setUploaderNames] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [rowLogs, setRowLogs] = useState<RowLog[]>([]);
-  const [fieldLogs, setFieldLogs] = useState<FieldLog[]>([]);
+  const [fieldOutcomeCounts, setFieldOutcomeCounts] = useState<Record<string, number>>({});
+  const [fieldLogCache, setFieldLogCache] = useState<Record<number, FieldLog[]>>({});
+  const [fieldRowLoading, setFieldRowLoading] = useState<number | null>(null);
+  const [csvLoading, setCsvLoading] = useState(false);
   const [expandedRowNo, setExpandedRowNo] = useState<number | null>(null);
   const [fieldOutcomeFilter, setFieldOutcomeFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
