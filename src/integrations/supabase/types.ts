@@ -2122,48 +2122,100 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          last_seen_at: string | null
+          linked_user_id: string | null
+          merged_into_id: string | null
           name: string
+          name_norm: string
+          name_variants: string[]
           updated_at: string
+          verified: boolean
         }
         Insert: {
           created_at?: string
           id?: string
           is_active?: boolean
+          last_seen_at?: string | null
+          linked_user_id?: string | null
+          merged_into_id?: string | null
           name: string
+          name_norm: string
+          name_variants?: string[]
           updated_at?: string
+          verified?: boolean
         }
         Update: {
           created_at?: string
           id?: string
           is_active?: boolean
+          last_seen_at?: string | null
+          linked_user_id?: string | null
+          merged_into_id?: string | null
           name?: string
+          name_norm?: string
+          name_variants?: string[]
           updated_at?: string
+          verified?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hdec_eng_name_master_merged_into_fk"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "hdec_eng_name_master"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hdec_pic_name_master: {
         Row: {
           created_at: string
           id: string
           is_active: boolean
+          last_seen_at: string | null
+          linked_user_id: string | null
+          merged_into_id: string | null
           name: string
+          name_norm: string
+          name_variants: string[]
           updated_at: string
+          verified: boolean
         }
         Insert: {
           created_at?: string
           id?: string
           is_active?: boolean
+          last_seen_at?: string | null
+          linked_user_id?: string | null
+          merged_into_id?: string | null
           name: string
+          name_norm: string
+          name_variants?: string[]
           updated_at?: string
+          verified?: boolean
         }
         Update: {
           created_at?: string
           id?: string
           is_active?: boolean
+          last_seen_at?: string | null
+          linked_user_id?: string | null
+          merged_into_id?: string | null
           name?: string
+          name_norm?: string
+          name_variants?: string[]
           updated_at?: string
+          verified?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hdec_pic_name_master_merged_into_fk"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "hdec_pic_name_master"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       import_field_logs: {
         Row: {
@@ -5629,6 +5681,7 @@ export type Database = {
         Args: { _role: string; _user_id: string }
         Returns: boolean
       }
+      hdec_name_norm: { Args: { _name: string }; Returns: string }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }
       is_full_access: { Args: { _user_id: string }; Returns: boolean }
       is_qaqc_readonly: { Args: { _user_id: string }; Returns: boolean }
