@@ -160,7 +160,10 @@ export function compareGroundLevelDesc(a: string, b: string): number {
 export const BASEMENT_ORDER = ["LG", "B1", "B2", "B3", "B4"];
 
 // ── Building ─────────────────────────────────────────────────────────
-export type BlockKind = "tower" | "podium" | "lg" | "basement" | "liftcabin";
+export type BlockKind = "tower" | "podium" | "lg" | "basement" | "liftcabin" | "unassigned";
+
+/** building 값이 비어 있는 행의 표시 라벨 */
+export const UNASSIGNED_BUILDING_LABEL = "(미지정)";
 
 // 원본 building 값 → 정규화된 building 라벨 (표시용). Tower는 하나로 모음.
 export function classifyBuilding(b: string | null | undefined): {
@@ -168,9 +171,11 @@ export function classifyBuilding(b: string | null | undefined): {
   label: string;
 } {
   const s = (b ?? "").trim();
-  if (!s) return { kind: "unknown", label: "Others" };
+  if (!s) return { kind: "unassigned", label: UNASSIGNED_BUILDING_LABEL };
   // LIFT CABIN = 독립 블록 (세로축 room · 가로축 subcontractor)
   if (/^LIFT\s*CABIN$/i.test(s)) return { kind: "liftcabin", label: "LIFT CABIN" };
+  // BSM = 지하 독립 블록. level_name 판정보다 우선한다.
+  if (/^BSM$/i.test(s)) return { kind: "basement", label: "BSM" };
   // LG = Lower Ground 독립 블록. level_name 의 'Level LG' 와 무관.
   if (/^LG$/i.test(s)) return { kind: "lg", label: "LG" };
   if (/^Tower(\s*[34])?$/i.test(s)) return { kind: "tower", label: "Tower" };
@@ -262,7 +267,7 @@ export function bottleneckTeam(
 // ── 매트릭스 형태 ────────────────────────────────────────────────────
 export type CellKey = string; // `${building}||${levelDisp}||${roomGroup}`
 
-export type BlockKey = "tower" | "podium" | "lg" | "basement" | "liftcabin";
+export type BlockKey = BlockKind;
 
 export type MatrixRow = {
   building: string;
