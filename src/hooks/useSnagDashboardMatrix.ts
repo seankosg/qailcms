@@ -19,6 +19,8 @@ export function useSnagDashboardMatrix(plot: PlotKey, teams: TeamKey[], asOfDate
         building: r.building ?? null,
         level_name: r.level_name ?? null,
         room_group: r.room_group ?? null,
+        room: r.room ?? null,
+        subcontractor: r.subcontractor ?? null,
         team: r.team ?? null,
         status_raw: r.status_raw ?? null,
         cnt: Number(r.cnt) || 0,
