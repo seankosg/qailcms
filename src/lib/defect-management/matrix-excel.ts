@@ -103,7 +103,7 @@ export function exportSnagMatrixToXlsx(args: {
     const ws: XLSX.WorkSheet = {};
     const merges: XLSX.Range[] = [];
     const groupCols = groupColsFor(block);
-    const cols: RoomGroupCol[] = block.columnKeys;
+    const cols: string[] = block.columnKeys;
     const totalCols = 2 + groupCols.length * PER_GROUP;
 
     // Title / meta
@@ -133,8 +133,8 @@ export function exportSnagMatrixToXlsx(args: {
 
     const H1 = 3, H2 = 4, H3 = 5, DATA = 6;
 
-    put(ws, H1, 0, "Building", hdr(HDR_G1, 11));
-    put(ws, H1, 1, "Level", hdr(HDR_G1, 11));
+    put(ws, H1, 0, block.rowAxis.primary, hdr(HDR_G1, 11));
+    put(ws, H1, 1, block.rowAxis.secondary, hdr(HDR_G1, 11));
     merges.push({ s: { r: H1, c: 0 }, e: { r: H3, c: 0 } });
     merges.push({ s: { r: H1, c: 1 }, e: { r: H3, c: 1 } });
     for (const r of [H2, H3]) {
