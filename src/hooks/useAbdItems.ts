@@ -21,6 +21,7 @@ export type AbdStatusGroup =
   | "ds_delay"
   | "no_plan"
   | "delayed"
+  | "resubmit"
   // stage_group 축 (Progress KPI 스트립): 재고 sg_*, 지연 sgd_*
   | "sg_ns"
   | "sg_ds"
@@ -107,7 +108,6 @@ export interface AbdItemsQueryParams {
   sort?: AbdServerSort[];
   page: number;
   pageSize: number;
-  excludedMode?: "hide" | "only" | "all";
   /** 판정 기준일(As of, YYYY-MM-DD). 빈 값 = 오늘(Doha). */
   asOf?: string | null;
 }
@@ -130,7 +130,6 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
           _offset: offset,
           _limit: limit,
           _plot: p.plot ?? null,
-          _excluded_mode: p.excludedMode ?? "hide",
           _as_of: resolveAsOf(p.asOf),
         });
         if (error) throw new Error(error.message);
@@ -239,11 +238,11 @@ export function useAbdFacet(
 }
 
 export interface AbdCounts {
-  approved_count: number;
-  in_progress_count: number;
-  not_started_count: number;
   total_count: number;
-  excluded_count: number;
+  approved_count: number;
+  ur_count: number;
+  ds_count: number;
+  resubmit_count: number;
   latest_data_date: string | null;
 }
 
@@ -260,11 +259,11 @@ export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean; pl
       if (error) throw new Error(error.message);
       const r = (data ?? [])[0] ?? {};
       return {
-        approved_count: Number(r.approved_count ?? 0),
-        in_progress_count: Number(r.in_progress_count ?? 0),
-        not_started_count: Number(r.not_started_count ?? 0),
         total_count: Number(r.total_count ?? 0),
-        excluded_count: Number(r.excluded_count ?? 0),
+        approved_count: Number(r.approved_count ?? 0),
+        ur_count: Number(r.ur_count ?? 0),
+        ds_count: Number(r.ds_count ?? 0),
+        resubmit_count: Number(r.resubmit_count ?? 0),
         latest_data_date: r.latest_data_date ?? null,
       };
     },
