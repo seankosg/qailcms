@@ -203,6 +203,32 @@ export const DEFECT_COLUMNS: DefectColumnDef[] = [
   { key: "data_date", label: "Data Date", type: "date", width: 110, group: "audit" },
 ];
 
+/**
+ * 임포트/자동 분류가 채우는 파생·자동채움 필드.
+ * 사용자가 직접 수정하면 `manual_locked_fields` 에 등록되어 이후 임포트에서 값이 보존된다.
+ */
+export const DEFECT_AUTO_FILLED_FIELDS: ReadonlySet<string> = new Set([
+  "classification",
+  "category",
+  "defect_type",
+  "item",
+  "location_raw",
+  "defect_location",
+  "location_reference",
+  "podium_area",
+  "building",
+  "room",
+  "room_group",
+  "level_name",
+  "plan_title",
+  "plan_group",
+  "trade_detail",
+  "classification_source",
+  "area_type",
+  "area_level",
+  "area_location",
+]);
+
 export const DEFECT_SEARCH_FIELDS = [
   "source_issue_no",
   "description",
