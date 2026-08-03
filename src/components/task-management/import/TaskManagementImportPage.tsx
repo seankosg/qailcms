@@ -873,13 +873,23 @@ function FileRow({
                         <td className="px-1 py-0.5 font-mono text-[11px]">{r.task_no}</td>
                         <td className="px-1 py-0.5">{r.task_name ?? "—"}</td>
                         <td className="px-1 py-0.5">
-                          {r.previous == null ? "—" : `${(r.previous * 100).toFixed(1)}%`}
+                          {r.kind === "finish_cleared"
+                            ? (r.previous_finish ?? "—")
+                            : r.previous == null
+                              ? "—"
+                              : `${(r.previous * 100).toFixed(1)}%`}
                         </td>
                         <td className="px-1 py-0.5">
-                          {r.next == null ? "—" : `${(r.next * 100).toFixed(1)}%`}
+                          {r.kind === "finish_cleared"
+                            ? "(공란)"
+                            : r.next == null
+                              ? "—"
+                              : `${(r.next * 100).toFixed(1)}%`}
                         </td>
                         <td className="px-1 py-0.5">
-                          {r.kind === "uncomplete" ? (
+                          {r.kind === "finish_cleared" ? (
+                            <span className="font-medium text-destructive">완료일 삭제</span>
+                          ) : r.kind === "uncomplete" ? (
                             <span className="font-medium text-destructive">완료 취소</span>
                           ) : (
                             "하향"
