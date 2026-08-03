@@ -1,40 +1,64 @@
-## 목표
+# SM Dashboard — LIFT CABIN 블록 신설
 
-현재 SM 대시보드는 `LANDSCAPE` 와 `FACADE` 를 하나의 `FACADE` 열/카드로 병합해 집계한다. 이를 분리해 **Landscape 1장, Facade 1장** 의 독립 Room Group 카드로 만들고, 매트릭스 열·필터 칩·엑셀 출력까지 동일하게 분리한다.
+Basement(BSM) 블록 아래에 LIFT CABIN 전용 매트릭스 블록을 추가한다. 세로축은 `room`, 가로축은 3단(Subcontractor > Issued/Rect/Closed > Elec·Mech·Arch) 구조로 타 블록과 동일한 셀·색상·드릴다운 규칙을 따른다.
 
 ## 현재 상태 (실측)
 
-- `src/lib/defect-management/dashboard-shape.ts:101` — `if (s === "LANDSCAPE" || s === "FACADE") return "FACADE";` 병합 지점(단일 원인)
-- `src/lib/defect-management/dashboard-shape.ts:67-78` — `ROOM_GROUP_ORDER` 에 `FACADE` 만 존재, `LANDSCAPE` 없음
-- `src/components/defect-management/dashboard/DeSnagDashboardPage.tsx:151, 202` — 드릴다운 파라미터를 `"FACADE,LANDSCAPE"` 로 합쳐 전달
-- `src/components/defect-management/dashboard/DeSnagMatrixBlock.tsx:223, 315` — 셀/열 헤더 드릴다운도 `"FACADE,LANDSCAPE"` 전달
-- 필터 칩(`DeSnagRoomGroupFilterBar.tsx:41`)과 엑셀(`matrix-excel.ts`)은 `ROOM_GROUP_ORDER` / 블록 `cols` 를 그대로 순회하므로 상수 변경만으로 자동 반영
+- `dashboard-shape.ts:149-162` `classifyBuilding()` 에 `LIFT CABIN` 분기 없음 → 전량 `Others`(podium 블록) 낙착
+- `defect_items_raw` 실측: `building = 'LIFT CABIN'` **1,004건** / room 71종 / subcontractor 6종 / team 2종
+  - 플롯별: Plot C 238(room 19) · Plot D 165(13) · Tower 3 267(17) · Tower 4 334(27)
+  - Subcontractor×Team: TKE·ELEC 522 / 미지정·ELEC 240 / Direct·ARCH 130 / 미지정·ARCH 46 / CMTC·ARCH 40 / QCTC·ARCH 22 / ELEC·ELEC 4
+- `defect_snag_dashboard_matrix_json` 은 `plan_group·building·level_name·room_group·team·status_raw` 만 GROUP BY → `room`·`subcontractor_name` 축이 없음
+- `matrix-excel.ts:80` `groupColsFor()` 는 `block.columnKeys` 만 순회 → 블록 형태만 맞추면 엑셀은 자동 반영
+- `DefectRawDataPage.tsx:284-305` `URL_MAP` 에 `subcontractor → subcontractor_name` 은 있으나 **`room` 파라미터 없음**
+
+## 확정 사양 (질의 응답)
+
+- 3단 최하단 = 팀 **3열 고정**(Elec·Mech·Arch). LIFT CABIN 은 Mech 실적 0이라 항상 0 표시
+- 상단 Subcontractor 열 = **실적 있는 값만 동적** + `N/A`(미지정) + `Row Total`
+- Room 행 정렬 = **자연 정렬**(접두어 그룹 → 숫자 오름차순). 예: `PL 01 … PL 09 < PL 10`, `P-PL 04 < P-PL 12`, `T-SL 02 …`
 
 ## 변경 내용
 
-### 1. `dashboard-shape.ts`
-- `ROOM_GROUP_ORDER` 에 `"LANDSCAPE"` 추가 — 순서는 `... CORRIDOR, FACADE, LANDSCAPE, N/A` (Facade 바로 뒤)
-- `normalizeRoomGroup` 의 병합 분기 제거 → `LANDSCAPE` 는 `LANDSCAPE`, `FACADE` 는 `FACADE` 로 각각 반환. 기존 일반 매칭 루프가 두 값을 모두 처리하므로 특수 분기 자체를 삭제
+### 1. 집계 RPC — `defect_snag_dashboard_matrix_json`
+- 반환 항목에 `room`, `subcontractor` 두 필드 추가. 단 **카디널리티 폭증 방지**를 위해 LIFT CABIN 행에서만 값을 채운다:
+  `CASE WHEN upper(trim(building)) = 'LIFT CABIN' THEN room END`, subcontractor 동일
+- 파라미터 시그니처는 불변(신규 인자 없음) → 구 시그니처 DROP 불필요
+- `rect_cnt`/`closed_cnt` 산출식(as-of 정본)은 그대로 유지
 
-### 2. `DeSnagDashboardPage.tsx`
-- `roomGroupParam()` 의 `FACADE → "FACADE,LANDSCAPE"` 분기 제거 (자기 값 그대로 전달)
-- `roomGroupEntries` 의 `param` 계산에서 동일 분기 제거 → Landscape 카드는 `roomGroup=LANDSCAPE`, Facade 카드는 `roomGroup=FACADE`
-- 카드는 기존 로직대로 `issued > 0` 인 그룹만 노출되므로 데이터가 있으면 자동으로 2장으로 표시
+### 2. `dashboard-shape.ts`
+- `MatrixRawRow` 에 `room`, `subcontractor` 추가
+- `classifyBuilding()` 에 `^LIFT\s*CABIN$/i → { kind: "liftcabin", label: "LIFT CABIN" }` 추가. `BlockKind`/`BlockKey` 에 `liftcabin` 추가
+- `buildMatrix()` 분기: `bld.kind === "liftcabin"` 이면 **level 판정보다 우선**해 lift 블록으로 보낸다(지하층 강제 분류에 흡수되지 않도록 LG 판정과 같은 위치에 배치)
+- 블록 셀 축을 문자열 키로 일반화: 기존 `Record<RoomGroupCol, Stats>` → `Record<string, Stats>` 로 완화하고, lift 블록은 열 키 = subcontractor 라벨(미지정은 `N/A`), 행 키 = `room`(빈 값은 `N/A`)
+- `MatrixBlock` 에 축 라벨 메타 추가: `rowAxis: { primary: string; secondary: string }`(일반 = Building/Level, lift = Block/Room), `colAxisLabel`(일반 = Room Group, lift = Subcontractor)
+- lift 블록 행 정렬용 자연 정렬 비교 함수 `compareRoomNatural(a, b)` 신설(접두어 문자열 대소 → 숫자 대소)
+- 블록 순서: tower → podium → lg → basement → **liftcabin**
 
 ### 3. `DeSnagMatrixBlock.tsx`
-- 223행·315행의 `"FACADE,LANDSCAPE"` 병합 파라미터를 각 열 키 그대로 전달하도록 수정
+- 1단 헤더 좌측 고정 헤더 텍스트를 `block.rowAxis` 에서 읽도록 변경(하드코딩 "Building"/"Level" 제거)
+- 열 헤더 드릴다운: lift 블록이면 `roomGroup` 대신 `subcontractor` 파라미터(미지정 열은 `__EMPTY__`)
+- 셀 드릴다운 `goCell()`: lift 블록이면 `building=LIFT CABIN`, `room=<행 값>`, `subcontractor=<열 값>`, `team`, `dateField` 조합. `level` 파라미터는 걸지 않는다(행 라벨이 level_name 이 아님)
+- Issued/Rect/Closed × 팀 9열, 병목 강조, Ready 하이라이트, 개수/%/잔여 토글은 기존 `TeamCells` 를 그대로 재사용
 
-### 4. 필터 바 / 엑셀
-- 코드 변경 없음. `ROOM_GROUP_ORDER` 확장에 따라 필터 칩에 `LANDSCAPE` 가 추가되고, 엑셀 매트릭스도 열이 하나 늘어난 상태로 그대로 출력됨. 실제 렌더 결과는 시행 후 확인해 보고
+### 4. 드릴다운 파라미터
+- `raw-data.tsx` 검색 스키마에 `room: z.string().optional()` 추가
+- `DefectRawDataPage.tsx` `URL_MAP` 에 `room: "room"` 추가(→ `DRILLDOWN_PARAMS` 자동 포함)
+- 카드 집계와 동일한 대소문자 무시 규칙을 위해 `defect_items_search` 의 `room`·`subcontractor_name` 필터를 `lower()` 양변 비교로 맞춘다(현행 `room_group` 과 동일)
+
+### 5. 엑셀 / 필터 바
+- `matrix-excel.ts` 는 `columnKeys` 순회 구조라 구조 변경 없음. 좌측 축 머리글 2칸 라벨만 `block.rowAxis` 에서 읽도록 대응
+- Room Group 필터 칩·카드에는 LIFT CABIN 을 노출하지 않는다(Room Group 축이 아니라 Building 축이므로)
 
 ## 영향 / 주의
 
-- 매트릭스 일반 블록의 열이 10개 → 11개로 늘어난다(가로 폭 증가). 이는 "카드+열+필터+엑셀 전부 분리" 승인 범위 내
-- LG 블록(Podium 축)은 영향 없음
-- 기존 URL 딥링크 `roomGroup=FACADE,LANDSCAPE` 는 Raw Data 필터에서 여전히 두 값 OR 로 해석되므로 깨지지 않음
+- LIFT CABIN 1,004건이 기존 `Others`(Podium 블록)에서 빠져 신규 블록으로 이동한다 → Podium 블록 합계가 감소하고 Plot 총계는 불변. 요청 범위 내 의도된 변화
+- 상단 Room Group 카드 집계는 `room_group` 기준이므로 영향 없음
+- 열 수는 (실적 있는 subcontractor 수 + N/A + Row Total) × 9. 플롯 필터 결과에 따라 최대 5~6그룹 수준
 
 ## 검증
 
-- 대시보드에서 Landscape / Facade 카드 각 1장 노출 및 Issued 합이 기존 병합 카드 값과 일치하는지 대조
-- 각 카드 클릭 → Raw Data 건수가 카드 숫자와 일치하는지 확인
-- 매트릭스 열 헤더/셀 드릴다운, 필터 칩, 엑셀 다운로드 열 구성 확인
+- 블록 합계 = `building='LIFT CABIN'` 모집단(Plot C 238 / D 165 / Tower3 267 / Tower4 334)과 일치하는지 검산
+- 임의 셀 클릭 → Raw Data 건수가 셀 숫자와 일치하는지 3건 표본 대조
+- 열 헤더·행 헤더·블록 전체 보기 드릴다운 각각 확인
+- 엑셀 다운로드에 LIFT CABIN 블록이 축 라벨과 함께 출력되는지 확인
