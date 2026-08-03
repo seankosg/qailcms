@@ -7,6 +7,14 @@ export interface ChartPoint {
   v: number; // 0..1
 }
 
+/** tm_kpi_norm_actual 과 동일 규칙: 0..1 정규화(1 초과는 100분율로 간주). */
+function normActual(v: unknown): number {
+  const n = Number(v);
+  if (!isFinite(n) || n <= 0) return 0;
+  const x = n > 1 ? n / 100 : n;
+  return Math.max(0, Math.min(1, x));
+}
+
 export interface TaskChartCache {
   task_no: string;
   plan_points: ChartPoint[];
