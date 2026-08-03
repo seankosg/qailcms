@@ -180,15 +180,50 @@ export const bulkUpdateDefects = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => BulkUpdateSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertCanEditRows(context, data.ids);
     const patch: Record<string, any> = {};
     for (const [k, v] of Object.entries(data.patch)) {
       if (ALLOWED_FIELDS.has(k)) patch[k] = v;
     }
     if (Object.keys(patch).length === 0) throw new Error("허용된 편집 필드가 없습니다.");
     patch.updated_at = new Date().toISOString();
-    const { error } = await (context.supabase as any).from("defect_items_raw").update(patch).in("id", data.ids);
-    if (error) throw new Error(error.message);
+    const editedFields = Object.keys(patch).filter((k) => DEFECT_AUTO_FILLED_FIELDS.has(k));
+    if (editedFields.length === 0) {
+      const { error } = await (context.supabase as any)
+        .from("defect_items_raw")
+        .update(patch)
+        .in("id", data.ids);
+      if (error) throw new Error(error.message);
+      return { ok: true, count: data.ids.length, fields: Object.keys(patch) };
+    }
+    // 자동채움 필드를 포함한 일괄 수정 → 행별 기존 잠금 목록에 병합해야 하므로
+    // 동일한 잠금 조합끼리 묶어 최소 횟수로 업데이트한다.
+    const { data: rows, error: fetchErr } = await context.supabase
+      .from("defect_items_raw")
+      .select("id, manual_locked_fields")
+      .in("id", data.ids);
+    if (fetchErr) throw new Error(fetchErr.message);
+    const groups = new Map<string, { ids: string[]; locks: string[] }>();
+    for (const r of (rows ?? []) as any[]) {
+      const locks = Array.from(
+        new Set<string>([...(((r.manual_locked_fields ?? []) as string[])), ...editedFields]),
+      ).sort();
+      const key = locks.join("|");
+      const g = groups.get(key) ?? { ids: [], locks };
+      g.ids.push(r.id as string);
+      groups.set(key, g);
+    }
+    for (const g of groups.values()) {
+      const { error } = await (context.supabase as any)
+        .from("defect_items_raw")
+        .update({
+          ...patch,
+          manual_locked_fields: g.locks,
+          manual_locked_at: new Date().toISOString(),
+        })
+        .in("id", g.ids);
+      if (error) throw new Error(error.message);
+    }
     return { ok: true, count: data.ids.length, fields: Object.keys(patch) };
   });
 
