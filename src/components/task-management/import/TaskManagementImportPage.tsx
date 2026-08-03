@@ -144,6 +144,7 @@ function ImportInner() {
   const [mappingFileId, setMappingFileId] = useState<string | null>(null);
   const [conflictFileId, setConflictFileId] = useState<string | null>(null);
   const [pendingImportAfterConflicts, setPendingImportAfterConflicts] = useState(false);
+  const [confirmAllOpen, setConfirmAllOpen] = useState(false);
   const masterOptions = useAllMasterOptions();
   const guard = useModuleGuard("tm", (fs) => addFiles(fs));
 
