@@ -285,7 +285,6 @@ export function AbdProgressPage() {
     if (plot !== "all" && !("plot" in s)) s.plot = plot;
     if (!("tab" in s)) s.tab = teams.length > 0 ? teams.join(",") : "MECH,ELEC,ARCH";
     // Progress 모집단(Terminated 포함)과 동일하게 맞춘다.
-    if (!("excluded" in s)) s.excluded = "all";
     navigate({ to: "/closure/abd/raw-data", search: s as any });
   };
 
@@ -321,7 +320,6 @@ export function AbdProgressPage() {
     params.set("plot", rowPlot ?? plot);
     // Progress 집계는 Terminated 포함이 업무 규칙. Raw 기본은 hide 라 모집단이
     // 어긋나므로 명시적으로 all 을 지정한다.
-    params.set("excluded", "all");
     // 매트릭스가 보던 As-of 를 명시 전달(세션 공유 의존 금지).
     params.set("asOf", asOfDate);
     // AP(Approval) 실적만 approval_date + sg_approved 경로 유지.
