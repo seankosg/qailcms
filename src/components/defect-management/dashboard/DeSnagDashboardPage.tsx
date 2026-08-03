@@ -20,6 +20,7 @@ import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import {
   ALL_TEAMS,
   buildMatrix,
+  isLgRoomGroup,
   LG_ROOM_GROUPS,
   mergeStats,
   newStats,
