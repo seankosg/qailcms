@@ -313,7 +313,7 @@ export function TaskDetailPage() {
                     >
                       <dt
                         className="flex w-[92px] shrink-0 items-center justify-end gap-1 text-right text-[10px] uppercase tracking-wide text-muted-foreground"
-                        title={label}
+                        title={c.note ? `${label} — ${c.note}` : label}
                       >
                         {isOwnerField && editable && (
                           <KeyRound className="h-2.5 w-2.5 text-primary/60" aria-label="권한 편집" />
