@@ -34,7 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { RollbackDialog, type RollbackKind } from "@/components/import/RollbackDialog";
-import { fetchAllByUploadId } from "@/lib/import/fetchAllByUploadId";
+import { fetchAllByUploadId, fetchAllFieldLogs } from "@/lib/import/fetchAllByUploadId";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   FieldLogTable,
