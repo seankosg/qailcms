@@ -321,6 +321,8 @@ export function buildMatrix(
   const lg: RowsMap = new Map();
   const basement: RowsMap = new Map();
   const liftcabin: RowsMap = new Map();
+  const roomGroupTotals: Record<string, Stats> = emptyRoomGroupStats();
+  const roomGroupSourceMap: Record<string, Set<string>> = {};
 
   const ensure = (
     m: RowsMap,
@@ -476,7 +478,18 @@ export function buildMatrix(
   const plotTotal = newStats();
   for (const b of blocks) mergeStats(plotTotal, b.blockTotal);
 
-  return { plot, planGroups: planGroupsForPlot(plot), teams, blocks, plotTotal };
+  const srcMap: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(roomGroupSourceMap)) srcMap[k] = Array.from(v);
+
+  return {
+    plot,
+    planGroups: planGroupsForPlot(plot),
+    teams,
+    blocks,
+    plotTotal,
+    roomGroupTotals,
+    roomGroupSourceMap: srcMap,
+  };
 }
 
 // ── 드릴다운 URL 파라미터 조립 ────────────────────────────────────
