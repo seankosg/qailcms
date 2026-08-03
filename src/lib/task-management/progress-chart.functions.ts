@@ -39,7 +39,11 @@ export const getTaskProgressChartsBulk = createServerFn({ method: "POST" })
 
 /** 팝업 오픈 시 개별 항목 즉시 재계산.
  *  Plan 곡선: plan_start..plan_end 를 60포인트 균등 샘플.
- *  Actual 곡선: status_history(field=actual_progress) 시간 오름차순 + 폴백. */
+ *  Actual 곡선(R2-1): 2점 직선(일할 역계산) — 이력 스냅샷 사용 금지.
+ *   - 시작 앵커 = actual_start ?? plan_start, v=0
+ *   - 끝 앵커  = actual_finish 있으면 그 날짜 v=1,
+ *               없으면 COALESCE(progress_observed_at, data_date) 에서 v=norm(actual_progress)
+ *   - 앵커가 하나라도 없거나 끝<시작 이면 빈 배열. */
 export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) =>
@@ -56,24 +60,13 @@ export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
     const { data: rawRow, error: rawErr } = await supa
       .from("task_management_raw")
       .select(
-        "task_no, task_name, plan_start, plan_end, actual_start, actual_finish, actual_progress, data_date",
+        "task_no, task_name, plan_start, plan_end, actual_start, actual_finish, actual_progress, progress_observed_at, data_date",
       )
       .eq("discipline", data.discipline)
       .eq("task_no", data.task_no)
       .maybeSingle();
     if (rawErr) throw new Error(rawErr.message);
     if (!rawRow) throw new Error("Task not found");
-
-    const { data: hist, error: histErr } = await supa
-      .from("task_management_status_history")
-      .select("new_value, changed_at")
-      .eq("discipline", data.discipline)
-      .eq("task_no", data.task_no)
-      .eq("field", "actual_progress")
-      .not("new_value", "is", null)
-      .order("changed_at", { ascending: true })
-      .limit(2000);
-    if (histErr) throw new Error(histErr.message);
 
     const NPTS = 60;
     const plan_points: ChartPoint[] = [];
@@ -91,45 +84,32 @@ export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
       }
     }
 
-    // Actual curve: start anchor (actual_start ?? plan_start, v=0)
-    //  → mid history snapshots (strictly between anchors)
-    //  → last anchor (data_date, actual_progress)
-    // No history ⇒ two-point linear = "일할 역계산" inference.
+    // R2-1: 2점 직선. 이력(status_history) 참조 없음.
     const actual_points: ChartPoint[] = [];
     const startAnchorDate: string | null =
       (rawRow.actual_start ? String(rawRow.actual_start).slice(0, 10) : null) ??
       (rawRow.plan_start ? String(rawRow.plan_start).slice(0, 10) : null);
-    const lastAnchorDate: string | null = rawRow.data_date
-      ? String(rawRow.data_date).slice(0, 10)
-      : null;
-    const lastAnchorVal: number | null =
-      rawRow.actual_progress != null
-        ? Math.max(0, Math.min(1, Number(rawRow.actual_progress)))
+    const finishIso = rawRow.actual_finish ? String(rawRow.actual_finish).slice(0, 10) : null;
+    const lastAnchorDate: string | null =
+      finishIso ??
+      (rawRow.progress_observed_at
+        ? String(rawRow.progress_observed_at).slice(0, 10)
+        : rawRow.data_date
+          ? String(rawRow.data_date).slice(0, 10)
+          : null);
+    const lastAnchorVal: number | null = finishIso
+      ? 1
+      : rawRow.actual_progress != null
+        ? normActual(rawRow.actual_progress)
         : null;
 
-    if (startAnchorDate) {
+    if (
+      startAnchorDate &&
+      lastAnchorDate &&
+      lastAnchorVal != null &&
+      lastAnchorDate >= startAnchorDate
+    ) {
       actual_points.push({ d: startAnchorDate, v: 0 });
-    }
-
-    const validHist = ((hist ?? []) as { new_value: string | null; changed_at: string }[])
-      .filter((h) => h.new_value != null && h.new_value !== "")
-      .map((h) => {
-        const dohaShift = new Date(new Date(h.changed_at).getTime() + 3 * 3600_000);
-        return {
-          d: dohaShift.toISOString().slice(0, 10),
-          v: Math.max(0, Math.min(1, Number(h.new_value) || 0)),
-        };
-      })
-      .filter(
-        (p) =>
-          (!startAnchorDate || p.d > startAnchorDate) &&
-          (!lastAnchorDate || p.d < lastAnchorDate),
-      );
-    for (const p of validHist) {
-      actual_points.push({ d: p.d, v: Number(p.v.toFixed(4)) });
-    }
-
-    if (lastAnchorDate && lastAnchorVal != null) {
       actual_points.push({ d: lastAnchorDate, v: Number(lastAnchorVal.toFixed(4)) });
     }
 
@@ -142,6 +122,7 @@ export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
       plan_start: (rawRow.plan_start ?? null) as string | null,
       plan_end: (rawRow.plan_end ?? null) as string | null,
       actual_progress: (rawRow.actual_progress ?? null) as number | null,
+      actual_finish: (rawRow.actual_finish ?? null) as string | null,
     };
   });
 
