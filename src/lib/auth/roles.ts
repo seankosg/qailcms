@@ -1,5 +1,10 @@
 import { ROLE_RANK, type AppRole } from "@/types/enums";
 
+/** 사용자 식별 정본 키 정규화 (DB profiles.name_norm 과 동일 규칙). */
+export function normalizeUserName(v: unknown): string {
+  return String(v ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+}
+
 export interface MinimalUser {
   roles?: AppRole[] | string[];
   rank?: number;
@@ -78,14 +83,19 @@ export function canEditRawRow(
     return !!rt && !!ut && rt === ut;
   }
   if (roles.includes("user")) {
-    const candidates: Array<[string | null | undefined, string | null | undefined]> = [
-      [user.hdec_pic_name, row.hdec_pic_name],
-      [user.hdec_eng_name, row.hdec_eng_name],
+    // 사람 이름은 profiles.name 단독 키로 판정한다 (hdec_pic_name/hdec_eng_name 은 별칭).
+    const me = normalizeUserName(user.name);
+    if (me) {
+      const rowNames = [row.hdec_pic_name, row.hdec_eng_name, row.pic].map(normalizeUserName);
+      if (rowNames.some((n) => n && n === me)) return true;
+    }
+    // 업체명은 사람 이름이 아니므로 업체 컬럼으로 계속 비교한다.
+    const company: Array<[string | null | undefined, string | null | undefined]> = [
       [user.subcontractor_name, row.subcontractor_name],
       [user.subsub_name, row.subsub_name],
     ];
-    return candidates.some(
-      ([u, r]) => !!u && !!r && String(u).trim() === String(r).trim(),
+    return company.some(
+      ([u, r]) => !!u && !!r && normalizeUserName(u) === normalizeUserName(r),
     );
   }
   return false;
