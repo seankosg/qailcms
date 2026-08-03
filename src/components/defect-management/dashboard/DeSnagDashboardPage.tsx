@@ -191,8 +191,11 @@ export function DeSnagDashboardPage() {
     const totals = {} as Record<RoomGroupCol, Stats>;
     for (const rg of keys) totals[rg] = newStats();
     for (const block of matrix.blocks) {
+      // 동적 열 블록(LIFT CABIN 등)은 Room Group 열을 갖지 않으므로 제외
+      if (block.colAxisLabel !== "Room Group") continue;
       for (const rg of keys) {
-        mergeStats(totals[rg], block.colTotals[rg]);
+        const src = block.colTotals[rg];
+        if (src) mergeStats(totals[rg], src);
       }
     }
     const base = ROOM_GROUP_ORDER.map((col) => ({
