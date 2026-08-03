@@ -210,14 +210,16 @@ function formatDdMmm(v: any): string {
 
 
 const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = [
-  { value: "approved", label: "Approved (A)" },
-  { value: "unapproved", label: "Unapproved" },
+  { value: "approved", label: "Approved" },
+  { value: "under_review", label: "Awaiting Response" },
+  { value: "drafting", label: "Draft Start" },
+  { value: "resubmit", label: "Resubmit by TM" },
 ];
 // UI 탭에 노출되는 3종 + Dashboard 딥링크로만 들어오는 세분화 상태값들.
 // URL 파라미터 파싱 시 유효값 판정에 사용된다.
 const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
-  "in_progress", "not_started",
-  "under_review", "drafting", "rs_delay", "sb_delay", "df_delay", "ds_delay", "no_plan", "delayed",
+  "in_progress", "not_started", "unapproved",
+  "rs_delay", "sb_delay", "df_delay", "ds_delay", "no_plan", "delayed",
   // stage_group 축 (Progress KPI 스트립 드릴다운): 재고 sg_*, 지연 sgd_*
   "sg_ns", "sg_ds", "sg_df", "sg_sb", "sg_rs", "sg_resubmit", "sg_approved",
   "sgd_ns", "sgd_ds", "sgd_df", "sgd_sb", "sgd_rs",
@@ -230,6 +232,8 @@ const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
   // 키 'under_review' = 회신 대기(RS). 딥링크 하위호환으로 키 유지, 라벨만 정정.
   under_review: "Awaiting Response",
   drafting: "Draft Start",
+  resubmit: "Resubmit by TM",
+  unapproved: "Unapproved",
   rs_delay: "Response Delay",
   sb_delay: "Submission Delay",
   df_delay: "Draft Finish Delay",
