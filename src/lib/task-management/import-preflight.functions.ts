@@ -14,6 +14,9 @@ const PreflightRowSchema = z.object({
   plan_start: z.string().nullable().optional(),
   plan_end: z.string().nullable().optional(),
   actual_progress: z.number().nullable().optional(),
+  actual_finish: z.string().nullable().optional(),
+  /** 엑셀에 '실제 완료' 열이 있고 셀이 명시적으로 비어 있는가 */
+  actual_finish_cleared: z.boolean().optional(),
 });
 
 const PreflightInputSchema = z.object({
@@ -53,8 +56,17 @@ export type PreflightRegression = {
   task_name: string | null;
   previous: number | null;
   next: number | null;
-  kind: "uncomplete" | "downgrade";
+  kind: "uncomplete" | "downgrade" | "finish_cleared";
+  /** finish_cleared 인 경우 DB에 남아 있는 완료일 */
+  previous_finish?: string | null;
 };
+
+/**
+ * §2: 임포트가 actual_finish 를 강제로 NULL 로 덮어쓰는가.
+ * 현재 임포트는 stripNullExcept 의 force 목록에 actual_finish 를 넣지 않으므로
+ * 엑셀 완료일 칸이 비어도 DB 값은 지워지지 않는다 → 목록에서 제외한다.
+ */
+const ACTUAL_FINISH_FORCE_CLEARED = false;
 
 function normalizeName(s: string | null | undefined): string {
   if (!s) return "";
@@ -113,13 +125,16 @@ export const previewTaskImport = createServerFn({ method: "POST" })
       plan_start: string | null;
       plan_end: string | null;
       actual_progress: number | null;
+      actual_finish: string | null;
     }>();
 
     for (let i = 0; i < taskNos.length; i += 500) {
       const chunk = taskNos.slice(i, i + 500);
       const { data: dbRows, error } = await supabase
         .from("task_management_raw")
-        .select("task_no, main_task_no, task_name, plot, plan_start, plan_end, actual_progress")
+        .select(
+          "task_no, main_task_no, task_name, plot, plan_start, plan_end, actual_progress, actual_finish",
+        )
         .eq("discipline", data.discipline)
         .in("task_no", chunk);
       if (error) throw new Error(error.message);
@@ -158,6 +173,23 @@ export const previewTaskImport = createServerFn({ method: "POST" })
             kind,
           });
         }
+      }
+
+      // §2: 엑셀 완료일이 명시적으로 비었고 DB에는 값이 있는 행 (실제로 지워질 때만 목록화)
+      if (
+        ACTUAL_FINISH_FORCE_CLEARED &&
+        r.actual_finish_cleared === true &&
+        (r.actual_finish ?? null) === null &&
+        db.actual_finish != null
+      ) {
+        regressions.push({
+          task_no: r.task_no,
+          task_name: db.task_name,
+          previous: db.actual_progress == null ? null : Number(db.actual_progress),
+          next: r.actual_progress == null ? null : Number(r.actual_progress),
+          kind: "finish_cleared",
+          previous_finish: db.actual_finish,
+        });
       }
 
       // Conflict detection
