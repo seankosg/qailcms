@@ -69,16 +69,6 @@ export function DeSnagDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.dataDate]);
 
-  // Plot/Team은 스테이징: 변경해도 서버 재호출 없음, '재계산' 버튼으로 적용
-  const [stagedPlot, setStagedPlot] = useState<PlotKey>(appliedPlot);
-  const [stagedTeams, setStagedTeams] = useState<TeamKey[]>(appliedTeams);
-
-  // URL 변경(뒤로가기/공유 링크 진입 등) 시 스테이징 값도 동기화
-  useEffect(() => {
-    setStagedPlot(appliedPlot);
-    setStagedTeams(appliedTeams);
-  }, [appliedPlot, appliedTeams]);
-
   const { data: rawRows = [], isLoading, error } = useSnagDashboardMatrix(
     appliedPlot,
     appliedTeams,
@@ -104,26 +94,12 @@ export function DeSnagDashboardPage() {
     : "count";
   const isRemainMode = matrixMode === "remain" || matrixMode === "remainPct";
 
-  const teamKey = (t: TeamKey[]) => [...t].sort().join(",");
-  const isDirty =
-    stagedPlot !== appliedPlot || teamKey(stagedTeams) !== teamKey(appliedTeams);
-
-  const applyFilters = () => {
-    if (!isDirty) return;
+  // Plot/Team 변경은 즉시 적용(자동 재계산)
+  const setTeamsImmediate = (t: TeamKey[]) =>
     navigate({
       to: "/closure/snag-management/dashboard",
-      search: {
-        plot: stagedPlot,
-        teams: stagedTeams.join(","),
-        roomGroups: rgStr,
-      },
+      search: (prev: Record<string, unknown>) => ({ ...prev, teams: t.join(",") }) as any,
     });
-  };
-
-  const resetStaged = () => {
-    setStagedPlot(appliedPlot);
-    setStagedTeams(appliedTeams);
-  };
 
   const setRoomGroups = (rgs: RoomGroupCol[]) =>
     navigate({
@@ -141,7 +117,6 @@ export function DeSnagDashboardPage() {
 
   // 매트릭스 상단 Plot 탭 — 즉시 적용 (다른 파라미터 보존)
   const setPlotTab = (p: PlotKey) => {
-    setStagedPlot(p);
     navigate({
       to: "/closure/snag-management/dashboard",
       search: (prev: Record<string, unknown>) => ({ ...prev, plot: p }) as any,
@@ -279,26 +254,13 @@ export function DeSnagDashboardPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <Tabs value={stagedPlot} onValueChange={(v) => setStagedPlot(v as PlotKey)}>
+          <Tabs value={appliedPlot} onValueChange={(v) => setPlotTab(v as PlotKey)}>
             <TabsList>
               <TabsTrigger value="C">Plot C (+Tower 3)</TabsTrigger>
               <TabsTrigger value="D">Plot D (+Tower 4)</TabsTrigger>
             </TabsList>
           </Tabs>
-          <DeSnagToolbar teams={stagedTeams} onChange={setStagedTeams} />
-        </div>
-        <div className="flex items-center gap-2">
-          {isDirty && (
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
-              변경된 필터 적용 필요
-            </span>
-          )}
-          <Button size="sm" onClick={applyFilters} disabled={!isDirty}>
-            재계산
-          </Button>
-          <Button size="sm" variant="ghost" onClick={resetStaged} disabled={!isDirty}>
-            초기화
-          </Button>
+          <DeSnagToolbar teams={appliedTeams} onChange={setTeamsImmediate} />
         </div>
       </div>
 
