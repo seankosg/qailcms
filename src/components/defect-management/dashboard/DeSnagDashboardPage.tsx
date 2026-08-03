@@ -246,9 +246,6 @@ export function DeSnagDashboardPage() {
                 }
               />
           </div>
-          <p className="text-xs text-muted-foreground">
-            Plot · Building · Level × Room Group 매트릭스. 셀·헤더 클릭 시 Raw Data 드릴다운.
-          </p>
         </div>
       </div>
 
