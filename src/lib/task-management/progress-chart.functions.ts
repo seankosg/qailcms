@@ -50,7 +50,8 @@ export const getTaskProgressChartsBulk = createServerFn({ method: "POST" })
  *  Actual 곡선(R2-1): 2점 직선(일할 역계산) — 이력 스냅샷 사용 금지.
  *   - 시작 앵커 = actual_start ?? plan_start, v=0
  *   - 끝 앵커  = actual_finish 있으면 그 날짜 v=1,
- *               없으면 COALESCE(progress_observed_at, data_date) 에서 v=norm(actual_progress)
+ *               없으면 COALESCE(progress_observed_at, data_date) 에서
+ *               v=COALESCE(norm(actual_progress), 0) — 판정 함수의 NULL→0 규칙과 일치
  *   - 앵커가 하나라도 없거나 끝<시작 이면 빈 배열. */
 export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -105,11 +106,8 @@ export const getTaskProgressChartDetail = createServerFn({ method: "POST" })
         : rawRow.data_date
           ? String(rawRow.data_date).slice(0, 10)
           : null);
-    const lastAnchorVal: number | null = finishIso
-      ? 1
-      : rawRow.actual_progress != null
-        ? normActual(rawRow.actual_progress)
-        : null;
+    // R2-1(2-1): NULL actual_progress 는 판정 함수와 동일하게 0 으로 취급한다.
+    const lastAnchorVal: number | null = finishIso ? 1 : normActual(rawRow.actual_progress);
 
     if (
       startAnchorDate &&
