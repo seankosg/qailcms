@@ -514,6 +514,49 @@ function ImportInner() {
       )}
 
       <PreviewDialog file={previewFile} onClose={() => setPreviewFileId(null)} />
+      <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>전체 스코프로 임포트합니다</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  {isAdmin
+                    ? "Admin 권한이므로 스코프가 '전체'로 강제됩니다."
+                    : "'전체' 스코프를 선택하셨습니다."}{" "}
+                  본인 담당이 아닌 행의 진도율·일정·담당자(HDEC PIC)까지 파일 값으로 덮어씁니다.
+                </p>
+                <div className="rounded border p-2">
+                  <div className="font-medium">영향 행수 — 총 {totalMatched}행</div>
+                  <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                    {readyFiles.map((f) => (
+                      <li key={f.id}>
+                        {f.name} · {matchedByFile[f.id]?.matched ?? 0}행
+                        {me?.hdec_pic_name
+                          ? ` (본인 HDEC PIC 매칭 ${
+                              (f.parsed ?? []).filter((r) => matchesHdecPic(r)).length
+                            }행)`
+                          : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmAllOpen(false);
+                void runStartImport();
+              }}
+            >
+              전체 임포트 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {conflictFile && (
         <ConflictDecisionDialog
           open={!!conflictFile}
