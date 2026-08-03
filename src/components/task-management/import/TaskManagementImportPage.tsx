@@ -34,6 +34,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   TaskManagementImportProvider,
@@ -94,7 +104,9 @@ export function TaskManagementImportPage() {
 function ImportInner() {
   const { data: me } = useCurrentUser();
   const canImport = !!me?.isEditor;
-  const isAdmin = !!me?.isAdmin;
+  // TM 임포트 전용 admin 판정 — superuser 는 제외한다(전역 useCurrentUser 는 수정하지 않음).
+  // superuser/d_superuser 는 스코프를 '드롭다운으로 선택'하는 것이 설계 의도다.
+  const isAdmin = (me?.roles ?? []).includes("admin");
   const isSuperUserLike = !!(me?.isSuperUser || me?.isDSuperUser);
   const {
     files,
@@ -132,12 +144,13 @@ function ImportInner() {
   const [mappingFileId, setMappingFileId] = useState<string | null>(null);
   const [conflictFileId, setConflictFileId] = useState<string | null>(null);
   const [pendingImportAfterConflicts, setPendingImportAfterConflicts] = useState(false);
+  const [confirmAllOpen, setConfirmAllOpen] = useState(false);
   const masterOptions = useAllMasterOptions();
   const guard = useModuleGuard("tm", (fs) => addFiles(fs));
 
   // Sync importer identity/scope to context whenever user info changes
   const hdecPic = me?.hdec_pic_name ?? null;
-  const adminFlag = !!me?.isAdmin;
+  const adminFlag = isAdmin;
   useEffect(() => {
     setImporterHdecPicName(hdecPic);
     setIsImporterAdmin(adminFlag);
@@ -281,6 +294,13 @@ function ImportInner() {
     readyCount === 0 ||
     !canImport ||
     (!isAdmin && totalMatched === 0);
+  const onStartClick = () => {
+    if (effectiveScope === "all") {
+      setConfirmAllOpen(true);
+      return;
+    }
+    void runStartImport();
+  };
   const previewFile = files.find((f) => f.id === previewFileId) ?? null;
   const columnFile = files.find((f) => f.id === mappingFileId) ?? null;
   const conflictFile = files.find((f) => f.id === conflictFileId) ?? null;
@@ -394,7 +414,13 @@ function ImportInner() {
               <CardTitle className="text-base">2. Files ({files.length})</CardTitle>
               <CardDescription>
                 {readyCount} ready · 임포트 대상 {totalMatched}행
-                {!isAdmin && ` · 스코프: ${effectiveScope === "mine" ? "본인 HDEC PIC만" : "전체(Super User)"}`}
+                {` · 스코프: ${
+                  isAdmin
+                    ? "전체(Admin — 강제)"
+                    : effectiveScope === "mine"
+                      ? "본인 HDEC PIC만"
+                      : "전체(Super User 선택)"
+                }`}
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -442,7 +468,7 @@ function ImportInner() {
               )}
               <Button
                 size="sm"
-                onClick={runStartImport}
+                onClick={onStartClick}
                 disabled={startDisabled || pendingImportAfterConflicts}
                 title={
                   !canImport
@@ -488,6 +514,53 @@ function ImportInner() {
       )}
 
       <PreviewDialog file={previewFile} onClose={() => setPreviewFileId(null)} />
+      <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>전체 스코프로 임포트합니다</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  {isAdmin
+                    ? "Admin 권한이므로 스코프가 '전체'로 강제됩니다."
+                    : "'전체' 스코프를 선택하셨습니다."}{" "}
+                  본인 담당이 아닌 행의 진도율·일정·담당자(HDEC PIC)까지 파일 값으로 덮어씁니다.
+                </p>
+                <div className="rounded border p-2">
+                  <div className="font-medium">영향 행수 — 총 {totalMatched}행</div>
+                  <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                    {readyFiles.map((f) => (
+                      <li key={f.id}>
+                        {f.name} · {matchedByFile[f.id]?.matched ?? 0}행
+                        {me?.hdec_pic_name
+                          ? ` (본인 HDEC PIC 매칭 ${
+                              (f.parsed ?? []).filter(
+                                (r) =>
+                                  (r.hdec_pic_name ?? "").trim().toLowerCase() ===
+                                  (me.hdec_pic_name ?? "").trim().toLowerCase(),
+                              ).length
+                            }행)`
+                          : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmAllOpen(false);
+                void runStartImport();
+              }}
+            >
+              전체 임포트 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {conflictFile && (
         <ConflictDecisionDialog
           open={!!conflictFile}
@@ -775,6 +848,48 @@ function FileRow({
                   <span className="text-muted-foreground">충돌 없음</span>
                 )}
               </div>
+            )}
+            {f.preflight && f.preflight.regressionCount > 0 && (
+              <details className="mt-2 rounded border border-amber-300 bg-amber-50/60 p-2 text-xs">
+                <summary className="cursor-pointer font-medium text-amber-800">
+                  진도율 하향 {f.preflight.regressionCount}건
+                  {f.preflight.uncompleteCount > 0
+                    ? ` (완료 취소 ${f.preflight.uncompleteCount}건 포함)`
+                    : ""}
+                </summary>
+                <table className="mt-2 w-full">
+                  <thead className="text-[11px] text-muted-foreground">
+                    <tr className="[&>th]:px-1 [&>th]:py-0.5 [&>th]:text-left">
+                      <th className="w-28">task_no</th>
+                      <th>task_name</th>
+                      <th className="w-20">이전</th>
+                      <th className="w-20">이후</th>
+                      <th className="w-20">구분</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {f.preflight.regressions.map((r) => (
+                      <tr key={r.task_no} className="border-t border-amber-200 align-top">
+                        <td className="px-1 py-0.5 font-mono text-[11px]">{r.task_no}</td>
+                        <td className="px-1 py-0.5">{r.task_name ?? "—"}</td>
+                        <td className="px-1 py-0.5">
+                          {r.previous == null ? "—" : `${(r.previous * 100).toFixed(1)}%`}
+                        </td>
+                        <td className="px-1 py-0.5">
+                          {r.next == null ? "—" : `${(r.next * 100).toFixed(1)}%`}
+                        </td>
+                        <td className="px-1 py-0.5">
+                          {r.kind === "uncomplete" ? (
+                            <span className="font-medium text-destructive">완료 취소</span>
+                          ) : (
+                            "하향"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
             )}
             {f.preflightError && (
               <p className="mt-1 text-xs text-destructive">중복 점검 실패: {f.preflightError}</p>

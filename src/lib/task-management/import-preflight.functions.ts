@@ -42,6 +42,18 @@ export type PreflightSummary = {
   unchangedCount: number;
   conflictCount: number;
   conflicts: PreflightConflict[];
+  /** 진도율이 낮아지거나 완료가 취소되는 행 목록 */
+  regressions: PreflightRegression[];
+  regressionCount: number;
+  uncompleteCount: number;
+};
+
+export type PreflightRegression = {
+  task_no: string;
+  task_name: string | null;
+  previous: number | null;
+  next: number | null;
+  kind: "uncomplete" | "downgrade";
 };
 
 function normalizeName(s: string | null | undefined): string {
@@ -86,6 +98,9 @@ export const previewTaskImport = createServerFn({ method: "POST" })
         unchangedCount: 0,
         conflictCount: 0,
         conflicts: [] as PreflightConflict[],
+        regressions: [] as PreflightRegression[],
+        regressionCount: 0,
+        uncompleteCount: 0,
       } satisfies PreflightSummary;
     }
 
@@ -117,12 +132,32 @@ export const previewTaskImport = createServerFn({ method: "POST" })
     let updateCount = 0;
     let unchangedCount = 0;
     const conflicts: PreflightConflict[] = [];
+    const regressions: PreflightRegression[] = [];
+    let uncompleteCount = 0;
 
     for (const r of rows) {
       const db = dbMap.get(r.task_no);
       if (!db) {
         newCount++;
         continue;
+      }
+
+      // 진도율 하향 · 완료 취소 감지 (충돌 여부와 무관하게 먼저 기록)
+      if (r.actual_progress != null && db.actual_progress != null) {
+        const prev = Number(db.actual_progress);
+        const next = Number(r.actual_progress);
+        if (next < prev - 1e-9) {
+          const wasComplete = prev >= 0.9999;
+          const kind = wasComplete && next < 0.9999 ? "uncomplete" : "downgrade";
+          if (kind === "uncomplete") uncompleteCount++;
+          regressions.push({
+            task_no: r.task_no,
+            task_name: db.task_name,
+            previous: prev,
+            next,
+            kind,
+          });
+        }
       }
 
       // Conflict detection
@@ -172,6 +207,11 @@ export const previewTaskImport = createServerFn({ method: "POST" })
       unchangedCount,
       conflictCount: conflicts.length,
       conflicts: conflicts.slice(0, 500), // safety cap
+      regressions: regressions
+        .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "uncomplete" ? -1 : 1))
+        .slice(0, 500),
+      regressionCount: regressions.length,
+      uncompleteCount,
     } satisfies PreflightSummary;
   });
 
