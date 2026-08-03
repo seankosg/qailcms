@@ -37,6 +37,7 @@ import { computeDailyPlan, computeDailyDiff } from "@/lib/task-management/derive
 import { todayIso } from "@/lib/task-management/schedule-utils";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { useTmRowsAsOf } from "@/hooks/useTmRowsAsOf";
+import { isUnconfirmedFinishSource, finishSourceTooltip } from "@/lib/task-management/finish-source";
 
 // Runtime reference to keep the deploy marker in the client bundle (tree-shake guard)
 if (typeof window !== "undefined") (window as any).__TM_MARK__ = TM_OWNER_MUTATIONS_MARKER;
