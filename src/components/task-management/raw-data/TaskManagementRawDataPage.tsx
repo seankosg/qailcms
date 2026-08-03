@@ -1518,6 +1518,13 @@ export function TaskManagementRawDataPage() {
                     : "";
                   const canSort = h.column.getCanSort();
                   const isSelectCol = h.column.id === "__select";
+                  const colNote = TM_COLUMNS.find((cc) => cc.key === h.column.id)?.note;
+                  const headerTitle = [
+                    typeof h.column.columnDef.header === "string" ? h.column.columnDef.header : "",
+                    colNote ?? "",
+                  ]
+                    .filter(Boolean)
+                    .join(" — ");
                   return (
                     <div
                       key={h.id}
@@ -1534,7 +1541,7 @@ export function TaskManagementRawDataPage() {
                     >
                       {h.column.id === "task_no" && <Pin className="h-3 w-3 text-primary" />}
                       {isSelectCol || !canSort ? (
-                        <span className="flex flex-1 items-center gap-1 truncate">
+                        <span className="flex flex-1 items-center gap-1 truncate" title={headerTitle || undefined}>
                           {flexRender(h.column.columnDef.header, h.getContext())}
                         </span>
                       ) : (
@@ -1542,7 +1549,7 @@ export function TaskManagementRawDataPage() {
                           type="button"
                           onClick={h.column.getToggleSortingHandler()}
                           className="flex flex-1 items-center gap-1 truncate text-left"
-                          title={typeof h.column.columnDef.header === "string" ? h.column.columnDef.header : ""}
+                          title={headerTitle}
                         >
                           <span className="truncate">
                             {flexRender(h.column.columnDef.header, h.getContext())}
