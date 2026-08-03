@@ -74,6 +74,6 @@ export async function fetchAllAbdRowsForExport(
     }
   }
 
-  assertNoTruncation("abd_items_search(EXPORT)", collected, total);
+  assertNoTruncation("abd_items_search(EXPORT)", collected, total, "ALL");
   return collected;
 }
