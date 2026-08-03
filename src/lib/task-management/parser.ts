@@ -27,8 +27,12 @@ export interface ParsedTaskRow {
   plan_progress: number | null;
   progress_variance: number | null;
   forecast_end: string | null;
-  /** actual_progress===1 이면 forecast_end(=Revise Finish) → dataDate 폴백으로 자동 채움. 그 외 null. */
+  /** 엑셀 '실제 완료' 열에서 읽은 값. 열이 없거나 셀이 비면 null. (자동 보정 없음 — P4-2) */
   actual_finish: string | null;
+  /** 엑셀에 '실제 완료' 열이 존재하고 해당 셀이 명시적으로 비어 있는가 (열 자체가 없으면 false) */
+  actual_finish_cleared: boolean;
+  /** 엑셀 '실적 진도율' 칸에 값이 있었는가 (P4-3 progress_observed_at 주입 조건) */
+  progress_cell_present: boolean;
   slip_days: number | null;
   auto_judgment: string | null;
   /** Milestone: HO | COC | DLP (H/O → HO 정규화). 미지정/비인식은 null. */
@@ -89,6 +93,7 @@ export const TASK_TARGET_FIELDS = [
   "plan_progress",
   "progress_variance",
   "forecast_end",
+  "actual_finish",
   "slip_days",
   "auto_judgment",
   "milestone",
@@ -131,6 +136,10 @@ const TASK_FIELD_ALIASES: Record<TaskTargetField, string[]> = {
     "누계 차이", "누계차이", "누계 진도차", "누계진도차",
   ],
   forecast_end: ["예상 완료", "Forecast End"],
+  actual_finish: [
+    "실제 완료", "실제완료", "실제 완료일", "실제완료일",
+    "Actual Finish", "Actual End", "A.Finish", "A. Finish", "완료일",
+  ],
   slip_days: ["차이 (일)", "차이(일)", "Slip"],
   auto_judgment: ["자동 판정", "Auto Judgment"],
   milestone: ["Milestone", "milestone", "마일스톤", "M/S", "MS"],
@@ -530,6 +539,14 @@ export async function parseTaskManagementExcel(
     forecast_end: pick("forecast_end", ["예상 완료"], 18),
     slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 19),
     auto_judgment: pick("auto_judgment", ["자동 판정"], 20),
+    // actual_finish 는 선택 컬럼: ★위치 폴백 금지 (milestone 방식). 헤더가 없으면 0.
+    actual_finish: (() => {
+      for (const name of withAlias("actual_finish", TASK_FIELD_ALIASES.actual_finish)) {
+        const idx = headerMap[normalizeHeader(name)];
+        if (idx) return idx;
+      }
+      return 0;
+    })(),
     // Milestone은 선택 컬럼: 헤더가 없으면 21열 폴백을 쓰지 않고 스킵(0).
     milestone: (() => {
       for (const name of withAlias("milestone", ["Milestone", "마일스톤"])) {
@@ -579,6 +596,7 @@ export async function parseTaskManagementExcel(
   clampField("plan_progress", "plan_progress");
   clampField("progress_variance", "progress_variance");
   clampField("forecast_end", "forecast_end");
+  clampField("actual_finish", "actual_finish");
   clampField("slip_days", "slip_days");
   clampField("auto_judgment", "auto_judgment");
   clampField("milestone", "milestone");
@@ -607,6 +625,7 @@ export async function parseTaskManagementExcel(
     plan_progress: cols.plan_progress,
     progress_variance: cols.progress_variance,
     forecast_end: cols.forecast_end,
+    actual_finish: cols.actual_finish,
     slip_days: cols.slip_days,
     auto_judgment: cols.auto_judgment,
     milestone: cols.milestone,
@@ -811,12 +830,26 @@ export async function parseTaskManagementExcel(
             header: sheetHeaders.find((h) => h.col === cols.forecast_end)?.header || "예상 완료",
           })
         : null,
-      // A.Finish 자동 보정: 100% 완료면 Revise Finish(=forecast_end) → dataDate 폴백.
-      actual_finish: (() => {
-        const ap = toPct4(getCell(sheet, r, cols.actual_progress));
-        if (ap !== 1) return null;
-        const fe = toIsoDate(getCell(sheet, r, cols.forecast_end));
-        return fe ?? dataDate ?? null;
+      // P4-1/P4-2: 엑셀 '실제 완료' 열에서만 읽는다. 자동 보정(forecast_end/dataDate 폴백) 없음.
+      actual_finish: cols.actual_finish
+        ? readDateCell(getCell(sheet, r, cols.actual_finish), {
+            cellRef: toCellRef(r, cols.actual_finish),
+            row: r,
+            col: cols.actual_finish,
+            field: "actual_finish",
+            header:
+              sheetHeaders.find((h) => h.col === cols.actual_finish)?.header || "실제 완료",
+          })
+        : null,
+      actual_finish_cleared: (() => {
+        if (!cols.actual_finish) return false;
+        const v = getCell(sheet, r, cols.actual_finish);
+        return v == null || String(v).trim() === "";
+      })(),
+      progress_cell_present: (() => {
+        if (!cols.actual_progress) return false;
+        const v = getCell(sheet, r, cols.actual_progress);
+        return v != null && String(v).trim() !== "";
       })(),
       slip_days: (() => {
         const n = toNumber(getCell(sheet, r, cols.slip_days));
