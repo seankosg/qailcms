@@ -822,8 +822,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   ) : (
                     visibleRowLogs.map((r) => {
                       const rowNo = r.raw_row_no ?? -1;
-                      const fls = fieldLogsByRow.get(rowNo) ?? [];
-                      const hasField = fls.length > 0;
+                      const cached = fieldLogCache[rowNo];
+                      const fls = (cached ?? []).filter(
+                        (f) => fieldOutcomeFilter === "all" || f.outcome === fieldOutcomeFilter,
+                      );
+                      const hasField = fieldLogTotal > 0;
                       const isOpen = expandedRowNo === rowNo;
                       return (
                         <Fragment key={r.id}>
@@ -833,7 +836,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                                 <button
                                   type="button"
                                   className="p-0.5 rounded hover:bg-muted"
-                                  onClick={() => setExpandedRowNo(isOpen ? null : rowNo)}
+                                  onClick={() => void toggleRowFields(rowNo)}
                                   aria-label={isOpen ? "Collapse" : "Expand"}
                                 >
                                   {isOpen ? (
@@ -864,7 +867,15 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                           {isOpen && (
                             <TableRow className="bg-muted/20 hover:bg-muted/20">
                               <TableCell colSpan={6} className="p-2">
-                                <FieldLogTable logs={fls} />
+                                {fieldRowLoading === rowNo ? (
+                                  <div className="py-2 text-xs text-muted-foreground">Loading…</div>
+                                ) : fls.length === 0 ? (
+                                  <div className="py-2 text-xs text-muted-foreground">
+                                    필드 로그가 없습니다
+                                  </div>
+                                ) : (
+                                  <FieldLogTable logs={fls} />
+                                )}
                               </TableCell>
                             </TableRow>
                           )}
