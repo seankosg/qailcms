@@ -34,7 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { RollbackDialog, type RollbackKind } from "@/components/import/RollbackDialog";
-import { fetchAllByUploadId } from "@/lib/import/fetchAllByUploadId";
+import { fetchAllByUploadId, fetchAllFieldLogs } from "@/lib/import/fetchAllByUploadId";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   FieldLogTable,
@@ -45,6 +45,8 @@ import {
 } from "@/components/import/FieldLogTable";
 import { Fragment } from "react";
 import { formatDdMmmYyyy, formatDdMmmYyyyHm } from "@/lib/time/doha";
+
+const FIELD_OUTCOMES = Object.keys(OUTCOME_LABELS);
 
 type Kind = RollbackKind;
 
@@ -153,7 +155,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
   const [uploaderNames, setUploaderNames] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [rowLogs, setRowLogs] = useState<RowLog[]>([]);
-  const [fieldLogs, setFieldLogs] = useState<FieldLog[]>([]);
+  const [fieldOutcomeCounts, setFieldOutcomeCounts] = useState<Record<string, number>>({});
+  const [fieldLogCache, setFieldLogCache] = useState<Record<number, FieldLog[]>>({});
+  const [fieldRowLoading, setFieldRowLoading] = useState<number | null>(null);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [fieldKind, setFieldKind] = useState<string>("defect");
   const [expandedRowNo, setExpandedRowNo] = useState<number | null>(null);
   const [fieldOutcomeFilter, setFieldOutcomeFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
@@ -278,7 +284,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
     setReasonFilter("all");
     setRowSearch("");
     setRenderLimit(500);
-    setFieldLogs([]);
+    setFieldOutcomeCounts({});
+    setFieldLogCache({});
+    setFieldRowLoading(null);
     setExpandedRowNo(null);
     setFieldOutcomeFilter("all");
     try {
@@ -312,18 +320,26 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
             : kind === "defect_management"
               ? "defect"
               : "abd";
-        const { data: fl } = await (supabase as any)
-          .from("import_field_logs")
-          .select(
-            "id, raw_row_no, field_name, outcome, raw_value, applied_value, previous_value, reason_code, reason_detail",
-          )
-          .eq("upload_id", id)
-          .eq("kind", kindKey)
-          .order("raw_row_no", { ascending: true, nullsFirst: true });
-        setFieldLogs((fl ?? []) as FieldLog[]);
+        setFieldKind(kindKey);
+        // 업로드당 필드 로그는 수십만 건까지 가능 → 전량 로드 금지.
+        // 요약은 outcome별 count(head), 상세는 행 확장 시 개별 조회.
+        const entries = await Promise.all(
+          FIELD_OUTCOMES.map(async (o) => {
+            const { count } = await (supabase as any)
+              .from("import_field_logs")
+              .select("id", { count: "exact", head: true })
+              .eq("upload_id", id)
+              .eq("kind", kindKey)
+              .eq("outcome", o);
+            return [o, (count ?? 0) as number] as const;
+          }),
+        );
+        const counts: Record<string, number> = {};
+        for (const [o, c] of entries) if (c > 0) counts[o] = c;
+        setFieldOutcomeCounts(counts);
       } catch (e) {
         console.warn("field logs load failed", e);
-        setFieldLogs([]);
+        setFieldOutcomeCounts({});
       }
     } catch (e) {
       console.error("Row logs load failed", e);
@@ -389,23 +405,67 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
 
   const visibleRowLogs = filteredRowLogs.slice(0, renderLimit);
 
-  // raw_row_no별 field log 그룹 & outcome 필터 적용
-  const fieldLogsByRow = useMemo(() => {
-    const m = new Map<number, FieldLog[]>();
-    for (const f of fieldLogs) {
-      if (fieldOutcomeFilter !== "all" && f.outcome !== fieldOutcomeFilter) continue;
-      const key = f.raw_row_no ?? -1;
-      if (!m.has(key)) m.set(key, []);
-      m.get(key)!.push(f);
-    }
-    return m;
-  }, [fieldLogs, fieldOutcomeFilter]);
+  const fieldLogTotal = useMemo(
+    () => Object.values(fieldOutcomeCounts).reduce((a, b) => a + b, 0),
+    [fieldOutcomeCounts],
+  );
 
-  const fieldOutcomeOptions = useMemo(() => {
-    const s = new Set<string>();
-    for (const f of fieldLogs) s.add(f.outcome);
-    return Array.from(s).sort();
-  }, [fieldLogs]);
+  const fieldOutcomeOptions = useMemo(
+    () => Object.keys(fieldOutcomeCounts).sort(),
+    [fieldOutcomeCounts],
+  );
+
+  /** 행 확장 시 해당 raw_row_no 의 필드 로그만 조회 (전량 로드 금지). */
+  const toggleRowFields = async (rowNo: number) => {
+    if (expandedRowNo === rowNo) {
+      setExpandedRowNo(null);
+      return;
+    }
+    setExpandedRowNo(rowNo);
+    if (fieldLogCache[rowNo] || !selected) return;
+    setFieldRowLoading(rowNo);
+    try {
+      let q = (supabase as any)
+        .from("import_field_logs")
+        .select(
+          "id, raw_row_no, field_name, outcome, raw_value, applied_value, previous_value, reason_code, reason_detail",
+        )
+        .eq("upload_id", selected)
+        .eq("kind", fieldKind)
+        .order("field_name", { ascending: true })
+        .limit(500);
+      q = rowNo === -1 ? q.is("raw_row_no", null) : q.eq("raw_row_no", rowNo);
+      const { data, error } = await q;
+      if (error) throw error;
+      setFieldLogCache((c) => ({ ...c, [rowNo]: (data ?? []) as FieldLog[] }));
+    } catch (e) {
+      console.warn("row field logs load failed", e);
+      setFieldLogCache((c) => ({ ...c, [rowNo]: [] }));
+    } finally {
+      setFieldRowLoading(null);
+    }
+  };
+
+  /** CSV 는 요청 시에만 페이지네이션 조회 (최대 100,000행). */
+  const exportFieldCsv = async () => {
+    if (!selected) return;
+    setCsvLoading(true);
+    try {
+      const rows = await fetchAllFieldLogs<FieldLog>(
+        selected,
+        fieldKind,
+        "id, raw_row_no, field_name, outcome, raw_value, applied_value, previous_value, reason_code, reason_detail",
+        1000,
+        fieldOutcomeFilter === "all" ? undefined : fieldOutcomeFilter,
+        100_000,
+      );
+      downloadFieldLevelCsv(rows, `${selectedBatch?.file_name ?? "field-logs"}.csv`);
+    } catch (e) {
+      console.error("field csv export failed", e);
+    } finally {
+      setCsvLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -644,7 +704,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 ))}
               </div>
               <div className="flex-1" />
-              {fieldLogs.length > 0 && (
+              {fieldLogTotal > 0 && (
                 <>
                   <Select
                     value={fieldOutcomeFilter}
@@ -666,16 +726,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                     variant="outline"
                     size="sm"
                     className="h-8 text-xs"
-                    onClick={() =>
-                      downloadFieldLevelCsv(
-                        fieldOutcomeFilter === "all"
-                          ? fieldLogs
-                          : fieldLogs.filter((f) => f.outcome === fieldOutcomeFilter),
-                        `${selectedBatch?.file_name ?? "field-logs"}.csv`,
-                      )
-                    }
+                    disabled={csvLoading}
+                    onClick={() => void exportFieldCsv()}
                   >
-                    <Download className="h-3.5 w-3.5 mr-1" /> Field-level CSV
+                    <Download className="h-3.5 w-3.5 mr-1" />
+                    {csvLoading ? "Exporting…" : "Field-level CSV"}
                   </Button>
                 </>
               )}
@@ -728,10 +783,10 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                 className="h-8 w-[100px] text-xs"
               />
             </div>
-            {fieldLogs.length > 0 && (
+            {fieldLogTotal > 0 && (
               <div className="mb-2">
                 <FieldLogSummaryChips
-                  logs={fieldLogs}
+                  counts={fieldOutcomeCounts}
                   activeOutcome={fieldOutcomeFilter}
                   onSelect={(o) => setFieldOutcomeFilter(o)}
                 />
@@ -767,8 +822,11 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   ) : (
                     visibleRowLogs.map((r) => {
                       const rowNo = r.raw_row_no ?? -1;
-                      const fls = fieldLogsByRow.get(rowNo) ?? [];
-                      const hasField = fls.length > 0;
+                      const cached = fieldLogCache[rowNo];
+                      const fls = (cached ?? []).filter(
+                        (f) => fieldOutcomeFilter === "all" || f.outcome === fieldOutcomeFilter,
+                      );
+                      const hasField = fieldLogTotal > 0;
                       const isOpen = expandedRowNo === rowNo;
                       return (
                         <Fragment key={r.id}>
@@ -778,7 +836,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                                 <button
                                   type="button"
                                   className="p-0.5 rounded hover:bg-muted"
-                                  onClick={() => setExpandedRowNo(isOpen ? null : rowNo)}
+                                  onClick={() => void toggleRowFields(rowNo)}
                                   aria-label={isOpen ? "Collapse" : "Expand"}
                                 >
                                   {isOpen ? (
@@ -809,7 +867,15 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                           {isOpen && (
                             <TableRow className="bg-muted/20 hover:bg-muted/20">
                               <TableCell colSpan={6} className="p-2">
-                                <FieldLogTable logs={fls} />
+                                {fieldRowLoading === rowNo ? (
+                                  <div className="py-2 text-xs text-muted-foreground">Loading…</div>
+                                ) : fls.length === 0 ? (
+                                  <div className="py-2 text-xs text-muted-foreground">
+                                    필드 로그가 없습니다
+                                  </div>
+                                ) : (
+                                  <FieldLogTable logs={fls} />
+                                )}
                               </TableCell>
                             </TableRow>
                           )}
