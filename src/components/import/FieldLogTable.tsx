@@ -99,15 +99,17 @@ export function FieldLogTable({ logs }: { logs: FieldLog[] }) {
 
 export function FieldLogSummaryChips({
   logs,
+  counts: countsProp,
   activeOutcome,
   onSelect,
 }: {
-  logs: FieldLog[];
+  logs?: FieldLog[];
+  counts?: Record<string, number>;
   activeOutcome?: string;
   onSelect?: (o: string) => void;
 }) {
-  const counts: Record<string, number> = {};
-  for (const l of logs) counts[l.outcome] = (counts[l.outcome] || 0) + 1;
+  const counts: Record<string, number> = { ...(countsProp ?? {}) };
+  if (!countsProp) for (const l of logs ?? []) counts[l.outcome] = (counts[l.outcome] || 0) + 1;
   const present = ALL_OUTCOMES.filter((o) => counts[o]);
   if (present.length === 0) return null;
   return (
