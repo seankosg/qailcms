@@ -76,3 +76,40 @@ export const updateTaskOwnerField = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/** R2-6(b): 날짜를 고치지 않고 '확인'만으로 actual_finish_source := 'user' 전환. */
+export const confirmActualFinishSource = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const [{ data: profile }, { data: roleRows }, { data: row }] = await Promise.all([
+      context.supabase.from("profiles").select("*").eq("id", context.userId).maybeSingle(),
+      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
+      context.supabase.from("task_management_raw").select("*").eq("id", data.id).maybeSingle(),
+    ]);
+    if (!row) throw new Error("대상 행을 찾을 수 없습니다.");
+    const roles = ((roleRows ?? []) as any[]).map((r) => r.role as string);
+    const rank = roles.reduce((m, r) => Math.max(m, ROLE_RANK[r as AppRole] ?? 0), 0);
+    const allowed = canEditRawRow(
+      {
+        roles: roles as (AppRole | string)[],
+        rank,
+        team: (profile as any)?.team ?? null,
+        hdec_pic_name: (profile as any)?.hdec_pic_name ?? null,
+        hdec_eng_name: (profile as any)?.hdec_eng_name ?? null,
+        subcontractor_name: (profile as any)?.subcontractor_name ?? null,
+        subsub_name: (profile as any)?.subsub_name ?? null,
+      },
+      "task_management_raw",
+      row as any,
+    );
+    if (!allowed) throw new Error("권한 없음: 이 행을 확인할 권한이 없습니다.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("task_management_raw")
+      .update({ actual_finish_source: "user", updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
