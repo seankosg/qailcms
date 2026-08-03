@@ -12,7 +12,6 @@ const abdRawDataSearchSchema = z.object({
   sort: fallback(z.string(), "").default(""),
   q: fallback(z.string(), "").default(""),
   filters: fallback(z.string(), "").default(""),
-  includeInactive: fallback(z.boolean(), false).default(false),
   detail: fallback(z.string(), "").default(""),
   // Progress 페이지에서 전달하는 셀 클릭 컨텍스트
   source: fallback(z.string(), "").default(""),

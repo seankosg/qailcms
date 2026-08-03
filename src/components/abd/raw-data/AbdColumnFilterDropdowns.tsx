@@ -27,7 +27,6 @@ export function AbdMultiSelectDropdown({
   const serverFacetCol: string | null = meta.serverFacet ?? null;
   const team: AbdTeam = (meta.team as AbdTeam) ?? "MECH";
   const statusGroup: AbdStatusGroup = (meta.statusGroup as AbdStatusGroup) ?? "all";
-  const includeInactive: boolean = !!meta.includeInactive;
   const plot: "C" | "D" | null = (meta.plot as "C" | "D" | null) ?? null;
   // 크로스 필터링: props로 부모의 최신 검색어/서버 필터를 받아 자기 자신은 훅에서 제외.
   const activeFilters: AbdServerFilter[] = serverFilters ?? [];
@@ -35,7 +34,6 @@ export function AbdMultiSelectDropdown({
   const { data: serverFacet, isFetching: facetLoading } = useAbdFacet(open ? serverFacetCol : null, {
     team,
     statusGroup,
-    includeInactive,
     plot,
     q,
     filters: activeFilters,

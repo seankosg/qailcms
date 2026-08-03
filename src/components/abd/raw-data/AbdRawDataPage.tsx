@@ -215,6 +215,7 @@ const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = 
   { value: "under_review", label: "Awaiting Response" },
   { value: "drafting", label: "Draft Start" },
   { value: "resubmit", label: "Resubmit by TM" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 // UI 탭에 노출되는 3종 + Dashboard 딥링크로만 들어오는 세분화 상태값들.
 // URL 파라미터 파싱 시 유효값 판정에 사용된다.
@@ -234,6 +235,7 @@ const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
   under_review: "Awaiting Response",
   drafting: "Draft Start",
   resubmit: "Resubmit by TM",
+  cancelled: "Cancelled",
   unapproved: "Unapproved",
   rs_delay: "Response Delay",
   sb_delay: "Submission Delay",
@@ -331,8 +333,6 @@ export function AbdRawDataPage() {
   }, [selectedStatuses]);
   const plotSel: "all" | "C" | "D" = (["all", "C", "D"].includes(String(urlSearch.plot ?? "")) ? (urlSearch.plot as any) : "all");
   const plotFilter: "C" | "D" | null = plotSel === "all" ? null : plotSel;
-  // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
-  const includeInactive = false;
   const rawPageSize = String(urlSearch.pageSize ?? "");
   const pageSizeSel: number | "all" =
     rawPageSize === "all"
@@ -453,14 +453,14 @@ export function AbdRawDataPage() {
   // 판정 기준일(As of) — 세션 전역 공유. 빈 값이면 오늘(Doha).
   const sharedAbdDate = effectiveAsOf;
   const { data: itemsData, isFetching, refetch } = useAbdItemsQuery({
-    team, statusGroup, includeInactive, plot: plotFilter, q, filters: serverFilters, sort: serverSort, page, pageSize,
+    team, statusGroup, plot: plotFilter, q, filters: serverFilters, sort: serverSort, page, pageSize,
     asOf: sharedAbdDate || null,
   });
   const rows = itemsData?.rows ?? [];
   const total = itemsData?.total ?? 0;
   const pageCount = isAllPage ? 1 : Math.max(1, Math.ceil(total / pageSize));
 
-  const { data: counts } = useAbdCounts({ team, includeInactive, plot: plotFilter, asOf: sharedAbdDate || null });
+  const { data: counts } = useAbdCounts({ team, plot: plotFilter, asOf: sharedAbdDate || null });
   const dataDate = counts?.latest_data_date ?? null;
 
   // Restore view preferences
@@ -588,10 +588,10 @@ export function AbdRawDataPage() {
       }
       const c = byKey.get(id);
       if (!c) continue;
-      cols.push(buildDataColumn(c, team, statusGroup, includeInactive, plotFilter, canEditRow, () => refetch()));
+      cols.push(buildDataColumn(c, team, statusGroup, plotFilter, canEditRow, () => refetch()));
     }
     return cols;
-  }, [orderedKeys, team, statusGroup, includeInactive, plotFilter, canEditRow, refetch]);
+  }, [orderedKeys, team, statusGroup, plotFilter, canEditRow, refetch]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     const vis: VisibilityState = {};
@@ -681,6 +681,7 @@ export function AbdRawDataPage() {
   const urCount = counts?.ur_count ?? 0;
   const dsCount = counts?.ds_count ?? 0;
   const resubmitCount = counts?.resubmit_count ?? 0;
+  const cancelledCount = counts?.cancelled_count ?? 0;
 
   return (
     <div className="space-y-3">
@@ -775,7 +776,9 @@ export function AbdRawDataPage() {
                   ? dsCount
                   : s.value === "resubmit"
                     ? resubmitCount
-                    : 0;
+                    : s.value === "cancelled"
+                      ? cancelledCount
+                      : 0;
           return (
             <button
               key={s.value}
@@ -788,7 +791,11 @@ export function AbdRawDataPage() {
                   : "text-muted-foreground hover:bg-background/60",
               )}
               aria-pressed={active}
-              title="다중 선택 가능"
+              title={
+                s.value === "cancelled"
+                  ? "Cancelled — Aconex 에서 취소되어 관리 대상에서 제외된 도면입니다."
+                  : "다중 선택 가능"
+              }
             >
               {s.label}
               <Badge variant={active ? "outline" : "secondary"} className="ml-1 h-4 px-1 text-[10px]">{count}</Badge>
@@ -903,7 +910,6 @@ export function AbdRawDataPage() {
         fetchParams={{
           team,
           statusGroup,
-          includeInactive,
           plot: plotFilter,
           q,
           filters: serverFilters,
@@ -921,7 +927,6 @@ function buildDataColumn(
   c: AbdColumnDef,
   team: AbdTeam,
   statusGroup: AbdStatusGroup,
-  includeInactive: boolean,
   plot: "C" | "D" | null,
   canEditRow: (row: AbdItem) => boolean,
   refetch: () => void,
@@ -940,7 +945,7 @@ function buildDataColumn(
     header: c.label,
     size: c.width,
     enableSorting: true,
-    meta: { filterType, filterOptions, serverFacet, team, statusGroup, includeInactive, plot, origin: c.origin ?? "system" },
+    meta: { filterType, filterOptions, serverFacet, team, statusGroup, plot, origin: c.origin ?? "system" },
     cell: ({ row, getValue }) => {
       const v: any = getValue();
       const display = renderAbdCell(c, v, row.original);

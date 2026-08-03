@@ -42,14 +42,17 @@ interface KpiCardProps {
   breakdown?: Array<{ team: string; count: number; onClick?: () => void }>;
   onClick?: () => void;
   stackBar?: Array<{ key: string; label: string; count: number; colorClass: string }>;
+  /** 마우스 오버 설명 */
+  hint?: string;
 }
 
-export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar }: KpiCardProps) {
+export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint }: KpiCardProps) {
   const pct = total && total > 0 ? Math.round((count / total) * 100) : null;
   const stackTotal = stackBar ? stackBar.reduce((s, x) => s + (x.count || 0), 0) : 0;
   return (
     <Card
       onClick={onClick}
+      title={hint}
       className={cn(onClick && "cursor-pointer transition-colors hover:bg-primary/10")}
     >
       <CardContent className="p-3">
@@ -133,9 +136,11 @@ interface Props {
 }
 
 /**
- * Row 1: 배타적 5분류 (Total | Approved | UR | DS | Resubmit by TM).
- * Resubmit 은 잔여 정의(Approved·UR·DS 어디에도 안 드는 나머지 전부)이므로
- * Approved + UR + DS + Resubmit = Total = Raw Data 전건(G1 등식)이 구조적으로 보장된다.
+ * Row 1: 배타적 6분류 (Total | Approved | UR | DS | Resubmit by TM | Cancelled).
+ * 분기 순서 정본 = public.abd_bucket_of(bucket_top, is_active):
+ *   is_active=false → CANCELLED (최우선), 그 외 Approved/UR/DS, 나머지 전부 → RESUBMIT.
+ * 따라서 Approved + UR + DS + Resubmit + Cancelled = Total = 원장 전건(G1 등식)이
+ * 구조적으로 보장된다. 진행률 스택바 분모도 Total 단일 모집단이다.
  */
 export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }: Props) {
   const fn = useServerFn(getAbdDashboardRow1);
@@ -153,7 +158,7 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
     const srv = byTeam.get("TOTAL") ?? [];
     if (srv.length > 0) return sortByTeamOrder(srv);
     const agg = new Map<string, number>();
-    for (const key of ["Approved", "UR", "DS", "RESUBMIT"]) {
+    for (const key of ["Approved", "UR", "DS", "RESUBMIT", "CANCELLED"]) {
       for (const b of byTeam.get(key) ?? []) {
         agg.set(b.team, (agg.get(b.team) ?? 0) + b.count);
       }
@@ -163,13 +168,14 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
     );
   }, [byTeam]);
 
-  const mk = (label: string, key: string, tone: Tone, statusGroup?: string) => (
+  const mk = (label: string, key: string, tone: Tone, statusGroup?: string, hint?: string) => (
     <AbdKpiCard
       key={key}
       label={label}
       count={totals.get(key) ?? 0}
       total={key === "TOTAL" ? undefined : total}
       tone={tone}
+      hint={hint}
       breakdown={sortByTeamOrder(byTeam.get(key) ?? []).map((b) => ({
         team: b.team,
         count: b.count,
@@ -188,10 +194,11 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
     { key: "UR", label: "UR", count: totals.get("UR") ?? 0, colorClass: "bg-blue-500" },
     { key: "DS", label: "DS", count: totals.get("DS") ?? 0, colorClass: "bg-amber-500" },
     { key: "RESUBMIT", label: "Resubmit by TM", count: totals.get("RESUBMIT") ?? 0, colorClass: "bg-rose-500" },
+    { key: "CANCELLED", label: "Cancelled", count: totals.get("CANCELLED") ?? 0, colorClass: "bg-muted-foreground" },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
       <AbdKpiCard
         key="TOTAL"
         label="Total"
@@ -210,6 +217,13 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
       {mk("Awaiting Response", "UR", "info", "under_review")}
       {mk("Draft Start", "DS", "warn", "drafting")}
       {mk("Resubmit by TM", "RESUBMIT", "danger", "resubmit")}
+      {mk(
+        "Cancelled",
+        "CANCELLED",
+        "neutral",
+        "cancelled",
+        "Cancelled — Aconex 에서 취소되어 관리 대상에서 제외된 도면입니다.",
+      )}
     </div>
   );
 }

@@ -22,6 +22,7 @@ export type AbdStatusGroup =
   | "no_plan"
   | "delayed"
   | "resubmit"
+  | "cancelled"
   // stage_group 축 (Progress KPI 스트립): 재고 sg_*, 지연 sgd_*
   | "sg_ns"
   | "sg_ds"
@@ -101,7 +102,6 @@ export interface AbdItem {
 export interface AbdItemsQueryParams {
   team: AbdTeam;
   statusGroup: AbdStatusGroup;
-  includeInactive: boolean;
   plot?: "C" | "D" | null;
   q?: string;
   filters?: AbdServerFilter[];
@@ -123,7 +123,6 @@ export function useAbdItemsQuery(p: AbdItemsQueryParams) {
         const { data, error } = await (supabase as any).rpc("abd_items_search", {
           _team: p.team,
           _status_group: p.statusGroup === "all" ? null : p.statusGroup,
-          _include_inactive: p.includeInactive,
           _q: p.q && p.q.trim() ? p.q.trim() : null,
           _filters: p.filters ?? [],
           _sort: p.sort ?? [],
@@ -196,7 +195,6 @@ export function useAbdFacet(
   opts: {
     team: AbdTeam;
     statusGroup: AbdStatusGroup;
-    includeInactive: boolean;
     plot?: "C" | "D" | null;
     enabled?: boolean;
     q?: string;
@@ -213,7 +211,7 @@ export function useAbdFacet(
       "abd",
       "facet",
       column,
-      { team: opts.team, statusGroup: opts.statusGroup, includeInactive: opts.includeInactive, plot: opts.plot ?? null, q: qNorm, filters: otherFilters, asOf: asOfNorm },
+      { team: opts.team, statusGroup: opts.statusGroup, plot: opts.plot ?? null, q: qNorm, filters: otherFilters, asOf: asOfNorm },
     ],
     queryFn: async () => {
       if (!column) return [];
@@ -221,7 +219,6 @@ export function useAbdFacet(
         _column: column,
         _team: opts.team,
         _status_group: opts.statusGroup === "all" ? null : opts.statusGroup,
-        _include_inactive: opts.includeInactive,
         _plot: opts.plot ?? null,
         _q: qNorm.length > 0 ? qNorm : null,
         _filters: otherFilters,
@@ -243,16 +240,16 @@ export interface AbdCounts {
   ur_count: number;
   ds_count: number;
   resubmit_count: number;
+  cancelled_count: number;
   latest_data_date: string | null;
 }
 
-export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean; plot?: "C" | "D" | null; asOf?: string | null }) {
+export function useAbdCounts(opts: { team: AbdTeam; plot?: "C" | "D" | null; asOf?: string | null }) {
   return useQuery<AbdCounts>({
     queryKey: ["abd", "counts", opts],
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("abd_items_counts", {
         _team: opts.team,
-        _include_inactive: opts.includeInactive,
         _plot: opts.plot ?? null,
         _as_of: resolveAsOf(opts.asOf),
       });
@@ -264,6 +261,7 @@ export function useAbdCounts(opts: { team: AbdTeam; includeInactive: boolean; pl
         ur_count: Number(r.ur_count ?? 0),
         ds_count: Number(r.ds_count ?? 0),
         resubmit_count: Number(r.resubmit_count ?? 0),
+        cancelled_count: Number(r.cancelled_count ?? 0),
         latest_data_date: r.latest_data_date ?? null,
       };
     },

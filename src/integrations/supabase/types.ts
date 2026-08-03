@@ -4902,7 +4902,10 @@ export type Database = {
           r3_set: string
         }[]
       }
-      abd_bucket_of: { Args: { _bucket_top: string }; Returns: string }
+      abd_bucket_of: {
+        Args: { _bucket_top: string; _is_active: boolean }
+        Returns: string
+      }
       abd_dashboard_approval_trend:
         | {
             Args: { _months?: number; _plots?: string[]; _teams?: string[] }
@@ -5045,14 +5048,10 @@ export type Database = {
       abd_derived_cols: { Args: never; Returns: string[] }
       abd_items_by_numbers: { Args: { _nums: string[] }; Returns: Json }
       abd_items_counts: {
-        Args: {
-          _as_of?: string
-          _include_inactive?: boolean
-          _plot?: string
-          _team?: string
-        }
+        Args: { _as_of?: string; _plot?: string; _team?: string }
         Returns: {
           approved_count: number
+          cancelled_count: number
           ds_count: number
           latest_data_date: string
           resubmit_count: number
@@ -5065,7 +5064,6 @@ export type Database = {
           _as_of?: string
           _column: string
           _filters?: Json
-          _include_inactive?: boolean
           _limit?: number
           _plot?: string
           _q?: string
@@ -5082,7 +5080,6 @@ export type Database = {
           _as_of?: string
           _bucket?: string[]
           _filters?: Json
-          _include_inactive?: boolean
           _limit?: number
           _offset?: number
           _plot?: string
