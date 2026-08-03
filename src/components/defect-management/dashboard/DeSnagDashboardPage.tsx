@@ -187,32 +187,29 @@ export function DeSnagDashboardPage() {
   }, [matrix]);
 
   const roomGroupEntries = useMemo(() => {
-    const keys: RoomGroupCol[] = [...ROOM_GROUP_ORDER, ...LG_ROOM_GROUPS];
-    const totals = {} as Record<RoomGroupCol, Stats>;
-    for (const rg of keys) totals[rg] = newStats();
-    for (const block of matrix.blocks) {
-      // 동적 열 블록(LIFT CABIN 등)은 Room Group 열을 갖지 않으므로 제외
-      if (block.colAxisLabel !== "Room Group") continue;
-      for (const rg of keys) {
-        const src = block.colTotals[rg];
-        if (src) mergeStats(totals[rg], src);
-      }
-    }
+    // 블록 배치(LIFT CABIN 등)와 무관하게 원본 room_group 기준 정본 집계를 사용한다.
+    const totals = matrix.roomGroupTotals as Record<string, Stats>;
+    const get = (rg: string) => totals[rg] ?? newStats();
+    const paramFor = (col: string) => {
+      const src = matrix.roomGroupSourceMap[col] ?? [];
+      if (src.length === 0) return col === "N/A" ? "__EMPTY__" : col;
+      return src.join(",");
+    };
     const base = ROOM_GROUP_ORDER.map((col) => ({
       col: col as string,
       label: col as string,
-      param: col === "N/A" ? "__EMPTY__" : (col as string),
-      stats: totals[col],
+      param: paramFor(col as string),
+      stats: get(col as string),
     }));
     // LG (Lower Ground) — Podium 1~N 통합 카드
-    const lgPresent = LG_ROOM_GROUPS.filter((rg) => totals[rg].issued > 0);
+    const lgPresent = LG_ROOM_GROUPS.filter((rg) => get(rg).issued > 0);
     if (lgPresent.length > 0) {
       const lgStats = newStats();
-      for (const rg of lgPresent) mergeStats(lgStats, totals[rg]);
+      for (const rg of lgPresent) mergeStats(lgStats, get(rg));
       base.push({
         col: "__LG_PODIUM__",
         label: "LG Podium",
-        param: lgPresent.join(","),
+        param: lgPresent.flatMap((rg) => paramFor(rg).split(",")).join(","),
         stats: lgStats,
       });
     }

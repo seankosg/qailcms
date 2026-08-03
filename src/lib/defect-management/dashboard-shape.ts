@@ -105,8 +105,21 @@ export function normalizeRoomGroup(v: string | null | undefined): RoomGroupCol {
   if (!s) return "N/A";
   const pm = /^PODIUM\s+([1-5])$/.exec(s);
   if (pm) return `Podium ${pm[1]}` as RoomGroupCol;
+  // 'LIFT CABIN' / 'LIFT LOBBY' 등 LIFT 계열 표기는 LIFT 열로 통합
+  if (/^LIFT\b/.test(s)) return "LIFT";
   const hit = (ROOM_GROUP_ORDER as readonly string[]).find((k) => k.toUpperCase() === s);
   return (hit as RoomGroupCol) ?? "N/A";
+}
+
+/** 카드 드릴다운용 — 정규화 열 → raw-data 필터에 넘길 원본 room_group 값 집합 */
+export function roomGroupSourceValues(col: string, rawValues: Iterable<string | null | undefined>): string[] {
+  const out = new Set<string>();
+  for (const v of rawValues) {
+    if (normalizeRoomGroup(v) !== col) continue;
+    const t = (v ?? "").trim();
+    out.add(t ? t : "__EMPTY__");
+  }
+  return Array.from(out);
 }
 
 // ── Level ─────────────────────────────────────────────────────────────
@@ -279,6 +292,10 @@ export type MatrixShape = {
   teams: TeamKey[];
   blocks: MatrixBlock[];
   plotTotal: Stats;
+  /** 블록 배치와 무관하게 원본 room_group 기준으로 집계한 열 합계 (Room Group별 현황 카드용) */
+  roomGroupTotals: Record<string, Stats>;
+  /** 정규화 열 → 원본 room_group 값 목록 (드릴다운 필터용) */
+  roomGroupSourceMap: Record<string, string[]>;
 };
 
 function emptyRoomGroupStats(): Record<string, Stats> {
@@ -304,6 +321,8 @@ export function buildMatrix(
   const lg: RowsMap = new Map();
   const basement: RowsMap = new Map();
   const liftcabin: RowsMap = new Map();
+  const roomGroupTotals: Record<string, Stats> = emptyRoomGroupStats();
+  const roomGroupSourceMap: Record<string, Set<string>> = {};
 
   const ensure = (
     m: RowsMap,
@@ -324,6 +343,11 @@ export function buildMatrix(
     const lvl = parseLevel(r.level_name);
     const bld = classifyBuilding(r.building);
     const rg = normalizeRoomGroup(r.room_group);
+
+    // Room Group 카드 집계는 블록 배치(LIFT CABIN 등)와 무관하게 항상 누적한다.
+    addRow(cellFor(roomGroupTotals, rg), r);
+    const srcVal = (r.room_group ?? "").trim() || "__EMPTY__";
+    (roomGroupSourceMap[rg] ??= new Set<string>()).add(srcVal);
 
     let block: RowsMap;
     let buildingLabel: string;
@@ -454,7 +478,18 @@ export function buildMatrix(
   const plotTotal = newStats();
   for (const b of blocks) mergeStats(plotTotal, b.blockTotal);
 
-  return { plot, planGroups: planGroupsForPlot(plot), teams, blocks, plotTotal };
+  const srcMap: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(roomGroupSourceMap)) srcMap[k] = Array.from(v);
+
+  return {
+    plot,
+    planGroups: planGroupsForPlot(plot),
+    teams,
+    blocks,
+    plotTotal,
+    roomGroupTotals,
+    roomGroupSourceMap: srcMap,
+  };
 }
 
 // ── 드릴다운 URL 파라미터 조립 ────────────────────────────────────
