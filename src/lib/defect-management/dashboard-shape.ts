@@ -72,10 +72,13 @@ export const ROOM_GROUP_ORDER = [
   "TENANT",
   "BOH",
   "FOH",
+  "Main Lobby",
   "STAIRCASE",
+  "STAIR-1",
+  "STAIR-2",
   "LIFT",
   "CARPARK",
-  "CARPARK RAMP",
+  "CARPARK / RAMP",
   "CORRIDOR",
   "FACADE",
   "LANDSCAPE",
@@ -105,6 +108,13 @@ export function normalizeRoomGroup(v: string | null | undefined): RoomGroupCol {
   if (!s) return "N/A";
   const pm = /^PODIUM\s+([1-5])$/.exec(s);
   if (pm) return `Podium ${pm[1]}` as RoomGroupCol;
+  // 'MAIN LOBBY' / 'FOH (MAIN LOBBY)' → Main Lobby 열
+  if (s.includes("MAIN LOBBY")) return "Main Lobby";
+  // STAIR-1 / STAIR 1 / STAIR-2 …
+  const st = /^STAIR[\s._-]*([12])$/.exec(s);
+  if (st) return `STAIR-${st[1]}` as RoomGroupCol;
+  // 'CARPARK RAMP' / 'CARPARK/ RAMP' / 'CARPARK./ RAMP' → CARPARK / RAMP 열
+  if (/^CARPARK[\s./]+RAMP$/.test(s)) return "CARPARK / RAMP";
   // 'LIFT CABIN' / 'LIFT LOBBY' 등 LIFT 계열 표기는 LIFT 열로 통합
   if (/^LIFT\b/.test(s)) return "LIFT";
   const hit = (ROOM_GROUP_ORDER as readonly string[]).find((k) => k.toUpperCase() === s);
