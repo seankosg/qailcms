@@ -296,6 +296,11 @@ function resolveColumn(
     const idx = headerMap[key];
     if (idx) return idx;
   }
+  // canonicalIndex 0 = 위치 폴백 금지(담당자 열 등). 별칭 매칭 실패 시 미매핑 처리.
+  if (!canonicalIndex) {
+    warnings.push(`헤더 텍스트를 찾지 못함 (${headerNames[0]}) — 위치 추정 금지 필드이므로 미매핑 처리`);
+    return 0;
+  }
   warnings.push(`헤더 텍스트를 찾지 못함 (${headerNames[0]}) — 기본 위치 ${canonicalIndex}열 사용`);
   return canonicalIndex;
 }
