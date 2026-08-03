@@ -11,7 +11,6 @@ import type {
 export interface AbdExportFetchParams {
   team: AbdTeam;
   statusGroup: AbdStatusGroup;
-  includeInactive: boolean;
   plot?: "C" | "D" | null;
   q?: string;
   filters?: AbdServerFilter[];
@@ -35,7 +34,6 @@ export async function fetchAllAbdRowsForExport(
     const { data, error } = await (supabase as any).rpc("abd_items_search", {
       _team: p.team,
       _status_group: p.statusGroup === "all" ? null : p.statusGroup,
-      _include_inactive: p.includeInactive,
       _q: p.q && p.q.trim() ? p.q.trim() : null,
       _filters: p.filters ?? [],
       _sort: p.sort ?? [],
