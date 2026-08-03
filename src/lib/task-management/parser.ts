@@ -530,8 +530,9 @@ export async function parseTaskManagementExcel(
     task_name: pick("task_name", ["항목"], 4),
     risk: pick("risk", ["리스크"], 5),
     sub_task_desc: pick("sub_task_desc", ["단계별 세부 업무"], 6),
-    hdec_pic_name: pick("hdec_pic_name", ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"], 7),
-    hdec_eng_name: pick("hdec_eng_name", ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"], 8),
+    // 담당자 열은 위치 폴백 금지(0) — 별칭 매칭만 허용.
+    hdec_pic_name: pick("hdec_pic_name", ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"], 0),
+    hdec_eng_name: pick("hdec_eng_name", ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"], 0),
     row_type: pick("row_type", ["유형"], 9),
     status_manual: pick("status_manual", ["상태"], 10),
     plan_start: pick("plan_start", ["계획 시작"], 11),
