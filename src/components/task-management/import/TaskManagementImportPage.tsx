@@ -849,6 +849,48 @@ function FileRow({
                 )}
               </div>
             )}
+            {f.preflight && f.preflight.regressionCount > 0 && (
+              <details className="mt-2 rounded border border-amber-300 bg-amber-50/60 p-2 text-xs">
+                <summary className="cursor-pointer font-medium text-amber-800">
+                  진도율 하향 {f.preflight.regressionCount}건
+                  {f.preflight.uncompleteCount > 0
+                    ? ` (완료 취소 ${f.preflight.uncompleteCount}건 포함)`
+                    : ""}
+                </summary>
+                <table className="mt-2 w-full">
+                  <thead className="text-[11px] text-muted-foreground">
+                    <tr className="[&>th]:px-1 [&>th]:py-0.5 [&>th]:text-left">
+                      <th className="w-28">task_no</th>
+                      <th>task_name</th>
+                      <th className="w-20">이전</th>
+                      <th className="w-20">이후</th>
+                      <th className="w-20">구분</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {f.preflight.regressions.map((r) => (
+                      <tr key={r.task_no} className="border-t border-amber-200 align-top">
+                        <td className="px-1 py-0.5 font-mono text-[11px]">{r.task_no}</td>
+                        <td className="px-1 py-0.5">{r.task_name ?? "—"}</td>
+                        <td className="px-1 py-0.5">
+                          {r.previous == null ? "—" : `${(r.previous * 100).toFixed(1)}%`}
+                        </td>
+                        <td className="px-1 py-0.5">
+                          {r.next == null ? "—" : `${(r.next * 100).toFixed(1)}%`}
+                        </td>
+                        <td className="px-1 py-0.5">
+                          {r.kind === "uncomplete" ? (
+                            <span className="font-medium text-destructive">완료 취소</span>
+                          ) : (
+                            "하향"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            )}
             {f.preflightError && (
               <p className="mt-1 text-xs text-destructive">중복 점검 실패: {f.preflightError}</p>
             )}
