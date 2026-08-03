@@ -5795,14 +5795,6 @@ export type Database = {
         }
         Returns: string
       }
-      tm_actual_at_date: {
-        Args: { _as_of: string; _ids?: string[] }
-        Returns: {
-          actual_source: string
-          hist_actual: number
-          id: string
-        }[]
-      }
       tm_classify_overdue: {
         Args: { buffer_days: number; mstone: string; target: string }
         Returns: string
@@ -5930,23 +5922,6 @@ export type Database = {
           _q?: string
         }
         Returns: Json
-      }
-      tm_judge_at_date: {
-        Args: { p_data_date: string; p_task_ids?: string[] }
-        Returns: Json
-      }
-      tm_judge_snapshot_at_date: {
-        Args: { p_data_date: string; p_task_ids?: string[] }
-        Returns: {
-          alarm_reason: string
-          auto_judgment: string
-          cum_actual_pct: number
-          cum_plan_pct: number
-          delay_days: number
-          effective_actual_progress: number
-          gap_pct: number
-          id: string
-        }[]
       }
       tm_kpi_bucket_matches: {
         Args: {
