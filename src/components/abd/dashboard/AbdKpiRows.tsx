@@ -132,7 +132,11 @@ interface Props {
   onOpenRaw: (params: Record<string, string>) => void;
 }
 
-/** Row 1: 배타적 4분류 (Total, Approved, UR, DS). 2026-07-30 NS 폐지 — 실적 전무는 DS(R1 DS)에 포함. */
+/**
+ * Row 1: 배타적 5분류 (Total | Approved | UR | DS | Resubmit by TM).
+ * Resubmit 은 잔여 정의(Approved·UR·DS 어디에도 안 드는 나머지 전부)이므로
+ * Approved + UR + DS + Resubmit = Total = Raw Data 전건(G1 등식)이 구조적으로 보장된다.
+ */
 export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }: Props) {
   const fn = useServerFn(getAbdDashboardRow1);
   const [asOf] = useAbdDataDate();
@@ -144,11 +148,12 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
   const { totals, byTeam } = useMemo(() => pivotRows(data ?? []), [data]);
   const total = totals.get("TOTAL") ?? 0;
 
-  // TOTAL 팀별 breakdown: RPC가 TOTAL bucket에서 팀별 행을 주지 않으므로
-  // 4개 스테이지 팀별 카운트를 합산해 fallback으로 구성.
+  // TOTAL 팀별 breakdown: 서버가 TOTAL 행을 내려주면 그것이 정본, 없으면 버킷 합산 폴백.
   const totalByTeam = useMemo(() => {
+    const srv = byTeam.get("TOTAL") ?? [];
+    if (srv.length > 0) return sortByTeamOrder(srv);
     const agg = new Map<string, number>();
-    for (const key of ["Approved", "UR", "DS"]) {
+    for (const key of ["Approved", "UR", "DS", "RESUBMIT"]) {
       for (const b of byTeam.get(key) ?? []) {
         agg.set(b.team, (agg.get(b.team) ?? 0) + b.count);
       }
@@ -182,10 +187,11 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
     { key: "Approved", label: "Approved", count: totals.get("Approved") ?? 0, colorClass: "bg-emerald-500" },
     { key: "UR", label: "UR", count: totals.get("UR") ?? 0, colorClass: "bg-blue-500" },
     { key: "DS", label: "DS", count: totals.get("DS") ?? 0, colorClass: "bg-amber-500" },
+    { key: "RESUBMIT", label: "Resubmit by TM", count: totals.get("RESUBMIT") ?? 0, colorClass: "bg-rose-500" },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <AbdKpiCard
         key="TOTAL"
         label="Total"
@@ -203,6 +209,7 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
       {/* 'UR' 은 내부 bucket_top 키(의미 = 회신 대기(RS)). 화면 라벨만 정정. */}
       {mk("Awaiting Response", "UR", "info", "under_review")}
       {mk("Draft Start", "DS", "warn", "drafting")}
+      {mk("Resubmit by TM", "RESUBMIT", "danger", "resubmit")}
     </div>
   );
 }

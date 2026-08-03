@@ -37,8 +37,6 @@ const abdRawDataSearchSchema = z.object({
   // 매트릭스가 보던 As-of 를 명시 전달(세션 공유에 의존하지 않음)
   asOf: fallback(z.string(), "").default(""),
   round: fallback(z.enum(["R1", "R2", "R3", "all"]), "all").default("all"),
-  // 모집단 정본: Terminated 포함 전수(6,659). Progress·Dashboard 와 동일 기준.
-  excluded: fallback(z.enum(["hide", "only", "all"]), "all").default("all"),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/abd/raw-data")({

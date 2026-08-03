@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Search, Upload, Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useAbdTeamList } from "@/hooks/useAbdTeamList";
 import {
   ABD_TEAMS,
   ABD_COLUMNS,
@@ -210,14 +211,16 @@ function formatDdMmm(v: any): string {
 
 
 const STATUS_TABS: { value: Exclude<AbdStatusGroup, "all">; label: string }[] = [
-  { value: "approved", label: "Approved (A)" },
-  { value: "unapproved", label: "Unapproved" },
+  { value: "approved", label: "Approved" },
+  { value: "under_review", label: "Awaiting Response" },
+  { value: "drafting", label: "Draft Start" },
+  { value: "resubmit", label: "Resubmit by TM" },
 ];
 // UI 탭에 노출되는 3종 + Dashboard 딥링크로만 들어오는 세분화 상태값들.
 // URL 파라미터 파싱 시 유효값 판정에 사용된다.
 const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
-  "in_progress", "not_started",
-  "under_review", "drafting", "rs_delay", "sb_delay", "df_delay", "ds_delay", "no_plan", "delayed",
+  "in_progress", "not_started", "unapproved",
+  "rs_delay", "sb_delay", "df_delay", "ds_delay", "no_plan", "delayed",
   // stage_group 축 (Progress KPI 스트립 드릴다운): 재고 sg_*, 지연 sgd_*
   "sg_ns", "sg_ds", "sg_df", "sg_sb", "sg_rs", "sg_resubmit", "sg_approved",
   "sgd_ns", "sgd_ds", "sgd_df", "sgd_sb", "sgd_rs",
@@ -230,6 +233,8 @@ const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
   // 키 'under_review' = 회신 대기(RS). 딥링크 하위호환으로 키 유지, 라벨만 정정.
   under_review: "Awaiting Response",
   drafting: "Draft Start",
+  resubmit: "Resubmit by TM",
+  unapproved: "Unapproved",
   rs_delay: "Response Delay",
   sb_delay: "Submission Delay",
   df_delay: "Draft Finish Delay",
@@ -267,9 +272,13 @@ export function AbdRawDataPage() {
 
   // ABD Raw Data는 ABD 전용 팀 탭만 사용한다. team_master의 DESN/PRJC/SUPP 등 공용 팀을 섞으면
   // 데이터가 없는 탭이 선택되어 전체 Raw Data가 사라진 것처럼 보일 수 있다.
+  const { data: teamList } = useAbdTeamList();
   const teamTabs = useMemo(
-    () => ABD_TEAMS.map((t) => ({ value: t.value, label: t.label })),
-    [],
+    () =>
+      teamList && teamList.length > 0
+        ? teamList.map((t) => ({ value: t, label: t }))
+        : ABD_TEAMS.map((t) => ({ value: t.value, label: t.label })),
+    [teamList],
   );
   const rawTab = String(urlSearch.tab ?? "").toUpperCase();
   // 다중 팀 선택: 콤마 구분(예: "MECH,ELEC"). 유효한 팀만 유지.
@@ -322,8 +331,6 @@ export function AbdRawDataPage() {
   }, [selectedStatuses]);
   const plotSel: "all" | "C" | "D" = (["all", "C", "D"].includes(String(urlSearch.plot ?? "")) ? (urlSearch.plot as any) : "all");
   const plotFilter: "C" | "D" | null = plotSel === "all" ? null : plotSel;
-  const excludedMode: "hide" | "only" | "all" =
-    ["hide", "only", "all"].includes(String(urlSearch.excluded ?? "")) ? (urlSearch.excluded as any) : "all";
   // 비활성 레코드는 항상 제외 (관리자 페이지에서 별도 관리 예정)
   const includeInactive = false;
   const rawPageSize = String(urlSearch.pageSize ?? "");
@@ -446,7 +453,7 @@ export function AbdRawDataPage() {
   // 판정 기준일(As of) — 세션 전역 공유. 빈 값이면 오늘(Doha).
   const sharedAbdDate = effectiveAsOf;
   const { data: itemsData, isFetching, refetch } = useAbdItemsQuery({
-    team, statusGroup, includeInactive, plot: plotFilter, q, filters: serverFilters, sort: serverSort, page, pageSize, excludedMode,
+    team, statusGroup, includeInactive, plot: plotFilter, q, filters: serverFilters, sort: serverSort, page, pageSize,
     asOf: sharedAbdDate || null,
   });
   const rows = itemsData?.rows ?? [];
@@ -671,9 +678,9 @@ export function AbdRawDataPage() {
 
   const totalCount = counts?.total_count ?? 0;
   const approvedCount = counts?.approved_count ?? 0;
-  const inProgressCount = counts?.in_progress_count ?? 0;
-  const notStartedCount = counts?.not_started_count ?? 0;
-  const excludedCount = counts?.excluded_count ?? 0;
+  const urCount = counts?.ur_count ?? 0;
+  const dsCount = counts?.ds_count ?? 0;
+  const resubmitCount = counts?.resubmit_count ?? 0;
 
   return (
     <div className="space-y-3">
@@ -762,9 +769,13 @@ export function AbdRawDataPage() {
           const count =
             s.value === "approved"
               ? approvedCount
-              : s.value === "unapproved"
-                ? inProgressCount + notStartedCount
-                : 0;
+              : s.value === "under_review"
+                ? urCount
+                : s.value === "drafting"
+                  ? dsCount
+                  : s.value === "resubmit"
+                    ? resubmitCount
+                    : 0;
           return (
             <button
               key={s.value}
@@ -803,23 +814,6 @@ export function AbdRawDataPage() {
               </button>
             </span>
           ))}
-        <button
-          type="button"
-          onClick={() => setUrl({ excluded: excludedMode === "only" ? "all" : "only", page: 1 })}
-          className={cn(
-            "ml-auto inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] transition-colors",
-            excludedMode === "only"
-              ? "bg-zinc-700 text-white shadow-sm"
-              : "text-muted-foreground hover:bg-background/60",
-          )}
-          aria-pressed={excludedMode === "only"}
-          title="Terminated / Cancelled — 기본 모집단에 포함 · 클릭 시 해당 항목만 보기"
-        >
-          Excluded
-          <Badge variant={excludedMode === "only" ? "outline" : "secondary"} className="ml-1 h-4 px-1 text-[10px]">
-            {excludedCount}
-          </Badge>
-        </button>
       </div>
 
       {activeChips.length > 0 && (
