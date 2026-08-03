@@ -291,6 +291,7 @@ export function DeSnagMatrixBlock({
     if (block.kind === "basement") return ["BSM"];
     if (block.kind === "lg") return ["LG"];
     if (block.kind === "liftcabin") return ["LIFT CABIN"];
+    if (block.kind === "vip") return ["VIP Drop Off (P5)"];
     if (block.kind === "unassigned") return ["__EMPTY__"];
     return presentBuildings;
   })();
