@@ -1,0 +1,1 @@
+ALTER TABLE public.defect_items_raw ENABLE TRIGGER trg_defect_items_raw_history;
