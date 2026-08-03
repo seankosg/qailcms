@@ -36,7 +36,6 @@ export interface AbdColumnDef {
 export const ABD_TEAMS = [
   { value: "MECH", label: "MECH" },
   { value: "ELEC", label: "ELEC" },
-  { value: "ARCH", label: "ARCH" },
 ] as const;
 export type AbdTeam = (typeof ABD_TEAMS)[number]["value"];
 
