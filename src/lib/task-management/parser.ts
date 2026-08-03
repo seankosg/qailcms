@@ -539,6 +539,14 @@ export async function parseTaskManagementExcel(
     forecast_end: pick("forecast_end", ["예상 완료"], 18),
     slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 19),
     auto_judgment: pick("auto_judgment", ["자동 판정"], 20),
+    // actual_finish 는 선택 컬럼: ★위치 폴백 금지 (milestone 방식). 헤더가 없으면 0.
+    actual_finish: (() => {
+      for (const name of withAlias("actual_finish", TASK_FIELD_ALIASES.actual_finish)) {
+        const idx = headerMap[normalizeHeader(name)];
+        if (idx) return idx;
+      }
+      return 0;
+    })(),
     // Milestone은 선택 컬럼: 헤더가 없으면 21열 폴백을 쓰지 않고 스킵(0).
     milestone: (() => {
       for (const name of withAlias("milestone", ["Milestone", "마일스톤"])) {
@@ -588,6 +596,7 @@ export async function parseTaskManagementExcel(
   clampField("plan_progress", "plan_progress");
   clampField("progress_variance", "progress_variance");
   clampField("forecast_end", "forecast_end");
+  clampField("actual_finish", "actual_finish");
   clampField("slip_days", "slip_days");
   clampField("auto_judgment", "auto_judgment");
   clampField("milestone", "milestone");
@@ -616,6 +625,7 @@ export async function parseTaskManagementExcel(
     plan_progress: cols.plan_progress,
     progress_variance: cols.progress_variance,
     forecast_end: cols.forecast_end,
+    actual_finish: cols.actual_finish,
     slip_days: cols.slip_days,
     auto_judgment: cols.auto_judgment,
     milestone: cols.milestone,
