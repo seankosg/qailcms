@@ -14,9 +14,11 @@ const PRIORITY = [
   "category", "defect_type", "description", "assigned_to",
 ];
 
-async function fetchPage(offset: number, limit: number) {
+type StatusGroup = "unclosed" | "closed";
+
+async function fetchPage(group: StatusGroup, offset: number, limit: number) {
   const { data, error } = await (supabase as any).rpc("defect_items_search", {
-    _status_group: "unclosed",
+    _status_group: group,
     _include_inactive: false,
     _q: null,
     _filters: [],
@@ -31,11 +33,13 @@ async function fetchPage(offset: number, limit: number) {
   return { rows, total };
 }
 
-export async function exportAllUnclosed(
+export async function exportAllByStatusGroup(
+  group: StatusGroup,
   onProgress?: (fetched: number, total: number) => void,
 ): Promise<{ count: number }> {
+  const label = group === "closed" ? "Closed" : "Unclosed";
   // First page → derive column list (priority ∪ discovered keys)
-  const first = await fetchPage(0, CHUNK);
+  const first = await fetchPage(group, 0, CHUNK);
   const seen = new Set<string>();
   const keys: string[] = [];
   for (const k of PRIORITY) if (!seen.has(k)) { seen.add(k); keys.push(k); }
@@ -48,7 +52,7 @@ export async function exportAllUnclosed(
   const header = buildDefectHeaderBlock({
     format: "view",
     meta: { userName: "system", userType: "" },
-    sourceLabel: "Snag Raw Data → Tab: unclosed · Full export",
+    sourceLabel: `Snag Raw Data → Tab: ${group} · Full export`,
     search: "",
     filterSummary: "(none)",
     sortSummary: "source_issue_no ↑",
@@ -57,8 +61,8 @@ export async function exportAllUnclosed(
   // Stream: reuse first page, then continue from CHUNK
   let served = false;
   return streamXlsxExport({
-    filename: `CMS_SM_raw-unclosed_${dohaStampCompact()}.xlsx`,
-    sheetName: "Unclosed",
+    filename: `CMS_SM_raw-${group}_${dohaStampCompact()}.xlsx`,
+    sheetName: label,
     columns,
     chunkSize: CHUNK,
     header: { title: header.title, metaRows: header.metaRows, freezeCols: 3 },
@@ -66,8 +70,14 @@ export async function exportAllUnclosed(
     datetimeFields: DEFECT_DATETIME_FIELDS,
     fetchPage: async (offset, limit) => {
       if (!served) { served = true; return first; }
-      return fetchPage(offset, limit);
+      return fetchPage(group, offset, limit);
     },
     onProgress,
   });
+}
+
+export async function exportAllUnclosed(
+  onProgress?: (fetched: number, total: number) => void,
+): Promise<{ count: number }> {
+  return exportAllByStatusGroup("unclosed", onProgress);
 }
