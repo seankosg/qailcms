@@ -326,6 +326,7 @@ export function buildMatrix(
   const lg: RowsMap = new Map();
   const basement: RowsMap = new Map();
   const liftcabin: RowsMap = new Map();
+  const unassigned: RowsMap = new Map();
   const roomGroupTotals: Record<string, Stats> = emptyRoomGroupStats();
   const roomGroupSourceMap: Record<string, Set<string>> = {};
 
@@ -356,8 +357,8 @@ export function buildMatrix(
 
     let block: RowsMap;
     let buildingLabel: string;
-    let levelDisp: string;
-    // LIFT CABIN / LG 는 building 단독 판정 — level_name 판정보다 우선한다.
+    // 블록 배치는 building 컬럼 단독 판정. level_name 은 행(Level) 라벨에만 사용한다.
+    const levelDisp = lvl.kind === "unknown" ? "Level ?" : `Level ${lvl.key}`;
     if (bld.kind === "liftcabin") {
       const roomKey = (r.room ?? "").trim() || "N/A";
       const subKey = (r.subcontractor ?? "").trim() || "N/A";
@@ -367,24 +368,22 @@ export function buildMatrix(
     } else if (bld.kind === "lg") {
       block = lg;
       buildingLabel = "LG";
-      levelDisp = "LG";
-    } else if (lvl.kind === "basement") {
+    } else if (bld.kind === "basement") {
       block = basement;
-      buildingLabel = "Basement"; // 공통
-      levelDisp = `Level ${lvl.key}`;
+      buildingLabel = "BSM";
     } else if (bld.kind === "tower") {
       block = tower;
       buildingLabel = "Tower";
-      levelDisp = lvl.kind === "ground" ? `Level ${lvl.key}` : "Level ?";
     } else if (bld.kind === "podium") {
       block = podium;
       buildingLabel = bld.label;
-      levelDisp = lvl.kind === "ground" ? `Level ${lvl.key}` : "Level ?";
+    } else if (bld.kind === "unassigned") {
+      block = unassigned;
+      buildingLabel = UNASSIGNED_BUILDING_LABEL;
     } else {
-      // Others → 지상 판정 시 Podium 옆에 별도 building 라벨로
+      // 인식되지 않은 building 값 → Podium 블록의 Others 행
       block = podium;
       buildingLabel = "Others";
-      levelDisp = lvl.kind === "ground" ? `Level ${lvl.key}` : "Level ?";
     }
 
     const entry = ensure(block, buildingLabel, levelDisp, lvl.kind, lvl.sortIdx);
@@ -396,8 +395,10 @@ export function buildMatrix(
     // 정렬 순서 building
     const buildingOrder = (() => {
       if (kind === "tower") return ["Tower"];
-      if (kind === "basement") return ["Basement"];
+      if (kind === "basement") return ["BSM"];
       if (kind === "lg") return ["LG"];
+      if (kind === "unassigned") return [UNASSIGNED_BUILDING_LABEL];
+      if (kind === "liftcabin") return Array.from(source.keys());
       // podium
       const known = PODIUM_ORDER.filter((b) => source.has(b));
       const others = Array.from(source.keys()).filter((b) => !PODIUM_ORDER.includes(b)).sort();
@@ -411,14 +412,14 @@ export function buildMatrix(
       // 정렬
       levels.sort(([ka2, a], [kb2, b]) => {
         if (kind === "liftcabin") return compareRoomNatural(ka2, kb2);
-        if (kind === "basement") {
-          // LG → B1 → B4
-          const ka = a.sortIdx;
-          const kb = b.sortIdx;
-          return ka - kb;
-        }
-        // 지상: 큰 숫자가 위
-        return b.sortIdx - a.sortIdx;
+        // 지상(큰 숫자 위) → 지하(LG → B1 … B4) → Unknown
+        const rank = (k: LevelKind) => (k === "ground" ? 0 : k === "basement" ? 1 : 2);
+        const ra = rank(a.levelKind);
+        const rb = rank(b.levelKind);
+        if (ra !== rb) return ra - rb;
+        if (ra === 0) return b.sortIdx - a.sortIdx;
+        if (ra === 1) return a.sortIdx - b.sortIdx;
+        return ka2.localeCompare(kb2);
       });
       for (const [levelDisp, info] of levels) {
         const rowTotal = newStats();
@@ -477,8 +478,9 @@ export function buildMatrix(
   if (tower.size) blocks.push(buildBlock("tower", "Tower", tower));
   if (podium.size) blocks.push(buildBlock("podium", "Podium", podium));
   if (lg.size) blocks.push(buildBlock("lg", "LG (Lower Ground)", lg));
-  if (basement.size) blocks.push(buildBlock("basement", "Basement (지하)", basement));
+  if (basement.size) blocks.push(buildBlock("basement", "BSM (지하)", basement));
   if (liftcabin.size) blocks.push(buildBlock("liftcabin", "LIFT CABIN", liftcabin));
+  if (unassigned.size) blocks.push(buildBlock("unassigned", "미지정 (Building 없음)", unassigned));
 
   const plotTotal = newStats();
   for (const b of blocks) mergeStats(plotTotal, b.blockTotal);
@@ -521,8 +523,10 @@ export function metricSearchParams(m: MetricKey): Record<string, string> {
 // building 그룹 헤더 → members (콤마 결합해 raw-data 필터로 전달)
 export function buildingGroupMembers(kind: BlockKey, presentBuildings: string[]): string[] {
   if (kind === "tower") return ["Tower", "Tower 3", "Tower 4"];
-  if (kind === "basement") return []; // basement는 building 무관, level=B*로만 필터
+  if (kind === "basement") return ["BSM"];
   if (kind === "lg") return ["LG"];
+  if (kind === "liftcabin") return ["LIFT CABIN"];
+  if (kind === "unassigned") return ["__EMPTY__"];
   // podium
   return presentBuildings; // 이미 정규화된 라벨 (예: Podium, Podium 1..4, Others)
 }
