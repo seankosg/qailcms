@@ -536,6 +536,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         plan_start: p.plan_start,
         plan_end: p.plan_end,
         actual_progress: p.actual_progress,
+        actual_finish: p.actual_finish,
+        actual_finish_cleared: p.actual_finish_cleared,
       }));
       const res = await previewTaskImport({ data: { discipline, rows } });
       setFiles((cur) =>
@@ -825,8 +827,16 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         plan_progress: null as number | null,
         progress_variance: null as number | null,
         forecast_end: p.forecast_end,
-        // A.Finish: 파서에서 100% 완료 시 forecast_end → dataDate 폴백으로 채움. null이면 기존 DB값 유지.
+        // A.Finish: 엑셀 '실제 완료' 열 값만. null이면 기존 DB값 유지(stripNullExcept).
         actual_finish: stripParent ? null : p.actual_finish,
+        // P4-3: 완료일이 실제로 임포트될 때만 출처를 'import' 로 기록. null 이면 기존 값 유지.
+        actual_finish_source:
+          !stripParent && p.actual_finish ? "import" : (null as string | null),
+        // P4-3: 엑셀 진도율 칸에 값이 있는 행만 관측일 기록. null 이면 기존 값 유지.
+        progress_observed_at:
+          !stripParent && p.progress_cell_present
+            ? (f.dataDateOverride ?? f.dataDate ?? null)
+            : null,
         slip_days: null as number | null,
         auto_judgment: null as string | null,
         auto_judgment_import: p.auto_judgment,
