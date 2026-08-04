@@ -629,9 +629,11 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           ? serverAllowed
           : serverAllowed.filter((p) => normalizePic(p.hdec_pic_name) === meNorm);
       const filteredOut = parsedAll.length - parsed.length;
-      if (effectiveScope === "mine" && parsed.length === 0) {
+      if (parsed.length === 0) {
         toast.warning(
-          `${f.name}: 본인(HDEC PIC: ${importerHdecPicRef.current ?? "-"}) 담당 행이 없어 임포트를 건너뜁니다`,
+          outOfScope > 0
+            ? `${f.name}: 반영 가능한 행이 없습니다 (범위 밖 ${outOfScope}건)`
+            : `${f.name}: 본인(HDEC PIC: ${importerHdecPicRef.current ?? "-"}) 담당 행이 없어 임포트를 건너뜁니다`,
         );
         setFiles((cur) =>
           cur.map((x) =>
@@ -656,8 +658,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       }
       const scopeNote =
         effectiveScope === "mine"
-          ? `Import scope: mine (HDEC PIC=${importerHdecPicRef.current ?? "-"}); matched ${parsed.length}/${parsedAll.length}`
-          : `Import scope: all; rows=${parsed.length}`;
+          ? `Import scope: mine (HDEC PIC=${importerHdecPicRef.current ?? "-"}); matched ${parsed.length}/${parsedAll.length}; RCL out-of-scope=${outOfScope}`
+          : `Import scope: all; rows=${parsed.length}; RCL out-of-scope=${outOfScope}`;
       const startTime = Date.now();
       const startedAtIso = new Date().toISOString();
 
@@ -1294,6 +1296,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     judgmentRecalculated,
                     renumbered,
                     resolvedByDecision,
+                    outOfScope,
+                    outOfScopeKeys,
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
