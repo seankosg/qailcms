@@ -5958,6 +5958,14 @@ export type Database = {
         Returns: boolean
       }
       rcl_grants: { Args: { _action: string; _module: string }; Returns: Json }
+      rcl_grants_for: {
+        Args: { _action: string; _module: string; _user_id: string }
+        Returns: Json
+      }
+      rcl_grants_impl: {
+        Args: { _action: string; _module: string; _user_id: string }
+        Returns: Json
+      }
       rcl_highest_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
