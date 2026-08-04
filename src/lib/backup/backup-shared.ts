@@ -70,8 +70,10 @@ export type BackupTableName =
   // === ABD OCS ===
   | "abd_ocs_import_logs"
   | "abd_ocs_comments"
+  | "abd_ocs_comment_groups"
   | "abd_ocs_compliance"
   | "abd_ocs_attachments"
+  | "abd_ocs_attachment_comment_links"
   | "abd_ocs_compliance_log";
 
 /**
@@ -138,8 +140,10 @@ export const BACKUP_TABLES: BackupTableName[] = [
   "task_management_status_history",
   "abd_ocs_import_logs",
   "abd_ocs_comments",
+  "abd_ocs_comment_groups",
   "abd_ocs_compliance",
   "abd_ocs_attachments",
+  "abd_ocs_attachment_comment_links",
   "abd_ocs_compliance_log",
 ];
 
@@ -163,8 +167,10 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "abd_change_log",
     "abd_ocs_import_logs",
     "abd_ocs_comments",
+    "abd_ocs_comment_groups",
     "abd_ocs_compliance",
     "abd_ocs_attachments",
+    "abd_ocs_attachment_comment_links",
     "abd_ocs_compliance_log",
   ],
   sm: ["defect_items_raw", "defect_import_logs", "defect_status_history"],
