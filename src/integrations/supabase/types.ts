@@ -2384,6 +2384,30 @@ export type Database = {
         }
         Relationships: []
       }
+      rcl_legacy_fn_backup: {
+        Row: {
+          backed_up_at: string
+          fn_args: string
+          fn_def: string
+          fn_name: string
+          id: string
+        }
+        Insert: {
+          backed_up_at?: string
+          fn_args: string
+          fn_def: string
+          fn_name: string
+          id?: string
+        }
+        Update: {
+          backed_up_at?: string
+          fn_args?: string
+          fn_def?: string
+          fn_name?: string
+          id?: string
+        }
+        Relationships: []
+      }
       rcl_module_config: {
         Row: {
           created_at: string
@@ -5933,11 +5957,12 @@ export type Database = {
         Args: { _action: string; _module: string; _user_id: string }
         Returns: string
       }
+      rcl_module_of_table: { Args: { _table_name: string }; Returns: string }
       rcl_role_counts: {
         Args: never
         Returns: {
           cnt: number
-          role: Database["public"]["Enums"]["app_role"]
+          role: string
         }[]
       }
       rcl_scope: {
