@@ -2128,6 +2128,7 @@ export type Database = {
           name: string
           name_norm: string
           name_variants: string[]
+          note: string | null
           updated_at: string
           verified: boolean
         }
@@ -2141,6 +2142,7 @@ export type Database = {
           name: string
           name_norm: string
           name_variants?: string[]
+          note?: string | null
           updated_at?: string
           verified?: boolean
         }
@@ -2154,6 +2156,7 @@ export type Database = {
           name?: string
           name_norm?: string
           name_variants?: string[]
+          note?: string | null
           updated_at?: string
           verified?: boolean
         }
@@ -2167,6 +2170,45 @@ export type Database = {
           },
         ]
       }
+      hdec_name_propagation_log: {
+        Row: {
+          created_at: string
+          from_name: string | null
+          id: string
+          owned_rows: number
+          ref_id: string | null
+          source: string
+          target_column: string
+          target_table: string
+          to_name: string | null
+          unowned_rows: number
+        }
+        Insert: {
+          created_at?: string
+          from_name?: string | null
+          id?: string
+          owned_rows?: number
+          ref_id?: string | null
+          source: string
+          target_column: string
+          target_table: string
+          to_name?: string | null
+          unowned_rows?: number
+        }
+        Update: {
+          created_at?: string
+          from_name?: string | null
+          id?: string
+          owned_rows?: number
+          ref_id?: string | null
+          source?: string
+          target_column?: string
+          target_table?: string
+          to_name?: string | null
+          unowned_rows?: number
+        }
+        Relationships: []
+      }
       hdec_pic_name_master: {
         Row: {
           created_at: string
@@ -2178,6 +2220,7 @@ export type Database = {
           name: string
           name_norm: string
           name_variants: string[]
+          note: string | null
           updated_at: string
           verified: boolean
         }
@@ -2191,6 +2234,7 @@ export type Database = {
           name: string
           name_norm: string
           name_variants?: string[]
+          note?: string | null
           updated_at?: string
           verified?: boolean
         }
@@ -2204,6 +2248,7 @@ export type Database = {
           name?: string
           name_norm?: string
           name_variants?: string[]
+          note?: string | null
           updated_at?: string
           verified?: boolean
         }
@@ -3270,6 +3315,7 @@ export type Database = {
           is_excluded: boolean
           latest_status: string | null
           latest_status_raw: string | null
+          owner_user_id: string | null
           pic: string | null
           pic_po: string | null
           plot: string
@@ -3297,6 +3343,7 @@ export type Database = {
           is_excluded?: boolean
           latest_status?: string | null
           latest_status_raw?: string | null
+          owner_user_id?: string | null
           pic?: string | null
           pic_po?: string | null
           plot: string
@@ -3324,6 +3371,7 @@ export type Database = {
           is_excluded?: boolean
           latest_status?: string | null
           latest_status_raw?: string | null
+          owner_user_id?: string | null
           pic?: string | null
           pic_po?: string | null
           plot?: string
@@ -4547,6 +4595,7 @@ export type Database = {
           is_final_approved: boolean
           latest_response_code: string | null
           latest_status_raw: string | null
+          owner_user_id: string | null
           pic: string | null
           plot: string
           r1_response_code: string | null
@@ -4577,6 +4626,7 @@ export type Database = {
           is_final_approved?: boolean
           latest_response_code?: string | null
           latest_status_raw?: string | null
+          owner_user_id?: string | null
           pic?: string | null
           plot: string
           r1_response_code?: string | null
@@ -4607,6 +4657,7 @@ export type Database = {
           is_final_approved?: boolean
           latest_response_code?: string | null
           latest_status_raw?: string | null
+          owner_user_id?: string | null
           pic?: string | null
           plot?: string
           r1_response_code?: string | null
