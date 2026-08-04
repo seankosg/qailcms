@@ -87,7 +87,7 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "abd_number", label: "ABD Number", type: "text", width: 260, group: "identity", origin: "identity" },
   { key: "abd_ocs_no", label: "ABD OCS No.", type: "text", width: 240, group: "identity", origin: "identity" },
   // OCS Check — 정본 = abd_ocs_comments / abd_ocs_compliance. 캐시 컬럼(ocs_check/ocs_total/ocs_complied)은 편집·임포트 대상 아님.
-  { key: "ocs_check", label: "OCS Check", type: "badge", width: 110, group: "identity", origin: "system", derived: true },
+  { key: "ocs_check", label: "OCS", type: "badge", width: 80, group: "identity", origin: "system", derived: true },
   { key: "batch_no", label: "Batch No.", type: "text", width: 110, group: "identity", editable: true, editorType: "text", origin: "identity" },
 
   // Content
