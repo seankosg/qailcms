@@ -420,6 +420,7 @@ export function SplRawDataPage() {
 function SplTableRow({
   row,
   catalog,
+/*__ANCHOR__*/
   subHeaders,
   canEdit,
   onSave,
