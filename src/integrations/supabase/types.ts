@@ -1162,6 +1162,7 @@ export type Database = {
           comment_revision: string | null
           contractor_response: string | null
           created_at: string
+          discipline: string | null
           drawing_number_norm: string | null
           file_revision: string | null
           id: string
@@ -1177,17 +1178,26 @@ export type Database = {
           ocs_number: string | null
           ocs_number_norm: string | null
           ocs_sn: string | null
+          plot: string | null
+          project: string | null
           retired_reason: string | null
+          review_priority: string | null
+          service: string | null
           sign_off_status: string | null
           source_comment_id: string
           source_drawing_number: string | null
+          source_extra: Json | null
+          source_file_hash: string | null
           source_file_name: string | null
+          source_imported_at: string | null
           source_modified_at: string | null
           source_row_hash: string | null
           source_row_index: number | null
           source_sheet_name: string | null
           team: string | null
           updated_at: string
+          validation_note: string | null
+          warning_codes: string[]
         }
         Insert: {
           abd_item_id?: string | null
@@ -1196,6 +1206,7 @@ export type Database = {
           comment_revision?: string | null
           contractor_response?: string | null
           created_at?: string
+          discipline?: string | null
           drawing_number_norm?: string | null
           file_revision?: string | null
           id?: string
@@ -1211,17 +1222,26 @@ export type Database = {
           ocs_number?: string | null
           ocs_number_norm?: string | null
           ocs_sn?: string | null
+          plot?: string | null
+          project?: string | null
           retired_reason?: string | null
+          review_priority?: string | null
+          service?: string | null
           sign_off_status?: string | null
           source_comment_id: string
           source_drawing_number?: string | null
+          source_extra?: Json | null
+          source_file_hash?: string | null
           source_file_name?: string | null
+          source_imported_at?: string | null
           source_modified_at?: string | null
           source_row_hash?: string | null
           source_row_index?: number | null
           source_sheet_name?: string | null
           team?: string | null
           updated_at?: string
+          validation_note?: string | null
+          warning_codes?: string[]
         }
         Update: {
           abd_item_id?: string | null
@@ -1230,6 +1250,7 @@ export type Database = {
           comment_revision?: string | null
           contractor_response?: string | null
           created_at?: string
+          discipline?: string | null
           drawing_number_norm?: string | null
           file_revision?: string | null
           id?: string
@@ -1245,17 +1266,26 @@ export type Database = {
           ocs_number?: string | null
           ocs_number_norm?: string | null
           ocs_sn?: string | null
+          plot?: string | null
+          project?: string | null
           retired_reason?: string | null
+          review_priority?: string | null
+          service?: string | null
           sign_off_status?: string | null
           source_comment_id?: string
           source_drawing_number?: string | null
+          source_extra?: Json | null
+          source_file_hash?: string | null
           source_file_name?: string | null
+          source_imported_at?: string | null
           source_modified_at?: string | null
           source_row_hash?: string | null
           source_row_index?: number | null
           source_sheet_name?: string | null
           team?: string | null
           updated_at?: string
+          validation_note?: string | null
+          warning_codes?: string[]
         }
         Relationships: [
           {
@@ -1370,6 +1400,16 @@ export type Database = {
       }
       abd_ocs_import_logs: {
         Row: {
+          attachment_linked: number
+          attachment_missing_storage: number
+          attachment_needs_review: number
+          attachment_orphan_storage: number
+          attachment_registered: number
+          attachment_total: number
+          compliance_inserted_count: number
+          data_file_hash: string | null
+          data_file_name: string | null
+          dryrun: Json | null
           error_count: number
           errors: Json | null
           finished_at: string | null
@@ -1380,16 +1420,32 @@ export type Database = {
           linked_count: number
           manifest_hash: string | null
           manifest_name: string | null
+          manual_review_count: number
+          mismatch_warning_count: number
+          snapshot_id: string | null
           source_file_hash: string | null
           source_file_name: string | null
           started_at: string
           status: string
+          storage_data_path: string | null
+          storage_manifest_path: string | null
           total_count: number
           unchanged_count: number
           unmatched_count: number
           updated_count: number
+          warnings: Json | null
         }
         Insert: {
+          attachment_linked?: number
+          attachment_missing_storage?: number
+          attachment_needs_review?: number
+          attachment_orphan_storage?: number
+          attachment_registered?: number
+          attachment_total?: number
+          compliance_inserted_count?: number
+          data_file_hash?: string | null
+          data_file_name?: string | null
+          dryrun?: Json | null
           error_count?: number
           errors?: Json | null
           finished_at?: string | null
@@ -1400,16 +1456,32 @@ export type Database = {
           linked_count?: number
           manifest_hash?: string | null
           manifest_name?: string | null
+          manual_review_count?: number
+          mismatch_warning_count?: number
+          snapshot_id?: string | null
           source_file_hash?: string | null
           source_file_name?: string | null
           started_at?: string
           status?: string
+          storage_data_path?: string | null
+          storage_manifest_path?: string | null
           total_count?: number
           unchanged_count?: number
           unmatched_count?: number
           updated_count?: number
+          warnings?: Json | null
         }
         Update: {
+          attachment_linked?: number
+          attachment_missing_storage?: number
+          attachment_needs_review?: number
+          attachment_orphan_storage?: number
+          attachment_registered?: number
+          attachment_total?: number
+          compliance_inserted_count?: number
+          data_file_hash?: string | null
+          data_file_name?: string | null
+          dryrun?: Json | null
           error_count?: number
           errors?: Json | null
           finished_at?: string | null
@@ -1420,14 +1492,20 @@ export type Database = {
           linked_count?: number
           manifest_hash?: string | null
           manifest_name?: string | null
+          manual_review_count?: number
+          mismatch_warning_count?: number
+          snapshot_id?: string | null
           source_file_hash?: string | null
           source_file_name?: string | null
           started_at?: string
           status?: string
+          storage_data_path?: string | null
+          storage_manifest_path?: string | null
           total_count?: number
           unchanged_count?: number
           unmatched_count?: number
           updated_count?: number
+          warnings?: Json | null
         }
         Relationships: []
       }
@@ -5738,10 +5816,23 @@ export type Database = {
         }
         Returns: Json
       }
+      abd_ocs_assert_admin: { Args: never; Returns: undefined }
       abd_ocs_comment_visible: {
         Args: { _comment_id: string }
         Returns: boolean
       }
+      abd_ocs_dryrun_batch: { Args: { p_rows: Json }; Returns: Json }
+      abd_ocs_finalize_comments: {
+        Args: { p_source_ids: string[] }
+        Returns: Json
+      }
+      abd_ocs_import_attachments: { Args: { p_rows: Json }; Returns: Json }
+      abd_ocs_import_comments: {
+        Args: { p_import_log_id: string; p_rows: Json }
+        Returns: Json
+      }
+      abd_ocs_norm: { Args: { v: string }; Returns: string }
+      abd_ocs_verify: { Args: never; Returns: Json }
       abd_progress_cell_ids: {
         Args: {
           _as_of?: string
