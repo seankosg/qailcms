@@ -10,29 +10,40 @@ import { toast } from "sonner";
 import { AlertTriangle, FileSpreadsheet, Loader2, ShieldAlert, Upload } from "lucide-react";
 import { parseSplHdecFile, type ParsedSplFile } from "@/lib/spl/hdec-parser";
 import { importSplHdecBatch, type SplHdecResult } from "@/lib/spl/hdec-import.functions";
+import { applyImportScope, type ImportScopeOutcome } from "@/lib/import/import-scope";
+import { ScopeSummary } from "@/components/wrt/import/WrtImportPage";
+
+type SplParsedRow = ParsedSplFile["rows"][number];
 
 export function SplImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<ParsedSplFile | null>(null);
+  const [scope, setScope] = useState<ImportScopeOutcome<SplParsedRow> | null>(null);
   const [preview, setPreview] = useState<SplHdecResult | null>(null);
   const [result, setResult] = useState<SplHdecResult | null>(null);
-  const [busy, setBusy] = useState<null | "parse" | "preview" | "apply">(null);
+  const [busy, setBusy] = useState<null | "parse" | "scope" | "preview" | "apply">(null);
   const [allowDeletes, setAllowDeletes] = useState(false);
   const runImport = useServerFn(importSplHdecBatch);
 
+  const scopeNote = scope
+    ? `scope=${scope.role} in_scope=${scope.allowedRows.length} out_of_scope=${scope.deniedKeys.length}`
+    : undefined;
+
   const payload = useMemo(() => {
-    if (!parsed) return null;
+    if (!parsed || !scope) return null;
     return {
       file_name: parsed.file_name,
       sheet_names: parsed.sheets.map((s) => s.sheet_name),
       ocs_excluded: parsed.ocs_excluded,
-      rows: parsed.rows,
+      rows: scope.allowedRows,
+      scope_note: scopeNote,
     };
-  }, [parsed]);
+  }, [parsed, scope, scopeNote]);
 
   async function onFile(file: File) {
     setBusy("parse");
     setParsed(null);
+    setScope(null);
     setPreview(null);
     setResult(null);
     setAllowDeletes(false);
@@ -40,6 +51,18 @@ export function SplImportPage() {
       const p = await parseSplHdecFile(file);
       setParsed(p);
       toast.success(`파싱 완료 — ${p.rows.length}행 (OCS 제외 ${p.ocs_excluded}건)`);
+      setBusy("scope");
+      const sc = await applyImportScope<SplParsedRow>(
+        "SPL",
+        "spl_number",
+        ["team", "pic", "eng", "pic_po", "eng_po"],
+        p.rows,
+        (r) => r.spl_number,
+      );
+      setScope(sc);
+      if (sc.deniedKeys.length > 0) {
+        toast.warning(`권한 범위 밖 ${sc.deniedKeys.length}행이 제외됩니다 (역할 ${sc.role})`);
+      }
     } catch (e: any) {
       toast.error(e?.message ?? "파일 파싱 실패");
     } finally {
@@ -103,10 +126,14 @@ export function SplImportPage() {
               }}
             />
             <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
-              {busy === "parse" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              {busy === "parse" || busy === "scope" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="mr-2 h-4 w-4" />
+              )}
               파일 선택
             </Button>
-            <Button onClick={onPreview} disabled={!parsed || busy !== null}>
+            <Button onClick={onPreview} disabled={!payload || busy !== null}>
               {busy === "preview" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               미리보기 (Diff)
             </Button>
@@ -135,6 +162,8 @@ export function SplImportPage() {
               )}
             </div>
           )}
+
+          {scope && <ScopeSummary scope={scope} />}
 
           {parsed && parsed.unknown_headers.length > 0 && (
             <Alert variant="destructive">
