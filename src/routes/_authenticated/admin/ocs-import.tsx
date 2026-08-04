@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,22 +10,23 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, FileJson, FolderUp, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { getOcsImportStats, OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
 import {
-  validateOcsManifest,
-  registerOcsAttachments,
-  getOcsImportStats,
-  OCS_BUCKET,
-  OCS_ALLOWED_MIME,
+  parseOcsManifest,
+  matchFolderFiles,
+  mimeForExt,
+  extOf,
   OCS_MAX_BYTES,
   type OcsManifestEntry,
-  type OcsManifestValidation,
-} from "@/lib/abd/ocs-import.functions";
+  type OcsManifestParse,
+  type FolderMatchResult,
+} from "@/lib/abd/ocs-manifest";
 
 export const Route = createFileRoute("/_authenticated/admin/ocs-import")({
   head: () => ({
     meta: [
       { title: "OCS Import — QAIL CMS" },
-      { name: "description", content: "ABD OCS 코멘트 매니페스트 검증 및 첨부 이미지 업로드 관리자 화면." },
+      { name: "description", content: "ABD OCS 첨부 매니페스트 검증 및 이미지 보관함 업로드 관리자 화면." },
       { property: "og:title", content: "OCS Import — QAIL CMS" },
       { property: "og:description", content: "ABD OCS 매니페스트 검증 및 첨부 이미지 업로드." },
       { property: "og:type", content: "website" },
@@ -35,12 +36,16 @@ export const Route = createFileRoute("/_authenticated/admin/ocs-import")({
   component: OcsImportPage,
 });
 
+type RowStatus = "대기" | "미매칭" | "업로드" | "완료" | "기존" | "실패";
 type UploadRow = {
   entry: OcsManifestEntry;
   file?: File;
-  status: "대기" | "업로드" | "완료" | "실패";
+  status: RowStatus;
+  hash?: "일치" | "불일치" | "해시없음";
   message?: string;
 };
+
+const CONCURRENCY = 5;
 
 async function sha256Hex(buf: ArrayBuffer) {
   const digest = await crypto.subtle.digest("SHA-256", buf);
@@ -50,153 +55,147 @@ async function sha256Hex(buf: ArrayBuffer) {
 }
 
 function OcsImportPage() {
-  const validate = useServerFn(validateOcsManifest);
-  const register = useServerFn(registerOcsAttachments);
   const fetchStats = useServerFn(getOcsImportStats);
-
-  const [entries, setEntries] = useState<OcsManifestEntry[]>([]);
+  const [parsed, setParsed] = useState<OcsManifestParse | null>(null);
   const [manifestName, setManifestName] = useState<string | null>(null);
-  const [validation, setValidation] = useState<OcsManifestValidation | null>(null);
-  const [validating, setValidating] = useState(false);
+  const [match, setMatch] = useState<FolderMatchResult | null>(null);
   const [rows, setRows] = useState<UploadRow[]>([]);
+  const [confirmed, setConfirmed] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [done, setDone] = useState(0);
   const folderRef = useRef<HTMLInputElement>(null);
 
-  const stats = useQuery({
-    queryKey: ["abd-ocs-import-stats"],
-    queryFn: () => fetchStats({}),
-  });
+  const stats = useQuery({ queryKey: ["abd-ocs-import-stats"], queryFn: () => fetchStats({}) });
+
+  const counts = useMemo(() => {
+    const c = { 완료: 0, 기존: 0, 실패: 0, 미매칭: 0, 대기: 0, 업로드: 0 } as Record<RowStatus, number>;
+    for (const r of rows) c[r.status] = (c[r.status] ?? 0) + 1;
+    const hashOk = rows.filter((r) => r.hash === "일치").length;
+    const hashBad = rows.filter((r) => r.hash === "불일치").length;
+    const hashNone = rows.filter((r) => r.hash === "해시없음").length;
+    return { ...c, hashOk, hashBad, hashNone };
+  }, [rows]);
 
   async function onManifest(file: File) {
     try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      const list: OcsManifestEntry[] = Array.isArray(json) ? json : (json.files ?? json.entries ?? []);
-      if (!Array.isArray(list) || list.length === 0) throw new Error("매니페스트에 항목이 없습니다.");
-      setEntries(list);
+      const res = parseOcsManifest(JSON.parse(await file.text()));
+      if (res.entries.length === 0) throw new Error("relative_path 를 가진 항목이 없습니다.");
+      setParsed(res);
       setManifestName(file.name);
-      setValidation(null);
-      setRows(list.map((entry) => ({ entry, status: "대기" as const })));
-      toast.success(`매니페스트 ${list.length}건 읽음`);
+      setMatch(null);
+      setConfirmed(false);
+      setRows(res.entries.map((entry) => ({ entry, status: "미매칭" as const })));
+      if (folderRef.current) folderRef.current.value = "";
+      toast.success(`업로드 대상 ${res.entries.length}건 읽음`);
     } catch (e: any) {
       toast.error(`매니페스트 읽기 실패: ${e.message}`);
     }
   }
 
-  async function onValidate() {
-    setValidating(true);
-    try {
-      const res = await validate({ data: { entries } });
-      setValidation(res);
-      toast.success("검증 완료");
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setValidating(false);
-    }
-  }
-
   function onFolder(files: FileList | null) {
-    if (!files) return;
-    const byName = new Map<string, File>();
-    for (const f of Array.from(files)) byName.set(f.name, f);
-    setRows((prev) =>
-      prev.map((r) => {
-        const f = byName.get(r.entry.file_name);
-        if (!f) return { ...r, status: "대기", message: "이미지 없음" };
-        if (!OCS_ALLOWED_MIME.includes(f.type as any)) return { ...r, file: undefined, status: "실패", message: `허용되지 않는 형식(${f.type || "unknown"})` };
-        if (f.size > OCS_MAX_BYTES) return { ...r, file: undefined, status: "실패", message: "8MB 초과" };
-        return { ...r, file: f, status: "대기", message: undefined };
+    if (!parsed || !files) return;
+    const m = matchFolderFiles(parsed.entries, files);
+    setMatch(m);
+    setConfirmed(false);
+    setRows(
+      parsed.entries.map((entry) => {
+        const f = m.matched.get(entry.relative_path);
+        return { entry, file: f, status: (f ? "대기" : "미매칭") as RowStatus };
       }),
     );
-    const matched = Array.from(byName.keys()).length;
-    toast.success(`이미지 ${matched}건 선택됨`);
+    toast.success(`매칭 ${m.matched.size}건 / 미매칭 ${m.unmatchedManifest.length}건`);
+  }
+
+  async function uploadOne(idx: number, r: UploadRow): Promise<UploadRow> {
+    const file = r.file!;
+    const ext = extOf(r.entry.relative_path);
+    const mime = mimeForExt(ext);
+    if (!mime) return { ...r, status: "실패", message: "허용되지 않는 형식" };
+    if (file.size > OCS_MAX_BYTES) return { ...r, status: "실패", message: "8MB 초과" };
+
+    const buf = await file.arrayBuffer();
+    const hex = await sha256Hex(buf);
+    const hash: UploadRow["hash"] = !r.entry.content_hash
+      ? "해시없음"
+      : hex === r.entry.content_hash
+        ? "일치"
+        : "불일치";
+    if (hash === "불일치") return { ...r, status: "실패", hash, message: "SHA-256 불일치" };
+
+    const { error } = await supabase.storage
+      .from(OCS_BUCKET)
+      .upload(r.entry.relative_path, new Blob([buf], { type: mime }), {
+        contentType: mime,
+        upsert: false,
+      });
+    if (error) {
+      const msg = String((error as any).message ?? error);
+      if (/exists/i.test(msg)) return { ...r, status: "기존", hash, message: "이미 존재 — 건너뜀" };
+      return { ...r, status: "실패", hash, message: msg };
+    }
+    return { ...r, status: "완료", hash };
   }
 
   async function onUpload() {
-    const targets = rows.filter((r) => r.file && r.status !== "완료");
-    if (targets.length === 0) {
-      toast.error("업로드할 이미지가 없습니다.");
-      return;
-    }
+    const targets = rows.map((r, i) => ({ r, i })).filter(({ r }) => r.file && r.status !== "완료");
+    if (targets.length === 0) return;
     setUploading(true);
-    setProgress(0);
-    const registered: Parameters<typeof registerOcsAttachments>[0] extends never ? never : any[] = [];
-    let done = 0;
-    for (const r of targets) {
-      const file = r.file!;
-      const path = `${r.entry.source_comment_id}/${r.entry.source_attachment_id}`;
-      setRows((prev) => prev.map((x) => (x.entry.source_attachment_id === r.entry.source_attachment_id ? { ...x, status: "업로드" } : x)));
-      try {
-        const buf = await file.arrayBuffer();
-        const hash = await sha256Hex(buf);
-        const { error } = await supabase.storage.from(OCS_BUCKET).upload(path, file, {
-          upsert: true,
-          contentType: file.type,
-        });
-        if (error) throw new Error(error.message);
-        registered.push({
-          source_comment_id: r.entry.source_comment_id,
-          source_attachment_id: r.entry.source_attachment_id,
-          storage_path: path,
-          mime_type: file.type,
-          byte_size: file.size,
-          sha256: hash,
-          sort_order: r.entry.sort_order ?? 0,
-        });
-        setRows((prev) => prev.map((x) => (x.entry.source_attachment_id === r.entry.source_attachment_id ? { ...x, status: "완료", message: undefined } : x)));
-      } catch (e: any) {
-        setRows((prev) => prev.map((x) => (x.entry.source_attachment_id === r.entry.source_attachment_id ? { ...x, status: "실패", message: e.message } : x)));
-      }
-      done += 1;
-      setProgress(Math.round((done / targets.length) * 100));
-    }
-
-    if (registered.length > 0) {
-      try {
-        const res = await register({ data: { items: registered } });
-        toast.success(`DB 등록 ${res.registered}건 완료`);
-        if (res.skipped_unknown_comment.length > 0) {
-          toast.error(`미등재 코멘트로 건너뜀: ${res.skipped_unknown_comment.length}건`);
+    setDone(0);
+    const next = rows.slice();
+    let cursor = 0;
+    let finished = 0;
+    async function worker() {
+      while (cursor < targets.length) {
+        const my = targets[cursor++]!;
+        next[my.i] = { ...next[my.i]!, status: "업로드" };
+        try {
+          next[my.i] = await uploadOne(my.i, next[my.i]!);
+        } catch (e: any) {
+          next[my.i] = { ...next[my.i]!, status: "실패", message: String(e?.message ?? e) };
         }
-        stats.refetch();
-      } catch (e: any) {
-        toast.error(`DB 등록 실패: ${e.message}`);
+        finished += 1;
+        setDone(finished);
+        if (finished % 20 === 0) setRows(next.slice());
       }
     }
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+    setRows(next.slice());
     setUploading(false);
+    const ok = next.filter((r) => r.status === "완료").length;
+    const skip = next.filter((r) => r.status === "기존").length;
+    const fail = next.filter((r) => r.status === "실패").length;
+    toast[fail ? "warning" : "success"](`업로드 완료 ${ok} / 기존 ${skip} / 실패 ${fail}`);
+    stats.refetch();
   }
 
-  const okCount = rows.filter((r) => r.status === "완료").length;
-  const failCount = rows.filter((r) => r.status === "실패").length;
+  const progress = rows.length ? Math.round((done / Math.max(1, rows.filter((r) => r.file).length)) * 100) : 0;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 p-4">
       <div>
-        <h1 className="text-2xl font-semibold">OCS Import (관리자)</h1>
+        <h1 className="text-xl font-semibold">ABD OCS Import (Stage A1)</h1>
         <p className="text-sm text-muted-foreground">
-          매니페스트를 검증하고 OCS 코멘트 첨부 이미지를 비공개 보관함에 업로드합니다. 관리자·Super User 전용.
+          이 화면은 이미지 보관함 업로드·검증만 수행합니다. 코멘트/첨부 DB 등록은 Stage B 입니다.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">OCS 코멘트</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-semibold">{stats.data?.comment_count ?? "-"}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">도면 연결됨</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-semibold">{stats.data?.linked_count ?? "-"}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">등록된 이미지</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-semibold">{stats.data?.attachment_count ?? "-"}</CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">현재 DB 현황</CardTitle>
+        </CardHeader>
+        <CardContent className="flex gap-6 text-sm">
+          <span>OCS 코멘트 {stats.data?.comment_count ?? 0}건</span>
+          <span>도면 연결 {stats.data?.linked_count ?? 0}건</span>
+          <span>첨부 메타 {stats.data?.attachment_count ?? 0}건</span>
+        </CardContent>
+      </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileJson className="h-4 w-4" /> 1. 매니페스트</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileJson className="h-4 w-4" /> 1. 첨부 매니페스트 (OCS_Final_Attachment_Manifest.json)
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3">
           <input
             type="file"
@@ -204,39 +203,37 @@ function OcsImportPage() {
             className="block text-sm"
             onChange={(e) => e.target.files?.[0] && onManifest(e.target.files[0])}
           />
-          <p className="text-xs text-muted-foreground">
-            형식: {"{"} "files": [{"{"} "source_comment_id", "source_attachment_id", "file_name", "sort_order" {"}"}] {"}"}
-          </p>
-          {manifestName && (
-            <div className="flex items-center gap-2 text-sm">
-              <Badge variant="secondary">{manifestName}</Badge>
-              <span>{entries.length}건</span>
-              <Button size="sm" onClick={onValidate} disabled={validating}>
-                {validating && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}검증
-              </Button>
-            </div>
-          )}
-          {validation && (
+          {parsed && (
             <div className="grid gap-1 rounded-md border p-3 text-sm">
-              <div>전체 {validation.total}건 / 실재 코멘트 {validation.known_comment_count}건</div>
-              <div className={validation.unknown_comment_ids.length ? "text-destructive" : ""}>
-                미등재 코멘트 {validation.unknown_comment_ids.length}건
-                {validation.unknown_comment_ids.length > 0 && ` — ${validation.unknown_comment_ids.slice(0, 5).join(", ")}…`}
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{manifestName}</Badge>
+                <span>원본 {parsed.total_raw}건</span>
               </div>
-              <div className={validation.duplicated_attachment_ids.length ? "text-destructive" : ""}>
-                중복 첨부 ID {validation.duplicated_attachment_ids.length}건
+              <div>업로드 대상(relative_path 보유) {parsed.entries.length}건</div>
+              <div>이미지 없음(제외) {parsed.skipped_no_path}건</div>
+              <div>코멘트 ID 없음 → needs_review 보존 {parsed.needs_review}건</div>
+              <div className={parsed.duplicated_attachment_ids.length ? "text-destructive" : ""}>
+                중복 attachment_id {parsed.duplicated_attachment_ids.length}건
               </div>
-              <div className={validation.invalid_rows.length ? "text-destructive" : ""}>
-                형식 오류 {validation.invalid_rows.length}건
+              <div className={parsed.duplicated_paths.length ? "text-destructive" : ""}>
+                중복 경로 {parsed.duplicated_paths.length}건
               </div>
-              <div>이미 등록됨 {validation.already_registered.length}건 (재업로드 시 갱신)</div>
+              <div className={parsed.invalid_rows.length ? "text-destructive" : ""}>
+                형식/용량 오류 {parsed.invalid_rows.length}건
+                {parsed.invalid_rows.length > 0 &&
+                  ` — ${parsed.invalid_rows.slice(0, 3).map((r) => `#${r.index} ${r.reason}`).join(", ")}…`}
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FolderUp className="h-4 w-4" /> 2. 이미지 폴더</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FolderUp className="h-4 w-4" /> 2. 이미지 폴더 선택
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3">
           <input
             ref={folderRef}
@@ -246,18 +243,41 @@ function OcsImportPage() {
             webkitdirectory=""
             className="block text-sm"
             onChange={(e) => onFolder(e.target.files)}
-            disabled={entries.length === 0}
+            disabled={!parsed}
           />
           <p className="text-xs text-muted-foreground">
-            허용 형식 PNG/JPEG/WebP/GIF, 파일당 최대 8MB. 저장 경로 = {"{source_comment_id}/{source_attachment_id}"}
+            PNG/JPEG, 파일당 최대 8MB. 최상위 폴더 한 단계만 제거한 뒤 매니페스트의 relative_path 와 정확히 비교합니다
+            (파일명만 비교하지 않음). 저장 경로 = relative_path 그대로.
           </p>
+          {match && (
+            <div className="grid gap-1 rounded-md border p-3 text-sm">
+              <div>매칭 {match.matched.size}건</div>
+              <div className={match.unmatchedManifest.length ? "text-destructive" : ""}>
+                매니페스트에 있으나 폴더에 없음 {match.unmatchedManifest.length}건
+              </div>
+              <div>폴더에만 있는 파일 {match.extraFiles.length}건</div>
+              <div>이미지 아닌 파일 {match.nonImageFiles}건</div>
+            </div>
+          )}
+          {match && match.matched.size > 0 && !confirmed && (
+            <div className="flex items-center gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              <AlertTriangle className="h-4 w-4" />
+              <span>
+                위 수치가 맞으면 승인하십시오. 승인 후 {match.matched.size}건을 업로드합니다(기존 파일은 건너뜀).
+              </span>
+              <Button size="sm" onClick={() => setConfirmed(true)}>
+                수치 확인 및 승인
+              </Button>
+            </div>
+          )}
           <div className="flex items-center gap-3">
-            <Button onClick={onUpload} disabled={uploading || rows.every((r) => !r.file)}>
-              {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}업로드 및 등록
+            <Button onClick={onUpload} disabled={!confirmed || uploading || !match || match.matched.size === 0}>
+              {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}업로드 실행 (동시 {CONCURRENCY})
             </Button>
             {rows.length > 0 && (
               <span className="text-sm text-muted-foreground">
-                매칭 {rows.filter((r) => r.file).length} / 완료 {okCount} / 실패 {failCount}
+                완료 {counts.완료} / 기존 {counts.기존} / 실패 {counts.실패} / 미매칭 {counts.미매칭} · 해시 일치{" "}
+                {counts.hashOk} / 불일치 {counts.hashBad} / 없음 {counts.hashNone}
               </span>
             )}
           </div>
@@ -267,34 +287,44 @@ function OcsImportPage() {
 
       {rows.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">3. 표본 검증 (상위 50건)</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">3. 표본 검증 (상위 50건)</CardTitle>
+          </CardHeader>
           <CardContent className="overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Comment ID</TableHead>
                   <TableHead>Attachment ID</TableHead>
-                  <TableHead>파일명</TableHead>
+                  <TableHead>Comment ID</TableHead>
+                  <TableHead>저장 경로</TableHead>
                   <TableHead>상태</TableHead>
+                  <TableHead>해시</TableHead>
                   <TableHead>비고</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.slice(0, 50).map((r) => (
                   <TableRow key={r.entry.source_attachment_id}>
-                    <TableCell className="font-mono text-xs">{r.entry.source_comment_id}</TableCell>
                     <TableCell className="font-mono text-xs">{r.entry.source_attachment_id}</TableCell>
-                    <TableCell className="text-xs">{r.entry.file_name}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {r.entry.source_comment_id ?? <Badge variant="outline">needs_review</Badge>}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{r.entry.relative_path}</TableCell>
                     <TableCell>
                       {r.status === "완료" ? (
-                        <span className="inline-flex items-center gap-1 text-xs"><CheckCircle2 className="h-3 w-3" />완료</span>
+                        <span className="inline-flex items-center gap-1 text-xs">
+                          <CheckCircle2 className="h-3 w-3" />완료
+                        </span>
                       ) : r.status === "실패" ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-destructive"><AlertTriangle className="h-3 w-3" />실패</span>
+                        <span className="inline-flex items-center gap-1 text-xs text-destructive">
+                          <AlertTriangle className="h-3 w-3" />실패
+                        </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">{r.status}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{r.message ?? (r.file ? "" : "이미지 미매칭")}</TableCell>
+                    <TableCell className="text-xs">{r.hash ?? "-"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{r.message ?? ""}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
