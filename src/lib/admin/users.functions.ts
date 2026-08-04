@@ -471,10 +471,13 @@ export const bulkCreateAppUsers = createServerFn({ method: "POST" })
         await (supabaseAdmin as any).from(masterTable)
           .update({ linked_user_id: uid }).eq("name_norm", nameNorm);
 
-        // 소유권 재계산
-        const { data: recalc } = await (supabaseAdmin as any).rpc("hdec_recalc_owner_for_user", {
-          _user_id: uid, _reason: "bulk_account_create",
-        });
+        // 소유권 재계산 — hdec_assert_admin() 이 auth.uid() 를 보므로
+        // service_role(supabaseAdmin) 이 아니라 호출자 세션(context.supabase)으로 실행한다.
+        const { data: recalc, error: recalcErr } = await (context.supabase as any).rpc(
+          "hdec_recalc_owner_for_user",
+          { _user_id: uid, _reason: "bulk_account_create" },
+        );
+        if (recalcErr) throw new Error(`계정은 생성되었으나 소유권 재계산 실패: ${recalcErr.message}`);
         const rc: Record<string, number> = {};
         for (const m of ((recalc as any)?.modules ?? []) as any[]) {
           rc[String(m.table)] = Number(m.updated ?? 0);
