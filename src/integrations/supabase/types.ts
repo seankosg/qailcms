@@ -3983,6 +3983,39 @@ export type Database = {
         }
         Relationships: []
       }
+      spl_owner_backfill_snapshot_20260804: {
+        Row: {
+          eng: string | null
+          eng_po: string | null
+          id: string | null
+          owner_user_id: string | null
+          pic: string | null
+          pic_po: string | null
+          snapshot_at: string | null
+          spl_number: string | null
+        }
+        Insert: {
+          eng?: string | null
+          eng_po?: string | null
+          id?: string | null
+          owner_user_id?: string | null
+          pic?: string | null
+          pic_po?: string | null
+          snapshot_at?: string | null
+          spl_number?: string | null
+        }
+        Update: {
+          eng?: string | null
+          eng_po?: string | null
+          id?: string | null
+          owner_user_id?: string | null
+          pic?: string | null
+          pic_po?: string | null
+          snapshot_at?: string | null
+          spl_number?: string | null
+        }
+        Relationships: []
+      }
       spl_settings: {
         Row: {
           key: string
