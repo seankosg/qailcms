@@ -484,6 +484,18 @@ function SplTableRow({
           </span>
         )}
       </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        <SplEditableCell row={row} field="pic" label="PIC" value={row.pic} canEdit={canEdit} onSave={onSave} />
+      </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        <SplEditableCell row={row} field="eng" label="ENG" value={row.eng} canEdit={canEdit} onSave={onSave} />
+      </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        <SplEditableCell row={row} field="pic_po" label="PIC PO" value={row.pic_po} canEdit={canEdit} onSave={onSave} />
+      </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        <SplEditableCell row={row} field="eng_po" label="ENG PO" value={row.eng_po} canEdit={canEdit} onSave={onSave} />
+      </td>
       <td className="whitespace-nowrap border-b border-l px-2 py-1 tabular-nums text-muted-foreground">
         {row.req_doc_done}/{row.req_doc_total}
       </td>
