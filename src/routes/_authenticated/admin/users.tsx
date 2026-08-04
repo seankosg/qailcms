@@ -25,6 +25,8 @@ import {
   type AppRole, type UserType,
 } from "@/types/enums";
 import { useTeamOptions } from "@/lib/team/team-master";
+import { highestRole } from "@/lib/auth/roles";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HdecPeopleTab } from "@/components/admin/HdecPeopleTab";
 
@@ -201,8 +203,9 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
           bv = USER_TYPE_LABELS[(b.user_type ?? "") as UserType] ?? "";
           break;
         case "role":
-          av = ROLE_LABELS[(a.roles?.[0] ?? "guest") as AppRole] ?? "";
-          bv = ROLE_LABELS[(b.roles?.[0] ?? "guest") as AppRole] ?? "";
+          // §6-1 표시·정렬 모두 DB rcl_highest_role 과 동일한 최고 등급 기준.
+          av = ROLE_LABELS[highestRole(a.roles)] ?? "";
+          bv = ROLE_LABELS[highestRole(b.roles)] ?? "";
           break;
         case "active":
           av = a.is_active ? 1 : 0;
