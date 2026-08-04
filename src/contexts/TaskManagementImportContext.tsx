@@ -117,9 +117,15 @@ interface CtxValue {
   setImportScope: (s: ImportScope) => void;
   importerHdecPicName: string | null;
   setImporterHdecPicName: (v: string | null) => void;
+  /** 서버 Own 정의(owner_cols = hdec_pic_name | hdec_eng_name)와 동일하게 맞추기 위한 본인 표기 목록 */
+  importerOwnNames: string[];
+  setImporterOwnNames: (v: string[]) => void;
   isImporterAdmin: boolean;
   setIsImporterAdmin: (v: boolean) => void;
-  matchesHdecPic: (row: { hdec_pic_name?: string | null }) => boolean;
+  matchesHdecPic: (row: {
+    hdec_pic_name?: string | null;
+    hdec_eng_name?: string | null;
+  }) => boolean;
   addFiles: (files: File[]) => Promise<void>;
   removeFile: (id: string) => void;
   clearAll: () => void;
@@ -166,23 +172,41 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
   const [recalcJudgment, setRecalcJudgment] = useState<boolean>(true);
   const [importScope, setImportScope] = useState<ImportScope>("mine");
   const [importerHdecPicName, setImporterHdecPicName] = useState<string | null>(null);
+  const [importerOwnNames, setImporterOwnNames] = useState<string[]>([]);
   const [isImporterAdmin, setIsImporterAdmin] = useState<boolean>(false);
 
   const importerHdecPicRef = useRef<string | null>(null);
   importerHdecPicRef.current = importerHdecPicName;
+  const importerOwnNamesRef = useRef<string[]>([]);
+  importerOwnNamesRef.current = importerOwnNames;
   const importScopeRef = useRef<ImportScope>(importScope);
   importScopeRef.current = importScope;
   const isImporterAdminRef = useRef<boolean>(isImporterAdmin);
   isImporterAdminRef.current = isImporterAdmin;
 
   const normalizePic = (v?: string | null) => (v ?? "").trim().toLowerCase();
+  /**
+   * 서버 Own 판정(public.rcl_scope_of_values)은 owner_cols = [hdec_pic_name, hdec_eng_name] 를
+   * resolve_user_by_name 으로 대조한다. 클라이언트 mine 토글도 동일 기준을 쓴다.
+   * (PIC 전용으로 두면 ENG 담당자는 mine 선택 시 자기 행이 전부 빠진다)
+   */
+  const ownNameSet = () => {
+    const s = new Set<string>();
+    for (const n of importerOwnNamesRef.current) {
+      const k = normalizePic(n);
+      if (k) s.add(k);
+    }
+    const legacy = normalizePic(importerHdecPicRef.current);
+    if (legacy) s.add(legacy);
+    return s;
+  };
   const matchesHdecPic = useCallback(
-    (row: { hdec_pic_name?: string | null }) => {
+    (row: { hdec_pic_name?: string | null; hdec_eng_name?: string | null }) => {
       const effective = isImporterAdminRef.current ? "all" : importScopeRef.current;
       if (effective === "all") return true;
-      const me = normalizePic(importerHdecPicRef.current);
-      if (!me) return false;
-      return normalizePic(row.hdec_pic_name) === me;
+      const mine = ownNameSet();
+      if (mine.size === 0) return false;
+      return mine.has(normalizePic(row.hdec_pic_name)) || mine.has(normalizePic(row.hdec_eng_name));
     },
     [],
   );
@@ -582,7 +606,14 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const effectiveScope: ImportScope = isImporterAdminRef.current
         ? "all"
         : importScopeRef.current;
-      const meNorm = normalizePic(importerHdecPicRef.current);
+      const mineNames = ownNameSet();
+      const mineLabel = Array.from(
+        new Set(
+          [...importerOwnNamesRef.current, importerHdecPicRef.current].filter(
+            (v): v is string => !!v && v.trim() !== "",
+          ),
+        ),
+      ).join(", ");
       const discipline = f.discipline ?? "ARCH";
 
       // ── RCL 서버 판정 (정본) ────────────────────────────────────────────
@@ -627,13 +658,17 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const parsed =
         effectiveScope === "all"
           ? serverAllowed
-          : serverAllowed.filter((p) => normalizePic(p.hdec_pic_name) === meNorm);
+          : serverAllowed.filter(
+              (p) =>
+                mineNames.has(normalizePic(p.hdec_pic_name)) ||
+                mineNames.has(normalizePic((p as any).hdec_eng_name)),
+            );
       const filteredOut = parsedAll.length - parsed.length;
       if (parsed.length === 0) {
         toast.warning(
           outOfScope > 0
             ? `${f.name}: 반영 가능한 행이 없습니다 (범위 밖 ${outOfScope}건)`
-            : `${f.name}: 본인(HDEC PIC: ${importerHdecPicRef.current ?? "-"}) 담당 행이 없어 임포트를 건너뜁니다`,
+            : `${f.name}: 본인 담당 행(PIC 또는 ENG: ${mineLabel || "-"})이 없어 임포트를 건너뜁니다`,
         );
         setFiles((cur) =>
           cur.map((x) =>
@@ -658,7 +693,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       }
       const scopeNote =
         effectiveScope === "mine"
-          ? `Import scope: mine (HDEC PIC=${importerHdecPicRef.current ?? "-"}); matched ${parsed.length}/${parsedAll.length}; RCL out-of-scope=${outOfScope}`
+          ? `Import scope: mine (PIC/ENG=${mineLabel || "-"}); matched ${parsed.length}/${parsedAll.length}; RCL out-of-scope=${outOfScope}`
           : `Import scope: all; rows=${parsed.length}; RCL out-of-scope=${outOfScope}`;
       const startTime = Date.now();
       const startedAtIso = new Date().toISOString();
@@ -1410,6 +1445,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setImportScope,
         importerHdecPicName,
         setImporterHdecPicName,
+        importerOwnNames,
+        setImporterOwnNames,
         isImporterAdmin,
         setIsImporterAdmin,
         matchesHdecPic,
