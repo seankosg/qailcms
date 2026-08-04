@@ -35,10 +35,34 @@ const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
 type DryAgg = Record<string, number>;
 
+const ARRAY_KEYS = new Set([
+  "parent_ids",
+  "group_keys",
+  "abd_item_ids",
+  "split_user_check_pids",
+  "user_row_pids",
+  "missing_parent_ids",
+  "resolved_ids",
+  "unresolved_ids",
+]);
+
 function addAgg(a: DryAgg, b: Record<string, unknown>): DryAgg {
   const out: DryAgg = { ...a };
-  for (const [k, v] of Object.entries(b)) out[k] = (out[k] ?? 0) + num(v);
+  for (const [k, v] of Object.entries(b)) {
+    if (ARRAY_KEYS.has(k) || Array.isArray(v)) continue; // 고유값은 합산 금지 — Set union 으로 처리
+    out[k] = (out[k] ?? 0) + num(v);
+  }
   return out;
+}
+
+/** 배치 응답의 ID 배열을 전역 Set 에 합친다. */
+function unionInto(sets: Record<string, Set<string>>, b: Record<string, unknown>) {
+  for (const k of ARRAY_KEYS) {
+    const v = b[k];
+    if (!Array.isArray(v)) continue;
+    const set = sets[k] ?? (sets[k] = new Set<string>());
+    for (const x of v) if (x !== null && x !== undefined) set.add(String(x));
+  }
 }
 
 export function OcsAtomicV2Panel() {
@@ -61,6 +85,8 @@ export function OcsAtomicV2Panel() {
   const [links, setLinks] = useState<OcsV2LinkParse | null>(null);
   const [dry, setDry] = useState<DryAgg | null>(null);
   const [dryAtt, setDryAtt] = useState<DryAgg | null>(null);
+  const [dryDistinct, setDryDistinct] = useState<DryAgg | null>(null);
+  const [attDistinct, setAttDistinct] = useState<DryAgg | null>(null);
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -82,14 +108,16 @@ export function OcsAtomicV2Panel() {
     if (parsed && parsed.invalid_rows.length > 0) out.push(`형식 오류 ${parsed.invalid_rows.length}건`);
     if (dry && num(dry["parent_missing"]) > 0)
       out.push(`부모 코멘트 미존재 ${num(dry["parent_missing"])}건`);
-    if (dry && num(dry["parents_split_with_user_check"]) > 0)
-      out.push(`사용자 Complied 체크가 있는 분할 대상 ${num(dry["parents_split_with_user_check"])}건`);
+    if (dryDistinct && num(dryDistinct["parents_split_with_user_check"]) > 0)
+      out.push(
+        `사용자 Complied 체크가 있는 분할 대상 ${num(dryDistinct["parents_split_with_user_check"])}건`,
+      );
     if (unresolvedLinkComments > 0)
       out.push(`링크 파일의 미확인 Comment ID ${unresolvedLinkComments}건`);
-    if (dryAtt && num(dryAtt["unresolved"]) > 0)
-      out.push(`링크 파일의 미확인 Attachment ID ${num(dryAtt["unresolved"])}건`);
+    if (attDistinct && num(attDistinct["unresolved_attachments"]) > 0)
+      out.push(`링크 파일의 미확인 Attachment ID ${num(attDistinct["unresolved_attachments"])}건`);
     return out;
-  }, [parsed, rows, dry, dryAtt, unresolvedLinkComments]);
+  }, [parsed, rows, dry, dryDistinct, attDistinct, unresolvedLinkComments]);
 
   async function readJson(files: FileList, kind: "atomic" | "link") {
     const f = files[0];
@@ -112,6 +140,8 @@ export function OcsAtomicV2Panel() {
       }
       setDry(null);
       setDryAtt(null);
+      setDryDistinct(null);
+      setAttDistinct(null);
       setApproved(false);
       setResult(null);
     } catch (e) {
@@ -127,6 +157,7 @@ export function OcsAtomicV2Panel() {
     setProgress(0);
     try {
       let agg: DryAgg = {};
+      const sets: Record<string, Set<string>> = {};
       const batches = chunk(rows, BATCH);
       for (let i = 0; i < batches.length; i += 1) {
         const res = (await dryComments({ data: { rows: batches[i] as unknown[] } })) as Record<
@@ -134,18 +165,43 @@ export function OcsAtomicV2Panel() {
           unknown
         >;
         agg = addAgg(agg, res);
+        unionInto(sets, res);
         setProgress(Math.round(((i + 1) / batches.length) * 100));
       }
       setDry(agg);
+      setDryDistinct({
+        source_parent_count: parsed?.source_parent_count ?? sets["parent_ids"]?.size ?? 0,
+        multi_group_count: parsed?.multi_group_count ?? 0,
+        single_parent_count: parsed?.single_parent_count ?? 0,
+        distinct_parents_in_db: sets["parent_ids"]?.size ?? 0,
+        distinct_group_keys: sets["group_keys"]?.size ?? 0,
+        distinct_abd_items: sets["abd_item_ids"]?.size ?? 0,
+        parents_split_with_user_check: sets["split_user_check_pids"]?.size ?? 0,
+        parents_with_user_row: sets["user_row_pids"]?.size ?? 0,
+        missing_parents: sets["missing_parent_ids"]?.size ?? 0,
+      });
 
       if (links && links.rows.length > 0) {
-        let aggA: DryAgg = {};
+        const attSets: Record<string, Set<string>> = {};
         const ids = Array.from(new Set(links.rows.map((l) => l.source_attachment_id)));
         for (const b of chunk(ids, BATCH)) {
           const res = (await dryAtts({ data: { ids: b } })) as Record<string, unknown>;
-          aggA = addAgg(aggA, res);
+          unionInto(attSets, res);
         }
-        setDryAtt(aggA);
+        const dupPairs = links.duplicated_pairs;
+        const unresolvedAtt = attSets["unresolved_ids"]?.size ?? 0;
+        setAttDistinct({
+          total_link_rows: links.total_raw,
+          confirmed_high: links.confirmed_high,
+          group_inherited_access: links.group_inherited_access,
+          duplicate_pairs: dupPairs,
+          unique_attachments: ids.length,
+          resolved_attachments: attSets["resolved_ids"]?.size ?? 0,
+          unresolved_attachments: unresolvedAtt,
+          resolved_link_rows: links.rows.length - unresolvedLinkComments,
+          unresolved_link_rows: unresolvedLinkComments + links.unresolved_rows,
+        });
+        setDryAtt(null);
       }
       toast.success("Dry-run 완료");
     } catch (e) {
@@ -184,7 +240,11 @@ export function OcsAtomicV2Panel() {
           total_count: rows.length,
           attachment_total: links?.rows.length ?? 0,
           snapshot_id: snapshotId,
-          dryrun: { ...(dry ?? {}), attachments: dryAtt ?? {} },
+          dryrun: {
+            ...(dry ?? {}),
+            distinct: dryDistinct ?? {},
+            attachments: attDistinct ?? dryAtt ?? {},
+          },
         },
       })) as { id: string };
 
@@ -281,6 +341,15 @@ export function OcsAtomicV2Panel() {
                   그룹 {parsed.groups.length}
                 </Badge>
                 <Badge variant="outline" className="text-[11px]">
+                  source parents {parsed.source_parent_count}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
+                  multi groups {parsed.multi_group_count}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
+                  single parents {parsed.single_parent_count}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
                   단일 {parsed.single_rows}
                 </Badge>
                 <Badge variant="outline" className="text-[11px]">
@@ -307,6 +376,12 @@ export function OcsAtomicV2Panel() {
                 </Badge>
                 <Badge variant="outline" className="text-[11px]">
                   코멘트 {links.distinct_comments}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
+                  confirmed {links.confirmed_high}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
+                  inherited {links.group_inherited_access}
                 </Badge>
                 {links.duplicated_pairs > 0 && (
                   <Badge variant="outline" className="text-[11px]">
@@ -338,7 +413,18 @@ export function OcsAtomicV2Panel() {
           <div className="space-y-2 rounded-md border p-3">
             <div className="text-xs font-medium">Dry-run 결과</div>
             <div className="flex flex-wrap gap-1.5">{kv(dry)}</div>
-            {dryAtt && <div className="flex flex-wrap gap-1.5">{kv(dryAtt)}</div>}
+            {dryDistinct && (
+              <>
+                <div className="text-xs font-medium pt-1">전역 고유값 (배치 합산 아님)</div>
+                <div className="flex flex-wrap gap-1.5">{kv(dryDistinct)}</div>
+              </>
+            )}
+            {attDistinct && (
+              <>
+                <div className="text-xs font-medium pt-1">첨부 링크</div>
+                <div className="flex flex-wrap gap-1.5">{kv(attDistinct)}</div>
+              </>
+            )}
           </div>
         )}
 
