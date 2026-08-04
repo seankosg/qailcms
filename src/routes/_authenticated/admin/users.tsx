@@ -25,6 +25,8 @@ import {
   type AppRole, type UserType,
 } from "@/types/enums";
 import { useTeamOptions } from "@/lib/team/team-master";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HdecRosterTab } from "@/components/admin/HdecRosterTab";
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
   head: () => ({ meta: [{ title: "사용자 관리 — QAIL CMS" }] }),
@@ -43,7 +45,14 @@ function UsersAdminPage() {
           <Link to="/admin/masters">마스터 관리 →</Link>
         </Button>
       </div>
-      <UsersTab />
+      <Tabs defaultValue="accounts">
+        <TabsList>
+          <TabsTrigger value="accounts">HDEC PIC(계정)</TabsTrigger>
+          <TabsTrigger value="roster">HDEC ENG(명부)</TabsTrigger>
+        </TabsList>
+        <TabsContent value="accounts" className="pt-4"><UsersTab /></TabsContent>
+        <TabsContent value="roster" className="pt-4"><HdecRosterTab kind="eng" /></TabsContent>
+      </Tabs>
     </div>
   );
 }
