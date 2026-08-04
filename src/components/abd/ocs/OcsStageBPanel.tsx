@@ -213,8 +213,8 @@ export function OcsStageBPanel() {
   async function onSnapshot() {
     try {
       setBusy("사전 백업 스냅샷 생성 중… (수 분 소요될 수 있습니다)");
-      const res = (await snapshotFn({ data: { module: "abd" } })) as { snapshotId?: string; snapshot_id?: string };
-      const id = res?.snapshotId ?? res?.snapshot_id ?? null;
+      const res = (await snapshotFn({ data: { module: "abd" } })) as { id?: string };
+      const id = res?.id ?? null;
       if (!id) throw new Error("스냅샷 ID를 확인하지 못했습니다.");
       setSnapshotId(id);
       toast.success("사전 백업 성공 — Import 가능");

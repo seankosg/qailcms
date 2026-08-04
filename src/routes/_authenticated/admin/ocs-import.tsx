@@ -18,6 +18,8 @@ import {
 import { Loader2, FileJson, FolderUp, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getOcsImportStats, OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
+import { OcsStageBPanel } from "@/components/abd/ocs/OcsStageBPanel";
+import { listBucketPaths } from "@/lib/abd/ocs-storage";
 import {
   parseOcsManifest,
   matchFolderFiles,
@@ -62,36 +64,6 @@ async function sha256Hex(buf: ArrayBuffer) {
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-}
-
-/** 로그인 사용자 client 로 private bucket 을 재귀 조회해 정확한 object path 집합을 만든다. */
-async function listExistingPaths(roots: string[]): Promise<string[]> {
-  const out: string[] = [];
-  const queue: string[] = (roots.length ? roots : [""]).slice();
-  const seen = new Set<string>();
-
-  while (queue.length > 0) {
-    const prefix = queue.shift()!;
-    if (seen.has(prefix)) continue;
-    seen.add(prefix);
-    let offset = 0;
-
-    for (;;) {
-      const { data: items, error } = await supabase.storage
-        .from(OCS_BUCKET)
-        .list(prefix, { limit: 1000, offset, sortBy: { column: "name", order: "asc" } });
-      if (error) throw new Error(error.message);
-      const list = items ?? [];
-      for (const it of list) {
-        const path = prefix ? `${prefix}/${it.name}` : it.name;
-        if ((it as { id?: string | null }).id) out.push(path);
-        else queue.push(path); // 하위 폴더
-      }
-      if (list.length < 1000) break;
-      offset += list.length;
-    }
-  }
-  return out;
 }
 
 function OcsImportPage() {
@@ -210,7 +182,7 @@ function OcsImportPage() {
       const roots = Array.from(
         new Set(rows.map((r) => r.entry.relative_path.split("/")[0]).filter(Boolean) as string[]),
       );
-      existing = new Set(await listExistingPaths(roots));
+      existing = new Set(await listBucketPaths(OCS_BUCKET, roots));
       setExistingCount(existing.size);
     } catch (e) {
       setUploading(false);
@@ -440,6 +412,8 @@ function OcsImportPage() {
           </CardContent>
         </Card>
       )}
+
+      <OcsStageBPanel />
     </div>
   );
 }
