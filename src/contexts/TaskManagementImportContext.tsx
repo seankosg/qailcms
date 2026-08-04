@@ -25,6 +25,7 @@ import {
   type PreflightSummary,
 } from "@/lib/task-management/import-preflight.functions";
 import { takePreImportSnapshotWithFeedback } from "@/lib/backup/pre-import-snapshot";
+import { rclImportFilter, rclKeyOf } from "@/lib/import/rcl-import-filter";
 
 export type RollupMode = "auto" | "keep" | "blank";
 
@@ -94,6 +95,10 @@ export interface TmImportFileItem {
     judgmentRecalculated?: number;
     renumbered?: number;
     resolvedByDecision?: number;
+    /** RCL 범위 밖이라 서버 판정에서 제외된 행 수 */
+    outOfScope?: number;
+    /** 제외된 행의 task_no 목록 (조용한 누락 방지) */
+    outOfScopeKeys?: string[];
     errors?: ImportErrorEntry[];
   };
 }
