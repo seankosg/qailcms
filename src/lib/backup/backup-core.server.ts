@@ -74,6 +74,11 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   defect_comments: ["id"],
   defect_status_history: ["id"],
   task_management_status_history: ["id"],
+  abd_ocs_import_logs: ["id"],
+  abd_ocs_comments: ["id"],
+  abd_ocs_compliance: ["comment_id"],
+  abd_ocs_attachments: ["id"],
+  abd_ocs_compliance_log: ["id"],
 };
 
 function sortKeysFor(tableName: string): string[] {
@@ -371,6 +376,12 @@ export async function restoreSnapshot(
       ["defect_hdec_pic_rules", 55],
       ["defect_subcon_rules", 56],
       ["defect_import_presets", 57],
+      // OCS: 로그 → 코멘트 → 첨부/준수 (FK 의존 순)
+      ["abd_ocs_import_logs", 58],
+      ["abd_ocs_comments", 59],
+      ["abd_ocs_attachments", 60],
+      ["abd_ocs_compliance", 61],
+      ["abd_ocs_compliance_log", 62],
     ]);
     return (order.get(a) ?? 99) - (order.get(b) ?? 99);
   });
