@@ -115,11 +115,9 @@ function OcsImportPage() {
     if (!mime) return { ...r, status: "실패", message: `허용되지 않는 확장자(.${ext})` };
     // 실제 File.type 도 강제 검사 — 확장자만 믿지 않는다(§4)
     const fileType = (file.type || "").toLowerCase();
-    if (fileType && fileType !== mime) {
+    if (!fileType) return { ...r, status: "실패", message: "MIME 판별 불가" };
+    if (fileType !== mime) {
       return { ...r, status: "실패", message: `MIME 불일치(파일 ${fileType} ≠ 경로 ${mime})` };
-    }
-    if (!fileType && !(file.type === "")) {
-      return { ...r, status: "실패", message: "MIME 판별 불가" };
     }
     const fmt = (r.entry.image_format ?? "").toLowerCase().replace("jpeg", "jpg");
     const extNorm = ext === "jpeg" ? "jpg" : ext;
