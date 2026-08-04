@@ -267,19 +267,16 @@ function ImportInner() {
     [guard],
   );
 
-  // Matched-row count per file under the current scope
+  // 행수 표기 — 스코프 판정은 서버(rcl_can 'import')가 하므로 클라이언트는
+  // 전송 대상 행수만 센다. 제외된 행은 임포트 결과의 "범위 밖 미반영" 목록에 노출된다.
   const matchedByFile = useMemo(() => {
     const map: Record<string, { matched: number; total: number }> = {};
     for (const f of files) {
       const rows = f.parsed ?? [];
-      const matched =
-        effectiveScope === "all"
-          ? rows.length
-          : rows.filter((r) => matchesHdecPic(r)).length;
-      map[f.id] = { matched, total: rows.length };
+      map[f.id] = { matched: rows.length, total: rows.length };
     }
     return map;
-  }, [files, effectiveScope, matchesHdecPic]);
+  }, [files]);
 
   const readyFiles = files.filter(
     (f) => f.status === "ready" && !f.validationError && !!f.discipline,
@@ -289,11 +286,7 @@ function ImportInner() {
     (s, f) => s + (matchedByFile[f.id]?.matched ?? 0),
     0,
   );
-  const startDisabled =
-    isRunning ||
-    readyCount === 0 ||
-    !canImport ||
-    (!isAdmin && totalMatched === 0);
+  const startDisabled = isRunning || readyCount === 0 || !canImport;
   const onStartClick = () => {
     if (effectiveScope === "all") {
       setConfirmAllOpen(true);
@@ -470,13 +463,7 @@ function ImportInner() {
                 size="sm"
                 onClick={onStartClick}
                 disabled={startDisabled || pendingImportAfterConflicts}
-                title={
-                  !canImport
-                    ? "임포트 권한이 없습니다"
-                    : !isAdmin && totalMatched === 0
-                      ? "본인 HDEC PIC로 매칭되는 행이 없습니다"
-                      : ""
-                }
+                title={!canImport ? "임포트 권한이 없습니다" : ""}
               >
                 {isRunning ? (
                   <>

@@ -50,9 +50,11 @@ function UsersAdminPage() {
         <TabsList>
           <TabsTrigger value="pic">HDEC PIC</TabsTrigger>
           <TabsTrigger value="eng">HDEC ENG</TabsTrigger>
+          <TabsTrigger value="accounts">계정 목록</TabsTrigger>
         </TabsList>
         <TabsContent value="pic" className="pt-4"><HdecPeopleTab kind="pic" /></TabsContent>
         <TabsContent value="eng" className="pt-4"><HdecPeopleTab kind="eng" /></TabsContent>
+        <TabsContent value="accounts" className="pt-4"><UsersTab /></TabsContent>
       </Tabs>
     </div>
   );

@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   resetUserPassword, updateUserRole, updateUserProfileFields,
   deleteAppUser, updateLoginId, suggestLoginIds, bulkCreateAppUsers,
+  baseLoginIdFromName,
 } from "@/lib/admin/users.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,7 +122,11 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
           }
           return next;
         });
-      } catch { /* 제안 실패는 수동 입력으로 대체 */ }
+      } catch (e: any) {
+        // 제안 실패를 조용히 삼키면 login_id 가 빈 값으로 전송된다 — 표면화한다.
+        console.error("suggestLoginIds failed", e);
+        toast.warning("Login ID 자동 제안에 실패했습니다. 이름 규칙으로 임시 생성합니다.");
+      }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -151,11 +156,34 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
     if (!PASSWORD_REGEX.test(bulkPw)) { toast.error(PASSWORD_HINT); return; }
     setCreating(true);
     try {
-      const payload = targets.map((r) => ({
-        name: r.name,
-        login_id: (draft[r.name]?.login_id ?? "").trim(),
-        team: (draft[r.name]?.team ?? "").trim() || null,
-      }));
+      // login_id 폴백 — 서버 제안이 아직 도착하지 않았거나 실패한 경우에도
+      // 빈 값으로 전송되지 않도록 이름 규칙 + 충돌 회피로 즉석 생성한다.
+      const taken = new Set<string>(
+        rows.map((r) => String(r.login_id ?? "").toLowerCase()).filter(Boolean),
+      );
+      const payload: { name: string; login_id: string; team: string | null }[] = [];
+      const invalid: string[] = [];
+      for (const r of targets) {
+        let id = (draft[r.name]?.login_id ?? "").trim().toLowerCase();
+        if (!id) {
+          const base = baseLoginIdFromName(r.name) || "user";
+          let cand = base;
+          let n = 1;
+          while (taken.has(cand)) { n += 1; cand = `${base}${n}`; }
+          id = cand;
+        }
+        if (!/^[a-z0-9._-]+$/.test(id)) { invalid.push(r.name); continue; }
+        taken.add(id);
+        payload.push({
+          name: r.name,
+          login_id: id,
+          team: (draft[r.name]?.team ?? "").trim() || null,
+        });
+      }
+      if (invalid.length) {
+        toast.error(`Login ID를 만들 수 없는 이름 ${invalid.length}건: ${invalid.join(", ")} — 표에서 직접 입력하세요.`);
+      }
+      if (!payload.length) { setCreating(false); return; }
       const res = (await bulkCreate({ data: { kind, rows: payload, temp_password: bulkPw } })) as BulkResult[];
       setResults(res);
       const ok = res.filter((r) => r.ok).length;
