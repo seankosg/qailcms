@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getOcsImportStats, OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
 import { OcsStageBPanel } from "@/components/abd/ocs/OcsStageBPanel";
 import { OcsRecountPanel } from "@/components/abd/ocs/OcsRecountPanel";
+import { FilePickerButton } from "@/components/shared/FilePickerButton";
 import { listBucketPaths } from "@/lib/abd/ocs-storage";
 import {
   parseOcsManifest,
@@ -258,11 +259,10 @@ function OcsImportPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <input
-            type="file"
+          <FilePickerButton
+            label="매니페스트 JSON 선택"
             accept="application/json,.json"
-            className="block text-sm"
-            onChange={(e) => e.target.files?.[0] && onManifest(e.target.files[0])}
+            onFiles={(files) => files[0] && onManifest(files[0])}
           />
           {parsed && (
             <div className="grid gap-1 rounded-md border p-3 text-sm">
@@ -299,15 +299,13 @@ function OcsImportPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <input
-            ref={folderRef}
-            type="file"
+          <FilePickerButton
+            label="이미지 폴더 선택"
+            inputRef={folderRef}
             multiple
-            // @ts-expect-error 브라우저 전용 폴더 선택 속성
-            webkitdirectory=""
-            className="block text-sm"
-            onChange={(e) => onFolder(e.target.files)}
+            directory
             disabled={!parsed}
+            onFiles={(files) => onFolder(files)}
           />
           <p className="text-xs text-muted-foreground">
             <b>attachments 폴더가 들어 있는 상위 ocs-db-all 폴더</b>를 선택하십시오(attachments

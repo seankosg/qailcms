@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { Search, Upload, Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useAbdTeamList } from "@/hooks/useAbdTeamList";
-import { ProgressDonutIcon } from "@/components/shared/ProgressDonutIcon";
+import { AbdOcsCommentsPanel } from "@/components/abd/ocs/AbdOcsCommentsPanel";
 import {
   ABD_TEAMS,
   ABD_COLUMNS,
@@ -1005,27 +1005,56 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
   return <span className="text-xs">{String(v)}</span>;
 }
 
-/** OCS Check 셀 — 도넛 + n/m. as-of 과거 조회 시 값이 null 이므로 공란(—). */
+/** OCS 셀 — 원 안에 총 건수만 표시. 클릭/Enter/Space 로 OCS 코멘트 패널을 연다.
+ *  as-of 과거 조회 시 값이 null 이므로 공란(—). */
 function OcsCheckCell({ value, row }: { value: any; row: AbdItem }) {
+  const [open, setOpen] = useState(false);
   const state = value == null || value === "" ? null : String(value);
   if (state === null) return <span className="text-muted-foreground/50">—</span>;
   const total = Number((row as any).ocs_total ?? 0) || 0;
   const done = Number((row as any).ocs_complied ?? 0) || 0;
-  if (state === "none" || total === 0) {
-    return <span className="text-muted-foreground/50" title="연결된 OCS 코멘트 없음">—</span>;
-  }
-  const ok = state === "ok";
+  const pending = Math.max(0, total - done);
+  const tone =
+    total === 0
+      ? "border-zinc-400/60 bg-zinc-500/10 text-zinc-600 dark:text-zinc-300"
+      : state === "ok"
+        ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+        : "border-rose-500/70 bg-rose-500/15 text-rose-700 dark:text-rose-300";
+  const abdNumber = String((row as any).abd_number ?? "");
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums whitespace-nowrap",
-        ok ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300",
+    <>
+      <span
+        role="button"
+        tabIndex={0}
+        aria-label={`${abdNumber} OCS 코멘트 열기`}
+        title={`OCS 총 ${total}건 / Complied ${done}건 / Pending ${pending}건`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(true);
+          }
+        }}
+        className={cn(
+          "inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border text-[11px] font-semibold tabular-nums transition-shadow hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          tone,
+        )}
+      >
+        {total}
+      </span>
+      {open && (
+        <AbdOcsCommentsPanel
+          open={open}
+          onOpenChange={setOpen}
+          itemId={String((row as any).id)}
+          abdNumber={abdNumber}
+        />
       )}
-      title={`OCS 코멘트 ${total}건 중 ${done}건 Complied${ok ? " (완료)" : " (미완료)"}`}
-    >
-      <ProgressDonutIcon value={done} total={total} tone={ok ? "ok" : "pending"} />
-      {done}/{total}
-    </span>
+    </>
   );
 }
 
