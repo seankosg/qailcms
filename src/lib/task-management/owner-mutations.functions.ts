@@ -2,8 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { TM_EDITABLE_FIELDS } from "./columns";
-import { canEditRawRow } from "@/lib/auth/roles";
-import { ROLE_RANK, type AppRole } from "@/types/enums";
 
 // task_no 는 columns.ts 의 편집 목록엔 없지만 admin/d_superuser 전용으로 별도 허용.
 const ALLOWED_FIELDS = new Set<string>([
@@ -15,7 +13,24 @@ const ALLOWED_FIELDS = new Set<string>([
 ]);
 
 // 배포 검증용 마커 — published 번들에서 grep 으로 확인.
-export const TM_OWNER_MUTATIONS_MARKER = "TM_OWNER_MUTATIONS_V2_2026_07_28";
+export const TM_OWNER_MUTATIONS_MARKER = "TM_OWNER_MUTATIONS_V3_RCL_2026_08_04";
+
+/** RCL 정본 판정. 판정 규칙은 DB `rcl_can` 하나뿐이며 여기서 재구현하지 않는다. */
+async function assertRcl(
+  supa: any,
+  userId: string,
+  rowId: string,
+  action: "write" | "delete" = "write",
+) {
+  const { data, error } = await supa.rpc("rcl_can", {
+    _user_id: userId,
+    _module: "TM",
+    _row_id: rowId,
+    _action: action,
+  });
+  if (error) throw new Error(`권한 판정 실패: ${error.message}`);
+  if (data !== true) throw new Error("권한 없음: 이 행/필드를 편집할 권한이 없습니다.");
+}
 
 const UpdateSchema = z.object({
   id: z.string().uuid(),
@@ -31,32 +46,25 @@ export const updateTaskOwnerField = createServerFn({ method: "POST" })
       throw new Error(`Field '${data.field}' 은 이 경로로 편집할 수 없습니다.`);
     }
 
-    // Raw Data / Detail 공용 canEditRawRow 규칙을 서버에서 재검증한다.
-    const [{ data: profile }, { data: roleRows }, { data: row }] = await Promise.all([
-      context.supabase.from("profiles").select("*").eq("id", context.userId).maybeSingle(),
-      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
-      context.supabase.from("task_management_raw").select("*").eq("id", data.id).maybeSingle(),
-    ]);
+    // 판정 정본: DB `rcl_can` 단일 경로.
+    const { data: row } = await context.supabase
+      .from("task_management_raw")
+      .select("id")
+      .eq("id", data.id)
+      .maybeSingle();
     if (!row) throw new Error("대상 행을 찾을 수 없습니다.");
-    const roles = ((roleRows ?? []) as any[]).map((r) => r.role as string);
-    const rank = roles.reduce((m, r) => Math.max(m, ROLE_RANK[r as AppRole] ?? 0), 0);
-    const userLike = {
-      roles: roles as (AppRole | string)[],
-      rank,
-      team: (profile as any)?.team ?? null,
-      name: (profile as any)?.name ?? null,
-      hdec_pic_name: (profile as any)?.hdec_pic_name ?? null,
-      hdec_eng_name: (profile as any)?.hdec_eng_name ?? null,
-      subcontractor_name: (profile as any)?.subcontractor_name ?? null,
-      subsub_name: (profile as any)?.subsub_name ?? null,
-    };
-    let allowed = canEditRawRow(userLike, "task_management_raw", row as any);
-    // task_no 는 admin 또는 d_superuser 만 편집 가능
-    if (allowed && data.field === "task_no") {
-      allowed = roles.includes("admin") || roles.includes("superuser") || roles.includes("d_superuser");
-    }
-    if (!allowed) {
-      throw new Error("권한 없음: 이 행/필드를 편집할 권한이 없습니다.");
+    await assertRcl(context.supabase, context.userId, data.id, "write");
+
+    // task_no 는 모듈 전체 범위(other_team) 편집권 보유자만 변경 가능.
+    if (data.field === "task_no") {
+      const { data: g, error: gErr } = await (context.supabase as any).rpc("rcl_grants", {
+        _module: "TM",
+        _action: "write",
+      });
+      if (gErr) throw new Error(`권한 판정 실패: ${gErr.message}`);
+      if (!g || g.other_team !== true) {
+        throw new Error("권한 없음: 과업코드(task_no)는 모듈 전체 편집 권한이 필요합니다.");
+      }
     }
 
     // 3) 값 정규화
@@ -83,29 +91,13 @@ export const confirmActualFinishSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
-    const [{ data: profile }, { data: roleRows }, { data: row }] = await Promise.all([
-      context.supabase.from("profiles").select("*").eq("id", context.userId).maybeSingle(),
-      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
-      context.supabase.from("task_management_raw").select("*").eq("id", data.id).maybeSingle(),
-    ]);
+    const { data: row } = await context.supabase
+      .from("task_management_raw")
+      .select("id")
+      .eq("id", data.id)
+      .maybeSingle();
     if (!row) throw new Error("대상 행을 찾을 수 없습니다.");
-    const roles = ((roleRows ?? []) as any[]).map((r) => r.role as string);
-    const rank = roles.reduce((m, r) => Math.max(m, ROLE_RANK[r as AppRole] ?? 0), 0);
-    const allowed = canEditRawRow(
-      {
-        roles: roles as (AppRole | string)[],
-        rank,
-        team: (profile as any)?.team ?? null,
-        name: (profile as any)?.name ?? null,
-        hdec_pic_name: (profile as any)?.hdec_pic_name ?? null,
-        hdec_eng_name: (profile as any)?.hdec_eng_name ?? null,
-        subcontractor_name: (profile as any)?.subcontractor_name ?? null,
-        subsub_name: (profile as any)?.subsub_name ?? null,
-      },
-      "task_management_raw",
-      row as any,
-    );
-    if (!allowed) throw new Error("권한 없음: 이 행을 확인할 권한이 없습니다.");
+    await assertRcl(context.supabase, context.userId, data.id, "write");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await (supabaseAdmin as any)

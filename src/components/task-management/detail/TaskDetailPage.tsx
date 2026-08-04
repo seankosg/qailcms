@@ -32,7 +32,7 @@ import {
   TM_OWNER_MUTATIONS_MARKER,
 } from "@/lib/task-management/owner-mutations.functions";
 import { toast } from "sonner";
-import { canEditRawRow } from "@/lib/auth/roles";
+import { useRclCan, rclScopeOfRow } from "@/hooks/useRclCan";
 import { computeDailyPlan, computeDailyDiff } from "@/lib/task-management/derived";
 import { todayIso } from "@/lib/task-management/schedule-utils";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
@@ -67,6 +67,8 @@ export function TaskDetailPage() {
   const { id } = useParams({ from: "/_authenticated/closure/task-management/detail/$id" });
   const router = useRouter();
   const { data: user } = useCurrentUser();
+  // 판정 정본: 서버 RCL
+  const { grants, canRow } = useRclCan("TM", "write");
   const isAdmin = !!(user as any)?.isAdmin;
   const isSuperUser = !!(user as any)?.isSuperUser;
   const isDSuperUser = !!(user as any)?.isDSuperUser;
@@ -181,7 +183,8 @@ export function TaskDetailPage() {
   }
 
   const isParent = row.level === "main";
-  const canEditRow = canEditRawRow(user as any, "task_management_raw", row);
+  const canEditRow = canRow(row as Record<string, unknown>);
+  const editScope = rclScopeOfRow(grants, row as Record<string, unknown>);
 
   const onFieldSaved = () => {
     refetch();
@@ -204,7 +207,7 @@ export function TaskDetailPage() {
           {canEditRow ? (
             <Badge className="h-5 text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
               <ShieldCheck className="mr-1 h-3 w-3" />
-              {isAdmin || isSuperUser || isDSuperUser ? " 편집" : " Owner 편집"}
+              {editScope === "own" ? " Own 편집" : editScope === "own_team" ? " Team 편집" : " 전체 편집"}
             </Badge>
           ) : (
             <Badge className="h-5 text-[10px] bg-zinc-500/15 text-zinc-700 dark:text-zinc-300">

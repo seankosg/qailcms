@@ -26,6 +26,8 @@ interface Props {
   }>;
   exportColumns: ExportColumn[];
   canEdit: boolean;
+  /** 행 단위 편집 판정자 — 서버 RCL(`useRclCan`) 결과를 그대로 받는다. */
+  canEditRow?: (row: Record<string, any>) => boolean;
   onClearSelection: () => void;
   onApplied: () => void;
 }
@@ -33,7 +35,7 @@ interface Props {
 const BLANK = "__BLANK__";
 const CHUNK = 500;
 
-export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onClearSelection, onApplied }: Props) {
+export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, canEditRow, onClearSelection, onApplied }: Props) {
   const [fieldName, setFieldName] = useState<string>("");
   const [rawValue, setRawValue] = useState<string>("");
   const [setBlank, setSetBlank] = useState<boolean>(false);
@@ -44,7 +46,12 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
   const [deleting, setDeleting] = useState(false);
 
   const count = selectedRows.length;
-  const ids = useMemo(() => selectedRows.map((row) => String(row.id ?? "")).filter(Boolean), [selectedRows]);
+  const editableRows = useMemo(
+    () => (canEditRow ? selectedRows.filter((r) => canEditRow(r)) : selectedRows),
+    [selectedRows, canEditRow],
+  );
+  const skippedCount = selectedRows.length - editableRows.length;
+  const ids = useMemo(() => editableRows.map((row) => String(row.id ?? "")).filter(Boolean), [editableRows]);
   const fieldGroups = useMemo(() => {
     const map = new Map<string, typeof fields>();
     for (const field of fields) {
@@ -93,7 +100,9 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
         // eslint-disable-next-line no-await-in-loop
         await bulkUpdateDefects({ data: { ids: slice, patch: { [field.field]: computedValue } } });
       }
-      toast.success("Bulk edit applied", { description: `${count} updated.` });
+      toast.success("Bulk edit applied", {
+        description: `${ids.length} updated.${skippedCount > 0 ? ` · ${skippedCount} 권한없음 제외` : ""}`,
+      });
       setConfirmOpen(false);
       reset();
       onApplied();
@@ -153,6 +162,10 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, onCl
           <div className="flex items-center gap-2 pr-2">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
             <span className="text-sm font-semibold">{count} selected</span>
+            <span className="text-[11px] text-muted-foreground">
+              적용 {ids.length}
+              {skippedCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">· 권한 밖 제외 {skippedCount}</span>}
+            </span>
             {count > CHUNK && <span className="text-xs text-muted-foreground">· Will run in {chunkCount} batches of {CHUNK}</span>}
           </div>
 

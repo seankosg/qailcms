@@ -43,7 +43,7 @@ import {
   type AbdTeam,
 } from "@/hooks/useAbdItems";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { canEditRawRow } from "@/lib/auth/roles";
+import { useRclCan } from "@/hooks/useRclCan";
 import { EMPTY_TOKEN, DATE_FILTER_FIELDS } from "@/lib/abd/filter-fns";
 import { getOriginHeaderStyle } from "@/lib/abd/origin-header-style";
 import { AbdColumnFilterDropdown } from "./AbdColumnFilterDropdowns";
@@ -266,9 +266,11 @@ export function AbdRawDataPage() {
   const urlSearch = AbdRawDataRoute.useSearch();
   const { data: user } = useCurrentUser();
   const isAdmin = !!user?.isAdmin;
+  // 판정 정본: 서버 RCL(`rcl_grants`). 화면은 규칙을 재구현하지 않는다.
+  const { canRow: canRclRow, anyScope: canRclWrite } = useRclCan("ABD", "write");
   const canEditRow = useCallback(
-    (row: AbdItem) => canEditRawRow(user ?? null, "abd_items_raw", row as unknown as Record<string, any>),
-    [user],
+    (row: AbdItem) => canRclRow(row as unknown as Record<string, unknown>),
+    [canRclRow],
   );
   const invalidate = useInvalidateAbd();
 
@@ -649,13 +651,7 @@ export function AbdRawDataPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [orderedKeys, visibility, labelOf],
   );
-  const canBulkEdit = !!user && (
-    isAdmin ||
-    (Array.isArray((user as any).roles) &&
-      (user as any).roles.some((r: string) =>
-        ["senior_user", "d_superuser", "superuser", "admin"].includes(r),
-      ))
-  );
+  const canBulkEdit = canRclWrite;
 
   const activeChips = useMemo(() => {
     const chips: { id: string; label: string; onClear: () => void }[] = [];
@@ -884,6 +880,7 @@ export function AbdRawDataPage() {
         selectedRows={selectedRowObjects as unknown as Record<string, unknown>[]}
         exportColumns={selectedExportColumns}
         canEdit={canBulkEdit}
+        canEditRow={canEditRow as unknown as (row: Record<string, unknown>) => boolean}
         onClear={() => setRowSelection({})}
         onMutated={() => {
           setRowSelection({});

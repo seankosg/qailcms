@@ -57,46 +57,11 @@ export function canAccessRoute(
   return true;
 }
 
-type RawTable =
-  | "abd_items_raw"
-  | "defect_items_raw"
-  | "task_management_raw";
-
 /**
- * Raw 행 편집 사전 판정 (클라이언트).  서버는 반드시 assertCanEdit 로 재검증.
- * - rank ≥ senior_user : 전체 편집
- * - user               : PIC 규칙(내 이름과 일치하는 행)
- * - d_superuser        : team 일치 시 편집
- * - 그 외              : 편집 불가
+ * ⚠️ 행 단위 편집 판정은 이 파일에 두지 않는다.
+ *
+ * 판정 정본은 DB `public.rcl_can` 하나뿐이며, 화면은 `@/hooks/useRclCan`
+ * (`rcl_grants` RPC)을 통해 서버 권한표를 그대로 사용한다.
+ * 여기에 규칙을 다시 구현하면 "화면에 보이는 것"과 "서버가 허용하는 것"이
+ * 갈라지므로 금지한다.
  */
-export function canEditRawRow(
-  user: MinimalUser | null | undefined,
-  _table: RawTable,
-  row: Record<string, any> | null | undefined,
-): boolean {
-  if (!user || !row) return false;
-  if (hasRank(user, "senior_user")) return true;
-  const roles = normalizeRoles(user.roles);
-  if (roles.includes("d_superuser")) {
-    const rt = (row.team ?? "").toString().toUpperCase();
-    const ut = (user.team ?? "").toString().toUpperCase();
-    return !!rt && !!ut && rt === ut;
-  }
-  if (roles.includes("user")) {
-    // 사람 이름은 profiles.name 단독 키로 판정한다 (hdec_pic_name/hdec_eng_name 은 별칭).
-    const me = normalizeUserName(user.name);
-    if (me) {
-      const rowNames = [row.hdec_pic_name, row.hdec_eng_name, row.pic].map(normalizeUserName);
-      if (rowNames.some((n) => n && n === me)) return true;
-    }
-    // 업체명은 사람 이름이 아니므로 업체 컬럼으로 계속 비교한다.
-    const company: Array<[string | null | undefined, string | null | undefined]> = [
-      [user.subcontractor_name, row.subcontractor_name],
-      [user.subsub_name, row.subsub_name],
-    ];
-    return company.some(
-      ([u, r]) => !!u && !!r && normalizeUserName(u) === normalizeUserName(r),
-    );
-  }
-  return false;
-}

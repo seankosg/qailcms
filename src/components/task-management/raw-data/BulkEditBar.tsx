@@ -229,6 +229,10 @@ export function BulkEditBar({
           <div className="flex items-center gap-2 pr-2">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
             <span className="text-sm font-semibold">{count} selected</span>
+            <span className="text-[11px] text-muted-foreground">
+              적용 {ids.length}
+              {skippedCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">· 권한 밖 제외 {skippedCount}</span>}
+            </span>
           </div>
 
           <div className="flex flex-1 flex-wrap items-center gap-2">
