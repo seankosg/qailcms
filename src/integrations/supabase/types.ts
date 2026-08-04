@@ -5732,7 +5732,46 @@ export type Database = {
         Args: { _role: string; _user_id: string }
         Returns: boolean
       }
+      hdec_assert_admin: { Args: never; Returns: undefined }
+      hdec_canonical_map: { Args: { _kind: string }; Returns: Json }
+      hdec_master_table: { Args: { _kind: string }; Returns: string }
       hdec_name_norm: { Args: { _name: string }; Returns: string }
+      hdec_name_usage: {
+        Args: { _kind: string }
+        Returns: {
+          cnt: number
+          module: string
+          norm: string
+        }[]
+      }
+      hdec_registry_backfill: { Args: { _kind: string }; Returns: Json }
+      hdec_registry_upsert: {
+        Args: { _kind: string; _names: string[] }
+        Returns: Json
+      }
+      hdec_roster_list: { Args: { _kind: string }; Returns: Json }
+      hdec_roster_merge: {
+        Args: { _dst_id: string; _kind: string; _src_id: string }
+        Returns: Json
+      }
+      hdec_roster_rename_preview: {
+        Args: { _id: string; _kind: string }
+        Returns: Json
+      }
+      hdec_roster_update: {
+        Args: {
+          _clear_link?: boolean
+          _id: string
+          _is_active?: boolean
+          _kind: string
+          _linked_user_id?: string
+          _name?: string
+          _note?: string
+          _variants?: string[]
+          _verified?: boolean
+        }
+        Returns: Json
+      }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }
       is_full_access: { Args: { _user_id: string }; Returns: boolean }
       is_qaqc_readonly: { Args: { _user_id: string }; Returns: boolean }
