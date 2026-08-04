@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { normalizeUserName } from "@/lib/auth/roles";
+import { evalScope, type RclScope } from "@/lib/auth/rcl-eval";
 
 export type RclModule = "TM" | "ABD" | "SM" | "SPL" | "WRT";
 export type RclAction = "read" | "write" | "delete" | "import" | "export";
@@ -51,25 +51,22 @@ export function useRclGrants(module: RclModule, action: RclAction) {
   });
 }
 
-/** `rcl_scope` 와 동일 순서로 행의 scope 를 판정한다. */
+/**
+ * `rcl_scope` 와 동일 순서로 행의 scope 를 판정한다(표시 전용 사본).
+ * 판정 본체는 순수 함수 `evalScope` 이며, 세션 없이 대조 스크립트에서 재사용된다.
+ */
 export function rclScopeOfRow(
   g: RclGrants | null | undefined,
   row: Record<string, unknown> | null | undefined,
-): "own" | "own_team" | "other_team" {
+): RclScope {
   if (!g) return "other_team";
-  const me = normalizeUserName(g.my_name);
-  if (row && me) {
-    for (const col of g.owner_cols ?? []) {
-      if (normalizeUserName(row[col]) === me) return "own";
-    }
-  }
-  const myTeam = (g.my_team ?? "").toUpperCase().trim();
-  if (g.owning_team && myTeam === g.owning_team.toUpperCase().trim()) return "own_team";
-  if (row && g.team_col && myTeam) {
-    const rowTeam = String(row[g.team_col] ?? "").toUpperCase().trim();
-    if (rowTeam && rowTeam === myTeam) return "own_team";
-  }
-  return "other_team";
+  return (
+    evalScope(
+      { owner_cols: g.owner_cols, team_col: g.team_col, owning_team: g.owning_team },
+      { my_name: g.my_name, my_team: g.my_team },
+      row,
+    ) ?? "other_team"
+  );
 }
 
 export function rclAllows(

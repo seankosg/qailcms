@@ -13,6 +13,7 @@ import { type DefectColumnDef } from "@/lib/defect-management/columns";
 import { copyRowsAsTsv, exportSelectedToXlsx, type ExportColumn } from "@/lib/defect-management/bulk-actions";
 import { toast } from "sonner";
 import { ChevronDown, ClipboardCopy, FileSpreadsheet, Loader2, MoreHorizontal, Trash2, X } from "lucide-react";
+import { OutOfScopeRowsPopover } from "@/components/shared/OutOfScopeRowsPopover";
 
 interface Props {
   selectedRows: Record<string, any>[];
@@ -51,6 +52,10 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, canE
     [selectedRows, canEditRow],
   );
   const skippedCount = selectedRows.length - editableRows.length;
+  const skippedRows = useMemo(
+    () => (canEditRow ? selectedRows.filter((r) => !canEditRow(r)) : []),
+    [selectedRows, canEditRow],
+  );
   const ids = useMemo(() => editableRows.map((row) => String(row.id ?? "")).filter(Boolean), [editableRows]);
   const fieldGroups = useMemo(() => {
     const map = new Map<string, typeof fields>();
@@ -164,7 +169,9 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, canE
             <span className="text-sm font-semibold">{count} selected</span>
             <span className="text-[11px] text-muted-foreground">
               적용 {ids.length}
-              {skippedCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">· 권한 밖 제외 {skippedCount}</span>}
+              {skippedCount > 0 && (
+                <OutOfScopeRowsPopover rows={skippedRows} labelKeys={["source_issue_no", "id"]} />
+              )}
             </span>
             {count > CHUNK && <span className="text-xs text-muted-foreground">· Will run in {chunkCount} batches of {CHUNK}</span>}
           </div>

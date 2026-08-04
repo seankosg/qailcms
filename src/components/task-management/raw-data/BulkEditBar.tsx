@@ -46,6 +46,7 @@ import {
 } from "@/lib/task-management/bulk-actions";
 import { BulkConfirmDialog } from "./dialogs/BulkConfirmDialog";
 import { BulkDeleteDialog } from "./dialogs/BulkDeleteDialog";
+import { OutOfScopeRowsPopover } from "@/components/shared/OutOfScopeRowsPopover";
 
 const BLANK = "__BLANK__";
 const CHUNK = 500;
@@ -120,6 +121,10 @@ export function BulkEditBar({
     [selectedRows, canEditRow],
   );
   const skippedCount = selectedRows.length - editableRows.length;
+  const skippedRows = useMemo(
+    () => (canEditRow ? selectedRows.filter((r) => !canEditRow(r)) : []),
+    [selectedRows, canEditRow],
+  );
   const ids = useMemo(
     () => editableRows.map((r) => String(r.id ?? "")).filter(Boolean),
     [editableRows],
@@ -231,7 +236,9 @@ export function BulkEditBar({
             <span className="text-sm font-semibold">{count} selected</span>
             <span className="text-[11px] text-muted-foreground">
               적용 {ids.length}
-              {skippedCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">· 권한 밖 제외 {skippedCount}</span>}
+              {skippedCount > 0 && (
+                <OutOfScopeRowsPopover rows={skippedRows} labelKeys={["task_no", "task_name"]} />
+              )}
             </span>
           </div>
 
