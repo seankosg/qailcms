@@ -85,6 +85,8 @@ export function OcsAtomicV2Panel() {
   const [links, setLinks] = useState<OcsV2LinkParse | null>(null);
   const [dry, setDry] = useState<DryAgg | null>(null);
   const [dryAtt, setDryAtt] = useState<DryAgg | null>(null);
+  const [dryDistinct, setDryDistinct] = useState<DryAgg | null>(null);
+  const [attDistinct, setAttDistinct] = useState<DryAgg | null>(null);
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -106,14 +108,16 @@ export function OcsAtomicV2Panel() {
     if (parsed && parsed.invalid_rows.length > 0) out.push(`형식 오류 ${parsed.invalid_rows.length}건`);
     if (dry && num(dry["parent_missing"]) > 0)
       out.push(`부모 코멘트 미존재 ${num(dry["parent_missing"])}건`);
-    if (dry && num(dry["parents_split_with_user_check"]) > 0)
-      out.push(`사용자 Complied 체크가 있는 분할 대상 ${num(dry["parents_split_with_user_check"])}건`);
+    if (dryDistinct && num(dryDistinct["parents_split_with_user_check"]) > 0)
+      out.push(
+        `사용자 Complied 체크가 있는 분할 대상 ${num(dryDistinct["parents_split_with_user_check"])}건`,
+      );
     if (unresolvedLinkComments > 0)
       out.push(`링크 파일의 미확인 Comment ID ${unresolvedLinkComments}건`);
-    if (dryAtt && num(dryAtt["unresolved"]) > 0)
-      out.push(`링크 파일의 미확인 Attachment ID ${num(dryAtt["unresolved"])}건`);
+    if (attDistinct && num(attDistinct["unresolved_attachments"]) > 0)
+      out.push(`링크 파일의 미확인 Attachment ID ${num(attDistinct["unresolved_attachments"])}건`);
     return out;
-  }, [parsed, rows, dry, dryAtt, unresolvedLinkComments]);
+  }, [parsed, rows, dry, dryDistinct, attDistinct, unresolvedLinkComments]);
 
   async function readJson(files: FileList, kind: "atomic" | "link") {
     const f = files[0];
@@ -136,6 +140,8 @@ export function OcsAtomicV2Panel() {
       }
       setDry(null);
       setDryAtt(null);
+      setDryDistinct(null);
+      setAttDistinct(null);
       setApproved(false);
       setResult(null);
     } catch (e) {
@@ -151,6 +157,7 @@ export function OcsAtomicV2Panel() {
     setProgress(0);
     try {
       let agg: DryAgg = {};
+      const sets: Record<string, Set<string>> = {};
       const batches = chunk(rows, BATCH);
       for (let i = 0; i < batches.length; i += 1) {
         const res = (await dryComments({ data: { rows: batches[i] as unknown[] } })) as Record<
@@ -158,18 +165,43 @@ export function OcsAtomicV2Panel() {
           unknown
         >;
         agg = addAgg(agg, res);
+        unionInto(sets, res);
         setProgress(Math.round(((i + 1) / batches.length) * 100));
       }
       setDry(agg);
+      setDryDistinct({
+        source_parent_count: parsed?.source_parent_count ?? sets["parent_ids"]?.size ?? 0,
+        multi_group_count: parsed?.multi_group_count ?? 0,
+        single_parent_count: parsed?.single_parent_count ?? 0,
+        distinct_parents_in_db: sets["parent_ids"]?.size ?? 0,
+        distinct_group_keys: sets["group_keys"]?.size ?? 0,
+        distinct_abd_items: sets["abd_item_ids"]?.size ?? 0,
+        parents_split_with_user_check: sets["split_user_check_pids"]?.size ?? 0,
+        parents_with_user_row: sets["user_row_pids"]?.size ?? 0,
+        missing_parents: sets["missing_parent_ids"]?.size ?? 0,
+      });
 
       if (links && links.rows.length > 0) {
-        let aggA: DryAgg = {};
+        const attSets: Record<string, Set<string>> = {};
         const ids = Array.from(new Set(links.rows.map((l) => l.source_attachment_id)));
         for (const b of chunk(ids, BATCH)) {
           const res = (await dryAtts({ data: { ids: b } })) as Record<string, unknown>;
-          aggA = addAgg(aggA, res);
+          unionInto(attSets, res);
         }
-        setDryAtt(aggA);
+        const dupPairs = links.duplicated_pairs;
+        const unresolvedAtt = attSets["unresolved_ids"]?.size ?? 0;
+        setAttDistinct({
+          total_link_rows: links.total_raw,
+          confirmed_high: links.confirmed_high,
+          group_inherited_access: links.group_inherited_access,
+          duplicate_pairs: dupPairs,
+          unique_attachments: ids.length,
+          resolved_attachments: attSets["resolved_ids"]?.size ?? 0,
+          unresolved_attachments: unresolvedAtt,
+          resolved_link_rows: links.rows.length - unresolvedLinkComments,
+          unresolved_link_rows: unresolvedLinkComments + links.unresolved_rows,
+        });
+        setDryAtt(null);
       }
       toast.success("Dry-run 완료");
     } catch (e) {
