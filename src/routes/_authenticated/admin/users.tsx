@@ -159,6 +159,8 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
   const updLogin = useServerFn(updateLoginId);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: () => list({}) });
+  const me = useCurrentUser();
+  const callerIsAdmin = (me.data?.roles ?? []).includes("admin");
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
   const teams = useTeamOptions();
 
@@ -320,13 +322,14 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
                       <LinkedMasterCell user={u} onSaved={invalidate} updProfile={updProfile} />
                     </TableCell>
                     <TableCell>
-                      <Select value={u.roles?.[0] ?? "guest"} onValueChange={async (v) => {
-                        try { await updRole({ data: { user_id: u.id, role: v as any } }); toast.success("역할 변경됨"); invalidate(); }
-                        catch (e: any) { toast.error(e.message); }
-                      }}>
-                        <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
-                        <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <RoleCell
+                        user={u}
+                        callerIsAdmin={callerIsAdmin}
+                        onChange={async (v) => {
+                          try { await updRole({ data: { user_id: u.id, role: v as any } }); toast.success("역할 변경됨"); invalidate(); }
+                          catch (e: any) { toast.error(e.message); }
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
