@@ -56,6 +56,10 @@ export const updateTaskOwnerField = createServerFn({ method: "POST" })
     await assertRcl(context.supabase, context.userId, data.id, "write");
 
     // task_no 는 모듈 전체 범위(other_team) 편집권 보유자만 변경 가능.
+    // 근거: task_no 는 TM 모듈 전역 식별자(계층 부모-자식 매칭 · 임포트 업서트 키 · 외부 참조)라
+    // 본인/자기팀 범위 판정으로는 변경의 영향 범위를 그 범위 안에 가둘 수 없다.
+    // 따라서 "다른 팀 권한을 요구"하는 것이 아니라 "모듈 전 범위 편집권(other_team=Y) 보유"를
+    // 요건으로 둔 것이며, 기존 admin/superuser/d_superuser 한정 정책을 RCL 격자로 옮긴 등가 조건이다.
     if (data.field === "task_no") {
       const { data: g, error: gErr } = await (context.supabase as any).rpc("rcl_grants", {
         _module: "TM",
