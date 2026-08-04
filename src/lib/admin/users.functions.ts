@@ -347,3 +347,146 @@ export const updateMasterFields = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+// ---- 명부 일괄 계정 생성 (2026-08-04) ----
+
+/** 이름 → login_id 기본 규칙: 소문자화 후 공백·마침표 제거, 허용문자 외 제거. */
+export function baseLoginIdFromName(name: string): string {
+  return String(name ?? "")
+    .toLowerCase()
+    .replace(/[\s.]/g, "")
+    .replace(/[^a-z0-9_-]/g, "");
+}
+
+function randomTempPassword(): string {
+  const chars = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  let s = "";
+  for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 3; i++) s += digits[Math.floor(Math.random() * digits.length)];
+  return `Q${s}`;
+}
+
+/** 이름 목록 → 충돌 회피된 login_id 제안. 기존 profiles.login_id 와 목록 내 중복을 모두 검사. */
+export const suggestLoginIds = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { names: string[] }) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing } = await supabaseAdmin.from("profiles").select("login_id");
+    const taken = new Set<string>((existing ?? []).map((r: any) => String(r.login_id ?? "").toLowerCase()));
+    const out: { name: string; login_id: string; suffix: number; conflicted: boolean; needs_edit: boolean }[] = [];
+    for (const name of data.names) {
+      const base = baseLoginIdFromName(name);
+      const needsEdit = base.length === 0;
+      let candidate = needsEdit ? "user" : base;
+      let suffix = 0;
+      while (taken.has(candidate)) {
+        suffix += 2 <= suffix + 2 ? 0 : 0; // no-op guard
+        suffix = suffix === 0 ? 2 : suffix + 1;
+        candidate = `${needsEdit ? "user" : base}${suffix}`;
+      }
+      taken.add(candidate);
+      out.push({ name, login_id: candidate, suffix, conflicted: suffix > 0, needs_edit: needsEdit });
+    }
+    return out;
+  });
+
+/** 명부 이름 다중 선택 → 계정 일괄 생성. 부분 실패 허용(전량 롤백 없음). */
+export const bulkCreateAppUsers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    kind: "pic" | "eng";
+    rows: { name: string; login_id: string; team?: string | null }[];
+  }) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const userType = data.kind === "pic" ? "hdec_pic" : "hdec_eng";
+    const masterTable = data.kind === "pic" ? "hdec_pic_name_master" : "hdec_eng_name_master";
+
+    const results: {
+      name: string;
+      login_id: string;
+      team: string | null;
+      temp_password: string | null;
+      ok: boolean;
+      error: string | null;
+      recalc: Record<string, number>;
+      recalc_total: number;
+    }[] = [];
+
+    for (const row of data.rows) {
+      const name = String(row.name ?? "").trim();
+      const loginId = String(row.login_id ?? "").trim().toLowerCase();
+      const team = row.team ? String(row.team).trim() : null;
+      const tempPw = randomTempPassword();
+      const base = {
+        name,
+        login_id: loginId,
+        team,
+        temp_password: null as string | null,
+        ok: false,
+        error: null as string | null,
+        recalc: {} as Record<string, number>,
+        recalc_total: 0,
+      };
+      try {
+        if (!name) throw new Error("이름이 비어 있습니다.");
+        if (!/^[a-z0-9._-]+$/.test(loginId)) throw new Error("Login ID 형식 오류 (영문 소문자·숫자·. _ - 만 사용)");
+        const nameNorm = name.replace(/\s+/g, " ").trim().toUpperCase();
+
+        const { data: dupName } = await supabaseAdmin
+          .from("profiles").select("id").eq("name_norm" as any, nameNorm).maybeSingle();
+        if (dupName) throw new Error(`이름 '${name}' 은(는) 이미 계정이 있습니다.`);
+        const { data: dupLogin } = await supabaseAdmin
+          .from("profiles").select("id").eq("login_id", loginId).maybeSingle();
+        if (dupLogin) throw new Error(`Login ID '${loginId}' 중복`);
+
+        const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+          email: `${loginId}@${DUMMY_EMAIL_DOMAIN}`,
+          password: tempPw,
+          email_confirm: true,
+          user_metadata: {
+            login_id: loginId,
+            display_name: name,
+            name,
+            user_type: userType,
+            team,
+            role: "user",
+            must_change_password: true,
+          },
+        });
+        if (error) throw new Error(error.message);
+        const uid = created?.user?.id;
+        if (!uid) throw new Error("계정 생성 응답이 비어 있습니다.");
+
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", uid);
+        await supabaseAdmin.from("user_roles").insert({ user_id: uid, role: "user" });
+        await supabaseAdmin.from("profiles").update({
+          name, display_name: name, login_id: loginId, team,
+          user_type: userType, must_change_password: true,
+        } as any).eq("id", uid);
+
+        // 명부 연결
+        await (supabaseAdmin as any).from(masterTable)
+          .update({ linked_user_id: uid }).eq("name_norm", nameNorm);
+
+        // 소유권 재계산
+        const { data: recalc } = await (supabaseAdmin as any).rpc("hdec_recalc_owner_for_user", {
+          _user_id: uid, _reason: "bulk_account_create",
+        });
+        const rc: Record<string, number> = {};
+        let total = 0;
+        for (const r of (recalc ?? []) as any[]) {
+          const n = Number(r.owned_rows ?? r.rows ?? 0);
+          rc[String(r.target_table ?? r.table_name)] = n;
+          total += n;
+        }
+        results.push({ ...base, temp_password: tempPw, ok: true, recalc: rc, recalc_total: total });
+      } catch (e: any) {
+        results.push({ ...base, error: e?.message ?? String(e) });
+      }
+    }
+    return results;
+  });
