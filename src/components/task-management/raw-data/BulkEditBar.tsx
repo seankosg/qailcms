@@ -56,7 +56,7 @@ interface Props {
   canEdit: boolean;
   onClear: () => void;
   onMutated: () => void;
-  /** 행 단위 편집 권한 예측자 — canEditRawRow 규칙과 동일해야 함 */
+  /** 행 단위 편집 판정자 — 서버 RCL(`useRclCan`) 결과를 그대로 받는다. */
   canEditRow?: (row: Record<string, unknown>) => boolean;
 }
 

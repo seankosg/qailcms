@@ -1071,7 +1071,7 @@ export function TaskManagementRawDataPage() {
           const rr = row.original as any;
           const isMain = rr.level === "main";
           const dyn = cellDynRef.current;
-          // 통합 편집 규칙: canEditRawRow 만으로 판단 (역할 rank / d_superuser team / user PIC).
+          // 통합 편집 규칙: 서버 RCL 판정(useRclCan → rcl_grants/rcl_can) 결과만으로 판단.
           const rowCanEdit = dyn.canEditRow(rr as Record<string, unknown>);
           const isTeamOverride = c.key === "team";
           const isDataDateOverride = c.key === "data_date";
