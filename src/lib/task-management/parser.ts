@@ -285,13 +285,18 @@ function buildHeaderMap(sheet: XLSX.WorkSheet): {
   return { map, warnings, headerRow: bestRow0 + 1 };
 }
 
+/** §4-3: 과업코드(task_no) 열 탐색에 사용하는 헤더 별칭 정본. 오류 문구에도 그대로 노출한다. */
+export const TASK_NO_ALIASES = [
+  "No", "no", "Task No", "Task No.", "Task Number", "Task_No", "TaskNo",
+  "번호", "작업번호", "업무번호",
+];
+
 function resolveColumn(
   headerMap: Record<string, number>,
   headerNames: string[],
   canonicalIndex: number,
   warnings: string[],
 ): number {
-  // (별칭 목록은 TASK_NO_ALIASES 등 호출부에서 넘긴다)
   for (const name of headerNames) {
     const key = normalizeHeader(name);
     const idx = headerMap[key];
