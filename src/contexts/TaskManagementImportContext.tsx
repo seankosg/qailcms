@@ -698,6 +698,17 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const startTime = Date.now();
       const startedAtIso = new Date().toISOString();
 
+      // §4-1(2026-08-04): 파서 경고를 로그에 보존. 경고가 없으면 아무것도 남기지 않는다(빈칸).
+      const parserWarnings = (f.warnings ?? []).filter(Boolean);
+      const warningsPayload =
+        parserWarnings.length > 0
+          ? {
+              parser: parserWarnings,
+              has_position_fallback: parserWarnings.some((w) => w.includes("기본 위치")),
+              has_header_row_fallback: parserWarnings.some((w) => w.includes("헤더 행을 찾지 못해")),
+            }
+          : null;
+
       // Create log
       const { data: logRow } = await (supabase as any)
         .from("task_management_import_logs")
@@ -711,6 +722,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           imported_by: userId,
           started_at: startedAtIso,
           note: [f.masterMappingNote, scopeNote].filter(Boolean).join(" | ") || null,
+          warnings: warningsPayload,
         })
         .select("id")
         .single();

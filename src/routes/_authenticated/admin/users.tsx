@@ -29,6 +29,7 @@ import { highestRole } from "@/lib/auth/roles";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HdecPeopleTab } from "@/components/admin/HdecPeopleTab";
+import { BulkRoleAssignTab } from "@/components/admin/BulkRoleAssignTab";
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
   head: () => ({ meta: [{ title: "사용자 관리 — QAIL CMS" }] }),
@@ -53,6 +54,7 @@ function UsersAdminPage() {
           <TabsTrigger value="pic">HDEC PIC</TabsTrigger>
           <TabsTrigger value="eng">HDEC ENG</TabsTrigger>
           <TabsTrigger value="accounts">계정 목록</TabsTrigger>
+          <TabsTrigger value="bulk-role">역할 일괄 지정</TabsTrigger>
         </TabsList>
         <TabsContent value="pic" className="pt-4">
           <p className="mb-2 text-xs text-muted-foreground">
@@ -71,6 +73,9 @@ function UsersAdminPage() {
             시스템 전체 로그인 계정 목록입니다. PIC/ENG 명부에 없는 사람(테스트 계정·신규 입사자)도 여기서 생성합니다.
           </p>
           <UsersTab />
+        </TabsContent>
+        <TabsContent value="bulk-role" className="pt-4">
+          <BulkRoleAssignTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -285,6 +285,12 @@ function buildHeaderMap(sheet: XLSX.WorkSheet): {
   return { map, warnings, headerRow: bestRow0 + 1 };
 }
 
+/** §4-3: 과업코드(task_no) 열 탐색에 사용하는 헤더 별칭 정본. 오류 문구에도 그대로 노출한다. */
+export const TASK_NO_ALIASES = [
+  "No", "no", "Task No", "Task No.", "Task Number", "Task_No", "TaskNo",
+  "번호", "작업번호", "업무번호",
+];
+
 function resolveColumn(
   headerMap: Record<string, number>,
   headerNames: string[],
@@ -524,7 +530,9 @@ export async function parseTaskManagementExcel(
   };
 
   const cols = {
-    no: pick("task_no", ["No", "no", "Task No", "Task No.", "Task Number", "Task_No", "TaskNo", "번호", "작업번호", "업무번호"], 1),
+    // §4-3(2026-08-04): 과업코드는 upsert 키(discipline,task_no) — ★위치 폴백 금지(0).
+    // 미매핑이면 아래에서 파싱 자체를 중단한다. 키가 틀리면 되돌릴 수 없다.
+    no: pick("task_no", TASK_NO_ALIASES, 0),
     category: pick("category", ["Category"], 2),
     plot: pick("plot", ["Plot"], 3),
     task_name: pick("task_name", ["항목"], 4),
@@ -562,6 +570,16 @@ export async function parseTaskManagementExcel(
       return 0;
     })(),
   };
+
+  // §4-3(2026-08-04): 과업코드 열을 못 찾으면 ★진행 금지. upsert 키(discipline,task_no)가
+  // 틀리면 엉뚱한 행이 덮이거나 중복이 대량 생긴다 — 되돌릴 수 없다.
+  if (!cols.no) {
+    const searched = [...(extraAliases?.["task_no"] ?? []), ...TASK_NO_ALIASES];
+    throw new Error(
+      `과업코드 열을 찾지 못했습니다. 찾은 이름: ${searched.join(" / ")} — ` +
+        `파일의 헤더를 고치거나 [Admin → 매핑 관리(/admin/mapping) → TM 헤더 매핑]에서 별칭을 추가하세요.`,
+    );
+  }
 
   // ---- 사용자가 체크 해제한 헤더 처리 ----
   // headerToFieldMap: sheetHeaders의 실제 header 텍스트 → canonical field

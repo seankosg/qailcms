@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ROLE_LABELS, ROLE_RANK, type AppRole, type UserType } from "@/types/enums";
-import { isQaqcRestricted } from "@/lib/auth/qaqc";
 
 export function useCurrentUser() {
   return useQuery({
@@ -35,13 +34,9 @@ export function useCurrentUser() {
       const isSuperGuest = roleSet.has("super_guest");
       const isDSuperUser = roleSet.has("d_superuser");
       const p = (profile ?? {}) as any;
-      const qaqcRestricted = isQaqcRestricted({
-        team: p.team ?? null,
-        userType: p.user_type ?? null,
-        roles: roleList,
-      });
-      const isEditor = !qaqcRestricted && (isAdmin || isDSuperUser || isSeniorUser || isUser);
-      const canEdit = !qaqcRestricted && rank >= ROLE_RANK.senior_user;
+      // §3-1(2026-08-04): QAQC 프론트 제한 폐기. 판정은 RCL(rcl_can) 단독.
+      const isEditor = isAdmin || isDSuperUser || isSeniorUser || isUser;
+      const canEdit = rank >= ROLE_RANK.senior_user;
       return {
         id: authData.user.id,
         email: authData.user.email,
@@ -61,7 +56,6 @@ export function useCurrentUser() {
         isEditor,
         isGuest: primaryRole === "guest" || !primaryRole,
         canEdit,
-        qaqcRestricted,
         mustChangePassword: p.must_change_password === true,
         userType: p.user_type as UserType | undefined,
         loginId: p.login_id as string | undefined,
