@@ -64,7 +64,7 @@ export const listExistingOcsPaths = createServerFn({ method: "POST" })
       if (seen.has(prefix)) continue;
       seen.add(prefix);
       let offset = 0;
-      // eslint-disable-next-line no-constant-condition
+
       while (true) {
         const { data: items, error } = await supabaseAdmin.storage
           .from(OCS_BUCKET)

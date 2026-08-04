@@ -7,10 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Loader2, FileJson, FolderUp, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getOcsImportStats, listExistingOcsPaths, OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
+import {
+  getOcsImportStats,
+  listExistingOcsPaths,
+  OCS_BUCKET,
+} from "@/lib/abd/ocs-import.functions";
 import {
   parseOcsManifest,
   matchFolderFiles,
@@ -26,7 +37,10 @@ export const Route = createFileRoute("/_authenticated/admin/ocs-import")({
   head: () => ({
     meta: [
       { title: "OCS Import — QAIL CMS" },
-      { name: "description", content: "ABD OCS 첨부 매니페스트 검증 및 이미지 보관함 업로드 관리자 화면." },
+      {
+        name: "description",
+        content: "ABD OCS 첨부 매니페스트 검증 및 이미지 보관함 업로드 관리자 화면.",
+      },
       { property: "og:title", content: "OCS Import — QAIL CMS" },
       { property: "og:description", content: "ABD OCS 매니페스트 검증 및 첨부 이미지 업로드." },
       { property: "og:type", content: "website" },
@@ -70,7 +84,10 @@ function OcsImportPage() {
   const stats = useQuery({ queryKey: ["abd-ocs-import-stats"], queryFn: () => fetchStats({}) });
 
   const counts = useMemo(() => {
-    const c = { 완료: 0, 기존: 0, 실패: 0, 미매칭: 0, 대기: 0, 업로드: 0 } as Record<RowStatus, number>;
+    const c = { 완료: 0, 기존: 0, 실패: 0, 미매칭: 0, 대기: 0, 업로드: 0 } as Record<
+      RowStatus,
+      number
+    >;
     for (const r of rows) c[r.status] = (c[r.status] ?? 0) + 1;
     const hashOk = rows.filter((r) => r.hash === "일치").length;
     const hashBad = rows.filter((r) => r.hash === "불일치").length;
@@ -122,7 +139,11 @@ function OcsImportPage() {
     const fmt = (r.entry.image_format ?? "").toLowerCase().replace("jpeg", "jpg");
     const extNorm = ext === "jpeg" ? "jpg" : ext;
     if (fmt && fmt !== extNorm) {
-      return { ...r, status: "실패", message: `manifest image_format(${r.entry.image_format}) ≠ 확장자(.${ext})` };
+      return {
+        ...r,
+        status: "실패",
+        message: `manifest image_format(${r.entry.image_format}) ≠ 확장자(.${ext})`,
+      };
     }
     if (file.size > OCS_MAX_BYTES) return { ...r, status: "실패", message: "8MB 초과" };
 
@@ -141,7 +162,8 @@ function OcsImportPage() {
         contentType: mime,
         upsert: false,
       });
-    if (error) return { ...r, status: "실패", hash, message: String((error as any).message ?? error) };
+    if (error)
+      return { ...r, status: "실패", hash, message: String((error as any).message ?? error) };
     return { ...r, status: "완료", hash };
   }
 
@@ -199,7 +221,9 @@ function OcsImportPage() {
     stats.refetch();
   }
 
-  const progress = rows.length ? Math.round((done / Math.max(1, rows.filter((r) => r.file).length)) * 100) : 0;
+  const progress = rows.length
+    ? Math.round((done / Math.max(1, rows.filter((r) => r.file).length)) * 100)
+    : 0;
 
   return (
     <div className="space-y-4 p-4">
@@ -252,7 +276,10 @@ function OcsImportPage() {
               <div className={parsed.invalid_rows.length ? "text-destructive" : ""}>
                 형식/용량 오류 {parsed.invalid_rows.length}건
                 {parsed.invalid_rows.length > 0 &&
-                  ` — ${parsed.invalid_rows.slice(0, 3).map((r) => `#${r.index} ${r.reason}`).join(", ")}…`}
+                  ` — ${parsed.invalid_rows
+                    .slice(0, 3)
+                    .map((r) => `#${r.index} ${r.reason}`)
+                    .join(", ")}…`}
               </div>
             </div>
           )}
@@ -277,9 +304,10 @@ function OcsImportPage() {
             disabled={!parsed}
           />
           <p className="text-xs text-muted-foreground">
-            <b>attachments 폴더가 들어 있는 상위 ocs-db-all 폴더</b>를 선택하십시오(attachments 폴더를 직접 선택해도
-            자동 인식합니다). PNG/JPEG, 파일당 최대 8MB. 파일 경로는 매니페스트의 relative_path 와 정확히 일치해야
-            하며(파일명만 비교하지 않음), 저장 경로도 relative_path 를 그대로 사용합니다.
+            <b>attachments 폴더가 들어 있는 상위 ocs-db-all 폴더</b>를 선택하십시오(attachments
+            폴더를 직접 선택해도 자동 인식합니다). PNG/JPEG, 파일당 최대 8MB. 파일 경로는
+            매니페스트의 relative_path 와 정확히 일치해야 하며(파일명만 비교하지 않음), 저장 경로도
+            relative_path 를 그대로 사용합니다.
           </p>
           {match && (
             <div className="grid gap-1 rounded-md border p-3 text-sm">
@@ -289,14 +317,17 @@ function OcsImportPage() {
               </div>
               <div>폴더에만 있는 파일 {match.extraFiles.length}건</div>
               <div>이미지 아닌 파일 {match.nonImageFiles}건</div>
-              {existingCount !== null && <div>보관함 기존 object {existingCount}건 (업로드 요청 생략)</div>}
+              {existingCount !== null && (
+                <div>보관함 기존 object {existingCount}건 (업로드 요청 생략)</div>
+              )}
             </div>
           )}
           {match && match.matched.size > 0 && !confirmed && (
             <div className="flex items-center gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               <AlertTriangle className="h-4 w-4" />
               <span>
-                위 수치가 맞으면 승인하십시오. 승인 후 {match.matched.size}건을 업로드합니다(기존 파일은 건너뜀).
+                위 수치가 맞으면 승인하십시오. 승인 후 {match.matched.size}건을 업로드합니다(기존
+                파일은 건너뜀).
               </span>
               <Button size="sm" onClick={() => setConfirmed(true)}>
                 수치 확인 및 승인
@@ -304,13 +335,18 @@ function OcsImportPage() {
             </div>
           )}
           <div className="flex items-center gap-3">
-            <Button onClick={onUpload} disabled={!confirmed || uploading || !match || match.matched.size === 0}>
-              {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}업로드 실행 (동시 {CONCURRENCY})
+            <Button
+              onClick={onUpload}
+              disabled={!confirmed || uploading || !match || match.matched.size === 0}
+            >
+              {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}업로드 실행 (동시{" "}
+              {CONCURRENCY})
             </Button>
             {rows.length > 0 && (
               <span className="text-sm text-muted-foreground">
-                완료 {counts.완료} / 기존 {counts.기존} / 실패 {counts.실패} / 미매칭 {counts.미매칭} · 해시 일치{" "}
-                {counts.hashOk} / 불일치 {counts.hashBad} / 없음 {counts.hashNone}
+                완료 {counts.완료} / 기존 {counts.기존} / 실패 {counts.실패} / 미매칭{" "}
+                {counts.미매칭} · 해시 일치 {counts.hashOk} / 불일치 {counts.hashBad} / 없음{" "}
+                {counts.hashNone}
               </span>
             )}
           </div>
@@ -338,7 +374,9 @@ function OcsImportPage() {
               <TableBody>
                 {rows.slice(0, 50).map((r) => (
                   <TableRow key={r.entry.source_attachment_id}>
-                    <TableCell className="font-mono text-xs">{r.entry.source_attachment_id}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {r.entry.source_attachment_id}
+                    </TableCell>
                     <TableCell className="font-mono text-xs">
                       {r.entry.source_comment_id ?? <Badge variant="outline">needs_review</Badge>}
                     </TableCell>
@@ -346,18 +384,22 @@ function OcsImportPage() {
                     <TableCell>
                       {r.status === "완료" ? (
                         <span className="inline-flex items-center gap-1 text-xs">
-                          <CheckCircle2 className="h-3 w-3" />완료
+                          <CheckCircle2 className="h-3 w-3" />
+                          완료
                         </span>
                       ) : r.status === "실패" ? (
                         <span className="inline-flex items-center gap-1 text-xs text-destructive">
-                          <AlertTriangle className="h-3 w-3" />실패
+                          <AlertTriangle className="h-3 w-3" />
+                          실패
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">{r.status}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-xs">{r.hash ?? "-"}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{r.message ?? ""}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {r.message ?? ""}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

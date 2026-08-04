@@ -81,7 +81,8 @@ export function parseOcsManifest(json: unknown): OcsManifestParse {
       skipped_no_path += 1;
       return; // A1 업로드 대상 아님 (이미지 파일 없음)
     }
-    const source_attachment_id = str(r?.attachment_id) ?? str(r?.source_attachment_id) ?? str(r?.id);
+    const source_attachment_id =
+      str(r?.attachment_id) ?? str(r?.source_attachment_id) ?? str(r?.id);
     if (!source_attachment_id) {
       invalid_rows.push({ index: i, reason: "attachment_id 누락" });
       return;
@@ -151,7 +152,10 @@ export type FolderMatchResult = {
   nonImageFiles: number;
 };
 
-export function matchFolderFiles(entries: OcsManifestEntry[], files: FileList | File[]): FolderMatchResult {
+export function matchFolderFiles(
+  entries: OcsManifestEntry[],
+  files: FileList | File[],
+): FolderMatchResult {
   const byPath = new Map<string, File>();
   let nonImageFiles = 0;
   const manifestRoots = new Set(
