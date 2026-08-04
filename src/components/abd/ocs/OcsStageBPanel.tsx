@@ -503,11 +503,10 @@ export function OcsStageBPanel() {
             <div className="flex items-center gap-2 text-sm font-medium">
               <FileJson className="h-4 w-4" /> 1. OCS DB Data JSON
             </div>
-            <input
-              type="file"
+            <FilePickerButton
+              label="OCS Data JSON 선택"
               accept="application/json,.json"
-              className="block text-sm"
-              onChange={(e) => e.target.files?.[0] && onDataFile(e.target.files[0])}
+              onFiles={(files) => files[0] && onDataFile(files[0])}
             />
             {comments && (
               <div className="text-xs text-muted-foreground">
@@ -521,11 +520,10 @@ export function OcsStageBPanel() {
             <div className="flex items-center gap-2 text-sm font-medium">
               <FileJson className="h-4 w-4" /> 2. Attachment Manifest JSON
             </div>
-            <input
-              type="file"
+            <FilePickerButton
+              label="Manifest JSON 선택"
               accept="application/json,.json"
-              className="block text-sm"
-              onChange={(e) => e.target.files?.[0] && onManifestFile(e.target.files[0])}
+              onFiles={(files) => files[0] && onManifestFile(files[0])}
             />
             {manifest && (
               <div className="text-xs text-muted-foreground">
