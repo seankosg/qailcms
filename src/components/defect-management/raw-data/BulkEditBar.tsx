@@ -13,6 +13,7 @@ import { type DefectColumnDef } from "@/lib/defect-management/columns";
 import { copyRowsAsTsv, exportSelectedToXlsx, type ExportColumn } from "@/lib/defect-management/bulk-actions";
 import { toast } from "sonner";
 import { ChevronDown, ClipboardCopy, FileSpreadsheet, Loader2, MoreHorizontal, Trash2, X } from "lucide-react";
+import { OutOfScopeRowsPopover } from "@/components/shared/OutOfScopeRowsPopover";
 
 interface Props {
   selectedRows: Record<string, any>[];

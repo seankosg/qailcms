@@ -46,6 +46,7 @@ import {
 } from "@/lib/task-management/bulk-actions";
 import { BulkConfirmDialog } from "./dialogs/BulkConfirmDialog";
 import { BulkDeleteDialog } from "./dialogs/BulkDeleteDialog";
+import { OutOfScopeRowsPopover } from "@/components/shared/OutOfScopeRowsPopover";
 
 const BLANK = "__BLANK__";
 const CHUNK = 500;
