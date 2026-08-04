@@ -1314,6 +1314,8 @@ export type Database = {
           created_at: string
           source: string
           updated_at: string
+          updated_by: string | null
+          updated_by_name: string | null
         }
         Insert: {
           comment_id: string
@@ -1324,6 +1326,8 @@ export type Database = {
           created_at?: string
           source?: string
           updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
         }
         Update: {
           comment_id?: string
@@ -1334,6 +1338,8 @@ export type Database = {
           created_at?: string
           source?: string
           updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
         }
         Relationships: [
           {
@@ -5821,6 +5827,10 @@ export type Database = {
         Args: { _comment_id: string }
         Returns: boolean
       }
+      abd_ocs_comments_for_item: {
+        Args: { p_abd_item_id: string }
+        Returns: Json
+      }
       abd_ocs_dryrun_batch: { Args: { p_rows: Json }; Returns: Json }
       abd_ocs_finalize_comments: {
         Args: { p_source_ids: string[] }
@@ -5832,6 +5842,10 @@ export type Database = {
         Returns: Json
       }
       abd_ocs_norm: { Args: { v: string }; Returns: string }
+      abd_ocs_set_complied: {
+        Args: { p_comment_id: string; p_complied: boolean; p_expected: boolean }
+        Returns: Json
+      }
       abd_ocs_verify: { Args: never; Returns: Json }
       abd_progress_cell_ids: {
         Args: {
