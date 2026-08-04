@@ -5744,6 +5744,10 @@ export type Database = {
           norm: string
         }[]
       }
+      hdec_recalc_owner_for_user: {
+        Args: { _reason?: string; _user_id: string }
+        Returns: Json
+      }
       hdec_registry_backfill: { Args: { _kind: string }; Returns: Json }
       hdec_registry_upsert: {
         Args: { _kind: string; _names: string[] }
