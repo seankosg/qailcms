@@ -226,8 +226,20 @@ export const deleteAppUser = createServerFn({ method: "POST" })
     await assertAdmin(context.supabase, context.userId);
     if (data.user_id === context.userId) throw new Error("본인 계정은 삭제할 수 없습니다.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // 명부(hdec_*_name_master) 등에서 linked_user_id 참조가 남아 있으면 삭제가 실패한다.
+    for (const t of ["hdec_pic_name_master", "hdec_eng_name_master"]) {
+      await (supabaseAdmin as any).from(t).update({ linked_user_id: null }).eq("linked_user_id", data.user_id);
+    }
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
-    if (error) throw new Error(error.message);
+    if (error) {
+      const detail =
+        error.message ||
+        (error as any).error_description ||
+        (error as any).code ||
+        JSON.stringify(error);
+      throw new Error(`계정 삭제 실패: ${detail}`);
+    }
     return { ok: true };
   });
 
