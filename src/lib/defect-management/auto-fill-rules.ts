@@ -35,34 +35,6 @@ export function resolvePlotFromPlanGroup(planGroup: string | null | undefined): 
 }
 
 /**
- * HDEC PIC / ENG 결정.
- * rule.room_group 은 plan_group OR room_group 어느 쪽과 일치해도 hit.
- */
-export function resolveHdec(
-  rules: HdecPicRule[],
-  plot: "C" | "D",
-  building: string | null | undefined,
-  planGroup: string | null | undefined,
-  roomGroup: string | null | undefined,
-): { pic: string | null; eng: string | null } | null {
-  const nBuilding = norm(building);
-  const nPlan = norm(planGroup);
-  const nRoom = norm(roomGroup);
-  if (!nBuilding) return null;
-  for (const r of rules) {
-    if (!r.is_active) continue;
-    if (r.plot !== plot) continue;
-    if (norm(r.building) !== nBuilding) continue;
-    const nRuleRoom = norm(r.room_group);
-    if (!nRuleRoom) continue;
-    if (nRuleRoom === nPlan || nRuleRoom === nRoom) {
-      return { pic: r.hdec_pic ?? null, eng: r.hdec_eng ?? null };
-    }
-  }
-  return null;
-}
-
-/**
  * Subcon 결정.
  * (1) main_trade/sub_trade 가 trade_keywords 중 하나와 정확 일치하면 hit.
  * (2) 없으면 description 에 trade_keywords 중 하나라도 substring 포함이면 hit.
