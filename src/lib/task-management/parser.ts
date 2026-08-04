@@ -524,7 +524,9 @@ export async function parseTaskManagementExcel(
   };
 
   const cols = {
-    no: pick("task_no", ["No", "no", "Task No", "Task No.", "Task Number", "Task_No", "TaskNo", "번호", "작업번호", "업무번호"], 1),
+    // §4-3(2026-08-04): 과업코드는 upsert 키(discipline,task_no) — ★위치 폴백 금지(0).
+    // 미매핑이면 아래에서 파싱 자체를 중단한다. 키가 틀리면 되돌릴 수 없다.
+    no: pick("task_no", TASK_NO_ALIASES, 0),
     category: pick("category", ["Category"], 2),
     plot: pick("plot", ["Plot"], 3),
     task_name: pick("task_name", ["항목"], 4),
