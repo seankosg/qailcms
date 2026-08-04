@@ -36,6 +36,24 @@ const AXIS_LABEL: Record<Exclude<SplitAxis, "none">, string> = {
 
 const ZIP_THRESHOLD = 7;
 
+/** OCS 캐시 컬럼은 재임포트 대상이 아니다 (정본 = OCS 코멘트/Complied). */
+const OCS_CACHE_KEYS = new Set(["ocs_check", "ocs_total", "ocs_complied"]);
+
+const OCS_CHECK_LABEL: Record<string, string> = { pending: "Pending", ok: "Complied", none: "" };
+
+/** 내보내기 직전 표시값 변환 (OCS Check → "Pending (2/5)") */
+function applyExportFormatting(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  return rows.map((r) => {
+    const s = r["ocs_check"];
+    if (s === undefined) return r;
+    if (s === null || s === "" || s === "none") return { ...r, ocs_check: "" };
+    const t = Number(r["ocs_total"] ?? 0) || 0;
+    const d = Number(r["ocs_complied"] ?? 0) || 0;
+    const label = OCS_CHECK_LABEL[String(s)] ?? String(s);
+    return { ...r, ocs_check: `${label} (${d}/${t})` };
+  });
+}
+
 // 상태/스테이지 값별 정적 셀 배경 (ARGB)
 const STATUS_FILL: Record<string, string> = {
   A: "FFC6EFCE", // 승인 — 초록
@@ -68,11 +86,12 @@ export function AbdExportDialog({ open, onOpenChange, total, fetchParams, export
     setBusy(true);
     const toastId = toast.loading("데이터를 불러오는 중...");
     try {
-      const allRows = await fetchAllAbdRowsForExport(fetchParams, (loaded, tot) => {
+      const fetched = await fetchAllAbdRowsForExport(fetchParams, (loaded, tot) => {
         toast.loading(`데이터 불러오는 중 ${loaded.toLocaleString()} / ${tot.toLocaleString()}`, {
           id: toastId,
         });
       });
+      const allRows = applyExportFormatting(fetched);
       if (allRows.length === 0) {
         toast.error("내보낼 행이 없습니다.", { id: toastId });
         setBusy(false);
@@ -82,7 +101,7 @@ export function AbdExportDialog({ open, onOpenChange, total, fetchParams, export
       const isView = format === "view";
       const columns = isView
         ? exportColumns.map((c) => ({ key: c.key, label: c.label }))
-        : ABD_COLUMNS.map((c) => ({ key: c.key, label: c.key }));
+        : ABD_COLUMNS.filter((c) => !OCS_CACHE_KEYS.has(c.key)).map((c) => ({ key: c.key, label: c.key }));
 
       const defByKey = new Map(ABD_COLUMNS.map((c) => [c.key, c] as const));
       const columnWidths: Record<string, number> = {};
