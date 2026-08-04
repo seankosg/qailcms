@@ -341,6 +341,15 @@ export function OcsAtomicV2Panel() {
                   그룹 {parsed.groups.length}
                 </Badge>
                 <Badge variant="outline" className="text-[11px]">
+                  source parents {parsed.source_parent_count}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
+                  multi groups {parsed.multi_group_count}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
+                  single parents {parsed.single_parent_count}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
                   단일 {parsed.single_rows}
                 </Badge>
                 <Badge variant="outline" className="text-[11px]">
@@ -367,6 +376,12 @@ export function OcsAtomicV2Panel() {
                 </Badge>
                 <Badge variant="outline" className="text-[11px]">
                   코멘트 {links.distinct_comments}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
+                  confirmed {links.confirmed_high}
+                </Badge>
+                <Badge variant="outline" className="text-[11px]">
+                  inherited {links.group_inherited_access}
                 </Badge>
                 {links.duplicated_pairs > 0 && (
                   <Badge variant="outline" className="text-[11px]">
