@@ -288,7 +288,7 @@ export const importWrtHdecBatch = createServerFn({ method: "POST" })
         items_updated: itemsUpdated,
         stages_upserted: stagesUpserted,
         finished_at: new Date().toISOString(),
-        note: `rows=${data.rows.length} changed=${rowsChanged} cleared=${cleared} unmatched=${unmatched.length}`,
+        note: `rows=${data.rows.length} changed=${rowsChanged} cleared=${cleared} unmatched=${unmatched.length}${data.scope_note ? ` ${data.scope_note}` : ""}`,
       })
       .eq("id", batchId);
 
