@@ -13,6 +13,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ROLE_LABELS, type AppRole } from "@/types/enums";
+import {
+  canonicalAllowed, diffAgainstCanonical, RCL_CANON_CELL_COUNT,
+} from "@/lib/auth/rcl-canonical";
 import { RotateCcw, Save, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/permissions")({
@@ -116,6 +119,12 @@ function PermissionsAdminPage() {
 
   const value = (key: string) => (key in draft ? draft[key]! : (base[key] ?? false));
 
+  // 검사 기준 (ㄷ): 정본 표와의 칸 대조. guest 계열은 정본 미확정이라 제외.
+  const canonDiffs = useMemo(
+    () => diffAgainstCanonical(permsQ.data ?? []),
+    [permsQ.data],
+  );
+
   const diffs = useMemo(
     () => Object.entries(draft).filter(([k, v]) => (base[k] ?? false) !== v).map(([k, v]) => {
       const [role, scope, action] = k.split("|") as [AppRole, string, string];
@@ -208,6 +217,19 @@ function PermissionsAdminPage() {
         </div>
       )}
 
+      {permsQ.data && (
+        <div className={`rounded-md border px-3 py-2 text-sm ${canonDiffs.length === 0 ? "border-emerald-500/30 bg-emerald-500/5" : "border-destructive/40 bg-destructive/5"}`}>
+          <ShieldCheck className="mr-1 inline h-4 w-4" />
+          정본 대조 (ㄷ): 어긋난 칸 {canonDiffs.length} / {RCL_CANON_CELL_COUNT}칸(4역할 × 3범위 × 5동작)
+          {canonDiffs.length > 0 && (
+            <span className="ml-2 font-mono text-xs">
+              {canonDiffs.map((d) => `${d.role}·${d.scope}·${d.action}: live ${d.live ? "Y" : "N"} / 정본 ${d.canon ? "Y" : "N"}`).join(" · ")}
+            </span>
+          )}
+          <span className="ml-2 text-xs text-muted-foreground">guest · super_guest 는 정본 미확정(BACKLOG #0804)으로 대조 제외.</span>
+        </div>
+      )}
+
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">권한 격자</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
@@ -243,8 +265,14 @@ function PermissionsAdminPage() {
                       ACTIONS.map((a) => {
                         const key = ck(role, s.key, a.key);
                         const changed = key in draft && (base[key] ?? false) !== draft[key];
+                        const canon = canonicalAllowed(role, s.key, a.key);
+                        const offCanon = canon !== null && canon !== (base[key] ?? false);
                         return (
-                          <td key={key} className={`border px-2 py-1 text-center ${changed ? "bg-amber-100 dark:bg-amber-900/40" : ""}`}>
+                          <td
+                            key={key}
+                            title={offCanon ? `정본 ${canon ? "Y" : "N"} 과 어긋남` : undefined}
+                            className={`border px-2 py-1 text-center ${changed ? "bg-amber-100 dark:bg-amber-900/40" : offCanon ? "bg-destructive/15 ring-1 ring-destructive/40" : ""}`}
+                          >
                             <Checkbox
                               checked={value(key)}
                               disabled={locked}
