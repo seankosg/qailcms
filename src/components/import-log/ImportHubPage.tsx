@@ -5,6 +5,7 @@ import { DefectManagementImportPage } from "@/components/defect-management/impor
 import { AbdImportPage } from "@/components/abd/import/AbdImportPage";
 import { DmrImportPage } from "@/components/resource/dmr/DmrImportPage";
 import { SplImportPage } from "@/components/spl/import/SplImportPage";
+import { WrtImportPage } from "@/components/wrt/import/WrtImportPage";
 import { getRouteApi } from "@tanstack/react-router";
 
 const routeApi = getRouteApi("/_authenticated/import-log/import");
@@ -48,7 +49,7 @@ export function ImportHubPage() {
           <SplImportPage />
         </TabsContent>
         <TabsContent value="warranty" className="mt-4">
-          <ComingSoonCard />
+          <WrtImportPage />
         </TabsContent>
       </Tabs>
     </div>
