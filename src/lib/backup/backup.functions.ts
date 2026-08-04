@@ -254,6 +254,57 @@ export const cleanupOldSnapshots = createServerFn({ method: "POST" })
     return await core.cleanupOldSnapshots(supabaseAdmin);
   });
 
+// ===== OCS 이미지(미디어) 백업 =====
+
+export const countOcsMediaFiles = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const media = await import("./ocs-media.server");
+    return { total: await media.countOcsMedia(supabaseAdmin) };
+  });
+
+export const backupOcsMediaBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { snapshot_id: string; offset: number; limit?: number }) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const media = await import("./ocs-media.server");
+    const limit = Math.min(Math.max(data.limit ?? 40, 1), 100);
+    return await media.backupOcsMediaBatch(supabaseAdmin, data.snapshot_id, Math.max(data.offset, 0), limit);
+  });
+
+export const finalizeOcsMediaManifest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { snapshot_id: string }) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const media = await import("./ocs-media.server");
+    return await media.finalizeOcsMediaManifest(supabaseAdmin, data.snapshot_id);
+  });
+
+export const verifyOcsMedia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { snapshot_id: string }) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const media = await import("./ocs-media.server");
+    const result = await media.verifyOcsMedia(supabaseAdmin, data.snapshot_id);
+    return {
+      ...result,
+      missing: result.missing.slice(0, 50),
+      orphan: result.orphan.slice(0, 50),
+      hash_mismatch: result.hash_mismatch.slice(0, 50),
+      missing_count: result.missing.length,
+      orphan_count: result.orphan.length,
+      hash_mismatch_count: result.hash_mismatch.length,
+    };
+  });
+
 export const createPreImportSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { module: PreImportModule; import_log_id?: string }) => input)

@@ -13,6 +13,9 @@ import {
   lockSnapshot,
   restoreSnapshot,
   cleanupOldSnapshots,
+  backupOcsMediaBatch,
+  finalizeOcsMediaManifest,
+  verifyOcsMedia,
 } from "@/lib/backup/backup.functions";
 import { BackupHelpDialog } from "@/components/admin/backup/BackupHelpDialog";
 import { Button } from "@/components/ui/button";
@@ -24,7 +27,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DatabaseBackup, Download, RotateCcw, Trash2, Lock, Unlock, CalendarClock, Play, AlertTriangle, Loader2, HardDrive } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { DatabaseBackup, Download, RotateCcw, Trash2, Lock, Unlock, CalendarClock, Play, AlertTriangle, Loader2, HardDrive, Images, ShieldCheck } from "lucide-react";
 import { BACKUP_TABLES, type BackupTableName } from "@/lib/backup/backup-shared";
 import { formatDateTime } from "@/lib/utils";
 
@@ -160,8 +164,9 @@ function BackupPage() {
         </Card>
       </div>
 
+      <OcsMediaBackupCard snapshots={snapshots} onCreated={invalidate} />
+
       <div className="flex flex-wrap items-center gap-2">
-        <CreateSnapshotButton onCreated={invalidate} />
         <DownloadArchiveButton snapshots={snapshots} />
         <RestoreButton snapshots={snapshots} onRestored={invalidate} />
         <CleanupButton onCleaned={invalidate} />
@@ -174,30 +179,154 @@ function BackupPage() {
   );
 }
 
-function CreateSnapshotButton({ onCreated }: { onCreated: () => void }) {
+/**
+ * 백업 실행 + OCS 이미지 포함 옵션(기본 OFF).
+ * OFF 이면 기존 DB 백업 경로 그대로 실행된다.
+ */
+function OcsMediaBackupCard({ snapshots, onCreated }: { snapshots: any[]; onCreated: () => void }) {
   const create = useServerFn(createManualSnapshot);
+  const mediaBatch = useServerFn(backupOcsMediaBatch);
+  const finalizeMedia = useServerFn(finalizeOcsMediaManifest);
+  const verifyMedia = useServerFn(verifyOcsMedia);
+
+  const [includeMedia, setIncludeMedia] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [failures, setFailures] = useState<{ storage_path: string; error: string }[]>([]);
+  const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [verifyTarget, setVerifyTarget] = useState<string>("");
+
+  const runBackup = async () => {
+    setLoading(true);
+    setFailures([]);
+    setProgress(null);
+    setVerifyResult(null);
+    try {
+      const snap = await create({ data: { name: `manual-${new Date().toISOString()}`, trigger: "manual" } });
+      if (!includeMedia) {
+        toast.success("스냅샷을 생성했습니다.");
+        onCreated();
+        return;
+      }
+
+      let offset = 0;
+      let done = 0;
+      const collected: { storage_path: string; error: string }[] = [];
+      // 배치 루프 — 원본 파일은 읽기 전용, 기존 백업 파일은 overwrite 하지 않음
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const res = await mediaBatch({ data: { snapshot_id: snap.id, offset, limit: 40 } });
+        done += res.processed;
+        collected.push(...res.failures);
+        setProgress({ done, total: res.total });
+        setFailures([...collected]);
+        if (res.next_offset === null) break;
+        offset = res.next_offset;
+      }
+      const fin = await finalizeMedia({ data: { snapshot_id: snap.id } });
+      setVerifyTarget(snap.id);
+      toast.success(`OCS 이미지 ${fin.files}건을 백업했습니다.${collected.length ? ` 실패 ${collected.length}건` : ""}`);
+      onCreated();
+    } catch (err) {
+      toast.error(`백업 실패: ${(err as Error).message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runVerify = async () => {
+    const id = verifyTarget || snapshots[0]?.id;
+    if (!id) return;
+    setVerifying(true);
+    try {
+      const res = await verifyMedia({ data: { snapshot_id: id } });
+      setVerifyResult(res);
+      toast.success("이미지 ↔ DB 메타데이터 대조를 완료했습니다.");
+    } catch (err) {
+      toast.error(`검증 실패: ${(err as Error).message}`);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
-    <Button
-      size="sm"
-      onClick={async () => {
-        setLoading(true);
-        try {
-          await create({ data: { name: `manual-${new Date().toISOString()}`, trigger: "manual" } });
-          toast.success("스냅샷을 생성했습니다.");
-          onCreated();
-        } catch (err) {
-          toast.error(`스냅샷 생성 실패: ${(err as Error).message}`);
-        } finally {
-          setLoading(false);
-        }
-      }}
-      disabled={loading}
-    >
-      {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Play className="h-4 w-4 mr-1.5" />}
-      지금 백업
-    </Button>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Images className="h-4 w-4 text-primary" />
+          백업 실행
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button size="sm" onClick={runBackup} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Play className="h-4 w-4 mr-1.5" />}
+            지금 백업
+          </Button>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              id="include-ocs-media"
+              checked={includeMedia}
+              onCheckedChange={(c) => setIncludeMedia(c === true)}
+              disabled={loading}
+            />
+            <span>OCS 이미지 포함</span>
+          </label>
+          <Button size="sm" variant="outline" onClick={runVerify} disabled={verifying || (!verifyTarget && snapshots.length === 0)}>
+            {verifying ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ShieldCheck className="h-4 w-4 mr-1.5" />}
+            이미지 복구 검증
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          기본 OFF. 체크 시 비공개 버킷의 OCS 이미지를 배치로 함께 백업하고 media manifest(경로·attachment id·해시·크기)를 기록합니다.
+        </p>
+
+        {progress && (
+          <div className="space-y-1">
+            <Progress value={pct} />
+            <div className="text-xs text-muted-foreground">
+              이미지 {progress.done.toLocaleString()} / {progress.total.toLocaleString()} ({pct}%)
+            </div>
+          </div>
+        )}
+
+        {failures.length > 0 && (
+          <div className="rounded-md border border-destructive/40 p-2">
+            <div className="text-sm font-medium text-destructive mb-1">실패 {failures.length}건</div>
+            <div className="max-h-40 overflow-y-auto text-xs space-y-0.5">
+              {failures.map((f) => (
+                <div key={f.storage_path} className="truncate">
+                  {f.storage_path} — {f.error}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {verifyResult && (
+          <div className="rounded-md border p-2 text-sm space-y-1">
+            <div className="grid gap-1 sm:grid-cols-3">
+              <div>DB 첨부: <b>{verifyResult.db_rows.toLocaleString()}</b></div>
+              <div>manifest: <b>{verifyResult.manifest_files.toLocaleString()}</b></div>
+              <div>저장 파일: <b>{verifyResult.stored_files.toLocaleString()}</b></div>
+              <div>missing: <b className={verifyResult.missing_count ? "text-destructive" : ""}>{verifyResult.missing_count}</b></div>
+              <div>orphan: <b className={verifyResult.orphan_count ? "text-destructive" : ""}>{verifyResult.orphan_count}</b></div>
+              <div>hash mismatch: <b className={verifyResult.hash_mismatch_count ? "text-destructive" : ""}>{verifyResult.hash_mismatch_count}</b></div>
+            </div>
+            {[...verifyResult.missing, ...verifyResult.orphan, ...verifyResult.hash_mismatch].length > 0 && (
+              <div className="max-h-40 overflow-y-auto text-xs text-muted-foreground">
+                {verifyResult.missing.map((p: string) => <div key={`m-${p}`}>missing: {p}</div>)}
+                {verifyResult.orphan.map((p: string) => <div key={`o-${p}`}>orphan: {p}</div>)}
+                {verifyResult.hash_mismatch.map((p: string) => <div key={`h-${p}`}>hash: {p}</div>)}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
