@@ -92,6 +92,8 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [creating, setCreating] = useState(false);
   const [results, setResults] = useState<BulkResult[] | null>(null);
+  // 임시 비밀번호 — 신규 계정 다이얼로그와 동일하게 기본값 DEFAULT_PASSWORD, 전원 동일 적용.
+  const [bulkPw, setBulkPw] = useState(DEFAULT_PASSWORD);
 
   const noAccountNames = useMemo(
     () => rows.filter((r) => !r.has_account).map((r) => r.name),
@@ -146,6 +148,7 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
 
   const runCreate = async (targets: PersonRow[]) => {
     if (!targets.length) return;
+    if (!PASSWORD_REGEX.test(bulkPw)) { toast.error(PASSWORD_HINT); return; }
     setCreating(true);
     try {
       const payload = targets.map((r) => ({
@@ -153,7 +156,7 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
         login_id: (draft[r.name]?.login_id ?? "").trim(),
         team: (draft[r.name]?.team ?? "").trim() || null,
       }));
-      const res = (await bulkCreate({ data: { kind, rows: payload } })) as BulkResult[];
+      const res = (await bulkCreate({ data: { kind, rows: payload, temp_password: bulkPw } })) as BulkResult[];
       setResults(res);
       const ok = res.filter((r) => r.ok).length;
       const fail = res.length - ok;
@@ -226,6 +229,13 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
                         </li>
                       ))}
                     </ol>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">임시 비밀번호 (전원 동일)</label>
+                    <Input value={bulkPw} onChange={(e) => setBulkPw(e.target.value)} className="h-9 font-mono" />
+                    <p className="text-[11px] text-muted-foreground">
+                      기본값 <code className="font-mono">{DEFAULT_PASSWORD}</code>. 첫 로그인 시 변경이 강제됩니다.
+                    </p>
                   </div>
                   <AlertDialogFooter>
                     <AlertDialogCancel>취소</AlertDialogCancel>
