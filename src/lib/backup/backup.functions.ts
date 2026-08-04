@@ -62,7 +62,9 @@ export const getBackupConfig = createServerFn({ method: "GET" })
       .single();
     if (error) {
       // create default if not exists
-      const { data: created, error: createError } = await context.supabase
+      await assertAdminOrSuper(context.supabase, context.userId);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: created, error: createError } = await supabaseAdmin
         .from("backup_config")
         .insert({})
         .select()
@@ -106,7 +108,9 @@ export const updateBackupConfig = createServerFn({ method: "POST" })
     if (findError) throw new Error(findError.message);
 
     const id = current?.id;
-    const { data: updated, error } = await context.supabase
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: updated, error } = await supabaseAdmin
       .from("backup_config")
       .update({ ...payload, updated_at: new Date().toISOString() })
       .eq("id", id!)
