@@ -157,7 +157,16 @@ export const RAW_DATA_TABLES: BackupTableName[] = [
 export type PreImportModule = "abd" | "sm" | "tm" | "spl" | "wrt";
 
 export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]> = {
-  abd: ["abd_items_raw", "abd_import_logs", "abd_change_log"],
+  abd: [
+    "abd_items_raw",
+    "abd_import_logs",
+    "abd_change_log",
+    "abd_ocs_import_logs",
+    "abd_ocs_comments",
+    "abd_ocs_compliance",
+    "abd_ocs_attachments",
+    "abd_ocs_compliance_log",
+  ],
   sm: ["defect_items_raw", "defect_import_logs", "defect_status_history"],
   tm: [
     "task_management_raw",

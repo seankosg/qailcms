@@ -8,7 +8,8 @@
  *  comment_id    | source_comment_id -> source_comment_id (없으면 needs_review)
  *  relative_path                     -> storage_path (정본, 그대로 사용)
  *  image_sha256  | sha256            -> content_hash
- *  image_index   | sort_order        -> source_image_index
+ *  source_image_index | image_index | sort_order -> source_image_index
+ *  width_px / height_px              -> width / height
  *  image_format  | format            -> image_format
  *  byte_size     | size              -> byte_size
  */
@@ -19,6 +20,8 @@ export type OcsManifestEntry = {
   content_hash: string | null;
   byte_size: number | null;
   source_image_index: number | null;
+  width: number | null;
+  height: number | null;
   image_format: string | null;
   file_name: string;
   link_status: "unmatched" | "needs_review";
@@ -100,7 +103,9 @@ export function parseOcsManifest(json: unknown): OcsManifestParse {
       relative_path,
       content_hash: (str(r?.image_sha256) ?? str(r?.sha256))?.toLowerCase() ?? null,
       byte_size,
-      source_image_index: num(r?.image_index) ?? num(r?.sort_order),
+      source_image_index: num(r?.source_image_index) ?? num(r?.image_index) ?? num(r?.sort_order),
+      width: num(r?.width_px) ?? num(r?.width),
+      height: num(r?.height_px) ?? num(r?.height),
       image_format: str(r?.image_format) ?? str(r?.format) ?? ext,
       file_name: str(r?.file_name) ?? basenameOf(relative_path),
       link_status: source_comment_id ? "unmatched" : "needs_review",
@@ -149,13 +154,20 @@ export type FolderMatchResult = {
 export function matchFolderFiles(entries: OcsManifestEntry[], files: FileList | File[]): FolderMatchResult {
   const byPath = new Map<string, File>();
   let nonImageFiles = 0;
+  const manifestRoots = new Set(
+    entries.map((e) => e.relative_path.split("/")[0]).filter((v): v is string => !!v),
+  );
   for (const f of Array.from(files)) {
-    const rel = stripTopFolder((f as any).webkitRelativePath || f.name);
-    const ext = extOf(rel);
+    const full = ((f as any).webkitRelativePath as string) || f.name;
+    const ext = extOf(full);
     if (!(OCS_ALLOWED_EXT as readonly string[]).includes(ext)) {
       nonImageFiles += 1;
       continue;
     }
+    // 사용자가 상위 폴더(ocs-db-all)를 골랐으면 한 단계 제거,
+    // manifest 루트 폴더(attachments) 자체를 골랐으면 그대로 비교한다.
+    const top = full.split("/")[0] ?? "";
+    const rel = manifestRoots.has(top) ? full : stripTopFolder(full);
     byPath.set(rel, f);
   }
   const matched = new Map<string, File>();
