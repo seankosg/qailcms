@@ -291,6 +291,7 @@ function resolveColumn(
   canonicalIndex: number,
   warnings: string[],
 ): number {
+  // (별칭 목록은 TASK_NO_ALIASES 등 호출부에서 넘긴다)
   for (const name of headerNames) {
     const key = normalizeHeader(name);
     const idx = headerMap[key];
