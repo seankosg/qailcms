@@ -11,6 +11,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useRclCan } from "@/hooks/useRclCan";
 import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "@/components/abd/dashboard/AbdAgingSettingsPopover";
 import { formatAbdStage } from "@/lib/abd/columns";
+import { AbdOcsCommentsButton } from "@/components/abd/ocs/AbdOcsCommentsButton";
 
 interface AbdItemRow {
   id: string;
@@ -147,8 +148,9 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
   return (
     <div className="space-y-3">
       <div className="rounded-md border bg-card p-3">
-        <div className="text-base font-semibold">
+        <div className="flex items-start justify-between gap-2 text-base font-semibold">
             {item ? (
+              <>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono">{item.abd_number}</span>
                 {!item.is_active && <Badge variant="secondary">Inactive</Badge>}
@@ -164,6 +166,8 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
                   </span>
                 )}
               </div>
+              <AbdOcsCommentsButton itemId={item.id} abdNumber={item.abd_number} />
+              </>
             ) : "Loading..."}
         </div>
       </div>
