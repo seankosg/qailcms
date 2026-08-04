@@ -12,6 +12,8 @@ export type AbdOcsAttachment = {
   width: number | null;
   height: number | null;
   sort_order: number;
+  mapping_status?: string | null;
+  mapping_method?: string | null;
 };
 
 export type AbdOcsComment = {
@@ -29,6 +31,11 @@ export type AbdOcsComment = {
   source_file_name: string | null;
   source_sheet_name: string | null;
   source_row_index: number | null;
+  atomic_item_no?: number | null;
+  atomic_item_count?: number | null;
+  split_status?: string | null;
+  response_mapping_status?: string | null;
+  source_parent_comment_id?: string | null;
   complied: boolean;
   compliance_source: string | null;
   complied_by_name: string | null;
