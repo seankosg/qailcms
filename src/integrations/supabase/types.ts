@@ -1092,6 +1092,323 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_ocs_attachments: {
+        Row: {
+          byte_size: number | null
+          comment_id: string
+          created_at: string
+          height: number | null
+          id: string
+          mime_type: string | null
+          sha256: string | null
+          sort_order: number
+          source_attachment_id: string
+          storage_path: string
+          width: number | null
+        }
+        Insert: {
+          byte_size?: number | null
+          comment_id: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          sha256?: string | null
+          sort_order?: number
+          source_attachment_id: string
+          storage_path: string
+          width?: number | null
+        }
+        Update: {
+          byte_size?: number | null
+          comment_id?: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          sha256?: string | null
+          sort_order?: number
+          source_attachment_id?: string
+          storage_path?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_ocs_attachments_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      abd_ocs_comments: {
+        Row: {
+          abd_item_id: string | null
+          assessed_code: string | null
+          comment_part: string | null
+          comment_revision: string | null
+          contractor_response: string | null
+          created_at: string
+          drawing_number_norm: string | null
+          file_revision: string | null
+          id: string
+          import_log_id: string | null
+          imported_at: string
+          inactive_at: string | null
+          is_active: boolean
+          link_method: string | null
+          link_note: string | null
+          link_status: string
+          linked_at: string | null
+          ocs_comment: string | null
+          ocs_number: string | null
+          ocs_number_norm: string | null
+          ocs_sn: string | null
+          retired_reason: string | null
+          sign_off_status: string | null
+          source_comment_id: string
+          source_drawing_number: string | null
+          source_file_name: string | null
+          source_modified_at: string | null
+          source_row_hash: string | null
+          source_row_index: number | null
+          source_sheet_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          abd_item_id?: string | null
+          assessed_code?: string | null
+          comment_part?: string | null
+          comment_revision?: string | null
+          contractor_response?: string | null
+          created_at?: string
+          drawing_number_norm?: string | null
+          file_revision?: string | null
+          id?: string
+          import_log_id?: string | null
+          imported_at?: string
+          inactive_at?: string | null
+          is_active?: boolean
+          link_method?: string | null
+          link_note?: string | null
+          link_status?: string
+          linked_at?: string | null
+          ocs_comment?: string | null
+          ocs_number?: string | null
+          ocs_number_norm?: string | null
+          ocs_sn?: string | null
+          retired_reason?: string | null
+          sign_off_status?: string | null
+          source_comment_id: string
+          source_drawing_number?: string | null
+          source_file_name?: string | null
+          source_modified_at?: string | null
+          source_row_hash?: string | null
+          source_row_index?: number | null
+          source_sheet_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          abd_item_id?: string | null
+          assessed_code?: string | null
+          comment_part?: string | null
+          comment_revision?: string | null
+          contractor_response?: string | null
+          created_at?: string
+          drawing_number_norm?: string | null
+          file_revision?: string | null
+          id?: string
+          import_log_id?: string | null
+          imported_at?: string
+          inactive_at?: string | null
+          is_active?: boolean
+          link_method?: string | null
+          link_note?: string | null
+          link_status?: string
+          linked_at?: string | null
+          ocs_comment?: string | null
+          ocs_number?: string | null
+          ocs_number_norm?: string | null
+          ocs_sn?: string | null
+          retired_reason?: string | null
+          sign_off_status?: string | null
+          source_comment_id?: string
+          source_drawing_number?: string | null
+          source_file_name?: string | null
+          source_modified_at?: string | null
+          source_row_hash?: string | null
+          source_row_index?: number | null
+          source_sheet_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_ocs_comments_abd_item_id_fkey"
+            columns: ["abd_item_id"]
+            isOneToOne: false
+            referencedRelation: "abd_items_raw"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      abd_ocs_compliance: {
+        Row: {
+          comment_id: string
+          complied: boolean
+          complied_at: string | null
+          complied_by: string | null
+          complied_by_name: string | null
+          created_at: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          comment_id: string
+          complied?: boolean
+          complied_at?: string | null
+          complied_by?: string | null
+          complied_by_name?: string | null
+          created_at?: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          comment_id?: string
+          complied?: boolean
+          complied_at?: string | null
+          complied_by?: string | null
+          complied_by_name?: string | null
+          created_at?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_ocs_compliance_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: true
+            referencedRelation: "abd_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      abd_ocs_compliance_log: {
+        Row: {
+          abd_item_id: string | null
+          abd_number: string | null
+          changed_at: string
+          changed_by: string | null
+          changed_by_name: string | null
+          comment_id: string | null
+          id: string
+          new_complied: boolean
+          ocs_number: string | null
+          old_complied: boolean | null
+          source: string
+          source_comment_id: string
+        }
+        Insert: {
+          abd_item_id?: string | null
+          abd_number?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          comment_id?: string | null
+          id?: string
+          new_complied: boolean
+          ocs_number?: string | null
+          old_complied?: boolean | null
+          source: string
+          source_comment_id: string
+        }
+        Update: {
+          abd_item_id?: string | null
+          abd_number?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          comment_id?: string | null
+          id?: string
+          new_complied?: boolean
+          ocs_number?: string | null
+          old_complied?: boolean | null
+          source?: string
+          source_comment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_ocs_compliance_log_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      abd_ocs_import_logs: {
+        Row: {
+          error_count: number
+          errors: Json | null
+          finished_at: string | null
+          id: string
+          imported_by: string | null
+          inactivated_count: number
+          inserted_count: number
+          linked_count: number
+          manifest_hash: string | null
+          manifest_name: string | null
+          source_file_hash: string | null
+          source_file_name: string | null
+          started_at: string
+          status: string
+          total_count: number
+          unchanged_count: number
+          unmatched_count: number
+          updated_count: number
+        }
+        Insert: {
+          error_count?: number
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          inactivated_count?: number
+          inserted_count?: number
+          linked_count?: number
+          manifest_hash?: string | null
+          manifest_name?: string | null
+          source_file_hash?: string | null
+          source_file_name?: string | null
+          started_at?: string
+          status?: string
+          total_count?: number
+          unchanged_count?: number
+          unmatched_count?: number
+          updated_count?: number
+        }
+        Update: {
+          error_count?: number
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          inactivated_count?: number
+          inserted_count?: number
+          linked_count?: number
+          manifest_hash?: string | null
+          manifest_name?: string | null
+          source_file_hash?: string | null
+          source_file_name?: string | null
+          started_at?: string
+          status?: string
+          total_count?: number
+          unchanged_count?: number
+          unmatched_count?: number
+          updated_count?: number
+        }
+        Relationships: []
+      }
       abd_resp_result_restore_snapshot_20260727: {
         Row: {
           abd_item_id: string | null
@@ -5398,6 +5715,10 @@ export type Database = {
           _today: string
         }
         Returns: Json
+      }
+      abd_ocs_comment_visible: {
+        Args: { _comment_id: string }
+        Returns: boolean
       }
       abd_progress_cell_ids: {
         Args: {
