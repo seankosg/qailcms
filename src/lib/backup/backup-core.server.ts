@@ -439,14 +439,12 @@ async function readAllRows<T extends Record<string, unknown>>(
   const rows: T[] = [];
   let from = 0;
   const pageSize = 1000;
-  const sortKey = (TABLE_SORT_KEYS as Record<string, string>)[tableName] ?? "id";
+  const keys = sortKeysFor(tableName);
 
   while (true) {
-    const { data, error } = await supabaseAdmin
-      .from(tableName as any)
-      .select("*")
-      .order(sortKey, { ascending: true })
-      .range(from, from + pageSize - 1);
+    let query = supabaseAdmin.from(tableName as any).select("*");
+    for (const k of keys) query = query.order(k, { ascending: true });
+    const { data, error } = await query.range(from, from + pageSize - 1);
     if (error) throw new Error(`Failed to read ${tableName}: ${error.message}`);
     if (!data || data.length === 0) break;
     rows.push(...((data as unknown) as T[]));
@@ -465,16 +463,14 @@ async function* iterRowsInParts(
   supabaseAdmin: SupabaseClient<Database>,
   tableName: string,
 ): AsyncGenerator<Record<string, unknown>[], void, unknown> {
-  const sortKey = (TABLE_SORT_KEYS as Record<string, string>)[tableName] ?? "id";
+  const keys = sortKeysFor(tableName);
   let from = 0;
   let buffer: Record<string, unknown>[] = [];
 
   while (true) {
-    const { data, error } = await supabaseAdmin
-      .from(tableName as any)
-      .select("*")
-      .order(sortKey, { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
+    let query = supabaseAdmin.from(tableName as any).select("*");
+    for (const k of keys) query = query.order(k, { ascending: true });
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(`Failed to read ${tableName}: ${error.message}`);
     const rows = ((data ?? []) as unknown) as Record<string, unknown>[];
     if (rows.length === 0) break;
