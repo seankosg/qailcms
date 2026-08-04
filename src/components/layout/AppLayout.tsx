@@ -43,6 +43,8 @@ type NavLeaf = {
   editorOnly?: boolean;
   disabled?: boolean;
   badge?: string;
+  /** admin 역할 단독 노출(superuser 제외). §1(2026-08-04) */
+  strictAdminOnly?: boolean;
 };
 type NavModule = {
   label: string;
@@ -154,7 +156,7 @@ const NAV: NavSection[] = [
     items: [
       { to: "/admin", label: "Overview", icon: iconDashboard, adminOnly: true },
       { to: "/admin/users", label: "사용자", icon: iconPeople, adminOnly: true },
-      { to: "/admin/permissions", label: "권한", icon: iconSlider, adminOnly: true },
+      { to: "/admin/permissions", label: "권한", icon: iconSlider, adminOnly: true, strictAdminOnly: true },
       { to: "/admin/masters", label: "마스터", icon: iconDatabase, adminOnly: true },
       { to: "/admin/mapping", label: "Mapping", icon: iconLink, adminOnly: true },
       { to: "/admin/task-thresholds", label: "Task 임계값", icon: iconSlider, adminOnly: true },
@@ -240,6 +242,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   const isVisible = (it: NavLeaf) => {
     if (it.adminOnly && !me?.isAdmin) return false;
+    if (it.strictAdminOnly && !me?.isStrictAdmin) return false;
     if (it.editorOnly && !me?.isEditor) return false;
     if (me?.qaqcRestricted && !(it.to && it.to.startsWith("/closure/snag-management"))) return false;
     return true;

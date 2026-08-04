@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wrench, DatabaseBackup, ShieldCheck } from "lucide-react";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: AdminOverview,
 });
 
 function AdminOverview() {
+  const { data: me } = useCurrentUser();
   return (
     <div className="space-y-4">
       <div>
@@ -36,6 +38,7 @@ function AdminOverview() {
             </CardContent>
           </Card>
         </Link>
+        {me?.isStrictAdmin && (
         <Link to="/admin/permissions" className="block">
           <Card className="transition-shadow hover:shadow-md">
             <CardHeader className="flex flex-row items-center gap-2 space-y-0">
@@ -47,6 +50,7 @@ function AdminOverview() {
             </CardContent>
           </Card>
         </Link>
+        )}
       </div>
     </div>
   );

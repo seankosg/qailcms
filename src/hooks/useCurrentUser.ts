@@ -27,6 +27,8 @@ export function useCurrentUser() {
           : ROLE_LABELS[primaryRole]
         : "Guest";
       const isAdmin = roleSet.has("admin") || roleSet.has("superuser");
+      // §1(2026-08-04): 권한 관리 등 admin 단독 화면용 엄격 판정. isAdmin 은 superuser 포함이므로 별도 유지.
+      const isStrictAdmin = roleSet.has("admin");
       const isSuperUser = roleSet.has("superuser");
       const isSeniorUser = roleSet.has("senior_user");
       const isUser = roleSet.has("user");
@@ -50,6 +52,7 @@ export function useCurrentUser() {
         roleLabel,
         rank,
         isAdmin,
+        isStrictAdmin,
         isSuperUser,
         isSeniorUser,
         isUser,

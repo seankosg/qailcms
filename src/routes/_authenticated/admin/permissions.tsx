@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -16,6 +16,18 @@ import { ROLE_LABELS, type AppRole } from "@/types/enums";
 import { RotateCcw, Save, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/permissions")({
+  // §1(2026-08-04): 이 화면만 admin 단독. 부모 /admin 가드(admin||superuser)는 그대로 둔다.
+  beforeLoad: async () => {
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) throw redirect({ to: "/auth" });
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", authData.user.id);
+    if (!(roles ?? []).some((r: { role: string }) => r.role === "admin")) {
+      throw redirect({ to: "/admin" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "권한 관리 — QAIL CMS" },
@@ -144,7 +156,12 @@ function PermissionsAdminPage() {
       await qc.invalidateQueries({ queryKey: ["rcl_permissions"] });
       await qc.invalidateQueries({ queryKey: ["rcl_permissions_audit"] });
       await qc.invalidateQueries({ queryKey: ["rcl_can"] });
-      toast.success(`권한 ${diffs.length}칸 저장 완료`);
+      // §1-4: 재조회 대조가 끝난 뒤에만 성공 토스트. 불일치가 있으면 실패로 알린다.
+      if (mismatched.length === 0) {
+        toast.success(`권한 ${diffs.length}칸 저장 완료 · 서버 재조회 일치`);
+      } else {
+        toast.error(`저장 반영 불일치 ${mismatched.length}칸 / 변경 ${diffs.length}칸 — 값이 서버에 반영되지 않았습니다.`);
+      }
     } catch (e) {
       toast.error(`저장 실패: ${(e as Error).message}`);
     } finally {
