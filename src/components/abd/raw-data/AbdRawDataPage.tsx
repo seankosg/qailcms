@@ -23,10 +23,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { Search, Upload, Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useAbdTeamList } from "@/hooks/useAbdTeamList";
+import { ProgressDonutIcon } from "@/components/shared/ProgressDonutIcon";
 import {
   ABD_TEAMS,
   ABD_COLUMNS,
   ABD_STATUSES,
+  ABD_OCS_CHECK_OPTIONS,
   PLOT_COLORS,
   STATUS_COLORS,
   formatAbdStage,
@@ -935,6 +937,7 @@ function buildDataColumn(
   const filterOptions = c.key === "latest_status" ? ABD_STATUSES.map((s) => ({ value: s, label: s })) :
     c.key === "plot" ? [{ value: "C", label: "C" }, { value: "D", label: "D" }] :
     c.key === "is_active" ? [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] :
+    c.key === "ocs_check" ? ABD_OCS_CHECK_OPTIONS.map((o) => ({ value: o.value, label: o.label })) :
     [];
   return {
     id: c.key,
@@ -965,6 +968,7 @@ function buildDataColumn(
 }
 
 function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
+  if (c.key === "ocs_check") return <OcsCheckCell value={v} row={row} />;
   if (v == null || v === "") return <span className="text-muted-foreground/50">—</span>;
   if (c.key === "plot") return <Badge className={cn("text-[10px]", PLOT_COLORS[String(v)] ?? "bg-zinc-500/15 text-zinc-700")}>{String(v)}</Badge>;
   if (c.key === "latest_status") {
@@ -999,6 +1003,30 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
   if (c.type === "date") return <span className="tabular-nums text-xs">{formatDdMmm(v)}</span>;
   if (c.type === "number") return <span className="tabular-nums text-xs">{String(v)}</span>;
   return <span className="text-xs">{String(v)}</span>;
+}
+
+/** OCS Check 셀 — 도넛 + n/m. as-of 과거 조회 시 값이 null 이므로 공란(—). */
+function OcsCheckCell({ value, row }: { value: any; row: AbdItem }) {
+  const state = value == null || value === "" ? null : String(value);
+  if (state === null) return <span className="text-muted-foreground/50">—</span>;
+  const total = Number((row as any).ocs_total ?? 0) || 0;
+  const done = Number((row as any).ocs_complied ?? 0) || 0;
+  if (state === "none" || total === 0) {
+    return <span className="text-muted-foreground/50" title="연결된 OCS 코멘트 없음">—</span>;
+  }
+  const ok = state === "ok";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums whitespace-nowrap",
+        ok ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300",
+      )}
+      title={`OCS 코멘트 ${total}건 중 ${done}건 Complied${ok ? " (완료)" : " (미완료)"}`}
+    >
+      <ProgressDonutIcon value={done} total={total} tone={ok ? "ok" : "pending"} />
+      {done}/{total}
+    </span>
+  );
 }
 
 function UrAgingBadge({ days }: { days: number }) {

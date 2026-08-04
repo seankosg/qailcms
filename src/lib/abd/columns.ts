@@ -86,6 +86,8 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
   { key: "service", label: "Service", type: "text", width: 160, group: "identity", origin: "identity" },
   { key: "abd_number", label: "ABD Number", type: "text", width: 260, group: "identity", origin: "identity" },
   { key: "abd_ocs_no", label: "ABD OCS No.", type: "text", width: 240, group: "identity", origin: "identity" },
+  // OCS Check — 정본 = abd_ocs_comments / abd_ocs_compliance. 캐시 컬럼(ocs_check/ocs_total/ocs_complied)은 편집·임포트 대상 아님.
+  { key: "ocs_check", label: "OCS Check", type: "badge", width: 110, group: "identity", origin: "system", derived: true },
   { key: "batch_no", label: "Batch No.", type: "text", width: 110, group: "identity", editable: true, editorType: "text", origin: "identity" },
 
   // Content
@@ -160,10 +162,17 @@ export function inferAbdFilterType(t: AbdFieldType, key?: string): AbdFilterType
   if (
     key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status" ||
     key === "batch_no" || key === "hdec_pic_name" || key === "hdec_eng_name" ||
-    key === "current_stage" || key === "completed_stage"
+    key === "current_stage" || key === "completed_stage" || key === "ocs_check"
   ) return "multi-select";
   return "text";
 }
+
+/** OCS Check 상태 라벨 (단일 소스) */
+export const ABD_OCS_CHECK_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "ok", label: "Complied" },
+  { value: "none", label: "No OCS" },
+] as const;
 
 export const GROUP_HEADER_BG: Record<AbdGroupKey, string> = {
   identity: "bg-slate-100/80 dark:bg-slate-800/40",
