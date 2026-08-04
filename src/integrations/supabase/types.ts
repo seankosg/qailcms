@@ -5990,6 +5990,10 @@ export type Database = {
         Args: { _module: string; _row_id: string; _user_id: string }
         Returns: string
       }
+      rcl_scope_core: {
+        Args: { _module: string; _row: Json; _user_id: string }
+        Returns: string
+      }
       rcl_scope_of_values: {
         Args: { _module: string; _user_id: string; _values: Json }
         Returns: string
