@@ -210,6 +210,11 @@ export function DeSnagDashboardPage() {
   }, [matrix, appliedRoomGroups]);
 
   // 안내 문구용 — 데이터에 존재하는 전체 Room Group 수 (필터 적용 전)
+  const availableRoomGroups = useMemo(() => {
+    const totals = matrix.roomGroupTotals as Record<string, Stats>;
+    return Object.keys(totals).filter((c) => (totals[c]?.issued ?? 0) > 0);
+  }, [matrix]);
+
   const roomGroupTotalCount = useMemo(() => {
     const totals = matrix.roomGroupTotals as Record<string, Stats>;
     const plain = Object.keys(totals).filter(
@@ -264,7 +269,11 @@ export function DeSnagDashboardPage() {
         </div>
       </div>
 
-      <DeSnagRoomGroupFilterBar selected={appliedRoomGroups} onChange={setRoomGroups} />
+      <DeSnagRoomGroupFilterBar
+        selected={appliedRoomGroups}
+        onChange={setRoomGroups}
+        available={availableRoomGroups}
+      />
 
       {/* Plot Grand Total — KPI 카드 */}
       <DeSnagGrandTotalCards
