@@ -417,10 +417,39 @@ export function SplRawDataPage() {
   );
 }
 
+function SplEditableCell({
+  row,
+  field,
+  label,
+  value,
+  canEdit,
+  onSave,
+}: {
+  row: SplRow;
+  field: string;
+  label: string;
+  value: string | null;
+  canEdit: boolean;
+  onSave: (field: string, value: string | null) => Promise<void>;
+}) {
+  return (
+    <AbdEditCellPopover
+      id={row.id}
+      field={field}
+      label={label}
+      editorType="text"
+      currentValue={value}
+      canEdit={canEdit}
+      saveFn={async (p) => onSave(p.field, p.value == null ? null : String(p.value))}
+    >
+      <span>{value ?? "—"}</span>
+    </AbdEditCellPopover>
+  );
+}
+
 function SplTableRow({
   row,
   catalog,
-/*__ANCHOR__*/
   subHeaders,
   canEdit,
   onSave,
