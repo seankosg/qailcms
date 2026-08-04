@@ -869,20 +869,28 @@ export function DefectRawDataPage() {
 
   // Active filter chips
   const activeChips = useMemo(() => {
-    const chips: { id: string; label: string; onClear: () => void }[] = [];
+    const chips: { id: string; label: string; title: string; onClear: () => void }[] = [];
     for (const f of columnFilters) {
       const col = table.getColumn(f.id);
       if (!col) continue;
       const label = String((col.columnDef.header as any) ?? f.id);
       const v = f.value as any;
       let text = "";
-      if (Array.isArray(v)) text = v.map((x) => (x === EMPTY_TOKEN ? "(Empty)" : x)).join(", ");
+      let full = "";
+      if (Array.isArray(v)) {
+        const vals = v.map((x) => (x === EMPTY_TOKEN ? "(Empty)" : String(x)));
+        full = vals.join(", ");
+        // 다중 선택이 많으면 칩 1개가 화면을 밀어내 표 영역이 뷰포트 밖으로 밀린다.
+        // 요약 표기 + title 로 전체 값 노출.
+        text = vals.length > 3 ? `${vals.slice(0, 2).join(", ")} 외 ${vals.length - 2}개` : full;
+      }
       else if (v && typeof v === "object") {
         if (v.emptyOnly) text = "(Empty)";
         else if (v.text) text = v.text;
         else if (v.from || v.to) text = `${v.from ?? ""} ~ ${v.to ?? ""}`;
+        full = text;
       }
-      chips.push({ id: f.id, label: `${label}: ${text}`, onClear: () => col.setFilterValue(undefined) });
+      chips.push({ id: f.id, label: `${label}: ${text}`, title: `${label}: ${full}`, onClear: () => col.setFilterValue(undefined) });
     }
     return chips;
   }, [columnFilters, table]);
@@ -967,10 +975,10 @@ export function DefectRawDataPage() {
       </Tabs>
 
       {activeUrlFilters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+        <div className="flex max-h-24 flex-wrap items-center gap-2 overflow-y-auto rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
           <span className="text-xs font-medium text-primary">Active URL filters:</span>
           {activeUrlFilters.map((filter) => (
-            <button key={filter.label} onClick={() => setUrl(clearObjectKeys(filter.clears, urlSearch as any))} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary hover:bg-primary/20" title="Click to remove">
+            <button key={filter.label} onClick={() => setUrl(clearObjectKeys(filter.clears, urlSearch as any))} className="inline-flex max-w-[420px] items-center gap-1 truncate rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary hover:bg-primary/20" title={`${filter.label} — Click to remove`}>
               {filter.label} ✕
             </button>
           ))}
@@ -979,10 +987,10 @@ export function DefectRawDataPage() {
       )}
 
       {activeChips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+        <div className="flex max-h-24 flex-wrap items-center gap-2 overflow-y-auto rounded-md border bg-muted/30 px-3 py-2">
           <span className="text-xs font-medium text-muted-foreground">Active column filters:</span>
           {activeChips.map((c) => (
-            <button key={c.id} onClick={c.onClear} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground hover:bg-secondary/80" title="Click to remove">
+            <button key={c.id} onClick={c.onClear} className="inline-flex max-w-[420px] items-center gap-1 truncate rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground hover:bg-secondary/80" title={`${c.title} — Click to remove`}>
               {c.label} ✕
             </button>
           ))}
