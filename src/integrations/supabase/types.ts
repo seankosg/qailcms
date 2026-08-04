@@ -785,6 +785,9 @@ export type Database = {
           mismatch_fields: Json
           needs_planning: boolean
           needs_revise: boolean
+          ocs_check: string
+          ocs_complied: number
+          ocs_total: number
           owner_user_id: string | null
           plot: string | null
           primary_delay: string | null
@@ -872,6 +875,9 @@ export type Database = {
           mismatch_fields?: Json
           needs_planning?: boolean
           needs_revise?: boolean
+          ocs_check?: string
+          ocs_complied?: number
+          ocs_total?: number
           owner_user_id?: string | null
           plot?: string | null
           primary_delay?: string | null
@@ -959,6 +965,9 @@ export type Database = {
           mismatch_fields?: Json
           needs_planning?: boolean
           needs_revise?: boolean
+          ocs_check?: string
+          ocs_complied?: number
+          ocs_total?: number
           owner_user_id?: string | null
           plot?: string | null
           primary_delay?: string | null
@@ -5842,6 +5851,8 @@ export type Database = {
         Returns: Json
       }
       abd_ocs_norm: { Args: { v: string }; Returns: string }
+      abd_ocs_recount_all: { Args: never; Returns: Json }
+      abd_ocs_recount_item: { Args: { p_item_id: string }; Returns: undefined }
       abd_ocs_set_complied: {
         Args: { p_comment_id: string; p_complied: boolean; p_expected: boolean }
         Returns: Json
@@ -6033,6 +6044,9 @@ export type Database = {
           mismatch_fields: Json
           needs_planning: boolean
           needs_revise: boolean
+          ocs_check: string
+          ocs_complied: number
+          ocs_total: number
           owner_user_id: string | null
           plot: string | null
           primary_delay: string | null
