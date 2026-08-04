@@ -238,6 +238,7 @@ export function parseOcsV2LinkJson(json: unknown): OcsV2LinkParse {
   const invalid_rows: { index: number; reason: string }[] = [];
   const seen = new Set<string>();
   let dup = 0;
+  const statusCounts: Record<string, number> = {};
 
   raw.forEach((r, i) => {
     const said = s(pick(r, K.attachment));
