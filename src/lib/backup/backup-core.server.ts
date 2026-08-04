@@ -12,38 +12,73 @@ const ROWS_PER_PART = 10_000;
 // 개별 페이지 로드 크기 (Supabase Data API 상한 1000)
 const PAGE_SIZE = 1000;
 
-const TABLE_SORT_KEYS: Record<BackupTableName, string> = {
-  abd_items_raw: "id",
-  defect_items_raw: "id",
-  task_management_raw: "id",
-  dmr_entries: "id",
-  profiles: "id",
-  user_roles: "id",
-  team_master: "id",
-  subcontractor_master: "id",
-  dmr_contractor_master: "id",
-  dmr_system_master: "id",
-  defect_category_team_map: "category",
-  task_management_settings: "id",
-  abd_field_config: "id",
-  defect_field_config: "id",
-  task_management_field_config: "id",
-  abd_header_mappings: "id",
-  defect_header_mappings: "id",
-  task_management_header_mappings: "id",
-  abd_import_logs: "id",
-  defect_import_logs: "id",
-  task_management_import_logs: "id",
-  task_schedule_change_audit: "id",
-  abd_settings: "id",
-  abd_import_presets: "id",
-  abd_comments: "id",
-  abd_change_log: "id",
-  spl_items: "id",
-  spl_stage_catalog: "id",
-  spl_stage_progress: "id",
-  spl_change_log: "id",
+/**
+ * 각 테이블의 결정적 페이지네이션 정렬키(실제 PK 컬럼).
+ * BACKUP_TABLES 및 DB 의 public.get_backup_tables() 와 동일 집합이어야 합니다.
+ */
+const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
+  abd_items_raw: ["id"],
+  defect_items_raw: ["id"],
+  task_management_raw: ["id"],
+  dmr_entries: ["id"],
+  profiles: ["id"],
+  user_roles: ["id"],
+  team_master: ["id"],
+  subcontractor_master: ["id"],
+  dmr_contractor_master: ["id"],
+  dmr_system_master: ["id"],
+  defect_category_team_map: ["category"],
+  task_management_settings: ["id"],
+  abd_field_config: ["id"],
+  defect_field_config: ["id"],
+  task_management_field_config: ["id"],
+  abd_header_mappings: ["id"],
+  defect_header_mappings: ["id"],
+  task_management_header_mappings: ["id"],
+  abd_import_logs: ["id"],
+  defect_import_logs: ["id"],
+  task_management_import_logs: ["id"],
+  task_schedule_change_audit: ["id"],
+  abd_settings: ["id"],
+  abd_import_presets: ["id"],
+  abd_comments: ["id"],
+  abd_change_log: ["id"],
+  spl_items: ["id"],
+  spl_stage_catalog: ["stage_code"],
+  spl_stage_progress: ["id"],
+  spl_change_log: ["id"],
+  spl_settings: ["key"],
+  spl_import_logs: ["id"],
+  wrt_items: ["id"],
+  wrt_stage_catalog: ["stage_code"],
+  wrt_stage_progress: ["id"],
+  wrt_change_log: ["id"],
+  wrt_settings: ["key"],
+  wrt_import_logs: ["id"],
+  rcl_permissions: ["role", "scope", "action"],
+  rcl_module_config: ["module"],
+  rcl_permissions_audit: ["id"],
+  rcl_module_config_audit: ["id"],
+  hdec_eng_name_master: ["id"],
+  hdec_pic_name_master: ["id"],
+  hdec_name_propagation_log: ["id"],
+  user_view_preferences: ["user_id", "view_key"],
+  tm_alarm_settings: ["key"],
+  tm_milestone_config: ["plot", "kind"],
+  tm_milestone_config_audit: ["id"],
+  tm_milestone_kinds: ["kind_code"],
+  defect_hdec_pic_rules: ["id"],
+  defect_subcon_rules: ["id"],
+  defect_import_presets: ["id"],
+  task_comments: ["id"],
+  defect_comments: ["id"],
+  defect_status_history: ["id"],
+  task_management_status_history: ["id"],
 };
+
+function sortKeysFor(tableName: string): string[] {
+  return (TABLE_SORT_KEYS as Record<string, string[]>)[tableName] ?? ["id"];
+}
 
 export type SnapshotManifest = {
   id: string;
@@ -275,7 +310,7 @@ export async function restoreSnapshot(
   const restoredTables: string[] = [];
   let totalRows = 0;
 
-  // Order tables to avoid FK dependency issues (raw tables first, then logs, then others)
+  // 실측 FK 의존성(pg_constraint) 기준 복구 순서. 참조되는 테이블이 항상 먼저 복구됩니다.
   const ordered = tables.slice().sort((a, b) => {
     const order = new Map<BackupTableName, number>([
       ["team_master", 1],
@@ -284,25 +319,58 @@ export async function restoreSnapshot(
       ["dmr_system_master", 4],
       ["defect_category_team_map", 5],
       ["task_management_settings", 6],
+      ["tm_milestone_kinds", 7],
       ["abd_field_config", 8],
       ["defect_field_config", 9],
       ["task_management_field_config", 10],
+      ["spl_stage_catalog", 11],
       ["abd_header_mappings", 12],
       ["defect_header_mappings", 13],
       ["task_management_header_mappings", 14],
+      ["wrt_stage_catalog", 15],
       ["user_roles", 16],
       ["profiles", 17],
-      ["abd_items_raw", 18],
-      ["defect_items_raw", 19],
-      ["task_management_raw", 20],
-      ["dmr_entries", 22],
-      ["abd_import_logs", 23],
-      ["defect_import_logs", 24],
-      ["task_management_import_logs", 25],
-      ["spl_items", 26],
-      ["spl_stage_catalog", 27],
-      ["spl_stage_progress", 28],
-      ["spl_change_log", 29],
+      ["hdec_eng_name_master", 18],
+      ["hdec_pic_name_master", 19],
+      ["hdec_name_propagation_log", 20],
+      ["abd_items_raw", 21],
+      ["defect_items_raw", 22],
+      // task_management_raw 는 task_management_import_logs 를 참조하므로 로그가 먼저다
+      ["task_management_import_logs", 23],
+      ["task_management_raw", 24],
+      ["dmr_entries", 25],
+      ["abd_import_logs", 26],
+      ["defect_import_logs", 27],
+      ["spl_items", 28],
+      ["spl_stage_progress", 29],
+      ["spl_change_log", 30],
+      ["spl_settings", 31],
+      ["spl_import_logs", 32],
+      ["wrt_items", 33],
+      ["wrt_stage_progress", 34],
+      ["wrt_change_log", 35],
+      ["wrt_settings", 36],
+      ["wrt_import_logs", 37],
+      ["abd_settings", 38],
+      ["abd_import_presets", 39],
+      ["abd_comments", 40],
+      ["abd_change_log", 41],
+      ["task_comments", 42],
+      ["defect_comments", 43],
+      ["defect_status_history", 44],
+      ["task_management_status_history", 45],
+      ["task_schedule_change_audit", 46],
+      ["rcl_permissions", 47],
+      ["rcl_module_config", 48],
+      ["rcl_permissions_audit", 49],
+      ["rcl_module_config_audit", 50],
+      ["user_view_preferences", 51],
+      ["tm_alarm_settings", 52],
+      ["tm_milestone_config", 53],
+      ["tm_milestone_config_audit", 54],
+      ["defect_hdec_pic_rules", 55],
+      ["defect_subcon_rules", 56],
+      ["defect_import_presets", 57],
     ]);
     return (order.get(a) ?? 99) - (order.get(b) ?? 99);
   });
@@ -404,14 +472,12 @@ async function readAllRows<T extends Record<string, unknown>>(
   const rows: T[] = [];
   let from = 0;
   const pageSize = 1000;
-  const sortKey = (TABLE_SORT_KEYS as Record<string, string>)[tableName] ?? "id";
+  const keys = sortKeysFor(tableName);
 
   while (true) {
-    const { data, error } = await supabaseAdmin
-      .from(tableName as any)
-      .select("*")
-      .order(sortKey, { ascending: true })
-      .range(from, from + pageSize - 1);
+    let query = supabaseAdmin.from(tableName as any).select("*");
+    for (const k of keys) query = query.order(k, { ascending: true });
+    const { data, error } = await query.range(from, from + pageSize - 1);
     if (error) throw new Error(`Failed to read ${tableName}: ${error.message}`);
     if (!data || data.length === 0) break;
     rows.push(...((data as unknown) as T[]));
@@ -430,16 +496,14 @@ async function* iterRowsInParts(
   supabaseAdmin: SupabaseClient<Database>,
   tableName: string,
 ): AsyncGenerator<Record<string, unknown>[], void, unknown> {
-  const sortKey = (TABLE_SORT_KEYS as Record<string, string>)[tableName] ?? "id";
+  const keys = sortKeysFor(tableName);
   let from = 0;
   let buffer: Record<string, unknown>[] = [];
 
   while (true) {
-    const { data, error } = await supabaseAdmin
-      .from(tableName as any)
-      .select("*")
-      .order(sortKey, { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
+    let query = supabaseAdmin.from(tableName as any).select("*");
+    for (const k of keys) query = query.order(k, { ascending: true });
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(`Failed to read ${tableName}: ${error.message}`);
     const rows = ((data ?? []) as unknown) as Record<string, unknown>[];
     if (rows.length === 0) break;
