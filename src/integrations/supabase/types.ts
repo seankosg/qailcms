@@ -1101,6 +1101,63 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_ocs_attachment_comment_links: {
+        Row: {
+          attachment_id: string
+          comment_id: string
+          created_at: string
+          id: string
+          import_log_id: string | null
+          mapping_method: string | null
+          mapping_status: string
+          sort_order: number | null
+          source_attachment_id: string | null
+          source_comment_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          attachment_id: string
+          comment_id: string
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          mapping_method?: string | null
+          mapping_status?: string
+          sort_order?: number | null
+          source_attachment_id?: string | null
+          source_comment_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attachment_id?: string
+          comment_id?: string
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          mapping_method?: string | null
+          mapping_status?: string
+          sort_order?: number | null
+          source_attachment_id?: string | null
+          source_comment_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_ocs_attachment_comment_links_attachment_id_fkey"
+            columns: ["attachment_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abd_ocs_attachment_comment_links_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       abd_ocs_attachments: {
         Row: {
           byte_size: number | null
@@ -1163,10 +1220,70 @@ export type Database = {
           },
         ]
       }
+      abd_ocs_comment_groups: {
+        Row: {
+          atomic_item_count: number
+          contractor_response_raw: string | null
+          created_at: string
+          drawing_number_norm: string | null
+          group_key: string
+          id: string
+          import_log_id: string | null
+          ocs_number: string | null
+          ocs_number_norm: string | null
+          response_mapping_status: string
+          source_drawing_number: string | null
+          source_file_name: string | null
+          source_parent_comment_id: string
+          source_row_index: number | null
+          source_sheet_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          atomic_item_count?: number
+          contractor_response_raw?: string | null
+          created_at?: string
+          drawing_number_norm?: string | null
+          group_key: string
+          id?: string
+          import_log_id?: string | null
+          ocs_number?: string | null
+          ocs_number_norm?: string | null
+          response_mapping_status?: string
+          source_drawing_number?: string | null
+          source_file_name?: string | null
+          source_parent_comment_id: string
+          source_row_index?: number | null
+          source_sheet_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          atomic_item_count?: number
+          contractor_response_raw?: string | null
+          created_at?: string
+          drawing_number_norm?: string | null
+          group_key?: string
+          id?: string
+          import_log_id?: string | null
+          ocs_number?: string | null
+          ocs_number_norm?: string | null
+          response_mapping_status?: string
+          source_drawing_number?: string | null
+          source_file_name?: string | null
+          source_parent_comment_id?: string
+          source_row_index?: number | null
+          source_sheet_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       abd_ocs_comments: {
         Row: {
           abd_item_id: string | null
           assessed_code: string | null
+          atomic_item_count: number | null
+          atomic_item_no: number | null
+          comment_group_id: string | null
           comment_part: string | null
           comment_revision: string | null
           contractor_response: string | null
@@ -1179,6 +1296,7 @@ export type Database = {
           imported_at: string
           inactive_at: string | null
           is_active: boolean
+          is_superseded_by_v2: boolean
           link_method: string | null
           link_note: string | null
           link_status: string
@@ -1189,6 +1307,7 @@ export type Database = {
           ocs_sn: string | null
           plot: string | null
           project: string | null
+          response_mapping_status: string | null
           retired_reason: string | null
           review_priority: string | null
           service: string | null
@@ -1200,17 +1319,24 @@ export type Database = {
           source_file_name: string | null
           source_imported_at: string | null
           source_modified_at: string | null
+          source_parent_comment_id: string | null
           source_row_hash: string | null
           source_row_index: number | null
           source_sheet_name: string | null
+          split_status: string | null
+          superseded_at: string | null
           team: string | null
           updated_at: string
+          v2_import_log_id: string | null
           validation_note: string | null
           warning_codes: string[]
         }
         Insert: {
           abd_item_id?: string | null
           assessed_code?: string | null
+          atomic_item_count?: number | null
+          atomic_item_no?: number | null
+          comment_group_id?: string | null
           comment_part?: string | null
           comment_revision?: string | null
           contractor_response?: string | null
@@ -1223,6 +1349,7 @@ export type Database = {
           imported_at?: string
           inactive_at?: string | null
           is_active?: boolean
+          is_superseded_by_v2?: boolean
           link_method?: string | null
           link_note?: string | null
           link_status?: string
@@ -1233,6 +1360,7 @@ export type Database = {
           ocs_sn?: string | null
           plot?: string | null
           project?: string | null
+          response_mapping_status?: string | null
           retired_reason?: string | null
           review_priority?: string | null
           service?: string | null
@@ -1244,17 +1372,24 @@ export type Database = {
           source_file_name?: string | null
           source_imported_at?: string | null
           source_modified_at?: string | null
+          source_parent_comment_id?: string | null
           source_row_hash?: string | null
           source_row_index?: number | null
           source_sheet_name?: string | null
+          split_status?: string | null
+          superseded_at?: string | null
           team?: string | null
           updated_at?: string
+          v2_import_log_id?: string | null
           validation_note?: string | null
           warning_codes?: string[]
         }
         Update: {
           abd_item_id?: string | null
           assessed_code?: string | null
+          atomic_item_count?: number | null
+          atomic_item_no?: number | null
+          comment_group_id?: string | null
           comment_part?: string | null
           comment_revision?: string | null
           contractor_response?: string | null
@@ -1267,6 +1402,7 @@ export type Database = {
           imported_at?: string
           inactive_at?: string | null
           is_active?: boolean
+          is_superseded_by_v2?: boolean
           link_method?: string | null
           link_note?: string | null
           link_status?: string
@@ -1277,6 +1413,7 @@ export type Database = {
           ocs_sn?: string | null
           plot?: string | null
           project?: string | null
+          response_mapping_status?: string | null
           retired_reason?: string | null
           review_priority?: string | null
           service?: string | null
@@ -1288,11 +1425,15 @@ export type Database = {
           source_file_name?: string | null
           source_imported_at?: string | null
           source_modified_at?: string | null
+          source_parent_comment_id?: string | null
           source_row_hash?: string | null
           source_row_index?: number | null
           source_sheet_name?: string | null
+          split_status?: string | null
+          superseded_at?: string | null
           team?: string | null
           updated_at?: string
+          v2_import_log_id?: string | null
           validation_note?: string | null
           warning_codes?: string[]
         }
@@ -1302,6 +1443,13 @@ export type Database = {
             columns: ["abd_item_id"]
             isOneToOne: false
             referencedRelation: "abd_items_raw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abd_ocs_comments_comment_group_id_fkey"
+            columns: ["comment_group_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_comment_groups"
             referencedColumns: ["id"]
           },
           {
@@ -5890,6 +6038,28 @@ export type Database = {
         Args: { p_comment_id: string; p_complied: boolean; p_expected: boolean }
         Returns: Json
       }
+      abd_ocs_v2_dryrun_attachments: {
+        Args: { p_ids: string[] }
+        Returns: Json
+      }
+      abd_ocs_v2_dryrun_comments: { Args: { p_rows: Json }; Returns: Json }
+      abd_ocs_v2_finalize_parents: {
+        Args: { p_import_log_id: string }
+        Returns: Json
+      }
+      abd_ocs_v2_import_comments: {
+        Args: { p_import_log_id: string; p_rows: Json }
+        Returns: Json
+      }
+      abd_ocs_v2_import_groups: {
+        Args: { p_import_log_id: string; p_rows: Json }
+        Returns: Json
+      }
+      abd_ocs_v2_import_links: {
+        Args: { p_import_log_id: string; p_rows: Json }
+        Returns: Json
+      }
+      abd_ocs_v2_verify: { Args: never; Returns: Json }
       abd_ocs_verify: { Args: never; Returns: Json }
       abd_progress_cell_ids: {
         Args: {
