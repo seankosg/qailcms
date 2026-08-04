@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,9 @@ import {
   type WrtStageCell,
 } from "@/lib/wrt/rows.functions";
 import { downloadWrtRoundtripWorkbook } from "@/lib/wrt/roundtrip-export";
+import { updateWrtField } from "@/lib/wrt/mutations.functions";
+import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
+import { useRclCan } from "@/hooks/useRclCan";
 
 const routeApi = getRouteApi("/_authenticated/closure/warranty/raw-data");
 
@@ -63,6 +66,10 @@ export function WrtRawDataPage() {
 
   const fetchRows = useServerFn(getWrtRowsAsOf);
   const fetchExport = useServerFn(getWrtExportRows);
+  const saveField = useServerFn(updateWrtField);
+  const queryClient = useQueryClient();
+  const { canRow } = useRclCan("WRT", "write");
+  const isToday = asOf === today;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["wrt-rows-as-of", asOf],
