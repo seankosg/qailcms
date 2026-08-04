@@ -4,6 +4,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 /** OCS 원본 JSON 보관함(비공개) */
 export const OCS_IMPORT_BUCKET = "abd-ocs-imports";
 
+export type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
+
 type LooseClient = {
   rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
   from: (table: string) => {
@@ -17,7 +19,7 @@ type LooseClient = {
 };
 
 async function assertAdmin(supabase: unknown, userId: string) {
-  const { data, error } = await (supabase as LooseClient).rpc("has_role", {
+  const { data, error } = await (supabase as unknown as LooseClient).rpc("has_role", {
     _user_id: userId,
     _role: "admin",
   });
@@ -26,9 +28,9 @@ async function assertAdmin(supabase: unknown, userId: string) {
 }
 
 async function callRpc(supabase: unknown, fn: string, args: Record<string, unknown>) {
-  const { data, error } = await (supabase as LooseClient).rpc(fn, args);
+  const { data, error } = await (supabase as unknown as LooseClient).rpc(fn, args);
   if (error) throw new Error(error.message);
-  return data as Record<string, unknown>;
+  return (data ?? {}) as Json;
 }
 
 /** dry-run — DB 변경 없음 */
@@ -61,7 +63,7 @@ export const createOcsImportLog = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const { data: row, error } = await (context.supabase as LooseClient)
+    const { data: row, error } = await (context.supabase as unknown as LooseClient)
       .from("abd_ocs_import_logs")
       .insert({
         status: "validating",
@@ -88,7 +90,7 @@ export const updateOcsImportLog = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string; patch: Record<string, unknown> }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const { error } = await (context.supabase as LooseClient)
+    const { error } = await (context.supabase as unknown as LooseClient)
       .from("abd_ocs_import_logs")
       .update(data.patch)
       .eq("id", data.id);
