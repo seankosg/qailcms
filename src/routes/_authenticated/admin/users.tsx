@@ -37,8 +37,7 @@ const USER_TYPES: UserType[] = ["admin", "hdec_pic", "hdec_eng", "pm_pd", "hdec"
 const ROLES: AppRole[] = ["admin", "superuser", "senior_user", "user", "super_guest", "guest", "d_superuser"];
 
 function UsersAdminPage() {
-  const [tab, setTab] = useState("accounts");
-  const [accountSearch, setAccountSearch] = useState("");
+  const [tab, setTab] = useState("pic");
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -49,13 +48,11 @@ function UsersAdminPage() {
       </div>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="accounts">HDEC PIC(계정)</TabsTrigger>
-          <TabsTrigger value="roster">HDEC ENG(명부)</TabsTrigger>
+          <TabsTrigger value="pic">HDEC PIC</TabsTrigger>
+          <TabsTrigger value="eng">HDEC ENG</TabsTrigger>
         </TabsList>
-        <TabsContent value="accounts" className="pt-4"><UsersTab initialSearch={accountSearch} /></TabsContent>
-        <TabsContent value="roster" className="pt-4">
-          <HdecRosterTab kind="eng" onGoAccounts={(q) => { setAccountSearch(q); setTab("accounts"); }} />
-        </TabsContent>
+        <TabsContent value="pic" className="pt-4"><HdecPeopleTab kind="pic" /></TabsContent>
+        <TabsContent value="eng" className="pt-4"><HdecPeopleTab kind="eng" /></TabsContent>
       </Tabs>
     </div>
   );
