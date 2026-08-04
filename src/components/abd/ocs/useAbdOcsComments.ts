@@ -49,11 +49,11 @@ export function useSetAbdOcsComplied(itemId: string | null) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("OCS_COMPLIANCE_STALE")) {
         void qc.invalidateQueries({ queryKey: key });
-        toast.error("다른 사용자가 먼저 변경했습니다. 최신 상태를 불러왔습니다.");
+        toast.error("Another user updated this comment. The latest data has been loaded.");
       } else if (msg.includes("OCS_FORBIDDEN_WRITE")) {
-        toast.error("이 도면을 편집할 권한이 없습니다.");
+        toast.error("You do not have permission to update this drawing.");
       } else {
-        toast.error(`변경 실패: ${msg}`);
+        toast.error(`Update failed: ${msg}`);
       }
     },
     onSuccess: (res) => {

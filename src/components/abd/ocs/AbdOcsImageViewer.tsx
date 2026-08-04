@@ -90,7 +90,9 @@ export function AbdOcsImageViewer({
       setRetried(true);
       void load();
     } else {
-      setError("이미지를 불러오지 못했습니다. 권한이 없거나 파일이 손상되었을 수 있습니다.");
+      setError(
+        "Unable to load this image. It may be unavailable or you may not have permission to view it.",
+      );
     }
   };
 
@@ -99,37 +101,38 @@ export function AbdOcsImageViewer({
       <DialogContent className="max-w-[min(1200px,95vw)] p-4">
         <DialogHeader className="pr-8">
           <DialogTitle className="text-sm">
-            OCS {ocsNumber ?? "—"} — 첨부 이미지 {count === 0 ? 0 : index + 1}/{count}
+            OCS {ocsNumber ?? "—"} — Attachment {count === 0 ? 0 : index + 1}/{count}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            좌우 화살표 키로 이동, +/− 버튼으로 확대·축소할 수 있습니다.
+            Use the Left and Right Arrow keys to navigate. Use + and − to zoom.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={() => go(-1)} disabled={count < 2} aria-label="이전 이미지">
+            <Button variant="outline" size="sm" onClick={() => go(-1)} disabled={count < 2} aria-label="Previous image" title="Previous image">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => go(1)} disabled={count < 2} aria-label="다음 이미지">
+            <Button variant="outline" size="sm" onClick={() => go(1)} disabled={count < 2} aria-label="Next image" title="Next image">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" aria-label="축소" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}>
+            <Button variant="outline" size="sm" aria-label="Zoom out" title="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}>
               <Minus className="h-4 w-4" />
             </Button>
             <span className="w-12 text-center text-xs tabular-nums">{Math.round(zoom * 100)}%</span>
-            <Button variant="outline" size="sm" aria-label="확대" onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}>
+            <Button variant="outline" size="sm" aria-label="Zoom in" title="Zoom in" onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}>
               <Plus className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" aria-label="원래 크기" onClick={() => setZoom(1)}>
+            <Button variant="outline" size="sm" aria-label="Reset zoom" title="Reset zoom" onClick={() => setZoom(1)}>
               <RotateCcw className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
               size="sm"
-              aria-label="다운로드"
+              aria-label="Download"
+              title="Download"
               disabled={!url}
               onClick={() => {
                 if (!url) return;
@@ -149,7 +152,7 @@ export function AbdOcsImageViewer({
         <div className="mt-2 flex max-h-[62vh] min-h-[240px] items-center justify-center overflow-auto rounded-md border bg-muted/30 p-2">
           {loading && !url ? (
             <span className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> 이미지 불러오는 중…
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading image…
             </span>
           ) : error ? (
             <span className="flex items-center gap-2 text-xs text-destructive">
@@ -164,7 +167,7 @@ export function AbdOcsImageViewer({
               className="max-w-full"
             />
           ) : (
-            <span className="text-xs text-muted-foreground">이미지가 없습니다.</span>
+            <span className="text-xs text-muted-foreground">No image available.</span>
           )}
         </div>
 
@@ -178,7 +181,7 @@ export function AbdOcsImageViewer({
                   setIndex(i);
                   setZoom(1);
                 }}
-                aria-label={`OCS ${ocsNumber ?? "—"} attachment ${i + 1} 보기`}
+                aria-label={`View OCS ${ocsNumber ?? "—"} attachment ${i + 1}`}
                 aria-current={i === index}
                 className={cn(
                   "h-14 w-14 shrink-0 overflow-hidden rounded border bg-muted/40",

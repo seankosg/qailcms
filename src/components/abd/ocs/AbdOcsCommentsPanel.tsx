@@ -99,7 +99,7 @@ export function AbdOcsCommentsPanel({
           <div
             role="separator"
             aria-orientation="vertical"
-            aria-label="패널 폭 조절 (좌우 화살표 키로 16px씩 조절)"
+            aria-label="Resize OCS comments panel. Use the Left and Right Arrow keys."
             tabIndex={0}
             onMouseDown={() => {
               dragging.current = true;
@@ -123,13 +123,13 @@ export function AbdOcsCommentsPanel({
             <span className="text-muted-foreground">OCS Comments</span>
             {data && (
               <>
-                <Badge variant="outline" className="text-[10px]">total {data.total}</Badge>
-                <Badge variant="secondary" className="text-[10px]">complied {data.complied}</Badge>
+                <Badge variant="outline" className="text-[10px]">Total {data.total}</Badge>
+                <Badge variant="secondary" className="text-[10px]">Complied {data.complied}</Badge>
                 <Badge
                   variant={data.pending > 0 ? "destructive" : "secondary"}
                   className="text-[10px]"
                 >
-                  pending {data.pending}
+                  Pending {data.pending}
                 </Badge>
               </>
             )}
@@ -138,26 +138,27 @@ export function AbdOcsCommentsPanel({
               size="sm"
               className="ml-auto h-7"
               onClick={() => void query.refetch()}
-              aria-label="새로고침"
+              aria-label="Refresh"
+              title="Refresh"
             >
               <RefreshCw className={cn("h-3.5 w-3.5", query.isFetching && "animate-spin")} />
             </Button>
           </SheetTitle>
           <SheetDescription className="text-xs">
-            이 도면에 연결된 OCS 코멘트 목록과 Complied 상태입니다.
+            OCS comments linked to this drawing and their Complied status.
           </SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 overflow-auto p-3">
           {query.isLoading ? (
             <div className="flex items-center justify-center py-16 text-xs text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 불러오는 중…
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading OCS comments…
             </div>
           ) : query.isError ? (
             <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
-                OCS 코멘트를 불러오지 못했습니다.
+                Unable to load OCS comments.
                 <div className="mt-1 break-all font-mono text-[10px]">
                   {query.error instanceof Error ? query.error.message : String(query.error)}
                 </div>
@@ -165,9 +166,9 @@ export function AbdOcsCommentsPanel({
             </div>
           ) : comments.length === 0 ? (
             <div className="py-16 text-center text-xs text-muted-foreground">
-              이 도면에 연결된 OCS 코멘트가 없습니다.
+              No OCS comments are linked to this drawing.
               <br />
-              미연결 OCS는 관리자 Import 화면에서 관리됩니다.
+              Unlinked OCS comments are managed from the OCS Import page.
             </div>
           ) : isMobile ? (
             <div className="space-y-2">{rows("card")}</div>
