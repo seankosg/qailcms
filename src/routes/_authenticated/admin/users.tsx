@@ -26,7 +26,7 @@ import {
 } from "@/types/enums";
 import { useTeamOptions } from "@/lib/team/team-master";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HdecRosterTab } from "@/components/admin/HdecRosterTab";
+import { HdecPeopleTab } from "@/components/admin/HdecPeopleTab";
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
   head: () => ({ meta: [{ title: "사용자 관리 — QAIL CMS" }] }),
