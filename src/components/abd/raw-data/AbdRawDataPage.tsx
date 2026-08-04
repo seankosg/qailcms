@@ -1005,6 +1005,34 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
 }
 
 function UrAgingBadge({ days }: { days: number }) {
+  return <UrAgingBadgeInner days={days} />;
+}
+
+/** OCS Check 셀 — 도넛 + n/m. as-of 과거 조회 시 값이 null 이므로 공란(—). */
+function OcsCheckCell({ value, row }: { value: any; row: AbdItem }) {
+  const state = value == null || value === "" ? null : String(value);
+  if (state === null) return <span className="text-muted-foreground/50">—</span>;
+  const total = Number((row as any).ocs_total ?? 0) || 0;
+  const done = Number((row as any).ocs_complied ?? 0) || 0;
+  if (state === "none" || total === 0) {
+    return <span className="text-muted-foreground/50" title="연결된 OCS 코멘트 없음">—</span>;
+  }
+  const ok = state === "ok";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums whitespace-nowrap",
+        ok ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300",
+      )}
+      title={`OCS 코멘트 ${total}건 중 ${done}건 Complied${ok ? " (완료)" : " (미완료)"}`}
+    >
+      <ProgressDonutIcon value={done} total={total} tone={ok ? "ok" : "pending"} />
+      {done}/{total}
+    </span>
+  );
+}
+
+function UrAgingBadgeInner({ days }: { days: number }) {
   const { data: settings } = useAbdSettingsQuery();
   const tone = agingTone(days, settings);
   return (
