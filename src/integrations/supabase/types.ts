@@ -5953,6 +5953,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      rcl_import_filter: {
+        Args: { _match_cols: string[]; _module: string; _rows: Json }
+        Returns: Json
+      }
       rcl_max_scope: {
         Args: { _action: string; _module: string; _user_id: string }
         Returns: string
@@ -5967,6 +5971,10 @@ export type Database = {
       }
       rcl_scope: {
         Args: { _module: string; _row_id: string; _user_id: string }
+        Returns: string
+      }
+      rcl_scope_of_values: {
+        Args: { _module: string; _user_id: string; _values: Json }
         Returns: string
       }
       recalc_task_auto_judgment: {
