@@ -433,6 +433,15 @@ export async function restoreSnapshot(
     restoredTables.push(tableName);
   }
 
+  // OCS 캐시(abd_items_raw.ocs_*)는 복원 중 트리거가 꺼져 있어 갱신되지 않는다.
+  // 정본(코멘트/Complied)이 복원된 경우 전량 재계산으로 캐시를 맞춘다.
+  const OCS_SOURCES = ["abd_items_raw", "abd_ocs_comments", "abd_ocs_compliance"];
+  if (restoredTables.some((t) => OCS_SOURCES.includes(t))) {
+    const { error: recountError } = await (supabaseAdmin as any).rpc("abd_ocs_recount_all");
+    if (recountError) throw new Error(`OCS 캐시 재계산 실패: ${recountError.message}`);
+    restoredTables.push("abd_items_raw.ocs_* (recounted)");
+  }
+
   return { restoredTables, totalRows };
 }
 
