@@ -98,7 +98,27 @@ export function OcsStageBPanel() {
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
   const [failedBatches, setFailedBatches] = useState<string[]>([]);
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [result, setResult] = useState<{
+    run_id: string;
+    run_ordinal: number | null;
+    comments: {
+      inserted: number;
+      updated: number;
+      unchanged: number;
+      inactivated: number;
+      linked: number;
+      unmatched: number;
+    };
+    compliance: { inserted: number; existing: number };
+    attachments: {
+      inserted: number;
+      updated: number;
+      unchanged: number;
+      linked: number;
+      needs_review: number;
+    };
+    raw: Record<string, unknown>;
+  } | null>(null);
   const storageRef = useRef<string[] | null>(null);
 
   async function onDataFile(f: File) {
