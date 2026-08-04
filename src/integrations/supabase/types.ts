@@ -2384,6 +2384,102 @@ export type Database = {
         }
         Relationships: []
       }
+      rcl_module_config: {
+        Row: {
+          created_at: string
+          module: string
+          owner_cols: string[]
+          owning_team: string | null
+          table_name: string
+          team_col: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          module: string
+          owner_cols: string[]
+          owning_team?: string | null
+          table_name: string
+          team_col?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          module?: string
+          owner_cols?: string[]
+          owning_team?: string | null
+          table_name?: string
+          team_col?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rcl_permissions: {
+        Row: {
+          action: string
+          allowed: boolean
+          created_at: string
+          role: Database["public"]["Enums"]["app_role"]
+          scope: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          allowed?: boolean
+          created_at?: string
+          role: Database["public"]["Enums"]["app_role"]
+          scope: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          allowed?: boolean
+          created_at?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          scope?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rcl_permissions_audit: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          changed_by_name: string | null
+          id: string
+          new_allowed: boolean | null
+          old_allowed: boolean | null
+          op: string
+          role: Database["public"]["Enums"]["app_role"]
+          scope: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          id?: string
+          new_allowed?: boolean | null
+          old_allowed?: boolean | null
+          op: string
+          role: Database["public"]["Enums"]["app_role"]
+          scope: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          id?: string
+          new_allowed?: boolean | null
+          old_allowed?: boolean | null
+          op?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          scope?: string
+        }
+        Relationships: []
+      }
       restore_run_log: {
         Row: {
           destructive: boolean
@@ -5819,6 +5915,34 @@ export type Database = {
       preview_rollback_task_management_import: {
         Args: { _batch_id: string }
         Returns: Json
+      }
+      rcl_can: {
+        Args: {
+          _action: string
+          _module: string
+          _row_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      rcl_highest_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      rcl_max_scope: {
+        Args: { _action: string; _module: string; _user_id: string }
+        Returns: string
+      }
+      rcl_role_counts: {
+        Args: never
+        Returns: {
+          cnt: number
+          role: Database["public"]["Enums"]["app_role"]
+        }[]
+      }
+      rcl_scope: {
+        Args: { _module: string; _row_id: string; _user_id: string }
+        Returns: string
       }
       recalc_task_auto_judgment: {
         Args: { _discipline?: string }

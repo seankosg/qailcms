@@ -1,0 +1,334 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ROLE_LABELS, type AppRole } from "@/types/enums";
+import { RotateCcw, Save, ShieldCheck } from "lucide-react";
+
+export const Route = createFileRoute("/_authenticated/admin/permissions")({
+  head: () => ({
+    meta: [
+      { title: "권한 관리 — QAIL CMS" },
+      { name: "description", content: "역할 × 범위 × 동작 권한표를 관리하고 변경 이력을 추적합니다." },
+      { property: "og:title", content: "권한 관리 — QAIL CMS" },
+      { property: "og:description", content: "역할 × 범위 × 동작 권한표 관리 화면." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: PermissionsAdminPage,
+});
+
+const ROLES: AppRole[] = ["user", "senior_user", "d_superuser", "superuser", "admin", "super_guest", "guest"];
+const SCOPES = [
+  { key: "own", label: "Own (본인)" },
+  { key: "own_team", label: "Own Team (같은 팀)" },
+  { key: "other_team", label: "Other Team (다른 팀)" },
+] as const;
+const ACTIONS = [
+  { key: "read", label: "R", full: "조회" },
+  { key: "write", label: "W", full: "수정" },
+  { key: "delete", label: "D", full: "삭제" },
+  { key: "import", label: "I", full: "임포트" },
+  { key: "export", label: "E", full: "익스포트" },
+] as const;
+
+type Row = { role: AppRole; scope: string; action: string; allowed: boolean };
+const ck = (role: string, scope: string, action: string) => `${role}|${scope}|${action}`;
+
+function PermissionsAdminPage() {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<Record<string, boolean>>({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
+
+  const permsQ = useQuery({
+    queryKey: ["rcl_permissions"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("rcl_permissions").select("role,scope,action,allowed");
+      if (error) throw error;
+      return (data ?? []) as Row[];
+    },
+  });
+
+  const countsQ = useQuery({
+    queryKey: ["rcl_role_counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("rcl_role_counts");
+      if (error) throw error;
+      const m: Record<string, number> = {};
+      for (const r of (data ?? []) as { role: string; cnt: number }[]) m[r.role] = Number(r.cnt);
+      return m;
+    },
+  });
+
+  const modulesQ = useQuery({
+    queryKey: ["rcl_module_config"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("rcl_module_config").select("module,table_name,owning_team,owner_cols").order("module");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const auditQ = useQuery({
+    queryKey: ["rcl_permissions_audit"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("rcl_permissions_audit")
+        .select("id,changed_at,changed_by_name,role,scope,action,old_allowed,new_allowed,op")
+        .order("changed_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const base = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    for (const r of permsQ.data ?? []) m[ck(r.role, r.scope, r.action)] = r.allowed;
+    return m;
+  }, [permsQ.data]);
+
+  const value = (key: string) => (key in draft ? draft[key]! : (base[key] ?? false));
+
+  const diffs = useMemo(
+    () => Object.entries(draft).filter(([k, v]) => (base[k] ?? false) !== v).map(([k, v]) => {
+      const [role, scope, action] = k.split("|") as [AppRole, string, string];
+      return { key: k, role, scope, action, from: base[k] ?? false, to: v };
+    }),
+    [draft, base],
+  );
+
+  const toggle = (role: AppRole, scope: string, action: string) => {
+    if (role === "admin") return;
+    const key = ck(role, scope, action);
+    setDraft((d) => ({ ...d, [key]: !value(key) }));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setVerifyMsg(null);
+    try {
+      for (const d of diffs) {
+        const { error } = await supabase
+          .from("rcl_permissions")
+          .update({ allowed: d.to })
+          .eq("role", d.role).eq("scope", d.scope).eq("action", d.action);
+        if (error) throw error;
+      }
+      // A-5 반영 확인: 저장 직후 서버 값을 다시 읽어 대조
+      const { data, error } = await supabase.from("rcl_permissions").select("role,scope,action,allowed");
+      if (error) throw error;
+      const server: Record<string, boolean> = {};
+      for (const r of (data ?? []) as Row[]) server[ck(r.role, r.scope, r.action)] = r.allowed;
+      const mismatched = diffs.filter((d) => server[d.key] !== d.to);
+      setVerifyMsg(
+        mismatched.length === 0
+          ? `반영 확인: 변경 ${diffs.length}칸 / 서버 재조회 일치 ${diffs.length}칸 · 불일치 0칸`
+          : `반영 불일치 ${mismatched.length}칸 — ${mismatched.map((m) => ck(m.role, m.scope, m.action)).join(", ")}`,
+      );
+      setDraft({});
+      await qc.invalidateQueries({ queryKey: ["rcl_permissions"] });
+      await qc.invalidateQueries({ queryKey: ["rcl_permissions_audit"] });
+      await qc.invalidateQueries({ queryKey: ["rcl_can"] });
+      toast.success(`권한 ${diffs.length}칸 저장 완료`);
+    } catch (e) {
+      toast.error(`저장 실패: ${(e as Error).message}`);
+    } finally {
+      setSaving(false);
+      setConfirmOpen(false);
+    }
+  };
+
+  const revert = async (a: { role: string; scope: string; action: string; old_allowed: boolean | null }) => {
+    if (a.old_allowed === null) { toast.error("되돌릴 이전 값이 없습니다."); return; }
+    const { error } = await supabase
+      .from("rcl_permissions").update({ allowed: a.old_allowed })
+      .eq("role", a.role as AppRole).eq("scope", a.scope).eq("action", a.action);
+    if (error) { toast.error(`되돌리기 실패: ${error.message}`); return; }
+    await qc.invalidateQueries({ queryKey: ["rcl_permissions"] });
+    await qc.invalidateQueries({ queryKey: ["rcl_permissions_audit"] });
+    toast.success(`되돌림: ${a.role} · ${a.scope} · ${a.action} → ${a.old_allowed ? "Y" : "N"}`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-semibold">권한 관리</h1>
+          <p className="text-sm text-muted-foreground">
+            역할 × 범위 × 동작 권한표(정본). 이 표를 <code>rcl_can</code>이 직접 읽습니다.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {diffs.length > 0 && <Badge variant="secondary">{diffs.length}칸 변경됨</Badge>}
+          <Button size="sm" disabled={diffs.length === 0 || saving} onClick={() => setConfirmOpen(true)}>
+            <Save className="mr-1 h-4 w-4" /> 저장
+          </Button>
+          {diffs.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setDraft({})}>취소</Button>
+          )}
+        </div>
+      </div>
+
+      {verifyMsg && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <ShieldCheck className="mr-1 inline h-4 w-4 text-primary" />
+          {verifyMsg}
+        </div>
+      )}
+
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">권한 격자</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse text-sm">
+            <thead>
+              <tr>
+                <th rowSpan={2} className="border px-2 py-1 text-left align-bottom">역할</th>
+                {SCOPES.map((s) => (
+                  <th key={s.key} colSpan={5} className="border px-2 py-1 text-center">{s.label}</th>
+                ))}
+              </tr>
+              <tr>
+                {SCOPES.flatMap((s) =>
+                  ACTIONS.map((a) => (
+                    <th key={`${s.key}-${a.key}`} className="border px-2 py-1 text-center text-xs font-normal text-muted-foreground" title={a.full}>
+                      {a.label}
+                    </th>
+                  )),
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {ROLES.map((role) => {
+                const locked = role === "admin";
+                return (
+                  <tr key={role} className={locked ? "bg-muted/60 text-muted-foreground" : undefined}>
+                    <td className="border px-2 py-1 whitespace-nowrap">
+                      <span className="font-medium">{ROLE_LABELS[role]}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">{countsQ.data?.[role] ?? 0}명</span>
+                      {locked && <Badge variant="outline" className="ml-2 text-[10px]">잠금</Badge>}
+                    </td>
+                    {SCOPES.flatMap((s) =>
+                      ACTIONS.map((a) => {
+                        const key = ck(role, s.key, a.key);
+                        const changed = key in draft && (base[key] ?? false) !== draft[key];
+                        return (
+                          <td key={key} className={`border px-2 py-1 text-center ${changed ? "bg-amber-100 dark:bg-amber-900/40" : ""}`}>
+                            <Checkbox
+                              checked={value(key)}
+                              disabled={locked}
+                              onCheckedChange={() => toggle(role, s.key, a.key)}
+                              aria-label={`${ROLE_LABELS[role]} ${s.label} ${a.full}`}
+                            />
+                          </td>
+                        );
+                      }),
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">모듈 주관팀 (읽기 전용)</CardTitle></CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>모듈</TableHead><TableHead>테이블</TableHead>
+                <TableHead>주관팀</TableHead><TableHead>담당 판정 컬럼</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(modulesQ.data ?? []).map((m: any) => (
+                <TableRow key={m.module}>
+                  <TableCell className="font-medium">{m.module}</TableCell>
+                  <TableCell className="font-mono text-xs">{m.table_name}</TableCell>
+                  <TableCell>{m.owning_team ?? <span className="text-muted-foreground">없음</span>}</TableCell>
+                  <TableCell className="font-mono text-xs">{(m.owner_cols ?? []).join(", ")}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <p className="mt-2 text-xs text-muted-foreground">
+            주관팀 사용자는 해당 모듈 전 행을 Own Team 으로 취급합니다(본인 담당 행은 Own 우선).
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">변경 이력</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>시각</TableHead><TableHead>변경자</TableHead><TableHead>칸</TableHead>
+                <TableHead>변경</TableHead><TableHead className="text-right">되돌리기</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(auditQ.data ?? []).map((a: any) => (
+                <TableRow key={a.id}>
+                  <TableCell className="whitespace-nowrap text-xs">{new Date(a.changed_at).toLocaleString("ko-KR", { timeZone: "Asia/Qatar" })}</TableCell>
+                  <TableCell className="text-xs">{a.changed_by_name ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{a.role} · {a.scope} · {a.action}</TableCell>
+                  <TableCell className="text-xs">
+                    {a.old_allowed === null ? "—" : a.old_allowed ? "Y" : "N"} → {a.new_allowed === null ? "—" : a.new_allowed ? "Y" : "N"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" disabled={a.old_allowed === null || a.role === "admin"} onClick={() => revert(a)}>
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {(auditQ.data ?? []).length === 0 && (
+                <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground">이력이 없습니다.</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>권한 {diffs.length}칸을 변경합니다</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="max-h-64 space-y-1 overflow-y-auto text-sm">
+                {diffs.map((d) => (
+                  <div key={d.key} className="font-mono text-xs">
+                    {ROLE_LABELS[d.role]} · {d.scope} · {d.action} : {d.from ? "Y" : "N"} → {d.to ? "Y" : "N"}
+                  </div>
+                ))}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); void save(); }} disabled={saving}>
+              저장
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
