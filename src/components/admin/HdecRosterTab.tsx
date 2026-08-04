@@ -233,6 +233,11 @@ function CreateAccountDialog({
       const userId = res?.id;
       let recalc: any = null;
       if (userId) {
+        // 명부 행 ↔ 계정 자동 연결
+        const { error: linkErr } = await (supabase as any).rpc("hdec_roster_update", {
+          _kind: kind, _id: row.id, _linked_user_id: userId,
+        });
+        if (linkErr) toast.error(`명부 연결 실패: ${linkErr.message}`);
         const { data, error } = await (supabase as any).rpc("hdec_recalc_owner_for_user", {
           _user_id: userId, _reason: "account_create",
         });
