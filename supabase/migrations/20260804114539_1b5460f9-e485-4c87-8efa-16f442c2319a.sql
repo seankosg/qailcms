@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.rcl_grants_impl(uuid, text, text) TO service_role, postgres;
