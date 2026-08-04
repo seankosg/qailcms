@@ -354,7 +354,7 @@ function PermissionsAdminPage() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">모듈 주관팀 (읽기 전용)</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-base">모듈 주관팀</CardTitle></CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -368,7 +368,25 @@ function PermissionsAdminPage() {
                 <TableRow key={m.module}>
                   <TableCell className="font-medium">{m.module}</TableCell>
                   <TableCell className="font-mono text-xs">{m.table_name}</TableCell>
-                  <TableCell>{m.owning_team ?? <span className="text-muted-foreground">없음</span>}</TableCell>
+                  <TableCell>
+                    <select
+                      className="h-8 rounded-md border bg-background px-2 text-sm"
+                      value={m.owning_team ?? ""}
+                      onChange={(e) =>
+                        setTeamEdit({
+                          module: m.module,
+                          from: m.owning_team ?? null,
+                          to: e.target.value === "" ? null : e.target.value,
+                        })
+                      }
+                      aria-label={`${m.module} 주관팀`}
+                    >
+                      <option value="">(없음)</option>
+                      {(teamsQ.data ?? []).map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{(m.owner_cols ?? []).join(", ")}</TableCell>
                 </TableRow>
               ))}
@@ -376,9 +394,63 @@ function PermissionsAdminPage() {
           </Table>
           <p className="mt-2 text-xs text-muted-foreground">
             주관팀 사용자는 해당 모듈 전 행을 Own Team 으로 취급합니다(본인 담당 행은 Own 우선).
+            {" "}주관팀(owning_team) 만 편집할 수 있고 테이블 · 담당 판정 컬럼은 읽기 전용입니다. 드롭다운(팀 마스터) 외 자유 입력은 불가합니다.
           </p>
+
+          <div className="mt-4">
+            <div className="mb-1 text-xs font-medium">주관팀 변경 이력 (최근 50건)</div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>시각</TableHead><TableHead>변경자</TableHead>
+                  <TableHead>모듈</TableHead><TableHead>이전 → 이후</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(moduleAuditQ.data ?? []).length === 0 && (
+                  <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground">변경 이력 없음</TableCell></TableRow>
+                )}
+                {((moduleAuditQ.data ?? []) as any[]).map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="whitespace-nowrap text-xs">{new Date(a.changed_at).toLocaleString("ko-KR")}</TableCell>
+                    <TableCell className="text-xs">{a.changed_by_name ?? "-"}</TableCell>
+                    <TableCell className="text-xs font-medium">{a.module}</TableCell>
+                    <TableCell className="text-xs font-mono">{a.old_team ?? "(없음)"} → {a.new_team ?? "(없음)"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!teamEdit} onOpenChange={(o) => !o && setTeamEdit(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>주관팀 변경 확인</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1 text-sm">
+                <div>
+                  <b>{teamEdit?.module}</b> 주관팀: {teamEdit?.from ?? "(없음)"} → <b>{teamEdit?.to ?? "(없음)"}</b>
+                </div>
+                <div>
+                  새 주관팀 계정 수: <b>{teamEdit?.to ? (teamCountsQ.data?.[teamEdit.to] ?? 0) : 0}명</b>
+                  {teamEdit?.from ? ` · 이전 주관팀 계정 수: ${teamCountsQ.data?.[teamEdit.from] ?? 0}명` : ""}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  해당 팀 계정은 이 모듈 전 행을 Own Team 범위로 취급하게 됩니다.
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={teamSaving}>취소</AlertDialogCancel>
+            <AlertDialogAction disabled={teamSaving} onClick={(e) => { e.preventDefault(); void saveOwningTeam(); }}>
+              변경
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">변경 이력</CardTitle></CardHeader>
