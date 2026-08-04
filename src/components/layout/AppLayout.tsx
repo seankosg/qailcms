@@ -44,6 +44,7 @@ type NavLeaf = {
   disabled?: boolean;
   badge?: string;
 };
+// strictAdminOnly: admin 역할 단독 노출(superuser 제외). §1(2026-08-04)
 type NavModule = {
   label: string;
   icon: string;
