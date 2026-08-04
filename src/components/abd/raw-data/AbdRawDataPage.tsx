@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { Search, Upload, Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useAbdTeamList } from "@/hooks/useAbdTeamList";
-import { ProgressDonutIcon } from "@/components/shared/ProgressDonutIcon";
+import { AbdOcsCommentsPanel } from "@/components/abd/ocs/AbdOcsCommentsPanel";
 import {
   ABD_TEAMS,
   ABD_COLUMNS,
