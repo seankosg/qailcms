@@ -170,7 +170,14 @@ function exportUsersXlsx(rows: any[]) {
   URL.revokeObjectURL(url);
 }
 
-type SortKey = "name" | "team" | "login_id" | "user_type" | "role" | "active";
+type SortKey = "name" | "team" | "login_id" | "user_type" | "linked" | "role" | "active";
+
+/** Linked Master 표시 문자열 — 정렬 기준과 화면 표기를 같은 값으로 맞춘다. */
+function linkedMasterText(u: any): string {
+  return (u.subcontractor_name ?? u.subsub_name ?? u.hdec_pic_name ?? u.hdec_eng_name ?? "")
+    .toString()
+    .toLowerCase();
+}
 
 function SortHeader({
   label,
@@ -253,6 +260,10 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
           av = USER_TYPE_LABELS[(a.user_type ?? "") as UserType] ?? "";
           bv = USER_TYPE_LABELS[(b.user_type ?? "") as UserType] ?? "";
           break;
+        case "linked":
+          av = linkedMasterText(a);
+          bv = linkedMasterText(b);
+          break;
         case "role":
           // §6-1 표시·정렬 모두 DB rcl_highest_role 과 동일한 최고 등급 기준.
           av = ROLE_LABELS[highestRole(a.roles)] ?? "";
@@ -316,7 +327,7 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
                   <SortHeader label="팀" sortKey="team" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                   <SortHeader label="Login ID" sortKey="login_id" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                   <SortHeader label="User Type" sortKey="user_type" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
-                  <TableHead>Linked Master</TableHead>
+                  <SortHeader label="Linked Master" sortKey="linked" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                   <SortHeader label="역할" sortKey="role" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                   <SortHeader label="상태" sortKey="active" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                   <TableHead className="text-right">액션</TableHead>
