@@ -25,6 +25,20 @@ export function highestRank(roles: (AppRole | string)[] | undefined): number {
   return rs.reduce((m, r) => Math.max(m, ROLE_RANK[r] ?? 0), 0);
 }
 
+/**
+ * 표시·정렬용 최고 등급. DB rcl_highest_role 과 동일 서열(ROLE_RANK)을 사용한다.
+ * user_roles 는 (user_id, role) UNIQUE 이므로 한 사람이 복수 행을 가질 수 있고,
+ * 실제 판정은 항상 최고 등급으로 돈다 → 화면도 같은 기준이어야 한다.
+ */
+export function highestRole(
+  roles: (AppRole | string)[] | undefined,
+  fallback: AppRole = "guest",
+): AppRole {
+  const rs = normalizeRoles(roles);
+  if (rs.length === 0) return fallback;
+  return rs.reduce((best, r) => (ROLE_RANK[r] > ROLE_RANK[best] ? r : best), rs[0]!);
+}
+
 export function hasRank(
   user: MinimalUser | null | undefined,
   minRole: AppRole,
