@@ -1,5 +1,4 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { TaskManagementImportPage } from "@/components/task-management/import/TaskManagementImportPage";
 import { DefectManagementImportPage } from "@/components/defect-management/import/DefectManagementImportPage";
 import { AbdImportPage } from "@/components/abd/import/AbdImportPage";
@@ -53,17 +52,5 @@ export function ImportHubPage() {
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-function ComingSoonCard() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Warranty & License — Import</CardTitle>
-        <CardDescription>준비 중입니다. 추후 지원 예정.</CardDescription>
-      </CardHeader>
-      <CardContent className="text-xs text-muted-foreground">Coming soon</CardContent>
-    </Card>
   );
 }
