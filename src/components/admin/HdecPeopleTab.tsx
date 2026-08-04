@@ -263,9 +263,17 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
                         {r.source === "profile" && <Badge variant="outline" className="ml-1 text-[10px]">명부 밖</Badge>}
                       </TableCell>
                       <TableCell>
-                        {r.has_account
-                          ? <Badge variant="secondary" className="text-[10px]">계정 있음</Badge>
-                          : <Badge variant="outline" className="text-[10px] text-amber-700 dark:text-amber-400">계정 없음</Badge>}
+                        {r.has_account ? (
+                          r.user_type && r.user_type !== (kind === "pic" ? "hdec_pic" : "hdec_eng") ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              계정 있음(다른 구분으로 등록됨: {r.user_type})
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px]">계정 있음</Badge>
+                          )
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-amber-700 dark:text-amber-400">계정 없음</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {r.has_account ? (
