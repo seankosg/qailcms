@@ -467,9 +467,12 @@ export const bulkCreateAppUsers = createServerFn({ method: "POST" })
           user_type: userType, must_change_password: true,
         } as any).eq("id", uid);
 
-        // 명부 연결
-        await (supabaseAdmin as any).from(masterTable)
-          .update({ linked_user_id: uid }).eq("name_norm", nameNorm);
+        // 명부 연결 — PIC·ENG 양쪽 명부에 name_norm 기준으로 모두 연결한다(§2-2).
+        // 같은 이름이 양쪽에 존재해도 계정은 하나이므로 두 행 모두 같은 uid 를 가리켜야 한다.
+        for (const t of ["hdec_pic_name_master", "hdec_eng_name_master"]) {
+          await (supabaseAdmin as any).from(t)
+            .update({ linked_user_id: uid }).eq("name_norm", nameNorm);
+        }
 
         // 소유권 재계산 — hdec_assert_admin() 이 auth.uid() 를 보므로
         // service_role(supabaseAdmin) 이 아니라 호출자 세션(context.supabase)으로 실행한다.

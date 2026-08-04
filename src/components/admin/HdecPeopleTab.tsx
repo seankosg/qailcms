@@ -200,10 +200,39 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
             <span>{selectedRows.length}건 선택됨</span>
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => setSelected({})}>선택 해제</Button>
-              <Button size="sm" disabled={creating} onClick={() => runCreate(selectedRows)}>
-                {creating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UserPlus className="mr-1 h-4 w-4" />}
-                선택 항목 계정 생성
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" disabled={creating}>
+                    {creating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UserPlus className="mr-1 h-4 w-4" />}
+                    선택 항목 계정 생성
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>계정 생성 대상 {selectedRows.length}명</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      아래 이름 전부에 대해 계정을 생성합니다. 사람이 아닌 값(예: NO SERVICES, 외부)이 섞여 있지 않은지 확인하세요.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="max-h-64 overflow-auto rounded-md border p-2 text-xs">
+                    <ol className="list-decimal space-y-0.5 pl-5">
+                      {selectedRows.map((r) => (
+                        <li key={r.name_norm}>
+                          <span className="font-medium">{r.name}</span>
+                          <span className="ml-2 font-mono text-muted-foreground">
+                            {(draft[r.name]?.login_id ?? "").trim() || "(login_id 미입력)"}
+                          </span>
+                          <span className="ml-2 text-muted-foreground">등장 {r.total}건</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>취소</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => runCreate(selectedRows)}>생성</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
         )}
@@ -263,9 +292,17 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
                         {r.source === "profile" && <Badge variant="outline" className="ml-1 text-[10px]">명부 밖</Badge>}
                       </TableCell>
                       <TableCell>
-                        {r.has_account
-                          ? <Badge variant="secondary" className="text-[10px]">계정 있음</Badge>
-                          : <Badge variant="outline" className="text-[10px] text-amber-700 dark:text-amber-400">계정 없음</Badge>}
+                        {r.has_account ? (
+                          r.user_type && r.user_type !== (kind === "pic" ? "hdec_pic" : "hdec_eng") ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              계정 있음(다른 구분으로 등록됨: {r.user_type})
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px]">계정 있음</Badge>
+                          )
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-amber-700 dark:text-amber-400">계정 없음</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {r.has_account ? (
