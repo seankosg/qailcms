@@ -26,6 +26,7 @@ import { Route as AuthenticatedCloseoutDashboardRouteImport } from './routes/_au
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminTaskThresholdsRouteImport } from './routes/_authenticated/admin/task-thresholds'
 import { Route as AuthenticatedAdminPermissionsRouteImport } from './routes/_authenticated/admin/permissions'
+import { Route as AuthenticatedAdminOcsImportRouteImport } from './routes/_authenticated/admin/ocs-import'
 import { Route as AuthenticatedAdminMilestonesRouteImport } from './routes/_authenticated/admin/milestones'
 import { Route as AuthenticatedAdminMastersRouteImport } from './routes/_authenticated/admin/masters'
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
@@ -152,6 +153,12 @@ const AuthenticatedAdminPermissionsRoute =
   AuthenticatedAdminPermissionsRouteImport.update({
     id: '/permissions',
     path: '/permissions',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminOcsImportRoute =
+  AuthenticatedAdminOcsImportRouteImport.update({
+    id: '/ocs-import',
+    path: '/ocs-import',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
 const AuthenticatedAdminMilestonesRoute =
@@ -370,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
   '/admin/milestones': typeof AuthenticatedAdminMilestonesRoute
+  '/admin/ocs-import': typeof AuthenticatedAdminOcsImportRoute
   '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -421,6 +429,7 @@ export interface FileRoutesByTo {
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
   '/admin/milestones': typeof AuthenticatedAdminMilestonesRoute
+  '/admin/ocs-import': typeof AuthenticatedAdminOcsImportRoute
   '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -475,6 +484,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/_authenticated/admin/masters': typeof AuthenticatedAdminMastersRoute
   '/_authenticated/admin/milestones': typeof AuthenticatedAdminMilestonesRoute
+  '/_authenticated/admin/ocs-import': typeof AuthenticatedAdminOcsImportRoute
   '/_authenticated/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
   '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -529,6 +539,7 @@ export interface FileRouteTypes {
     | '/admin/mapping'
     | '/admin/masters'
     | '/admin/milestones'
+    | '/admin/ocs-import'
     | '/admin/permissions'
     | '/admin/task-thresholds'
     | '/admin/users'
@@ -580,6 +591,7 @@ export interface FileRouteTypes {
     | '/admin/mapping'
     | '/admin/masters'
     | '/admin/milestones'
+    | '/admin/ocs-import'
     | '/admin/permissions'
     | '/admin/task-thresholds'
     | '/admin/users'
@@ -633,6 +645,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/mapping'
     | '/_authenticated/admin/masters'
     | '/_authenticated/admin/milestones'
+    | '/_authenticated/admin/ocs-import'
     | '/_authenticated/admin/permissions'
     | '/_authenticated/admin/task-thresholds'
     | '/_authenticated/admin/users'
@@ -805,6 +818,13 @@ declare module '@tanstack/react-router' {
       path: '/permissions'
       fullPath: '/admin/permissions'
       preLoaderRoute: typeof AuthenticatedAdminPermissionsRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/ocs-import': {
+      id: '/_authenticated/admin/ocs-import'
+      path: '/ocs-import'
+      fullPath: '/admin/ocs-import'
+      preLoaderRoute: typeof AuthenticatedAdminOcsImportRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/admin/milestones': {
@@ -1053,6 +1073,7 @@ interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminMappingRoute: typeof AuthenticatedAdminMappingRoute
   AuthenticatedAdminMastersRoute: typeof AuthenticatedAdminMastersRoute
   AuthenticatedAdminMilestonesRoute: typeof AuthenticatedAdminMilestonesRoute
+  AuthenticatedAdminOcsImportRoute: typeof AuthenticatedAdminOcsImportRoute
   AuthenticatedAdminPermissionsRoute: typeof AuthenticatedAdminPermissionsRoute
   AuthenticatedAdminTaskThresholdsRoute: typeof AuthenticatedAdminTaskThresholdsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
@@ -1065,6 +1086,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
     AuthenticatedAdminMappingRoute: AuthenticatedAdminMappingRoute,
     AuthenticatedAdminMastersRoute: AuthenticatedAdminMastersRoute,
     AuthenticatedAdminMilestonesRoute: AuthenticatedAdminMilestonesRoute,
+    AuthenticatedAdminOcsImportRoute: AuthenticatedAdminOcsImportRoute,
     AuthenticatedAdminPermissionsRoute: AuthenticatedAdminPermissionsRoute,
     AuthenticatedAdminTaskThresholdsRoute:
       AuthenticatedAdminTaskThresholdsRoute,
