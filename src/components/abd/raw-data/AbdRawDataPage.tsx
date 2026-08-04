@@ -935,6 +935,7 @@ function buildDataColumn(
   const filterOptions = c.key === "latest_status" ? ABD_STATUSES.map((s) => ({ value: s, label: s })) :
     c.key === "plot" ? [{ value: "C", label: "C" }, { value: "D", label: "D" }] :
     c.key === "is_active" ? [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] :
+    c.key === "ocs_check" ? ABD_OCS_CHECK_OPTIONS.map((o) => ({ value: o.value, label: o.label })) :
     [];
   return {
     id: c.key,
@@ -965,6 +966,7 @@ function buildDataColumn(
 }
 
 function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
+  if (c.key === "ocs_check") return <OcsCheckCell value={v} row={row} />;
   if (v == null || v === "") return <span className="text-muted-foreground/50">—</span>;
   if (c.key === "plot") return <Badge className={cn("text-[10px]", PLOT_COLORS[String(v)] ?? "bg-zinc-500/15 text-zinc-700")}>{String(v)}</Badge>;
   if (c.key === "latest_status") {
