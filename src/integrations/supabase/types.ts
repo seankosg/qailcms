@@ -1095,40 +1095,52 @@ export type Database = {
       abd_ocs_attachments: {
         Row: {
           byte_size: number | null
-          comment_id: string
+          comment_id: string | null
+          content_hash: string | null
           created_at: string
           height: number | null
           id: string
+          image_format: string | null
+          link_status: string
           mime_type: string | null
-          sha256: string | null
           sort_order: number
           source_attachment_id: string
+          source_comment_id: string | null
+          source_image_index: number | null
           storage_path: string
           width: number | null
         }
         Insert: {
           byte_size?: number | null
-          comment_id: string
+          comment_id?: string | null
+          content_hash?: string | null
           created_at?: string
           height?: number | null
           id?: string
+          image_format?: string | null
+          link_status?: string
           mime_type?: string | null
-          sha256?: string | null
           sort_order?: number
           source_attachment_id: string
+          source_comment_id?: string | null
+          source_image_index?: number | null
           storage_path: string
           width?: number | null
         }
         Update: {
           byte_size?: number | null
-          comment_id?: string
+          comment_id?: string | null
+          content_hash?: string | null
           created_at?: string
           height?: number | null
           id?: string
+          image_format?: string | null
+          link_status?: string
           mime_type?: string | null
-          sha256?: string | null
           sort_order?: number
           source_attachment_id?: string
+          source_comment_id?: string | null
+          source_image_index?: number | null
           storage_path?: string
           width?: number | null
         }
@@ -1174,6 +1186,7 @@ export type Database = {
           source_row_hash: string | null
           source_row_index: number | null
           source_sheet_name: string | null
+          team: string | null
           updated_at: string
         }
         Insert: {
@@ -1207,6 +1220,7 @@ export type Database = {
           source_row_hash?: string | null
           source_row_index?: number | null
           source_sheet_name?: string | null
+          team?: string | null
           updated_at?: string
         }
         Update: {
@@ -1240,6 +1254,7 @@ export type Database = {
           source_row_hash?: string | null
           source_row_index?: number | null
           source_sheet_name?: string | null
+          team?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1248,6 +1263,13 @@ export type Database = {
             columns: ["abd_item_id"]
             isOneToOne: false
             referencedRelation: "abd_items_raw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abd_ocs_comments_import_log_fk"
+            columns: ["import_log_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_import_logs"
             referencedColumns: ["id"]
           },
         ]
