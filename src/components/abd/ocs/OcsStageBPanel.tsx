@@ -663,9 +663,40 @@ export function OcsStageBPanel() {
         )}
 
         {result && (
-          <pre className="max-h-72 overflow-auto rounded-md border p-3 text-xs">
-            {JSON.stringify(result, null, 2)}
-          </pre>
+          <div className="space-y-3 rounded-md border p-3 text-xs">
+            <div className="text-muted-foreground">
+              Import run ID <span className="font-mono">{result.run_id}</span>
+              {result.run_ordinal != null && <> · 실행 차수 {result.run_ordinal}회차</>}
+            </div>
+            <div>
+              <div className="mb-1 font-medium">Comments</div>
+              <div className="text-muted-foreground">
+                inserted {result.comments.inserted} / updated {result.comments.updated} / unchanged{" "}
+                {result.comments.unchanged} / inactivated {result.comments.inactivated}
+                {" · "}linked {result.comments.linked} / unmatched {result.comments.unmatched}
+              </div>
+            </div>
+            <div>
+              <div className="mb-1 font-medium">Compliance</div>
+              <div className="text-muted-foreground">
+                inserted {result.compliance.inserted} / existing {result.compliance.existing}
+              </div>
+            </div>
+            <div>
+              <div className="mb-1 font-medium">Attachments</div>
+              <div className="text-muted-foreground">
+                inserted {result.attachments.inserted} / updated {result.attachments.updated} /
+                unchanged {result.attachments.unchanged} / linked {result.attachments.linked} /
+                needs_review {result.attachments.needs_review}
+              </div>
+            </div>
+            <details>
+              <summary className="cursor-pointer text-muted-foreground">원본 응답 보기</summary>
+              <pre className="mt-2 max-h-72 overflow-auto">
+                {JSON.stringify(result.raw, null, 2)}
+              </pre>
+            </details>
+          </div>
         )}
       </CardContent>
     </Card>
