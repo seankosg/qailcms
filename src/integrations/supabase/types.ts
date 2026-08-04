@@ -5758,6 +5758,10 @@ export type Database = {
           norm: string
         }[]
       }
+      hdec_people_list: {
+        Args: { _include_orphans?: boolean; _kind: string }
+        Returns: Json
+      }
       hdec_recalc_owner_for_user: {
         Args: { _reason?: string; _user_id: string }
         Returns: Json
