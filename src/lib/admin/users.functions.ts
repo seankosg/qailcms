@@ -282,6 +282,36 @@ export const deleteAppUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * §1 임시 비밀번호 통일 — must_change_password = true 인 계정만 대상.
+ * 이미 비밀번호를 바꾼 계정(false)은 절대 건드리지 않는다.
+ */
+export const bulkResetTempPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { temp_password: string }) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const pw = String(data.temp_password ?? "");
+    if (!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(pw)) {
+      throw new Error("임시 비밀번호는 영문+숫자 포함 6자 이상이어야 합니다.");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: targets, error } = await supabaseAdmin
+      .from("profiles")
+      .select("id,name,login_id")
+      .eq("must_change_password", true);
+    if (error) throw new Error(error.message);
+    const failed: { login_id: string; error: string }[] = [];
+    let ok = 0;
+    for (const t of targets ?? []) {
+      const { error: e } = await supabaseAdmin.auth.admin.updateUserById((t as any).id, { password: pw });
+      if (e) failed.push({ login_id: String((t as any).login_id ?? ""), error: e.message });
+      else ok += 1;
+    }
+    // must_change_password = true 유지 (변경하지 않음)
+    return { total: (targets ?? []).length, ok, failed };
+  });
+
 export const markPasswordChanged = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

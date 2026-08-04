@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  listAppUsers, createAppUser, resetUserPassword, updateUserRole,
+  listAppUsers, createAppUser, resetUserPassword, updateUserRole, bulkResetTempPassword,
   updateUserProfileFields, deleteAppUser, updateLoginId,
 } from "@/lib/admin/users.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -314,6 +314,7 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
           <Button variant="outline" size="sm" onClick={() => exportUsersXlsx(rows)}>
             <Download className="mr-1 h-4 w-4" />Export
           </Button>
+          <BulkResetPasswordButton onDone={invalidate} />
           <NewUserDialog onCreated={invalidate} />
         </div>
       </CardHeader>
@@ -557,6 +558,48 @@ function ResetPasswordButton({ onReset }: { onReset: (pw: string) => Promise<voi
             if (!PASSWORD_REGEX.test(pw)) { toast.error(PASSWORD_HINT); return; }
             await onReset(pw); setOpen(false); setPw(DEFAULT_PASSWORD);
           }}>발급</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** §1 임시 비밀번호 통일 — must_change_password=true 계정 전원 일괄 재설정. */
+function BulkResetPasswordButton({ onDone }: { onDone: () => void }) {
+  const bulkReset = useServerFn(bulkResetTempPassword);
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState(DEFAULT_PASSWORD);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm"><KeyRound className="mr-1 h-4 w-4" />임시 비밀번호 일괄 재설정</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>임시 비밀번호 일괄 재설정</DialogTitle>
+          <DialogDescription>
+            대상은 <b>비밀번호를 아직 바꾸지 않은 계정</b>(첫 로그인 시 변경 강제 상태)뿐입니다.
+            이미 비밀번호를 변경한 계정은 건드리지 않습니다.
+            <br />{PASSWORD_HINT}
+          </DialogDescription>
+        </DialogHeader>
+        <Input value={pw} onChange={(e) => setPw(e.target.value)} placeholder="임시 비밀번호" />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>취소</Button>
+          <Button disabled={busy} onClick={async () => {
+            if (!PASSWORD_REGEX.test(pw)) { toast.error(PASSWORD_HINT); return; }
+            setBusy(true);
+            try {
+              const r: any = await bulkReset({ data: { temp_password: pw } });
+              toast.success(`재설정 성공 ${r.ok} / 대상 ${r.total}${r.failed?.length ? ` · 실패 ${r.failed.length}` : ""}`);
+              if (r.failed?.length) console.warn("bulk reset failed:", r.failed);
+              onDone();
+              setOpen(false);
+            } catch (e: any) {
+              toast.error(e?.message ?? "재설정 실패");
+            } finally { setBusy(false); }
+          }}>{busy ? "재설정 중…" : "일괄 재설정"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
