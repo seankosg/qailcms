@@ -421,10 +421,14 @@ function SplTableRow({
   row,
   catalog,
   subHeaders,
+  canEdit,
+  onSave,
 }: {
   row: SplRow;
   catalog: SplCatalogEntry[];
   subHeaders: (s: SplCatalogEntry) => Array<{ field: keyof SplStageCell; label: string }>;
+  canEdit: boolean;
+  onSave: (field: string, value: string | null) => Promise<void>;
 }) {
   const judgeTone =
     row.judgment === "지연"
@@ -444,7 +448,7 @@ function SplTableRow({
         {row.plot ? `PLOT-${row.plot}` : "—"}
       </StickyCell>
       <StickyCell left={300} width={80}>
-        {row.team ?? "—"}
+        <SplEditableCell row={row} field="team" label="Team" value={row.team} canEdit={canEdit} onSave={onSave} />
       </StickyCell>
       <StickyCell left={380} width={90}>
         <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>{row.judgment}</span>
