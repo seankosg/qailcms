@@ -19,6 +19,7 @@ import { Loader2, FileJson, FolderUp, CheckCircle2, AlertTriangle } from "lucide
 import { supabase } from "@/integrations/supabase/client";
 import { getOcsImportStats, OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
 import { OcsStageBPanel } from "@/components/abd/ocs/OcsStageBPanel";
+import { OcsAtomicV2Panel } from "@/components/abd/ocs/OcsAtomicV2Panel";
 import { OcsRecountPanel } from "@/components/abd/ocs/OcsRecountPanel";
 import { FilePickerButton } from "@/components/shared/FilePickerButton";
 import { listBucketPaths } from "@/lib/abd/ocs-storage";
@@ -413,6 +414,7 @@ function OcsImportPage() {
       )}
 
       <OcsStageBPanel />
+      <OcsAtomicV2Panel />
       <OcsRecountPanel />
     </div>
   );
