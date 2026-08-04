@@ -1,10 +1,10 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { TaskManagementImportPage } from "@/components/task-management/import/TaskManagementImportPage";
 import { DefectManagementImportPage } from "@/components/defect-management/import/DefectManagementImportPage";
 import { AbdImportPage } from "@/components/abd/import/AbdImportPage";
 import { DmrImportPage } from "@/components/resource/dmr/DmrImportPage";
 import { SplImportPage } from "@/components/spl/import/SplImportPage";
+import { WrtImportPage } from "@/components/wrt/import/WrtImportPage";
 import { getRouteApi } from "@tanstack/react-router";
 
 const routeApi = getRouteApi("/_authenticated/import-log/import");
@@ -48,21 +48,9 @@ export function ImportHubPage() {
           <SplImportPage />
         </TabsContent>
         <TabsContent value="warranty" className="mt-4">
-          <ComingSoonCard />
+          <WrtImportPage />
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-function ComingSoonCard() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Warranty & License — Import</CardTitle>
-        <CardDescription>준비 중입니다. 추후 지원 예정.</CardDescription>
-      </CardHeader>
-      <CardContent className="text-xs text-muted-foreground">Coming soon</CardContent>
-    </Card>
   );
 }

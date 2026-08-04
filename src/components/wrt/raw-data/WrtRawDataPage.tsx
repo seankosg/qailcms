@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,9 @@ import {
   type WrtStageCell,
 } from "@/lib/wrt/rows.functions";
 import { downloadWrtRoundtripWorkbook } from "@/lib/wrt/roundtrip-export";
+import { updateWrtField } from "@/lib/wrt/mutations.functions";
+import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
+import { useRclCan } from "@/hooks/useRclCan";
 
 const routeApi = getRouteApi("/_authenticated/closure/warranty/raw-data");
 
@@ -63,6 +66,10 @@ export function WrtRawDataPage() {
 
   const fetchRows = useServerFn(getWrtRowsAsOf);
   const fetchExport = useServerFn(getWrtExportRows);
+  const saveField = useServerFn(updateWrtField);
+  const queryClient = useQueryClient();
+  const { canRow } = useRclCan("WRT", "write");
+  const isToday = asOf === today;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["wrt-rows-as-of", asOf],
@@ -340,9 +347,15 @@ export function WrtRawDataPage() {
                       Team
                     </StickyHead>
                     <StickyHead rowSpan={3} left={400} width={90}>
+                      PIC
+                    </StickyHead>
+                    <StickyHead rowSpan={3} left={490} width={90}>
+                      ENG
+                    </StickyHead>
+                    <StickyHead rowSpan={3} left={580} width={90}>
                       판정
                     </StickyHead>
-                    <StickyHead rowSpan={3} left={490} width={80}>
+                    <StickyHead rowSpan={3} left={670} width={80}>
                       진척률
                     </StickyHead>
                     <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
@@ -400,11 +413,21 @@ export function WrtRawDataPage() {
                 </thead>
                 <tbody>
                   {filtered.map((r) => (
-                    <WrtTableRow key={r.id} row={r} catalog={catalog} subHeaders={subHeaders} />
+                    <WrtTableRow
+                      key={r.id}
+                      row={r}
+                      catalog={catalog}
+                      subHeaders={subHeaders}
+                      canEdit={isToday && canRow(r as unknown as Record<string, unknown>)}
+                      onSave={async (field, value) => {
+                        await saveField({ data: { id: r.id, field, value } });
+                        await queryClient.invalidateQueries({ queryKey: ["wrt-rows-as-of"] });
+                      }}
+                    />
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={10 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={12 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
                         조건에 맞는 행이 없습니다.
                       </td>
                     </tr>
@@ -428,10 +451,14 @@ function WrtTableRow({
   row,
   catalog,
   subHeaders,
+  canEdit,
+  onSave,
 }: {
   row: WrtRow;
   catalog: WrtCatalogEntry[];
   subHeaders: (s: WrtCatalogEntry) => Array<{ field: keyof WrtStageCell; label: string }>;
+  canEdit: boolean;
+  onSave: (field: string, value: string | null) => Promise<void>;
 }) {
   const judgeTone =
     row.judgment === "지연"
@@ -453,9 +480,45 @@ function WrtTableRow({
         {row.plot ? `PLOT-${row.plot}` : "—"}
       </StickyCell>
       <StickyCell left={320} width={80}>
-        {row.team ?? "—"}
+        <AbdEditCellPopover
+          id={row.id}
+          field="team"
+          label="Team"
+          editorType="text"
+          currentValue={row.team}
+          canEdit={canEdit}
+          saveFn={async (p) => onSave(p.field, p.value == null ? null : String(p.value))}
+        >
+          <span>{row.team ?? "—"}</span>
+        </AbdEditCellPopover>
       </StickyCell>
       <StickyCell left={400} width={90}>
+        <AbdEditCellPopover
+          id={row.id}
+          field="pic"
+          label="PIC"
+          editorType="text"
+          currentValue={row.pic}
+          canEdit={canEdit}
+          saveFn={async (p) => onSave(p.field, p.value == null ? null : String(p.value))}
+        >
+          <span>{row.pic ?? "—"}</span>
+        </AbdEditCellPopover>
+      </StickyCell>
+      <StickyCell left={490} width={90}>
+        <AbdEditCellPopover
+          id={row.id}
+          field="eng"
+          label="ENG"
+          editorType="text"
+          currentValue={row.eng}
+          canEdit={canEdit}
+          saveFn={async (p) => onSave(p.field, p.value == null ? null : String(p.value))}
+        >
+          <span>{row.eng ?? "—"}</span>
+        </AbdEditCellPopover>
+      </StickyCell>
+      <StickyCell left={580} width={90}>
         <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>{row.judgment}</span>
         {(row.hdec_actual_count ?? 0) === 0 && (
           <span
@@ -466,7 +529,7 @@ function WrtTableRow({
           </span>
         )}
       </StickyCell>
-      <StickyCell left={490} width={80} className="tabular-nums">
+      <StickyCell left={670} width={80} className="tabular-nums">
         {row.progress_pct == null ? "—" : `${row.progress_pct}%`}
         <span className="ml-1 text-[9px] text-muted-foreground">
           {row.done}/{row.denom}

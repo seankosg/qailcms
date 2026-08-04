@@ -16,10 +16,15 @@ export interface AbdEditCellPopoverProps {
   currentValue: any;
   canEdit?: boolean;
   onSaved?: (val: any) => void;
+  /**
+   * 저장 경로 교체용 (기본 = ABD `updateAbdField`).
+   * WRT/SPL Raw Data 최소 편집이 같은 팝오버 UI를 그대로 재사용한다.
+   */
+  saveFn?: (payload: { id: string; field: string; value: any }) => Promise<unknown>;
   children: React.ReactNode;
 }
 
-export function AbdEditCellPopover({ id, field, label, editorType, options, currentValue, canEdit = true, onSaved, children }: AbdEditCellPopoverProps) {
+export function AbdEditCellPopover({ id, field, label, editorType, options, currentValue, canEdit = true, onSaved, saveFn, children }: AbdEditCellPopoverProps) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState<any>(currentValue ?? "");
   const [busy, setBusy] = useState(false);
@@ -33,7 +38,8 @@ export function AbdEditCellPopover({ id, field, label, editorType, options, curr
     try {
       const raw = value === "__null__" ? "" : value;
       const nextVal = raw === "" ? null : editorType === "number" ? Number(raw) : raw;
-      await updateAbdField({ data: { id, field, value: nextVal } });
+      if (saveFn) await saveFn({ id, field, value: nextVal });
+      else await updateAbdField({ data: { id, field, value: nextVal } });
       toast.success(`${label} 저장됨`);
       onSaved?.(nextVal);
       setOpen(false);

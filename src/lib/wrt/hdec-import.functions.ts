@@ -35,6 +35,8 @@ const InputSchema = z.object({
   rows: z.array(RowSchema).max(20000),
   apply: z.boolean().default(false),
   allow_deletes: z.boolean().default(false),
+  /** 클라이언트가 서버 `rcl_import_filter` 로 걸러낸 결과 요약 (감사 로그용) */
+  scope_note: z.string().optional(),
 });
 
 export type WrtChange = { target: string; field: string; previous: string | null; next: string | null };
@@ -82,12 +84,14 @@ async function readIntegrity(supa: any) {
 }
 
 async function assertEditor(ctx: any) {
-  const [{ data: isAdmin }, { data: isSuper }, { data: isD }] = await Promise.all([
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" }),
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "superuser" }),
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "d_superuser" }),
-  ]);
-  if (!isAdmin && !isSuper && !isD) throw new Error("권한 없음: 관리자만 WRT 임포트를 실행할 수 있습니다");
+  // RCL 정본: 역할 × 범위 격자에서 WRT/import 가 한 범위라도 열려 있어야 실행 가능.
+  // 행 단위 판정은 화면에서 `rcl_import_filter` 가, 쓰기 차단은 RLS 가 담당한다.
+  const { data, error } = await ctx.supabase.rpc("rcl_grants", { _module: "WRT", _action: "import" });
+  if (error) throw new Error(`권한 조회 실패: ${error.message}`);
+  const g = data as { role: string | null; own: boolean; own_team: boolean; other_team: boolean } | null;
+  if (!g?.role || !(g.own || g.own_team || g.other_team)) {
+    throw new Error("권한 없음: WRT 임포트 권한이 없습니다");
+  }
 }
 
 async function fetchAll(supa: any, table: string, cols: string) {
@@ -284,7 +288,7 @@ export const importWrtHdecBatch = createServerFn({ method: "POST" })
         items_updated: itemsUpdated,
         stages_upserted: stagesUpserted,
         finished_at: new Date().toISOString(),
-        note: `rows=${data.rows.length} changed=${rowsChanged} cleared=${cleared} unmatched=${unmatched.length}`,
+        note: `rows=${data.rows.length} changed=${rowsChanged} cleared=${cleared} unmatched=${unmatched.length}${data.scope_note ? ` ${data.scope_note}` : ""}`,
       })
       .eq("id", batchId);
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,9 @@ import {
   type SplStageCell,
 } from "@/lib/spl/rows.functions";
 import { downloadSplRoundtripWorkbook } from "@/lib/spl/roundtrip-export";
+import { updateSplField } from "@/lib/spl/mutations.functions";
+import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
+import { useRclCan } from "@/hooks/useRclCan";
 
 const routeApi = getRouteApi("/_authenticated/closure/spare-part/raw-data");
 
@@ -56,6 +59,10 @@ export function SplRawDataPage() {
 
   const fetchRows = useServerFn(getSplRowsAsOf);
   const fetchExport = useServerFn(getSplExportRows);
+  const saveField = useServerFn(updateSplField);
+  const queryClient = useQueryClient();
+  const { canRow } = useRclCan("SPL", "write");
+  const isToday = asOf === today;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["spl-rows-as-of", asOf],
@@ -319,6 +326,18 @@ export function SplRawDataPage() {
                       대표 지연
                     </th>
                     <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      PIC
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      ENG
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      PIC PO
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      ENG PO
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
                       Req.Doc
                     </th>
                     <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
@@ -364,11 +383,21 @@ export function SplRawDataPage() {
                 </thead>
                 <tbody>
                   {filtered.map((r) => (
-                    <SplTableRow key={r.id} row={r} catalog={catalog} subHeaders={subHeaders} />
+                    <SplTableRow
+                      key={r.id}
+                      row={r}
+                      catalog={catalog}
+                      subHeaders={subHeaders}
+                      canEdit={isToday && canRow(r as unknown as Record<string, unknown>)}
+                      onSave={async (field, value) => {
+                        await saveField({ data: { id: r.id, field, value } });
+                        await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
+                      }}
+                    />
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={9 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={13 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
                         조건에 맞는 행이 없습니다.
                       </td>
                     </tr>
@@ -388,14 +417,48 @@ export function SplRawDataPage() {
   );
 }
 
+function SplEditableCell({
+  row,
+  field,
+  label,
+  value,
+  canEdit,
+  onSave,
+}: {
+  row: SplRow;
+  field: string;
+  label: string;
+  value: string | null;
+  canEdit: boolean;
+  onSave: (field: string, value: string | null) => Promise<void>;
+}) {
+  return (
+    <AbdEditCellPopover
+      id={row.id}
+      field={field}
+      label={label}
+      editorType="text"
+      currentValue={value}
+      canEdit={canEdit}
+      saveFn={async (p) => onSave(p.field, p.value == null ? null : String(p.value))}
+    >
+      <span>{value ?? "—"}</span>
+    </AbdEditCellPopover>
+  );
+}
+
 function SplTableRow({
   row,
   catalog,
   subHeaders,
+  canEdit,
+  onSave,
 }: {
   row: SplRow;
   catalog: SplCatalogEntry[];
   subHeaders: (s: SplCatalogEntry) => Array<{ field: keyof SplStageCell; label: string }>;
+  canEdit: boolean;
+  onSave: (field: string, value: string | null) => Promise<void>;
 }) {
   const judgeTone =
     row.judgment === "지연"
@@ -415,7 +478,7 @@ function SplTableRow({
         {row.plot ? `PLOT-${row.plot}` : "—"}
       </StickyCell>
       <StickyCell left={300} width={80}>
-        {row.team ?? "—"}
+        <SplEditableCell row={row} field="team" label="Team" value={row.team} canEdit={canEdit} onSave={onSave} />
       </StickyCell>
       <StickyCell left={380} width={90}>
         <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>{row.judgment}</span>
@@ -450,6 +513,18 @@ function SplTableRow({
             +{row.delay_bucket.length}
           </span>
         )}
+      </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        <SplEditableCell row={row} field="pic" label="PIC" value={row.pic} canEdit={canEdit} onSave={onSave} />
+      </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        <SplEditableCell row={row} field="eng" label="ENG" value={row.eng} canEdit={canEdit} onSave={onSave} />
+      </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        <SplEditableCell row={row} field="pic_po" label="PIC PO" value={row.pic_po} canEdit={canEdit} onSave={onSave} />
+      </td>
+      <td className="whitespace-nowrap border-b border-l px-2 py-1">
+        <SplEditableCell row={row} field="eng_po" label="ENG PO" value={row.eng_po} canEdit={canEdit} onSave={onSave} />
       </td>
       <td className="whitespace-nowrap border-b border-l px-2 py-1 tabular-nums text-muted-foreground">
         {row.req_doc_done}/{row.req_doc_total}
