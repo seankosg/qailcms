@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { Search, Upload, Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useAbdTeamList } from "@/hooks/useAbdTeamList";
+import { ProgressDonutIcon } from "@/components/shared/ProgressDonutIcon";
 import {
   ABD_TEAMS,
   ABD_COLUMNS,
@@ -1004,10 +1005,6 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
   return <span className="text-xs">{String(v)}</span>;
 }
 
-function UrAgingBadge({ days }: { days: number }) {
-  return <UrAgingBadgeInner days={days} />;
-}
-
 /** OCS Check 셀 — 도넛 + n/m. as-of 과거 조회 시 값이 null 이므로 공란(—). */
 function OcsCheckCell({ value, row }: { value: any; row: AbdItem }) {
   const state = value == null || value === "" ? null : String(value);
@@ -1032,7 +1029,7 @@ function OcsCheckCell({ value, row }: { value: any; row: AbdItem }) {
   );
 }
 
-function UrAgingBadgeInner({ days }: { days: number }) {
+function UrAgingBadge({ days }: { days: number }) {
   const { data: settings } = useAbdSettingsQuery();
   const tone = agingTone(days, settings);
   return (
