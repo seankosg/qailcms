@@ -199,6 +199,7 @@ export const updateUserRole = createServerFn({ method: "POST" })
 
 export const updateLoginId = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string; login_id: string }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
