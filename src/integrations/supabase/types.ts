@@ -2438,6 +2438,36 @@ export type Database = {
         }
         Relationships: []
       }
+      rcl_module_config_audit: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          changed_by_name: string | null
+          id: string
+          module: string
+          new_team: string | null
+          old_team: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          id?: string
+          module: string
+          new_team?: string | null
+          old_team?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          id?: string
+          module?: string
+          new_team?: string | null
+          old_team?: string | null
+        }
+        Relationships: []
+      }
       rcl_permissions: {
         Row: {
           action: string
@@ -3876,6 +3906,7 @@ export type Database = {
           total_rows: number
           updated: number
           updated_at: string
+          warnings: Json | null
         }
         Insert: {
           created_at?: string
@@ -3899,6 +3930,7 @@ export type Database = {
           total_rows?: number
           updated?: number
           updated_at?: string
+          warnings?: Json | null
         }
         Update: {
           created_at?: string
@@ -3922,6 +3954,7 @@ export type Database = {
           total_rows?: number
           updated?: number
           updated_at?: string
+          warnings?: Json | null
         }
         Relationships: []
       }
@@ -5940,6 +5973,8 @@ export type Database = {
         Args: { _batch_id: string }
         Returns: Json
       }
+      rcl_bulk_role_apply: { Args: { _items: Json }; Returns: Json }
+      rcl_bulk_role_preview: { Args: { _items: Json }; Returns: Json }
       rcl_can: {
         Args: {
           _action: string
@@ -5997,6 +6032,17 @@ export type Database = {
       rcl_scope_of_values: {
         Args: { _module: string; _user_id: string; _values: Json }
         Returns: string
+      }
+      rcl_set_module_owning_team: {
+        Args: { _module: string; _team: string }
+        Returns: Json
+      }
+      rcl_team_user_counts: {
+        Args: never
+        Returns: {
+          cnt: number
+          team: string
+        }[]
       }
       recalc_task_auto_judgment: {
         Args: { _discipline?: string }

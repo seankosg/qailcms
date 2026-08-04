@@ -227,6 +227,11 @@ function PermissionsAdminPage() {
             </span>
           )}
           <span className="ml-2 text-xs text-muted-foreground">guest · super_guest 는 정본 미확정(BACKLOG #0804)으로 대조 제외.</span>
+          <div className="mt-1 text-xs text-muted-foreground">
+            어긋난 칸은 <b>알림만</b> 합니다. 자동 정정하지 않습니다 — 어느 쪽이 맞는지는 지시자가 정합니다.
+            {" "}격자 값은 <b>DB(rcl_permissions)</b> 에서 읽고 기준표는 <b>코드(src/lib/auth/rcl-canonical.ts)</b> 에 있습니다.
+            정본이 바뀌면 이 파일을 고치고 <b>배포</b>해야 배너 기준이 바뀝니다.
+          </div>
         </div>
       )}
 
