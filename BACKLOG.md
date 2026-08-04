@@ -410,3 +410,5 @@
 - [보류] SPL·WRT RLS 범위 술어 — 현행 유지(admin·superuser·d_superuser). 행 가드 없이 먼저 열지 않는다.
 - [보류] SPL·WRT 는 RCL 검증 모집단에서 제외(§C-4).
 - [보류] rcl_scope_of_values 가 rcl_scope 로직을 SQL 복제 중(2벌) — 위임 구조로 통합 검토(지시 없어 미시행).
+
+- [ ] #0804 isAdmin(admin ∪ superuser) → isAdminOrSuperuser 로 명칭 변경. isStrictAdmin(admin 단독)과 혼동 방지. 배포 이후 착수. (2026-08-04 지시 §3)
