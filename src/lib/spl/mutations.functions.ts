@@ -33,7 +33,7 @@ export const updateSplField = createServerFn({ method: "POST" })
     const value = data.value === null || data.value.trim() === "" ? null : data.value.trim();
     const { error } = await (context.supabase as any)
       .from("spl_items")
-      .update({ [data.field]: value, updated_at: new Date().toISOString() })
+      .update({ [data.field]: value, updated_at: new Date().toISOString(), updated_by: context.userId })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
