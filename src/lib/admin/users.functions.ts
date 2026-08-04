@@ -161,6 +161,7 @@ export const resetUserPassword = createServerFn({ method: "POST" })
   });
 
 export const updateUserRole = createServerFn({ method: "POST" })
+  // (아래 updateUserRole 정의는 그대로)
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string; role: AppRole }) => input)
   .handler(async ({ data, context }) => {
