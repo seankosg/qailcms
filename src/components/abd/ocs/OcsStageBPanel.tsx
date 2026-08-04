@@ -439,14 +439,34 @@ export function OcsStageBPanel() {
           },
         },
       });
+      const { count: runCount } = await supabase
+        .from("abd_ocs_import_logs")
+        .select("id", { count: "exact", head: true });
       setResult({
-        ...totals,
-        ...att,
-        ...fin,
-        verify: ver,
-        storage_missing: missing,
-        storage_orphan: orphan,
-        conflicts: conflicts.length,
+        run_id: logId,
+        run_ordinal: runCount ?? null,
+        comments: {
+          inserted: totals.inserted,
+          updated: totals.updated,
+          unchanged: totals.unchanged,
+          inactivated: numOf(fin["inactivated"]),
+          linked: totals.linked,
+          unmatched: totals.unmatched,
+        },
+        compliance: {
+          inserted: totals.compliance_inserted,
+          existing: Math.max(0, (dry?.new_a ?? 0) - totals.compliance_inserted),
+        },
+        attachments: { ...att },
+        raw: {
+          ...totals,
+          attachments: att,
+          finalize: fin,
+          verify: ver,
+          storage_missing: missing,
+          storage_orphan: orphan,
+          conflicts: conflicts.length,
+        },
       });
       toast.success("Stage B import 완료");
     } catch (e) {
