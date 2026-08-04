@@ -85,7 +85,8 @@ export const createAppUser = createServerFn({ method: "POST" })
     // 이름은 사용자 식별 정본 키 — 필수 + 전역 유일.
     const name = (data.name ?? "").trim();
     if (!name) throw new Error("이름은 필수입니다. (사용자 식별 정본 키)");
-    const nameNorm = name.replace(/\s+/g, " ").toUpperCase();
+    // public.hdec_name_norm(name) 과 동일 규칙: 공백류 축약 → trim → 대문자
+    const nameNorm = name.replace(/\s+/g, " ").trim().toUpperCase();
     const { data: dup } = await supabaseAdmin
       .from("profiles")
       .select("id,name")

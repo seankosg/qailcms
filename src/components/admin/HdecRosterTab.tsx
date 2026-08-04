@@ -205,7 +205,7 @@ function CreateAccountDialog({
   kind, row, onClose, onDone,
 }: { kind: "eng" | "pic"; row: RosterRow | null; onClose: () => void; onDone: () => void }) {
   const create = useServerFn(createAppUser);
-  const teams = useTeamOptions();
+  const { data: teams = [] } = useTeamOptions();
   const [loginId, setLoginId] = useState("");
   const [team, setTeam] = useState<string>("__none__");
   const [role, setRole] = useState<AppRole>("user");
@@ -285,8 +285,8 @@ function CreateAccountDialog({
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">—</SelectItem>
-                    {(teams ?? []).map((t: any) => (
-                      <SelectItem key={t.code ?? t} value={t.code ?? t}>{t.code ?? t}</SelectItem>
+                    {teams.map((t) => (
+                      <SelectItem key={t.code} value={t.code}>{t.code} — {t.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
