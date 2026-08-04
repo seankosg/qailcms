@@ -5949,6 +5949,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      rcl_can_rows: {
+        Args: { _action: string; _module: string; _row_ids: string[] }
+        Returns: Json
+      }
+      rcl_can_values: {
+        Args: { _action: string; _module: string; _values: Json }
+        Returns: boolean
+      }
+      rcl_grants: { Args: { _action: string; _module: string }; Returns: Json }
       rcl_highest_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

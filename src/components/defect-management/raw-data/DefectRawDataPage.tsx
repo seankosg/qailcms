@@ -56,7 +56,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTeamOptions } from "@/lib/team/team-master";
-import { canEditRawRow } from "@/lib/auth/roles";
+import { useRclCan } from "@/hooks/useRclCan";
 import {
   EMPTY_TOKEN,
   TEXT_FILTER_FIELDS,
@@ -322,9 +322,11 @@ export function DefectRawDataPage() {
   const { data: user } = useCurrentUser();
   const { data: teamOptions = [] } = useTeamOptions();
   const teamCodesForEdit = useMemo(() => teamOptions.map((t) => t.code), [teamOptions]);
+  // 판정 정본: 서버 RCL(`rcl_grants`). 화면은 규칙을 재구현하지 않는다.
+  const { canRow: canRclRow, anyScope: canBulkEdit } = useRclCan("SM", "write");
   const canEditRow = useCallback(
-    (row: DefectItem) => canEditRawRow(user ?? null, "defect_items_raw", row as unknown as Record<string, any>),
-    [user],
+    (row: DefectItem) => canRclRow(row as unknown as Record<string, unknown>),
+    [canRclRow],
   );
   const { data: fieldConfig = [], isPending: fieldConfigPending } = useDefectFieldConfig();
   const helpers = useDefectFieldHelpers();
@@ -1052,7 +1054,8 @@ export function DefectRawDataPage() {
         selectedRows={selectedRows as any}
         fields={bulkFields}
         exportColumns={exportColumns}
-        canEdit={isAdmin}
+        canEdit={canBulkEdit}
+        canEditRow={canEditRow as unknown as (row: Record<string, any>) => boolean}
         onClearSelection={() => { setRowSelection({}); setAllMatchIds(null); }}
         onApplied={() => { setRowSelection({}); setAllMatchIds(null); invalidateDefects(); }}
       />

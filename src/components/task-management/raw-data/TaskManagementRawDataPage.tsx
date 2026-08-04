@@ -90,7 +90,7 @@ import {
   CLIENT_ONLY_FILTER_COLUMNS,
   CLIENT_ONLY_SORT_COLUMNS,
 } from "@/lib/task-management/server-bridge";
-import { canEditRawRow } from "@/lib/auth/roles";
+import { useRclCan } from "@/hooks/useRclCan";
 import { EditCellPopover } from "./EditCellPopover";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
 import { DISCIPLINES } from "@/lib/task-management/columns";
@@ -228,18 +228,16 @@ function modeToColumnFilters(
 export function TaskManagementRawDataPage() {
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
-  const canEdit = !!currentUser?.isAdmin;
-  const isSuperUser = !!(currentUser as any)?.isSuperUser;
-  const isDSuperUser = !!(currentUser as any)?.isDSuperUser;
-  const canEditTaskNo = canEdit || isDSuperUser;
-  const canEditOwnerFieldsBase = canEdit || isSuperUser;
+  // 판정 정본: 서버 RCL(`rcl_grants` → `rcl_permissions`). 화면은 규칙을 재구현하지 않는다.
+  const { grants, canRow, anyScope } = useRclCan("TM", "write");
+  const isAdmin = !!currentUser?.isAdmin;
+  /** 벌크 편집/추가 진입 게이트 — 어떤 행이든 편집 여지가 있으면 연다(행 필터는 canEditRow). */
+  const canEdit = anyScope;
+  /** 모듈 전체 범위(other_team) 편집권이 있어야 하는 필드(담당자·과업코드) */
+  const canEditOwnerFieldsBase = !!grants?.other_team;
   const myPic = String((currentUser as any)?.hdec_pic_name ?? "").trim().toLowerCase();
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
-  const canEditRow = useCallback(
-    (row: Record<string, unknown>) =>
-      canEditRawRow(currentUser ?? null, "task_management_raw", row as Record<string, any>),
-    [currentUser],
-  );
+  const canEditRow = canRow;
   const { data: fieldConfig } = useTaskManagementFieldConfig();
   const labelOverrides = useMemo(() => buildTmLabelOverrides(fieldConfig), [fieldConfig]);
   const viewPref = useUserViewPreference("task-management.raw-data.v1");
@@ -1073,7 +1071,7 @@ export function TaskManagementRawDataPage() {
           const rr = row.original as any;
           const isMain = rr.level === "main";
           const dyn = cellDynRef.current;
-          // 통합 편집 규칙: canEditRawRow 만으로 판단 (역할 rank / d_superuser team / user PIC).
+          // 통합 편집 규칙: 서버 RCL 판정(useRclCan → rcl_grants/rcl_can) 결과만으로 판단.
           const rowCanEdit = dyn.canEditRow(rr as Record<string, unknown>);
           const isTeamOverride = c.key === "team";
           const isDataDateOverride = c.key === "data_date";
@@ -1363,7 +1361,7 @@ export function TaskManagementRawDataPage() {
             onOrderChange={setOrder}
             onVisibilityChange={setVisibility}
             onFrozenChange={setFrozenExtras}
-            isAdmin={canEdit}
+            isAdmin={isAdmin}
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
           />

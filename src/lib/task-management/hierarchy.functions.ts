@@ -21,16 +21,36 @@ const AddChildSchema = z.object({
   plan_end: z.string().nullable().optional(),
 });
 
-async function assertAdmin(context: { supabase: any; userId: string }) {
-  const { data: isAdmin } = await context.supabase.rpc("has_role", {
+/** RCL 정본 — 부모 행에 대한 write 판정. 규칙은 DB `rcl_can` 하나뿐이다. */
+async function assertRclRow(
+  context: { supabase: any; userId: string },
+  rowId: string,
+  action: "write" | "delete" = "write",
+) {
+  const { data, error } = await context.supabase.rpc("rcl_can", {
     _user_id: context.userId,
-    _role: "admin",
+    _module: "TM",
+    _row_id: rowId,
+    _action: action,
   });
-  const { data: isSuper } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "superuser",
+  if (error) throw new Error(`권한 판정 실패: ${error.message}`);
+  if (data !== true) throw new Error("권한 없음: 이 과업에 하위 태스크를 추가할 수 없습니다");
+}
+
+/** RCL 정본 — 생성될 행의 값(담당자·팀)에 대한 판정. */
+async function assertRclValues(
+  context: { supabase: any; userId: string },
+  values: Record<string, unknown>,
+  action: "write" = "write",
+  message = "권한 없음: 지정한 담당자/팀 범위에는 등록할 수 없습니다",
+) {
+  const { data, error } = await context.supabase.rpc("rcl_can_values", {
+    _module: "TM",
+    _values: values,
+    _action: action,
   });
-  if (!isAdmin && !isSuper) throw new Error("권한 없음: 관리자만 Sub Task를 추가할 수 있습니다");
+  if (error) throw new Error(`권한 판정 실패: ${error.message}`);
+  if (data !== true) throw new Error(message);
 }
 
 /**
@@ -43,7 +63,6 @@ export const addChildTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => AddChildSchema.parse(v))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const admin = supabaseAdmin as any;
 
@@ -56,6 +75,14 @@ export const addChildTask = createServerFn({ method: "POST" })
       .maybeSingle();
     if (pErr) throw new Error(pErr.message);
     if (!parent) throw new Error(`Main Task '${data.main_task_no}'을(를) 찾을 수 없습니다`);
+
+    // 1-1) 권한: 부모 행 write + 생성될 자식의 담당자/팀 범위
+    await assertRclRow(context, parent.id as string, "write");
+    await assertRclValues(context, {
+      hdec_pic_name: data.hdec_pic_name ?? null,
+      hdec_eng_name: data.hdec_eng_name ?? null,
+      team: parent.team ?? null,
+    });
 
     // 2) 채번: DB advisory lock 기반 RPC (경합 안전)
     const { data: allocated, error: allocErr } = await admin.rpc("allocate_task_no", {
@@ -176,40 +203,33 @@ const AddMainSchema = z.object({
   subs: z.array(SubSchema).min(1),
 });
 
-async function assertCanCreateMain(context: { supabase: any; userId: string }, disc: string) {
-  const roleCheck = async (role: string) => {
-    const { data } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: role });
-    return !!data;
-  };
-  const [isAdmin, isSuper, isSenior, isDSuper, isUser] = await Promise.all([
-    roleCheck("admin"), roleCheck("superuser"), roleCheck("senior_user"),
-    roleCheck("d_superuser"), roleCheck("user"),
-  ]);
-  if (!isAdmin && !isSuper && !isSenior && !isDSuper && !isUser) {
-    throw new Error("권한 없음: Task를 추가할 수 없습니다");
-  }
-  return { isAdmin, isSuper, isSenior, isDSuper, isUser };
-}
-
 /** Main Task 1개 + Sub Task N개(>=1) 원자적 생성 후 롤업. */
 export const addMainTaskWithSubs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => AddMainSchema.parse(v))
   .handler(async ({ data, context }) => {
-    const perms = await assertCanCreateMain(context, data.discipline);
-
-    // user / d_superuser: HDEC PIC 또는 팀 강제 확인 (profiles.hdec_pic_name / team)
-    if (!perms.isAdmin && !perms.isSuper && !perms.isSenior) {
-      const { data: prof } = await context.supabase
-        .from("profiles").select("hdec_pic_name, team").eq("id", context.userId).maybeSingle();
-      const myPic = (prof?.hdec_pic_name ?? "").trim();
-      const myTeam = (prof?.team ?? "").trim();
-      if (perms.isUser && myPic && data.main.hdec_pic_name.trim() !== myPic) {
-        throw new Error("권한: HDEC PIC는 본인 이름으로만 등록 가능합니다");
-      }
-      if ((perms.isUser || perms.isDSuper) && myTeam && data.main.team.trim() !== myTeam) {
-        throw new Error("권한: Team은 본인 소속으로만 등록 가능합니다");
-      }
+    // 판정 정본: DB `rcl_can_values` 단일 경로 (Main + 모든 Sub 의 담당자/팀 범위).
+    await assertRclValues(
+      context,
+      {
+        hdec_pic_name: data.main.hdec_pic_name,
+        hdec_eng_name: data.main.hdec_eng_name ?? null,
+        team: data.main.team,
+      },
+      "write",
+      "권한 없음: 지정한 담당자/팀 범위에는 Main Task를 등록할 수 없습니다",
+    );
+    for (const s of data.subs) {
+      await assertRclValues(
+        context,
+        {
+          hdec_pic_name: s.hdec_pic_name,
+          hdec_eng_name: s.hdec_eng_name ?? null,
+          team: data.main.team,
+        },
+        "write",
+        `권한 없음: Sub Task 담당자 '${s.hdec_pic_name}' 는 등록 범위를 벗어납니다`,
+      );
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

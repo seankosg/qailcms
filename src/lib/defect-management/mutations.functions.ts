@@ -47,7 +47,7 @@ async function assertAdmin(ctx: any) {
 }
 
 /**
- * 행 단위 편집 권한 (클라이언트 canEditRawRow 와 동일 규칙).
+ * 행 단위 편집 권한 — 판정 정본은 DB `rcl_can`(can_edit_row 가 위임).
  * 정본 = public.can_edit_row(user, table, row): admin/superuser 전체,
  * QAQC HDEC PIC/ENG 읽기전용, senior_user 전체, d_superuser 팀 일치, user 본인 PIC 행.
  */

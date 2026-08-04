@@ -47,6 +47,8 @@ interface Props {
   selectedRows: Record<string, unknown>[];
   exportColumns: ExportColumn[];
   canEdit: boolean;
+  /** 행 단위 편집 판정자 — 서버 RCL(`useRclCan`) 결과를 그대로 받는다. */
+  canEditRow?: (row: Record<string, unknown>) => boolean;
   onClear: () => void;
   onMutated: () => void;
 }
@@ -55,6 +57,7 @@ export function AbdBulkEditBar({
   selectedRows,
   exportColumns,
   canEdit,
+  canEditRow,
   onClear,
   onMutated,
 }: Props) {
@@ -82,9 +85,14 @@ export function AbdBulkEditBar({
   );
 
   const count = selectedRows.length;
+  const editableRows = useMemo(
+    () => (canEditRow ? selectedRows.filter((r) => canEditRow(r)) : selectedRows),
+    [selectedRows, canEditRow],
+  );
+  const skippedCount = selectedRows.length - editableRows.length;
   const ids = useMemo(
-    () => selectedRows.map((r) => String(r.id ?? "")).filter(Boolean),
-    [selectedRows],
+    () => editableRows.map((r) => String(r.id ?? "")).filter(Boolean),
+    [editableRows],
   );
 
   if (count === 0) return null;
@@ -136,7 +144,7 @@ export function AbdBulkEditBar({
         failed += r.failed;
       }
       toast.success(failed > 0 ? "부분 반영" : "저장 완료", {
-        description: `${ok} updated${failed > 0 ? ` · ${failed} 실패` : ""}`,
+        description: `${ok} updated${failed > 0 ? ` · ${failed} 실패` : ""}${skippedCount > 0 ? ` · ${skippedCount} 권한없음 제외` : ""}`,
       });
       setConfirmOpen(false);
       reset();
@@ -180,6 +188,10 @@ export function AbdBulkEditBar({
           <div className="flex items-center gap-2 pr-2">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
             <span className="text-sm font-semibold">{count} selected</span>
+            <span className="text-[11px] text-muted-foreground">
+              적용 {ids.length}
+              {skippedCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">· 권한 밖 제외 {skippedCount}</span>}
+            </span>
           </div>
 
           <div className="flex flex-1 flex-wrap items-center gap-2">

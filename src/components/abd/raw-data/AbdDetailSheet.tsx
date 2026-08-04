@@ -8,7 +8,7 @@ import { CommentsThread, ABD_CATEGORIES } from "@/components/shared/CommentsThre
 import { formatDdMmmYyyy } from "@/lib/time/doha";
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { canEditRawRow } from "@/lib/auth/roles";
+import { useRclCan } from "@/hooks/useRclCan";
 import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "@/components/abd/dashboard/AbdAgingSettingsPopover";
 import { formatAbdStage } from "@/lib/abd/columns";
 
@@ -86,6 +86,8 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
   const [changes, setChanges] = useState<ChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const { data: me } = useCurrentUser();
+  // 판정 정본: 서버 RCL
+  const { canRow: canAbdRow } = useRclCan("ABD", "write");
   const { data: settings } = useAbdSettingsQuery();
   const roundsRef = useRef<HTMLElement>(null);
   const aconexRef = useRef<HTMLElement>(null);
@@ -138,7 +140,7 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
     setItem(it as any);
   };
 
-  const canEdit = !!item && canEditRawRow(me as any, "abd_items_raw", item as any);
+  const canEdit = !!item && canAbdRow(item as unknown as Record<string, unknown>);
   const aging = item?.ur_aging_days as number | null | undefined;
   const tone = agingTone(aging ?? null, settings);
 
