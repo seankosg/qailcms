@@ -240,7 +240,11 @@ export function OcsAtomicV2Panel() {
           total_count: rows.length,
           attachment_total: links?.rows.length ?? 0,
           snapshot_id: snapshotId,
-          dryrun: { ...(dry ?? {}), attachments: dryAtt ?? {} },
+          dryrun: {
+            ...(dry ?? {}),
+            distinct: dryDistinct ?? {},
+            attachments: attDistinct ?? dryAtt ?? {},
+          },
         },
       })) as { id: string };
 
@@ -394,7 +398,18 @@ export function OcsAtomicV2Panel() {
           <div className="space-y-2 rounded-md border p-3">
             <div className="text-xs font-medium">Dry-run 결과</div>
             <div className="flex flex-wrap gap-1.5">{kv(dry)}</div>
-            {dryAtt && <div className="flex flex-wrap gap-1.5">{kv(dryAtt)}</div>}
+            {dryDistinct && (
+              <>
+                <div className="text-xs font-medium pt-1">전역 고유값 (배치 합산 아님)</div>
+                <div className="flex flex-wrap gap-1.5">{kv(dryDistinct)}</div>
+              </>
+            )}
+            {attDistinct && (
+              <>
+                <div className="text-xs font-medium pt-1">첨부 링크</div>
+                <div className="flex flex-wrap gap-1.5">{kv(attDistinct)}</div>
+              </>
+            )}
           </div>
         )}
 
