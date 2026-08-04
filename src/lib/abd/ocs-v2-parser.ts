@@ -138,6 +138,10 @@ function rowsOf(json: unknown, extraKeys: string[] = []): Record<string, unknown
 
 export function parseOcsV2CommentJson(json: unknown): OcsV2CommentParse {
   const raw = rowsOf(json, ["atomic_comments"]);
+  const box = (json ?? {}) as Record<string, unknown>;
+  const declaredGroups = Array.isArray(box["comment_groups"])
+    ? (box["comment_groups"] as unknown[]).length
+    : null;
   const rows: OcsV2CommentRow[] = [];
   const invalid_rows: { index: number; reason: string }[] = [];
 
@@ -209,6 +213,11 @@ export function parseOcsV2CommentJson(json: unknown): OcsV2CommentParse {
 
   const single = rows.filter((r) => r.source_comment_id === r.source_parent_comment_id).length;
 
+  const byParent = new Map<string, number>();
+  for (const r of rows) byParent.set(r.source_parent_comment_id, (byParent.get(r.source_parent_comment_id) ?? 0) + 1);
+  const single_parent_count = Array.from(byParent.values()).filter((c) => c === 1).length;
+  const multi_derived = Array.from(byParent.values()).filter((c) => c > 1).length;
+
   return {
     total_raw: raw.length,
     rows,
@@ -217,6 +226,9 @@ export function parseOcsV2CommentJson(json: unknown): OcsV2CommentParse {
     duplicated_comment_ids: Array.from(dup),
     single_rows: single,
     split_rows: rows.length - single,
+    source_parent_count: byParent.size,
+    multi_group_count: declaredGroups ?? multi_derived,
+    single_parent_count,
   };
 }
 
@@ -241,11 +253,16 @@ export function parseOcsV2LinkJson(json: unknown): OcsV2LinkParse {
     }
     seen.add(key);
     const st = (s(pick(r, K.mapStatus)) ?? "confirmed").toLowerCase();
+    statusCounts[st] = (statusCounts[st] ?? 0) + 1;
     rows.push({
       source_attachment_id: said,
       source_comment_id: scid,
       mapping_method: s(pick(r, K.mapMethod)) ?? "ui_access_link",
-      mapping_status: st === "inherited" ? "inherited" : st === "unresolved" ? "unresolved" : "confirmed",
+      mapping_status: st.includes("inherit")
+        ? "inherited"
+        : st.includes("unresolved")
+          ? "unresolved"
+          : "confirmed",
       sort_order: n(pick(r, K.sortOrder)),
     });
   });
@@ -257,6 +274,10 @@ export function parseOcsV2LinkJson(json: unknown): OcsV2LinkParse {
     duplicated_pairs: dup,
     distinct_attachments: new Set(rows.map((r) => r.source_attachment_id)).size,
     distinct_comments: new Set(rows.map((r) => r.source_comment_id)).size,
+    confirmed_high: rows.filter((r) => r.mapping_status === "confirmed").length,
+    group_inherited_access: rows.filter((r) => r.mapping_status === "inherited").length,
+    unresolved_rows: rows.filter((r) => r.mapping_status === "unresolved").length,
+    status_counts: statusCounts,
   };
 }
 
