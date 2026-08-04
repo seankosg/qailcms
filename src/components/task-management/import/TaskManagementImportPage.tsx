@@ -993,6 +993,21 @@ function FileRow({
                 Judgment: {f.result.judgmentRecalculated}
               </Badge>
             )}
+          {typeof f.result.outOfScope === "number" && f.result.outOfScope > 0 && (
+            <Badge variant="outline" className="border-orange-400 text-orange-700">
+              범위 밖 미반영: {f.result.outOfScope}
+            </Badge>
+          )}
+        </div>
+      )}
+      {f.result?.outOfScopeKeys && f.result.outOfScopeKeys.length > 0 && (
+        <div className="mt-2 space-y-1 rounded border border-orange-400/50 bg-orange-500/5 p-2 text-[11px] text-orange-800">
+          <div className="font-semibold">
+            권한 범위 밖이라 반영되지 않은 행 {f.result.outOfScopeKeys.length}건
+          </div>
+          <div className="max-h-40 overflow-auto font-mono leading-5">
+            {f.result.outOfScopeKeys.join(", ")}
+          </div>
         </div>
       )}
       {f.result?.errors && f.result.errors.length > 0 && (

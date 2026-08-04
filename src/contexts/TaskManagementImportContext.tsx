@@ -25,6 +25,7 @@ import {
   type PreflightSummary,
 } from "@/lib/task-management/import-preflight.functions";
 import { takePreImportSnapshotWithFeedback } from "@/lib/backup/pre-import-snapshot";
+import { rclImportFilter, rclKeyOf } from "@/lib/import/rcl-import-filter";
 
 export type RollupMode = "auto" | "keep" | "blank";
 
@@ -94,6 +95,10 @@ export interface TmImportFileItem {
     judgmentRecalculated?: number;
     renumbered?: number;
     resolvedByDecision?: number;
+    /** RCL 범위 밖이라 서버 판정에서 제외된 행 수 */
+    outOfScope?: number;
+    /** 제외된 행의 task_no 목록 (조용한 누락 방지) */
+    outOfScopeKeys?: string[];
     errors?: ImportErrorEntry[];
   };
 }
@@ -578,14 +583,57 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         ? "all"
         : importScopeRef.current;
       const meNorm = normalizePic(importerHdecPicRef.current);
+      const discipline = f.discipline ?? "ARCH";
+
+      // ── RCL 서버 판정 (정본) ────────────────────────────────────────────
+      // 스코프 판정은 클라이언트가 하지 않는다. 서버 rcl_can(..., 'import') 결과만 신뢰.
+      const MATCH_COLS = ["discipline", "task_no"];
+      let serverAllowed: typeof parsedAll = [];
+      let outOfScopeKeys: string[] = [];
+      try {
+        const rcl = await rclImportFilter(
+          "TM",
+          MATCH_COLS,
+          parsedAll.map((p) => ({
+            discipline,
+            task_no: p.task_no,
+            team: (p as any).team ?? null,
+            hdec_pic_name: p.hdec_pic_name ?? null,
+            hdec_eng_name: (p as any).hdec_eng_name ?? null,
+          })),
+        );
+        serverAllowed = parsedAll.filter((p) =>
+          rcl.allowedKeys.has(rclKeyOf(MATCH_COLS, { discipline, task_no: p.task_no })),
+        );
+        outOfScopeKeys = rcl.denied.map(
+          (d) => `${d.key["task_no"] ?? "-"} (${d.scope})`,
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        toast.error(`${f.name}: 권한 판정 실패로 임포트 중단 — ${msg}`);
+        setFiles((cur) =>
+          cur.map((x) => (x.id === f.id ? { ...x, status: "failed", error: msg } : x)),
+        );
+        continue;
+      }
+      const outOfScope = outOfScopeKeys.length;
+      if (outOfScope > 0) {
+        toast.warning(
+          `${f.name}: 범위 밖이라 반영되지 않은 행 ${outOfScope}건 (결과 카드에서 목록 확인)`,
+        );
+      }
+
+      // 사용자 선택(mine/all)은 서버 허용 집합 위에 얹는 추가 축소일 뿐이다.
       const parsed =
         effectiveScope === "all"
-          ? parsedAll
-          : parsedAll.filter((p) => normalizePic(p.hdec_pic_name) === meNorm);
+          ? serverAllowed
+          : serverAllowed.filter((p) => normalizePic(p.hdec_pic_name) === meNorm);
       const filteredOut = parsedAll.length - parsed.length;
-      if (effectiveScope === "mine" && parsed.length === 0) {
+      if (parsed.length === 0) {
         toast.warning(
-          `${f.name}: 본인(HDEC PIC: ${importerHdecPicRef.current ?? "-"}) 담당 행이 없어 임포트를 건너뜁니다`,
+          outOfScope > 0
+            ? `${f.name}: 반영 가능한 행이 없습니다 (범위 밖 ${outOfScope}건)`
+            : `${f.name}: 본인(HDEC PIC: ${importerHdecPicRef.current ?? "-"}) 담당 행이 없어 임포트를 건너뜁니다`,
         );
         setFiles((cur) =>
           cur.map((x) =>
@@ -599,6 +647,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     updated: 0,
                     skipped: filteredOut,
                     rejected: 0,
+                    outOfScope,
+                    outOfScopeKeys,
                   },
                 }
               : x,
@@ -608,9 +658,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       }
       const scopeNote =
         effectiveScope === "mine"
-          ? `Import scope: mine (HDEC PIC=${importerHdecPicRef.current ?? "-"}); matched ${parsed.length}/${parsedAll.length}`
-          : `Import scope: all; rows=${parsed.length}`;
-      const discipline = f.discipline ?? "ARCH";
+          ? `Import scope: mine (HDEC PIC=${importerHdecPicRef.current ?? "-"}); matched ${parsed.length}/${parsedAll.length}; RCL out-of-scope=${outOfScope}`
+          : `Import scope: all; rows=${parsed.length}; RCL out-of-scope=${outOfScope}`;
       const startTime = Date.now();
       const startedAtIso = new Date().toISOString();
 
@@ -1247,6 +1296,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     judgmentRecalculated,
                     renumbered,
                     resolvedByDecision,
+                    outOfScope,
+                    outOfScopeKeys,
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
