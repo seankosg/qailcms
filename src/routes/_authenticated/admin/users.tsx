@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  listAppUsers, createAppUser, resetUserPassword, updateUserRole,
+  listAppUsers, createAppUser, resetUserPassword, updateUserRole, bulkResetTempPassword,
   updateUserProfileFields, deleteAppUser, updateLoginId,
 } from "@/lib/admin/users.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -314,6 +314,7 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
           <Button variant="outline" size="sm" onClick={() => exportUsersXlsx(rows)}>
             <Download className="mr-1 h-4 w-4" />Export
           </Button>
+          <BulkResetPasswordButton onDone={invalidate} />
           <NewUserDialog onCreated={invalidate} />
         </div>
       </CardHeader>
