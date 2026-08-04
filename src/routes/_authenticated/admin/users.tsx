@@ -25,6 +25,8 @@ import {
   type AppRole, type UserType,
 } from "@/types/enums";
 import { useTeamOptions } from "@/lib/team/team-master";
+import { highestRole } from "@/lib/auth/roles";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HdecPeopleTab } from "@/components/admin/HdecPeopleTab";
 
@@ -71,6 +73,50 @@ function UsersAdminPage() {
           <UsersTab />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+/**
+ * §5 확인창 + §2-2 admin 항목 노출 제한 + §6 최고 등급 표시/복수 역할 배지.
+ */
+function RoleCell({
+  user, callerIsAdmin, onChange,
+}: {
+  user: any;
+  callerIsAdmin: boolean;
+  onChange: (role: AppRole) => Promise<void>;
+}) {
+  const roles: string[] = user.roles ?? [];
+  const current = highestRole(roles);
+  const [pending, setPending] = useState<AppRole | null>(null);
+  const options = ROLES.filter((r) => r !== "admin" || callerIsAdmin || current === "admin");
+  return (
+    <div className="flex items-center gap-1">
+      <Select value={current} onValueChange={(v) => setPending(v as AppRole)}>
+        <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+        <SelectContent>{options.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
+      </Select>
+      {roles.length > 1 && (
+        <Badge variant="destructive" className="text-[10px]">역할 {roles.length}건</Badge>
+      )}
+      <AlertDialog open={pending !== null} onOpenChange={(o) => { if (!o) setPending(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>등급 변경 확인</AlertDialogTitle>
+            <AlertDialogDescription>
+              {user.name ?? user.display_name ?? user.login_id} 을(를){" "}
+              {ROLE_LABELS[current]} → {pending ? ROLE_LABELS[pending] : ""} 로 바꿉니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => { const v = pending; setPending(null); if (v) await onChange(v); }}>
+              확인
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -157,6 +203,8 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
   const updLogin = useServerFn(updateLoginId);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: () => list({}) });
+  const me = useCurrentUser();
+  const callerIsAdmin = (me.data?.roles ?? []).includes("admin");
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
   const teams = useTeamOptions();
 
@@ -201,8 +249,9 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
           bv = USER_TYPE_LABELS[(b.user_type ?? "") as UserType] ?? "";
           break;
         case "role":
-          av = ROLE_LABELS[(a.roles?.[0] ?? "guest") as AppRole] ?? "";
-          bv = ROLE_LABELS[(b.roles?.[0] ?? "guest") as AppRole] ?? "";
+          // §6-1 표시·정렬 모두 DB rcl_highest_role 과 동일한 최고 등급 기준.
+          av = ROLE_LABELS[highestRole(a.roles)] ?? "";
+          bv = ROLE_LABELS[highestRole(b.roles)] ?? "";
           break;
         case "active":
           av = a.is_active ? 1 : 0;
@@ -317,13 +366,14 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
                       <LinkedMasterCell user={u} onSaved={invalidate} updProfile={updProfile} />
                     </TableCell>
                     <TableCell>
-                      <Select value={u.roles?.[0] ?? "guest"} onValueChange={async (v) => {
-                        try { await updRole({ data: { user_id: u.id, role: v as any } }); toast.success("역할 변경됨"); invalidate(); }
-                        catch (e: any) { toast.error(e.message); }
-                      }}>
-                        <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
-                        <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <RoleCell
+                        user={u}
+                        callerIsAdmin={callerIsAdmin}
+                        onChange={async (v) => {
+                          try { await updRole({ data: { user_id: u.id, role: v as any } }); toast.success("역할 변경됨"); invalidate(); }
+                          catch (e: any) { toast.error(e.message); }
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

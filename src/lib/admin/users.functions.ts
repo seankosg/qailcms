@@ -30,6 +30,22 @@ async function assertAdmin(supabase: any, userId: string) {
   if (!data) throw new Error("관리자 권한이 필요합니다.");
 }
 
+/** admin 단독 검사 (superuser 불통과). admin 등급 부여 등 잠금 경로 전용. */
+async function assertStrictAdmin(supabase: any, userId: string) {
+  const { data, error } = await supabase.rpc("has_role", {
+    _user_id: userId,
+    _role: "admin",
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("이 작업은 Admin 계정만 수행할 수 있습니다.");
+}
+
+/** 화면과 서버 판정 기준을 맞추기 위한 등급 서열 (DB rcl_highest_role 과 동일). */
+const ROLE_RANK_SRV: Record<string, number> = {
+  admin: 100, superuser: 90, d_superuser: 80, senior_user: 70,
+  user: 50, super_guest: 30, guest: 10,
+};
+
 type UserType = "subcontractor" | "hdec" | "hdec_pic" | "hdec_eng" | "pm_pd" | "admin" | "subsub" | "guest";
 type AppRole =
   | "admin"
@@ -149,7 +165,30 @@ export const updateUserRole = createServerFn({ method: "POST" })
   .inputValidator((input: { user_id: string; role: AppRole }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
+    // §2 admin 승격은 admin 만. superuser 가 admin 계정 수를 늘리지 못하게 한다.
+    if (data.role === "admin") {
+      await assertStrictAdmin(context.supabase, context.userId);
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: curRows } = await supabaseAdmin
+      .from("user_roles").select("role").eq("user_id", data.user_id);
+    const current = (curRows ?? []).map((r: any) => String(r.role));
+    const currentRank = current.reduce((m, r) => Math.max(m, ROLE_RANK_SRV[r] ?? 0), 0);
+    const nextRank = ROLE_RANK_SRV[data.role] ?? 0;
+    // §3 본인 계정의 등급 하향 금지 (상향은 허용).
+    if (data.user_id === context.userId && nextRank < currentRank) {
+      throw new Error("본인 계정의 등급은 낮출 수 없습니다.");
+    }
+    // §4 마지막 admin 제거 금지.
+    if (current.includes("admin") && data.role !== "admin") {
+      const { count } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id", { count: "exact", head: true })
+        .eq("role", "admin");
+      if ((count ?? 0) <= 1) {
+        throw new Error("마지막 Admin 계정의 등급은 변경할 수 없습니다. 다른 Admin 을 먼저 지정하세요.");
+      }
+    }
     await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
     const { error } = await supabaseAdmin
       .from("user_roles")
