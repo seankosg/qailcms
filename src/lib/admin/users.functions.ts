@@ -357,15 +357,6 @@ export function baseLoginIdFromName(name: string): string {
     .replace(/[^a-z0-9_-]/g, "");
 }
 
-function randomTempPassword(): string {
-  const chars = "abcdefghijkmnpqrstuvwxyz";
-  const digits = "23456789";
-  let s = "";
-  for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  for (let i = 0; i < 3; i++) s += digits[Math.floor(Math.random() * digits.length)];
-  return `Q${s}`;
-}
-
 /** 이름 목록 → 충돌 회피된 login_id 제안. 기존 profiles.login_id 와 목록 내 중복을 모두 검사. */
 export const suggestLoginIds = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -397,9 +388,15 @@ export const bulkCreateAppUsers = createServerFn({ method: "POST" })
   .inputValidator((input: {
     kind: "pic" | "eng";
     rows: { name: string; login_id: string; team?: string | null }[];
+    temp_password: string;
   }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
+    // 임시 비밀번호는 호출부가 준 값 하나를 전원에게 사용한다(생성 경로 단일화).
+    const sharedPw = String(data.temp_password ?? "");
+    if (!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(sharedPw)) {
+      throw new Error("임시 비밀번호는 영문+숫자 포함 6자 이상이어야 합니다.");
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const userType = data.kind === "pic" ? "hdec_pic" : "hdec_eng";
     const masterTable = data.kind === "pic" ? "hdec_pic_name_master" : "hdec_eng_name_master";
@@ -419,7 +416,7 @@ export const bulkCreateAppUsers = createServerFn({ method: "POST" })
       const name = String(row.name ?? "").trim();
       const loginId = String(row.login_id ?? "").trim().toLowerCase();
       const team = row.team ? String(row.team).trim() : null;
-      const tempPw = randomTempPassword();
+      const tempPw = sharedPw;
       const base = {
         name,
         login_id: loginId,
