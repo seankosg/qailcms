@@ -2128,6 +2128,7 @@ export type Database = {
           name: string
           name_norm: string
           name_variants: string[]
+          note: string | null
           updated_at: string
           verified: boolean
         }
@@ -2141,6 +2142,7 @@ export type Database = {
           name: string
           name_norm: string
           name_variants?: string[]
+          note?: string | null
           updated_at?: string
           verified?: boolean
         }
@@ -2154,6 +2156,7 @@ export type Database = {
           name?: string
           name_norm?: string
           name_variants?: string[]
+          note?: string | null
           updated_at?: string
           verified?: boolean
         }
@@ -2167,6 +2170,45 @@ export type Database = {
           },
         ]
       }
+      hdec_name_propagation_log: {
+        Row: {
+          created_at: string
+          from_name: string | null
+          id: string
+          owned_rows: number
+          ref_id: string | null
+          source: string
+          target_column: string
+          target_table: string
+          to_name: string | null
+          unowned_rows: number
+        }
+        Insert: {
+          created_at?: string
+          from_name?: string | null
+          id?: string
+          owned_rows?: number
+          ref_id?: string | null
+          source: string
+          target_column: string
+          target_table: string
+          to_name?: string | null
+          unowned_rows?: number
+        }
+        Update: {
+          created_at?: string
+          from_name?: string | null
+          id?: string
+          owned_rows?: number
+          ref_id?: string | null
+          source?: string
+          target_column?: string
+          target_table?: string
+          to_name?: string | null
+          unowned_rows?: number
+        }
+        Relationships: []
+      }
       hdec_pic_name_master: {
         Row: {
           created_at: string
@@ -2178,6 +2220,7 @@ export type Database = {
           name: string
           name_norm: string
           name_variants: string[]
+          note: string | null
           updated_at: string
           verified: boolean
         }
@@ -2191,6 +2234,7 @@ export type Database = {
           name: string
           name_norm: string
           name_variants?: string[]
+          note?: string | null
           updated_at?: string
           verified?: boolean
         }
@@ -2204,6 +2248,7 @@ export type Database = {
           name?: string
           name_norm?: string
           name_variants?: string[]
+          note?: string | null
           updated_at?: string
           verified?: boolean
         }
@@ -3270,6 +3315,7 @@ export type Database = {
           is_excluded: boolean
           latest_status: string | null
           latest_status_raw: string | null
+          owner_user_id: string | null
           pic: string | null
           pic_po: string | null
           plot: string
@@ -3297,6 +3343,7 @@ export type Database = {
           is_excluded?: boolean
           latest_status?: string | null
           latest_status_raw?: string | null
+          owner_user_id?: string | null
           pic?: string | null
           pic_po?: string | null
           plot: string
@@ -3324,6 +3371,7 @@ export type Database = {
           is_excluded?: boolean
           latest_status?: string | null
           latest_status_raw?: string | null
+          owner_user_id?: string | null
           pic?: string | null
           pic_po?: string | null
           plot?: string
@@ -4547,6 +4595,7 @@ export type Database = {
           is_final_approved: boolean
           latest_response_code: string | null
           latest_status_raw: string | null
+          owner_user_id: string | null
           pic: string | null
           plot: string
           r1_response_code: string | null
@@ -4577,6 +4626,7 @@ export type Database = {
           is_final_approved?: boolean
           latest_response_code?: string | null
           latest_status_raw?: string | null
+          owner_user_id?: string | null
           pic?: string | null
           plot: string
           r1_response_code?: string | null
@@ -4607,6 +4657,7 @@ export type Database = {
           is_final_approved?: boolean
           latest_response_code?: string | null
           latest_status_raw?: string | null
+          owner_user_id?: string | null
           pic?: string | null
           plot?: string
           r1_response_code?: string | null
@@ -5681,7 +5732,46 @@ export type Database = {
         Args: { _role: string; _user_id: string }
         Returns: boolean
       }
+      hdec_assert_admin: { Args: never; Returns: undefined }
+      hdec_canonical_map: { Args: { _kind: string }; Returns: Json }
+      hdec_master_table: { Args: { _kind: string }; Returns: string }
       hdec_name_norm: { Args: { _name: string }; Returns: string }
+      hdec_name_usage: {
+        Args: { _kind: string }
+        Returns: {
+          cnt: number
+          module: string
+          norm: string
+        }[]
+      }
+      hdec_registry_backfill: { Args: { _kind: string }; Returns: Json }
+      hdec_registry_upsert: {
+        Args: { _kind: string; _names: string[] }
+        Returns: Json
+      }
+      hdec_roster_list: { Args: { _kind: string }; Returns: Json }
+      hdec_roster_merge: {
+        Args: { _dst_id: string; _kind: string; _src_id: string }
+        Returns: Json
+      }
+      hdec_roster_rename_preview: {
+        Args: { _id: string; _kind: string }
+        Returns: Json
+      }
+      hdec_roster_update: {
+        Args: {
+          _clear_link?: boolean
+          _id: string
+          _is_active?: boolean
+          _kind: string
+          _linked_user_id?: string
+          _name?: string
+          _note?: string
+          _variants?: string[]
+          _verified?: boolean
+        }
+        Returns: Json
+      }
       is_admin_or_super: { Args: { _user_id: string }; Returns: boolean }
       is_full_access: { Args: { _user_id: string }; Returns: boolean }
       is_qaqc_readonly: { Args: { _user_id: string }; Returns: boolean }
