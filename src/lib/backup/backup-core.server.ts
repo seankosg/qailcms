@@ -76,8 +76,10 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   task_management_status_history: ["id"],
   abd_ocs_import_logs: ["id"],
   abd_ocs_comments: ["id"],
+  abd_ocs_comment_groups: ["id"],
   abd_ocs_compliance: ["comment_id"],
   abd_ocs_attachments: ["id"],
+  abd_ocs_attachment_comment_links: ["id"],
   abd_ocs_compliance_log: ["id"],
 };
 
@@ -378,10 +380,12 @@ export async function restoreSnapshot(
       ["defect_import_presets", 57],
       // OCS: 로그 → 코멘트 → 첨부/준수 (FK 의존 순)
       ["abd_ocs_import_logs", 58],
-      ["abd_ocs_comments", 59],
-      ["abd_ocs_attachments", 60],
-      ["abd_ocs_compliance", 61],
-      ["abd_ocs_compliance_log", 62],
+      ["abd_ocs_comment_groups", 59],
+      ["abd_ocs_comments", 60],
+      ["abd_ocs_attachments", 61],
+      ["abd_ocs_attachment_comment_links", 62],
+      ["abd_ocs_compliance", 63],
+      ["abd_ocs_compliance_log", 64],
     ]);
     return (order.get(a) ?? 99) - (order.get(b) ?? 99);
   });

@@ -95,6 +95,15 @@ function Body({ c }: { c: AbdOcsComment }) {
         <span className="text-muted-foreground">S/N {c.ocs_sn ?? "—"}</span>
         <span className="text-muted-foreground">Rev {c.comment_revision ?? c.file_revision ?? "—"}</span>
         {c.comment_part && <Badge variant="outline" className="text-[10px]">{c.comment_part}</Badge>}
+        {c.atomic_item_no != null && (
+          <Badge variant="outline" className="text-[10px]">
+            Item {c.atomic_item_no}
+            {c.atomic_item_count ? ` / ${c.atomic_item_count}` : ""}
+          </Badge>
+        )}
+        {c.response_mapping_status === "inherited" && (
+          <Badge variant="secondary" className="text-[10px]">Inherited</Badge>
+        )}
       </div>
       <div className="whitespace-pre-wrap break-words text-xs">{c.ocs_comment ?? "—"}</div>
       <div className="flex flex-wrap items-center gap-1.5">
