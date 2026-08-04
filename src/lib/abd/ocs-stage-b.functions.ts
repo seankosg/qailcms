@@ -7,10 +7,15 @@ export const OCS_IMPORT_BUCKET = "abd-ocs-imports";
 export type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 
 type LooseClient = {
-  rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
   from: (table: string) => {
     insert: (v: Record<string, unknown>) => {
-      select: (c: string) => { single: () => Promise<{ data: unknown; error: { message: string } | null }> };
+      select: (c: string) => {
+        single: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      };
     };
     update: (v: Record<string, unknown>) => {
       eq: (c: string, v2: string) => Promise<{ error: { message: string } | null }>;
