@@ -35,10 +35,34 @@ const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
 type DryAgg = Record<string, number>;
 
+const ARRAY_KEYS = new Set([
+  "parent_ids",
+  "group_keys",
+  "abd_item_ids",
+  "split_user_check_pids",
+  "user_row_pids",
+  "missing_parent_ids",
+  "resolved_ids",
+  "unresolved_ids",
+]);
+
 function addAgg(a: DryAgg, b: Record<string, unknown>): DryAgg {
   const out: DryAgg = { ...a };
-  for (const [k, v] of Object.entries(b)) out[k] = (out[k] ?? 0) + num(v);
+  for (const [k, v] of Object.entries(b)) {
+    if (ARRAY_KEYS.has(k) || Array.isArray(v)) continue; // 고유값은 합산 금지 — Set union 으로 처리
+    out[k] = (out[k] ?? 0) + num(v);
+  }
   return out;
+}
+
+/** 배치 응답의 ID 배열을 전역 Set 에 합친다. */
+function unionInto(sets: Record<string, Set<string>>, b: Record<string, unknown>) {
+  for (const k of ARRAY_KEYS) {
+    const v = b[k];
+    if (!Array.isArray(v)) continue;
+    const set = sets[k] ?? (sets[k] = new Set<string>());
+    for (const x of v) if (x !== null && x !== undefined) set.add(String(x));
+  }
 }
 
 export function OcsAtomicV2Panel() {
