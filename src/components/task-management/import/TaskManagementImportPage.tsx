@@ -121,6 +121,7 @@ function ImportInner() {
     importScope,
     setImportScope,
     setImporterHdecPicName,
+    setImporterOwnNames,
     setIsImporterAdmin,
     matchesHdecPic,
     addFiles,
@@ -150,11 +151,25 @@ function ImportInner() {
 
   // Sync importer identity/scope to context whenever user info changes
   const hdecPic = me?.hdec_pic_name ?? null;
+  // 서버 Own 정의(owner_cols = hdec_pic_name | hdec_eng_name)와 동일 기준으로 mine 판정
+  const ownNames = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [me?.hdec_pic_name, me?.hdec_eng_name, me?.name].filter(
+            (v): v is string => !!v && v.trim() !== "",
+          ),
+        ),
+      ),
+    [me?.hdec_pic_name, me?.hdec_eng_name, me?.name],
+  );
+  const ownNamesLabel = ownNames.join(", ");
   const adminFlag = isAdmin;
   useEffect(() => {
     setImporterHdecPicName(hdecPic);
+    setImporterOwnNames(ownNames);
     setIsImporterAdmin(adminFlag);
-  }, [hdecPic, adminFlag, setImporterHdecPicName, setIsImporterAdmin]);
+  }, [hdecPic, ownNames, adminFlag, setImporterHdecPicName, setImporterOwnNames, setIsImporterAdmin]);
 
   // Effective scope for display/counts
   const effectiveScope: "mine" | "all" = isAdmin ? "all" : importScope;
@@ -416,7 +431,7 @@ function ImportInner() {
                   isAdmin
                     ? "전체(Admin — 강제)"
                     : effectiveScope === "mine"
-                      ? "본인 HDEC PIC만"
+                      ? "본인 담당 행(PIC 또는 ENG)만"
                       : "전체(Super User 선택)"
                 }`}
               </CardDescription>
@@ -436,7 +451,7 @@ function ImportInner() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="mine" className="text-xs">
-                          본인 HDEC PIC 항목만 (기본)
+                          본인 담당 행(PIC 또는 ENG)만 (기본)
                         </SelectItem>
                         <SelectItem value="all" className="text-xs">
                           Super User: 전체 임포트
@@ -446,8 +461,8 @@ function ImportInner() {
                   </div>
                 ) : (
                   <Badge variant="outline" className="text-[11px]">
-                    본인 HDEC PIC 항목만
-                    {me?.hdec_pic_name ? ` (${me.hdec_pic_name})` : ""}
+                    본인 담당 행(PIC 또는 ENG)만
+                    {ownNamesLabel ? ` (${ownNamesLabel})` : ""}
                   </Badge>
                 )
               )}
@@ -525,14 +540,8 @@ function ImportInner() {
                     {readyFiles.map((f) => (
                       <li key={f.id}>
                         {f.name} · {matchedByFile[f.id]?.matched ?? 0}행
-                        {me?.hdec_pic_name
-                          ? ` (본인 HDEC PIC 매칭 ${
-                              (f.parsed ?? []).filter(
-                                (r) =>
-                                  (r.hdec_pic_name ?? "").trim().toLowerCase() ===
-                                  (me.hdec_pic_name ?? "").trim().toLowerCase(),
-                              ).length
-                            }행)`
+                        {ownNames.length > 0
+                          ? ` (본인 담당(PIC 또는 ENG) 매칭 ${matchedByFile[f.id]?.mine ?? 0}행)`
                           : ""}
                       </li>
                     ))}
@@ -657,7 +666,8 @@ function FileRow({
               <p className="mt-0.5 text-[11px]">
                 {scopeIsMine ? (
                   <span className="text-primary">
-                    서버 권한 판정 대상 {matched}행 · 그중 본인 HDEC PIC {mine}행만 반영 (파싱 {total}행)
+                    서버 권한 판정 대상 {matched}행 · 그중 본인 담당 행(PIC 또는 ENG) {mine}행만 반영
+                    (파싱 {total}행)
                   </span>
                 ) : (
                   <span className="text-muted-foreground">전체 {total}행 임포트</span>
