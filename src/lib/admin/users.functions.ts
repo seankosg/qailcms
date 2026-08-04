@@ -282,7 +282,6 @@ export const deleteAppUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const markPasswordChanged = createServerFn({ method: "POST" })
 /**
  * §1 임시 비밀번호 통일 — must_change_password = true 인 계정만 대상.
  * 이미 비밀번호를 바꾼 계정(false)은 절대 건드리지 않는다.
