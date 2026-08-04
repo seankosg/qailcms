@@ -1,21 +1,12 @@
 /**
  * SM Import Auto-fill Rules
- * - HDEC PIC/ENG rule: Plot + Building + (Plan Group OR Room Group) 매칭
  * - Subcon rule: Plot + Room Group + Trade 키워드 매칭
  *
- * 두 rule 모두 원본 엑셀 값 또는 기존 DB 값이 있으면 덮어쓰지 않음.
+ * 원본 엑셀 값 또는 기존 DB 값이 있으면 덮어쓰지 않음.
+ *
+ * (2026-08-04) HDEC PIC/ENG 자동 채움 규칙은 폐지되었다.
+ * 담당자 값은 임포트 파일 또는 명부 정본만을 소스로 한다.
  */
-
-export interface HdecPicRule {
-  id: string;
-  plot: string; // 'C' | 'D'
-  building: string;
-  room_group: string;
-  hdec_pic: string | null;
-  hdec_eng: string | null;
-  sort_order: number;
-  is_active: boolean;
-}
 
 export interface SubconRule {
   id: string;
