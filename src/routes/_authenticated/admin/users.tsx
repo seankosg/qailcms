@@ -77,6 +77,50 @@ function UsersAdminPage() {
   );
 }
 
+/**
+ * §5 확인창 + §2-2 admin 항목 노출 제한 + §6 최고 등급 표시/복수 역할 배지.
+ */
+function RoleCell({
+  user, callerIsAdmin, onChange,
+}: {
+  user: any;
+  callerIsAdmin: boolean;
+  onChange: (role: AppRole) => Promise<void>;
+}) {
+  const roles: string[] = user.roles ?? [];
+  const current = highestRole(roles);
+  const [pending, setPending] = useState<AppRole | null>(null);
+  const options = ROLES.filter((r) => r !== "admin" || callerIsAdmin || current === "admin");
+  return (
+    <div className="flex items-center gap-1">
+      <Select value={current} onValueChange={(v) => setPending(v as AppRole)}>
+        <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+        <SelectContent>{options.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
+      </Select>
+      {roles.length > 1 && (
+        <Badge variant="destructive" className="text-[10px]">역할 {roles.length}건</Badge>
+      )}
+      <AlertDialog open={pending !== null} onOpenChange={(o) => { if (!o) setPending(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>등급 변경 확인</AlertDialogTitle>
+            <AlertDialogDescription>
+              {user.name ?? user.display_name ?? user.login_id} 을(를){" "}
+              {ROLE_LABELS[current]} → {pending ? ROLE_LABELS[pending] : ""} 로 바꿉니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => { const v = pending; setPending(null); if (v) await onChange(v); }}>
+              확인
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 function useMasterList(kind: "subcontractor" | "subsub" | "hdec_pic" | "hdec_eng") {
   const table =
     kind === "hdec_pic" ? "hdec_pic_master" :
