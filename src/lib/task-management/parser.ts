@@ -571,6 +571,16 @@ export async function parseTaskManagementExcel(
     })(),
   };
 
+  // §4-3(2026-08-04): 과업코드 열을 못 찾으면 ★진행 금지. upsert 키(discipline,task_no)가
+  // 틀리면 엉뚱한 행이 덮이거나 중복이 대량 생긴다 — 되돌릴 수 없다.
+  if (!cols.no) {
+    const searched = [...(extraAliases?.["task_no"] ?? []), ...TASK_NO_ALIASES];
+    throw new Error(
+      `과업코드 열을 찾지 못했습니다. 찾은 이름: ${searched.join(" / ")} — ` +
+        `파일의 헤더를 고치거나 [Admin → 매핑 관리(/admin/mapping) → TM 헤더 매핑]에서 별칭을 추가하세요.`,
+    );
+  }
+
   // ---- 사용자가 체크 해제한 헤더 처리 ----
   // headerToFieldMap: sheetHeaders의 실제 header 텍스트 → canonical field
   const headerToFieldMap: Record<string, string> = {};
