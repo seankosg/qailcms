@@ -111,6 +111,63 @@ function PermissionsAdminPage() {
     },
   });
 
+  const teamsQ = useQuery({
+    queryKey: ["team_master_names"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("team_master").select("name").order("name");
+      if (error) throw error;
+      return (data ?? []).map((t: any) => String(t.name));
+    },
+  });
+
+  const teamCountsQ = useQuery({
+    queryKey: ["rcl_team_user_counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("rcl_team_user_counts" as any);
+      if (error) throw error;
+      const m: Record<string, number> = {};
+      for (const r of (data ?? []) as { team: string; cnt: number }[]) m[r.team] = Number(r.cnt);
+      return m;
+    },
+  });
+
+  const moduleAuditQ = useQuery({
+    queryKey: ["rcl_module_config_audit"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("rcl_module_config_audit" as any)
+        .select("id,changed_at,changed_by_name,module,old_team,new_team")
+        .order("changed_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const [teamEdit, setTeamEdit] = useState<{ module: string; from: string | null; to: string | null } | null>(null);
+  const [teamSaving, setTeamSaving] = useState(false);
+
+  const saveOwningTeam = async () => {
+    if (!teamEdit) return;
+    setTeamSaving(true);
+    try {
+      const { error } = await supabase.rpc("rcl_set_module_owning_team" as any, {
+        _module: teamEdit.module,
+        _team: teamEdit.to,
+      });
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ["rcl_module_config"] });
+      await qc.invalidateQueries({ queryKey: ["rcl_module_config_audit"] });
+      await qc.invalidateQueries({ queryKey: ["rcl_can"] });
+      toast.success(`${teamEdit.module} 주관팀 → ${teamEdit.to ?? "(없음)"} 반영`);
+      setTeamEdit(null);
+    } catch (e) {
+      toast.error(`주관팀 변경 실패: ${(e as Error).message}`);
+    } finally {
+      setTeamSaving(false);
+    }
+  };
+
   const base = useMemo(() => {
     const m: Record<string, boolean> = {};
     for (const r of permsQ.data ?? []) m[ck(r.role, r.scope, r.action)] = r.allowed;
