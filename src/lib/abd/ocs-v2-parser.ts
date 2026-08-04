@@ -59,6 +59,12 @@ export type OcsV2CommentParse = {
   duplicated_comment_ids: string[];
   single_rows: number;
   split_rows: number;
+  /** 전역 DISTINCT — 배치 합산 금지, 파일 전체 기준 */
+  source_parent_count: number;
+  /** comment_groups 배열(또는 2건 이상 원자항목을 가진 그룹) 기준 */
+  multi_group_count: number;
+  /** 원자항목이 1건뿐인 부모 수 */
+  single_parent_count: number;
 };
 
 export type OcsV2LinkParse = {
@@ -68,6 +74,10 @@ export type OcsV2LinkParse = {
   duplicated_pairs: number;
   distinct_attachments: number;
   distinct_comments: number;
+  confirmed_high: number;
+  group_inherited_access: number;
+  unresolved_rows: number;
+  status_counts: Record<string, number>;
 };
 
 function pick(r: Record<string, unknown>, keys: string[]): unknown {
