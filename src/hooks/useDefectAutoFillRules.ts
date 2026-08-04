@@ -1,65 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { HdecPicRule, SubconRule } from "@/lib/defect-management/auto-fill-rules";
+import type { SubconRule } from "@/lib/defect-management/auto-fill-rules";
 
-const HDEC_KEY = ["defect-hdec-pic-rules"] as const;
 const SUBCON_KEY = ["defect-subcon-rules"] as const;
-
-export function useDefectHdecPicRules() {
-  return useQuery({
-    queryKey: HDEC_KEY,
-    queryFn: async (): Promise<HdecPicRule[]> => {
-      const { data, error } = await (supabase as any)
-        .from("defect_hdec_pic_rules")
-        .select("id, plot, building, room_group, hdec_pic, hdec_eng, sort_order, is_active")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as HdecPicRule[];
-    },
-  });
-}
-
-export function useUpsertHdecPicRule() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: Partial<HdecPicRule> & { plot: string; building: string; room_group: string }) => {
-      const { error } = await (supabase as any)
-        .from("defect_hdec_pic_rules")
-        .upsert(input, { onConflict: "plot,building,room_group" });
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: HDEC_KEY }),
-  });
-}
-
-export function useUpdateHdecPicRule() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: { id: string } & Partial<HdecPicRule>) => {
-      const { id, ...patch } = input;
-      const { error } = await (supabase as any)
-        .from("defect_hdec_pic_rules")
-        .update(patch)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: HDEC_KEY }),
-  });
-}
-
-export function useDeleteHdecPicRule() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await (supabase as any)
-        .from("defect_hdec_pic_rules")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: HDEC_KEY }),
-  });
-}
 
 export function useDefectSubconRules() {
   return useQuery({

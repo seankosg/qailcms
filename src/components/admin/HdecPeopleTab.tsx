@@ -38,6 +38,7 @@ export interface PersonRow {
   team_suggest: string | null;
   is_active: boolean | null;
   has_account: boolean;
+  dual_roster?: boolean;
   role: string | null;
   tm: number; abd: number; sm: number; spl: number; wrt: number; total: number;
   first_seen: string | null;
@@ -328,10 +329,13 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
                       <TableCell className="whitespace-nowrap font-medium">
                         {r.name}
                         {r.source === "profile" && <Badge variant="outline" className="ml-1 text-[10px]">명부 밖</Badge>}
+                        {r.dual_roster && (
+                          <Badge variant="outline" className="ml-1 text-[10px] border-primary/40 text-primary">겸직(PIC+ENG)</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         {r.has_account ? (
-                          r.user_type && r.user_type !== (kind === "pic" ? "hdec_pic" : "hdec_eng") ? (
+                          r.user_type && !r.dual_roster && r.user_type !== (kind === "pic" ? "hdec_pic" : "hdec_eng") ? (
                             <Badge variant="secondary" className="text-[10px]">
                               계정 있음(다른 구분으로 등록됨: {r.user_type})
                             </Badge>

@@ -32,7 +32,6 @@ function loadDefectParser(): Promise<DefectParserModule> {
 import { deriveRectifiedStatus, deriveClosureStatus } from "@/lib/defect-management/derived";
 import {
   resolvePlotFromPlanGroup,
-  resolveHdec,
   resolveSubcon,
 } from "@/lib/defect-management/auto-fill-rules";
 import type { DefectTeam } from "@/lib/defect-management/columns";
@@ -761,23 +760,15 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       return teamByCategory.get(String(category).trim()) ?? null;
     };
 
-    // HDEC PIC/ENG 및 Subcon 자동 채움 rule 조회
-    let hdecRules: import("@/lib/defect-management/auto-fill-rules").HdecPicRule[] = [];
+    // Subcon 자동 채움 rule 조회
+    // (2026-08-04) HDEC PIC/ENG 자동 채움은 폐지 — 담당자 값은 파일/명부 정본만 사용한다.
     let subconRules: import("@/lib/defect-management/auto-fill-rules").SubconRule[] = [];
     try {
-      const [hRes, sRes] = await Promise.all([
-        (supabase as any)
-          .from("defect_hdec_pic_rules")
-          .select("id, plot, building, room_group, hdec_pic, hdec_eng, sort_order, is_active")
-          .eq("is_active", true)
-          .order("sort_order", { ascending: true }),
-        (supabase as any)
-          .from("defect_subcon_rules")
-          .select("id, plot, room_group, trade_keywords, subcontractor_name, sort_order, is_active")
-          .eq("is_active", true)
-          .order("sort_order", { ascending: true }),
-      ]);
-      hdecRules = (hRes.data ?? []) as typeof hdecRules;
+      const sRes = await (supabase as any)
+        .from("defect_subcon_rules")
+        .select("id, plot, room_group, trade_keywords, subcontractor_name, sort_order, is_active")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
       subconRules = (sRes.data ?? []) as typeof subconRules;
     } catch (e) {
       console.warn("[defect-import] auto-fill rules fetch failed", e);
@@ -992,24 +983,14 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             put(base, k, v);
           }
         }
-        // ── 자동 채움 rule: HDEC PIC/ENG · Subcon ──
+        // ── 자동 채움 rule: Subcon ──
+        // HDEC PIC/ENG 자동 채움은 2026-08-04 폐지(규칙 매칭 0건 · 담당 오염 위험).
         // 원본 엑셀 값(base 에 이미 있음) 또는 기존 DB 값이 있으면 skip.
         {
           const planGroupVal = (base.plan_group ?? p.plan_group ?? null) as string | null;
           const roomGroupVal = (base.room_group ?? p.room_group ?? null) as string | null;
-          const buildingVal = (base.building ?? p.building ?? null) as string | null;
           const plot = resolvePlotFromPlanGroup(planGroupVal);
           if (plot) {
-            // HDEC PIC / ENG
-            const needPic = !base.hdec_pic_name && !prev?.hdec_pic_name && !excludedFields.has("hdec_pic_name");
-            const needEng = !base.hdec_eng_name && !prev?.hdec_eng_name && !excludedFields.has("hdec_eng_name");
-            if (needPic || needEng) {
-              const hit = resolveHdec(hdecRules, plot, buildingVal, planGroupVal, roomGroupVal);
-              if (hit) {
-                if (needPic && hit.pic) base.hdec_pic_name = hit.pic;
-                if (needEng && hit.eng) base.hdec_eng_name = hit.eng;
-              }
-            }
             // Subcon
             if (
               !base.subcontractor_name &&

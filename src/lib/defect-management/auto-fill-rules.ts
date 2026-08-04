@@ -1,21 +1,12 @@
 /**
  * SM Import Auto-fill Rules
- * - HDEC PIC/ENG rule: Plot + Building + (Plan Group OR Room Group) 매칭
  * - Subcon rule: Plot + Room Group + Trade 키워드 매칭
  *
- * 두 rule 모두 원본 엑셀 값 또는 기존 DB 값이 있으면 덮어쓰지 않음.
+ * 원본 엑셀 값 또는 기존 DB 값이 있으면 덮어쓰지 않음.
+ *
+ * (2026-08-04) HDEC PIC/ENG 자동 채움 규칙은 폐지되었다.
+ * 담당자 값은 임포트 파일 또는 명부 정본만을 소스로 한다.
  */
-
-export interface HdecPicRule {
-  id: string;
-  plot: string; // 'C' | 'D'
-  building: string;
-  room_group: string;
-  hdec_pic: string | null;
-  hdec_eng: string | null;
-  sort_order: number;
-  is_active: boolean;
-}
 
 export interface SubconRule {
   id: string;
@@ -40,34 +31,6 @@ export function resolvePlotFromPlanGroup(planGroup: string | null | undefined): 
   if (!s) return null;
   if (s.includes("plot d") || s.includes("tower 4")) return "D";
   if (s.includes("plot c") || s.includes("tower 3")) return "C";
-  return null;
-}
-
-/**
- * HDEC PIC / ENG 결정.
- * rule.room_group 은 plan_group OR room_group 어느 쪽과 일치해도 hit.
- */
-export function resolveHdec(
-  rules: HdecPicRule[],
-  plot: "C" | "D",
-  building: string | null | undefined,
-  planGroup: string | null | undefined,
-  roomGroup: string | null | undefined,
-): { pic: string | null; eng: string | null } | null {
-  const nBuilding = norm(building);
-  const nPlan = norm(planGroup);
-  const nRoom = norm(roomGroup);
-  if (!nBuilding) return null;
-  for (const r of rules) {
-    if (!r.is_active) continue;
-    if (r.plot !== plot) continue;
-    if (norm(r.building) !== nBuilding) continue;
-    const nRuleRoom = norm(r.room_group);
-    if (!nRuleRoom) continue;
-    if (nRuleRoom === nPlan || nRuleRoom === nRoom) {
-      return { pic: r.hdec_pic ?? null, eng: r.hdec_eng ?? null };
-    }
-  }
   return null;
 }
 
