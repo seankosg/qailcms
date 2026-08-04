@@ -27,6 +27,7 @@ import {
   type Discipline,
 } from "@/lib/task-management/columns";
 import { addChildTask } from "@/lib/task-management/hierarchy.functions";
+import { useRclCan } from "@/hooks/useRclCan";
 
 export interface ParentSeed {
   task_no: string;
@@ -65,14 +66,18 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
   const [planEnd, setPlanEnd] = useState("");
 
   const submit = useServerFn(addChildTask);
+  // 담당자 지정 범위 — 서버 `rcl_can_values` 와 동일 근거(`rcl_grants`).
+  const { grants } = useRclCan("TM", "write");
+  const ownerLocked = !!grants && !grants.other_team && !grants.own_team;
+  const myName = grants?.my_name ?? "";
 
   useEffect(() => {
     if (!open || !parent) return;
     setTaskName(parent.task_name ?? "");
     setSubTaskDesc("");
     setCategory(parent.category ?? "");
-    setHdecPic(parent.hdec_pic_name ?? "");
-    setHdecEng(parent.hdec_eng_name ?? "");
+    setHdecPic(ownerLocked ? myName : (parent.hdec_pic_name ?? ""));
+    setHdecEng(ownerLocked ? "" : (parent.hdec_eng_name ?? ""));
     setFloorLevel(parent.floor_level ?? "");
     setLocation(parent.location ?? "");
     setRowType("");
@@ -80,7 +85,7 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
     setRisk(parent.risk ?? "");
     setPlanStart(parent.plan_start ?? "");
     setPlanEnd(parent.plan_end ?? "");
-  }, [open, parent]);
+  }, [open, parent, ownerLocked, myName]);
 
   async function handleSave() {
     if (!parent) return;
@@ -158,11 +163,21 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
             </div>
             <div>
               <Label className="text-xs">HDEC PIC (한글)</Label>
-              <Input value={hdecPic} onChange={(e) => setHdecPic(e.target.value)} className="mt-1" />
+              <Input
+                value={hdecPic}
+                onChange={(e) => setHdecPic(e.target.value)}
+                className="mt-1"
+                readOnly={ownerLocked}
+              />
             </div>
             <div>
               <Label className="text-xs">HDEC ENG (영문)</Label>
-              <Input value={hdecEng} onChange={(e) => setHdecEng(e.target.value)} className="mt-1" />
+              <Input
+                value={hdecEng}
+                onChange={(e) => setHdecEng(e.target.value)}
+                className="mt-1"
+                readOnly={ownerLocked}
+              />
             </div>
             <div>
               <Label className="text-xs">Level (층)</Label>
@@ -212,6 +227,12 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
             </div>
           </div>
         </div>
+
+        {ownerLocked && (
+          <p className="text-[11px] text-muted-foreground">
+            현재 권한 범위(본인 담당)에서는 담당자를 본인({myName || "—"})으로만 지정할 수 있습니다.
+          </p>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
