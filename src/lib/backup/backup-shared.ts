@@ -66,7 +66,13 @@ export type BackupTableName =
   | "task_comments"
   | "defect_comments"
   | "defect_status_history"
-  | "task_management_status_history";
+  | "task_management_status_history"
+  // === ABD OCS ===
+  | "abd_ocs_import_logs"
+  | "abd_ocs_comments"
+  | "abd_ocs_compliance"
+  | "abd_ocs_attachments"
+  | "abd_ocs_compliance_log";
 
 /**
  * 백업 대상 정본 목록.
@@ -130,6 +136,11 @@ export const BACKUP_TABLES: BackupTableName[] = [
   "defect_comments",
   "defect_status_history",
   "task_management_status_history",
+  "abd_ocs_import_logs",
+  "abd_ocs_comments",
+  "abd_ocs_compliance",
+  "abd_ocs_attachments",
+  "abd_ocs_compliance_log",
 ];
 
 export const RAW_DATA_TABLES: BackupTableName[] = [
