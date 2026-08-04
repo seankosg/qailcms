@@ -68,14 +68,15 @@ export function mimeForExt(ext: string): string | null {
 }
 
 export function parseOcsManifest(json: unknown): OcsManifestParse {
-  const raw: any[] = Array.isArray(json)
-    ? json
-    : ((json as any)?.attachments ?? (json as any)?.files ?? (json as any)?.entries ?? []);
+  const box = (json ?? {}) as Record<string, unknown>;
+  const raw: Record<string, unknown>[] = (
+    Array.isArray(json) ? json : (box["attachments"] ?? box["files"] ?? box["entries"] ?? [])
+  ) as Record<string, unknown>[];
   const invalid_rows: { index: number; reason: string }[] = [];
   const entries: OcsManifestEntry[] = [];
   let skipped_no_path = 0;
 
-  raw.forEach((r, i) => {
+  raw.forEach((r: Record<string, unknown>, i) => {
     const relative_path = str(r?.relative_path);
     if (!relative_path) {
       skipped_no_path += 1;
@@ -162,7 +163,7 @@ export function matchFolderFiles(
     entries.map((e) => e.relative_path.split("/")[0]).filter((v): v is string => !!v),
   );
   for (const f of Array.from(files)) {
-    const full = ((f as any).webkitRelativePath as string) || f.name;
+    const full = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name;
     const ext = extOf(full);
     if (!(OCS_ALLOWED_EXT as readonly string[]).includes(ext)) {
       nonImageFiles += 1;

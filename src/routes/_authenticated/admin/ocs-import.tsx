@@ -106,8 +106,8 @@ function OcsImportPage() {
       setRows(res.entries.map((entry) => ({ entry, status: "미매칭" as const })));
       if (folderRef.current) folderRef.current.value = "";
       toast.success(`업로드 대상 ${res.entries.length}건 읽음`);
-    } catch (e: any) {
-      toast.error(`매니페스트 읽기 실패: ${e.message}`);
+    } catch (e) {
+      toast.error(`매니페스트 읽기 실패: ${(e as Error).message}`);
     }
   }
 
@@ -163,7 +163,12 @@ function OcsImportPage() {
         upsert: false,
       });
     if (error)
-      return { ...r, status: "실패", hash, message: String((error as any).message ?? error) };
+      return {
+        ...r,
+        status: "실패",
+        hash,
+        message: String((error as { message?: string }).message ?? error),
+      };
     return { ...r, status: "완료", hash };
   }
 
@@ -183,9 +188,9 @@ function OcsImportPage() {
       const res = await fetchExisting({ data: { roots } });
       existing = new Set(res.paths);
       setExistingCount(existing.size);
-    } catch (e: any) {
+    } catch (e) {
       setUploading(false);
-      toast.error(`기존 파일 조회 실패: ${e.message}`);
+      toast.error(`기존 파일 조회 실패: ${(e as Error).message}`);
       return;
     }
     for (const t of targets) {
@@ -203,8 +208,12 @@ function OcsImportPage() {
         next[my.i] = { ...next[my.i]!, status: "업로드" };
         try {
           next[my.i] = await uploadOne(next[my.i]!);
-        } catch (e: any) {
-          next[my.i] = { ...next[my.i]!, status: "실패", message: String(e?.message ?? e) };
+        } catch (e) {
+          next[my.i] = {
+            ...next[my.i]!,
+            status: "실패",
+            message: String((e as Error)?.message ?? e),
+          };
         }
         finished += 1;
         setDone(finished);

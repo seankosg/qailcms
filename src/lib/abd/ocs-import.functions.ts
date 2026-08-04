@@ -9,7 +9,14 @@ export const OCS_BUCKET = "abd-ocs-attachments";
  * DB 메타데이터 등록(abd_ocs_attachments insert)은 Stage B 에서 코멘트 임포트 뒤에 한다.
  * (고아 row 방지 — 지시문 §4)
  */
-async function assertStrictAdmin(supabase: any, userId: string) {
+type SupabaseLike = {
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+};
+
+async function assertStrictAdmin(supabase: SupabaseLike, userId: string) {
   const { data, error } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
@@ -73,7 +80,7 @@ export const listExistingOcsPaths = createServerFn({ method: "POST" })
         const list = items ?? [];
         for (const it of list) {
           const path = prefix ? `${prefix}/${it.name}` : it.name;
-          if ((it as any).id) out.push(path);
+          if ((it as { id?: string | null }).id) out.push(path);
           else queue.push(path); // 하위 폴더
         }
         if (list.length < 1000) break;
