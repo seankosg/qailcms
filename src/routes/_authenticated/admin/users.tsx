@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { todayInDoha } from "@/lib/time/doha";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   listAppUsers, createAppUser, resetUserPassword, updateUserRole,
@@ -25,6 +25,8 @@ import {
   type AppRole, type UserType,
 } from "@/types/enums";
 import { useTeamOptions } from "@/lib/team/team-master";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HdecRosterTab } from "@/components/admin/HdecRosterTab";
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
   head: () => ({ meta: [{ title: "사용자 관리 — QAIL CMS" }] }),
@@ -35,6 +37,8 @@ const USER_TYPES: UserType[] = ["admin", "hdec_pic", "hdec_eng", "pm_pd", "hdec"
 const ROLES: AppRole[] = ["admin", "superuser", "senior_user", "user", "super_guest", "guest", "d_superuser"];
 
 function UsersAdminPage() {
+  const [tab, setTab] = useState("accounts");
+  const [accountSearch, setAccountSearch] = useState("");
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -43,7 +47,16 @@ function UsersAdminPage() {
           <Link to="/admin/masters">마스터 관리 →</Link>
         </Button>
       </div>
-      <UsersTab />
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="accounts">HDEC PIC(계정)</TabsTrigger>
+          <TabsTrigger value="roster">HDEC ENG(명부)</TabsTrigger>
+        </TabsList>
+        <TabsContent value="accounts" className="pt-4"><UsersTab initialSearch={accountSearch} /></TabsContent>
+        <TabsContent value="roster" className="pt-4">
+          <HdecRosterTab kind="eng" onGoAccounts={(q) => { setAccountSearch(q); setTab("accounts"); }} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -121,7 +134,7 @@ function SortHeader({
   );
 }
 
-function UsersTab() {
+function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
   const list = useServerFn(listAppUsers);
   const resetPw = useServerFn(resetUserPassword);
   const updRole = useServerFn(updateUserRole);
@@ -135,7 +148,8 @@ function UsersTab() {
 
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
+  useEffect(() => { if (initialSearch) setSearch(initialSearch); }, [initialSearch]);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 

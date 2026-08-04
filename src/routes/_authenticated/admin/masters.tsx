@@ -31,7 +31,7 @@ function MastersAdminPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">마스터 관리</h1>
       <p className="text-sm text-muted-foreground">
-        HDEC PIC / HDEC ENG 명단은 <b>사용자관리</b>에서 관리됩니다. (user_type 이 <code>hdec</code>/<code>pm_pd</code>이고 활성 상태인 사용자가 자동으로 드롭다운에 표시됩니다.)
+        HDEC PIC(계정) 과 HDEC ENG(명부) 는 <b>사용자관리</b>의 두 탭에서 관리됩니다. ENG 명부는 임포트 시 자동 등재되며, 명부 행에서 직접 계정을 생성할 수 있습니다.
       </p>
       <Tabs defaultValue="team">
         <TabsList>
