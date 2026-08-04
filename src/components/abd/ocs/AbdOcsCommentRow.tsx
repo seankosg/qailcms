@@ -8,7 +8,7 @@ import type { AbdOcsComment } from "@/lib/abd/ocs.functions";
 
 function fmtWhen(v: string | null) {
   if (!v) return null;
-  return new Date(v).toLocaleString("ko-KR", { hour12: false });
+  return new Date(v).toLocaleString("en-GB", { hour12: false });
 }
 
 function CompliedControl({
@@ -30,7 +30,8 @@ function CompliedControl({
         checked={comment.complied}
         disabled={!canWrite || busy}
         onCheckedChange={(v) => onToggle(v === true)}
-        aria-describedby={`${id}-label`}
+        aria-label={`Mark OCS comment ${comment.source_comment_id} as complied`}
+        aria-describedby={canWrite ? `${id}-label` : `${id}-readonly`}
       />
       <label
         id={`${id}-label`}
@@ -52,13 +53,15 @@ function CompliedControl({
             <TooltipTrigger asChild>
               <span>{box}</span>
             </TooltipTrigger>
-            <TooltipContent>이 도면에 대한 편집 권한이 없습니다 (읽기 전용).</TooltipContent>
+            <TooltipContent id={`${id}-readonly`}>
+              You do not have permission to update this drawing (read-only).
+            </TooltipContent>
           </Tooltip>
         </TooltipProvider>
       )}
       {comment.compliance_source === "import_status_a" && (
         <Badge variant="secondary" className="text-[10px]">
-          Status A · auto
+          Status A · Auto
         </Badge>
       )}
       {comment.complied && comment.complied_by_name && (
@@ -74,7 +77,7 @@ function MetaBlock({ c }: { c: AbdOcsComment }) {
   return (
     <details className="mt-1 text-[10px] text-muted-foreground">
       <summary className="inline-flex cursor-pointer items-center gap-1 select-none">
-        <ChevronDown className="h-3 w-3" /> source
+        <ChevronDown className="h-3 w-3" /> Source
       </summary>
       <div className="mt-1 break-words">
         {c.source_file_name ?? "—"} / {c.source_sheet_name ?? "—"} / row {c.source_row_index ?? "—"}
