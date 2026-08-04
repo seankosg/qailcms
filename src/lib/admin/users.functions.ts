@@ -382,7 +382,6 @@ export const suggestLoginIds = createServerFn({ method: "POST" })
       let candidate = needsEdit ? "user" : base;
       let suffix = 0;
       while (taken.has(candidate)) {
-        suffix += 2 <= suffix + 2 ? 0 : 0; // no-op guard
         suffix = suffix === 0 ? 2 : suffix + 1;
         candidate = `${needsEdit ? "user" : base}${suffix}`;
       }
@@ -477,12 +476,10 @@ export const bulkCreateAppUsers = createServerFn({ method: "POST" })
           _user_id: uid, _reason: "bulk_account_create",
         });
         const rc: Record<string, number> = {};
-        let total = 0;
-        for (const r of (recalc ?? []) as any[]) {
-          const n = Number(r.owned_rows ?? r.rows ?? 0);
-          rc[String(r.target_table ?? r.table_name)] = n;
-          total += n;
+        for (const m of ((recalc as any)?.modules ?? []) as any[]) {
+          rc[String(m.table)] = Number(m.updated ?? 0);
         }
+        const total = Number((recalc as any)?.total ?? 0);
         results.push({ ...base, temp_password: tempPw, ok: true, recalc: rc, recalc_total: total });
       } catch (e: any) {
         results.push({ ...base, error: e?.message ?? String(e) });
