@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,9 @@ import {
   type SplStageCell,
 } from "@/lib/spl/rows.functions";
 import { downloadSplRoundtripWorkbook } from "@/lib/spl/roundtrip-export";
+import { updateSplField } from "@/lib/spl/mutations.functions";
+import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
+import { useRclCan } from "@/hooks/useRclCan";
 
 const routeApi = getRouteApi("/_authenticated/closure/spare-part/raw-data");
 
@@ -56,6 +59,10 @@ export function SplRawDataPage() {
 
   const fetchRows = useServerFn(getSplRowsAsOf);
   const fetchExport = useServerFn(getSplExportRows);
+  const saveField = useServerFn(updateSplField);
+  const queryClient = useQueryClient();
+  const { canRow } = useRclCan("SPL", "write");
+  const isToday = asOf === today;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["spl-rows-as-of", asOf],
@@ -319,6 +326,18 @@ export function SplRawDataPage() {
                       대표 지연
                     </th>
                     <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      PIC
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      ENG
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      PIC PO
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
+                      ENG PO
+                    </th>
+                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
                       Req.Doc
                     </th>
                     <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
@@ -364,11 +383,21 @@ export function SplRawDataPage() {
                 </thead>
                 <tbody>
                   {filtered.map((r) => (
-                    <SplTableRow key={r.id} row={r} catalog={catalog} subHeaders={subHeaders} />
+                    <SplTableRow
+                      key={r.id}
+                      row={r}
+                      catalog={catalog}
+                      subHeaders={subHeaders}
+                      canEdit={isToday && canRow(r as unknown as Record<string, unknown>)}
+                      onSave={async (field, value) => {
+                        await saveField({ data: { id: r.id, field, value } });
+                        await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
+                      }}
+                    />
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={9 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={13 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
                         조건에 맞는 행이 없습니다.
                       </td>
                     </tr>
