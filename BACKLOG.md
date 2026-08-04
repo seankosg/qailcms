@@ -414,3 +414,7 @@
 - [ ] #0804 isAdmin(admin ∪ superuser) → isAdminOrSuperuser 로 명칭 변경. isStrictAdmin(admin 단독)과 혼동 방지. 배포 이후 착수. (2026-08-04 지시 §3)
 
 - [ ] #0804 guest·super_guest 권한 범위 재정의 (현재 other_team read=Y, user 보다 넓음. 계정 0명. 배포 후 지시자가 정함)
+
+- [ ] #0804 `is_qaqc_readonly` — 호출처 0건(함수 0 · RLS 정책 0, 2026-08-04 17:20 실측). 배포 후 삭제 검토.
+- [ ] #0804 owner 판정 술어 불일치 — TM·SM 은 계정 기준 COALESCE, ABD 는 이름 기준. 같은 행이라도 모듈에 따라 owner 가 달라진다. 배포 후 하나로 통일.
+- [ ] #0804 `canEdit`(rank >= senior_user) — DmrRawDataPage 1곳 잔존. DMR 은 RCL 대상 밖. RCL 확장 시 같이 정리.
