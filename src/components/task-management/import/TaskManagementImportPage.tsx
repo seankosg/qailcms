@@ -270,13 +270,18 @@ function ImportInner() {
   // 행수 표기 — 스코프 판정은 서버(rcl_can 'import')가 하므로 클라이언트는
   // 전송 대상 행수만 센다. 제외된 행은 임포트 결과의 "범위 밖 미반영" 목록에 노출된다.
   const matchedByFile = useMemo(() => {
-    const map: Record<string, { matched: number; total: number }> = {};
+    const map: Record<string, { matched: number; total: number; mine: number }> = {};
     for (const f of files) {
       const rows = f.parsed ?? [];
-      map[f.id] = { matched: rows.length, total: rows.length };
+      map[f.id] = {
+        matched: rows.length,
+        total: rows.length,
+        // mine/all 토글의 추가 축소분(서버 허용 집합 위에 얹힘) 미리보기 — 게이트가 아니라 안내용
+        mine: rows.filter((r) => matchesHdecPic(r)).length,
+      };
     }
     return map;
-  }, [files]);
+  }, [files, effectiveScope, matchesHdecPic]);
 
   const readyFiles = files.filter(
     (f) => f.status === "ready" && !f.validationError && !!f.discipline,
@@ -483,6 +488,7 @@ function ImportInner() {
                 isRunning={isRunning}
                 matched={matchedByFile[f.id]?.matched ?? 0}
                 total={matchedByFile[f.id]?.total ?? 0}
+                mine={matchedByFile[f.id]?.mine ?? 0}
                 scopeIsMine={!isAdmin && effectiveScope === "mine"}
                 onRemove={() => removeFile(f.id)}
                 onDisciplineChange={(d) => setFileDiscipline(f.id, d)}
@@ -603,6 +609,7 @@ function FileRow({
   isRunning,
   matched,
   total,
+  mine,
   scopeIsMine,
   onRemove,
   onDisciplineChange,
@@ -619,6 +626,7 @@ function FileRow({
   isRunning: boolean;
   matched: number;
   total: number;
+  mine: number;
   scopeIsMine: boolean;
   onRemove: () => void;
   onDisciplineChange: (d: Discipline | null) => void;
@@ -648,8 +656,8 @@ function FileRow({
             {total > 0 && (
               <p className="mt-0.5 text-[11px]">
                 {scopeIsMine ? (
-                  <span className={matched === 0 ? "text-destructive" : "text-primary"}>
-                    임포트 대상 {matched} / 파싱 {total}행 (본인 HDEC PIC만)
+                  <span className="text-primary">
+                    서버 권한 판정 대상 {matched}행 · 그중 본인 HDEC PIC {mine}행만 반영 (파싱 {total}행)
                   </span>
                 ) : (
                   <span className="text-muted-foreground">전체 {total}행 임포트</span>

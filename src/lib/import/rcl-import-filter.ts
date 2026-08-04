@@ -39,25 +39,36 @@ export async function rclImportFilter(
   let role = "";
   let total = 0;
 
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize);
-    const { data, error } = await (supabase as any).rpc("rcl_import_filter", {
-      _module: moduleKey,
-      _match_cols: matchCols,
-      _rows: chunk,
-    });
-    // 조용한 통과 금지: 판정 실패는 즉시 예외로 표면화한다.
-    if (error) throw new Error(`권한 판정 실패(${moduleKey}): ${error.message}`);
-    if (!data || typeof data !== "object" || Array.isArray(data)) {
-      throw new Error(`권한 판정 응답 형식 오류(${moduleKey})`);
-    }
-    role = String(data.role ?? role);
-    total += Number(data.total ?? 0);
-    for (const k of (data.allowed ?? []) as Array<Record<string, string | null>>) {
-      allowedKeys.add(rclKeyOf(matchCols, k));
-    }
-    for (const d of (data.denied ?? []) as RclDeniedRow[]) {
-      denied.push(d);
+  // 청크는 순차가 아니라 소규모 병렬로 보낸다. 1,000행당 ~0.6s 이므로
+  // 39k행 마스터 파일이 순차라면 ~23s, 동시 4개면 ~6s 로 줄어든다.
+  // 판정 자체는 여전히 서버 단독(rcl_can(..., 'import'))이다.
+  const chunks: Array<Array<Record<string, unknown>>> = [];
+  for (let i = 0; i < rows.length; i += chunkSize) chunks.push(rows.slice(i, i + chunkSize));
+
+  const CONCURRENCY = 4;
+  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+    const batch = chunks.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      batch.map((chunk) =>
+        (supabase as any).rpc("rcl_import_filter", {
+          _module: moduleKey,
+          _match_cols: matchCols,
+          _rows: chunk,
+        }),
+      ),
+    );
+    for (const { data, error } of results) {
+      // 조용한 통과 금지: 판정 실패는 즉시 예외로 표면화한다.
+      if (error) throw new Error(`권한 판정 실패(${moduleKey}): ${error.message}`);
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error(`권한 판정 응답 형식 오류(${moduleKey})`);
+      }
+      role = String(data.role ?? role);
+      total += Number(data.total ?? 0);
+      for (const k of (data.allowed ?? []) as Array<Record<string, string | null>>) {
+        allowedKeys.add(rclKeyOf(matchCols, k));
+      }
+      for (const d of (data.denied ?? []) as RclDeniedRow[]) denied.push(d);
     }
   }
 

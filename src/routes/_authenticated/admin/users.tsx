@@ -52,9 +52,24 @@ function UsersAdminPage() {
           <TabsTrigger value="eng">HDEC ENG</TabsTrigger>
           <TabsTrigger value="accounts">계정 목록</TabsTrigger>
         </TabsList>
-        <TabsContent value="pic" className="pt-4"><HdecPeopleTab kind="pic" /></TabsContent>
-        <TabsContent value="eng" className="pt-4"><HdecPeopleTab kind="eng" /></TabsContent>
-        <TabsContent value="accounts" className="pt-4"><UsersTab /></TabsContent>
+        <TabsContent value="pic" className="pt-4">
+          <p className="mb-2 text-xs text-muted-foreground">
+            HDEC PIC 명부(활성) 기준 명단입니다. 계정이 없는 사람도 포함되며, 시스템 전체 계정은 “계정 목록” 탭에서 봅니다.
+          </p>
+          <HdecPeopleTab kind="pic" />
+        </TabsContent>
+        <TabsContent value="eng" className="pt-4">
+          <p className="mb-2 text-xs text-muted-foreground">
+            HDEC ENG 명부(활성) 기준 명단입니다. 표기 통합(merge)으로 비활성 처리된 옛 표기는 표시되지 않으므로 명부 원본 건수보다 적을 수 있습니다.
+          </p>
+          <HdecPeopleTab kind="eng" />
+        </TabsContent>
+        <TabsContent value="accounts" className="pt-4">
+          <p className="mb-2 text-xs text-muted-foreground">
+            시스템 전체 로그인 계정 목록입니다. PIC/ENG 명부에 없는 사람(테스트 계정·신규 입사자)도 여기서 생성합니다.
+          </p>
+          <UsersTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
