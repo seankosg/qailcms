@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, FileJson, FolderUp, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getOcsImportStats, OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
+import { getOcsImportStats, listExistingOcsPaths, OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
 import {
   parseOcsManifest,
   matchFolderFiles,
@@ -56,6 +56,8 @@ async function sha256Hex(buf: ArrayBuffer) {
 
 function OcsImportPage() {
   const fetchStats = useServerFn(getOcsImportStats);
+  const fetchExisting = useServerFn(listExistingOcsPaths);
+  const [existingCount, setExistingCount] = useState<number | null>(null);
   const [parsed, setParsed] = useState<OcsManifestParse | null>(null);
   const [manifestName, setManifestName] = useState<string | null>(null);
   const [match, setMatch] = useState<FolderMatchResult | null>(null);
@@ -106,11 +108,24 @@ function OcsImportPage() {
     toast.success(`매칭 ${m.matched.size}건 / 미매칭 ${m.unmatchedManifest.length}건`);
   }
 
-  async function uploadOne(idx: number, r: UploadRow): Promise<UploadRow> {
+  async function uploadOne(r: UploadRow): Promise<UploadRow> {
     const file = r.file!;
     const ext = extOf(r.entry.relative_path);
     const mime = mimeForExt(ext);
-    if (!mime) return { ...r, status: "실패", message: "허용되지 않는 형식" };
+    if (!mime) return { ...r, status: "실패", message: `허용되지 않는 확장자(.${ext})` };
+    // 실제 File.type 도 강제 검사 — 확장자만 믿지 않는다(§4)
+    const fileType = (file.type || "").toLowerCase();
+    if (fileType && fileType !== mime) {
+      return { ...r, status: "실패", message: `MIME 불일치(파일 ${fileType} ≠ 경로 ${mime})` };
+    }
+    if (!fileType && !(file.type === "")) {
+      return { ...r, status: "실패", message: "MIME 판별 불가" };
+    }
+    const fmt = (r.entry.image_format ?? "").toLowerCase().replace("jpeg", "jpg");
+    const extNorm = ext === "jpeg" ? "jpg" : ext;
+    if (fmt && fmt !== extNorm) {
+      return { ...r, status: "실패", message: `manifest image_format(${r.entry.image_format}) ≠ 확장자(.${ext})` };
+    }
     if (file.size > OCS_MAX_BYTES) return { ...r, status: "실패", message: "8MB 초과" };
 
     const buf = await file.arrayBuffer();
@@ -128,11 +143,7 @@ function OcsImportPage() {
         contentType: mime,
         upsert: false,
       });
-    if (error) {
-      const msg = String((error as any).message ?? error);
-      if (/exists/i.test(msg)) return { ...r, status: "기존", hash, message: "이미 존재 — 건너뜀" };
-      return { ...r, status: "실패", hash, message: msg };
-    }
+    if (error) return { ...r, status: "실패", hash, message: String((error as any).message ?? error) };
     return { ...r, status: "완료", hash };
   }
 
@@ -142,14 +153,36 @@ function OcsImportPage() {
     setUploading(true);
     setDone(0);
     const next = rows.slice();
+
+    // §3 기존 object 선조회 — 존재하는 경로는 업로드 요청 자체를 보내지 않는다.
+    let existing = new Set<string>();
+    try {
+      const roots = Array.from(
+        new Set(rows.map((r) => r.entry.relative_path.split("/")[0]).filter(Boolean) as string[]),
+      );
+      const res = await fetchExisting({ data: { roots } });
+      existing = new Set(res.paths);
+      setExistingCount(existing.size);
+    } catch (e: any) {
+      setUploading(false);
+      toast.error(`기존 파일 조회 실패: ${e.message}`);
+      return;
+    }
+    for (const t of targets) {
+      if (existing.has(next[t.i]!.entry.relative_path)) {
+        next[t.i] = { ...next[t.i]!, status: "기존", message: "보관함에 이미 존재 — 건너뜀" };
+      }
+    }
+    setRows(next.slice());
+    const pending = targets.filter((t) => next[t.i]!.status !== "기존");
     let cursor = 0;
     let finished = 0;
     async function worker() {
-      while (cursor < targets.length) {
-        const my = targets[cursor++]!;
+      while (cursor < pending.length) {
+        const my = pending[cursor++]!;
         next[my.i] = { ...next[my.i]!, status: "업로드" };
         try {
-          next[my.i] = await uploadOne(my.i, next[my.i]!);
+          next[my.i] = await uploadOne(next[my.i]!);
         } catch (e: any) {
           next[my.i] = { ...next[my.i]!, status: "실패", message: String(e?.message ?? e) };
         }
@@ -246,8 +279,9 @@ function OcsImportPage() {
             disabled={!parsed}
           />
           <p className="text-xs text-muted-foreground">
-            PNG/JPEG, 파일당 최대 8MB. 최상위 폴더 한 단계만 제거한 뒤 매니페스트의 relative_path 와 정확히 비교합니다
-            (파일명만 비교하지 않음). 저장 경로 = relative_path 그대로.
+            <b>attachments 폴더가 들어 있는 상위 ocs-db-all 폴더</b>를 선택하십시오(attachments 폴더를 직접 선택해도
+            자동 인식합니다). PNG/JPEG, 파일당 최대 8MB. 파일 경로는 매니페스트의 relative_path 와 정확히 일치해야
+            하며(파일명만 비교하지 않음), 저장 경로도 relative_path 를 그대로 사용합니다.
           </p>
           {match && (
             <div className="grid gap-1 rounded-md border p-3 text-sm">
@@ -257,6 +291,7 @@ function OcsImportPage() {
               </div>
               <div>폴더에만 있는 파일 {match.extraFiles.length}건</div>
               <div>이미지 아닌 파일 {match.nonImageFiles}건</div>
+              {existingCount !== null && <div>보관함 기존 object {existingCount}건 (업로드 요청 생략)</div>}
             </div>
           )}
           {match && match.matched.size > 0 && !confirmed && (
