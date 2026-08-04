@@ -2162,6 +2162,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "hdec_eng_name_master_linked_user_id_fkey"
+            columns: ["linked_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "hdec_eng_name_master_merged_into_fk"
             columns: ["merged_into_id"]
             isOneToOne: false
@@ -2253,6 +2260,13 @@ export type Database = {
           verified?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "hdec_pic_name_master_linked_user_id_fkey"
+            columns: ["linked_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hdec_pic_name_master_merged_into_fk"
             columns: ["merged_into_id"]
