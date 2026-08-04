@@ -37,7 +37,7 @@ const ROLES: AppRole[] = ["admin", "superuser", "senior_user", "user", "super_gu
 type Filter = "all" | "no_account" | "zero_usage" | "merged";
 type SortKey = "name" | "cnt_total" | "account";
 
-export function HdecRosterTab({ kind = "eng" as "eng" | "pic" }) {
+export function HdecRosterTab({ kind = "eng" as "eng" | "pic", onGoAccounts }: { kind?: "eng" | "pic"; onGoAccounts?: (name: string) => void }) {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["hdec-roster", kind],
@@ -167,7 +167,8 @@ export function HdecRosterTab({ kind = "eng" as "eng" | "pic" }) {
                       </TableCell>
                       <TableCell>
                         {r.has_account ? (
-                          <Button variant="ghost" size="sm" disabled className="text-xs">
+                          <Button variant="ghost" size="sm" className="text-xs"
+                            onClick={() => onGoAccounts?.(r.account_login_id ?? r.name)}>
                             <ExternalLink className="mr-1 h-3 w-3" />계정 탭
                           </Button>
                         ) : (
