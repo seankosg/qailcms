@@ -77,7 +77,8 @@ export type BackupTableName =
   | "abd_ocs_compliance_log"
   | "abd_ocs_response_segments"
   | "abd_ocs_response_comment_links"
-  | "abd_ocs_source_files";
+  | "abd_ocs_source_files"
+  | "abd_ocs_number_correction_log";
 
 /**
  * 백업 대상 정본 목록.
@@ -151,6 +152,7 @@ export const BACKUP_TABLES: BackupTableName[] = [
   "abd_ocs_response_segments",
   "abd_ocs_response_comment_links",
   "abd_ocs_source_files",
+  "abd_ocs_number_correction_log",
 ];
 
 export const RAW_DATA_TABLES: BackupTableName[] = [
@@ -181,6 +183,7 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "abd_ocs_response_segments",
     "abd_ocs_response_comment_links",
     "abd_ocs_source_files",
+    "abd_ocs_number_correction_log",
   ],
   sm: ["defect_items_raw", "defect_import_logs", "defect_status_history"],
   tm: [
