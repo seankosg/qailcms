@@ -1010,7 +1010,17 @@ function renderAbdCell(c: AbdColumnDef, v: any, row: AbdItem): React.ReactNode {
 function OcsCheckCell({ value, row }: { value: any; row: AbdItem }) {
   const [open, setOpen] = useState(false);
   const state = value == null || value === "" ? null : String(value);
-  if (state === null) return <span className="text-muted-foreground/50">—</span>;
+  const abdNumber = String((row as any).abd_number ?? "");
+  if (state === null) {
+    return (
+      <span
+        className="inline-flex h-6 items-center border border-emerald-500/70 bg-emerald-500/15 px-1.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300"
+        title="OCS 코멘트 없음 (0/0)"
+      >
+        ✓
+      </span>
+    );
+  }
   const total = Number((row as any).ocs_total ?? 0) || 0;
   const done = Number((row as any).ocs_complied ?? 0) || 0;
   const pending = Math.max(0, total - done);
