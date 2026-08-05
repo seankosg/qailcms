@@ -983,6 +983,16 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             put(base, k, v);
           }
         }
+        // ── 자동 채움 rule: room_group (location_raw 조회+규칙, AI 토글 ON 일 때만) ──
+        // 우선순위: 엑셀 원본값 → 기존 DB값 → 조회표(496키) → 규칙 10개 → BOH
+        // Reference 가 두 값으로 갈리는 8키는 채우지 않는다.
+        if (f.aiClassifyEnabled && !base.room_group && !prev?.room_group && !excludedFields.has("room_group")) {
+          const rg = resolveRoomGroup((base.location_raw ?? p.location_raw ?? null) as string | null);
+          if (rg) {
+            base.room_group = rg;
+            roomGroupAutoFilled += 1;
+          }
+        }
         // ── 자동 채움 rule: Subcon ──
         // HDEC PIC/ENG 자동 채움은 2026-08-04 폐지(규칙 매칭 0건 · 담당 오염 위험).
         // 원본 엑셀 값(base 에 이미 있음) 또는 기존 DB 값이 있으면 skip.
