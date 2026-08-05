@@ -45,6 +45,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useRclGrants } from "@/hooks/useRclCan";
 import {
   TaskManagementImportProvider,
   useTaskManagementImport,
@@ -441,7 +442,7 @@ function ImportInner() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {!isAdmin && (
-                isSuperUserLike ? (
+                canChooseScope ? (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">임포트 스코프</span>
                     <Select
