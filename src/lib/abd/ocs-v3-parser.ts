@@ -1,39 +1,99 @@
 /**
  * ABD OCS Atomic V3 일회성 교정 어댑터 — 순수 함수만 둔다.
  *
- * 입력 1) OCS_Atomic_V3_DryRun.json               — 교정 정본(원자 코멘트 + 첨부 메타)
- * 입력 2) OCS_Atomic_V2_to_V3_Delta_Audit.json    — V2→V3 변경 감사
+ * 입력 1) OCS_Atomic_V3_Corrected_DB.json          — 교정 정본(그룹 + 원자 코멘트 + 첨부 메타)
+ * 입력 2) OCS_Atomic_V2_to_V3_Delta_Audit.json     — V2→V3 변경 감사
  * 입력 3) OCS_Contractor_Response_Atomic_Mapping_V3.json — 응답 segment ↔ atomic 매핑
+ * 입력 4) OCS_V3_Final_Import_Policy.json          — 최종 정책(해시 관문 + 기대값)
  *
- * 이 어댑터는 코멘트를 재파싱하지 않는다. 제공된 JSON 을 그대로 정본으로 읽는다.
+ * 이 어댑터는 코멘트를 재파싱하지 않는다. 제공된 JSON 을 그대로 정본으로 읽고
+ * 서버 스테이징 테이블 컬럼명에 1:1 로 대응시킨다.
  */
 
-export type V3AtomicRow = {
+export type V3StageGroup = {
+  group_id: string;
+  source_parent_comment_id: string;
+  ocs_number: string | null;
+  drawing_number: string | null;
+  source_file_name: string | null;
+  source_sheet: string | null;
+  source_row: number | null;
+  item_count: number | null;
+  split_status: string | null;
+  group_contractor_response: string | null;
+  v3_ocs_number: string | null;
+};
+
+export type V3StageComment = {
   source_comment_id: string;
   source_parent_comment_id: string;
-  group_key: string;
+  comment_group_id: string | null;
   atomic_item_no: number | null;
   atomic_item_count: number | null;
+  split_status: string | null;
+  comment_part: number | null;
   ocs_comment: string | null;
   assessed_code: string | null;
+  contractor_response: string | null;
   ocs_number: string | null;
-  source_drawing_number: string | null;
+  drawing_number: string | null;
   source_file_name: string | null;
   source_sheet_name: string | null;
   source_row_index: number | null;
-  contractor_response_raw: string | null;
+  abd_numbers: string[];
+  link_status: string | null;
+  link_scope: string | null;
+  link_method: string | null;
+  is_active: boolean;
+  retired_reason: string | null;
+  initial_complied: boolean;
+  compliance_source: string | null;
+  compliance_reason: string | null;
+};
+
+export type V3StageAttachment = {
+  attachment_id: string;
+  comment_id: string | null;
+  source_parent_comment_id: string | null;
+  comment_group_id: string | null;
+  atomic_comment_id: string | null;
+  attachment_scope: string | null;
+};
+
+export type V3StageResponse = {
+  group_id: string | null;
+  source_parent_comment_id: string;
+  response_segment_no: number;
+  response_source_label: string | null;
+  response_text: string | null;
+  atomic_comment_id: string | null;
+  mapping_status: string;
+  mapping_method: string | null;
+  confidence_score: number | null;
+  source_file_name: string | null;
+  source_sheet: string | null;
+  source_row: number | null;
+  generic_response: boolean;
 };
 
 export type V3AtomicParse = {
-  total_raw: number;
-  rows: V3AtomicRow[];
+  summary: Record<string, unknown>;
+  link_correction_summary: Record<string, unknown>;
+  payload_sha256: string | null;
+  groups: V3StageGroup[];
+  comments: V3StageComment[];
+  attachments: V3StageAttachment[];
   invalid_rows: { index: number; reason: string }[];
   duplicated_atomic_ids: string[];
   source_parent_count: number;
-  multi_group_count: number;
-  single_comment_count: number;
+  active_count: number;
+  inactive_count: number;
+  linked_count: number;
+  linked_multi_count: number;
+  abd_link_associations: number;
+  distinct_abd_numbers: number;
   residual_multi_marker_rows: number;
-  attachments_metadata: number;
+  attachment_scope_counts: Record<string, number>;
 };
 
 export type V3DeltaParse = {
@@ -47,24 +107,9 @@ export type V3DeltaParse = {
   changed_parent_ids: string[];
 };
 
-export type V3ResponseSegment = {
-  source_parent_comment_id: string;
-  response_segment_no: number;
-  response_source_label: string | null;
-  response_text: string | null;
-  source_file_name: string | null;
-  source_sheet: string | null;
-  source_row: number | null;
-  target_atomic_comment_id: string | null;
-  mapping_status: string;
-  mapping_method: string | null;
-  confidence_score: number | null;
-  evidence_terms: unknown;
-};
-
 export type V3ResponseParse = {
   total_raw: number;
-  segments: V3ResponseSegment[];
+  segments: V3StageResponse[];
   invalid_rows: { index: number; reason: string }[];
   reviewed_source_groups: number;
   atomic_comments_in_groups: number;
@@ -73,8 +118,24 @@ export type V3ResponseParse = {
   probable: number;
   requires_review: number;
   duplicate_ignored: number;
+  open_segments: number;
+  open_groups: number;
   confirmed_high_unique_targets: number;
   duplicate_links: number;
+};
+
+export type V3PolicyParse = {
+  policy_version: string | null;
+  generated_at: string | null;
+  atomic_v3_file: string | null;
+  atomic_v3_sha256: string | null;
+  response_mapping_file: string | null;
+  response_mapping_sha256: string | null;
+  open_segment_count: number;
+  open_group_count: number;
+  group_inherited_attachment_count: number;
+  raw_data_ocs_change_count: number;
+  group_response_decisions: number;
 };
 
 /** 하이픈/점/괄호 번호 마커가 본문 안에 2개 이상 남아 있는지 — V3 잔존 복수 번호 검사 */
@@ -110,81 +171,96 @@ function f(v: unknown): number | null {
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
   return null;
 }
+function b(v: unknown, dflt = false): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") return ["true", "1", "y", "yes"].includes(v.trim().toLowerCase());
+  if (typeof v === "number") return v !== 0;
+  return dflt;
+}
+function arr(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => s(x)).filter((x): x is string => !!x);
+  const one = s(v);
+  return one ? [one] : [];
+}
 
 const K = {
-  atomic: [
-    "Atomic Comment ID",
-    "atomic_comment_id",
-    "source_comment_id",
-    "Comment ID",
-    "comment_id",
-  ],
-  parent: [
-    "Parent Comment ID",
-    "parent_comment_id",
-    "Source Parent Comment ID",
-    "source_parent_comment_id",
-    "Original Comment ID",
-  ],
-  group: ["Group Key", "group_key", "Comment Group Key", "comment_group_key"],
-  itemNo: ["Atomic Item No", "atomic_item_no", "Item No", "item_no", "Seq"],
-  itemCount: ["Atomic Item Count", "atomic_item_count", "Item Count", "item_count"],
-  text: ["Atomic Comment", "atomic_comment", "OCS Comment", "ocs_comment", "Comment Text"],
+  atomic: ["Atomic Comment ID", "atomic_comment_id", "Comment ID", "comment_id"],
+  parent: ["Source Parent Comment ID", "source_parent_comment_id", "Parent Comment ID"],
+  group: ["Comment Group ID", "comment_group_id", "group_id", "Group Key"],
+  itemNo: ["Atomic Item No", "atomic_item_no"],
+  itemCount: ["Atomic Item Count", "atomic_item_count"],
+  splitStatus: ["Atomic Split Status", "atomic_split_status", "split_status"],
+  commentPart: ["Comment Part", "comment_part"],
+  text: ["OCS Comment", "ocs_comment", "Atomic Comment", "atomic_comment"],
   assessed: ["Assessed Code", "assessed_code"],
-  ocsNumber: ["OCS Number", "ocs_number"],
-  drawing: ["ABD Drawing Number", "source_drawing_number", "Drawing Number"],
-  fileName: ["Source File Name", "source_file_name", "source_file"],
-  sheet: ["Source Sheet", "source_sheet_name", "source_sheet", "Source Sheet Name"],
-  rowIndex: ["Source Row", "source_row_index", "source_row", "Source Row Index"],
-  responseRaw: [
-    "Contractor Response Raw",
-    "contractor_response_raw",
-    "Original Contractor Response",
-    "Contractor Response",
-    "contractor_response",
-  ],
-  segNo: ["Response Segment No", "response_segment_no", "segment_no", "Segment No"],
-  segLabel: ["Response Source Label", "response_source_label", "segment_label", "Response Label"],
-  segText: ["Response Text", "response_text", "Segment Text", "segment_text"],
-  target: [
-    "Target Atomic Comment ID",
-    "target_atomic_comment_id",
-    "Atomic Comment ID",
-    "atomic_comment_id",
-  ],
-  mapStatus: ["Mapping Status", "mapping_status", "status"],
-  mapMethod: ["Mapping Method", "mapping_method", "method"],
-  score: ["Confidence", "confidence", "confidence_score", "Confidence Score"],
-  evidence: ["Evidence Terms", "evidence_terms", "evidence"],
+  response: ["Contractor Response", "contractor_response"],
+  ocsNumber: ["V3 OCS Number", "v3_ocs_number", "OCS Number", "ocs_number"],
+  drawing: ["ABD Drawing Number", "drawing_number", "source_drawing_number"],
+  fileName: ["Source File Name", "source_file_name"],
+  sheet: ["Source Sheet", "source_sheet", "source_sheet_name"],
+  rowIndex: ["Source Row", "source_row", "source_row_index"],
+  abdNumbers: ["V3 ABD Numbers", "v3_abd_numbers"],
+  abdNumber: ["V3 ABD Number", "v3_abd_number"],
+  linkStatus: ["V3 Link Status", "v3_link_status"],
+  linkScope: ["V3 Link Scope", "v3_link_scope"],
+  linkMethod: ["V3 Link Method", "v3_link_method"],
+  active: ["V3 Active", "v3_active", "is_active"],
+  retired: ["V3 Retired Reason", "v3_retired_reason", "retired_reason"],
+  complied: ["V3 Initial Complied", "v3_initial_complied"],
+  complianceSource: ["V3 Compliance Source", "v3_compliance_source"],
+  complianceReason: ["V3 Compliance Reason", "v3_compliance_reason"],
+  segNo: ["response_segment_no", "Response Segment No"],
+  segLabel: ["response_source_label", "Response Source Label"],
+  segText: ["response_text", "Response Text"],
+  mapStatus: ["mapping_status", "Mapping Status"],
+  mapMethod: ["mapping_method", "Mapping Method"],
+  score: ["confidence_score", "Confidence Score", "confidence"],
 };
 
-function rowsOf(json: unknown, extraKeys: string[] = []): Record<string, unknown>[] {
+function listOf(json: unknown, keys: string[]): Record<string, unknown>[] {
   if (Array.isArray(json)) return json as Record<string, unknown>[];
   const box = (json ?? {}) as Record<string, unknown>;
-  for (const k of ["rows", "data", "items", ...extraKeys]) {
+  for (const k of keys) if (Array.isArray(box[k])) return box[k] as Record<string, unknown>[];
+  for (const k of ["rows", "data", "items"])
     if (Array.isArray(box[k])) return box[k] as Record<string, unknown>[];
-  }
   return [];
 }
 
-function summaryOf(json: unknown): Record<string, unknown> {
+function objOf(json: unknown, keys: string[]): Record<string, unknown> {
   const box = (json ?? {}) as Record<string, unknown>;
-  for (const k of ["summary", "meta", "totals", "audit_summary", "statistics"]) {
+  for (const k of keys) {
     const v = box[k];
     if (v && typeof v === "object" && !Array.isArray(v)) return v as Record<string, unknown>;
   }
-  return box;
+  return {};
 }
 
-/** 4.1 — Atomic V3 정본 */
+/** 4.1 — Atomic V3 정본 (그룹 / 원자 코멘트 / 첨부) */
 export function parseV3Atomic(json: unknown): V3AtomicParse {
   const box = (json ?? {}) as Record<string, unknown>;
-  const raw = rowsOf(json, ["atomic_comments", "comments", "atomic_rows"]);
-  const rows: V3AtomicRow[] = [];
+  const rawGroups = listOf(json, ["comment_groups", "groups"]);
+  const rawComments = listOf(json, ["atomic_comments", "comments", "atomic_rows"]);
+  const rawAtt = listOf(json, ["attachments", "attachment_metadata"]);
+
   const invalid_rows: { index: number; reason: string }[] = [];
   let residual = 0;
 
-  raw.forEach((r, i) => {
+  const groups: V3StageGroup[] = rawGroups.map((r) => ({
+    group_id: s(pick(r, ["group_id", "Comment Group ID"])) ?? "",
+    source_parent_comment_id: s(pick(r, K.parent)) ?? "",
+    ocs_number: s(pick(r, ["ocs_number", "OCS Number"])),
+    drawing_number: s(pick(r, K.drawing)),
+    source_file_name: s(pick(r, K.fileName)),
+    source_sheet: s(pick(r, K.sheet)),
+    source_row: n(pick(r, K.rowIndex)),
+    item_count: n(pick(r, ["item_count", "Item Count"])),
+    split_status: s(pick(r, K.splitStatus)),
+    group_contractor_response: s(pick(r, ["group_contractor_response", "Group Contractor Response"])),
+    v3_ocs_number: s(pick(r, ["v3_ocs_number", "V3 OCS Number"])),
+  }));
+
+  const comments: V3StageComment[] = [];
+  rawComments.forEach((r, i) => {
     const cid = s(pick(r, K.atomic));
     if (!cid) {
       invalid_rows.push({ index: i, reason: "Atomic Comment ID 누락" });
@@ -193,79 +269,112 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
     const pid = s(pick(r, K.parent)) ?? cid;
     const text = s(pick(r, K.text));
     if (countNumberMarkers(text) > 1) residual += 1;
-    rows.push({
+    const numbers = arr(r["V3 ABD Numbers"] ?? r["v3_abd_numbers"]);
+    const abd = numbers.length > 0 ? numbers : arr(pick(r, K.abdNumber));
+    comments.push({
       source_comment_id: cid,
       source_parent_comment_id: pid,
-      group_key: s(pick(r, K.group)) ?? `G:${pid}`,
+      comment_group_id: s(pick(r, K.group)),
       atomic_item_no: n(pick(r, K.itemNo)),
       atomic_item_count: n(pick(r, K.itemCount)),
+      split_status: s(pick(r, K.splitStatus)),
+      comment_part: n(pick(r, K.commentPart)),
       ocs_comment: text,
       assessed_code: s(pick(r, K.assessed)),
+      contractor_response: s(pick(r, K.response)),
       ocs_number: s(pick(r, K.ocsNumber)),
-      source_drawing_number: s(pick(r, K.drawing)),
+      drawing_number: s(pick(r, K.drawing)),
       source_file_name: s(pick(r, K.fileName)),
       source_sheet_name: s(pick(r, K.sheet)),
       source_row_index: n(pick(r, K.rowIndex)),
-      contractor_response_raw: s(pick(r, K.responseRaw)),
+      abd_numbers: abd,
+      link_status: s(pick(r, K.linkStatus)),
+      link_scope: s(pick(r, K.linkScope)),
+      link_method: s(pick(r, K.linkMethod)),
+      is_active: b(r["V3 Active"] ?? r["v3_active"] ?? r["is_active"], true),
+      retired_reason: s(pick(r, K.retired)),
+      initial_complied: b(r["V3 Initial Complied"] ?? r["v3_initial_complied"], false),
+      compliance_source: s(pick(r, K.complianceSource)),
+      compliance_reason: s(pick(r, K.complianceReason)),
     });
   });
 
+  const attachments: V3StageAttachment[] = rawAtt.map((r) => ({
+    attachment_id: s(pick(r, ["attachment_id", "Attachment ID"])) ?? "",
+    comment_id: s(pick(r, ["comment_id", "Comment ID"])),
+    source_parent_comment_id: s(pick(r, K.parent)),
+    comment_group_id: s(pick(r, ["comment_group_id", "Comment Group ID"])),
+    atomic_comment_id: s(pick(r, ["atomic_comment_id", "Atomic Comment ID"])),
+    attachment_scope: s(pick(r, ["attachment_scope", "Attachment Scope"])),
+  }));
+
   const seen = new Set<string>();
   const dup = new Set<string>();
-  const byParent = new Map<string, number>();
-  for (const r of rows) {
-    if (seen.has(r.source_comment_id)) dup.add(r.source_comment_id);
-    seen.add(r.source_comment_id);
-    byParent.set(r.source_parent_comment_id, (byParent.get(r.source_parent_comment_id) ?? 0) + 1);
+  const parents = new Set<string>();
+  const abdSet = new Set<string>();
+  let active = 0;
+  let linked = 0;
+  let linkedMulti = 0;
+  let assoc = 0;
+  for (const c of comments) {
+    if (seen.has(c.source_comment_id)) dup.add(c.source_comment_id);
+    seen.add(c.source_comment_id);
+    parents.add(c.source_parent_comment_id);
+    if (c.is_active) {
+      active += 1;
+      assoc += c.abd_numbers.length;
+      for (const x of c.abd_numbers) abdSet.add(x);
+      if (c.link_status === "linked") linked += 1;
+      if (c.link_status === "linked_multi" || c.abd_numbers.length > 1) linkedMulti += 1;
+    }
   }
 
-  const attArr = ["attachments", "attachment_metadata", "attachments_metadata"]
-    .map((k) => box[k])
-    .find((v) => Array.isArray(v)) as unknown[] | undefined;
+  const scopeCounts: Record<string, number> = {};
+  for (const a of attachments) {
+    const k = a.attachment_scope ?? "unknown";
+    scopeCounts[k] = (scopeCounts[k] ?? 0) + 1;
+  }
 
   return {
-    total_raw: raw.length,
-    rows,
+    summary: objOf(json, ["summary"]),
+    link_correction_summary: objOf(json, ["v3_link_correction_summary"]),
+    payload_sha256: s(box["v3_corrected_payload_sha256"]),
+    groups,
+    comments,
+    attachments,
     invalid_rows,
     duplicated_atomic_ids: Array.from(dup),
-    source_parent_count: byParent.size,
-    multi_group_count: Array.from(byParent.values()).filter((c) => c > 1).length,
-    single_comment_count: Array.from(byParent.values()).filter((c) => c === 1).length,
+    source_parent_count: parents.size,
+    active_count: active,
+    inactive_count: comments.length - active,
+    linked_count: linked,
+    linked_multi_count: linkedMulti,
+    abd_link_associations: assoc,
+    distinct_abd_numbers: abdSet.size,
     residual_multi_marker_rows: residual,
-    attachments_metadata: attArr?.length ?? 0,
+    attachment_scope_counts: scopeCounts,
   };
 }
 
 /** 4.2 — V2→V3 Delta Audit */
 export function parseV3Delta(json: unknown): V3DeltaParse {
-  const sum = summaryOf(json);
-  const rows = rowsOf(json, ["changed_parents", "changes", "delta_rows", "parents"]);
+  const sum = objOf(json, ["summary", "meta", "totals"]);
+  const rows = listOf(json, ["changed_parents", "changes", "delta_rows"]);
   const changedIds = new Set<string>();
   for (const r of rows) {
-    const changedFlag = pick(r, ["changed", "is_changed", "has_change"]);
     const pid = s(pick(r, K.parent)) ?? s(pick(r, K.atomic));
-    if (!pid) continue;
-    const v2c = n(pick(r, ["v2_count", "V2 Count", "v2_atomic_count"]));
-    const v3c = n(pick(r, ["v3_count", "V3 Count", "v3_atomic_count"]));
-    const changed =
-      changedFlag === undefined
-        ? v2c !== null && v3c !== null
-          ? v2c !== v3c
-          : true
-        : String(changedFlag).toLowerCase() === "true";
-    if (changed) changedIds.add(pid);
+    if (pid) changedIds.add(pid);
   }
   const g = (keys: string[]) => n(pick(sum, keys)) ?? 0;
-  const v2 = g(["v2_atomic_comments", "V2 Atomic Comments", "v2_atomic", "v2_count"]);
-  const v3 = g(["v3_atomic_comments", "V3 Atomic Comments", "v3_atomic", "v3_count"]);
-  const changedCount =
-    g(["changed_source_parents", "changed_parents", "Changed Source Parents"]) || changedIds.size;
-  const parents = g(["source_parents", "Source Parents", "source_parent_count"]);
+  const v2 = g(["v2_atomic_comments", "v2_atomic", "v2_count"]);
+  const v3 = g(["v3_atomic_comments", "v3_atomic", "v3_count"]);
+  const parents = g(["source_parents", "source_parent_count"]);
+  const changedCount = g(["changed_source_parents", "changed_parents"]) || changedIds.size;
   return {
     source_parents: parents,
     v2_atomic: v2,
     v3_atomic: v3,
-    delta: g(["delta", "atomic_delta"]) || v3 - v2,
+    delta: g(["atomic_comment_delta", "delta"]) || v3 - v2,
     changed_parents: changedCount,
     unchanged_parents:
       g(["unchanged_source_parents", "unchanged_parents"]) ||
@@ -281,11 +390,12 @@ const ALLOWED_STATUS = new Set([
   "requires_review",
   "duplicate_ignored",
 ]);
+const OPEN_STATUS = new Set(["probable", "requires_review"]);
 
 /** 4.3 — Contractor Response Atomic Mapping */
 export function parseV3ResponseMapping(json: unknown): V3ResponseParse {
-  const raw = rowsOf(json, ["segments", "response_segments", "mappings", "response_mappings"]);
-  const segments: V3ResponseSegment[] = [];
+  const raw = listOf(json, ["mappings", "segments", "response_segments", "response_mappings"]);
+  const segments: V3StageResponse[] = [];
   const invalid_rows: { index: number; reason: string }[] = [];
   const statusCounts: Record<string, number> = {};
   const pairSeen = new Set<string>();
@@ -294,7 +404,7 @@ export function parseV3ResponseMapping(json: unknown): V3ResponseParse {
   raw.forEach((r, i) => {
     const pid = s(pick(r, K.parent));
     if (!pid) {
-      invalid_rows.push({ index: i, reason: "Parent Comment ID 누락" });
+      invalid_rows.push({ index: i, reason: "source_parent_comment_id 누락" });
       return;
     }
     const statusRaw = (s(pick(r, K.mapStatus)) ?? "requires_review")
@@ -302,32 +412,35 @@ export function parseV3ResponseMapping(json: unknown): V3ResponseParse {
       .replace(/\s+/g, "_");
     const status = ALLOWED_STATUS.has(statusRaw) ? statusRaw : "requires_review";
     statusCounts[status] = (statusCounts[status] ?? 0) + 1;
-    const target = s(pick(r, K.target));
+    const target = s(pick(r, ["atomic_comment_id", "target_atomic_comment_id"]));
+    const segNo = n(pick(r, K.segNo)) ?? i + 1;
     if (target) {
-      const key = `${pid}|${s(pick(r, K.segNo)) ?? ""}|${target}`;
+      const key = `${pid}|${segNo}|${target}`;
       if (pairSeen.has(key)) duplicateLinks += 1;
       pairSeen.add(key);
     }
     segments.push({
+      group_id: s(pick(r, ["comment_group_id", "group_id"])),
       source_parent_comment_id: pid,
-      response_segment_no: n(pick(r, K.segNo)) ?? i + 1,
+      response_segment_no: segNo,
       response_source_label: s(pick(r, K.segLabel)),
       response_text: s(pick(r, K.segText)),
-      source_file_name: s(pick(r, K.fileName)),
-      source_sheet: s(pick(r, K.sheet)),
-      source_row: n(pick(r, K.rowIndex)),
-      target_atomic_comment_id: target,
+      atomic_comment_id: target,
       mapping_status: status,
       mapping_method: s(pick(r, K.mapMethod)),
       confidence_score: f(pick(r, K.score)),
-      evidence_terms: pick(r, K.evidence) ?? null,
+      source_file_name: s(pick(r, K.fileName)),
+      source_sheet: s(pick(r, K.sheet)),
+      source_row: n(pick(r, K.rowIndex)),
+      generic_response: b(r["generic_response"], false),
     });
   });
 
+  const open = segments.filter((x) => OPEN_STATUS.has(x.mapping_status));
   const confirmedTargets = new Set(
     segments
-      .filter((x) => x.mapping_status === "confirmed_high" && x.target_atomic_comment_id)
-      .map((x) => x.target_atomic_comment_id as string),
+      .filter((x) => x.mapping_status === "confirmed_high" && x.atomic_comment_id)
+      .map((x) => x.atomic_comment_id as string),
   );
 
   return {
@@ -335,61 +448,111 @@ export function parseV3ResponseMapping(json: unknown): V3ResponseParse {
     segments,
     invalid_rows,
     reviewed_source_groups: new Set(segments.map((x) => x.source_parent_comment_id)).size,
-    atomic_comments_in_groups: 0, // V3 원자 코멘트와 교차 계산 후 채운다
+    atomic_comments_in_groups: 0,
     status_counts: statusCounts,
     confirmed_high: statusCounts["confirmed_high"] ?? 0,
     probable: statusCounts["probable"] ?? 0,
     requires_review: statusCounts["requires_review"] ?? 0,
     duplicate_ignored: statusCounts["duplicate_ignored"] ?? 0,
+    open_segments: open.length,
+    open_groups: new Set(open.map((x) => x.source_parent_comment_id)).size,
     confirmed_high_unique_targets: confirmedTargets.size,
     duplicate_links: duplicateLinks,
   };
 }
 
-/** V3 원자 코멘트 기준으로 응답 매핑을 교차 검증한다. */
-export function crossCheckResponse(atomic: V3AtomicParse, resp: V3ResponseParse) {
-  const idSet = new Set(atomic.rows.map((r) => r.source_comment_id));
-  const parentChildren = new Map<string, number>();
-  for (const r of atomic.rows) {
-    parentChildren.set(
-      r.source_parent_comment_id,
-      (parentChildren.get(r.source_parent_comment_id) ?? 0) + 1,
-    );
-  }
-  const reviewedParents = new Set(resp.segments.map((x) => x.source_parent_comment_id));
-  let atomicInGroups = 0;
-  let missingParents = 0;
-  for (const p of reviewedParents) {
-    const c = parentChildren.get(p);
-    if (c === undefined) missingParents += 1;
-    else atomicInGroups += c;
-  }
-  const confirmed = resp.segments.filter((x) => x.mapping_status === "confirmed_high");
-  const resolved = confirmed.filter(
-    (x) => x.target_atomic_comment_id && idSet.has(x.target_atomic_comment_id),
-  );
+/** 4.4 — 최종 Import 정책 */
+export function parseV3Policy(json: unknown): V3PolicyParse {
+  const box = (json ?? {}) as Record<string, unknown>;
+  const inputs = objOf(json, ["inputs"]);
+  const decisions = objOf(json, ["decisions"]);
+  const open = (decisions["open_contractor_response"] ?? {}) as Record<string, unknown>;
+  const att = (decisions["group_attachments"] ?? {}) as Record<string, unknown>;
+  const imp = (decisions["v3_import"] ?? {}) as Record<string, unknown>;
+  const decisionsList = Array.isArray(box["group_response_decisions"])
+    ? (box["group_response_decisions"] as unknown[])
+    : [];
   return {
-    reviewed_source_groups: reviewedParents.size,
-    atomic_comments_in_groups: atomicInGroups,
-    missing_parents_in_v3: missingParents,
-    confirmed_high_resolved: resolved.length,
-    confirmed_high_unresolved: confirmed.length - resolved.length,
-    confirmed_high_unique_targets: new Set(
-      resolved.map((x) => x.target_atomic_comment_id as string),
-    ).size,
+    policy_version: s(box["policy_version"]),
+    generated_at: s(box["generated_at"]),
+    atomic_v3_file: s(inputs["atomic_v3_file"]),
+    atomic_v3_sha256: s(inputs["atomic_v3_sha256"]),
+    response_mapping_file: s(inputs["response_mapping_file"]),
+    response_mapping_sha256: s(inputs["response_mapping_sha256"]),
+    open_segment_count: n(open["open_segment_count"] ?? open["segment_count"]) ?? 0,
+    open_group_count: n(open["parent_group_count"]) ?? 0,
+    group_inherited_attachment_count: n(att["group_inherited_attachment_count"]) ?? 0,
+    raw_data_ocs_change_count: n(imp["raw_data_ocs_one_time_change_count"]) ?? 0,
+    group_response_decisions: decisionsList.length,
   };
 }
 
-/** V3 원자 코멘트를 dry-run RPC 입력(부모 단위)으로 접는다. */
-export function foldParents(rows: V3AtomicRow[]) {
-  const map = new Map<string, { pid: string; children: { cid: string; txt: string }[] }>();
-  for (const r of rows) {
-    const e = map.get(r.source_parent_comment_id) ?? {
-      pid: r.source_parent_comment_id,
-      children: [],
-    };
-    e.children.push({ cid: r.source_comment_id, txt: r.ocs_comment ?? "" });
-    map.set(r.source_parent_comment_id, e);
+/** 4종 파일 상호 검증 — SHA-256 관문 + 수치 교차 대조 */
+export function crossValidate(input: {
+  atomic: V3AtomicParse | null;
+  atomicHash: string | null;
+  delta: V3DeltaParse | null;
+  resp: V3ResponseParse | null;
+  respHash: string | null;
+  policy: V3PolicyParse | null;
+}) {
+  const { atomic, atomicHash, delta, resp, respHash, policy } = input;
+  const issues: string[] = [];
+
+  if (policy && atomicHash && policy.atomic_v3_sha256 && policy.atomic_v3_sha256 !== atomicHash) {
+    issues.push(
+      `Atomic V3 SHA-256 불일치 (정책 ${policy.atomic_v3_sha256.slice(0, 12)}… / 파일 ${atomicHash.slice(0, 12)}…)`,
+    );
   }
-  return Array.from(map.values());
+  if (policy && respHash && policy.response_mapping_sha256 && policy.response_mapping_sha256 !== respHash) {
+    issues.push(
+      `Response Mapping SHA-256 불일치 (정책 ${policy.response_mapping_sha256.slice(0, 12)}… / 파일 ${respHash.slice(0, 12)}…)`,
+    );
+  }
+  if (atomic && delta) {
+    if (delta.v3_atomic && delta.v3_atomic !== atomic.comments.length)
+      issues.push(`Delta v3_atomic ${delta.v3_atomic} ≠ Atomic 행 ${atomic.comments.length}`);
+    if (delta.source_parents && delta.source_parents !== atomic.source_parent_count)
+      issues.push(
+        `Delta source_parents ${delta.source_parents} ≠ Atomic parents ${atomic.source_parent_count}`,
+      );
+  }
+  if (resp && policy) {
+    if (policy.open_segment_count && policy.open_segment_count !== resp.open_segments)
+      issues.push(`Policy open segments ${policy.open_segment_count} ≠ 매핑 ${resp.open_segments}`);
+    if (policy.open_group_count && policy.open_group_count !== resp.open_groups)
+      issues.push(`Policy open groups ${policy.open_group_count} ≠ 매핑 ${resp.open_groups}`);
+  }
+
+  let atomicInGroups = 0;
+  let missingParents = 0;
+  let confirmedResolved = 0;
+  let confirmedUnresolved = 0;
+  if (atomic && resp) {
+    const idSet = new Set(atomic.comments.filter((c) => c.is_active).map((c) => c.source_comment_id));
+    const byParent = new Map<string, number>();
+    for (const c of atomic.comments)
+      byParent.set(c.source_parent_comment_id, (byParent.get(c.source_parent_comment_id) ?? 0) + 1);
+    for (const p of new Set(resp.segments.map((x) => x.source_parent_comment_id))) {
+      const c = byParent.get(p);
+      if (c === undefined) missingParents += 1;
+      else atomicInGroups += c;
+    }
+    for (const seg of resp.segments) {
+      if (seg.mapping_status !== "confirmed_high") continue;
+      if (seg.atomic_comment_id && idSet.has(seg.atomic_comment_id)) confirmedResolved += 1;
+      else confirmedUnresolved += 1;
+    }
+    if (missingParents > 0) issues.push(`매핑 부모 ${missingParents}건이 Atomic V3 에 없음`);
+    if (confirmedUnresolved > 0)
+      issues.push(`confirmed_high 대상 코멘트 누락 ${confirmedUnresolved}건`);
+  }
+
+  return {
+    issues,
+    atomic_comments_in_groups: atomicInGroups,
+    missing_parents_in_v3: missingParents,
+    confirmed_high_resolved: confirmedResolved,
+    confirmed_high_unresolved: confirmedUnresolved,
+  };
 }
