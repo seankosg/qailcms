@@ -83,13 +83,6 @@ export interface DemotedField {
   samples: string[];
 }
 
-interface SheetHeaderEntryLegacy {
-  col: number; // 1-based
-  letter: string; // A, B, ...
-  header: string; // row 5 텍스트 (\n → space, trim)
-  sample: string | null; // row 7 첫 데이터 셀 값
-}
-
 export const TASK_TARGET_FIELDS = [
   "task_no",
   "category",
