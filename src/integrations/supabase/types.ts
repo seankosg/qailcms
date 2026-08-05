@@ -1675,6 +1675,51 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_ocs_number_correction_log: {
+        Row: {
+          abd_number: string
+          change_category: string | null
+          created_at: string
+          executed_at: string
+          executed_by: string | null
+          id: string
+          migration_name: string
+          ocs_after: string | null
+          ocs_before: string | null
+          snapshot_id: string | null
+          updated: boolean
+          verification: Json | null
+        }
+        Insert: {
+          abd_number: string
+          change_category?: string | null
+          created_at?: string
+          executed_at?: string
+          executed_by?: string | null
+          id?: string
+          migration_name: string
+          ocs_after?: string | null
+          ocs_before?: string | null
+          snapshot_id?: string | null
+          updated?: boolean
+          verification?: Json | null
+        }
+        Update: {
+          abd_number?: string
+          change_category?: string | null
+          created_at?: string
+          executed_at?: string
+          executed_by?: string | null
+          id?: string
+          migration_name?: string
+          ocs_after?: string | null
+          ocs_before?: string | null
+          snapshot_id?: string | null
+          updated?: boolean
+          verification?: Json | null
+        }
+        Relationships: []
+      }
       abd_ocs_response_comment_links: {
         Row: {
           atomic_comment_id: string | null
