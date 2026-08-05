@@ -547,6 +547,7 @@ function ImportInner() {
                 matched={matchedByFile[f.id]?.matched ?? 0}
                 total={matchedByFile[f.id]?.total ?? 0}
                 mine={matchedByFile[f.id]?.mine ?? 0}
+                myTeam={myTeam}
                 scopeIsMine={!isAdmin && effectiveScope === "mine"}
                 onRemove={() => removeFile(f.id)}
                 onDisciplineChange={(d) => setFileDiscipline(f.id, d)}
