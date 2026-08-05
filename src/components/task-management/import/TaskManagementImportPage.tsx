@@ -527,6 +527,12 @@ function ImportInner() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            {hasNoTeamBlock && (
+              <div className="rounded border border-destructive/50 bg-destructive/5 p-2 text-xs text-destructive">
+                팀 열이 없고 내 소속(profiles.team)도 비어 있어 판정할 수 없습니다. 관리자에게
+                소속 지정을 요청하세요. (대상 파일: {noTeamBlockedFiles.map((f) => f.name).join(", ")})
+              </div>
+            )}
             {files.map((f) => (
               <FileRow
                 key={f.id}
