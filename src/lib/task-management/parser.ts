@@ -1023,5 +1023,7 @@ export async function parseTaskManagementExcel(
     excludedHeaders: excludedHeadersInput,
     excludedFields,
     dateIssues: audit.issues,
+    unmappedFields,
+    demotedFields,
   } as ParseTaskManagementResult;
 }
