@@ -1347,11 +1347,23 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           });
         }
 
+        // 반영 행수가 파싱 행수와 같을 때만 success. 제외·거부가 하나라도 있으면 partial.
+        const appliedRows = inserted + updated;
+        const unclassified = Math.max(
+          0,
+          parsedAll.length -
+            (appliedRows +
+              excludedByPermission +
+              excludedByScope +
+              duplicates +
+              rejected +
+              skippedByPolicy),
+        );
         const finalStatus =
-          rejected === 0 && importErrors.length === 0
-            ? "success"
-            : inserted + updated === 0
-              ? "failed"
+          appliedRows === 0
+            ? "failed"
+            : appliedRows === parsedAll.length && rejected === 0 && importErrors.length === 0
+              ? "success"
               : "partial";
 
         if (logId) {
@@ -1362,6 +1374,18 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               inserted,
               updated,
               rejected,
+              applied_rows: appliedRows,
+              exclusions: {
+                excluded_by_permission: excludedByPermission,
+                excluded_by_scope: excludedByScope,
+                excluded_unmapped_fields: unmappedFieldList,
+                duplicates,
+                skipped_by_policy: skippedByPolicy,
+                rolled_up: rolledUp,
+                renumbered,
+                resolved_by_decision: resolvedByDecision,
+                unclassified,
+              },
               errors: importErrors.length ? importErrors : null,
               finished_at: new Date().toISOString(),
             })
@@ -1387,6 +1411,10 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     resolvedByDecision,
                     outOfScope,
                     outOfScopeKeys,
+                    parsedRows: parsedAll.length,
+                    appliedRows,
+                    excludedByScope,
+                    unclassified,
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
