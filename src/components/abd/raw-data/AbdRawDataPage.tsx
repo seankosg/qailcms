@@ -1028,7 +1028,6 @@ function OcsCheckCell({ value, row }: { value: any; row: AbdItem }) {
     state === "ok" || total === 0
       ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
       : "border-rose-500/70 bg-rose-500/15 text-rose-700 dark:text-rose-300";
-  const abdNumber = String((row as any).abd_number ?? "");
   return (
     <>
       <span
