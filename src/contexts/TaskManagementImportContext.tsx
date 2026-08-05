@@ -686,6 +686,13 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 mineNames.has(normalizePic((p as any).hdec_eng_name)),
             );
       const filteredOut = parsedAll.length - parsed.length;
+      // 제외 사유 분리 — 권한(RCL denied) vs 스코프(mine 토글)
+      const excludedByPermission = outOfScope;
+      const excludedByScope = Math.max(0, serverAllowed.length - parsed.length);
+      const excludedUnmapped =
+        ((f.unmappedFields?.length ?? 0) + (f.demotedFields?.length ?? 0)) > 0
+          ? parsedAll.length
+          : 0;
       if (parsed.length === 0) {
         toast.warning(
           outOfScope > 0
@@ -706,6 +713,9 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     rejected: 0,
                     outOfScope,
                     outOfScopeKeys,
+                    parsedRows: parsedAll.length,
+                    appliedRows: 0,
+                    excludedByScope,
                   },
                 }
               : x,
