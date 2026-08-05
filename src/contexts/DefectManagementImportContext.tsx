@@ -34,6 +34,7 @@ import {
   resolvePlotFromPlanGroup,
   resolveSubcon,
 } from "@/lib/defect-management/auto-fill-rules";
+import { resolveRoomGroup } from "@/lib/defect-management/classifier/room-group-rules";
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
@@ -869,6 +870,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
           hdec_pic_name: string | null;
           hdec_eng_name: string | null;
           subcontractor_name: string | null;
+          room_group: string | null;
         }
       >();
       const idChunks: string[][] = [];
@@ -878,7 +880,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       await runWithConcurrency(idChunks, EXISTING_FETCH_CONCURRENCY, async (chunk) => {
         const { data, error } = await (supabase as any)
           .from("defect_items_raw")
-          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, actual_rectified_date, actual_start_date, rectified_status, closure_status, defect_location, main_trade, sub_trade, work_type, hdec_pic_name, hdec_eng_name, subcontractor_name")
+          .select("source_issue_no, priority_locked, hdec_verification_locked, actual_closure_date, actual_rectified_date, actual_start_date, rectified_status, closure_status, defect_location, main_trade, sub_trade, work_type, hdec_pic_name, hdec_eng_name, subcontractor_name, room_group")
           .in("source_issue_no", chunk);
         if (error) {
           throw new Error(
@@ -898,6 +900,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             main_trade: r.main_trade ?? null,
             sub_trade: r.sub_trade ?? null,
             work_type: r.work_type ?? null,
+            room_group: r.room_group ?? null,
             hdec_pic_name: r.hdec_pic_name ?? null,
             hdec_eng_name: r.hdec_eng_name ?? null,
             subcontractor_name: r.subcontractor_name ?? null,
@@ -924,6 +927,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       };
 
       const unmappedCategories = new Map<string, number>();
+      let roomGroupAutoFilled = 0;
       const payloads = workingRows.map((p) => {
         const prev = existing.get(p.source_issue_no);
         const skipPriority = prev?.priority_locked;
@@ -981,6 +985,16 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             if (k === "team") continue;
             if (k === "hdec_verification" && skipVerification) continue;
             put(base, k, v);
+          }
+        }
+        // ── 자동 채움 rule: room_group (location_raw 조회+규칙, AI 토글 ON 일 때만) ──
+        // 우선순위: 엑셀 원본값 → 기존 DB값 → 조회표(496키) → 규칙 10개 → BOH
+        // Reference 가 두 값으로 갈리는 8키는 채우지 않는다.
+        if (f.aiClassifyEnabled && !base.room_group && !prev?.room_group && !excludedFields.has("room_group")) {
+          const rg = resolveRoomGroup((base.location_raw ?? p.location_raw ?? null) as string | null);
+          if (rg) {
+            base.room_group = rg;
+            roomGroupAutoFilled += 1;
           }
         }
         // ── 자동 채움 rule: Subcon ──
@@ -1090,6 +1104,12 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         }
         return base;
       });
+
+      if (f.aiClassifyEnabled) {
+        console.log(
+          `[defect-import] room_group 자동채움 ${roomGroupAutoFilled}건 / 대상 ${workingRows.length}행 (AI=ON)`,
+        );
+      }
 
       // ============ 규칙 기반 자동 분류 (인라인, LLM 은 임포트 후 백그라운드) ============
       // 4개 필드 중 "빈 필드" 만 대상. 규칙으로 매칭되는 것만 즉시 채우고,
