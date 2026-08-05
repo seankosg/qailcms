@@ -606,6 +606,105 @@ export async function parseTaskManagementExcel(
   clampField("auto_judgment", "auto_judgment");
   clampField("milestone", "milestone");
 
+  // ───────────────────────────────────────────────────────────────
+  // B. 값 형태 검증 (2026-08-05). 헤더 이름이 맞아도 값의 모양이 필드 정의와
+  //    다르면 그 컬럼을 미매핑으로 강등한다. task_no 는 강등 금지 — 예외로 중단.
+  // ───────────────────────────────────────────────────────────────
+  const demotedFields: DemotedField[] = [];
+  {
+    const rangeV = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S1000");
+    const scanEndRow = Math.min(rangeV.e.r + 1, 5000);
+    const sampleValues = (col: number): string[] => {
+      const out: string[] = [];
+      for (let r = dataStart; r <= scanEndRow; r++) {
+        const v = getCell(sheet, r, col);
+        if (v == null || String(v).trim() === "") continue;
+        out.push(String(v).trim());
+      }
+      return out;
+    };
+    const isDate = (s: string) => {
+      try {
+        return strictParseDateValue(s) != null;
+      } catch {
+        return false;
+      }
+    };
+    const isPct = (s: string) => {
+      const n = Number(s.replace(/%$/, ""));
+      return Number.isFinite(n) && n >= 0 && n <= 100;
+    };
+    const isInt = (s: string) => {
+      const n = Number(s);
+      return Number.isFinite(n) && Math.abs(n - Math.round(n)) < 1e-9;
+    };
+    const isPlot = (s: string) => {
+      const u = s.trim().toUpperCase();
+      return u === "C" || u === "D";
+    };
+    const isTaskNo = (s: string) =>
+      /^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$/.test(s) && s.length <= 40;
+
+    const checks: Array<{
+      field: TaskTargetField;
+      key: keyof typeof cols;
+      label: string;
+      test: (s: string) => boolean;
+      threshold: number;
+    }> = [
+      { field: "plot", key: "plot", label: "C/D", test: isPlot, threshold: 0.8 },
+      { field: "plan_start", key: "plan_start", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "plan_end", key: "plan_end", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "actual_start", key: "actual_start", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "forecast_end", key: "forecast_end", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "actual_finish", key: "actual_finish", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "actual_progress", key: "actual_progress", label: "진도율(0~1 또는 0~100)", test: isPct, threshold: 0.8 },
+      { field: "plan_progress", key: "plan_progress", label: "진도율(0~1 또는 0~100)", test: isPct, threshold: 0.8 },
+      { field: "plan_days", key: "plan_days", label: "정수", test: isInt, threshold: 0.8 },
+      { field: "slip_days", key: "slip_days", label: "정수", test: isInt, threshold: 0.8 },
+    ];
+
+    // task_no — 강등 금지. 90% 미만이면 파싱 중단.
+    {
+      const vals = sampleValues(cols.no);
+      if (vals.length > 0) {
+        const ok = vals.filter(isTaskNo).length;
+        const ratio = ok / vals.length;
+        if (ratio < 0.9) {
+          const bad = vals.filter((v) => !isTaskNo(v)).slice(0, 3);
+          throw new Error(
+            `과업코드 열(${cols.no}열)의 값 형태가 과업코드가 아닙니다 ` +
+              `(정상 ${Math.round(ratio * 100)}%, 모집단 ${vals.length}행). ` +
+              `표본: ${bad.join(", ")} — 헤더 매핑을 확인하세요.`,
+          );
+        }
+      }
+    }
+
+    for (const c of checks) {
+      const col = (cols as Record<string, number>)[c.key as string];
+      if (!col) continue;
+      const vals = sampleValues(col);
+      if (vals.length === 0) continue; // 값이 없으면 판단하지 않는다
+      const ok = vals.filter(c.test).length;
+      const ratio = ok / vals.length;
+      if (ratio >= c.threshold) continue;
+      const samples = vals.filter((v) => !c.test(v)).slice(0, 3);
+      (cols as Record<string, number>)[c.key as string] = 0;
+      demotedFields.push({
+        field: c.field,
+        reason: `값 형태 불일치(${c.label} ${Math.round(ratio * 100)}%)`,
+        ratio: Math.round(ratio * 1000) / 1000,
+        population: vals.length,
+        samples,
+      });
+      warnings.push(
+        `${c.field}: 값 형태 불일치(${c.label} ${Math.round(ratio * 100)}%) — 임포트에서 제외. ` +
+          `표본: ${samples.join(", ")}`,
+      );
+    }
+  }
+
   // 단일 "담당" 컬럼만 있고 HDEC ENG가 별도로 매핑되지 않은 경우 자동 분배
   const singlePicColumn =
     cols.hdec_pic_name > 0 && cols.hdec_pic_name === cols.hdec_eng_name;
