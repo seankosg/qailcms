@@ -78,7 +78,7 @@ export type V3ResponseParse = {
 };
 
 /** 하이픈/점/괄호 번호 마커가 본문 안에 2개 이상 남아 있는지 — V3 잔존 복수 번호 검사 */
-const MULTI_MARKER = /(^|\n|\s)(\d{1,2})\s*[.)\-]\s+\S/g;
+const MULTI_MARKER = /(^|\n|\s)(\d{1,2})\s*[.)-]\s+\S/g;
 
 export function countNumberMarkers(text: string | null): number {
   if (!text) return 0;
@@ -216,10 +216,7 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
   for (const r of rows) {
     if (seen.has(r.source_comment_id)) dup.add(r.source_comment_id);
     seen.add(r.source_comment_id);
-    byParent.set(
-      r.source_parent_comment_id,
-      (byParent.get(r.source_parent_comment_id) ?? 0) + 1,
-    );
+    byParent.set(r.source_parent_comment_id, (byParent.get(r.source_parent_comment_id) ?? 0) + 1);
   }
 
   const attArr = ["attachments", "attachment_metadata", "attachments_metadata"]
@@ -300,7 +297,9 @@ export function parseV3ResponseMapping(json: unknown): V3ResponseParse {
       invalid_rows.push({ index: i, reason: "Parent Comment ID 누락" });
       return;
     }
-    const statusRaw = (s(pick(r, K.mapStatus)) ?? "requires_review").toLowerCase().replace(/\s+/g, "_");
+    const statusRaw = (s(pick(r, K.mapStatus)) ?? "requires_review")
+      .toLowerCase()
+      .replace(/\s+/g, "_");
     const status = ALLOWED_STATUS.has(statusRaw) ? statusRaw : "requires_review";
     statusCounts[status] = (statusCounts[status] ?? 0) + 1;
     const target = s(pick(r, K.target));

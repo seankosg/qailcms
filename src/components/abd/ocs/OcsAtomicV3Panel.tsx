@@ -83,9 +83,11 @@ export function OcsAtomicV3Panel() {
     let alive = true;
     void (async () => {
       try {
-        const s = (await latestSnapshotFn({ data: { module: "abd" } })) as
-          | { id: string; name: string; created_at: string }
-          | null;
+        const s = (await latestSnapshotFn({ data: { module: "abd" } })) as {
+          id: string;
+          name: string;
+          created_at: string;
+        } | null;
         if (!alive || !s) return;
         setSnapshotInfo({ name: s.name, created_at: s.created_at });
       } catch {
@@ -446,7 +448,10 @@ export function OcsAtomicV3Panel() {
                 value={cross?.confirmed_high_unique_targets ?? 0}
               />
               <Row label="reviewed source groups" value={cross?.reviewed_source_groups ?? 0} />
-              <Row label="atomic comments in groups" value={cross?.atomic_comments_in_groups ?? 0} />
+              <Row
+                label="atomic comments in groups"
+                value={cross?.atomic_comments_in_groups ?? 0}
+              />
               <Row
                 label="duplicate links"
                 value={resp?.duplicate_links ?? 0}
@@ -456,10 +461,7 @@ export function OcsAtomicV3Panel() {
 
             <Block title="9.4 Attachments">
               <Row label="preserved confirmed links" value={num(dry["att_confirmed_preserved"])} />
-              <Row
-                label="downgraded-to-group links"
-                value={num(dry["att_confirmed_downgraded"])}
-              />
+              <Row label="downgraded-to-group links" value={num(dry["att_confirmed_downgraded"])} />
               <Row label="group attachments touched" value={num(dry["att_group_attachments"])} />
               <Row label="V3 attachments metadata" value={atomic?.attachments_metadata ?? 0} />
               <p className="pt-1 text-[11px] text-muted-foreground">
