@@ -107,7 +107,9 @@ function ImportInner() {
   // TM 임포트 전용 admin 판정 — superuser 는 제외한다(전역 useCurrentUser 는 수정하지 않음).
   // superuser/d_superuser 는 스코프를 '드롭다운으로 선택'하는 것이 설계 의도다.
   const isAdmin = (me?.roles ?? []).includes("admin");
-  const isSuperUserLike = !!(me?.isSuperUser || me?.isDSuperUser);
+  // D. 역할 이름 하드코딩 금지 — rcl_grants('TM','import') 가 유일한 근거.
+  const { data: tmImportGrants } = useRclGrants("TM", "import");
+  const canChooseScope = !!(tmImportGrants?.own_team || tmImportGrants?.other_team);
   const {
     files,
     getFiles,
@@ -133,6 +135,7 @@ function ImportInner() {
     setFileExcludedHeaders,
     setFileDateOverrides,
     setFileConflictPolicy,
+    setFileAckUnmapped,
     setFileConflictDecisions,
     clearFileConflictDecisions,
     runPreflight,
