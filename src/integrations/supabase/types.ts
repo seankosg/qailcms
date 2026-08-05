@@ -1585,6 +1585,7 @@ export type Database = {
           manifest_name: string | null
           manual_review_count: number
           mismatch_warning_count: number
+          result: Json | null
           snapshot_id: string | null
           source_file_hash: string | null
           source_file_name: string | null
@@ -1621,6 +1622,7 @@ export type Database = {
           manifest_name?: string | null
           manual_review_count?: number
           mismatch_warning_count?: number
+          result?: Json | null
           snapshot_id?: string | null
           source_file_hash?: string | null
           source_file_name?: string | null
@@ -1657,6 +1659,7 @@ export type Database = {
           manifest_name?: string | null
           manual_review_count?: number
           mismatch_warning_count?: number
+          result?: Json | null
           snapshot_id?: string | null
           source_file_hash?: string | null
           source_file_name?: string | null

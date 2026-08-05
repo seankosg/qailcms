@@ -31,6 +31,25 @@ export const listSnapshots = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+/** 모듈별 최근 사전 임포트 스냅샷 1건 조회 (읽기 전용) */
+export const getLatestPreImportSnapshot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { module: PreImportModule }) => input)
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("database_snapshots")
+      .select("id, name, created_at, size_bytes, trigger_metadata")
+      .eq("triggered_by", "pre-import")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) throw new Error(error.message);
+    const hit = (rows ?? []).find(
+      (r: { trigger_metadata: unknown }) =>
+        (r.trigger_metadata as { module?: string } | null)?.module === data.module,
+    );
+    return hit ?? null;
+  });
+
 export const getBackupLogs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
