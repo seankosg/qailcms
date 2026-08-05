@@ -508,19 +508,63 @@ export function OcsAtomicV3Panel() {
           )}
           <Button
             size="sm"
-            disabled={!!busy || blockers.length > 0 || !runId || !snapshotId}
+            disabled={!!busy || blockers.length > 0 || !runId || !snapshotId || !!importFailure}
             title={
-              blockers.length > 0
+              importFailure
+                ? "직전 Import 실패 — 조사 중. 실패 결과 박스를 닫아야 재시도할 수 있습니다."
+                : blockers.length > 0
                 ? `차단 ${blockers.length}건: ${blockers[0]}`
                 : "V3 본체 Import 실행"
             }
             onClick={() => void runImport()}
           >
             {busy === "V3 Import 실행 중…" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            7. V3 Import 실행
+            {importFailure ? "7. V3 Import (조사 중 · 잠김)" : "7. V3 Import 실행"}
           </Button>
         </div>
         {busy && progress > 0 && <Progress value={progress} />}
+
+        {importFailure && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs">
+            <div className="mb-2 flex items-center gap-1.5 font-semibold text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5" /> V3 Import 실패 — 조사 상태 (버튼 잠김)
+            </div>
+            <div className="grid gap-1 font-mono text-[11px]">
+              <div>발생 시각: {importFailure.at}</div>
+              <div>run ID: {importFailure.runId}</div>
+              <div>snapshot ID: {importFailure.snapshotId}</div>
+              <div>실패 단계: {importFailure.stage}</div>
+              <div>대상 객체: {importFailure.object ?? "-"}</div>
+            </div>
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-background/60 p-2 font-mono text-[11px]">
+              {importFailure.message}
+            </pre>
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void navigator.clipboard.writeText(
+                    [
+                      `at: ${importFailure.at}`,
+                      `run_id: ${importFailure.runId}`,
+                      `snapshot_id: ${importFailure.snapshotId}`,
+                      `stage: ${importFailure.stage}`,
+                      `object: ${importFailure.object ?? "-"}`,
+                      `error: ${importFailure.message}`,
+                    ].join("\n"),
+                  );
+                  toast.success("실패 내역을 복사했습니다");
+                }}
+              >
+                복사
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setImportFailure(null)}>
+                닫기(잠금 해제)
+              </Button>
+            </div>
+          </div>
+        )}
 
         {blockers.length > 0 && (
           <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
