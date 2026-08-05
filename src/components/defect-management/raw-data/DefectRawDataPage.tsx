@@ -583,13 +583,15 @@ export function DefectRawDataPage() {
     [navigate],
   );
 
-  // Debounced global search input → URL q
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      if ((urlSearch.q ?? "") !== searchInput) setUrl({ q: searchInput, page: 1 });
-    }, 300);
-    return () => window.clearTimeout(t);
+  // 검색은 버튼/Enter 로만 실행 (자동 디바운스 검색 없음)
+  const searchDirty = (urlSearch.q ?? "") !== searchInput;
+  const runSearch = useCallback(() => {
+    if ((urlSearch.q ?? "") !== searchInput) setUrl({ q: searchInput, page: 1 });
   }, [searchInput, urlSearch.q, setUrl]);
+  const clearSearch = useCallback(() => {
+    setSearchInput("");
+    if ((urlSearch.q ?? "") !== "") setUrl({ q: "", page: 1 });
+  }, [urlSearch.q, setUrl]);
 
   // sort/columnFilters → URL
   useEffect(() => {
@@ -1006,10 +1008,24 @@ export function DefectRawDataPage() {
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search defects... (comma = AND)"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                runSearch();
+              }
+            }}
+            placeholder="Search defects... (comma = OR)"
             className="h-9 pl-8"
           />
         </div>
+        <Button size="sm" className="h-9" variant={searchDirty ? "default" : "secondary"} onClick={runSearch}>
+          검색
+        </Button>
+        {(searchInput || (urlSearch.q ?? "")) && (
+          <Button size="sm" variant="ghost" className="h-9" onClick={clearSearch}>
+            초기화
+          </Button>
+        )}
         <span className="self-center text-sm text-muted-foreground">{total.toLocaleString()} records</span>
         {sorting.length > 0 && (
           <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => setSorting([{ id: "source_issue_no", desc: false }])}>Clear sort ({sorting.length})</Button>
