@@ -4986,16 +4986,19 @@ export type Database = {
       }
       task_management_import_logs: {
         Row: {
+          applied_rows: number | null
           created_at: string
           data_date: string | null
           discipline: string
           errors: Json | null
+          exclusions: Json | null
           file_name: string
           finished_at: string | null
           id: string
           imported_by: string | null
           inserted: number
           note: string | null
+          parsed_rows: number | null
           rejected: number
           rollback_force: boolean
           rolled_back_at: string | null
@@ -5010,16 +5013,19 @@ export type Database = {
           warnings: Json | null
         }
         Insert: {
+          applied_rows?: number | null
           created_at?: string
           data_date?: string | null
           discipline: string
           errors?: Json | null
+          exclusions?: Json | null
           file_name: string
           finished_at?: string | null
           id?: string
           imported_by?: string | null
           inserted?: number
           note?: string | null
+          parsed_rows?: number | null
           rejected?: number
           rollback_force?: boolean
           rolled_back_at?: string | null
@@ -5034,16 +5040,19 @@ export type Database = {
           warnings?: Json | null
         }
         Update: {
+          applied_rows?: number | null
           created_at?: string
           data_date?: string | null
           discipline?: string
           errors?: Json | null
+          exclusions?: Json | null
           file_name?: string
           finished_at?: string | null
           id?: string
           imported_by?: string | null
           inserted?: number
           note?: string | null
+          parsed_rows?: number | null
           rejected?: number
           rollback_force?: boolean
           rolled_back_at?: string | null
