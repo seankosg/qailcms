@@ -76,11 +76,11 @@ export function AbdOcsSourceFileButton({
         variant="link"
         size="sm"
         className="h-auto min-w-0 justify-start gap-1 p-0 text-[10px] font-normal"
-        onClick={() => void onClick()}
-        disabled={busy}
-        title={`Download Original Excel: ${fileName}`}
+        onClick={() => void onOpenInExcel()}
+        disabled={opening}
+        title={`Excel에서 바로 열기: ${fileName}`}
       >
-        {busy ? (
+        {opening ? (
           <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
         ) : (
           <FileSpreadsheet className="h-3 w-3 shrink-0" />
@@ -91,16 +91,16 @@ export function AbdOcsSourceFileButton({
         variant="link"
         size="sm"
         className="h-auto shrink-0 gap-1 p-0 text-[10px] font-normal"
-        onClick={() => void onOpenInExcel()}
-        disabled={opening}
-        title="설치된 Excel 프로그램으로 바로 열기"
+        onClick={() => void onClick()}
+        disabled={busy}
+        title="원본 파일 다운로드"
       >
-        {opening ? (
+        {busy ? (
           <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
         ) : (
           <ExternalLink className="h-3 w-3 shrink-0" />
         )}
-        Excel에서 열기
+        다운로드
       </Button>
     </div>
   );
