@@ -29,6 +29,20 @@ export const WRT_STAGE_LABELS: Record<
   "final submission": { code: "FINAL_SUBMISSION", type: "range", authority: "HDEC" },
 };
 
+/** 팀 표기 정규화 — 매핑은 이 한 곳에서만 한다 (파서). 임포터에서 다시 매핑하지 않는다. */
+export function normalizeTeam(v: string | null): string | null {
+  if (v == null) return null;
+  const t = v.trim();
+  if (t === "") return null;
+  const u = t.toUpperCase();
+  if (u === "CIVIL") return "PRJC";
+  if (u === "MEP") return "ELEC";
+  return t;
+}
+
+/** Aconex 권위 단계 — 실적(actual)은 값이 있을 때만 반영하고 빈칸은 기존 값을 지우지 않는다 */
+export const WRT_ACONEX_STAGES = new Set(["RESPONSE_DATE_R1", "RESPONSE_DATE_R2"]);
+
 /** 아이템 메타 컬럼 (헤더명 → wrt_items 컬럼) */
 const ITEM_COLS: Record<string, string> = {
   team: "team",
@@ -196,8 +210,6 @@ export async function parseWrtHdecFile(file: File): Promise<ParsedWrtFile> {
       if (!currentStage) continue;
       const field = subFieldKey(sub, currentStage.type);
       if (!field) continue;
-      // 권위 모델: Aconex 정본 실적(회신일)은 HDEC 임포트 대상에서 제외
-      if (currentStage.authority !== "HDEC" && (field === "actual_start" || field === "actual_finish")) continue;
       cols.push({ kind: "stage", col: c, stage_code: currentStage.code, field });
       presentStage.add(`${currentStage.code}|${field}`);
     }
@@ -215,7 +227,8 @@ export async function parseWrtHdecFile(file: File): Promise<ParsedWrtFile> {
         const raw = cell(r, cm.col);
         if (cm.kind === "item") {
           const s = String(raw ?? "").trim();
-          item[cm.field] = s === "" ? null : s;
+          const val = s === "" ? null : s;
+          item[cm.field] = cm.field === "team" ? normalizeTeam(val) : val;
         } else {
           let entry = stageMap.get(cm.stage_code);
           if (!entry) {
