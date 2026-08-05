@@ -105,6 +105,14 @@ export interface TmImportFileItem {
     outOfScope?: number;
     /** 제외된 행의 task_no 목록 (조용한 누락 방지) */
     outOfScopeKeys?: string[];
+    /** 파싱된 전체 행수(분모) */
+    parsedRows?: number;
+    /** 실제 반영 대상 행수 */
+    appliedRows?: number;
+    /** mine 토글로 제외된 행수 (권한 제외와 분리) */
+    excludedByScope?: number;
+    /** 항등식이 맞지 않을 때의 잔차 */
+    unclassified?: number;
     errors?: ImportErrorEntry[];
   };
 }
