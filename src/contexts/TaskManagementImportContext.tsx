@@ -643,6 +643,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const MATCH_COLS = ["discipline", "task_no"];
       let serverAllowed: typeof parsedAll = [];
       let outOfScopeKeys: string[] = [];
+      let deniedEntries: { task_no: string; scope: string }[] = [];
       try {
         const rcl = await rclImportFilter(
           "TM",
@@ -661,6 +662,10 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         outOfScopeKeys = rcl.denied.map(
           (d) => `${d.key["task_no"] ?? "-"} (${d.scope})`,
         );
+        deniedEntries = rcl.denied.map((d) => ({
+          task_no: String(d.key["task_no"] ?? "-"),
+          scope: String(d.scope ?? "-"),
+        }));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         toast.error(`${f.name}: 권한 판정 실패로 임포트 중단 — ${msg}`);
