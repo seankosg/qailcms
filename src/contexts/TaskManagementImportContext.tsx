@@ -141,6 +141,7 @@ interface CtxValue {
   setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
   setFileDateOverrides: (id: string, overrides: Record<string, string>) => Promise<void>;
   setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
+  setFileAckUnmapped: (id: string, ack: boolean) => void;
   setFileConflictDecisions: (id: string, decisions: Record<string, ConflictPolicy>) => void;
   clearFileConflictDecisions: (id: string) => void;
   runPreflight: (id: string) => Promise<void>;
@@ -522,6 +523,10 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
 
   const setFileConflictPolicy = useCallback((id: string, policy: ConflictPolicy) => {
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, conflictPolicy: policy } : f)));
+  }, []);
+
+  const setFileAckUnmapped = useCallback((id: string, ack: boolean) => {
+    setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, ackUnmapped: ack } : f)));
   }, []);
 
   const setFileConflictDecisions = useCallback(
@@ -1480,6 +1485,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setFileExcludedHeaders,
         setFileDateOverrides,
         setFileConflictPolicy,
+        setFileAckUnmapped,
         setFileConflictDecisions,
         clearFileConflictDecisions,
         runPreflight,
