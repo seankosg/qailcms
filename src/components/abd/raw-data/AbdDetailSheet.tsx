@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
@@ -86,6 +87,7 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
   const [item, setItem] = useState<AbdItemRow | null>(null);
   const [changes, setChanges] = useState<ChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const qc = useQueryClient();
   const { data: me } = useCurrentUser();
   // 판정 정본: 서버 RCL
   const { canRow: canAbdRow } = useRclCan("ABD", "write");
@@ -139,6 +141,12 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
     if (!id) return;
     const { data: it } = await (supabase as any).from("abd_items_raw").select("*").eq("id", id).maybeSingle();
     setItem(it as any);
+  };
+
+  // 상세창 편집 후: 상세창 로컬 갱신 + Raw Data 목록/대시보드 캐시 무효화
+  const onFieldSaved = () => {
+    void reloadItem();
+    qc.invalidateQueries({ queryKey: ["abd"] });
   };
 
   const canEdit = !!item && canAbdRow(item as unknown as Record<string, unknown>);
@@ -250,7 +258,7 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
                               editorType="select"
                               options={["A", "B", "C"]}
                               currentValue={result}
-                              onSaved={() => void reloadItem()}
+                              onSaved={onFieldSaved}
                             >
                               {result ? (
                                 <span className={cn("inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-bold", RESULT_TONE[result])}>{result}</span>
@@ -298,7 +306,7 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
                                       label={`R${r} ${STAGE_LABELS[s]} Plan`}
                                       editorType="date"
                                       currentValue={plan}
-                                      onSaved={() => void reloadItem()}
+                                      onSaved={onFieldSaved}
                                     >{planCell}</AbdEditCellPopover>
                                   ) : planCell}
                                 </td>
@@ -310,7 +318,7 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
                                       label={`R${r} ${STAGE_LABELS[s]} Actual`}
                                       editorType="date"
                                       currentValue={actual}
-                                      onSaved={() => void reloadItem()}
+                                      onSaved={onFieldSaved}
                                     >{actualCell}</AbdEditCellPopover>
                                   ) : actualCell}
                                 </td>
