@@ -1452,6 +1452,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
             (appliedRows +
               excludedByPermission +
               excludedByScope +
+              excludedNoTeam +
               duplicates +
               rejected +
               skippedByPolicy),
@@ -1475,6 +1476,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               exclusions: {
                 excluded_by_permission: excludedByPermission,
                 excluded_by_scope: excludedByScope,
+                excluded_no_team: excludedNoTeam,
                 excluded_unmapped_fields: unmappedFieldList,
                 duplicates,
                 skipped_by_policy: skippedByPolicy,
@@ -1511,6 +1513,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     parsedRows: parsedAll.length,
                     appliedRows,
                     excludedByScope,
+                    excludedNoTeam,
+                    noTeamKeys,
                     unclassified,
                     errors: importErrors.length ? importErrors : undefined,
                   },
