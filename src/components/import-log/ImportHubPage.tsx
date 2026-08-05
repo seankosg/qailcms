@@ -6,13 +6,18 @@ import { DmrImportPage } from "@/components/resource/dmr/DmrImportPage";
 import { SplImportPage } from "@/components/spl/import/SplImportPage";
 import { WrtImportPage } from "@/components/wrt/import/WrtImportPage";
 import { getRouteApi } from "@tanstack/react-router";
+import { OcsIncrementImportPanel } from "@/components/abd/ocs/OcsIncrementImportPanel";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const routeApi = getRouteApi("/_authenticated/import-log/import");
 
 export function ImportHubPage() {
   const { tab } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
-  const current = tab ?? "task";
+  const { data: me } = useCurrentUser();
+  const isAdmin = me?.isStrictAdmin === true;
+  const requested = tab ?? "task";
+  const current = requested === "abd-ocs" && !isAdmin ? "task" : requested;
 
   return (
     <div className="space-y-4">
@@ -28,6 +33,7 @@ export function ImportHubPage() {
           <TabsTrigger value="task">Task Management</TabsTrigger>
           <TabsTrigger value="snag">Snag List</TabsTrigger>
           <TabsTrigger value="abd">ABD</TabsTrigger>
+          {isAdmin && <TabsTrigger value="abd-ocs">ABD OCS</TabsTrigger>}
           <TabsTrigger value="dmr">DMR</TabsTrigger>
           <TabsTrigger value="spl">Spare Parts</TabsTrigger>
           <TabsTrigger value="warranty">Warranty</TabsTrigger>
@@ -41,6 +47,11 @@ export function ImportHubPage() {
         <TabsContent value="abd" className="mt-4">
           <AbdImportPage />
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="abd-ocs" className="mt-4">
+            <OcsIncrementImportPanel />
+          </TabsContent>
+        )}
         <TabsContent value="dmr" className="mt-4">
           <DmrImportPage />
         </TabsContent>

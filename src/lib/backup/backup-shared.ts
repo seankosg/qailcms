@@ -71,6 +71,7 @@ export type BackupTableName =
   | "abd_ocs_import_logs"
   | "abd_ocs_comments"
   | "abd_ocs_comment_groups"
+  | "abd_ocs_comment_abd_links"
   | "abd_ocs_compliance"
   | "abd_ocs_attachments"
   | "abd_ocs_attachment_comment_links"
@@ -145,6 +146,7 @@ export const BACKUP_TABLES: BackupTableName[] = [
   "abd_ocs_import_logs",
   "abd_ocs_comments",
   "abd_ocs_comment_groups",
+  "abd_ocs_comment_abd_links",
   "abd_ocs_compliance",
   "abd_ocs_attachments",
   "abd_ocs_attachment_comment_links",
@@ -176,6 +178,7 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "abd_ocs_import_logs",
     "abd_ocs_comments",
     "abd_ocs_comment_groups",
+    "abd_ocs_comment_abd_links",
     "abd_ocs_compliance",
     "abd_ocs_attachments",
     "abd_ocs_attachment_comment_links",

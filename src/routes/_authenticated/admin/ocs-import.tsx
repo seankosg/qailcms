@@ -18,9 +18,6 @@ import {
 import { Loader2, FileJson, FolderUp, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getOcsImportStats, OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
-import { OcsStageBPanel } from "@/components/abd/ocs/OcsStageBPanel";
-import { OcsAtomicV2Panel } from "@/components/abd/ocs/OcsAtomicV2Panel";
-import { OcsAtomicV3Panel } from "@/components/abd/ocs/OcsAtomicV3Panel";
 import { OcsRecountPanel } from "@/components/abd/ocs/OcsRecountPanel";
 import { OcsSourceFilesPanel } from "@/components/abd/ocs/OcsSourceFilesPanel";
 import { FilePickerButton } from "@/components/shared/FilePickerButton";
@@ -415,10 +412,16 @@ function OcsImportPage() {
         </Card>
       )}
 
-      <OcsStageBPanel />
       <OcsSourceFilesPanel />
-      <OcsAtomicV2Panel />
-      <OcsAtomicV3Panel />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">일회성 초기 적재 경로 종료</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          OCS 코멘트 적재는 정규 증분 Import 로 일원화되었습니다. Import → <b>ABD OCS</b> 탭을 사용하십시오.
+          기존 V2 · V3 일회성 실행 화면은 정본 오염 방지를 위해 제거되었습니다.
+        </CardContent>
+      </Card>
       <OcsRecountPanel />
     </div>
   );

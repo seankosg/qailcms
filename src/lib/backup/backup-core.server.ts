@@ -77,6 +77,7 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   abd_ocs_import_logs: ["id"],
   abd_ocs_comments: ["id"],
   abd_ocs_comment_groups: ["id"],
+  abd_ocs_comment_abd_links: ["id"],
   abd_ocs_compliance: ["comment_id"],
   abd_ocs_attachments: ["id"],
   abd_ocs_attachment_comment_links: ["id"],
@@ -89,6 +90,37 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
 
 function sortKeysFor(tableName: string): string[] {
   return (TABLE_SORT_KEYS as Record<string, string[]>)[tableName] ?? ["id"];
+}
+
+/**
+ * 백업 대상 목록 정합성 검증.
+ * - DB 정본 `public.get_backup_tables()` 는 information_schema 로 영구 `abd_ocs_%` 테이블을 유도해
+ *   누락이 있으면 스스로 EXCEPTION 을 던진다(staging 4종 제외).
+ * - 여기서는 DB 목록과 코드 목록(BACKUP_TABLES / TABLE_SORT_KEYS)의 집합 차이를 검사한다.
+ */
+export async function assertBackupTableParity(supabaseAdmin: SupabaseClient<Database>): Promise<void> {
+  const { data, error } = await (
+    supabaseAdmin as unknown as {
+      rpc: (fn: string) => Promise<{ data: unknown; error: { message: string } | null }>;
+    }
+  ).rpc("get_backup_tables");
+  if (error) throw new Error(`백업 목록 검증 실패: ${error.message}`);
+
+  const dbList = (Array.isArray(data) ? data : []).map((row) =>
+    typeof row === "string" ? row : String((row as { table_name?: string }).table_name ?? ""),
+  );
+  const dbSet = new Set(dbList.filter(Boolean));
+  const codeSet = new Set<string>(BACKUP_TABLES);
+  const missingInCode = [...dbSet].filter((t) => !codeSet.has(t));
+  const missingInDb = [...codeSet].filter((t) => !dbSet.has(t));
+  const missingSortKey = BACKUP_TABLES.filter((t) => !(t in TABLE_SORT_KEYS));
+  if (missingInCode.length || missingInDb.length || missingSortKey.length) {
+    throw new Error(
+      `백업 목록 불일치 — DB에만 있음: [${missingInCode.join(", ")}] / 코드에만 있음: [${missingInDb.join(
+        ", ",
+      )}] / 정렬키 누락: [${missingSortKey.join(", ")}]`,
+    );
+  }
 }
 
 export type SnapshotManifest = {
@@ -132,6 +164,9 @@ export async function createSnapshot(
   supabaseAdmin: SupabaseClient<Database>,
   opts: CreateSnapshotOptions,
 ): Promise<CreateSnapshotResult> {
+  // 백업 목록 정합성 관문: DB 정본(get_backup_tables)과 코드 목록이 다르면 조용히 진행하지 않는다.
+  // get_backup_tables() 내부에서 information_schema 의 영구 abd_ocs_% 테이블 누락도 EXCEPTION 으로 막는다.
+  await assertBackupTableParity(supabaseAdmin);
   const { snapshotId, name, triggeredBy, triggerMetadata, tables } = opts;
   const startedAt = new Date().toISOString();
   const folder = `snapshots/${snapshotId}/`;
@@ -388,6 +423,8 @@ export async function restoreSnapshot(
       ["abd_ocs_import_logs", 58],
       ["abd_ocs_comment_groups", 59],
       ["abd_ocs_comments", 60],
+      // comment-ABD 링크는 코멘트와 abd_items_raw 복구 이후
+      ["abd_ocs_comment_abd_links", 60.5],
       ["abd_ocs_attachments", 61],
       ["abd_ocs_attachment_comment_links", 62],
       ["abd_ocs_compliance", 63],
