@@ -594,6 +594,20 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                                   {fmtDateTime(b.rolled_back_at)}
                                 </span>
                               )}
+                              {b.status === "partial" && (
+                                <span className="text-[10px] text-amber-700 dark:text-amber-300">
+                                  {typeof b.applied_rows === "number" &&
+                                  typeof b.parsed_rows === "number"
+                                    ? `반영 ${b.applied_rows}/${b.parsed_rows}`
+                                    : "일부 미반영"}
+                                  {b.exclusions
+                                    ? ` · ${Object.entries(b.exclusions)
+                                        .filter(([, v]) => typeof v === "number" && v > 0)
+                                        .map(([k, v]) => `${k}=${v}`)
+                                        .join(" · ")}`
+                                    : ""}
+                                </span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell
