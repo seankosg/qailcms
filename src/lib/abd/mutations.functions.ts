@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { stripNullExcept } from "@/lib/import/strip-null";
 import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
 import { isDfActualBlocked, isDfActualField, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
+import { isDsActualBlocked, isDsActualField, MF_DS_BLOCK_MESSAGE } from "@/lib/abd/mf-ds-guard";
 
 const UpdateFieldSchema = z.object({
   id: z.string().uuid(),
@@ -48,6 +49,15 @@ export const updateAbdField = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertCanEditRow(context, data.id);
     if (!EDITABLE_FIELDS.has(data.field)) throw new Error(`Field '${data.field}' 은 편집 대상이 아닙니다.`);
+    // Gate 1: MF 미확인 도면은 Draft Start 실적일 입력/변경 금지 (비우기는 허용)
+    if (isDsActualField(data.field) && data.value !== null && data.value !== "") {
+      const { data: mf } = await (context.supabase as any)
+        .from("abd_items_raw")
+        .select("mf_check, mf_types, mf_reference")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (isDsActualBlocked(mf ?? {}, data.field)) throw new Error(MF_DS_BLOCK_MESSAGE);
+    }
     // OCS 미완료 도면은 Draft Finish 실적일 입력/변경 금지 (비우기는 허용)
     if (isDfActualField(data.field) && data.value !== null && data.value !== "") {
       const { data: cur } = await (context.supabase as any)

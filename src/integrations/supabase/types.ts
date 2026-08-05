@@ -86,6 +86,47 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_audit_log: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          from_status: string | null
+          id: string
+          item_id: string
+          note: string | null
+          reason: string | null
+          to_status: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          item_id: string
+          note?: string | null
+          reason?: string | null
+          to_status: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          item_id?: string
+          note?: string | null
+          reason?: string | null
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_audit_log_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "abd_items_raw"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       abd_change_log: {
         Row: {
           abd_item_id: string | null
@@ -754,6 +795,12 @@ export type Database = {
           aconex_status_raw: string | null
           active_round: number | null
           approval_date: string | null
+          audit_at: string | null
+          audit_by: string | null
+          audit_note: string | null
+          audit_reason: string | null
+          audit_selected_at: string | null
+          audit_status: string
           batch_no: string | null
           bucket_top: string | null
           completed_stage: string | null
@@ -778,10 +825,18 @@ export type Database = {
           id: string
           inactive_reason: string | null
           is_active: boolean
+          is_reopened: boolean
           is_terminated: boolean
           latest_rev: string | null
           latest_status: string | null
           latest_status_norm: string | null
+          mf_changed_after_ds: boolean
+          mf_check: boolean
+          mf_checked_at: string | null
+          mf_checked_by: string | null
+          mf_reference: string | null
+          mf_revision: string | null
+          mf_types: string[]
           mismatch_fields: Json
           needs_planning: boolean
           needs_revise: boolean
@@ -844,6 +899,12 @@ export type Database = {
           aconex_status_raw?: string | null
           active_round?: number | null
           approval_date?: string | null
+          audit_at?: string | null
+          audit_by?: string | null
+          audit_note?: string | null
+          audit_reason?: string | null
+          audit_selected_at?: string | null
+          audit_status?: string
           batch_no?: string | null
           bucket_top?: string | null
           completed_stage?: string | null
@@ -868,10 +929,18 @@ export type Database = {
           id?: string
           inactive_reason?: string | null
           is_active?: boolean
+          is_reopened?: boolean
           is_terminated?: boolean
           latest_rev?: string | null
           latest_status?: string | null
           latest_status_norm?: string | null
+          mf_changed_after_ds?: boolean
+          mf_check?: boolean
+          mf_checked_at?: string | null
+          mf_checked_by?: string | null
+          mf_reference?: string | null
+          mf_revision?: string | null
+          mf_types?: string[]
           mismatch_fields?: Json
           needs_planning?: boolean
           needs_revise?: boolean
@@ -934,6 +1003,12 @@ export type Database = {
           aconex_status_raw?: string | null
           active_round?: number | null
           approval_date?: string | null
+          audit_at?: string | null
+          audit_by?: string | null
+          audit_note?: string | null
+          audit_reason?: string | null
+          audit_selected_at?: string | null
+          audit_status?: string
           batch_no?: string | null
           bucket_top?: string | null
           completed_stage?: string | null
@@ -958,10 +1033,18 @@ export type Database = {
           id?: string
           inactive_reason?: string | null
           is_active?: boolean
+          is_reopened?: boolean
           is_terminated?: boolean
           latest_rev?: string | null
           latest_status?: string | null
           latest_status_norm?: string | null
+          mf_changed_after_ds?: boolean
+          mf_check?: boolean
+          mf_checked_at?: string | null
+          mf_checked_by?: string | null
+          mf_reference?: string | null
+          mf_revision?: string | null
+          mf_types?: string[]
           mismatch_fields?: Json
           needs_planning?: boolean
           needs_revise?: boolean
@@ -1100,6 +1183,50 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      abd_mf_change_log: {
+        Row: {
+          after_ds: boolean
+          after_value: Json | null
+          before_value: Json | null
+          changed_by: string | null
+          created_at: string
+          id: string
+          impact_note: string | null
+          item_id: string
+          reason: string | null
+        }
+        Insert: {
+          after_ds?: boolean
+          after_value?: Json | null
+          before_value?: Json | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          impact_note?: string | null
+          item_id: string
+          reason?: string | null
+        }
+        Update: {
+          after_ds?: boolean
+          after_value?: Json | null
+          before_value?: Json | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          impact_note?: string | null
+          item_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_mf_change_log_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "abd_items_raw"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       abd_ocs_attachment_comment_links: {
         Row: {
@@ -2192,6 +2319,7 @@ export type Database = {
       }
       abd_settings: {
         Row: {
+          audit_sample_ratio: number
           ds_gap_after_rs_days: number
           id: string
           rs_plan_gap_days: number
@@ -2202,6 +2330,7 @@ export type Database = {
           ur_aging_warn_days: number
         }
         Insert: {
+          audit_sample_ratio?: number
           ds_gap_after_rs_days?: number
           id?: string
           rs_plan_gap_days?: number
@@ -2212,6 +2341,7 @@ export type Database = {
           ur_aging_warn_days?: number
         }
         Update: {
+          audit_sample_ratio?: number
           ds_gap_after_rs_days?: number
           id?: string
           rs_plan_gap_days?: number
@@ -6366,6 +6496,10 @@ export type Database = {
         Args: { _row: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
         Returns: number
       }
+      abd_audit_risk_reasons: {
+        Args: { r: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
+        Returns: string[]
+      }
       abd_backfill_response_results: {
         Args: { _dry_run?: boolean }
         Returns: {
@@ -6585,6 +6719,10 @@ export type Database = {
           _row: Database["public"]["Tables"]["abd_items_raw"]["Row"]
         }
         Returns: Json
+      }
+      abd_mf_ready: {
+        Args: { r: Database["public"]["Tables"]["abd_items_raw"]["Row"] }
+        Returns: boolean
       }
       abd_my_workspace_counts: {
         Args: { _filter_value: string; _mode: string; _today: string }
@@ -6834,6 +6972,12 @@ export type Database = {
           aconex_status_raw: string | null
           active_round: number | null
           approval_date: string | null
+          audit_at: string | null
+          audit_by: string | null
+          audit_note: string | null
+          audit_reason: string | null
+          audit_selected_at: string | null
+          audit_status: string
           batch_no: string | null
           bucket_top: string | null
           completed_stage: string | null
@@ -6858,10 +7002,18 @@ export type Database = {
           id: string
           inactive_reason: string | null
           is_active: boolean
+          is_reopened: boolean
           is_terminated: boolean
           latest_rev: string | null
           latest_status: string | null
           latest_status_norm: string | null
+          mf_changed_after_ds: boolean
+          mf_check: boolean
+          mf_checked_at: string | null
+          mf_checked_by: string | null
+          mf_reference: string | null
+          mf_revision: string | null
+          mf_types: string[]
           mismatch_fields: Json
           needs_planning: boolean
           needs_revise: boolean

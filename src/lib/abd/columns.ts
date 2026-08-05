@@ -146,6 +146,14 @@ export const ABD_COLUMNS: AbdColumnDef[] = [
 
   // Flags & audit
   { key: "is_active", label: "Active", type: "badge", width: 80, group: "flags", origin: "system", boolish: true },
+  // Gate 1 (Master Reference) — 편집은 상세페이지 MF 카드에서만 (이력 기록 보장)
+  { key: "mf_check", label: "MF Check", type: "badge", width: 90, group: "flags", origin: "system", boolish: true, derived: true },
+  { key: "mf_reference", label: "MF Reference", type: "text", width: 200, group: "flags", origin: "system", derived: true },
+  { key: "mf_revision", label: "MF Rev.", type: "text", width: 100, group: "flags", origin: "system", derived: true, hiddenByDefault: true },
+  { key: "mf_changed_after_ds", label: "MF 변경(DS후)", type: "badge", width: 110, group: "flags", origin: "system", boolish: true, derived: true, hiddenByDefault: true },
+  // 표본감사 (§6) — 편집은 상세페이지 감사 카드에서만
+  { key: "audit_status", label: "Audit", type: "badge", width: 130, group: "audit", origin: "system", derived: true },
+  { key: "is_reopened", label: "Reopened", type: "badge", width: 90, group: "audit", origin: "system", boolish: true, derived: true, hiddenByDefault: true },
   { key: "data_date", label: "Data Date", type: "date", width: 110, group: "audit", origin: "system" },
   { key: "updated_at", label: "Updated", type: "date", width: 130, group: "audit", origin: "system", derived: true },
 ];
@@ -163,6 +171,7 @@ export function inferAbdFilterType(t: AbdFieldType, key?: string): AbdFilterType
     key === "plot" || key === "dis" || key === "latest_rev" || key === "latest_status" ||
     key === "batch_no" || key === "hdec_pic_name" || key === "hdec_eng_name" ||
     key === "current_stage" || key === "completed_stage" || key === "ocs_check"
+    || key === "audit_status"
   ) return "multi-select";
   return "text";
 }

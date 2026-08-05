@@ -9,6 +9,9 @@ import { CommentsThread, ABD_CATEGORIES } from "@/components/shared/CommentsThre
 import { formatDdMmmYyyy } from "@/lib/time/doha";
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { isDfActualBlocked, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
+import { isDsActualBlocked, MF_DS_BLOCK_MESSAGE } from "@/lib/abd/mf-ds-guard";
+import { AbdMfCard } from "@/components/abd/gates/AbdMfCard";
+import { AbdAuditCard } from "@/components/abd/gates/AbdAuditCard";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useRclCan } from "@/hooks/useRclCan";
 import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "@/components/abd/dashboard/AbdAgingSettingsPopover";
@@ -228,6 +231,10 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
             <Separator />
 
             {/* Rounds Timeline */}
+            <AbdMfCard item={item as any} canEdit={canEdit} onSaved={onFieldSaved} />
+
+            <Separator />
+
             <section ref={roundsRef} data-section="rounds" className="scroll-mt-4">
               <h3 className="font-semibold text-sm mb-2">Rounds Timeline</h3>
               <div className="space-y-3">
@@ -321,7 +328,11 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
                                       currentValue={actual}
                                       onSaved={onFieldSaved}
                                       lockedReason={
-                                        isDfActualBlocked(item as any, f.actual) ? OCS_DF_BLOCK_MESSAGE : null
+                                        isDfActualBlocked(item as any, f.actual)
+                                          ? OCS_DF_BLOCK_MESSAGE
+                                          : isDsActualBlocked(item as any, f.actual)
+                                            ? MF_DS_BLOCK_MESSAGE
+                                            : null
                                       }
                                     >{actualCell}</AbdEditCellPopover>
                                   ) : actualCell}
@@ -353,6 +364,12 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
             )}
 
             {/* Change Log */}
+            <AbdAuditCard
+              item={item as any}
+              canAudit={!!me && (me.isAdmin || me.isDSuperUser || canEdit)}
+              onSaved={onFieldSaved}
+            />
+
             <section>
               <h3 className="font-semibold text-sm mb-2">Change Log</h3>
               {changes.length === 0 ? (
