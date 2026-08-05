@@ -122,9 +122,10 @@ export const ocsV3Import = createServerFn({ method: "POST" })
     const { error: logErr } = await supabaseAdmin.from("abd_ocs_import_logs").insert({
       id: importLogId,
       status: "running",
-      import_mode: "atomic_v3_one_time",
-      triggered_by: context.userId,
-      notes: `Atomic V3 one-time correction (snapshot ${data.snapshot_id})`,
+      manifest_name: "OCS_V3_Final_Import_Policy.json",
+      data_file_name: "OCS_Atomic_V3_Corrected_DB.json",
+      imported_by: context.userId,
+      snapshot_id: data.snapshot_id,
     });
     if (logErr) throw new Error(logErr.message);
 
@@ -139,7 +140,7 @@ export const ocsV3Import = createServerFn({ method: "POST" })
         .update({
           status: "success",
           finished_at: new Date().toISOString(),
-          result_summary: { import: result, verify } as never,
+          result: { import: result, verify } as never,
         })
         .eq("id", importLogId);
       return { import_log_id: importLogId, result, verify } as unknown as Json;
@@ -149,7 +150,7 @@ export const ocsV3Import = createServerFn({ method: "POST" })
         .update({
           status: "failed",
           finished_at: new Date().toISOString(),
-          error_message: (err as Error).message,
+          errors: [{ message: (err as Error).message }] as never,
         })
         .eq("id", importLogId);
       throw err;
