@@ -106,8 +106,8 @@ export type TaskTargetField = (typeof TASK_TARGET_FIELDS)[number];
  */
 const TASK_FIELD_ALIASES: Record<TaskTargetField, string[]> = {
   task_no: ["No", "no", "Task No", "Task No.", "Task Number", "Task_No", "TaskNo", "번호", "작업번호", "업무번호"],
-  category: ["Category", "카테고리"],
-  plot: ["Plot"],
+  category: ["Category", "카테고리", "카테고리 1", "구분"],
+  plot: ["Plot", "플롯", "동"],
   task_name: ["항목", "Item", "Task Name"],
   risk: ["리스크", "Risk"],
   sub_task_desc: ["단계별 세부 업무", "세부 업무", "Sub Task", "Subtask", "Sub-task"],
