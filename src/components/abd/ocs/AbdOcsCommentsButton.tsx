@@ -20,7 +20,7 @@ export function AbdOcsCommentsButton({
 
   const total = data?.total ?? 0;
   const pending = data?.pending ?? 0;
-  const allDone = total > 0 && pending === 0;
+  const allDone = pending === 0;
 
   return (
     <>
