@@ -111,6 +111,10 @@ export interface TmImportFileItem {
     appliedRows?: number;
     /** mine 토글로 제외된 행수 (권한 제외와 분리) */
     excludedByScope?: number;
+    /** ③ team 미확정으로 제외된 행수 (권한·스코프 제외와 분리) */
+    excludedNoTeam?: number;
+    /** team 미확정 제외 행의 task_no 목록 */
+    noTeamKeys?: string[];
     /** 항등식이 맞지 않을 때의 잔차 */
     unclassified?: number;
     errors?: ImportErrorEntry[];
@@ -134,6 +138,9 @@ interface CtxValue {
   /** 서버 Own 정의(owner_cols = hdec_pic_name | hdec_eng_name)와 동일하게 맞추기 위한 본인 표기 목록 */
   importerOwnNames: string[];
   setImporterOwnNames: (v: string[]) => void;
+  /** 실행자 profiles.team — 파일에 팀 열이 없을 때의 유일한 폴백 */
+  importerTeam: string | null;
+  setImporterTeam: (v: string | null) => void;
   isImporterAdmin: boolean;
   setIsImporterAdmin: (v: boolean) => void;
   matchesHdecPic: (row: {
@@ -188,12 +195,15 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
   const [importScope, setImportScope] = useState<ImportScope>("mine");
   const [importerHdecPicName, setImporterHdecPicName] = useState<string | null>(null);
   const [importerOwnNames, setImporterOwnNames] = useState<string[]>([]);
+  const [importerTeam, setImporterTeam] = useState<string | null>(null);
   const [isImporterAdmin, setIsImporterAdmin] = useState<boolean>(false);
 
   const importerHdecPicRef = useRef<string | null>(null);
   importerHdecPicRef.current = importerHdecPicName;
   const importerOwnNamesRef = useRef<string[]>([]);
   importerOwnNamesRef.current = importerOwnNames;
+  const importerTeamRef = useRef<string | null>(null);
+  importerTeamRef.current = importerTeam;
   const importScopeRef = useRef<ImportScope>(importScope);
   importScopeRef.current = importScope;
   const isImporterAdminRef = useRef<boolean>(isImporterAdmin);
@@ -638,6 +648,24 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       ).join(", ");
       const discipline = f.discipline ?? "ARCH";
 
+      // ── 행 team 결정 규칙(2026-08-05) ─────────────────────────────────
+      // ① 파일의 팀 열 값 ② 없으면 실행자 profiles.team ③ 그것도 없으면 제외.
+      // 판정에 쓰는 team 과 저장하는 team 은 항상 같은 값이어야 한다.
+      // discipline 폴백 금지 — discipline 은 upsert 키 전용이다.
+      const myTeam = (importerTeamRef.current ?? "").trim() || null;
+      const teamOf = (p: { team?: string | null }): string | null =>
+        p.team && p.team.trim() ? p.team.trim() : myTeam;
+
+      const noTeamRows = parsedAll.filter((p) => teamOf(p) === null);
+      const teamResolved = parsedAll.filter((p) => teamOf(p) !== null);
+      const excludedNoTeam = noTeamRows.length;
+      const noTeamKeys = noTeamRows.map((p) => String(p.task_no ?? "-"));
+      if (excludedNoTeam > 0) {
+        toast.warning(
+          `${f.name}: 팀 미확정으로 제외된 행 ${excludedNoTeam}건 — 파일에 팀 열이 없고 내 소속(profiles.team)도 비어 있습니다`,
+        );
+      }
+
       // ── RCL 서버 판정 (정본) ────────────────────────────────────────────
       // 스코프 판정은 클라이언트가 하지 않는다. 서버 rcl_can(..., 'import') 결과만 신뢰.
       const MATCH_COLS = ["discipline", "task_no"];
@@ -648,15 +676,15 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         const rcl = await rclImportFilter(
           "TM",
           MATCH_COLS,
-          parsedAll.map((p) => ({
+          teamResolved.map((p) => ({
             discipline,
             task_no: p.task_no,
-            team: (p as any).team ?? null,
+            team: teamOf(p),
             hdec_pic_name: p.hdec_pic_name ?? null,
             hdec_eng_name: (p as any).hdec_eng_name ?? null,
           })),
         );
-        serverAllowed = parsedAll.filter((p) =>
+        serverAllowed = teamResolved.filter((p) =>
           rcl.allowedKeys.has(rclKeyOf(MATCH_COLS, { discipline, task_no: p.task_no })),
         );
         outOfScopeKeys = rcl.denied.map(
@@ -727,6 +755,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     parsedRows: parsedAll.length,
                     appliedRows: 0,
                     excludedByScope,
+                    excludedNoTeam,
+                    noTeamKeys,
                   },
                 }
               : x,
@@ -955,7 +985,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         main_task_no: p.main_task_no,
         level: p.level,
         discipline,
-        team: (p.team && p.team.trim()) ? p.team.trim() : discipline,
+        team: teamOf(p),
         category: p.category,
         plot: p.plot,
         task_name: p.task_name,
@@ -1182,6 +1212,19 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 reason_detail: "본인 담당(PIC/ENG) 아님으로 제외",
               });
             }
+            // ③ team 미확정 제외 — 권한/스코프 제외와 분리해 같은 코드로 남긴다.
+            for (const t of noTeamKeys) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: t,
+                action_taken: "excluded",
+                reason_code: "SCOPE_NO_TEAM",
+                reason_detail:
+                  "팀 미확정 — 파일의 팀 열이 비었고 실행자 profiles.team 도 비어 있음",
+              });
+            }
             for (const [k, n] of dupDetail.entries()) {
               rowLogRows.push({
                 upload_id: logId,
@@ -1331,7 +1374,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               task_no: p.task_no,
               main_task_no: p.main_task_no ?? null,
               discipline,
-              team: (p.team && p.team.trim()) ? p.team.trim() : discipline,
+              team: teamOf(p),
               plot: p.plot ?? null,
               task_name: p.task_name ?? null,
               hdec_pic_name: p.hdec_pic_name ?? null,
@@ -1409,6 +1452,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
             (appliedRows +
               excludedByPermission +
               excludedByScope +
+              excludedNoTeam +
               duplicates +
               rejected +
               skippedByPolicy),
@@ -1432,6 +1476,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               exclusions: {
                 excluded_by_permission: excludedByPermission,
                 excluded_by_scope: excludedByScope,
+                excluded_no_team: excludedNoTeam,
                 excluded_unmapped_fields: unmappedFieldList,
                 duplicates,
                 skipped_by_policy: skippedByPolicy,
@@ -1468,6 +1513,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     parsedRows: parsedAll.length,
                     appliedRows,
                     excludedByScope,
+                    excludedNoTeam,
+                    noTeamKeys,
                     unclassified,
                     errors: importErrors.length ? importErrors : undefined,
                   },
@@ -1583,6 +1630,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setImporterHdecPicName,
         importerOwnNames,
         setImporterOwnNames,
+        importerTeam,
+        setImporterTeam,
         isImporterAdmin,
         setIsImporterAdmin,
         matchesHdecPic,

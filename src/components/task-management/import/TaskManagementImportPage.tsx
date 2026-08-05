@@ -125,6 +125,7 @@ function ImportInner() {
     setImportScope,
     setImporterHdecPicName,
     setImporterOwnNames,
+    setImporterTeam,
     setIsImporterAdmin,
     matchesHdecPic,
     addFiles,
@@ -169,11 +170,13 @@ function ImportInner() {
   );
   const ownNamesLabel = ownNames.join(", ");
   const adminFlag = isAdmin;
+  const myTeam = (me?.team ?? "").trim() || null;
   useEffect(() => {
     setImporterHdecPicName(hdecPic);
     setImporterOwnNames(ownNames);
+    setImporterTeam(myTeam);
     setIsImporterAdmin(adminFlag);
-  }, [hdecPic, ownNames, adminFlag, setImporterHdecPicName, setImporterOwnNames, setIsImporterAdmin]);
+  }, [hdecPic, ownNames, myTeam, adminFlag, setImporterHdecPicName, setImporterOwnNames, setImporterTeam, setIsImporterAdmin]);
 
   // Effective scope for display/counts
   const effectiveScope: "mine" | "all" = isAdmin ? "all" : importScope;
@@ -312,13 +315,21 @@ function ImportInner() {
   const readyFiles = files.filter(
     (f) => f.status === "ready" && !f.validationError && !!f.discipline,
   );
+  // ③ 전건 team 미확정이면 조용한 0행 임포트 금지 — Start 를 막는다.
+  const noTeamBlockedFiles = readyFiles.filter(
+    (f) =>
+      (f.parsed?.length ?? 0) > 0 &&
+      (f.parsed ?? []).every((r) => !((r.team ?? "").trim()) ) &&
+      !myTeam,
+  );
+  const hasNoTeamBlock = noTeamBlockedFiles.length > 0;
   const readyCount = readyFiles.length;
   const totalMatched = readyFiles.reduce(
     (s, f) => s + (matchedByFile[f.id]?.matched ?? 0),
     0,
   );
   const startDisabled =
-    isRunning || readyCount === 0 || !canImport || hasUnapprovedUnmapped;
+    isRunning || readyCount === 0 || !canImport || hasUnapprovedUnmapped || hasNoTeamBlock;
   const onStartClick = () => {
     if (effectiveScope === "all") {
       setConfirmAllOpen(true);
@@ -498,7 +509,9 @@ function ImportInner() {
                 title={
                   !canImport
                     ? "임포트 권한이 없습니다"
-                    : hasUnapprovedUnmapped
+                    : hasNoTeamBlock
+                      ? "팀 열이 없고 내 소속(profiles.team)도 비어 있어 판정할 수 없습니다. 관리자에게 소속 지정을 요청하세요."
+                      : hasUnapprovedUnmapped
                       ? "미매핑·강등 컬럼이 있습니다 — 파일 카드에서 '이 컬럼들 없이 진행'을 체크하세요"
                       : ""
                 }
@@ -514,6 +527,12 @@ function ImportInner() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            {hasNoTeamBlock && (
+              <div className="rounded border border-destructive/50 bg-destructive/5 p-2 text-xs text-destructive">
+                팀 열이 없고 내 소속(profiles.team)도 비어 있어 판정할 수 없습니다. 관리자에게
+                소속 지정을 요청하세요. (대상 파일: {noTeamBlockedFiles.map((f) => f.name).join(", ")})
+              </div>
+            )}
             {files.map((f) => (
               <FileRow
                 key={f.id}
@@ -1072,6 +1091,11 @@ function FileRow({
               본인 담당 아님으로 제외: {f.result.excludedByScope}
             </Badge>
           )}
+          {typeof f.result.excludedNoTeam === "number" && f.result.excludedNoTeam > 0 && (
+            <Badge variant="outline" className="border-rose-400 text-rose-700">
+              팀 미확정으로 제외: {f.result.excludedNoTeam}
+            </Badge>
+          )}
           {typeof f.result.unclassified === "number" && f.result.unclassified > 0 && (
             <Badge variant="outline" className="border-destructive text-destructive">
               미분류: {f.result.unclassified}
@@ -1083,7 +1107,8 @@ function FileRow({
         <div className="mt-1 text-[11px] text-muted-foreground">
           검산 — 파싱 {f.result.parsedRows} = 반영 {f.result.appliedRows ?? 0} + 권한제외{" "}
           {f.result.outOfScope ?? 0} + 스코프제외 {f.result.excludedByScope ?? 0} + 중복{" "}
-          {f.result.duplicates ?? 0} + 거부 {f.result.rejected} + 정책스킵 {f.result.skipped}
+          {f.result.duplicates ?? 0} + 팀미확정제외 {f.result.excludedNoTeam ?? 0} + 거부{" "}
+          {f.result.rejected} + 정책스킵 {f.result.skipped}
           {(f.result.unclassified ?? 0) > 0 ? ` + 미분류 ${f.result.unclassified}` : ""}
         </div>
       )}

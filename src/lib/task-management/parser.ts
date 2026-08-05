@@ -97,6 +97,7 @@ export const TASK_TARGET_FIELDS = [
   "hdec_pic_name",
   "hdec_eng_name",
   "row_type",
+  "team",
   "status_manual",
   "plan_start",
   "plan_end",
@@ -127,6 +128,7 @@ const TASK_FIELD_ALIASES: Record<TaskTargetField, string[]> = {
   hdec_pic_name: ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"],
   hdec_eng_name: ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"],
   row_type: ["유형", "Type"],
+  team: ["Team", "팀", "팀명", "담당팀", "소속팀"],
   status_manual: ["상태", "Status"],
   plan_start: ["계획 시작", "Plan Start"],
   plan_end: ["계획 완료", "Plan End"],
@@ -538,6 +540,8 @@ export async function parseTaskManagementExcel(
     hdec_pic_name: pick("hdec_pic_name", ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"]),
     hdec_eng_name: pick("hdec_eng_name", ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"]),
     row_type: pick("row_type", ["유형"]),
+    // 팀 열: 별칭 표 기반. ★위치 폴백 없음(미매핑 = 0). 값 형태 검증 대상 아님.
+    team: pick("team", ["Team"]),
     status_manual: pick("status_manual", ["상태"]),
     plan_start: pick("plan_start", ["계획 시작"]),
     plan_end: pick("plan_end", ["계획 완료"]),
@@ -911,10 +915,7 @@ export async function parseTaskManagementExcel(
         return { hdec_pic_name: picRaw, hdec_eng_name: engRaw };
       })(),
       row_type: toStr(getCell(sheet, r, cols.row_type)),
-      team: (() => {
-        const idx = headerMap["team"] ?? headerMap["팀"];
-        return idx ? toStr(getCell(sheet, r, idx)) : null;
-      })(),
+      team: cols.team ? toStr(getCell(sheet, r, cols.team)) : null,
       status_manual: toStr(getCell(sheet, r, cols.status_manual)),
       plan_start: cols.plan_start
         ? readDateCell(getCell(sheet, r, cols.plan_start), {
