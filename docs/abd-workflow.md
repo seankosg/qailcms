@@ -143,3 +143,26 @@ Draft Start (DS) → Draft Finish (DF) → Submission (Sub) → DAR Response (Re
   `r1_submission_actual` 100% NULL · `r1_dar_actual` 100% 존재 — 레거시 R1 귀속(회신만 기록) 코호트다.
 - 결함이 아니라 **가시화 개선**: 반려 후 재작업 대기 물량이 NS(미착수)에 숨어 있다가 R2 DS 큐로 드러났다.
 - 분모 인지: R2 DS 재고 788 중 지연(`primary_delay='DS2'`) 78 · DS3 5 · DS1 0 = DS 지연 83.
+
+## Gate 1 — Master Reference (MF) 사전조건 (2026-08-05 신설)
+
+- 필드(`abd_items_raw`): `mf_check` · `mf_types(text[])` · `mf_reference` · `mf_revision` ·
+  `mf_checked_by` · `mf_checked_at` · `mf_changed_after_ds`.
+- 판정 정본 = `public.abd_mf_ready(row)` = `mf_check AND mf_types<>{} AND mf_reference<>''`.
+  클라이언트 미러 = `src/lib/abd/mf-ds-guard.ts` 의 `isMfReady`(사전 안내 전용, 최종 관문은 DB).
+- 트리거 `abd_guard_ds_actual_requires_mf`: MF 미완료 시 `r{n}_draft_start_actual` 입력·변경 차단.
+  **적용 범위 = 수동 경로 한정**(`app.change_source ∈ {manual, revise, revise-bulk}`).
+  임포트 경로는 제외 — 기존 HDEC/Aconex 임포트가 전 행 `mf_check=false` 로 전면 실패하는 것을 방지.
+- MF 변경은 삭제하지 않고 `abd_mf_change_log` 에 전/후 값·변경자·시각·사유를 보존한다.
+  DS 실적일이 이미 있으면 `mf_changed_after_ds=true` 로 재검토 표시.
+- 저장 경로는 상세페이지 MF 카드 전용(`setAbdMf`). Raw Data 격자에서는 표시만 하며 직접 편집하지 않는다.
+
+## 표본감사 (2026-08-05 신설)
+
+- 상태(`audit_status`): `not_audited` · `audit_selected` · `audit_passed` · `audit_failed` · `correction_required`.
+  실패/수정요청은 `is_reopened=true` 로 표시하며 **DS·DF 실적일은 삭제하지 않는다**.
+- 이력 = `abd_audit_log`(전/후 상태·사유·메모·감사자·시각).
+- 표본선정 `pickAbdAuditSample`: 모집단 = `is_active AND mf_check AND audit_status='not_audited'`.
+  위험조건(OCS 코멘트 10건 이상 · Code C 이력 · DS 이후 MF 변경 · Site Verification 기준 · 재오픈 이력)
+  해당 도면 우선 선정 후 잔여 수량을 무작위 충당. 비율은 `abd_settings.audit_sample_ratio`(기본 10%).
+- 위험조건 DB 정본 = `public.abd_audit_risk_reasons(row)`.
