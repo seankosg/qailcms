@@ -6758,6 +6758,30 @@ export type Database = {
         Args: { p_import_log_id: string; p_rows: Json }
         Returns: Json
       }
+      abd_ocs_inc_baseline: {
+        Args: { p_base_import_run_id?: string }
+        Returns: Json
+      }
+      abd_ocs_inc_dryrun: {
+        Args: { p_run: string; p_source_files?: Json }
+        Returns: Json
+      }
+      abd_ocs_inc_import: {
+        Args: {
+          p_allow_retire?: boolean
+          p_import_log_id: string
+          p_run: string
+          p_source_files?: Json
+        }
+        Returns: Json
+      }
+      abd_ocs_inc_outside_hash: { Args: { p_run: string }; Returns: Json }
+      abd_ocs_inc_scope: {
+        Args: { p_run: string }
+        Returns: {
+          ocs_norm: string
+        }[]
+      }
       abd_ocs_norm: { Args: { v: string }; Returns: string }
       abd_ocs_recount_all: { Args: never; Returns: Json }
       abd_ocs_recount_item: { Args: { p_item_id: string }; Returns: undefined }
