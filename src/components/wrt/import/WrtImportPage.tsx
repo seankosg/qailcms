@@ -24,7 +24,7 @@ export function WrtImportPage() {
   const [allowDeletes, setAllowDeletes] = useState(false);
   const runImport = useServerFn(importWrtHdecBatch);
 
-  const scopeNote = scope ? `scope=${scope.role} in_scope=${scope.allowedRows.length} out_of_scope=${scope.deniedKeys.length}` : undefined;
+  const scopeNote = scope ? `scope=${scope.role} in_scope=${scope.allowedRows.length} out_of_scope=${scope.deniedKeys.length}${scope.deniedKeys.length ? ` denied_keys=[${scope.deniedKeys.slice(0, 100).join("|")}${scope.deniedKeys.length > 100 ? "|…" : ""}]` : ""}` : undefined;
 
   const payload = useMemo(() => {
     if (!parsed || !scope) return null;
