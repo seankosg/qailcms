@@ -1,9 +1,10 @@
-import { toJSONAsync, fromJSON } from "seroval";
+import { toJSONAsync } from "seroval";
+import { dec } from "./dec";
 async function callFn(id: string, data: any) {
   const body = JSON.stringify(await toJSONAsync({ data }));
   const r = await fetch(`http://localhost:8080/_serverFn/${id}`, { method: "POST", headers: { "content-type": "application/json", "x-tsr-serverFn": "true", origin: "http://localhost:8080", accept: "application/json", authorization: `Bearer ${process.env.LOVABLE_BROWSER_SUPABASE_ACCESS_TOKEN}` }, body });
   const t = await r.text();
-  try { return (fromJSON(JSON.parse(t)) as any); } catch { return { raw: t }; }
+  return dec(JSON.parse(t));
 }
 function sum(res: any, label: string) {
   const x = res.result ?? res;
