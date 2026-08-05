@@ -878,6 +878,8 @@ export async function parseTaskManagementExcel(
       plot: (() => {
         const resolved = plot ?? propagate?.plot ?? null;
         if (resolved) return resolved;
+        // plot 컬럼이 미매핑·강등되었으면 유도하지 않는다 (제외가 곧 제외여야 한다).
+        if (!cols.plot) return null;
         // 방어: plot 공란인데 task_no 두 번째 세그먼트가 C/D 이면 자동 유도
         const seg = taskNo.split("-")[1];
         if (seg === "C" || seg === "D") {
