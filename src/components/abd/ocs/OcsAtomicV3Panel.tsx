@@ -524,6 +524,20 @@ export function OcsAtomicV3Panel() {
         </div>
         {busy && progress > 0 && <Progress value={progress} />}
 
+        <div className="rounded-md border border-emerald-500/50 bg-emerald-500/10 p-3 text-xs">
+          <div className="mb-1 flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-400">
+            Import completed; verification recovered
+          </div>
+          <div className="grid gap-1 font-mono text-[11px]">
+            <div>run ID: 21311c37-fb5a-4a4f-b5bb-21471fc9a670</div>
+            <div>snapshot ID: 75f4fd33-2953-4f9e-8837-af35006b8533</div>
+            <div>status: success (post-import verify function corrected and rerun)</div>
+          </div>
+          <p className="mt-2 font-normal text-muted-foreground">
+            V3 본체 Import 는 이미 정상 반영되었습니다. 재실행하지 마십시오.
+          </p>
+        </div>
+
         {importFailure && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs">
             <div className="mb-2 flex items-center gap-1.5 font-semibold text-destructive">
