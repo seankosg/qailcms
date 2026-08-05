@@ -133,6 +133,9 @@ export async function createSnapshot(
   supabaseAdmin: SupabaseClient<Database>,
   opts: CreateSnapshotOptions,
 ): Promise<CreateSnapshotResult> {
+  // 백업 목록 정합성 관문: DB 정본(get_backup_tables)과 코드 목록이 다르면 조용히 진행하지 않는다.
+  // get_backup_tables() 내부에서 information_schema 의 영구 abd_ocs_% 테이블 누락도 EXCEPTION 으로 막는다.
+  await assertBackupTableParity(supabaseAdmin);
   const { snapshotId, name, triggeredBy, triggerMetadata, tables } = opts;
   const startedAt = new Date().toISOString();
   const folder = `snapshots/${snapshotId}/`;
