@@ -1182,6 +1182,17 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 reason_detail: "본인 담당(PIC/ENG) 아님으로 제외",
               });
             }
+            for (const [k, n] of dupDetail.entries()) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: String(k),
+                action_taken: "excluded",
+                reason_code: "DUPLICATE_TASK_NO",
+                reason_detail: `파일 내 중복 ${n}건 중 1건만 반영`,
+              });
+            }
             if (unmappedFieldList.length > 0) {
               rowLogRows.push({
                 upload_id: logId,
