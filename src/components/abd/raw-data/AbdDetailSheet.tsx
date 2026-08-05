@@ -143,6 +143,12 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
     setItem(it as any);
   };
 
+  // 상세창 편집 후: 상세창 로컬 갱신 + Raw Data 목록/대시보드 캐시 무효화
+  const onFieldSaved = () => {
+    void reloadItem();
+    qc.invalidateQueries({ queryKey: ["abd"] });
+  };
+
   const canEdit = !!item && canAbdRow(item as unknown as Record<string, unknown>);
   const aging = item?.ur_aging_days as number | null | undefined;
   const tone = agingTone(aging ?? null, settings);
