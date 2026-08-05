@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertImportScope } from "@/lib/import/rcl-import-gate";
 
 /**
  * WRT HDEC 임포트 (왕복 임포트).
@@ -37,6 +38,8 @@ const InputSchema = z.object({
   allow_deletes: z.boolean().default(false),
   /** 클라이언트가 서버 `rcl_import_filter` 로 걸러낸 결과 요약 (감사 로그용) */
   scope_note: z.string().optional(),
+  /** 클라이언트가 판정한 allowed 키 집합 — 서버가 다시 대조한다(신뢰하지 않음) */
+  allowed_keys: z.array(z.string()).max(20000).optional(),
 });
 
 export type WrtChange = { target: string; field: string; previous: string | null; next: string | null };
@@ -85,7 +88,7 @@ async function readIntegrity(supa: any) {
 
 async function assertEditor(ctx: any) {
   // RCL 정본: 역할 × 범위 격자에서 WRT/import 가 한 범위라도 열려 있어야 실행 가능.
-  // 행 단위 판정은 화면에서 `rcl_import_filter` 가, 쓰기 차단은 RLS 가 담당한다.
+  // 행 단위 판정은 핸들러의 `assertImportScope`(서버 `rcl_import_filter`)가 최종 관문이다.
   const { data, error } = await ctx.supabase.rpc("rcl_grants", { _module: "WRT", _action: "import" });
   if (error) throw new Error(`권한 조회 실패: ${error.message}`);
   const g = data as { role: string | null; own: boolean; own_team: boolean; other_team: boolean } | null;
@@ -122,6 +125,17 @@ export const importWrtHdecBatch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<WrtHdecResult> => {
     await assertEditor(context);
     const supa = context.supabase as any;
+
+    // ★ 서버 최종 관문: SECURITY DEFINER apply 전에 행 단위 스코프를 재판정한다.
+    await assertImportScope(
+      supa,
+      "WRT",
+      "wrt_number",
+      ["team", "pic", "eng"],
+      data.rows,
+      (r) => r.wrt_number,
+      data.allowed_keys ?? null,
+    );
 
     const items = await fetchAll(supa, "wrt_items", "id, wrt_number, team, pic, eng");
     const byNumber = new Map<string, any>(items.map((i) => [i.wrt_number, i]));
