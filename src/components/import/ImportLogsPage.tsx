@@ -65,6 +65,10 @@ interface Batch {
   rejected: number;
   extra?: string | null; // discipline for TM, sheet for SP
   rolled_back_at?: string | null;
+  /** TM: 파싱/반영 행수와 사유별 제외 건수 (E-2) */
+  parsed_rows?: number | null;
+  applied_rows?: number | null;
+  exclusions?: Record<string, unknown> | null;
 }
 
 interface RowLog {
@@ -181,7 +185,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await supabase
         .from("task_management_import_logs")
         .select(
-          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at",
+          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at, parsed_rows, applied_rows, exclusions",
         )
         .order("started_at", { ascending: false })
         .limit(100);
@@ -200,6 +204,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         rejected: r.rejected ?? 0,
         extra: r.discipline,
         rolled_back_at: r.rolled_back_at,
+        parsed_rows: r.parsed_rows ?? null,
+        applied_rows: r.applied_rows ?? null,
+        exclusions: r.exclusions ?? null,
       }));
       setBatches(list);
       await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
@@ -585,6 +592,20 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                                   title={new Date(b.rolled_back_at).toLocaleString()}
                                 >
                                   {fmtDateTime(b.rolled_back_at)}
+                                </span>
+                              )}
+                              {b.status === "partial" && (
+                                <span className="text-[10px] text-amber-700 dark:text-amber-300">
+                                  {typeof b.applied_rows === "number" &&
+                                  typeof b.parsed_rows === "number"
+                                    ? `반영 ${b.applied_rows}/${b.parsed_rows}`
+                                    : "일부 미반영"}
+                                  {b.exclusions
+                                    ? ` · ${Object.entries(b.exclusions)
+                                        .filter(([, v]) => typeof v === "number" && v > 0)
+                                        .map(([k, v]) => `${k}=${v}`)
+                                        .join(" · ")}`
+                                    : ""}
                                 </span>
                               )}
                             </div>

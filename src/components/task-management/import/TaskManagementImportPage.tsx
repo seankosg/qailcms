@@ -45,6 +45,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useRclGrants } from "@/hooks/useRclCan";
 import {
   TaskManagementImportProvider,
   useTaskManagementImport,
@@ -107,7 +108,9 @@ function ImportInner() {
   // TM 임포트 전용 admin 판정 — superuser 는 제외한다(전역 useCurrentUser 는 수정하지 않음).
   // superuser/d_superuser 는 스코프를 '드롭다운으로 선택'하는 것이 설계 의도다.
   const isAdmin = (me?.roles ?? []).includes("admin");
-  const isSuperUserLike = !!(me?.isSuperUser || me?.isDSuperUser);
+  // D. 역할 이름 하드코딩 금지 — rcl_grants('TM','import') 가 유일한 근거.
+  const { data: tmImportGrants } = useRclGrants("TM", "import");
+  const canChooseScope = !!(tmImportGrants?.own_team || tmImportGrants?.other_team);
   const {
     files,
     getFiles,
@@ -133,6 +136,7 @@ function ImportInner() {
     setFileExcludedHeaders,
     setFileDateOverrides,
     setFileConflictPolicy,
+    setFileAckUnmapped,
     setFileConflictDecisions,
     clearFileConflictDecisions,
     runPreflight,
@@ -298,6 +302,13 @@ function ImportInner() {
     return map;
   }, [files, effectiveScope, matchesHdecPic]);
 
+  // C. 미매핑·강등이 있으면 사용자가 명시적으로 승인하기 전까지 Start 를 막는다.
+  const hasUnapprovedUnmapped = files.some(
+    (f) =>
+      f.status === "ready" &&
+      ((f.unmappedFields?.length ?? 0) > 0 || (f.demotedFields?.length ?? 0) > 0) &&
+      !f.ackUnmapped,
+  );
   const readyFiles = files.filter(
     (f) => f.status === "ready" && !f.validationError && !!f.discipline,
   );
@@ -306,7 +317,8 @@ function ImportInner() {
     (s, f) => s + (matchedByFile[f.id]?.matched ?? 0),
     0,
   );
-  const startDisabled = isRunning || readyCount === 0 || !canImport;
+  const startDisabled =
+    isRunning || readyCount === 0 || !canImport || hasUnapprovedUnmapped;
   const onStartClick = () => {
     if (effectiveScope === "all") {
       setConfirmAllOpen(true);
@@ -438,7 +450,7 @@ function ImportInner() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {!isAdmin && (
-                isSuperUserLike ? (
+                canChooseScope ? (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">임포트 스코프</span>
                     <Select
@@ -483,7 +495,13 @@ function ImportInner() {
                 size="sm"
                 onClick={onStartClick}
                 disabled={startDisabled || pendingImportAfterConflicts}
-                title={!canImport ? "임포트 권한이 없습니다" : ""}
+                title={
+                  !canImport
+                    ? "임포트 권한이 없습니다"
+                    : hasUnapprovedUnmapped
+                      ? "미매핑·강등 컬럼이 있습니다 — 파일 카드에서 '이 컬럼들 없이 진행'을 체크하세요"
+                      : ""
+                }
               >
                 {isRunning ? (
                   <>
@@ -515,6 +533,7 @@ function ImportInner() {
                 onRunPreflight={() => runPreflight(f.id)}
                 onOpenConflict={() => setConflictFileId(f.id)}
                 onDateOverridesApply={(ov) => setFileDateOverrides(f.id, ov)}
+                onAckUnmappedChange={(v) => setFileAckUnmapped(f.id, v)}
               />
             ))}
           </CardContent>
@@ -630,6 +649,7 @@ function FileRow({
   onRunPreflight,
   onOpenConflict,
   onDateOverridesApply,
+  onAckUnmappedChange,
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
@@ -647,6 +667,7 @@ function FileRow({
   onRunPreflight: () => void;
   onOpenConflict: () => void;
   onDateOverridesApply: (overrides: Record<string, string>) => void | Promise<void>;
+  onAckUnmappedChange: (v: boolean) => void;
 }) {
   const badge = statusBadge[f.status];
   const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
@@ -792,6 +813,7 @@ function FileRow({
                 onClick={onRunPreflight}
                 disabled={
                   isRunning ||
+                  f.status === "done" ||
                   f.status !== "ready" ||
                   !f.parsed ||
                   f.parsed.length === 0 ||
@@ -910,10 +932,52 @@ function FileRow({
               <p className="mt-1 text-xs text-destructive">중복 점검 실패: {f.preflightError}</p>
             )}
             {f.warnings && f.warnings.length > 0 && (
-              <p className="mt-1 text-xs text-amber-600">
-                ⚠ {f.warnings.slice(0, 3).join(" · ")}
-                {f.warnings.length > 3 ? ` (+${f.warnings.length - 3})` : ""}
-              </p>
+              // C. 경고를 접지 않는다 — 전부 노출.
+              <ul className="mt-1 space-y-0.5 text-xs text-amber-600">
+                {f.warnings.map((w, i) => (
+                  <li key={i}>⚠ {w}</li>
+                ))}
+              </ul>
+            )}
+            {((f.unmappedFields?.length ?? 0) > 0 ||
+              (f.demotedFields?.length ?? 0) > 0) && (
+              <div className="mt-2 space-y-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-xs">
+                <div className="font-semibold text-destructive">
+                  임포트에서 제외될 컬럼이 있습니다 — 확인 후 진행하세요
+                </div>
+                {(f.unmappedFields?.length ?? 0) > 0 && (
+                  <div>
+                    <span className="font-medium">미매핑(헤더 없음): </span>
+                    <span className="font-mono">{(f.unmappedFields ?? []).join(", ")}</span>
+                  </div>
+                )}
+                {(f.demotedFields ?? []).map((d) => (
+                  <div key={d.field}>
+                    <span className="font-medium">강등: </span>
+                    <span className="font-mono">{d.field}</span> — {d.reason} (
+                    {Math.round(d.ratio * 100)}% / 모집단 {d.population}) · 표본:{" "}
+                    <span className="font-mono">{d.samples.join(", ")}</span>
+                  </div>
+                ))}
+                <label className="flex items-start gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={!!f.ackUnmapped}
+                    disabled={isRunning}
+                    onChange={(e) => onAckUnmappedChange(e.target.checked)}
+                  />
+                  <span>
+                    이 컬럼들 없이 진행:{" "}
+                    <span className="font-mono">
+                      {[
+                        ...(f.unmappedFields ?? []),
+                        ...(f.demotedFields ?? []).map((d) => d.field),
+                      ].join(", ")}
+                    </span>
+                  </span>
+                </label>
+              </div>
             )}
             {f.validationError && (
               <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -1003,6 +1067,24 @@ function FileRow({
               범위 밖 미반영: {f.result.outOfScope}
             </Badge>
           )}
+          {typeof f.result.excludedByScope === "number" && f.result.excludedByScope > 0 && (
+            <Badge variant="outline" className="border-amber-400 text-amber-700">
+              본인 담당 아님으로 제외: {f.result.excludedByScope}
+            </Badge>
+          )}
+          {typeof f.result.unclassified === "number" && f.result.unclassified > 0 && (
+            <Badge variant="outline" className="border-destructive text-destructive">
+              미분류: {f.result.unclassified}
+            </Badge>
+          )}
+        </div>
+      )}
+      {f.result && typeof f.result.parsedRows === "number" && (
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          검산 — 파싱 {f.result.parsedRows} = 반영 {f.result.appliedRows ?? 0} + 권한제외{" "}
+          {f.result.outOfScope ?? 0} + 스코프제외 {f.result.excludedByScope ?? 0} + 중복{" "}
+          {f.result.duplicates ?? 0} + 거부 {f.result.rejected} + 정책스킵 {f.result.skipped}
+          {(f.result.unclassified ?? 0) > 0 ? ` + 미분류 ${f.result.unclassified}` : ""}
         </div>
       )}
       {f.result?.outOfScopeKeys && f.result.outOfScopeKeys.length > 0 && (

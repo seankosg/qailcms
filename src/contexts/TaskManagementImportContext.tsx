@@ -78,6 +78,12 @@ export interface TmImportFileItem {
   headerToFieldMap?: Record<string, string>;
   excludedHeaders?: string[];
   dateIssues?: import("@/lib/import/date-audit").DateIssue[];
+  /** A. 헤더 미탐지로 임포트에서 제외된 필드 */
+  unmappedFields?: string[];
+  /** B. 값 형태 불일치로 강등된 필드 */
+  demotedFields?: import("@/lib/task-management/parser").DemotedField[];
+  /** C. 사용자가 "이 컬럼들 없이 진행"을 명시적으로 승인했는가 */
+  ackUnmapped?: boolean;
   dateOverrides?: Record<string, string>;
   conflictPolicy?: ConflictPolicy;
   conflictDecisions?: Record<string, ConflictPolicy>;
@@ -99,6 +105,14 @@ export interface TmImportFileItem {
     outOfScope?: number;
     /** 제외된 행의 task_no 목록 (조용한 누락 방지) */
     outOfScopeKeys?: string[];
+    /** 파싱된 전체 행수(분모) */
+    parsedRows?: number;
+    /** 실제 반영 대상 행수 */
+    appliedRows?: number;
+    /** mine 토글로 제외된 행수 (권한 제외와 분리) */
+    excludedByScope?: number;
+    /** 항등식이 맞지 않을 때의 잔차 */
+    unclassified?: number;
     errors?: ImportErrorEntry[];
   };
 }
@@ -135,6 +149,7 @@ interface CtxValue {
   setFileExcludedHeaders: (id: string, excluded: string[]) => Promise<void>;
   setFileDateOverrides: (id: string, overrides: Record<string, string>) => Promise<void>;
   setFileConflictPolicy: (id: string, policy: ConflictPolicy) => void;
+  setFileAckUnmapped: (id: string, ack: boolean) => void;
   setFileConflictDecisions: (id: string, decisions: Record<string, ConflictPolicy>) => void;
   clearFileConflictDecisions: (id: string) => void;
   runPreflight: (id: string) => Promise<void>;
@@ -304,6 +319,9 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               headerToFieldMap: parsed.headerToFieldMap,
               excludedHeaders: parsed.excludedHeaders,
               dateIssues: parsed.dateIssues,
+              unmappedFields: parsed.unmappedFields ?? [],
+              demotedFields: parsed.demotedFields ?? [],
+              ackUnmapped: false,
               // preflight 재실행 필요 — 결과 초기화
               preflight: null,
               preflightError: null,
@@ -515,6 +533,10 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, conflictPolicy: policy } : f)));
   }, []);
 
+  const setFileAckUnmapped = useCallback((id: string, ack: boolean) => {
+    setFiles((cur) => cur.map((f) => (f.id === id ? { ...f, ackUnmapped: ack } : f)));
+  }, []);
+
   const setFileConflictDecisions = useCallback(
     (id: string, decisions: Record<string, ConflictPolicy>) => {
       setFiles((cur) =>
@@ -621,6 +643,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       const MATCH_COLS = ["discipline", "task_no"];
       let serverAllowed: typeof parsedAll = [];
       let outOfScopeKeys: string[] = [];
+      let deniedEntries: { task_no: string; scope: string }[] = [];
       try {
         const rcl = await rclImportFilter(
           "TM",
@@ -639,6 +662,10 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         outOfScopeKeys = rcl.denied.map(
           (d) => `${d.key["task_no"] ?? "-"} (${d.scope})`,
         );
+        deniedEntries = rcl.denied.map((d) => ({
+          task_no: String(d.key["task_no"] ?? "-"),
+          scope: String(d.scope ?? "-"),
+        }));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         toast.error(`${f.name}: 권한 판정 실패로 임포트 중단 — ${msg}`);
@@ -664,6 +691,19 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 mineNames.has(normalizePic((p as any).hdec_eng_name)),
             );
       const filteredOut = parsedAll.length - parsed.length;
+      const appliedTaskNos = new Set(parsed.map((p) => String(p.task_no ?? "")));
+      const scopeFilteredKeys = serverAllowed
+        .filter((p) => !appliedTaskNos.has(String(p.task_no ?? "")))
+        .map((p) => String(p.task_no ?? "-"));
+      // 제외 사유 분리 — 권한(RCL denied) vs 스코프(mine 토글)
+      const excludedByPermission = outOfScope;
+      const excludedByScope = Math.max(0, serverAllowed.length - parsed.length);
+      // 미매핑·강등은 "행 제외"가 아니라 "값 미반영"이다. 항등식 분모를 흐리지 않도록
+      // 건수는 0으로 두고, 대상 필드 목록을 로그(jsonb)와 화면에 남긴다.
+      const unmappedFieldList = [
+        ...(f.unmappedFields ?? []),
+        ...(f.demotedFields ?? []).map((d) => d.field),
+      ];
       if (parsed.length === 0) {
         toast.warning(
           outOfScope > 0
@@ -684,6 +724,9 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     rejected: 0,
                     outOfScope,
                     outOfScopeKeys,
+                    parsedRows: parsedAll.length,
+                    appliedRows: 0,
+                    excludedByScope,
                   },
                 }
               : x,
@@ -701,11 +744,18 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       // §4-1(2026-08-04): 파서 경고를 로그에 보존. 경고가 없으면 아무것도 남기지 않는다(빈칸).
       const parserWarnings = (f.warnings ?? []).filter(Boolean);
       const warningsPayload =
-        parserWarnings.length > 0
+        parserWarnings.length > 0 || unmappedFieldList.length > 0
           ? {
               parser: parserWarnings,
-              has_position_fallback: parserWarnings.some((w) => w.includes("기본 위치")),
               has_header_row_fallback: parserWarnings.some((w) => w.includes("헤더 행을 찾지 못해")),
+              unmapped_fields: f.unmappedFields ?? [],
+              demoted_fields: (f.demotedFields ?? []).map((d) => ({
+                field: d.field,
+                reason: d.reason,
+                ratio: d.ratio,
+                samples: d.samples,
+              })),
+              user_ack_unmapped: !!f.ackUnmapped,
             }
           : null;
 
@@ -717,7 +767,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           discipline,
           data_date: f.dataDateOverride ?? f.dataDate ?? null,
           sheet_name: f.sheetName ?? null,
-          total_rows: parsed.length,
+          total_rows: parsedAll.length,
+          parsed_rows: parsedAll.length,
           status: "processing",
           imported_by: userId,
           started_at: startedAtIso,
@@ -1108,6 +1159,51 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 reason_detail: `날짜 범위 오류 (${DATE_MIN}~${DATE_MAX}): ${r.detail}`,
               });
             }
+            // 제외된 행도 사유별로 전부 남긴다(침묵 금지).
+            for (const d of deniedEntries) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: d.task_no,
+                action_taken: "excluded",
+                reason_code: "SCOPE_DENIED_PERMISSION",
+                reason_detail: `RCL denied — scope=${d.scope}`,
+              });
+            }
+            for (const t of scopeFilteredKeys) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: t,
+                action_taken: "excluded",
+                reason_code: "SCOPE_FILTERED_MINE",
+                reason_detail: "본인 담당(PIC/ENG) 아님으로 제외",
+              });
+            }
+            for (const [k, n] of dupDetail.entries()) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: String(k),
+                action_taken: "excluded",
+                reason_code: "DUPLICATE_TASK_NO",
+                reason_detail: `파일 내 중복 ${n}건 중 1건만 반영`,
+              });
+            }
+            if (unmappedFieldList.length > 0) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: "-",
+                action_taken: "excluded",
+                reason_code: "COLUMN_UNMAPPED",
+                reason_detail: `미매핑·강등 컬럼 값 미반영: ${unmappedFieldList.join(", ")}`,
+              });
+            }
             for (let i = 0; i < rowLogRows.length; i += 500) {
               await (supabase as any)
                 .from("task_management_import_row_logs")
@@ -1305,11 +1401,23 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           });
         }
 
+        // 반영 행수가 파싱 행수와 같을 때만 success. 제외·거부가 하나라도 있으면 partial.
+        const appliedRows = inserted + updated;
+        const unclassified = Math.max(
+          0,
+          parsedAll.length -
+            (appliedRows +
+              excludedByPermission +
+              excludedByScope +
+              duplicates +
+              rejected +
+              skippedByPolicy),
+        );
         const finalStatus =
-          rejected === 0 && importErrors.length === 0
-            ? "success"
-            : inserted + updated === 0
-              ? "failed"
+          appliedRows === 0
+            ? "failed"
+            : appliedRows === parsedAll.length && rejected === 0 && importErrors.length === 0
+              ? "success"
               : "partial";
 
         if (logId) {
@@ -1320,6 +1428,18 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               inserted,
               updated,
               rejected,
+              applied_rows: appliedRows,
+              exclusions: {
+                excluded_by_permission: excludedByPermission,
+                excluded_by_scope: excludedByScope,
+                excluded_unmapped_fields: unmappedFieldList,
+                duplicates,
+                skipped_by_policy: skippedByPolicy,
+                rolled_up: rolledUp,
+                renumbered,
+                resolved_by_decision: resolvedByDecision,
+                unclassified,
+              },
               errors: importErrors.length ? importErrors : null,
               finished_at: new Date().toISOString(),
             })
@@ -1345,6 +1465,10 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     resolvedByDecision,
                     outOfScope,
                     outOfScopeKeys,
+                    parsedRows: parsedAll.length,
+                    appliedRows,
+                    excludedByScope,
+                    unclassified,
                     errors: importErrors.length ? importErrors : undefined,
                   },
                 }
@@ -1471,6 +1595,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setFileExcludedHeaders,
         setFileDateOverrides,
         setFileConflictPolicy,
+        setFileAckUnmapped,
         setFileConflictDecisions,
         clearFileConflictDecisions,
         runPreflight,

@@ -65,6 +65,10 @@ export interface ParseTaskManagementResult {
   excludedFields: Set<string>;
   /** 날짜 파싱에 실패한 셀 목록. 임포트 UI에서 사용자가 수정. */
   dateIssues: DateIssue[];
+  /** A. 헤더를 찾지 못해 임포트에서 제외된 필드 */
+  unmappedFields: string[];
+  /** B. 값 형태 불일치로 강등된 필드 */
+  demotedFields: DemotedField[];
 }
 
 export interface SheetHeaderEntry {
@@ -72,6 +76,15 @@ export interface SheetHeaderEntry {
   letter: string; // A, B, ...
   header: string; // row 5 텍스트 (\n → space, trim)
   sample: string | null; // row 7 첫 데이터 셀 값
+}
+
+/** B. 값 형태 검증으로 강등된 필드 */
+export interface DemotedField {
+  field: string;
+  reason: string;
+  ratio: number;
+  population: number;
+  samples: string[];
 }
 
 export const TASK_TARGET_FIELDS = [
@@ -106,8 +119,8 @@ export type TaskTargetField = (typeof TASK_TARGET_FIELDS)[number];
  */
 const TASK_FIELD_ALIASES: Record<TaskTargetField, string[]> = {
   task_no: ["No", "no", "Task No", "Task No.", "Task Number", "Task_No", "TaskNo", "번호", "작업번호", "업무번호"],
-  category: ["Category", "카테고리"],
-  plot: ["Plot"],
+  category: ["Category", "카테고리", "카테고리 1", "구분"],
+  plot: ["Plot", "플롯", "동"],
   task_name: ["항목", "Item", "Task Name"],
   risk: ["리스크", "Risk"],
   sub_task_desc: ["단계별 세부 업무", "세부 업무", "Sub Task", "Subtask", "Sub-task"],
@@ -165,33 +178,6 @@ export function toTaskFieldName(
   return "";
 }
 
-/** Header text → 컬럼 인덱스 (1-based). */
-const CANONICAL_HEADERS: Record<string, number> = {
-  no: 1,
-  category: 2,
-  plot: 3,
-  "항목": 4,
-  "리스크": 5,
-  "단계별 세부 업무": 6,
-  "담당": 7,
-  "hdec pic": 7,
-  "hdec eng": 8,
-  "유형": 9,
-  "상태": 10,
-  "계획 시작": 11,
-  "계획 완료": 12,
-  "계획 일수": 13,
-  "실제 시작": 14,
-  "실적 진도율": 15,
-  "계획 진도율": 16,
-  "진도차 (%p)": 17,
-  "진도차(%p)": 17,
-  "예상 완료": 18,
-  "차이 (일)": 19,
-  "차이(일)": 19,
-  "자동 판정": 20,
-};
-
 function normalizeHeader(v: unknown): string {
   if (v == null) return "";
   return String(v).replace(/\s+/g, " ").trim().toLowerCase();
@@ -248,7 +234,7 @@ function buildHeaderMap(sheet: XLSX.WorkSheet): {
 } {
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S5");
   const warnings: string[] = [];
-  const maxCol = Math.min(range.e.c, 25);
+  const maxCol = range.e.c; // A-4: 26열 상한 제거(2026-08-05)
   const DEFAULT_HEADER_ROW = 5; // 1-based fallback
   const MIN_HEADER_CELLS = 3;
   const MAX_SCAN_ROWS = 30; // 상단 30행 스캔
@@ -261,7 +247,9 @@ function buildHeaderMap(sheet: XLSX.WorkSheet): {
     let score = 0;
     for (let c = range.s.c; c <= maxCol; c++) {
       const v = sheet[XLSX.utils.encode_cell({ r, c })]?.v;
-      if (normalizeHeader(v)) score++;
+      // 헤더 후보 점수는 "텍스트 셀"만 센다. Gantt 날짜 열(숫자/Date)이
+      // 열 상한 제거(A-4) 이후 헤더 행 감지를 흔드는 것을 막는다.
+      if (typeof v === "string" && normalizeHeader(v)) score++;
     }
     if (score > bestScore) {
       bestScore = score;
@@ -291,24 +279,27 @@ export const TASK_NO_ALIASES = [
   "번호", "작업번호", "업무번호",
 ];
 
+/**
+ * 헤더 텍스트 매칭만으로 컬럼을 찾는다. ★위치·순서·인덱스 폴백 금지(2026-08-05).
+ * 못 찾으면 0(미매핑)을 반환하고, getCell(col=0) → undefined → null 로 흘러
+ * stripNull 이 걷어낸다.
+ */
 function resolveColumn(
   headerMap: Record<string, number>,
   headerNames: string[],
-  canonicalIndex: number,
   warnings: string[],
+  unmapped: string[],
+  target: string,
 ): number {
   for (const name of headerNames) {
-    const key = normalizeHeader(name);
-    const idx = headerMap[key];
+    const idx = headerMap[normalizeHeader(name)];
     if (idx) return idx;
   }
-  // canonicalIndex 0 = 위치 폴백 금지(담당자 열 등). 별칭 매칭 실패 시 미매핑 처리.
-  if (!canonicalIndex) {
-    warnings.push(`헤더 텍스트를 찾지 못함 (${headerNames[0]}) — 위치 추정 금지 필드이므로 미매핑 처리`);
-    return 0;
-  }
-  warnings.push(`헤더 텍스트를 찾지 못함 (${headerNames[0]}) — 기본 위치 ${canonicalIndex}열 사용`);
-  return canonicalIndex;
+  warnings.push(
+    `미매핑: ${headerNames[0]} — 헤더를 찾지 못해 이 컬럼은 임포트하지 않습니다`,
+  );
+  unmapped.push(target);
+  return 0;
 }
 
 function getCell(sheet: XLSX.WorkSheet, row: number, col: number): unknown {
@@ -375,7 +366,7 @@ export async function getTaskExcelHeaders(
   const headerRow0 = headerRow - 1;
   const dataStart = headerRow + 2;
   const rangeAll = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S7");
-  const maxCol = Math.min(rangeAll.e.c, 25);
+  const maxCol = rangeAll.e.c;
   const entries: SheetHeaderEntry[] = [];
   const sample: Record<string, unknown> = {};
   for (let c = 0; c <= maxCol; c++) {
@@ -503,7 +494,7 @@ export async function parseTaskManagementExcel(
   const sheetHeaders: SheetHeaderEntry[] = [];
   {
     const rangeAll = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S7");
-    const maxCol = Math.min(rangeAll.e.c, 25);
+    const maxCol = rangeAll.e.c;
     for (let c = 0; c <= maxCol; c++) {
       const headerCell = sheet[XLSX.utils.encode_cell({ r: headerRow0, c })];
       const raw = headerCell?.v;
@@ -525,34 +516,39 @@ export async function parseTaskManagementExcel(
     const extra = extraAliases?.[target] ?? [];
     return [...extra, ...names];
   };
-  const pick = (target: TaskTargetField, names: string[], canonical: number): number => {
-    return resolveColumn(headerMap, withAlias(target, names), canonical, warnings);
-  };
+  const unmappedFields: string[] = [];
+  const pick = (target: TaskTargetField, names: string[]): number =>
+    resolveColumn(
+      headerMap,
+      [...withAlias(target, names), ...TASK_FIELD_ALIASES[target]],
+      warnings,
+      unmappedFields,
+      target,
+    );
 
   const cols = {
     // §4-3(2026-08-04): 과업코드는 upsert 키(discipline,task_no) — ★위치 폴백 금지(0).
     // 미매핑이면 아래에서 파싱 자체를 중단한다. 키가 틀리면 되돌릴 수 없다.
-    no: pick("task_no", TASK_NO_ALIASES, 0),
-    category: pick("category", ["Category"], 2),
-    plot: pick("plot", ["Plot"], 3),
-    task_name: pick("task_name", ["항목"], 4),
-    risk: pick("risk", ["리스크"], 5),
-    sub_task_desc: pick("sub_task_desc", ["단계별 세부 업무"], 6),
-    // 담당자 열은 위치 폴백 금지(0) — 별칭 매칭만 허용.
-    hdec_pic_name: pick("hdec_pic_name", ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"], 0),
-    hdec_eng_name: pick("hdec_eng_name", ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"], 0),
-    row_type: pick("row_type", ["유형"], 9),
-    status_manual: pick("status_manual", ["상태"], 10),
-    plan_start: pick("plan_start", ["계획 시작"], 11),
-    plan_end: pick("plan_end", ["계획 완료"], 12),
-    plan_days: pick("plan_days", ["계획 일수"], 13),
-    actual_start: pick("actual_start", ["실제 시작"], 14),
-    actual_progress: pick("actual_progress", ["실적 진도율"], 15),
-    plan_progress: pick("plan_progress", ["계획 진도율"], 16),
-    progress_variance: pick("progress_variance", ["진도차 (%p)", "진도차(%p)"], 17),
-    forecast_end: pick("forecast_end", ["예상 완료"], 18),
-    slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 19),
-    auto_judgment: pick("auto_judgment", ["자동 판정"], 20),
+    no: pick("task_no", TASK_NO_ALIASES),
+    category: pick("category", ["Category"]),
+    plot: pick("plot", ["Plot"]),
+    task_name: pick("task_name", ["항목"]),
+    risk: pick("risk", ["리스크"]),
+    sub_task_desc: pick("sub_task_desc", ["단계별 세부 업무"]),
+    hdec_pic_name: pick("hdec_pic_name", ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"]),
+    hdec_eng_name: pick("hdec_eng_name", ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"]),
+    row_type: pick("row_type", ["유형"]),
+    status_manual: pick("status_manual", ["상태"]),
+    plan_start: pick("plan_start", ["계획 시작"]),
+    plan_end: pick("plan_end", ["계획 완료"]),
+    plan_days: pick("plan_days", ["계획 일수"]),
+    actual_start: pick("actual_start", ["실제 시작"]),
+    actual_progress: pick("actual_progress", ["실적 진도율"]),
+    plan_progress: pick("plan_progress", ["계획 진도율"]),
+    progress_variance: pick("progress_variance", ["진도차 (%p)", "진도차(%p)"]),
+    forecast_end: pick("forecast_end", ["예상 완료"]),
+    slip_days: pick("slip_days", ["차이 (일)", "차이(일)"]),
+    auto_judgment: pick("auto_judgment", ["자동 판정"]),
     // actual_finish 는 선택 컬럼: ★위치 폴백 금지 (milestone 방식). 헤더가 없으면 0.
     actual_finish: (() => {
       for (const name of withAlias("actual_finish", TASK_FIELD_ALIASES.actual_finish)) {
@@ -624,6 +620,110 @@ export async function parseTaskManagementExcel(
   clampField("slip_days", "slip_days");
   clampField("auto_judgment", "auto_judgment");
   clampField("milestone", "milestone");
+
+  // ───────────────────────────────────────────────────────────────
+  // B. 값 형태 검증 (2026-08-05). 헤더 이름이 맞아도 값의 모양이 필드 정의와
+  //    다르면 그 컬럼을 미매핑으로 강등한다. task_no 는 강등 금지 — 예외로 중단.
+  // ───────────────────────────────────────────────────────────────
+  const demotedFields: DemotedField[] = [];
+  {
+    const rangeV = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S1000");
+    const scanEndRow = Math.min(rangeV.e.r + 1, 5000);
+    const sampleValues = (col: number): string[] => {
+      const out: string[] = [];
+      for (let r = dataStart; r <= scanEndRow; r++) {
+        const v = getCell(sheet, r, col);
+        if (v == null || String(v).trim() === "") continue;
+        out.push(String(v).trim());
+      }
+      return out;
+    };
+    const isDate = (s: string) => {
+      // 엑셀 날짜 시리얼(숫자)도 정상 날짜로 본다.
+      const n = Number(s);
+      if (Number.isFinite(n) && n >= 20000 && n <= 80000) return true;
+      try {
+        return strictParseDateValue(s) != null;
+      } catch {
+        return false;
+      }
+    };
+    const isPct = (s: string) => {
+      const n = Number(s.replace(/%$/, ""));
+      return Number.isFinite(n) && n >= 0 && n <= 100;
+    };
+    const isInt = (s: string) => {
+      const n = Number(s);
+      return Number.isFinite(n) && Math.abs(n - Math.round(n)) < 1e-9;
+    };
+    const isPlot = (s: string) => {
+      const u = s.trim().toUpperCase();
+      return u === "C" || u === "D";
+    };
+    // 과업코드 = 영숫자·하이픈·점·슬래시 조합의 짧은 코드. 부분 접두어("ME-D-")도 허용.
+    // 한글·공백이 섞인 문장(카테고리·업무명 오매핑)만 걸러낸다.
+    const isTaskNo = (s: string) =>
+      /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(s) && s.length <= 40;
+
+    const checks: Array<{
+      field: TaskTargetField;
+      key: keyof typeof cols;
+      label: string;
+      test: (s: string) => boolean;
+      threshold: number;
+    }> = [
+      { field: "plot", key: "plot", label: "C/D", test: isPlot, threshold: 0.8 },
+      { field: "plan_start", key: "plan_start", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "plan_end", key: "plan_end", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "actual_start", key: "actual_start", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "forecast_end", key: "forecast_end", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "actual_finish", key: "actual_finish", label: "날짜", test: isDate, threshold: 0.8 },
+      { field: "actual_progress", key: "actual_progress", label: "진도율(0~1 또는 0~100)", test: isPct, threshold: 0.8 },
+      { field: "plan_progress", key: "plan_progress", label: "진도율(0~1 또는 0~100)", test: isPct, threshold: 0.8 },
+      { field: "plan_days", key: "plan_days", label: "정수", test: isInt, threshold: 0.8 },
+      { field: "slip_days", key: "slip_days", label: "정수", test: isInt, threshold: 0.8 },
+    ];
+
+    // task_no — 강등 금지. 90% 미만이면 파싱 중단.
+    {
+      const vals = sampleValues(cols.no);
+      if (vals.length > 0) {
+        const ok = vals.filter(isTaskNo).length;
+        const ratio = ok / vals.length;
+        if (ratio < 0.9) {
+          const bad = vals.filter((v) => !isTaskNo(v)).slice(0, 3);
+          throw new Error(
+            `과업코드 열(${cols.no}열)의 값 형태가 과업코드가 아닙니다 ` +
+              `(정상 ${Math.round(ratio * 100)}%, 모집단 ${vals.length}행). ` +
+              `표본: ${bad.join(", ")} — 헤더 매핑을 확인하세요.`,
+          );
+        }
+      }
+    }
+
+    for (const c of checks) {
+      const col = (cols as Record<string, number>)[c.key as string];
+      if (!col) continue;
+      const vals = sampleValues(col);
+      if (vals.length === 0) continue; // 값이 없으면 판단하지 않는다
+      const ok = vals.filter(c.test).length;
+      const ratio = ok / vals.length;
+      if (ratio >= c.threshold) continue;
+      const samples = vals.filter((v) => !c.test(v)).slice(0, 3);
+      (cols as Record<string, number>)[c.key as string] = 0;
+      demotedFields.push({
+        field: c.field,
+        reason: `값 형태 불일치(${c.label} ${Math.round(ratio * 100)}%)`,
+        ratio: Math.round(ratio * 1000) / 1000,
+        population: vals.length,
+        samples,
+      });
+      warnings.push(
+        `${c.field}: 값 형태 불일치(${c.label} ${Math.round(ratio * 100)}%) — 임포트에서 제외. ` +
+          `표본: ${samples.join(", ")}`,
+      );
+    }
+  }
 
   // 단일 "담당" 컬럼만 있고 HDEC ENG가 별도로 매핑되지 않은 경우 자동 분배
   const singlePicColumn =
@@ -785,6 +885,8 @@ export async function parseTaskManagementExcel(
       plot: (() => {
         const resolved = plot ?? propagate?.plot ?? null;
         if (resolved) return resolved;
+        // plot 컬럼이 미매핑·강등되었으면 유도하지 않는다 (제외가 곧 제외여야 한다).
+        if (!cols.plot) return null;
         // 방어: plot 공란인데 task_no 두 번째 세그먼트가 C/D 이면 자동 유도
         const seg = taskNo.split("-")[1];
         if (seg === "C" || seg === "D") {
@@ -930,5 +1032,7 @@ export async function parseTaskManagementExcel(
     excludedHeaders: excludedHeadersInput,
     excludedFields,
     dateIssues: audit.issues,
+    unmappedFields,
+    demotedFields,
   } as ParseTaskManagementResult;
 }
