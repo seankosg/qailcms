@@ -22,6 +22,7 @@ import { OcsStageBPanel } from "@/components/abd/ocs/OcsStageBPanel";
 import { OcsAtomicV2Panel } from "@/components/abd/ocs/OcsAtomicV2Panel";
 import { OcsAtomicV3Panel } from "@/components/abd/ocs/OcsAtomicV3Panel";
 import { OcsRecountPanel } from "@/components/abd/ocs/OcsRecountPanel";
+import { OcsSourceFilesPanel } from "@/components/abd/ocs/OcsSourceFilesPanel";
 import { FilePickerButton } from "@/components/shared/FilePickerButton";
 import { listBucketPaths } from "@/lib/abd/ocs-storage";
 import {
@@ -415,6 +416,7 @@ function OcsImportPage() {
       )}
 
       <OcsStageBPanel />
+      <OcsSourceFilesPanel />
       <OcsAtomicV2Panel />
       <OcsAtomicV3Panel />
       <OcsRecountPanel />

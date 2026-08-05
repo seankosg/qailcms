@@ -1839,6 +1839,51 @@ export type Database = {
           },
         ]
       }
+      abd_ocs_source_files: {
+        Row: {
+          byte_size: number
+          content_hash: string
+          created_at: string
+          file_name: string
+          id: string
+          is_active: boolean
+          mime_type: string
+          relative_path: string
+          source_file_id: string
+          storage_path: string
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          byte_size: number
+          content_hash: string
+          created_at?: string
+          file_name: string
+          id?: string
+          is_active?: boolean
+          mime_type: string
+          relative_path: string
+          source_file_id: string
+          storage_path: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          byte_size?: number
+          content_hash?: string
+          created_at?: string
+          file_name?: string
+          id?: string
+          is_active?: boolean
+          mime_type?: string
+          relative_path?: string
+          source_file_id?: string
+          storage_path?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       abd_resp_result_restore_snapshot_20260727: {
         Row: {
           abd_item_id: string | null
@@ -6203,6 +6248,10 @@ export type Database = {
       abd_ocs_recount_item: { Args: { p_item_id: string }; Returns: undefined }
       abd_ocs_set_complied: {
         Args: { p_comment_id: string; p_complied: boolean; p_expected: boolean }
+        Returns: Json
+      }
+      abd_ocs_source_file_for_comment: {
+        Args: { _comment_id: string }
         Returns: Json
       }
       abd_ocs_v2_dryrun_attachments: {
