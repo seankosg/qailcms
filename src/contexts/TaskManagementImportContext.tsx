@@ -1159,6 +1159,40 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 reason_detail: `날짜 범위 오류 (${DATE_MIN}~${DATE_MAX}): ${r.detail}`,
               });
             }
+            // 제외된 행도 사유별로 전부 남긴다(침묵 금지).
+            for (const d of deniedEntries) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: d.task_no,
+                action_taken: "excluded",
+                reason_code: "SCOPE_DENIED_PERMISSION",
+                reason_detail: `RCL denied — scope=${d.scope}`,
+              });
+            }
+            for (const t of scopeFilteredKeys) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: t,
+                action_taken: "excluded",
+                reason_code: "SCOPE_FILTERED_MINE",
+                reason_detail: "본인 담당(PIC/ENG) 아님으로 제외",
+              });
+            }
+            if (unmappedFieldList.length > 0) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: "-",
+                action_taken: "excluded",
+                reason_code: "COLUMN_UNMAPPED",
+                reason_detail: `미매핑·강등 컬럼 값 미반영: ${unmappedFieldList.join(", ")}`,
+              });
+            }
             for (let i = 0; i < rowLogRows.length; i += 500) {
               await (supabase as any)
                 .from("task_management_import_row_logs")
