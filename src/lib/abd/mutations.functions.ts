@@ -312,7 +312,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       const combinedSelect =
         "abd_number," +
         ABD_TRACKED_FIELDS.join(",") +
-        ",r1_response_source,r2_response_source,r3_response_source";
+        ",r1_response_source,r2_response_source,r3_response_source" +
+        ",ocs_check,ocs_total,ocs_complied";
       const { data: existingRows } = await supa
         .from("abd_items_raw")
         .select(combinedSelect)
@@ -332,6 +333,20 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       //           덮어쓰기를 허용하되 r{n}_response_source 를 'hdec' 로 명시 갱신한다.
       for (const row of payload) {
         const src = srcMap.get((row as any).abd_number);
+        // OCS 미완료(Pending) 도면은 Draft Finish 실적일을 임포트로 채울 수 없다.
+        // (DB 트리거 abd_guard_df_actual_requires_ocs 와 동일 규칙 — 배치 실패 대신 해당 필드만 제외)
+        if (src && isOcsPending(src)) {
+          for (const n of [1, 2, 3] as const) {
+            const key = `r${n}_draft_finish_actual`;
+            const incoming = (row as any)[key];
+            const prev = (src as any)[key] ?? null;
+            if (incoming != null && incoming !== "" && incoming !== prev) {
+              delete (row as any)[key];
+              dfBlocked++;
+              if (dfBlockedSamples.length < 20) dfBlockedSamples.push(String((row as any).abd_number));
+            }
+          }
+        }
         for (const n of [1, 2, 3] as const) {
           const key = `r${n}_response_result`;
           const srcKey = `r${n}_response_source`;
