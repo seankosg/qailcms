@@ -191,12 +191,15 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
   const [importScope, setImportScope] = useState<ImportScope>("mine");
   const [importerHdecPicName, setImporterHdecPicName] = useState<string | null>(null);
   const [importerOwnNames, setImporterOwnNames] = useState<string[]>([]);
+  const [importerTeam, setImporterTeam] = useState<string | null>(null);
   const [isImporterAdmin, setIsImporterAdmin] = useState<boolean>(false);
 
   const importerHdecPicRef = useRef<string | null>(null);
   importerHdecPicRef.current = importerHdecPicName;
   const importerOwnNamesRef = useRef<string[]>([]);
   importerOwnNamesRef.current = importerOwnNames;
+  const importerTeamRef = useRef<string | null>(null);
+  importerTeamRef.current = importerTeam;
   const importScopeRef = useRef<ImportScope>(importScope);
   importScopeRef.current = importScope;
   const isImporterAdminRef = useRef<boolean>(isImporterAdmin);
@@ -1586,6 +1589,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         setImporterHdecPicName,
         importerOwnNames,
         setImporterOwnNames,
+        importerTeam,
+        setImporterTeam,
         isImporterAdmin,
         setIsImporterAdmin,
         matchesHdecPic,
