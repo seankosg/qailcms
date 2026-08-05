@@ -23,6 +23,7 @@ import {
   addMainTaskWithSubs, allocateMainTaskNo,
 } from "@/lib/task-management/hierarchy.functions";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useTeamOptions } from "@/lib/team/team-master";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -62,11 +63,20 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
   const roleLocked = !!me && (me.isUser || me.isDSuperUser) && !me.isSeniorUser && !me.isAdmin && !me.isSuperUser;
   const lockedPic = roleLocked && me?.isUser ? (me.hdec_pic_name ?? "") : "";
   const lockedTeam = roleLocked ? (me?.team ?? "") : "";
+  const { data: teamOptions } = useTeamOptions();
 
   const [discipline, setDiscipline] = useState<Discipline>(defaultDiscipline ?? "ARCH");
   const [taskNo, setTaskNo] = useState("");
   const [taskName, setTaskName] = useState("");
   const [team, setTeam] = useState<string>("");
+  const teamCodes = useMemo(() => {
+    const codes = (teamOptions ?? []).map((o) => o.code);
+    // 잠긴 소속/기존 선택값이 마스터에 없더라도 항상 표시
+    for (const extra of [lockedTeam, team]) {
+      if (extra && !codes.includes(extra)) codes.push(extra);
+    }
+    return codes;
+  }, [teamOptions, lockedTeam, team]);
   const [category, setCategory] = useState("");
   const [hdecPic, setHdecPic] = useState("");
   const [risk, setRisk] = useState<string>("");
@@ -266,7 +276,7 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
                 <Select value={team} onValueChange={setTeam} disabled={!!lockedTeam}>
                   <SelectTrigger className="h-8"><SelectValue placeholder="선택" /></SelectTrigger>
                   <SelectContent>
-                    {["ARCH", "ELEC", "MECH"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {teamCodes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </Field>
