@@ -664,6 +664,7 @@ function FileRow({
   matched,
   total,
   mine,
+  myTeam,
   scopeIsMine,
   onRemove,
   onDisciplineChange,
@@ -682,6 +683,7 @@ function FileRow({
   matched: number;
   total: number;
   mine: number;
+  myTeam: string | null;
   scopeIsMine: boolean;
   onRemove: () => void;
   onDisciplineChange: (d: Discipline | null) => void;
@@ -696,6 +698,10 @@ function FileRow({
   onAckUnmappedChange: (v: boolean) => void;
 }) {
   const badge = statusBadge[f.status];
+  const teamAutoFilled = (f.unmappedFields ?? []).includes("team") && !!myTeam;
+  const visibleUnmapped = (f.unmappedFields ?? []).filter(
+    (x) => !(x === "team" && !!myTeam),
+  );
   const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
   return (
     <div className="rounded border p-3">
