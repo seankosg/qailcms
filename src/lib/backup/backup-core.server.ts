@@ -81,6 +81,8 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   abd_ocs_attachments: ["id"],
   abd_ocs_attachment_comment_links: ["id"],
   abd_ocs_compliance_log: ["id"],
+  abd_ocs_response_segments: ["id"],
+  abd_ocs_response_comment_links: ["id"],
 };
 
 function sortKeysFor(tableName: string): string[] {
@@ -386,6 +388,8 @@ export async function restoreSnapshot(
       ["abd_ocs_attachment_comment_links", 62],
       ["abd_ocs_compliance", 63],
       ["abd_ocs_compliance_log", 64],
+      ["abd_ocs_response_segments", 65],
+      ["abd_ocs_response_comment_links", 66],
     ]);
     return (order.get(a) ?? 99) - (order.get(b) ?? 99);
   });
