@@ -49,6 +49,7 @@ import { useAllMasterOptions, type MasterKind, type MasterOption } from "@/hooks
 import type { ParsedDefectRow } from "@/lib/defect-management/parser";
 import { useModuleGuard } from "@/hooks/useModuleGuard";
 import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
+import { useRclGrants } from "@/hooks/useRclCan";
 
 const statusBadge: Record<DefectFileStatus, { label: string; cls: string }> = {
   parsing: { label: "Parsing", cls: "bg-muted text-muted-foreground" },
@@ -81,10 +82,26 @@ export function DefectManagementImportPage() {
 
 function Inner() {
   const { data: me } = useCurrentUser();
+  // 권한 판정은 RCL 정본(rcl_grants) 하나만 본다. 역할 하드코딩 금지.
+  const importGrantsQ = useRclGrants("SM", "import");
+  const importGrants = importGrantsQ.data ?? null;
   const canImport =
-    !!me?.roles?.includes("admin") ||
-    !!me?.roles?.includes("superuser") ||
-    !!me?.roles?.includes("user");
+    !!importGrants?.role &&
+    (importGrants.own || importGrants.own_team || importGrants.other_team);
+  const importDenyReason = (() => {
+    if (canImport) return "";
+    if (importGrantsQ.isLoading) return "권한 확인 중…";
+    if (importGrantsQ.error) {
+      return `권한 조회 실패: ${(importGrantsQ.error as Error).message}`;
+    }
+    const roleLabel = importGrants?.role
+      ? `역할 ${importGrants.role}`
+      : `역할 없음${me?.roles?.length ? ` (보유: ${me.roles.join(", ")})` : ""}`;
+    const yn = (v: boolean | undefined) => (v ? "Y" : "N");
+    return `${roleLabel} · SM import 권한 없음 (own=${yn(importGrants?.own)} / own_team=${yn(
+      importGrants?.own_team,
+    )} / other_team=${yn(importGrants?.other_team)})`;
+  })();
   const {
     files,
     isRunning,
@@ -258,7 +275,7 @@ function Inner() {
                 size="sm"
                 onClick={runStartImport}
                 disabled={isRunning || readyCount === 0 || !canImport}
-                title={!canImport ? "권한이 필요합니다" : ""}
+                title={importDenyReason}
               >
                 {isRunning ? (
                   <>
