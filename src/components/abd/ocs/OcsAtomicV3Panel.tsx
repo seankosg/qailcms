@@ -277,7 +277,7 @@ export function OcsAtomicV3Panel() {
   }
 
   async function runImport() {
-    if (!runId || !snapshotId || blockers.length > 0) return;
+    if (!runId || !snapshotId || blockers.length > 0 || importFailure) return;
     setBusy("V3 Import 실행 중…");
     try {
       const out = (await importFn({
@@ -286,7 +286,15 @@ export function OcsAtomicV3Panel() {
       setImportResult(out);
       toast.success("V3 Import 완료");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      const raw = e instanceof Error ? e.message : String(e);
+      setImportFailure({
+        at: new Date().toISOString(),
+        runId,
+        snapshotId,
+        message: raw,
+        stage: parseStage(raw),
+        object: parseObject(raw),
+      });
     } finally {
       setBusy(null);
     }
