@@ -306,10 +306,14 @@ function ImportInner() {
   }, [files, effectiveScope, matchesHdecPic]);
 
   // C. 미매핑·강등이 있으면 사용자가 명시적으로 승인하기 전까지 Start 를 막는다.
+  // 단, team 은 파일에 열이 없어도 실행자 소속(profiles.team)으로 채워지므로
+  // 내 소속이 있는 한 "제외될 컬럼"이 아니다 — 안내만 한다.
+  const visibleUnmapped = (f: (typeof files)[number]) =>
+    (f.unmappedFields ?? []).filter((x) => !(x === "team" && !!myTeam));
   const hasUnapprovedUnmapped = files.some(
     (f) =>
       f.status === "ready" &&
-      ((f.unmappedFields?.length ?? 0) > 0 || (f.demotedFields?.length ?? 0) > 0) &&
+      (visibleUnmapped(f).length > 0 || (f.demotedFields?.length ?? 0) > 0) &&
       !f.ackUnmapped,
   );
   const readyFiles = files.filter(
@@ -541,6 +545,7 @@ function ImportInner() {
                 matched={matchedByFile[f.id]?.matched ?? 0}
                 total={matchedByFile[f.id]?.total ?? 0}
                 mine={matchedByFile[f.id]?.mine ?? 0}
+                myTeam={myTeam}
                 scopeIsMine={!isAdmin && effectiveScope === "mine"}
                 onRemove={() => removeFile(f.id)}
                 onDisciplineChange={(d) => setFileDiscipline(f.id, d)}
@@ -657,6 +662,7 @@ function FileRow({
   matched,
   total,
   mine,
+  myTeam,
   scopeIsMine,
   onRemove,
   onDisciplineChange,
@@ -675,6 +681,7 @@ function FileRow({
   matched: number;
   total: number;
   mine: number;
+  myTeam: string | null;
   scopeIsMine: boolean;
   onRemove: () => void;
   onDisciplineChange: (d: Discipline | null) => void;
@@ -689,6 +696,10 @@ function FileRow({
   onAckUnmappedChange: (v: boolean) => void;
 }) {
   const badge = statusBadge[f.status];
+  const teamAutoFilled = (f.unmappedFields ?? []).includes("team") && !!myTeam;
+  const visibleUnmapped = (f.unmappedFields ?? []).filter(
+    (x) => !(x === "team" && !!myTeam),
+  );
   const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
   return (
     <div className="rounded border p-3">
@@ -958,16 +969,22 @@ function FileRow({
                 ))}
               </ul>
             )}
-            {((f.unmappedFields?.length ?? 0) > 0 ||
+            {teamAutoFilled && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                <span className="font-mono">team</span>: 파일에 열 없음 — 내 소속(
+                <span className="font-mono">{myTeam}</span>)으로 채웁니다
+              </p>
+            )}
+            {(visibleUnmapped.length > 0 ||
               (f.demotedFields?.length ?? 0) > 0) && (
               <div className="mt-2 space-y-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-xs">
                 <div className="font-semibold text-destructive">
                   임포트에서 제외될 컬럼이 있습니다 — 확인 후 진행하세요
                 </div>
-                {(f.unmappedFields?.length ?? 0) > 0 && (
+                {visibleUnmapped.length > 0 && (
                   <div>
                     <span className="font-medium">미매핑(헤더 없음): </span>
-                    <span className="font-mono">{(f.unmappedFields ?? []).join(", ")}</span>
+                    <span className="font-mono">{visibleUnmapped.join(", ")}</span>
                   </div>
                 )}
                 {(f.demotedFields ?? []).map((d) => (
@@ -990,7 +1007,7 @@ function FileRow({
                     이 컬럼들 없이 진행:{" "}
                     <span className="font-mono">
                       {[
-                        ...(f.unmappedFields ?? []),
+                        ...visibleUnmapped,
                         ...(f.demotedFields ?? []).map((d) => d.field),
                       ].join(", ")}
                     </span>
