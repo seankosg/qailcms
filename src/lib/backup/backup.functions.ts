@@ -32,6 +32,7 @@ export const listSnapshots = createServerFn({ method: "GET" })
   });
 
 export const getBackupLogs = createServerFn({ method: "GET" })
+
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const [backup, restore] = await Promise.all([
