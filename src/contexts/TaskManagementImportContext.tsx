@@ -691,6 +691,10 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 mineNames.has(normalizePic((p as any).hdec_eng_name)),
             );
       const filteredOut = parsedAll.length - parsed.length;
+      const appliedTaskNos = new Set(parsed.map((p) => String(p.task_no ?? "")));
+      const scopeFilteredKeys = serverAllowed
+        .filter((p) => !appliedTaskNos.has(String(p.task_no ?? "")))
+        .map((p) => String(p.task_no ?? "-"));
       // 제외 사유 분리 — 권한(RCL denied) vs 스코프(mine 토글)
       const excludedByPermission = outOfScope;
       const excludedByScope = Math.max(0, serverAllowed.length - parsed.length);
