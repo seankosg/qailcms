@@ -187,8 +187,8 @@ export function WrtImportPage() {
               <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
                 <Stat label="총 행" value={view.total} />
                 <Stat label="매칭" value={view.matched} />
-                <Stat label="미매칭" value={view.unmatched} tone={view.unmatched > 0 ? "warn" : undefined} />
-                <Stat label="변경 행" value={view.rows_changed} />
+                <Stat label="신규 생성" value={view.created} tone={view.created > 0 ? "warn" : undefined} />
+                <Stat label="갱신" value={view.rows_changed} />
                 <Stat label="값 삭제" value={view.cleared_values} tone={view.cleared_values > 0 ? "warn" : undefined} />
               </div>
 
@@ -222,11 +222,11 @@ export function WrtImportPage() {
                 </Alert>
               )}
 
-              {view.unmatched > 0 && (
+              {view.created > 0 && (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>미매칭 {view.unmatched}건 — 신규 생성하지 않음</AlertTitle>
-                  <AlertDescription className="text-xs">{view.unmatched_list.join(", ")}</AlertDescription>
+                  <AlertTitle>신규 생성 {view.created}건 — 파일에만 있는 번호</AlertTitle>
+                  <AlertDescription className="text-xs">{view.created_list.join(", ")}</AlertDescription>
                 </Alert>
               )}
 
