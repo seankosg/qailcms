@@ -128,6 +128,7 @@ const TASK_FIELD_ALIASES: Record<TaskTargetField, string[]> = {
   hdec_pic_name: ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"],
   hdec_eng_name: ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"],
   row_type: ["유형", "Type"],
+  team: ["Team", "팀", "팀명", "담당팀", "소속팀"],
   status_manual: ["상태", "Status"],
   plan_start: ["계획 시작", "Plan Start"],
   plan_end: ["계획 완료", "Plan End"],
