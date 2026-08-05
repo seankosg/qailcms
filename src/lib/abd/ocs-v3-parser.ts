@@ -288,7 +288,8 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
       source_sheet_name: s(pick(r, K.sheet)),
       source_row_index: n(pick(r, K.rowIndex)),
       abd_numbers: abd,
-      link_status: s(pick(r, K.linkStatus)),
+      // 복수 ABD 연결은 linked_multi 로 정규화한다 (다대다 링크표 대상)
+      link_status: abd.length > 1 ? "linked_multi" : s(pick(r, K.linkStatus)),
       link_scope: s(pick(r, K.linkScope)),
       link_method: s(pick(r, K.linkMethod)),
       is_active: b(r["V3 Active"] ?? r["v3_active"] ?? r["is_active"], true),

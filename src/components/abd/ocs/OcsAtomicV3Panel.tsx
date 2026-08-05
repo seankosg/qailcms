@@ -50,7 +50,7 @@ const EXPECTS: Expect[] = [
   { no: 10, label: "duplicate active atomic ID", expect: 0, key: "duplicate_active_atomic_id", strict: true },
   { no: 11, label: "unresolved attachment", expect: 0, key: "unresolved_attachments", strict: true },
   { no: 12, label: "duplicate attachment/comment pair", expect: 0, key: "duplicate_attachment_comment_pairs", strict: true },
-  { no: 13, label: "group-inherited attachments", expect: 740, key: "attachment_group_inherited_only", strict: true },
+  { no: 13, label: "group-inherited attachments", expect: 740, key: "attachments_group_only", strict: true },
   { no: 14, label: "Open Response segments", expect: 520, key: "open_response_segments", strict: true },
   { no: 15, label: "group responses (Open)", expect: 136, key: "open_response_groups", strict: true },
   { no: 16, label: "remaining decision required", expect: 0, key: "remaining_decision_required", strict: true },
