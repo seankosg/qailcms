@@ -644,6 +644,24 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       ).join(", ");
       const discipline = f.discipline ?? "ARCH";
 
+      // ── 행 team 결정 규칙(2026-08-05) ─────────────────────────────────
+      // ① 파일의 팀 열 값 ② 없으면 실행자 profiles.team ③ 그것도 없으면 제외.
+      // 판정에 쓰는 team 과 저장하는 team 은 항상 같은 값이어야 한다.
+      // discipline 폴백 금지 — discipline 은 upsert 키 전용이다.
+      const myTeam = (importerTeamRef.current ?? "").trim() || null;
+      const teamOf = (p: { team?: string | null }): string | null =>
+        p.team && p.team.trim() ? p.team.trim() : myTeam;
+
+      const noTeamRows = parsedAll.filter((p) => teamOf(p) === null);
+      const teamResolved = parsedAll.filter((p) => teamOf(p) !== null);
+      const excludedNoTeam = noTeamRows.length;
+      const noTeamKeys = noTeamRows.map((p) => String(p.task_no ?? "-"));
+      if (excludedNoTeam > 0) {
+        toast.warning(
+          `${f.name}: 팀 미확정으로 제외된 행 ${excludedNoTeam}건 — 파일에 팀 열이 없고 내 소속(profiles.team)도 비어 있습니다`,
+        );
+      }
+
       // ── RCL 서버 판정 (정본) ────────────────────────────────────────────
       // 스코프 판정은 클라이언트가 하지 않는다. 서버 rcl_can(..., 'import') 결과만 신뢰.
       const MATCH_COLS = ["discipline", "task_no"];
@@ -654,15 +672,15 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         const rcl = await rclImportFilter(
           "TM",
           MATCH_COLS,
-          parsedAll.map((p) => ({
+          teamResolved.map((p) => ({
             discipline,
             task_no: p.task_no,
-            team: (p as any).team ?? null,
+            team: teamOf(p),
             hdec_pic_name: p.hdec_pic_name ?? null,
             hdec_eng_name: (p as any).hdec_eng_name ?? null,
           })),
         );
-        serverAllowed = parsedAll.filter((p) =>
+        serverAllowed = teamResolved.filter((p) =>
           rcl.allowedKeys.has(rclKeyOf(MATCH_COLS, { discipline, task_no: p.task_no })),
         );
         outOfScopeKeys = rcl.denied.map(
