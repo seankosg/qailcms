@@ -134,6 +134,9 @@ interface CtxValue {
   /** 서버 Own 정의(owner_cols = hdec_pic_name | hdec_eng_name)와 동일하게 맞추기 위한 본인 표기 목록 */
   importerOwnNames: string[];
   setImporterOwnNames: (v: string[]) => void;
+  /** 실행자 profiles.team — 파일에 팀 열이 없을 때의 유일한 폴백 */
+  importerTeam: string | null;
+  setImporterTeam: (v: string | null) => void;
   isImporterAdmin: boolean;
   setIsImporterAdmin: (v: boolean) => void;
   matchesHdecPic: (row: {
