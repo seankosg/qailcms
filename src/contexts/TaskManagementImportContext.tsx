@@ -1212,6 +1212,19 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 reason_detail: "본인 담당(PIC/ENG) 아님으로 제외",
               });
             }
+            // ③ team 미확정 제외 — 권한/스코프 제외와 분리해 같은 코드로 남긴다.
+            for (const t of noTeamKeys) {
+              rowLogRows.push({
+                upload_id: logId,
+                raw_row_no: rowLogRows.length + 1,
+                discipline,
+                task_no: t,
+                action_taken: "excluded",
+                reason_code: "SCOPE_NO_TEAM",
+                reason_detail:
+                  "팀 미확정 — 파일의 팀 열이 비었고 실행자 profiles.team 도 비어 있음",
+              });
+            }
             for (const [k, n] of dupDetail.entries()) {
               rowLogRows.push({
                 upload_id: logId,
