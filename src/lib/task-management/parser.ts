@@ -501,34 +501,39 @@ export async function parseTaskManagementExcel(
     const extra = extraAliases?.[target] ?? [];
     return [...extra, ...names];
   };
-  const pick = (target: TaskTargetField, names: string[], canonical: number): number => {
-    return resolveColumn(headerMap, withAlias(target, names), canonical, warnings);
-  };
+  const unmappedFields: string[] = [];
+  const pick = (target: TaskTargetField, names: string[]): number =>
+    resolveColumn(
+      headerMap,
+      [...withAlias(target, names), ...TASK_FIELD_ALIASES[target]],
+      warnings,
+      unmappedFields,
+      target,
+    );
 
   const cols = {
     // §4-3(2026-08-04): 과업코드는 upsert 키(discipline,task_no) — ★위치 폴백 금지(0).
     // 미매핑이면 아래에서 파싱 자체를 중단한다. 키가 틀리면 되돌릴 수 없다.
-    no: pick("task_no", TASK_NO_ALIASES, 0),
-    category: pick("category", ["Category"], 2),
-    plot: pick("plot", ["Plot"], 3),
-    task_name: pick("task_name", ["항목"], 4),
-    risk: pick("risk", ["리스크"], 5),
-    sub_task_desc: pick("sub_task_desc", ["단계별 세부 업무"], 6),
-    // 담당자 열은 위치 폴백 금지(0) — 별칭 매칭만 허용.
-    hdec_pic_name: pick("hdec_pic_name", ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"], 0),
-    hdec_eng_name: pick("hdec_eng_name", ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"], 0),
-    row_type: pick("row_type", ["유형"], 9),
-    status_manual: pick("status_manual", ["상태"], 10),
-    plan_start: pick("plan_start", ["계획 시작"], 11),
-    plan_end: pick("plan_end", ["계획 완료"], 12),
-    plan_days: pick("plan_days", ["계획 일수"], 13),
-    actual_start: pick("actual_start", ["실제 시작"], 14),
-    actual_progress: pick("actual_progress", ["실적 진도율"], 15),
-    plan_progress: pick("plan_progress", ["계획 진도율"], 16),
-    progress_variance: pick("progress_variance", ["진도차 (%p)", "진도차(%p)"], 17),
-    forecast_end: pick("forecast_end", ["예상 완료"], 18),
-    slip_days: pick("slip_days", ["차이 (일)", "차이(일)"], 19),
-    auto_judgment: pick("auto_judgment", ["자동 판정"], 20),
+    no: pick("task_no", TASK_NO_ALIASES),
+    category: pick("category", ["Category"]),
+    plot: pick("plot", ["Plot"]),
+    task_name: pick("task_name", ["항목"]),
+    risk: pick("risk", ["리스크"]),
+    sub_task_desc: pick("sub_task_desc", ["단계별 세부 업무"]),
+    hdec_pic_name: pick("hdec_pic_name", ["HDEC PIC", "HDEC_PIC", "담당(한글)", "담당(국문)", "담당 (한글)", "담당"]),
+    hdec_eng_name: pick("hdec_eng_name", ["HDEC ENG", "HDEC_ENG", "담당(영문)", "담당 (영문)", "PIC(ENG)", "PIC (ENG)"]),
+    row_type: pick("row_type", ["유형"]),
+    status_manual: pick("status_manual", ["상태"]),
+    plan_start: pick("plan_start", ["계획 시작"]),
+    plan_end: pick("plan_end", ["계획 완료"]),
+    plan_days: pick("plan_days", ["계획 일수"]),
+    actual_start: pick("actual_start", ["실제 시작"]),
+    actual_progress: pick("actual_progress", ["실적 진도율"]),
+    plan_progress: pick("plan_progress", ["계획 진도율"]),
+    progress_variance: pick("progress_variance", ["진도차 (%p)", "진도차(%p)"]),
+    forecast_end: pick("forecast_end", ["예상 완료"]),
+    slip_days: pick("slip_days", ["차이 (일)", "차이(일)"]),
+    auto_judgment: pick("auto_judgment", ["자동 판정"]),
     // actual_finish 는 선택 컬럼: ★위치 폴백 금지 (milestone 방식). 헤더가 없으면 0.
     actual_finish: (() => {
       for (const name of withAlias("actual_finish", TASK_FIELD_ALIASES.actual_finish)) {
