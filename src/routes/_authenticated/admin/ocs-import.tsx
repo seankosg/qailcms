@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getOcsImportStats, OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
 import { OcsStageBPanel } from "@/components/abd/ocs/OcsStageBPanel";
 import { OcsAtomicV2Panel } from "@/components/abd/ocs/OcsAtomicV2Panel";
+import { OcsAtomicV3Panel } from "@/components/abd/ocs/OcsAtomicV3Panel";
 import { OcsRecountPanel } from "@/components/abd/ocs/OcsRecountPanel";
 import { FilePickerButton } from "@/components/shared/FilePickerButton";
 import { listBucketPaths } from "@/lib/abd/ocs-storage";
@@ -415,6 +416,7 @@ function OcsImportPage() {
 
       <OcsStageBPanel />
       <OcsAtomicV2Panel />
+      <OcsAtomicV3Panel />
       <OcsRecountPanel />
     </div>
   );
