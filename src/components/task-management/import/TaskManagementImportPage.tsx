@@ -917,10 +917,52 @@ function FileRow({
               <p className="mt-1 text-xs text-destructive">중복 점검 실패: {f.preflightError}</p>
             )}
             {f.warnings && f.warnings.length > 0 && (
-              <p className="mt-1 text-xs text-amber-600">
-                ⚠ {f.warnings.slice(0, 3).join(" · ")}
-                {f.warnings.length > 3 ? ` (+${f.warnings.length - 3})` : ""}
-              </p>
+              // C. 경고를 접지 않는다 — 전부 노출.
+              <ul className="mt-1 space-y-0.5 text-xs text-amber-600">
+                {f.warnings.map((w, i) => (
+                  <li key={i}>⚠ {w}</li>
+                ))}
+              </ul>
+            )}
+            {((f.unmappedFields?.length ?? 0) > 0 ||
+              (f.demotedFields?.length ?? 0) > 0) && (
+              <div className="mt-2 space-y-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-xs">
+                <div className="font-semibold text-destructive">
+                  임포트에서 제외될 컬럼이 있습니다 — 확인 후 진행하세요
+                </div>
+                {(f.unmappedFields?.length ?? 0) > 0 && (
+                  <div>
+                    <span className="font-medium">미매핑(헤더 없음): </span>
+                    <span className="font-mono">{(f.unmappedFields ?? []).join(", ")}</span>
+                  </div>
+                )}
+                {(f.demotedFields ?? []).map((d) => (
+                  <div key={d.field}>
+                    <span className="font-medium">강등: </span>
+                    <span className="font-mono">{d.field}</span> — {d.reason} (
+                    {Math.round(d.ratio * 100)}% / 모집단 {d.population}) · 표본:{" "}
+                    <span className="font-mono">{d.samples.join(", ")}</span>
+                  </div>
+                ))}
+                <label className="flex items-start gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={!!f.ackUnmapped}
+                    disabled={isRunning}
+                    onChange={(e) => onAckUnmappedChange(e.target.checked)}
+                  />
+                  <span>
+                    이 컬럼들 없이 진행:{" "}
+                    <span className="font-mono">
+                      {[
+                        ...(f.unmappedFields ?? []),
+                        ...(f.demotedFields ?? []).map((d) => d.field),
+                      ].join(", ")}
+                    </span>
+                  </span>
+                </label>
+              </div>
             )}
             {f.validationError && (
               <div className="mt-2 flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
