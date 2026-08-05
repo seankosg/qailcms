@@ -310,6 +310,9 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
               headerToFieldMap: parsed.headerToFieldMap,
               excludedHeaders: parsed.excludedHeaders,
               dateIssues: parsed.dateIssues,
+              unmappedFields: parsed.unmappedFields ?? [],
+              demotedFields: parsed.demotedFields ?? [],
+              ackUnmapped: false,
               // preflight 재실행 필요 — 결과 초기화
               preflight: null,
               preflightError: null,
