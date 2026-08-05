@@ -267,7 +267,7 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
                 <Select value={team} onValueChange={setTeam} disabled={!!lockedTeam}>
                   <SelectTrigger className="h-8"><SelectValue placeholder="선택" /></SelectTrigger>
                   <SelectContent>
-                    {["ARCH", "ELEC", "MECH"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {teamCodes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </Field>
