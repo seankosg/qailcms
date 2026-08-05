@@ -34,6 +34,7 @@ import {
   resolvePlotFromPlanGroup,
   resolveSubcon,
 } from "@/lib/defect-management/auto-fill-rules";
+import { resolveRoomGroup } from "@/lib/defect-management/classifier/room-group-rules";
 import type { DefectTeam } from "@/lib/defect-management/columns";
 import { DEFECT_TEAMS } from "@/lib/defect-management/columns";
 import { computeTargets, mergeClassification, runRuleStage, type ClassifyRequestItem } from "@/lib/defect-management/classifier/apply-classification";
