@@ -267,7 +267,7 @@ export function WrtImportPage() {
                         <td className="px-2 py-1 font-mono text-[11px]">{d.wrt_number}</td>
                         <td className="px-2 py-1">
                           <Badge
-                            variant={d.outcome === "unmatched" ? "destructive" : "secondary"}
+                            variant={d.outcome === "created" ? "default" : "secondary"}
                             className="text-[10px]"
                           >
                             {d.outcome}
