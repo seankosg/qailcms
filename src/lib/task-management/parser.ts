@@ -165,33 +165,6 @@ export function toTaskFieldName(
   return "";
 }
 
-/** Header text → 컬럼 인덱스 (1-based). */
-const CANONICAL_HEADERS: Record<string, number> = {
-  no: 1,
-  category: 2,
-  plot: 3,
-  "항목": 4,
-  "리스크": 5,
-  "단계별 세부 업무": 6,
-  "담당": 7,
-  "hdec pic": 7,
-  "hdec eng": 8,
-  "유형": 9,
-  "상태": 10,
-  "계획 시작": 11,
-  "계획 완료": 12,
-  "계획 일수": 13,
-  "실제 시작": 14,
-  "실적 진도율": 15,
-  "계획 진도율": 16,
-  "진도차 (%p)": 17,
-  "진도차(%p)": 17,
-  "예상 완료": 18,
-  "차이 (일)": 19,
-  "차이(일)": 19,
-  "자동 판정": 20,
-};
-
 function normalizeHeader(v: unknown): string {
   if (v == null) return "";
   return String(v).replace(/\s+/g, " ").trim().toLowerCase();
