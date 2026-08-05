@@ -751,6 +751,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     parsedRows: parsedAll.length,
                     appliedRows: 0,
                     excludedByScope,
+                    excludedNoTeam,
+                    noTeamKeys,
                   },
                 }
               : x,
