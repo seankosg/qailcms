@@ -1220,6 +1220,60 @@ export type Database = {
           },
         ]
       }
+      abd_ocs_comment_abd_links: {
+        Row: {
+          abd_item_id: string
+          abd_number: string
+          comment_id: string
+          created_at: string
+          id: string
+          import_log_id: string | null
+          is_primary: boolean
+          link_method: string
+          source_comment_id: string
+          updated_at: string
+        }
+        Insert: {
+          abd_item_id: string
+          abd_number: string
+          comment_id: string
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          is_primary?: boolean
+          link_method?: string
+          source_comment_id: string
+          updated_at?: string
+        }
+        Update: {
+          abd_item_id?: string
+          abd_number?: string
+          comment_id?: string
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          is_primary?: boolean
+          link_method?: string
+          source_comment_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_ocs_comment_abd_links_abd_item_id_fkey"
+            columns: ["abd_item_id"]
+            isOneToOne: false
+            referencedRelation: "abd_items_raw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abd_ocs_comment_abd_links_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       abd_ocs_comment_groups: {
         Row: {
           atomic_item_count: number
@@ -1881,6 +1935,228 @@ export type Database = {
           storage_path?: string
           uploaded_at?: string
           uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      abd_ocs_v3_stage_attachments: {
+        Row: {
+          atomic_comment_id: string | null
+          attachment_id: string
+          attachment_scope: string | null
+          comment_group_id: string | null
+          comment_id: string | null
+          created_at: string
+          source_parent_comment_id: string | null
+          stage_run_id: string
+        }
+        Insert: {
+          atomic_comment_id?: string | null
+          attachment_id: string
+          attachment_scope?: string | null
+          comment_group_id?: string | null
+          comment_id?: string | null
+          created_at?: string
+          source_parent_comment_id?: string | null
+          stage_run_id: string
+        }
+        Update: {
+          atomic_comment_id?: string | null
+          attachment_id?: string
+          attachment_scope?: string | null
+          comment_group_id?: string | null
+          comment_id?: string | null
+          created_at?: string
+          source_parent_comment_id?: string | null
+          stage_run_id?: string
+        }
+        Relationships: []
+      }
+      abd_ocs_v3_stage_comments: {
+        Row: {
+          abd_numbers: string[]
+          assessed_code: string | null
+          atomic_item_count: number | null
+          atomic_item_no: number | null
+          comment_group_id: string | null
+          comment_part: number | null
+          compliance_reason: string | null
+          compliance_source: string | null
+          contractor_response: string | null
+          created_at: string
+          drawing_number: string | null
+          initial_complied: boolean
+          is_active: boolean
+          link_method: string | null
+          link_scope: string | null
+          link_status: string | null
+          ocs_comment: string | null
+          ocs_number: string | null
+          retired_reason: string | null
+          source_comment_id: string
+          source_file_name: string | null
+          source_parent_comment_id: string
+          source_row_index: number | null
+          source_sheet_name: string | null
+          split_status: string | null
+          stage_run_id: string
+        }
+        Insert: {
+          abd_numbers?: string[]
+          assessed_code?: string | null
+          atomic_item_count?: number | null
+          atomic_item_no?: number | null
+          comment_group_id?: string | null
+          comment_part?: number | null
+          compliance_reason?: string | null
+          compliance_source?: string | null
+          contractor_response?: string | null
+          created_at?: string
+          drawing_number?: string | null
+          initial_complied?: boolean
+          is_active?: boolean
+          link_method?: string | null
+          link_scope?: string | null
+          link_status?: string | null
+          ocs_comment?: string | null
+          ocs_number?: string | null
+          retired_reason?: string | null
+          source_comment_id: string
+          source_file_name?: string | null
+          source_parent_comment_id: string
+          source_row_index?: number | null
+          source_sheet_name?: string | null
+          split_status?: string | null
+          stage_run_id: string
+        }
+        Update: {
+          abd_numbers?: string[]
+          assessed_code?: string | null
+          atomic_item_count?: number | null
+          atomic_item_no?: number | null
+          comment_group_id?: string | null
+          comment_part?: number | null
+          compliance_reason?: string | null
+          compliance_source?: string | null
+          contractor_response?: string | null
+          created_at?: string
+          drawing_number?: string | null
+          initial_complied?: boolean
+          is_active?: boolean
+          link_method?: string | null
+          link_scope?: string | null
+          link_status?: string | null
+          ocs_comment?: string | null
+          ocs_number?: string | null
+          retired_reason?: string | null
+          source_comment_id?: string
+          source_file_name?: string | null
+          source_parent_comment_id?: string
+          source_row_index?: number | null
+          source_sheet_name?: string | null
+          split_status?: string | null
+          stage_run_id?: string
+        }
+        Relationships: []
+      }
+      abd_ocs_v3_stage_groups: {
+        Row: {
+          created_at: string
+          drawing_number: string | null
+          group_contractor_response: string | null
+          group_id: string
+          item_count: number | null
+          ocs_number: string | null
+          source_file_name: string | null
+          source_parent_comment_id: string
+          source_row: number | null
+          source_sheet: string | null
+          split_status: string | null
+          stage_run_id: string
+          v3_ocs_number: string | null
+        }
+        Insert: {
+          created_at?: string
+          drawing_number?: string | null
+          group_contractor_response?: string | null
+          group_id: string
+          item_count?: number | null
+          ocs_number?: string | null
+          source_file_name?: string | null
+          source_parent_comment_id: string
+          source_row?: number | null
+          source_sheet?: string | null
+          split_status?: string | null
+          stage_run_id: string
+          v3_ocs_number?: string | null
+        }
+        Update: {
+          created_at?: string
+          drawing_number?: string | null
+          group_contractor_response?: string | null
+          group_id?: string
+          item_count?: number | null
+          ocs_number?: string | null
+          source_file_name?: string | null
+          source_parent_comment_id?: string
+          source_row?: number | null
+          source_sheet?: string | null
+          split_status?: string | null
+          stage_run_id?: string
+          v3_ocs_number?: string | null
+        }
+        Relationships: []
+      }
+      abd_ocs_v3_stage_response: {
+        Row: {
+          atomic_comment_id: string | null
+          confidence_score: number | null
+          created_at: string
+          generic_response: boolean | null
+          group_id: string | null
+          mapping_method: string | null
+          mapping_status: string | null
+          response_segment_no: number
+          response_source_label: string | null
+          response_text: string | null
+          source_file_name: string | null
+          source_parent_comment_id: string
+          source_row: number | null
+          source_sheet: string | null
+          stage_run_id: string
+        }
+        Insert: {
+          atomic_comment_id?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          generic_response?: boolean | null
+          group_id?: string | null
+          mapping_method?: string | null
+          mapping_status?: string | null
+          response_segment_no: number
+          response_source_label?: string | null
+          response_text?: string | null
+          source_file_name?: string | null
+          source_parent_comment_id: string
+          source_row?: number | null
+          source_sheet?: string | null
+          stage_run_id: string
+        }
+        Update: {
+          atomic_comment_id?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          generic_response?: boolean | null
+          group_id?: string | null
+          mapping_method?: string | null
+          mapping_status?: string | null
+          response_segment_no?: number
+          response_source_label?: string | null
+          response_text?: string | null
+          source_file_name?: string | null
+          source_parent_comment_id?: string
+          source_row?: number | null
+          source_sheet?: string | null
+          stage_run_id?: string
         }
         Relationships: []
       }
@@ -6276,7 +6552,31 @@ export type Database = {
         Returns: Json
       }
       abd_ocs_v2_verify: { Args: never; Returns: Json }
+      abd_ocs_v3_attachment_metrics: { Args: never; Returns: Json }
+      abd_ocs_v3_dryrun: { Args: { p_run: string }; Returns: Json }
       abd_ocs_v3_dryrun_parents: { Args: { p_rows: Json }; Returns: Json }
+      abd_ocs_v3_import: {
+        Args: { p_import_log_id: string; p_run: string }
+        Returns: Json
+      }
+      abd_ocs_v3_stage_load_attachments: {
+        Args: { p_rows: Json; p_run: string }
+        Returns: Json
+      }
+      abd_ocs_v3_stage_load_comments: {
+        Args: { p_rows: Json; p_run: string }
+        Returns: Json
+      }
+      abd_ocs_v3_stage_load_groups: {
+        Args: { p_rows: Json; p_run: string }
+        Returns: Json
+      }
+      abd_ocs_v3_stage_load_response: {
+        Args: { p_rows: Json; p_run: string }
+        Returns: Json
+      }
+      abd_ocs_v3_stage_reset: { Args: { p_run: string }; Returns: Json }
+      abd_ocs_v3_verify: { Args: never; Returns: Json }
       abd_ocs_verify: { Args: never; Returns: Json }
       abd_progress_cell_ids: {
         Args: {
