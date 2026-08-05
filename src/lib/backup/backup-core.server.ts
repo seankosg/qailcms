@@ -77,6 +77,7 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   abd_ocs_import_logs: ["id"],
   abd_ocs_comments: ["id"],
   abd_ocs_comment_groups: ["id"],
+  abd_ocs_comment_abd_links: ["id"],
   abd_ocs_compliance: ["comment_id"],
   abd_ocs_attachments: ["id"],
   abd_ocs_attachment_comment_links: ["id"],
@@ -388,6 +389,8 @@ export async function restoreSnapshot(
       ["abd_ocs_import_logs", 58],
       ["abd_ocs_comment_groups", 59],
       ["abd_ocs_comments", 60],
+      // comment-ABD 링크는 코멘트와 abd_items_raw 복구 이후
+      ["abd_ocs_comment_abd_links", 60.5],
       ["abd_ocs_attachments", 61],
       ["abd_ocs_attachment_comment_links", 62],
       ["abd_ocs_compliance", 63],
