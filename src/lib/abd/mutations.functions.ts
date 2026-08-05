@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { stripNullExcept } from "@/lib/import/strip-null";
 import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
+import { isOcsPending, isDfActualField, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
 
 const UpdateFieldSchema = z.object({
   id: z.string().uuid(),
@@ -47,6 +48,15 @@ export const updateAbdField = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertCanEditRow(context, data.id);
     if (!EDITABLE_FIELDS.has(data.field)) throw new Error(`Field '${data.field}' 은 편집 대상이 아닙니다.`);
+    // OCS 미완료 도면은 Draft Finish 실적일 입력/변경 금지 (비우기는 허용)
+    if (isDfActualField(data.field) && data.value !== null && data.value !== "") {
+      const { data: cur } = await (context.supabase as any)
+        .from("abd_items_raw")
+        .select("ocs_check, ocs_total, ocs_complied")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (isOcsPending(cur)) throw new Error(OCS_DF_BLOCK_MESSAGE);
+    }
     await (context.supabase as any).rpc("set_config", { setting_name: "app.change_source", new_value: "manual", is_local: true }).catch(() => {});
     const patch: Record<string, any> = { [data.field]: data.value, updated_at: new Date().toISOString(), updated_by: context.userId };
     const { error } = await (context.supabase as any).from("abd_items_raw").update(patch).eq("id", data.id);
@@ -218,6 +228,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
 
     // 2) upsert rows in chunks
     let inserted = 0, updated = 0;
+    let dfBlocked = 0;
+    const dfBlockedSamples: string[] = [];
     const seenNumbers = new Set<string>();
     const CHUNK = 500;
     const rowLogs: any[] = [];
@@ -524,7 +536,15 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         .eq("id", batchId);
     }
 
-    return { batch_id: batchId, inserted, updated, inactivated, total: rowsToImport.length };
+    return {
+      batch_id: batchId,
+      inserted,
+      updated,
+      inactivated,
+      total: rowsToImport.length,
+      df_actual_blocked: dfBlocked,
+      df_actual_blocked_samples: dfBlockedSamples,
+    };
    } catch (err: any) {
      const msg = err?.message ?? String(err);
      const stack = err?.stack ? String(err.stack).split("\n").slice(0, 4).join(" | ") : "";
