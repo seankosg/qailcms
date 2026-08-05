@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { CommentsThread, ABD_CATEGORIES } from "@/components/shared/CommentsThread";
 import { formatDdMmmYyyy } from "@/lib/time/doha";
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
+import { isDfActualField, isOcsPending, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useRclCan } from "@/hooks/useRclCan";
 import { agingTone, AGING_TONE_CLASS, useAbdSettingsQuery } from "@/components/abd/dashboard/AbdAgingSettingsPopover";
@@ -319,6 +320,11 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
                                       editorType="date"
                                       currentValue={actual}
                                       onSaved={onFieldSaved}
+                                      lockedReason={
+                                        isDfActualField(f.actual) && isOcsPending(item as any)
+                                          ? OCS_DF_BLOCK_MESSAGE
+                                          : null
+                                      }
                                     >{actualCell}</AbdEditCellPopover>
                                   ) : actualCell}
                                 </td>
