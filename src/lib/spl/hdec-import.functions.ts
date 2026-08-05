@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertImportScope } from "@/lib/import/rcl-import-gate";
 
 /**
  * SPL HDEC 임포트 (왕복 임포트).
@@ -38,6 +39,8 @@ const InputSchema = z.object({
   allow_deletes: z.boolean().default(false),
   /** 클라이언트가 서버 `rcl_import_filter` 로 걸러낸 결과 요약 (감사 로그용) */
   scope_note: z.string().optional(),
+  /** 클라이언트가 판정한 allowed 키 집합 — 서버가 다시 대조한다(신뢰하지 않음) */
+  allowed_keys: z.array(z.string()).max(20000).optional(),
 });
 
 export type SplChange = { target: string; field: string; previous: string | null; next: string | null };
@@ -104,6 +107,17 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<SplHdecResult> => {
     await assertEditor(context);
     const supa = context.supabase as any;
+
+    // ★ 서버 최종 관문: SECURITY DEFINER apply 전에 행 단위 스코프를 재판정한다.
+    await assertImportScope(
+      supa,
+      "SPL",
+      "spl_number",
+      ["team", "pic", "eng", "pic_po", "eng_po"],
+      data.rows,
+      (r) => r.spl_number,
+      data.allowed_keys ?? null,
+    );
 
     const items = await fetchAll(supa, "spl_items", "id, spl_number, team, pic, eng, pic_po, eng_po, supplier");
     const byNumber = new Map<string, any>(items.map((i) => [i.spl_number, i]));
