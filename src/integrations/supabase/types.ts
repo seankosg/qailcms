@@ -4782,6 +4782,13 @@ export type Database = {
             foreignKeyName: "spl_stage_progress_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "spl_items_judged"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_stage_progress_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "spl_precedence_violations"
             referencedColumns: ["item_id"]
           },
@@ -6082,6 +6089,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "wrt_stage_progress_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "wrt_items_judged"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "wrt_stage_progress_stage_code_fkey"
             columns: ["stage_code"]
             isOneToOne: false
@@ -6109,6 +6123,42 @@ export type Database = {
           is_active: boolean | null
           name: string | null
           updated_at: string | null
+        }
+        Relationships: []
+      }
+      spl_items_judged: {
+        Row: {
+          approval_status_raw: string | null
+          created_at: string | null
+          created_by: string | null
+          data_date: string | null
+          dis: string | null
+          eng: string | null
+          eng_po: string | null
+          exclusion_reason: string | null
+          id: string | null
+          is_active: boolean | null
+          is_excluded: boolean | null
+          j_active_round: string | null
+          j_bucket_top: string | null
+          j_completed_stage: string | null
+          j_current_stage: string | null
+          judgment: Json | null
+          latest_status: string | null
+          latest_status_raw: string | null
+          owner_user_id: string | null
+          pic: string | null
+          pic_po: string | null
+          plot: string | null
+          revision: string | null
+          service: string | null
+          source_file: string | null
+          spl_number: string | null
+          supplier: string | null
+          team: string | null
+          title: string | null
+          updated_at: string | null
+          updated_by: string | null
         }
         Relationships: []
       }
@@ -6201,6 +6251,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      wrt_items_judged: {
+        Row: {
+          active_round: number | null
+          created_at: string | null
+          created_by: string | null
+          data_date: string | null
+          dis: string | null
+          eng: string | null
+          exclusion_reason: string | null
+          final_approved_raw: string | null
+          id: string | null
+          is_active: boolean | null
+          is_excluded: boolean | null
+          is_final_approved: boolean | null
+          j_active_round: string | null
+          j_bucket_top: string | null
+          j_completed_stage: string | null
+          j_current_stage: string | null
+          judgment: Json | null
+          latest_response_code: string | null
+          latest_status_raw: string | null
+          owner_user_id: string | null
+          pic: string | null
+          plot: string | null
+          r1_response_code: string | null
+          r1_response_code_raw: string | null
+          r2_response_code: string | null
+          r2_response_code_raw: string | null
+          response_source: string | null
+          service: string | null
+          source_file: string | null
+          team: string | null
+          title: string | null
+          updated_at: string | null
+          updated_by: string | null
+          wrt_number: string | null
+        }
+        Relationships: []
       }
       wrt_precedence_violations: {
         Row: {
@@ -7356,6 +7445,17 @@ export type Database = {
         }
         Returns: Json
       }
+      spl_judge_one: {
+        Args: { _as_of?: string; _item_id: string }
+        Returns: Json
+      }
+      spl_judge_v1: {
+        Args: { _as_of?: string }
+        Returns: {
+          item_id: string
+          judgment: Json
+        }[]
+      }
       spl_judge_v3: {
         Args: {
           _band_state: string
@@ -7751,6 +7851,17 @@ export type Database = {
           _patches: Json
         }
         Returns: Json
+      }
+      wrt_judge_one: {
+        Args: { _as_of?: string; _item_id: string }
+        Returns: Json
+      }
+      wrt_judge_v1: {
+        Args: { _as_of?: string }
+        Returns: {
+          item_id: string
+          judgment: Json
+        }[]
       }
       wrt_judge_v3: {
         Args: {
