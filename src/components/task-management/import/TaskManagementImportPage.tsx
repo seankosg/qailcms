@@ -306,10 +306,16 @@ function ImportInner() {
   }, [files, effectiveScope, matchesHdecPic]);
 
   // C. 미매핑·강등이 있으면 사용자가 명시적으로 승인하기 전까지 Start 를 막는다.
+  // 단, team 은 파일에 열이 없어도 실행자 소속(profiles.team)으로 채워지므로
+  // 내 소속이 있는 한 "제외될 컬럼"이 아니다 — 안내만 한다.
+  const teamAutoFilled = (f: (typeof files)[number]) =>
+    (f.unmappedFields ?? []).includes("team") && !!myTeam;
+  const visibleUnmapped = (f: (typeof files)[number]) =>
+    (f.unmappedFields ?? []).filter((x) => !(x === "team" && !!myTeam));
   const hasUnapprovedUnmapped = files.some(
     (f) =>
       f.status === "ready" &&
-      ((f.unmappedFields?.length ?? 0) > 0 || (f.demotedFields?.length ?? 0) > 0) &&
+      (visibleUnmapped(f).length > 0 || (f.demotedFields?.length ?? 0) > 0) &&
       !f.ackUnmapped,
   );
   const readyFiles = files.filter(
