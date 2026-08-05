@@ -689,10 +689,12 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       // 제외 사유 분리 — 권한(RCL denied) vs 스코프(mine 토글)
       const excludedByPermission = outOfScope;
       const excludedByScope = Math.max(0, serverAllowed.length - parsed.length);
-      const excludedUnmapped =
-        ((f.unmappedFields?.length ?? 0) + (f.demotedFields?.length ?? 0)) > 0
-          ? parsedAll.length
-          : 0;
+      // 미매핑·강등은 "행 제외"가 아니라 "값 미반영"이다. 항등식 분모를 흐리지 않도록
+      // 건수는 0으로 두고, 대상 필드 목록을 로그(jsonb)와 화면에 남긴다.
+      const unmappedFieldList = [
+        ...(f.unmappedFields ?? []),
+        ...(f.demotedFields ?? []).map((d) => d.field),
+      ];
       if (parsed.length === 0) {
         toast.warning(
           outOfScope > 0
