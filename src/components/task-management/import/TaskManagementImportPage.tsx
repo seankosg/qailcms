@@ -125,6 +125,7 @@ function ImportInner() {
     setImportScope,
     setImporterHdecPicName,
     setImporterOwnNames,
+    setImporterTeam,
     setIsImporterAdmin,
     matchesHdecPic,
     addFiles,
@@ -169,11 +170,13 @@ function ImportInner() {
   );
   const ownNamesLabel = ownNames.join(", ");
   const adminFlag = isAdmin;
+  const myTeam = (me?.team ?? "").trim() || null;
   useEffect(() => {
     setImporterHdecPicName(hdecPic);
     setImporterOwnNames(ownNames);
+    setImporterTeam(myTeam);
     setIsImporterAdmin(adminFlag);
-  }, [hdecPic, ownNames, adminFlag, setImporterHdecPicName, setImporterOwnNames, setIsImporterAdmin]);
+  }, [hdecPic, ownNames, myTeam, adminFlag, setImporterHdecPicName, setImporterOwnNames, setImporterTeam, setIsImporterAdmin]);
 
   // Effective scope for display/counts
   const effectiveScope: "mine" | "all" = isAdmin ? "all" : importScope;
@@ -312,13 +315,21 @@ function ImportInner() {
   const readyFiles = files.filter(
     (f) => f.status === "ready" && !f.validationError && !!f.discipline,
   );
+  // ③ 전건 team 미확정이면 조용한 0행 임포트 금지 — Start 를 막는다.
+  const noTeamBlockedFiles = readyFiles.filter(
+    (f) =>
+      (f.parsed?.length ?? 0) > 0 &&
+      (f.parsed ?? []).every((r) => !((r.team ?? "").trim()) ) &&
+      !myTeam,
+  );
+  const hasNoTeamBlock = noTeamBlockedFiles.length > 0;
   const readyCount = readyFiles.length;
   const totalMatched = readyFiles.reduce(
     (s, f) => s + (matchedByFile[f.id]?.matched ?? 0),
     0,
   );
   const startDisabled =
-    isRunning || readyCount === 0 || !canImport || hasUnapprovedUnmapped;
+    isRunning || readyCount === 0 || !canImport || hasUnapprovedUnmapped || hasNoTeamBlock;
   const onStartClick = () => {
     if (effectiveScope === "all") {
       setConfirmAllOpen(true);
