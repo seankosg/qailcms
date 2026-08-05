@@ -1066,6 +1066,24 @@ function FileRow({
               범위 밖 미반영: {f.result.outOfScope}
             </Badge>
           )}
+          {typeof f.result.excludedByScope === "number" && f.result.excludedByScope > 0 && (
+            <Badge variant="outline" className="border-amber-400 text-amber-700">
+              본인 담당 아님으로 제외: {f.result.excludedByScope}
+            </Badge>
+          )}
+          {typeof f.result.unclassified === "number" && f.result.unclassified > 0 && (
+            <Badge variant="outline" className="border-destructive text-destructive">
+              미분류: {f.result.unclassified}
+            </Badge>
+          )}
+        </div>
+      )}
+      {f.result && typeof f.result.parsedRows === "number" && (
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          검산 — 파싱 {f.result.parsedRows} = 반영 {f.result.appliedRows ?? 0} + 권한제외{" "}
+          {f.result.outOfScope ?? 0} + 스코프제외 {f.result.excludedByScope ?? 0} + 중복{" "}
+          {f.result.duplicates ?? 0} + 거부 {f.result.rejected} + 정책스킵 {f.result.skipped}
+          {(f.result.unclassified ?? 0) > 0 ? ` + 미분류 ${f.result.unclassified}` : ""}
         </div>
       )}
       {f.result?.outOfScopeKeys && f.result.outOfScopeKeys.length > 0 && (
