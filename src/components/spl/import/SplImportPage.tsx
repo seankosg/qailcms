@@ -37,6 +37,7 @@ export function SplImportPage() {
       ocs_excluded: parsed.ocs_excluded,
       rows: scope.allowedRows,
       scope_note: scopeNote,
+      allowed_keys: scope.allowedRows.map((r) => r.spl_number),
     };
   }, [parsed, scope, scopeNote]);
 
