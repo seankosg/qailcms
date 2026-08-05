@@ -519,6 +519,7 @@ function ImportInner() {
                 onRunPreflight={() => runPreflight(f.id)}
                 onOpenConflict={() => setConflictFileId(f.id)}
                 onDateOverridesApply={(ov) => setFileDateOverrides(f.id, ov)}
+                onAckUnmappedChange={(v) => setFileAckUnmapped(f.id, v)}
               />
             ))}
           </CardContent>
@@ -634,6 +635,7 @@ function FileRow({
   onRunPreflight,
   onOpenConflict,
   onDateOverridesApply,
+  onAckUnmappedChange,
 }: {
   file: TmImportFileItem;
   isRunning: boolean;
@@ -651,6 +653,7 @@ function FileRow({
   onRunPreflight: () => void;
   onOpenConflict: () => void;
   onDateOverridesApply: (overrides: Record<string, string>) => void | Promise<void>;
+  onAckUnmappedChange: (v: boolean) => void;
 }) {
   const badge = statusBadge[f.status];
   const effectiveDataDate = f.dataDateOverride ?? f.dataDate ?? "";
