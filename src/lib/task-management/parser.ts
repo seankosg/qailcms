@@ -97,6 +97,7 @@ export const TASK_TARGET_FIELDS = [
   "hdec_pic_name",
   "hdec_eng_name",
   "row_type",
+  "team",
   "status_manual",
   "plan_start",
   "plan_end",
