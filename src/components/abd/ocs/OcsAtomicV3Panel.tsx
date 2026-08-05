@@ -31,6 +31,35 @@ import { createPreImportSnapshot, getLatestPreImportSnapshot } from "@/lib/backu
 const BATCH = 500;
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
+type ImportFailure = {
+  at: string;
+  runId: string;
+  snapshotId: string;
+  message: string;
+  stage: string;
+  object: string | null;
+};
+
+/** 서버 오류 문자열에서 실패 단계(RPC 이름)를 추출 */
+function parseStage(msg: string): string {
+  const m = msg.match(/^([a-z0-9_]+):/i);
+  if (m) return m[1];
+  if (/snapshot/i.test(msg)) return "pre-import snapshot 검증";
+  return "알 수 없음";
+}
+
+/** constraint / function / column 이름 추출 */
+function parseObject(msg: string): string | null {
+  const c = msg.match(/constraint "([^"]+)"/);
+  if (c) return `constraint ${c[1]}`;
+  const col = msg.match(/column "([^"]+)"/);
+  if (col) return `column ${col[1]}`;
+  const rel = msg.match(/relation "([^"]+)"/);
+  if (rel) return `relation ${rel[1]}`;
+  const fn = msg.match(/^([a-z0-9_]+):/i);
+  return fn ? `function ${fn[1]}` : null;
+}
+
 type Dry = Record<string, unknown>;
 type FileMeta = { name: string; hash: string; rows: number };
 type Kind = "atomic" | "delta" | "resp" | "policy";
@@ -107,6 +136,7 @@ export function OcsAtomicV3Panel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [importFailure, setImportFailure] = useState<ImportFailure | null>(null);
   const [snapshotInfo, setSnapshotInfo] = useState<{ name: string; created_at: string } | null>(null);
   const [dryAt, setDryAt] = useState<number | null>(null);
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
@@ -277,7 +307,7 @@ export function OcsAtomicV3Panel() {
   }
 
   async function runImport() {
-    if (!runId || !snapshotId || blockers.length > 0) return;
+    if (!runId || !snapshotId || blockers.length > 0 || importFailure) return;
     setBusy("V3 Import 실행 중…");
     try {
       const out = (await importFn({
@@ -286,7 +316,15 @@ export function OcsAtomicV3Panel() {
       setImportResult(out);
       toast.success("V3 Import 완료");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      const raw = e instanceof Error ? e.message : String(e);
+      setImportFailure({
+        at: new Date().toISOString(),
+        runId,
+        snapshotId,
+        message: raw,
+        stage: parseStage(raw),
+        object: parseObject(raw),
+      });
     } finally {
       setBusy(null);
     }
@@ -470,19 +508,63 @@ export function OcsAtomicV3Panel() {
           )}
           <Button
             size="sm"
-            disabled={!!busy || blockers.length > 0 || !runId || !snapshotId}
+            disabled={!!busy || blockers.length > 0 || !runId || !snapshotId || !!importFailure}
             title={
-              blockers.length > 0
+              importFailure
+                ? "직전 Import 실패 — 조사 중. 실패 결과 박스를 닫아야 재시도할 수 있습니다."
+                : blockers.length > 0
                 ? `차단 ${blockers.length}건: ${blockers[0]}`
                 : "V3 본체 Import 실행"
             }
             onClick={() => void runImport()}
           >
             {busy === "V3 Import 실행 중…" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            7. V3 Import 실행
+            {importFailure ? "7. V3 Import (조사 중 · 잠김)" : "7. V3 Import 실행"}
           </Button>
         </div>
         {busy && progress > 0 && <Progress value={progress} />}
+
+        {importFailure && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs">
+            <div className="mb-2 flex items-center gap-1.5 font-semibold text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5" /> V3 Import 실패 — 조사 상태 (버튼 잠김)
+            </div>
+            <div className="grid gap-1 font-mono text-[11px]">
+              <div>발생 시각: {importFailure.at}</div>
+              <div>run ID: {importFailure.runId}</div>
+              <div>snapshot ID: {importFailure.snapshotId}</div>
+              <div>실패 단계: {importFailure.stage}</div>
+              <div>대상 객체: {importFailure.object ?? "-"}</div>
+            </div>
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-background/60 p-2 font-mono text-[11px]">
+              {importFailure.message}
+            </pre>
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void navigator.clipboard.writeText(
+                    [
+                      `at: ${importFailure.at}`,
+                      `run_id: ${importFailure.runId}`,
+                      `snapshot_id: ${importFailure.snapshotId}`,
+                      `stage: ${importFailure.stage}`,
+                      `object: ${importFailure.object ?? "-"}`,
+                      `error: ${importFailure.message}`,
+                    ].join("\n"),
+                  );
+                  toast.success("실패 내역을 복사했습니다");
+                }}
+              >
+                복사
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setImportFailure(null)}>
+                닫기(잠금 해제)
+              </Button>
+            </div>
+          </div>
+        )}
 
         {blockers.length > 0 && (
           <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
