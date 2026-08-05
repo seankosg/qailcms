@@ -302,6 +302,13 @@ function ImportInner() {
     return map;
   }, [files, effectiveScope, matchesHdecPic]);
 
+  // C. 미매핑·강등이 있으면 사용자가 명시적으로 승인하기 전까지 Start 를 막는다.
+  const hasUnapprovedUnmapped = files.some(
+    (f) =>
+      f.status === "ready" &&
+      ((f.unmappedFields?.length ?? 0) > 0 || (f.demotedFields?.length ?? 0) > 0) &&
+      !f.ackUnmapped,
+  );
   const readyFiles = files.filter(
     (f) => f.status === "ready" && !f.validationError && !!f.discipline,
   );
@@ -310,7 +317,8 @@ function ImportInner() {
     (s, f) => s + (matchedByFile[f.id]?.matched ?? 0),
     0,
   );
-  const startDisabled = isRunning || readyCount === 0 || !canImport;
+  const startDisabled =
+    isRunning || readyCount === 0 || !canImport || hasUnapprovedUnmapped;
   const onStartClick = () => {
     if (effectiveScope === "all") {
       setConfirmAllOpen(true);
@@ -487,7 +495,13 @@ function ImportInner() {
                 size="sm"
                 onClick={onStartClick}
                 disabled={startDisabled || pendingImportAfterConflicts}
-                title={!canImport ? "임포트 권한이 없습니다" : ""}
+                title={
+                  !canImport
+                    ? "임포트 권한이 없습니다"
+                    : hasUnapprovedUnmapped
+                      ? "미매핑·강등 컬럼이 있습니다 — 파일 카드에서 '이 컬럼들 없이 진행'을 체크하세요"
+                      : ""
+                }
               >
                 {isRunning ? (
                   <>
