@@ -509,7 +509,9 @@ function ImportInner() {
                 title={
                   !canImport
                     ? "임포트 권한이 없습니다"
-                    : hasUnapprovedUnmapped
+                    : hasNoTeamBlock
+                      ? "팀 열이 없고 내 소속(profiles.team)도 비어 있어 판정할 수 없습니다. 관리자에게 소속 지정을 요청하세요."
+                      : hasUnapprovedUnmapped
                       ? "미매핑·강등 컬럼이 있습니다 — 파일 카드에서 '이 컬럼들 없이 진행'을 체크하세요"
                       : ""
                 }
