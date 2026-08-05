@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AbdOcsAttachmentButton } from "./AbdOcsAttachmentButton";
+import { AbdOcsSourceFileButton } from "./AbdOcsSourceFileButton";
 import type { AbdOcsComment } from "@/lib/abd/ocs.functions";
 
 function fmtWhen(v: string | null) {
@@ -75,15 +76,13 @@ function CompliedControl({
 
 function MetaBlock({ c }: { c: AbdOcsComment }) {
   return (
-    <details className="mt-1 text-[10px] text-muted-foreground">
-      <summary className="inline-flex cursor-pointer items-center gap-1 select-none">
-        <ChevronDown className="h-3 w-3" /> Source
-      </summary>
-      <div className="mt-1 break-words">
-        {c.source_file_name ?? "—"} / {c.source_sheet_name ?? "—"} / row {c.source_row_index ?? "—"}
-        <div className="font-mono">{c.source_comment_id}</div>
+    <div className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
+      <AbdOcsSourceFileButton commentId={c.id} fileName={c.source_file_name} />
+      <div className="break-words">
+        {c.source_sheet_name ?? "—"} / row {c.source_row_index ?? "—"}
+        <span className="ml-1 font-mono">{c.source_comment_id}</span>
       </div>
-    </details>
+    </div>
   );
 }
 
