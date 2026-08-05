@@ -264,24 +264,27 @@ export const TASK_NO_ALIASES = [
   "번호", "작업번호", "업무번호",
 ];
 
+/**
+ * 헤더 텍스트 매칭만으로 컬럼을 찾는다. ★위치·순서·인덱스 폴백 금지(2026-08-05).
+ * 못 찾으면 0(미매핑)을 반환하고, getCell(col=0) → undefined → null 로 흘러
+ * stripNull 이 걷어낸다.
+ */
 function resolveColumn(
   headerMap: Record<string, number>,
   headerNames: string[],
-  canonicalIndex: number,
   warnings: string[],
+  unmapped: string[],
+  target: string,
 ): number {
   for (const name of headerNames) {
-    const key = normalizeHeader(name);
-    const idx = headerMap[key];
+    const idx = headerMap[normalizeHeader(name)];
     if (idx) return idx;
   }
-  // canonicalIndex 0 = 위치 폴백 금지(담당자 열 등). 별칭 매칭 실패 시 미매핑 처리.
-  if (!canonicalIndex) {
-    warnings.push(`헤더 텍스트를 찾지 못함 (${headerNames[0]}) — 위치 추정 금지 필드이므로 미매핑 처리`);
-    return 0;
-  }
-  warnings.push(`헤더 텍스트를 찾지 못함 (${headerNames[0]}) — 기본 위치 ${canonicalIndex}열 사용`);
-  return canonicalIndex;
+  warnings.push(
+    `미매핑: ${headerNames[0]} — 헤더를 찾지 못해 이 컬럼은 임포트하지 않습니다`,
+  );
+  unmapped.push(target);
+  return 0;
 }
 
 function getCell(sheet: XLSX.WorkSheet, row: number, col: number): unknown {
