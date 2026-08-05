@@ -65,6 +65,10 @@ interface Batch {
   rejected: number;
   extra?: string | null; // discipline for TM, sheet for SP
   rolled_back_at?: string | null;
+  /** TM: 파싱/반영 행수와 사유별 제외 건수 (E-2) */
+  parsed_rows?: number | null;
+  applied_rows?: number | null;
+  exclusions?: Record<string, unknown> | null;
 }
 
 interface RowLog {
@@ -181,7 +185,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await supabase
         .from("task_management_import_logs")
         .select(
-          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at",
+          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at, parsed_rows, applied_rows, exclusions",
         )
         .order("started_at", { ascending: false })
         .limit(100);
@@ -200,6 +204,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         rejected: r.rejected ?? 0,
         extra: r.discipline,
         rolled_back_at: r.rolled_back_at,
+        parsed_rows: r.parsed_rows ?? null,
+        applied_rows: r.applied_rows ?? null,
+        exclusions: r.exclusions ?? null,
       }));
       setBatches(list);
       await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
