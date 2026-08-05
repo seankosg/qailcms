@@ -63,6 +63,15 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
   const roleLocked = !!me && (me.isUser || me.isDSuperUser) && !me.isSeniorUser && !me.isAdmin && !me.isSuperUser;
   const lockedPic = roleLocked && me?.isUser ? (me.hdec_pic_name ?? "") : "";
   const lockedTeam = roleLocked ? (me?.team ?? "") : "";
+  const { data: teamOptions } = useTeamOptions();
+  const teamCodes = useMemo(() => {
+    const codes = (teamOptions ?? []).map((o) => o.code);
+    // 잠긴 소속/기존 선택값이 마스터에 없더라도 항상 표시
+    for (const extra of [lockedTeam, team]) {
+      if (extra && !codes.includes(extra)) codes.push(extra);
+    }
+    return codes;
+  }, [teamOptions, lockedTeam, team]);
 
   const [discipline, setDiscipline] = useState<Discipline>(defaultDiscipline ?? "ARCH");
   const [taskNo, setTaskNo] = useState("");
