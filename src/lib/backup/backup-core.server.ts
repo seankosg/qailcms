@@ -92,6 +92,37 @@ function sortKeysFor(tableName: string): string[] {
   return (TABLE_SORT_KEYS as Record<string, string[]>)[tableName] ?? ["id"];
 }
 
+/**
+ * 백업 대상 목록 정합성 검증.
+ * - DB 정본 `public.get_backup_tables()` 는 information_schema 로 영구 `abd_ocs_%` 테이블을 유도해
+ *   누락이 있으면 스스로 EXCEPTION 을 던진다(staging 4종 제외).
+ * - 여기서는 DB 목록과 코드 목록(BACKUP_TABLES / TABLE_SORT_KEYS)의 집합 차이를 검사한다.
+ */
+export async function assertBackupTableParity(supabaseAdmin: SupabaseClient<Database>): Promise<void> {
+  const { data, error } = await (
+    supabaseAdmin as unknown as {
+      rpc: (fn: string) => Promise<{ data: unknown; error: { message: string } | null }>;
+    }
+  ).rpc("get_backup_tables");
+  if (error) throw new Error(`백업 목록 검증 실패: ${error.message}`);
+
+  const dbList = (Array.isArray(data) ? data : []).map((row) =>
+    typeof row === "string" ? row : String((row as { table_name?: string }).table_name ?? ""),
+  );
+  const dbSet = new Set(dbList.filter(Boolean));
+  const codeSet = new Set<string>(BACKUP_TABLES);
+  const missingInCode = [...dbSet].filter((t) => !codeSet.has(t));
+  const missingInDb = [...codeSet].filter((t) => !dbSet.has(t));
+  const missingSortKey = BACKUP_TABLES.filter((t) => !(t in TABLE_SORT_KEYS));
+  if (missingInCode.length || missingInDb.length || missingSortKey.length) {
+    throw new Error(
+      `백업 목록 불일치 — DB에만 있음: [${missingInCode.join(", ")}] / 코드에만 있음: [${missingInDb.join(
+        ", ",
+      )}] / 정렬키 누락: [${missingSortKey.join(", ")}]`,
+    );
+  }
+}
+
 export type SnapshotManifest = {
   id: string;
   name: string;
