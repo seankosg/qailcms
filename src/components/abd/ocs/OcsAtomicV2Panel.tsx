@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import {
   ocsRecountAll,
 } from "@/lib/abd/ocs-v2-import.functions";
 import { createOcsImportLog, updateOcsImportLog } from "@/lib/abd/ocs-stage-b.functions";
-import { createPreImportSnapshot } from "@/lib/backup/backup.functions";
+import { createPreImportSnapshot, getLatestPreImportSnapshot } from "@/lib/backup/backup.functions";
 
 const BATCH = 200;
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
@@ -77,6 +77,7 @@ export function OcsAtomicV2Panel() {
   const verify = useServerFn(ocsV2Verify);
   const recount = useServerFn(ocsRecountAll);
   const snapshotFn = useServerFn(createPreImportSnapshot);
+  const latestSnapshotFn = useServerFn(getLatestPreImportSnapshot);
 
   const [atomicFile, setAtomicFile] = useState<{ name: string; hash: string } | null>(null);
   const [linkFile, setLinkFile] = useState<{ name: string; hash: string } | null>(null);
@@ -88,11 +89,32 @@ export function OcsAtomicV2Panel() {
   const [dryDistinct, setDryDistinct] = useState<DryAgg | null>(null);
   const [attDistinct, setAttDistinct] = useState<DryAgg | null>(null);
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [snapshotInfo, setSnapshotInfo] = useState<{ name: string; created_at: string } | null>(null);
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [verifyOut, setVerifyOut] = useState<Record<string, unknown> | null>(null);
+
+  // 이미 성공한 사전 스냅샷이 있으면 복구 (중복 생성 방지)
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const s = (await latestSnapshotFn({ data: { module: "abd" } })) as
+          | { id: string; name: string; created_at: string }
+          | null;
+        if (!alive || !s) return;
+        setSnapshotId((prev) => prev ?? s.id);
+        setSnapshotInfo({ name: s.name, created_at: s.created_at });
+      } catch {
+        /* 조회 실패는 무시 — 수동 생성 가능 */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [latestSnapshotFn]);
 
   const unresolvedLinkComments = useMemo(() => {
     if (!links || rows.length === 0) return 0;
@@ -213,11 +235,13 @@ export function OcsAtomicV2Panel() {
   }
 
   async function runSnapshot() {
+    if (busy) return;
     setBusy("사전 백업 스냅샷 생성 중…");
     try {
       const res = (await snapshotFn({ data: { module: "abd" } })) as { id?: string } | null;
       const id = res?.id ?? null;
       setSnapshotId(id);
+      setSnapshotInfo(null);
       toast.success("사전 백업 스냅샷 생성 완료");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
@@ -399,11 +423,17 @@ export function OcsAtomicV2Panel() {
             3. Dry-run (DB 변경 없음)
           </Button>
           <Button size="sm" variant="outline" disabled={!!busy || !dry} onClick={() => void runSnapshot()}>
-            <ShieldCheck className="mr-2 h-4 w-4" /> 4. 사전 백업 스냅샷
+            {busy === "사전 백업 스냅샷 생성 중…" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="mr-2 h-4 w-4" />
+            )}
+            4. 사전 백업 스냅샷
           </Button>
           {snapshotId && (
             <Badge variant="secondary" className="text-[11px]">
               스냅샷 {snapshotId.slice(0, 8)}
+              {snapshotInfo ? " (기존 재사용)" : ""}
             </Badge>
           )}
         </div>
