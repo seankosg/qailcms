@@ -247,7 +247,9 @@ function buildHeaderMap(sheet: XLSX.WorkSheet): {
     let score = 0;
     for (let c = range.s.c; c <= maxCol; c++) {
       const v = sheet[XLSX.utils.encode_cell({ r, c })]?.v;
-      if (normalizeHeader(v)) score++;
+      // 헤더 후보 점수는 "텍스트 셀"만 센다. Gantt 날짜 열(숫자/Date)이
+      // 열 상한 제거(A-4) 이후 헤더 행 감지를 흔드는 것을 막는다.
+      if (typeof v === "string" && normalizeHeader(v)) score++;
     }
     if (score > bestScore) {
       bestScore = score;
