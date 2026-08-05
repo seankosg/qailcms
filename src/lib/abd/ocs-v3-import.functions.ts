@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
+
 type LooseClient = {
   rpc: (
     fn: string,
@@ -32,5 +34,5 @@ export const ocsV3DryRunParents = createServerFn({ method: "POST" })
       { p_rows: data.rows },
     );
     if (error) throw new Error(error.message);
-    return (out ?? {}) as Record<string, unknown>;
+    return (out ?? {}) as Json;
   });
