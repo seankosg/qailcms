@@ -111,6 +111,10 @@ export interface TmImportFileItem {
     appliedRows?: number;
     /** mine 토글로 제외된 행수 (권한 제외와 분리) */
     excludedByScope?: number;
+    /** ③ team 미확정으로 제외된 행수 (권한·스코프 제외와 분리) */
+    excludedNoTeam?: number;
+    /** team 미확정 제외 행의 task_no 목록 */
+    noTeamKeys?: string[];
     /** 항등식이 맞지 않을 때의 잔차 */
     unclassified?: number;
     errors?: ImportErrorEntry[];
