@@ -24,7 +24,7 @@ export function WrtImportPage() {
   const [allowDeletes, setAllowDeletes] = useState(false);
   const runImport = useServerFn(importWrtHdecBatch);
 
-  const scopeNote = scope ? `scope=${scope.role} in_scope=${scope.allowedRows.length} out_of_scope=${scope.deniedKeys.length}` : undefined;
+  const scopeNote = scope ? `scope=${scope.role} in_scope=${scope.allowedRows.length} out_of_scope=${scope.deniedKeys.length}${scope.deniedKeys.length ? ` denied_keys=[${scope.deniedKeys.slice(0, 100).join("|")}${scope.deniedKeys.length > 100 ? "|…" : ""}]` : ""}` : undefined;
 
   const payload = useMemo(() => {
     if (!parsed || !scope) return null;
@@ -33,6 +33,7 @@ export function WrtImportPage() {
       sheet_names: parsed.sheets.map((s) => s.sheet_name),
       rows: scope.allowedRows,
       scope_note: scopeNote,
+      allowed_keys: scope.allowedRows.map((r) => r.wrt_number),
     };
   }, [parsed, scope, scopeNote]);
 
@@ -322,8 +323,7 @@ export function ScopeSummary({ scope }: { scope: ImportScopeOutcome<any> }) {
           <>
             <div className="mb-1">권한 범위 밖 행은 서버 판정에 따라 전송 자체에서 제외됩니다.</div>
             <div className="max-h-24 overflow-auto font-mono text-[10px] leading-relaxed">
-              {denied.slice(0, 200).join(", ")}
-              {denied.length > 200 ? ` … 외 ${denied.length - 200}건` : ""}
+              {denied.join(", ")}
             </div>
           </>
         )}
