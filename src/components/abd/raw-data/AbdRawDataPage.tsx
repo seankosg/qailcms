@@ -53,6 +53,7 @@ import { TopHorizontalScrollbar } from "@/components/defect-management/raw-data/
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { isDfActualBlocked, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
 import { AbdExportDialog } from "./AbdExportDialog";
+import { AbdAuditSamplePopover } from "@/components/abd/gates/AbdAuditSamplePopover";
 // ABD detail은 /closure/abd/detail/$id 라우트로 이동 (TM 방식)
 import { AbdBulkEditBar } from "./AbdBulkEditBar";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
@@ -713,6 +714,7 @@ export function AbdRawDataPage() {
             onServerLabel={onServerLabel}
           />
           <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "abd" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
+          {isAdmin && <AbdAuditSamplePopover />}
           <Button size="sm" onClick={() => setExportOpen(true)}><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
         </div>
       </header>
