@@ -1105,6 +1105,12 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
         return base;
       });
 
+      if (f.aiClassifyEnabled) {
+        console.log(
+          `[defect-import] room_group 자동채움 ${roomGroupAutoFilled}건 / 대상 ${workingRows.length}행 (AI=ON)`,
+        );
+      }
+
       // ============ 규칙 기반 자동 분류 (인라인, LLM 은 임포트 후 백그라운드) ============
       // 4개 필드 중 "빈 필드" 만 대상. 규칙으로 매칭되는 것만 즉시 채우고,
       // 규칙 미매칭 필드는 그대로 두어 임포트 후 서버 측 bulkClassifyDefects 가 LLM 으로 채움.
