@@ -275,7 +275,7 @@ function Inner() {
                 size="sm"
                 onClick={runStartImport}
                 disabled={isRunning || readyCount === 0 || !canImport}
-                title={!canImport ? "권한이 필요합니다" : ""}
+                title={importDenyReason}
               >
                 {isRunning ? (
                   <>
