@@ -71,7 +71,7 @@ const TOWER_FOH_NAMES = new Set([
 ]);
 
 /** 2계층 — 규칙 10개 + BOH 기본값. Reference 496키를 오차 0으로 재현한다. */
-function ruleStage(key: string): string {
+export function ruleStage(key: string): string {
   const tower = key.startsWith("T-");
   const podiumN = /^P([1-4])-/.test(key);
   const podium = key.startsWith("P-");
