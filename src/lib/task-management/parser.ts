@@ -639,6 +639,9 @@ export async function parseTaskManagementExcel(
       return out;
     };
     const isDate = (s: string) => {
+      // 엑셀 날짜 시리얼(숫자)도 정상 날짜로 본다.
+      const n = Number(s);
+      if (Number.isFinite(n) && n >= 20000 && n <= 80000) return true;
       try {
         return strictParseDateValue(s) != null;
       } catch {
@@ -657,8 +660,10 @@ export async function parseTaskManagementExcel(
       const u = s.trim().toUpperCase();
       return u === "C" || u === "D";
     };
+    // 과업코드 = 영숫자·하이픈·점·슬래시 조합의 짧은 코드. 부분 접두어("ME-D-")도 허용.
+    // 한글·공백이 섞인 문장(카테고리·업무명 오매핑)만 걸러낸다.
     const isTaskNo = (s: string) =>
-      /^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$/.test(s) && s.length <= 40;
+      /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(s) && s.length <= 40;
 
     const checks: Array<{
       field: TaskTargetField;
