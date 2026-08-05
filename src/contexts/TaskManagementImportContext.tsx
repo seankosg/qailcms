@@ -78,6 +78,12 @@ export interface TmImportFileItem {
   headerToFieldMap?: Record<string, string>;
   excludedHeaders?: string[];
   dateIssues?: import("@/lib/import/date-audit").DateIssue[];
+  /** A. 헤더 미탐지로 임포트에서 제외된 필드 */
+  unmappedFields?: string[];
+  /** B. 값 형태 불일치로 강등된 필드 */
+  demotedFields?: import("@/lib/task-management/parser").DemotedField[];
+  /** C. 사용자가 "이 컬럼들 없이 진행"을 명시적으로 승인했는가 */
+  ackUnmapped?: boolean;
   dateOverrides?: Record<string, string>;
   conflictPolicy?: ConflictPolicy;
   conflictDecisions?: Record<string, ConflictPolicy>;
