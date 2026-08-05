@@ -61,8 +61,18 @@ export function AbdOcsSourceFileButton({
         toast.error("Original Excel file is not available.");
         return;
       }
-      window.location.href = `ms-excel:ofv|u|${res.url}`;
-      toast.info("데스크톱 Excel 실행을 요청했습니다. 열리지 않으면 다운로드 후 열어 주세요.");
+      // Excel 은 attachment 강제(download=) 응답과 긴 쿼리스트링을 처리하지 못하므로 제거한다.
+      const clean = (() => {
+        try {
+          const u = new URL(res.url);
+          u.searchParams.delete("download");
+          return u.toString();
+        } catch {
+          return res.url;
+        }
+      })();
+      window.location.href = `ms-excel:ofv|u|${clean}`;
+      toast.info("데스크톱 Excel 실행을 요청했습니다. 열리지 않으면 '다운로드' 후 열어 주세요.");
     } catch {
       toast.error("Original Excel file is not available.");
     } finally {
@@ -76,11 +86,11 @@ export function AbdOcsSourceFileButton({
         variant="link"
         size="sm"
         className="h-auto min-w-0 justify-start gap-1 p-0 text-[10px] font-normal"
-        onClick={() => void onOpenInExcel()}
-        disabled={opening}
-        title={`Excel에서 바로 열기: ${fileName}`}
+        onClick={() => void onClick()}
+        disabled={busy}
+        title={`원본 파일 다운로드: ${fileName}`}
       >
-        {opening ? (
+        {busy ? (
           <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
         ) : (
           <FileSpreadsheet className="h-3 w-3 shrink-0" />
@@ -91,16 +101,16 @@ export function AbdOcsSourceFileButton({
         variant="link"
         size="sm"
         className="h-auto shrink-0 gap-1 p-0 text-[10px] font-normal"
-        onClick={() => void onClick()}
-        disabled={busy}
-        title="원본 파일 다운로드"
+        onClick={() => void onOpenInExcel()}
+        disabled={opening}
+        title="설치된 데스크톱 Excel 로 열기 시도 (실패 시 다운로드 사용)"
       >
-        {busy ? (
+        {opening ? (
           <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
         ) : (
           <ExternalLink className="h-3 w-3 shrink-0" />
         )}
-        다운로드
+        Excel에서 열기
       </Button>
     </div>
   );
