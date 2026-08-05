@@ -258,7 +258,7 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
                               editorType="select"
                               options={["A", "B", "C"]}
                               currentValue={result}
-                              onSaved={() => void reloadItem()}
+                              onSaved={onFieldSaved}
                             >
                               {result ? (
                                 <span className={cn("inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-bold", RESULT_TONE[result])}>{result}</span>
@@ -306,7 +306,7 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
                                       label={`R${r} ${STAGE_LABELS[s]} Plan`}
                                       editorType="date"
                                       currentValue={plan}
-                                      onSaved={() => void reloadItem()}
+                                      onSaved={onFieldSaved}
                                     >{planCell}</AbdEditCellPopover>
                                   ) : planCell}
                                 </td>
@@ -318,7 +318,7 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
                                       label={`R${r} ${STAGE_LABELS[s]} Actual`}
                                       editorType="date"
                                       currentValue={actual}
-                                      onSaved={() => void reloadItem()}
+                                      onSaved={onFieldSaved}
                                     >{actualCell}</AbdEditCellPopover>
                                   ) : actualCell}
                                 </td>
