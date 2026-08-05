@@ -31,7 +31,8 @@ const RowSchema = z.object({
   stages: z.array(
     z.object({
       stage_code: z.string(),
-      fields: z.record(z.enum(STAGE_FIELDS), z.string().nullable()),
+      // 컬럼 부재 = 미제공이므로 부분 레코드여야 한다 (z.record + enum 은 전 키 필수)
+      fields: z.partialRecord(z.enum(STAGE_FIELDS), z.string().nullable()),
     }),
   ),
 });
