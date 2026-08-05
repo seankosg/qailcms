@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ABD_COLUMNS, type AbdGroupKey } from "./columns";
+import { isDfActualField, isOcsPending, OCS_DF_BLOCK_MESSAGE } from "./ocs-df-guard";
 import {
   buildStyledWorkbook,
   saveStyledWorkbook,
@@ -39,8 +40,27 @@ export async function applyAbdBulkUpdate(
   };
   if (ids.length === 0) return result;
 
-  for (let i = 0; i < ids.length; i += UPDATE_CHUNK) {
-    const slice = ids.slice(i, i + UPDATE_CHUNK);
+  // OCS 미완료 도면은 Draft Finish 실적일을 채울 수 없다 (비우기는 허용).
+  let targetIds = ids;
+  if (isDfActualField(field) && value !== null && value !== "") {
+    const blocked = new Set<string>();
+    for (let i = 0; i < ids.length; i += UPDATE_CHUNK) {
+      const slice = ids.slice(i, i + UPDATE_CHUNK);
+      const { data: rows } = await (supabase as any)
+        .from("abd_items_raw")
+        .select("id, ocs_check, ocs_total, ocs_complied")
+        .in("id", slice);
+      for (const r of (rows ?? []) as any[]) if (isOcsPending(r)) blocked.add(String(r.id));
+    }
+    if (blocked.size > 0) {
+      targetIds = ids.filter((id) => !blocked.has(id));
+      result.failed += blocked.size;
+      blocked.forEach((id) => result.errors.push({ id, message: OCS_DF_BLOCK_MESSAGE }));
+    }
+  }
+
+  for (let i = 0; i < targetIds.length; i += UPDATE_CHUNK) {
+    const slice = targetIds.slice(i, i + UPDATE_CHUNK);
     const payload: Record<string, unknown> = {
       [field]: value,
       updated_at: new Date().toISOString(),

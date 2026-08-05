@@ -51,6 +51,7 @@ import { getOriginHeaderStyle } from "@/lib/abd/origin-header-style";
 import { AbdColumnFilterDropdown } from "./AbdColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "@/components/defect-management/raw-data/TopHorizontalScrollbar";
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
+import { isDfActualField, isOcsPending, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
 import { AbdExportDialog } from "./AbdExportDialog";
 // ABD detail은 /closure/abd/detail/$id 라우트로 이동 (TM 방식)
 import { AbdBulkEditBar } from "./AbdBulkEditBar";
@@ -959,6 +960,9 @@ function buildDataColumn(
             options={c.options}
             currentValue={v}
             onSaved={() => refetch()}
+            lockedReason={
+              isDfActualField(c.key) && isOcsPending(row.original as any) ? OCS_DF_BLOCK_MESSAGE : null
+            }
           >{display}</AbdEditCellPopover>
         );
       }

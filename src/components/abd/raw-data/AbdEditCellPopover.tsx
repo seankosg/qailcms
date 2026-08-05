@@ -21,10 +21,15 @@ export interface AbdEditCellPopoverProps {
    * WRT/SPL Raw Data 최소 편집이 같은 팝오버 UI를 그대로 재사용한다.
    */
   saveFn?: (payload: { id: string; field: string; value: any }) => Promise<unknown>;
+  /**
+   * 값 입력 잠금 사유. 지정되면 값 채우기는 차단되고 "(비우기)"만 허용된다.
+   * 예: OCS 미완료 도면의 Draft Finish 실적일.
+   */
+  lockedReason?: string | null;
   children: React.ReactNode;
 }
 
-export function AbdEditCellPopover({ id, field, label, editorType, options, currentValue, canEdit = true, onSaved, saveFn, children }: AbdEditCellPopoverProps) {
+export function AbdEditCellPopover({ id, field, label, editorType, options, currentValue, canEdit = true, onSaved, saveFn, lockedReason, children }: AbdEditCellPopoverProps) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState<any>(currentValue ?? "");
   const [busy, setBusy] = useState(false);
@@ -38,6 +43,11 @@ export function AbdEditCellPopover({ id, field, label, editorType, options, curr
     try {
       const raw = value === "__null__" ? "" : value;
       const nextVal = raw === "" ? null : editorType === "number" ? Number(raw) : raw;
+      if (lockedReason && nextVal !== null) {
+        toast.error(lockedReason);
+        setBusy(false);
+        return;
+      }
       if (saveFn) await saveFn({ id, field, value: nextVal });
       else await updateAbdField({ data: { id, field, value: nextVal } });
       toast.success(`${label} 저장됨`);
@@ -58,9 +68,14 @@ export function AbdEditCellPopover({ id, field, label, editorType, options, curr
       </PopoverTrigger>
       <PopoverContent className="w-64 space-y-2 p-3" align="start" onClick={(e) => e.stopPropagation()}>
         <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
+        {lockedReason && (
+          <div className="rounded border border-amber-500/60 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-800 dark:text-amber-200">
+            {lockedReason}
+          </div>
+        )}
         {editorType === "text" && <Input value={String(value ?? "")} onChange={(e) => setValue(e.target.value)} className="h-8 text-xs" />}
-        {editorType === "number" && <Input type="number" value={String(value ?? "")} onChange={(e) => setValue(e.target.value)} className="h-8 text-xs" />}
-        {editorType === "date" && <Input type="date" value={String(value ?? "").slice(0, 10)} onChange={(e) => setValue(e.target.value)} className="h-8 text-xs" />}
+        {editorType === "number" && <Input type="number" value={String(value ?? "")} onChange={(e) => setValue(e.target.value)} className="h-8 text-xs" disabled={!!lockedReason} />}
+        {editorType === "date" && <Input type="date" value={String(value ?? "").slice(0, 10)} onChange={(e) => setValue(e.target.value)} className="h-8 text-xs" disabled={!!lockedReason} />}
         {editorType === "select" && (
           <Select value={String(value ?? "")} onValueChange={setValue}>
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="선택..." /></SelectTrigger>
@@ -72,7 +87,7 @@ export function AbdEditCellPopover({ id, field, label, editorType, options, curr
         )}
         <div className="flex justify-end gap-2 pt-1">
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setOpen(false)} disabled={busy}>취소</Button>
-          <Button size="sm" className="h-7 text-xs" onClick={save} disabled={busy}>{busy ? "저장 중..." : "저장"}</Button>
+          <Button size="sm" className="h-7 text-xs" onClick={save} disabled={busy || (!!lockedReason && String(value ?? "") !== "" && value !== "__null__")}>{busy ? "저장 중..." : "저장"}</Button>
         </div>
       </PopoverContent>
     </Popover>
