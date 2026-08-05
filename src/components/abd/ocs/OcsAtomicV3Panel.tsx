@@ -31,6 +31,35 @@ import { createPreImportSnapshot, getLatestPreImportSnapshot } from "@/lib/backu
 const BATCH = 500;
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
+type ImportFailure = {
+  at: string;
+  runId: string;
+  snapshotId: string;
+  message: string;
+  stage: string;
+  object: string | null;
+};
+
+/** 서버 오류 문자열에서 실패 단계(RPC 이름)를 추출 */
+function parseStage(msg: string): string {
+  const m = msg.match(/^([a-z0-9_]+):/i);
+  if (m) return m[1];
+  if (/snapshot/i.test(msg)) return "pre-import snapshot 검증";
+  return "알 수 없음";
+}
+
+/** constraint / function / column 이름 추출 */
+function parseObject(msg: string): string | null {
+  const c = msg.match(/constraint "([^"]+)"/);
+  if (c) return `constraint ${c[1]}`;
+  const col = msg.match(/column "([^"]+)"/);
+  if (col) return `column ${col[1]}`;
+  const rel = msg.match(/relation "([^"]+)"/);
+  if (rel) return `relation ${rel[1]}`;
+  const fn = msg.match(/^([a-z0-9_]+):/i);
+  return fn ? `function ${fn[1]}` : null;
+}
+
 type Dry = Record<string, unknown>;
 type FileMeta = { name: string; hash: string; rows: number };
 type Kind = "atomic" | "delta" | "resp" | "policy";
@@ -107,6 +136,7 @@ export function OcsAtomicV3Panel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [importFailure, setImportFailure] = useState<ImportFailure | null>(null);
   const [snapshotInfo, setSnapshotInfo] = useState<{ name: string; created_at: string } | null>(null);
   const [dryAt, setDryAt] = useState<number | null>(null);
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
