@@ -23,6 +23,7 @@ import {
   addMainTaskWithSubs, allocateMainTaskNo,
 } from "@/lib/task-management/hierarchy.functions";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useTeamOptions } from "@/lib/team/team-master";
 import { cn } from "@/lib/utils";
 
 interface Props {
