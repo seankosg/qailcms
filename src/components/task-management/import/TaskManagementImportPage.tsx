@@ -964,16 +964,22 @@ function FileRow({
                 ))}
               </ul>
             )}
-            {((f.unmappedFields?.length ?? 0) > 0 ||
+            {teamAutoFilled(f) && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                <span className="font-mono">team</span>: 파일에 열 없음 — 내 소속(
+                <span className="font-mono">{myTeam}</span>)으로 채웁니다
+              </p>
+            )}
+            {(visibleUnmapped(f).length > 0 ||
               (f.demotedFields?.length ?? 0) > 0) && (
               <div className="mt-2 space-y-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-xs">
                 <div className="font-semibold text-destructive">
                   임포트에서 제외될 컬럼이 있습니다 — 확인 후 진행하세요
                 </div>
-                {(f.unmappedFields?.length ?? 0) > 0 && (
+                {visibleUnmapped(f).length > 0 && (
                   <div>
                     <span className="font-medium">미매핑(헤더 없음): </span>
-                    <span className="font-mono">{(f.unmappedFields ?? []).join(", ")}</span>
+                    <span className="font-mono">{visibleUnmapped(f).join(", ")}</span>
                   </div>
                 )}
                 {(f.demotedFields ?? []).map((d) => (
@@ -996,7 +1002,7 @@ function FileRow({
                     이 컬럼들 없이 진행:{" "}
                     <span className="font-mono">
                       {[
-                        ...(f.unmappedFields ?? []),
+                        ...visibleUnmapped(f),
                         ...(f.demotedFields ?? []).map((d) => d.field),
                       ].join(", ")}
                     </span>
