@@ -87,6 +87,7 @@ export function AbdDetailBody({ id, focusSection }: { id: string | null; focusSe
   const [item, setItem] = useState<AbdItemRow | null>(null);
   const [changes, setChanges] = useState<ChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const qc = useQueryClient();
   const { data: me } = useCurrentUser();
   // 판정 정본: 서버 RCL
   const { canRow: canAbdRow } = useRclCan("ABD", "write");
