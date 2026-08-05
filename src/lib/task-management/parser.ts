@@ -65,6 +65,10 @@ export interface ParseTaskManagementResult {
   excludedFields: Set<string>;
   /** 날짜 파싱에 실패한 셀 목록. 임포트 UI에서 사용자가 수정. */
   dateIssues: DateIssue[];
+  /** A. 헤더를 찾지 못해 임포트에서 제외된 필드 */
+  unmappedFields: string[];
+  /** B. 값 형태 불일치로 강등된 필드 */
+  demotedFields: DemotedField[];
 }
 
 export interface SheetHeaderEntry {
