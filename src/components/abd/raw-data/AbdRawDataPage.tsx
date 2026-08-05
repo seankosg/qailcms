@@ -959,6 +959,9 @@ function buildDataColumn(
             options={c.options}
             currentValue={v}
             onSaved={() => refetch()}
+            lockedReason={
+              isDfActualField(c.key) && isOcsPending(row.original as any) ? OCS_DF_BLOCK_MESSAGE : null
+            }
           >{display}</AbdEditCellPopover>
         );
       }
