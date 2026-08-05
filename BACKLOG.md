@@ -418,3 +418,5 @@
 - [ ] #0804 `is_qaqc_readonly` — 호출처 0건(함수 0 · RLS 정책 0, 2026-08-04 17:20 실측). 배포 후 삭제 검토.
 - [ ] #0804 owner 판정 술어 불일치 — TM·SM 은 계정 기준 COALESCE, ABD 는 이름 기준. 같은 행이라도 모듈에 따라 owner 가 달라진다. 배포 후 하나로 통일.
 - [ ] #0804 `canEdit`(rank >= senior_user) — DmrRawDataPage 1곳 잔존. DMR 은 RCL 대상 밖. RCL 확장 시 같이 정리.
+
+- [ ] #0805 WRT 라운드 승격은 `r1/r2_response_code` 에 의존하는데 그 값은 Aconex 임포트가 채운다. 그 경로가 없는 동안 `wrt_judge_v1` 의 `active_round` 는 잠정치다. (2026-08-05 실측: 모집단 339 중 `latest_response_code` 337 / `r1_response_code` 80 / `r2_response_code` 31, `rs_result_missing` 244(72%). 실제 승격은 "R2 단계 실적 존재" 조건 하나로만 일어난다.)
