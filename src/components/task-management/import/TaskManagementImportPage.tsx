@@ -813,6 +813,7 @@ function FileRow({
                 onClick={onRunPreflight}
                 disabled={
                   isRunning ||
+                  f.status === "done" ||
                   f.status !== "ready" ||
                   !f.parsed ||
                   f.parsed.length === 0 ||
