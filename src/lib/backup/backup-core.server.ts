@@ -84,6 +84,7 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   abd_ocs_response_segments: ["id"],
   abd_ocs_response_comment_links: ["id"],
   abd_ocs_source_files: ["id"],
+  abd_ocs_number_correction_log: ["id"],
 };
 
 function sortKeysFor(tableName: string): string[] {
@@ -344,6 +345,8 @@ export async function restoreSnapshot(
       ["hdec_pic_name_master", 19],
       ["hdec_name_propagation_log", 20],
       ["abd_items_raw", 21],
+      // 번호 교정 기록은 abd_items_raw 복구 이후에 적재한다
+      ["abd_ocs_number_correction_log", 21.5],
       ["defect_items_raw", 22],
       // task_management_raw 는 task_management_import_logs 를 참조하므로 로그가 먼저다
       ["task_management_import_logs", 23],
