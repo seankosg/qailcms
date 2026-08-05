@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ABD_COLUMNS, type AbdGroupKey } from "./columns";
-import { isDfActualField, isOcsPending, OCS_DF_BLOCK_MESSAGE } from "./ocs-df-guard";
+import { isDfActualBlocked, isDfActualField, OCS_DF_BLOCK_MESSAGE } from "./ocs-df-guard";
 import {
   buildStyledWorkbook,
   saveStyledWorkbook,
@@ -48,9 +48,20 @@ export async function applyAbdBulkUpdate(
       const slice = ids.slice(i, i + UPDATE_CHUNK);
       const { data: rows } = await (supabase as any)
         .from("abd_items_raw")
-        .select("id, ocs_check, ocs_total, ocs_complied")
+        .select(
+          "id, ocs_check, ocs_total, ocs_complied," +
+            [1, 2, 3]
+              .flatMap((n) => [
+                `r${n}_draft_start_actual`,
+                `r${n}_draft_finish_actual`,
+                `r${n}_submission_actual`,
+                `r${n}_dar_actual`,
+                `r${n}_response_result`,
+              ])
+              .join(","),
+        )
         .in("id", slice);
-      for (const r of (rows ?? []) as any[]) if (isOcsPending(r)) blocked.add(String(r.id));
+      for (const r of (rows ?? []) as any[]) if (isDfActualBlocked(r, field)) blocked.add(String(r.id));
     }
     if (blocked.size > 0) {
       targetIds = ids.filter((id) => !blocked.has(id));

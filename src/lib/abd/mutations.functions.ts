@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { stripNullExcept } from "@/lib/import/strip-null";
 import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
-import { isOcsPending, isDfActualField, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
+import { isDfActualBlocked, isDfActualField, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
 
 const UpdateFieldSchema = z.object({
   id: z.string().uuid(),
@@ -52,10 +52,24 @@ export const updateAbdField = createServerFn({ method: "POST" })
     if (isDfActualField(data.field) && data.value !== null && data.value !== "") {
       const { data: cur } = await (context.supabase as any)
         .from("abd_items_raw")
-        .select("ocs_check, ocs_total, ocs_complied")
+        .select(
+          "ocs_check, ocs_total, ocs_complied," +
+            [1, 2, 3]
+              .flatMap((n) => [
+                `r${n}_draft_start_actual`,
+                `r${n}_draft_finish_actual`,
+                `r${n}_submission_actual`,
+                `r${n}_dar_actual`,
+                `r${n}_response_result`,
+              ])
+              .join(","),
+        )
         .eq("id", data.id)
         .maybeSingle();
-      if (isOcsPending(cur)) throw new Error(OCS_DF_BLOCK_MESSAGE);
+      // 현재(활성) 라운드의 DF 실적일만 차단 — 과거 라운드는 자유 편집
+      if (isDfActualBlocked({ ...(cur ?? {}), [data.field]: data.value }, data.field)) {
+        throw new Error(OCS_DF_BLOCK_MESSAGE);
+      }
     }
     await (context.supabase as any).rpc("set_config", { setting_name: "app.change_source", new_value: "manual", is_local: true }).catch(() => {});
     const patch: Record<string, any> = { [data.field]: data.value, updated_at: new Date().toISOString(), updated_by: context.userId };
@@ -347,12 +361,13 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         const src = srcMap.get((row as any).abd_number);
         // OCS 미완료(Pending) 도면은 Draft Finish 실적일을 임포트로 채울 수 없다.
         // (DB 트리거 abd_guard_df_actual_requires_ocs 와 동일 규칙 — 배치 실패 대신 해당 필드만 제외)
-        if (src && isOcsPending(src)) {
+        if (src) {
+          const merged = { ...src, ...(row as any) };
           for (const n of [1, 2, 3] as const) {
             const key = `r${n}_draft_finish_actual`;
             const incoming = (row as any)[key];
             const prev = (src as any)[key] ?? null;
-            if (incoming != null && incoming !== "" && incoming !== prev) {
+            if (incoming != null && incoming !== "" && incoming !== prev && isDfActualBlocked(merged, key)) {
               delete (row as any)[key];
               dfBlocked++;
               if (dfBlockedSamples.length < 20) dfBlockedSamples.push(String((row as any).abd_number));
