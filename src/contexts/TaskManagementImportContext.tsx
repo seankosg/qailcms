@@ -735,11 +735,18 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       // §4-1(2026-08-04): 파서 경고를 로그에 보존. 경고가 없으면 아무것도 남기지 않는다(빈칸).
       const parserWarnings = (f.warnings ?? []).filter(Boolean);
       const warningsPayload =
-        parserWarnings.length > 0
+        parserWarnings.length > 0 || unmappedFieldList.length > 0
           ? {
               parser: parserWarnings,
-              has_position_fallback: parserWarnings.some((w) => w.includes("기본 위치")),
               has_header_row_fallback: parserWarnings.some((w) => w.includes("헤더 행을 찾지 못해")),
+              unmapped_fields: f.unmappedFields ?? [],
+              demoted_fields: (f.demotedFields ?? []).map((d) => ({
+                field: d.field,
+                reason: d.reason,
+                ratio: d.ratio,
+                samples: d.samples,
+              })),
+              user_ack_unmapped: !!f.ackUnmapped,
             }
           : null;
 
@@ -751,7 +758,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
           discipline,
           data_date: f.dataDateOverride ?? f.dataDate ?? null,
           sheet_name: f.sheetName ?? null,
-          total_rows: parsed.length,
+          total_rows: parsedAll.length,
+          parsed_rows: parsedAll.length,
           status: "processing",
           imported_by: userId,
           started_at: startedAtIso,
