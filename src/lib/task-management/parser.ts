@@ -234,7 +234,7 @@ function buildHeaderMap(sheet: XLSX.WorkSheet): {
 } {
   const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S5");
   const warnings: string[] = [];
-  const maxCol = Math.min(range.e.c, 25);
+  const maxCol = range.e.c; // A-4: 26열 상한 제거(2026-08-05)
   const DEFAULT_HEADER_ROW = 5; // 1-based fallback
   const MIN_HEADER_CELLS = 3;
   const MAX_SCAN_ROWS = 30; // 상단 30행 스캔
@@ -364,7 +364,7 @@ export async function getTaskExcelHeaders(
   const headerRow0 = headerRow - 1;
   const dataStart = headerRow + 2;
   const rangeAll = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S7");
-  const maxCol = Math.min(rangeAll.e.c, 25);
+  const maxCol = rangeAll.e.c;
   const entries: SheetHeaderEntry[] = [];
   const sample: Record<string, unknown> = {};
   for (let c = 0; c <= maxCol; c++) {
@@ -492,7 +492,7 @@ export async function parseTaskManagementExcel(
   const sheetHeaders: SheetHeaderEntry[] = [];
   {
     const rangeAll = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:S7");
-    const maxCol = Math.min(rangeAll.e.c, 25);
+    const maxCol = rangeAll.e.c;
     for (let c = 0; c <= maxCol; c++) {
       const headerCell = sheet[XLSX.utils.encode_cell({ r: headerRow0, c })];
       const raw = headerCell?.v;
