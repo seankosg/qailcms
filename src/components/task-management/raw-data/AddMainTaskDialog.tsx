@@ -64,6 +64,11 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
   const lockedPic = roleLocked && me?.isUser ? (me.hdec_pic_name ?? "") : "";
   const lockedTeam = roleLocked ? (me?.team ?? "") : "";
   const { data: teamOptions } = useTeamOptions();
+
+  const [discipline, setDiscipline] = useState<Discipline>(defaultDiscipline ?? "ARCH");
+  const [taskNo, setTaskNo] = useState("");
+  const [taskName, setTaskName] = useState("");
+  const [team, setTeam] = useState<string>("");
   const teamCodes = useMemo(() => {
     const codes = (teamOptions ?? []).map((o) => o.code);
     // 잠긴 소속/기존 선택값이 마스터에 없더라도 항상 표시
@@ -72,11 +77,6 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
     }
     return codes;
   }, [teamOptions, lockedTeam, team]);
-
-  const [discipline, setDiscipline] = useState<Discipline>(defaultDiscipline ?? "ARCH");
-  const [taskNo, setTaskNo] = useState("");
-  const [taskName, setTaskName] = useState("");
-  const [team, setTeam] = useState<string>("");
   const [category, setCategory] = useState("");
   const [hdecPic, setHdecPic] = useState("");
   const [risk, setRisk] = useState<string>("");
