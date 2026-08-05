@@ -1675,6 +1675,125 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_ocs_response_comment_links: {
+        Row: {
+          atomic_comment_id: string | null
+          confidence_score: number | null
+          created_at: string
+          evidence_terms: Json | null
+          id: string
+          import_log_id: string | null
+          is_active: boolean
+          mapping_method: string | null
+          mapping_status: string
+          response_segment_id: string
+          source_atomic_comment_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          atomic_comment_id?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          evidence_terms?: Json | null
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          mapping_method?: string | null
+          mapping_status: string
+          response_segment_id: string
+          source_atomic_comment_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          atomic_comment_id?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          evidence_terms?: Json | null
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          mapping_method?: string | null
+          mapping_status?: string
+          response_segment_id?: string
+          source_atomic_comment_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_ocs_response_comment_links_atomic_comment_id_fkey"
+            columns: ["atomic_comment_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abd_ocs_response_comment_links_response_segment_id_fkey"
+            columns: ["response_segment_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_response_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      abd_ocs_response_segments: {
+        Row: {
+          comment_group_id: string | null
+          created_at: string
+          id: string
+          import_log_id: string | null
+          is_active: boolean
+          response_segment_no: number
+          response_source_label: string | null
+          response_text: string | null
+          source_file_name: string | null
+          source_hash: string
+          source_parent_comment_id: string
+          source_row: number | null
+          source_sheet: string | null
+          updated_at: string
+        }
+        Insert: {
+          comment_group_id?: string | null
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          response_segment_no?: number
+          response_source_label?: string | null
+          response_text?: string | null
+          source_file_name?: string | null
+          source_hash?: string
+          source_parent_comment_id: string
+          source_row?: number | null
+          source_sheet?: string | null
+          updated_at?: string
+        }
+        Update: {
+          comment_group_id?: string | null
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          response_segment_no?: number
+          response_source_label?: string | null
+          response_text?: string | null
+          source_file_name?: string | null
+          source_hash?: string
+          source_parent_comment_id?: string
+          source_row?: number | null
+          source_sheet?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abd_ocs_response_segments_comment_group_id_fkey"
+            columns: ["comment_group_id"]
+            isOneToOne: false
+            referencedRelation: "abd_ocs_comment_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       abd_resp_result_restore_snapshot_20260727: {
         Row: {
           abd_item_id: string | null
@@ -6063,6 +6182,7 @@ export type Database = {
         Returns: Json
       }
       abd_ocs_v2_verify: { Args: never; Returns: Json }
+      abd_ocs_v3_dryrun_parents: { Args: { p_rows: Json }; Returns: Json }
       abd_ocs_verify: { Args: never; Returns: Json }
       abd_progress_cell_ids: {
         Args: {
