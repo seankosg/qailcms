@@ -4680,6 +4680,7 @@ export type Database = {
           label: string
           module: string
           note: string | null
+          round_no: number | null
           sort_order: number
           stage_code: string
           updated_at: string
@@ -4694,6 +4695,7 @@ export type Database = {
           label: string
           module?: string
           note?: string | null
+          round_no?: number | null
           sort_order: number
           stage_code: string
           updated_at?: string
@@ -4708,6 +4710,7 @@ export type Database = {
           label?: string
           module?: string
           note?: string | null
+          round_no?: number | null
           sort_order?: number
           stage_code?: string
           updated_at?: string
