@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -57,20 +57,29 @@ export function useUserViewPreference(viewKey: string) {
   const getFn = useServerFn(getUserViewPreference);
   const upsertFn = useServerFn(upsertUserViewPreference);
 
-  const [initialState] = useState<ViewPreferenceState | null>(() =>
-    readLocal(userId, viewKey),
-  );
+  // 로컬 캐시는 사용자 id 가 확정된 뒤에 읽는다.
+  // (첫 렌더에는 currentUser 가 없어 항상 null 이 되던 결함 수정)
+  const [localState, setLocalState] = useState<ViewPreferenceState | null>(null);
+  useEffect(() => {
+    setLocalState(readLocal(userId, viewKey));
+  }, [userId, viewKey]);
 
   const queryKey = ["user-view-pref", viewKey, userId] as const;
   const query = useQuery({
     queryKey,
     enabled: !!userId,
     staleTime: 60_000,
+    retry: 2,
     queryFn: async () => {
       const res = await getFn({ data: { viewKey } });
       return res?.state ?? null;
     },
   });
+
+  // 서버 조회가 "성공"으로 끝났을 때만 저장을 허용한다.
+  // (조회 실패 → 화면이 기본값 복원 → 그 기본값이 서버를 덮어써 설정이 날아가던 결함 방지)
+  const loadedRef = useRef(false);
+  if (query.isSuccess) loadedRef.current = true;
 
   // 서버 응답 도착 시 로컬 캐시 동기화 + 서버가 비었으면 로컬 값 마이그레이션
   const migratedRef = useRef(false);
@@ -109,10 +118,12 @@ export function useUserViewPreference(viewKey: string) {
   const save = useCallback(
     (state: ViewPreferenceState) => {
       writeLocal(userId, viewKey, state);
-      queryClient.setQueryData(queryKey, state);
+      // 캐시 갱신은 서버 값이 이미 로드된 뒤에만 (렌더 루프 방지)
+      if (loadedRef.current) queryClient.setQueryData(queryKey, state);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         if (!userId) return;
+        if (!loadedRef.current) return;
         void (async () => {
           if (!(await hasActiveSession())) return;
           mutation.mutate(state);
@@ -127,9 +138,14 @@ export function useUserViewPreference(viewKey: string) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
   }, []);
 
+  // 조회 실패 시에는 ready 를 세우지 않는다 — 단, 로컬 캐시가 있으면 그것으로 복원.
   const state: ViewPreferenceState | null =
-    query.data ?? initialState ?? null;
-  const ready = !!userId && (!query.isPending || initialState != null);
+    (query.isSuccess ? query.data : null) ?? localState ?? null;
+  const ready =
+    !!userId && (query.isSuccess || (query.isError && localState != null));
 
-  return { state, ready, save };
+  return useMemo(
+    () => ({ state, ready, save, error: query.error ?? null }),
+    [state, ready, save, query.error],
+  );
 }
