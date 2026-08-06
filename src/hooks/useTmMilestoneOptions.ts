@@ -6,11 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
  * TM Milestone 선택지 정본.
  * - 활성 종류(tm_milestone_kinds.is_active) 만 후보로 둔다.
  * - Plot 별 등록 목록(tm_milestone_config.plot) 으로 좁힌다.
- * - 해당 Plot 에 등록이 하나도 없으면 '공통' 등록분을 쓰고, 그것도 없으면 전체 활성 종류.
+ * - 해당 Plot 에 등록이 하나도 없으면 전체 활성 종류.
  */
-const COMMON_PLOT = "공통";
-/** Plot 별칭 — G 는 별도 등록 없이 '공통' 등록분을 참조한다. */
-const PLOT_ALIAS: Record<string, string> = { G: COMMON_PLOT };
 
 export interface TmMilestoneOptions {
   allCodes: string[];
@@ -60,9 +57,8 @@ export function useTmMilestoneOptions(): TmMilestoneOptions {
   const optionsForPlot = useCallback(
     (plot: unknown) => {
       const raw = typeof plot === "string" ? plot.trim() : "";
-      const key = PLOT_ALIAS[raw.toUpperCase()] ?? raw;
+      const key = raw.toUpperCase() === "G" ? "G" : raw;
       if (key && byPlot[key]?.length) return byPlot[key];
-      if (byPlot[COMMON_PLOT]?.length) return byPlot[COMMON_PLOT];
       return allCodes;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
