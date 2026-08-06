@@ -78,6 +78,9 @@ export function OcsIncrementImportPanel() {
 
   const blockers = useMemo(() => {
     const out: string[] = [];
+    if (!BASELINE_VERIFICATION_IMPLEMENTED) {
+      out.push("Baseline 실측 검증(생성·다운로드·내용 대조) 미완료 — 증분 Import 잠금");
+    }
     if (!pkg) out.push("증분 ZIP 패키지를 선택하십시오.");
     if (pkg) out.push(...pkg.blockers);
     if (pkg && !collision) out.push("Storage 충돌 점검 미완료");
