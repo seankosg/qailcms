@@ -6379,13 +6379,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "task_management_raw_milestone_fk"
-            columns: ["milestone"]
-            isOneToOne: false
-            referencedRelation: "tm_milestone_kinds"
-            referencedColumns: ["kind_code"]
-          },
-          {
             foreignKeyName: "task_management_raw_source_import_log_id_fkey"
             columns: ["source_import_log_id"]
             isOneToOne: false
