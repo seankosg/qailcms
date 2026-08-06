@@ -245,14 +245,22 @@ function SharedTimeline({
             {ticks.map((t) => (
               <span
                 key={t.day}
-                className="absolute top-0 -translate-x-1/2 whitespace-nowrap font-mono text-[10px] text-muted-foreground"
+                className={cn(
+                  "absolute top-0 -translate-x-1/2 whitespace-nowrap font-mono text-[10px]",
+                  showAuto ? "text-muted-foreground/50" : "text-muted-foreground",
+                )}
                 style={{ left: `${pct(t.day)}%` }}
               >
                 {t.label}
               </span>
             ))}
             <span
-              className="absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-full border border-primary/30 bg-primary/15 px-1.5 font-mono text-[10px] font-semibold text-primary"
+              className={cn(
+                "absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-full border px-1.5 font-mono text-[10px] font-semibold",
+                showAuto
+                  ? "border-muted-foreground/30 bg-muted-foreground/10 text-muted-foreground/70"
+                  : "border-primary/30 bg-primary/15 text-primary",
+              )}
               style={{ left: `${todayPct}%` }}
             >
               Today
