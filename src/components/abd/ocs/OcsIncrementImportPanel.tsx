@@ -11,6 +11,12 @@ import { FilePickerButton } from "@/components/shared/FilePickerButton";
 import { supabase } from "@/integrations/supabase/client";
 import { chunk } from "@/lib/abd/ocs-db-parser";
 import { readIncrementPackage, type IncrementPackage } from "@/lib/abd/ocs-increment-package";
+import {
+  checkPackageStorageCollisions,
+  imageStoragePath,
+  sourceStoragePath,
+  type CollisionReport,
+} from "@/lib/abd/ocs-storage-collision";
 import { ocsV3StageLoad, ocsV3StageReset, type V3StageKind } from "@/lib/abd/ocs-v3-import.functions";
 import { ocsIncDryRun, ocsIncImport, ocsIncPrecheck } from "@/lib/abd/ocs-increment.functions";
 import { createPreImportSnapshot } from "@/lib/backup/backup.functions";
@@ -21,6 +27,12 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 const BATCH = 500;
 const RETIRE_PCT = 0.3;
 const RETIRE_ABS = 100;
+/**
+ * Stage 9 — Baseline 다운로드/검증 기능이 아직 없다. 그 기능이 구현되기 전까지
+ * 증분 Import 는 잠금 상태로 둔다. (기능 완료로 표현하지 말 것)
+ */
+const BASELINE_VERIFICATION_IMPLEMENTED = false;
+const BASELINE_LOCK_MESSAGE = "Baseline download/verification not implemented — Import locked";
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
 type Dry = Record<string, unknown>;
@@ -56,6 +68,7 @@ export function OcsIncrementImportPanel() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [collision, setCollision] = useState<CollisionReport | null>(null);
 
   const isAdmin = me?.isStrictAdmin === true;
 
@@ -65,8 +78,11 @@ export function OcsIncrementImportPanel() {
 
   const blockers = useMemo(() => {
     const out: string[] = [];
+    if (!BASELINE_VERIFICATION_IMPLEMENTED) out.push(BASELINE_LOCK_MESSAGE);
     if (!pkg) out.push("증분 ZIP 패키지를 선택하십시오.");
     if (pkg) out.push(...pkg.blockers);
+    if (pkg && !collision) out.push("Storage 충돌 점검 미완료");
+    if (collision) out.push(...collision.blockers);
     if (precheck?.["duplicate_package"] === true) out.push("동일 패키지 해시가 이미 반영되었습니다.");
     const base = (precheck?.["baseline"] ?? {}) as Record<string, unknown>;
     if (precheck && base["base_import_run_found"] !== true) out.push("base_import_run_id 를 정본에서 찾을 수 없습니다.");
@@ -83,7 +99,7 @@ export function OcsIncrementImportPanel() {
     if (!snapshotId) out.push("사전 백업 스냅샷 미완료 (Dry-run 이후 생성분만 인정)");
     if (!approved) out.push("최종 승인 체크 필요");
     return out;
-  }, [pkg, precheck, dry, snapshotId, approved, massRetire, allowRetire, retire]);
+  }, [pkg, precheck, dry, snapshotId, approved, massRetire, allowRetire, retire, collision]);
 
   function resetDownstream() {
     setRunId(null);
@@ -101,6 +117,7 @@ export function OcsIncrementImportPanel() {
     setBusy("패키지 검증 중…");
     resetDownstream();
     setPrecheck(null);
+    setCollision(null);
     try {
       const p = await readIncrementPackage(file);
       setPkg(p);
@@ -111,7 +128,13 @@ export function OcsIncrementImportPanel() {
         },
       })) as Record<string, unknown>;
       setPrecheck(pc);
-      toast.success(`패키지 검증 완료 — 내부 파일 ${p.verifiedFiles}건 SHA-256 일치`);
+      const col = await checkPackageStorageCollisions(p);
+      setCollision(col);
+      toast.success(
+        `패키지 검증 완료 — 내부 파일 ${p.verifiedFiles}건 SHA-256 일치 · Storage 충돌 ${
+          col.counts.hash_mismatch + col.counts.unresolved
+        }건`,
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
@@ -178,8 +201,10 @@ export function OcsIncrementImportPanel() {
 
   /** source/ 와 images/ 를 비공개 보관함에 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기) */
   async function uploadAssets(p: IncrementPackage) {
+    const skip = collision?.skipPaths ?? new Set<string>();
     for (const img of p.images) {
-      const path = img.relative_path.replace(/^images\//, "");
+      const path = imageStoragePath(img.relative_path);
+      if (skip.has(path)) continue;
       const { error } = await supabase.storage
         .from(OCS_BUCKET)
         .upload(path, new Blob([img.bytes]), { upsert: false });
@@ -187,7 +212,8 @@ export function OcsIncrementImportPanel() {
     }
     for (const sf of p.sourceFiles) {
       const fileName = sf.relative_path.split("/").pop() ?? sf.relative_path;
-      const storagePath = `${p.manifest.package_id}/${fileName}`;
+      const storagePath = sourceStoragePath(p.manifest.package_id, sf.relative_path);
+      if (skip.has(storagePath)) continue;
       const { error } = await supabase.storage
         .from(OCS_SOURCE_BUCKET)
         .upload(storagePath, new Blob([sf.bytes]), { upsert: false });
