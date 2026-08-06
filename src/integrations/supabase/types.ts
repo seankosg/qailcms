@@ -7898,6 +7898,15 @@ export type Database = {
         Args: { _as_of: string; _discipline: string; _task_no: string }
         Returns: number
       }
+      tm_milestone_overdue_counts: {
+        Args: {
+          _filters?: Json
+          _include_inactive?: boolean
+          _q?: string
+          _task_scope?: string
+        }
+        Returns: Json
+      }
       tm_my_workspace_counts: {
         Args: { _filter_value: string; _mode: string; _today: string }
         Returns: Json
