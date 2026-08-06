@@ -1089,6 +1089,8 @@ export function TaskManagementRawDataPage() {
               editorType: "select",
               options: [...(dyn.milestoneOptions ?? [])],
             };
+            // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 만 인라인 수정 가능.
+            effectiveCanEdit = effectiveCanEdit && isStrictAdminRef.current;
           }
           const editableInline =
             !!effectiveColumn.editable &&
