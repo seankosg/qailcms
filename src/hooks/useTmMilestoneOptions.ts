@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
  * - 해당 Plot 에 등록이 하나도 없으면 '공통' 등록분을 쓰고, 그것도 없으면 전체 활성 종류.
  */
 const COMMON_PLOT = "공통";
+/** Plot 별칭 — G 는 별도 등록 없이 '공통' 등록분을 참조한다. */
+const PLOT_ALIAS: Record<string, string> = { G: COMMON_PLOT };
 
 export interface TmMilestoneOptions {
   allCodes: string[];
@@ -57,7 +59,8 @@ export function useTmMilestoneOptions(): TmMilestoneOptions {
 
   const optionsForPlot = useCallback(
     (plot: unknown) => {
-      const key = typeof plot === "string" ? plot.trim() : "";
+      const raw = typeof plot === "string" ? plot.trim() : "";
+      const key = PLOT_ALIAS[raw.toUpperCase()] ?? raw;
       if (key && byPlot[key]?.length) return byPlot[key];
       if (byPlot[COMMON_PLOT]?.length) return byPlot[COMMON_PLOT];
       return allCodes;
