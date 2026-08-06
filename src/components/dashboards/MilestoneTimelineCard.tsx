@@ -246,15 +246,15 @@ function PlotTimeline({
                   className={`absolute z-10 flex flex-col ${
                     isFirst ? "items-start" : isLast ? "items-end" : "items-center"
                   } ${isDone ? "opacity-70" : ""}`}
-                  style={{
-                    left: `${pos(index)}%`,
-                    top: 0,
-                    transform: isFirst
-                      ? "translateX(0)"
-                      : isLast
-                        ? "translateX(-100%)"
-                        : "translateX(-50%)",
-                  }}
+                  style={
+                    isLast
+                      ? { right: 0, top: 0 }
+                      : {
+                          left: `${pos(index)}%`,
+                          top: 0,
+                          transform: isFirst ? "translateX(0)" : "translateX(-50%)",
+                        }
+                  }
                 >
                   <div
                     className={`flex items-center justify-center rounded-full border-2 transition-all ${
