@@ -54,6 +54,7 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
       .from("abd_ocs_import_logs")
       .select("id, data_file_name, status, started_at")
       .eq("data_file_hash", data.package_sha256)
+      .neq("status", "failed")
       .limit(1);
     if (dupErr) throw new Error(dupErr.message);
 
@@ -137,6 +138,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       .from("abd_ocs_import_logs")
       .select("id")
       .eq("data_file_hash", data.package_sha256)
+      .neq("status", "failed")
       .limit(1);
     if (dupErr) throw new Error(dupErr.message);
     if ((dup ?? []).length > 0) throw new Error("동일 패키지 해시가 이미 반영되었습니다.");
