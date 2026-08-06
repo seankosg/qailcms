@@ -25,6 +25,7 @@ interface Node {
   label: string;
   date: string; // YYYY-MM-DD
   diff: number; // days from today (positive = future)
+  auto?: boolean; // 모듈·팀 자동 최종 완료일 (보조 노드)
 }
 interface AutoRow {
   plot: string | null;
