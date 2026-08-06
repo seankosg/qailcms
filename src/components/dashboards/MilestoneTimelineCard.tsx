@@ -281,10 +281,10 @@ function PlotRow({
   const placed = nodes.map((n) => {
     const left = pct(dayNum(n.date));
     const textLen = Math.max(n.label.length, `${fmtDate(n.date)} · ${dLabel(n.diff)}`.length);
-    const half = (textLen * 6.2 + 14) / 2;
+    const half = (textLen * 7 + 18) / 2;
     const leftPx = (left / 100) * TRACK_PX;
     let lane = 0;
-    while (lane < lanes.length && leftPx - half < lanes[lane] + 8) lane += 1;
+    while (lane < lanes.length && leftPx - half < lanes[lane] + 14) lane += 1;
     lanes[lane] = leftPx + half;
     return { node: n, left, lane };
   });
