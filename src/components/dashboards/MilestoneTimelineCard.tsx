@@ -285,6 +285,7 @@ function SharedTimeline({
               nodes={nodes}
               pct={pct}
               todayPct={todayPct}
+              showAuto={showAuto}
             />
           ))}
         </div>
