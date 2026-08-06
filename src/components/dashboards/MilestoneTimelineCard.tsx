@@ -476,7 +476,7 @@ function PlotRow({
                 <span
                   className={cn(
                     "whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-extrabold",
-                    showAuto ? "text-destructive" : isActive ? "text-primary" : "text-muted-foreground",
+                    showAuto ? "text-muted-foreground/70" : isActive ? "text-primary" : "text-muted-foreground",
                   )}
                 >
                   {dLabel(n.diff)}
