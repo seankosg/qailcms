@@ -177,7 +177,7 @@ export function MilestoneTimelineCard() {
             등록된 마일스톤 기준일이 없습니다. (Admin &gt; 마일스톤 설정)
           </p>
         ) : (
-          <SharedTimeline plots={plots} todayNum={todayNum} />
+          <SharedTimeline plots={plots} todayNum={todayNum} showAuto={showAuto} />
         )}
       </CardContent>
     </Card>
