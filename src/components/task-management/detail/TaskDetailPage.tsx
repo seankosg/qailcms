@@ -19,6 +19,7 @@ import {
   GROUP_HEADER_BG,
   type TmColumnDef,
 } from "@/lib/task-management/columns";
+import { tmAdminEditor } from "@/lib/task-management/columns";
 import { EditCellPopover } from "../raw-data/EditCellPopover";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
@@ -172,7 +173,9 @@ export function TaskDetailPage() {
   }
 
   const isParent = row.level === "main";
-  const canEditRow = canRow(row as Record<string, unknown>);
+  const isAdminEditor = user?.isStrictAdmin === true;
+  // admin 계정은 모든 행·모든 항목(파생/자동계산 제외)을 수정할 수 있다.
+  const canEditRow = isAdminEditor || canRow(row as Record<string, unknown>);
   const editScope = rclScopeOfRow(grants, row as Record<string, unknown>);
 
   const onFieldSaved = () => {
@@ -286,7 +289,7 @@ export function TaskDetailPage() {
                   let effectiveCanEdit = canEditRow;
                   if (c.key === "task_no") {
                     effectiveColumn = { ...c, editable: true, editorType: "text" };
-                    effectiveCanEdit = canEditTaskNo;
+                    effectiveCanEdit = canEditTaskNo || isAdminEditor;
                   } else if (c.key === "team") {
                     effectiveColumn = { ...c, editable: true, editorType: "select", options: [...DISCIPLINES] };
                   } else if (c.key === "data_date") {
@@ -299,7 +302,12 @@ export function TaskDetailPage() {
                       options: optionsForPlot((row as any).plot),
                     };
                     // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 만 수정 가능.
-                    effectiveCanEdit = effectiveCanEdit && user?.isStrictAdmin === true;
+                    effectiveCanEdit = effectiveCanEdit && isAdminEditor;
+                  } else if (isAdminEditor && !(c.editable && c.editorType)) {
+                    const ed = tmAdminEditor(c);
+                    if (ed) {
+                      effectiveColumn = { ...c, editable: true, editorType: ed.editorType, options: ed.options };
+                    }
                   }
                   const editable =
                     !!effectiveColumn.editable &&

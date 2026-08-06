@@ -303,6 +303,8 @@ const GROUP_LABELS: Record<TmColumnDef["group"], string> = {
 
 export function getBulkEditableFields(opts?: {
   milestoneOptions?: string[];
+  /** admin 계정: 파생/자동계산을 제외한 전 항목을 일괄 편집 대상으로 노출 */
+  admin?: boolean;
 }): BulkEditableField[] {
   const out: BulkEditableField[] = [];
   for (const c of TM_COLUMNS) {
@@ -344,5 +346,63 @@ export function getBulkEditableFields(opts?: {
     options: (opts?.milestoneOptions ?? []).map((v) => ({ value: v, label: v })),
     group: GROUP_LABELS.task,
   });
+  if (opts?.admin) {
+    const seen = new Set(out.map((f) => f.field));
+    for (const c of TM_COLUMNS) {
+      if (seen.has(c.key)) continue;
+      const ed = tmAdminEditor(c, { milestoneOptions: opts.milestoneOptions });
+      if (!ed) continue;
+      out.push({
+        field: c.key,
+        label: c.label,
+        inputType: ed.editorType!,
+        isPercent: c.type === "percent",
+        options: ed.options?.map((v) => ({ value: v, label: v })),
+        group: GROUP_LABELS[c.group] ?? c.group,
+      });
+    }
+  }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Admin 전 항목 편집 승격
+// ---------------------------------------------------------------------------
+
+/** admin 이라도 편집할 수 없는 필드(자동계산·파생·임포트 메타). */
+export const TM_ADMIN_LOCKED_FIELDS: string[] = [
+  ...TM_AUTO_CALCULATED,
+  "stage_progress",
+  "today_actual",
+  "today_gap",
+  "expected_progress_today",
+  "imported_at",
+  "source_file",
+  "level",
+];
+
+/**
+ * admin 계정용 편집기 정의. 잠금 필드는 null.
+ * 컬럼 정의에 editable 이 없어도 타입에 맞는 편집기를 유도한다.
+ */
+export function tmAdminEditor(
+  c: TmColumnDef,
+  opts?: { milestoneOptions?: string[] },
+): { editorType: TmColumnDef["editorType"]; options?: string[] } | null {
+  if (TM_ADMIN_LOCKED_FIELDS.includes(c.key)) return null;
+  if (c.editable && c.editorType) return { editorType: c.editorType, options: c.options };
+  switch (c.key) {
+    case "team":
+    case "discipline":
+      return { editorType: "select", options: [...DISCIPLINES] };
+    case "plot":
+      return { editorType: "select", options: [...PLOTS] };
+    case "milestone":
+      return { editorType: "select", options: opts?.milestoneOptions ?? [] };
+    default:
+      break;
+  }
+  if (c.type === "date") return { editorType: "date" };
+  if (c.type === "number" || c.type === "percent") return { editorType: "number" };
+  return { editorType: "text" };
 }
