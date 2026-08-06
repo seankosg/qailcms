@@ -38,6 +38,7 @@ import { exportTaskSummary } from "./exportTaskSummary";
 import { resolveJudgment, resolvePlanPct } from "@/lib/task-management/delay-utils";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+import { MilestoneReferenceButton } from "@/components/task-management/shared/MilestoneReferenceButton";
 import { MiniProgressChart } from "./MiniProgressChart";
 // recharts (~130KB gzip) is only needed when the drill-down chart opens.
 // Lazy-load so the tree page's initial render doesn't pull the chart library.
@@ -738,6 +739,7 @@ export function TaskTreePage() {
         <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
           {asOfHeaderLabel(asOfDate)}
         </span>
+        <MilestoneReferenceButton />
         <Tabs value={discipline} onValueChange={(v) => setDiscipline(v as Discipline)}>
           <TabsList>
             {DISCIPLINES.map((d) => (
