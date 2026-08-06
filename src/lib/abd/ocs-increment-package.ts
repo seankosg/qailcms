@@ -93,6 +93,28 @@ async function hashBytes(buf: ArrayBuffer): Promise<string> {
   return sha256Hex(buf);
 }
 
+/**
+ * base_core_table_hashes 계약 — Baseline Core 8개 테이블이 정확히 모두 있어야 하고
+ * 값은 공백이 아니어야 한다. 누락·추가·공백은 blocker(= null 로 우회 불가).
+ */
+export function coreTableHashBlockers(hashes: Record<string, string>): string[] {
+  const out: string[] = [];
+  const keys = Object.keys(hashes ?? {});
+  if (keys.length === 0) {
+    out.push("manifest.base_core_table_hashes 가 없습니다.");
+    return out;
+  }
+  const missing = BASELINE_CORE_TABLES.filter((t) => !keys.includes(t));
+  const extra = keys.filter((k) => !(BASELINE_CORE_TABLES as readonly string[]).includes(k));
+  const blank = BASELINE_CORE_TABLES.filter(
+    (t) => keys.includes(t) && !String(hashes[t] ?? "").trim(),
+  );
+  if (missing.length) out.push(`base_core_table_hashes 누락: ${missing.join(", ")}`);
+  if (extra.length) out.push(`base_core_table_hashes 에 정본 외 항목: ${extra.join(", ")}`);
+  if (blank.length) out.push(`base_core_table_hashes 공백 값: ${blank.join(", ")}`);
+  return out;
+}
+
 /** ZIP 1개를 열고 매니페스트 계약·SHA-256 을 전부 검증한다. 운영 DB 는 건드리지 않는다. */
 export async function readIncrementPackage(file: File): Promise<IncrementPackage> {
   const blockers: string[] = [];
