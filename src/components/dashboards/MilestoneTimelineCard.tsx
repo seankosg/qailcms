@@ -276,12 +276,12 @@ function SharedTimeline({
               {ticks.map((t) => (
                 <div
                   key={t.day}
-                  className="absolute inset-y-0 w-px bg-border/60"
+                  className={cn("absolute inset-y-0 w-px", showAuto ? "bg-border/40" : "bg-border/60")}
                   style={{ left: `${pct(t.day)}%` }}
                 />
               ))}
               <div
-                className="absolute inset-y-0 w-0.5 bg-primary/60"
+                className={cn("absolute inset-y-0", showAuto ? "w-px bg-muted-foreground/30" : "w-0.5 bg-primary/60")}
                 style={{ left: `${todayPct}%` }}
               />
             </div>
