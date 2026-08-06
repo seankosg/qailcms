@@ -36,8 +36,10 @@ const FORMULA: Record<OverdueBadge, string> = {
   PASS: "완료 (기한 내)",
 };
 
-export function MilestoneOverdueKpiCards({ asOfDate, taskScope, ownerContext }: Props) {
+export function MilestoneOverdueKpiCards({ asOfDate, taskScope: _taskScope, ownerContext }: Props) {
   const navigate = useNavigate();
+  /** 이 카드의 집계 단위는 Subtask 고정 — 상단 과업 스코프와 무관 */
+  const taskScope: TaskScope = "sub";
   const { data, isLoading, isError } = useTmMilestoneOverdueCounts({
     filters: {
       team: ownerContext?.team,
@@ -120,7 +122,7 @@ export function MilestoneOverdueKpiCards({ asOfDate, taskScope, ownerContext }: 
       <div className="flex items-baseline gap-2">
         <h3 className="text-sm font-semibold">Milestone Base TM Status</h3>
         <span className="text-[11px] text-muted-foreground">
-          Raw Data 의 Plan / Actual Overdue 뱃지 기준 · {total.toLocaleString()} items
+          Raw Data 의 Plan / Actual Overdue 뱃지 기준 · Subtask 기준 · {total.toLocaleString()} items
         </span>
       </div>
       {isError && (
