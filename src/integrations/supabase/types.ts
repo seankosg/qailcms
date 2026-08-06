@@ -7440,6 +7440,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      plot_module_team_last_date: {
+        Args: never
+        Returns: {
+          label: string
+          last_date: string
+          plot: string
+        }[]
+      }
       preview_rollback_abd_import: {
         Args: { _batch_id: string }
         Returns: Json
