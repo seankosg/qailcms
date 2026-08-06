@@ -167,6 +167,10 @@ export const importWrtHdecBatch = createServerFn({ method: "POST" })
     const patches: any[] = [];
     let cleared = 0;
     const createdList: string[] = [];
+    // allow_deletes=false 는 "값 삭제를 patch 에 담지 않는다" 로 동작한다.
+    // (전체 중단이 아니라 갱신분만 반영 — 삭제는 승인 시에만 수행)
+    const skipClear = (prev: string | null, next: string | null): boolean =>
+      !data.allow_deletes && prev !== null && next === null;
 
     for (const row of data.rows) {
       const existing = byNumber.get(row.wrt_number);
@@ -179,6 +183,7 @@ export const importWrtHdecBatch = createServerFn({ method: "POST" })
         const next = s(row.item[f]);
         const prev = isNew ? null : s(existing[f]);
         if (next === prev) continue;
+        if (skipClear(prev, next)) continue;
         itemPatch[f] = next;
         changes.push({ target: "item", field: f, previous: prev, next });
         fieldDiff.set(f, (fieldDiff.get(f) ?? 0) + 1);
@@ -196,6 +201,7 @@ export const importWrtHdecBatch = createServerFn({ method: "POST" })
           if (isAconexNoClear(st.stage_code, f, next)) continue;
           const prev = s((cur as any)[f]);
           if (next === prev) continue;
+          if (skipClear(prev, next)) continue;
           patch[f] = next;
           const key = `${st.stage_code}.${f}`;
           changes.push({ target: st.stage_code, field: f, previous: prev, next });
