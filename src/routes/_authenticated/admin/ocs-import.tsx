@@ -98,7 +98,8 @@ function OcsMaintenanceBody() {
         </CardHeader>
         <CardContent className="flex gap-6 text-sm">
           <span>OCS 코멘트 {stats.data?.comment_count ?? 0}건</span>
-          <span>도면 연결 {stats.data?.linked_count ?? 0}건</span>
+          <span>연결된 코멘트 {stats.data?.linked_comment_count ?? 0}건</span>
+          <span>ABD 연결 관계 {stats.data?.abd_association_count ?? 0}건</span>
           <span>첨부 메타 {stats.data?.attachment_count ?? 0}건</span>
         </CardContent>
       </Card>
