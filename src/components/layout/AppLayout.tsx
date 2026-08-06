@@ -160,7 +160,7 @@ const NAV: NavSection[] = [
       { to: "/admin/mapping", label: "Mapping", icon: iconLink, adminOnly: true },
       { to: "/admin/task-thresholds", label: "Task 임계값", icon: iconSlider, adminOnly: true },
       { to: "/admin/milestones", label: "Milestone", icon: iconCalendar, adminOnly: true },
-      { to: "/admin/ocs-import", label: "OCS Import", icon: iconLink, adminOnly: true },
+      { to: "/admin/ocs-import", label: "OCS Maintenance", icon: iconLink, adminOnly: true, strictAdminOnly: true },
       { to: "/admin/backup", label: "Backup", icon: iconDatabase, adminOnly: true },
     ],
   },
