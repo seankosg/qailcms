@@ -198,7 +198,7 @@ function SharedTimeline({
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[900px]">
+      <div className="min-w-[1000px] pr-16">
         <div className="flex">
           {/* Plot 라벨 거터 */}
           <div className="w-24 shrink-0" />
