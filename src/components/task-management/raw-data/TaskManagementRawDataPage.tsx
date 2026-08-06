@@ -711,6 +711,9 @@ export function TaskManagementRawDataPage() {
     kpiMode,
     canEditRow,
   });
+  // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 편집 admin 한정 판정용.
+  const isStrictAdminRef = useRef(false);
+  isStrictAdminRef.current = currentUser?.isStrictAdmin === true;
   cellDynRef.current = {
     commentCounts,
     tActualMap,
