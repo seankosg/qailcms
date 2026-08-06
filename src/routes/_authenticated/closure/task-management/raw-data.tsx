@@ -15,6 +15,8 @@ const searchSchema = z.object({
   plot: fallback(z.string(), "").default(""),
   q: fallback(z.string(), "").default(""),
   dataDate: fallback(z.string(), "").default(""),
+  planOverdue: fallback(z.string(), "").default(""),
+  actualOverdue: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/task-management/raw-data")({

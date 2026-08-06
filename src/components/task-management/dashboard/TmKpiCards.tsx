@@ -15,6 +15,7 @@ import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { EMPTY_TOKEN } from "@/lib/task-management/filters";
 import { useTmItemsCounts, type TmCountsByTeamEntry } from "@/hooks/useTmItemsCounts";
+import { MilestoneOverdueKpiCards } from "./MilestoneOverdueKpiCards";
 import { AlertTriangle } from "lucide-react";
 
 interface Props {
@@ -290,6 +291,12 @@ export function TmKpiCards({
           formula="In Delay 와 동일 산식 (gap<0 · 미완료)"
         />
       </div>
+
+      <MilestoneOverdueKpiCards
+        asOfDate={asOfDate}
+        taskScope={taskScope}
+        ownerContext={ownerContext}
+      />
     </div>
   );
 }

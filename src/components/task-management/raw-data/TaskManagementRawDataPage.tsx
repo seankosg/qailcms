@@ -374,6 +374,8 @@ export function TaskManagementRawDataPage() {
       discipline?: string;
       plot?: string;
       q?: string;
+      planOverdue?: string;
+      actualOverdue?: string;
     };
     if (s.source !== "dashboard") return;
     dashboardAppliedRef.current = true;
@@ -394,6 +396,8 @@ export function TaskManagementRawDataPage() {
           "plot",
           "q",
           "dataDate",
+          "planOverdue",
+          "actualOverdue",
         ]);
         const unknown = [...raw.keys()].filter((k) => !known.has(k));
         if (unknown.length) {
@@ -420,6 +424,8 @@ export function TaskManagementRawDataPage() {
     push("hdec_eng_name", s.hdec_eng_name);
     push("discipline", s.discipline);
     push("plot", s.plot);
+    push("plan_overdue", s.planOverdue);
+    push("actual_overdue", s.actualOverdue);
 
     setSorting(DEFAULT_SORTING);
     const q = (s.q ?? "").trim();
