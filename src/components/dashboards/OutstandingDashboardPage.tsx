@@ -1,5 +1,4 @@
-import { ClipboardList, AlertTriangle } from "lucide-react";
-import { SectionDashboardCard } from "./SectionDashboardCard";
+import { MilestoneTimelineCard } from "./MilestoneTimelineCard";
 
 export function OutstandingDashboardPage() {
   return (
@@ -10,22 +9,7 @@ export function OutstandingDashboardPage() {
           미완료 업무 요약 대시보드. 각 모듈로 이동해 세부 데이터를 확인하세요.
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <SectionDashboardCard
-          title="Task Management"
-          description="공정·진도 계획 대비 실적 및 리스크 감시."
-          icon={ClipboardList}
-          to="/closure/task-management/raw-data"
-          cta="Task 열기"
-        />
-        <SectionDashboardCard
-          title="Snag List Management"
-          description="De-Snagging 매트릭스 대시보드 (Plot · Level × Room Group). 셀 클릭 시 Raw Data 드릴다운."
-          icon={AlertTriangle}
-          to="/closure/snag-management/dashboard"
-          cta="Snag List 열기"
-        />
-      </div>
+      <MilestoneTimelineCard />
     </div>
   );
 }
