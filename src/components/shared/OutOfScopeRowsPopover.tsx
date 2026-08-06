@@ -4,10 +4,12 @@ interface Props {
   rows: Record<string, unknown>[];
   /** 표시용 식별자 후보 컬럼(앞에서부터 값이 있는 것 사용). */
   labelKeys: string[];
+  /** 버튼/헤더 문구 (기본: 권한 밖 제외). */
+  title?: string;
 }
 
 /** 권한 밖으로 제외된 행을 숫자만이 아니라 목록으로 펼쳐 보여준다(임포트 outOfScope 와 동일 기준). */
-export function OutOfScopeRowsPopover({ rows, labelKeys }: Props) {
+export function OutOfScopeRowsPopover({ rows, labelKeys, title = "권한 밖 제외" }: Props) {
   if (rows.length === 0) return null;
   const label = (r: Record<string, unknown>) => {
     for (const k of labelKeys) {
@@ -23,12 +25,12 @@ export function OutOfScopeRowsPopover({ rows, labelKeys }: Props) {
           type="button"
           className="ml-1 underline underline-offset-2 text-amber-600 hover:text-amber-700 dark:text-amber-400"
         >
-          · 권한 밖 제외 {rows.length}
+          · {title} {rows.length}
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-2">
         <div className="mb-1 text-[11px] font-semibold text-muted-foreground">
-          권한 밖 미반영 {rows.length}건
+          {title} {rows.length}건
         </div>
         <ul className="max-h-56 space-y-0.5 overflow-auto text-[11px] font-mono">
           {rows.slice(0, 200).map((r, i) => (
