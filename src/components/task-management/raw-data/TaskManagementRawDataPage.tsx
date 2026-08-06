@@ -451,9 +451,10 @@ export function TaskManagementRawDataPage() {
 
   // persist to server (with local cache) — debounce lives inside the hook
   const savePref = viewPref.save;
+  const lastSavedPrefRef = useRef<string | null>(null);
   useEffect(() => {
     if (!stateLoaded) return;
-    savePref({
+    const next = {
       sorting,
       sizing,
       visibility,
@@ -461,7 +462,11 @@ export function TaskManagementRawDataPage() {
       globalFilter,
       order,
       frozenExtras,
-    } satisfies PersistedState);
+    } satisfies PersistedState;
+    const sig = JSON.stringify(next);
+    if (lastSavedPrefRef.current === sig) return;
+    lastSavedPrefRef.current = sig;
+    savePref(next);
   }, [
     stateLoaded,
     sorting,
