@@ -998,6 +998,7 @@ function FileRow({
                   id: s.abd_number,
                 }))}
                 labelKeys={["abd_number"]}
+                title="OCS 미완료 제외 목록"
               />
             </>
           )}
