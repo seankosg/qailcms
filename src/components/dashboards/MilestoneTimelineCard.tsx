@@ -142,166 +142,204 @@ export function MilestoneTimelineCard() {
             등록된 마일스톤 기준일이 없습니다. (Admin &gt; 마일스톤 설정)
           </p>
         ) : (
-          <div className="flex flex-col gap-4">
-            {plots.map(([plot, nodes]) => (
-              <PlotTimeline key={plot} plot={plot} nodes={nodes} todayNum={todayNum} />
-            ))}
-          </div>
+          <SharedTimeline plots={plots} todayNum={todayNum} />
         )}
       </CardContent>
     </Card>
   );
 }
 
-function PlotTimeline({
+/** 모든 Plot 이 공유하는 단일 시간축 타임라인. */
+function SharedTimeline({
+  plots,
+  todayNum,
+}: {
+  plots: [string, Node[]][];
+  todayNum: number;
+}) {
+  const { minDay, maxDay, ticks } = useMemo(() => {
+    const all = plots.flatMap(([, ns]) => ns.map((n) => dayNum(n.date)));
+    all.push(todayNum);
+    const rawMin = Math.min(...all);
+    const rawMax = Math.max(...all);
+    const pad = Math.max(Math.round((rawMax - rawMin) * 0.07), 21);
+    const minDay = rawMin - pad;
+    const maxDay = rawMax + pad;
+    // 월 단위 눈금
+    const ticks: { day: number; label: string }[] = [];
+    const start = new Date((minDay + pad) * 86_400_000);
+    let y = start.getUTCFullYear();
+    let m = start.getUTCMonth();
+    for (let i = 0; i < 60; i++) {
+      const day = Math.floor(Date.UTC(y, m, 1) / 86_400_000);
+      if (day > maxDay) break;
+      if (day >= minDay) {
+        ticks.push({
+          day,
+          label: new Date(Date.UTC(y, m, 1)).toLocaleDateString("en-US", {
+            month: "short",
+            year: "2-digit",
+            timeZone: "UTC",
+          }),
+        });
+      }
+      m += 1;
+      if (m > 11) {
+        m = 0;
+        y += 1;
+      }
+    }
+    return { minDay, maxDay, ticks };
+  }, [plots, todayNum]);
+
+  const span = Math.max(maxDay - minDay, 1);
+  const pct = (day: number) => ((day - minDay) / span) * 100;
+  const todayPct = pct(todayNum);
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[1000px] pr-16">
+        <div className="flex">
+          {/* Plot 라벨 거터 */}
+          <div className="w-24 shrink-0" />
+          {/* 시간축 헤더 */}
+          <div className="relative h-6 flex-1 border-b">
+            {ticks.map((t) => (
+              <span
+                key={t.day}
+                className="absolute top-0 -translate-x-1/2 whitespace-nowrap font-mono text-[10px] text-muted-foreground"
+                style={{ left: `${pct(t.day)}%` }}
+              >
+                {t.label}
+              </span>
+            ))}
+            <span
+              className="absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-full border border-primary/30 bg-primary/15 px-1.5 font-mono text-[10px] font-semibold text-primary"
+              style={{ left: `${todayPct}%` }}
+            >
+              Today
+            </span>
+          </div>
+        </div>
+
+        <div className="relative">
+          {/* 전 Plot 공통 Today 세로선 · 월 그리드 */}
+          <div className="pointer-events-none absolute inset-0 flex">
+            <div className="w-24 shrink-0" />
+            <div className="relative flex-1">
+              {ticks.map((t) => (
+                <div
+                  key={t.day}
+                  className="absolute inset-y-0 w-px bg-border/60"
+                  style={{ left: `${pct(t.day)}%` }}
+                />
+              ))}
+              <div
+                className="absolute inset-y-0 w-0.5 bg-primary/60"
+                style={{ left: `${todayPct}%` }}
+              />
+            </div>
+          </div>
+
+          {plots.map(([plot, nodes]) => (
+            <PlotRow
+              key={plot}
+              plot={plot}
+              nodes={nodes}
+              pct={pct}
+              todayPct={todayPct}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlotRow({
   plot,
   nodes,
-  todayNum,
+  pct,
+  todayPct,
 }: {
   plot: string;
   nodes: Node[];
-  todayNum: number;
+  pct: (day: number) => number;
+  todayPct: number;
 }) {
-  const pos = (i: number) => (nodes.length <= 1 ? 50 : (i / (nodes.length - 1)) * 100);
-
-  // 오늘이 속한 구간을 보간해 경과선 길이를 구한다.
-  const elapsedPercent = useMemo(() => {
-    const days = nodes.map((n) => dayNum(n.date));
-    if (days.length === 0) return 0;
-    if (todayNum <= days[0]) return 0;
-    if (todayNum >= days[days.length - 1]) return 100;
-    for (let i = 1; i < days.length; i++) {
-      if (todayNum <= days[i]) {
-        const seg = Math.max(days[i] - days[i - 1], 1);
-        const ratio = (todayNum - days[i - 1]) / seg;
-        return pos(i - 1) + (pos(i) - pos(i - 1)) * ratio;
-      }
-    }
-    return 100;
-  }, [nodes, todayNum]);
-
-  // 다음 도래(진행중) 노드 = 아직 지나지 않은 첫 노드
   const activeIdx = nodes.findIndex((n) => n.diff >= 0);
-  const final = nodes[nodes.length - 1];
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  const startPct = pct(dayNum(first.date));
+  const endPct = pct(dayNum(last.date));
+  const elapsedEnd = Math.min(Math.max(todayPct, startPct), endPct);
 
   return (
-    <div className="rounded-lg border bg-muted/20">
-      <div className="flex items-center justify-between gap-2 border-b bg-background/60 px-3 py-1.5">
-        <div className="flex items-center gap-2">
-          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary ring-1 ring-primary/20">
-            Plot {plot}
-          </span>
-          <span className="text-[11px] text-muted-foreground tabular-nums">
-            {nodes.length} milestones
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5">
-          <CalendarClock className="h-3.5 w-3.5 text-primary" />
-          <span className="font-mono text-xs font-bold text-primary">{dLabel(final.diff)}</span>
-          <span className="ml-0.5 hidden text-[10px] text-muted-foreground sm:inline">
-            {final.label}
-          </span>
-        </div>
+    <div className="flex items-stretch border-b last:border-b-0">
+      <div className="flex w-24 shrink-0 flex-col justify-center gap-1 py-4 pr-2">
+        <span className="w-fit rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary ring-1 ring-primary/20">
+          Plot {plot}
+        </span>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {nodes.length} MS · {dLabel(last.diff)}
+        </span>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="relative min-w-[720px] px-14 pb-3 pt-8">
-          {/* 기준선 */}
-          <div className="absolute left-14 right-14 top-[calc(2rem+18px-1.5px)] h-[3px] rounded-full bg-border" />
-          {/* 경과선 */}
-          <div className="pointer-events-none absolute left-14 right-14 top-[calc(2rem+18px-1.5px)] h-[3px]">
-            <div
-              className="h-full rounded-full bg-destructive"
-              style={{ width: `${elapsedPercent}%` }}
-            />
-          </div>
+      <div className="relative flex-1 py-4" style={{ height: 132 }}>
+        {/* 기준선 */}
+        <div
+          className="absolute top-6 h-[3px] rounded-full bg-border"
+          style={{ left: `${startPct}%`, width: `${Math.max(endPct - startPct, 0)}%` }}
+        />
+        {/* 경과선 */}
+        <div
+          className="absolute top-6 h-[3px] rounded-full bg-destructive"
+          style={{ left: `${startPct}%`, width: `${Math.max(elapsedEnd - startPct, 0)}%` }}
+        />
 
-          {/* Today 마커 */}
-          {elapsedPercent > 0 && elapsedPercent < 100 && (
+        {nodes.map((n, index) => {
+          const isDone = n.diff < 0;
+          const isActive = index === activeIdx;
+          const Icon = isDone ? CheckCircle2 : isActive ? Clock : Circle;
+          const left = pct(dayNum(n.date));
+          const flip = index % 2 === 1; // 라벨 겹침 완화: 홀수 노드는 아래로 더 내림
+          return (
             <div
-              className="pointer-events-none absolute flex flex-col items-center"
-              style={{
-                top: "calc(2rem + 18px - 1.5px)",
-                left: `calc(56px + (100% - 112px) * ${elapsedPercent / 100})`,
-                transform: "translate(-50%, -100%)",
-              }}
+              key={`${n.kind}-${n.date}`}
+              className={`absolute z-10 flex -translate-x-1/2 flex-col items-center ${
+                isDone ? "opacity-70" : ""
+              }`}
+              style={{ left: `${left}%`, top: flip ? 62 : 10 }}
             >
-              <span className="mb-1 whitespace-nowrap rounded-full border border-primary/30 bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary">
-                Today
+              <div
+                className={`flex items-center justify-center rounded-full border-2 bg-background transition-all ${
+                  isActive
+                    ? "h-8 w-8 border-primary bg-primary/20 ring-4 ring-primary/15"
+                    : isDone
+                      ? "h-7 w-7 border-success bg-success/20"
+                      : "h-7 w-7 border-border bg-muted"
+                }`}
+              >
+                <Icon
+                  className={`${isActive ? "h-4 w-4" : "h-3.5 w-3.5"} ${
+                    isDone ? "text-success" : isActive ? "text-primary" : "text-muted-foreground"
+                  }`}
+                />
+              </div>
+              <span
+                className={`mt-1 whitespace-nowrap rounded bg-background/80 px-1 text-[11px] leading-tight ${
+                  isActive ? "font-bold text-foreground" : "font-medium"
+                }`}
+                title={`${n.label} · ${fmtDate(n.date)}`}
+              >
+                {n.label}
               </span>
-              <div className="h-2 w-0.5 rounded-full bg-primary/50" />
+              <span className="whitespace-nowrap rounded bg-background/80 px-1 font-mono text-[10px] text-muted-foreground">
+                {fmtDate(n.date)} · {dLabel(n.diff)}
+              </span>
             </div>
-          )}
-
-          <div className="relative" style={{ height: 124 }}>
-            {nodes.map((n, index) => {
-              const isDone = n.diff < 0;
-              const isActive = index === activeIdx;
-              const Icon = isDone ? CheckCircle2 : isActive ? Clock : Circle;
-              const isFirst = index === 0;
-              const isLast = index === nodes.length - 1;
-              return (
-                <div
-                  key={`${n.kind}-${n.date}`}
-                  className={`absolute z-10 flex flex-col ${
-                    isFirst ? "items-start" : isLast ? "items-end" : "items-center"
-                  } ${isDone ? "opacity-70" : ""}`}
-                  style={
-                    isLast
-                      ? { right: 0, top: 0 }
-                      : {
-                          left: `${pos(index)}%`,
-                          top: 0,
-                          transform: isFirst ? "translateX(0)" : "translateX(-50%)",
-                        }
-                  }
-                >
-                  <div
-                    className={`flex items-center justify-center rounded-full border-2 transition-all ${
-                      isActive
-                        ? "h-10 w-10 border-primary bg-primary/20 ring-4 ring-primary/15"
-                        : isDone
-                          ? "h-9 w-9 border-success bg-success/20"
-                          : "h-9 w-9 border-border bg-muted"
-                    }`}
-                  >
-                    <Icon
-                      className={`${isActive ? "h-5 w-5" : "h-4 w-4"} ${
-                        isDone
-                          ? "text-success"
-                          : isActive
-                            ? "text-primary"
-                            : "text-muted-foreground"
-                      }`}
-                    />
-                  </div>
-                  <span
-                    className={`mt-2 max-w-[120px] whitespace-nowrap text-center text-xs leading-tight ${
-                      isActive ? "font-bold text-foreground" : "font-medium"
-                    }`}
-                    title={n.label}
-                  >
-                    {n.label}
-                  </span>
-                  <span className="mt-0.5 whitespace-nowrap font-mono text-[11px] text-muted-foreground">
-                    {fmtDate(n.date)}
-                  </span>
-                  <span
-                    className={`mt-0.5 whitespace-nowrap font-mono text-base font-bold ${
-                      n.diff > 0
-                        ? "text-primary"
-                        : n.diff === 0
-                          ? "text-warning"
-                          : "text-muted-foreground"
-                    }`}
-                  >
-                    {dLabel(n.diff)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+          );
+        })}
       </div>
     </div>
   );
