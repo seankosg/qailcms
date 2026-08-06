@@ -57,17 +57,22 @@ export function MilestoneTimelineCard() {
     queryKey: ["tm_milestone_timeline"],
     staleTime: 60_000,
     queryFn: async () => {
-      const [kindsRes, cfgRes] = await Promise.all([
+      const [kindsRes, cfgRes, autoRes] = await Promise.all([
         (supabase as any)
           .from("tm_milestone_kinds")
           .select("kind_code, label, sort_order, is_active")
           .is("deleted_at", null)
           .order("sort_order", { ascending: true }),
         (supabase as any).from("tm_milestone_config").select("plot, kind, target_date"),
+        (supabase as any).rpc("plot_module_team_last_date"),
       ]);
       if (kindsRes.error) throw kindsRes.error;
       if (cfgRes.error) throw cfgRes.error;
-      return { kinds: (kindsRes.data ?? []) as Kind[], cfg: (cfgRes.data ?? []) as Cfg[] };
+      return {
+        kinds: (kindsRes.data ?? []) as Kind[],
+        cfg: (cfgRes.data ?? []) as Cfg[],
+        auto: (autoRes?.data ?? []) as AutoRow[],
+      };
     },
   });
 
@@ -89,6 +94,18 @@ export function MilestoneTimelineCard() {
         label: k.label || r.kind,
         date: r.target_date,
         diff: dayNum(r.target_date) - todayNum,
+      });
+      byPlot.set(r.plot, list);
+    }
+    for (const list of byPlot.values()) list.sort((a, b) => a.date.localeCompare(b.date));
+    for (const r of data?.auto ?? []) {
+      if (!r?.plot || !r?.label || !r?.last_date) continue;
+      const list = byPlot.get(r.plot) ?? [];
+      list.push({
+        kind: `auto:${r.label}`,
+        label: `· ${r.label}`,
+        date: r.last_date,
+        diff: dayNum(r.last_date) - todayNum,
       });
       byPlot.set(r.plot, list);
     }
