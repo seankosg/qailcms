@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { OutOfScopeRowsPopover } from "@/components/shared/OutOfScopeRowsPopover";
 import {
   Card,
   CardContent,
