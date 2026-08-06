@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { todayInDoha } from "@/lib/time/doha";
+import { cn } from "@/lib/utils";
 
 const PLOT_ORDER = ["D", "C", "G"];
 
@@ -177,7 +178,7 @@ export function MilestoneTimelineCard() {
             등록된 마일스톤 기준일이 없습니다. (Admin &gt; 마일스톤 설정)
           </p>
         ) : (
-          <SharedTimeline plots={plots} todayNum={todayNum} />
+          <SharedTimeline plots={plots} todayNum={todayNum} showAuto={showAuto} />
         )}
       </CardContent>
     </Card>
@@ -188,9 +189,11 @@ export function MilestoneTimelineCard() {
 function SharedTimeline({
   plots,
   todayNum,
+  showAuto,
 }: {
   plots: [string, Node[]][];
   todayNum: number;
+  showAuto: boolean;
 }) {
   const { minDay, maxDay, ticks } = useMemo(() => {
     const all = plots.flatMap(([, ns]) => ns.map((n) => dayNum(n.date)));
@@ -242,14 +245,22 @@ function SharedTimeline({
             {ticks.map((t) => (
               <span
                 key={t.day}
-                className="absolute top-0 -translate-x-1/2 whitespace-nowrap font-mono text-[10px] text-muted-foreground"
+                className={cn(
+                  "absolute top-0 -translate-x-1/2 whitespace-nowrap font-mono text-[10px]",
+                  showAuto ? "text-muted-foreground/50" : "text-muted-foreground",
+                )}
                 style={{ left: `${pct(t.day)}%` }}
               >
                 {t.label}
               </span>
             ))}
             <span
-              className="absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-full border border-primary/30 bg-primary/15 px-1.5 font-mono text-[10px] font-semibold text-primary"
+              className={cn(
+                "absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-full border px-1.5 font-mono text-[10px] font-semibold",
+                showAuto
+                  ? "border-muted-foreground/30 bg-muted-foreground/10 text-muted-foreground/70"
+                  : "border-primary/30 bg-primary/15 text-primary",
+              )}
               style={{ left: `${todayPct}%` }}
             >
               Today
@@ -265,12 +276,12 @@ function SharedTimeline({
               {ticks.map((t) => (
                 <div
                   key={t.day}
-                  className="absolute inset-y-0 w-px bg-border/60"
+                  className={cn("absolute inset-y-0 w-px", showAuto ? "bg-border/40" : "bg-border/60")}
                   style={{ left: `${pct(t.day)}%` }}
                 />
               ))}
               <div
-                className="absolute inset-y-0 w-0.5 bg-primary/60"
+                className={cn("absolute inset-y-0", showAuto ? "w-px bg-muted-foreground/30" : "w-0.5 bg-primary/60")}
                 style={{ left: `${todayPct}%` }}
               />
             </div>
@@ -283,6 +294,7 @@ function SharedTimeline({
               nodes={nodes}
               pct={pct}
               todayPct={todayPct}
+              showAuto={showAuto}
             />
           ))}
         </div>
@@ -296,11 +308,13 @@ function PlotRow({
   nodes,
   pct,
   todayPct,
+  showAuto,
 }: {
   plot: string;
   nodes: Node[];
   pct: (day: number) => number;
   todayPct: number;
+  showAuto: boolean;
 }) {
   const activeIdx = nodes.findIndex((n) => n.diff >= 0 && !n.auto);
   const first = nodes[0];
@@ -339,12 +353,18 @@ function PlotRow({
       <div className="relative flex-1 py-4" style={{ height: 36 + laneCount * LANE_H }}>
         {/* 기준선 */}
         <div
-          className="absolute top-[22px] h-[6px] rounded-full bg-border"
+          className={cn(
+            "absolute top-[22px] h-[6px] rounded-full",
+            showAuto ? "bg-muted-foreground/30" : "bg-border",
+          )}
           style={{ left: `${startPct}%`, width: `${Math.max(endPct - startPct, 0)}%` }}
         />
         {/* 경과선 */}
         <div
-          className="absolute top-[22px] h-[6px] rounded-full bg-destructive"
+          className={cn(
+            "absolute top-[22px] h-[6px] rounded-full",
+            showAuto ? "bg-muted-foreground/40" : "bg-destructive",
+          )}
           style={{ left: `${startPct}%`, width: `${Math.max(elapsedEnd - startPct, 0)}%` }}
         />
 
@@ -355,86 +375,109 @@ function PlotRow({
             return (
               <div
                 key={`${n.kind}-${n.date}`}
-                className="absolute z-10 flex -translate-x-1/2 flex-col items-center opacity-60"
+                className="absolute z-30 flex -translate-x-1/2 flex-col items-center"
                 style={{ left: `${left}%`, top: 12 + lane * LANE_H }}
               >
                 {lane > 0 ? (
                   <span
-                    className="absolute bottom-full w-px bg-border/70"
+                    className="absolute bottom-full w-px bg-muted-foreground/50"
                     style={{ height: lane * LANE_H - 10 }}
                   />
                 ) : null}
-                <div className="h-3 w-3 rounded-full border-2 border-muted-foreground/50 bg-background" />
+                <div className="h-4 w-4 rounded-full border-2 border-background bg-foreground shadow-sm" />
                 <span
-                  className="mt-1 whitespace-nowrap rounded bg-background/80 px-1 text-[10px] font-normal leading-tight text-muted-foreground"
+                  className="mt-1 whitespace-nowrap rounded-md bg-background px-2 py-0.5 text-[11px] font-bold text-foreground shadow-sm"
                   title={`${n.label} · ${fmtDate(n.date)} (모듈·팀 최종 계획일)`}
                 >
                   {n.label}
                 </span>
-                <span className="whitespace-nowrap rounded bg-background/80 px-1 font-mono text-[9px] text-muted-foreground/80">
+                <span className="whitespace-nowrap rounded bg-background px-1 font-mono text-[10px] font-semibold text-foreground">
                   {fmtDate(n.date)}
+                </span>
+                <span className="whitespace-nowrap rounded bg-background px-1 font-mono text-[10px] font-extrabold text-destructive">
+                  {dLabel(n.diff)}
                 </span>
               </div>
             );
           }
           const Icon = isDone ? CheckCircle2 : isActive ? Clock : Circle;
           return (
-          <div
-            key={`${n.kind}-${n.date}`}
-            className="absolute z-20 flex -translate-x-1/2 flex-col items-center"
-            style={{ left: `${left}%`, top: 8 + lane * LANE_H }}
+            <div
+              key={`${n.kind}-${n.date}`}
+              className="absolute z-20 flex -translate-x-1/2 flex-col items-center"
+              style={{ left: `${left}%`, top: 8 + lane * LANE_H }}
             >
               {lane > 0 ? (
                 <span
-                  className="absolute bottom-full w-px bg-border"
+                  className={cn(
+                    "absolute bottom-full w-px",
+                    showAuto ? "bg-muted-foreground/30" : "bg-border",
+                  )}
                   style={{ height: lane * LANE_H - 14 }}
                 />
               ) : null}
               <div
-                className={`flex items-center justify-center rounded-full border-[3px] bg-background transition-all ${
-                  isActive
-                    ? "h-10 w-10 border-primary ring-4 ring-primary/20"
-                    : isDone
-                      ? "h-8 w-8 border-success ring-2 ring-success/20"
-                      : "h-8 w-8 border-muted-foreground/40 bg-muted"
-                }`}
+                className={cn(
+                  "flex items-center justify-center rounded-full border-[3px] bg-background transition-all",
+                  showAuto
+                    ? "h-8 w-8 border-muted-foreground/40"
+                    : isActive
+                      ? "h-10 w-10 border-primary ring-4 ring-primary/20"
+                      : isDone
+                        ? "h-8 w-8 border-success ring-2 ring-success/20"
+                        : "h-8 w-8 border-muted-foreground/40 bg-muted",
+                )}
               >
                 <div
-                  className={`flex items-center justify-center rounded-full ${
-                    isActive
-                      ? "h-7 w-7 bg-primary text-primary-foreground"
-                      : isDone
-                        ? "h-6 w-6 bg-success text-success-foreground"
-                        : "h-6 w-6 bg-muted-foreground/20 text-muted-foreground"
-                  }`}
+                  className={cn(
+                    "flex items-center justify-center rounded-full",
+                    showAuto
+                      ? "h-6 w-6 bg-muted-foreground/30 text-muted-foreground"
+                      : isActive
+                        ? "h-7 w-7 bg-primary text-primary-foreground"
+                        : isDone
+                          ? "h-6 w-6 bg-success text-success-foreground"
+                          : "h-6 w-6 bg-muted-foreground/20 text-muted-foreground",
+                  )}
                 >
                   <Icon
-                    className={`${isActive ? "h-4 w-4" : "h-3.5 w-3.5"} ${
-                      isActive ? "text-primary-foreground" : isDone ? "text-success-foreground" : "text-muted-foreground"
-                    }`}
+                    className={cn(
+                      showAuto ? "h-3.5 w-3.5 text-muted-foreground" : isActive ? "h-4 w-4" : "h-3.5 w-3.5",
+                      showAuto
+                        ? "text-muted-foreground"
+                        : isActive
+                          ? "text-primary-foreground"
+                          : isDone
+                            ? "text-success-foreground"
+                            : "text-muted-foreground",
+                    )}
                   />
                 </div>
               </div>
               <span
-                className={`mt-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-bold uppercase leading-tight tracking-wide ring-1 ${
-                  isActive
-                    ? "bg-primary text-primary-foreground ring-primary"
-                    : isDone
-                      ? "bg-success/15 text-success ring-success/40"
-                      : "bg-muted text-foreground ring-border"
-                }`}
+                className={cn(
+                  "mt-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-bold uppercase leading-tight tracking-wide ring-1",
+                  showAuto
+                    ? "bg-muted text-muted-foreground ring-border"
+                    : isActive
+                      ? "bg-primary text-primary-foreground ring-primary"
+                      : isDone
+                        ? "bg-success/15 text-success ring-success/40"
+                        : "bg-muted text-foreground ring-border",
+                )}
                 title={`${n.label} · ${fmtDate(n.date)}`}
               >
                 {n.label}
               </span>
-              <span className="mt-1 whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-bold text-foreground">
+              <span className="mt-1 whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-bold text-muted-foreground">
                 {fmtDate(n.date)}
               </span>
               {!isDone ? (
                 <span
-                  className={`whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-extrabold ${
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  }`}
+                  className={cn(
+                    "whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-extrabold",
+                    showAuto ? "text-muted-foreground/70" : isActive ? "text-primary" : "text-muted-foreground",
+                  )}
                 >
                   {dLabel(n.diff)}
                 </span>
