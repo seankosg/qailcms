@@ -631,7 +631,6 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           updated: (cur?.updated ?? 0) + updated,
           inactivated,
           mismatched: 0,
-          skipped_no_key: exclusions.ocs_pending ?? 0,
           parsed_rows: parsedTotal,
           applied_rows: appliedTotal,
           exclusions,
