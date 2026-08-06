@@ -349,6 +349,10 @@ export function TaskManagementRawDataPage() {
     setColumnFilters(cleanedFilters);
     setGlobalFilter(s.globalFilter ?? "");
     setSearchInput(s.globalFilter ?? "");
+    baseFiltersRef.current = {
+      columnFilters: cleanedFilters,
+      globalFilter: s.globalFilter ?? "",
+    };
     try {
       const savedCollapsed = localStorage.getItem("qail.task-management.collapsed");
       if (savedCollapsed) setCollapsedParents(new Set(JSON.parse(savedCollapsed)));
@@ -1403,6 +1407,7 @@ export function TaskManagementRawDataPage() {
             isAdmin={isAdmin}
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
+            onSaveLayout={saveLayoutNow}
           />
           </div>
           <Button
