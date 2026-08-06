@@ -84,6 +84,7 @@ import { TaskStageProgress } from "./TaskStageProgress";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+import { MilestoneReferenceButton } from "@/components/task-management/shared/MilestoneReferenceButton";
 import { useTmInfiniteItems } from "@/hooks/useTmInfiniteItems";
 import {
   columnFiltersToServer,
@@ -1342,6 +1343,7 @@ export function TaskManagementRawDataPage() {
           onChange={(v: string) => setSharedDataDate(v)}
           onReset={() => setSharedDataDate("")}
         />
+        <MilestoneReferenceButton />
         {isFetching && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
 
         <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
