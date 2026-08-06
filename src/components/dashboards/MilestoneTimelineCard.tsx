@@ -367,12 +367,10 @@ function PlotRow({
           }
           const Icon = isDone ? CheckCircle2 : isActive ? Clock : Circle;
           return (
-            <div
-              key={`${n.kind}-${n.date}`}
-              className={`absolute z-10 flex -translate-x-1/2 flex-col items-center ${
-                isDone ? "opacity-80" : ""
-              }`}
-              style={{ left: `${left}%`, top: 8 + lane * LANE_H }}
+          <div
+            key={`${n.kind}-${n.date}`}
+            className="absolute z-20 flex -translate-x-1/2 flex-col items-center"
+            style={{ left: `${left}%`, top: 8 + lane * LANE_H }}
             >
               {lane > 0 ? (
                 <span
