@@ -83,7 +83,8 @@ export function BulkEditBar({
   const fields = useMemo(
     () =>
       // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 일괄 편집은 admin 만 가능.
-      getBulkEditableFields({ milestoneOptions }).filter(
+      // admin 계정은 파생/자동계산을 제외한 전 항목을 일괄 편집할 수 있다.
+      getBulkEditableFields({ milestoneOptions, admin: isStrictAdmin }).filter(
         (f) => f.field !== "milestone" || isStrictAdmin,
       ),
     [milestoneOptions, isStrictAdmin],
@@ -118,13 +119,15 @@ export function BulkEditBar({
   const count = selectedRows.length;
   // TM_OWNER_MUTATIONS_V2_2026_07_28 — 편집 불가 행은 skip
   const editableRows = useMemo(
-    () => (canEditRow ? selectedRows.filter((r) => canEditRow(r)) : selectedRows),
-    [selectedRows, canEditRow],
+    () =>
+      isStrictAdmin || !canEditRow ? selectedRows : selectedRows.filter((r) => canEditRow(r)),
+    [selectedRows, canEditRow, isStrictAdmin],
   );
   const skippedCount = selectedRows.length - editableRows.length;
   const skippedRows = useMemo(
-    () => (canEditRow ? selectedRows.filter((r) => !canEditRow(r)) : []),
-    [selectedRows, canEditRow],
+    () =>
+      isStrictAdmin || !canEditRow ? [] : selectedRows.filter((r) => !canEditRow(r)),
+    [selectedRows, canEditRow, isStrictAdmin],
   );
   const ids = useMemo(
     () => editableRows.map((r) => String(r.id ?? "")).filter(Boolean),
