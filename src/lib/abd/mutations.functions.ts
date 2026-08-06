@@ -239,6 +239,10 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           plot: null,
           sheet_name: null,
           total_rows: data.file_total_rows ?? data.rows.length,
+          data_date: data.data_date ?? null,
+          parsed_rows: 0,
+          applied_rows: 0,
+          exclusions: {},
           status: "in_progress",
           started_at: new Date().toISOString(),
           imported_by: context.userId,
@@ -592,7 +596,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       // 누적된 카운트를 읽어와 이번 호출분과 합산 후 마감
       const { data: cur } = await supa
         .from("abd_import_logs")
-        .select("inserted, updated")
+        .select("inserted, updated, parsed_rows, applied_rows, exclusions")
         .eq("id", batchId)
         .single();
       // 파일 전체 기준 OCS 제외 건수 (여러 HTTP 청크 누적분 포함)
@@ -601,6 +605,25 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         .select("id", { count: "exact", head: true })
         .eq("upload_id", batchId)
         .eq("reason_code", "ocs_pending");
+      const parsedTotal = (cur?.parsed_rows ?? 0) + rowsToImport.length;
+      const appliedTotal = (cur?.applied_rows ?? 0) + inserted + updated;
+      const exclusions: Record<string, number> = {
+        ...((cur?.exclusions ?? {}) as Record<string, number>),
+        ocs_pending: skippedTotal ?? 0,
+      };
+      const excludedTotal = Object.values(exclusions).reduce(
+        (a, b) => a + (typeof b === "number" ? b : 0),
+        0,
+      );
+      const unclassified = Math.max(0, parsedTotal - appliedTotal - excludedTotal);
+      if (unclassified > 0) exclusions.unclassified = unclassified;
+      // 상태 규칙: 반영=파싱이면 success, 반영 0이면 failed, 그 외 partial
+      const status =
+        appliedTotal === 0 && parsedTotal > 0
+          ? "failed"
+          : appliedTotal === parsedTotal
+            ? "success"
+            : "partial";
       await supa
         .from("abd_import_logs")
         .update({
@@ -608,7 +631,11 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           updated: (cur?.updated ?? 0) + updated,
           inactivated,
           mismatched: 0,
-          status: (skippedTotal ?? 0) > 0 ? "partial" : "success",
+          parsed_rows: parsedTotal,
+          applied_rows: appliedTotal,
+          exclusions,
+          data_date: data.data_date ?? null,
+          status,
           finished_at: new Date().toISOString(),
         })
         .eq("id", batchId);
@@ -616,7 +643,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       // 중간 호출: 누적만 갱신 (finished/status 건드리지 않음)
       const { data: cur } = await supa
         .from("abd_import_logs")
-        .select("inserted, updated")
+        .select("inserted, updated, parsed_rows, applied_rows")
         .eq("id", batchId)
         .single();
       await supa
@@ -624,6 +651,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         .update({
           inserted: (cur?.inserted ?? 0) + inserted,
           updated: (cur?.updated ?? 0) + updated,
+          parsed_rows: (cur?.parsed_rows ?? 0) + rowsToImport.length,
+          applied_rows: (cur?.applied_rows ?? 0) + inserted + updated,
         })
         .eq("id", batchId);
     }

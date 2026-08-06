@@ -241,7 +241,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await (supabase as any)
         .from("abd_import_logs")
         .select(
-          "id, file_name, status, started_at, finished_at, imported_by, total_rows, inserted, updated, inactivated, mismatched, skipped_no_key, team, rolled_back_at",
+          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, inactivated, mismatched, skipped_no_key, team, rolled_back_at, parsed_rows, applied_rows, exclusions",
         )
         .order("started_at", { ascending: false })
         .limit(100);
@@ -252,7 +252,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         started_at: r.started_at,
         finished_at: r.finished_at,
         imported_by: r.imported_by,
-        data_date: null,
+        data_date: r.data_date ?? null,
         total: r.total_rows ?? 0,
         inserted: r.inserted ?? 0,
         updated: r.updated ?? 0,
@@ -260,6 +260,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         rejected: r.mismatched ?? 0,
         extra: r.team,
         rolled_back_at: r.rolled_back_at,
+        parsed_rows: r.parsed_rows ?? null,
+        applied_rows: r.applied_rows ?? null,
+        exclusions: r.exclusions ?? null,
       }));
       setBatches(list);
       await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
@@ -705,6 +708,38 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
             <CardTitle className="text-base">{selectedBatch?.file_name}</CardTitle>
           </CardHeader>
           <CardContent>
+            {selectedBatch && (
+              <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
+                <Badge variant="outline" className={statusColor[selectedBatch.status] || ""}>
+                  {selectedBatch.status === "rolled_back" ? "rolled back" : selectedBatch.status}
+                </Badge>
+                {hasExtra && <Badge variant="outline">{cfg.extraLabel} {selectedBatch.extra ?? "—"}</Badge>}
+                <Badge variant="outline">Data Date {selectedBatch.data_date ? formatDdMmmYyyy(selectedBatch.data_date) || "—" : "—"}</Badge>
+                <Badge variant="outline">Uploaded {fmtDateTime(selectedBatch.started_at)}</Badge>
+                <Badge variant="outline">
+                  Uploader {selectedBatch.imported_by ? uploaderNames[selectedBatch.imported_by] || "—" : "—"}
+                </Badge>
+                <Badge variant="outline">Duration {fmtDuration(selectedBatch.started_at, selectedBatch.finished_at)}</Badge>
+                {typeof selectedBatch.parsed_rows === "number" && (
+                  <Badge variant="outline">파싱 {selectedBatch.parsed_rows}</Badge>
+                )}
+                {typeof selectedBatch.applied_rows === "number" && (
+                  <Badge variant="outline">반영 {selectedBatch.applied_rows}</Badge>
+                )}
+                <Badge variant="outline">Inserted {selectedBatch.inserted}</Badge>
+                <Badge variant="outline">Updated {selectedBatch.updated}</Badge>
+                <Badge variant="outline">Skipped {selectedBatch.skipped}</Badge>
+                <Badge variant="outline">Rejected {selectedBatch.rejected}</Badge>
+                {selectedBatch.exclusions &&
+                  Object.entries(selectedBatch.exclusions)
+                    .filter(([, v]) => typeof v === "number" && (v as number) > 0)
+                    .map(([k, v]) => (
+                      <Badge key={k} variant="outline" className="bg-amber-100 text-amber-800">
+                        제외 {k} {v as number}
+                      </Badge>
+                    ))}
+              </div>
+            )}
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1.5 text-xs">
                 <Badge variant="outline">Total {rowLogs.length}</Badge>
