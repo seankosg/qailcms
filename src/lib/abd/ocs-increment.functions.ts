@@ -5,18 +5,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BASELINE_SCHEMA_VERSION, computeBaselineId } from "@/lib/abd/ocs-baseline-shared";
 import { assertBaselineGate } from "@/lib/abd/ocs-increment-gate";
 import { recheckCollisionsServerSide } from "@/lib/abd/ocs-increment-collision";
-import {
-  assetList,
-  sourceFileList,
-  sourceMetaList,
-} from "@/lib/abd/ocs-increment-normalize";
+import { assetList, sourceFileList, sourceMetaList } from "@/lib/abd/ocs-increment-normalize";
 import type { SourceFileRef } from "@/lib/abd/ocs-increment-types";
 
-export type {
-  AssetRef,
-  SourceFileMeta,
-  SourceFileRef,
-} from "@/lib/abd/ocs-increment-types";
+export type { AssetRef, SourceFileMeta, SourceFileRef } from "@/lib/abd/ocs-increment-types";
 
 export type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 
@@ -53,15 +45,15 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
       base_core_hash?: string;
       base_core_table_hashes?: Record<string, string>;
     }) => {
-    if (!input?.package_sha256) throw new Error("package_sha256 이 필요합니다.");
-    return {
-      package_sha256: input.package_sha256,
-      base_import_run_id: input.base_import_run_id ?? "",
-      base_baseline_id: input.base_baseline_id ?? "",
-      base_core_hash: (input.base_core_hash ?? "").toLowerCase(),
-      base_core_table_hashes: input.base_core_table_hashes ?? {},
-    };
-  },
+      if (!input?.package_sha256) throw new Error("package_sha256 이 필요합니다.");
+      return {
+        package_sha256: input.package_sha256,
+        base_import_run_id: input.base_import_run_id ?? "",
+        base_baseline_id: input.base_baseline_id ?? "",
+        base_core_hash: (input.base_core_hash ?? "").toLowerCase(),
+        base_core_table_hashes: input.base_core_table_hashes ?? {},
+      };
+    },
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);

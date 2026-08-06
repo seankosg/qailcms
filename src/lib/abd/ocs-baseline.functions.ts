@@ -54,10 +54,7 @@ function dohaDate(d: Date): string {
   return new Date(d.getTime() + 3 * 3600_000).toISOString().slice(0, 10);
 }
 function dohaStampCompact(d: Date): string {
-  return new Date(d.getTime() + 3 * 3600_000)
-    .toISOString()
-    .slice(0, 16)
-    .replace(/[-:T]/g, "");
+  return new Date(d.getTime() + 3 * 3600_000).toISOString().slice(0, 16).replace(/[-:T]/g, "");
 }
 
 export type BaselineFileInfo = {
@@ -195,8 +192,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         data_date: stored.data_date ?? "",
         storage_path: path,
         zip_byte_size: existing.metadata?.size ?? 0,
-        total_rows:
-          stored.total_rows ?? storedFiles.reduce((s, f) => s + (f.row_count ?? 0), 0),
+        total_rows: stored.total_rows ?? storedFiles.reduce((s, f) => s + (f.row_count ?? 0), 0),
         files: storedFiles,
         reused: true,
         signed_url: signed?.signedUrl ?? "",
@@ -278,7 +274,11 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       core_last_changed_at: before["core_last_changed_at"] ?? null,
       generated_at: generatedAt.toISOString(),
       data_date: dohaDate(generatedAt),
-      excluded: ["abd_ocs_compliance_log", "abd_ocs_import_logs", "storage binaries (images, xlsx)"],
+      excluded: [
+        "abd_ocs_compliance_log",
+        "abd_ocs_import_logs",
+        "storage binaries (images, xlsx)",
+      ],
       total_rows: files.reduce((s, f) => s + f.row_count, 0),
       files: files.map((f) => ({
         relative_path: f.name,

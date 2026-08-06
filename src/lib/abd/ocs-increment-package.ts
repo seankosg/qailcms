@@ -146,7 +146,9 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
 
   const manifest = parseManifest(JSON.parse(await manifestFile.async("string")));
   if (manifest.schema_version !== INCREMENT_SCHEMA_VERSION) {
-    blockers.push(`schema_version 불일치: ${manifest.schema_version || "(없음)"} ≠ ${INCREMENT_SCHEMA_VERSION}`);
+    blockers.push(
+      `schema_version 불일치: ${manifest.schema_version || "(없음)"} ≠ ${INCREMENT_SCHEMA_VERSION}`,
+    );
   }
   if (!manifest.data_date) blockers.push("manifest.data_date 가 없습니다.");
   if (!manifest.base_baseline_id) blockers.push("manifest.base_baseline_id 가 없습니다.");
@@ -155,7 +157,8 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
   if (!manifest.base_generated_at) blockers.push("manifest.base_generated_at 가 없습니다.");
   blockers.push(...coreTableHashBlockers(manifest.base_core_table_hashes));
   if (!manifest.package_id) blockers.push("manifest.package_id 가 없습니다.");
-  if (manifest.target_ocs_numbers.length === 0) blockers.push("대상 OCS 번호 배열이 비어 있습니다.");
+  if (manifest.target_ocs_numbers.length === 0)
+    blockers.push("대상 OCS 번호 배열이 비어 있습니다.");
   if (manifest.files.length === 0) blockers.push("manifest.files 목록이 비어 있습니다.");
 
   // 내부 파일 SHA-256 · byte size 전수 검증
@@ -174,7 +177,9 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
       continue;
     }
     if (entry.byte_size && entry.byte_size !== bytes.byteLength) {
-      blockers.push(`byte size 불일치: ${entry.relative_path} (${bytes.byteLength} ≠ ${entry.byte_size})`);
+      blockers.push(
+        `byte size 불일치: ${entry.relative_path} (${bytes.byteLength} ≠ ${entry.byte_size})`,
+      );
       continue;
     }
     verified += 1;
@@ -205,7 +210,8 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
   if (atomic.duplicated_atomic_ids.length > 0) {
     blockers.push(`중복 source_comment_id ${atomic.duplicated_atomic_ids.length}건`);
   }
-  if (atomic.invalid_rows.length > 0) blockers.push(`atomic.json 형식 오류 ${atomic.invalid_rows.length}건`);
+  if (atomic.invalid_rows.length > 0)
+    blockers.push(`atomic.json 형식 오류 ${atomic.invalid_rows.length}건`);
   if (!policy.policy_version) blockers.push("policy.json 의 policy_version 이 없습니다.");
 
   const sourceFiles = [...bins.values()].filter((b) => b.relative_path.startsWith("source/"));

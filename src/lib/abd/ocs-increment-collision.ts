@@ -81,7 +81,9 @@ export async function recheckCollisionsServerSide(
       fresh.push(a.path);
       continue;
     }
-    blockers.push(`STORAGE_UNRESOLVED: ${a.bucket}/${a.path} — Storage object 는 있으나 DB metadata 가 없습니다.`);
+    blockers.push(
+      `STORAGE_UNRESOLVED: ${a.bucket}/${a.path} — Storage object 는 있으나 DB metadata 가 없습니다.`,
+    );
   }
 
   return { skip_paths: skip, new_paths: fresh, blockers };
