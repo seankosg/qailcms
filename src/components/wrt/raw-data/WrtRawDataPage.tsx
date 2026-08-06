@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertTriangle, Download, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,13 @@ import { downloadWrtRoundtripWorkbook } from "@/lib/wrt/roundtrip-export";
 import { updateWrtField } from "@/lib/wrt/mutations.functions";
 import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
 import { useRclCan } from "@/hooks/useRclCan";
+import { useUserViewPreference } from "@/hooks/useUserViewPreference";
+import { WRT_COLUMNS, WRT_DEFAULT_ORDER, WRT_DEFAULT_VISIBILITY, type WrtColumnDef } from "./wrt-columns";
+import { WrtColumnFilterDropdown } from "./WrtColumnFilterDropdowns";
+import { WrtColumnOrderMenu } from "./WrtColumnOrderMenu";
+import { WrtBulkEditBar } from "./WrtBulkEditBar";
+import { WrtDetailSheet } from "./WrtDetailSheet";
+import { WrtExportDialog } from "./WrtExportDialog";
 
 const routeApi = getRouteApi("/_authenticated/closure/warranty/raw-data");
 
@@ -71,6 +79,40 @@ export function WrtRawDataPage() {
   const { canRow } = useRclCan("WRT", "write");
   const isToday = asOf === today;
 
+  // ── 컬럼 설정(순서·표시·고정) — 계정 단위 저장 ──
+  const viewPref = useUserViewPreference("wrt.raw-data.v1");
+  const [order, setOrder] = useState<string[]>(WRT_DEFAULT_ORDER);
+  const [visibility, setVisibility] = useState<Record<string, boolean>>(WRT_DEFAULT_VISIBILITY);
+  const [frozenExtras, setFrozenExtras] = useState<string[]>(["wrt_number"]);
+  const [stateLoaded, setStateLoaded] = useState(false);
+  useEffect(() => {
+    if (!viewPref.ready || stateLoaded) return;
+    const s = (viewPref.state ?? {}) as any;
+    const valid = new Set(WRT_DEFAULT_ORDER);
+    if (Array.isArray(s.order)) {
+      const kept = s.order.filter((k: any) => typeof k === "string" && valid.has(k));
+      setOrder([...kept, ...WRT_DEFAULT_ORDER.filter((k) => !kept.includes(k))]);
+    }
+    if (s.visibility && typeof s.visibility === "object") {
+      setVisibility({ ...WRT_DEFAULT_VISIBILITY, ...s.visibility });
+    }
+    if (Array.isArray(s.frozenExtras)) {
+      setFrozenExtras(s.frozenExtras.filter((k: any) => typeof k === "string" && valid.has(k)));
+    }
+    setStateLoaded(true);
+  }, [viewPref.ready, viewPref.state, stateLoaded]);
+  const persistColumns = () => viewPref.save({ order, visibility, frozenExtras } as any);
+  useEffect(() => {
+    if (!stateLoaded) return;
+    viewPref.save({ order, visibility, frozenExtras } as any);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateLoaded, order, visibility, frozenExtras]);
+
+  const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [detailRow, setDetailRow] = useState<WrtRow | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["wrt-rows-as-of", asOf],
     queryFn: () => fetchRows({ data: { as_of: asOf } }),
@@ -111,6 +153,24 @@ export function WrtRawDataPage() {
           ];
 
   const rows = data?.rows ?? [];
+
+  /** 필터 후보값 — 필터 적용 전 원본 행 distinct */
+  const distinctValues = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const c of WRT_COLUMNS) if (c.filter === "multi") m.set(c.key, new Set<string>());
+    for (const r of rows) {
+      for (const c of WRT_COLUMNS) {
+        if (c.filter !== "multi") continue;
+        m.get(c.key)!.add(c.get(r));
+      }
+    }
+    const out: Record<string, string[]> = {};
+    for (const [k, s] of m) out[k] = [...s].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+    return out;
+  }, [rows]);
+
+  const colDefMap = useMemo(() => new Map(WRT_COLUMNS.map((c) => [c.key, c] as const)), []);
+
   const filtered = useMemo(() => {
     const q = (search.q ?? "").trim().toLowerCase();
     return rows.filter((r) => {
@@ -125,12 +185,56 @@ export function WrtRawDataPage() {
         if (r.active_band !== search.delayBand) return false;
         if (r.primary_delay?.band !== search.delayBand) return false;
       }
+      for (const [key, vals] of Object.entries(colFilters)) {
+        if (!vals || vals.length === 0) continue;
+        const def = colDefMap.get(key);
+        if (!def) continue;
+        if (!vals.includes(def.get(r))) return false;
+      }
       if (!q) return true;
       return [r.wrt_number, r.title, r.team, r.pic, r.eng, r.dis, r.service]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [rows, search.q, search.plot, search.judgment, search.round, search.delayBand, search.hdecMissing]);
+  }, [rows, search.q, search.plot, search.judgment, search.round, search.delayBand, search.hdecMissing, colFilters, colDefMap]);
+
+  /** 표시 컬럼 배치 — __select 는 항상 좌측 고정, 그다음 사용자 pin */
+  const layout = useMemo(() => {
+    const visibleOrder = order.filter((k) => visibility[k] !== false && colDefMap.has(k));
+    const frozen = frozenExtras.filter((k) => visibleOrder.includes(k));
+    const rest = visibleOrder.filter((k) => !frozen.includes(k));
+    const items: Array<{ key: string; def: WrtColumnDef | null; width: number; left: number | null }> = [
+      { key: "__select", def: null, width: 36, left: 0 },
+    ];
+    let left = 36;
+    for (const k of frozen) {
+      const def = colDefMap.get(k)!;
+      items.push({ key: k, def, width: def.width, left });
+      left += def.width;
+    }
+    for (const k of rest) {
+      const def = colDefMap.get(k)!;
+      items.push({ key: k, def, width: def.width, left: null });
+    }
+    return items;
+  }, [order, visibility, frozenExtras, colDefMap]);
+
+  const exportColumns = useMemo(
+    () => layout.filter((i) => i.def).map((i) => ({ key: i.key, label: i.def!.label })),
+    [layout],
+  );
+
+  const teamOptions = useMemo(
+    () => [...new Set(rows.map((r) => r.team).filter(Boolean) as string[])].sort(),
+    [rows],
+  );
+
+  const saveOne = async (id: string, field: string, value: string | null) => {
+    await saveField({ data: { id, field, value } });
+  };
+  const refetchRows = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["wrt-rows-as-of"] });
+  };
 
   const delayBands = useMemo(() => {
     const m = new Map<string, number>();
@@ -180,9 +284,21 @@ export function WrtRawDataPage() {
             onChange={(v) => setSearch({ asOf: v })}
             onReset={() => setSearch({ asOf: "" })}
           />
-          <Button size="sm" variant="outline" onClick={onExport} disabled={exporting}>
+          <WrtColumnOrderMenu
+            order={order}
+            visibility={visibility}
+            frozenExtras={frozenExtras}
+            onOrderChange={setOrder}
+            onVisibilityChange={setVisibility}
+            onFrozenChange={setFrozenExtras}
+            onSave={() => {
+              persistColumns();
+              toast.success("컬럼 설정이 저장되었습니다.");
+            }}
+          />
+          <Button size="sm" variant="outline" onClick={() => setExportOpen(true)} disabled={exporting}>
             {exporting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1 h-3.5 w-3.5" />}
-            Export (왕복 양식)
+            Export
           </Button>
         </div>
       </div>
@@ -337,42 +453,46 @@ export function WrtRawDataPage() {
               <table className="w-max border-separate border-spacing-0 text-[11px]">
                 <thead>
                   <tr>
-                    <StickyHead rowSpan={3} left={0} width={250}>
-                      WRT NUMBER
-                    </StickyHead>
-                    <StickyHead rowSpan={3} left={250} width={70}>
-                      Plot
-                    </StickyHead>
-                    <StickyHead rowSpan={3} left={320} width={80}>
-                      Team
-                    </StickyHead>
-                    <StickyHead rowSpan={3} left={400} width={90}>
-                      PIC
-                    </StickyHead>
-                    <StickyHead rowSpan={3} left={490} width={90}>
-                      ENG
-                    </StickyHead>
-                    <StickyHead rowSpan={3} left={580} width={90}>
-                      판정
-                    </StickyHead>
-                    <StickyHead rowSpan={3} left={670} width={80}>
-                      진척률
-                    </StickyHead>
-                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
-                      Round
-                    </th>
-                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
-                      현재 단계
-                    </th>
-                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
-                      대표 지연
-                    </th>
-                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
-                      Latest Status
-                    </th>
-                    <th className="border-b border-l bg-muted px-2 py-1 text-left" rowSpan={3}>
-                      Final Approved
-                    </th>
+                    {layout.map((it) => {
+                      const inner =
+                        it.key === "__select" ? (
+                          <Checkbox
+                            checked={filtered.length > 0 && selectedIds.length === filtered.length}
+                            onCheckedChange={(v) =>
+                              setSelectedIds(v ? filtered.map((r) => r.id) : [])
+                            }
+                            aria-label="전체 선택"
+                          />
+                        ) : (
+                          <span className="inline-flex items-center">
+                            {it.def!.label}
+                            {it.def!.filter === "multi" && (
+                              <WrtColumnFilterDropdown
+                                label={it.def!.label}
+                                values={distinctValues[it.key] ?? []}
+                                selected={colFilters[it.key] ?? []}
+                                onChange={(next) =>
+                                  setColFilters((p) => ({ ...p, [it.key]: next }))
+                                }
+                              />
+                            )}
+                          </span>
+                        );
+                      return it.left != null ? (
+                        <StickyHead key={it.key} rowSpan={3} left={it.left} width={it.width}>
+                          {inner}
+                        </StickyHead>
+                      ) : (
+                        <th
+                          key={it.key}
+                          rowSpan={3}
+                          style={{ minWidth: it.width }}
+                          className="whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-left"
+                        >
+                          {inner}
+                        </th>
+                      );
+                    })}
                     {bands.map((b, i) => (
                       <th
                         key={`${b.band}-${i}`}
@@ -418,6 +538,12 @@ export function WrtRawDataPage() {
                       row={r}
                       catalog={catalog}
                       subHeaders={subHeaders}
+                      layout={layout}
+                      selected={selectedIds.includes(r.id)}
+                      onToggleSelect={() =>
+                        setSelectedIds((p) => (p.includes(r.id) ? p.filter((x) => x !== r.id) : [...p, r.id]))
+                      }
+                      onOpenDetail={() => setDetailRow(r)}
                       canEdit={isToday && canRow(r as unknown as Record<string, unknown>)}
                       onSave={async (field, value) => {
                         await saveField({ data: { id: r.id, field, value } });
@@ -427,7 +553,7 @@ export function WrtRawDataPage() {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={12 + catalog.length * 2} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={layout.length + catalog.length * 4} className="p-8 text-center text-muted-foreground">
                         조건에 맞는 행이 없습니다.
                       </td>
                     </tr>
@@ -438,6 +564,34 @@ export function WrtRawDataPage() {
           )}
         </CardContent>
       </Card>
+
+      <WrtBulkEditBar
+        selectedIds={selectedIds}
+        teamOptions={teamOptions}
+        onClear={() => setSelectedIds([])}
+        onSaveField={saveOne}
+        onDone={refetchRows}
+        disabledReason={isToday ? null : "과거 시점(as-of) 보기에서는 편집할 수 없습니다."}
+      />
+
+      <WrtDetailSheet
+        row={detailRow}
+        catalog={catalog}
+        canEdit={isToday && !!detailRow && canRow(detailRow as unknown as Record<string, unknown>)}
+        onSave={async (id, field, value) => {
+          await saveOne(id, field, value);
+          await refetchRows();
+        }}
+        onOpenChange={(o) => { if (!o) setDetailRow(null); }}
+      />
+
+      <WrtExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        rows={filtered}
+        exportColumns={exportColumns}
+        onRoundtrip={onExport}
+      />
 
       <div className="text-[11px] text-muted-foreground">
         표시 {filtered.length.toLocaleString()}행 / 모집단 {population.toLocaleString()}행 · As of {asOf} · NA 단계는{" "}
@@ -451,12 +605,20 @@ function WrtTableRow({
   row,
   catalog,
   subHeaders,
+  layout,
+  selected,
+  onToggleSelect,
+  onOpenDetail,
   canEdit,
   onSave,
 }: {
   row: WrtRow;
   catalog: WrtCatalogEntry[];
   subHeaders: (s: WrtCatalogEntry) => Array<{ field: keyof WrtStageCell; label: string }>;
+  layout: Array<{ key: string; def: WrtColumnDef | null; width: number; left: number | null }>;
+  selected: boolean;
+  onToggleSelect: () => void;
+  onOpenDetail: () => void;
   canEdit: boolean;
   onSave: (field: string, value: string | null) => Promise<void>;
 }) {
@@ -471,101 +633,120 @@ function WrtTableRow({
             ? "bg-muted text-muted-foreground"
             : // 미착수 = 중립(회색). 지연색 사용 금지
               "bg-slate-100 text-slate-800";
-  return (
-    <tr className="hover:bg-muted/30">
-      <StickyCell left={0} width={250} className="font-mono">
-        {row.wrt_number}
-      </StickyCell>
-      <StickyCell left={250} width={70}>
-        {row.plot ? `PLOT-${row.plot}` : "—"}
-      </StickyCell>
-      <StickyCell left={320} width={80}>
-        <AbdEditCellPopover
-          id={row.id}
-          field="team"
-          label="Team"
-          editorType="text"
-          currentValue={row.team}
-          canEdit={canEdit}
-          saveFn={async (p) => onSave(p.field, p.value == null ? null : String(p.value))}
-        >
-          <span>{row.team ?? "—"}</span>
-        </AbdEditCellPopover>
-      </StickyCell>
-      <StickyCell left={400} width={90}>
-        <AbdEditCellPopover
-          id={row.id}
-          field="pic"
-          label="PIC"
-          editorType="text"
-          currentValue={row.pic}
-          canEdit={canEdit}
-          saveFn={async (p) => onSave(p.field, p.value == null ? null : String(p.value))}
-        >
-          <span>{row.pic ?? "—"}</span>
-        </AbdEditCellPopover>
-      </StickyCell>
-      <StickyCell left={490} width={90}>
-        <AbdEditCellPopover
-          id={row.id}
-          field="eng"
-          label="ENG"
-          editorType="text"
-          currentValue={row.eng}
-          canEdit={canEdit}
-          saveFn={async (p) => onSave(p.field, p.value == null ? null : String(p.value))}
-        >
-          <span>{row.eng ?? "—"}</span>
-        </AbdEditCellPopover>
-      </StickyCell>
-      <StickyCell left={580} width={90}>
-        <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>{row.judgment}</span>
-        {(row.hdec_actual_count ?? 0) === 0 && (
-          <span
-            className="ml-1 rounded bg-muted px-1 text-[9px] text-muted-foreground"
-            title="HDEC 권한 단계 실적 보유 0건 — 판정과 독립된 자료 상태 표기"
+
+  const renderCell = (key: string) => {
+    switch (key) {
+      case "wrt_number":
+        return (
+          <button type="button" className="font-mono text-primary hover:underline" onClick={onOpenDetail}>
+            {row.wrt_number}
+          </button>
+        );
+      case "plot":
+        return row.plot ? `PLOT-${row.plot}` : "—";
+      case "team":
+      case "pic":
+      case "eng":
+        return (
+          <AbdEditCellPopover
+            id={row.id}
+            field={key}
+            label={key.toUpperCase()}
+            editorType="text"
+            currentValue={(row as any)[key]}
+            canEdit={canEdit}
+            saveFn={async (p) => onSave(p.field, p.value == null ? null : String(p.value))}
           >
-            HDEC 실적 미확보
+            <span>{(row as any)[key] ?? "—"}</span>
+          </AbdEditCellPopover>
+        );
+      case "judgment":
+        return (
+          <>
+            <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>{row.judgment}</span>
+            {(row.hdec_actual_count ?? 0) === 0 && (
+              <span
+                className="ml-1 rounded bg-muted px-1 text-[9px] text-muted-foreground"
+                title="HDEC 권한 단계 실적 보유 0건 — 판정과 독립된 자료 상태 표기"
+              >
+                HDEC 실적 미확보
+              </span>
+            )}
+          </>
+        );
+      case "progress_pct":
+        return (
+          <span className="tabular-nums">
+            {row.progress_pct == null ? "—" : `${row.progress_pct}%`}
+            <span className="ml-1 text-[9px] text-muted-foreground">
+              {row.done}/{row.denom}
+            </span>
           </span>
-        )}
-      </StickyCell>
-      <StickyCell left={670} width={80} className="tabular-nums">
-        {row.progress_pct == null ? "—" : `${row.progress_pct}%`}
-        <span className="ml-1 text-[9px] text-muted-foreground">
-          {row.done}/{row.denom}
-        </span>
-      </StickyCell>
-      <td className="whitespace-nowrap border-b border-l px-2 py-1 text-center">R{row.active_round}</td>
-      <td className="whitespace-nowrap border-b border-l px-2 py-1 text-muted-foreground">
-        {row.current_stage ? stageLabel(row.current_stage) : row.active_band ? "—" : "전 단계 완료/미발생"}
-      </td>
-      <td className="whitespace-nowrap border-b border-l px-2 py-1">
-        {row.primary_delay ? (
-          <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
-            {stageLabel(row.primary_delay)} · {row.primary_delay.days}일
+        );
+      case "active_round":
+        return `R${row.active_round}`;
+      case "current_stage":
+        return (
+          <span className="text-muted-foreground">
+            {row.current_stage ? stageLabel(row.current_stage) : row.active_band ? "—" : "전 단계 완료/미발생"}
           </span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
-        {row.delay_bucket.length > 0 && (
-          <span className="ml-1 text-[9px] text-muted-foreground" title="후행 지연 — 인지용, 지연 카드 미합산">
-            +{row.delay_bucket.length}
-          </span>
-        )}
-        {row.response_wait.length > 0 && (
-          <span className="ml-1 text-[9px] text-amber-700" title="Aconex 회신 대기 — HDEC 귀책 아님">
-            회신대기
-          </span>
-        )}
-      </td>
-      <td className="whitespace-nowrap border-b border-l px-2 py-1 text-center">{row.latest_status_raw ?? "—"}</td>
-      <td className="whitespace-nowrap border-b border-l px-2 py-1 text-center">
-        {row.is_final_approved ? (
+        );
+      case "primary_delay":
+        return (
+          <>
+            {row.primary_delay ? (
+              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
+                {stageLabel(row.primary_delay)} · {row.primary_delay.days}일
+              </span>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+            {row.delay_bucket.length > 0 && (
+              <span className="ml-1 text-[9px] text-muted-foreground" title="후행 지연 — 인지용, 지연 카드 미합산">
+                +{row.delay_bucket.length}
+              </span>
+            )}
+            {row.response_wait.length > 0 && (
+              <span className="ml-1 text-[9px] text-amber-700" title="Aconex 회신 대기 — HDEC 귀책 아님">
+                회신대기
+              </span>
+            )}
+          </>
+        );
+      case "latest_status_raw":
+        return row.latest_status_raw ?? "—";
+      case "is_final_approved":
+        return row.is_final_approved ? (
           <span className="rounded bg-emerald-100 px-1 text-[10px] font-semibold text-emerald-800">A</span>
         ) : (
           "—"
-        )}
-      </td>
+        );
+      case "data_date":
+        return row.data_date ? formatDdMmm(row.data_date) : "—";
+      default:
+        return <span className="text-muted-foreground">{(row as any)[key] ?? "—"}</span>;
+    }
+  };
+
+  return (
+    <tr className={cn("hover:bg-muted/30", selected && "bg-primary/5")}>
+      {layout.map((it) => {
+        const inner =
+          it.key === "__select" ? (
+            <Checkbox checked={selected} onCheckedChange={onToggleSelect} aria-label="행 선택" />
+          ) : (
+            renderCell(it.key)
+          );
+        return it.left != null ? (
+          <StickyCell key={it.key} left={it.left} width={it.width}>
+            {inner}
+          </StickyCell>
+        ) : (
+          <td key={it.key} className="whitespace-nowrap border-b border-l px-2 py-1">
+            {inner}
+          </td>
+        );
+      })}
       {catalog.flatMap((s) => {
         const cell = row.stages[s.stage_code];
         return subHeaders(s).map((h) => {
