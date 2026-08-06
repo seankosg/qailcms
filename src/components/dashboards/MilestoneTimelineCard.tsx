@@ -299,11 +299,13 @@ function PlotRow({
   nodes,
   pct,
   todayPct,
+  showAuto,
 }: {
   plot: string;
   nodes: Node[];
   pct: (day: number) => number;
   todayPct: number;
+  showAuto: boolean;
 }) {
   const activeIdx = nodes.findIndex((n) => n.diff >= 0 && !n.auto);
   const first = nodes[0];
