@@ -93,7 +93,14 @@ export function MilestoneReferenceButton() {
           <div className="space-y-4">
             {plots.map((plot) => {
               const m = byPlot.get(plot)!;
-              const rows = kinds.filter((k) => m.has(k.kind_code));
+              const rows = kinds
+                .filter((k) => m.has(k.kind_code))
+                .sort((a, b) => {
+                  const dateA = m.get(a.kind_code) ?? "";
+                  const dateB = m.get(b.kind_code) ?? "";
+                  if (dateA !== dateB) return dateA.localeCompare(dateB);
+                  return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+                });
               return (
                 <div key={plot} className="rounded-md border">
                   <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2">
