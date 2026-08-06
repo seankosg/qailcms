@@ -72,6 +72,7 @@ import {
 } from "@/lib/task-management/filters";
 import { ColumnFilterDropdown } from "./ColumnFilters";
 import { BulkEditBar } from "./BulkEditBar";
+import { useTmMilestoneOptions } from "@/hooks/useTmMilestoneOptions";
 import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { ExportDialog } from "./ExportDialog";
 import { HistoryDrawer } from "./HistoryDrawer";
@@ -527,20 +528,8 @@ export function TaskManagementRawDataPage() {
     void refetchServer();
   }, [refetchServer]);
 
-  // 활성 Milestone 종류 목록 — Admin 페이지에서 관리 (동적)
-  const { data: milestoneOptions = [] } = useQuery({
-    queryKey: ["tm_milestone_kinds", "active-codes"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tm_milestone_kinds")
-        .select("kind_code, sort_order")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((r: { kind_code: string }) => r.kind_code);
-    },
-    staleTime: 60_000,
-  });
+  // 활성 Milestone 종류 — Plot 별 등록분으로 좁힌다 (tm_milestone_config)
+  const { optionsForPlot: milestoneOptionsForPlot } = useTmMilestoneOptions();
 
   // 댓글 수/최종 갱신 시각 조회 — 현재 로드된 행 기준
   const { data: commentCounts } = useQuery({
@@ -705,7 +694,7 @@ export function TaskManagementRawDataPage() {
     refetch,
     toggleCollapse,
     setAddChildParent,
-    milestoneOptions,
+    milestoneOptionsForPlot,
     patchRow,
     refetchRow,
     kpiMode,
@@ -727,7 +716,7 @@ export function TaskManagementRawDataPage() {
     refetch,
     toggleCollapse,
     setAddChildParent,
-    milestoneOptions,
+    milestoneOptionsForPlot,
     patchRow,
     refetchRow,
     kpiMode,
@@ -1090,7 +1079,7 @@ export function TaskManagementRawDataPage() {
               ...c,
               editable: true,
               editorType: "select",
-              options: [...(dyn.milestoneOptions ?? [])],
+              options: dyn.milestoneOptionsForPlot(rr.plot),
             };
             // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 만 인라인 수정 가능.
             effectiveCanEdit = effectiveCanEdit && isStrictAdminRef.current;

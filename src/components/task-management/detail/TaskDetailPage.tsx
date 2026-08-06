@@ -33,6 +33,7 @@ import {
 } from "@/lib/task-management/owner-mutations.functions";
 import { toast } from "sonner";
 import { useRclCan, rclScopeOfRow } from "@/hooks/useRclCan";
+import { useTmMilestoneOptions } from "@/hooks/useTmMilestoneOptions";
 import { computeDailyPlan, computeDailyDiff } from "@/lib/task-management/derived";
 import { todayIso } from "@/lib/task-management/schedule-utils";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
@@ -77,19 +78,7 @@ export function TaskDetailPage() {
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
   const confirmFinishSourceFn = useServerFn(confirmActualFinishSource);
   const queryClient = useQueryClient();
-  const { data: milestoneOptions = [] } = useQuery({
-    queryKey: ["tm_milestone_kinds", "active-codes"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("tm_milestone_kinds")
-        .select("kind_code, sort_order")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((r: { kind_code: string }) => r.kind_code as string);
-    },
-    staleTime: 60_000,
-  });
+  const { optionsForPlot } = useTmMilestoneOptions();
 
   const { data: rawRow, refetch, isFetching } = useQuery({
     queryKey: ["task-detail", id],
@@ -303,7 +292,12 @@ export function TaskDetailPage() {
                   } else if (c.key === "data_date") {
                     effectiveColumn = { ...c, editable: true, editorType: "date" };
                   } else if (c.key === "milestone") {
-                    effectiveColumn = { ...c, editable: true, editorType: "select", options: milestoneOptions };
+                    effectiveColumn = {
+                      ...c,
+                      editable: true,
+                      editorType: "select",
+                      options: optionsForPlot((row as any).plot),
+                    };
                     // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 만 수정 가능.
                     effectiveCanEdit = effectiveCanEdit && user?.isStrictAdmin === true;
                   }
