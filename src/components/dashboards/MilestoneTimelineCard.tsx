@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarClock, CheckCircle2, Circle, Clock, RefreshCw } from "lucide-react";
+import { CalendarClock, CheckCircle2, Circle, Clock, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,6 +83,7 @@ export function MilestoneTimelineCard() {
 
   const today = todayInDoha();
   const todayNum = dayNum(today);
+  const [showAuto, setShowAuto] = useState(false);
 
   const plots = useMemo(() => {
     const kinds = new Map(
@@ -103,19 +104,21 @@ export function MilestoneTimelineCard() {
       byPlot.set(r.plot, list);
     }
     for (const list of byPlot.values()) list.sort((a, b) => a.date.localeCompare(b.date));
-    for (const r of data?.auto ?? []) {
-      if (!r?.plot || !r?.label || !r?.last_date) continue;
-      const list = byPlot.get(r.plot) ?? [];
-      list.push({
-        kind: `auto:${r.label}`,
-        label: r.label,
-        date: r.last_date,
-        diff: dayNum(r.last_date) - todayNum,
-        auto: true,
-      });
-      byPlot.set(r.plot, list);
+    if (showAuto) {
+      for (const r of data?.auto ?? []) {
+        if (!r?.plot || !r?.label || !r?.last_date) continue;
+        const list = byPlot.get(r.plot) ?? [];
+        list.push({
+          kind: `auto:${r.label}`,
+          label: r.label,
+          date: r.last_date,
+          diff: dayNum(r.last_date) - todayNum,
+          auto: true,
+        });
+        byPlot.set(r.plot, list);
+      }
+      for (const list of byPlot.values()) list.sort((a, b) => a.date.localeCompare(b.date));
     }
-    for (const list of byPlot.values()) list.sort((a, b) => a.date.localeCompare(b.date));
     return Array.from(byPlot.entries())
       .filter(([, list]) => list.length > 0)
       .sort((a, b) => {
@@ -124,7 +127,7 @@ export function MilestoneTimelineCard() {
         if (ia !== ib) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
         return a[0].localeCompare(b[0]);
       });
-  }, [data, todayNum]);
+  }, [data, todayNum, showAuto]);
 
   return (
     <Card className="overflow-hidden">
@@ -136,6 +139,15 @@ export function MilestoneTimelineCard() {
             Plot 별 마일스톤 · 오늘 {today} (Doha)
           </span>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 px-2 text-xs"
+          onClick={() => setShowAuto((s) => !s)}
+        >
+          {showAuto ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+          모듈-팀 {showAuto ? "숨기기" : "보기"}
+        </Button>
         <Button
           variant="ghost"
           size="sm"
