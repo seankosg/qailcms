@@ -22,7 +22,7 @@ async function assertAdmin(supabase: unknown, userId: string) {
   if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
 }
 
-async function rpc(supabase: unknown, fn: string, args: Record<string, unknown>) {
+async function rpc(supabase: unknown, fn: string, args: Record<string, unknown> = {}) {
   const { data, error } = await (supabase as unknown as LooseClient).rpc(fn, args);
   if (error) throw new Error(`${fn}: ${error.message}`);
   return (data ?? {}) as Json;
