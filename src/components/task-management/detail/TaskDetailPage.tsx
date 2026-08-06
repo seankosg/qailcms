@@ -33,6 +33,7 @@ import {
 } from "@/lib/task-management/owner-mutations.functions";
 import { toast } from "sonner";
 import { useRclCan, rclScopeOfRow } from "@/hooks/useRclCan";
+import { useTmMilestoneOptions } from "@/hooks/useTmMilestoneOptions";
 import { computeDailyPlan, computeDailyDiff } from "@/lib/task-management/derived";
 import { todayIso } from "@/lib/task-management/schedule-utils";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
@@ -291,7 +292,12 @@ export function TaskDetailPage() {
                   } else if (c.key === "data_date") {
                     effectiveColumn = { ...c, editable: true, editorType: "date" };
                   } else if (c.key === "milestone") {
-                    effectiveColumn = { ...c, editable: true, editorType: "select", options: milestoneOptions };
+                    effectiveColumn = {
+                      ...c,
+                      editable: true,
+                      editorType: "select",
+                      options: optionsForPlot((row as any).plot),
+                    };
                     // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 만 수정 가능.
                     effectiveCanEdit = effectiveCanEdit && user?.isStrictAdmin === true;
                   }
