@@ -113,7 +113,7 @@ export function EditCellPopover({
     >
       <PopoverTrigger asChild>
         <span
-          className="cursor-pointer rounded hover:bg-accent/50"
+          className="flex w-full cursor-pointer items-center rounded hover:bg-accent/50"
           onClick={(e) => e.stopPropagation()}
         >
           {children}
