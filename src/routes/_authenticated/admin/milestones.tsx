@@ -136,8 +136,8 @@ function Page() {
       arr.push(r);
       g.set(r.plot, arr);
     }
-    // 기존 Plot 목록이 하나도 없어도 '공통' 카드는 노출 (신규 프로젝트 초기 상태 지원)
-    if (g.size === 0) g.set("공통", []);
+    // 기존 Plot 목록이 하나도 없어도 'G' 카드는 노출 (신규 프로젝트 초기 상태 지원)
+    if (g.size === 0) g.set("G", []);
     return Array.from(g.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [rows]);
 
