@@ -147,8 +147,13 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       data_date: string;
       base_import_run_id: string;
       base_baseline_id: string;
+      base_core_hash: string;
+      base_core_table_hashes: Record<string, string>;
+      base_generated_at: string;
       allow_retire?: boolean;
       source_files?: SourceFileRef[];
+      source_meta?: unknown;
+      assets?: unknown;
     }) => {
       const need = [
         "run_id",
@@ -158,14 +163,20 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         "data_date",
         "base_import_run_id",
         "base_baseline_id",
+        "base_core_hash",
+        "base_generated_at",
       ] as const;
       for (const k of need) {
         if (!input?.[k]) throw new Error(`${k} 가 필요합니다.`);
       }
       return {
         ...input,
+        base_core_hash: String(input.base_core_hash).toLowerCase(),
+        base_core_table_hashes: input.base_core_table_hashes ?? {},
         allow_retire: input.allow_retire === true,
         source_files: sourceFileList(input.source_files),
+        source_meta: sourceMetaList(input.source_meta),
+        assets: assetList(input.assets),
       };
     },
   )
