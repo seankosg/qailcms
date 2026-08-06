@@ -162,7 +162,7 @@ function SharedTimeline({
     all.push(todayNum);
     const rawMin = Math.min(...all);
     const rawMax = Math.max(...all);
-    const pad = Math.max(Math.round((rawMax - rawMin) * 0.04), 7);
+    const pad = Math.max(Math.round((rawMax - rawMin) * 0.07), 21);
     const minDay = rawMin - pad;
     const maxDay = rawMax + pad;
     // 월 단위 눈금
