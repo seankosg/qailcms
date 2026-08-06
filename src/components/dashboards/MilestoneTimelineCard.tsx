@@ -143,6 +143,15 @@ export function MilestoneTimelineCard() {
           variant="ghost"
           size="sm"
           className="h-7 gap-1.5 px-2 text-xs"
+          onClick={() => setShowAuto((s) => !s)}
+        >
+          {showAuto ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+          모듈-팀 {showAuto ? "숨기기" : "보기"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 px-2 text-xs"
           onClick={() => void refetch()}
           disabled={isFetching}
         >
