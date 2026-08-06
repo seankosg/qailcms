@@ -107,6 +107,7 @@ export function BulkEditBar({
   const [fieldName, setFieldName] = useState<string>("");
   const [rawValue, setRawValue] = useState<string>("");
   const [setBlank, setSetBlank] = useState<boolean>(false);
+  const [customMode, setCustomMode] = useState<boolean>(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -159,6 +160,7 @@ export function BulkEditBar({
     setFieldName("");
     setRawValue("");
     setSetBlank(false);
+    setCustomMode(false);
   }
 
   // Detail 과 동일하게 서버 함수 경유가 필요한 필드
@@ -253,6 +255,7 @@ export function BulkEditBar({
                 setFieldName(v);
                 setRawValue("");
                 setSetBlank(false);
+                setCustomMode(false);
               }}
             >
               <SelectTrigger className="h-8 w-[200px]">
@@ -274,26 +277,49 @@ export function BulkEditBar({
 
             {field && (
               <>
+                {field.inputType === "select" &&
+                  (customMode ? (
+                    <Input
+                      type="text"
+                      className="h-8 w-[160px]"
+                      value={setBlank ? "" : rawValue}
+                      disabled={setBlank}
+                      onChange={(e) => setRawValue(e.target.value)}
+                      placeholder="신규값 입력…"
+                    />
+                  ) : (
+                    <Select
+                      value={setBlank ? BLANK : rawValue}
+                      onValueChange={(v) => {
+                        setRawValue(v);
+                        setSetBlank(v === BLANK);
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[160px]">
+                        <SelectValue placeholder="New value…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={BLANK}>(Clear / Blank)</SelectItem>
+                        {(field.options ?? []).map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ))}
                 {field.inputType === "select" && (
-                  <Select
-                    value={setBlank ? BLANK : rawValue}
-                    onValueChange={(v) => {
-                      setRawValue(v);
-                      setSetBlank(v === BLANK);
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-[160px]">
-                      <SelectValue placeholder="New value…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={BLANK}>(Clear / Blank)</SelectItem>
-                      {(field.options ?? []).map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={customMode}
+                      onCheckedChange={(c) => {
+                        setCustomMode(!!c);
+                        setRawValue("");
+                        setSetBlank(false);
+                      }}
+                    />
+                    신규값 입력
+                  </label>
                 )}
                 {field.inputType === "date" && (
                   <Input
