@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { todayInDoha } from "@/lib/time/doha";
 
-const PLOT_ORDER = ["C", "D", "G"];
+const PLOT_ORDER = ["D", "C", "G"];
 
 interface Kind {
   kind_code: string;
@@ -110,7 +110,7 @@ export function MilestoneTimelineCard() {
           <CalendarClock className="h-4 w-4 text-primary" />
           <CardTitle className="text-base">Milestone Timeline</CardTitle>
           <span className="hidden text-xs text-muted-foreground sm:inline">
-            Plot 별 계약 마일스톤 · 오늘 {today} (Doha)
+            Plot 별 마일스톤 · 오늘 {today} (Doha)
           </span>
         </div>
         <Button
