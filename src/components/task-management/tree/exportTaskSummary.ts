@@ -1,7 +1,16 @@
 import { dohaStampCompact } from "@/lib/time/doha";
 import { streamXlsxExport } from "@/lib/excel/stream-export";
-import { cumPlanProgress, computeVariance } from "@/lib/task-management/derived";
-import { resolveJudgment, resolvePlanPct } from "@/lib/task-management/delay-utils";
+import {
+  cumPlanProgress,
+  computeVariance,
+  DEFAULT_THRESHOLDS,
+} from "@/lib/task-management/derived";
+import type { TaskThresholds } from "@/lib/task-management/derived";
+import { resolvePlanPct } from "@/lib/task-management/delay-utils";
+import {
+  resolveMainJudgment,
+  resolveRowJudgment,
+} from "@/lib/task-management/summary-judgment";
 
 export interface TaskSummaryRow {
   id: string;
@@ -19,6 +28,9 @@ export interface TaskSummaryRow {
   hdec_pic_name: string | null;
   hdec_eng_name: string | null;
   sub_task_desc: string | null;
+  actual_start?: string | null;
+  actual_finish?: string | null;
+  [key: string]: unknown;
 }
 
 export interface ExportTaskSummaryOpts {
@@ -30,7 +42,7 @@ export interface ExportTaskSummaryOpts {
   sortLabel?: string;
   asOfDate?: string;
   /** 임계값 단일 소스에서 전달 (색상 강조 경계) */
-  thresholds?: { caution_gap_buffer: number; worsen_gap: number };
+  thresholds?: TaskThresholds;
 }
 
 // SHAW/앱 통일 팔레트 (ARGB)
@@ -53,12 +65,14 @@ function pct(v: number | null | undefined): number | "" {
 export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<number> {
   const flat: Array<Record<string, unknown> & { __isMain: boolean; __zebra: boolean }> = [];
   let zebra = false;
+  // 판정 임계값 정본: 화면과 동일한 서버 임계값을 사용한다(미전달 시에만 폴백).
+  const thresholds = opts.thresholds ?? DEFAULT_THRESHOLDS;
   for (const p of opts.mainTasks) {
     zebra = !zebra;
-    flat.push(buildRow(p, true, zebra, opts.asOfDate));
     const kids = opts.subsByMain.get(p.task_no) ?? [];
+    flat.push(buildRow(p, true, zebra, opts.asOfDate, thresholds, kids));
     for (const k of kids) {
-      flat.push(buildRow(k, false, zebra, opts.asOfDate));
+      flat.push(buildRow(k, false, zebra, opts.asOfDate, thresholds));
     }
   }
 
@@ -161,12 +175,21 @@ export async function exportTaskSummary(opts: ExportTaskSummaryOpts): Promise<nu
   return count;
 }
 
-function buildRow(r: TaskSummaryRow, isMain: boolean, zebra: boolean, asOf?: string): Record<string, unknown> & { __isMain: boolean; __zebra: boolean } {
+function buildRow(
+  r: TaskSummaryRow,
+  isMain: boolean,
+  zebra: boolean,
+  asOf: string | undefined,
+  thresholds: TaskThresholds,
+  kids?: TaskSummaryRow[],
+): Record<string, unknown> & { __isMain: boolean; __zebra: boolean } {
   const gap = computeVariance(r, asOf) ?? 0;
   const expected = cumPlanProgress(r, asOf);
-  // 정본 경유: 서버 병합값(srv_judgment/srv_plan_pct) 우선, 없을 때만 클라 as-of 재계산.
+  // 화면(TaskTreePage)과 동일한 공용 판정 함수를 사용한다 — Main 은 하위 롤업 판정.
   const judgeAsOf = asOf ?? "";
-  const judgment = resolveJudgment(r as never, undefined, judgeAsOf) || "";
+  const judgment = isMain
+    ? resolveMainJudgment(r as never, (kids ?? []) as never[], thresholds, judgeAsOf)
+    : resolveRowJudgment(r as never, thresholds, judgeAsOf);
   const planPct = resolvePlanPct(r as never, judgeAsOf);
   return {
     __isMain: isMain,

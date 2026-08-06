@@ -25,17 +25,18 @@ import {
 import type { Discipline } from "@/lib/task-management/columns";
 import {
   DEFAULT_THRESHOLDS,
-  computeJudgment,
   cumPlanProgress,
   computeVariance,
   mainCumPlanProgress,
   mainVariance,
-  judgeFromGap,
-  worstJudgment,
 } from "@/lib/task-management/derived";
 import type { TaskThresholds } from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
-import { resolveJudgment, resolvePlanPct } from "@/lib/task-management/delay-utils";
+import { resolvePlanPct } from "@/lib/task-management/delay-utils";
+import {
+  resolveMainJudgment,
+  resolveRowJudgment,
+} from "@/lib/task-management/summary-judgment";
 import { toast } from "sonner";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { MilestoneReferenceButton } from "@/components/task-management/shared/MilestoneReferenceButton";
@@ -140,58 +141,6 @@ function formatExtraValue(key: string, value: unknown): string {
   if (def?.type === "date") return String(value).slice(0, 10);
   if (def?.type === "boolean") return value ? "Y" : "N";
   return String(value);
-}
-
-/** 정본 경유: 서버 병합 판정(srv_judgment) 우선, 없을 때만 as-of 클라 재판정. */
-function resolveRowJudgment(
-  r: Row,
-  thresholds: TaskThresholds,
-  asOfDate?: string,
-): string {
-  return resolveJudgment(r as never, thresholds, asOfDate ?? "") || "";
-}
-
-function resolveMainJudgment(
-  main: Row,
-  kids: Row[],
-  thresholds: TaskThresholds,
-  asOfDate?: string,
-): string {
-  // 정본 우선: 서버 tm_kpi_judgment_g(Main 가중 계획 tm_main_tplan 기준) 값이 있으면 그대로 사용.
-  const srv = (main as { srv_judgment?: string | null }).srv_judgment;
-  if (srv != null && srv !== "" && srv !== "이력 없음") return srv;
-  if (kids.length === 0) {
-    // 하위 없는 Main = 자기 창 선형 tplan vs 자기 Actual
-    return computeJudgment(main, thresholds, asOfDate) || "";
-  }
-
-  const clamp01 = (v: unknown) => {
-    const n = Number(v ?? 0);
-    if (!Number.isFinite(n)) return 0;
-    const s = n > 1 ? n / 100 : n;
-    return Math.max(0, Math.min(1, s));
-  };
-  const rolledActual = clamp01(main.actual_progress);
-  const allDone = kids.every(
-    (k) => clamp01(k.actual_progress) >= 1 || k.auto_judgment === "완료",
-  );
-  const hasProgress = rolledActual > 0;
-  const syntheticMain: Row = {
-    ...main,
-    actual_progress: rolledActual,
-    actual_start: main.actual_start ?? (hasProgress ? main.plan_start : null),
-    actual_finish: allDone ? (main.actual_finish ?? main.plan_end) : null,
-    auto_judgment: allDone ? "완료" : null,
-  };
-  // 동종 비교: 하위 가중 누계 계획(Σwₖ·tplanₖ/Σwₖ) vs 동일 가중 실적(롤업 Actual)
-  const gap = mainVariance(syntheticMain, kids, asOfDate);
-  const j = judgeFromGap(syntheticMain, gap, thresholds, asOfDate);
-  // 하위 하나라도 미완이면 상위는 어떤 경우에도 "완료"가 될 수 없음.
-  if (!allDone && j === "완료") {
-    const kidJudgments = kids.map((k) => resolveRowJudgment(k, thresholds, asOfDate));
-    return worstJudgment(kidJudgments) ?? "정상";
-  }
-  return j;
 }
 
 function ProgressBar({ v }: { v: number | null | undefined }) {
