@@ -2,7 +2,11 @@
 // 판정식은 DB 함수(abd_ocs_inc_scope / _dryrun / _import) 하나에만 존재한다. 여기서 재구현하지 않는다.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { BASELINE_SCHEMA_VERSION, computeBaselineId } from "@/lib/abd/ocs-baseline-shared";
+import {
+  BASELINE_CORE_TABLES,
+  BASELINE_SCHEMA_VERSION,
+  computeBaselineId,
+} from "@/lib/abd/ocs-baseline-shared";
 
 export type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 
@@ -30,12 +34,66 @@ async function rpc(supabase: unknown, fn: string, args: Record<string, unknown> 
 
 export type SourceFileRef = { file_name: string; content_hash: string };
 
+/** 패키지가 전달하는 원본 Excel 메타데이터 전체 (등록은 서버 트랜잭션 안에서만) */
+export type SourceFileMeta = {
+  source_file_id: string;
+  file_name: string;
+  relative_path: string;
+  storage_path: string;
+  content_hash: string;
+  byte_size: number;
+  mime_type: string;
+};
+
+/** Import 직전 서버 재검증 대상 Storage 자산 */
+export type AssetRef = {
+  kind: "image" | "source";
+  bucket: string;
+  path: string;
+  sha256: string;
+};
+
 const sourceFileList = (v: unknown): SourceFileRef[] =>
   Array.isArray(v)
     ? v.map((x) => ({
         file_name: String((x as SourceFileRef)?.file_name ?? ""),
         content_hash: String((x as SourceFileRef)?.content_hash ?? ""),
       }))
+    : [];
+
+const sourceMetaList = (v: unknown): SourceFileMeta[] =>
+  Array.isArray(v)
+    ? v.map((x) => {
+        const o = (x ?? {}) as Record<string, unknown>;
+        const meta: SourceFileMeta = {
+          source_file_id: String(o["source_file_id"] ?? ""),
+          file_name: String(o["file_name"] ?? ""),
+          relative_path: String(o["relative_path"] ?? ""),
+          storage_path: String(o["storage_path"] ?? ""),
+          content_hash: String(o["content_hash"] ?? "").toLowerCase(),
+          byte_size: Number(o["byte_size"] ?? 0),
+          mime_type: String(o["mime_type"] ?? ""),
+        };
+        for (const [k, val] of Object.entries(meta)) {
+          if (k === "byte_size" ? !(val as number) : !String(val)) {
+            throw new Error(`source metadata 필드 누락: ${k}`);
+          }
+        }
+        return meta;
+      })
+    : [];
+
+const assetList = (v: unknown): AssetRef[] =>
+  Array.isArray(v)
+    ? v.map((x) => {
+        const o = (x ?? {}) as Record<string, unknown>;
+        return {
+          kind: o["kind"] === "source" ? "source" : "image",
+          bucket: String(o["bucket"] ?? ""),
+          path: String(o["path"] ?? ""),
+          sha256: String(o["sha256"] ?? "").toLowerCase(),
+        } as AssetRef;
+      })
     : [];
 
 /** 패키지 사전 관문 — 중복 패키지 해시 · Baseline 최신성 (읽기 전용) */
