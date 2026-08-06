@@ -285,6 +285,19 @@ export function OcsIncrementImportPanel() {
 
   return (
     <div className="space-y-4">
+      {!BASELINE_VERIFICATION_IMPLEMENTED && (
+        <Card className="border-destructive/50">
+          <CardContent className="flex items-start gap-2 p-4 text-xs">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <div>
+              <div className="text-sm font-semibold text-destructive">{BASELINE_LOCK_MESSAGE}</div>
+              Baseline 다운로드·검증 기능이 아직 없으므로 <code>manifest.base_baseline_id</code> 를 서버 정본과
+              대조할 수단이 없습니다. 검증·Dry-run 은 사용할 수 있으나 실제 증분 Import 는 잠겨 있습니다.
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -394,6 +407,40 @@ export function OcsIncrementImportPanel() {
               <Row label="comments hash" value={dry["outside_scope_comment_hash_before"]} />
               <Row label="links hash" value={dry["outside_scope_link_hash_before"]} />
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {dry && massRetire && (
+        <></>
+      )}
+      {collision && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Storage 충돌 점검 (읽기 전용)</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              동일 <code>storage_path</code> 존재 시 DB metadata 의 <code>content_hash</code> 와 manifest SHA-256 을
+              대조합니다. overwrite·삭제는 수행하지 않습니다.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="grid gap-3 md:grid-cols-4">
+              <Row label="new" value={collision.counts.new} />
+              <Row label="existing (skip)" value={collision.counts.existing} />
+              <Row label="hash_mismatch" value={collision.counts.hash_mismatch} bad={collision.counts.hash_mismatch > 0} />
+              <Row label="unresolved" value={collision.counts.unresolved} bad={collision.counts.unresolved > 0} />
+            </div>
+            {collision.rows.filter((r) => r.state === "hash_mismatch" || r.state === "unresolved").length > 0 && (
+              <div className="max-h-56 overflow-auto rounded-md border p-2 text-[11px]">
+                {collision.rows
+                  .filter((r) => r.state === "hash_mismatch" || r.state === "unresolved")
+                  .map((r) => (
+                    <div key={`${r.bucket}/${r.path}`} className="font-mono text-destructive">
+                      [{r.state}] {r.bucket}/{r.path}
+                    </div>
+                  ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
