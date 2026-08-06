@@ -77,19 +77,7 @@ export function TaskDetailPage() {
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
   const confirmFinishSourceFn = useServerFn(confirmActualFinishSource);
   const queryClient = useQueryClient();
-  const { data: milestoneOptions = [] } = useQuery({
-    queryKey: ["tm_milestone_kinds", "active-codes"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("tm_milestone_kinds")
-        .select("kind_code, sort_order")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((r: { kind_code: string }) => r.kind_code as string);
-    },
-    staleTime: 60_000,
-  });
+  const { optionsForPlot } = useTmMilestoneOptions();
 
   const { data: rawRow, refetch, isFetching } = useQuery({
     queryKey: ["task-detail", id],
