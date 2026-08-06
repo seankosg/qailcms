@@ -344,12 +344,18 @@ function PlotRow({
       <div className="relative flex-1 py-4" style={{ height: 36 + laneCount * LANE_H }}>
         {/* 기준선 */}
         <div
-          className="absolute top-[22px] h-[6px] rounded-full bg-border"
+          className={cn(
+            "absolute top-[22px] h-[6px] rounded-full",
+            showAuto ? "bg-muted-foreground/30" : "bg-border",
+          )}
           style={{ left: `${startPct}%`, width: `${Math.max(endPct - startPct, 0)}%` }}
         />
         {/* 경과선 */}
         <div
-          className="absolute top-[22px] h-[6px] rounded-full bg-destructive"
+          className={cn(
+            "absolute top-[22px] h-[6px] rounded-full",
+            showAuto ? "bg-muted-foreground/40" : "bg-destructive",
+          )}
           style={{ left: `${startPct}%`, width: `${Math.max(elapsedEnd - startPct, 0)}%` }}
         />
 
