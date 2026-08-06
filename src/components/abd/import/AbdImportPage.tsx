@@ -181,12 +181,13 @@ export function AbdImportPage() {
     [entries, columnFileId],
   );
   const hdecFieldKeys = useMemo(
-    () => hdecFieldOptions.map((o) => o.field),
+    () => [...hdecFieldOptions.map((o) => o.field), OCS_DISPLAY_FIELD],
     [hdecFieldOptions],
   );
   const hdecFieldLabelMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const o of hdecFieldOptions) m.set(o.field, o.label);
+    m.set(OCS_DISPLAY_FIELD, "OCS");
     return m;
   }, [hdecFieldOptions]);
 
@@ -205,8 +206,9 @@ export function AbdImportPage() {
         return { required: false };
       },
       isKnownField: (field) => knownSet.has(field),
-      getSourceLabel: () => "HDEC",
-      getSourceOrigin: () => "hdec",
+      getSourceLabel: (field) => (field === OCS_DISPLAY_FIELD ? "SYSTEM" : "HDEC"),
+      getSourceOrigin: (field) => (field === OCS_DISPLAY_FIELD ? "system" : "hdec"),
+      isDisplayOnly: (header) => header === OCS_DISPLAY_FIELD,
     };
   }, [hdecFieldKeys]);
 
