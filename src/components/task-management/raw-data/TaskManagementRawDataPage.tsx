@@ -1064,7 +1064,9 @@ export function TaskManagementRawDataPage() {
           const isMain = rr.level === "main";
           const dyn = cellDynRef.current;
           // 통합 편집 규칙: 서버 RCL 판정(useRclCan → rcl_grants/rcl_can) 결과만으로 판단.
-          const rowCanEdit = dyn.canEditRow(rr as Record<string, unknown>);
+          const isAdminEditor = isStrictAdminRef.current;
+          // admin 계정은 모든 행·모든 항목(파생/자동계산 제외)을 수정할 수 있다.
+          const rowCanEdit = isAdminEditor || dyn.canEditRow(rr as Record<string, unknown>);
           const isTeamOverride = c.key === "team";
           const isDataDateOverride = c.key === "data_date";
           const isMilestoneOverride = c.key === "milestone";
@@ -1082,7 +1084,12 @@ export function TaskManagementRawDataPage() {
               options: dyn.milestoneOptionsForPlot(rr.plot),
             };
             // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 만 인라인 수정 가능.
-            effectiveCanEdit = effectiveCanEdit && isStrictAdminRef.current;
+            effectiveCanEdit = effectiveCanEdit && isAdminEditor;
+          } else if (isAdminEditor && !(c.editable && c.editorType)) {
+            const ed = tmAdminEditor(c);
+            if (ed) {
+              effectiveColumn = { ...c, editable: true, editorType: ed.editorType, options: ed.options };
+            }
           }
           const editableInline =
             !!effectiveColumn.editable &&
