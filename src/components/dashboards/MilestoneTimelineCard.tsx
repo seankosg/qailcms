@@ -381,17 +381,27 @@ function PlotRow({
               <div
                 className={`flex items-center justify-center rounded-full border-[3px] bg-background transition-all ${
                   isActive
-                    ? "h-10 w-10 border-primary bg-primary/20 ring-4 ring-primary/20"
+                    ? "h-10 w-10 border-primary ring-4 ring-primary/20"
                     : isDone
-                      ? "h-8 w-8 border-success bg-success/20"
+                      ? "h-8 w-8 border-success ring-2 ring-success/20"
                       : "h-8 w-8 border-muted-foreground/40 bg-muted"
                 }`}
               >
-                <Icon
-                  className={`${isActive ? "h-5 w-5" : "h-4 w-4"} ${
-                    isDone ? "text-success" : isActive ? "text-primary" : "text-muted-foreground"
+                <div
+                  className={`flex items-center justify-center rounded-full ${
+                    isActive
+                      ? "h-7 w-7 bg-primary text-primary-foreground"
+                      : isDone
+                        ? "h-6 w-6 bg-success text-success-foreground"
+                        : "h-6 w-6 bg-muted-foreground/20 text-muted-foreground"
                   }`}
-                />
+                >
+                  <Icon
+                    className={`${isActive ? "h-4 w-4" : "h-3.5 w-3.5"} ${
+                      isActive ? "text-primary-foreground" : isDone ? "text-success-foreground" : "text-muted-foreground"
+                    }`}
+                  />
+                </div>
               </div>
               <span
                 className={`mt-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-bold uppercase leading-tight tracking-wide ring-1 ${
