@@ -420,3 +420,9 @@
 - [ ] #0804 `canEdit`(rank >= senior_user) — DmrRawDataPage 1곳 잔존. DMR 은 RCL 대상 밖. RCL 확장 시 같이 정리.
 
 - [ ] #0805 WRT 라운드 승격은 `r1/r2_response_code` 에 의존하는데 그 값은 Aconex 임포트가 채운다. 그 경로가 없는 동안 `wrt_judge_v1` 의 `active_round` 는 잠정치다. (2026-08-05 실측: 모집단 339 중 `latest_response_code` 337 / `r1_response_code` 80 / `r2_response_code` 31, `rs_result_missing` 244(72%). 실제 승격은 "R2 단계 실적 존재" 조건 하나로만 일어난다.)
+
+## ABD OCS 증분 Import (2026-08-06)
+- [ ] #0806 **Revision 간 comment ID 안정성** — 향후 로컬 패키징 도구 책임으로 이관. 앱/DB 는 무변경.
+  - DB 내부 무결성 사실(증명 아님): `abd_ocs_comments.source_comment_id` UNIQUE + `abd_ocs_attachments.source_attachment_id` UNIQUE, upsert conflict key = `source_comment_id`. 이는 "동일 revision 내 중복 차단" 만 보장하며, revision 간 ID 안정성(identity stability)을 증명하지 않는다.
+  - 로컬 도구가 revision 간 ID 재현 규칙과 그 검증 리포트를 제공해야 한다. 그 전까지 앱은 ID 재생성/보정 로직을 두지 않는다.
+- [ ] #0806 **Baseline download/verification 미구현** — `manifest.base_baseline_id` 를 서버 정본과 대조할 수단 없음. 구현 전까지 증분 Import 는 UI 상수 `BASELINE_VERIFICATION_IMPLEMENTED=false` 로 잠금.
