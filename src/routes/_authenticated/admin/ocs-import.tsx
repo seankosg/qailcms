@@ -87,7 +87,8 @@ function OcsMaintenanceBody() {
       <div>
         <h1 className="text-xl font-semibold">OCS Maintenance</h1>
         <p className="text-sm text-muted-foreground">
-          OCS 정본 현황 조회 · 캐시 재계산 · 무결성 검증 전용 화면입니다. 데이터 적재는 하지 않습니다.
+          OCS 정본 현황 조회 · 캐시 재계산 · 무결성 검증 전용 화면입니다. 데이터 적재는 하지
+          않습니다.
         </p>
       </div>
 
