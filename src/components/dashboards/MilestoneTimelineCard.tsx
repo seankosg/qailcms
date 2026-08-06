@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { todayInDoha } from "@/lib/time/doha";
+import { cn } from "@/lib/utils";
 
 const PLOT_ORDER = ["D", "C", "G"];
 
