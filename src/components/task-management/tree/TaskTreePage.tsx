@@ -25,13 +25,10 @@ import {
 import type { Discipline } from "@/lib/task-management/columns";
 import {
   DEFAULT_THRESHOLDS,
-  computeJudgment,
   cumPlanProgress,
   computeVariance,
   mainCumPlanProgress,
   mainVariance,
-  judgeFromGap,
-  worstJudgment,
 } from "@/lib/task-management/derived";
 import type { TaskThresholds } from "@/lib/task-management/derived";
 import { exportTaskSummary } from "./exportTaskSummary";
