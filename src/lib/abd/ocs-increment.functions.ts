@@ -7,6 +7,20 @@ import {
   BASELINE_SCHEMA_VERSION,
   computeBaselineId,
 } from "@/lib/abd/ocs-baseline-shared";
+import { assertBaselineGate } from "@/lib/abd/ocs-increment-gate";
+import { recheckCollisionsServerSide } from "@/lib/abd/ocs-increment-collision";
+import {
+  assetList,
+  sourceFileList,
+  sourceMetaList,
+} from "@/lib/abd/ocs-increment-normalize";
+import type { SourceFileRef } from "@/lib/abd/ocs-increment-types";
+
+export type {
+  AssetRef,
+  SourceFileMeta,
+  SourceFileRef,
+} from "@/lib/abd/ocs-increment-types";
 
 export type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 
