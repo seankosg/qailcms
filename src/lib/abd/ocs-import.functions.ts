@@ -36,17 +36,25 @@ export const getOcsImportStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertStrictAdmin(context.supabase, context.userId);
-    const [comments, linked, attachments] = await Promise.all([
+    const [comments, linkedRows, links, attachments] = await Promise.all([
       context.supabase.from("abd_ocs_comments").select("id", { count: "exact", head: true }),
+      // V3 정본: abd_ocs_comment_abd_links 의 distinct comment_id
       context.supabase
-        .from("abd_ocs_comments")
-        .select("id", { count: "exact", head: true })
-        .not("abd_item_id", "is", null),
+        .from("abd_ocs_comment_abd_links")
+        .select("comment_id")
+        .limit(100000),
+      context.supabase
+        .from("abd_ocs_comment_abd_links")
+        .select("id", { count: "exact", head: true }),
       context.supabase.from("abd_ocs_attachments").select("id", { count: "exact", head: true }),
     ]);
+    const distinctComments = new Set(
+      ((linkedRows.data ?? []) as { comment_id: string }[]).map((r) => r.comment_id),
+    ).size;
     return {
       comment_count: comments.count ?? 0,
-      linked_count: linked.count ?? 0,
+      linked_comment_count: distinctComments,
+      abd_association_count: links.count ?? 0,
       attachment_count: attachments.count ?? 0,
     };
   });
