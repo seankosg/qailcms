@@ -367,86 +367,109 @@ function PlotRow({
             return (
               <div
                 key={`${n.kind}-${n.date}`}
-                className="absolute z-10 flex -translate-x-1/2 flex-col items-center opacity-60"
+                className="absolute z-30 flex -translate-x-1/2 flex-col items-center"
                 style={{ left: `${left}%`, top: 12 + lane * LANE_H }}
               >
                 {lane > 0 ? (
                   <span
-                    className="absolute bottom-full w-px bg-border/70"
+                    className="absolute bottom-full w-px bg-muted-foreground/50"
                     style={{ height: lane * LANE_H - 10 }}
                   />
                 ) : null}
-                <div className="h-3 w-3 rounded-full border-2 border-muted-foreground/50 bg-background" />
+                <div className="h-4 w-4 rounded-full border-2 border-background bg-foreground shadow-sm" />
                 <span
-                  className="mt-1 whitespace-nowrap rounded bg-background/80 px-1 text-[10px] font-normal leading-tight text-muted-foreground"
+                  className="mt-1 whitespace-nowrap rounded-md bg-background px-2 py-0.5 text-[11px] font-bold text-foreground shadow-sm"
                   title={`${n.label} · ${fmtDate(n.date)} (모듈·팀 최종 계획일)`}
                 >
                   {n.label}
                 </span>
-                <span className="whitespace-nowrap rounded bg-background/80 px-1 font-mono text-[9px] text-muted-foreground/80">
+                <span className="whitespace-nowrap rounded bg-background px-1 font-mono text-[10px] font-semibold text-foreground">
                   {fmtDate(n.date)}
+                </span>
+                <span className="whitespace-nowrap rounded bg-background px-1 font-mono text-[10px] font-extrabold text-destructive">
+                  {dLabel(n.diff)}
                 </span>
               </div>
             );
           }
           const Icon = isDone ? CheckCircle2 : isActive ? Clock : Circle;
           return (
-          <div
-            key={`${n.kind}-${n.date}`}
-            className="absolute z-20 flex -translate-x-1/2 flex-col items-center"
-            style={{ left: `${left}%`, top: 8 + lane * LANE_H }}
+            <div
+              key={`${n.kind}-${n.date}`}
+              className="absolute z-20 flex -translate-x-1/2 flex-col items-center"
+              style={{ left: `${left}%`, top: 8 + lane * LANE_H }}
             >
               {lane > 0 ? (
                 <span
-                  className="absolute bottom-full w-px bg-border"
+                  className={cn(
+                    "absolute bottom-full w-px",
+                    showAuto ? "bg-muted-foreground/30" : "bg-border",
+                  )}
                   style={{ height: lane * LANE_H - 14 }}
                 />
               ) : null}
               <div
-                className={`flex items-center justify-center rounded-full border-[3px] bg-background transition-all ${
-                  isActive
-                    ? "h-10 w-10 border-primary ring-4 ring-primary/20"
-                    : isDone
-                      ? "h-8 w-8 border-success ring-2 ring-success/20"
-                      : "h-8 w-8 border-muted-foreground/40 bg-muted"
-                }`}
+                className={cn(
+                  "flex items-center justify-center rounded-full border-[3px] bg-background transition-all",
+                  showAuto
+                    ? "h-8 w-8 border-muted-foreground/40"
+                    : isActive
+                      ? "h-10 w-10 border-primary ring-4 ring-primary/20"
+                      : isDone
+                        ? "h-8 w-8 border-success ring-2 ring-success/20"
+                        : "h-8 w-8 border-muted-foreground/40 bg-muted",
+                )}
               >
                 <div
-                  className={`flex items-center justify-center rounded-full ${
-                    isActive
-                      ? "h-7 w-7 bg-primary text-primary-foreground"
-                      : isDone
-                        ? "h-6 w-6 bg-success text-success-foreground"
-                        : "h-6 w-6 bg-muted-foreground/20 text-muted-foreground"
-                  }`}
+                  className={cn(
+                    "flex items-center justify-center rounded-full",
+                    showAuto
+                      ? "h-6 w-6 bg-muted-foreground/30 text-muted-foreground"
+                      : isActive
+                        ? "h-7 w-7 bg-primary text-primary-foreground"
+                        : isDone
+                          ? "h-6 w-6 bg-success text-success-foreground"
+                          : "h-6 w-6 bg-muted-foreground/20 text-muted-foreground",
+                  )}
                 >
                   <Icon
-                    className={`${isActive ? "h-4 w-4" : "h-3.5 w-3.5"} ${
-                      isActive ? "text-primary-foreground" : isDone ? "text-success-foreground" : "text-muted-foreground"
-                    }`}
+                    className={cn(
+                      showAuto ? "h-3.5 w-3.5 text-muted-foreground" : isActive ? "h-4 w-4" : "h-3.5 w-3.5",
+                      showAuto
+                        ? "text-muted-foreground"
+                        : isActive
+                          ? "text-primary-foreground"
+                          : isDone
+                            ? "text-success-foreground"
+                            : "text-muted-foreground",
+                    )}
                   />
                 </div>
               </div>
               <span
-                className={`mt-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-bold uppercase leading-tight tracking-wide ring-1 ${
-                  isActive
-                    ? "bg-primary text-primary-foreground ring-primary"
-                    : isDone
-                      ? "bg-success/15 text-success ring-success/40"
-                      : "bg-muted text-foreground ring-border"
-                }`}
+                className={cn(
+                  "mt-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-bold uppercase leading-tight tracking-wide ring-1",
+                  showAuto
+                    ? "bg-muted text-muted-foreground ring-border"
+                    : isActive
+                      ? "bg-primary text-primary-foreground ring-primary"
+                      : isDone
+                        ? "bg-success/15 text-success ring-success/40"
+                        : "bg-muted text-foreground ring-border",
+                )}
                 title={`${n.label} · ${fmtDate(n.date)}`}
               >
                 {n.label}
               </span>
-              <span className="mt-1 whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-bold text-foreground">
+              <span className="mt-1 whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-bold text-muted-foreground">
                 {fmtDate(n.date)}
               </span>
               {!isDone ? (
                 <span
-                  className={`whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-extrabold ${
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  }`}
+                  className={cn(
+                    "whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-extrabold",
+                    showAuto ? "text-destructive" : isActive ? "text-primary" : "text-muted-foreground",
+                  )}
                 >
                   {dLabel(n.diff)}
                 </span>
