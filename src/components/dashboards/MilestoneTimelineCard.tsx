@@ -83,6 +83,7 @@ export function MilestoneTimelineCard() {
 
   const today = todayInDoha();
   const todayNum = dayNum(today);
+  const [showAuto, setShowAuto] = useState(false);
 
   const plots = useMemo(() => {
     const kinds = new Map(
@@ -103,19 +104,21 @@ export function MilestoneTimelineCard() {
       byPlot.set(r.plot, list);
     }
     for (const list of byPlot.values()) list.sort((a, b) => a.date.localeCompare(b.date));
-    for (const r of data?.auto ?? []) {
-      if (!r?.plot || !r?.label || !r?.last_date) continue;
-      const list = byPlot.get(r.plot) ?? [];
-      list.push({
-        kind: `auto:${r.label}`,
-        label: r.label,
-        date: r.last_date,
-        diff: dayNum(r.last_date) - todayNum,
-        auto: true,
-      });
-      byPlot.set(r.plot, list);
+    if (showAuto) {
+      for (const r of data?.auto ?? []) {
+        if (!r?.plot || !r?.label || !r?.last_date) continue;
+        const list = byPlot.get(r.plot) ?? [];
+        list.push({
+          kind: `auto:${r.label}`,
+          label: r.label,
+          date: r.last_date,
+          diff: dayNum(r.last_date) - todayNum,
+          auto: true,
+        });
+        byPlot.set(r.plot, list);
+      }
+      for (const list of byPlot.values()) list.sort((a, b) => a.date.localeCompare(b.date));
     }
-    for (const list of byPlot.values()) list.sort((a, b) => a.date.localeCompare(b.date));
     return Array.from(byPlot.entries())
       .filter(([, list]) => list.length > 0)
       .sort((a, b) => {
@@ -124,7 +127,7 @@ export function MilestoneTimelineCard() {
         if (ia !== ib) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
         return a[0].localeCompare(b[0]);
       });
-  }, [data, todayNum]);
+  }, [data, todayNum, showAuto]);
 
   return (
     <Card className="overflow-hidden">
