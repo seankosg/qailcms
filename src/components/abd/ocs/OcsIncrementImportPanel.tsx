@@ -29,10 +29,10 @@ const BATCH = 500;
 const RETIRE_PCT = 0.3;
 const RETIRE_ABS = 100;
 /**
- * Stage 9 — Latest OCS Baseline 다운로드·검증이 구현되었다.
- * precheck 가 manifest 의 base_baseline_id / base_core_hash 를 서버 실시간 값과 대조한다.
+ * Stage 9 — 실제 admin 세션에서 Baseline ZIP 생성·다운로드·내용 검증이
+ * 완료되기 전에는 false 를 유지한다. 별도 승인 없이 true 로 바꾸지 않는다.
  */
-const BASELINE_VERIFICATION_IMPLEMENTED = true;
+const BASELINE_VERIFICATION_IMPLEMENTED = false;
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
 type Dry = Record<string, unknown>;
