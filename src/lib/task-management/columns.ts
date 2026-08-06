@@ -128,12 +128,14 @@ export function milestoneColorClass(code: string): string {
   return MILESTONE_FALLBACK_PALETTE[idx];
 }
 
-// Plan/Actual Overdue 색상 (PASS = 완료 / SAFE / WARNING / RISK)
+// Plan/Actual Overdue 색상
+// PASS = 완료(진한 회색) / SAFE = 버퍼 밖 여유(초록)
+// RISK = 마일스톤 이내 버퍼 구간 침범(주황) / WARNING = 마일스톤 초과(빨강)
 export const OVERDUE_COLORS: Record<string, string> = {
-  PASS: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  PASS: "bg-slate-500/25 text-slate-700 dark:text-slate-200",
   SAFE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  WARNING: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  RISK: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+  RISK: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  WARNING: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
 };
 
 export const PLOT_COLORS: Record<string, string> = {
