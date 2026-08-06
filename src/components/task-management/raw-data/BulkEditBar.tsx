@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { todayInDoha } from "@/lib/time/doha";
 import { useQuery } from "@tanstack/react-query";
+import { useTmMilestoneOptions } from "@/hooks/useTmMilestoneOptions";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -73,19 +74,12 @@ export function BulkEditBar({
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
   const { data: me } = useCurrentUser();
   const isStrictAdmin = me?.isStrictAdmin === true;
-  const { data: milestoneOptions = [] } = useQuery({
-    queryKey: ["tm_milestone_kinds", "active-codes"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("tm_milestone_kinds")
-        .select("kind_code, sort_order")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((r: { kind_code: string }) => r.kind_code as string);
-    },
-    staleTime: 60_000,
-  });
+  const { optionsForPlots } = useTmMilestoneOptions();
+  // 선택 행들의 Plot 교집합만 노출 (Plot 별 등록 마일스톤)
+  const milestoneOptions = useMemo(
+    () => optionsForPlots(selectedRows.map((r) => (r as any).plot)),
+    [optionsForPlots, selectedRows],
+  );
   const fields = useMemo(
     () =>
       // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 일괄 편집은 admin 만 가능.
