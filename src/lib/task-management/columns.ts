@@ -128,8 +128,9 @@ export function milestoneColorClass(code: string): string {
   return MILESTONE_FALLBACK_PALETTE[idx];
 }
 
-// Plan/Actual Overdue 3단계 색상 (SAFE / WARNING / RISK)
+// Plan/Actual Overdue 색상 (PASS = 완료 / SAFE / WARNING / RISK)
 export const OVERDUE_COLORS: Record<string, string> = {
+  PASS: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   SAFE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   WARNING: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   RISK: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
