@@ -595,6 +595,12 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         .select("inserted, updated")
         .eq("id", batchId)
         .single();
+      // 파일 전체 기준 OCS 제외 건수 (여러 HTTP 청크 누적분 포함)
+      const { count: skippedTotal } = await supa
+        .from("abd_import_row_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("upload_id", batchId)
+        .eq("reason_code", "ocs_pending");
       await supa
         .from("abd_import_logs")
         .update({
@@ -602,7 +608,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           updated: (cur?.updated ?? 0) + updated,
           inactivated,
           mismatched: 0,
-          status: "success",
+          status: (skippedTotal ?? 0) > 0 ? "partial" : "success",
           finished_at: new Date().toISOString(),
         })
         .eq("id", batchId);
@@ -630,6 +636,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       total: rowsToImport.length,
       df_actual_blocked: dfBlocked,
       df_actual_blocked_samples: dfBlockedSamples,
+      ocs_skipped_rows: ocsSkipped,
     };
    } catch (err: any) {
      const msg = err?.message ?? String(err);
