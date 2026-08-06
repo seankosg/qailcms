@@ -72,6 +72,7 @@ import {
 } from "@/lib/task-management/filters";
 import { ColumnFilterDropdown } from "./ColumnFilters";
 import { BulkEditBar } from "./BulkEditBar";
+import { useTmMilestoneOptions } from "@/hooks/useTmMilestoneOptions";
 import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { ExportDialog } from "./ExportDialog";
 import { HistoryDrawer } from "./HistoryDrawer";
@@ -693,7 +694,7 @@ export function TaskManagementRawDataPage() {
     refetch,
     toggleCollapse,
     setAddChildParent,
-    milestoneOptions,
+    milestoneOptionsForPlot,
     patchRow,
     refetchRow,
     kpiMode,
@@ -715,7 +716,7 @@ export function TaskManagementRawDataPage() {
     refetch,
     toggleCollapse,
     setAddChildParent,
-    milestoneOptions,
+    milestoneOptionsForPlot,
     patchRow,
     refetchRow,
     kpiMode,
@@ -1078,7 +1079,7 @@ export function TaskManagementRawDataPage() {
               ...c,
               editable: true,
               editorType: "select",
-              options: [...(dyn.milestoneOptions ?? [])],
+              options: dyn.milestoneOptionsForPlot(rr.plot),
             };
             // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 만 인라인 수정 가능.
             effectiveCanEdit = effectiveCanEdit && isStrictAdminRef.current;
