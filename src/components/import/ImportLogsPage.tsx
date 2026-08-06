@@ -708,6 +708,38 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
             <CardTitle className="text-base">{selectedBatch?.file_name}</CardTitle>
           </CardHeader>
           <CardContent>
+            {selectedBatch && (
+              <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
+                <Badge variant="outline" className={statusColor[selectedBatch.status] || ""}>
+                  {selectedBatch.status === "rolled_back" ? "rolled back" : selectedBatch.status}
+                </Badge>
+                {hasExtra && <Badge variant="outline">{cfg.extraLabel} {selectedBatch.extra ?? "—"}</Badge>}
+                <Badge variant="outline">Data Date {selectedBatch.data_date ? formatDdMmmYyyy(selectedBatch.data_date) || "—" : "—"}</Badge>
+                <Badge variant="outline">Uploaded {fmtDateTime(selectedBatch.started_at)}</Badge>
+                <Badge variant="outline">
+                  Uploader {selectedBatch.imported_by ? uploaderNames[selectedBatch.imported_by] || "—" : "—"}
+                </Badge>
+                <Badge variant="outline">Duration {fmtDuration(selectedBatch.started_at, selectedBatch.finished_at)}</Badge>
+                {typeof selectedBatch.parsed_rows === "number" && (
+                  <Badge variant="outline">파싱 {selectedBatch.parsed_rows}</Badge>
+                )}
+                {typeof selectedBatch.applied_rows === "number" && (
+                  <Badge variant="outline">반영 {selectedBatch.applied_rows}</Badge>
+                )}
+                <Badge variant="outline">Inserted {selectedBatch.inserted}</Badge>
+                <Badge variant="outline">Updated {selectedBatch.updated}</Badge>
+                <Badge variant="outline">Skipped {selectedBatch.skipped}</Badge>
+                <Badge variant="outline">Rejected {selectedBatch.rejected}</Badge>
+                {selectedBatch.exclusions &&
+                  Object.entries(selectedBatch.exclusions)
+                    .filter(([, v]) => typeof v === "number" && (v as number) > 0)
+                    .map(([k, v]) => (
+                      <Badge key={k} variant="outline" className="bg-amber-100 text-amber-800">
+                        제외 {k} {v as number}
+                      </Badge>
+                    ))}
+              </div>
+            )}
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1.5 text-xs">
                 <Badge variant="outline">Total {rowLogs.length}</Badge>
