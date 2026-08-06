@@ -188,9 +188,11 @@ export function MilestoneTimelineCard() {
 function SharedTimeline({
   plots,
   todayNum,
+  showAuto,
 }: {
   plots: [string, Node[]][];
   todayNum: number;
+  showAuto: boolean;
 }) {
   const { minDay, maxDay, ticks } = useMemo(() => {
     const all = plots.flatMap(([, ns]) => ns.map((n) => dayNum(n.date)));
