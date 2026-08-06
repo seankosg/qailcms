@@ -139,6 +139,9 @@ function formatEta(sec: number): string {
   return s ? `${m}분 ${s}초` : `${m}분`;
 }
 
+/** OCS 준수 상태 — 시스템 산출 컬럼(임포트 대상 아님, 컬럼 메뉴 표시 전용) */
+const OCS_DISPLAY_FIELD = "ocs_check";
+
 export function AbdImportPage() {
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [mode, setMode] = useState<ImportMode>("hdec");
