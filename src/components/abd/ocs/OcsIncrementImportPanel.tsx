@@ -11,6 +11,12 @@ import { FilePickerButton } from "@/components/shared/FilePickerButton";
 import { supabase } from "@/integrations/supabase/client";
 import { chunk } from "@/lib/abd/ocs-db-parser";
 import { readIncrementPackage, type IncrementPackage } from "@/lib/abd/ocs-increment-package";
+import {
+  checkPackageStorageCollisions,
+  imageStoragePath,
+  sourceStoragePath,
+  type CollisionReport,
+} from "@/lib/abd/ocs-storage-collision";
 import { ocsV3StageLoad, ocsV3StageReset, type V3StageKind } from "@/lib/abd/ocs-v3-import.functions";
 import { ocsIncDryRun, ocsIncImport, ocsIncPrecheck } from "@/lib/abd/ocs-increment.functions";
 import { createPreImportSnapshot } from "@/lib/backup/backup.functions";
@@ -21,6 +27,12 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 const BATCH = 500;
 const RETIRE_PCT = 0.3;
 const RETIRE_ABS = 100;
+/**
+ * Stage 9 — Baseline 다운로드/검증 기능이 아직 없다. 그 기능이 구현되기 전까지
+ * 증분 Import 는 잠금 상태로 둔다. (기능 완료로 표현하지 말 것)
+ */
+const BASELINE_VERIFICATION_IMPLEMENTED = false;
+const BASELINE_LOCK_MESSAGE = "Baseline download/verification not implemented — Import locked";
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
 type Dry = Record<string, unknown>;
@@ -56,6 +68,7 @@ export function OcsIncrementImportPanel() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [collision, setCollision] = useState<CollisionReport | null>(null);
 
   const isAdmin = me?.isStrictAdmin === true;
 
@@ -65,8 +78,11 @@ export function OcsIncrementImportPanel() {
 
   const blockers = useMemo(() => {
     const out: string[] = [];
+    if (!BASELINE_VERIFICATION_IMPLEMENTED) out.push(BASELINE_LOCK_MESSAGE);
     if (!pkg) out.push("증분 ZIP 패키지를 선택하십시오.");
     if (pkg) out.push(...pkg.blockers);
+    if (pkg && !collision) out.push("Storage 충돌 점검 미완료");
+    if (collision) out.push(...collision.blockers);
     if (precheck?.["duplicate_package"] === true) out.push("동일 패키지 해시가 이미 반영되었습니다.");
     const base = (precheck?.["baseline"] ?? {}) as Record<string, unknown>;
     if (precheck && base["base_import_run_found"] !== true) out.push("base_import_run_id 를 정본에서 찾을 수 없습니다.");
@@ -83,7 +99,7 @@ export function OcsIncrementImportPanel() {
     if (!snapshotId) out.push("사전 백업 스냅샷 미완료 (Dry-run 이후 생성분만 인정)");
     if (!approved) out.push("최종 승인 체크 필요");
     return out;
-  }, [pkg, precheck, dry, snapshotId, approved, massRetire, allowRetire, retire]);
+  }, [pkg, precheck, dry, snapshotId, approved, massRetire, allowRetire, retire, collision]);
 
   function resetDownstream() {
     setRunId(null);
@@ -101,6 +117,7 @@ export function OcsIncrementImportPanel() {
     setBusy("패키지 검증 중…");
     resetDownstream();
     setPrecheck(null);
+    setCollision(null);
     try {
       const p = await readIncrementPackage(file);
       setPkg(p);
@@ -111,7 +128,13 @@ export function OcsIncrementImportPanel() {
         },
       })) as Record<string, unknown>;
       setPrecheck(pc);
-      toast.success(`패키지 검증 완료 — 내부 파일 ${p.verifiedFiles}건 SHA-256 일치`);
+      const col = await checkPackageStorageCollisions(p);
+      setCollision(col);
+      toast.success(
+        `패키지 검증 완료 — 내부 파일 ${p.verifiedFiles}건 SHA-256 일치 · Storage 충돌 ${
+          col.counts.hash_mismatch + col.counts.unresolved
+        }건`,
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
@@ -178,8 +201,10 @@ export function OcsIncrementImportPanel() {
 
   /** source/ 와 images/ 를 비공개 보관함에 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기) */
   async function uploadAssets(p: IncrementPackage) {
+    const skip = collision?.skipPaths ?? new Set<string>();
     for (const img of p.images) {
-      const path = img.relative_path.replace(/^images\//, "");
+      const path = imageStoragePath(img.relative_path);
+      if (skip.has(path)) continue;
       const { error } = await supabase.storage
         .from(OCS_BUCKET)
         .upload(path, new Blob([img.bytes]), { upsert: false });
@@ -187,7 +212,8 @@ export function OcsIncrementImportPanel() {
     }
     for (const sf of p.sourceFiles) {
       const fileName = sf.relative_path.split("/").pop() ?? sf.relative_path;
-      const storagePath = `${p.manifest.package_id}/${fileName}`;
+      const storagePath = sourceStoragePath(p.manifest.package_id, sf.relative_path);
+      if (skip.has(storagePath)) continue;
       const { error } = await supabase.storage
         .from(OCS_SOURCE_BUCKET)
         .upload(storagePath, new Blob([sf.bytes]), { upsert: false });
@@ -259,6 +285,19 @@ export function OcsIncrementImportPanel() {
 
   return (
     <div className="space-y-4">
+      {!BASELINE_VERIFICATION_IMPLEMENTED && (
+        <Card className="border-destructive/50">
+          <CardContent className="flex items-start gap-2 p-4 text-xs">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <div>
+              <div className="text-sm font-semibold text-destructive">{BASELINE_LOCK_MESSAGE}</div>
+              Baseline 다운로드·검증 기능이 아직 없으므로 <code>manifest.base_baseline_id</code> 를 서버 정본과
+              대조할 수단이 없습니다. 검증·Dry-run 은 사용할 수 있으나 실제 증분 Import 는 잠겨 있습니다.
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -368,6 +407,37 @@ export function OcsIncrementImportPanel() {
               <Row label="comments hash" value={dry["outside_scope_comment_hash_before"]} />
               <Row label="links hash" value={dry["outside_scope_link_hash_before"]} />
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {collision && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Storage 충돌 점검 (읽기 전용)</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              동일 <code>storage_path</code> 존재 시 DB metadata 의 <code>content_hash</code> 와 manifest SHA-256 을
+              대조합니다. overwrite·삭제는 수행하지 않습니다.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="grid gap-3 md:grid-cols-4">
+              <Row label="new" value={collision.counts.new} />
+              <Row label="existing (skip)" value={collision.counts.existing} />
+              <Row label="hash_mismatch" value={collision.counts.hash_mismatch} bad={collision.counts.hash_mismatch > 0} />
+              <Row label="unresolved" value={collision.counts.unresolved} bad={collision.counts.unresolved > 0} />
+            </div>
+            {collision.rows.filter((r) => r.state === "hash_mismatch" || r.state === "unresolved").length > 0 && (
+              <div className="max-h-56 overflow-auto rounded-md border p-2 text-[11px]">
+                {collision.rows
+                  .filter((r) => r.state === "hash_mismatch" || r.state === "unresolved")
+                  .map((r) => (
+                    <div key={`${r.bucket}/${r.path}`} className="font-mono text-destructive">
+                      [{r.state}] {r.bucket}/{r.path}
+                    </div>
+                  ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
