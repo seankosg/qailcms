@@ -91,6 +91,8 @@ interface FileEntry {
     updated: number;
     inactivated: number;
     total: number;
+    /** OCS 미완료로 행 단위 제외된 도면 목록 */
+    ocsSkipped?: { abd_number: string; reason: string }[];
   };
   progress?: number;
   /** 임포트 진행 상세 (현재 시트/청크/ETA) */
@@ -474,7 +476,13 @@ export function AbdImportPage() {
         p.map((x) => (x.id === e.id ? { ...x, status: "importing", progress: 20 } : x)),
       );
       try {
-        const agg = { inserted: 0, updated: 0, inactivated: 0, total: 0 };
+        const agg = {
+          inserted: 0,
+          updated: 0,
+          inactivated: 0,
+          total: 0,
+          ocsSkipped: [] as { abd_number: string; reason: string }[],
+        };
         // 파일당 로그 1건 — 첫 호출에서 log_id를 발급받아 이후 호출은 append.
         let logId: string | null = null;
         const sheets = e.parsed.sheets;
@@ -560,6 +568,12 @@ export function AbdImportPage() {
           agg.updated += res.updated;
           agg.inactivated += res.inactivated;
           agg.total += res.total;
+          for (const s of ((res as any).ocs_skipped_rows ?? []) as {
+            abd_number: string;
+            reason: string;
+          }[]) {
+            if (!agg.ocsSkipped.some((x) => x.abd_number === s.abd_number)) agg.ocsSkipped.push(s);
+          }
           const pct = 10 + Math.round(((idx + 1) / plan.length) * 85);
           setEntries((p) =>
             p.map((x) => (x.id === e.id ? { ...x, progress: pct } : x)),
@@ -573,7 +587,8 @@ export function AbdImportPage() {
           ),
         );
         toast.success(
-          `${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성`,
+          `${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성` +
+            (agg.ocsSkipped.length > 0 ? ` / OCS 미완료 제외 ${agg.ocsSkipped.length}행` : ""),
         );
       } catch (err: any) {
         const rawMsg = err?.message ?? String(err);
@@ -970,6 +985,20 @@ function FileRow({
             <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">
               Inactivated: {e.result.inactivated}
             </Badge>
+          )}
+          {(e.result.ocsSkipped?.length ?? 0) > 0 && (
+            <>
+              <Badge variant="outline" className="border-amber-300 text-amber-700">
+                OCS 미완료 제외: {e.result.ocsSkipped!.length}행
+              </Badge>
+              <OutOfScopeRowsPopover
+                rows={e.result.ocsSkipped!.map((s) => ({
+                  abd_number: s.abd_number,
+                  id: s.abd_number,
+                }))}
+                labelKeys={["abd_number"]}
+              />
+            </>
           )}
         </div>
       )}
