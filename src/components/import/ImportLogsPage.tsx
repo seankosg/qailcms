@@ -241,7 +241,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await (supabase as any)
         .from("abd_import_logs")
         .select(
-          "id, file_name, status, started_at, finished_at, imported_by, total_rows, inserted, updated, inactivated, mismatched, skipped_no_key, team, rolled_back_at",
+          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, inactivated, mismatched, skipped_no_key, team, rolled_back_at, parsed_rows, applied_rows, exclusions",
         )
         .order("started_at", { ascending: false })
         .limit(100);
@@ -252,7 +252,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         started_at: r.started_at,
         finished_at: r.finished_at,
         imported_by: r.imported_by,
-        data_date: null,
+        data_date: r.data_date ?? null,
         total: r.total_rows ?? 0,
         inserted: r.inserted ?? 0,
         updated: r.updated ?? 0,
@@ -260,6 +260,9 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         rejected: r.mismatched ?? 0,
         extra: r.team,
         rolled_back_at: r.rolled_back_at,
+        parsed_rows: r.parsed_rows ?? null,
+        applied_rows: r.applied_rows ?? null,
+        exclusions: r.exclusions ?? null,
       }));
       setBatches(list);
       await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
