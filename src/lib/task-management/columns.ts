@@ -63,7 +63,7 @@ export const ROW_TYPES = ["항목", "실행", "승인", "대기"] as const;
 export const STATUS_MANUAL = ["예정", "진행", "완료"] as const;
 export const RISK_LEVELS = ["Critical", "High", "Med", "Low"] as const;
 export const AUTO_JUDGMENTS = ["완료", "정상", "주의", "지연", "악화"] as const;
-export const PLOTS = ["C", "D"] as const;
+export const PLOTS = ["C", "D", "G"] as const;
 export const LEVELS = ["main", "sub"] as const;
 
 export const RISK_COLORS: Record<string, string> = {
@@ -139,6 +139,7 @@ export const OVERDUE_COLORS: Record<string, string> = {
 export const PLOT_COLORS: Record<string, string> = {
   C: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   D: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  G: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
 };
 
 export const DISCIPLINE_COLORS: Record<string, string> = {
