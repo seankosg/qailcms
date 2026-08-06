@@ -198,7 +198,7 @@ function SharedTimeline({
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[1000px] pr-16">
+      <div className="min-w-[1000px] pr-24">
         <div className="flex">
           {/* Plot 라벨 거터 */}
           <div className="w-24 shrink-0" />
@@ -276,7 +276,7 @@ function PlotRow({
 
   // 라벨 겹침 자동 회피: 라벨 폭(추정)이 겹치면 아래 레인으로 밀어낸다.
   const TRACK_PX = 840; // min-w-[1000px] - 라벨 거터(96) - 우측 여백(64)
-  const LANE_H = 56;
+  const LANE_H = 70;
   const lanes: number[] = []; // 레인별 마지막 라벨 우측 끝(px)
   const placed = nodes.map((n) => {
     const left = pct(dayNum(n.date));
