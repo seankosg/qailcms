@@ -108,9 +108,10 @@ export function MilestoneTimelineCard() {
       const list = byPlot.get(r.plot) ?? [];
       list.push({
         kind: `auto:${r.label}`,
-        label: `· ${r.label}`,
+        label: r.label,
         date: r.last_date,
         diff: dayNum(r.last_date) - todayNum,
+        auto: true,
       });
       byPlot.set(r.plot, list);
     }
