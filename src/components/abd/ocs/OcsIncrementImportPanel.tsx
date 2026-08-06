@@ -292,18 +292,7 @@ export function OcsIncrementImportPanel() {
 
   return (
     <div className="space-y-4">
-      {!BASELINE_VERIFICATION_IMPLEMENTED && (
-        <Card className="border-destructive/50">
-          <CardContent className="flex items-start gap-2 p-4 text-xs">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-            <div>
-              <div className="text-sm font-semibold text-destructive">{BASELINE_LOCK_MESSAGE}</div>
-              Baseline 다운로드·검증 기능이 아직 없으므로 <code>manifest.base_baseline_id</code> 를 서버 정본과
-              대조할 수단이 없습니다. 검증·Dry-run 은 사용할 수 있으나 실제 증분 Import 는 잠겨 있습니다.
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <OcsBaselineCard />
 
       <Card>
         <CardHeader>
