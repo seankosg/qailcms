@@ -2,6 +2,7 @@
 // 이 모듈은 archive reader + 계약 검증만 수행한다. OCS 의미 파서가 아니다.
 import JSZip from "jszip";
 import { sha256Hex } from "@/lib/abd/ocs-db-parser";
+import { BASELINE_CORE_TABLES } from "@/lib/abd/ocs-baseline-shared";
 import {
   parseV3Atomic,
   parseV3Policy,
@@ -128,6 +129,9 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
   if (!manifest.data_date) blockers.push("manifest.data_date 가 없습니다.");
   if (!manifest.base_baseline_id) blockers.push("manifest.base_baseline_id 가 없습니다.");
   if (!manifest.base_import_run_id) blockers.push("manifest.base_import_run_id 가 없습니다.");
+  if (!manifest.base_core_hash) blockers.push("manifest.base_core_hash 가 없습니다.");
+  if (!manifest.base_generated_at) blockers.push("manifest.base_generated_at 가 없습니다.");
+  blockers.push(...coreTableHashBlockers(manifest.base_core_table_hashes));
   if (!manifest.package_id) blockers.push("manifest.package_id 가 없습니다.");
   if (manifest.target_ocs_numbers.length === 0) blockers.push("대상 OCS 번호 배열이 비어 있습니다.");
   if (manifest.files.length === 0) blockers.push("manifest.files 목록이 비어 있습니다.");
