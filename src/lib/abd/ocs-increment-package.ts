@@ -26,6 +26,9 @@ export type IncrementManifest = {
   data_date: string;
   base_baseline_id: string;
   base_import_run_id: string;
+  base_core_hash: string;
+  base_core_table_hashes: Record<string, string>;
+  base_generated_at: string;
   target_ocs_numbers: string[];
   change_type: "new" | "revision" | "mixed" | string;
   files: ManifestFileEntry[];
@@ -65,6 +68,12 @@ function parseManifest(json: unknown): IncrementManifest {
     data_date: str(o["data_date"]),
     base_baseline_id: str(o["base_baseline_id"]),
     base_import_run_id: str(o["base_import_run_id"]),
+    base_core_hash: str(o["base_core_hash"]).toLowerCase(),
+    base_core_table_hashes:
+      o["base_core_table_hashes"] && typeof o["base_core_table_hashes"] === "object"
+        ? (o["base_core_table_hashes"] as Record<string, string>)
+        : {},
+    base_generated_at: str(o["base_generated_at"]),
     target_ocs_numbers: Array.isArray(o["target_ocs_numbers"])
       ? (o["target_ocs_numbers"] as unknown[]).map(str).filter(Boolean)
       : [],
