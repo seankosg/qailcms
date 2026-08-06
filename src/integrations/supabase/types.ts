@@ -6740,6 +6740,11 @@ export type Database = {
         Returns: Json
       }
       abd_ocs_assert_admin: { Args: never; Returns: undefined }
+      abd_ocs_baseline_core_hash: { Args: never; Returns: Json }
+      abd_ocs_baseline_dump: {
+        Args: { p_dataset: string; p_limit?: number; p_offset?: number }
+        Returns: Json
+      }
       abd_ocs_comment_visible: {
         Args: { _comment_id: string }
         Returns: boolean
