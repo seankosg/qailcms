@@ -55,6 +55,18 @@ export const updateTaskOwnerField = createServerFn({ method: "POST" })
     if (!row) throw new Error("대상 행을 찾을 수 없습니다.");
     await assertRcl(context.supabase, context.userId, data.id, "write");
 
+    // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 등급만 수정 가능.
+    if (data.field === "milestone") {
+      const { data: isAdmin, error: rErr } = await (context.supabase as any).rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+      if (rErr) throw new Error(`권한 판정 실패: ${rErr.message}`);
+      if (isAdmin !== true) {
+        throw new Error("권한 없음: Milestone 은 현재 관리자만 수정할 수 있습니다(임시 조치).");
+      }
+    }
+
     // task_no 는 모듈 전체 범위(other_team) 편집권 보유자만 변경 가능.
     // 근거: task_no 는 TM 모듈 전역 식별자(계층 부모-자식 매칭 · 임포트 업서트 키 · 외부 참조)라
     // 본인/자기팀 범위 판정으로는 변경의 영향 범위를 그 범위 안에 가둘 수 없다.

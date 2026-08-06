@@ -622,6 +622,16 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
     setIsRunning(true);
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id ?? null;
+    // ⛔ 임시 조치(2026-08-06, 원복 예정): admin 등급 외에는 임포트로 Milestone 을
+    // 덮어쓸 수 없다. 값은 파싱하되 페이로드에서 항상 null 로 만들어 기존 DB 값을 유지한다.
+    let canImportMilestone = false;
+    if (userId) {
+      const { data: roleRows } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+      canImportMilestone = (roleRows ?? []).some((r: { role: string }) => r.role === "admin");
+    }
 
     for (const f of ready) {
       if (cancelRequestedRef.current) {
@@ -1018,7 +1028,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         auto_judgment: null as string | null,
         auto_judgment_import: p.auto_judgment,
         // Milestone: 파일에 컬럼이 있고 정규화 성공 시에만 값이 있음. null이면 기존 DB 값 유지(stripNullExcept).
-        milestone: p.milestone ?? null,
+        milestone: canImportMilestone ? (p.milestone ?? null) : null,
         data_date: f.dataDateOverride ?? f.dataDate ?? null,
         sort_order: p.sort_order,
         source_file: f.name,

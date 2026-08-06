@@ -304,6 +304,8 @@ export function TaskDetailPage() {
                     effectiveColumn = { ...c, editable: true, editorType: "date" };
                   } else if (c.key === "milestone") {
                     effectiveColumn = { ...c, editable: true, editorType: "select", options: milestoneOptions };
+                    // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 만 수정 가능.
+                    effectiveCanEdit = effectiveCanEdit && user?.isStrictAdmin === true;
                   }
                   const editable =
                     !!effectiveColumn.editable &&

@@ -3,6 +3,7 @@ import { todayInDoha } from "@/lib/time/doha";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
 import {
   ChevronDown,
@@ -70,6 +71,8 @@ export function BulkEditBar({
   canEditRow,
 }: Props) {
   const updateOwnerFieldFn = useServerFn(updateTaskOwnerField);
+  const { data: me } = useCurrentUser();
+  const isStrictAdmin = me?.isStrictAdmin === true;
   const { data: milestoneOptions = [] } = useQuery({
     queryKey: ["tm_milestone_kinds", "active-codes"],
     queryFn: async () => {
@@ -84,8 +87,12 @@ export function BulkEditBar({
     staleTime: 60_000,
   });
   const fields = useMemo(
-    () => getBulkEditableFields({ milestoneOptions }),
-    [milestoneOptions],
+    () =>
+      // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 일괄 편집은 admin 만 가능.
+      getBulkEditableFields({ milestoneOptions }).filter(
+        (f) => f.field !== "milestone" || isStrictAdmin,
+      ),
+    [milestoneOptions, isStrictAdmin],
   );
   const resolveLabel = useTmColumnLabel();
   const displayFields = useMemo(
