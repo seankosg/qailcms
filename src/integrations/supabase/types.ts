@@ -632,9 +632,12 @@ export type Database = {
       }
       abd_import_logs: {
         Row: {
+          applied_rows: number | null
           build_id: string | null
           created_at: string
+          data_date: string | null
           errors: Json | null
+          exclusions: Json | null
           file_name: string
           finished_at: string | null
           id: string
@@ -643,6 +646,7 @@ export type Database = {
           inserted: number | null
           mismatched: number | null
           note: string | null
+          parsed_rows: number | null
           plot: string | null
           rollback_force: boolean | null
           rolled_back_at: string | null
@@ -658,9 +662,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          applied_rows?: number | null
           build_id?: string | null
           created_at?: string
+          data_date?: string | null
           errors?: Json | null
+          exclusions?: Json | null
           file_name: string
           finished_at?: string | null
           id?: string
@@ -669,6 +676,7 @@ export type Database = {
           inserted?: number | null
           mismatched?: number | null
           note?: string | null
+          parsed_rows?: number | null
           plot?: string | null
           rollback_force?: boolean | null
           rolled_back_at?: string | null
@@ -684,9 +692,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          applied_rows?: number | null
           build_id?: string | null
           created_at?: string
+          data_date?: string | null
           errors?: Json | null
+          exclusions?: Json | null
           file_name?: string
           finished_at?: string | null
           id?: string
@@ -695,6 +706,7 @@ export type Database = {
           inserted?: number | null
           mismatched?: number | null
           note?: string | null
+          parsed_rows?: number | null
           plot?: string | null
           rollback_force?: boolean | null
           rolled_back_at?: string | null
