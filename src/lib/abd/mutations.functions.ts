@@ -254,6 +254,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     let inserted = 0, updated = 0;
     let dfBlocked = 0;
     const dfBlockedSamples: string[] = [];
+    // B안 — OCS 미완료 위반 행은 "행 단위로 통째 제외". 나머지 행은 정상 반영.
+    const ocsSkipped: Array<{ abd_number: string; reason: string }> = [];
     const seenNumbers = new Set<string>();
     const CHUNK = 500;
     const rowLogs: any[] = [];
