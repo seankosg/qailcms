@@ -2,11 +2,7 @@
 // 판정식은 DB 함수(abd_ocs_inc_scope / _dryrun / _import) 하나에만 존재한다. 여기서 재구현하지 않는다.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  BASELINE_CORE_TABLES,
-  BASELINE_SCHEMA_VERSION,
-  computeBaselineId,
-} from "@/lib/abd/ocs-baseline-shared";
+import { BASELINE_SCHEMA_VERSION, computeBaselineId } from "@/lib/abd/ocs-baseline-shared";
 import { assertBaselineGate } from "@/lib/abd/ocs-increment-gate";
 import { recheckCollisionsServerSide } from "@/lib/abd/ocs-increment-collision";
 import {

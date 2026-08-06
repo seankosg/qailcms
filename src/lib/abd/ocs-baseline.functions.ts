@@ -107,6 +107,36 @@ async function findExisting(admin: unknown, baselineId: string) {
   return (data ?? []).find((f) => f.name.endsWith(".zip")) ?? null;
 }
 
+/** 재사용 시 원래 metadata 를 되살리기 위한 manifest sidecar 경로 */
+const sidecarPath = (baselineId: string) => `${baselineFolder(baselineId)}/manifest.json`;
+
+type StoredManifest = {
+  generated_at?: string;
+  data_date?: string;
+  total_rows?: number;
+  base_core_table_hashes?: Record<string, string>;
+  latest_success_at?: string | null;
+  core_last_changed_at?: string | null;
+  files?: { relative_path: string; byte_size: number; sha256: string; row_count: number }[];
+};
+
+async function readSidecar(admin: unknown, baselineId: string): Promise<StoredManifest | null> {
+  const client = admin as {
+    storage: {
+      from: (b: string) => {
+        download: (p: string) => Promise<{ data: Blob | null; error: unknown }>;
+      };
+    };
+  };
+  const { data } = await client.storage.from(BASELINE_BUCKET).download(sidecarPath(baselineId));
+  if (!data) return null;
+  try {
+    return JSON.parse(await data.text()) as StoredManifest;
+  } catch {
+    return null;
+  }
+}
+
 export const createOcsBaseline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<BaselineResult> => {
@@ -135,20 +165,39 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         .from(BASELINE_BUCKET)
         .createSignedUrl(path, BASELINE_SIGNED_URL_SECONDS);
       if (signErr) throw new Error(signErr.message);
+      const stored = await readSidecar(supabaseAdmin, baselineId);
+      if (!stored) {
+        throw new Error(
+          "BASELINE_SIDECAR_MISSING: 기존 ZIP 의 manifest sidecar 를 읽지 못했습니다. 해당 폴더를 정리한 뒤 다시 생성하십시오.",
+        );
+      }
+      const storedFiles: BaselineFileInfo[] = (stored.files ?? []).map((f) => ({
+        name: f.relative_path,
+        byte_size: f.byte_size,
+        sha256: f.sha256,
+        row_count: f.row_count,
+      }));
       return {
         baseline_id: baselineId,
         core_hash: coreHashBefore,
-        core_table_hashes: (before["core_table_hashes"] ?? {}) as Record<string, string>,
+        core_table_hashes: (stored.base_core_table_hashes ??
+          before["core_table_hashes"] ??
+          {}) as Record<string, string>,
         schema_version: BASELINE_SCHEMA_VERSION,
         latest_success_import_run_id: latestRunId,
-        latest_success_at: (baselineInfo["latest_success_at"] ?? null) as string | null,
-        core_last_changed_at: (before["core_last_changed_at"] ?? null) as string | null,
-        generated_at: new Date().toISOString(),
-        data_date: dohaDate(new Date()),
+        latest_success_at: (stored.latest_success_at ??
+          baselineInfo["latest_success_at"] ??
+          null) as string | null,
+        core_last_changed_at: (stored.core_last_changed_at ??
+          before["core_last_changed_at"] ??
+          null) as string | null,
+        generated_at: stored.generated_at ?? "",
+        data_date: stored.data_date ?? "",
         storage_path: path,
         zip_byte_size: existing.metadata?.size ?? 0,
-        total_rows: 0,
-        files: [],
+        total_rows:
+          stored.total_rows ?? storedFiles.reduce((s, f) => s + (f.row_count ?? 0), 0),
+        files: storedFiles,
         reused: true,
         signed_url: signed?.signedUrl ?? "",
         signed_url_expires_in: BASELINE_SIGNED_URL_SECONDS,
@@ -255,6 +304,16 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         contentType: "application/zip",
       });
     if (upErr && !/exists/i.test(upErr.message)) throw new Error(upErr.message);
+
+    // manifest sidecar — 재사용 응답에서 원래 metadata 를 그대로 되돌려주기 위해 저장
+    const { error: sideErr } = await supabaseAdmin.storage
+      .from(BASELINE_BUCKET)
+      .upload(
+        sidecarPath(baselineId),
+        new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" }),
+        { upsert: true, contentType: "application/json" },
+      );
+    if (sideErr) throw new Error(`manifest sidecar 저장 실패: ${sideErr.message}`);
 
     const { data: signed, error: signErr } = await supabaseAdmin.storage
       .from(BASELINE_BUCKET)
