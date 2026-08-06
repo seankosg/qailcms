@@ -94,7 +94,7 @@ import {
 import { useRclCan } from "@/hooks/useRclCan";
 import { EditCellPopover } from "./EditCellPopover";
 import { updateTaskOwnerField } from "@/lib/task-management/owner-mutations.functions";
-import { DISCIPLINES } from "@/lib/task-management/columns";
+import { DISCIPLINES, tmAdminEditor } from "@/lib/task-management/columns";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import { useCommentReadState } from "@/lib/task-management/useCommentReadState";
 import {
