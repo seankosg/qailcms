@@ -458,14 +458,21 @@ export function TaskManagementRawDataPage() {
   // persist to server (with local cache) — debounce lives inside the hook
   const savePref = viewPref.save;
   const lastSavedPrefRef = useRef<string | null>(null);
+  // 드릴다운(source=dashboard) 진입 시 임시로 덮어쓴 필터가 계정 저장값을 오염시키지 않도록
+  // 최초 로드 시점의 필터/검색어를 보관해 두고, 드릴다운 세션에서는 그 값을 저장한다.
+  const baseFiltersRef = useRef<{ columnFilters: ColumnFiltersState; globalFilter: string }>({
+    columnFilters: [],
+    globalFilter: "",
+  });
   useEffect(() => {
     if (!stateLoaded) return;
+    const drill = dashboardAppliedRef.current;
     const next = {
       sorting,
       sizing,
       visibility,
-      columnFilters,
-      globalFilter,
+      columnFilters: drill ? baseFiltersRef.current.columnFilters : columnFilters,
+      globalFilter: drill ? baseFiltersRef.current.globalFilter : globalFilter,
       order,
       frozenExtras,
     } satisfies PersistedState;
@@ -484,6 +491,23 @@ export function TaskManagementRawDataPage() {
     frozenExtras,
     savePref,
   ]);
+
+  /** 컬럼 메뉴의 "현재 컬럼 설정 저장" — 디바운스 없이 즉시 계정 설정으로 확정 */
+  const saveLayoutNow = useCallback(() => {
+    const drill = dashboardAppliedRef.current;
+    const next = {
+      sorting,
+      sizing,
+      visibility,
+      columnFilters: drill ? baseFiltersRef.current.columnFilters : columnFilters,
+      globalFilter: drill ? baseFiltersRef.current.globalFilter : globalFilter,
+      order,
+      frozenExtras,
+    } satisfies PersistedState;
+    lastSavedPrefRef.current = JSON.stringify(next);
+    savePref(next);
+    toast.success("컬럼 설정을 저장했습니다");
+  }, [sorting, sizing, visibility, columnFilters, globalFilter, order, frozenExtras, savePref]);
 
   // C1-b: 서버 페이지네이션(Main 100/페이지) + 무한 스크롤로 데이터 소스 스왑.
   // - 서버가 이해하는 필터/정렬은 RPC 로 넘기고, 클라이언트 전용 파생 필드
