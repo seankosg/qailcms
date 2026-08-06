@@ -1,38 +1,35 @@
-# SM Raw Data 미사용 컬럼 22개 완전 삭제
+# Plan Overdue / Actual Overdue 라벨·색상 변경
 
-`defect_items_raw`(118,664행)에서 값이 단 한 건도 없는 25개 컬럼 중, 지시대로 `subsub_name` · `trade_detail` · `classification_source` 3개를 남기고 **22개를 DB 컬럼 DROP까지 완전 삭제**합니다.
+## 무엇을 바꾸나
 
-## 삭제 대상 22개
+1. **PASS 뱃지 색**: 하늘색 → 진한 회색
+2. **RISK / WARNING 라벨 의미 교환**
+   - 지금: 마일스톤 초과 = RISK, 마일스톤 이내이나 버퍼(7일) 구간 침범 = WARNING
+   - 변경 후: 마일스톤 초과 = WARNING, 버퍼 구간 침범 = RISK
+3. **RISK / WARNING 뱃지 색 교환**: RISK = 주황, WARNING = 빨강 (기존 색을 서로 맞바꿈)
 
-`ir`, `forms`, `updated_status`, `updated_date_raw`, `issue_no`, `subcontractor_issue_no`, `subcontractor_issue_source`, `area_type`, `area_level`, `area_location`, `captured_by_name`, `classified_at`, `planned_progress_pct`, `actual_progress_pct`, `status_manual`, `hdec_verification`, `hdec_reason`, `hdec_comments`, `aconex_comments`, `remarks`, `critical_marked_by`, `critical_marked_at`
+SAFE(초록)와 빈칸(마일스톤 미지정)은 변경 없음.
 
-(전 행 값 0건 실측 완료. `subsub_name`/`trade_detail`/`classification_source`는 지시에 따라 유지, B·C 그룹도 전부 유지.)
+## 변경 후 판정표
 
-## 실측된 의존성 (전부 같이 정리)
+| 조건 | 라벨 | 색 |
+|---|---|---|
+| 완료(actual_finish 있음 또는 진도 100%) | PASS | 진한 회색 |
+| 마일스톤보다 7일 이상 여유 | SAFE | 초록 |
+| 마일스톤 이내(버퍼 구간 침범) | RISK | 주황 |
+| 마일스톤 초과 | WARNING | 빨강 |
+| 마일스톤 미지정 / 비교 날짜 없음 | (빈칸) | 없음 |
 
-DB 함수·트리거 (컬럼 참조 실측):
-- `defect_items_search`, `defect_items_facets`, `defect_items_search_ids` — 18개 컬럼 참조
-- `trg_defect_suppress_noop_update` — 20개 컬럼 참조
-- `trg_defect_history_fn` — `actual_progress_pct`, `status_manual`, `hdec_verification`, `hdec_reason`
-- `_snag_group_val`, `_snag_dim_val`, `defect_snag_progress_cells`, `defect_snag_progress_totals` — `area_level`(그룹 축 후보), `actual_progress_pct`
-- `_snag_stage_done` — `actual_progress_pct`
-- `rollback_defect_import` — `planned_progress_pct`, `actual_progress_pct`
+## 기술 상세
 
-인덱스: `defect_items_raw_area_location_trgm_idx`, `defect_items_raw_remarks_trgm_idx`, `defect_items_raw_active_group_arealevel_idx`, `idx_defect_items_raw_area` (DROP COLUMN 시 자동 제거되나 마이그레이션에 명시)
+- **DB 마이그레이션 1건**
+  - `public.tm_classify_overdue(target, mstone, buffer_days)`: `target <= mstone` 분기 반환값을 `'WARNING'` → `'RISK'`, `else` 분기를 `'RISK'` → `'WARNING'` 으로 교체.
+  - `public.v_task_management_raw_derived`: Main 과업 롤업의 심각도 순위 매핑을 함께 조정. 최악값 채택 규칙이 실제 위험도(마일스톤 초과가 가장 나쁨)를 그대로 유지하도록 `WARNING = 3`, `RISK = 2`, `SAFE = 1`, `PASS = 0` 으로 순위를 바꾸고 역매핑도 동일하게 수정. 즉 Main 행은 지금과 동일한 하위 행을 근거로 삼되 라벨 표기만 새 규칙을 따름.
+  - 두 오브젝트 외에 `RISK`/`WARNING` 문자열을 쓰는 DB 함수는 없음(`pg_proc` 조회로 확인).
+- **프론트엔드 1개 파일**
+  - `src/lib/task-management/columns.ts` (131~137): `OVERDUE_COLORS` 를 `PASS` = 진한 회색(slate/zinc 계열), `RISK` = amber, `WARNING` = rose 로 수정하고 상단 주석 갱신.
+  - 이 상수는 `TaskManagementRawDataPage.tsx` 의 `plan_overdue` / `actual_overdue` 뱃지에서만 참조되므로 추가 수정 파일 없음.
 
-설정 행: `defect_field_config` 16행, `defect_header_mappings` 16행 삭제
+## 검증
 
-프론트엔드: `src/lib/defect-management/columns.ts`(컬럼 정의·그룹), `parser.ts`(헤더 매핑·필드 목록), `derived.ts`, `filter-fns.ts`, `progress-utils.ts`, `mutations.functions.ts`, `export-meta.ts`, `useDefectItems.ts`, `DefectRawDataPage.tsx`, `DefectDetailPage.tsx`, `DefectStageProgress.tsx`, `DuplicateReviewDialog.tsx`, `exportAllUnclosed.ts`, `DefectManagementImportContext.tsx`
-(TM 쪽 동명 컬럼 `status_manual`/`actual_progress_pct`는 별개 테이블이므로 손대지 않음.)
-
-## 진행 순서
-
-1. **마이그레이션 1 — 함수/트리거 재정의**: 위 함수·트리거 본문에서 22개 컬럼 참조를 제거한 새 정의로 교체. `_snag_group_val`/`_snag_dim_val`의 `area_level` 축은 제거(값 0건이라 화면 결과 불변), `_snag_stage_done`·`defect_snag_progress_totals`의 `actual_progress_pct` 분기는 삭제. RPC 시그니처는 바꾸지 않음(파라미터 변화 없음).
-2. **마이그레이션 2 — 설정 행 정리 + 컬럼 DROP**: `defect_field_config`/`defect_header_mappings`의 해당 행 DELETE 후 `ALTER TABLE public.defect_items_raw DROP COLUMN ...` 22건.
-3. **되돌리기 스크립트**: `docs/revert/2026-08-05-sm-drop-unused-cols.sql`에 컬럼 재생성 + 설정 행 복원 + 구 함수 정의를 남김(미적용).
-4. **프론트엔드 정리**: 위 파일들에서 컬럼 정의·필터·엑스포트·상세창 필드·임포트 매핑 참조 제거. 화면 배치와 나머지 컬럼 UI는 변경하지 않음.
-5. **검증**: SM Raw Data 목록/필터/패싯/검색, 상세창, Export, 임포트 프리뷰, SM 대시보드 매트릭스가 삭제 전과 동일 결과인지 실측 후 행수·화면 상태 보고.
-
-## 확인 사항
-
-`remarks`는 상세창 비고 입력란으로 열려 있을 수 있으나 118,664행 전부 비어 있어 삭제 대상에 포함했습니다. 입력 UI까지 함께 제거합니다 — 남겨야 하면 알려주세요.
+마이그레이션 후 활성 2,058행 기준 분포를 재조회해, 기존 분포와 라벨만 뒤바뀌고 총합·PASS·SAFE·빈칸 건수는 동일한지 실측 확인.
