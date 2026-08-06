@@ -248,7 +248,6 @@ function SharedTimeline({
               nodes={nodes}
               pct={pct}
               todayPct={todayPct}
-              todayNum={todayNum}
             />
           ))}
         </div>
@@ -262,13 +261,11 @@ function PlotRow({
   nodes,
   pct,
   todayPct,
-  todayNum,
 }: {
   plot: string;
   nodes: Node[];
   pct: (day: number) => number;
   todayPct: number;
-  todayNum: number;
 }) {
   const activeIdx = nodes.findIndex((n) => n.diff >= 0);
   const first = nodes[0];
@@ -343,8 +340,6 @@ function PlotRow({
             </div>
           );
         })}
-        {/* 미사용 변수 회피용(가독성): todayNum 은 상위에서 계산됨 */}
-        <span className="hidden">{todayNum}</span>
       </div>
     </div>
   );
