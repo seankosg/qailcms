@@ -2,6 +2,7 @@
 // 판정식은 DB 함수(abd_ocs_inc_scope / _dryrun / _import) 하나에만 존재한다. 여기서 재구현하지 않는다.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { BASELINE_SCHEMA_VERSION, computeBaselineId } from "@/lib/abd/ocs-baseline-shared";
 
 export type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 
@@ -21,7 +22,7 @@ async function assertAdmin(supabase: unknown, userId: string) {
   if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
 }
 
-async function rpc(supabase: unknown, fn: string, args: Record<string, unknown>) {
+async function rpc(supabase: unknown, fn: string, args: Record<string, unknown> = {}) {
   const { data, error } = await (supabase as unknown as LooseClient).rpc(fn, args);
   if (error) throw new Error(`${fn}: ${error.message}`);
   return (data ?? {}) as Json;
@@ -40,13 +41,24 @@ const sourceFileList = (v: unknown): SourceFileRef[] =>
 /** 패키지 사전 관문 — 중복 패키지 해시 · Baseline 최신성 (읽기 전용) */
 export const ocsIncPrecheck = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { package_sha256: string; base_import_run_id: string }) => {
+  .inputValidator(
+    (input: {
+      package_sha256: string;
+      base_import_run_id: string;
+      base_baseline_id?: string;
+      base_core_hash?: string;
+      base_core_table_hashes?: Record<string, string>;
+    }) => {
     if (!input?.package_sha256) throw new Error("package_sha256 이 필요합니다.");
     return {
       package_sha256: input.package_sha256,
       base_import_run_id: input.base_import_run_id ?? "",
+      base_baseline_id: input.base_baseline_id ?? "",
+      base_core_hash: (input.base_core_hash ?? "").toLowerCase(),
+      base_core_table_hashes: input.base_core_table_hashes ?? {},
     };
-  })
+  },
+  )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
 
@@ -62,10 +74,39 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
       p_base_import_run_id: data.base_import_run_id || null,
     });
 
+    // Baseline manifest 대조 — core hash 재계산 + baseline_id 동일 산식 재계산
+    const core = (await rpc(context.supabase, "abd_ocs_baseline_core_hash")) as Record<
+      string,
+      unknown
+    >;
+    const currentCoreHash = String(core["core_hash"] ?? "");
+    const currentTableHashes = (core["core_table_hashes"] ?? {}) as Record<string, string>;
+    const latestRunId = String(
+      (baseline as Record<string, unknown>)["latest_success_import_run_id"] ?? "",
+    );
+    const expectedBaselineId = await computeBaselineId(
+      BASELINE_SCHEMA_VERSION,
+      data.base_core_hash || currentCoreHash,
+      data.base_import_run_id || latestRunId,
+    );
+    const mismatchedTables = Object.keys(currentTableHashes).filter(
+      (t) =>
+        data.base_core_table_hashes[t] !== undefined &&
+        data.base_core_table_hashes[t] !== currentTableHashes[t],
+    );
+
     return {
       duplicate_package: (dup ?? []).length > 0,
       duplicate_log: (dup ?? [])[0] ?? null,
       baseline,
+      core_hash_current: currentCoreHash,
+      core_table_hashes_current: currentTableHashes,
+      base_core_hash_match: data.base_core_hash ? data.base_core_hash === currentCoreHash : null,
+      baseline_id_match: data.base_baseline_id
+        ? data.base_baseline_id === expectedBaselineId
+        : null,
+      baseline_id_expected: expectedBaselineId,
+      mismatched_core_tables: mismatchedTables,
     } as unknown as Json;
   });
 
