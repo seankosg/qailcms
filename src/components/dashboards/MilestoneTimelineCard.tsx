@@ -31,13 +31,6 @@ interface AutoRow {
   label: string | null;
   last_date: string | null;
 }
-interface NodeUnused {
-  kind: string;
-  label: string;
-  date: string; // YYYY-MM-DD
-  diff: number; // days from today (positive = future)
-}
-
 /** YYYY-MM-DD -> UTC-midnight epoch day number. */
 function dayNum(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);
