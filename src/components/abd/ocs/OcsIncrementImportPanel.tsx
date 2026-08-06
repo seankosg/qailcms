@@ -28,11 +28,10 @@ const BATCH = 500;
 const RETIRE_PCT = 0.3;
 const RETIRE_ABS = 100;
 /**
- * Stage 9 — Baseline 다운로드/검증 기능이 아직 없다. 그 기능이 구현되기 전까지
- * 증분 Import 는 잠금 상태로 둔다. (기능 완료로 표현하지 말 것)
+ * Stage 9 — Latest OCS Baseline 다운로드·검증이 구현되었다.
+ * precheck 가 manifest 의 base_baseline_id / base_core_hash 를 서버 실시간 값과 대조한다.
  */
-const BASELINE_VERIFICATION_IMPLEMENTED = false;
-const BASELINE_LOCK_MESSAGE = "Baseline download/verification not implemented — Import locked";
+const BASELINE_VERIFICATION_IMPLEMENTED = true;
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
 type Dry = Record<string, unknown>;
@@ -78,7 +77,6 @@ export function OcsIncrementImportPanel() {
 
   const blockers = useMemo(() => {
     const out: string[] = [];
-    if (!BASELINE_VERIFICATION_IMPLEMENTED) out.push(BASELINE_LOCK_MESSAGE);
     if (!pkg) out.push("증분 ZIP 패키지를 선택하십시오.");
     if (pkg) out.push(...pkg.blockers);
     if (pkg && !collision) out.push("Storage 충돌 점검 미완료");
@@ -88,6 +86,12 @@ export function OcsIncrementImportPanel() {
     if (precheck && base["base_import_run_found"] !== true) out.push("base_import_run_id 를 정본에서 찾을 수 없습니다.");
     if (precheck && base["is_latest"] !== true) out.push("Baseline 이 최신 정본 Import 가 아닙니다.");
     if (precheck && base["core_changed_since_base"] === true) out.push("Baseline 이후 OCS 정본이 변경되었습니다.");
+    if (precheck && precheck["base_core_hash_match"] === false)
+      out.push("manifest.base_core_hash 가 서버 정본 core hash 와 다릅니다.");
+    if (precheck && precheck["baseline_id_match"] === false)
+      out.push("manifest.base_baseline_id 가 서버 재계산값과 다릅니다.");
+    if (precheck && Array.isArray(precheck["mismatched_core_tables"]) && (precheck["mismatched_core_tables"] as string[]).length > 0)
+      out.push(`core 테이블 해시 불일치: ${(precheck["mismatched_core_tables"] as string[]).join(", ")}`);
     if (!dry) out.push("Dry-run 미실행");
     if (dry) {
       if (num(dry["comments_to_update"]) !== num(dry["comments_unchanged"]) + num(dry["comments_modified"])) {
@@ -125,6 +129,9 @@ export function OcsIncrementImportPanel() {
         data: {
           package_sha256: p.package_sha256,
           base_import_run_id: p.manifest.base_import_run_id,
+          base_baseline_id: p.manifest.base_baseline_id,
+          base_core_hash: p.manifest.base_core_hash,
+          base_core_table_hashes: p.manifest.base_core_table_hashes,
         },
       })) as Record<string, unknown>;
       setPrecheck(pc);
