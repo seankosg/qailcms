@@ -32,6 +32,8 @@ export interface ColumnSelectHelpers {
   getSourceOrigin?: (field: string) => "hdec" | "aconex" | "system" | "derived";
   /** 알려진 필드인지 (unmapped 표시 판단) */
   isKnownField?: (field: string) => boolean;
+  /** 표시 전용 컬럼(산출/시스템 컬럼) — 항상 제외되며 선택 불가 */
+  isDisplayOnly?: (header: string) => boolean;
   /** 추가 경고 라인 */
   extraWarnings?: (excluded: Set<string>) => string[];
 }
@@ -81,16 +83,18 @@ export function ColumnSelectDialog({
     getSourceLabel,
     getSourceOrigin,
     isKnownField,
+    isDisplayOnly,
     extraWarnings,
   } = helpers;
   const [excluded, setExcluded] = useState<Set<string>>(new Set(defaultExcluded));
 
   const isRequiredHeader = (h: string) => getRequirement(h).required;
+  const isDisplayOnlyHeader = (h: string) => (isDisplayOnly ? isDisplayOnly(h) : false);
   const stripRequired = (set: Set<string>) => {
-    if (!lockRequired) return set;
     const next = new Set(set);
     for (const h of headers) {
-      if (isRequiredHeader(h)) next.delete(h);
+      if (isDisplayOnlyHeader(h)) next.add(h);
+      else if (lockRequired && isRequiredHeader(h)) next.delete(h);
     }
     return next;
   };
@@ -115,10 +119,15 @@ export function ColumnSelectDialog({
     [requiredHeaders, excluded, getRequirement],
   );
 
-  const selectedCount = headers.length - excluded.size;
-  const totalCount = headers.length;
+  const importableHeaders = headers.filter((h) => !isDisplayOnlyHeader(h));
+  const selectedCount = importableHeaders.filter((h) => !excluded.has(h)).length;
+  const totalCount = importableHeaders.length;
 
   const toggle = (header: string, nextChecked: boolean) => {
+    if (isDisplayOnlyHeader(header)) {
+      toast.info(`"${header}"은(는) 시스템 산출 컬럼입니다. 임포트 대상이 아닙니다.`);
+      return;
+    }
     const req = getRequirement(header);
     if (lockRequired && req.required && !nextChecked) {
       toast.warning(
@@ -138,11 +147,11 @@ export function ColumnSelectDialog({
     });
   };
 
-  const selectAll = () => setExcluded(new Set());
+  const selectAll = () => setExcluded(stripRequired(new Set()));
   const deselectAll = () => setExcluded(stripRequired(new Set(headers)));
   const applyPreset = (matched?: string[]) => {
     if (!matched || matched.length === 0) {
-      setExcluded(new Set());
+      setExcluded(stripRequired(new Set()));
       return;
     }
     const allow = new Set(matched);
@@ -230,6 +239,7 @@ export function ColumnSelectDialog({
             const checked = !excluded.has(header);
             const field = toFieldName(header);
             const req = getRequirement(header);
+            const displayOnly = isDisplayOnlyHeader(header);
             const sample = previewValue(samples[header]);
             const slug = header
               .toLowerCase()
@@ -247,11 +257,20 @@ export function ColumnSelectDialog({
                 <Checkbox
                   checked={checked}
                   onCheckedChange={(v) => toggle(header, v === true)}
-                  disabled={lockRequired && req.required}
+                  disabled={displayOnly || (lockRequired && req.required)}
                   aria-label={`Include ${header}`}
                 />
                 <div className="min-w-0 flex items-center gap-1.5">
                   <span className="truncate text-sm font-medium">{header}</span>
+                  {displayOnly && (
+                    <Badge
+                      variant="outline"
+                      className="bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200 text-[10px] px-1.5 py-0"
+                      title="시스템 산출 컬럼 — 임포트 대상이 아닙니다."
+                    >
+                      표시 전용
+                    </Badge>
+                  )}
                   {req.required && (
                     <Badge
                       variant="outline"
