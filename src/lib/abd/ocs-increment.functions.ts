@@ -3,6 +3,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BASELINE_SCHEMA_VERSION, computeBaselineId } from "@/lib/abd/ocs-baseline-shared";
+import { assertBaselineGate } from "@/lib/abd/ocs-increment-gate";
+import { recheckCollisionsServerSide } from "@/lib/abd/ocs-increment-collision";
+import { assetList, sourceFileList, sourceMetaList } from "@/lib/abd/ocs-increment-normalize";
+import type { SourceFileRef } from "@/lib/abd/ocs-increment-types";
+
+export type { AssetRef, SourceFileMeta, SourceFileRef } from "@/lib/abd/ocs-increment-types";
 
 export type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 
@@ -28,16 +34,6 @@ async function rpc(supabase: unknown, fn: string, args: Record<string, unknown> 
   return (data ?? {}) as Json;
 }
 
-export type SourceFileRef = { file_name: string; content_hash: string };
-
-const sourceFileList = (v: unknown): SourceFileRef[] =>
-  Array.isArray(v)
-    ? v.map((x) => ({
-        file_name: String((x as SourceFileRef)?.file_name ?? ""),
-        content_hash: String((x as SourceFileRef)?.content_hash ?? ""),
-      }))
-    : [];
-
 /** 패키지 사전 관문 — 중복 패키지 해시 · Baseline 최신성 (읽기 전용) */
 export const ocsIncPrecheck = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -49,15 +45,15 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
       base_core_hash?: string;
       base_core_table_hashes?: Record<string, string>;
     }) => {
-    if (!input?.package_sha256) throw new Error("package_sha256 이 필요합니다.");
-    return {
-      package_sha256: input.package_sha256,
-      base_import_run_id: input.base_import_run_id ?? "",
-      base_baseline_id: input.base_baseline_id ?? "",
-      base_core_hash: (input.base_core_hash ?? "").toLowerCase(),
-      base_core_table_hashes: input.base_core_table_hashes ?? {},
-    };
-  },
+      if (!input?.package_sha256) throw new Error("package_sha256 이 필요합니다.");
+      return {
+        package_sha256: input.package_sha256,
+        base_import_run_id: input.base_import_run_id ?? "",
+        base_baseline_id: input.base_baseline_id ?? "",
+        base_core_hash: (input.base_core_hash ?? "").toLowerCase(),
+        base_core_table_hashes: input.base_core_table_hashes ?? {},
+      };
+    },
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
@@ -139,8 +135,13 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       data_date: string;
       base_import_run_id: string;
       base_baseline_id: string;
+      base_core_hash: string;
+      base_core_table_hashes: Record<string, string>;
+      base_generated_at: string;
       allow_retire?: boolean;
       source_files?: SourceFileRef[];
+      source_meta?: unknown;
+      assets?: unknown;
     }) => {
       const need = [
         "run_id",
@@ -150,14 +151,20 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         "data_date",
         "base_import_run_id",
         "base_baseline_id",
+        "base_core_hash",
+        "base_generated_at",
       ] as const;
       for (const k of need) {
         if (!input?.[k]) throw new Error(`${k} 가 필요합니다.`);
       }
       return {
         ...input,
+        base_core_hash: String(input.base_core_hash).toLowerCase(),
+        base_core_table_hashes: input.base_core_table_hashes ?? {},
         allow_retire: input.allow_retire === true,
         source_files: sourceFileList(input.source_files),
+        source_meta: sourceMetaList(input.source_meta),
+        assets: assetList(input.assets),
       };
     },
   )
@@ -184,21 +191,48 @@ export const ocsIncImport = createServerFn({ method: "POST" })
     if (dupErr) throw new Error(dupErr.message);
     if ((dup ?? []).length > 0) throw new Error("동일 패키지 해시가 이미 반영되었습니다.");
 
-    // Baseline 최신성 관문
-    const baseline = (await rpc(context.supabase, "abd_ocs_inc_baseline", {
-      p_base_import_run_id: data.base_import_run_id,
-    })) as Record<string, unknown>;
-    if (baseline["base_import_run_found"] !== true) {
-      throw new Error("패키지의 base_import_run_id 를 운영 정본에서 찾을 수 없습니다.");
-    }
-    if (baseline["is_latest"] !== true) {
-      throw new Error("패키지 Baseline 이 최신 정본 Import 가 아닙니다.");
-    }
-    if (baseline["core_changed_since_base"] === true) {
-      throw new Error("Baseline 이후 OCS 정본이 변경되었습니다. 최신 Baseline 으로 다시 생성하십시오.");
-    }
+    // Baseline 최종 관문 — 시간 비교가 아니라 서버 실측 core hash 일치를 정본으로 사용한다.
+    const gate = await assertBaselineGate((fn, args) => rpc(context.supabase, fn, args), {
+      base_baseline_id: data.base_baseline_id,
+      base_core_hash: data.base_core_hash,
+      base_core_table_hashes: data.base_core_table_hashes,
+      base_import_run_id: data.base_import_run_id,
+    });
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Storage 충돌 최종 재검증 (실행 직전, 서버 기준)
+    const collision = await recheckCollisionsServerSide(
+      data.assets,
+      data.source_meta,
+      async (table, paths) => {
+        const { data: rows, error } = await context.supabase
+          .from(table)
+          .select("storage_path, content_hash")
+          .in("storage_path", paths);
+        if (error) throw new Error(`${table}: ${error.message}`);
+        return (rows ?? []) as { storage_path: string; content_hash: string | null }[];
+      },
+      async (bucket, dir) => {
+        const names: string[] = [];
+        let offset = 0;
+        for (;;) {
+          const { data: list, error } = await supabaseAdmin.storage
+            .from(bucket)
+            .list(dir, { limit: 1000, offset, sortBy: { column: "name", order: "asc" } });
+          if (error) throw new Error(`${bucket}/${dir}: ${error.message}`);
+          const page = list ?? [];
+          for (const it of page) {
+            if ((it as { id?: string | null }).id) names.push(it.name);
+          }
+          if (page.length < 1000) break;
+          offset += page.length;
+        }
+        return names;
+      },
+    );
+    if (collision.blockers.length > 0) throw new Error(collision.blockers.join(" / "));
+
     const importLogId = crypto.randomUUID();
     const { error: logErr } = await supabaseAdmin.from("abd_ocs_import_logs").insert({
       id: importLogId,
@@ -218,6 +252,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         p_import_log_id: importLogId,
         p_allow_retire: data.allow_retire,
         p_source_files: data.source_files,
+        p_source_meta: data.source_meta,
       });
       const verify = await rpc(context.supabase, "abd_ocs_v3_verify", {});
       await supabaseAdmin
@@ -231,6 +266,9 @@ export const ocsIncImport = createServerFn({ method: "POST" })
             data_date: data.data_date,
             base_baseline_id: data.base_baseline_id,
             base_import_run_id: data.base_import_run_id,
+            base_core_hash: gate.core_hash_current,
+            base_generated_at: data.base_generated_at,
+            storage_skipped: collision.skip_paths.length,
             allow_retire: data.allow_retire,
           } as never,
         })

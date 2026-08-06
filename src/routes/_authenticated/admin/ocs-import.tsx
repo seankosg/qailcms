@@ -10,7 +10,6 @@ import { getOcsImportStats } from "@/lib/abd/ocs-import.functions";
 import { ocsVerify } from "@/lib/abd/ocs-stage-b.functions";
 import { ocsV3Verify } from "@/lib/abd/ocs-v3-import.functions";
 import { OcsRecountPanel } from "@/components/abd/ocs/OcsRecountPanel";
-import { OcsBaselineCard } from "@/components/abd/ocs/OcsBaselineCard";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export const Route = createFileRoute("/_authenticated/admin/ocs-import")({
@@ -104,8 +103,6 @@ function OcsMaintenanceBody() {
           <span>첨부 메타 {stats.data?.attachment_count ?? 0}건</span>
         </CardContent>
       </Card>
-
-      <OcsBaselineCard />
 
       <OcsRecountPanel />
 

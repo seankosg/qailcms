@@ -2,6 +2,7 @@
 // 이 모듈은 archive reader + 계약 검증만 수행한다. OCS 의미 파서가 아니다.
 import JSZip from "jszip";
 import { sha256Hex } from "@/lib/abd/ocs-db-parser";
+import { BASELINE_CORE_TABLES } from "@/lib/abd/ocs-baseline-shared";
 import {
   parseV3Atomic,
   parseV3Policy,
@@ -92,6 +93,28 @@ async function hashBytes(buf: ArrayBuffer): Promise<string> {
   return sha256Hex(buf);
 }
 
+/**
+ * base_core_table_hashes 계약 — Baseline Core 8개 테이블이 정확히 모두 있어야 하고
+ * 값은 공백이 아니어야 한다. 누락·추가·공백은 blocker(= null 로 우회 불가).
+ */
+export function coreTableHashBlockers(hashes: Record<string, string>): string[] {
+  const out: string[] = [];
+  const keys = Object.keys(hashes ?? {});
+  if (keys.length === 0) {
+    out.push("manifest.base_core_table_hashes 가 없습니다.");
+    return out;
+  }
+  const missing = BASELINE_CORE_TABLES.filter((t) => !keys.includes(t));
+  const extra = keys.filter((k) => !(BASELINE_CORE_TABLES as readonly string[]).includes(k));
+  const blank = BASELINE_CORE_TABLES.filter(
+    (t) => keys.includes(t) && !String(hashes[t] ?? "").trim(),
+  );
+  if (missing.length) out.push(`base_core_table_hashes 누락: ${missing.join(", ")}`);
+  if (extra.length) out.push(`base_core_table_hashes 에 정본 외 항목: ${extra.join(", ")}`);
+  if (blank.length) out.push(`base_core_table_hashes 공백 값: ${blank.join(", ")}`);
+  return out;
+}
+
 /** ZIP 1개를 열고 매니페스트 계약·SHA-256 을 전부 검증한다. 운영 DB 는 건드리지 않는다. */
 export async function readIncrementPackage(file: File): Promise<IncrementPackage> {
   const blockers: string[] = [];
@@ -123,13 +146,19 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
 
   const manifest = parseManifest(JSON.parse(await manifestFile.async("string")));
   if (manifest.schema_version !== INCREMENT_SCHEMA_VERSION) {
-    blockers.push(`schema_version 불일치: ${manifest.schema_version || "(없음)"} ≠ ${INCREMENT_SCHEMA_VERSION}`);
+    blockers.push(
+      `schema_version 불일치: ${manifest.schema_version || "(없음)"} ≠ ${INCREMENT_SCHEMA_VERSION}`,
+    );
   }
   if (!manifest.data_date) blockers.push("manifest.data_date 가 없습니다.");
   if (!manifest.base_baseline_id) blockers.push("manifest.base_baseline_id 가 없습니다.");
   if (!manifest.base_import_run_id) blockers.push("manifest.base_import_run_id 가 없습니다.");
+  if (!manifest.base_core_hash) blockers.push("manifest.base_core_hash 가 없습니다.");
+  if (!manifest.base_generated_at) blockers.push("manifest.base_generated_at 가 없습니다.");
+  blockers.push(...coreTableHashBlockers(manifest.base_core_table_hashes));
   if (!manifest.package_id) blockers.push("manifest.package_id 가 없습니다.");
-  if (manifest.target_ocs_numbers.length === 0) blockers.push("대상 OCS 번호 배열이 비어 있습니다.");
+  if (manifest.target_ocs_numbers.length === 0)
+    blockers.push("대상 OCS 번호 배열이 비어 있습니다.");
   if (manifest.files.length === 0) blockers.push("manifest.files 목록이 비어 있습니다.");
 
   // 내부 파일 SHA-256 · byte size 전수 검증
@@ -148,7 +177,9 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
       continue;
     }
     if (entry.byte_size && entry.byte_size !== bytes.byteLength) {
-      blockers.push(`byte size 불일치: ${entry.relative_path} (${bytes.byteLength} ≠ ${entry.byte_size})`);
+      blockers.push(
+        `byte size 불일치: ${entry.relative_path} (${bytes.byteLength} ≠ ${entry.byte_size})`,
+      );
       continue;
     }
     verified += 1;
@@ -179,7 +210,8 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
   if (atomic.duplicated_atomic_ids.length > 0) {
     blockers.push(`중복 source_comment_id ${atomic.duplicated_atomic_ids.length}건`);
   }
-  if (atomic.invalid_rows.length > 0) blockers.push(`atomic.json 형식 오류 ${atomic.invalid_rows.length}건`);
+  if (atomic.invalid_rows.length > 0)
+    blockers.push(`atomic.json 형식 오류 ${atomic.invalid_rows.length}건`);
   if (!policy.policy_version) blockers.push("policy.json 의 policy_version 이 없습니다.");
 
   const sourceFiles = [...bins.values()].filter((b) => b.relative_path.startsWith("source/"));

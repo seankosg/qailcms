@@ -6777,6 +6777,16 @@ export type Database = {
           p_import_log_id: string
           p_run: string
           p_source_files?: Json
+          p_source_meta?: Json
+        }
+        Returns: Json
+      }
+      abd_ocs_inc_import_core: {
+        Args: {
+          p_allow_retire?: boolean
+          p_import_log_id: string
+          p_run: string
+          p_source_files?: Json
         }
         Returns: Json
       }

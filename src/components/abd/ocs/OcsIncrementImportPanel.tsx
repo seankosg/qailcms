@@ -17,7 +17,11 @@ import {
   sourceStoragePath,
   type CollisionReport,
 } from "@/lib/abd/ocs-storage-collision";
-import { ocsV3StageLoad, ocsV3StageReset, type V3StageKind } from "@/lib/abd/ocs-v3-import.functions";
+import {
+  ocsV3StageLoad,
+  ocsV3StageReset,
+  type V3StageKind,
+} from "@/lib/abd/ocs-v3-import.functions";
 import { ocsIncDryRun, ocsIncImport, ocsIncPrecheck } from "@/lib/abd/ocs-increment.functions";
 import { OcsBaselineCard } from "@/components/abd/ocs/OcsBaselineCard";
 import { createPreImportSnapshot } from "@/lib/backup/backup.functions";
@@ -29,10 +33,10 @@ const BATCH = 500;
 const RETIRE_PCT = 0.3;
 const RETIRE_ABS = 100;
 /**
- * Stage 9 — Latest OCS Baseline 다운로드·검증이 구현되었다.
- * precheck 가 manifest 의 base_baseline_id / base_core_hash 를 서버 실시간 값과 대조한다.
+ * Stage 9 — 실제 admin 세션에서 Baseline ZIP 생성·다운로드·내용 검증이
+ * 완료되기 전에는 false 를 유지한다. 별도 승인 없이 true 로 바꾸지 않는다.
  */
-const BASELINE_VERIFICATION_IMPLEMENTED = true;
+const BASELINE_VERIFICATION_IMPLEMENTED = false;
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
 type Dry = Record<string, unknown>;
@@ -78,27 +82,44 @@ export function OcsIncrementImportPanel() {
 
   const blockers = useMemo(() => {
     const out: string[] = [];
+    if (!BASELINE_VERIFICATION_IMPLEMENTED) {
+      out.push("Baseline 실측 검증(생성·다운로드·내용 대조) 미완료 — 증분 Import 잠금");
+    }
     if (!pkg) out.push("증분 ZIP 패키지를 선택하십시오.");
     if (pkg) out.push(...pkg.blockers);
     if (pkg && !collision) out.push("Storage 충돌 점검 미완료");
     if (collision) out.push(...collision.blockers);
-    if (precheck?.["duplicate_package"] === true) out.push("동일 패키지 해시가 이미 반영되었습니다.");
+    if (precheck?.["duplicate_package"] === true)
+      out.push("동일 패키지 해시가 이미 반영되었습니다.");
     const base = (precheck?.["baseline"] ?? {}) as Record<string, unknown>;
-    if (precheck && base["base_import_run_found"] !== true) out.push("base_import_run_id 를 정본에서 찾을 수 없습니다.");
-    if (precheck && base["is_latest"] !== true) out.push("Baseline 이 최신 정본 Import 가 아닙니다.");
-    if (precheck && base["core_changed_since_base"] === true) out.push("Baseline 이후 OCS 정본이 변경되었습니다.");
+    if (precheck && base["base_import_run_found"] !== true)
+      out.push("base_import_run_id 를 정본에서 찾을 수 없습니다.");
+    if (precheck && base["is_latest"] !== true)
+      out.push("Baseline 이 최신 정본 Import 가 아닙니다.");
+    if (precheck && base["core_changed_since_base"] === true)
+      out.push("Baseline 이후 OCS 정본이 변경되었습니다.");
     if (precheck && precheck["base_core_hash_match"] === false)
       out.push("manifest.base_core_hash 가 서버 정본 core hash 와 다릅니다.");
     if (precheck && precheck["baseline_id_match"] === false)
       out.push("manifest.base_baseline_id 가 서버 재계산값과 다릅니다.");
-    if (precheck && Array.isArray(precheck["mismatched_core_tables"]) && (precheck["mismatched_core_tables"] as string[]).length > 0)
-      out.push(`core 테이블 해시 불일치: ${(precheck["mismatched_core_tables"] as string[]).join(", ")}`);
+    if (
+      precheck &&
+      Array.isArray(precheck["mismatched_core_tables"]) &&
+      (precheck["mismatched_core_tables"] as string[]).length > 0
+    )
+      out.push(
+        `core 테이블 해시 불일치: ${(precheck["mismatched_core_tables"] as string[]).join(", ")}`,
+      );
     if (!dry) out.push("Dry-run 미실행");
     if (dry) {
-      if (num(dry["comments_to_update"]) !== num(dry["comments_unchanged"]) + num(dry["comments_modified"])) {
+      if (
+        num(dry["comments_to_update"]) !==
+        num(dry["comments_unchanged"]) + num(dry["comments_modified"])
+      ) {
         out.push("Dry-run 항등식 불일치");
       }
-      if (num(dry["attachments_unresolved"]) > 0) out.push(`미확인 첨부 ${num(dry["attachments_unresolved"])}건`);
+      if (num(dry["attachments_unresolved"]) > 0)
+        out.push(`미확인 첨부 ${num(dry["attachments_unresolved"])}건`);
       if (massRetire && !allowRetire) out.push(`대량 퇴역 미승인 (${retire}건 · 임계 30% / 100건)`);
     }
     if (!snapshotId) out.push("사전 백업 스냅샷 미완료 (Dry-run 이후 생성분만 인정)");
@@ -150,7 +171,13 @@ export function OcsIncrementImportPanel() {
     }
   }
 
-  async function stage(run: string, kind: V3StageKind, rows: unknown[], base: number, span: number) {
+  async function stage(
+    run: string,
+    kind: V3StageKind,
+    rows: unknown[],
+    base: number,
+    span: number,
+  ) {
     const batches = chunk(rows, BATCH);
     for (let i = 0; i < batches.length; i += 1) {
       await stageLoad({ data: { run_id: run, kind, rows: batches[i] as unknown[] } });
@@ -207,7 +234,10 @@ export function OcsIncrementImportPanel() {
     }
   }
 
-  /** source/ 와 images/ 를 비공개 보관함에 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기) */
+  /**
+   * source/ 와 images/ 바이너리만 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기).
+   * abd_ocs_source_files DB 등록은 Baseline 최종 검증 이후 서버 트랜잭션에서 수행한다.
+   */
   async function uploadAssets(p: IncrementPackage) {
     const skip = collision?.skipPaths ?? new Set<string>();
     for (const img of p.images) {
@@ -216,7 +246,8 @@ export function OcsIncrementImportPanel() {
       const { error } = await supabase.storage
         .from(OCS_BUCKET)
         .upload(path, new Blob([img.bytes]), { upsert: false });
-      if (error && !/exists/i.test(error.message)) throw new Error(`이미지 업로드 실패 ${path}: ${error.message}`);
+      if (error && !/exists/i.test(error.message))
+        throw new Error(`이미지 업로드 실패 ${path}: ${error.message}`);
     }
     for (const sf of p.sourceFiles) {
       const fileName = sf.relative_path.split("/").pop() ?? sf.relative_path;
@@ -225,19 +256,8 @@ export function OcsIncrementImportPanel() {
       const { error } = await supabase.storage
         .from(OCS_SOURCE_BUCKET)
         .upload(storagePath, new Blob([sf.bytes]), { upsert: false });
-      if (error && !/exists/i.test(error.message)) throw new Error(`원본 업로드 실패 ${fileName}: ${error.message}`);
-      const { error: insErr } = await supabase.from("abd_ocs_source_files").insert({
-        source_file_id: sf.sha256,
-        file_name: fileName,
-        relative_path: sf.relative_path,
-        storage_path: storagePath,
-        content_hash: sf.sha256,
-        byte_size: sf.byte_size,
-        mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      if (insErr && !/duplicate key/i.test(insErr.message)) {
-        throw new Error(`원본 등록 실패 ${fileName}: ${insErr.message}`);
-      }
+      if (error && !/exists/i.test(error.message))
+        throw new Error(`원본 업로드 실패 ${fileName}: ${error.message}`);
     }
   }
 
@@ -257,11 +277,37 @@ export function OcsIncrementImportPanel() {
           data_date: pkg.manifest.data_date,
           base_import_run_id: pkg.manifest.base_import_run_id,
           base_baseline_id: pkg.manifest.base_baseline_id,
+          base_core_hash: pkg.manifest.base_core_hash,
+          base_core_table_hashes: pkg.manifest.base_core_table_hashes,
+          base_generated_at: pkg.manifest.base_generated_at,
           allow_retire: allowRetire,
           source_files: pkg.sourceFiles.map((f) => ({
             file_name: f.relative_path.split("/").pop() ?? f.relative_path,
             content_hash: f.sha256,
           })),
+          source_meta: pkg.sourceFiles.map((f) => ({
+            source_file_id: f.sha256,
+            file_name: f.relative_path.split("/").pop() ?? f.relative_path,
+            relative_path: f.relative_path,
+            storage_path: sourceStoragePath(pkg.manifest.package_id, f.relative_path),
+            content_hash: f.sha256,
+            byte_size: f.byte_size,
+            mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          })),
+          assets: [
+            ...pkg.images.map((b) => ({
+              kind: "image" as const,
+              bucket: OCS_BUCKET,
+              path: imageStoragePath(b.relative_path),
+              sha256: b.sha256,
+            })),
+            ...pkg.sourceFiles.map((b) => ({
+              kind: "source" as const,
+              bucket: OCS_SOURCE_BUCKET,
+              path: sourceStoragePath(pkg.manifest.package_id, b.relative_path),
+              sha256: b.sha256,
+            })),
+          ],
         },
       })) as Record<string, unknown>;
       setResult(out);
@@ -284,8 +330,7 @@ export function OcsIncrementImportPanel() {
     return (
       <Card className="border-destructive/40">
         <CardContent className="flex items-center gap-2 p-6 text-sm">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          이 화면은 관리자(admin) 전용입니다.
+          <AlertTriangle className="h-4 w-4 text-destructive" />이 화면은 관리자(admin) 전용입니다.
         </CardContent>
       </Card>
     );
@@ -319,7 +364,11 @@ export function OcsIncrementImportPanel() {
                 <div className="mb-1 text-xs font-semibold">패키지</div>
                 <Row label="파일명" value={pkg.file_name} />
                 <Row label="package_id" value={pkg.manifest.package_id} />
-                <Row label="Data Date" value={pkg.manifest.data_date} bad={!pkg.manifest.data_date} />
+                <Row
+                  label="Data Date"
+                  value={pkg.manifest.data_date}
+                  bad={!pkg.manifest.data_date}
+                />
                 <Row label="Baseline ID" value={pkg.manifest.base_baseline_id} />
                 <Row label="Base Import Run" value={pkg.manifest.base_import_run_id} />
                 <Row label="대상 OCS 수" value={pkg.manifest.target_ocs_numbers.length} />
@@ -351,7 +400,8 @@ export function OcsIncrementImportPanel() {
             </Button>
             {snapshotId && (
               <Badge variant="outline" className="gap-1 text-[11px]">
-                <CheckCircle2 className="h-3 w-3 text-emerald-600" /> snapshot {snapshotId.slice(0, 8)}
+                <CheckCircle2 className="h-3 w-3 text-emerald-600" /> snapshot{" "}
+                {snapshotId.slice(0, 8)}
               </Badge>
             )}
           </div>
@@ -413,18 +463,27 @@ export function OcsIncrementImportPanel() {
           <CardHeader>
             <CardTitle className="text-base">Storage 충돌 점검 (읽기 전용)</CardTitle>
             <p className="text-xs text-muted-foreground">
-              동일 <code>storage_path</code> 존재 시 DB metadata 의 <code>content_hash</code> 와 manifest SHA-256 을
-              대조합니다. overwrite·삭제는 수행하지 않습니다.
+              동일 <code>storage_path</code> 존재 시 DB metadata 의 <code>content_hash</code> 와
+              manifest SHA-256 을 대조합니다. overwrite·삭제는 수행하지 않습니다.
             </p>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="grid gap-3 md:grid-cols-4">
               <Row label="new" value={collision.counts.new} />
               <Row label="existing (skip)" value={collision.counts.existing} />
-              <Row label="hash_mismatch" value={collision.counts.hash_mismatch} bad={collision.counts.hash_mismatch > 0} />
-              <Row label="unresolved" value={collision.counts.unresolved} bad={collision.counts.unresolved > 0} />
+              <Row
+                label="hash_mismatch"
+                value={collision.counts.hash_mismatch}
+                bad={collision.counts.hash_mismatch > 0}
+              />
+              <Row
+                label="unresolved"
+                value={collision.counts.unresolved}
+                bad={collision.counts.unresolved > 0}
+              />
             </div>
-            {collision.rows.filter((r) => r.state === "hash_mismatch" || r.state === "unresolved").length > 0 && (
+            {collision.rows.filter((r) => r.state === "hash_mismatch" || r.state === "unresolved")
+              .length > 0 && (
               <div className="max-h-56 overflow-auto rounded-md border p-2 text-[11px]">
                 {collision.rows
                   .filter((r) => r.state === "hash_mismatch" || r.state === "unresolved")
@@ -446,8 +505,8 @@ export function OcsIncrementImportPanel() {
               <AlertTriangle className="h-4 w-4" /> 대량 퇴역 차단
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              퇴역 예정 {retire}건이 임계(범위 내 active의 <b>30%</b> 또는 <b>100건</b>)를 넘었습니다. 목록을
-              내려받아 확인한 뒤에만 승인할 수 있습니다.
+              퇴역 예정 {retire}건이 임계(범위 내 active의 <b>30%</b> 또는 <b>100건</b>)를
+              넘었습니다. 목록을 내려받아 확인한 뒤에만 승인할 수 있습니다.
             </p>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center gap-3">
