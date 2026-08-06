@@ -430,13 +430,15 @@ function PlotRow({
               <span className="mt-1 whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-bold text-foreground">
                 {fmtDate(n.date)}
               </span>
-              <span
-                className={`whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-extrabold ${
-                  isDone ? "text-success" : isActive ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                {dLabel(n.diff)}
-              </span>
+              {!isDone ? (
+                <span
+                  className={`whitespace-nowrap rounded bg-background/90 px-1 font-mono text-[12px] font-extrabold ${
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  {dLabel(n.diff)}
+                </span>
+              ) : null}
             </div>
           );
         })}
