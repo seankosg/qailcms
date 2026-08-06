@@ -274,6 +274,22 @@ function PlotRow({
   const endPct = pct(dayNum(last.date));
   const elapsedEnd = Math.min(Math.max(todayPct, startPct), endPct);
 
+  // 라벨 겹침 자동 회피: 라벨 폭(추정)이 겹치면 아래 레인으로 밀어낸다.
+  const TRACK_PX = 840; // min-w-[1000px] - 라벨 거터(96) - 우측 여백(64)
+  const LANE_H = 56;
+  const lanes: number[] = []; // 레인별 마지막 라벨 우측 끝(px)
+  const placed = nodes.map((n) => {
+    const left = pct(dayNum(n.date));
+    const textLen = Math.max(n.label.length, `${fmtDate(n.date)} · ${dLabel(n.diff)}`.length);
+    const half = (textLen * 6.2 + 14) / 2;
+    const leftPx = (left / 100) * TRACK_PX;
+    let lane = 0;
+    while (lane < lanes.length && leftPx - half < lanes[lane] + 8) lane += 1;
+    lanes[lane] = leftPx + half;
+    return { node: n, left, lane };
+  });
+  const laneCount = Math.max(lanes.length, 1);
+
   return (
     <div className="flex items-stretch border-b last:border-b-0">
       <div className="flex w-24 shrink-0 flex-col justify-center gap-1 py-4 pr-2">
@@ -285,39 +301,43 @@ function PlotRow({
         </span>
       </div>
 
-      <div className="relative flex-1 py-4" style={{ height: 132 }}>
+      <div className="relative flex-1 py-4" style={{ height: 36 + laneCount * LANE_H }}>
         {/* 기준선 */}
         <div
-          className="absolute top-6 h-[3px] rounded-full bg-border"
+          className="absolute top-[22px] h-[6px] rounded-full bg-border"
           style={{ left: `${startPct}%`, width: `${Math.max(endPct - startPct, 0)}%` }}
         />
         {/* 경과선 */}
         <div
-          className="absolute top-6 h-[3px] rounded-full bg-destructive"
+          className="absolute top-[22px] h-[6px] rounded-full bg-destructive"
           style={{ left: `${startPct}%`, width: `${Math.max(elapsedEnd - startPct, 0)}%` }}
         />
 
-        {nodes.map((n, index) => {
+        {placed.map(({ node: n, left, lane }, index) => {
           const isDone = n.diff < 0;
           const isActive = index === activeIdx;
           const Icon = isDone ? CheckCircle2 : isActive ? Clock : Circle;
-          const left = pct(dayNum(n.date));
-          const flip = index % 2 === 1; // 라벨 겹침 완화: 홀수 노드는 아래로 더 내림
           return (
             <div
               key={`${n.kind}-${n.date}`}
               className={`absolute z-10 flex -translate-x-1/2 flex-col items-center ${
                 isDone ? "opacity-70" : ""
               }`}
-              style={{ left: `${left}%`, top: flip ? 62 : 10 }}
+              style={{ left: `${left}%`, top: 8 + lane * LANE_H }}
             >
+              {lane > 0 ? (
+                <span
+                  className="absolute bottom-full w-px bg-border"
+                  style={{ height: lane * LANE_H - 14 }}
+                />
+              ) : null}
               <div
-                className={`flex items-center justify-center rounded-full border-2 bg-background transition-all ${
+                className={`flex items-center justify-center rounded-full border-[3px] bg-background transition-all ${
                   isActive
-                    ? "h-8 w-8 border-primary bg-primary/20 ring-4 ring-primary/15"
+                    ? "h-9 w-9 border-primary bg-primary/20 ring-4 ring-primary/15"
                     : isDone
-                      ? "h-7 w-7 border-success bg-success/20"
-                      : "h-7 w-7 border-border bg-muted"
+                      ? "h-8 w-8 border-success bg-success/20"
+                      : "h-8 w-8 border-muted-foreground/40 bg-muted"
                 }`}
               >
                 <Icon
