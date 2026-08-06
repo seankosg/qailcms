@@ -36,24 +36,33 @@ export const getOcsImportStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertStrictAdmin(context.supabase, context.userId);
-    const [comments, linkedRows, links, attachments] = await Promise.all([
+    const [comments, links, attachments] = await Promise.all([
       context.supabase.from("abd_ocs_comments").select("id", { count: "exact", head: true }),
-      // V3 정본: abd_ocs_comment_abd_links 의 distinct comment_id
-      context.supabase
-        .from("abd_ocs_comment_abd_links")
-        .select("comment_id")
-        .limit(100000),
       context.supabase
         .from("abd_ocs_comment_abd_links")
         .select("id", { count: "exact", head: true }),
       context.supabase.from("abd_ocs_attachments").select("id", { count: "exact", head: true }),
     ]);
-    const distinctComments = new Set(
-      ((linkedRows.data ?? []) as { comment_id: string }[]).map((r) => r.comment_id),
-    ).size;
+
+    // V3 정본: abd_ocs_comment_abd_links 의 distinct comment_id.
+    // PostgREST 1,000행 상한 때문에 청크 루프로 전량 조회한다.
+    const seen = new Set<string>();
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await context.supabase
+        .from("abd_ocs_comment_abd_links")
+        .select("comment_id")
+        .order("comment_id", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      const rows = (data ?? []) as { comment_id: string }[];
+      for (const r of rows) seen.add(r.comment_id);
+      if (rows.length < PAGE) break;
+      if (from > 1_000_000) throw new Error("링크 조회 런어웨이");
+    }
     return {
       comment_count: comments.count ?? 0,
-      linked_comment_count: distinctComments,
+      linked_comment_count: seen.size,
       abd_association_count: links.count ?? 0,
       attachment_count: attachments.count ?? 0,
     };
