@@ -233,7 +233,7 @@ function PlotTimeline({
             </div>
           )}
 
-          <div className="relative" style={{ height: 118 }}>
+          <div className="relative" style={{ height: 124 }}>
             {nodes.map((n, index) => {
               const isDone = n.diff < 0;
               const isActive = index === activeIdx;
@@ -283,11 +283,11 @@ function PlotTimeline({
                   >
                     {n.label}
                   </span>
-                  <span className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                  <span className="mt-0.5 whitespace-nowrap font-mono text-[11px] text-muted-foreground">
                     {fmtDate(n.date)}
                   </span>
                   <span
-                    className={`mt-0.5 font-mono text-base font-bold ${
+                    className={`mt-0.5 whitespace-nowrap font-mono text-base font-bold ${
                       n.diff > 0
                         ? "text-primary"
                         : n.diff === 0
