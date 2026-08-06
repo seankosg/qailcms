@@ -210,7 +210,10 @@ export function OcsIncrementImportPanel() {
     }
   }
 
-  /** source/ 와 images/ 를 비공개 보관함에 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기) */
+  /**
+   * source/ 와 images/ 바이너리만 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기).
+   * abd_ocs_source_files DB 등록은 Baseline 최종 검증 이후 서버 트랜잭션에서 수행한다.
+   */
   async function uploadAssets(p: IncrementPackage) {
     const skip = collision?.skipPaths ?? new Set<string>();
     for (const img of p.images) {
@@ -229,18 +232,6 @@ export function OcsIncrementImportPanel() {
         .from(OCS_SOURCE_BUCKET)
         .upload(storagePath, new Blob([sf.bytes]), { upsert: false });
       if (error && !/exists/i.test(error.message)) throw new Error(`원본 업로드 실패 ${fileName}: ${error.message}`);
-      const { error: insErr } = await supabase.from("abd_ocs_source_files").insert({
-        source_file_id: sf.sha256,
-        file_name: fileName,
-        relative_path: sf.relative_path,
-        storage_path: storagePath,
-        content_hash: sf.sha256,
-        byte_size: sf.byte_size,
-        mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      if (insErr && !/duplicate key/i.test(insErr.message)) {
-        throw new Error(`원본 등록 실패 ${fileName}: ${insErr.message}`);
-      }
     }
   }
 
@@ -260,11 +251,38 @@ export function OcsIncrementImportPanel() {
           data_date: pkg.manifest.data_date,
           base_import_run_id: pkg.manifest.base_import_run_id,
           base_baseline_id: pkg.manifest.base_baseline_id,
+          base_core_hash: pkg.manifest.base_core_hash,
+          base_core_table_hashes: pkg.manifest.base_core_table_hashes,
+          base_generated_at: pkg.manifest.base_generated_at,
           allow_retire: allowRetire,
           source_files: pkg.sourceFiles.map((f) => ({
             file_name: f.relative_path.split("/").pop() ?? f.relative_path,
             content_hash: f.sha256,
           })),
+          source_meta: pkg.sourceFiles.map((f) => ({
+            source_file_id: f.sha256,
+            file_name: f.relative_path.split("/").pop() ?? f.relative_path,
+            relative_path: f.relative_path,
+            storage_path: sourceStoragePath(pkg.manifest.package_id, f.relative_path),
+            content_hash: f.sha256,
+            byte_size: f.byte_size,
+            mime_type:
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          })),
+          assets: [
+            ...pkg.images.map((b) => ({
+              kind: "image" as const,
+              bucket: OCS_BUCKET,
+              path: imageStoragePath(b.relative_path),
+              sha256: b.sha256,
+            })),
+            ...pkg.sourceFiles.map((b) => ({
+              kind: "source" as const,
+              bucket: OCS_SOURCE_BUCKET,
+              path: sourceStoragePath(pkg.manifest.package_id, b.relative_path),
+              sha256: b.sha256,
+            })),
+          ],
         },
       })) as Record<string, unknown>;
       setResult(out);
