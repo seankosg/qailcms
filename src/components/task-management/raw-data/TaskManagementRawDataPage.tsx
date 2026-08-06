@@ -450,9 +450,10 @@ export function TaskManagementRawDataPage() {
   }, [searchInput]);
 
   // persist to server (with local cache) — debounce lives inside the hook
+  const savePref = viewPref.save;
   useEffect(() => {
     if (!stateLoaded) return;
-    viewPref.save({
+    savePref({
       sorting,
       sizing,
       visibility,
@@ -470,7 +471,7 @@ export function TaskManagementRawDataPage() {
     globalFilter,
     order,
     frozenExtras,
-    viewPref,
+    savePref,
   ]);
 
   // C1-b: 서버 페이지네이션(Main 100/페이지) + 무한 스크롤로 데이터 소스 스왑.
