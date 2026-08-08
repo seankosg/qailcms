@@ -712,11 +712,16 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       df_actual_blocked: dfBlocked,
       df_actual_blocked_samples: dfBlockedSamples,
       ocs_skipped_rows: ocsSkipped,
+      applied_count: inserted + updated,
+      skipped_ocs_count: ocsSkipped.length,
+      failed_count: failedRows.length,
+      applied_numbers: Array.from(appliedNumbers),
+      failed_rows: failedRows,
     };
    } catch (err: any) {
      const msg = err?.message ?? String(err);
-     const stack = err?.stack ? String(err.stack).split("\n").slice(0, 4).join(" | ") : "";
-     console.error("[importAbdBatch] failed:", msg, stack);
-     throw new Error(`ABD 임포트 실패: ${msg}${stack ? ` [${stack}]` : ""}`);
+     // stack 은 서버 로그에만 남긴다 (UI 노출 금지)
+     console.error("[importAbdBatch] failed:", msg, err?.stack ?? "");
+     throw new Error(msg);
    }
   });
