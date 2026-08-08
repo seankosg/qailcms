@@ -260,6 +260,10 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     const dfBlockedSamples: string[] = [];
     // B안 — OCS 미완료 위반 행은 "행 단위로 통째 제외". 나머지 행은 정상 반영.
     const ocsSkipped: Array<{ abd_number: string; reason: string }> = [];
+    // 비-OCS 오류로 반영되지 못한 행 (행 단위로 확정 — 전체 실패로 감추지 않는다)
+    const failedRows: Array<{ abd_number: string; error: string }> = [];
+    // 실제로 DB 에 반영된 행 (분할 재시도 중 성공분 포함)
+    const appliedNumbers = new Set<string>();
     const seenNumbers = new Set<string>();
     const CHUNK = 500;
     const rowLogs: any[] = [];
@@ -418,20 +422,29 @@ export const importAbdBatch = createServerFn({ method: "POST" })
 
       const isOcsGuardError = (m: string) =>
         /OCS 미완료|abd_guard_df_actual_requires_ocs/i.test(m);
-      // 안전망: 클라이언트 미러가 놓친 위반이 있어도 배치 전체가 실패하지 않도록
-      // 분할 재시도하여 위반 행만 골라 제외한다.
+      // 안전망: 클라이언트 미러가 놓친 위반이나 다른 제약 위반이 있어도
+      // 배치 전체가 실패하지 않도록 분할 재시도하여 행 단위로 판정을 확정한다.
+      // - 성공: appliedNumbers 에 수집 (재-upsert 하지 않음)
+      // - OCS 가드: ocsSkipped
+      // - 그 외 오류: failedRows (예외를 던지지 않아 이미 반영된 행의 로그가 유실되지 않는다)
       const upsertWithSplit = async (rows: any[]): Promise<void> => {
         if (rows.length === 0) return;
         const { error } = await supa
           .from("abd_items_raw")
           .upsert(rows, { onConflict: "team,abd_number" });
-        if (!error) return;
+        if (!error) {
+          for (const r of rows) appliedNumbers.add(String(r.abd_number));
+          return;
+        }
         const msg = error.message ?? String(error);
-        if (!isOcsGuardError(msg)) throw new Error(msg);
         if (rows.length === 1) {
           const num = String(rows[0].abd_number);
-          blockedNumbers.add(num);
-          ocsSkipped.push({ abd_number: num, reason: msg });
+          if (isOcsGuardError(msg)) {
+            blockedNumbers.add(num);
+            ocsSkipped.push({ abd_number: num, reason: msg });
+          } else {
+            failedRows.push({ abd_number: num, error: msg });
+          }
           return;
         }
         const mid = Math.floor(rows.length / 2);
@@ -442,6 +455,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       dfBlocked = ocsSkipped.length;
       dfBlockedSamples.length = 0;
       dfBlockedSamples.push(...ocsSkipped.slice(0, 20).map((s) => s.abd_number));
+      const failedMap = new Map(failedRows.map((f) => [f.abd_number, f.error]));
 
       for (const r of chunk) {
         rowIndex++;
@@ -467,6 +481,31 @@ export const importAbdBatch = createServerFn({ method: "POST" })
               previous: null,
               code: "ocs_pending",
               detail: reason,
+            }),
+          );
+          continue;
+        }
+        if (failedMap.has(r.abd_number)) {
+          const detail = failedMap.get(r.abd_number)!;
+          rowLogs.push({
+            upload_id: batchId,
+            raw_row_no: rowIndex,
+            team: data.team,
+            abd_number: r.abd_number,
+            action_taken: "failed",
+            reason_code: "db_error",
+            reason_detail: detail,
+          });
+          pendingFieldLogs.push(
+            buildFieldLog("abd", {
+              rawRowNo: rowIndex,
+              field: "__row__",
+              outcome: "rejected_conflict",
+              raw: r.abd_number,
+              applied: "failed",
+              previous: null,
+              code: "db_error",
+              detail,
             }),
           );
           continue;
