@@ -30,6 +30,7 @@ import {
   WRT_DEFAULT_ORDER,
   WRT_DEFAULT_VISIBILITY,
   buildWrtStageColumns,
+  wrtBandHeaderClass,
   wrtJudgmentLabel,
   type WrtColumnDef,
   type WrtStageColumn,
