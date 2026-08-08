@@ -7662,6 +7662,7 @@ export type Database = {
         }[]
       }
       spl_assert_row_rules: { Args: { _item_id: string }; Returns: undefined }
+      spl_estimated_cells: { Args: never; Returns: Json }
       spl_eval_as_of: {
         Args: { _as_of?: string }
         Returns: {
@@ -8099,6 +8100,7 @@ export type Database = {
         }[]
       }
       wrt_assert_row_rules: { Args: { _item_id: string }; Returns: undefined }
+      wrt_estimated_cells: { Args: never; Returns: Json }
       wrt_eval_as_of: {
         Args: { _as_of?: string }
         Returns: {
