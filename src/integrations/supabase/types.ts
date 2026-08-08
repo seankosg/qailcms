@@ -4850,6 +4850,7 @@ export type Database = {
           module: string
           note: string | null
           round_no: number | null
+          short_code: string
           sort_order: number
           stage_code: string
           updated_at: string
@@ -4865,6 +4866,7 @@ export type Database = {
           module?: string
           note?: string | null
           round_no?: number | null
+          short_code: string
           sort_order: number
           stage_code: string
           updated_at?: string
@@ -4880,6 +4882,7 @@ export type Database = {
           module?: string
           note?: string | null
           round_no?: number | null
+          short_code?: string
           sort_order?: number
           stage_code?: string
           updated_at?: string
@@ -6040,7 +6043,6 @@ export type Database = {
       }
       wrt_items: {
         Row: {
-          active_round: number | null
           created_at: string
           created_by: string | null
           data_date: string | null
@@ -6071,7 +6073,6 @@ export type Database = {
           wrt_number: string
         }
         Insert: {
-          active_round?: number | null
           created_at?: string
           created_by?: string | null
           data_date?: string | null
@@ -6102,7 +6103,6 @@ export type Database = {
           wrt_number: string
         }
         Update: {
-          active_round?: number | null
           created_at?: string
           created_by?: string | null
           data_date?: string | null
@@ -6163,6 +6163,7 @@ export type Database = {
           module: string
           note: string | null
           round_no: number | null
+          short_code: string
           sort_order: number
           stage_code: string
           updated_at: string
@@ -6178,6 +6179,7 @@ export type Database = {
           module?: string
           note?: string | null
           round_no?: number | null
+          short_code: string
           sort_order: number
           stage_code: string
           updated_at?: string
@@ -6193,6 +6195,7 @@ export type Database = {
           module?: string
           note?: string | null
           round_no?: number | null
+          short_code?: string
           sort_order?: number
           stage_code?: string
           updated_at?: string
@@ -6419,7 +6422,6 @@ export type Database = {
       }
       wrt_items_judged: {
         Row: {
-          active_round: number | null
           created_at: string | null
           created_by: string | null
           data_date: string | null
@@ -7646,6 +7648,14 @@ export type Database = {
           stage: string
         }[]
       }
+      spl_active_round: {
+        Args: { _as_of?: string }
+        Returns: {
+          active_round: number
+          item_id: string
+        }[]
+      }
+      spl_assert_row_rules: { Args: { _item_id: string }; Returns: undefined }
       spl_eval_as_of: {
         Args: { _as_of?: string }
         Returns: {
@@ -7690,17 +7700,17 @@ export type Database = {
           judgment: Json
         }[]
       }
-      spl_judge_v3: {
+      spl_precheck_patches: { Args: { _patches: Json }; Returns: Json }
+      spl_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
+      spl_rule_msg: {
         Args: {
-          _band_state: string
-          _denom: number
-          _has_primary_delay: boolean
-          _is_excluded: boolean
-          _latest_status: string
+          _missing: string[]
+          _num: string
+          _ready: number
+          _total: number
         }
         Returns: string
       }
-      spl_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
       spl_stage_state: {
         Args: {
           _actual_finish: string
@@ -8075,6 +8085,14 @@ export type Database = {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
       }
+      wrt_active_round: {
+        Args: { _as_of?: string }
+        Returns: {
+          active_round: number
+          item_id: string
+        }[]
+      }
+      wrt_assert_row_rules: { Args: { _item_id: string }; Returns: undefined }
       wrt_eval_as_of: {
         Args: { _as_of?: string }
         Returns: {
@@ -8118,17 +8136,9 @@ export type Database = {
           judgment: Json
         }[]
       }
-      wrt_judge_v3: {
-        Args: {
-          _band_state: string
-          _denom: number
-          _has_primary_delay: boolean
-          _is_excluded: boolean
-          _is_final_approved: boolean
-        }
-        Returns: string
-      }
+      wrt_precheck_patches: { Args: { _patches: Json }; Returns: Json }
       wrt_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
+      wrt_rule_msg: { Args: { _code: string; _num: string }; Returns: string }
       wrt_stage_state: {
         Args: {
           _actual_finish: string

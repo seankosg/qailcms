@@ -24,7 +24,16 @@ import { updateWrtField } from "@/lib/wrt/mutations.functions";
 import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
 import { useRclCan } from "@/hooks/useRclCan";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
-import { WRT_COLUMNS, WRT_DEFAULT_ORDER, WRT_DEFAULT_VISIBILITY, type WrtColumnDef } from "./wrt-columns";
+import {
+  WRT_BAND_LABEL,
+  WRT_COLUMNS,
+  WRT_DEFAULT_ORDER,
+  WRT_DEFAULT_VISIBILITY,
+  buildWrtStageColumns,
+  wrtJudgmentLabel,
+  type WrtColumnDef,
+  type WrtStageColumn,
+} from "./wrt-columns";
 import { WrtColumnFilterDropdown } from "./WrtColumnFilterDropdowns";
 import { WrtColumnOrderMenu } from "./WrtColumnOrderMenu";
 import { WrtBulkEditBar } from "./WrtBulkEditBar";
@@ -33,18 +42,14 @@ import { WrtExportDialog } from "./WrtExportDialog";
 
 const routeApi = getRouteApi("/_authenticated/closure/warranty/raw-data");
 
-const BAND_LABEL: Record<string, string> = {
-  COMMERCIAL: "Commercial Stage",
-  DRAFT_APPROVAL: "Draft Approval Stage",
-  SUBMISSION: "Submission Stage",
-};
+const BAND_LABEL = WRT_BAND_LABEL;
 
 const JUDGMENTS = ["완료", "정상", "지연", "미착수", "미분류", "제외"] as const;
 
 /**
  * ★ 계획일 임포트 직후 재실행 필수 검증 체크리스트 (D-4-3)
  *  1. 지연 KPI 카드 클릭 → 드릴다운 목록 건수 == 카드값
- *  2. 밴드별 대표 지연 칩 합계 == 지연 카드값
+ *  2. Primary delay by band 칩 합계 == 지연 카드값
  *  3. 아이템당 primary_delay ≤ 1
  *  현재 상태: 불변식 I-1 / I-3 / I-5 는 지연 표본 0 위에서 관측된 것이므로 "미검증".
  */
@@ -126,31 +131,8 @@ export function WrtRawDataPage() {
     });
 
   const catalog: WrtCatalogEntry[] = data?.catalog ?? [];
-  const bands = useMemo(() => {
-    const out: Array<{ band: string; span: number }> = [];
-    for (const s of catalog) {
-      const span = s.value_type === "flag" ? 1 : s.value_type === "single" ? 2 : 4;
-      const last = out[out.length - 1];
-      if (last && last.band === s.band) last.span += span;
-      else out.push({ band: s.band, span });
-    }
-    return out;
-  }, [catalog]);
-
-  const subHeaders = (s: WrtCatalogEntry): Array<{ field: keyof WrtStageCell; label: string }> =>
-    s.value_type === "flag"
-      ? [{ field: "fv", label: "Value" }]
-      : s.value_type === "single"
-        ? [
-            { field: "ps", label: "Plan" },
-            { field: "as", label: s.actual_authority === "ACONEX" ? "Actual (Aconex)" : "Actual" },
-          ]
-        : [
-            { field: "ps", label: "P.Start" },
-            { field: "as", label: "A.Start" },
-            { field: "pf", label: "P.Finish" },
-            { field: "af", label: "A.Finish" },
-          ];
+  /** A. Single-row header — one cell per stage field, code taken from the catalog */
+  const stageCols = useMemo(() => buildWrtStageColumns(catalog), [catalog]);
 
   const rows = data?.rows ?? [];
 
@@ -256,9 +238,9 @@ export function WrtRawDataPage() {
     try {
       const payload = await fetchExport({ data: {} } as any);
       const name = downloadWrtRoundtripWorkbook(payload as any);
-      toast.success(`Export 완료 — ${name} (왕복 임포트 양식)`);
+      toast.success(`Export complete — ${name} (HDEC re-importable format)`);
     } catch (e: any) {
-      toast.error(e?.message ?? "Export 실패");
+      toast.error(e?.message ?? "Export failed");
     } finally {
       setExporting(false);
     }
@@ -272,8 +254,8 @@ export function WrtRawDataPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Warranty — Raw Data</h1>
           <p className="text-xs text-muted-foreground">
-            표시·집계 수치는 정본 함수(wrt_rows_as_of → wrt_eval_as_of → wrt_judge_v3) 경유 · 읽기 시 재계산. 완료
-            판정은 Final Approved(A) 기준입니다.
+            All displayed and aggregated figures come from the canonical functions (wrt_rows_as_of → wrt_eval_as_of →
+            wrt_judge_v1) and are recomputed on read. Completion follows Final Approved (A).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -293,7 +275,7 @@ export function WrtRawDataPage() {
             onFrozenChange={setFrozenExtras}
             onSave={() => {
               persistColumns();
-              toast.success("컬럼 설정이 저장되었습니다.");
+              toast.success("Column settings saved.");
             }}
           />
           <Button size="sm" variant="outline" onClick={() => setExportOpen(true)} disabled={exporting}>
@@ -321,7 +303,7 @@ export function WrtRawDataPage() {
             className="h-8 text-xs"
             onClick={() => setSearch({ plot: p })}
           >
-            {p === "all" ? "전체 Plot" : `PLOT-${p}`}
+            {p === "all" ? "All Plots" : `PLOT-${p}`}
           </Button>
         ))}
         {(["all", "1", "2"] as const).map((r) => (
@@ -332,7 +314,7 @@ export function WrtRawDataPage() {
             className="h-8 text-xs"
             onClick={() => setSearch({ round: r })}
           >
-            {r === "all" ? "전체 Round" : `R${r}`}
+            {r === "all" ? "All Rounds" : `R${r}`}
           </Button>
         ))}
         {viol && (
@@ -343,13 +325,13 @@ export function WrtRawDataPage() {
             >
               <AlertTriangle className="h-3 w-3" />
               {(viol.inspected_items ?? 0) === 0 ? (
-                <>위반 검사 미실시 — HDEC 제출 실적 미임포트</>
+                <>Violation check not run — HDEC submission actuals not imported</>
               ) : (
                 <>
-                  위반 {viol.total}건 (검사 대상 {viol.inspected_items}건) · 선후관계 {viol.precedence} · 라운드 귀속{" "}
-                  {viol.ghost_round} · 회신선행 {viol.response_before_submission ?? 0}
+                  Violations {viol.total} (inspected {viol.inspected_items}) · precedence {viol.precedence} · round attribution{" "}
+                  {viol.ghost_round} · response before submission {viol.response_before_submission ?? 0}
                   {viol.from_last_import > 0 && (
-                    <span className="opacity-80"> · 최근 임포트 발생 {viol.from_last_import}건</span>
+                    <span className="opacity-80"> · from the latest import {viol.from_last_import}</span>
                   )}
                 </>
               )}
@@ -357,34 +339,34 @@ export function WrtRawDataPage() {
             <Badge
               variant="outline"
               className="text-[11px]"
-              title="HDEC 제출 실적이 전 라운드에 걸쳐 없는 상태에서 Aconex 회신만 존재 — 임포트 대기이며 위반 아님"
+              title="Aconex response exists while no HDEC submission actual is present in any round — pending import, not a violation"
             >
-              제출 대기 {viol.pending_hdec_items ?? 0}건 (라운드 기준 {viol.pending_hdec ?? 0}쌍 · R1{" "}
+              Pending submission {viol.pending_hdec_items ?? 0} ({viol.pending_hdec ?? 0} round pairs · R1{" "}
               {viol.pending_hdec_r1 ?? 0} / R2 {viol.pending_hdec_r2 ?? 0})
             </Badge>
             <Badge
               variant="outline"
               className="text-[11px]"
-              title="선행 단계의 progress 행 자체가 없는 건 — HDEC 임포트 미완이며 실제 공정 역전이 아님"
+              title="No progress row exists for the preceding stage — HDEC import incomplete, not an actual sequence reversal"
             >
-              자료 미유입 {viol.import_incomplete ?? 0}건
+              Data not loaded {viol.import_incomplete ?? 0}
             </Badge>
           </>
         )}
         {(data?.plan_items ?? 0) === 0 && (
           <Badge variant="secondary" className="text-[11px]">
-            HDEC 계획일 미유입 — 지연 판정 미실시 (계획일 보유 아이템 {data?.plan_items ?? 0}건)
+            No HDEC plan dates loaded — delay judgment not applied (items with a plan date: {data?.plan_items ?? 0})
           </Badge>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
         <KpiCard
-          label="모집단 (문서)"
+          label="Population (documents)"
           value={population}
           active={(search.judgment ?? "all") === "all" && !search.delayBand}
           onClick={() => setSearch({ judgment: "all", delayBand: "" })}
-          note={reconOk ? "합계=모집단 ✓" : `검산 불일치: 합계 ${countsSum}`}
+          note={reconOk ? "Sum = population ✓" : `Reconciliation mismatch: sum ${countsSum}`}
           tone={reconOk ? undefined : "warn"}
         />
         {JUDGMENTS.map((j) => (
@@ -398,15 +380,15 @@ export function WrtRawDataPage() {
             }
             note={
               j === "완료"
-                ? `Final Approved (A) · HDEC 실적 미확보 ${data?.hdec_missing_done ?? 0}건`
+                ? `Final Approved (A) · no HDEC actual: ${data?.hdec_missing_done ?? 0}`
                 : j === "미분류"
-                  ? "계획·실적 없음 (분모 0)"
+                  ? "No plan and no actual (denominator 0)"
                   : j === "제외"
-                    ? "Cancelled — 통계 제외"
+                    ? "Cancelled — excluded from statistics"
                     : j === "지연"
-                      ? "대표 지연 보유 문서"
+                      ? "Documents with a primary delay"
                       : j === "미착수"
-                        ? "활성 밴드 판정대상 0단계"
+                        ? "No judgeable stage in the active band"
                         : undefined
             }
             tone={j === "지연" ? "bad" : j === "미분류" ? "warn" : undefined}
@@ -415,7 +397,7 @@ export function WrtRawDataPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] text-muted-foreground">밴드별 대표 지연</span>
+        <span className="text-[11px] text-muted-foreground">Primary delay by band</span>
         {delayBands.map(([band, n]) => (
           <Button
             key={band}
@@ -428,7 +410,7 @@ export function WrtRawDataPage() {
           </Button>
         ))}
         <Badge variant="outline" className="text-[11px]">
-          회신 대기 지연 {responseWaitItems}건 (Aconex 귀책 · 지연 카드 미합산)
+          Awaiting response: {responseWaitItems} (Aconex-owned · not counted in the delay card)
         </Badge>
         <Button
           size="sm"
@@ -436,7 +418,7 @@ export function WrtRawDataPage() {
           className="h-7 text-[11px]"
           onClick={() => setSearch({ hdecMissing: !search.hdecMissing, delayBand: "" })}
         >
-          HDEC 실적 미확보 {data?.hdec_missing_items ?? 0}건
+          No HDEC actual: {data?.hdec_missing_items ?? 0}
         </Button>
       </div>
 
@@ -444,7 +426,7 @@ export function WrtRawDataPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 불러오는 중…
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
             </div>
           ) : error ? (
             <div className="p-6 text-sm text-destructive">{(error as Error).message}</div>
@@ -461,7 +443,7 @@ export function WrtRawDataPage() {
                             onCheckedChange={(v) =>
                               setSelectedIds(v ? filtered.map((r) => r.id) : [])
                             }
-                            aria-label="전체 선택"
+                            aria-label="Select all"
                           />
                         ) : (
                           <span className="inline-flex items-center">
@@ -479,13 +461,12 @@ export function WrtRawDataPage() {
                           </span>
                         );
                       return it.left != null ? (
-                        <StickyHead key={it.key} rowSpan={3} left={it.left} width={it.width}>
+                        <StickyHead key={it.key} left={it.left} width={it.width}>
                           {inner}
                         </StickyHead>
                       ) : (
                         <th
                           key={it.key}
-                          rowSpan={3}
                           style={{ minWidth: it.width }}
                           className="whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-left"
                         >
@@ -493,42 +474,15 @@ export function WrtRawDataPage() {
                         </th>
                       );
                     })}
-                    {bands.map((b, i) => (
+                    {stageCols.map((sc) => (
                       <th
-                        key={`${b.band}-${i}`}
-                        colSpan={b.span}
-                        className="border-b border-l bg-muted/80 px-2 py-1 text-center font-semibold"
+                        key={sc.key}
+                        title={sc.title}
+                        className="whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-center font-medium"
                       >
-                        {BAND_LABEL[b.band] ?? b.band}
+                        {sc.code}
                       </th>
                     ))}
-                  </tr>
-                  <tr>
-                    {catalog.map((s) => (
-                      <th
-                        key={s.stage_code}
-                        colSpan={subHeaders(s).length}
-                        className="whitespace-nowrap border-b border-l bg-muted/60 px-2 py-1 text-center"
-                        title={`${s.stage_code} · ${s.value_type} · 실적 정본 ${s.actual_authority}`}
-                      >
-                        {s.label}
-                        {s.actual_authority === "ACONEX" && (
-                          <span className="ml-1 rounded bg-emerald-100 px-1 text-[9px] text-emerald-800">Aconex</span>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                  <tr>
-                    {catalog.flatMap((s) =>
-                      subHeaders(s).map((h) => (
-                        <th
-                          key={`${s.stage_code}-${h.field}`}
-                          className="whitespace-nowrap border-b border-l bg-muted/40 px-2 py-1 text-center font-normal text-muted-foreground"
-                        >
-                          {h.label}
-                        </th>
-                      )),
-                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -536,8 +490,7 @@ export function WrtRawDataPage() {
                     <WrtTableRow
                       key={r.id}
                       row={r}
-                      catalog={catalog}
-                      subHeaders={subHeaders}
+                      stageCols={stageCols}
                       layout={layout}
                       selected={selectedIds.includes(r.id)}
                       onToggleSelect={() =>
@@ -553,8 +506,8 @@ export function WrtRawDataPage() {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={layout.length + catalog.length * 4} className="p-8 text-center text-muted-foreground">
-                        조건에 맞는 행이 없습니다.
+                      <td colSpan={layout.length + stageCols.length} className="p-8 text-center text-muted-foreground">
+                        No rows match the current filters.
                       </td>
                     </tr>
                   )}
@@ -571,7 +524,7 @@ export function WrtRawDataPage() {
         onClear={() => setSelectedIds([])}
         onSaveField={saveOne}
         onDone={refetchRows}
-        disabledReason={isToday ? null : "과거 시점(as-of) 보기에서는 편집할 수 없습니다."}
+        disabledReason={isToday ? null : "Editing is disabled in as-of (historical) view."}
       />
 
       <WrtDetailSheet
@@ -594,8 +547,8 @@ export function WrtRawDataPage() {
       />
 
       <div className="text-[11px] text-muted-foreground">
-        표시 {filtered.length.toLocaleString()}행 / 모집단 {population.toLocaleString()}행 · As of {asOf} · NA 단계는{" "}
-        <span className="rounded bg-muted px-1">NA</span> 로 표기하며 진척률 분모에서 제외됩니다(빈칸과 구분).
+        Showing {filtered.length.toLocaleString()} of {population.toLocaleString()} rows · As of {asOf} · NA stages are marked{" "}
+        <span className="rounded bg-muted px-1">NA</span> and excluded from the progress denominator (distinct from blank).
       </div>
     </div>
   );
@@ -603,8 +556,7 @@ export function WrtRawDataPage() {
 
 function WrtTableRow({
   row,
-  catalog,
-  subHeaders,
+  stageCols,
   layout,
   selected,
   onToggleSelect,
@@ -613,8 +565,7 @@ function WrtTableRow({
   onSave,
 }: {
   row: WrtRow;
-  catalog: WrtCatalogEntry[];
-  subHeaders: (s: WrtCatalogEntry) => Array<{ field: keyof WrtStageCell; label: string }>;
+  stageCols: WrtStageColumn[];
   layout: Array<{ key: string; def: WrtColumnDef | null; width: number; left: number | null }>;
   selected: boolean;
   onToggleSelect: () => void;
@@ -663,13 +614,15 @@ function WrtTableRow({
       case "judgment":
         return (
           <>
-            <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>{row.judgment}</span>
+            <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", judgeTone)}>
+              {wrtJudgmentLabel(row.judgment)}
+            </span>
             {(row.hdec_actual_count ?? 0) === 0 && (
               <span
                 className="ml-1 rounded bg-muted px-1 text-[9px] text-muted-foreground"
-                title="HDEC 권한 단계 실적 보유 0건 — 판정과 독립된 자료 상태 표기"
+                title="No actual recorded on any HDEC-authoritative stage — data status only, independent of judgment"
               >
-                HDEC 실적 미확보
+                No HDEC actual
               </span>
             )}
           </>
@@ -688,7 +641,7 @@ function WrtTableRow({
       case "current_stage":
         return (
           <span className="text-muted-foreground">
-            {row.current_stage ? stageLabel(row.current_stage) : row.active_band ? "—" : "전 단계 완료/미발생"}
+            {row.current_stage ? stageLabel(row.current_stage) : row.active_band ? "—" : "All bands closed"}
           </span>
         );
       case "primary_delay":
@@ -696,19 +649,19 @@ function WrtTableRow({
           <>
             {row.primary_delay ? (
               <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
-                {stageLabel(row.primary_delay)} · {row.primary_delay.days}일
+                {stageLabel(row.primary_delay)} · {row.primary_delay.days}d
               </span>
             ) : (
               <span className="text-muted-foreground">—</span>
             )}
             {row.delay_bucket.length > 0 && (
-              <span className="ml-1 text-[9px] text-muted-foreground" title="후행 지연 — 인지용, 지연 카드 미합산">
+              <span className="ml-1 text-[9px] text-muted-foreground" title="Trailing delays — informational, not counted in the delay card">
                 +{row.delay_bucket.length}
               </span>
             )}
             {row.response_wait.length > 0 && (
-              <span className="ml-1 text-[9px] text-amber-700" title="Aconex 회신 대기 — HDEC 귀책 아님">
-                회신대기
+              <span className="ml-1 text-[9px] text-amber-700" title="Awaiting Aconex response — not attributable to HDEC">
+                Awaiting response
               </span>
             )}
           </>
@@ -733,7 +686,7 @@ function WrtTableRow({
       {layout.map((it) => {
         const inner =
           it.key === "__select" ? (
-            <Checkbox checked={selected} onCheckedChange={onToggleSelect} aria-label="행 선택" />
+            <Checkbox checked={selected} onCheckedChange={onToggleSelect} aria-label="Select row" />
           ) : (
             renderCell(it.key)
           );
@@ -747,51 +700,46 @@ function WrtTableRow({
           </td>
         );
       })}
-      {catalog.flatMap((s) => {
-        const cell = row.stages[s.stage_code];
-        return subHeaders(s).map((h) => {
-          const isNa = cell?.na;
-          const raw = cell?.[h.field] as string | null | undefined;
-          return (
-            <td
-              key={`${s.stage_code}-${h.field}`}
-              className={cn(
-                "whitespace-nowrap border-b border-l px-2 py-1 text-center tabular-nums",
-                STATE_CLASS[cell?.st ?? "none"],
-                isNa && "bg-muted/40",
-              )}
-              title={isNa ? "NA — 진척률 분모에서 제외" : undefined}
-            >
-              {isNa ? (
-                <span className="rounded bg-muted px-1 text-[9px] font-semibold text-muted-foreground">NA</span>
-              ) : raw ? (
-                h.field === "fv" ? raw : formatDdMmm(raw)
-              ) : (
-                ""
-              )}
-            </td>
-          );
-        });
+      {stageCols.map((sc) => {
+        const cell = row.stages[sc.stage_code];
+        const isNa = cell?.na;
+        const raw = cell?.[sc.field] as string | null | undefined;
+        return (
+          <td
+            key={sc.key}
+            className={cn(
+              "whitespace-nowrap border-b border-l px-2 py-1 text-center tabular-nums",
+              STATE_CLASS[cell?.st ?? "none"],
+              isNa && "bg-muted/40",
+            )}
+            title={isNa ? "NA — excluded from the progress denominator" : sc.title}
+          >
+            {isNa ? (
+              <span className="rounded bg-muted px-1 text-[9px] font-semibold text-muted-foreground">NA</span>
+            ) : raw ? (
+              sc.field === "fv" ? raw : formatDdMmm(raw)
+            ) : (
+              ""
+            )}
+          </td>
+        );
       })}
     </tr>
   );
 }
 
-/** 고정(스티키) 헤더 — 배경 100% 불투명 유지 */
+/** Sticky header cell — background must stay 100% opaque */
 function StickyHead({
   children,
   left,
   width,
-  rowSpan,
 }: {
   children: React.ReactNode;
   left: number;
   width: number;
-  rowSpan?: number;
 }) {
   return (
     <th
-      rowSpan={rowSpan}
       style={{ left, width, minWidth: width }}
       className="sticky z-20 border-b border-l bg-background px-2 py-1 text-left [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
     >

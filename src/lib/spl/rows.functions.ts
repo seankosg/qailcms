@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
  * SPL 화면 데이터 정본 경유 진입점.
- * 표시·집계 수치는 전부 `spl_rows_as_of`(→ `spl_eval_as_of` → `spl_stage_state` / `spl_judge_v2`)를 거친다.
+ * 표시·집계 수치는 전부 `spl_rows_as_of`(→ `spl_eval_as_of` → `spl_stage_state` / `spl_active_round`)를 거친다.
  * 원시 테이블 직조회 + 클라이언트 재계산 금지.
  * 판정·대표지연은 읽기 시 서버 재계산 결과이며, 저장 판정 컬럼은 존재하지 않는다.
  */
@@ -21,10 +21,13 @@ export type SplStageCell = {
 
 export type SplCatalogEntry = {
   stage_code: string;
+  /** Header code shown in the single-row table header (catalog-owned, e.g. D-SB) */
+  short_code: string;
   label: string;
   band: "REQUIRED_DOC" | "DOCUMENTATION" | "PO";
   value_type: "flag" | "single" | "range";
   actual_authority: "HDEC" | "ACONEX";
+  round_no?: number | null;
   sort_order: number;
   /** 순차 사슬·판정 모집단에서 제외되는 단계(SPL REQUIRED_DOC) */
   chain_excluded?: boolean;
@@ -57,6 +60,7 @@ export type SplRow = {
   approval_status_raw: string | null;
   revision: string | null;
   data_date: string | null;
+  active_round: number;
   is_excluded: boolean;
   exclusion_reason: string | null;
   stages: Record<string, SplStageCell>;
@@ -157,7 +161,7 @@ export const getSplExportRows = createServerFn({ method: "POST" })
     );
     const { data: catalog, error: cErr } = await supa
       .from("spl_stage_catalog")
-      .select("stage_code, label, band, value_type, actual_authority, sort_order")
+      .select("stage_code, short_code, label, band, value_type, actual_authority, sort_order")
       .order("sort_order");
     if (cErr) throw new Error(cErr.message);
     return {

@@ -9,19 +9,33 @@ export interface SplColumnDef {
   edit?: "team" | "pic" | "eng" | "pic_po" | "eng_po";
 }
 
+/** Judgment values are stored canonically; screens show the English label only. */
+export const SPL_JUDGMENT_LABEL: Record<string, string> = {
+  "완료": "Completed",
+  "정상": "On Track",
+  "지연": "Delayed",
+  "미착수": "Not Started",
+  "미분류": "Unclassified",
+  "제외": "Excluded",
+};
+
+export function splJudgmentLabel(v: string): string {
+  return SPL_JUDGMENT_LABEL[v] ?? v;
+}
+
 export const SPL_COLUMNS: SplColumnDef[] = [
   { key: "spl_number", label: "SPL NUMBER", width: 230, filter: "none", get: (r) => r.spl_number ?? "" },
   { key: "plot", label: "Plot", width: 70, filter: "multi", get: (r) => (r.plot ? `PLOT-${r.plot}` : "") },
   { key: "team", label: "Team", width: 80, filter: "multi", get: (r) => r.team ?? "", edit: "team" },
-  { key: "judgment", label: "판정", width: 100, filter: "multi", get: (r) => r.judgment },
-  { key: "progress_pct", label: "진척률", width: 90, filter: "none", get: (r) => (r.progress_pct == null ? "" : `${r.progress_pct}%`) },
-  { key: "current_stage", label: "현재 단계", width: 150, filter: "multi", get: (r) => r.current_stage?.label ?? "" },
+  { key: "judgment", label: "Status", width: 110, filter: "multi", get: (r) => splJudgmentLabel(r.judgment) },
+  { key: "progress_pct", label: "Progress", width: 90, filter: "none", get: (r) => (r.progress_pct == null ? "" : `${r.progress_pct}%`) },
+  { key: "current_stage", label: "Current Stage", width: 150, filter: "multi", get: (r) => r.current_stage?.label ?? "" },
   {
     key: "primary_delay",
-    label: "대표 지연",
+    label: "Primary Delay",
     width: 170,
     filter: "multi",
-    get: (r) => (r.primary_delay ? `${r.primary_delay.label} · ${r.primary_delay.days}일` : ""),
+    get: (r) => (r.primary_delay ? `${r.primary_delay.label} · ${r.primary_delay.days}d` : ""),
   },
   { key: "pic", label: "PIC", width: 90, filter: "multi", get: (r) => r.pic ?? "", edit: "pic" },
   { key: "eng", label: "ENG", width: 90, filter: "multi", get: (r) => r.eng ?? "", edit: "eng" },
@@ -42,7 +56,7 @@ export const SPL_DEFAULT_VISIBILITY: Record<string, boolean> = Object.fromEntrie
   SPL_COLUMNS.map((c) => [c.key, !["supplier", "latest_status", "dis", "service", "title"].includes(c.key)]),
 );
 
-/** SPL team 은 테이블 CHECK 값 정본 */
+/** SPL team values are owned by the table CHECK constraint */
 export const SPL_TEAM_OPTIONS = ["MECH", "ELEC", "PRJC"] as const;
 
 export const SPL_EDITABLE_FIELDS: Array<{ field: "team" | "pic" | "eng" | "pic_po" | "eng_po"; label: string }> = [
@@ -52,3 +66,58 @@ export const SPL_EDITABLE_FIELDS: Array<{ field: "team" | "pic" | "eng" | "pic_p
   { field: "pic_po", label: "PIC PO" },
   { field: "eng_po", label: "ENG PO" },
 ];
+
+/** Band full names used in the single-row header tooltip */
+export const SPL_BAND_LABEL: Record<string, string> = {
+  REQUIRED_DOC: "Required Documents",
+  DOCUMENTATION: "Documentation Stage",
+  PO: "PO Stage",
+};
+
+export type SplStageColumn = {
+  key: string;
+  stage_code: string;
+  field: "ps" | "as" | "pf" | "af" | "fv";
+  code: string;
+  title: string;
+  aconex: boolean;
+};
+
+/** Single-row header: one cell per stage field. Codes come from the catalog, never hardcoded. */
+export function buildSplStageColumns(
+  catalog: Array<{
+    stage_code: string;
+    short_code: string;
+    label: string;
+    band: string;
+    value_type: "flag" | "single" | "range";
+    actual_authority: "HDEC" | "ACONEX";
+  }>,
+): SplStageColumn[] {
+  const out: SplStageColumn[] = [];
+  for (const s of catalog) {
+    const band = SPL_BAND_LABEL[s.band] ?? s.band;
+    const aconex = s.actual_authority === "ACONEX";
+    const mk = (field: SplStageColumn["field"], sfx: string, name: string) =>
+      out.push({
+        key: `${s.stage_code}|${field}`,
+        stage_code: s.stage_code,
+        field,
+        code: `${s.short_code}${sfx}`,
+        title: `${band} › ${s.label}${name ? ` — ${name}` : ""}${aconex && field === "as" ? " (Aconex)" : ""}`,
+        aconex,
+      });
+    if (s.value_type === "flag") {
+      mk("fv", "", "");
+    } else if (s.value_type === "single") {
+      mk("ps", "-PD", "Plan Date");
+      mk("as", "-AD", "Actual Date");
+    } else {
+      mk("ps", "-PS", "Plan Start");
+      mk("as", "-AS", "Actual Start");
+      mk("pf", "-PF", "Plan Finish");
+      mk("af", "-AF", "Actual Finish");
+    }
+  }
+  return out;
+}

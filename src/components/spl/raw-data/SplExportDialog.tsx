@@ -59,13 +59,13 @@ export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRou
         return;
       }
       if (rows.length === 0) {
-        toast.error("내보낼 행이 없습니다.");
+        toast.error("No rows to export.");
         return;
       }
       const stamp = ts();
       if (axis === "none") {
         exportRowsToXlsx({ rows: rows.map(toRecord), columns: exportColumns, fileName: `CMS_SPL_view_${stamp}.xlsx` });
-        toast.success(`${rows.length.toLocaleString()}건 내보내기 완료`);
+        toast.success(`Exported ${rows.length.toLocaleString()} rows`);
       } else {
         const groups = new Map<string, SplRow[]>();
         for (const r of rows) {
@@ -82,11 +82,11 @@ export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRou
           });
           await new Promise((r) => setTimeout(r, 0));
         }
-        toast.success(`${groups.size}개 파일 다운로드`);
+        toast.success(`Downloaded ${groups.size} files`);
       }
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(`내보내기 실패: ${e?.message ?? e}`);
+      toast.error(`Export failed: ${e?.message ?? e}`);
     } finally {
       setBusy(false);
     }
@@ -94,7 +94,7 @@ export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRou
 
   const copy = async () => {
     const res = await copyRowsAsTsv({ rows: rows.map(toRecord), columns: exportColumns });
-    toast.success(`${res.rowCount}행 × ${res.colCount}열 복사됨`);
+    toast.success(`Copied ${res.rowCount} rows × ${res.colCount} columns`);
   };
 
   return (
@@ -103,7 +103,7 @@ export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRou
         <DialogHeader>
           <DialogTitle>Export SPL Raw Data</DialogTitle>
           <DialogDescription>
-            현재 필터 결과 <span className="font-medium tabular-nums">{rows.length.toLocaleString()}</span>행을 내보냅니다.
+            Exports <span className="font-medium tabular-nums">{rows.length.toLocaleString()}</span> rows from the current filter result.
           </DialogDescription>
         </DialogHeader>
 
@@ -113,11 +113,11 @@ export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRou
             <RadioGroup value={format} onValueChange={(v) => setFormat(v as Format)} className="mt-2 flex flex-col gap-2">
               <label className="flex items-start gap-2 text-sm">
                 <RadioGroupItem value="view" className="mt-1" />
-                <span>View — 현재 표시 컬럼/라벨 그대로</span>
+                <span>View (as displayed)</span>
               </label>
               <label className="flex items-start gap-2 text-sm">
                 <RadioGroupItem value="roundtrip" className="mt-1" />
-                <span>왕복 양식 — 재임포트용 표준 시트</span>
+                <span>HDEC format (re-importable)</span>
               </label>
             </RadioGroup>
           </div>
@@ -127,12 +127,12 @@ export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRou
               <RadioGroup value={axis} onValueChange={(v) => setAxis(v as Axis)} className="mt-2 flex flex-col gap-2">
                 <label className="flex items-start gap-2 text-sm">
                   <RadioGroupItem value="none" className="mt-1" />
-                  <span>단일 파일</span>
+                  <span>Single file</span>
                 </label>
                 {(Object.keys(AXIS_LABEL) as Array<keyof typeof AXIS_LABEL>).map((a) => (
                   <label key={a} className="flex items-start gap-2 text-sm">
                     <RadioGroupItem value={a} className="mt-1" />
-                    <span>{AXIS_LABEL[a]} 별 분리</span>
+                    <span>Split by {AXIS_LABEL[a]}</span>
                   </label>
                 ))}
               </RadioGroup>
@@ -142,10 +142,10 @@ export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRou
 
         <DialogFooter>
           <Button variant="ghost" onClick={copy} disabled={busy || rows.length === 0}>
-            TSV 복사
+            Copy TSV
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-            취소
+            Cancel
           </Button>
           <Button onClick={run} disabled={busy}>
             {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />}

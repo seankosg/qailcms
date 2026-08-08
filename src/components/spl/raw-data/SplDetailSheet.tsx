@@ -31,7 +31,7 @@ export function SplDetailSheet({ row, catalog, canEdit, onSave, onOpenChange }: 
           <Badge variant="outline">{row.plot ? `PLOT-${row.plot}` : "Plot —"}</Badge>
           <Badge variant={row.judgment === "지연" ? "destructive" : "secondary"}>{row.judgment}</Badge>
           <Badge variant="outline">
-            진척률 {row.progress_pct == null ? "—" : `${row.progress_pct}%`} ({row.done}/{row.denom})
+            Progress {row.progress_pct == null ? "—" : `${row.progress_pct}%`} ({row.done}/{row.denom})
           </Badge>
           <Badge variant="outline">
             Req.Doc {row.req_doc_done}/{row.req_doc_total}
@@ -46,8 +46,8 @@ export function SplDetailSheet({ row, catalog, canEdit, onSave, onOpenChange }: 
           <Field label="Supplier" value={row.supplier ?? "—"} />
           <Field label="Data Date" value={d(row.data_date)} />
           <Field
-            label="대표 지연"
-            value={row.primary_delay ? `${row.primary_delay.label} · ${row.primary_delay.days}일` : "—"}
+            label="Primary delay"
+            value={row.primary_delay ? `${row.primary_delay.label} · ${row.primary_delay.days}d` : "—"}
           />
         </div>
 
@@ -71,7 +71,7 @@ export function SplDetailSheet({ row, catalog, canEdit, onSave, onOpenChange }: 
         </div>
 
         <div className="mt-5">
-          <div className="mb-1 text-[11px] font-medium">단계 진행</div>
+          <div className="mb-1 text-[11px] font-medium">Stage progress</div>
           <table className="w-full border-separate border-spacing-0 text-[11px]">
             <thead>
               <tr className="bg-muted">
