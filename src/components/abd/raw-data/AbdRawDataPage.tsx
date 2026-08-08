@@ -712,6 +712,7 @@ export function AbdRawDataPage() {
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
             onServerLabel={onServerLabel}
+            onSaveLayout={saveLayoutNow}
           />
           <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "abd" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
           {isAdmin && <AbdAuditSamplePopover />}

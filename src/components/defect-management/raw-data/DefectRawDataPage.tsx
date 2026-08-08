@@ -920,6 +920,7 @@ export function DefectRawDataPage() {
             onServerReorder={onServerReorder}
             onServerVisibility={onServerVisibility}
             onServerLabel={onServerLabel}
+            onSaveLayout={saveLayoutNow}
           />
           {isAdmin && <AiClassifyButton selectedRows={selectedRows as any} onDone={() => { invalidateDefects(); refetch(); }} />}
           <Button asChild variant="outline" size="sm"><Link to="/import-log/import" search={{ tab: "snag" }}><Upload className="mr-1 h-3.5 w-3.5" /> Import</Link></Button>
