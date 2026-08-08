@@ -2430,6 +2430,33 @@ export type Database = {
           },
         ]
       }
+      comment_read_state: {
+        Row: {
+          created_at: string
+          key: string
+          last_read_at: string
+          scope: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          last_read_at: string
+          scope: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          last_read_at?: string
+          scope?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       database_snapshots: {
         Row: {
           created_at: string
