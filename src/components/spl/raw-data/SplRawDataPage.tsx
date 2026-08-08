@@ -30,6 +30,7 @@ import {
   SPL_DEFAULT_VISIBILITY,
   SPL_TEAM_OPTIONS,
   buildSplStageColumns,
+  splBandHeaderClass,
   splJudgmentLabel,
   type SplColumnDef,
   type SplStageColumn,
