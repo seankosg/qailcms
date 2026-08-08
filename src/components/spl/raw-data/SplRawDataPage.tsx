@@ -1,3 +1,4 @@
+import { ColumnResizeHandle } from "@/components/common/ColumnResizeHandle";
 import { useEffect, useMemo, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -89,6 +90,8 @@ export function SplRawDataPage() {
   const [order, setOrder] = useState<string[]>(SPL_DEFAULT_ORDER);
   const [visibility, setVisibility] = useState<Record<string, boolean>>(SPL_DEFAULT_VISIBILITY);
   const [frozenExtras, setFrozenExtras] = useState<string[]>(["spl_number"]);
+  /** 컬럼 폭(px) — 사용자가 드래그로 조절한 값만 담는다 */
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const [stateLoaded, setStateLoaded] = useState(false);
   useEffect(() => {
     if (!viewPref.ready || stateLoaded) return;
@@ -104,14 +107,21 @@ export function SplRawDataPage() {
     if (Array.isArray(s.frozenExtras)) {
       setFrozenExtras(s.frozenExtras.filter((k: any) => typeof k === "string" && valid.has(k)));
     }
+    if (s.colWidths && typeof s.colWidths === "object") {
+      const kept: Record<string, number> = {};
+      for (const [k, v] of Object.entries(s.colWidths as Record<string, unknown>)) {
+        if (typeof v === "number" && v > 0 && valid.has(k)) kept[k] = v;
+      }
+      setColWidths(kept);
+    }
     setStateLoaded(true);
   }, [viewPref.ready, viewPref.state, stateLoaded]);
-  const persistColumns = () => viewPref.save({ order, visibility, frozenExtras } as any);
+  const persistColumns = () => viewPref.save({ order, visibility, frozenExtras, colWidths } as any);
   useEffect(() => {
     if (!stateLoaded) return;
-    viewPref.save({ order, visibility, frozenExtras } as any);
+    viewPref.save({ order, visibility, frozenExtras, colWidths } as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stateLoaded, order, visibility, frozenExtras]);
+  }, [stateLoaded, order, visibility, frozenExtras, colWidths]);
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -197,15 +207,16 @@ export function SplRawDataPage() {
     let left = 36;
     for (const k of frozen) {
       const def = colDefMap.get(k)!;
-      items.push({ key: k, def, width: def.width, left });
-      left += def.width;
+      const w = colWidths[k] ?? def.width;
+      items.push({ key: k, def, width: w, left });
+      left += w;
     }
     for (const k of rest) {
       const def = colDefMap.get(k)!;
-      items.push({ key: k, def, width: def.width, left: null });
+      items.push({ key: k, def, width: colWidths[k] ?? def.width, left: null });
     }
     return items;
-  }, [order, visibility, frozenExtras, colDefMap]);
+  }, [order, visibility, frozenExtras, colDefMap, colWidths]);
 
   const exportColumns = useMemo(
     () => layout.filter((i) => i.def).map((i) => ({ key: i.key, label: i.def!.label })),
@@ -435,17 +446,26 @@ export function SplRawDataPage() {
                             )}
                           </span>
                         );
+                      const resizer =
+                        it.def == null ? null : (
+                          <ColumnResizeHandle
+                            width={it.width}
+                            onChange={(w: number) => setColWidths((p) => ({ ...p, [it.key]: w }))}
+                          />
+                        );
                       return it.left != null ? (
                         <StickyHead key={it.key} left={it.left} width={it.width}>
                           {inner}
+                          {resizer}
                         </StickyHead>
                       ) : (
                         <th
                           key={it.key}
-                          style={{ minWidth: it.width }}
-                          className="whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-left"
+                          style={{ width: it.width, minWidth: it.width }}
+                          className="relative whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-left"
                         >
                           {inner}
+                          {resizer}
                         </th>
                       );
                     })}
@@ -751,7 +771,7 @@ function StickyHead({
   return (
     <th
       style={{ left, width, minWidth: width }}
-      className="sticky z-20 border-b border-l bg-background px-2 py-1 text-left [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
+      className="sticky z-20 relative border-b border-l bg-background px-2 py-1 text-left [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
     >
       {children}
     </th>
