@@ -79,6 +79,15 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
   };
 
   const items = data?.items ?? [];
+  const PRIORITY_ORDER = ["Physical Work", "T&C", "Approval", "Documentation"];
+  const sortedItems = [...items].sort((a, b) => {
+    const ai = PRIORITY_ORDER.indexOf(a.work_type);
+    const bi = PRIORITY_ORDER.indexOf(b.work_type);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return 0;
+  });
 
   return (
     <div className="space-y-3">
