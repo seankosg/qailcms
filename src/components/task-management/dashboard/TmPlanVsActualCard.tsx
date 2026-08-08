@@ -246,7 +246,7 @@ export function TmPlanVsActualCard({
                     </span>
                   </div>
                   <div className="flex flex-col justify-center px-3 py-1 text-[10px] leading-relaxed text-muted-foreground">
-                    <span>Solid = measured snapshots · Dashed = linear back-calculation</span>
+                    <span>Solid = actual · Dashed = plan · Thick = measured · Thin = estimated</span>
                     <span>Tasks in scope: {curve.taskCount.toLocaleString()}</span>
                   </div>
                 </div>
@@ -306,8 +306,8 @@ export function TmPlanVsActualCard({
                       dataKey="cumPlan"
                       name="Plan (cum %)"
                       stroke="var(--muted-foreground)"
-                      strokeDasharray="5 3"
-                      strokeWidth={1.5}
+                      strokeDasharray="6 4"
+                      strokeWidth={2.5}
                       dot={false}
                       hide={hidden.has("cumPlan")}
                     />
@@ -316,8 +316,7 @@ export function TmPlanVsActualCard({
                       type="monotone"
                       dataKey="cumActual"
                       name="Actual (cum %, estimated)"
-                      stroke="color-mix(in oklab, var(--primary) 45%, transparent)"
-                      strokeDasharray="3 3"
+                      stroke="color-mix(in oklab, var(--primary) 55%, transparent)"
                       strokeWidth={1.5}
                       dot={false}
                       connectNulls={false}
@@ -329,7 +328,7 @@ export function TmPlanVsActualCard({
                       dataKey="cumActualMeasured"
                       name="Actual (cum %, measured)"
                       stroke="var(--primary)"
-                      strokeWidth={2.5}
+                      strokeWidth={3.5}
                       dot={false}
                       connectNulls={false}
                       hide={hidden.has("cumActualMeasured")}
