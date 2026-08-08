@@ -359,6 +359,10 @@ export function CommentsThread({
         </div>
       )}
 
+      {enableRecipients && !replyTo && (
+        <CommentRecipientPicker value={recipients} onChange={setRecipients} disabled={!user || sending} />
+      )}
+
       <div className="flex gap-2 items-end">
         {!replyTo && (
           <Select value={category ?? "__none__"} onValueChange={(v) => setCategory(v === "__none__" ? null : v)}>
