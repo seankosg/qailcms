@@ -80,6 +80,7 @@ export function WrtRawDataPage() {
   const [exporting, setExporting] = useState(false);
 
   const fetchRows = useServerFn(getWrtRowsAsOf);
+  const fetchEstimated = useServerFn(getWrtEstimatedCells);
   const fetchExport = useServerFn(getWrtExportRows);
   const saveField = useServerFn(updateWrtField);
   const queryClient = useQueryClient();
@@ -124,6 +125,13 @@ export function WrtRawDataPage() {
     queryKey: ["wrt-rows-as-of", asOf],
     queryFn: () => fetchRows({ data: { as_of: asOf } }),
   });
+
+  /** 역산 추정 실적 표시용 (이탤릭 + 툴팁) */
+  const { data: estimated } = useQuery({
+    queryKey: ["wrt-estimated-cells"],
+    queryFn: () => fetchEstimated({ data: undefined as never }),
+  });
+  const estMap = estimated?.map ?? {};
 
   type WrtSearch = typeof search;
   const setSearch = (patch: Partial<WrtSearch>) =>
@@ -422,6 +430,9 @@ export function WrtRawDataPage() {
         >
           No HDEC actual: {data?.hdec_missing_items ?? 0}
         </Button>
+        <Badge variant="outline" className="text-[11px]">
+          Estimated actuals: {estimated?.items ?? 0} documents (back-filled · shown in italics)
+        </Badge>
       </div>
 
       <Card>
@@ -497,6 +508,7 @@ export function WrtRawDataPage() {
                       key={r.id}
                       row={r}
                       stageCols={stageCols}
+                      estCells={estMap[r.id]}
                       layout={layout}
                       selected={selectedIds.includes(r.id)}
                       onToggleSelect={() =>
