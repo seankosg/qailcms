@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
       .eq("user_id", authData.user.id);
     const set = new Set((roles ?? []).map((r: { role: string }) => r.role));
     if (!(set.has("admin") || set.has("superuser"))) {
-      throw redirect({ to: "/outstanding/dashboard" });
+      throw redirect({ to: "/project-dashboard" });
     }
   },
   component: () => <Outlet />,
