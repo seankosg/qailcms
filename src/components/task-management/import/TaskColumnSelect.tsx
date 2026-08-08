@@ -3,7 +3,7 @@ import {
   ColumnSelectDialog,
   type ColumnSelectHelpers,
 } from "@/components/import/ColumnSelectDialog";
-import { isKnownTaskField } from "@/lib/task-management/parser";
+import { isKnownTaskField, TM_IMPORT_BLOCKED_FIELDS } from "@/lib/task-management/parser";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
@@ -64,9 +64,15 @@ export function TaskColumnSelect({
         return { required: false };
       },
       isKnownField: (field) => isKnownTaskField(field),
-      extraWarnings: () => [],
+      extraWarnings: () => {
+        const blocked = headers.filter((h) => TM_IMPORT_BLOCKED_FIELDS.has(headerToFieldMap[h]));
+        if (blocked.length === 0) return [];
+        return [
+          `⚠ Work Type(${blocked.join(", ")}) 컬럼은 현재 임포트 매핑이 임시로 제한되어 있습니다 — 체크 여부와 무관하게 값이 반영되지 않습니다.`,
+        ];
+      },
     };
-  }, [headerToFieldMap]);
+  }, [headerToFieldMap, headers]);
 
   const presets = useMemo(() => {
     const updateHeaders = headers.filter((h) => UPDATE_FIELDS.has(headerToFieldMap[h]));
