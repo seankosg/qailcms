@@ -13,13 +13,13 @@ import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedProjectDashboardRouteImport } from './routes/_authenticated/project-dashboard'
 import { Route as AuthenticatedMyWorkSpaceRouteImport } from './routes/_authenticated/my-work-space'
 import { Route as AuthenticatedMyTeamWorkSpaceRouteImport } from './routes/_authenticated/my-team-work-space'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
 import { Route as AuthenticatedResourceDashboardRouteImport } from './routes/_authenticated/resource/dashboard'
-import { Route as AuthenticatedOutstandingDashboardRouteImport } from './routes/_authenticated/outstanding/dashboard'
 import { Route as AuthenticatedImportLogLogsRouteImport } from './routes/_authenticated/import-log/logs'
 import { Route as AuthenticatedImportLogImportRouteImport } from './routes/_authenticated/import-log/import'
 import { Route as AuthenticatedCloseoutDashboardRouteImport } from './routes/_authenticated/closeout/dashboard'
@@ -81,6 +81,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedProjectDashboardRoute =
+  AuthenticatedProjectDashboardRouteImport.update({
+    id: '/project-dashboard',
+    path: '/project-dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMyWorkSpaceRoute =
   AuthenticatedMyWorkSpaceRouteImport.update({
     id: '/my-work-space',
@@ -112,12 +118,6 @@ const AuthenticatedResourceDashboardRoute =
   AuthenticatedResourceDashboardRouteImport.update({
     id: '/resource/dashboard',
     path: '/resource/dashboard',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedOutstandingDashboardRoute =
-  AuthenticatedOutstandingDashboardRouteImport.update({
-    id: '/outstanding/dashboard',
-    path: '/outstanding/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedImportLogLogsRoute =
@@ -373,6 +373,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
+  '/project-dashboard': typeof AuthenticatedProjectDashboardRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
@@ -384,7 +385,6 @@ export interface FileRoutesByFullPath {
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
-  '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -425,6 +425,7 @@ export interface FileRoutesByTo {
   '/change-password': typeof ChangePasswordRoute
   '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
+  '/project-dashboard': typeof AuthenticatedProjectDashboardRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
@@ -436,7 +437,6 @@ export interface FileRoutesByTo {
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
-  '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -480,6 +480,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/_authenticated/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
+  '/_authenticated/project-dashboard': typeof AuthenticatedProjectDashboardRoute
   '/_authenticated/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/_authenticated/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/_authenticated/admin/masters': typeof AuthenticatedAdminMastersRoute
@@ -491,7 +492,6 @@ export interface FileRoutesById {
   '/_authenticated/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
   '/_authenticated/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/_authenticated/import-log/logs': typeof AuthenticatedImportLogLogsRoute
-  '/_authenticated/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/_authenticated/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -535,6 +535,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/my-team-work-space'
     | '/my-work-space'
+    | '/project-dashboard'
     | '/admin/backup'
     | '/admin/mapping'
     | '/admin/masters'
@@ -546,7 +547,6 @@ export interface FileRouteTypes {
     | '/closeout/dashboard'
     | '/import-log/import'
     | '/import-log/logs'
-    | '/outstanding/dashboard'
     | '/resource/dashboard'
     | '/api/public/version'
     | '/admin/'
@@ -587,6 +587,7 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/my-team-work-space'
     | '/my-work-space'
+    | '/project-dashboard'
     | '/admin/backup'
     | '/admin/mapping'
     | '/admin/masters'
@@ -598,7 +599,6 @@ export interface FileRouteTypes {
     | '/closeout/dashboard'
     | '/import-log/import'
     | '/import-log/logs'
-    | '/outstanding/dashboard'
     | '/resource/dashboard'
     | '/api/public/version'
     | '/admin'
@@ -641,6 +641,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/my-team-work-space'
     | '/_authenticated/my-work-space'
+    | '/_authenticated/project-dashboard'
     | '/_authenticated/admin/backup'
     | '/_authenticated/admin/mapping'
     | '/_authenticated/admin/masters'
@@ -652,7 +653,6 @@ export interface FileRouteTypes {
     | '/_authenticated/closeout/dashboard'
     | '/_authenticated/import-log/import'
     | '/_authenticated/import-log/logs'
-    | '/_authenticated/outstanding/dashboard'
     | '/_authenticated/resource/dashboard'
     | '/api/public/version'
     | '/_authenticated/admin/'
@@ -729,6 +729,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/project-dashboard': {
+      id: '/_authenticated/project-dashboard'
+      path: '/project-dashboard'
+      fullPath: '/project-dashboard'
+      preLoaderRoute: typeof AuthenticatedProjectDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/my-work-space': {
       id: '/_authenticated/my-work-space'
       path: '/my-work-space'
@@ -769,13 +776,6 @@ declare module '@tanstack/react-router' {
       path: '/resource/dashboard'
       fullPath: '/resource/dashboard'
       preLoaderRoute: typeof AuthenticatedResourceDashboardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/outstanding/dashboard': {
-      id: '/_authenticated/outstanding/dashboard'
-      path: '/outstanding/dashboard'
-      fullPath: '/outstanding/dashboard'
-      preLoaderRoute: typeof AuthenticatedOutstandingDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/import-log/logs': {
@@ -1118,10 +1118,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
   AuthenticatedMyTeamWorkSpaceRoute: typeof AuthenticatedMyTeamWorkSpaceRoute
   AuthenticatedMyWorkSpaceRoute: typeof AuthenticatedMyWorkSpaceRoute
+  AuthenticatedProjectDashboardRoute: typeof AuthenticatedProjectDashboardRoute
   AuthenticatedCloseoutDashboardRoute: typeof AuthenticatedCloseoutDashboardRoute
   AuthenticatedImportLogImportRoute: typeof AuthenticatedImportLogImportRoute
   AuthenticatedImportLogLogsRoute: typeof AuthenticatedImportLogLogsRoute
-  AuthenticatedOutstandingDashboardRoute: typeof AuthenticatedOutstandingDashboardRoute
   AuthenticatedResourceDashboardRoute: typeof AuthenticatedResourceDashboardRoute
   AuthenticatedClosureAbdDashboardRoute: typeof AuthenticatedClosureAbdDashboardRoute
   AuthenticatedClosureAbdImportRoute: typeof AuthenticatedClosureAbdImportRouteWithChildren
@@ -1155,11 +1155,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
   AuthenticatedMyTeamWorkSpaceRoute: AuthenticatedMyTeamWorkSpaceRoute,
   AuthenticatedMyWorkSpaceRoute: AuthenticatedMyWorkSpaceRoute,
+  AuthenticatedProjectDashboardRoute: AuthenticatedProjectDashboardRoute,
   AuthenticatedCloseoutDashboardRoute: AuthenticatedCloseoutDashboardRoute,
   AuthenticatedImportLogImportRoute: AuthenticatedImportLogImportRoute,
   AuthenticatedImportLogLogsRoute: AuthenticatedImportLogLogsRoute,
-  AuthenticatedOutstandingDashboardRoute:
-    AuthenticatedOutstandingDashboardRoute,
   AuthenticatedResourceDashboardRoute: AuthenticatedResourceDashboardRoute,
   AuthenticatedClosureAbdDashboardRoute: AuthenticatedClosureAbdDashboardRoute,
   AuthenticatedClosureAbdImportRoute:

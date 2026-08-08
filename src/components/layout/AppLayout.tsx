@@ -68,8 +68,11 @@ const NAV: NavSection[] = [
     ],
   },
   {
+    label: "Project Dashboard",
+    dashboard: { to: "/project-dashboard", label: "Dashboard", icon: iconDashboard },
+  },
+  {
     label: "Outstanding Work",
-    dashboard: { to: "/outstanding/dashboard", label: "Dashboard", icon: iconDashboard },
     modules: [
       {
         label: "Task Management",
