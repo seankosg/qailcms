@@ -80,6 +80,7 @@ const NAV: NavSection[] = [
         matchPrefix: "/closure/task-management",
         items: [
           { to: "/closure/task-management/dashboard", label: "Dashboard", icon: iconDashboard },
+          { to: "/closure/task-management/kpi-analysis", label: "KPI Analysis", icon: iconChartUp },
           { to: "/closure/task-management/tree", label: "Task Summary", icon: iconTree },
           { to: "/closure/task-management/raw-data", label: "Raw Data", icon: iconDatabase },
           { to: "/closure/task-management/schedule-revision", label: "Schedule Revision", icon: iconCalendar },

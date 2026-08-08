@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft, Search } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
@@ -15,10 +14,6 @@ import {
   todayIso,
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
-import {
-  type OwnerDim,
-  type OwnerLeaderboardRow,
-} from "@/lib/task-management/delay-utils";
 import { TmKpiCards } from "./TmKpiCards";
 
 const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
@@ -30,11 +25,9 @@ const TASK_SCOPE_OPTIONS = [
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
 import { useTmRowsAsOf } from "@/hooks/useTmRowsAsOf";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
-import { OwnerProgressChart } from "./OwnerProgressChart";
 import { JudgmentStageBreakdown } from "./JudgmentStageBreakdown";
 import { JudgmentDonut } from "./JudgmentDonut";
 import { computeJudgmentStageBreakdown } from "@/lib/task-management/delay-utils";
-import { OwnerDetailDialog } from "./OwnerDetailDialog";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { resolveJudgment, resolveIsDelayed } from "@/lib/task-management/delay-utils";
@@ -47,10 +40,6 @@ const DELAY_FILTER_OPTIONS = [
   { value: "delayed", label: "지연만" },
   { value: "risk", label: "악화만" },
 ] as const;
-
-function isOwnerDim(v: string): v is OwnerDim {
-  return v === "team" || v === "hdec_pic_name" || v === "hdec_eng_name";
-}
 
 function uniqSorted(items: TaskItem[], field: keyof TaskItem): string[] {
   const s = new Set<string>();
@@ -108,8 +97,6 @@ export function TmDashboardPage() {
   // 행에는 이미 srv_judgment/srv_plan_pct/srv_actual_pct 가 부착되어 있다(useTmAsOfRows).
   const effectiveItems = items;
 
-  const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
-
   const taskScope: TaskScope =
     search.taskScope === "main" || search.taskScope === "sub" ? search.taskScope : "all";
 
@@ -118,12 +105,6 @@ export function TmDashboardPage() {
   // 정본 thresholds — KPI/Raw Data 와 동일 소스. 미전달 시 DEFAULT 폴백으로 판정이 어긋남.
   const { data: thresholdsData } = useTaskManagementSettings();
   const thresholds = thresholdsData ?? DEFAULT_THRESHOLDS;
-
-  const [ownerDetail, setOwnerDetail] = useState<{
-    dim: OwnerDim;
-    key: string;
-    row: OwnerLeaderboardRow;
-  } | null>(null);
 
   // Facet options — derived from ALL loaded items (respect discipline/plot filter for owners).
   const teamOptions = useMemo(() => uniqSorted(items, "team"), [items]);
@@ -313,36 +294,14 @@ export function TmDashboardPage() {
         />
       )}
 
-      {isLoading ? (
-        <Skeleton className="h-[600px] w-full" />
-      ) : items.length === 0 ? (
+      {!isLoading && items.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-2 p-10 text-sm text-muted-foreground">
             <AlertTriangle className="h-6 w-6 text-muted-foreground/60" />
             현재 조건에 해당하는 태스크가 없습니다.
           </CardContent>
         </Card>
-      ) : (
-        <OwnerProgressChart
-          items={scopedItems}
-          asOfDate={asOfDate}
-          dim={ownerDim}
-          onDimChange={(dim) => patch({ ownerDim: dim })}
-          onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
-          thresholds={thresholds}
-        />
-      )}
-
-      <OwnerDetailDialog
-        open={ownerDetail !== null}
-        onOpenChange={(o) => !o && setOwnerDetail(null)}
-        dim={ownerDetail?.dim ?? ownerDim}
-        ownerKey={ownerDetail?.key ?? ""}
-        row={ownerDetail?.row ?? null}
-        items={scopedItems}
-        asOfDate={asOfDate}
-        thresholds={thresholds}
-      />
+      ) : null}
     </div>
   );
 }
