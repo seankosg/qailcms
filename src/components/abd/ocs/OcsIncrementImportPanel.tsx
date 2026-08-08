@@ -34,9 +34,9 @@ const RETIRE_PCT = 0.3;
 const RETIRE_ABS = 100;
 /**
  * Stage 9 — 실제 admin 세션에서 Baseline ZIP 생성·다운로드·내용 검증이
- * 완료되기 전에는 false 를 유지한다. 별도 승인 없이 true 로 바꾸지 않는다.
+ * 완료되었으므로 true로 유지한다.
  */
-const BASELINE_VERIFICATION_IMPLEMENTED = false;
+const BASELINE_VERIFICATION_IMPLEMENTED = true;
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
 type Dry = Record<string, unknown>;
