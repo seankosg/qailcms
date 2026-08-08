@@ -81,7 +81,22 @@ export type SplStageColumn = {
   code: string;
   title: string;
   aconex: boolean;
+  /** Catalog band code — drives header tint (never hardcode per column key) */
+  band: string;
+  /** True on the first column of each band — draws the band divider */
+  bandStart: boolean;
 };
+
+/** Header tint per band. Keys are catalog band codes. */
+export const SPL_BAND_HEADER_CLASS: Record<string, string> = {
+  REQUIRED_DOC: "bg-slate-200 dark:bg-slate-800/60",
+  DOCUMENTATION: "bg-blue-100 dark:bg-blue-950/40",
+  PO: "bg-violet-100 dark:bg-violet-950/40",
+};
+
+export function splBandHeaderClass(band: string): string {
+  return SPL_BAND_HEADER_CLASS[band] ?? "bg-muted";
+}
 
 /** Single-row header: one cell per stage field. Codes come from the catalog, never hardcoded. */
 export function buildSplStageColumns(
@@ -95,9 +110,11 @@ export function buildSplStageColumns(
   }>,
 ): SplStageColumn[] {
   const out: SplStageColumn[] = [];
+  let prevBand: string | null = null;
   for (const s of catalog) {
     const band = SPL_BAND_LABEL[s.band] ?? s.band;
     const aconex = s.actual_authority === "ACONEX";
+    const bandStartAt = out.length;
     const mk = (field: SplStageColumn["field"], sfx: string, name: string) =>
       out.push({
         key: `${s.stage_code}|${field}`,
@@ -106,6 +123,8 @@ export function buildSplStageColumns(
         code: `${s.short_code}${sfx}`,
         title: `${band} › ${s.label}${name ? ` — ${name}` : ""}${aconex && field === "as" ? " (Aconex)" : ""}`,
         aconex,
+        band: s.band,
+        bandStart: false,
       });
     if (s.value_type === "flag") {
       mk("fv", "", "");
@@ -117,6 +136,10 @@ export function buildSplStageColumns(
       mk("as", "-AS", "Actual Start");
       mk("pf", "-PF", "Plan Finish");
       mk("af", "-AF", "Actual Finish");
+    }
+    if (s.band !== prevBand && out[bandStartAt]) {
+      out[bandStartAt].bandStart = true;
+      prevBand = s.band;
     }
   }
   return out;

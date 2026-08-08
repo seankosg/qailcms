@@ -30,6 +30,7 @@ import {
   WRT_DEFAULT_ORDER,
   WRT_DEFAULT_VISIBILITY,
   buildWrtStageColumns,
+  wrtBandHeaderClass,
   wrtJudgmentLabel,
   type WrtColumnDef,
   type WrtStageColumn,
@@ -478,7 +479,11 @@ export function WrtRawDataPage() {
                       <th
                         key={sc.key}
                         title={sc.title}
-                        className="whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-center font-medium"
+                        className={cn(
+                          "whitespace-nowrap border-b border-l px-2 py-1 text-center font-medium",
+                          wrtBandHeaderClass(sc.band),
+                          sc.bandStart && "border-l-2 border-l-foreground/40",
+                        )}
                       >
                         {sc.code}
                       </th>

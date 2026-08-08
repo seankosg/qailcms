@@ -86,7 +86,22 @@ export type WrtStageColumn = {
   /** Tooltip — band full name › stage full name — field */
   title: string;
   aconex: boolean;
+  /** Catalog band code — drives header tint (never hardcode per column key) */
+  band: string;
+  /** True on the first column of each band — draws the band divider */
+  bandStart: boolean;
 };
+
+/** Header tint per band. Keys are catalog band codes. */
+export const WRT_BAND_HEADER_CLASS: Record<string, string> = {
+  COMMERCIAL: "bg-amber-100 dark:bg-amber-950/40",
+  DRAFT_APPROVAL: "bg-blue-100 dark:bg-blue-950/40",
+  SUBMISSION: "bg-emerald-100 dark:bg-emerald-950/40",
+};
+
+export function wrtBandHeaderClass(band: string): string {
+  return WRT_BAND_HEADER_CLASS[band] ?? "bg-muted";
+}
 
 const FIELD_SUFFIX: Record<string, { sfx: string; name: string }> = {
   ps_single: { sfx: "-PD", name: "Plan Date" },
@@ -109,9 +124,11 @@ export function buildWrtStageColumns(
   }>,
 ): WrtStageColumn[] {
   const out: WrtStageColumn[] = [];
+  let prevBand: string | null = null;
   for (const s of catalog) {
     const band = WRT_BAND_LABEL[s.band] ?? s.band;
     const aconex = s.actual_authority === "ACONEX";
+    const bandStartAt = out.length;
     const mk = (field: WrtStageColumn["field"], sfx: string, name: string) =>
       out.push({
         key: `${s.stage_code}|${field}`,
@@ -120,6 +137,8 @@ export function buildWrtStageColumns(
         code: `${s.short_code}${sfx}`,
         title: `${band} › ${s.label}${name ? ` — ${name}` : ""}${aconex && field === "as" ? " (Aconex)" : ""}`,
         aconex,
+        band: s.band,
+        bandStart: false,
       });
     if (s.value_type === "flag") {
       mk("fv", "", "");
@@ -131,6 +150,10 @@ export function buildWrtStageColumns(
       mk("as", FIELD_SUFFIX.as_range.sfx, FIELD_SUFFIX.as_range.name);
       mk("pf", FIELD_SUFFIX.pf_range.sfx, FIELD_SUFFIX.pf_range.name);
       mk("af", FIELD_SUFFIX.af_range.sfx, FIELD_SUFFIX.af_range.name);
+    }
+    if (s.band !== prevBand && out[bandStartAt]) {
+      out[bandStartAt].bandStart = true;
+      prevBand = s.band;
     }
   }
   return out;

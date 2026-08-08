@@ -30,6 +30,7 @@ import {
   SPL_DEFAULT_VISIBILITY,
   SPL_TEAM_OPTIONS,
   buildSplStageColumns,
+  splBandHeaderClass,
   splJudgmentLabel,
   type SplColumnDef,
   type SplStageColumn,
@@ -253,8 +254,8 @@ export function SplRawDataPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Spare Part List — Raw Data</h1>
           <p className="text-xs text-muted-foreground">
-            All displayed and aggregated figures come from the canonical functions (spl_rows_as_of → spl_eval_as_of → spl_judge_v1) and are recomputed on read. 행별 Data
-            Date 는 표기 전용입니다.
+            All displayed and aggregated figures come from the canonical functions (spl_rows_as_of → spl_eval_as_of → spl_judge_v1) and are recomputed on read. Data Date
+            is per row and for display only.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -440,7 +441,11 @@ export function SplRawDataPage() {
                       <th
                         key={sc.key}
                         title={sc.title}
-                        className="whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-center font-medium"
+                        className={cn(
+                          "whitespace-nowrap border-b border-l px-2 py-1 text-center font-medium",
+                          splBandHeaderClass(sc.band),
+                          sc.bandStart && "border-l-2 border-l-foreground/40",
+                        )}
                       >
                         {sc.code}
                       </th>

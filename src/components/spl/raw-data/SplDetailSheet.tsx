@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { formatDdMmm } from "@/lib/time/doha";
 import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
 import type { SplCatalogEntry, SplRow } from "@/lib/spl/rows.functions";
-import { SPL_EDITABLE_FIELDS } from "./spl-columns";
+import { SPL_EDITABLE_FIELDS, splJudgmentLabel } from "./spl-columns";
 
 interface Props {
   row: SplRow | null;
@@ -29,7 +29,7 @@ export function SplDetailSheet({ row, catalog, canEdit, onSave, onOpenChange }: 
 
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
           <Badge variant="outline">{row.plot ? `PLOT-${row.plot}` : "Plot —"}</Badge>
-          <Badge variant={row.judgment === "지연" ? "destructive" : "secondary"}>{row.judgment}</Badge>
+          <Badge variant={row.judgment === "지연" ? "destructive" : "secondary"}>{splJudgmentLabel(row.judgment)}</Badge>
           <Badge variant="outline">
             Progress {row.progress_pct == null ? "—" : `${row.progress_pct}%`} ({row.done}/{row.denom})
           </Badge>
