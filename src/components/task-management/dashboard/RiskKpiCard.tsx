@@ -107,7 +107,9 @@ export function RiskKpiCard({
                     <span className="truncate">{row.label}</span>
                     <span className={cn("font-medium", TONE_CLASSES[tone])}>
                       {row.count.toLocaleString()}
-                      {row.suffix ? <span className="opacity-80"> {row.suffix}</span> : null}
+                      {row.suffix ? (
+                        <span className={cn("opacity-80", row.suffixClassName)}> {row.suffix}</span>
+                      ) : null}
                     </span>
                   </div>
                 ) : (
