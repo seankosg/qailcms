@@ -115,6 +115,13 @@ export const TASK_TARGET_FIELDS = [
 export type TaskTargetField = (typeof TASK_TARGET_FIELDS)[number];
 
 /**
+ * 임시 조치(2026-08-08, 사용자 지시): TM Work Type(row_type) 컬럼은 임포트 매핑을
+ * 일시 제한한다. 헤더가 있어도 매핑하지 않고 값을 반영하지 않는다.
+ * 해제 시 이 상수를 false 로 바꾸면 원복된다(다른 로직 변경 없음).
+ */
+export const TM_IMPORT_BLOCKED_FIELDS = new Set<string>(["row_type"]);
+
+/**
  * canonical alias table. `pick()`가 이 표를 사용하며,
  * `toTaskFieldName()`는 반대 방향(header text → field)에서 사용한다.
  */
