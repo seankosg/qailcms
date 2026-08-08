@@ -83,7 +83,9 @@ export function RiskKpiCard({
             >
               {primary}
               {countSuffix ? (
-                <span className="ml-1 text-lg font-semibold opacity-80">{countSuffix}</span>
+                <span className={cn("ml-1 text-lg font-semibold opacity-80", countSuffixClassName)}>
+                  {countSuffix}
+                </span>
               ) : null}
             </div>
             {secondary && (
