@@ -11,6 +11,8 @@ interface CacheRow {
 export interface TaskProgressSnapshot {
   /** 주어진 asOf 이하 가장 최근 actual point의 v (0..1). 데이터 없으면 null. */
   actualAt(disciplineTaskKey: string, asOf: string): number | null;
+  /** 저장된 일자별 실적 스냅샷 포인트 전체 (S-Curve 실측 구간 판정용). */
+  pointsOf(disciplineTaskKey: string): Array<{ d: string; v: number }> | null;
   ready: boolean;
 }
 
@@ -51,6 +53,13 @@ export function useTaskProgressSnapshot(): TaskProgressSnapshot & { isLoading: b
   return {
     ready: !!map,
     isLoading: q.isLoading,
+    pointsOf(key: string) {
+      if (!map) return null;
+      const row = map.get(key);
+      const pts = row?.actual_points ?? null;
+      if (!pts || !pts.length) return null;
+      return pts;
+    },
     actualAt(key: string, asOf: string) {
       if (!map) return null;
       const row = map.get(key);
