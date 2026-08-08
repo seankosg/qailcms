@@ -68,6 +68,8 @@ export interface ParsedWrtStage {
   stage_code: string;
   /** 파일에 존재하는 컬럼만 키로 담긴다. 값 null = 셀 공란(삭제 의도) */
   fields: Partial<Record<StageFieldKey, string | null>>;
+  /** 파일에 "NA" 로 표기된 칸이 하나라도 있으면 true (해당 없음) */
+  na?: boolean;
 }
 
 export interface ParsedWrtRow {
@@ -87,6 +89,17 @@ export interface ParsedWrtFile {
   unknown_headers: string[];
   present_stage_fields: Array<{ stage_code: string; field: StageFieldKey }>;
   present_item_fields: string[];
+  /** "NA" 로 표기된 날짜 칸 수 */
+  na_cells: number;
+}
+
+/** 파일 셀이 "해당 없음" 표기인지 */
+export function isNaMarker(v: unknown): boolean {
+  const s = String(v ?? "")
+    .replace(/\s+/g, "")
+    .toLowerCase()
+    .replace(/[.\-_/]/g, "");
+  return s === "na" || s === "notapplicable";
 }
 
 function norm(v: unknown): string {
@@ -153,6 +166,7 @@ export async function parseWrtHdecFile(file: File): Promise<ParsedWrtFile> {
     unknown_headers: [],
     present_stage_fields: [],
     present_item_fields: [],
+    na_cells: 0,
   };
   const presentStage = new Set<string>();
   const presentItem = new Set<string>();
@@ -238,6 +252,10 @@ export async function parseWrtHdecFile(file: File): Promise<ParsedWrtFile> {
           if (cm.field === "flag_value") {
             const s = String(raw ?? "").trim();
             entry.fields.flag_value = s === "" ? null : s;
+          } else if (isNaMarker(raw)) {
+            entry.na = true;
+            entry.fields[cm.field] = null;
+            out.na_cells += 1;
           } else {
             entry.fields[cm.field] = raw == null || String(raw).trim() === "" ? null : toIso(raw);
           }

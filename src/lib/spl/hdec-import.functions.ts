@@ -33,6 +33,7 @@ const RowSchema = z.object({
       stage_code: z.string(),
       // 컬럼 부재 = 미제공이므로 부분 레코드여야 한다 (z.record + enum 은 전 키 필수)
       fields: z.partialRecord(z.enum(STAGE_FIELDS), z.string().nullable()),
+      na: z.boolean().optional(),
     }),
   ),
 });
@@ -135,7 +136,7 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
     const progress = await fetchAll(
       supa,
       "spl_stage_progress",
-      "item_id, stage_code, plan_start, actual_start, plan_finish, actual_finish, flag_value",
+      "item_id, stage_code, plan_start, actual_start, plan_finish, actual_finish, flag_value, na_flag",
     );
     const byStage = new Map<string, any>(progress.map((p) => [`${p.item_id}|${p.stage_code}`, p]));
 
@@ -189,7 +190,24 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
           fieldDiff.set(key, (fieldDiff.get(key) ?? 0) + 1);
           if (prev !== null && next === null) cleared += 1;
         }
-        if (Object.keys(patch).length > 0) stagePatches.push({ stage_code: st.stage_code, ...patch });
+        // 파일의 NA 표기 = 해당 없음. 빈칸(미입력)과 구분해 na_flag 로 반영한다.
+        const nextNa = st.na === true;
+        const prevNa = isNew ? false : (cur as any).na_flag === true;
+        let naPatch: Record<string, boolean> | null = null;
+        if (nextNa !== prevNa) {
+          naPatch = { na_flag: nextNa };
+          changes.push({
+            target: st.stage_code,
+            field: "na_flag",
+            previous: prevNa ? "NA" : null,
+            next: nextNa ? "NA" : null,
+          });
+          const nk = `${st.stage_code}.na_flag`;
+          fieldDiff.set(nk, (fieldDiff.get(nk) ?? 0) + 1);
+        }
+        if (Object.keys(patch).length > 0 || naPatch) {
+          stagePatches.push({ stage_code: st.stage_code, ...patch, ...(naPatch ?? {}) });
+        }
       }
 
       diffs.push({
