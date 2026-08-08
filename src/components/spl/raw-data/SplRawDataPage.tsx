@@ -446,17 +446,26 @@ export function SplRawDataPage() {
                             )}
                           </span>
                         );
+                      const resizer =
+                        it.def == null ? null : (
+                          <ColumnResizeHandle
+                            width={it.width}
+                            onChange={(w: number) => setColWidths((p) => ({ ...p, [it.key]: w }))}
+                          />
+                        );
                       return it.left != null ? (
                         <StickyHead key={it.key} left={it.left} width={it.width}>
                           {inner}
+                          {resizer}
                         </StickyHead>
                       ) : (
                         <th
                           key={it.key}
-                          style={{ minWidth: it.width }}
-                          className="whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-left"
+                          style={{ width: it.width, minWidth: it.width }}
+                          className="relative whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-left"
                         >
                           {inner}
+                          {resizer}
                         </th>
                       );
                     })}
