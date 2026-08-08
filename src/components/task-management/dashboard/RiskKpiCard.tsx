@@ -13,6 +13,8 @@ const TONE_CLASSES: Record<Tone, string> = {
 export interface RiskKpiBreakdownRow {
   label: string;
   count: number;
+  /** 값 뒤에 덧붙일 보조 표기 (예: 지연 건수 "(12)") */
+  suffix?: string;
   onClick?: () => void;
   disabled?: boolean;
 }
@@ -20,6 +22,8 @@ export interface RiskKpiBreakdownRow {
 interface Props {
   label: string;
   count: number;
+  /** 주 수치 뒤에 덧붙일 보조 표기 (예: 지연 건수 "(12)") */
+  countSuffix?: string;
   percent?: number;
   sub?: string;
   tone?: Tone;
@@ -34,6 +38,7 @@ interface Props {
 export function RiskKpiCard({
   label,
   count,
+  countSuffix,
   percent,
   sub,
   tone = "neutral",
@@ -74,6 +79,9 @@ export function RiskKpiCard({
               )}
             >
               {primary}
+              {countSuffix ? (
+                <span className="ml-1 text-lg font-semibold opacity-80">{countSuffix}</span>
+              ) : null}
             </div>
             {secondary && (
               <div className="text-[11px] text-muted-foreground tabular-nums">{secondary}</div>
@@ -94,6 +102,7 @@ export function RiskKpiCard({
                     <span className="truncate">{row.label}</span>
                     <span className={cn("font-medium", TONE_CLASSES[tone])}>
                       {row.count.toLocaleString()}
+                      {row.suffix ? <span className="opacity-80"> {row.suffix}</span> : null}
                     </span>
                   </div>
                 ) : (
@@ -109,6 +118,7 @@ export function RiskKpiCard({
                     <span className="truncate">{row.label}</span>
                     <span className={cn("font-medium", TONE_CLASSES[tone])}>
                       {row.count.toLocaleString()}
+                      {row.suffix ? <span className="opacity-80"> {row.suffix}</span> : null}
                     </span>
                   </button>
                 ),
