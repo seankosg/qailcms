@@ -41,18 +41,23 @@ interface Props {
   value: string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
+  /** 해제 불가(항상 포함) 수신자 — 해당 항목의 HDEC PIC */
+  locked?: string[];
+  /** 사용자가 '확인'을 눌러 수신자를 확정했는지 */
+  confirmed?: boolean;
+  onConfirm?: () => void;
 }
 
-export function CommentRecipientPicker({ value, onChange, disabled }: Props) {
+export function CommentRecipientPicker({ value, onChange, disabled, locked = [], confirmed, onConfirm }: Props) {
   const { data: options = [], isLoading } = useHdecPicOptions();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const [draft, setDraft] = useState<string[]>(value);
+  const [draft, setDraft] = useState<string[]>(Array.from(new Set([...locked, ...value])));
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (open) {
-      setDraft(value);
+      setDraft(Array.from(new Set([...locked, ...value])));
       setQ("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,20 +77,31 @@ export function CommentRecipientPicker({ value, onChange, disabled }: Props) {
       .map(([team, names]) => [team, names.sort(collator.compare)] as const);
   }, [options, q]);
 
-  const toggle = (name: string) =>
+  const toggle = (name: string) => {
+    if (locked.includes(name)) return;
     setDraft((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
+  };
 
   const toggleTeam = (names: string[], allOn: boolean) =>
-    setDraft((prev) => (allOn ? prev.filter((n) => !names.includes(n)) : Array.from(new Set([...prev, ...names]))));
+    setDraft((prev) =>
+      allOn
+        ? prev.filter((n) => !names.includes(n) || locked.includes(n))
+        : Array.from(new Set([...prev, ...names])),
+    );
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-1.5 flex-wrap">
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-7 text-[11px]" disabled={disabled}>
+            <Button
+              variant={confirmed ? "outline" : "default"}
+              size="sm"
+              className="h-7 text-[11px]"
+              disabled={disabled}
+            >
               <Users className="mr-1 h-3 w-3" />
-              수신자 {value.length > 0 ? `${value.length}명` : "선택"}
+              수신자 {confirmed ? `${value.length}명 확정` : "선택 필요"}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-[300px] p-0">
@@ -132,10 +148,20 @@ export function CommentRecipientPicker({ value, onChange, disabled }: Props) {
                           {names.map((n) => (
                             <label
                               key={n}
-                              className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/60"
+                              className={cn(
+                                "flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/60",
+                                locked.includes(n) ? "cursor-not-allowed opacity-90" : "cursor-pointer",
+                              )}
                             >
-                              <Checkbox checked={draft.includes(n)} onCheckedChange={() => toggle(n)} />
+                              <Checkbox
+                                checked={draft.includes(n)}
+                                disabled={locked.includes(n)}
+                                onCheckedChange={() => toggle(n)}
+                              />
                               <span>{n}</span>
+                              {locked.includes(n) && (
+                                <span className="ml-auto text-[10px] text-muted-foreground">HDEC PIC</span>
+                              )}
                             </label>
                           ))}
                         </div>
@@ -147,14 +173,20 @@ export function CommentRecipientPicker({ value, onChange, disabled }: Props) {
             </ScrollArea>
             <div className="flex items-center gap-2 border-t p-2">
               <span className="text-[11px] text-muted-foreground">{draft.length}명 선택</span>
-              <Button variant="ghost" size="sm" className="ml-auto h-7 text-[11px]" onClick={() => setDraft([])}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto h-7 text-[11px]"
+                onClick={() => setDraft([...locked])}
+              >
                 초기화
               </Button>
               <Button
                 size="sm"
                 className="h-7 text-[11px]"
                 onClick={() => {
-                  onChange(draft);
+                  onChange(Array.from(new Set([...locked, ...draft])));
+                  onConfirm?.();
                   setOpen(false);
                 }}
               >
@@ -167,17 +199,22 @@ export function CommentRecipientPicker({ value, onChange, disabled }: Props) {
         {value.map((n) => (
           <Badge key={n} variant="secondary" className="h-5 gap-1 px-1.5 text-[10px]">
             {n}
-            <button
-              type="button"
-              onClick={() => onChange(value.filter((x) => x !== n))}
-              className="text-muted-foreground hover:text-foreground"
-              aria-label={`${n} 제거`}
-            >
-              <X className="h-2.5 w-2.5" />
-            </button>
+            {!locked.includes(n) && (
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((x) => x !== n))}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label={`${n} 제거`}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
           </Badge>
         ))}
       </div>
+      {!confirmed && (
+        <p className="text-[11px] text-muted-foreground">수신자를 선택하고 확인을 눌러야 댓글을 보낼 수 있습니다.</p>
+      )}
     </div>
   );
 }
