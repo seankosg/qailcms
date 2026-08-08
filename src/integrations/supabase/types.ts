@@ -4892,6 +4892,7 @@ export type Database = {
       }
       spl_stage_progress: {
         Row: {
+          actual_estimated: boolean
           actual_finish: string | null
           actual_start: string | null
           created_at: string
@@ -4909,6 +4910,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          actual_estimated?: boolean
           actual_finish?: string | null
           actual_start?: string | null
           created_at?: string
@@ -4926,6 +4928,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          actual_estimated?: boolean
           actual_finish?: string | null
           actual_start?: string | null
           created_at?: string
@@ -6205,6 +6208,7 @@ export type Database = {
       }
       wrt_stage_progress: {
         Row: {
+          actual_estimated: boolean
           actual_finish: string | null
           actual_start: string | null
           created_at: string
@@ -6222,6 +6226,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          actual_estimated?: boolean
           actual_finish?: string | null
           actual_start?: string | null
           created_at?: string
@@ -6239,6 +6244,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          actual_estimated?: boolean
           actual_finish?: string | null
           actual_start?: string | null
           created_at?: string
