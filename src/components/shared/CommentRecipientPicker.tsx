@@ -45,10 +45,20 @@ interface Props {
   locked?: string[];
   /** 사용자가 '확인'을 눌러 수신자를 확정했는지 */
   confirmed?: boolean;
+  /** 수신자 확정이 전송 필수 조건인지 (본인이 담당자면 false) */
+  required?: boolean;
   onConfirm?: () => void;
 }
 
-export function CommentRecipientPicker({ value, onChange, disabled, locked = [], confirmed, onConfirm }: Props) {
+export function CommentRecipientPicker({
+  value,
+  onChange,
+  disabled,
+  locked = [],
+  confirmed,
+  required = true,
+  onConfirm,
+}: Props) {
   const { data: options = [], isLoading } = useHdecPicOptions();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -95,13 +105,13 @@ export function CommentRecipientPicker({ value, onChange, disabled, locked = [],
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button
-              variant={confirmed ? "outline" : "default"}
+              variant={confirmed || !required ? "outline" : "default"}
               size="sm"
               className="h-7 text-[11px]"
               disabled={disabled}
             >
               <Users className="mr-1 h-3 w-3" />
-              수신자 {confirmed ? `${value.length}명 확정` : "선택 필요"}
+              수신자 {value.length > 0 ? `${value.length}명` : required ? "선택 필요" : "선택(선택사항)"}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-[300px] p-0">
@@ -212,7 +222,7 @@ export function CommentRecipientPicker({ value, onChange, disabled, locked = [],
           </Badge>
         ))}
       </div>
-      {!confirmed && (
+      {required && !confirmed && (
         <p className="text-[11px] text-muted-foreground">수신자를 선택하고 확인을 눌러야 댓글을 보낼 수 있습니다.</p>
       )}
     </div>
