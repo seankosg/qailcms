@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { PASSWORD_REGEX, PASSWORD_HINT } from "@/types/enums";
@@ -26,6 +26,8 @@ function ChangePasswordPage() {
   const mark = useServerFn(markPasswordChanged);
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
+  const [show1, setShow1] = useState(false);
+  const [show2, setShow2] = useState(false);
   const [loading, setLoading] = useState(false);
   const isForced = me?.mustChangePassword === true;
 
@@ -65,12 +67,58 @@ function ChangePasswordPage() {
           <form onSubmit={submit} className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="p1">새 비밀번호</Label>
-              <Input id="p1" type="password" value={pw1} onChange={(e) => setPw1(e.target.value)} required minLength={6} />
+              <div className="relative">
+                <Input
+                  id="p1"
+                  type={show1 ? "text" : "password"}
+                  value={pw1}
+                  onChange={(e) => setPw1(e.target.value)}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShow1((v) => !v)}
+                  aria-label={show1 ? "비밀번호 숨기기" : "비밀번호 보기"}
+                  aria-pressed={show1}
+                  tabIndex={-1}
+                >
+                  {show1 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="p2">새 비밀번호 확인</Label>
-              <Input id="p2" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={6} />
+              <div className="relative">
+                <Input
+                  id="p2"
+                  type={show2 ? "text" : "password"}
+                  value={pw2}
+                  onChange={(e) => setPw2(e.target.value)}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShow2((v) => !v)}
+                  aria-label={show2 ? "비밀번호 숨기기" : "비밀번호 보기"}
+                  aria-pressed={show2}
+                  tabIndex={-1}
+                >
+                  {show2 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button type="submit" className="flex-1" disabled={loading}>
