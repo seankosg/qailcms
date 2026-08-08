@@ -98,8 +98,6 @@ export function TmDashboardPage() {
   // 행에는 이미 srv_judgment/srv_plan_pct/srv_actual_pct 가 부착되어 있다(useTmAsOfRows).
   const effectiveItems = items;
 
-  const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
-
   const taskScope: TaskScope =
     search.taskScope === "main" || search.taskScope === "sub" ? search.taskScope : "all";
 
