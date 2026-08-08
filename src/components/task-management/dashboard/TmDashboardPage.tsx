@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft, Search } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
@@ -15,10 +14,7 @@ import {
   todayIso,
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
-import {
-  type OwnerDim,
-  type OwnerLeaderboardRow,
-} from "@/lib/task-management/delay-utils";
+import { type OwnerDim } from "@/lib/task-management/delay-utils";
 import { TmKpiCards } from "./TmKpiCards";
 
 const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
@@ -30,11 +26,9 @@ const TASK_SCOPE_OPTIONS = [
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
 import { useTmRowsAsOf } from "@/hooks/useTmRowsAsOf";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
-import { OwnerProgressChart } from "./OwnerProgressChart";
 import { JudgmentStageBreakdown } from "./JudgmentStageBreakdown";
 import { JudgmentDonut } from "./JudgmentDonut";
 import { computeJudgmentStageBreakdown } from "@/lib/task-management/delay-utils";
-import { OwnerDetailDialog } from "./OwnerDetailDialog";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { resolveJudgment, resolveIsDelayed } from "@/lib/task-management/delay-utils";
@@ -118,12 +112,6 @@ export function TmDashboardPage() {
   // 정본 thresholds — KPI/Raw Data 와 동일 소스. 미전달 시 DEFAULT 폴백으로 판정이 어긋남.
   const { data: thresholdsData } = useTaskManagementSettings();
   const thresholds = thresholdsData ?? DEFAULT_THRESHOLDS;
-
-  const [ownerDetail, setOwnerDetail] = useState<{
-    dim: OwnerDim;
-    key: string;
-    row: OwnerLeaderboardRow;
-  } | null>(null);
 
   // Facet options — derived from ALL loaded items (respect discipline/plot filter for owners).
   const teamOptions = useMemo(() => uniqSorted(items, "team"), [items]);
