@@ -618,6 +618,13 @@ export async function parseTaskManagementExcel(
   clampField("hdec_pic_name", "hdec_pic_name");
   clampField("hdec_eng_name", "hdec_eng_name");
   clampField("row_type", "row_type");
+  // 임시 제한: Work Type(row_type) 은 헤더가 매핑되어도 임포트에서 제외한다.
+  if (TM_IMPORT_BLOCKED_FIELDS.has("row_type") && cols.row_type) {
+    cols.row_type = 0;
+    warnings.push(
+      "Work Type(유형) 컬럼은 현재 임포트 매핑이 임시로 제한되어 있습니다 — 이번 임포트에서 값이 반영되지 않습니다.",
+    );
+  }
   clampField("status_manual", "status_manual");
   clampField("plan_start", "plan_start");
   clampField("plan_end", "plan_end");
