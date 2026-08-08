@@ -1012,6 +1012,9 @@ function FileRow({
       )}
       {e.result && (
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          <Badge variant="outline" className="border-foreground/30">
+            Applied: {e.result.inserted + e.result.updated}
+          </Badge>
           <Badge variant="outline" className="border-emerald-300 text-emerald-700">
             <CheckCircle2 className="mr-1 h-3 w-3" /> Inserted: {e.result.inserted}
           </Badge>
@@ -1026,16 +1029,67 @@ function FileRow({
           {(e.result.ocsSkipped?.length ?? 0) > 0 && (
             <>
               <Badge variant="outline" className="border-amber-300 text-amber-700">
-                OCS 미완료 제외: {e.result.ocsSkipped!.length}행
+                OCS Pending — Excluded: {e.result.ocsSkipped!.length}
               </Badge>
-              <OutOfScopeRowsPopover
-                rows={e.result.ocsSkipped!.map((s) => ({
-                  abd_number: s.abd_number,
-                  id: s.abd_number,
-                }))}
-                labelKeys={["abd_number"]}
-                title="OCS 미완료 제외 목록"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="underline underline-offset-2 text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                  >
+                    · 제외 목록 {e.result.ocsSkipped!.length}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[26rem] p-2">
+                  <div className="mb-1 text-[11px] font-semibold text-muted-foreground">
+                    OCS Pending — Excluded {e.result.ocsSkipped!.length}건
+                  </div>
+                  <ul className="max-h-56 space-y-1 overflow-auto text-[11px]">
+                    {e.result.ocsSkipped!.slice(0, 200).map((s) => (
+                      <li key={s.abd_number} className="border-b pb-1 last:border-0">
+                        <div className="font-mono font-medium">{s.abd_number}</div>
+                        <div className="text-muted-foreground">
+                          {s.field_label ?? "Draft Finish Actual"}
+                          {s.pending_count != null ? ` · Pending OCS ${s.pending_count}` : ""}
+                        </div>
+                        <div className="text-muted-foreground">{s.reason}</div>
+                      </li>
+                    ))}
+                  </ul>
+                  {e.result.ocsSkipped!.length > 200 && (
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      … 외 {e.result.ocsSkipped!.length - 200}건
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
+          {(e.result.failedRows?.length ?? 0) > 0 && (
+            <>
+              <Badge variant="outline" className="border-destructive/50 text-destructive">
+                Failed: {e.result.failedRows!.length}
+              </Badge>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="underline underline-offset-2 text-destructive"
+                  >
+                    · 오류 목록 {e.result.failedRows!.length}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[26rem] p-2">
+                  <ul className="max-h-56 space-y-1 overflow-auto text-[11px]">
+                    {e.result.failedRows!.slice(0, 200).map((f) => (
+                      <li key={f.abd_number} className="border-b pb-1 last:border-0">
+                        <div className="font-mono font-medium">{f.abd_number}</div>
+                        <div className="text-muted-foreground">{f.error}</div>
+                      </li>
+                    ))}
+                  </ul>
+                </PopoverContent>
+              </Popover>
             </>
           )}
         </div>
