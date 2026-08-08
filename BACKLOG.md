@@ -425,4 +425,4 @@
 - [ ] #0806 **Revision 간 comment ID 안정성** — 향후 로컬 패키징 도구 책임으로 이관. 앱/DB 는 무변경.
   - DB 내부 무결성 사실(증명 아님): `abd_ocs_comments.source_comment_id` UNIQUE + `abd_ocs_attachments.source_attachment_id` UNIQUE, upsert conflict key = `source_comment_id`. 이는 "동일 revision 내 중복 차단" 만 보장하며, revision 간 ID 안정성(identity stability)을 증명하지 않는다.
   - 로컬 도구가 revision 간 ID 재현 규칙과 그 검증 리포트를 제공해야 한다. 그 전까지 앱은 ID 재생성/보정 로직을 두지 않는다.
-- [ ] #0806 **Baseline download/verification 미구현** — `manifest.base_baseline_id` 를 서버 정본과 대조할 수단 없음. 구현 전까지 증분 Import 는 UI 상수 `BASELINE_VERIFICATION_IMPLEMENTED=false` 로 잠금.
+- [x] #0806 **Baseline 생성·다운로드·검증 완료** — 2026-08-08 실측: ZIP 정상 생성·다운로드, 데이터셋 10개/총 35,714행, manifest 행수·크기·SHA-256 일치, 생성 전후 core_hash 일치, 동일 core 재실행 시 baseline_id 및 기존 ZIP 재사용. `OcsIncrementImportPanel.tsx`의 `BASELINE_VERIFICATION_IMPLEMENTED`를 `true`로 활성화. Baseline 최신성 검증 관문(base_baseline_id, base_core_hash, 테이블별 core hash)은 그대로 유지, 불일치 시 Import 차단.
