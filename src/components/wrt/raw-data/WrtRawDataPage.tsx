@@ -14,6 +14,7 @@ import { DataDatePicker } from "@/components/task-management/shared/DataDatePick
 import { todayInDoha, formatDdMmm } from "@/lib/time/doha";
 import {
   getWrtRowsAsOf,
+  getWrtEstimatedCells,
   getWrtExportRows,
   type WrtCatalogEntry,
   type WrtRow,
@@ -79,6 +80,7 @@ export function WrtRawDataPage() {
   const [exporting, setExporting] = useState(false);
 
   const fetchRows = useServerFn(getWrtRowsAsOf);
+  const fetchEstimated = useServerFn(getWrtEstimatedCells);
   const fetchExport = useServerFn(getWrtExportRows);
   const saveField = useServerFn(updateWrtField);
   const queryClient = useQueryClient();
@@ -123,6 +125,13 @@ export function WrtRawDataPage() {
     queryKey: ["wrt-rows-as-of", asOf],
     queryFn: () => fetchRows({ data: { as_of: asOf } }),
   });
+
+  /** 역산 추정 실적 표시용 (이탤릭 + 툴팁) */
+  const { data: estimated } = useQuery({
+    queryKey: ["wrt-estimated-cells"],
+    queryFn: () => fetchEstimated({ data: undefined as never }),
+  });
+  const estMap = estimated?.map ?? {};
 
   type WrtSearch = typeof search;
   const setSearch = (patch: Partial<WrtSearch>) =>
@@ -421,6 +430,9 @@ export function WrtRawDataPage() {
         >
           No HDEC actual: {data?.hdec_missing_items ?? 0}
         </Button>
+        <Badge variant="outline" className="text-[11px]">
+          Estimated actuals: {estimated?.items ?? 0} documents (back-filled · shown in italics)
+        </Badge>
       </div>
 
       <Card>
@@ -496,6 +508,7 @@ export function WrtRawDataPage() {
                       key={r.id}
                       row={r}
                       stageCols={stageCols}
+                      estCells={estMap[r.id]}
                       layout={layout}
                       selected={selectedIds.includes(r.id)}
                       onToggleSelect={() =>
@@ -562,6 +575,7 @@ export function WrtRawDataPage() {
 function WrtTableRow({
   row,
   stageCols,
+  estCells,
   layout,
   selected,
   onToggleSelect,
@@ -571,6 +585,8 @@ function WrtTableRow({
 }: {
   row: WrtRow;
   stageCols: WrtStageColumn[];
+  /** 역산 추정 실적 칸 — stage_code -> { as, af } */
+  estCells?: Record<string, { as?: boolean; af?: boolean }>;
   layout: Array<{ key: string; def: WrtColumnDef | null; width: number; left: number | null }>;
   selected: boolean;
   onToggleSelect: () => void;
@@ -709,6 +725,8 @@ function WrtTableRow({
         const cell = row.stages[sc.stage_code];
         const isNa = cell?.na;
         const raw = cell?.[sc.field] as string | null | undefined;
+        const isEst =
+          !!raw && (sc.field === "as" || sc.field === "af") && !!estCells?.[sc.stage_code]?.[sc.field];
         return (
           <td
             key={sc.key}
@@ -716,8 +734,15 @@ function WrtTableRow({
               "whitespace-nowrap border-b border-l px-2 py-1 text-center tabular-nums",
               STATE_CLASS[cell?.st ?? "none"],
               isNa && "bg-muted/40",
+              isEst && "italic",
             )}
-            title={isNa ? "NA — excluded from the progress denominator" : sc.title}
+            title={
+              isNa
+                ? "NA — excluded from the progress denominator"
+                : isEst
+                  ? `Estimated (back-filled) — ${sc.title}`
+                  : sc.title
+            }
           >
             {isNa ? (
               <span className="rounded bg-muted px-1 text-[9px] font-semibold text-muted-foreground">NA</span>
