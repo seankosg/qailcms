@@ -259,7 +259,13 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     let dfBlocked = 0;
     const dfBlockedSamples: string[] = [];
     // B안 — OCS 미완료 위반 행은 "행 단위로 통째 제외". 나머지 행은 정상 반영.
-    const ocsSkipped: Array<{ abd_number: string; reason: string }> = [];
+    const ocsSkipped: Array<{
+      abd_number: string;
+      reason: string;
+      round?: number | null;
+      field_label?: string | null;
+      pending_count?: number | null;
+    }> = [];
     // 비-OCS 오류로 반영되지 못한 행 (행 단위로 확정 — 전체 실패로 감추지 않는다)
     const failedRows: Array<{ abd_number: string; error: string }> = [];
     // 실제로 DB 에 반영된 행 (분할 재시도 중 성공분 포함)
@@ -388,7 +394,13 @@ export const importAbdBatch = createServerFn({ method: "POST" })
             const incoming = (row as any)[key];
             const prev = (src as any)[key] ?? null;
             if (incoming != null && incoming !== "" && incoming !== prev && isDfActualBlocked(merged, key)) {
-              (row as any).__ocs_blocked = `R${n} Draft Finish 실적일 — OCS Pending ${Math.max(0, Number(src.ocs_total ?? 0) - Number(src.ocs_complied ?? 0))}건`;
+              const pending = Math.max(
+                0,
+                Number(src.ocs_total ?? 0) - Number(src.ocs_complied ?? 0),
+              );
+              (row as any).__ocs_blocked = `R${n} Draft Finish 실적일 — OCS Pending ${pending}건`;
+              (row as any).__ocs_round = n;
+              (row as any).__ocs_pending = pending;
               break;
             }
           }
@@ -414,7 +426,13 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       for (const row of payload as any[]) {
         if (row.__ocs_blocked) {
           blockedNumbers.add(String(row.abd_number));
-          ocsSkipped.push({ abd_number: String(row.abd_number), reason: String(row.__ocs_blocked) });
+          ocsSkipped.push({
+            abd_number: String(row.abd_number),
+            reason: String(row.__ocs_blocked),
+            round: row.__ocs_round ?? null,
+            field_label: row.__ocs_round ? `R${row.__ocs_round} Draft Finish Actual` : null,
+            pending_count: row.__ocs_pending ?? null,
+          });
           continue;
         }
         keptPayload.push(row);
