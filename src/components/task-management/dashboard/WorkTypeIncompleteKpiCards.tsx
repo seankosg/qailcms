@@ -65,6 +65,7 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
       label: e.team,
       count: e.count,
       suffix: `(${e.delayed.toLocaleString()})`,
+      suffixClassName: "text-red-600 dark:text-red-400",
       onClick: () => goRaw(item.work_type, item.isNull, e),
     }));
     if (rest.length) {
@@ -72,6 +73,7 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
         label: `기타 (${rest.length}팀)`,
         count: rest.reduce((a, b) => a + b.count, 0),
         suffix: `(${rest.reduce((a, b) => a + b.delayed, 0).toLocaleString()})`,
+        suffixClassName: "text-red-600 dark:text-red-400",
         disabled: true,
       });
     }
@@ -113,17 +115,18 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
           {sortedItems.map((it) => (
           <RiskKpiCard
-              key={it.work_type}
-              label={it.work_type}
-              count={it.count}
-              countSuffix={`(${it.delayed.toLocaleString()})`}
-              percent={total ? (it.count / total) * 100 : undefined}
-              sub={`${it.count.toLocaleString()} / ${total.toLocaleString()} items · 지연 ${it.delayed.toLocaleString()}`}
-              tone={it.delayed > 0 ? "warn" : "neutral"}
-              onClick={() => goRaw(it.work_type, it.isNull)}
-              breakdown={rows(it)}
-              formula={`Actual % < 100% 인 Subtask 중 ${it.work_type}\n괄호 = Cum. Diff < 0 (지연) 건수`}
-            />
+            key={it.work_type}
+            label={it.work_type}
+            count={it.count}
+            countSuffix={`(${it.delayed.toLocaleString()})`}
+            countSuffixClassName="text-red-600 dark:text-red-400"
+            percent={total ? (it.count / total) * 100 : undefined}
+            sub={`${it.count.toLocaleString()} / ${total.toLocaleString()} items · 지연 ${it.delayed.toLocaleString()}`}
+            tone="neutral"
+            onClick={() => goRaw(it.work_type, it.isNull)}
+            breakdown={rows(it)}
+            formula={`Actual % < 100% 인 Subtask 중 ${it.work_type}\n괄호 = Cum. Diff < 0 (지연) 건수`}
+          />
           ))}
         </div>
       )}
