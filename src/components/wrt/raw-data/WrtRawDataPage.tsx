@@ -575,6 +575,7 @@ export function WrtRawDataPage() {
 function WrtTableRow({
   row,
   stageCols,
+  estCells,
   layout,
   selected,
   onToggleSelect,
@@ -584,6 +585,8 @@ function WrtTableRow({
 }: {
   row: WrtRow;
   stageCols: WrtStageColumn[];
+  /** 역산 추정 실적 칸 — stage_code -> { as, af } */
+  estCells?: Record<string, { as?: boolean; af?: boolean }>;
   layout: Array<{ key: string; def: WrtColumnDef | null; width: number; left: number | null }>;
   selected: boolean;
   onToggleSelect: () => void;
@@ -722,6 +725,8 @@ function WrtTableRow({
         const cell = row.stages[sc.stage_code];
         const isNa = cell?.na;
         const raw = cell?.[sc.field] as string | null | undefined;
+        const isEst =
+          !!raw && (sc.field === "as" || sc.field === "af") && !!estCells?.[sc.stage_code]?.[sc.field];
         return (
           <td
             key={sc.key}
@@ -729,8 +734,15 @@ function WrtTableRow({
               "whitespace-nowrap border-b border-l px-2 py-1 text-center tabular-nums",
               STATE_CLASS[cell?.st ?? "none"],
               isNa && "bg-muted/40",
+              isEst && "italic",
             )}
-            title={isNa ? "NA — excluded from the progress denominator" : sc.title}
+            title={
+              isNa
+                ? "NA — excluded from the progress denominator"
+                : isEst
+                  ? `Estimated (back-filled) — ${sc.title}`
+                  : sc.title
+            }
           >
             {isNa ? (
               <span className="rounded bg-muted px-1 text-[9px] font-semibold text-muted-foreground">NA</span>
