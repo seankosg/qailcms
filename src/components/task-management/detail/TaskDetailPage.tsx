@@ -423,6 +423,8 @@ export function TaskDetailPage() {
               parentValue={String(row.id)}
               categories={TASK_CATEGORIES}
               defaultCategory={null}
+              enableRecipients
+              defaultRecipients={row.hdec_pic_name ? [String(row.hdec_pic_name)] : []}
             />
           </div>
         </div>
