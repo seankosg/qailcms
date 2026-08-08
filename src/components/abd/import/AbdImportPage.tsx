@@ -1112,6 +1112,21 @@ function FileRow({
               </Popover>
             </>
           )}
+          {(e.result.logPersistErrors?.length ?? 0) > 0 && (
+            <div className="mt-1 w-full rounded-md border border-destructive/50 bg-destructive/5 p-2 text-[11px] text-destructive">
+              <div className="font-medium">
+                데이터 일부가 반영됐으나 감사 로그 저장에 실패했습니다. 관리자 확인이 필요합니다.
+              </div>
+              <div className="mt-0.5 font-mono">run ID: {e.result.runId ?? "-"}</div>
+              <ul className="mt-1 space-y-0.5">
+                {e.result.logPersistErrors!.map((l, i) => (
+                  <li key={`${l.source}-${i}`}>
+                    LOG_PERSIST_FAILED · {l.source} · 저장 {l.persisted}/{l.attempted} — {l.error}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>
