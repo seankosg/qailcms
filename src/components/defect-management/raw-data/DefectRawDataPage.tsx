@@ -565,6 +565,15 @@ export function DefectRawDataPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateLoaded, columnSizing, order, visibility, frozenExtras]);
 
+  /** 컬럼 메뉴의 "현재 컬럼 설정 저장" — 즉시 계정 설정으로 확정 */
+  const saveLayoutNow = useCallback(() => {
+    const next = { columnSizing, order, visibility, frozenExtras };
+    lastSavedRef.current = JSON.stringify(next);
+    viewPref.save(next as any);
+    toast.success("컬럼 설정을 저장했습니다");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columnSizing, order, visibility, frozenExtras, viewPref.save]);
+
   // ── Sync local (columnFilters/sorting/q) → URL (debounced) ──────────────
   const setUrl = useCallback(
     (patch: Record<string, any>) => {
