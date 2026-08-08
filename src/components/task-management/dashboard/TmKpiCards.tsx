@@ -16,6 +16,7 @@ import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { EMPTY_TOKEN } from "@/lib/task-management/filters";
 import { useTmItemsCounts, type TmCountsByTeamEntry } from "@/hooks/useTmItemsCounts";
 import { MilestoneOverdueKpiCards } from "./MilestoneOverdueKpiCards";
+import { WorkTypeIncompleteKpiCards } from "./WorkTypeIncompleteKpiCards";
 import { AlertTriangle } from "lucide-react";
 
 interface Props {
@@ -308,6 +309,8 @@ export function TmKpiCards({
         taskScope={taskScope}
         ownerContext={ownerContext}
       />
+
+      <WorkTypeIncompleteKpiCards asOfDate={asOfDate} ownerContext={ownerContext} />
     </div>
   );
 }

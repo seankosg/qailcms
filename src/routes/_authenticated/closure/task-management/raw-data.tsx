@@ -17,6 +17,9 @@ const searchSchema = z.object({
   dataDate: fallback(z.string(), "").default(""),
   planOverdue: fallback(z.string(), "").default(""),
   actualOverdue: fallback(z.string(), "").default(""),
+  rowType: fallback(z.string(), "").default(""),
+  incompleteOnly: fallback(z.string(), "").default(""),
+  delayedOnly: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/task-management/raw-data")({
