@@ -125,7 +125,7 @@ export function SplRawDataPage() {
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [detailRow, setDetailRow] = useState<SplRow | null>(null);
+  const [detailRowState, setDetailRow] = useState<SplRow | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
