@@ -125,7 +125,7 @@ export function SplRawDataPage() {
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [detailRow, setDetailRow] = useState<SplRow | null>(null);
+  const [detailRowState, setDetailRow] = useState<SplRow | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -226,6 +226,8 @@ export function SplRawDataPage() {
   const saveOne = async (id: string, field: string, value: string | null) => {
     await saveField({ data: { id, field, value } });
   };
+  // Keep the open detail sheet bound to the freshest row after a refetch
+  const detailRow = detailRowState ? (rows.find((r) => r.id === detailRowState.id) ?? detailRowState) : null;
   const refetchRows = async () => {
     await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
   };
@@ -535,6 +537,7 @@ export function SplRawDataPage() {
           await saveOne(id, field, value);
           await refetchRows();
         }}
+        onRefresh={refetchRows}
         onOpenChange={(o) => { if (!o) setDetailRow(null); }}
       />
 

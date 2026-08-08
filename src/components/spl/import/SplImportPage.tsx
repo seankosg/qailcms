@@ -11,7 +11,7 @@ import { AlertTriangle, FileSpreadsheet, Loader2, ShieldAlert, Upload } from "lu
 import { parseSplHdecFile, type ParsedSplFile } from "@/lib/spl/hdec-parser";
 import { importSplHdecBatch, type SplHdecResult } from "@/lib/spl/hdec-import.functions";
 import { applyImportScope, type ImportScopeOutcome } from "@/lib/import/import-scope";
-import { ScopeSummary } from "@/components/wrt/import/WrtImportPage";
+import { AconexPlanGapLine, RejectedRows, ScopeSummary } from "@/components/wrt/import/WrtImportPage";
 
 type SplParsedRow = ParsedSplFile["rows"][number];
 
@@ -51,7 +51,7 @@ export function SplImportPage() {
     try {
       const p = await parseSplHdecFile(file);
       setParsed(p);
-      toast.success(`파싱 완료 — ${p.rows.length}행 (OCS 제외 ${p.ocs_excluded}건)`);
+      toast.success(`Parsed — ${p.rows.length} rows (OCS excluded ${p.ocs_excluded})`);
       setBusy("scope");
       const sc = await applyImportScope<SplParsedRow>(
         "SPL",
@@ -62,10 +62,10 @@ export function SplImportPage() {
       );
       setScope(sc);
       if (sc.deniedKeys.length > 0) {
-        toast.warning(`권한 범위 밖 ${sc.deniedKeys.length}행이 제외됩니다 (역할 ${sc.role})`);
+        toast.warning(`${sc.deniedKeys.length} row(s) out of permission scope are excluded (role ${sc.role})`);
       }
     } catch (e: any) {
-      toast.error(e?.message ?? "파일 파싱 실패");
+      toast.error(e?.message ?? "File parsing failed");
     } finally {
       setBusy(null);
     }
@@ -79,7 +79,7 @@ export function SplImportPage() {
       setPreview(r);
       setResult(null);
     } catch (e: any) {
-      toast.error(e?.message ?? "미리보기 실패");
+      toast.error(e?.message ?? "Preview failed");
     } finally {
       setBusy(null);
     }
@@ -92,9 +92,9 @@ export function SplImportPage() {
       const r = await runImport({ data: { ...payload, apply: true, allow_deletes: allowDeletes } });
       setResult(r);
       setPreview(r);
-      toast.success(`반영 완료 — 아이템 ${r.items_updated}건 / 단계 ${r.stages_upserted}건`);
+      toast.success(`Applied — ${r.items_updated} item(s) / ${r.stages_upserted} stage(s)`);
     } catch (e: any) {
-      toast.error(e?.message ?? "임포트 실패", { duration: 10000 });
+      toast.error(e?.message ?? "Import failed", { duration: 10000 });
     } finally {
       setBusy(null);
     }
@@ -109,8 +109,8 @@ export function SplImportPage() {
         <CardHeader>
           <CardTitle className="text-base">Spare Parts (SPL) — HDEC Import</CardTitle>
           <CardDescription>
-            Aconex 시딩본(SPL_Status_AconexSeeded.xlsx)에 계획일·TEAM·PIC/ENG·SUPPLIER 를 채워 되돌린 파일을 업로드합니다.
-            매칭 키는 <b>SPL NUMBER</b> 이며, 미매칭 항목은 생성하지 않고 리포트로만 표시합니다.
+            Upload the Aconex-seeded workbook (SPL_Status_AconexSeeded.xlsx) filled in with plan dates, TEAM, PIC/ENG and
+            SUPPLIER. The match key is <b>SPL NUMBER</b>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -132,15 +132,15 @@ export function SplImportPage() {
               ) : (
                 <Upload className="mr-2 h-4 w-4" />
               )}
-              파일 선택
+              Choose file
             </Button>
             <Button onClick={onPreview} disabled={!payload || busy !== null}>
               {busy === "preview" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              미리보기 (Diff)
+              Preview (Diff)
             </Button>
             <Button variant="default" onClick={onApply} disabled={!preview || busy !== null || guardBlocked}>
               {busy === "apply" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              반영
+              Apply
             </Button>
           </div>
 
@@ -151,15 +151,15 @@ export function SplImportPage() {
               </Badge>
               {parsed.sheets.map((s) => (
                 <Badge key={s.sheet_name} variant="outline">
-                  {s.sheet_name} → PLOT-{s.plot} · {s.rows}행
+                  {s.sheet_name} → PLOT-{s.plot} · {s.rows} rows
                 </Badge>
               ))}
               <Badge variant={parsed.ocs_excluded > 0 ? "destructive" : "outline"}>
-                OCS 제외 {parsed.ocs_excluded}건
+                OCS excluded {parsed.ocs_excluded}
               </Badge>
-              <Badge variant="outline">단계 컬럼 {parsed.present_stage_fields.length}개</Badge>
+              <Badge variant="outline">Stage columns {parsed.present_stage_fields.length}</Badge>
               {parsed.unknown_headers.length > 0 && (
-                <Badge variant="destructive">미인식 헤더 {parsed.unknown_headers.length}</Badge>
+                <Badge variant="destructive">Unknown headers {parsed.unknown_headers.length}</Badge>
               )}
             </div>
           )}
@@ -169,7 +169,7 @@ export function SplImportPage() {
           {parsed && parsed.unknown_headers.length > 0 && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>카탈로그에 없는 헤더</AlertTitle>
+              <AlertTitle>Headers not in catalog</AlertTitle>
               <AlertDescription className="text-xs">{parsed.unknown_headers.join(", ")}</AlertDescription>
             </Alert>
           )}
@@ -180,33 +180,38 @@ export function SplImportPage() {
         <>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Diff 요약</CardTitle>
+              <CardTitle className="text-base">Diff summary</CardTitle>
               <CardDescription>
-                컬럼 부재 = 미제공(무시) / 셀 공란 = 삭제 의도. 모든 변경은 change_log 에 기록됩니다.
+                Missing column = not provided (ignored) / empty cell = intent to clear. Every change is recorded in the
+                change log.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
-                <Stat label="총 행" value={view.total} />
-                <Stat label="매칭" value={view.matched} />
-                <Stat label="신규 생성" value={view.created} tone={view.created > 0 ? "warn" : undefined} />
-                <Stat label="갱신" value={view.rows_changed} />
-                <Stat label="값 삭제" value={view.cleared_values} tone={view.cleared_values > 0 ? "warn" : undefined} />
-                <Stat label="OCS 제외" value={view.ocs_excluded} />
+                <Stat label="Total rows" value={view.total} />
+                <Stat label="Matched" value={view.matched} />
+                <Stat label="Created" value={view.created} tone={view.created > 0 ? "warn" : undefined} />
+                <Stat label="Updated" value={view.rows_changed} />
+                <Stat label="Cleared values" value={view.cleared_values} tone={view.cleared_values > 0 ? "warn" : undefined} />
+                <Stat label="OCS excluded" value={view.ocs_excluded} />
               </div>
+
+              <AconexPlanGapLine items={view.aconex_plan_missing} />
+
+              <RejectedRows rows={view.rejected} />
 
               {view.delete_guard.tripped && (
                 <Alert variant="destructive">
                   <ShieldAlert className="h-4 w-4" />
-                  <AlertTitle>삭제 규모 가드 작동</AlertTitle>
+                  <AlertTitle>Delete guard tripped</AlertTitle>
                   <AlertDescription className="space-y-2 text-xs">
                     <div>
-                      값 삭제 {view.cleared_values}건 — 임계 {view.delete_guard.pct}% 또는 {view.delete_guard.min_count}건 초과.
-                      의도한 삭제인지 확인 후 승인해야 반영됩니다.
+                      {view.cleared_values} value(s) would be cleared — over the threshold ({view.delete_guard.pct}% or{" "}
+                      {view.delete_guard.min_count} cells). Confirm the deletions are intended before applying.
                     </div>
                     <label className="flex items-center gap-2">
                       <Checkbox checked={allowDeletes} onCheckedChange={(v) => setAllowDeletes(v === true)} />
-                      <span>삭제를 승인하고 반영합니다</span>
+                      <span>Approve the deletions and apply</span>
                     </label>
                   </AlertDescription>
                 </Alert>
@@ -215,7 +220,7 @@ export function SplImportPage() {
               {view.created > 0 && (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>신규 생성 {view.created}건 — 파일에만 있는 번호</AlertTitle>
+                  <AlertTitle>{view.created} new item(s) — numbers found only in the file</AlertTitle>
                   <AlertDescription className="text-xs">{view.created_list.join(", ")}</AlertDescription>
                 </Alert>
               )}
@@ -234,8 +239,10 @@ export function SplImportPage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">행 단위 로그</CardTitle>
-              <CardDescription>변경/미매칭 행만 표시 (최대 300행). 전체 이력은 Import Log 에 저장됩니다.</CardDescription>
+              <CardTitle className="text-base">Row-level log</CardTitle>
+              <CardDescription>
+                Changed / unmatched rows only (max 300). The full history is stored in the Import Log.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[420px] rounded-md border">
@@ -244,8 +251,8 @@ export function SplImportPage() {
                     <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-left">
                       <th className="w-20">Row</th>
                       <th className="w-64">SPL NUMBER</th>
-                      <th className="w-24">결과</th>
-                      <th>변경 내역</th>
+                      <th className="w-24">Outcome</th>
+                      <th>Changes</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -279,7 +286,7 @@ export function SplImportPage() {
                     {view.diff_rows.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-6 text-center text-muted-foreground">
-                          변경 사항이 없습니다.
+                          No changes.
                         </td>
                       </tr>
                     )}

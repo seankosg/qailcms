@@ -75,6 +75,8 @@ export type SplHdecPreview = {
   field_diff_counts: Array<{ field: string; changed: number }>;
   delete_guard: { pct: number; min_count: number; tripped: boolean };
   diff_rows: SplRowDiff[];
+  /** A-5: Aconex 단계 계획일(plan) 공란 건수 — 비면 그 단계 지연이 판정되지 않는다 */
+  aconex_plan_missing: Array<{ stage_code: string; short_code: string; label: string; missing: number; total: number }>;
 };
 
 export type SplHdecResult = SplHdecPreview & {
@@ -83,6 +85,8 @@ export type SplHdecResult = SplHdecPreview & {
   items_updated: number;
   stages_upserted: number;
   items_created: number;
+  /** C-3: 쓰기 가드에 걸려 거부된 행 (message 는 DB 원문 그대로) */
+  rejected: Array<{ key: string; reason_code: string; message: string }>;
 };
 
 async function assertEditor(ctx: any) {
@@ -149,6 +153,9 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
     const patches: any[] = [];
     let cleared = 0;
     const createdList: string[] = [];
+    // A-5: Aconex 단계 계획일 공란 집계 (반영 후 상태 기준)
+    const planSeen = new Map<string, number>();
+    const planMissing = new Map<string, number>();
     // allow_deletes=false 는 "값 삭제를 patch 에 담지 않는다" 로 동작한다.
     // (전체 중단이 아니라 갱신분만 반영 — 삭제는 승인 시에만 수행)
     const skipClear = (prev: string | null, next: string | null): boolean =>
@@ -175,6 +182,12 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
       const stagePatches: any[] = [];
       for (const st of row.stages) {
         const cur = isNew ? {} : (byStage.get(`${existing.id}|${st.stage_code}`) ?? {});
+        if (ACONEX_STAGES.has(st.stage_code)) {
+          const resolvedPlan =
+            "plan_start" in st.fields ? s((st.fields as any).plan_start) : s((cur as any).plan_start);
+          planSeen.set(st.stage_code, (planSeen.get(st.stage_code) ?? 0) + 1);
+          if (resolvedPlan === null) planMissing.set(st.stage_code, (planMissing.get(st.stage_code) ?? 0) + 1);
+        }
         const patch: Record<string, string | null> = {};
         for (const f of STAGE_FIELDS) {
           if (!(f in st.fields)) continue; // 컬럼 부재 = 미제공
@@ -229,6 +242,20 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
     const denominator = Math.max(data.rows.length, 1);
     const tripped = cleared > 0 && (cleared >= guardMin || (cleared * 100) / denominator >= guardPct);
 
+    const { data: catRows } = await supa
+      .from("spl_stage_catalog")
+      .select("stage_code, short_code, label, sort_order")
+      .order("sort_order");
+    const aconexPlanMissing = ((catRows ?? []) as any[])
+      .filter((c) => ACONEX_STAGES.has(c.stage_code))
+      .map((c) => ({
+        stage_code: c.stage_code as string,
+        short_code: c.short_code as string,
+        label: c.label as string,
+        missing: planMissing.get(c.stage_code) ?? 0,
+        total: planSeen.get(c.stage_code) ?? 0,
+      }));
+
     const preview: SplHdecPreview = {
       total: data.rows.length,
       matched: data.rows.length - createdList.length,
@@ -244,10 +271,19 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
         .sort((a, b) => b.changed - a.changed),
       delete_guard: { pct: guardPct, min_count: guardMin, tripped },
       diff_rows: diffs.filter((d) => d.outcome !== "unchanged").slice(0, 300),
+      aconex_plan_missing: aconexPlanMissing,
     };
 
     if (!data.apply) {
-      return { ...preview, applied: false, batch_id: null, items_updated: 0, stages_upserted: 0, items_created: 0 };
+      return {
+        ...preview,
+        applied: false,
+        batch_id: null,
+        items_updated: 0,
+        stages_upserted: 0,
+        items_created: 0,
+        rejected: [],
+      };
     }
     if (tripped && !data.allow_deletes) {
       throw new Error(
@@ -278,6 +314,7 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
     let itemsUpdated = 0;
     let stagesUpserted = 0;
     let itemsCreated = 0;
+    const rejected: Array<{ key: string; reason_code: string; message: string }> = [];
     try {
       const CHUNK = 200;
       for (let i = 0; i < patches.length; i += CHUNK) {
@@ -292,6 +329,13 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
         itemsUpdated += Number(res?.items_updated ?? 0);
         stagesUpserted += Number(res?.stages_upserted ?? 0);
         itemsCreated += Number(res?.items_created ?? 0);
+        for (const r of (res?.rejected ?? []) as any[]) {
+          rejected.push({
+            key: String(r?.key ?? ""),
+            reason_code: String(r?.reason_code ?? ""),
+            message: String(r?.message ?? ""),
+          });
+        }
       }
     } catch (e: any) {
       const msg = e?.message ?? String(e);
@@ -327,7 +371,7 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
         items_updated: itemsUpdated,
         stages_upserted: stagesUpserted,
         finished_at: new Date().toISOString(),
-        note: `rows=${data.rows.length} changed=${rowsChanged} created=${createdList.length} cleared=${cleared} unmatched=0 ocs_excluded=${data.ocs_excluded}${data.scope_note ? ` ${data.scope_note}` : ""}`,
+        note: `rows=${data.rows.length} changed=${rowsChanged} created=${createdList.length} cleared=${cleared} unmatched=0 rejected=${rejected.length} ocs_excluded=${data.ocs_excluded}${data.scope_note ? ` ${data.scope_note}` : ""}`,
       })
       .eq("id", batchId);
 
@@ -338,6 +382,7 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
       items_updated: itemsUpdated,
       stages_upserted: stagesUpserted,
       items_created: itemsCreated,
+      rejected,
     };
   });
 
