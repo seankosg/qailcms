@@ -14,7 +14,6 @@ import {
   todayIso,
   type TaskItem,
 } from "@/lib/task-management/schedule-utils";
-import { type OwnerDim } from "@/lib/task-management/delay-utils";
 import { TmKpiCards } from "./TmKpiCards";
 
 const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
