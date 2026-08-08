@@ -143,8 +143,23 @@ export const getWrtRowsAsOf = createServerFn({ method: "POST" })
   });
 
 /**
+ * 역산(back-fill)으로 채운 추정 실적 칸 목록.
+ * map: item_id -> stage_code -> { as?: true, af?: true }
+ */
+export type EstimatedCells = { items: number; map: Record<string, Record<string, { as?: boolean; af?: boolean }>> };
+
+export const getWrtEstimatedCells = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<EstimatedCells> => {
+    const { data, error } = await (context.supabase as any).rpc("wrt_estimated_cells");
+    if (error) throw new Error(`WRT 추정 실적 조회 실패: ${error.message}`);
+    return (data ?? { items: 0, map: {} }) as EstimatedCells;
+  });
+
+/**
  * Export(왕복 임포트 양식) 전용 원본 조회.
  * 왕복 무결성을 위해 as-of 마스킹을 적용하지 않은 "저장 원본"을 그대로 내보낸다.
+ * ★ 역산 추정 실적(actual_estimated)은 내보내지 않는다 — 재임포트 시 실측으로 둔갑하는 것을 막는다.
  */
 export const getWrtExportRows = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -166,7 +181,7 @@ export const getWrtExportRows = createServerFn({ method: "POST" })
     );
     const progress = await fetchAll(
       "wrt_stage_progress",
-      "item_id, stage_code, plan_start, actual_start, plan_finish, actual_finish, flag_value, na_flag",
+      "item_id, stage_code, plan_start, actual_start, plan_finish, actual_finish, flag_value, na_flag, actual_estimated",
     );
     const { data: catalog, error: cErr } = await supa
       .from("wrt_stage_catalog")
@@ -176,6 +191,8 @@ export const getWrtExportRows = createServerFn({ method: "POST" })
     return {
       catalog: (catalog ?? []) as WrtCatalogEntry[],
       items: items.filter((i) => i.is_active),
-      progress,
+      progress: progress.map((p) =>
+        p.actual_estimated ? { ...p, actual_start: null, actual_finish: null } : p,
+      ),
     };
   });
