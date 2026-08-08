@@ -4895,6 +4895,7 @@ export type Database = {
           actual_estimated: boolean
           actual_finish: string | null
           actual_start: string | null
+          backfill_batch_id: string | null
           created_at: string
           created_by: string | null
           data_date: string | null
@@ -4913,6 +4914,7 @@ export type Database = {
           actual_estimated?: boolean
           actual_finish?: string | null
           actual_start?: string | null
+          backfill_batch_id?: string | null
           created_at?: string
           created_by?: string | null
           data_date?: string | null
@@ -4931,6 +4933,7 @@ export type Database = {
           actual_estimated?: boolean
           actual_finish?: string | null
           actual_start?: string | null
+          backfill_batch_id?: string | null
           created_at?: string
           created_by?: string | null
           data_date?: string | null
@@ -6211,6 +6214,7 @@ export type Database = {
           actual_estimated: boolean
           actual_finish: string | null
           actual_start: string | null
+          backfill_batch_id: string | null
           created_at: string
           created_by: string | null
           data_date: string | null
@@ -6229,6 +6233,7 @@ export type Database = {
           actual_estimated?: boolean
           actual_finish?: string | null
           actual_start?: string | null
+          backfill_batch_id?: string | null
           created_at?: string
           created_by?: string | null
           data_date?: string | null
@@ -6247,6 +6252,7 @@ export type Database = {
           actual_estimated?: boolean
           actual_finish?: string | null
           actual_start?: string | null
+          backfill_batch_id?: string | null
           created_at?: string
           created_by?: string | null
           data_date?: string | null
