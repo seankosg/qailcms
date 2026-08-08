@@ -102,6 +102,10 @@ interface FileEntry {
     }[];
     /** 비-OCS 오류로 반영되지 못한 행 */
     failedRows?: { abd_number: string; error: string }[];
+    /** 감사 로그(행/필드 단위) 저장 실패 — 관리자 확인 필요 */
+    logPersistErrors?: { source: string; error: string; attempted: number; persisted: number }[];
+    /** 재검증용 run ID (abd_import_logs.id) */
+    runId?: string | null;
   };
   progress?: number;
   /** 임포트 진행 상세 (현재 시트/청크/ETA) */
@@ -503,6 +507,13 @@ export function AbdImportPage() {
             pending_count?: number | null;
           }[],
           failedRows: [] as { abd_number: string; error: string }[],
+          logPersistErrors: [] as {
+            source: string;
+            error: string;
+            attempted: number;
+            persisted: number;
+          }[],
+          runId: null as string | null,
         };
         // 파일당 로그 1건 — 첫 호출에서 log_id를 발급받아 이후 호출은 append.
         let logId: string | null = null;
@@ -585,6 +596,7 @@ export function AbdImportPage() {
             } as any,
           });
           if (!logId) logId = res.batch_id;
+          agg.runId = logId;
           agg.inserted += res.inserted;
           agg.updated += res.updated;
           agg.inactivated += res.inactivated;
@@ -594,6 +606,9 @@ export function AbdImportPage() {
           }
           for (const f of ((res as any).failed_rows ?? []) as (typeof agg.failedRows)) {
             if (!agg.failedRows.some((x) => x.abd_number === f.abd_number)) agg.failedRows.push(f);
+          }
+          for (const l of ((res as any).log_persist_errors ?? []) as typeof agg.logPersistErrors) {
+            agg.logPersistErrors.push(l);
           }
           const pct = 10 + Math.round(((idx + 1) / plan.length) * 85);
           setEntries((p) =>
@@ -609,9 +624,14 @@ export function AbdImportPage() {
         );
         {
           const applied = agg.inserted + agg.updated;
+          const logFailed = agg.logPersistErrors.length > 0;
           const base =
             `${e.file.name}: 반영 ${applied}행 (신규 ${agg.inserted} / 변경 ${agg.updated}) · 비활성 ${agg.inactivated}`;
-          if (agg.ocsSkipped.length === 0 && agg.failedRows.length === 0) {
+          if (logFailed) {
+            toast.warning(
+              `${base} — 데이터 일부가 반영됐으나 감사 로그 저장에 실패했습니다. 관리자 확인이 필요합니다. (run ID: ${agg.runId ?? "-"})`,
+            );
+          } else if (agg.ocsSkipped.length === 0 && agg.failedRows.length === 0) {
             toast.success(base);
           } else if (applied === 0 && agg.failedRows.length > 0) {
             toast.error(
