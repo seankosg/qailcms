@@ -5,6 +5,7 @@ import { formatDdMmm } from "@/lib/time/doha";
 import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
 import type { SplCatalogEntry, SplRow } from "@/lib/spl/rows.functions";
 import { SPL_EDITABLE_FIELDS, splJudgmentLabel } from "./spl-columns";
+import { SplRequiredDocChecklist } from "./SplRequiredDocChecklist";
 
 interface Props {
   row: SplRow | null;
@@ -12,13 +13,14 @@ interface Props {
   canEdit: boolean;
   onSave: (id: string, field: string, value: string | null) => Promise<void>;
   onOpenChange: (o: boolean) => void;
+  onRefresh?: () => Promise<void> | void;
 }
 
 function d(v: string | null | undefined) {
   return v ? formatDdMmm(v) : "—";
 }
 
-export function SplDetailSheet({ row, catalog, canEdit, onSave, onOpenChange }: Props) {
+export function SplDetailSheet({ row, catalog, canEdit, onSave, onOpenChange, onRefresh }: Props) {
   if (!row) return null;
   return (
     <Sheet open={!!row} onOpenChange={onOpenChange}>
@@ -105,6 +107,15 @@ export function SplDetailSheet({ row, catalog, canEdit, onSave, onOpenChange }: 
             </tbody>
           </table>
         </div>
+
+        <SplRequiredDocChecklist
+          row={row}
+          catalog={catalog}
+          canEdit={canEdit}
+          onChanged={async () => {
+            await onRefresh?.();
+          }}
+        />
       </SheetContent>
     </Sheet>
   );
