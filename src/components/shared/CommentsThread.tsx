@@ -11,6 +11,7 @@ import { MessageSquare, Reply, X, Pencil, Trash2, Check, Send } from "lucide-rea
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { CommentRecipientPicker } from "@/components/shared/CommentRecipientPicker";
 
 export interface CommentRow {
   id: string;
@@ -22,6 +23,7 @@ export interface CommentRow {
   edited: boolean;
   created_at: string;
   updated_at: string;
+  recipient_names?: string[] | null;
 }
 
 export interface CommentCategoryDef {
@@ -38,6 +40,10 @@ interface Props {
   defaultCategory?: string | null;
   heightClass?: string;
   emptyLabel?: string;
+  /** 수신자(HDEC PIC 다중 지정) 기능 사용 여부 */
+  enableRecipients?: boolean;
+  /** 기본 선택 수신자 (예: 해당 항목의 HDEC PIC) */
+  defaultRecipients?: string[];
 }
 
 export function CommentsThread({
@@ -48,6 +54,8 @@ export function CommentsThread({
   defaultCategory,
   heightClass = "h-80",
   emptyLabel = "No comments yet",
+  enableRecipients = false,
+  defaultRecipients,
 }: Props) {
   const qc = useQueryClient();
   const { data: user } = useCurrentUser();
