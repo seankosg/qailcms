@@ -341,7 +341,7 @@ export function SplRawDataPage() {
         {JUDGMENTS.map((j) => (
           <KpiCard
             key={j}
-            label={j}
+            label={splJudgmentLabel(j)}
             value={counts[j] ?? 0}
             active={search.judgment === j && !search.delayBand}
             onClick={() =>
