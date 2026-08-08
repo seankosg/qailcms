@@ -11,6 +11,7 @@ import { MessageSquare, Reply, X, Pencil, Trash2, Check, Send } from "lucide-rea
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { CommentRecipientPicker } from "@/components/shared/CommentRecipientPicker";
 
 export interface CommentRow {
   id: string;
@@ -22,6 +23,7 @@ export interface CommentRow {
   edited: boolean;
   created_at: string;
   updated_at: string;
+  recipient_names?: string[] | null;
 }
 
 export interface CommentCategoryDef {
@@ -38,6 +40,10 @@ interface Props {
   defaultCategory?: string | null;
   heightClass?: string;
   emptyLabel?: string;
+  /** 수신자(HDEC PIC 다중 지정) 기능 사용 여부 */
+  enableRecipients?: boolean;
+  /** 기본 선택 수신자 (예: 해당 항목의 HDEC PIC) */
+  defaultRecipients?: string[];
 }
 
 export function CommentsThread({
@@ -48,6 +54,8 @@ export function CommentsThread({
   defaultCategory,
   heightClass = "h-80",
   emptyLabel = "No comments yet",
+  enableRecipients = false,
+  defaultRecipients,
 }: Props) {
   const qc = useQueryClient();
   const { data: user } = useCurrentUser();
@@ -96,6 +104,12 @@ export function CommentsThread({
     defaultCategory === undefined ? (categories[0]?.value ?? null) : defaultCategory,
   );
   const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
+  const [recipients, setRecipients] = useState<string[]>(defaultRecipients ?? []);
+
+  useEffect(() => {
+    setRecipients(defaultRecipients ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(defaultRecipients ?? []).join("|"), parentValue]);
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -167,6 +181,7 @@ export function CommentsThread({
       source: "app_manual",
       author_user_id: user.id,
     };
+    if (enableRecipients) payload["recipient_names"] = recipients;
     const { error } = await (supabase as any).from(table).insert(payload);
     setSending(false);
     if (error) {
@@ -175,6 +190,7 @@ export function CommentsThread({
     }
     setMessage("");
     setReplyTo(null);
+    if (enableRecipients) setRecipients(defaultRecipients ?? []);
     invalidate();
   };
 
@@ -276,6 +292,16 @@ export function CommentsThread({
         ) : (
           <>
             <p className="text-sm whitespace-pre-wrap break-words text-foreground">{c.message}</p>
+            {enableRecipients && (c.recipient_names?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">수신:</span>
+                {c.recipient_names!.map((n) => (
+                  <Badge key={n} variant="outline" className="h-4 px-1.5 py-0 text-[10px]">
+                    {n}
+                  </Badge>
+                ))}
+              </div>
+            )}
             {user && (
               <div className="flex justify-end">
                 <button
@@ -331,6 +357,10 @@ export function CommentsThread({
             <X className="h-3 w-3" />
           </button>
         </div>
+      )}
+
+      {enableRecipients && !replyTo && (
+        <CommentRecipientPicker value={recipients} onChange={setRecipients} disabled={!user || sending} />
       )}
 
       <div className="flex gap-2 items-end">
