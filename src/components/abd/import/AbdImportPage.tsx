@@ -495,7 +495,14 @@ export function AbdImportPage() {
           updated: 0,
           inactivated: 0,
           total: 0,
-          ocsSkipped: [] as { abd_number: string; reason: string }[],
+          ocsSkipped: [] as {
+            abd_number: string;
+            reason: string;
+            round?: number | null;
+            field_label?: string | null;
+            pending_count?: number | null;
+          }[],
+          failedRows: [] as { abd_number: string; error: string }[],
         };
         // 파일당 로그 1건 — 첫 호출에서 log_id를 발급받아 이후 호출은 append.
         let logId: string | null = null;
