@@ -93,7 +93,15 @@ interface FileEntry {
     inactivated: number;
     total: number;
     /** OCS 미완료로 행 단위 제외된 도면 목록 */
-    ocsSkipped?: { abd_number: string; reason: string }[];
+    ocsSkipped?: {
+      abd_number: string;
+      reason: string;
+      round?: number | null;
+      field_label?: string | null;
+      pending_count?: number | null;
+    }[];
+    /** 비-OCS 오류로 반영되지 못한 행 */
+    failedRows?: { abd_number: string; error: string }[];
   };
   progress?: number;
   /** 임포트 진행 상세 (현재 시트/청크/ETA) */
