@@ -1,3 +1,4 @@
+import { ColumnResizeHandle } from "@/components/common/ColumnResizeHandle";
 import { useEffect, useMemo, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
