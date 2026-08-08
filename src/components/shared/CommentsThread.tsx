@@ -105,9 +105,11 @@ export function CommentsThread({
   );
   const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
   const [recipients, setRecipients] = useState<string[]>(defaultRecipients ?? []);
+  const [recipientsConfirmed, setRecipientsConfirmed] = useState(false);
 
   useEffect(() => {
     setRecipients(defaultRecipients ?? []);
+    setRecipientsConfirmed(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [(defaultRecipients ?? []).join("|"), parentValue]);
   const [sending, setSending] = useState(false);
@@ -172,6 +174,9 @@ export function CommentsThread({
     if (!replyTo && !parentCategory) {
       return toast.error("카테고리를 선택해주세요");
     }
+    if (enableRecipients && !replyTo && !recipientsConfirmed) {
+      return toast.error("수신자를 선택하고 확인을 눌러주세요");
+    }
     setSending(true);
     const payload: Record<string, unknown> = {
       [parentKey]: parentValue,
@@ -190,7 +195,10 @@ export function CommentsThread({
     }
     setMessage("");
     setReplyTo(null);
-    if (enableRecipients) setRecipients(defaultRecipients ?? []);
+    if (enableRecipients) {
+      setRecipients(defaultRecipients ?? []);
+      setRecipientsConfirmed(false);
+    }
     invalidate();
   };
 
@@ -360,7 +368,14 @@ export function CommentsThread({
       )}
 
       {enableRecipients && !replyTo && (
-        <CommentRecipientPicker value={recipients} onChange={setRecipients} disabled={!user || sending} />
+        <CommentRecipientPicker
+          value={recipients}
+          onChange={setRecipients}
+          disabled={!user || sending}
+          locked={defaultRecipients ?? []}
+          confirmed={recipientsConfirmed}
+          onConfirm={() => setRecipientsConfirmed(true)}
+        />
       )}
 
       <div className="flex gap-2 items-end">
@@ -392,7 +407,17 @@ export function CommentsThread({
             }
           }}
         />
-        <Button onClick={handleSend} disabled={!user || sending || !message.trim()} size="sm" className="h-9">
+        <Button
+          onClick={handleSend}
+          disabled={
+            !user ||
+            sending ||
+            !message.trim() ||
+            (enableRecipients && !replyTo && !recipientsConfirmed)
+          }
+          size="sm"
+          className="h-9"
+        >
           <Send className="h-3.5 w-3.5 mr-1" /> Send
         </Button>
       </div>
