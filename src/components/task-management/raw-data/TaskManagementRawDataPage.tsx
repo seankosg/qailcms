@@ -382,6 +382,9 @@ export function TaskManagementRawDataPage() {
       q?: string;
       planOverdue?: string;
       actualOverdue?: string;
+      rowType?: string;
+      incompleteOnly?: string;
+      delayedOnly?: string;
     };
     if (s.source !== "dashboard") return;
     dashboardAppliedRef.current = true;
@@ -404,6 +407,9 @@ export function TaskManagementRawDataPage() {
           "dataDate",
           "planOverdue",
           "actualOverdue",
+          "rowType",
+          "incompleteOnly",
+          "delayedOnly",
         ]);
         const unknown = [...raw.keys()].filter((k) => !known.has(k));
         if (unknown.length) {
@@ -432,6 +438,15 @@ export function TaskManagementRawDataPage() {
     push("plot", s.plot);
     push("plan_overdue", s.planOverdue);
     push("actual_overdue", s.actualOverdue);
+    push("row_type", s.rowType);
+    // Actual % < 100% (미완료) — 대시보드 Work Type 카드 드릴다운
+    if (s.incompleteOnly === "1") {
+      next.push({ id: "actual_progress", value: { max: 0.9999 } });
+    }
+    // 지연 = Cum. Diff < 0
+    if (s.delayedOnly === "1") {
+      next.push({ id: "progress_variance", value: { max: -0.000001 } });
+    }
 
     setSorting(DEFAULT_SORTING);
     const q = (s.q ?? "").trim();
