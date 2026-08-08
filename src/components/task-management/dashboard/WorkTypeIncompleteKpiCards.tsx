@@ -103,9 +103,9 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
       ) : (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
           {items.map((it) => (
-            <RiskKpiCard
+          <RiskKpiCard
               key={it.work_type}
-              label={`Work Type · ${it.work_type}`}
+              label={it.work_type}
               count={it.count}
               countSuffix={`(${it.delayed.toLocaleString()})`}
               percent={total ? (it.count / total) * 100 : undefined}
@@ -113,7 +113,7 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
               tone={it.delayed > 0 ? "warn" : "neutral"}
               onClick={() => goRaw(it.work_type, it.isNull)}
               breakdown={rows(it)}
-              formula={`Actual % < 100% 인 Subtask 중 Work Type = ${it.work_type}\n괄호 = Cum. Diff < 0 (지연) 건수`}
+              formula={`Actual % < 100% 인 Subtask 중 ${it.work_type}\n괄호 = Cum. Diff < 0 (지연) 건수`}
             />
           ))}
         </div>
