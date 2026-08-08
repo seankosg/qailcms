@@ -589,11 +589,11 @@ export function AbdImportPage() {
           agg.updated += res.updated;
           agg.inactivated += res.inactivated;
           agg.total += res.total;
-          for (const s of ((res as any).ocs_skipped_rows ?? []) as {
-            abd_number: string;
-            reason: string;
-          }[]) {
+          for (const s of ((res as any).ocs_skipped_rows ?? []) as (typeof agg.ocsSkipped)) {
             if (!agg.ocsSkipped.some((x) => x.abd_number === s.abd_number)) agg.ocsSkipped.push(s);
+          }
+          for (const f of ((res as any).failed_rows ?? []) as (typeof agg.failedRows)) {
+            if (!agg.failedRows.some((x) => x.abd_number === f.abd_number)) agg.failedRows.push(f);
           }
           const pct = 10 + Math.round(((idx + 1) / plan.length) * 85);
           setEntries((p) =>
@@ -607,10 +607,26 @@ export function AbdImportPage() {
               : x,
           ),
         );
-        toast.success(
-          `${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성` +
-            (agg.ocsSkipped.length > 0 ? ` / OCS 미완료 제외 ${agg.ocsSkipped.length}행` : ""),
-        );
+        {
+          const applied = agg.inserted + agg.updated;
+          const base =
+            `${e.file.name}: 반영 ${applied}행 (신규 ${agg.inserted} / 변경 ${agg.updated}) · 비활성 ${agg.inactivated}`;
+          if (agg.ocsSkipped.length === 0 && agg.failedRows.length === 0) {
+            toast.success(base);
+          } else if (applied === 0 && agg.failedRows.length > 0) {
+            toast.error(
+              `${e.file.name}: 반영 0행 · 오류 ${agg.failedRows.length}행` +
+                (agg.ocsSkipped.length > 0 ? ` · OCS 제외 ${agg.ocsSkipped.length}행` : "") +
+                ". 상세 목록을 확인하십시오.",
+            );
+          } else {
+            toast.warning(
+              `${base} · OCS 제외 ${agg.ocsSkipped.length}행` +
+                (agg.failedRows.length > 0 ? ` · 오류 ${agg.failedRows.length}행` : "") +
+                " — 일부만 반영되었습니다(partial).",
+            );
+          }
+        }
       } catch (err: any) {
         const rawMsg = err?.message ?? String(err);
         const msg = /internal server error|worker exceeded cpu|cpu time|\b502\b/i.test(rawMsg)
