@@ -42,10 +42,6 @@ const DELAY_FILTER_OPTIONS = [
   { value: "risk", label: "악화만" },
 ] as const;
 
-function isOwnerDim(v: string): v is OwnerDim {
-  return v === "team" || v === "hdec_pic_name" || v === "hdec_eng_name";
-}
-
 function uniqSorted(items: TaskItem[], field: keyof TaskItem): string[] {
   const s = new Set<string>();
   for (const it of items) {
