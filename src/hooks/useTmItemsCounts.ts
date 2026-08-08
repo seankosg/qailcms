@@ -151,5 +151,11 @@ export function useTmItemsCounts(params: {
     isLoading: countsQ.isLoading || teamQ.isLoading || weightedQ.isLoading,
     isError: countsQ.isError || teamQ.isError || weightedQ.isError,
     error: countsQ.error ?? teamQ.error ?? weightedQ.error,
+    /** RPC 별 실패 원문 — 배너에 그대로 노출한다(원인 추적용). */
+    errors: [
+      { rpc: "tm_items_counts", error: countsQ.error },
+      { rpc: "tm_items_counts_by_team", error: teamQ.error },
+      { rpc: "tm_items_weighted_progress", error: weightedQ.error },
+    ].filter((e) => !!e.error) as Array<{ rpc: string; error: unknown }>,
   };
 }
