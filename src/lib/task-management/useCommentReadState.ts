@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+const SCOPE = "tm";
 
 type ReadMap = Record<string, string>;
 
@@ -36,6 +39,40 @@ export function useCommentReadState(userId: string | null | undefined) {
     setMap(load(userId));
   }, [userId]);
 
+  // 서버 읽음 상태 병합(로컬 우선 렌더 → 응답 시 키별 최신 시각 채택)
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("comment_read_state")
+        .select("key,last_read_at")
+        .eq("scope", SCOPE);
+      if (cancelled || error || !data) {
+        if (error) console.warn("comment_read_state load failed", error.message);
+        return;
+      }
+      setMap((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        for (const r of data) {
+          const k = r.key as string;
+          const at = r.last_read_at as string;
+          if (!next[k] || next[k] < at) {
+            next[k] = at;
+            changed = true;
+          }
+        }
+        if (!changed) return prev;
+        save(userId, next);
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   const isRead = useCallback(
     (taskRawId: string, lastUpdatedAt: string | null | undefined) => {
       if (!lastUpdatedAt) return true;
@@ -55,6 +92,17 @@ export function useCommentReadState(userId: string | null | undefined) {
         save(userId, next);
         return next;
       });
+      if (userId) {
+        void supabase
+          .from("comment_read_state")
+          .upsert(
+            [{ scope: SCOPE, key: taskRawId, last_read_at: lastUpdatedAt }],
+            { onConflict: "user_id,scope,key" },
+          )
+          .then(({ error }) => {
+            if (error) console.warn("comment_read_state upsert failed", error.message);
+          });
+      }
     },
     [userId],
   );
