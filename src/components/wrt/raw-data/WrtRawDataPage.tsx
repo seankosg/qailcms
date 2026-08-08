@@ -488,7 +488,7 @@ export function WrtRawDataPage() {
                         it.def == null ? null : (
                           <ColumnResizeHandle
                             width={it.width}
-                            onChange={(w) => setColWidths((p) => ({ ...p, [it.key]: w }))}
+                            onChange={(w: number) => setColWidths((p) => ({ ...p, [it.key]: w }))}
                           />
                         );
                       return it.left != null ? (
