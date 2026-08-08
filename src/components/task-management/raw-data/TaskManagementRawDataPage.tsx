@@ -323,9 +323,11 @@ export function TaskManagementRawDataPage() {
       });
     }
 
+    // 저장값이 있으면 그대로 존중한다. 기본 고정 컬럼을 다시 채우면
+    // 사용자가 해제(unpin)한 컬럼이 리로드마다 되살아난다.
+    const hasSavedFrozen = Array.isArray(s.frozenExtras);
     const savedFrozen = (s.frozenExtras ?? []).filter((k) => validKeys.has(k));
-    const frozenFill = DEFAULT_FROZEN_EXTRAS.filter((k) => !savedFrozen.includes(k));
-    const mergedFrozen = [...savedFrozen, ...frozenFill];
+    const mergedFrozen = hasSavedFrozen ? savedFrozen : DEFAULT_FROZEN_EXTRAS;
 
     const cleanedVisibility: VisibilityState = {};
     for (const [k, v] of Object.entries(s.visibility ?? {})) {
@@ -345,7 +347,7 @@ export function TaskManagementRawDataPage() {
     setSizing(cleanedSizing);
     setVisibility(cleanedVisibility);
     setOrder(mergedOrder);
-    setFrozenExtras(mergedFrozen.length ? mergedFrozen : DEFAULT_FROZEN_EXTRAS);
+    setFrozenExtras(hasSavedFrozen ? mergedFrozen : DEFAULT_FROZEN_EXTRAS);
     setColumnFilters(cleanedFilters);
     setGlobalFilter(s.globalFilter ?? "");
     setSearchInput(s.globalFilter ?? "");
