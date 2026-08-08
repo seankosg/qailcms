@@ -535,6 +535,7 @@ export function SplRawDataPage() {
           await saveOne(id, field, value);
           await refetchRows();
         }}
+        onRefresh={refetchRows}
         onOpenChange={(o) => { if (!o) setDetailRow(null); }}
       />
 
