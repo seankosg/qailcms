@@ -47,7 +47,7 @@ export function WrtImportPage() {
     try {
       const p = await parseWrtHdecFile(file);
       setParsed(p);
-      toast.success(`파싱 완료 — ${p.rows.length}행 (건너뜀 ${p.skipped_rows}행)`);
+      toast.success(`Parsed — ${p.rows.length} rows (skipped ${p.skipped_rows})`);
       setBusy("scope");
       const sc = await applyImportScope<WrtParsedRow>(
         "WRT",
@@ -58,10 +58,10 @@ export function WrtImportPage() {
       );
       setScope(sc);
       if (sc.deniedKeys.length > 0) {
-        toast.warning(`권한 범위 밖 ${sc.deniedKeys.length}행이 제외됩니다 (역할 ${sc.role})`);
+        toast.warning(`${sc.deniedKeys.length} row(s) out of permission scope are excluded (role ${sc.role})`);
       }
     } catch (e: any) {
-      toast.error(e?.message ?? "파일 파싱 실패");
+      toast.error(e?.message ?? "File parsing failed");
     } finally {
       setBusy(null);
     }
@@ -75,7 +75,7 @@ export function WrtImportPage() {
       setPreview(r);
       setResult(null);
     } catch (e: any) {
-      toast.error(e?.message ?? "미리보기 실패");
+      toast.error(e?.message ?? "Preview failed");
     } finally {
       setBusy(null);
     }
@@ -88,9 +88,9 @@ export function WrtImportPage() {
       const r = await runImport({ data: { ...payload, apply: true, allow_deletes: allowDeletes } });
       setResult(r);
       setPreview(r);
-      toast.success(`반영 완료 — 아이템 ${r.items_updated}건 / 단계 ${r.stages_upserted}건`);
+      toast.success(`Applied — ${r.items_updated} item(s) / ${r.stages_upserted} stage(s)`);
     } catch (e: any) {
-      toast.error(e?.message ?? "임포트 실패", { duration: 10000 });
+      toast.error(e?.message ?? "Import failed", { duration: 10000 });
     } finally {
       setBusy(null);
     }
@@ -105,9 +105,9 @@ export function WrtImportPage() {
         <CardHeader>
           <CardTitle className="text-base">Warranty &amp; License (WRT) — HDEC Import</CardTitle>
           <CardDescription>
-            Aconex 시딩본에 계획일·TEAM·PIC/ENG 를 채워 되돌린 파일을 업로드합니다. 매칭 키는 <b>WRT NUMBER</b> 이며,
-            미매칭 항목은 생성하지 않고 리포트로만 표시합니다. Aconex 정본(회신코드·회신일·Latest Status)은 대상에서
-            제외됩니다.
+            Upload the Aconex-seeded workbook filled in with plan dates, TEAM and PIC/ENG. The match key is{" "}
+            <b>WRT NUMBER</b>. Aconex-owned data (response code, response date, Latest Status) is excluded from this
+            import.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -129,15 +129,15 @@ export function WrtImportPage() {
               ) : (
                 <Upload className="mr-2 h-4 w-4" />
               )}
-              파일 선택
+              Choose file
             </Button>
             <Button onClick={onPreview} disabled={!payload || busy !== null}>
               {busy === "preview" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              미리보기 (Diff)
+              Preview (Diff)
             </Button>
             <Button variant="default" onClick={onApply} disabled={!preview || busy !== null || guardBlocked}>
               {busy === "apply" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              반영
+              Apply
             </Button>
           </div>
 
@@ -148,16 +148,16 @@ export function WrtImportPage() {
               </Badge>
               {parsed.sheets.map((s) => (
                 <Badge key={s.sheet_name} variant="outline">
-                  {s.sheet_name} → PLOT-{s.plot} · {s.rows}행
+                  {s.sheet_name} → PLOT-{s.plot} · {s.rows} rows
                 </Badge>
               ))}
               <Badge variant={parsed.skipped_rows > 0 ? "destructive" : "outline"}>
-                건너뜀 {parsed.skipped_rows}행
+                Skipped {parsed.skipped_rows}
               </Badge>
-              <Badge variant="outline">단계 컬럼 {parsed.present_stage_fields.length}개</Badge>
-              <Badge variant="outline">아이템 컬럼 {parsed.present_item_fields.length}개</Badge>
+              <Badge variant="outline">Stage columns {parsed.present_stage_fields.length}</Badge>
+              <Badge variant="outline">Item columns {parsed.present_item_fields.length}</Badge>
               {parsed.unknown_headers.length > 0 && (
-                <Badge variant="destructive">미인식 헤더 {parsed.unknown_headers.length}</Badge>
+                <Badge variant="destructive">Unknown headers {parsed.unknown_headers.length}</Badge>
               )}
             </div>
           )}
@@ -167,7 +167,7 @@ export function WrtImportPage() {
           {parsed && parsed.unknown_headers.length > 0 && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>카탈로그에 없는 헤더</AlertTitle>
+              <AlertTitle>Headers not in catalog</AlertTitle>
               <AlertDescription className="text-xs">{parsed.unknown_headers.join(", ")}</AlertDescription>
             </Alert>
           )}
@@ -178,18 +178,19 @@ export function WrtImportPage() {
         <>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Diff 요약</CardTitle>
+              <CardTitle className="text-base">Diff summary</CardTitle>
               <CardDescription>
-                컬럼 부재 = 미제공(무시) / 셀 공란 = 삭제 의도. 모든 변경은 change_log 에 기록됩니다.
+                Missing column = not provided (ignored) / empty cell = intent to clear. Every change is recorded in the
+                change log.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-                <Stat label="총 행" value={view.total} />
-                <Stat label="매칭" value={view.matched} />
-                <Stat label="신규 생성" value={view.created} tone={view.created > 0 ? "warn" : undefined} />
-                <Stat label="갱신" value={view.rows_changed} />
-                <Stat label="값 삭제" value={view.cleared_values} tone={view.cleared_values > 0 ? "warn" : undefined} />
+                <Stat label="Total rows" value={view.total} />
+                <Stat label="Matched" value={view.matched} />
+                <Stat label="Created" value={view.created} tone={view.created > 0 ? "warn" : undefined} />
+                <Stat label="Updated" value={view.rows_changed} />
+                <Stat label="Cleared values" value={view.cleared_values} tone={view.cleared_values > 0 ? "warn" : undefined} />
               </div>
 
               {view.applied && (
@@ -198,25 +199,29 @@ export function WrtImportPage() {
                   <Stat label="pending R1" value={view.integrity.pending_hdec_r1} />
                   <Stat label="pending R2" value={view.integrity.pending_hdec_r2} />
                   <Stat
-                    label="위반"
+                    label="Violations"
                     value={view.integrity.violation}
                     tone={view.integrity.violation > 0 ? "warn" : undefined}
                   />
                 </div>
               )}
 
+              <AconexPlanGapLine items={view.aconex_plan_missing} />
+
+              <RejectedRows rows={view.rejected} />
+
               {view.delete_guard.tripped && (
                 <Alert variant="destructive">
                   <ShieldAlert className="h-4 w-4" />
-                  <AlertTitle>삭제 규모 가드 작동</AlertTitle>
+                  <AlertTitle>Delete guard tripped</AlertTitle>
                   <AlertDescription className="space-y-2 text-xs">
                     <div>
-                      값 삭제 {view.cleared_values}건 — 임계 {view.delete_guard.pct}% 또는 {view.delete_guard.min_count}건
-                      초과. 의도한 삭제인지 확인 후 승인해야 반영됩니다.
+                      {view.cleared_values} value(s) would be cleared — over the threshold ({view.delete_guard.pct}% or{" "}
+                      {view.delete_guard.min_count} cells). Confirm the deletions are intended before applying.
                     </div>
                     <label className="flex items-center gap-2">
                       <Checkbox checked={allowDeletes} onCheckedChange={(v) => setAllowDeletes(v === true)} />
-                      <span>삭제를 승인하고 반영합니다</span>
+                      <span>Approve the deletions and apply</span>
                     </label>
                   </AlertDescription>
                 </Alert>
@@ -225,7 +230,7 @@ export function WrtImportPage() {
               {view.created > 0 && (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>신규 생성 {view.created}건 — 파일에만 있는 번호</AlertTitle>
+                  <AlertTitle>{view.created} new item(s) — numbers found only in the file</AlertTitle>
                   <AlertDescription className="text-xs">{view.created_list.join(", ")}</AlertDescription>
                 </Alert>
               )}
@@ -244,8 +249,10 @@ export function WrtImportPage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">행 단위 로그</CardTitle>
-              <CardDescription>변경/미매칭 행만 표시 (최대 300행). 전체 이력은 Import Log 에 저장됩니다.</CardDescription>
+              <CardTitle className="text-base">Row-level log</CardTitle>
+              <CardDescription>
+                Changed / unmatched rows only (max 300). The full history is stored in the Import Log.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[420px] rounded-md border">
@@ -254,8 +261,8 @@ export function WrtImportPage() {
                     <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-left">
                       <th className="w-20">Row</th>
                       <th className="w-64">WRT NUMBER</th>
-                      <th className="w-24">결과</th>
-                      <th>변경 내역</th>
+                      <th className="w-24">Outcome</th>
+                      <th>Changes</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -292,7 +299,7 @@ export function WrtImportPage() {
                     {view.diff_rows.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-6 text-center text-muted-foreground">
-                          변경 사항이 없습니다.
+                          No changes.
                         </td>
                       </tr>
                     )}
@@ -313,20 +320,76 @@ export function ScopeSummary({ scope }: { scope: ImportScopeOutcome<any> }) {
     <Alert variant={denied.length > 0 ? "default" : "default"}>
       {denied.length > 0 ? <ShieldAlert className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
       <AlertTitle className="text-sm">
-        임포트 범위 판정 (역할 {scope.role}) — 대상 {scope.allowedRows.length.toLocaleString()}행 / 제외{" "}
-        {denied.length.toLocaleString()}행
+        Import scope (role {scope.role}) — in scope {scope.allowedRows.length.toLocaleString()} / excluded{" "}
+        {denied.length.toLocaleString()}
       </AlertTitle>
       <AlertDescription className="text-xs">
         {denied.length === 0 ? (
-          "전 행이 권한 범위 안입니다."
+          "All rows are within your permission scope."
         ) : (
           <>
-            <div className="mb-1">권한 범위 밖 행은 서버 판정에 따라 전송 자체에서 제외됩니다.</div>
+            <div className="mb-1">Rows out of scope are excluded from the request by the server ruling.</div>
             <div className="max-h-24 overflow-auto font-mono text-[10px] leading-relaxed">
               {denied.join(", ")}
             </div>
           </>
         )}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/** A-5 — Aconex stages with no plan date: no delay can be judged for those stages. */
+export function AconexPlanGapLine({
+  items,
+}: {
+  items: Array<{ stage_code: string; short_code: string; label: string; missing: number; total: number }>;
+}) {
+  if (!items || items.length === 0) return null;
+  const any = items.some((i) => i.missing > 0);
+  return (
+    <div className="rounded-md border px-2 py-1.5 text-[11px]">
+      <span className="mr-2 font-medium">Aconex plan date missing</span>
+      {items.map((i) => (
+        <span key={i.stage_code} className="mr-3">
+          {i.short_code}{" "}
+          <b className={i.missing > 0 ? "text-amber-600" : ""}>{i.missing.toLocaleString()}</b>
+          <span className="text-muted-foreground"> / {i.total.toLocaleString()}</span>
+        </span>
+      ))}
+      {any && <span className="text-muted-foreground">— no plan date means no delay is judged for that stage.</span>}
+    </div>
+  );
+}
+
+/** C-3 — rows refused by the DB write guard. Messages are shown exactly as the database returned them. */
+export function RejectedRows({ rows }: { rows?: Array<{ key: string; reason_code: string; message: string }> }) {
+  if (!rows || rows.length === 0) return null;
+  return (
+    <Alert variant="destructive">
+      <ShieldAlert className="h-4 w-4" />
+      <AlertTitle>{rows.length} row(s) rejected by the write guard — not applied</AlertTitle>
+      <AlertDescription>
+        <div className="max-h-56 overflow-auto rounded-md border bg-background/40">
+          <table className="w-full text-[11px]">
+            <thead className="sticky top-0 bg-muted">
+              <tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-left">
+                <th className="w-56">Document No.</th>
+                <th className="w-48">Reason</th>
+                <th>Message (from database)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={`${r.key}-${i}`} className="border-t align-top">
+                  <td className="px-2 py-1 font-mono">{r.key}</td>
+                  <td className="px-2 py-1 font-mono">{r.reason_code}</td>
+                  <td className="px-2 py-1">{r.message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </AlertDescription>
     </Alert>
   );
