@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Columns3, GripVertical, Pencil, Pin } from "lucide-react";
+import { Columns3, GripVertical, Pencil, Pin, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ABD_COLUMNS } from "@/lib/abd/columns";
 import { useAbdFieldHelpers } from "@/hooks/useAbdFieldConfig";
@@ -20,6 +20,8 @@ interface Props {
   onServerReorder?: (patches: Array<{ field_key: string; sort_order: number }>) => void;
   onServerVisibility?: (field_key: string, visible: boolean) => void;
   onServerLabel?: (field_key: string, label: string) => void;
+  /** 현재 컬럼 레이아웃(순서/노출/고정/너비)을 계정 설정으로 즉시 저장 */
+  onSaveLayout?: () => void;
 }
 
 export function AbdColumnOrderMenu({
