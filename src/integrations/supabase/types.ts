@@ -8094,6 +8094,15 @@ export type Database = {
         Args: { _as_of: string; _ids: string[] }
         Returns: Json
       }
+      tm_worktype_incomplete_counts: {
+        Args: {
+          _as_of?: string
+          _filters?: Json
+          _include_inactive?: boolean
+          _q?: string
+        }
+        Returns: Json
+      }
       update_task_summary: {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
