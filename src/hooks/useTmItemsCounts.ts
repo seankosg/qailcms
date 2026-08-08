@@ -81,25 +81,16 @@ export function useTmItemsCounts(params: {
     _caution_buffer: t.caution_gap_buffer,
   };
 
-  const countsQ = useQuery({
-    queryKey: ["tm-items-counts", args],
+  // counts + by_team 은 서버에서 동일 스캔 1회로 묶어 반환한다(tm_items_kpi_bundle).
+  // 반환 수치는 기존 tm_items_counts / tm_items_counts_by_team 과 완전히 동일함을 실측 대조.
+  const bundleQ = useQuery({
+    queryKey: ["tm-items-kpi-bundle", args],
     enabled,
     staleTime: 30_000,
-    queryFn: async (): Promise<TmCounts> => {
-      const { data, error } = await (supabase as any).rpc("tm_items_counts", args);
+    queryFn: async (): Promise<{ counts: TmCounts; by_team: TmCountsByTeam }> => {
+      const { data, error } = await (supabase as any).rpc("tm_items_kpi_bundle", args);
       if (error) throw new Error(error.message);
-      return (data ?? {}) as TmCounts;
-    },
-  });
-
-  const teamQ = useQuery({
-    queryKey: ["tm-items-counts-by-team", args],
-    enabled,
-    staleTime: 30_000,
-    queryFn: async (): Promise<TmCountsByTeam> => {
-      const { data, error } = await (supabase as any).rpc("tm_items_counts_by_team", args);
-      if (error) throw new Error(error.message);
-      return (data ?? {}) as TmCountsByTeam;
+      return (data ?? {}) as { counts: TmCounts; by_team: TmCountsByTeam };
     },
   });
 
@@ -145,16 +136,15 @@ export function useTmItemsCounts(params: {
   });
 
   return {
-    counts: countsQ.data,
-    byTeam: teamQ.data,
+    counts: bundleQ.data?.counts,
+    byTeam: bundleQ.data?.by_team,
     weighted: weightedQ.data,
-    isLoading: countsQ.isLoading || teamQ.isLoading || weightedQ.isLoading,
-    isError: countsQ.isError || teamQ.isError || weightedQ.isError,
-    error: countsQ.error ?? teamQ.error ?? weightedQ.error,
+    isLoading: bundleQ.isLoading || weightedQ.isLoading,
+    isError: bundleQ.isError || weightedQ.isError,
+    error: bundleQ.error ?? weightedQ.error,
     /** RPC 별 실패 원문 — 배너에 그대로 노출한다(원인 추적용). */
     errors: [
-      { rpc: "tm_items_counts", error: countsQ.error },
-      { rpc: "tm_items_counts_by_team", error: teamQ.error },
+      { rpc: "tm_items_kpi_bundle", error: bundleQ.error },
       { rpc: "tm_items_weighted_progress", error: weightedQ.error },
     ].filter((e) => !!e.error) as Array<{ rpc: string; error: unknown }>,
   };
