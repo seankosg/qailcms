@@ -47,12 +47,12 @@ export function SplColumnOrderMenu({
       <PopoverTrigger asChild>
         <Button size="sm" variant="outline" className="h-8 text-xs">
           <Columns3 className="mr-1 h-3.5 w-3.5" />
-          컬럼 ({visibleCount})
+          Columns ({visibleCount})
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-2">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[11px] font-medium">컬럼 순서 · 표시 · 고정</span>
+          <span className="text-[11px] font-medium">Order · visibility · pin</span>
           <Button
             size="sm"
             variant="ghost"
@@ -64,7 +64,7 @@ export function SplColumnOrderMenu({
             }}
           >
             <RotateCcw className="mr-0.5 h-3 w-3" />
-            초기화
+            Reset
           </Button>
         </div>
         <div className="max-h-80 space-y-0.5 overflow-auto">
@@ -91,7 +91,7 @@ export function SplColumnOrderMenu({
               <span className="flex-1 truncate">{LABEL.get(k) ?? k}</span>
               <button
                 type="button"
-                title="좌측 고정"
+                title="Pin to left"
                 onClick={() => toggleFrozen(k)}
                 className={cn(
                   "rounded p-0.5 hover:bg-muted-foreground/20",
@@ -105,7 +105,7 @@ export function SplColumnOrderMenu({
         </div>
         {onSave && (
           <Button size="sm" className="mt-2 h-7 w-full text-[11px]" onClick={onSave}>
-            현재 컬럼 설정 저장
+            Save current column settings
           </Button>
         )}
       </PopoverContent>

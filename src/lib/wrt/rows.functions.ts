@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
  * WRT 화면 데이터 정본 경유 진입점.
- * 표시·집계 수치는 전부 `wrt_rows_as_of`(→ `wrt_eval_as_of` → `wrt_stage_state` / `wrt_judge_v2`)를 거친다.
+ * 표시·집계 수치는 전부 `wrt_rows_as_of`(→ `wrt_eval_as_of` → `wrt_stage_state` / `wrt_active_round`)를 거친다.
  * 원시 테이블 직조회 + 클라이언트 재계산 금지.
  * 판정·대표지연은 읽기 시 서버 재계산 결과이며, 저장 판정 컬럼은 존재하지 않는다.
  */
@@ -21,6 +21,8 @@ export type WrtStageCell = {
 
 export type WrtCatalogEntry = {
   stage_code: string;
+  /** Header code shown in the single-row table header (catalog-owned, e.g. D-SB1) */
+  short_code: string;
   label: string;
   band: "COMMERCIAL" | "DRAFT_APPROVAL" | "SUBMISSION";
   value_type: "flag" | "single" | "range";
@@ -168,7 +170,7 @@ export const getWrtExportRows = createServerFn({ method: "POST" })
     );
     const { data: catalog, error: cErr } = await supa
       .from("wrt_stage_catalog")
-      .select("stage_code, label, band, value_type, actual_authority, round_no, sort_order")
+      .select("stage_code, short_code, label, band, value_type, actual_authority, round_no, sort_order")
       .order("sort_order");
     if (cErr) throw new Error(cErr.message);
     return {

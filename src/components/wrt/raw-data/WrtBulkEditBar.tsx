@@ -50,7 +50,7 @@ export function WrtBulkEditBar({ selectedIds, teamOptions, onClear, onSaveField,
     }
     const ids = allowed ?? [];
     if (ids.length === 0) {
-      toast.error("편집 권한이 있는 행이 없습니다.");
+      toast.error("No rows you are allowed to edit.");
       return;
     }
     setBusy(true);
@@ -67,17 +67,17 @@ export function WrtBulkEditBar({ selectedIds, teamOptions, onClear, onSaveField,
     }
     setBusy(false);
     await onDone();
-    if (errs.length === 0) toast.success(`${ok}건 수정됨`);
-    else toast.warning(`${ok}건 수정 · ${errs.length}건 실패 — ${errs[0]}`);
+    if (errs.length === 0) toast.success(`${ok} rows updated`);
+    else toast.warning(`${ok} updated · ${errs.length} failed — ${errs[0]}`);
   };
 
   return (
     <div className="sticky bottom-2 z-30 flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 shadow-lg">
       <span className="text-xs font-medium">
-        {selectedIds.length.toLocaleString()}건 선택
+        {selectedIds.length.toLocaleString()} selected
         {allowed && (
           <span className="ml-1 text-[11px] text-muted-foreground">
-            (적용 {allowed.length} / 권한 제외 {excluded})
+            (editable {allowed.length} / not permitted {excluded})
           </span>
         )}
       </span>
@@ -96,10 +96,10 @@ export function WrtBulkEditBar({ selectedIds, teamOptions, onClear, onSaveField,
       {isTeam ? (
         <Select value={value} onValueChange={setValue}>
           <SelectTrigger className="h-8 w-40 text-xs">
-            <SelectValue placeholder="Team 선택" />
+            <SelectValue placeholder="Select team" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__null__">(없음)</SelectItem>
+            <SelectItem value="__null__">(none)</SelectItem>
             {options.map((o) => (
               <SelectItem key={o} value={o}>
                 {o}
@@ -111,18 +111,18 @@ export function WrtBulkEditBar({ selectedIds, teamOptions, onClear, onSaveField,
         <Input
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="새 값 (비우려면 공백)"
+          placeholder="New value (leave empty to clear)"
           className="h-8 w-48 text-xs"
         />
       )}
       <Button size="sm" className="h-8 text-xs" onClick={apply} disabled={busy || !!disabledReason}>
         {busy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-        일괄 적용
+        Apply to selection
       </Button>
       {disabledReason && <span className="text-[11px] text-amber-600">{disabledReason}</span>}
       <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={onClear}>
         <X className="mr-1 h-3 w-3" />
-        선택 해제
+        선택 Clear
       </Button>
     </div>
   );

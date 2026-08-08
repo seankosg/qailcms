@@ -14,7 +14,7 @@ interface Props {
   onChange: (next: string[]) => void;
 }
 
-const BLANK = "(비어 있음)";
+const BLANK = "(blank)";
 
 export function SplColumnFilterDropdown({ label, values, selected, onChange }: Props) {
   const [open, setOpen] = useState(false);
@@ -34,7 +34,7 @@ export function SplColumnFilterDropdown({ label, values, selected, onChange }: P
       <PopoverTrigger asChild>
         <button
           type="button"
-          title={`${label} 필터`}
+          title={`Filter: ${label}`}
           className={cn(
             "ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted-foreground/20",
             active ? "text-primary" : "text-muted-foreground/60",
@@ -49,26 +49,26 @@ export function SplColumnFilterDropdown({ label, values, selected, onChange }: P
           {active && (
             <Button size="sm" variant="ghost" className="h-6 px-1 text-[10px]" onClick={() => onChange([])}>
               <X className="mr-0.5 h-3 w-3" />
-              해제
+              Clear
             </Button>
           )}
         </div>
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="값 검색"
+          placeholder="Search values"
           className="mb-2 h-7 text-xs"
         />
         <div className="mb-1 flex gap-1">
           <Button size="sm" variant="outline" className="h-6 flex-1 text-[10px]" onClick={() => onChange(options)}>
-            전체 선택
+            Select all
           </Button>
           <Button size="sm" variant="outline" className="h-6 flex-1 text-[10px]" onClick={() => onChange([])}>
-            전체 해제
+            Clear all
           </Button>
         </div>
         <div className="max-h-60 space-y-1 overflow-auto">
-          {options.length === 0 && <div className="p-2 text-[11px] text-muted-foreground">값 없음</div>}
+          {options.length === 0 && <div className="p-2 text-[11px] text-muted-foreground">No values</div>}
           {options.map((v) => (
             <label key={v || "__blank__"} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-[11px] hover:bg-muted">
               <Checkbox checked={selected.includes(v)} onCheckedChange={() => toggle(v)} />
