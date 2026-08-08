@@ -292,6 +292,16 @@ export function CommentsThread({
         ) : (
           <>
             <p className="text-sm whitespace-pre-wrap break-words text-foreground">{c.message}</p>
+            {enableRecipients && (c.recipient_names?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">수신:</span>
+                {c.recipient_names!.map((n) => (
+                  <Badge key={n} variant="outline" className="h-4 px-1.5 py-0 text-[10px]">
+                    {n}
+                  </Badge>
+                ))}
+              </div>
+            )}
             {user && (
               <div className="flex justify-end">
                 <button
