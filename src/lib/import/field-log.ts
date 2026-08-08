@@ -88,15 +88,23 @@ export const classifyChange = (
   return "applied";
 };
 
-/** import_field_logs로 chunk 삽입 (실패 시 콘솔 경고만 하고 임포트는 계속). */
+export interface FlushFieldLogsResult {
+  ok: boolean;
+  attempted: number;
+  persisted: number;
+  error: string | null;
+}
+
+/** import_field_logs로 chunk 삽입. 실패해도 예외를 던지지 않고 결과를 반환한다(호출자가 판정). */
 export async function flushFieldLogs(
   supabase: any,
   uploadId: string,
   userId: string | null | undefined,
   logs: PendingFieldLog[],
   chunkSize = 1000,
-): Promise<void> {
-  if (!uploadId || logs.length === 0) return;
+): Promise<FlushFieldLogsResult> {
+  if (!uploadId || logs.length === 0)
+    return { ok: true, attempted: logs.length, persisted: 0, error: null };
   const rows = logs.map((b) => ({
     upload_id: uploadId,
     kind: b.kind,
@@ -110,13 +118,20 @@ export async function flushFieldLogs(
     reason_detail: b.reason_detail,
     created_by: userId ?? null,
   }));
+  let persisted = 0;
   for (let i = 0; i < rows.length; i += chunkSize) {
-    const { error } = await supabase
-      .from("import_field_logs")
-      .insert(rows.slice(i, i + chunkSize));
+    const slice = rows.slice(i, i + chunkSize);
+    const { error } = await supabase.from("import_field_logs").insert(slice);
     if (error) {
       console.warn("[import_field_logs] insert failed", error);
-      break;
+      return {
+        ok: false,
+        attempted: rows.length,
+        persisted,
+        error: error.message ?? String(error),
+      };
     }
+    persisted += slice.length;
   }
+  return { ok: true, attempted: rows.length, persisted, error: null };
 }
