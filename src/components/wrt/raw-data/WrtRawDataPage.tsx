@@ -14,6 +14,7 @@ import { DataDatePicker } from "@/components/task-management/shared/DataDatePick
 import { todayInDoha, formatDdMmm } from "@/lib/time/doha";
 import {
   getWrtRowsAsOf,
+  getWrtEstimatedCells,
   getWrtExportRows,
   type WrtCatalogEntry,
   type WrtRow,
