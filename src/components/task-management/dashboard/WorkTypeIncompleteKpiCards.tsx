@@ -83,7 +83,7 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-baseline gap-2">
-        <h3 className="text-sm font-semibold">Work Type Status (Actual &lt; 100%)</h3>
+        <h3 className="text-sm font-semibold">Incomplete Status (Actual &lt; 100%)</h3>
         <span className="text-[11px] text-muted-foreground">
           Subtask 기준 · 전체 {total.toLocaleString()} items · 괄호 안은 지연(Cum. Diff &lt; 0) 건수 ·
           지연 합계 {(data?.delayed_total ?? 0).toLocaleString()}
