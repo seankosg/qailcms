@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { OutOfScopeRowsPopover } from "@/components/shared/OutOfScopeRowsPopover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Card,
   CardContent,
@@ -93,7 +93,15 @@ interface FileEntry {
     inactivated: number;
     total: number;
     /** OCS 미완료로 행 단위 제외된 도면 목록 */
-    ocsSkipped?: { abd_number: string; reason: string }[];
+    ocsSkipped?: {
+      abd_number: string;
+      reason: string;
+      round?: number | null;
+      field_label?: string | null;
+      pending_count?: number | null;
+    }[];
+    /** 비-OCS 오류로 반영되지 못한 행 */
+    failedRows?: { abd_number: string; error: string }[];
   };
   progress?: number;
   /** 임포트 진행 상세 (현재 시트/청크/ETA) */
@@ -487,7 +495,14 @@ export function AbdImportPage() {
           updated: 0,
           inactivated: 0,
           total: 0,
-          ocsSkipped: [] as { abd_number: string; reason: string }[],
+          ocsSkipped: [] as {
+            abd_number: string;
+            reason: string;
+            round?: number | null;
+            field_label?: string | null;
+            pending_count?: number | null;
+          }[],
+          failedRows: [] as { abd_number: string; error: string }[],
         };
         // 파일당 로그 1건 — 첫 호출에서 log_id를 발급받아 이후 호출은 append.
         let logId: string | null = null;
@@ -574,11 +589,11 @@ export function AbdImportPage() {
           agg.updated += res.updated;
           agg.inactivated += res.inactivated;
           agg.total += res.total;
-          for (const s of ((res as any).ocs_skipped_rows ?? []) as {
-            abd_number: string;
-            reason: string;
-          }[]) {
+          for (const s of ((res as any).ocs_skipped_rows ?? []) as (typeof agg.ocsSkipped)) {
             if (!agg.ocsSkipped.some((x) => x.abd_number === s.abd_number)) agg.ocsSkipped.push(s);
+          }
+          for (const f of ((res as any).failed_rows ?? []) as (typeof agg.failedRows)) {
+            if (!agg.failedRows.some((x) => x.abd_number === f.abd_number)) agg.failedRows.push(f);
           }
           const pct = 10 + Math.round(((idx + 1) / plan.length) * 85);
           setEntries((p) =>
@@ -592,10 +607,26 @@ export function AbdImportPage() {
               : x,
           ),
         );
-        toast.success(
-          `${e.file.name}: ${agg.inserted} 신규 / ${agg.updated} 변경 / ${agg.inactivated} 비활성` +
-            (agg.ocsSkipped.length > 0 ? ` / OCS 미완료 제외 ${agg.ocsSkipped.length}행` : ""),
-        );
+        {
+          const applied = agg.inserted + agg.updated;
+          const base =
+            `${e.file.name}: 반영 ${applied}행 (신규 ${agg.inserted} / 변경 ${agg.updated}) · 비활성 ${agg.inactivated}`;
+          if (agg.ocsSkipped.length === 0 && agg.failedRows.length === 0) {
+            toast.success(base);
+          } else if (applied === 0 && agg.failedRows.length > 0) {
+            toast.error(
+              `${e.file.name}: 반영 0행 · 오류 ${agg.failedRows.length}행` +
+                (agg.ocsSkipped.length > 0 ? ` · OCS 제외 ${agg.ocsSkipped.length}행` : "") +
+                ". 상세 목록을 확인하십시오.",
+            );
+          } else {
+            toast.warning(
+              `${base} · OCS 제외 ${agg.ocsSkipped.length}행` +
+                (agg.failedRows.length > 0 ? ` · 오류 ${agg.failedRows.length}행` : "") +
+                " — 일부만 반영되었습니다(partial).",
+            );
+          }
+        }
       } catch (err: any) {
         const rawMsg = err?.message ?? String(err);
         const msg = /internal server error|worker exceeded cpu|cpu time|\b502\b/i.test(rawMsg)
@@ -981,6 +1012,9 @@ function FileRow({
       )}
       {e.result && (
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          <Badge variant="outline" className="border-foreground/30">
+            Applied: {e.result.inserted + e.result.updated}
+          </Badge>
           <Badge variant="outline" className="border-emerald-300 text-emerald-700">
             <CheckCircle2 className="mr-1 h-3 w-3" /> Inserted: {e.result.inserted}
           </Badge>
@@ -995,16 +1029,67 @@ function FileRow({
           {(e.result.ocsSkipped?.length ?? 0) > 0 && (
             <>
               <Badge variant="outline" className="border-amber-300 text-amber-700">
-                OCS 미완료 제외: {e.result.ocsSkipped!.length}행
+                OCS Pending — Excluded: {e.result.ocsSkipped!.length}
               </Badge>
-              <OutOfScopeRowsPopover
-                rows={e.result.ocsSkipped!.map((s) => ({
-                  abd_number: s.abd_number,
-                  id: s.abd_number,
-                }))}
-                labelKeys={["abd_number"]}
-                title="OCS 미완료 제외 목록"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="underline underline-offset-2 text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                  >
+                    · 제외 목록 {e.result.ocsSkipped!.length}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[26rem] p-2">
+                  <div className="mb-1 text-[11px] font-semibold text-muted-foreground">
+                    OCS Pending — Excluded {e.result.ocsSkipped!.length}건
+                  </div>
+                  <ul className="max-h-56 space-y-1 overflow-auto text-[11px]">
+                    {e.result.ocsSkipped!.slice(0, 200).map((s) => (
+                      <li key={s.abd_number} className="border-b pb-1 last:border-0">
+                        <div className="font-mono font-medium">{s.abd_number}</div>
+                        <div className="text-muted-foreground">
+                          {s.field_label ?? "Draft Finish Actual"}
+                          {s.pending_count != null ? ` · Pending OCS ${s.pending_count}` : ""}
+                        </div>
+                        <div className="text-muted-foreground">{s.reason}</div>
+                      </li>
+                    ))}
+                  </ul>
+                  {e.result.ocsSkipped!.length > 200 && (
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      … 외 {e.result.ocsSkipped!.length - 200}건
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
+          {(e.result.failedRows?.length ?? 0) > 0 && (
+            <>
+              <Badge variant="outline" className="border-destructive/50 text-destructive">
+                Failed: {e.result.failedRows!.length}
+              </Badge>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="underline underline-offset-2 text-destructive"
+                  >
+                    · 오류 목록 {e.result.failedRows!.length}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[26rem] p-2">
+                  <ul className="max-h-56 space-y-1 overflow-auto text-[11px]">
+                    {e.result.failedRows!.slice(0, 200).map((f) => (
+                      <li key={f.abd_number} className="border-b pb-1 last:border-0">
+                        <div className="font-mono font-medium">{f.abd_number}</div>
+                        <div className="text-muted-foreground">{f.error}</div>
+                      </li>
+                    ))}
+                  </ul>
+                </PopoverContent>
+              </Popover>
             </>
           )}
         </div>
