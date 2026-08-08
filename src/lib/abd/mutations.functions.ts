@@ -640,12 +640,38 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     }
 
     // 3.5) persist row logs (chunked to keep request size reasonable)
-    for (let i = 0; i < rowLogs.length; i += 500) {
-      await supa.from("abd_import_row_logs").insert(rowLogs.slice(i, i + 500));
+    // 감사 로그 저장 실패는 무시하지 않는다. 실패 시 run(batchId) 단위로 표면화한다.
+    const logPersistErrors: { source: string; error: string; attempted: number; persisted: number }[] = [];
+    {
+      let persisted = 0;
+      for (let i = 0; i < rowLogs.length; i += 500) {
+        const slice = rowLogs.slice(i, i + 500);
+        const { error } = await supa.from("abd_import_row_logs").insert(slice);
+        if (error) {
+          console.error("[abd_import_row_logs] insert failed", error);
+          logPersistErrors.push({
+            source: "abd_import_row_logs",
+            error: error.message ?? String(error),
+            attempted: rowLogs.length,
+            persisted,
+          });
+          break;
+        }
+        persisted += slice.length;
+      }
     }
 
     // 3.6) persist field logs
-    await flushFieldLogs(supa, batchId, context.userId, pendingFieldLogs);
+    const fieldLogRes = await flushFieldLogs(supa, batchId, context.userId, pendingFieldLogs);
+    if (!fieldLogRes.ok) {
+      logPersistErrors.push({
+        source: "import_field_logs",
+        error: fieldLogRes.error ?? "unknown",
+        attempted: fieldLogRes.attempted,
+        persisted: fieldLogRes.persisted,
+      });
+    }
+    const logPersistFailed = logPersistErrors.length > 0;
 
     // 4) finalize log — 파일 마지막 호출에서만 성공 마감.
     //    append 모드 중간 호출에서는 누적 값을 원자적으로 더한다.
@@ -653,7 +679,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       // 누적된 카운트를 읽어와 이번 호출분과 합산 후 마감
       const { data: cur } = await supa
         .from("abd_import_logs")
-        .select("inserted, updated, parsed_rows, applied_rows, exclusions")
+        .select("inserted, updated, parsed_rows, applied_rows, exclusions, errors")
         .eq("id", batchId)
         .single();
       // 파일 전체 기준 OCS 제외 건수 (여러 HTTP 청크 누적분 포함)
@@ -682,12 +708,28 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       const unclassified = Math.max(0, parsedTotal - appliedTotal - excludedTotal);
       if (unclassified > 0) exclusions.unclassified = unclassified;
       // 상태 규칙: 반영=파싱이면 success, 반영 0이면 failed, 그 외 partial
-      const status =
+      let status =
         appliedTotal === 0 && parsedTotal > 0
           ? "failed"
           : appliedTotal === parsedTotal
             ? "success"
             : "partial";
+      // 감사 로그 저장 실패 시 success 마감 금지
+      const prevErrors = Array.isArray((cur as any)?.errors) ? ((cur as any).errors as any[]) : [];
+      const newErrors = [
+        ...prevErrors,
+        ...logPersistErrors.map((e) => ({
+          code: "LOG_PERSIST_FAILED",
+          run_id: batchId,
+          source: e.source,
+          attempted: e.attempted,
+          persisted: e.persisted,
+          message: e.error,
+          at: new Date().toISOString(),
+        })),
+      ];
+      const hasLogFailure = newErrors.some((e: any) => e?.code === "LOG_PERSIST_FAILED");
+      if (hasLogFailure && status === "success") status = appliedTotal > 0 ? "partial" : "failed";
       await supa
         .from("abd_import_logs")
         .update({
@@ -700,6 +742,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           exclusions,
           data_date: data.data_date ?? null,
           status,
+          errors: newErrors.length > 0 ? newErrors : null,
           finished_at: new Date().toISOString(),
         })
         .eq("id", batchId);
@@ -707,9 +750,22 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       // 중간 호출: 누적만 갱신 (finished/status 건드리지 않음)
       const { data: cur } = await supa
         .from("abd_import_logs")
-        .select("inserted, updated, parsed_rows, applied_rows")
+        .select("inserted, updated, parsed_rows, applied_rows, errors")
         .eq("id", batchId)
         .single();
+      const prevErrors = Array.isArray((cur as any)?.errors) ? ((cur as any).errors as any[]) : [];
+      const mergedErrors = [
+        ...prevErrors,
+        ...logPersistErrors.map((e) => ({
+          code: "LOG_PERSIST_FAILED",
+          run_id: batchId,
+          source: e.source,
+          attempted: e.attempted,
+          persisted: e.persisted,
+          message: e.error,
+          at: new Date().toISOString(),
+        })),
+      ];
       await supa
         .from("abd_import_logs")
         .update({
@@ -717,6 +773,7 @@ export const importAbdBatch = createServerFn({ method: "POST" })
           updated: (cur?.updated ?? 0) + updated,
           parsed_rows: (cur?.parsed_rows ?? 0) + rowsToImport.length,
           applied_rows: (cur?.applied_rows ?? 0) + inserted + updated,
+          ...(mergedErrors.length > 0 ? { errors: mergedErrors } : {}),
         })
         .eq("id", batchId);
     }
@@ -735,6 +792,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       failed_count: failedRows.length,
       applied_numbers: Array.from(appliedNumbers),
       failed_rows: failedRows,
+      log_persist_failed: logPersistFailed,
+      log_persist_errors: logPersistErrors,
     };
    } catch (err: any) {
      const msg = err?.message ?? String(err);
