@@ -15,6 +15,7 @@ export interface RiskKpiBreakdownRow {
   count: number;
   /** 값 뒤에 덧붙일 보조 표기 (예: 지연 건수 "(12)") */
   suffix?: string;
+  suffixClassName?: string;
   onClick?: () => void;
   disabled?: boolean;
 }
@@ -24,6 +25,7 @@ interface Props {
   count: number;
   /** 주 수치 뒤에 덧붙일 보조 표기 (예: 지연 건수 "(12)") */
   countSuffix?: string;
+  countSuffixClassName?: string;
   percent?: number;
   sub?: string;
   tone?: Tone;
@@ -39,6 +41,7 @@ export function RiskKpiCard({
   label,
   count,
   countSuffix,
+  countSuffixClassName,
   percent,
   sub,
   tone = "neutral",
