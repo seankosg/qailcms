@@ -1,6 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useUserViewPreference } from "@/hooks/useUserViewPreference";
 import { useTmAsOfRows } from "@/hooks/useTmRowsAsOf";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -262,21 +263,30 @@ export function TaskTreePage() {
     }
     return out;
   }, [tmFieldConfig]);
+  const summaryPref = useUserViewPreference("task-management.tree.summary-cols.v1");
   const [colOrder, setColOrder] = useState<string[]>(SUMMARY_DEFAULT_ORDER);
   const [colVisibility, setColVisibility] = useState<Record<string, boolean>>(
     SUMMARY_DEFAULT_VISIBILITY,
   );
   const [colFrozen, setColFrozen] = useState<string[]>(SUMMARY_DEFAULT_FROZEN);
+  // 복원 완료 전에는 저장하지 않는다.
+  // (복원 effect 가 setState 를 예약해도 같은 커밋의 저장 effect 는 기본값을 보게 되어
+  //  저장값을 기본값으로 덮어써 버리던 결함 수정)
+  const summaryColsLoaded = useRef(false);
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(SUMMARY_COLS_KEY);
-      if (!raw) return;
-      const p = JSON.parse(raw) as {
-        order?: string[];
-        visibility?: Record<string, boolean>;
-        frozen?: string[];
-      };
+    if (summaryColsLoaded.current) return;
+    if (!summaryPref.ready) return;
+    let p: { order?: string[]; visibility?: Record<string, boolean>; frozen?: string[] } | null =
+      (summaryPref.state as never) ?? null;
+    if (!p) {
+      try {
+        const raw = typeof window === "undefined" ? null : window.localStorage.getItem(SUMMARY_COLS_KEY);
+        p = raw ? JSON.parse(raw) : null;
+      } catch {
+        p = null;
+      }
+    }
+    if (p) {
       const known = (arr?: string[]) =>
         (arr ?? []).filter((k) => SUMMARY_DEFAULT_ORDER.includes(k));
       const order = known(p.order);
@@ -284,21 +294,23 @@ export function TaskTreePage() {
       setColVisibility({ ...SUMMARY_DEFAULT_VISIBILITY, ...(p.visibility ?? {}) });
       const frozen = known(p.frozen);
       setColFrozen(frozen.includes("task_no") ? frozen : ["task_no", ...frozen]);
-    } catch {
-      // ignore
     }
-  }, []);
+    summaryColsLoaded.current = true;
+  }, [summaryPref.ready, summaryPref.state]);
+
+  const saveSummaryPref = summaryPref.save;
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!summaryColsLoaded.current) return;
+    const next = { order: colOrder, visibility: colVisibility, frozen: colFrozen };
+    saveSummaryPref(next);
     try {
-      window.localStorage.setItem(
-        SUMMARY_COLS_KEY,
-        JSON.stringify({ order: colOrder, visibility: colVisibility, frozen: colFrozen }),
-      );
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(SUMMARY_COLS_KEY, JSON.stringify(next));
+      }
     } catch {
       // ignore
     }
-  }, [colOrder, colVisibility, colFrozen]);
+  }, [colOrder, colVisibility, colFrozen, saveSummaryPref]);
 
   /** 고정 컬럼 먼저, 이어서 나머지 순서대로. 숨김 컬럼 제외. */
   const visibleCols = useMemo(() => {
