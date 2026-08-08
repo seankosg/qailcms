@@ -373,7 +373,7 @@ export function WrtRawDataPage() {
         {JUDGMENTS.map((j) => (
           <KpiCard
             key={j}
-            label={j}
+            label={wrtJudgmentLabel(j)}
             value={counts[j] ?? 0}
             active={search.judgment === j && !search.delayBand}
             onClick={() =>
