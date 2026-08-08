@@ -644,11 +644,18 @@ export const importAbdBatch = createServerFn({ method: "POST" })
         .select("id", { count: "exact", head: true })
         .eq("upload_id", batchId)
         .eq("reason_code", "ocs_pending");
+      // 파일 전체 기준 비-OCS 실패 건수
+      const { count: failedTotal } = await supa
+        .from("abd_import_row_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("upload_id", batchId)
+        .eq("action_taken", "failed");
       const parsedTotal = (cur?.parsed_rows ?? 0) + rowsToImport.length;
       const appliedTotal = (cur?.applied_rows ?? 0) + inserted + updated;
       const exclusions: Record<string, number> = {
         ...((cur?.exclusions ?? {}) as Record<string, number>),
         ocs_pending: skippedTotal ?? 0,
+        failed: failedTotal ?? 0,
       };
       const excludedTotal = Object.values(exclusions).reduce(
         (a, b) => a + (typeof b === "number" ? b : 0),
