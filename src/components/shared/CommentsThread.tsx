@@ -107,11 +107,19 @@ export function CommentsThread({
   const [recipients, setRecipients] = useState<string[]>(defaultRecipients ?? []);
   const [recipientsConfirmed, setRecipientsConfirmed] = useState(false);
 
+  // 본인(작성자)이 해당 항목의 HDEC PIC 인 경우: 본인은 잠금 대상에서 제외하고, 수신자 선택도 필수가 아님
+  const selfName = user?.name ?? null;
+  const lockedRecipients = useMemo(
+    () => (defaultRecipients ?? []).filter((n) => !selfName || n !== selfName),
+    [(defaultRecipients ?? []).join("|"), selfName],
+  );
+  const recipientsRequired = enableRecipients && lockedRecipients.length > 0;
+
   useEffect(() => {
-    setRecipients(defaultRecipients ?? []);
+    setRecipients(lockedRecipients);
     setRecipientsConfirmed(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [(defaultRecipients ?? []).join("|"), parentValue]);
+  }, [lockedRecipients.join("|"), parentValue]);
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -174,7 +182,7 @@ export function CommentsThread({
     if (!replyTo && !parentCategory) {
       return toast.error("카테고리를 선택해주세요");
     }
-    if (enableRecipients && !replyTo && !recipientsConfirmed) {
+    if (recipientsRequired && !replyTo && !recipientsConfirmed) {
       return toast.error("수신자를 선택하고 확인을 눌러주세요");
     }
     setSending(true);
@@ -196,7 +204,7 @@ export function CommentsThread({
     setMessage("");
     setReplyTo(null);
     if (enableRecipients) {
-      setRecipients(defaultRecipients ?? []);
+      setRecipients(lockedRecipients);
       setRecipientsConfirmed(false);
     }
     invalidate();
@@ -372,8 +380,9 @@ export function CommentsThread({
           value={recipients}
           onChange={setRecipients}
           disabled={!user || sending}
-          locked={defaultRecipients ?? []}
-          confirmed={recipientsConfirmed}
+          locked={lockedRecipients}
+          confirmed={recipientsConfirmed || !recipientsRequired}
+          required={recipientsRequired}
           onConfirm={() => setRecipientsConfirmed(true)}
         />
       )}
@@ -413,7 +422,7 @@ export function CommentsThread({
             !user ||
             sending ||
             !message.trim() ||
-            (enableRecipients && !replyTo && !recipientsConfirmed)
+            (recipientsRequired && !replyTo && !recipientsConfirmed)
           }
           size="sm"
           className="h-9"
