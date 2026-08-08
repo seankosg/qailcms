@@ -111,7 +111,7 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
         <div className="text-xs text-muted-foreground">불러오는 중…</div>
       ) : (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          {items.map((it) => (
+          {sortedItems.map((it) => (
           <RiskKpiCard
               key={it.work_type}
               label={it.work_type}
