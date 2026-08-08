@@ -20,7 +20,6 @@ import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
 import { Route as AuthenticatedResourceDashboardRouteImport } from './routes/_authenticated/resource/dashboard'
-import { Route as AuthenticatedOutstandingDashboardRouteImport } from './routes/_authenticated/outstanding/dashboard'
 import { Route as AuthenticatedImportLogLogsRouteImport } from './routes/_authenticated/import-log/logs'
 import { Route as AuthenticatedImportLogImportRouteImport } from './routes/_authenticated/import-log/import'
 import { Route as AuthenticatedCloseoutDashboardRouteImport } from './routes/_authenticated/closeout/dashboard'
@@ -119,12 +118,6 @@ const AuthenticatedResourceDashboardRoute =
   AuthenticatedResourceDashboardRouteImport.update({
     id: '/resource/dashboard',
     path: '/resource/dashboard',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedOutstandingDashboardRoute =
-  AuthenticatedOutstandingDashboardRouteImport.update({
-    id: '/outstanding/dashboard',
-    path: '/outstanding/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedImportLogLogsRoute =
@@ -392,7 +385,6 @@ export interface FileRoutesByFullPath {
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
-  '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -445,7 +437,6 @@ export interface FileRoutesByTo {
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
-  '/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -501,7 +492,6 @@ export interface FileRoutesById {
   '/_authenticated/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
   '/_authenticated/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/_authenticated/import-log/logs': typeof AuthenticatedImportLogLogsRoute
-  '/_authenticated/outstanding/dashboard': typeof AuthenticatedOutstandingDashboardRoute
   '/_authenticated/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -557,7 +547,6 @@ export interface FileRouteTypes {
     | '/closeout/dashboard'
     | '/import-log/import'
     | '/import-log/logs'
-    | '/outstanding/dashboard'
     | '/resource/dashboard'
     | '/api/public/version'
     | '/admin/'
@@ -610,7 +599,6 @@ export interface FileRouteTypes {
     | '/closeout/dashboard'
     | '/import-log/import'
     | '/import-log/logs'
-    | '/outstanding/dashboard'
     | '/resource/dashboard'
     | '/api/public/version'
     | '/admin'
@@ -665,7 +653,6 @@ export interface FileRouteTypes {
     | '/_authenticated/closeout/dashboard'
     | '/_authenticated/import-log/import'
     | '/_authenticated/import-log/logs'
-    | '/_authenticated/outstanding/dashboard'
     | '/_authenticated/resource/dashboard'
     | '/api/public/version'
     | '/_authenticated/admin/'
@@ -789,13 +776,6 @@ declare module '@tanstack/react-router' {
       path: '/resource/dashboard'
       fullPath: '/resource/dashboard'
       preLoaderRoute: typeof AuthenticatedResourceDashboardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/outstanding/dashboard': {
-      id: '/_authenticated/outstanding/dashboard'
-      path: '/outstanding/dashboard'
-      fullPath: '/outstanding/dashboard'
-      preLoaderRoute: typeof AuthenticatedOutstandingDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/import-log/logs': {
@@ -1142,7 +1122,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCloseoutDashboardRoute: typeof AuthenticatedCloseoutDashboardRoute
   AuthenticatedImportLogImportRoute: typeof AuthenticatedImportLogImportRoute
   AuthenticatedImportLogLogsRoute: typeof AuthenticatedImportLogLogsRoute
-  AuthenticatedOutstandingDashboardRoute: typeof AuthenticatedOutstandingDashboardRoute
   AuthenticatedResourceDashboardRoute: typeof AuthenticatedResourceDashboardRoute
   AuthenticatedClosureAbdDashboardRoute: typeof AuthenticatedClosureAbdDashboardRoute
   AuthenticatedClosureAbdImportRoute: typeof AuthenticatedClosureAbdImportRouteWithChildren
@@ -1180,8 +1159,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCloseoutDashboardRoute: AuthenticatedCloseoutDashboardRoute,
   AuthenticatedImportLogImportRoute: AuthenticatedImportLogImportRoute,
   AuthenticatedImportLogLogsRoute: AuthenticatedImportLogLogsRoute,
-  AuthenticatedOutstandingDashboardRoute:
-    AuthenticatedOutstandingDashboardRoute,
   AuthenticatedResourceDashboardRoute: AuthenticatedResourceDashboardRoute,
   AuthenticatedClosureAbdDashboardRoute: AuthenticatedClosureAbdDashboardRoute,
   AuthenticatedClosureAbdImportRoute:
@@ -1248,13 +1225,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
