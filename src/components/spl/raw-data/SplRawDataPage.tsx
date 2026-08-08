@@ -226,6 +226,8 @@ export function SplRawDataPage() {
   const saveOne = async (id: string, field: string, value: string | null) => {
     await saveField({ data: { id, field, value } });
   };
+  // Keep the open detail sheet bound to the freshest row after a refetch
+  const detailRow = detailRowState ? (rows.find((r) => r.id === detailRowState.id) ?? detailRowState) : null;
   const refetchRows = async () => {
     await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
   };
