@@ -313,36 +313,14 @@ export function TmDashboardPage() {
         />
       )}
 
-      {isLoading ? (
-        <Skeleton className="h-[600px] w-full" />
-      ) : items.length === 0 ? (
+      {!isLoading && items.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-2 p-10 text-sm text-muted-foreground">
             <AlertTriangle className="h-6 w-6 text-muted-foreground/60" />
             현재 조건에 해당하는 태스크가 없습니다.
           </CardContent>
         </Card>
-      ) : (
-        <OwnerProgressChart
-          items={scopedItems}
-          asOfDate={asOfDate}
-          dim={ownerDim}
-          onDimChange={(dim) => patch({ ownerDim: dim })}
-          onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
-          thresholds={thresholds}
-        />
-      )}
-
-      <OwnerDetailDialog
-        open={ownerDetail !== null}
-        onOpenChange={(o) => !o && setOwnerDetail(null)}
-        dim={ownerDetail?.dim ?? ownerDim}
-        ownerKey={ownerDetail?.key ?? ""}
-        row={ownerDetail?.row ?? null}
-        items={scopedItems}
-        asOfDate={asOfDate}
-        thresholds={thresholds}
-      />
+      ) : null}
     </div>
   );
 }
