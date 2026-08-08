@@ -104,6 +104,12 @@ export function CommentsThread({
     defaultCategory === undefined ? (categories[0]?.value ?? null) : defaultCategory,
   );
   const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
+  const [recipients, setRecipients] = useState<string[]>(defaultRecipients ?? []);
+
+  useEffect(() => {
+    setRecipients(defaultRecipients ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(defaultRecipients ?? []).join("|"), parentValue]);
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -175,6 +181,7 @@ export function CommentsThread({
       source: "app_manual",
       author_user_id: user.id,
     };
+    if (enableRecipients) payload["recipient_names"] = recipients;
     const { error } = await (supabase as any).from(table).insert(payload);
     setSending(false);
     if (error) {
@@ -183,6 +190,7 @@ export function CommentsThread({
     }
     setMessage("");
     setReplyTo(null);
+    if (enableRecipients) setRecipients(defaultRecipients ?? []);
     invalidate();
   };
 
