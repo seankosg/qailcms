@@ -42,6 +42,7 @@ export function DefectColumnOrderMenu({
   onServerReorder,
   onServerVisibility,
   onServerLabel,
+  onSaveLayout,
 }: Props) {
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
