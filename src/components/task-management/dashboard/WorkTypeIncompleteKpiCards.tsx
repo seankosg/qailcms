@@ -65,6 +65,7 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
       label: e.team,
       count: e.count,
       suffix: `(${e.delayed.toLocaleString()})`,
+      suffixClassName: "text-red-600 dark:text-red-400",
       onClick: () => goRaw(item.work_type, item.isNull, e),
     }));
     if (rest.length) {
@@ -72,6 +73,7 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
         label: `기타 (${rest.length}팀)`,
         count: rest.reduce((a, b) => a + b.count, 0),
         suffix: `(${rest.reduce((a, b) => a + b.delayed, 0).toLocaleString()})`,
+        suffixClassName: "text-red-600 dark:text-red-400",
         disabled: true,
       });
     }
