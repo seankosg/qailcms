@@ -83,7 +83,7 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-baseline gap-2">
-        <h3 className="text-sm font-semibold">Work Type Status (Actual &lt; 100%)</h3>
+        <h3 className="text-sm font-semibold">Incomplete Status (Actual &lt; 100%)</h3>
         <span className="text-[11px] text-muted-foreground">
           Subtask 기준 · 전체 {total.toLocaleString()} items · 괄호 안은 지연(Cum. Diff &lt; 0) 건수 ·
           지연 합계 {(data?.delayed_total ?? 0).toLocaleString()}
@@ -103,9 +103,9 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
       ) : (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
           {items.map((it) => (
-            <RiskKpiCard
+          <RiskKpiCard
               key={it.work_type}
-              label={`Work Type · ${it.work_type}`}
+              label={it.work_type}
               count={it.count}
               countSuffix={`(${it.delayed.toLocaleString()})`}
               percent={total ? (it.count / total) * 100 : undefined}
@@ -113,7 +113,7 @@ export function WorkTypeIncompleteKpiCards({ asOfDate, ownerContext }: Props) {
               tone={it.delayed > 0 ? "warn" : "neutral"}
               onClick={() => goRaw(it.work_type, it.isNull)}
               breakdown={rows(it)}
-              formula={`Actual % < 100% 인 Subtask 중 Work Type = ${it.work_type}\n괄호 = Cum. Diff < 0 (지연) 건수`}
+              formula={`Actual % < 100% 인 Subtask 중 ${it.work_type}\n괄호 = Cum. Diff < 0 (지연) 건수`}
             />
           ))}
         </div>
