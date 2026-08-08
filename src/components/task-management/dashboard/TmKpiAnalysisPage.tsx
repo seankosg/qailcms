@@ -16,6 +16,8 @@ import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { OwnerProgressChart } from "./OwnerProgressChart";
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
+import { TmPlanVsActualCard } from "./TmPlanVsActualCard";
+import type { SCurveBucket } from "@/lib/task-management/scurve-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { resolveJudgment, resolveIsDelayed } from "@/lib/task-management/delay-utils";
@@ -95,6 +97,11 @@ export function TmKpiAnalysisPage() {
     key: string;
     row: OwnerLeaderboardRow;
   } | null>(null);
+  const [curveOpen, setCurveOpen] = useState(true);
+  const curveBucket: SCurveBucket =
+    search.curveBucket === "day" || search.curveBucket === "month"
+      ? search.curveBucket
+      : "week";
 
   const teamOptions = useMemo(() => uniqSorted(items, "team"), [items]);
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
@@ -257,14 +264,30 @@ export function TmKpiAnalysisPage() {
           </CardContent>
         </Card>
       ) : (
-        <OwnerProgressChart
-          items={scopedItems}
-          asOfDate={asOfDate}
-          dim={ownerDim}
-          onDimChange={(dim) => patch({ ownerDim: dim })}
-          onOwnerClick={(dim, key, row) => setOwnerDetail({ dim, key, row })}
-          thresholds={thresholds}
-        />
+        <>
+          <OwnerProgressChart
+            items={scopedItems}
+            asOfDate={asOfDate}
+            dim={ownerDim}
+            onDimChange={(dim) => patch({ ownerDim: dim, curveKey: "" })}
+            onOwnerClick={(dim, key, row) => {
+              setOwnerDetail({ dim, key, row });
+              patch({ curveKey: key });
+            }}
+            thresholds={thresholds}
+          />
+          <TmPlanVsActualCard
+            items={scopedItems}
+            asOfDate={asOfDate}
+            dim={ownerDim}
+            ownerKey={search.curveKey}
+            onOwnerKeyChange={(key) => patch({ curveKey: key })}
+            bucket={curveBucket}
+            onBucketChange={(b) => patch({ curveBucket: b })}
+            open={curveOpen}
+            onOpenChange={setCurveOpen}
+          />
+        </>
       )}
 
       <OwnerDetailDialog
