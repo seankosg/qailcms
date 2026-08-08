@@ -37,6 +37,7 @@ export function AbdColumnOrderMenu({
   onServerReorder,
   onServerVisibility,
   onServerLabel,
+  onSaveLayout,
 }: Props) {
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -142,6 +143,14 @@ export function AbdColumnOrderMenu({
             Reset
           </button>
         </div>
+        {onSaveLayout ? (
+          <div className="mb-2 px-1">
+            <Button size="sm" className="h-7 w-full text-xs" onClick={() => onSaveLayout()}>
+              <Save className="mr-1 h-3.5 w-3.5" />
+              현재 컬럼 설정 저장
+            </Button>
+          </div>
+        ) : null}
         <div className="max-h-80 overflow-y-auto pr-1">
           <div className="mb-1 rounded bg-muted/50 px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
             Frozen · Select (고정)
