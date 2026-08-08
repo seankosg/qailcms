@@ -7776,6 +7776,18 @@ export type Database = {
           value: string
         }[]
       }
+      tm_items_kpi_bundle: {
+        Args: {
+          _as_of?: string
+          _caution_buffer?: number
+          _filters?: Json
+          _include_inactive?: boolean
+          _q?: string
+          _task_scope?: string
+          _worsen_gap?: number
+        }
+        Returns: Json
+      }
       tm_items_search: {
         Args: {
           _as_of?: string
