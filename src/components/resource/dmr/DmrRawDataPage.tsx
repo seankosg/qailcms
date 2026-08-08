@@ -462,6 +462,10 @@ export function DmrRawDataPage() {
             onOrderChange={(o) => { setOrder(o); persistPref({ order: o }); }}
             onVisibilityChange={(v) => { setVisibility(v); persistPref({ visibility: v }); }}
             onFrozenChange={(f) => { setFrozenExtras(f); persistPref({ frozenExtras: f }); }}
+            onSaveLayout={() => {
+              persistPref({});
+              toast.success('컬럼 설정을 저장했습니다');
+            }}
           />
           {canEdit && (
             <Button asChild variant="outline" size="sm">
