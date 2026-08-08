@@ -5027,6 +5027,7 @@ export type Database = {
           id: string
           message: string
           parent_comment_id: string | null
+          recipient_names: string[]
           source: string
           task_raw_id: string
           updated_at: string
@@ -5039,6 +5040,7 @@ export type Database = {
           id?: string
           message: string
           parent_comment_id?: string | null
+          recipient_names?: string[]
           source?: string
           task_raw_id: string
           updated_at?: string
@@ -5051,6 +5053,7 @@ export type Database = {
           id?: string
           message?: string
           parent_comment_id?: string | null
+          recipient_names?: string[]
           source?: string
           task_raw_id?: string
           updated_at?: string
