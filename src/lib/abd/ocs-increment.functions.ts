@@ -320,7 +320,11 @@ export const ocsIncImport = createServerFn({ method: "POST" })
     try {
       let result: Json;
       try {
-        result = await rpc(context.supabase, "abd_ocs_inc_import", {
+        // 명시적 DB 오류 응답(error 객체)만 롤백 확정으로 본다.
+        // 예외 throw(fetch 실패·timeout·응답 유실)는 반영 여부 미확인이다.
+        const { data: rpcData, error: rpcError } = await (
+          context.supabase as unknown as LooseClient
+        ).rpc("abd_ocs_inc_import", {
           p_run: data.run_id,
           p_import_log_id: importLogId,
           p_allow_retire: data.allow_retire,
@@ -328,9 +332,19 @@ export const ocsIncImport = createServerFn({ method: "POST" })
           p_source_meta: data.source_meta,
           p_image_meta: data.image_meta,
         });
+        if (rpcError) {
+          const code = String((rpcError as { code?: string }).code ?? "");
+          // PostgREST/PostgreSQL 이 구조화된 DB 오류를 반환한 경우에만 커밋 실패가 확정된다.
+          const isDbError = code.length > 0;
+          const stage = isDbError ? "transactional_import" : "import_unconfirmed";
+          throw new Error(`OCS_IMPORT_STAGE[${stage}]: abd_ocs_inc_import: ${rpcError.message}`);
+        }
+        result = (rpcData ?? {}) as Json;
       } catch (e) {
-        // 본체 RPC 는 단일 트랜잭션이므로 실패 = 롤백 확정.
-        throw new Error(`OCS_IMPORT_STAGE[transactional_import]: ${(e as Error).message}`);
+        const msg = (e as Error).message;
+        if (/OCS_IMPORT_STAGE\[/.test(msg)) throw e;
+        // 네트워크 단절·timeout·응답 유실 — 반영 여부를 확정할 수 없다.
+        throw new Error(`OCS_IMPORT_STAGE[import_unconfirmed]: ${msg}`);
       }
       let verify: Json;
       try {
@@ -380,10 +394,13 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       // failed 로 두면 동일 패키지 중복 판정에서 제외되어 재실행이 허용되기 때문이다.
       const msg = (err as Error).message;
       const postApply = /OCS_IMPORT_STAGE\[(post_import_verify|import_log_finalize)\]/.test(msg);
+      const unconfirmed = /OCS_IMPORT_STAGE\[import_unconfirmed\]/.test(msg);
+      // 미확인(unknown) 은 failed 로 마감하지 않는다. failed 로 두면 중복 판정에서 빠져 재실행이 열린다.
+      const status = postApply ? "partial" : unconfirmed ? "unknown" : "failed";
       await supabaseAdmin
         .from("abd_ocs_import_logs")
         .update({
-          status: postApply ? "partial" : "failed",
+          status,
           finished_at: new Date().toISOString(),
           errors: [{ message: msg }] as never,
           result: { upload_receipts: data.upload_receipts } as never,
