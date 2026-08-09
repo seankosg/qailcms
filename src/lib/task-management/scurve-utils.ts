@@ -85,9 +85,7 @@ function buildBuckets(startIso: string, endIso: string, bucket: SCurveBucket): s
   while (cur <= end && out.length < MAX_BUCKETS) {
     out.push(iso(cur));
     cur =
-      bucket === "month"
-        ? endOfMonth(addDays(cur, 1))
-        : addDays(cur, bucket === "week" ? 7 : 1);
+      bucket === "month" ? endOfMonth(addDays(cur, 1)) : addDays(cur, bucket === "week" ? 7 : 1);
   }
   // 종료일이 속한 구간까지 포함한다(마지막 구간이 잘리지 않도록).
   if (out.length === 0 || (out[out.length - 1] < iso(end) && out.length < MAX_BUCKETS)) {

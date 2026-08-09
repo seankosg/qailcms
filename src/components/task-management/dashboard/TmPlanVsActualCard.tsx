@@ -12,11 +12,7 @@ import {
 } from "recharts";
 import { ChevronDown, ChevronRight, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   ChartContainer,
@@ -113,8 +109,7 @@ export function TmPlanVsActualCard({
     bucket: b,
     bucketLabel: curve.bucketLabels[i],
     planInc: r1(conv(curve.dailyPlan[i])),
-    actualInc:
-      curve.dailyActual[i] == null ? null : r1(conv(curve.dailyActual[i] as number)),
+    actualInc: curve.dailyActual[i] == null ? null : r1(conv(curve.dailyActual[i] as number)),
     cumPlan: r1(conv(curve.cumPlan[i])),
     cumActual: curve.cumActual[i] == null ? null : r1(conv(curve.cumActual[i] as number)),
     variance:
@@ -123,11 +118,10 @@ export function TmPlanVsActualCard({
         : r1(conv((curve.cumActual[i] as number) - curve.cumPlan[i])),
   }));
 
-  const todayLabel =
-    curve.todayIndex >= 0 ? curve.bucketLabels[curve.todayIndex] ?? null : null;
+  const todayLabel = curve.todayIndex >= 0 ? (curve.bucketLabels[curve.todayIndex] ?? null) : null;
 
   const idxForKpi = curve.todayIndex >= 0 ? curve.todayIndex : curve.buckets.length - 1;
-  const planNow = idxForKpi >= 0 ? curve.cumPlan[idxForKpi] ?? 0 : 0;
+  const planNow = idxForKpi >= 0 ? (curve.cumPlan[idxForKpi] ?? 0) : 0;
   // 실적은 버킷 종료일이 기준일보다 뒤면 null 이다(주·월 단위에서 흔함).
   // 그래서 null 이 아닌 마지막 인덱스의 누계를 쓴다. 계획(P)은 지금대로 둔다.
   let lastActualIdx = -1;
@@ -284,7 +278,8 @@ export function TmPlanVsActualCard({
                   </div>
                   {curve.excludedCount > 0 && (
                     <div className="flex items-center rounded border border-destructive/40 bg-destructive/10 px-3 py-1 text-[11px] font-semibold text-destructive">
-                      실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 실적 곡선 제외
+                      실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 실적 곡선
+                      제외
                     </div>
                   )}
                 </div>
@@ -398,7 +393,11 @@ export function TmPlanVsActualCard({
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     {todayLabel && (
-                      <ReferenceLine x={todayLabel} stroke="var(--destructive)" strokeDasharray="4 2" />
+                      <ReferenceLine
+                        x={todayLabel}
+                        stroke="var(--destructive)"
+                        strokeDasharray="4 2"
+                      />
                     )}
                     <ReferenceLine yAxisId="v" y={0} stroke="var(--border)" />
                     <Bar yAxisId="v" dataKey="variance" name={varianceLabel} barSize={8}>

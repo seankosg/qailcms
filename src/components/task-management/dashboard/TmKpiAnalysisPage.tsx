@@ -102,9 +102,7 @@ export function TmKpiAnalysisPage() {
   const [curveOpen, setCurveOpen] = useState(true);
   const [curveStart, setCurveStart] = useState<string>(DEFAULT_CURVE_START);
   const curveBucket: SCurveBucket =
-    search.curveBucket === "day" || search.curveBucket === "month"
-      ? search.curveBucket
-      : "week";
+    search.curveBucket === "day" || search.curveBucket === "month" ? search.curveBucket : "week";
 
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
@@ -138,7 +136,6 @@ export function TmKpiAnalysisPage() {
   }, [ownerDim, disciplines, search.hdecPic, search.hdecEng]);
 
   const filterSummary = useMemo(
-
     () => [
       { label: "Task", value: taskScope === "main" ? "Main" : "Sub" },
       { label: "Team", value: listLabel(disciplines) },
@@ -308,7 +305,6 @@ export function TmKpiAnalysisPage() {
             dim={ownerDim}
             titleSuffix={selectedOwnerLabel}
             onDimChange={(dim) => patch({ ownerDim: dim, curveKey: "" })}
-
             onOwnerClick={(dim, key, row) => {
               setOwnerDetail({ dim, key, row });
               // 카드 내 담당자 필터 폐기 — 클릭 시 상단 담당자 필터에 반영한다.
