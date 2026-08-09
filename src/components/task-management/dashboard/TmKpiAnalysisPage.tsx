@@ -201,6 +201,18 @@ export function TmKpiAnalysisPage() {
 
               <span className="h-5 w-px bg-border" aria-hidden />
 
+              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <span className="font-medium uppercase tracking-wide">Chart start</span>
+                <input
+                  type="date"
+                  value={curveStart}
+                  onChange={(e) => setCurveStart(e.target.value)}
+                  className="h-8 rounded-md border bg-background px-2 text-xs tabular-nums"
+                />
+              </label>
+
+              <span className="h-5 w-px bg-border" aria-hidden />
+
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Task
