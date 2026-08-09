@@ -394,10 +394,15 @@ export function OcsIncrementImportPanel() {
       try {
         const rec = (await listVerifyReceiptsFn({
           data: { package_id: p.manifest.package_id },
-        })) as { total: number; ok_paths: string[]; failed: { path: string }[] };
+        })) as {
+          total: number;
+          truncated: boolean;
+          ok_count: number;
+          failed: { path: string }[];
+        };
         setRestoredVerify(
           rec.total > 0
-            ? `서버에 이 패키지의 검증 영수증 ${rec.total}건이 있습니다 (ok ${rec.ok_paths.length} · failed ${rec.failed.length}). 이번 실행에서는 새 run ID 로 다시 검증합니다.`
+            ? `Previous verification receipts were found (${rec.total} · ok ${rec.ok_count} · failed ${rec.failed.length}${rec.truncated ? " · truncated" : ""}). For safety, this run will verify all required assets again.`
             : null,
         );
       } catch {
@@ -804,8 +809,6 @@ export function OcsIncrementImportPanel() {
   }
 
   // ── Wizard 단계 상태 판정 (기존 blockers/서버 판정을 재사용만 한다) ──
-  const duplicatePackage = precheck?.["duplicate_package"] === true;
-  const duplicateRecovered = precheck?.["duplicate_recovered"] === true;
   const duplicateLog = (precheck?.["duplicate_log"] ?? null) as {
     id?: string;
     data_file_name?: string;
@@ -820,11 +823,12 @@ export function OcsIncrementImportPanel() {
   const step1Done = baselineConfirmed || skipPreparation;
   const step2Done = prepDone || skipPreparation;
   const step3Done = packageBuilt || skipPreparation;
-  const step4Done = !!pkg && !!dry && !duplicatePackage;
-  const step5Done = verifyComplete;
-  const step6Done = !!snapshotId;
+  const step4Done = gates.step4Complete;
+  const step5Done = gates.step5Complete;
+  const step6Done = gates.step6Complete;
+  const importSuccess = evaluateImportSuccess(result);
   const step7Done = !!result;
-  const step8Done = !!result;
+  const step8Done = importSuccess.complete;
 
   const statusOf = (done: boolean, current: boolean, warn = false, blocked = false): StepStatus =>
     blocked ? "blocked" : done ? "done" : warn ? "warning" : current ? "current" : "pending";
@@ -893,13 +897,7 @@ export function OcsIncrementImportPanel() {
   ];
 
   const toggle = (i: number) => setOpenStep((cur) => (cur === i ? 0 : i));
-  const packageStatus: "pass" | "warn" | "fail" = !dry
-    ? "warn"
-    : blockers.some((b) => !/승인|미완료|미실행|스냅샷|검증/.test(b))
-      ? "fail"
-      : warnings.length > 0
-        ? "warn"
-        : "pass";
+  const packageStatus = gates.packageStatus;
 
   return (
     <div className="space-y-4">
@@ -1284,8 +1282,12 @@ export function OcsIncrementImportPanel() {
         status={steps[4]!.status}
         open={openStep === 5}
         onToggle={() => toggle(5)}
-        locked={!dry}
-        lockReasons={!dry ? ["Step 4 Dry-run 통과 후 활성화됩니다."] : []}
+        locked={!gates.step5Unlocked}
+        lockReasons={
+          !gates.step5Unlocked
+            ? ["Step 4 (ZIP 계약 · Precheck · Dry-run · 항등식 · blocker 0) 통과 후 활성화됩니다."]
+            : []
+        }
         summary={
           verifyTotal > 0 ? (
             <span className="text-[11px]">
@@ -1383,13 +1385,19 @@ export function OcsIncrementImportPanel() {
         status={steps[5]!.status}
         open={openStep === 6}
         onToggle={() => toggle(6)}
-        locked={!verifyComplete}
-        lockReasons={!verifyComplete ? ["Step 5 서버 실측 검증 완료 후 활성화됩니다."] : []}
+        locked={!gates.step6Unlocked}
+        lockReasons={
+          !gates.step6Unlocked
+            ? [
+                "Step 5 (업로드 실패 0 · 서버 검증 전량 통과 · hash mismatch 0 · unresolved 0) 완료 후 활성화됩니다.",
+              ]
+            : []
+        }
         summary={snapshotId ? <span className="font-mono text-[11px]">{snapshotId}</span> : null}
       >
         <Button
           size="sm"
-          disabled={!dry || !verifyComplete || !!busy || snapshotRunning}
+          disabled={!gates.step6Unlocked || !!busy || snapshotRunning}
           onClick={() => void runSnapshot()}
         >
           {snapshotRunning ? (
@@ -1474,8 +1482,10 @@ export function OcsIncrementImportPanel() {
         status={steps[6]!.status}
         open={openStep === 7}
         onToggle={() => toggle(7)}
-        locked={!snapshotId}
-        lockReasons={!snapshotId ? ["Step 6 Snapshot 성공 후 활성화됩니다."] : []}
+        locked={!gates.step7Unlocked}
+        lockReasons={
+          !gates.step7Unlocked ? ["Step 4~6 이 모두 통과하고 Snapshot 이 성공해야 활성화됩니다."] : []
+        }
       >
         {dry && (
           <div className="grid gap-3 md:grid-cols-2">
@@ -1602,11 +1612,31 @@ export function OcsIncrementImportPanel() {
       >
         {result ? (
           <div className="space-y-3">
-            <div className="text-sm font-semibold text-emerald-600">OCS Import Completed</div>
+            {importSuccess.complete ? (
+              <div className="text-sm font-semibold text-emerald-600">OCS Import Completed</div>
+            ) : (
+              <div className="space-y-1 rounded-md border border-amber-500 p-3">
+                <div className="text-sm font-semibold text-amber-600">Verification required</div>
+                <p className="text-[11px] text-muted-foreground">
+                  서버 Import log·post-import verify·항등식·보호 해시 대조가 모두 확인되지 않았습니다.
+                  완료로 처리하지 마십시오.
+                </p>
+                <ul className="space-y-0.5 text-[11px] text-destructive">
+                  {importSuccess.reasons.map((r) => (
+                    <li key={r}>• {r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="rounded-md border p-3">
               <Row label="Package ID" value={pkg?.manifest.package_id ?? "—"} />
               <Row label="Import run ID" value={runId} />
               <Row label="import_log_id" value={result["import_log_id"]} />
+              <Row
+                label="import log status"
+                value={result["import_log_status"] ?? "—"}
+                bad={result["import_log_status"] !== "success"}
+              />
               <Row label="Snapshot ID" value={snapshotId ?? "—"} />
               {Object.entries((result["result"] ?? {}) as Record<string, unknown>)
                 .filter(([, v]) => typeof v === "number" || typeof v === "string")
