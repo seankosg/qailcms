@@ -250,8 +250,8 @@ export function buildTmSCurve(opts: {
   for (let i = 0; i < n; i++) {
     const d = buckets[i];
     let planSum = 0;
-    for (const it of items) planSum += cumPlanProgress(it, d);
-    cumPlan[i] = (planSum / items.length) * 100;
+    for (const it of includedItems) planSum += cumPlanProgress(it, d);
+    cumPlan[i] = (planSum / includedItems.length) * 100;
 
     if (d > asOf) continue;
     if (!seriesList.length) continue;
