@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,8 +28,10 @@ import { createPreImportSnapshot } from "@/lib/backup/backup.functions";
 import { OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
 import { OCS_SOURCE_BUCKET } from "@/lib/abd/ocs-source-manifest";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import type { UploadReceipt } from "@/lib/abd/ocs-increment-types";
 
 const BATCH = 500;
+const UPLOAD_CONCURRENCY = 5;
 const RETIRE_PCT = 0.3;
 const RETIRE_ABS = 100;
 /**
@@ -73,6 +75,9 @@ export function OcsIncrementImportPanel() {
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [collision, setCollision] = useState<CollisionReport | null>(null);
+  const [receipts, setReceipts] = useState<UploadReceipt[]>([]);
+  const [stageLabel, setStageLabel] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isAdmin = me?.isStrictAdmin === true;
 
@@ -135,18 +140,39 @@ export function OcsIncrementImportPanel() {
     setAllowRetire(false);
     setResult(null);
     setFailure(null);
+    setReceipts([]);
+    setStageLabel(null);
+  }
+
+  function clearPick() {
+    resetDownstream();
+    setPkg(null);
+    setPrecheck(null);
+    setCollision(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function onPick(files: FileList) {
     const file = files[0];
     if (!file) return;
-    setBusy("패키지 검증 중…");
-    resetDownstream();
+    // 새 선택 시 이전 패키지 상태를 먼저 전부 폐기한다 (잘못된 파일이어도 이전 결과가 남지 않음)
+    setPkg(null);
     setPrecheck(null);
     setCollision(null);
+    resetDownstream();
+    if (/\.xlsx?$/i.test(file.name)) {
+      toast.error(
+        "Excel 은 로컬 Codex Skill 에서 처리하고, 완성된 증분 ZIP 을 선택하십시오.",
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setBusy("패키지 검증 중…");
+    setStageLabel("1/6 패키지 검증");
     try {
       const p = await readIncrementPackage(file);
       setPkg(p);
+      setStageLabel("2/6 기존 자산 대조");
       const pc = (await precheckFn({
         data: {
           package_sha256: p.package_sha256,
@@ -166,8 +192,12 @@ export function OcsIncrementImportPanel() {
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
+      setPkg(null);
+      setPrecheck(null);
+      setCollision(null);
     } finally {
       setBusy(null);
+      setStageLabel(null);
     }
   }
 
