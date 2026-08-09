@@ -441,12 +441,24 @@ export function OcsIncrementImportPanel() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <FilePickerButton
-            label="Select Increment ZIP"
-            accept=".zip,application/zip"
-            disabled={!!busy}
-            onFiles={(f) => void onPick(f)}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <FilePickerButton
+              label={pkg ? "Change Increment ZIP" : "Select Increment ZIP"}
+              accept=".zip,application/zip"
+              disabled={!!busy}
+              onFiles={(f) => void onPick(f)}
+            />
+            {(pkg || failure) && (
+              <Button size="sm" variant="ghost" disabled={!!busy} onClick={clearPick}>
+                Clear
+              </Button>
+            )}
+            {stageLabel && (
+              <Badge variant="outline" className="text-[11px]">
+                {stageLabel}
+              </Badge>
+            )}
+          </div>
 
           {pkg && (
             <div className="grid gap-3 md:grid-cols-2">
