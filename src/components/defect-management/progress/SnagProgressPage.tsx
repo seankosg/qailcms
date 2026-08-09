@@ -44,6 +44,7 @@ import {
   assembleMatrix,
   buildBucketRange,
   groupKeyToRawParams,
+  noPlanUnionFromMask,
   stageDateField,
   todayIso,
   weekStartIso,
@@ -212,11 +213,14 @@ export function SnagProgressPage() {
       // 그룹키/스테이지별 7/21 누계 조회 맵
       const cumRows = totalsCumQ.data ?? [];
       const cumMap = new Map<string, Record<Stage, { plan: number; actual: number }>>();
-      const emptyStages = (): Record<Stage, { plan: number; actual: number }> => ({
-        start: { plan: 0, actual: 0 },
-        rectified: { plan: 0, actual: 0 },
-        closure: { plan: 0, actual: 0 },
-      });
+      const emptyStages = (): Record<Stage, { plan: number; actual: number }> =>
+        ALL_STAGES.reduce(
+          (acc, s) => {
+            acc[s] = { plan: 0, actual: 0 };
+            return acc;
+          },
+          {} as Record<Stage, { plan: number; actual: number }>,
+        );
       for (const t of cumRows) {
         const k = JSON.stringify(t.group_key ?? []);
         if (!cumMap.has(k)) cumMap.set(k, emptyStages());
@@ -240,11 +244,13 @@ export function SnagProgressPage() {
       const rows = result.rows.map((r) => ({
         ...r,
         combined: [combinedFor(r.groupKeyRaw), ...r.combined.slice(visStart)],
-        stages: {
-          start: { ...r.stages.start, cells: [cellFor(r.groupKeyRaw, "start"), ...r.stages.start.cells.slice(visStart)] },
-          rectified: { ...r.stages.rectified, cells: [cellFor(r.groupKeyRaw, "rectified"), ...r.stages.rectified.cells.slice(visStart)] },
-          closure: { ...r.stages.closure, cells: [cellFor(r.groupKeyRaw, "closure"), ...r.stages.closure.cells.slice(visStart)] },
-        },
+        stages: ALL_STAGES.reduce(
+          (acc, s) => {
+            acc[s] = { ...r.stages[s], cells: [cellFor(r.groupKeyRaw, s), ...r.stages[s].cells.slice(visStart)] };
+            return acc;
+          },
+          {} as typeof r.stages,
+        ),
       }));
       return { buckets: newBuckets, rows };
     }
@@ -256,11 +262,13 @@ export function SnagProgressPage() {
     const rows = result.rows.map((r) => ({
       ...r,
       combined: r.combined.slice(startIdx),
-      stages: {
-        start: { ...r.stages.start, cells: r.stages.start.cells.slice(startIdx) },
-        rectified: { ...r.stages.rectified, cells: r.stages.rectified.cells.slice(startIdx) },
-        closure: { ...r.stages.closure, cells: r.stages.closure.cells.slice(startIdx) },
-      },
+      stages: ALL_STAGES.reduce(
+        (acc, s) => {
+          acc[s] = { ...r.stages[s], cells: r.stages[s].cells.slice(startIdx) };
+          return acc;
+        },
+        {} as typeof r.stages,
+      ),
     }));
     return { buckets: newBuckets, rows };
   }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket, cumIso]);
