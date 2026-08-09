@@ -295,7 +295,6 @@ export function TmPlanVsActualCard({
                       minTickGap={0}
                     />
                     <YAxis
-                      yAxisId="cum"
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
                       domain={[0, "auto"]}
@@ -318,7 +317,6 @@ export function TmPlanVsActualCard({
                     />
                     {todayLabel && (
                       <ReferenceLine
-                        yAxisId="cum"
                         x={todayLabel}
                         stroke="var(--destructive)"
                         strokeDasharray="4 2"
@@ -342,7 +340,6 @@ export function TmPlanVsActualCard({
                       hide={hidden.has("actualInc")}
                     />
                     <Line
-                      yAxisId="cum"
                       type="monotone"
                       dataKey="cumPlan"
                       name={cumPlanLabel}
@@ -353,7 +350,6 @@ export function TmPlanVsActualCard({
                       hide={hidden.has("cumPlan")}
                     />
                     <Line
-                      yAxisId="cum"
                       type="monotone"
                       dataKey="cumActual"
                       name={cumActualLabel}
@@ -377,7 +373,6 @@ export function TmPlanVsActualCard({
                       minTickGap={0}
                     />
                     <YAxis
-                      yAxisId="v"
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
                       domain={["auto", "auto"]}
@@ -399,8 +394,8 @@ export function TmPlanVsActualCard({
                         strokeDasharray="4 2"
                       />
                     )}
-                    <ReferenceLine yAxisId="v" y={0} stroke="var(--border)" />
-                    <Bar yAxisId="v" dataKey="variance" name={varianceLabel} barSize={8}>
+                    <ReferenceLine y={0} stroke="var(--border)" />
+                    <Bar dataKey="variance" name={varianceLabel} barSize={8}>
                       {data.map((row, i) => {
                         const v = row.variance as number | null;
                         // 값이 없는 구간(미래)은 그리지 않는다.
