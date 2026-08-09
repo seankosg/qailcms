@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedProjectDashboardRouteImport } from './routes/_authenticated/project-dashboard'
 import { Route as AuthenticatedMyWorkSpaceRouteImport } from './routes/_authenticated/my-work-space'
 import { Route as AuthenticatedMyTeamWorkSpaceRouteImport } from './routes/_authenticated/my-team-work-space'
+import { Route as AuthenticatedMyKpiAnalysisRouteImport } from './routes/_authenticated/my-kpi-analysis'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
@@ -98,6 +99,12 @@ const AuthenticatedMyTeamWorkSpaceRoute =
   AuthenticatedMyTeamWorkSpaceRouteImport.update({
     id: '/my-team-work-space',
     path: '/my-team-work-space',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMyKpiAnalysisRoute =
+  AuthenticatedMyKpiAnalysisRouteImport.update({
+    id: '/my-kpi-analysis',
+    path: '/my-kpi-analysis',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
@@ -378,6 +385,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/my-kpi-analysis': typeof AuthenticatedMyKpiAnalysisRoute
   '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/project-dashboard': typeof AuthenticatedProjectDashboardRoute
@@ -431,6 +439,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
+  '/my-kpi-analysis': typeof AuthenticatedMyKpiAnalysisRoute
   '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/project-dashboard': typeof AuthenticatedProjectDashboardRoute
@@ -487,6 +496,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/_authenticated/my-kpi-analysis': typeof AuthenticatedMyKpiAnalysisRoute
   '/_authenticated/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/_authenticated/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/_authenticated/project-dashboard': typeof AuthenticatedProjectDashboardRoute
@@ -543,6 +553,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/admin'
+    | '/my-kpi-analysis'
     | '/my-team-work-space'
     | '/my-work-space'
     | '/project-dashboard'
@@ -596,6 +607,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/change-password'
+    | '/my-kpi-analysis'
     | '/my-team-work-space'
     | '/my-work-space'
     | '/project-dashboard'
@@ -651,6 +663,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/_authenticated/admin'
+    | '/_authenticated/my-kpi-analysis'
     | '/_authenticated/my-team-work-space'
     | '/_authenticated/my-work-space'
     | '/_authenticated/project-dashboard'
@@ -761,6 +774,13 @@ declare module '@tanstack/react-router' {
       path: '/my-team-work-space'
       fullPath: '/my-team-work-space'
       preLoaderRoute: typeof AuthenticatedMyTeamWorkSpaceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/my-kpi-analysis': {
+      id: '/_authenticated/my-kpi-analysis'
+      path: '/my-kpi-analysis'
+      fullPath: '/my-kpi-analysis'
+      preLoaderRoute: typeof AuthenticatedMyKpiAnalysisRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin': {
@@ -1136,6 +1156,7 @@ const AuthenticatedClosureAbdImportRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
+  AuthenticatedMyKpiAnalysisRoute: typeof AuthenticatedMyKpiAnalysisRoute
   AuthenticatedMyTeamWorkSpaceRoute: typeof AuthenticatedMyTeamWorkSpaceRoute
   AuthenticatedMyWorkSpaceRoute: typeof AuthenticatedMyWorkSpaceRoute
   AuthenticatedProjectDashboardRoute: typeof AuthenticatedProjectDashboardRoute
@@ -1174,6 +1195,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
+  AuthenticatedMyKpiAnalysisRoute: AuthenticatedMyKpiAnalysisRoute,
   AuthenticatedMyTeamWorkSpaceRoute: AuthenticatedMyTeamWorkSpaceRoute,
   AuthenticatedMyWorkSpaceRoute: AuthenticatedMyWorkSpaceRoute,
   AuthenticatedProjectDashboardRoute: AuthenticatedProjectDashboardRoute,
@@ -1248,3 +1270,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
