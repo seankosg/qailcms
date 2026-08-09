@@ -450,6 +450,8 @@ export function OcsIncrementImportPanel() {
               label={pkg ? "Change Increment ZIP" : "Select Increment ZIP"}
               accept=".zip,application/zip"
               disabled={!!busy}
+              inputRef={fileInputRef}
+              resetKey={pickerKey}
               onFiles={(f) => void onPick(f)}
             />
             {(pkg || failure) && (
