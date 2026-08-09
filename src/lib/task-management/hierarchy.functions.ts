@@ -115,6 +115,7 @@ export const addChildTask = createServerFn({ method: "POST" })
       hdec_eng_name: data.hdec_eng_name ?? null,
       team: parent.team ?? null,
     });
+    await assertWorkTypeAllowed(context, [data.row_type]);
 
     // 2) 채번: DB advisory lock 기반 RPC (경합 안전)
     const { data: allocated, error: allocErr } = await admin.rpc("allocate_task_no", {
