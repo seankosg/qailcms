@@ -726,6 +726,7 @@ export function OcsIncrementImportPanel() {
     setImportElapsed(0);
     setFailure(null);
     setImportFailStage(null);
+    setImportFailure(null);
     const startedAt = Date.now();
     const tick = setInterval(
       () => setImportElapsed(Math.floor((Date.now() - startedAt) / 1000)),
@@ -781,10 +782,15 @@ export function OcsIncrementImportPanel() {
         },
       })) as Record<string, unknown>;
       setResult(out);
-      toast.success(`Import completed — run ${runId}`);
+      const ok = evaluateImportSuccess(out);
+      if (ok.complete) toast.success(`Import completed — run ${runId}`);
+      else toast.warning("Import 결과 검증이 필요합니다. Step 8 안내를 확인하십시오.");
     } catch (e) {
-      setFailure(e instanceof Error ? e.message : String(e));
-      setImportFailStage("Transactional OCS database import");
+      const state = classifyImportFailure(e);
+      setFailure(state.message);
+      setImportFailure(state);
+      setImportFailStage(state.stage);
+      toast.error(state.title);
     } finally {
       clearInterval(tick);
       setImportRunning(false);
@@ -1537,13 +1543,19 @@ export function OcsIncrementImportPanel() {
           <AlertDialogTrigger asChild>
             <Button
               size="sm"
-              disabled={blockers.length > 0 || !!busy || !!result || importRunning}
+              disabled={
+                blockers.length > 0 ||
+                !!busy ||
+                !!result ||
+                importRunning ||
+                (importFailure !== null && !importFailure.retryAllowed)
+              }
             >
               {importRunning ? (
                 <>
                   <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Importing…
                 </>
-              ) : failure ? (
+              ) : importFailure?.retryAllowed ? (
                 "Retry Increment Import"
               ) : (
                 "Import OCS Package"
@@ -1583,18 +1595,26 @@ export function OcsIncrementImportPanel() {
             <p className="text-xs font-medium text-amber-600">Do not refresh or close this page.</p>
           </div>
         )}
-        {failure && (
+        {importFailure && (
           <OcsErrorCard
-            title="Import failed"
-            affected="단일 트랜잭션이므로 부분 반영은 남지 않습니다. 업로드된 자산과 사전 스냅샷은 보존됩니다."
-            nextStep={
-              /partial|부분/i.test(failure)
-                ? "Import requires administrator recovery. Do not import this package again."
-                : "Import 단계만 다시 실행하십시오. 파일 재업로드나 백업 재생성은 필요하지 않습니다."
-            }
+            title={importFailure.title}
+            affected={importFailure.affected}
+            nextStep={importFailure.nextStep}
             runId={runId}
             snapshotId={snapshotId}
-            details={`${importFailStage ? `stage: ${importFailStage}\n` : ""}${failure}`}
+            details={`status: ${importFailure.kind}${
+              importFailure.stage ? `\nstage: ${importFailure.stage}` : ""
+            }\n${importFailure.message}`}
+          />
+        )}
+        {failure && !importFailure && (
+          <OcsErrorCard
+            title="Step failed"
+            affected="이 단계만 실패했습니다. 운영 정본 반영 여부는 이 메시지로 판정하지 않습니다."
+            nextStep="run ID 로 Import log 와 운영 정본을 확인한 뒤 진행하십시오."
+            runId={runId}
+            snapshotId={snapshotId}
+            details={failure}
           />
         )}
       </OcsWizardStepCard>
