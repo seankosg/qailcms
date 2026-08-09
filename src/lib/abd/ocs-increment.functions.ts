@@ -396,16 +396,32 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       const postApply = /OCS_IMPORT_STAGE\[(post_import_verify|import_log_finalize)\]/.test(msg);
       const unconfirmed = /OCS_IMPORT_STAGE\[import_unconfirmed\]/.test(msg);
       // 미확인(unknown) 은 failed 로 마감하지 않는다. failed 로 두면 중복 판정에서 빠져 재실행이 열린다.
-      const status = postApply ? "partial" : unconfirmed ? "unknown" : "failed";
+      let status = postApply ? "partial" : unconfirmed ? "unknown" : "failed";
+      let finalMsg = msg;
+      if (unconfirmed) {
+        // 서버 상태로 커밋 여부를 확인한다. 커밋 흔적이 없으면 롤백 확정으로 강등한다.
+        try {
+          const { count, error: cErr } = await supabaseAdmin
+            .from("abd_ocs_comment_groups")
+            .select("id", { count: "exact", head: true })
+            .eq("import_log_id", importLogId);
+          if (!cErr && (count ?? 0) === 0) {
+            status = "failed";
+            finalMsg = msg.replace("[import_unconfirmed]", "[transactional_import]");
+          }
+        } catch {
+          /* 상태 조회 실패 시 미확인 유지 */
+        }
+      }
       await supabaseAdmin
         .from("abd_ocs_import_logs")
         .update({
           status,
           finished_at: new Date().toISOString(),
-          errors: [{ message: msg }] as never,
+          errors: [{ message: finalMsg }] as never,
           result: { upload_receipts: data.upload_receipts } as never,
         })
         .eq("id", importLogId);
-      throw err;
+      throw finalMsg === msg ? err : new Error(finalMsg);
     }
   });
