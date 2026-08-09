@@ -548,6 +548,18 @@ export function OcsIncrementImportPanel() {
                 value={dry["attachments_unresolved"]}
                 bad={num(dry["attachments_unresolved"]) > 0}
               />
+              <Row label="images_new" value={dry["images_new"]} />
+              <Row label="images_existing" value={dry["images_existing"]} />
+              <Row
+                label="images_conflict"
+                value={dry["images_conflict"]}
+                bad={num(dry["images_conflict"]) > 0}
+              />
+              <Row
+                label="images_meta_missing"
+                value={dry["images_meta_missing"]}
+                bad={num(dry["images_meta_missing"]) > 0}
+              />
               <Row label="source_files_new" value={dry["source_files_new"]} />
               <Row label="source_files_revised" value={dry["source_files_revised"]} />
               <Row label="source_files_existing" value={dry["source_files_existing"]} />
