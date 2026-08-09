@@ -33,6 +33,9 @@ export interface TmSCurveResult {
   /** 버킷 간 증분(pp) */
   dailyPlan: number[];
   dailyActual: (number | null)[];
+  /** 창 시작 직전 시점의 누계(pp) — 첫 막대가 튀지 않도록 기준선으로 뺀다. */
+  baselinePlan: number;
+  baselineActual: number | null;
 }
 
 const MAX_BUCKETS = 800;
@@ -62,6 +65,14 @@ function endOfSatWeek(d: Date): Date {
 }
 function labelOf(isoDate: string, bucket: SCurveBucket): string {
   return bucket === "month" ? formatDdMmmYy(isoDate) : formatDdMmm(isoDate);
+}
+
+/** 버킷 종료일이 속한 구간의 시작일. */
+function periodStart(bucketEndIso: string, bucket: SCurveBucket): Date {
+  const d = parse(bucketEndIso)!;
+  if (bucket === "day") return d;
+  if (bucket === "week") return addDays(d, -6);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 }
 
 /** 구간의 마지막 날짜 배열(오름차순). 종료일 강제 추가 없음. */
