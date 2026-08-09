@@ -290,7 +290,9 @@ export function TmKpiAnalysisPage() {
             items={scopedItems}
             asOfDate={asOfDate}
             dim={ownerDim}
+            titleSuffix={selectedOwnerLabel}
             onDimChange={(dim) => patch({ ownerDim: dim, curveKey: "" })}
+
             onOwnerClick={(dim, key, row) => {
               setOwnerDetail({ dim, key, row });
               // 카드 내 담당자 필터 폐기 — 클릭 시 상단 담당자 필터에 반영한다.
