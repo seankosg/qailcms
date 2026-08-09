@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -67,7 +66,7 @@ export function TmKpiAnalysisPage() {
       hdecPic: search.hdecPic,
       hdecEng: search.hdecEng,
       level: "all",
-      q: search.q,
+      q: "",
     },
     asOfDate,
   );
@@ -234,18 +233,8 @@ export function TmKpiAnalysisPage() {
                 </Tabs>
               </div>
 
-              <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
-                <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <Input
-                  value={search.q}
-                  placeholder="task_no / 이름 / 담당"
-                  className="h-8 w-full text-xs sm:w-56"
-                  onChange={(e) => patch({ q: e.target.value })}
-                />
-              </div>
-            </div>
+              <span className="h-5 w-px bg-border" aria-hidden />
 
-            <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
               <OwnerQuickFilterPills
                 picOptions={picOptions}
                 engOptions={engOptions}
