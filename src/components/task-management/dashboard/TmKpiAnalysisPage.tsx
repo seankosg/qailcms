@@ -20,7 +20,7 @@ import { TmPlanVsActualCard } from "./TmPlanVsActualCard";
 import type { SCurveBucket } from "@/lib/task-management/scurve-utils";
 import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
-import { resolveJudgment, resolveIsDelayed } from "@/lib/task-management/delay-utils";
+import { resolveJudgment } from "@/lib/task-management/delay-utils";
 import { todayInDoha } from "@/lib/time/doha";
 
 const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
