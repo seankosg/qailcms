@@ -163,9 +163,7 @@ export function OcsIncrementImportPanel() {
     setCollision(null);
     resetDownstream();
     if (/\.xlsx?$/i.test(file.name)) {
-      toast.error(
-        "Excel 은 로컬 Codex Skill 에서 처리하고, 완성된 증분 ZIP 을 선택하십시오.",
-      );
+      toast.error("Excel 은 로컬 Codex Skill 에서 처리하고, 완성된 증분 ZIP 을 선택하십시오.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       setPickerKey((k) => k + 1);
       return;

@@ -442,7 +442,9 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
   const imagePathSet = new Set(images.map((b) => b.relative_path.replace(/^images\//, "")));
   for (const a of atomic.attachments) {
     if (a.storage_path && !imagePathSet.has(a.storage_path)) {
-      blockers.push(`attachment metadata 에 대응하는 이미지 바이너리가 없습니다: ${a.storage_path}`);
+      blockers.push(
+        `attachment metadata 에 대응하는 이미지 바이너리가 없습니다: ${a.storage_path}`,
+      );
     }
   }
 
