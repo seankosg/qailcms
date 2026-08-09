@@ -24,6 +24,12 @@ export const verifiedKey = (bucket: string, path: string, sha256: string, byteSi
 
 export type RunIdentity = { run_id: string; package_id: string };
 
+/**
+ * 최종 Import 용도에서는 Storage 에 object 가 없는 자산을 절대 "신규(fresh)" 로 통과시키지 않는다.
+ * (업로드 실패/누락분이 조용히 Import 되는 것을 차단)
+ */
+export type RecheckOptions = { requireStorageExists?: boolean };
+
 export type ServerCollisionResult = {
   skip_paths: string[];
   new_paths: string[];
@@ -71,7 +77,9 @@ export async function recheckCollisionsServerSide(
   receipts: UploadReceipt[] = [],
   identity?: RunIdentity,
   verified: VerifiedKeySet = new Set<string>(),
+  options: RecheckOptions = {},
 ): Promise<ServerCollisionResult> {
+  const requireStorageExists = options.requireStorageExists === true;
   const blockers: string[] = imageMetaIntegrityBlockers(imageMeta);
   const skip: string[] = [];
   const fresh: string[] = [];
@@ -139,7 +147,13 @@ export async function recheckCollisionsServerSide(
     const table = a.kind === "image" ? "abd_ocs_attachments" : "abd_ocs_source_files";
     const exists = existing.has(`${a.bucket}::${a.path}`);
     if (!exists) {
-      fresh.push(a.path);
+      if (requireStorageExists) {
+        blockers.push(
+          `STORAGE_MISSING: ${a.bucket}/${a.path} — 업로드되지 않은 자산입니다. 업로드를 완료한 뒤 다시 실행하십시오.`,
+        );
+      } else {
+        fresh.push(a.path);
+      }
       continue;
     }
     const key = `${table}::${a.path}`;

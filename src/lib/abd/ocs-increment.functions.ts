@@ -280,6 +280,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       data.upload_receipts,
       { run_id: data.run_id, package_id: data.package_id },
       verified,
+      { requireStorageExists: true },
     );
     if (collision.blockers.length > 0) throw new Error(collision.blockers.join(" / "));
 
