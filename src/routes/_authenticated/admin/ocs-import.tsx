@@ -10,7 +10,7 @@ import { getOcsImportStats } from "@/lib/abd/ocs-import.functions";
 import { ocsVerify } from "@/lib/abd/ocs-stage-b.functions";
 import { ocsV3Verify } from "@/lib/abd/ocs-v3-import.functions";
 import { OcsRecountPanel } from "@/components/abd/ocs/OcsRecountPanel";
-import { OcsRecoveryPanel } from "@/components/abd/ocs/OcsRecoveryPanel";
+// OcsRecoveryPanel: 2026-08-09 일회성 복구 완료 후 렌더 경로 폐쇄 (파일·함수는 감사 목적 보존)
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export const Route = createFileRoute("/_authenticated/admin/ocs-import")({
@@ -106,8 +106,6 @@ function OcsMaintenanceBody() {
       </Card>
 
       <OcsRecountPanel />
-
-      <OcsRecoveryPanel />
 
       <Card>
         <CardHeader>
