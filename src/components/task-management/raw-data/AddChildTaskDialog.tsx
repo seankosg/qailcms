@@ -26,6 +26,7 @@ import {
   RISK_LEVELS,
   type Discipline,
 } from "@/lib/task-management/columns";
+import { WorkTypeCombo } from "./WorkTypeCombo";
 import { addChildTask } from "@/lib/task-management/hierarchy.functions";
 import { useRclCan } from "@/hooks/useRclCan";
 
@@ -189,13 +190,9 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
             </div>
             <div>
               <Label className="text-xs">Work Type</Label>
-              <Select value={rowType || "__none__"} onValueChange={(v) => setRowType(v === "__none__" ? "" : v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="선택" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">(비우기)</SelectItem>
-                  {ROW_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="mt-1">
+                <WorkTypeCombo value={rowType} onChange={setRowType} className="h-9" />
+              </div>
             </div>
             <div>
               <Label className="text-xs">Status</Label>

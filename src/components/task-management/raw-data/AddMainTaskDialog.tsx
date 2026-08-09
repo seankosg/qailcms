@@ -22,6 +22,7 @@ import {
 import {
   addMainTaskWithSubs, allocateMainTaskNo,
 } from "@/lib/task-management/hierarchy.functions";
+import { WorkTypeCombo } from "./WorkTypeCombo";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTeamOptions } from "@/lib/team/team-master";
 import { cn } from "@/lib/utils";
@@ -313,13 +314,7 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
                 </Select>
               </Field>
               <Field label={<>Work Type {optHint}</>}>
-                <Select value={rowType || "__none__"} onValueChange={(v) => setRowType(v === "__none__" ? "" : v)}>
-                  <SelectTrigger className="h-8"><SelectValue placeholder="선택" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">(비우기)</SelectItem>
-                    {ROW_TYPES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <WorkTypeCombo value={rowType} onChange={setRowType} />
               </Field>
               <ReadOnlyField label="P.Start (Sub 자동 롤업)" value={rollup.plan_start || "—"} />
               <ReadOnlyField label="P.Finish (Sub 자동 롤업)" value={rollup.plan_end || "—"} />
@@ -355,10 +350,12 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
                       <Textarea rows={1} value={s.sub_task_desc} onChange={(e) => updateSub(i, { sub_task_desc: e.target.value })} className="min-h-8" data-invalid={!s.sub_task_desc.trim()} />
                     </Field>
                     <Field label={<>Work Type {reqStar}</>} invalid={!s.row_type.trim()}>
-                      <Select value={s.row_type} onValueChange={(v) => updateSub(i, { row_type: v })}>
-                        <SelectTrigger className="h-8" data-invalid={!s.row_type.trim()}><SelectValue placeholder="선택" /></SelectTrigger>
-                        <SelectContent>{ROW_TYPES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <WorkTypeCombo
+                        value={s.row_type}
+                        onChange={(v) => updateSub(i, { row_type: v })}
+                        allowEmpty={false}
+                        invalid={!s.row_type.trim()}
+                      />
                     </Field>
                     <Field label={<>Risk {reqStar}</>} invalid={!s.risk.trim()}>
                       <Select value={s.risk} onValueChange={(v) => updateSub(i, { risk: v })}>
