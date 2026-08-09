@@ -100,6 +100,30 @@ describe("wizard gates", () => {
     expect(f.retryAllowed).toBe(true);
   });
 
+  it("timeout 후 commit 흔적 0건이어도 unknown 유지 (자동 강등 금지)", () => {
+    // 서버는 커밋 흔적 조회 결과와 무관하게 import_unconfirmed 단계를 유지한다.
+    const f = classifyImportFailure(
+      new Error("OCS_IMPORT_STAGE[import_unconfirmed]: request timeout (comment_groups count 0)"),
+    );
+    expect(f.kind).toBe("unknown");
+    expect(f.stage).toBe("import_unconfirmed");
+    expect(f.kind).not.toBe("confirmed_rollback");
+  });
+
+  it("unknown 은 재시도 금지 안내", () => {
+    const f = classifyImportFailure(new Error("OCS_IMPORT_STAGE[import_unconfirmed]: socket hang up"));
+    expect(f.retryAllowed).toBe(false);
+    expect(f.nextStep).toContain("Do not retry");
+  });
+
+  it("명시적 DB 오류 응답 → confirmed_rollback · 재시도 허용", () => {
+    const f = classifyImportFailure(
+      new Error('OCS_IMPORT_STAGE[transactional_import]: abd_ocs_inc_import: 42P01 relation does not exist'),
+    );
+    expect(f.kind).toBe("confirmed_rollback");
+    expect(f.retryAllowed).toBe(true);
+  });
+
   it("6. 서버 로그 success + 숫자 항등식 정상 → Step 8 완료", () => {
     const ev = evaluateImportSuccess({
       import_log_id: "log-1",
