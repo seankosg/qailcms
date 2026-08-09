@@ -18,16 +18,18 @@ interface Props {
   onChange: (v: string) => void;
   /** 비우기 옵션 노출 여부 */
   allowEmpty?: boolean;
+  /** 신규 값 직접 입력 허용 (기본 true). 비관리자는 false 로 기존 값 선택만 가능. */
+  allowNew?: boolean;
   className?: string;
   invalid?: boolean;
 }
 
 /** 기존값 풀다운 + 신규값 직접 입력 콤보. */
-export function WorkTypeCombo({ value, onChange, allowEmpty = true, className, invalid }: Props) {
+export function WorkTypeCombo({ value, onChange, allowEmpty = true, allowNew = true, className, invalid }: Props) {
   const { data: options = [] } = useTmWorkTypeOptions();
   const [manual, setManual] = useState(false);
   const isKnown = !!value && options.includes(value);
-  const showInput = manual || (!!value && !isKnown);
+  const showInput = allowNew && (manual || (!!value && !isKnown));
 
   if (showInput) {
     return (
@@ -78,7 +80,7 @@ export function WorkTypeCombo({ value, onChange, allowEmpty = true, className, i
             {o}
           </SelectItem>
         ))}
-        <SelectItem value={NEW}>+ 새 값 입력…</SelectItem>
+        {allowNew && <SelectItem value={NEW}>+ 새 값 입력…</SelectItem>}
       </SelectContent>
     </Select>
   );
