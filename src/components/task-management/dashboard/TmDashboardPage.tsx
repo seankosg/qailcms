@@ -40,6 +40,13 @@ const DELAY_FILTER_OPTIONS = [
   { value: "risk", label: "악화만" },
 ] as const;
 
+const PLOT_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "C", label: "C" },
+  { value: "D", label: "D" },
+  { value: "G", label: "G" },
+] as const;
+
 function uniqSorted(items: TaskItem[], field: keyof TaskItem): string[] {
   const s = new Set<string>();
   for (const it of items) {
@@ -234,19 +241,26 @@ export function TmDashboardPage() {
               </Tabs>
             </div>
 
-            <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
-              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <Input
-                value={search.q}
-                placeholder="task_no / 이름 / 담당"
-                className="h-8 w-full text-xs sm:w-56"
-                onChange={(e) => patch({ q: e.target.value })}
-              />
-            </div>
-          </div>
+            <span className="h-5 w-px bg-border" aria-hidden />
 
-          {/* Row 2: Owner axis pills */}
-          <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Plot
+              </span>
+              <Tabs
+                value={(search.plot ?? []).length === 1 ? String(search.plot[0]) : "all"}
+                onValueChange={(v) => patch({ plot: v === "all" ? [] : [v] })}
+              >
+                <TabsList className="h-8">
+                  {PLOT_OPTIONS.map((o) => (
+                    <TabsTrigger key={o.value} value={o.value} className="h-6 px-2 text-xs">
+                      {o.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+
             <OwnerQuickFilterPills
               teamOptions={teamOptions}
               picOptions={picOptions}
@@ -256,6 +270,16 @@ export function TmDashboardPage() {
               hdecEng={search.hdecEng}
               onChange={patch}
             />
+
+            <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
+              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <Input
+                value={search.q}
+                placeholder="task_no / 이름 / 담당"
+                className="h-8 w-full text-xs sm:w-56"
+                onChange={(e) => patch({ q: e.target.value })}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
