@@ -119,18 +119,47 @@ Actual HO Date               -> actual_ho_date
 - `planned_pre_inspection_date`, `actual_pre_inspection_date`, `planned_dar_inspection_date`, `actual_dar_inspection_date`, `planned_ho_date`, `actual_ho_date` 추가.
 - 기존 `planned_H/O_date`, `actual_H/O_date` 등 하이픈/슬래시 버전은 canonical 정규화를 통해 위 key로 수렴.
 
-## 4. 데이터 마이그레이션 정책
+## 4. 확정된 설계 결정 (사용자 확인 완료)
 
-### 4.1 기존 데이터
+1. **H/O 단계 의미** — Closure 이후의 **최종 Hand Over**. Closure와 별개 시점이며 마지막 단계.
+2. **Pre-Inspection / DAR-Inspection Owner** — **HDEC PIC**. 두 단계의 실적 입력·수정 권한은 HDEC PIC(및 상위 관리자)로 제한.
+3. **Completion → Rectified 병합** — UI 문구를 전부 `Rectified`로 통일. 실측 결과 SM 컴포넌트의 사용자 노출 문구는 이미 "Rectified"이며, 남은 것은 DB 함수 3종의 `'completion'` stage key alias 제거뿐이다.
+4. **기존 데이터 백필** — 아래 4.2 규칙에 따름.
 
-- `completion` key를 사용한 기존 뷰/함수/코드는 모두 `rectified`로 교체.
-- `actual_rectified_date`가 있는 항목은 Rectified 단계 완료로 간주. Pre-Inspection/DAR-Inspection 날짜는 비워 둠.
-- H/O 날짜는 기존에 없으므로 `closure` 이후 단계로 별도 채워 넣어야 함.
+### 4.1 현재 데이터 실측 (`defect_items_raw`)
 
-### 4.2 임포트/백필 시 매핑
+| 구분 | 행수 |
+|------|------|
+| 전체 | 119,432 |
+| `actual_rectified_date` 있음 | 77,981 |
+| `actual_rectified_date` + `actual_closure_date` 모두 있음 | 68,976 |
+| `actual_rectified_date` 있고 `actual_closure_date` 없음 | 9,005 |
+| `actual_closure_date` 있음 (전체) | 70,364 |
 
-- 파일에서 `Planned Pre-Inspection Date` 등이 있으면 해당 컬럼에 직접 매핑.
-- 파일에서 `Completion Date` 등 레거시 헤더가 있으면 `Rectified`로 별칭 처리(하위 호환).
+### 4.2 백필 규칙 (확정)
+
+**규칙 A — Closure 실적이 있는 행 (70,364건)**
+
+Pre-Inspection·DAR-Inspection을 **자동 완료**로 간주하고, 계획일·실적일 **4개 컬럼 모두 `actual_closure_date`와 동일한 값**으로 백필한다.
+
+```sql
+UPDATE public.defect_items_raw
+SET planned_pre_inspection_date  = actual_closure_date,
+    actual_pre_inspection_date   = actual_closure_date,
+    planned_dar_inspection_date  = actual_closure_date,
+    actual_dar_inspection_date   = actual_closure_date
+WHERE actual_closure_date IS NOT NULL
+  AND actual_pre_inspection_date IS NULL
+  AND actual_dar_inspection_date IS NULL;
+```
+
+- H/O 단계는 **백필하지 않는다**. 이 행들의 잔여 작업은 Hand Over 단계로 남는다.
+- 되돌리기 대비 백필 스냅샷 테이블(`defect_stage_backfill_snapshot_<YYYYMMDD>`)에 대상 `id` 목록을 저장한다.
+
+**규칙 B — Closure 실적이 없는 행 (rectified만 있는 9,005건 포함)**
+
+- 자동 완료로 보지 **않는다**. Pre-Inspection / DAR-Inspection / H/O 계획·실적 모두 `NULL` 유지.
+- 코드 구현 완료 후 **임포트를 통해 계획일을 입력**할 예정.
 
 ## 5. 임포트/백필 가드
 
@@ -140,10 +169,17 @@ Actual HO Date               -> actual_ho_date
 - 단, 선행 단계 계획일이 없는 상태에서 후속 단계 실적만 입력하는 것은 허용(계획일 누락 가능).
 - 실적 삭제 시 후속 단계 실적이 있으면 선행 단계 삭제 불가(가드).
 
-### 5.2 Aconex / 재수출 파일
+### 5.2 권한 가드 (Pre-Inspection / DAR-Inspection)
 
-- Aconex 임포트는 `Closure`, `H/O` 등의 UPDATE만 수행. 행 생성 없음.
-- 재수출 파일에서 6단계 날짜 모두 수신 가능.
+- 두 단계의 실적일(`actual_pre_inspection_date`, `actual_dar_inspection_date`) 쓰기는 **HDEC PIC** 소유.
+- 판정 근거는 역할 이름 하드코딩이 아니라 `rcl_grants(모듈, 액션)` 경로를 사용하며, 행의 `hdec_pic_name` 일치 여부를 함께 검사한다.
+- 계획일(`planned_*`)은 임포트/관리자 경로로 입력한다.
+- 거부된 쓰기는 사유별로 집계해 화면과 임포트 로그 양쪽에 남긴다.
+
+### 5.3 임포트 파일
+
+- 재수출 파일에서 6단계 계획/실적 12개 컬럼 모두 수신 가능.
+- 헤더는 추정하지 않는다. 매핑이 부족하면 `/admin/mapping` 별칭으로 해결하고, 미매핑 컬럼은 임포트에서 제외한 뒤 사용자 승인 절차를 거친다.
 
 ## 6. UI 영향
 
@@ -153,41 +189,44 @@ Actual HO Date               -> actual_ho_date
 - Raw Data 테이블에 6단계 계획/실적 컬럼 추가(12개 컬럼 증가).
 - Sticky 컬럼 배경 불투명 규칙 유지.
 
-### 6.2 Progress Matrix
+### 6.2 Stage Progress Pip
+
+`src/components/defect-management/raw-data/DefectStageProgress.tsx`의 `StageName`을 6단계로 확장하고 Pip 3개 → 6개로 변경. Legend 문구도 `Start → Rectified → Pr-Ins → Dr-Ins → Closure → H/O`로 갱신.
+
+### 6.3 Progress Matrix
 
 - SM Progress Matrix의 열을 6단계로 교체.
-- 각 단계별 Done % 집계.
+- `progress.tsx` 라우트의 `stageView` 기본값(`"start,rectified"`)과 허용 값 확장. 각 단계별 Done % 집계.
 - 팀/빌딩/룸 그룹별 drill-down 유지.
 
-### 6.3 Dashboard
+### 6.4 Dashboard
 
-- KPI 카드: Start, Rectified, Pre-Ins, DAR-Ins, Closure, H/O 각 단계별 완료/미완료/지연.
+- KPI 카드: Start, Rectified, Pr-Ins, Dr-Ins, Closure, H/O 각 단계별 완료/미완료/지연.
 - Overdue 계산: 각 단계별 planned vs actual 비교.
-- Milestone Timeline(Outstanding Work)에 6단계 추가 반영.
+- 합계 = 모집단 검산: 분포·도넛·스택 차트는 미분류 버킷을 명시적으로 만들어 총합이 대상 행 수와 일치하는지 검증.
 
-### 6.4 필터
+### 6.5 필터
 
-- 단계 필터: 6단계 드롭다운.
-- 지연 기준: 현재 시점 > planned_date && actual_date IS NULL.
+- 단계 필터를 6단계로 확장(`raw-data.tsx`의 `stage`, `remaining_stage`, `noPlanStages` 파라미터).
+- 지연 기준: `asOf > planned_date && actual_date IS NULL`.
 
 ## 7. 영향 파일 목록(예상)
 
-- `src/lib/defect-management/parser.ts`
+- `src/lib/defect-management/stage-utils.ts` — `StageName` 3→6, `isStageDone` / `isStageDelayedAsOf` / `classifyDefectStage` 확장
+- `src/components/defect-management/raw-data/DefectStageProgress.tsx` — Pip 6개
+- `src/lib/defect-management/parser.ts` — canonical 헤더 + `EXTRA_REIMPORT_FIELDS`
 - `src/lib/defect-management/columns.ts` 및 필드 설정
-- `src/lib/defect-management/derived.ts` 또는 유사 판정 로직
-- SM Progress Matrix 컴포넌트
-- SM Dashboard 카드/차트
-- SM Raw Data 테이블
-- DB 마이그레이션: `defect_items_raw` 컬럼 추가 + 함수 교체
-- DB 함수: `_snag_stage_*`, `_snag_done_asof`, `_snag_progress_norm` 등
+- SM Progress Matrix / Dashboard 컴포넌트
+- `src/routes/_authenticated/closure/snag-management/progress.tsx`, `raw-data.tsx` — search schema
+- DB 마이그레이션: `defect_items_raw` 컬럼 6개 추가 + `_snag_stage_*` 함수 3종 교체
+- DB 함수: `_snag_done_asof`, `snag_progress_events`, 대시보드/매트릭스 RPC의 stage 목록
 
-## 8. 결정 필요 사항
+## 8. 실행 순서
 
-1. **H/O 단계의 의미**: Closure 이후 최종 Hand Over인가, 아니면 Closure와 동일한 시점인가?
-2. **Pre-Inspection/DAR-Inspection의 Owner**: HDEC, PM/PD, Subcontractor 중 누가 실적 입력 권한을 가지는가?
-3. **Completion→Rectified 병합**: 기존 "Completion"이라는 UI 문구를 "Rectified"로 일괄 교체할 것인가?
-4. **기존 데이터 백필**: `actual_rectified_date`가 있는 항목을 Pre-Inspection/DAR-Inspection도 자동 완료로 볼 것인가, 아니면 비워 둘 것인가?
-
-## 9. 다음 단계
-
-사용자 승인 후 코드 수정 및 마이그레이션을 시작합니다.
+1. 마이그레이션 1 — 컬럼 6개 추가
+2. 마이그레이션 2 — `_snag_stage_*` 함수 3종 6단계로 교체 (`'completion'` alias 제거)
+3. 마이그레이션 3 — 백필 스냅샷 테이블 생성 + 규칙 A 백필 (멱등 `WHERE` 조건 포함)
+4. 파서 / 컬럼 / stage-utils 코드 수정
+5. Raw Data · Progress Matrix · Dashboard UI 반영
+6. Pre-Ins / Dr-Ins 쓰기 권한 가드 적용
+7. 실측 검증 — 백필 대상 건수 대조, 단계별 done 카운트 항등식, 합계 = 모집단 검산
