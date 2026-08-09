@@ -220,17 +220,6 @@ export function TmKpiAnalysisPage() {
                   </TabsList>
                 </Tabs>
               </div>
-
-              <span className="h-5 w-px bg-border" aria-hidden />
-
-              <OwnerQuickFilterPills
-                picOptions={picOptions}
-                engOptions={engOptions}
-                showTeam={false}
-                hdecPic={search.hdecPic}
-                hdecEng={search.hdecEng}
-                onChange={patch}
-              />
             </div>
           </CardContent>
         </Card>
