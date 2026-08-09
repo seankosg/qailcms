@@ -146,6 +146,17 @@ export type CreateSnapshotOptions = {
   triggeredBy: "manual" | "scheduled" | "pre-import";
   triggerMetadata?: Record<string, unknown> | null;
   tables?: BackupTableName[];
+  /**
+   * 진행 상태 보고 전용 훅. 백업/복원 로직에는 관여하지 않으며,
+   * 예외가 나도 스냅샷 생성을 중단시키지 않는다.
+   */
+  onTableProgress?: (p: {
+    table: BackupTableName;
+    index: number;
+    total: number;
+    done: number;
+    phase: "start" | "done";
+  }) => Promise<void> | void;
 };
 
 export type CreateSnapshotResult = {
@@ -167,10 +178,29 @@ export async function createSnapshot(
   // 백업 목록 정합성 관문: DB 정본(get_backup_tables)과 코드 목록이 다르면 조용히 진행하지 않는다.
   // get_backup_tables() 내부에서 information_schema 의 영구 abd_ocs_% 테이블 누락도 EXCEPTION 으로 막는다.
   await assertBackupTableParity(supabaseAdmin);
-  const { snapshotId, name, triggeredBy, triggerMetadata, tables } = opts;
+  const { snapshotId, name, triggeredBy, triggerMetadata, tables, onTableProgress } = opts;
   const startedAt = new Date().toISOString();
   const folder = `snapshots/${snapshotId}/`;
   const tablesToBackup = tables && tables.length > 0 ? tables : BACKUP_TABLES;
+
+  const report = async (
+    table: BackupTableName,
+    index: number,
+    phase: "start" | "done",
+  ) => {
+    if (!onTableProgress) return;
+    try {
+      await onTableProgress({
+        table,
+        index,
+        total: tablesToBackup.length,
+        done: phase === "done" ? index + 1 : index,
+        phase,
+      });
+    } catch (err) {
+      console.warn("[createSnapshot] progress report failed", err);
+    }
+  };
 
   const tableManifests: SnapshotManifest["tables"] = [];
   let totalRows = 0;
@@ -178,6 +208,7 @@ export async function createSnapshot(
   const overallHasher = new Hasher();
 
   for (const tableName of tablesToBackup) {
+    await report(tableName, tablesToBackup.indexOf(tableName), "start");
     const parts: NonNullable<SnapshotManifest["tables"][number]["parts"]> = [];
     let partIndex = 0;
     let tableRows = 0;
@@ -237,6 +268,7 @@ export async function createSnapshot(
     });
     totalRows += tableRows;
     totalSize += tableSize;
+    await report(tableName, tablesToBackup.indexOf(tableName), "done");
   }
 
   const overallHash = await overallHasher.digest();

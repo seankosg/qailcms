@@ -330,12 +330,14 @@ export const verifyOcsMedia = createServerFn({ method: "POST" })
 
 export const createPreImportSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { module: PreImportModule; import_log_id?: string }) => input)
+  .inputValidator(
+    (input: { module: PreImportModule; import_log_id?: string; run_id?: string }) => input,
+  )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const core = await import("./backup-core.server");
 
-    const runId = crypto.randomUUID();
+    const runId = data.run_id ?? crypto.randomUUID();
     const snapshotId = crypto.randomUUID();
     const tables = MODULE_PRE_IMPORT_TABLES[data.module] ?? BACKUP_TABLES;
     const name = `pre-import-${data.module}-${new Date().toISOString()}`;
@@ -344,6 +346,13 @@ export const createPreImportSnapshot = createServerFn({ method: "POST" })
       id: runId,
       status: "running",
       snapshot_id: null,
+      metadata: {
+        kind: "pre-import",
+        module: data.module,
+        tables_total: tables.length,
+        tables_done: 0,
+        current_table: null,
+      } as any,
     });
     if (logError) throw new Error(logError.message);
 
@@ -355,6 +364,20 @@ export const createPreImportSnapshot = createServerFn({ method: "POST" })
         triggeredBy: "pre-import",
         triggerMetadata: { module: data.module, import_log_id: data.import_log_id ?? null },
         tables,
+        onTableProgress: async (p) => {
+          await supabaseAdmin
+            .from("backup_run_log")
+            .update({
+              metadata: {
+                kind: "pre-import",
+                module: data.module,
+                tables_total: p.total,
+                tables_done: p.done,
+                current_table: p.phase === "start" ? p.table : null,
+              } as any,
+            })
+            .eq("id", runId);
+        },
       });
       await supabaseAdmin
         .from("backup_run_log")
@@ -363,6 +386,15 @@ export const createPreImportSnapshot = createServerFn({ method: "POST" })
           snapshot_id: snapshotId,
           finished_at: new Date().toISOString(),
           duration_ms: Date.now() - started,
+          metadata: {
+            kind: "pre-import",
+            module: data.module,
+            tables_total: tables.length,
+            tables_done: tables.length,
+            current_table: null,
+            size_bytes: result.size_bytes,
+            total_rows: result.total_rows,
+          } as any,
         })
         .eq("id", runId);
       return result;
@@ -378,6 +410,22 @@ export const createPreImportSnapshot = createServerFn({ method: "POST" })
         .eq("id", runId);
       throw err;
     }
+  });
+
+/** 진행 상태 조회 전용(읽기). 백업 로직에는 관여하지 않는다. */
+export const getBackupRunStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { run_id: string }) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("backup_run_log")
+      .select("id, status, snapshot_id, started_at, finished_at, duration_ms, error_message, metadata")
+      .eq("id", data.run_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return row;
   });
 
 // Enqueue a pre-import snapshot job for background execution.
