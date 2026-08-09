@@ -428,14 +428,44 @@ export function OcsIncrementImportPanel() {
     try {
       // 영수증이 있어도 실패분·누락분은 반드시 다시 업로드한다.
       setStageLabel("4/6 신규 자산 업로드");
-      const rec = await uploadAssets(pkg, runId, receipts);
-      const failedUploads = rec.filter((r) => r.state === "failed");
+      let rec = await uploadAssets(pkg, runId, receipts);
 
       const sizeByPath = new Map<string, number>();
       for (const b of pkg.images) sizeByPath.set(imageStoragePath(b.relative_path), b.byte_size);
       for (const b of pkg.sourceFiles) {
         sizeByPath.set(sourceStoragePath(pkg.manifest.package_id, b.relative_path), b.byte_size);
       }
+
+      // 네트워크 모호 오류 복구 — 업로드는 오류를 반환했으나 object 가 실제 저장된 경우가 있다.
+      // 실패 path 를 서버 검증 배치로 실측해 hash/size 가 일치하면 declared_new 로 교정한다.
+      const ambiguous = rec.filter((r) => r.state === "failed");
+      if (ambiguous.length > 0) {
+        setStageLabel(`4/6 업로드 실패분 서버 실측 확인 (${ambiguous.length}건)`);
+        const recovered = new Map<string, string | null>();
+        for (const batch of chunk(ambiguous, VERIFY_BATCH_MAX) as UploadReceipt[][]) {
+          const items = batch.map((t) => ({
+            bucket: t.bucket,
+            path: t.path,
+            expected_sha256: t.sha256,
+            expected_byte_size: sizeByPath.get(t.path) ?? 0,
+          }));
+          const probe = (await verifyFn({
+            data: { run_id: runId, package_id: pkg.manifest.package_id, items },
+          })) as { failed?: { path: string; error: string | null }[] };
+          const bad = new Map((probe.failed ?? []).map((f) => [f.path, f.error]));
+          for (const it of items) {
+            if (!bad.has(it.path)) recovered.set(it.path, null);
+            else recovered.set(it.path, bad.get(it.path) ?? "verify failed");
+          }
+        }
+        rec = rec.map((r) =>
+          r.state === "failed" && recovered.get(r.path) === null
+            ? { ...r, state: "declared_new" as const, error: undefined }
+            : r,
+        );
+        setReceipts(rec);
+      }
+      const failedUploads = rec.filter((r) => r.state === "failed");
 
       const targets = rec.filter((r) => r.state === "uploaded" || r.state === "declared_new");
       // 분모는 성공 영수증 수가 아니라 "서버 검증이 필요한 전체 신규 asset 수" 로 고정한다.
