@@ -55,15 +55,19 @@ export const updateTaskOwnerField = createServerFn({ method: "POST" })
     if (!row) throw new Error("대상 행을 찾을 수 없습니다.");
     await assertRcl(context.supabase, context.userId, data.id, "write");
 
-    // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 은 admin 등급만 수정 가능.
-    if (data.field === "milestone") {
+    // ⛔ 임시 조치: Milestone / Work Type(row_type) 은 admin 등급만 수정 가능.
+    if (data.field === "milestone" || data.field === "row_type") {
       const { data: isAdmin, error: rErr } = await (context.supabase as any).rpc("has_role", {
         _user_id: context.userId,
         _role: "admin",
       });
       if (rErr) throw new Error(`권한 판정 실패: ${rErr.message}`);
       if (isAdmin !== true) {
-        throw new Error("권한 없음: Milestone 은 현재 관리자만 수정할 수 있습니다(임시 조치).");
+        throw new Error(
+          data.field === "milestone"
+            ? "권한 없음: Milestone 은 현재 관리자만 수정할 수 있습니다(임시 조치)."
+            : "권한 없음: Work Type 은 현재 관리자만 수정할 수 있습니다(임시 조치).",
+        );
       }
     }
 
