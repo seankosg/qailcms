@@ -286,7 +286,7 @@ export function TmPlanVsActualCard({
 
                 <ChartContainer config={cfg} className="h-[340px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
-                    <CartesianGrid yAxisId="cum" strokeDasharray="3 3" />
+                    <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="bucketLabel"
                       tick={{ fontSize: 10 }}
@@ -368,7 +368,7 @@ export function TmPlanVsActualCard({
 
                 <ChartContainer config={varianceCfg} className="h-[120px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
-                    <CartesianGrid yAxisId="v" strokeDasharray="3 3" />
+                    <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="bucketLabel"
                       tick={{ fontSize: 10 }}
