@@ -160,6 +160,20 @@ export function coreTableHashBlockers(hashes: Record<string, string>): string[] 
 }
 
 /**
+ * ZIP 바이너리 magic bytes 로 실제 이미지 형식을 판별한다 (추측 금지 · 판별 실패는 null).
+ */
+export function sniffImageFormat(buf: ArrayBuffer): "png" | "jpeg" | "gif" | "webp" | null {
+  const b = new Uint8Array(buf.slice(0, 12));
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "png";
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpeg";
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return "gif";
+  if (b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "webp";
+  return null;
+}
+
+const normFormat = (v: string): string => (v.toLowerCase() === "jpg" ? "jpeg" : v.toLowerCase());
+
+/**
  * 패키지 이미지 바이너리 ↔ atomic.json attachment metadata 대응 검증.
  * 앱은 값을 만들지 않는다. 선언이 없거나 필수값이 비면 blocker 다.
  */
@@ -185,11 +199,22 @@ export function buildImageMeta(
     if (a.width === null) missing.push("width");
     if (a.height === null) missing.push("height");
     if (!a.image_format) missing.push("image_format");
-    if (!a.mime_type) missing.push("mime_type");
     if (a.source_image_index === null) missing.push("source_image_index");
     if (!a.attachment_scope) missing.push("attachment_scope");
     if (missing.length > 0) {
       blockers.push(`신규 attachment metadata 누락 (${path}): ${missing.join(", ")}`);
+      continue;
+    }
+    // image_format 선언 ↔ 실제 바이너리 형식 대조 (mime_type 은 추측하지 않는다)
+    const sniffed = sniffImageFormat(bin.bytes);
+    if (!sniffed) {
+      blockers.push(`이미지 형식을 판별할 수 없습니다: ${path}`);
+      continue;
+    }
+    if (normFormat(a.image_format as string) !== sniffed) {
+      blockers.push(
+        `image_format 선언(${a.image_format})과 실제 바이너리 형식(${sniffed})이 다릅니다: ${path}`,
+      );
       continue;
     }
     if (a.content_hash !== bin.sha256.toLowerCase()) {
@@ -412,6 +437,14 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
     blockers.push(`중복 source_attachment_id ${atomic.duplicated_attachment_ids.length}건`);
   if (atomic.duplicated_attachment_paths.length > 0)
     blockers.push(`중복 attachment storage_path ${atomic.duplicated_attachment_paths.length}건`);
+
+  // metadata ↔ binary 전수 대응 — 바이너리 없는 metadata 도 blocker
+  const imagePathSet = new Set(images.map((b) => b.relative_path.replace(/^images\//, "")));
+  for (const a of atomic.attachments) {
+    if (a.storage_path && !imagePathSet.has(a.storage_path)) {
+      blockers.push(`attachment metadata 에 대응하는 이미지 바이너리가 없습니다: ${a.storage_path}`);
+    }
+  }
 
   const { imageMeta, blockers: imgBlockers } = buildImageMeta(atomic.attachments, images);
   blockers.push(...imgBlockers);
