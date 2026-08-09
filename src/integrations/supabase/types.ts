@@ -2939,6 +2939,9 @@ export type Database = {
           _backfilled_asd_before_20260722: boolean
           aconex_comments: string | null
           actual_closure_date: string | null
+          actual_dar_inspection_date: string | null
+          actual_ho_date: string | null
+          actual_pre_inspection_date: string | null
           actual_progress_pct: number | null
           actual_rectified_date: string | null
           actual_start_date: string | null
@@ -2989,6 +2992,9 @@ export type Database = {
           plan_group: string | null
           plan_title: string | null
           planned_closure_date: string | null
+          planned_dar_inspection_date: string | null
+          planned_ho_date: string | null
+          planned_pre_inspection_date: string | null
           planned_progress_pct: number | null
           planned_rectified_date: string | null
           planned_start_date: string | null
@@ -3026,6 +3032,9 @@ export type Database = {
           _backfilled_asd_before_20260722?: boolean
           aconex_comments?: string | null
           actual_closure_date?: string | null
+          actual_dar_inspection_date?: string | null
+          actual_ho_date?: string | null
+          actual_pre_inspection_date?: string | null
           actual_progress_pct?: number | null
           actual_rectified_date?: string | null
           actual_start_date?: string | null
@@ -3076,6 +3085,9 @@ export type Database = {
           plan_group?: string | null
           plan_title?: string | null
           planned_closure_date?: string | null
+          planned_dar_inspection_date?: string | null
+          planned_ho_date?: string | null
+          planned_pre_inspection_date?: string | null
           planned_progress_pct?: number | null
           planned_rectified_date?: string | null
           planned_start_date?: string | null
@@ -3113,6 +3125,9 @@ export type Database = {
           _backfilled_asd_before_20260722?: boolean
           aconex_comments?: string | null
           actual_closure_date?: string | null
+          actual_dar_inspection_date?: string | null
+          actual_ho_date?: string | null
+          actual_pre_inspection_date?: string | null
           actual_progress_pct?: number | null
           actual_rectified_date?: string | null
           actual_start_date?: string | null
@@ -3163,6 +3178,9 @@ export type Database = {
           plan_group?: string | null
           plan_title?: string | null
           planned_closure_date?: string | null
+          planned_dar_inspection_date?: string | null
+          planned_ho_date?: string | null
+          planned_pre_inspection_date?: string | null
           planned_progress_pct?: number | null
           planned_rectified_date?: string | null
           planned_start_date?: string | null
@@ -3195,6 +3213,36 @@ export type Database = {
           updated_description?: string | null
           updated_status?: string | null
           work_type?: string | null
+        }
+        Relationships: []
+      }
+      defect_stage_backfill_snapshot_20260809: {
+        Row: {
+          actual_closure_date: string | null
+          created_at: string
+          id: string
+          prev_actual_dar_inspection_date: string | null
+          prev_actual_pre_inspection_date: string | null
+          prev_planned_dar_inspection_date: string | null
+          prev_planned_pre_inspection_date: string | null
+        }
+        Insert: {
+          actual_closure_date?: string | null
+          created_at?: string
+          id: string
+          prev_actual_dar_inspection_date?: string | null
+          prev_actual_pre_inspection_date?: string | null
+          prev_planned_dar_inspection_date?: string | null
+          prev_planned_pre_inspection_date?: string | null
+        }
+        Update: {
+          actual_closure_date?: string | null
+          created_at?: string
+          id?: string
+          prev_actual_dar_inspection_date?: string | null
+          prev_actual_pre_inspection_date?: string | null
+          prev_planned_dar_inspection_date?: string | null
+          prev_planned_pre_inspection_date?: string | null
         }
         Relationships: []
       }
