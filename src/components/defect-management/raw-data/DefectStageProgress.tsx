@@ -5,12 +5,38 @@ import {
   isClosureComplete,
   isStageDelayedAsOf,
   isStageDone,
+  SNAG_STAGES,
   todayIso,
 } from "@/lib/defect-management/stage-utils";
 
-export type StageName = "start" | "rectified" | "closure";
+export type StageName = "start" | "rectified" | "pre_inspection" | "dar_inspection" | "closure" | "ho";
 export type StageState = "done" | "wip" | "planned" | "hold" | "empty";
 type Row = Record<string, any>;
+
+const STAGE_TITLES: Record<StageName, string> = {
+  start: "Start",
+  rectified: "Rectified",
+  pre_inspection: "Pre-Inspection",
+  dar_inspection: "DAR-Inspection",
+  closure: "Closure",
+  ho: "Hand Over",
+};
+const PLAN_FIELD: Record<StageName, string> = {
+  start: "planned_start_date",
+  rectified: "planned_rectified_date",
+  pre_inspection: "planned_pre_inspection_date",
+  dar_inspection: "planned_dar_inspection_date",
+  closure: "planned_closure_date",
+  ho: "planned_ho_date",
+};
+const ACTUAL_FIELD: Record<StageName, string> = {
+  start: "actual_start_date",
+  rectified: "actual_rectified_date",
+  pre_inspection: "actual_pre_inspection_date",
+  dar_inspection: "actual_dar_inspection_date",
+  closure: "actual_closure_date",
+  ho: "actual_ho_date",
+};
 
 export function classifyStage(item: Row, stage: StageName, asOfDate: string): StageState {
   if (isStageDone(item, stage)) return "done";
@@ -32,13 +58,7 @@ export function classifyStage(item: Row, stage: StageName, asOfDate: string): St
     if (closureStatus === "wip" || (isActualComplete(item) && !isClosureComplete(item))) return "wip";
   }
 
-  const plan =
-    stage === "start"
-      ? item.planned_start_date
-      : stage === "rectified"
-        ? item.planned_rectified_date
-        : item.planned_closure_date;
-  return plan ? "planned" : "empty";
+  return item[PLAN_FIELD[stage]] ? "planned" : "empty";
 }
 
 function Pip({ state, label }: { state: StageState; label: string }) {
@@ -75,23 +95,25 @@ const stateLabel = (state: StageState) =>
 
 export function DefectStageProgress({ item, asOfDate = null }: { item: Row; asOfDate?: string | null }) {
   const delayAsOfDate = asOfDate ?? todayIso();
-  const start = classifyStage(item, "start", delayAsOfDate);
-  const completion = classifyStage(item, "rectified", delayAsOfDate);
-  const closure = classifyStage(item, "closure", delayAsOfDate);
+  const states = SNAG_STAGES.map((s) => ({ stage: s as StageName, state: classifyStage(item, s as StageName, delayAsOfDate) }));
   const title = [
     `Delay as of ${formatDdMmm(delayAsOfDate)}`,
-    `Start: ${stateLabel(start)}${item.actual_start_date ? ` · ${formatDdMmm(item.actual_start_date)}` : item.planned_start_date ? ` (plan ${formatDdMmm(item.planned_start_date)})` : ""}`,
-    `Rectified: ${stateLabel(completion)}${item.actual_rectified_date ? ` · ${formatDdMmm(item.actual_rectified_date)}` : item.planned_rectified_date ? ` (plan ${formatDdMmm(item.planned_rectified_date)})` : ""}`,
-    `Closure: ${stateLabel(closure)}${item.actual_closure_date ? ` · ${formatDdMmm(item.actual_closure_date)}` : item.planned_closure_date ? ` (plan ${formatDdMmm(item.planned_closure_date)})` : ""}`,
+    ...states.map(({ stage, state }) => {
+      const a = item[ACTUAL_FIELD[stage]];
+      const p = item[PLAN_FIELD[stage]];
+      const suffix = a ? ` · ${formatDdMmm(a)}` : p ? ` (plan ${formatDdMmm(p)})` : "";
+      return `${STAGE_TITLES[stage]}: ${stateLabel(state)}${suffix}`;
+    }),
   ].join("\n");
 
   return (
     <span className="inline-flex select-none items-center gap-0.5" title={title} onClick={(event) => event.stopPropagation()}>
-      <Pip state={start} label={`Start: ${stateLabel(start)}`} />
-      <span className="h-px w-2 bg-muted-foreground/30" aria-hidden />
-      <Pip state={completion} label={`Rectified: ${stateLabel(completion)}`} />
-      <span className="h-px w-2 bg-muted-foreground/30" aria-hidden />
-      <Pip state={closure} label={`Closure: ${stateLabel(closure)}`} />
+      {states.map(({ stage, state }, i) => (
+        <span key={stage} className="inline-flex items-center gap-0.5">
+          {i > 0 ? <span className="h-px w-2 bg-muted-foreground/30" aria-hidden /> : null}
+          <Pip state={state} label={`${STAGE_TITLES[stage]}: ${stateLabel(state)}`} />
+        </span>
+      ))}
     </span>
   );
 }
@@ -104,7 +126,7 @@ export function DefectStageProgressLegend() {
       <span className="inline-flex items-center gap-1"><Pip state="wip" label="WIP" /> WIP</span>
       <span className="inline-flex items-center gap-1"><Pip state="planned" label="Planned" /> Planned</span>
       <span className="inline-flex items-center gap-1"><Pip state="hold" label="Delay" /> Delay</span>
-      <span className="ml-2">Stages: Start → Rectified → Closure</span>
+      <span className="ml-2">Stages: Start → Rectified → Pre-Ins → DAR-Ins → Closure → H/O</span>
     </div>
   );
 }
