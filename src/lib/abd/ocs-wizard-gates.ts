@@ -204,6 +204,23 @@ export function classifyImportFailure(err: unknown): ImportFailureState {
   const stage = STAGE_RE.exec(message)?.[1]?.toLowerCase() ?? null;
   const clean = message.replace(STAGE_RE, "").replace(/^[:\s]+/, "");
 
+  // 네트워크·timeout·응답 유실은 서버 상태를 확인하지 못한 것이므로 절대 롤백으로 보지 않는다.
+  const NETWORKISH =
+    /failed to fetch|network|timeout|timed out|econnreset|connection reset|aborted|socket hang up|502|503|504|gateway/i;
+  if (stage === "import_unconfirmed" || (!stage && NETWORKISH.test(message))) {
+    return {
+      kind: "unknown",
+      stage,
+      message: clean,
+      retryAllowed: false,
+      title: "Import result could not be confirmed",
+      affected:
+        "네트워크 오류·timeout·응답 유실 등으로 서버 반영 여부를 확인하지 못했습니다. 운영 정본이 이미 변경되었을 수 있습니다.",
+      nextStep:
+        "Do not retry. run ID 와 Import log 상태(failed / partial / success)를 먼저 확인하십시오.",
+    };
+  }
+
   if (
     stage === "precheck" ||
     stage === "final_validation" ||
