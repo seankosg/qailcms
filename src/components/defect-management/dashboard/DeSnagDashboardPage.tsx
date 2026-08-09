@@ -111,8 +111,7 @@ export function DeSnagDashboardPage() {
   const setMatrixMode = (m: MatrixMode) =>
     navigate({
       to: "/closure/snag-management/dashboard",
-      search: (prev: Record<string, unknown>) =>
-        ({ ...prev, matrixMode: m === "count" ? "" : m }) as any,
+      search: (prev: Record<string, unknown>) => ({ ...prev, matrixMode: m }) as any,
     });
 
   // 매트릭스 상단 Plot 탭 — 즉시 적용 (다른 파라미터 보존)
