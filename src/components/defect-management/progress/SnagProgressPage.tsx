@@ -274,11 +274,14 @@ export function SnagProgressPage() {
   }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket, cumIso]);
 
   const kpis = useMemo(() => {
-    const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number; noPlan: number }> = {
-      start: { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 },
-      rectified: { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 },
-      closure: { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 },
-    };
+    const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number; noPlan: number }> =
+      ALL_STAGES.reduce(
+        (acc, s) => {
+          acc[s] = { plan: 0, actual: 0, done: 0, total: 0, noPlan: 0 };
+          return acc;
+        },
+        {} as Record<Stage, { plan: number; actual: number; done: number; total: number; noPlan: number }>,
+      );
     for (const t of (totalsQ.data ?? []) as Array<{
       stage: Stage;
       plan_upto: number;
@@ -287,10 +290,7 @@ export function SnagProgressPage() {
       total: number;
       no_plan: number;
       group_key?: string[];
-      np_sr?: number;
-      np_sc?: number;
-      np_rc?: number;
-      np_src?: number;
+      np_mask?: Record<string, number> | null;
     }>) {
       if (!effectiveStages.includes(t.stage)) continue;
       byStage[t.stage].plan += t.plan_upto;
@@ -314,27 +314,20 @@ export function SnagProgressPage() {
     const planPctOfTotal = totalStages > 0 ? (cumPlan / totalStages) * 100 : 0;
     const actualPctOfTotal = totalStages > 0 ? (cumActual / totalStages) * 100 : 0;
     // NO PLAN 총계: 스테이지 이벤트 단순 합이 아니라 문서 distinct(합집합).
-    // 그룹별 교집합 카운트(np_sr/np_sc/np_rc/np_src)로 포함–배제 원리 적용.
+    // 그룹별 No Plan 비트마스크 분포(np_mask)로 합집합 계산(6단계 일반화).
     const rowsAll = (totalsQ.data ?? []) as Array<any>;
     let noPlanTotal = 0;
     let noPlanSum = 0;
     for (const r of rowsAll) {
-      if (r.stage !== "start") continue; // 그룹당 1행만 사용(np_* 는 3행 동일값)
+      if (r.stage !== "start") continue; // 그룹당 1행만 사용(np_mask 는 스테이지 행마다 동일값)
+      noPlanTotal += noPlanUnionFromMask(r.np_mask, effectiveStages);
       const g = new Map<Stage, number>();
-      for (const s of ["start", "rectified", "closure"] as Stage[]) {
+      for (const s of effectiveStages) {
         const row = rowsAll.find(
           (x) => x.stage === s && String((x.group_key ?? []).join("\u0001")) === String((r.group_key ?? []).join("\u0001")),
         );
         g.set(s, Number(row?.no_plan) || 0);
       }
-      const has = (s: Stage) => effectiveStages.includes(s);
-      let u = 0;
-      for (const s of effectiveStages) u += g.get(s) ?? 0;
-      if (has("start") && has("rectified")) u -= Number(r.np_sr) || 0;
-      if (has("start") && has("closure")) u -= Number(r.np_sc) || 0;
-      if (has("rectified") && has("closure")) u -= Number(r.np_rc) || 0;
-      if (has("start") && has("rectified") && has("closure")) u += Number(r.np_src) || 0;
-      noPlanTotal += u;
       noPlanSum += effectiveStages.reduce((acc, s) => acc + (g.get(s) ?? 0), 0);
     }
     void noPlanSum;
@@ -512,7 +505,7 @@ export function SnagProgressPage() {
             <ToolbarGroup label="Stage">
               <ToggleGroup
                 type="multiple"
-                value={isAllStages ? ["start", "rectified", "closure"] : effectiveStages}
+                value={isAllStages ? [...ALL_STAGES] : effectiveStages}
                 onValueChange={(v) => {
                   const next = (v as Stage[]).filter((x) => (ALL_STAGES as string[]).includes(x));
                   if (next.length === 0) return;
