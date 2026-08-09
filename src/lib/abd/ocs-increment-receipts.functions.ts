@@ -31,8 +31,12 @@ export type VerifyReceiptRow = {
   verified_at: string;
 };
 
-const PAGE = 1000;
-const MAX_ROWS = 20000;
+import {
+  dedupeLatestReceipts,
+  isTruncated,
+  RECEIPT_MAX_ROWS as MAX_ROWS,
+  RECEIPT_PAGE as PAGE,
+} from "@/lib/abd/ocs-increment-receipts";
 
 /**
  * 현재 패키지의 서버 실측 검증 영수증을 조회한다 (읽기 전용).
@@ -68,12 +72,8 @@ export const ocsIncListVerifyReceipts = createServerFn({ method: "POST" })
     }
 
     // 최신 영수증 중복 제거 키는 bucket::path (동일 path 가 다른 bucket 에 있을 수 있다).
-    const latest = new Map<string, VerifyReceiptRow>();
-    for (const r of list) {
-      const key = `${r.bucket}::${r.path}`;
-      if (!latest.has(key)) latest.set(key, r);
-    }
-    const dedup = [...latest.values()];
+    const dedup = dedupeLatestReceipts(list);
+    truncated = truncated || isTruncated(list.length);
     return {
       package_id: data.package_id,
       truncated,

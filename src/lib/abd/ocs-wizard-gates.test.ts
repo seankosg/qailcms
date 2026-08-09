@@ -139,3 +139,21 @@ describe("wizard gates", () => {
     expect(ev.reasons.some((r) => r.includes("항등식 실패"))).toBe(true);
   });
 });
+
+import { dedupeLatestReceipts, isTruncated } from "./ocs-increment-receipts";
+
+describe("verify receipts", () => {
+  it("7. 같은 path 가 서로 다른 bucket 에 있으면 2건으로 유지한다", () => {
+    const out = dedupeLatestReceipts([
+      { bucket: "ocs", path: "a/b.png" },
+      { bucket: "ocs-source", path: "a/b.png" },
+      { bucket: "ocs", path: "a/b.png" },
+    ]);
+    expect(out).toHaveLength(2);
+  });
+
+  it("8. 상한 도달 시 truncated 로 표면화한다", () => {
+    expect(isTruncated(20000)).toBe(true);
+    expect(isTruncated(4999)).toBe(false);
+  });
+});
