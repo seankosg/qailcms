@@ -168,17 +168,10 @@ export async function recheckCollisionsServerSide(
         rec &&
         rec.sha256 === a.sha256
       ) {
-        // 클라이언트 신고 SHA-256 을 믿지 않는다 — 서버가 object 를 직접 실측한다.
-        const probe = probeStorage ? await probeStorage(a.bucket, a.path) : null;
-        if (!probe) {
+        // 클라이언트 신고 SHA-256 을 믿지 않는다 — 서버 검증 배치가 남긴 영수증만 인정한다.
+        if (!verified.has(verifiedKey(a.bucket, a.path, a.sha256, decl.byte_size))) {
           blockers.push(
-            `STORAGE_PROBE_FAILED: ${a.bucket}/${a.path} — 서버가 object 를 실측하지 못했습니다.`,
-          );
-          continue;
-        }
-        if (probe.sha256 !== a.sha256 || probe.byte_size !== decl.byte_size) {
-          blockers.push(
-            `STORAGE_PROBE_MISMATCH: ${a.bucket}/${a.path} (실측 ${probe.sha256.slice(0, 12)}/${probe.byte_size} ≠ 선언 ${a.sha256.slice(0, 12)}/${decl.byte_size})`,
+            `SERVER_VERIFY_MISSING: ${a.bucket}/${a.path} — 서버 실측 검증 영수증(hash/size 일치)이 없습니다.`,
           );
           continue;
         }
