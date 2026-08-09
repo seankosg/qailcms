@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, BookOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -274,5 +273,3 @@ export function MyTmKpiAnalysisPage() {
     </div>
   );
 }
-void Button;
-void BookOpen;
