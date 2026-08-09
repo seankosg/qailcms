@@ -40,6 +40,13 @@ const DELAY_FILTER_OPTIONS = [
   { value: "risk", label: "악화만" },
 ] as const;
 
+const PLOT_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "C", label: "C" },
+  { value: "D", label: "D" },
+  { value: "G", label: "G" },
+] as const;
+
 function uniqSorted(items: TaskItem[], field: keyof TaskItem): string[] {
   const s = new Set<string>();
   for (const it of items) {
