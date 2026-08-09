@@ -759,10 +759,18 @@ export function OcsIncrementImportPanel() {
             <Button
               size="sm"
               variant="outline"
-              disabled={!dry || !verifyComplete || !!busy}
+              disabled={!dry || !verifyComplete || !!busy || snapshotRunning}
               onClick={() => void runSnapshot()}
             >
-              3. Create Pre-import Snapshot
+              {snapshotRunning ? (
+                <>
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" /> 3. Creating Snapshot…
+                </>
+              ) : snapshotError ? (
+                "3. Retry Pre-import Snapshot"
+              ) : (
+                "3. Create Pre-import Snapshot"
+              )}
             </Button>
             {uploadFailedCount > 0 && (
               <Badge variant="outline" className="gap-1 text-[11px] text-destructive">
@@ -785,6 +793,61 @@ export function OcsIncrementImportPanel() {
               </Badge>
             )}
           </div>
+
+          {snapshotRunning && (
+            <div className="space-y-1 rounded-md border p-3">
+              <div className="flex items-center gap-2 text-xs font-medium">
+                <Loader2 className="h-3 w-3 animate-spin" /> 3. Creating Snapshot…
+                <span className="font-mono text-muted-foreground">
+                  {Math.floor(snapshotElapsed / 60)}m {snapshotElapsed % 60}s
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Backing up ABD and OCS tables. This may take several minutes. Do not navigate away
+                or refresh this page.
+              </p>
+              {snapshotStatus && snapshotStatus.tablesTotal > 0 && (
+                <>
+                  <div className="text-xs text-muted-foreground">
+                    tables {snapshotStatus.tablesDone}/{snapshotStatus.tablesTotal}
+                    {snapshotStatus.currentTable ? ` — ${snapshotStatus.currentTable}` : ""}
+                  </div>
+                  <Progress
+                    value={(snapshotStatus.tablesDone / snapshotStatus.tablesTotal) * 100}
+                  />
+                </>
+              )}
+            </div>
+          )}
+
+          {snapshotId && !snapshotRunning && (
+            <div className="rounded-md border p-3 text-xs">
+              <div className="font-medium text-emerald-600">Snapshot created</div>
+              <div className="font-mono text-muted-foreground">
+                {snapshotId}
+                {snapshotStatus?.sizeBytes
+                  ? ` · ${(snapshotStatus.sizeBytes / 1024 / 1024).toFixed(2)} MB`
+                  : ""}
+              </div>
+            </div>
+          )}
+
+          {snapshotError && !snapshotRunning && (
+            <div className="space-y-2 rounded-md border border-destructive/50 p-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-destructive">
+                <AlertTriangle className="h-3 w-3" /> Snapshot failed
+              </div>
+              <pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-destructive">
+                {snapshotError}
+              </pre>
+              <p className="text-xs text-muted-foreground">
+                Uploaded assets are kept. Only the snapshot step needs to be retried.
+              </p>
+              <Button size="sm" variant="outline" onClick={() => void runSnapshot()}>
+                Retry Snapshot
+              </Button>
+            </div>
+          )}
 
           {busy && (
             <div className="space-y-1">
