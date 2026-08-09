@@ -90,22 +90,24 @@ function OwnerPill({ label, options, value, onChange }: PillProps) {
 }
 
 interface Props {
-  teamOptions: string[];
+  teamOptions?: string[];
   picOptions: string[];
   engOptions: string[];
-  team: string[];
+  team?: string[];
   hdecPic: string[];
   hdecEng: string[];
+  showTeam?: boolean;
   onChange: (v: { team?: string[]; hdecPic?: string[]; hdecEng?: string[] }) => void;
 }
 
 export function OwnerQuickFilterPills({
-  teamOptions,
+  teamOptions = [],
   picOptions,
   engOptions,
-  team,
+  team = [],
   hdecPic,
   hdecEng,
+  showTeam = true,
   onChange,
 }: Props) {
   return (
@@ -113,7 +115,9 @@ export function OwnerQuickFilterPills({
       <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         담당자 축
       </span>
-      <OwnerPill label="Team" options={teamOptions} value={team} onChange={(v) => onChange({ team: v })} />
+      {showTeam && (
+        <OwnerPill label="Team" options={teamOptions} value={team} onChange={(v) => onChange({ team: v })} />
+      )}
       <OwnerPill label="HDEC PIC" options={picOptions} value={hdecPic} onChange={(v) => onChange({ hdecPic: v })} />
       <OwnerPill label="HDEC ENG" options={engOptions} value={hdecEng} onChange={(v) => onChange({ hdecEng: v })} />
     </div>
