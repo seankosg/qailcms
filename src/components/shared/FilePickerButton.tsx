@@ -11,6 +11,8 @@ type Props = {
   disabled?: boolean;
   className?: string;
   inputRef?: React.RefObject<HTMLInputElement | null>;
+  /** 값이 바뀌면 내부 선택 표시와 input value 를 초기화한다. */
+  resetKey?: string | number;
   onFiles: (files: FileList) => void;
 };
 
@@ -23,12 +25,19 @@ export function FilePickerButton({
   disabled,
   className,
   inputRef,
+  resetKey,
   onFiles,
 }: Props) {
   const ownRef = useRef<HTMLInputElement | null>(null);
   const ref = inputRef ?? ownRef;
   const id = useId();
   const [picked, setPicked] = useState<string | null>(null);
+  const lastReset = useRef(resetKey);
+  if (lastReset.current !== resetKey) {
+    lastReset.current = resetKey;
+    if (picked !== null) setPicked(null);
+    if (ref.current) ref.current.value = "";
+  }
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
@@ -46,6 +55,8 @@ export function FilePickerButton({
           if (!files || files.length === 0) return;
           setPicked(files.length > 1 ? `${files.length}개 파일 선택됨` : (files[0]?.name ?? null));
           onFiles(files);
+          // 같은 파일을 다시 선택해도 change 가 발생하도록 value 를 비운다.
+          e.target.value = "";
         }}
       />
       <Button
