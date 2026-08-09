@@ -577,16 +577,7 @@ export function AbdImportPage() {
           const rows = sheet.rows
             .slice(start, end)
             .map((r) => ({ ...r, plot: r.plot ?? sheet.plot ?? null }));
-          const res: {
-            batch_id: string;
-            inserted: number;
-            updated: number;
-            inactivated: number;
-            total: number;
-            ocs_skipped_rows: typeof agg.ocsSkipped;
-            failed_rows: typeof agg.failedRows;
-            log_persist_errors: typeof agg.logPersistErrors;
-          } = await importAbdBatch({
+          const res = await importAbdBatch({
             data: {
               file_name: e.file.name,
               team: e.team,

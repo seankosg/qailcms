@@ -9,9 +9,10 @@ import { DataDatePicker } from "@/components/task-management/shared/DataDatePick
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
-import { todayIso } from "@/lib/task-management/schedule-utils";
+import { todayIso, type TaskItem } from "@/lib/task-management/schedule-utils";
 import type { OwnerDim, OwnerLeaderboardRow } from "@/lib/task-management/delay-utils";
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
+import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { OwnerProgressChart } from "./OwnerProgressChart";
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
 import { TmPlanVsActualCard } from "./TmPlanVsActualCard";
@@ -34,6 +35,19 @@ const DELAY_FILTER_OPTIONS = [
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/kpi-analysis");
 
+function isOwnerDim(v: string): v is OwnerDim {
+  return v === "team" || v === "hdec_pic_name" || v === "hdec_eng_name";
+}
+
+function uniqSorted(items: TaskItem[], field: keyof TaskItem): string[] {
+  const s = new Set<string>();
+  for (const it of items) {
+    const v = it[field];
+    if (typeof v === "string" && v.trim()) s.add(v.trim());
+  }
+  return Array.from(s).sort((a, b) => a.localeCompare(b, "ko"));
+}
+
 export function TmKpiAnalysisPage() {
   const search = routeApi.useSearch();
   const navigate = useNavigate();
@@ -47,11 +61,11 @@ export function TmKpiAnalysisPage() {
     {
       disciplines: search.discipline,
       plots: search.plot,
-      // 담당자 축 필터 제거 — 상단 Team(=discipline) 필터만 사용
+      // 담당자 축의 Team 필터는 폐기 — 상단 Team(=discipline) 필터만 사용
       teams: [],
-      hdecPic: [],
-      hdecEng: [],
-      level: "sub",
+      hdecPic: search.hdecPic,
+      hdecEng: search.hdecEng,
+      level: "all",
       q: "",
     },
     asOfDate,
@@ -68,8 +82,7 @@ export function TmKpiAnalysisPage() {
     return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [items]);
 
-  // 차트용 담당자 차원은 로컬 상태로 관리 (search param에서 제거)
-  const [chartDim, setChartDim] = useState<OwnerDim>("hdec_pic_name");
+  const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
   // 계산은 항상 Sub 기준(기본값). Main 은 명시 선택 시에만.
   const taskScope: TaskScope = search.taskScope === "main" ? "main" : "sub";
 
@@ -88,6 +101,9 @@ export function TmKpiAnalysisPage() {
     search.curveBucket === "day" || search.curveBucket === "month"
       ? search.curveBucket
       : "week";
+
+  const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
+  const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
   const scopedItems = useMemo(() => {
     const base = scopedByTaskScope;
@@ -216,6 +232,17 @@ export function TmKpiAnalysisPage() {
                   </TabsList>
                 </Tabs>
               </div>
+
+              <span className="h-5 w-px bg-border" aria-hidden />
+
+              <OwnerQuickFilterPills
+                picOptions={picOptions}
+                engOptions={engOptions}
+                showTeam={false}
+                hdecPic={search.hdecPic}
+                hdecEng={search.hdecEng}
+                onChange={patch}
+              />
             </div>
           </CardContent>
         </Card>
@@ -235,13 +262,9 @@ export function TmKpiAnalysisPage() {
           <OwnerProgressChart
             items={scopedItems}
             asOfDate={asOfDate}
-            dim={chartDim}
-            onDimChange={(dim) => {
-              setChartDim(dim);
-              patch({ curveKey: "" });
-            }}
+            dim={ownerDim}
+            onDimChange={(dim) => patch({ ownerDim: dim, curveKey: "" })}
             onOwnerClick={(dim, key, row) => {
-              setChartDim(dim);
               setOwnerDetail({ dim, key, row });
               patch({ curveKey: key });
             }}
@@ -250,7 +273,7 @@ export function TmKpiAnalysisPage() {
           <TmPlanVsActualCard
             items={scopedItems}
             asOfDate={asOfDate}
-            dim={chartDim}
+            dim={ownerDim}
             ownerKey={search.curveKey}
             onOwnerKeyChange={(key) => patch({ curveKey: key })}
             bucket={curveBucket}
@@ -264,7 +287,7 @@ export function TmKpiAnalysisPage() {
       <OwnerDetailDialog
         open={ownerDetail !== null}
         onOpenChange={(o) => !o && setOwnerDetail(null)}
-        dim={ownerDetail?.dim ?? chartDim}
+        dim={ownerDetail?.dim ?? ownerDim}
         ownerKey={ownerDetail?.key ?? ""}
         row={ownerDetail?.row ?? null}
         items={scopedItems}
