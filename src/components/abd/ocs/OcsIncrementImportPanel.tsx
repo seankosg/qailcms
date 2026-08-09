@@ -381,17 +381,31 @@ export function OcsIncrementImportPanel() {
       setPrecheck(pc);
       if (pc["duplicate_package"] === true) {
         // 이미 반영(및 복구)된 패키지는 선택 즉시 차단한다.
+        // 상태를 지우지 않고 완료 카드로 run ID 와 함께 명시한다.
         toast.error(
           pc["duplicate_recovered"] === true
             ? "이미 반영 및 복구 완료된 패키지입니다. 다시 실행할 수 없습니다."
             : "이미 반영된 패키지입니다. 다시 실행할 수 없습니다.",
         );
         setCollision(null);
-        setPickerKey((k) => k + 1);
+        setOpenStep(4);
         return;
       }
       const col = await checkPackageStorageCollisions(p);
       setCollision(col);
+      // 서버 영수증 복원 — 동일 패키지의 과거 서버 실측 검증 결과를 안내한다.
+      try {
+        const rec = (await listVerifyReceiptsFn({
+          data: { package_id: p.manifest.package_id },
+        })) as { total: number; ok_paths: string[]; failed: { path: string }[] };
+        setRestoredVerify(
+          rec.total > 0
+            ? `서버에 이 패키지의 검증 영수증 ${rec.total}건이 있습니다 (ok ${rec.ok_paths.length} · failed ${rec.failed.length}). 이번 실행에서는 새 run ID 로 다시 검증합니다.`
+            : null,
+        );
+      } catch {
+        setRestoredVerify(null);
+      }
       toast.success(
         `패키지 검증 완료 — 내부 파일 ${p.verifiedFiles}건 SHA-256 일치 · Storage 충돌 ${
           col.counts.hash_mismatch + col.counts.unresolved
