@@ -6618,6 +6618,9 @@ export type Database = {
       _snag_done_asof: {
         Args: {
           _acd: string
+          _add?: string
+          _ahd?: string
+          _apd?: string
           _as_of: string
           _asd: string
           _axd: string
@@ -7502,10 +7505,7 @@ export type Database = {
           done_upto: number
           group_key: string[]
           no_plan: number
-          np_rc: number
-          np_sc: number
-          np_sr: number
-          np_src: number
+          np_mask: Json
           plan_upto: number
           stage: string
           total: number
