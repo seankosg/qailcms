@@ -37,6 +37,48 @@ export type ServerCollisionResult = {
   blockers: string[];
 };
 
+/** 신규 자산(이미지·Source Excel) 공통 검증 결과 */
+type NewAssetVerdict = { ok: true } | { ok: false; blocker: string };
+
+/**
+ * DB metadata 가 없는 신규 자산의 공통 관문.
+ * 이미지/Source 를 구분하지 않고 동일 조건을 요구한다:
+ * 패키지 선언 일치 → 이번 run/package 업로드 영수증 → 서버 실측 검증 영수증.
+ */
+function verifyNewAsset(
+  a: AssetRef,
+  declaredHash: string | undefined,
+  declaredSize: number | undefined,
+  receipt: UploadReceipt | undefined,
+  verified: VerifiedKeySet,
+): NewAssetVerdict {
+  if (declaredHash === undefined || declaredSize === undefined) {
+    return {
+      ok: false,
+      blocker: `STORAGE_UNRESOLVED: ${a.bucket}/${a.path} — Storage object 는 있으나 DB metadata 가 없습니다.`,
+    };
+  }
+  if (declaredHash !== a.sha256) {
+    return {
+      ok: false,
+      blocker: `PACKAGE_HASH_CONFLICT: ${a.bucket}/${a.path} (선언 ${declaredHash.slice(0, 12)} ≠ 자산 ${a.sha256.slice(0, 12)})`,
+    };
+  }
+  if (!receipt || receipt.sha256 !== a.sha256) {
+    return {
+      ok: false,
+      blocker: `UPLOAD_RECEIPT_MISSING: ${a.bucket}/${a.path} — 이번 run/package 의 업로드 영수증이 없습니다.`,
+    };
+  }
+  if (!verified.has(verifiedKey(a.bucket, a.path, a.sha256, declaredSize))) {
+    return {
+      ok: false,
+      blocker: `SERVER_VERIFY_MISSING: ${a.bucket}/${a.path} — 서버 실측 검증 영수증(hash/size 일치)이 없습니다.`,
+    };
+  }
+  return { ok: true };
+}
+
 const dirOf = (p: string) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
 
 /** 서버 입력 최종 방어 — attachment ID/경로 중복 및 ID↔경로 교차 불일치. */
@@ -88,6 +130,7 @@ export async function recheckCollisionsServerSide(
     return { skip_paths: skip, new_paths: fresh, declared_new_paths: declaredNew, blockers };
 
   const declared = new Map(sourceMeta.map((m) => [m.storage_path, m.content_hash.toLowerCase()]));
+  const declaredSourceSize = new Map(sourceMeta.map((m) => [m.storage_path, m.byte_size]));
   const declaredImages = new Map(imageMeta.map((m) => [m.storage_path, m]));
   // receipt 교차검증 — 다른 run/package 영수증 재사용 차단.
   const foreign = receipts.filter(
@@ -166,36 +209,25 @@ export async function recheckCollisionsServerSide(
         );
       continue;
     }
-    // metadata 없음 — 이번 패키지가 방금 올린 원본 Excel 만 허용 (등록은 서버 트랜잭션에서 수행)
-    if (a.kind === "source" && declared.get(a.path) === a.sha256) {
-      fresh.push(a.path);
-      continue;
-    }
-    // 신규 이미지: 패키지 선언 + ID/경로/해시 일치 + 이번 run 업로드 receipt 가 모두 있어야 허용
-    if (a.kind === "image") {
-      const decl = declaredImages.get(a.path);
-      const rec = receiptByPath.get(`${a.bucket}::${a.path}`);
-      if (
-        decl &&
-        decl.storage_path === a.path &&
-        decl.content_hash === a.sha256 &&
-        rec &&
-        rec.sha256 === a.sha256
-      ) {
-        // 클라이언트 신고 SHA-256 을 믿지 않는다 — 서버 검증 배치가 남긴 영수증만 인정한다.
-        if (!verified.has(verifiedKey(a.bucket, a.path, a.sha256, decl.byte_size))) {
-          blockers.push(
-            `SERVER_VERIFY_MISSING: ${a.bucket}/${a.path} — 서버 실측 검증 영수증(hash/size 일치)이 없습니다.`,
-          );
-          continue;
-        }
-        declaredNew.push(a.path);
-        continue;
-      }
-    }
-    blockers.push(
-      `STORAGE_UNRESOLVED: ${a.bucket}/${a.path} — Storage object 는 있으나 DB metadata 가 없습니다.`,
+    // metadata 없음 — 이미지/Source 동일 관문 (패키지 선언 + 업로드 영수증 + 서버 실측 검증)
+    const declImg = a.kind === "image" ? declaredImages.get(a.path) : undefined;
+    const declaredHash =
+      a.kind === "image"
+        ? declImg && declImg.storage_path === a.path
+          ? declImg.content_hash
+          : undefined
+        : declared.get(a.path);
+    const declaredSize =
+      a.kind === "image" ? declImg?.byte_size : declaredSourceSize.get(a.path);
+    const verdict = verifyNewAsset(
+      a,
+      declaredHash,
+      declaredSize,
+      receiptByPath.get(`${a.bucket}::${a.path}`),
+      verified,
     );
+    if (verdict.ok) declaredNew.push(a.path);
+    else blockers.push(verdict.blocker);
   }
 
   return { skip_paths: skip, new_paths: fresh, declared_new_paths: declaredNew, blockers };
