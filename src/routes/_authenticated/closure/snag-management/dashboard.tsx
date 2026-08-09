@@ -8,7 +8,7 @@ const searchSchema = z.object({
   teams: fallback(z.string(), "").default(""),
   roomGroups: fallback(z.string(), "").default(""),
   dataDate: fallback(z.string(), "").default(""),
-  matrixMode: fallback(z.string(), "").default(""),
+  matrixMode: fallback(z.string(), "remainPct").default("remainPct"),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/snag-management/dashboard")({
