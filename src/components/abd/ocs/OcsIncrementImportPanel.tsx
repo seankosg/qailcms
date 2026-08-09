@@ -375,14 +375,75 @@ export function OcsIncrementImportPanel() {
     return out;
   }
 
+  /**
+   * 신규 자산 업로드 → 서버 실측 검증(배치).
+   * 클라이언트 신고 hash 를 믿지 않는다. 서버가 object 를 직접 내려받아 SHA-256/byte_size 를
+   * 실측하고 run_id/package_id 기준 영수증으로 저장한다. 실패분만 재실행 가능.
+   */
+  async function runUploadVerify() {
+    if (!pkg || !runId) return;
+    setBusy("신규 자산 업로드 · 서버 실측 검증 중…");
+    setProgress(0);
+    setFailure(null);
+    try {
+      let rec = receipts;
+      if (rec.length === 0) {
+        setStageLabel("4/6 신규 자산 업로드");
+        rec = await uploadAssets(pkg, runId);
+      }
+
+      const sizeByPath = new Map<string, number>();
+      for (const b of pkg.images) sizeByPath.set(imageStoragePath(b.relative_path), b.byte_size);
+      for (const b of pkg.sourceFiles) {
+        sizeByPath.set(sourceStoragePath(pkg.manifest.package_id, b.relative_path), b.byte_size);
+      }
+
+      const targets = rec.filter((r) => r.state === "uploaded" || r.state === "declared_new");
+      setVerifyTotal(targets.length);
+      const okSet = new Set(verifyOk);
+      const pending = targets.filter((t) => !okSet.has(t.path));
+      setStageLabel(`5/6 서버 실측 검증 (${pending.length}건)`);
+
+      const failures: { path: string; error: string }[] = [];
+      const batches = chunk(pending, VERIFY_BATCH_MAX) as UploadReceipt[][];
+      for (let i = 0; i < batches.length; i += 1) {
+        const items = batches[i]!.map((t) => ({
+          bucket: t.bucket,
+          path: t.path,
+          expected_sha256: t.sha256,
+          expected_byte_size: sizeByPath.get(t.path) ?? 0,
+        }));
+        const out = (await verifyFn({
+          data: { run_id: runId, package_id: pkg.manifest.package_id, items },
+        })) as { failed?: { path: string; error: string | null }[] };
+        const failedPaths = new Set((out.failed ?? []).map((f) => f.path));
+        for (const f of out.failed ?? []) failures.push({ path: f.path, error: f.error ?? "" });
+        for (const it of items) if (!failedPaths.has(it.path)) okSet.add(it.path);
+        setVerifyOk([...okSet]);
+        setProgress(Math.round(((i + 1) / batches.length) * 100));
+      }
+      setVerifyFailures(failures);
+      if (failures.length > 0) {
+        toast.error(`서버 실측 검증 실패 ${failures.length}건 — 실패분만 재실행하십시오.`);
+      } else {
+        toast.success(`서버 실측 검증 완료 — ${targets.length}건`);
+      }
+    } catch (e) {
+      setFailure(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+      setProgress(0);
+      setStageLabel(null);
+    }
+  }
+
   async function runImport() {
     if (!pkg || !runId || !snapshotId || blockers.length > 0) return;
     setBusy("증분 Import 실행 중…");
     setProgress(0);
     try {
-      setStageLabel("4/6 신규 자산 업로드");
-      const rec = await uploadAssets(pkg, runId);
-      setStageLabel("5/6 Import 실행");
+      setStageLabel("6/6 Import 실행");
+      const rec = receipts;
       const out = (await importFn({
         data: {
           run_id: runId,
