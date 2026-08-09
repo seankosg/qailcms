@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft, Search } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -63,6 +63,7 @@ export function TmKpiAnalysisPage() {
       disciplines: search.discipline,
       plots: search.plot,
       teams: search.team,
+      // 담당자 축의 Team 필터는 폐기 — 상단 Team(=discipline) 필터만 사용
       hdecPic: search.hdecPic,
       hdecEng: search.hdecEng,
       level: "all",
@@ -102,7 +103,6 @@ export function TmKpiAnalysisPage() {
       ? search.curveBucket
       : "week";
 
-  const teamOptions = useMemo(() => uniqSorted(items, "team"), [items]);
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
