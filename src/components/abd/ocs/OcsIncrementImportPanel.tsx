@@ -806,183 +806,125 @@ export function OcsIncrementImportPanel() {
     );
   }
 
+  // ── Wizard 단계 상태 판정 (기존 blockers/서버 판정을 재사용만 한다) ──
+  const duplicatePackage = precheck?.["duplicate_package"] === true;
+  const duplicateRecovered = precheck?.["duplicate_recovered"] === true;
+  const duplicateLog = (precheck?.["duplicate_log"] ?? null) as {
+    id?: string;
+    data_file_name?: string;
+    started_at?: string;
+  } | null;
+  const duplicateRecoveryLog = (precheck?.["duplicate_recovery_log"] ?? null) as {
+    id?: string;
+    started_at?: string;
+  } | null;
+
+  const prepDone = prepChecks.every(Boolean);
+  const step1Done = baselineConfirmed || skipPreparation;
+  const step2Done = prepDone || skipPreparation;
+  const step3Done = packageBuilt || skipPreparation;
+  const step4Done = !!pkg && !!dry && !duplicatePackage;
+  const step5Done = verifyComplete;
+  const step6Done = !!snapshotId;
+  const step7Done = !!result;
+  const step8Done = !!result;
+
+  const statusOf = (done: boolean, current: boolean, warn = false, blocked = false): StepStatus =>
+    blocked ? "blocked" : done ? "done" : warn ? "warning" : current ? "current" : "pending";
+
+  const firstOpen = [
+    step1Done,
+    step2Done,
+    step3Done,
+    step4Done,
+    step5Done,
+    step6Done,
+    step7Done,
+    step8Done,
+  ].findIndex((d) => !d);
+  const currentStep = firstOpen === -1 ? 8 : firstOpen + 1;
+
+  const steps: WizardStep[] = [
+    {
+      index: 1,
+      title: "Download Latest OCS Baseline",
+      group: "preparation",
+      status: statusOf(step1Done, currentStep === 1, !!baselineInfoError),
+    },
+    {
+      index: 2,
+      title: "Prepare OCS Files",
+      group: "preparation",
+      status: statusOf(step2Done, currentStep === 2),
+    },
+    {
+      index: 3,
+      title: "Build Increment Package",
+      group: "preparation",
+      status: statusOf(step3Done, currentStep === 3),
+    },
+    {
+      index: 4,
+      title: "Select and Check the Increment Package",
+      group: "import",
+      status: statusOf(step4Done, currentStep === 4, false, duplicatePackage),
+    },
+    {
+      index: 5,
+      title: "Upload and Verify Files",
+      group: "import",
+      status: statusOf(step5Done, currentStep === 5, uploadFailedCount > 0),
+    },
+    {
+      index: 6,
+      title: "Create Pre-import Backup",
+      group: "import",
+      status: statusOf(step6Done, currentStep === 6, !!snapshotError),
+    },
+    {
+      index: 7,
+      title: "Review and Import",
+      group: "import",
+      status: statusOf(step7Done, currentStep === 7, false, !!failure),
+    },
+    {
+      index: 8,
+      title: "Complete",
+      group: "import",
+      status: statusOf(step8Done, currentStep === 8),
+    },
+  ];
+
+  const toggle = (i: number) => setOpenStep((cur) => (cur === i ? 0 : i));
+  const packageStatus: "pass" | "warn" | "fail" = !dry
+    ? "warn"
+    : blockers.some((b) => !/승인|미완료|미실행|스냅샷|검증/.test(b))
+      ? "fail"
+      : warnings.length > 0
+        ? "warn"
+        : "pass";
+
   return (
     <div className="space-y-4">
-      <OcsBaselineCard />
-
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <PackageOpen className="h-4 w-4" /> ABD OCS 정규 증분 Import
+            <PackageOpen className="h-4 w-4" /> ABD OCS Increment — Guided Workflow
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            DAR 신규·개정 OCS 를 로컬에서 완성한 단일 ZIP 패키지로 반영합니다. 파일명 계약:{" "}
+            DAR 신규·개정 OCS 를 8단계로 반영합니다. 1~3 단계는 로컬 Codex Skill 준비, 4~8 단계는
+            QAIL CMS 의 검증·반영입니다. 파일명 계약:{" "}
             <code>OCS_Increment_&lt;YYYYMMDD&gt;_&lt;seq&gt;.zip</code>
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <FilePickerButton
-              label={pkg ? "Change Increment ZIP" : "Select Increment ZIP"}
-              accept=".zip,application/zip"
-              disabled={!!busy}
-              inputRef={fileInputRef}
-              resetKey={pickerKey}
-              onFiles={(f) => void onPick(f)}
-            />
-            {(pkg || failure) && (
-              <Button size="sm" variant="ghost" disabled={!!busy} onClick={clearPick}>
-                Clear
-              </Button>
-            )}
-            {stageLabel && (
-              <Badge variant="outline" className="text-[11px]">
-                {stageLabel}
-              </Badge>
-            )}
-          </div>
-
-          {pkg && (
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-md border p-3">
-                <div className="mb-1 text-xs font-semibold">패키지</div>
-                <Row label="파일명" value={pkg.file_name} />
-                <Row label="package_id" value={pkg.manifest.package_id} />
-                <Row
-                  label="Data Date"
-                  value={pkg.manifest.data_date}
-                  bad={!pkg.manifest.data_date}
-                />
-                <Row label="Baseline ID" value={pkg.manifest.base_baseline_id} />
-                <Row label="Base Import Run" value={pkg.manifest.base_import_run_id} />
-                <Row label="대상 OCS 수" value={pkg.manifest.target_ocs_numbers.length} />
-                <Row label="구분" value={pkg.manifest.change_type} />
-              </div>
-              <div className="rounded-md border p-3">
-                <div className="mb-1 text-xs font-semibold">내부 파일 검증</div>
-                <Row label="manifest files" value={pkg.manifest.files.length} />
-                <Row label="SHA-256 일치" value={pkg.verifiedFiles} />
-                <Row label="source/*.xlsx" value={pkg.sourceFiles.length} />
-                <Row label="images/*" value={pkg.images.length} />
-                <Row label="atomic rows" value={pkg.atomic.comments.length} />
-                <Row label="package SHA-256" value={pkg.package_sha256.slice(0, 16)} />
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" disabled={!pkg || !!busy} onClick={() => void runDryRun()}>
-              1. Run Dry-run
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!pkg || !dry || !!busy || !!result}
-              onClick={() => void runUploadVerify()}
-            >
-              {uploadFailedCount > 0
-                ? `2. Retry Failed Uploads (${uploadFailedCount})`
-                : verifyFailures.length > 0
-                  ? "2. Retry Failed Verification"
-                  : "2. Upload & Verify Assets"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!dry || !verifyComplete || !!busy || snapshotRunning}
-              onClick={() => void runSnapshot()}
-            >
-              {snapshotRunning ? (
-                <>
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" /> 3. Creating Snapshot…
-                </>
-              ) : snapshotError ? (
-                "3. Retry Pre-import Snapshot"
-              ) : (
-                "3. Create Pre-import Snapshot"
-              )}
-            </Button>
-            {uploadFailedCount > 0 && (
-              <Badge variant="outline" className="gap-1 text-[11px] text-destructive">
-                <AlertTriangle className="h-3 w-3" /> upload failed {uploadFailedCount}
-              </Badge>
-            )}
-            {(verifyRan || verifyTotal > 0) && (
-              <Badge
-                variant="outline"
-                className={`gap-1 text-[11px] ${verifyComplete ? "" : "text-destructive"}`}
-              >
-                {verifyComplete && <CheckCircle2 className="h-3 w-3 text-emerald-600" />}
-                server-verified {verifyOk.length}/{newAssetTotal}
-              </Badge>
-            )}
-            {snapshotId && (
-              <Badge variant="outline" className="gap-1 text-[11px]">
-                <CheckCircle2 className="h-3 w-3 text-emerald-600" /> snapshot{" "}
-                {snapshotId.slice(0, 8)}
-              </Badge>
-            )}
-          </div>
-
-          {snapshotRunning && (
-            <div className="space-y-1 rounded-md border p-3">
-              <div className="flex items-center gap-2 text-xs font-medium">
-                <Loader2 className="h-3 w-3 animate-spin" /> 3. Creating Snapshot…
-                <span className="font-mono text-muted-foreground">
-                  {Math.floor(snapshotElapsed / 60)}m {snapshotElapsed % 60}s
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Backing up ABD and OCS tables. This may take several minutes. Do not navigate away
-                or refresh this page.
-              </p>
-              {snapshotStatus && snapshotStatus.tablesTotal > 0 && (
-                <>
-                  <div className="text-xs text-muted-foreground">
-                    tables {snapshotStatus.tablesDone}/{snapshotStatus.tablesTotal}
-                    {snapshotStatus.currentTable ? ` — ${snapshotStatus.currentTable}` : ""}
-                  </div>
-                  <Progress
-                    value={(snapshotStatus.tablesDone / snapshotStatus.tablesTotal) * 100}
-                  />
-                </>
-              )}
-            </div>
-          )}
-
-          {snapshotId && !snapshotRunning && (
-            <div className="rounded-md border p-3 text-xs">
-              <div className="font-medium text-emerald-600">Snapshot created</div>
-              <div className="font-mono text-muted-foreground">
-                {snapshotId}
-                {snapshotStatus?.sizeBytes
-                  ? ` · ${(snapshotStatus.sizeBytes / 1024 / 1024).toFixed(2)} MB`
-                  : ""}
-              </div>
-            </div>
-          )}
-
-          {snapshotError && !snapshotRunning && (
-            <div className="space-y-2 rounded-md border border-destructive/50 p-3">
-              <div className="flex items-center gap-2 text-xs font-medium text-destructive">
-                <AlertTriangle className="h-3 w-3" /> Snapshot failed
-              </div>
-              <pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-destructive">
-                {snapshotError}
-              </pre>
-              <p className="text-xs text-muted-foreground">
-                Uploaded assets are kept. Only the snapshot step needs to be retried.
-              </p>
-              <Button size="sm" variant="outline" onClick={() => void runSnapshot()}>
-                Retry Snapshot
-              </Button>
-            </div>
-          )}
-
+          <OcsResponsibilityCard />
+          <OcsWizardStepper steps={steps} onSelect={(i) => setOpenStep(i)} />
           {busy && (
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" /> {busy}
+                {stageLabel ? ` · ${stageLabel}` : ""}
               </div>
               {progress > 0 && <Progress value={progress} />}
             </div>
@@ -990,69 +932,226 @@ export function OcsIncrementImportPanel() {
         </CardContent>
       </Card>
 
-      {dry && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Dry-run 결과 (운영 데이터 변경 없음)</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-md border p-3">
-              <div className="mb-1 text-xs font-semibold">Scope</div>
-              <Row label="scope_ocs_count" value={dry["scope_ocs_count"]} />
-              <Row label="scope_existing_active" value={dry["scope_existing_active"]} />
-            </div>
-            <div className="rounded-md border p-3">
-              <div className="mb-1 text-xs font-semibold">코멘트</div>
-              <Row label="comments_new" value={dry["comments_new"]} />
-              <Row label="comments_to_update" value={dry["comments_to_update"]} />
-              <Row label="comments_unchanged" value={dry["comments_unchanged"]} />
-              <Row label="comments_modified" value={dry["comments_modified"]} />
-              <Row label="comments_to_retire" value={dry["comments_to_retire"]} bad={massRetire} />
-            </div>
-            <div className="rounded-md border p-3">
-              <div className="mb-1 text-xs font-semibold">첨부 · 원본 Excel</div>
-              <Row label="attachments_new" value={dry["attachments_new"]} />
-              <Row label="attachments_existing" value={dry["attachments_existing"]} />
+      {/* ───────── Step 1 ───────── */}
+      <OcsWizardStepCard
+        index={1}
+        title="Download Latest OCS Baseline"
+        description="새로운 DAR OCS 파일을 처리할 때마다 가장 먼저 최신 운영 OCS 데이터를 내려받습니다."
+        status={steps[0]!.status}
+        open={openStep === 1}
+        onToggle={() => toggle(1)}
+        summary={
+          baselineInfo?.exists ? (
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {baselineInfo.baseline_id.slice(0, 16)} · {baselineInfo.is_latest ? "Latest" : "Outdated"}
+            </span>
+          ) : null
+        }
+      >
+        <p className="text-xs text-muted-foreground">
+          Baseline 은 로컬 Codex Skill 이 기존 코멘트, ID, Response 및 이미지 연결을 재사용하는 기준
+          데이터입니다. 오래 보관한 Baseline 을 다음 증분에 재사용하지 마십시오.
+        </p>
+        <OcsBaselineCard />
+        <div className="rounded-md border p-3">
+          <div className="mb-1 text-xs font-semibold">현재 서버 정본 Baseline</div>
+          {baselineInfoError ? (
+            <OcsErrorCard
+              title="Baseline 정보를 불러오지 못했습니다."
+              affected="Step 1 표시 정보만 영향을 받으며 운영 데이터는 변경되지 않았습니다."
+              nextStep="새로고침 후 다시 시도하거나 Generate Latest Baseline 을 실행하십시오."
+              details={baselineInfoError}
+            />
+          ) : baselineInfo ? (
+            <>
+              <Row label="Baseline ID" value={baselineInfo.baseline_id} />
+              <Row label="Generated at" value={baselineInfo.generated_at ?? "—"} />
+              <Row label="Data date" value={baselineInfo.data_date ?? "—"} />
+              <Row label="Dataset rows" value={baselineInfo.total_rows ?? "—"} />
               <Row
-                label="attachments_unresolved"
-                value={dry["attachments_unresolved"]}
-                bad={num(dry["attachments_unresolved"]) > 0}
-              />
-              <Row label="images_new" value={dry["images_new"]} />
-              <Row label="images_existing" value={dry["images_existing"]} />
-              <Row
-                label="images_conflict"
-                value={dry["images_conflict"]}
-                bad={num(dry["images_conflict"]) > 0}
+                label="ZIP size"
+                value={
+                  baselineInfo.zip_byte_size
+                    ? `${(baselineInfo.zip_byte_size / 1024 / 1024).toFixed(2)} MB`
+                    : "—"
+                }
               />
               <Row
-                label="images_meta_missing"
-                value={dry["images_meta_missing"]}
-                bad={num(dry["images_meta_missing"]) > 0}
+                label="Status"
+                value={baselineInfo.exists ? (baselineInfo.is_latest ? "Latest" : "Outdated") : "Not generated"}
+                bad={!baselineInfo.exists}
               />
-              <Row label="source_files_new" value={dry["source_files_new"]} />
-              <Row label="source_files_revised" value={dry["source_files_revised"]} />
-              <Row label="source_files_existing" value={dry["source_files_existing"]} />
+              {baselineInfo.files.length > 0 && (
+                <details className="mt-2 rounded-md border bg-muted/40 p-2">
+                  <summary className="cursor-pointer text-[11px] font-medium">
+                    Technical details ({baselineInfo.files.length} datasets)
+                  </summary>
+                  <div className="mt-1 max-h-48 overflow-auto font-mono text-[11px]">
+                    {baselineInfo.files.map((f) => (
+                      <div key={f.name}>
+                        {f.name} · {f.row_count ?? "—"} rows · {f.byte_size} bytes
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Baseline 정보 조회 중…
             </div>
-            <div className="rounded-md border p-3 md:col-span-3">
-              <div className="mb-1 text-xs font-semibold">범위 밖 보호 해시 (Import 전후 대조)</div>
-              <Row label="comments hash" value={dry["outside_scope_comment_hash_before"]} />
-              <Row label="links hash" value={dry["outside_scope_link_hash_before"]} />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Baseline ZIP is ready. Confirm that the file was saved on this computer.
+        </p>
+        <div className="rounded-md border p-3">
+          <CheckItem
+            checked={baselineConfirmed}
+            onChange={setBaselineConfirmed}
+            label="I saved the Baseline ZIP on this computer."
+          />
+        </div>
+      </OcsWizardStepCard>
 
-      {collision && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Storage 충돌 점검 (읽기 전용)</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              동일 <code>storage_path</code> 존재 시 DB metadata 의 <code>content_hash</code> 와
-              manifest SHA-256 을 대조합니다. overwrite·삭제는 수행하지 않습니다.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-2">
+      {/* ───────── Step 2 ───────── */}
+      <OcsWizardStepCard
+        index={2}
+        title="Prepare OCS Files"
+        description="DAR 에서 새로 받은 신규·개정 OCS Excel 만 한 폴더에 모읍니다."
+        status={steps[1]!.status}
+        open={openStep === 2}
+        onToggle={() => toggle(2)}
+      >
+        <Step2PrepareFiles
+          checks={prepChecks}
+          onChange={(i, v) =>
+            setPrepChecks((prev) => {
+              const next = [...prev] as [boolean, boolean, boolean];
+              next[i] = v;
+              return next;
+            })
+          }
+        />
+      </OcsWizardStepCard>
+
+      {/* ───────── Step 3 ───────── */}
+      <OcsWizardStepCard
+        index={3}
+        title="Build Increment Package"
+        description="로컬 qail-ocs-increment Skill 로 증분 ZIP 을 생성합니다."
+        status={steps[2]!.status}
+        open={openStep === 3}
+        onToggle={() => toggle(3)}
+      >
+        <Step3BuildPackage confirmed={packageBuilt} onConfirm={setPackageBuilt} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setSkipPreparation(true);
+              setOpenStep(4);
+            }}
+          >
+            I already have a completed Increment ZIP
+          </Button>
+          <span className="text-[11px] text-muted-foreground">
+            준비 단계만 건너뜁니다. Step 4 의 서버 검증은 그대로 수행됩니다.
+          </span>
+        </div>
+      </OcsWizardStepCard>
+
+      {/* ───────── Step 4 ───────── */}
+      <OcsWizardStepCard
+        index={4}
+        title="Select and Check the Increment Package"
+        description="완성된 Increment ZIP 한 개만 선택하고, 운영 DB 와 비교하는 Dry-run 을 실행합니다."
+        status={steps[3]!.status}
+        open={openStep === 4}
+        onToggle={() => toggle(4)}
+        summary={pkg ? <span className="font-mono text-[11px]">{pkg.file_name}</span> : null}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <FilePickerButton
+            label={pkg ? "Change Increment ZIP" : "Choose Increment ZIP"}
+            accept=".zip,application/zip"
+            disabled={!!busy}
+            inputRef={fileInputRef}
+            resetKey={pickerKey}
+            onFiles={(f) => void onPick(f)}
+          />
+          {pkg && (
+            <Badge variant="outline" className="gap-1 text-[11px]">
+              <CheckCircle2 className="h-3 w-3 text-emerald-600" /> {pkg.file_name}
+            </Badge>
+          )}
+          {(pkg || failure) && (
+            <Button size="sm" variant="ghost" disabled={!!busy} onClick={clearPick}>
+              Clear
+            </Button>
+          )}
+        </div>
+
+        {duplicatePackage && (
+          <div className="space-y-2 rounded-md border border-destructive/50 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {duplicateRecovered
+                ? "This package was already imported and successfully recovered. Do not import it again."
+                : "This package was already imported. Do not import it again."}
+            </div>
+            <Row label="original import run" value={duplicateLog?.id ?? "—"} />
+            <Row label="imported at" value={duplicateLog?.started_at ?? "—"} />
+            {duplicateRecovered && (
+              <>
+                <Row label="recovery run" value={duplicateRecoveryLog?.id ?? "—"} />
+                <Row label="recovered at" value={duplicateRecoveryLog?.started_at ?? "—"} />
+                <div className="text-[11px] text-emerald-700">
+                  Partial import recovered successfully.
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {pkg && (
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-md border p-3">
+              <div className="mb-1 text-xs font-semibold">패키지</div>
+              <Row label="Package file" value={pkg.file_name} />
+              <Row label="Package ID" value={pkg.manifest.package_id} />
+              <Row label="Data date" value={pkg.manifest.data_date} bad={!pkg.manifest.data_date} />
+              <Row label="Baseline ID" value={pkg.manifest.base_baseline_id} />
+              <Row label="Base Import run" value={pkg.manifest.base_import_run_id} />
+              <Row label="OCS files" value={pkg.manifest.target_ocs_numbers.length} />
+              <Row label="구분" value={pkg.manifest.change_type} />
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="mb-1 text-xs font-semibold">내부 파일 검증</div>
+              <Row label="manifest files" value={pkg.manifest.files.length} />
+              <Row label="SHA-256 일치" value={pkg.verifiedFiles} />
+              <Row label="Source Excel files" value={pkg.sourceFiles.length} />
+              <Row label="Images" value={pkg.images.length} />
+              <Row label="Atomic comments" value={pkg.atomic.comments.length} />
+              <details className="mt-2 rounded-md border bg-muted/40 p-2">
+                <summary className="cursor-pointer text-[11px] font-medium">
+                  Technical details
+                </summary>
+                <div className="mt-1 max-h-48 overflow-auto font-mono text-[11px]">
+                  <div>package SHA-256: {pkg.package_sha256}</div>
+                  {pkg.manifest.files.map((f) => (
+                    <div key={f.relative_path}>{f.relative_path}</div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          </div>
+        )}
+
+        {collision && (
+          <div className="rounded-md border p-3">
+            <div className="mb-1 text-xs font-semibold">Storage 충돌 점검 (읽기 전용)</div>
             <div className="grid gap-3 md:grid-cols-5">
               <Row label="new" value={collision.counts.new} />
               <Row label="existing (skip)" value={collision.counts.existing} />
@@ -1070,7 +1169,7 @@ export function OcsIncrementImportPanel() {
             </div>
             {collision.rows.filter((r) => r.state === "hash_mismatch" || r.state === "unresolved")
               .length > 0 && (
-              <div className="max-h-56 overflow-auto rounded-md border p-2 text-[11px]">
+              <div className="mt-2 max-h-56 overflow-auto rounded-md border p-2 text-[11px]">
                 {collision.rows
                   .filter((r) => r.state === "hash_mismatch" || r.state === "unresolved")
                   .map((r) => (
@@ -1080,175 +1179,479 @@ export function OcsIncrementImportPanel() {
                   ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {dry && massRetire && (
-        <Card className="border-destructive/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-destructive">
-              <AlertTriangle className="h-4 w-4" /> 대량 퇴역 차단
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              퇴역 예정 {retire}건이 임계(범위 내 active의 <b>30%</b> 또는 <b>100건</b>)를
-              넘었습니다. 목록을 내려받아 확인한 뒤에만 승인할 수 있습니다.
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            disabled={!pkg || !!busy || duplicatePackage}
+            onClick={() => void runDryRun()}
+          >
+            Check Package — No Data Will Be Changed
+          </Button>
+          <span className="text-[11px] text-muted-foreground">
+            현재 운영 DB 와 패키지를 비교하지만 데이터를 수정하지 않습니다.
+          </span>
+        </div>
+
+        {dry && (
+          <>
+            <div
+              className={`rounded-md border p-2 text-xs font-semibold ${
+                packageStatus === "pass"
+                  ? "border-emerald-600 text-emerald-700"
+                  : packageStatus === "warn"
+                    ? "border-amber-500 text-amber-600"
+                    : "border-destructive text-destructive"
+              }`}
+            >
+              {packageStatus === "pass"
+                ? "Package check passed"
+                : packageStatus === "warn"
+                  ? "Package can proceed with warnings"
+                  : "Package cannot be imported"}
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-md border p-3">
+                <div className="mb-1 text-xs font-semibold">Scope</div>
+                <Row label="scope_ocs_count" value={dry["scope_ocs_count"]} />
+                <Row label="scope_existing_active" value={dry["scope_existing_active"]} />
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="mb-1 text-xs font-semibold">코멘트</div>
+                <Row label="comments_new" value={dry["comments_new"]} />
+                <Row label="comments_to_update" value={dry["comments_to_update"]} />
+                <Row label="comments_unchanged" value={dry["comments_unchanged"]} />
+                <Row label="comments_modified" value={dry["comments_modified"]} />
+                <Row label="comments_to_retire" value={dry["comments_to_retire"]} bad={massRetire} />
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="mb-1 text-xs font-semibold">첨부 · 원본 Excel</div>
+                <Row label="attachments_new" value={dry["attachments_new"]} />
+                <Row label="attachments_existing" value={dry["attachments_existing"]} />
+                <Row
+                  label="attachments_unresolved"
+                  value={dry["attachments_unresolved"]}
+                  bad={num(dry["attachments_unresolved"]) > 0}
+                />
+                <Row label="images_new" value={dry["images_new"]} />
+                <Row label="images_existing" value={dry["images_existing"]} />
+                <Row
+                  label="images_conflict"
+                  value={dry["images_conflict"]}
+                  bad={num(dry["images_conflict"]) > 0}
+                />
+                <Row
+                  label="images_meta_missing"
+                  value={dry["images_meta_missing"]}
+                  bad={num(dry["images_meta_missing"]) > 0}
+                />
+                <Row label="source_files_new" value={dry["source_files_new"]} />
+                <Row label="source_files_revised" value={dry["source_files_revised"]} />
+                <Row label="source_files_existing" value={dry["source_files_existing"]} />
+              </div>
+              <div className="rounded-md border p-3 md:col-span-3">
+                <div className="mb-1 text-xs font-semibold">
+                  범위 밖 보호 해시 (Import 전후 대조)
+                </div>
+                <Row label="comments hash" value={dry["outside_scope_comment_hash_before"]} />
+                <Row label="links hash" value={dry["outside_scope_link_hash_before"]} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {dry && massRetire && (
+          <div className="space-y-2 rounded-md border border-destructive/50 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5" /> 대량 퇴역 차단
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              퇴역 예정 {retire}건이 임계(범위 내 active 의 <b>30%</b> 또는 <b>100건</b>)를
+              넘었습니다.
             </p>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={allowRetire} onCheckedChange={(v) => setAllowRetire(v === true)} />
               Allow retire — 퇴역 {retire}건을 확인했습니다
             </label>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+      </OcsWizardStepCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheck className="h-4 w-4" /> 실행
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {warnings.length > 0 && (
-            <ul className="space-y-1 text-xs text-amber-600">
-              {warnings.map((w) => (
-                <li key={w}>• {w}</li>
-              ))}
-            </ul>
-          )}
-          {blockers.length > 0 && (
-            <ul className="space-y-1 text-xs text-destructive">
-              {blockers.map((b) => (
-                <li key={b}>• {b}</li>
-              ))}
-            </ul>
-          )}
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={approved}
-              disabled={!dry || !snapshotId}
-              onCheckedChange={(v) => setApproved(v === true)}
-            />
-            Dry-run 결과와 백업을 확인했고 증분 Import 를 승인합니다
-          </label>
+      {/* ───────── Step 5 ───────── */}
+      <OcsWizardStepCard
+        index={5}
+        title="Upload and Verify Files"
+        description="새 이미지와 Source Excel 만 업로드하고 서버가 각 파일의 SHA-256 과 크기를 직접 검증합니다."
+        status={steps[4]!.status}
+        open={openStep === 5}
+        onToggle={() => toggle(5)}
+        locked={!dry}
+        lockReasons={!dry ? ["Step 4 Dry-run 통과 후 활성화됩니다."] : []}
+        summary={
+          verifyTotal > 0 ? (
+            <span className="text-[11px]">
+              server-verified {verifyOk.length}/{newAssetTotal}
+            </span>
+          ) : null
+        }
+      >
+        {restoredVerify && (
+          <p className="rounded-md border border-dashed p-2 text-[11px] text-muted-foreground">
+            {restoredVerify}
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
-            disabled={blockers.length > 0 || !!busy || !!result || importRunning}
-            onClick={() => void runImport()}
+            disabled={!pkg || !dry || !!busy || !!result}
+            onClick={() => void runUploadVerify()}
           >
-            {importRunning ? (
-              <>
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Importing…
-              </>
-            ) : failure ? (
-              "Retry Increment Import"
-            ) : (
-              "Run Increment Import"
-            )}
+            {uploadFailedCount > 0 || verifyFailures.length > 0
+              ? "Retry Failed Files"
+              : "Upload & Verify Files"}
           </Button>
-          {importRunning && (
-            <div className="space-y-2 rounded-md border p-3">
-              <div className="flex items-center gap-2 text-xs font-medium">
-                <Loader2 className="h-3 w-3 animate-spin" /> Importing…
-                <span className="font-mono text-muted-foreground">
-                  {Math.floor(importElapsed / 60)}m {importElapsed % 60}s
-                </span>
-              </div>
-              {/* 단일 원자적 RPC 트랜잭션이므로 내부 단계 전환을 관측할 수 없다.
-                  백분율 대신 indeterminate 표시와 경과시간만 노출한다. */}
-              <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
-                <div className="h-full w-1/3 animate-[pulse_1.2s_ease-in-out_infinite] rounded bg-primary" />
-              </div>
-              <ul className="space-y-0.5 text-[11px] text-muted-foreground">
-                <li>• Final server validation</li>
-                <li>• Transactional OCS database import</li>
-                <li>• Post-import integrity verification</li>
-              </ul>
-              <p className="text-xs font-medium text-amber-600">
-                Do not refresh or close this page.
-              </p>
-            </div>
+          {uploadFailedCount > 0 && (
+            <Badge variant="outline" className="gap-1 text-[11px] text-destructive">
+              <AlertTriangle className="h-3 w-3" /> upload failed {uploadFailedCount}
+            </Badge>
           )}
-          {result && !importRunning && (
-            <div className="rounded-md border p-3 text-xs">
-              <div className="font-medium text-emerald-600">Import completed</div>
-              <div className="font-mono text-muted-foreground">run {runId}</div>
-            </div>
+          {(verifyRan || verifyTotal > 0) && (
+            <Badge
+              variant="outline"
+              className={`gap-1 text-[11px] ${verifyComplete ? "" : "text-destructive"}`}
+            >
+              {verifyComplete && <CheckCircle2 className="h-3 w-3 text-emerald-600" />}
+              server-verified {verifyOk.length}/{newAssetTotal}
+            </Badge>
           )}
-          {failure && (
-            <div className="space-y-2 rounded-md border border-destructive/50 p-3">
-              <div className="flex items-center gap-2 text-xs font-medium text-destructive">
-                <AlertTriangle className="h-3 w-3" /> Import failed
-              </div>
-              <div className="font-mono text-[11px] text-muted-foreground">
-                run {runId ?? "—"}
-                {importFailStage ? ` · stage: ${importFailStage}` : ""}
-              </div>
-              <pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-destructive">
-                {failure}
-              </pre>
-              <p className="text-[11px] text-muted-foreground">
-                The import runs in a single transaction — a failure leaves no partial data. Uploaded
-                assets and the pre-import snapshot are kept; retry the import step only.
-              </p>
+        </div>
+        {busy && (
+          <p className="text-xs font-medium text-amber-600">Do not refresh or close this page.</p>
+        )}
+        {verifyComplete && (
+          <div className="text-xs font-medium text-emerald-600">
+            All files were uploaded and verified successfully.
+          </div>
+        )}
+        {receipts.length > 0 && (
+          <div className="rounded-md border p-3">
+            <div className="mb-1 text-xs font-semibold">
+              업로드 영수증 (uploaded {receipts.filter((r) => r.state === "uploaded").length} ·
+              existing {receipts.filter((r) => r.state === "existing").length} · failed{" "}
+              {uploadFailedCount})
             </div>
-          )}
-          {receipts.length > 0 && (
-            <div className="rounded-md border p-3">
-              <div className="mb-1 text-xs font-semibold">
-                업로드 영수증 (uploaded {receipts.filter((r) => r.state === "uploaded").length} ·
-                existing {receipts.filter((r) => r.state === "existing").length} · failed{" "}
-                {receipts.filter((r) => r.state === "failed").length})
-              </div>
-              <p className="mb-2 text-[11px] text-muted-foreground">
-                실패분은 자동 삭제하지 않습니다. 동일 ZIP 을 다시 선택하면 이미 올라간 object 는
-                건너뛰고 실패분만 재시도합니다.
-              </p>
-              <div className="max-h-40 overflow-auto text-[11px] font-mono">
-                {receipts
-                  .filter((r) => r.state === "failed")
-                  .map((r) => (
-                    <div key={`${r.bucket}/${r.path}`} className="text-destructive">
-                      [failed] {r.bucket}/{r.path} — {r.error ?? ""}
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-          {verifyTotal > 0 && (
-            <div className="rounded-md border p-3">
-              <div className="mb-1 text-xs font-semibold">
-                서버 실측 검증 (ok {verifyOk.length} / {verifyTotal} · 배치 {VERIFY_BATCH_MAX}건 ·
-                동시성 5)
-              </div>
-              <p className="mb-2 text-[11px] text-muted-foreground">
-                서버가 각 object 를 직접 내려받아 SHA-256·byte_size 를 실측합니다. 최종 Import 는
-                클라이언트 영수증이 아니라 이 서버 검증 영수증을 정본으로 사용합니다.
-              </p>
-              {verifyFailures.length > 0 && (
-                <div className="max-h-40 overflow-auto font-mono text-[11px] text-destructive">
-                  {verifyFailures.map((f) => (
-                    <div key={f.path}>
-                      [verify-failed] {f.path} — {f.error}
-                    </div>
-                  ))}
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              실패분은 자동 삭제하지 않습니다. 동일 ZIP 을 다시 선택하면 이미 올라간 object 는
+              건너뛰고 실패분만 재시도합니다.
+            </p>
+            <div className="max-h-40 overflow-auto font-mono text-[11px]">
+              {uploadFailures.map((r) => (
+                <div key={`${r.bucket}/${r.path}`} className="text-destructive">
+                  [failed] {r.bucket}/{r.path} — {r.error ?? ""}
                 </div>
-              )}
+              ))}
             </div>
+          </div>
+        )}
+        {verifyTotal > 0 && (
+          <div className="rounded-md border p-3">
+            <div className="mb-1 text-xs font-semibold">
+              서버 실측 검증 (ok {verifyOk.length} / {verifyTotal} · 배치 {VERIFY_BATCH_MAX}건 ·
+              동시성 5)
+            </div>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              첨부 연결 정본은 <code>abd_ocs_attachment_comment_links</code> 이며, 레거시{" "}
+              <code>link_status</code>·<code>comment_id</code> 로 연결 여부를 판정하지 않습니다.
+            </p>
+            {verifyFailures.length > 0 && (
+              <div className="max-h-40 overflow-auto font-mono text-[11px] text-destructive">
+                {verifyFailures.map((f) => (
+                  <div key={f.path}>
+                    [verify-failed] {f.path} — {f.error}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </OcsWizardStepCard>
+
+      {/* ───────── Step 6 ───────── */}
+      <OcsWizardStepCard
+        index={6}
+        title="Create Pre-import Backup"
+        description="운영 DB 변경 전에 복구 가능한 Snapshot 을 생성합니다. 성공한 Snapshot 없이는 Import 할 수 없습니다."
+        status={steps[5]!.status}
+        open={openStep === 6}
+        onToggle={() => toggle(6)}
+        locked={!verifyComplete}
+        lockReasons={!verifyComplete ? ["Step 5 서버 실측 검증 완료 후 활성화됩니다."] : []}
+        summary={snapshotId ? <span className="font-mono text-[11px]">{snapshotId}</span> : null}
+      >
+        <Button
+          size="sm"
+          disabled={!dry || !verifyComplete || !!busy || snapshotRunning}
+          onClick={() => void runSnapshot()}
+        >
+          {snapshotRunning ? (
+            <>
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Creating Backup…
+            </>
+          ) : snapshotError ? (
+            "Retry Backup"
+          ) : (
+            "Create Pre-import Backup"
           )}
-          {result && (
+        </Button>
+        {snapshotRunning && (
+          <div className="space-y-1 rounded-md border p-3">
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <Loader2 className="h-3 w-3 animate-spin" /> Creating Backup…
+              <span className="font-mono text-muted-foreground">
+                {Math.floor(snapshotElapsed / 60)}m {snapshotElapsed % 60}s
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Backing up ABD and OCS tables. This may take several minutes. Do not navigate away or
+              refresh this page.
+            </p>
+            {snapshotStatus && snapshotStatus.tablesTotal > 0 && (
+              <>
+                <div className="text-xs text-muted-foreground">
+                  tables {snapshotStatus.tablesDone}/{snapshotStatus.tablesTotal}
+                  {snapshotStatus.currentTable ? ` — ${snapshotStatus.currentTable}` : ""}
+                </div>
+                <Progress value={(snapshotStatus.tablesDone / snapshotStatus.tablesTotal) * 100} />
+              </>
+            )}
+          </div>
+        )}
+        {snapshotId && !snapshotRunning && (
+          <div className="space-y-1 rounded-md border p-3 text-xs">
+            <div className="font-medium text-emerald-600">Backup completed</div>
+            <div className="flex flex-wrap items-center gap-2 font-mono text-muted-foreground">
+              {snapshotId}
+              {snapshotStatus?.sizeBytes
+                ? ` · ${(snapshotStatus.sizeBytes / 1024 / 1024).toFixed(2)} MB`
+                : ""}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2"
+                onClick={() => {
+                  void navigator.clipboard.writeText(snapshotId);
+                  toast.success("Snapshot ID copied");
+                }}
+              >
+                <Copy className="mr-1 h-3 w-3" /> Copy
+              </Button>
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              Snapshot ID 는 Import 실행에 자동 연결됩니다.
+            </div>
+          </div>
+        )}
+        {snapshotError && !snapshotRunning && (
+          <OcsErrorCard
+            title="Backup failed"
+            affected="운영 데이터와 업로드된 파일은 변경되지 않았습니다. 백업 단계만 실패했습니다."
+            nextStep="Retry Backup 을 눌러 백업만 다시 실행하십시오. 파일을 다시 업로드할 필요는 없습니다."
+            runId={runId}
+            details={snapshotError}
+            action={
+              <Button size="sm" variant="outline" onClick={() => void runSnapshot()}>
+                Retry Backup
+              </Button>
+            }
+          />
+        )}
+      </OcsWizardStepCard>
+
+      {/* ───────── Step 7 ───────── */}
+      <OcsWizardStepCard
+        index={7}
+        title="Review and Import"
+        description="검증된 패키지와 백업을 확인하고 운영 DB 에 반영합니다."
+        status={steps[6]!.status}
+        open={openStep === 7}
+        onToggle={() => toggle(7)}
+        locked={!snapshotId}
+        lockReasons={!snapshotId ? ["Step 6 Snapshot 성공 후 활성화됩니다."] : []}
+      >
+        {dry && (
+          <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-md border p-3">
+              <div className="mb-1 text-xs font-semibold">최종 요약</div>
+              <Row label="OCS files" value={dry["scope_ocs_count"]} />
+              <Row label="New comments" value={dry["comments_new"]} />
+              <Row label="Updated comments" value={dry["comments_to_update"]} />
+              <Row label="Unchanged comments" value={dry["comments_unchanged"]} />
+              <Row label="Retired comments" value={dry["comments_to_retire"]} bad={massRetire} />
+              <Row label="Response segments" value={pkg?.response.segments.length ?? "—"} />
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="mb-1 text-xs font-semibold">자산 · 백업</div>
+              <Row label="Images new / existing" value={`${num(dry["images_new"])} / ${num(dry["images_existing"])}`} />
+              <Row
+                label="Source Excel new / revised / existing"
+                value={`${num(dry["source_files_new"])} / ${num(dry["source_files_revised"])} / ${num(dry["source_files_existing"])}`}
+              />
+              <Row label="Unresolved attachments" value={dry["attachments_unresolved"]} bad={num(dry["attachments_unresolved"]) > 0} />
+              <Row label="Snapshot ID" value={snapshotId ?? "—"} />
+            </div>
+          </div>
+        )}
+        {warnings.length > 0 && (
+          <ul className="space-y-1 text-xs text-amber-600">
+            {warnings.map((w) => (
+              <li key={w}>• {w}</li>
+            ))}
+          </ul>
+        )}
+        {blockers.length > 0 && (
+          <ul className="space-y-1 text-xs text-destructive">
+            {blockers.map((b) => (
+              <li key={b}>• {b}</li>
+            ))}
+          </ul>
+        )}
+        <label className="flex items-start gap-2 text-sm">
+          <Checkbox
+            className="mt-0.5"
+            checked={approved}
+            disabled={!dry || !snapshotId}
+            onCheckedChange={(v) => setApproved(v === true)}
+          />
+          I reviewed the package check, uploaded files and backup results and approve this import.
+        </label>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              size="sm"
+              disabled={blockers.length > 0 || !!busy || !!result || importRunning}
+            >
+              {importRunning ? (
+                <>
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Importing…
+                </>
+              ) : failure ? (
+                "Retry Increment Import"
+              ) : (
+                "Import OCS Package"
+              )}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Import OCS Package</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will update the production OCS database using the verified package and backup
+                shown above. It cannot be started twice.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => void runImport()}>Start Import</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        {importRunning && (
+          <div className="space-y-2 rounded-md border p-3">
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <Loader2 className="h-3 w-3 animate-spin" /> Importing…
+              <span className="font-mono text-muted-foreground">
+                {Math.floor(importElapsed / 60)}m {importElapsed % 60}s
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
+              <div className="h-full w-1/3 animate-[pulse_1.2s_ease-in-out_infinite] rounded bg-primary" />
+            </div>
+            <ul className="space-y-0.5 text-[11px] text-muted-foreground">
+              <li>• Final server validation</li>
+              <li>• Transactional OCS database import</li>
+              <li>• Post-import integrity verification</li>
+            </ul>
+            <p className="text-xs font-medium text-amber-600">Do not refresh or close this page.</p>
+          </div>
+        )}
+        {failure && (
+          <OcsErrorCard
+            title="Import failed"
+            affected="단일 트랜잭션이므로 부분 반영은 남지 않습니다. 업로드된 자산과 사전 스냅샷은 보존됩니다."
+            nextStep={
+              /partial|부분/i.test(failure)
+                ? "Import requires administrator recovery. Do not import this package again."
+                : "Import 단계만 다시 실행하십시오. 파일 재업로드나 백업 재생성은 필요하지 않습니다."
+            }
+            runId={runId}
+            snapshotId={snapshotId}
+            details={`${importFailStage ? `stage: ${importFailStage}\n` : ""}${failure}`}
+          />
+        )}
+      </OcsWizardStepCard>
+
+      {/* ───────── Step 8 ───────── */}
+      <OcsWizardStepCard
+        index={8}
+        title="Complete"
+        description="반영 결과와 감사 증거를 확인합니다."
+        status={steps[7]!.status}
+        open={openStep === 8}
+        onToggle={() => toggle(8)}
+        locked={!result}
+        lockReasons={!result ? ["Import 성공 후 표시됩니다."] : []}
+      >
+        {result ? (
+          <div className="space-y-3">
+            <div className="text-sm font-semibold text-emerald-600">OCS Import Completed</div>
+            <div className="rounded-md border p-3">
+              <Row label="Package ID" value={pkg?.manifest.package_id ?? "—"} />
+              <Row label="Import run ID" value={runId} />
               <Row label="import_log_id" value={result["import_log_id"]} />
-              <Row label="run" value={runId} />
+              <Row label="Snapshot ID" value={snapshotId ?? "—"} />
+              {Object.entries((result["result"] ?? {}) as Record<string, unknown>)
+                .filter(([, v]) => typeof v === "number" || typeof v === "string")
+                .map(([k, v]) => (
+                  <Row key={k} label={k} value={v} />
+                ))}
+            </div>
+            <details className="rounded-md border bg-muted/40 p-2">
+              <summary className="cursor-pointer text-[11px] font-medium">
+                Technical result JSON
+              </summary>
               <pre className="mt-2 max-h-64 overflow-auto text-[11px]">
                 {JSON.stringify(result["result"], null, 2)}
               </pre>
+            </details>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void navigator.clipboard.writeText(runId ?? "");
+                  toast.success("Run ID copied");
+                }}
+              >
+                <Copy className="mr-1 h-3 w-3" /> Copy Run ID
+              </Button>
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/closure/abd/raw-data">
+                  <ExternalLink className="mr-1 h-3 w-3" /> Open ABD Raw Data
+                </Link>
+              </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <p className="text-[11px] text-muted-foreground">
+              Keep the original DAR files and generated package for audit. When the next DAR files
+              arrive, start again from Step 1 and generate a new Baseline. 같은 package 는 다시
+              실행할 수 없습니다.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">아직 완료된 Import 가 없습니다.</p>
+        )}
+      </OcsWizardStepCard>
     </div>
   );
 }
