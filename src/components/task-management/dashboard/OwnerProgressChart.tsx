@@ -54,7 +54,9 @@ export function OwnerProgressChart({
   onOwnerClick,
   thresholds,
   limit = 15,
+  titleSuffix,
 }: Props) {
+
   const viewMode: "team" | "individual" = dim === "team" ? "team" : "individual";
 
   const rows = useMemo(
