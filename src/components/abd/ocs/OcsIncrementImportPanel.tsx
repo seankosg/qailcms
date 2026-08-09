@@ -258,83 +258,68 @@ export function OcsIncrementImportPanel() {
     return out;
   }, [precheck, baselineIdentityOk]);
 
-  const blockers = useMemo(() => {
-    const out: string[] = [];
-    if (!BASELINE_VERIFICATION_IMPLEMENTED) {
-      out.push("Baseline 실측 검증(생성·다운로드·내용 대조) 미완료 — 증분 Import 잠금");
-    }
-    if (!pkg) out.push("증분 ZIP 패키지를 선택하십시오.");
-    if (pkg) out.push(...pkg.blockers);
-    if (pkg && !collision) out.push("Storage 충돌 점검 미완료");
-    if (collision) out.push(...collision.blockers);
-    if (precheck?.["duplicate_package"] === true)
-      out.push(
-        precheck?.["duplicate_recovered"] === true
-          ? "이미 반영 및 복구 완료된 패키지입니다. 재실행할 수 없습니다."
-          : "동일 패키지 해시가 이미 반영되었습니다.",
-      );
-    const base = (precheck?.["baseline"] ?? {}) as Record<string, unknown>;
-    if (precheck && base["base_import_run_found"] !== true)
-      out.push("base_import_run_id 를 정본에서 찾을 수 없습니다.");
-    if (precheck && base["is_latest"] !== true)
-      out.push("Baseline 이 최신 정본 Import 가 아닙니다.");
-    if (precheck && base["core_changed_since_base"] === true && !baselineIdentityOk)
-      out.push("Baseline 이후 OCS 정본이 변경되었습니다.");
-    if (precheck && precheck["base_core_hash_match"] === false)
-      out.push("manifest.base_core_hash 가 서버 정본 core hash 와 다릅니다.");
-    if (precheck && precheck["baseline_id_match"] === false)
-      out.push("manifest.base_baseline_id 가 서버 재계산값과 다릅니다.");
-    if (
-      precheck &&
-      Array.isArray(precheck["mismatched_core_tables"]) &&
-      (precheck["mismatched_core_tables"] as string[]).length > 0
-    )
-      out.push(
-        `core 테이블 해시 불일치: ${(precheck["mismatched_core_tables"] as string[]).join(", ")}`,
-      );
-    if (!dry) out.push("Dry-run 미실행");
-    if (dry) {
-      if (
-        num(dry["comments_to_update"]) !==
-        num(dry["comments_unchanged"]) + num(dry["comments_modified"])
-      ) {
-        out.push("Dry-run 항등식 불일치");
-      }
-      if (num(dry["attachments_unresolved"]) > 0)
-        out.push(`미확인 첨부 ${num(dry["attachments_unresolved"])}건`);
-      if (massRetire && !allowRetire) out.push(`대량 퇴역 미승인 (${retire}건 · 임계 30% / 100건)`);
-    }
-    if (!snapshotId) out.push("사전 백업 스냅샷 미완료 (Dry-run 이후 생성분만 인정)");
-    if (uploadFailedCount > 0)
-      out.push(
-        `자산 업로드 실패 ${uploadFailedCount}건 — 재실행으로 실패분만 다시 업로드하십시오.`,
-      );
-    if (!verifyComplete)
-      out.push(
-        !verifyRan
-          ? "신규 자산 업로드 · 서버 실측 검증 미실행"
-          : `서버 실측 검증 미완료 (${verifyOk.length}/${newAssetTotal})`,
-      );
-    if (!approved) out.push("최종 승인 체크 필요");
-    return out;
-  }, [
-    pkg,
-    precheck,
-    dry,
-    snapshotId,
-    approved,
-    massRetire,
-    allowRetire,
-    retire,
-    collision,
-    verifyComplete,
-    verifyTotal,
-    verifyOk.length,
-    verifyRan,
-    newAssetTotal,
-    uploadFailedCount,
-    baselineIdentityOk,
-  ]);
+  // ── 구조화된 blocker 그룹 · 단계 관문 (문구 정규식 판정 금지) ──
+  const duplicatePackage = precheck?.["duplicate_package"] === true;
+  const duplicateRecovered = precheck?.["duplicate_recovered"] === true;
+
+  const gateInput: GateInput = useMemo(
+    () => ({
+      baselineVerificationImplemented: BASELINE_VERIFICATION_IMPLEMENTED,
+      hasPackage: !!pkg,
+      packageFileBlockers: pkg?.blockers ?? [],
+      collisionDone: !!collision,
+      collisionBlockers: collision?.blockers ?? [],
+      collisionCounts: collision
+        ? {
+            hash_mismatch: collision.counts.hash_mismatch,
+            unresolved: collision.counts.unresolved,
+          }
+        : null,
+      duplicatePackage,
+      duplicateRecovered,
+      precheck,
+      baselineIdentityOk,
+      dry,
+      dryIdentityOk: dry
+        ? num(dry["comments_to_update"]) ===
+          num(dry["comments_unchanged"]) + num(dry["comments_modified"])
+        : false,
+      attachmentsUnresolved: num(dry?.["attachments_unresolved"]),
+      massRetire,
+      allowRetire,
+      retireCount: retire,
+      uploadFailedCount,
+      verifyRan,
+      verifyOkCount: verifyOk.length,
+      verifyFailureCount: verifyFailures.length,
+      newAssetTotal,
+      snapshotId,
+      approved,
+    }),
+    [
+      pkg,
+      collision,
+      duplicatePackage,
+      duplicateRecovered,
+      precheck,
+      baselineIdentityOk,
+      dry,
+      massRetire,
+      allowRetire,
+      retire,
+      uploadFailedCount,
+      verifyRan,
+      verifyOk.length,
+      verifyFailures.length,
+      newAssetTotal,
+      snapshotId,
+      approved,
+    ],
+  );
+
+  const gates = useMemo(() => evaluateGates(gateInput, warnings.length), [gateInput, warnings.length]);
+  const blockers = gates.blockers;
+  const verifyComplete = gates.step5Complete;
 
   function resetDownstream() {
     setRunId(null);
