@@ -264,6 +264,10 @@ export const addMainTaskWithSubs = createServerFn({ method: "POST" })
         `권한 없음: Sub Task 담당자 '${s.hdec_pic_name}' 는 등록 범위를 벗어납니다`,
       );
     }
+    await assertWorkTypeAllowed(context, [
+      data.main.row_type,
+      ...data.subs.map((s) => s.row_type),
+    ]);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const admin = supabaseAdmin as any;
