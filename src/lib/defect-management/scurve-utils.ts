@@ -5,7 +5,7 @@
 // planMode(baseline/remaining) 처리는 RPC 측에서 이미 반영되어 있어
 // 여기서는 카운트를 단순 집계만 하면 된다.
 
-import type { CellRaw, Stage } from "./progress-utils";
+import { ALL_STAGES, type CellRaw, type Stage } from "./progress-utils";
 
 export interface SCurveStageSeries {
   stage: Stage;
