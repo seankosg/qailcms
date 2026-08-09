@@ -1,13 +1,49 @@
 // Snag Progress 매트릭스 클라이언트 유틸.
 // DB 사전 집계(RPC) 결과를 UI 매트릭스 형태로 조립하는 순수 함수 모음.
 
-export type Stage = "start" | "rectified" | "closure";
-export const ALL_STAGES: Stage[] = ["start", "rectified", "closure"];
+export type Stage =
+  | "start"
+  | "rectified"
+  | "pre_inspection"
+  | "dar_inspection"
+  | "closure"
+  | "ho";
+export const ALL_STAGES: Stage[] = [
+  "start",
+  "rectified",
+  "pre_inspection",
+  "dar_inspection",
+  "closure",
+  "ho",
+];
 export const STAGE_LABELS: Record<Stage, string> = {
   start: "Start",
   rectified: "Rect",
+  pre_inspection: "Pr-Ins",
+  dar_inspection: "Dr-Ins",
   closure: "Close",
+  ho: "H/O",
 };
+/** No Plan 합집합 계산용 비트마스크(서버 np_mask 규약과 동일 순서) */
+export const STAGE_BIT: Record<Stage, number> = {
+  start: 1,
+  rectified: 2,
+  pre_inspection: 4,
+  dar_inspection: 8,
+  closure: 16,
+  ho: 32,
+};
+
+/** np_mask(마스크→건수) 에서 선택 스테이지 합집합 건수를 구한다. */
+export function noPlanUnionFromMask(mask: Record<string, number> | null | undefined, stages: Stage[]): number {
+  if (!mask) return 0;
+  const sel = stages.reduce((acc, s) => acc | STAGE_BIT[s], 0);
+  let out = 0;
+  for (const [k, v] of Object.entries(mask)) {
+    if ((Number(k) & sel) !== 0) out += Number(v) || 0;
+  }
+  return out;
+}
 
 export type Bucket = "day" | "week";
 
@@ -228,11 +264,13 @@ export function assembleMatrix(opts: {
         doneCount: 0,
         cumPlan: 0,
         cumActual: 0,
-        stages: {
-          start: emptyStageRow(buckets, "start", 0),
-          rectified: emptyStageRow(buckets, "rectified", 0),
-          closure: emptyStageRow(buckets, "closure", 0),
-        },
+        stages: ALL_STAGES.reduce(
+          (acc, s) => {
+            acc[s] = emptyStageRow(buckets, s, 0);
+            return acc;
+          },
+          {} as Record<Stage, StageRow>,
+        ),
         combined: buckets.map((b) => ({ bucket: b, plan: 0, actual: 0 })),
         groupKeyRaw: [...groupKeyRaw],
       };
@@ -334,7 +372,10 @@ export function stageDateField(stage: Stage | "all", field: "planned" | "actual"
   const map: Record<Stage, { planned: string; actual: string }> = {
     start: { planned: "planned_start_date", actual: "actual_start_date" },
     rectified: { planned: "planned_rectified_date", actual: "actual_rectified_date" },
+    pre_inspection: { planned: "planned_pre_inspection_date", actual: "actual_pre_inspection_date" },
+    dar_inspection: { planned: "planned_dar_inspection_date", actual: "actual_dar_inspection_date" },
     closure: { planned: "planned_closure_date", actual: "actual_closure_date" },
+    ho: { planned: "planned_ho_date", actual: "actual_ho_date" },
   };
   return map[stage][field];
 }
