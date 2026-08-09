@@ -14,11 +14,14 @@ export type MatrixRawRow = {
   status_raw: string | null;
   cnt: number;
   rect_cnt: number;
+  pre_cnt: number;
+  dar_cnt: number;
   closed_cnt: number;
+  ho_cnt: number;
 };
 
 // 팀 분해 통계 — 정본(_snag_done_asof: 자기 실적일 ≤ as-of) 기준 rect/closed
-export type TeamStat = { issued: number; rect: number; closed: number };
+export type TeamStat = { issued: number; rect: number; pre: number; dar: number; closed: number; ho: number };
 
 export type Stats = {
   open: number;
@@ -26,6 +29,10 @@ export type Stats = {
   reopen: number;
   closed: number;
   issued: number;
+  /** 실적일 기준(≤ as-of) 스테이지 완료 건수 */
+  preIns: number;
+  darIns: number;
+  ho: number;
   closurePct: number | null; // null when issued=0
   byTeam: Record<TeamKey, TeamStat>;
 };
@@ -51,9 +58,9 @@ export function normalizeTeam(v: string | null | undefined): TeamKey | null {
 
 export function emptyTeamStats(): Record<TeamKey, TeamStat> {
   return {
-    ARCH: { issued: 0, rect: 0, closed: 0 },
-    MECH: { issued: 0, rect: 0, closed: 0 },
-    ELEC: { issued: 0, rect: 0, closed: 0 },
+    ARCH: { issued: 0, rect: 0, pre: 0, dar: 0, closed: 0, ho: 0 },
+    MECH: { issued: 0, rect: 0, pre: 0, dar: 0, closed: 0, ho: 0 },
+    ELEC: { issued: 0, rect: 0, pre: 0, dar: 0, closed: 0, ho: 0 },
   };
 }
 
@@ -63,6 +70,9 @@ export const EMPTY_STATS: Stats = {
   reopen: 0,
   closed: 0,
   issued: 0,
+  preIns: 0,
+  darIns: 0,
+  ho: 0,
   closurePct: null,
   byTeam: emptyTeamStats(),
 };
@@ -235,12 +245,18 @@ export function addRow(stats: Stats, row: MatrixRawRow): void {
     stats.issued += row.cnt;
     stats.closurePct = stats.issued > 0 ? stats.closed / stats.issued : null;
   }
+  stats.preIns += row.pre_cnt;
+  stats.darIns += row.dar_cnt;
+  stats.ho += row.ho_cnt;
   const team = normalizeTeam(row.team);
   if (team) {
     const t = stats.byTeam[team];
     t.issued += row.cnt;
     t.rect += row.rect_cnt;
+    t.pre += row.pre_cnt;
+    t.dar += row.dar_cnt;
     t.closed += row.closed_cnt;
+    t.ho += row.ho_cnt;
   }
 }
 
@@ -250,16 +266,22 @@ export function mergeStats(target: Stats, src: Stats): void {
   target.reopen += src.reopen;
   target.closed += src.closed;
   target.issued += src.issued;
+  target.preIns += src.preIns;
+  target.darIns += src.darIns;
+  target.ho += src.ho;
   target.closurePct = target.issued > 0 ? target.closed / target.issued : null;
   for (const t of ALL_TEAMS) {
     target.byTeam[t].issued += src.byTeam[t].issued;
     target.byTeam[t].rect += src.byTeam[t].rect;
+    target.byTeam[t].pre += src.byTeam[t].pre;
+    target.byTeam[t].dar += src.byTeam[t].dar;
     target.byTeam[t].closed += src.byTeam[t].closed;
+    target.byTeam[t].ho += src.byTeam[t].ho;
   }
 }
 
 export function newStats(): Stats {
-  return { open: 0, rectified: 0, reopen: 0, closed: 0, issued: 0, closurePct: null, byTeam: emptyTeamStats() };
+  return { open: 0, rectified: 0, reopen: 0, closed: 0, issued: 0, preIns: 0, darIns: 0, ho: 0, closurePct: null, byTeam: emptyTeamStats() };
 }
 
 // ── 병목 팀 판정 ──────────────────────────────────────────────────────
@@ -267,9 +289,20 @@ export function newStats(): Stats {
 // gapPp(기본 15%p) 이상 뒤처지면 병목으로 강조.
 export const BOTTLENECK_GAP_PP = 15;
 
+export type StageMetric = "rect" | "pre" | "dar" | "closed" | "ho";
+
+/** 매트릭스 스테이지 열 정의 (Issued 제외) — 화면·엑셀 공통 정본 */
+export const STAGE_METRICS: Array<{ slot: StageMetric; label: string; dateField: string }> = [
+  { slot: "rect", label: "Rect", dateField: "actual_rectified_date" },
+  { slot: "pre", label: "Pre-Ins", dateField: "actual_pre_inspection_date" },
+  { slot: "dar", label: "DAR-Ins", dateField: "actual_dar_inspection_date" },
+  { slot: "closed", label: "Closed", dateField: "actual_closure_date" },
+  { slot: "ho", label: "H/O", dateField: "actual_ho_date" },
+];
+
 export function bottleneckTeam(
   byTeam: Record<TeamKey, TeamStat>,
-  metric: "rect" | "closed",
+  metric: StageMetric,
   gapPp: number = BOTTLENECK_GAP_PP,
 ): TeamKey | null {
   const entries = (TEAM_COL_ORDER as readonly TeamKey[])
