@@ -165,11 +165,7 @@ export function OcsIncrementImportPanel() {
       if (!raw) return;
       const s = JSON.parse(raw) as Record<string, unknown>;
       if (Array.isArray(s["checks"]))
-        setPrepChecks([
-          s["checks"][0] === true,
-          s["checks"][1] === true,
-          s["checks"][2] === true,
-        ]);
+        setPrepChecks([s["checks"][0] === true, s["checks"][1] === true, s["checks"][2] === true]);
       setBaselineConfirmed(s["baselineConfirmed"] === true);
       setPackageBuilt(s["packageBuilt"] === true);
       setSkipPreparation(s["skipPreparation"] === true);
@@ -317,7 +313,10 @@ export function OcsIncrementImportPanel() {
     ],
   );
 
-  const gates = useMemo(() => evaluateGates(gateInput, warnings.length), [gateInput, warnings.length]);
+  const gates = useMemo(
+    () => evaluateGates(gateInput, warnings.length),
+    [gateInput, warnings.length],
+  );
   const blockers = gates.blockers;
   const verifyComplete = gates.step5Complete;
 
@@ -484,13 +483,16 @@ export function OcsIncrementImportPanel() {
     setSnapshotStatus(null);
     setSnapshotElapsed(0);
 
-    const tick = setInterval(() => setSnapshotElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    const tick = setInterval(
+      () => setSnapshotElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
     const poll = setInterval(() => {
       void (async () => {
         try {
-          const row = (await snapshotStatusFn({ data: { run_id: runId } })) as
-            | { metadata?: Record<string, unknown> | null }
-            | null;
+          const row = (await snapshotStatusFn({ data: { run_id: runId } })) as {
+            metadata?: Record<string, unknown> | null;
+          } | null;
           const m = (row?.metadata ?? null) as Record<string, unknown> | null;
           if (!m) return;
           setSnapshotStatus({
@@ -506,9 +508,10 @@ export function OcsIncrementImportPanel() {
     }, 3000);
 
     try {
-      const res = (await snapshotFn({ data: { module: "abd", run_id: runId } })) as
-        | { id?: string; size_bytes?: number }
-        | null;
+      const res = (await snapshotFn({ data: { module: "abd", run_id: runId } })) as {
+        id?: string;
+        size_bytes?: number;
+      } | null;
       if (!res?.id) throw new Error("스냅샷 ID 를 확인하지 못했습니다.");
       setSnapshotId(res.id);
       setSnapshotStatus((prev) => ({
@@ -927,10 +930,13 @@ export function OcsIncrementImportPanel() {
               <div className="mb-1 font-semibold text-foreground">
                 새로고침 후 복원되는 항목 / 복원되지 않는 항목
               </div>
-              <div>복원됨: 최신 Baseline 정보 · 패키지의 과거 검증 영수증 존재 여부 · 완료·복구 패키지 중복 차단</div>
               <div>
-                복원되지 않음: 선택한 ZIP 파일 · Dry-run 결과 · 현재 Snapshot ID · Import 진행 상태와
-                결과 — Re-select the ZIP to restore and verify this workflow.
+                복원됨: 최신 Baseline 정보 · 패키지의 과거 검증 영수증 존재 여부 · 완료·복구 패키지
+                중복 차단
+              </div>
+              <div>
+                복원되지 않음: 선택한 ZIP 파일 · Dry-run 결과 · 현재 Snapshot ID · Import 진행
+                상태와 결과 — Re-select the ZIP to restore and verify this workflow.
               </div>
             </div>
           )}
@@ -958,7 +964,8 @@ export function OcsIncrementImportPanel() {
         summary={
           baselineInfo?.exists ? (
             <span className="font-mono text-[11px] text-muted-foreground">
-              {baselineInfo.baseline_id.slice(0, 16)} · {baselineInfo.is_latest ? "Latest" : "Outdated"}
+              {baselineInfo.baseline_id.slice(0, 16)} ·{" "}
+              {baselineInfo.is_latest ? "Latest" : "Outdated"}
             </span>
           ) : null
         }
@@ -993,7 +1000,13 @@ export function OcsIncrementImportPanel() {
               />
               <Row
                 label="Status"
-                value={baselineInfo.exists ? (baselineInfo.is_latest ? "Latest" : "Outdated") : "Not generated"}
+                value={
+                  baselineInfo.exists
+                    ? baselineInfo.is_latest
+                      ? "Latest"
+                      : "Outdated"
+                    : "Not generated"
+                }
                 bad={!baselineInfo.exists}
               />
               {baselineInfo.files.length > 0 && (
@@ -1239,7 +1252,11 @@ export function OcsIncrementImportPanel() {
                 <Row label="comments_to_update" value={dry["comments_to_update"]} />
                 <Row label="comments_unchanged" value={dry["comments_unchanged"]} />
                 <Row label="comments_modified" value={dry["comments_modified"]} />
-                <Row label="comments_to_retire" value={dry["comments_to_retire"]} bad={massRetire} />
+                <Row
+                  label="comments_to_retire"
+                  value={dry["comments_to_retire"]}
+                  bad={massRetire}
+                />
               </div>
               <div className="rounded-md border p-3">
                 <div className="mb-1 text-xs font-semibold">첨부 · 원본 Excel</div>
@@ -1504,7 +1521,9 @@ export function OcsIncrementImportPanel() {
         onToggle={() => toggle(7)}
         locked={!gates.step7Unlocked}
         lockReasons={
-          !gates.step7Unlocked ? ["Step 4~6 이 모두 통과하고 Snapshot 이 성공해야 활성화됩니다."] : []
+          !gates.step7Unlocked
+            ? ["Step 4~6 이 모두 통과하고 Snapshot 이 성공해야 활성화됩니다."]
+            : []
         }
       >
         {dry && (
@@ -1520,12 +1539,19 @@ export function OcsIncrementImportPanel() {
             </div>
             <div className="rounded-md border p-3">
               <div className="mb-1 text-xs font-semibold">자산 · 백업</div>
-              <Row label="Images new / existing" value={`${num(dry["images_new"])} / ${num(dry["images_existing"])}`} />
+              <Row
+                label="Images new / existing"
+                value={`${num(dry["images_new"])} / ${num(dry["images_existing"])}`}
+              />
               <Row
                 label="Source Excel new / revised / existing"
                 value={`${num(dry["source_files_new"])} / ${num(dry["source_files_revised"])} / ${num(dry["source_files_existing"])}`}
               />
-              <Row label="Unresolved attachments" value={dry["attachments_unresolved"]} bad={num(dry["attachments_unresolved"]) > 0} />
+              <Row
+                label="Unresolved attachments"
+                value={dry["attachments_unresolved"]}
+                bad={num(dry["attachments_unresolved"]) > 0}
+              />
               <Row label="Snapshot ID" value={snapshotId ?? "—"} />
             </div>
           </div>
@@ -1652,8 +1678,8 @@ export function OcsIncrementImportPanel() {
               <div className="space-y-1 rounded-md border border-amber-500 p-3">
                 <div className="text-sm font-semibold text-amber-600">Verification required</div>
                 <p className="text-[11px] text-muted-foreground">
-                  서버 Import log·post-import verify·항등식·보호 해시 대조가 모두 확인되지 않았습니다.
-                  완료로 처리하지 마십시오.
+                  서버 Import log·post-import verify·항등식·보호 해시 대조가 모두 확인되지
+                  않았습니다. 완료로 처리하지 마십시오.
                 </p>
                 <ul className="space-y-0.5 text-[11px] text-destructive">
                   {importSuccess.reasons.map((r) => (

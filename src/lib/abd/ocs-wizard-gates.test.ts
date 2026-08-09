@@ -72,9 +72,7 @@ describe("wizard gates", () => {
   });
 
   it("4. Import RPC 성공 + post-verify 실패 → 재시도 금지", () => {
-    const f = classifyImportFailure(
-      new Error("OCS_IMPORT_STAGE[post_import_verify]: verify boom"),
-    );
+    const f = classifyImportFailure(new Error("OCS_IMPORT_STAGE[post_import_verify]: verify boom"));
     expect(f.kind).toBe("partial_or_post_verify_failure");
     expect(f.retryAllowed).toBe(false);
     expect(f.nextStep).toContain("Do not retry");

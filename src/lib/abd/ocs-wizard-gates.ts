@@ -94,8 +94,7 @@ export function buildBlockerGroups(i: GateInput): BlockerGroups {
     assetBlockers.push(
       `자산 업로드 실패 ${i.uploadFailedCount}건 — 재실행으로 실패분만 다시 업로드하십시오.`,
     );
-  if (i.verifyFailureCount > 0)
-    assetBlockers.push(`서버 실측 검증 실패 ${i.verifyFailureCount}건`);
+  if (i.verifyFailureCount > 0) assetBlockers.push(`서버 실측 검증 실패 ${i.verifyFailureCount}건`);
   if (!i.verifyRan) assetBlockers.push("신규 자산 업로드 · 서버 실측 검증 미실행");
   else if (i.verifyOkCount !== i.newAssetTotal)
     assetBlockers.push(`서버 실측 검증 미완료 (${i.verifyOkCount}/${i.newAssetTotal})`);
@@ -185,10 +184,7 @@ export function evaluateGates(i: GateInput, warningCount = 0): WizardGates {
 
 // ───────────────────────── Import 실패 분류 ─────────────────────────
 
-export type ImportFailureKind =
-  | "confirmed_rollback"
-  | "partial_or_post_verify_failure"
-  | "unknown";
+export type ImportFailureKind = "confirmed_rollback" | "partial_or_post_verify_failure" | "unknown";
 
 export type ImportFailureState = {
   kind: ImportFailureKind;
@@ -223,8 +219,7 @@ export function classifyImportFailure(err: unknown): ImportFailureState {
       title: "Import failed — no production changes were applied",
       affected:
         "서버가 운영 정본 무변경 또는 트랜잭션 롤백을 확인했습니다. 업로드된 자산과 사전 스냅샷은 보존됩니다.",
-      nextStep:
-        "Import 단계만 다시 실행하십시오. 파일 재업로드나 백업 재생성은 필요하지 않습니다.",
+      nextStep: "Import 단계만 다시 실행하십시오. 파일 재업로드나 백업 재생성은 필요하지 않습니다.",
     };
   }
   if (stage === "post_import_verify" || stage === "import_log_finalize") {
@@ -245,10 +240,8 @@ export function classifyImportFailure(err: unknown): ImportFailureState {
     message: clean,
     retryAllowed: false,
     title: "Import result could not be confirmed",
-    affected:
-      "네트워크 오류·timeout·응답 유실 등으로 반영 여부를 확정하지 못했습니다.",
-    nextStep:
-      "Do not retry. run ID 로 Import log 와 운영 정본 반영 여부를 먼저 확인하십시오.",
+    affected: "네트워크 오류·timeout·응답 유실 등으로 반영 여부를 확정하지 못했습니다.",
+    nextStep: "Do not retry. run ID 로 Import log 와 운영 정본 반영 여부를 먼저 확인하십시오.",
   };
 }
 
@@ -259,12 +252,16 @@ export type ImportSuccessEvaluation = { complete: boolean; reasons: string[] };
 const n = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
 /** result 객체 존재만으로 완료 처리하지 않는다. 서버 로그·verify·항등식을 모두 확인한다. */
-export function evaluateImportSuccess(payload: Record<string, unknown> | null): ImportSuccessEvaluation {
+export function evaluateImportSuccess(
+  payload: Record<string, unknown> | null,
+): ImportSuccessEvaluation {
   const reasons: string[] = [];
   if (!payload) return { complete: false, reasons: ["Import 결과가 없습니다."] };
 
   if (payload["import_log_status"] !== "success")
-    reasons.push(`서버 Import log status 가 success 가 아닙니다 (${String(payload["import_log_status"] ?? "unknown")}).`);
+    reasons.push(
+      `서버 Import log status 가 success 가 아닙니다 (${String(payload["import_log_status"] ?? "unknown")}).`,
+    );
 
   const verify = payload["verify"];
   if (!verify || typeof verify !== "object") reasons.push("post-import verify 결과가 없습니다.");

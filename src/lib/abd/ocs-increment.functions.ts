@@ -249,7 +249,9 @@ export const ocsIncImport = createServerFn({ method: "POST" })
     // 서버 실측 검증 영수증 — 신규 object 판정의 유일한 정본 (클라이언트 receipt 는 보조).
     const { data: verifyRows, error: verifyErr } = await context.supabase
       .from("abd_ocs_inc_verify_receipts")
-      .select("bucket, path, expected_sha256, expected_byte_size, actual_sha256, actual_byte_size, ok, package_id")
+      .select(
+        "bucket, path, expected_sha256, expected_byte_size, actual_sha256, actual_byte_size, ok, package_id",
+      )
       .eq("run_id", data.run_id)
       .eq("package_id", data.package_id)
       .eq("ok", true);
