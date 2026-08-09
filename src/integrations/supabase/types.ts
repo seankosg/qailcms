@@ -8191,6 +8191,10 @@ export type Database = {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
       }
+      wrt_aconex_apply: {
+        Args: { _batch_id: string; _patches: Json }
+        Returns: Json
+      }
       wrt_active_round: {
         Args: { _as_of?: string }
         Returns: {
