@@ -98,7 +98,10 @@ export const receiptList = (v: unknown): UploadReceipt[] =>
           path: String(o["path"] ?? ""),
           sha256: String(o["sha256"] ?? "").toLowerCase(),
           state:
-            o["state"] === "uploaded" || o["state"] === "existing" || o["state"] === "failed"
+            o["state"] === "uploaded" ||
+            o["state"] === "existing" ||
+            o["state"] === "declared_new" ||
+            o["state"] === "failed"
               ? (o["state"] as UploadReceipt["state"])
               : "failed",
         } as UploadReceipt;
