@@ -230,13 +230,6 @@ export function OcsIncrementImportPanel() {
 
   const uploadFailures = useMemo(() => receipts.filter((r) => r.state === "failed"), [receipts]);
   const uploadFailedCount = uploadFailures.length;
-  const verifyPending = Math.max(0, verifyTotal - verifyOk.length);
-  const verifyComplete =
-    verifyRan &&
-    uploadFailedCount === 0 &&
-    verifyFailures.length === 0 &&
-    verifyTotal === newAssetTotal &&
-    verifyPending === 0;
 
   // Baseline 동일성 — 4개 값이 모두 일치하면 "마지막 Import 이후 변경" 은 경고로만 취급한다.
   const baselineIdentityOk = useMemo(() => {
