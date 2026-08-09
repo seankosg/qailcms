@@ -52,12 +52,23 @@ export type V3StageComment = {
 };
 
 export type V3StageAttachment = {
+  /** 정본 키. 과거 `attachment_id` 는 호환 alias 로만 허용한다. */
+  source_attachment_id: string;
+  /** 호환 alias — 항상 source_attachment_id 와 동일 값으로 채운다. */
   attachment_id: string;
   comment_id: string | null;
   source_parent_comment_id: string | null;
   comment_group_id: string | null;
   atomic_comment_id: string | null;
   attachment_scope: string | null;
+  storage_path: string | null;
+  content_hash: string | null;
+  byte_size: number | null;
+  width: number | null;
+  height: number | null;
+  image_format: string | null;
+  mime_type: string | null;
+  source_image_index: number | null;
 };
 
 export type V3StageResponse = {
@@ -94,6 +105,9 @@ export type V3AtomicParse = {
   distinct_abd_numbers: number;
   residual_multi_marker_rows: number;
   attachment_scope_counts: Record<string, number>;
+  attachment_invalid_rows: { index: number; reason: string }[];
+  duplicated_attachment_ids: string[];
+  duplicated_attachment_paths: string[];
 };
 
 export type V3DeltaParse = {
