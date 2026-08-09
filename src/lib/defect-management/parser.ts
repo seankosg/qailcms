@@ -150,6 +150,21 @@ const EXTRA_REIMPORT_FIELDS = new Set<string>([
   "_backfilled_asd_before_20260722",
 ]);
 
+/**
+ * 확장 필드의 원본 헤더 별칭 (정규화 키 → 필드명).
+ * 파일 헤더가 하이픈/슬래시를 쓰는 경우(예: planned_Pre-Inspection_date, actual_H/O_date).
+ */
+const EXTRA_FIELD_ALIASES: Record<string, string> = {
+  "planned_pre-inspection_date": "planned_pre_inspection_date",
+  "actual_pre-inspection_date": "actual_pre_inspection_date",
+  "planned_dar-inspection_date": "planned_dar_inspection_date",
+  "actual_dar-inspection_date": "actual_dar_inspection_date",
+  "planned_h/o_date": "planned_ho_date",
+  "actual_h/o_date": "actual_ho_date",
+  "planned_h-o_date": "planned_ho_date",
+  "actual_h-o_date": "actual_ho_date",
+};
+
 
 export interface DefectSheetHeader {
   col: number; // 1-based
@@ -575,6 +590,9 @@ export function toDefectFieldName(
   for (const f of EXTRA_REIMPORT_FIELDS) {
     if (normalizeHeader(f) === asIs) return f;
   }
+  // 확장 필드 별칭 (하이픈/슬래시 표기)
+  const extraAlias = EXTRA_FIELD_ALIASES[norm];
+  if (extraAlias) return extraAlias;
   // canonical
   const canonical = CANONICAL_HEADERS[norm];
   if (canonical) return canonical;
