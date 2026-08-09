@@ -25,7 +25,6 @@ import { todayInDoha } from "@/lib/time/doha";
 
 const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
 const TASK_SCOPE_OPTIONS = [
-  { value: "all", label: "All" },
   { value: "main", label: "Main Task" },
   { value: "sub", label: "Sub Task" },
 ] as const;
@@ -84,8 +83,8 @@ export function TmKpiAnalysisPage() {
   }, [items]);
 
   const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
-  const taskScope: TaskScope =
-    search.taskScope === "main" || search.taskScope === "sub" ? search.taskScope : "all";
+  // 계산은 항상 Sub 기준(기본값). Main 은 명시 선택 시에만.
+  const taskScope: TaskScope = search.taskScope === "main" ? "main" : "sub";
 
   const scopedByTaskScope = useMemo(() => scopeItems(items, taskScope), [items, taskScope]);
 
@@ -113,7 +112,8 @@ export function TmKpiAnalysisPage() {
       return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "악화");
     if (search.delayFilter === "delayed")
       return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "지연");
-    return base.filter((it) => resolveIsDelayed(it, thresholds, asOfDate));
+    // "전체" 는 모집단 그대로 — 지연 과업만 남기지 않는다.
+    return base;
   }, [scopedByTaskScope, search.delayFilter, thresholds, asOfDate]);
 
   const patch = (obj: Record<string, unknown>) =>
@@ -173,7 +173,7 @@ export function TmKpiAnalysisPage() {
                   type="single"
                   value={taskScope}
                   onValueChange={(v) => {
-                    if (v === "all" || v === "main" || v === "sub") patch({ taskScope: v });
+                    if (v === "main" || v === "sub") patch({ taskScope: v });
                   }}
                   className="gap-1"
                 >
