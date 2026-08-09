@@ -152,7 +152,9 @@ export function TmPlanVsActualCard({
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-muted-foreground";
   const sign = deltaNow > 0 ? "+" : "";
-  const appliedLabel = `${DIM_LABEL[dim]}: ${ownerKey || "All"} · n = ${n.toLocaleString()} tasks`;
+  const appliedLabel = `${filterSummary
+    .map((f) => `${f.label}: ${f.value}`)
+    .join(" · ")} · n = ${n.toLocaleString()} tasks`;
 
   return (
     <Card>
@@ -168,32 +170,24 @@ export function TmPlanVsActualCard({
                 {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 <TrendingUp className="h-4 w-4 text-primary" />
                 <CardTitle className="text-sm">Plan vs Actual — S-Curve</CardTitle>
-                <span className="text-[11px] text-muted-foreground tabular-nums">
-                  {appliedLabel}
-                </span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {filterSummary.map((f) => (
+                    <span
+                      key={f.label}
+                      className="rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                      <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
+                      <span className="text-foreground">{f.value}</span>
+                    </span>
+                  ))}
+                  <span className="rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] tabular-nums text-foreground">
+                    n = {n.toLocaleString()} tasks
+                  </span>
+                </div>
               </button>
             </CollapsibleTrigger>
 
             <div className="flex items-center gap-2">
-              <Select
-                value={ownerKey || ALL_KEY}
-                onValueChange={(v) => onOwnerKeyChange(v === ALL_KEY ? "" : v)}
-              >
-                <SelectTrigger className="h-8 w-[200px] text-xs">
-                  <SelectValue placeholder={DIM_LABEL[dim]} />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  <SelectItem value={ALL_KEY} className="text-xs">
-                    All ({DIM_LABEL[dim]} rollup)
-                  </SelectItem>
-                  {ownerOptions.map((o) => (
-                    <SelectItem key={o} value={o} className="text-xs">
-                      {o}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
               <ToggleGroup
                 type="single"
                 value={unit}
