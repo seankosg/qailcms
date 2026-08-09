@@ -66,6 +66,7 @@ export function TmKpiAnalysisPage() {
       hdecPic: search.hdecPic,
       hdecEng: search.hdecEng,
       level: "all",
+      q: "",
     },
     asOfDate,
   );
