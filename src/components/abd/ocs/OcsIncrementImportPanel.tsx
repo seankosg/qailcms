@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,23 @@ import { ocsIncDryRun, ocsIncImport, ocsIncPrecheck } from "@/lib/abd/ocs-increm
 import { ocsIncVerifyBatch } from "@/lib/abd/ocs-increment-verify.functions";
 import { VERIFY_BATCH_MAX } from "@/lib/abd/ocs-increment-verify";
 import { OcsBaselineCard } from "@/components/abd/ocs/OcsBaselineCard";
+import { getLatestOcsBaselineInfo } from "@/lib/abd/ocs-baseline.functions";
+import { ocsIncListVerifyReceipts } from "@/lib/abd/ocs-increment-receipts.functions";
+import {
+  OcsWizardStepper,
+  type StepStatus,
+  type WizardStep,
+} from "@/components/abd/ocs/wizard/OcsWizardStepper";
+import { OcsWizardStepCard } from "@/components/abd/ocs/wizard/OcsWizardStepCard";
+import { OcsErrorCard } from "@/components/abd/ocs/wizard/OcsErrorCard";
+import {
+  CheckItem,
+  OcsResponsibilityCard,
+  Step2PrepareFiles,
+  Step3BuildPackage,
+} from "@/components/abd/ocs/wizard/OcsPreparationSteps";
+import { Copy, ExternalLink } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { createPreImportSnapshot, getBackupRunStatus } from "@/lib/backup/backup.functions";
 import { OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
 import { OCS_SOURCE_BUCKET } from "@/lib/abd/ocs-source-manifest";
@@ -66,6 +83,8 @@ export function OcsIncrementImportPanel() {
   const verifyFn = useServerFn(ocsIncVerifyBatch);
   const snapshotFn = useServerFn(createPreImportSnapshot);
   const snapshotStatusFn = useServerFn(getBackupRunStatus);
+  const baselineInfoFn = useServerFn(getLatestOcsBaselineInfo);
+  const listVerifyReceiptsFn = useServerFn(ocsIncListVerifyReceipts);
 
   const [pkg, setPkg] = useState<IncrementPackage | null>(null);
   const [precheck, setPrecheck] = useState<Record<string, unknown> | null>(null);
@@ -100,7 +119,80 @@ export function OcsIncrementImportPanel() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pickerKey, setPickerKey] = useState(0);
 
+  // ── Wizard 로컬 진행 상태 (사용자 확인 기록 · 서버 판정에는 영향 없음) ──
+  const PREP_KEY = "abd.ocs.wizard.prep.v1";
+  const [prepChecks, setPrepChecks] = useState<[boolean, boolean, boolean]>([false, false, false]);
+  const [baselineConfirmed, setBaselineConfirmed] = useState(false);
+  const [packageBuilt, setPackageBuilt] = useState(false);
+  const [skipPreparation, setSkipPreparation] = useState(false);
+  const [openStep, setOpenStep] = useState(1);
+  const [baselineInfo, setBaselineInfo] = useState<{
+    exists: boolean;
+    baseline_id: string;
+    generated_at: string | null;
+    data_date: string | null;
+    zip_byte_size: number | null;
+    total_rows: number | null;
+    files: { name: string; byte_size: number; row_count: number | null }[];
+    is_latest: boolean;
+  } | null>(null);
+  const [baselineInfoError, setBaselineInfoError] = useState<string | null>(null);
+  const [restoredVerify, setRestoredVerify] = useState<string | null>(null);
+
+  // 새로고침 복원 — 로컬 확인 체크는 브라우저에, 서버 사실은 서버에서만 복원한다.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PREP_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw) as Record<string, unknown>;
+      if (Array.isArray(s["checks"]))
+        setPrepChecks([
+          s["checks"][0] === true,
+          s["checks"][1] === true,
+          s["checks"][2] === true,
+        ]);
+      setBaselineConfirmed(s["baselineConfirmed"] === true);
+      setPackageBuilt(s["packageBuilt"] === true);
+      setSkipPreparation(s["skipPreparation"] === true);
+    } catch {
+      /* 저장 형식 오류는 무시하고 초기 상태로 시작한다 */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        PREP_KEY,
+        JSON.stringify({
+          checks: prepChecks,
+          baselineConfirmed,
+          packageBuilt,
+          skipPreparation,
+        }),
+      );
+    } catch {
+      /* 저장 실패는 진행에 영향 없음 */
+    }
+  }, [prepChecks, baselineConfirmed, packageBuilt, skipPreparation]);
+
+  // Step 1 — 최신 Baseline 메타데이터 서버 복원 (읽기 전용)
+  useEffect(() => {
+    if (!isAdminRef.current) return;
+    void (async () => {
+      try {
+        const info = (await baselineInfoFn({ data: {} })) as typeof baselineInfo;
+        setBaselineInfo(info);
+        setBaselineInfoError(null);
+      } catch (e) {
+        setBaselineInfoError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.isStrictAdmin]);
+
   const isAdmin = me?.isStrictAdmin === true;
+  const isAdminRef = useRef(false);
+  isAdminRef.current = isAdmin;
 
   const retire = num(dry?.["comments_to_retire"]);
   const scopeActive = num(dry?.["scope_existing_active"]);
