@@ -124,6 +124,26 @@ export function TmKpiAnalysisPage() {
   const disciplines = search.discipline ?? [];
   const totalItems = items.length;
 
+  const listLabel = (arr: string[] | undefined) =>
+    !arr || arr.length === 0 ? "All" : arr.length <= 3 ? arr.join(", ") : `${arr.length} selected`;
+
+  const filterSummary = useMemo(
+    () => [
+      { label: "Task", value: taskScope === "main" ? "Main" : "Sub" },
+      { label: "Team", value: listLabel(disciplines) },
+      { label: "PIC", value: listLabel(search.hdecPic) },
+      { label: "ENG", value: listLabel(search.hdecEng) },
+      {
+        label: "Delay",
+        value:
+          DELAY_FILTER_OPTIONS.find((o) => o.value === search.delayFilter)?.label ??
+          String(search.delayFilter ?? "all"),
+      },
+      { label: "As of", value: asOfDate },
+    ],
+    [taskScope, disciplines, search.hdecPic, search.hdecEng, search.delayFilter, asOfDate],
+  );
+
   // 폐기된 담당자축 Team 필터의 잔여 선택값 정리
   useEffect(() => {
     if ((search.team ?? []).length > 0) patch({ team: [] });
@@ -266,7 +286,9 @@ export function TmKpiAnalysisPage() {
             onDimChange={(dim) => patch({ ownerDim: dim, curveKey: "" })}
             onOwnerClick={(dim, key, row) => {
               setOwnerDetail({ dim, key, row });
-              patch({ curveKey: key });
+              // 카드 내 담당자 필터 폐기 — 클릭 시 상단 담당자 필터에 반영한다.
+              if (dim === "hdec_pic_name") patch({ hdecPic: [key], hdecEng: [] });
+              else if (dim === "hdec_eng_name") patch({ hdecEng: [key], hdecPic: [] });
             }}
             thresholds={thresholds}
           />
@@ -274,8 +296,7 @@ export function TmKpiAnalysisPage() {
             items={scopedItems}
             asOfDate={asOfDate}
             dim={ownerDim}
-            ownerKey={search.curveKey}
-            onOwnerKeyChange={(key) => patch({ curveKey: key })}
+            filterSummary={filterSummary}
             bucket={curveBucket}
             onBucketChange={(b) => patch({ curveBucket: b })}
             open={curveOpen}
