@@ -651,15 +651,24 @@ export function OcsIncrementImportPanel() {
               disabled={!pkg || !!busy || !!result}
               onClick={() => void runUploadVerify()}
             >
-              {verifyFailures.length > 0 ? "Retry Failed Verification" : "Upload & Verify Assets"}
+              {uploadFailedCount > 0
+                ? `Retry Failed Uploads (${uploadFailedCount})`
+                : verifyFailures.length > 0
+                  ? "Retry Failed Verification"
+                  : "Upload & Verify Assets"}
             </Button>
-            {verifyTotal > 0 && (
+            {uploadFailedCount > 0 && (
+              <Badge variant="outline" className="gap-1 text-[11px] text-destructive">
+                <AlertTriangle className="h-3 w-3" /> upload failed {uploadFailedCount}
+              </Badge>
+            )}
+            {(verifyRan || verifyTotal > 0) && (
               <Badge
                 variant="outline"
                 className={`gap-1 text-[11px] ${verifyComplete ? "" : "text-destructive"}`}
               >
                 {verifyComplete && <CheckCircle2 className="h-3 w-3 text-emerald-600" />}
-                server-verified {verifyOk.length}/{verifyTotal}
+                server-verified {verifyOk.length}/{newAssetTotal}
               </Badge>
             )}
             {snapshotId && (
