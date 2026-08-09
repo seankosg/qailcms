@@ -357,7 +357,7 @@ export function TmPlanVsActualCard({
                       type="monotone"
                       dataKey="cumActual"
                       name={cumActualLabel}
-                      stroke="var(--primary)"
+                      stroke="var(--destructive)"
                       strokeWidth={3.5}
                       dot={false}
                       connectNulls={false}
