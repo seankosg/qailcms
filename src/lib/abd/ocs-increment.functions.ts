@@ -374,12 +374,16 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         verify,
       } as unknown as Json;
     } catch (err) {
+      // 본체 반영 이후(post_import_verify / import_log_finalize) 실패는 failed 로 마감하지 않는다.
+      // failed 로 두면 동일 패키지 중복 판정에서 제외되어 재실행이 허용되기 때문이다.
+      const msg = (err as Error).message;
+      const postApply = /OCS_IMPORT_STAGE\[(post_import_verify|import_log_finalize)\]/.test(msg);
       await supabaseAdmin
         .from("abd_ocs_import_logs")
         .update({
-          status: "failed",
+          status: postApply ? "partial" : "failed",
           finished_at: new Date().toISOString(),
-          errors: [{ message: (err as Error).message }] as never,
+          errors: [{ message: msg }] as never,
           result: { upload_receipts: data.upload_receipts } as never,
         })
         .eq("id", importLogId);
