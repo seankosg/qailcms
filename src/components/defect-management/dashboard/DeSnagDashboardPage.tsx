@@ -87,11 +87,11 @@ export function DeSnagDashboardPage() {
   const teamsStr = search.teams ?? "";
   const rgStr = search.roomGroups ?? "";
   const rawMode = (search as any).matrixMode as string;
-  const matrixMode: MatrixMode = (["pct", "remain", "remainPct"] as const).includes(
-    rawMode as any,
-  )
+  const matrixMode: MatrixMode = (
+    ["count", "pct", "remain", "remainPct"] as const
+  ).includes(rawMode as any)
     ? (rawMode as MatrixMode)
-    : "count";
+    : "remainPct";
   const isRemainMode = matrixMode === "remain" || matrixMode === "remainPct";
 
   // Plot/Team 변경은 즉시 적용(자동 재계산)
