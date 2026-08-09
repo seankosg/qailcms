@@ -595,6 +595,23 @@ export function OcsIncrementImportPanel() {
             >
               Create Pre-import Snapshot
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!pkg || !!busy || !!result}
+              onClick={() => void runUploadVerify()}
+            >
+              {verifyFailures.length > 0 ? "Retry Failed Verification" : "Upload & Verify Assets"}
+            </Button>
+            {verifyTotal > 0 && (
+              <Badge
+                variant="outline"
+                className={`gap-1 text-[11px] ${verifyComplete ? "" : "text-destructive"}`}
+              >
+                {verifyComplete && <CheckCircle2 className="h-3 w-3 text-emerald-600" />}
+                server-verified {verifyOk.length}/{verifyTotal}
+              </Badge>
+            )}
             {snapshotId && (
               <Badge variant="outline" className="gap-1 text-[11px]">
                 <CheckCircle2 className="h-3 w-3 text-emerald-600" /> snapshot{" "}
@@ -782,6 +799,27 @@ export function OcsIncrementImportPanel() {
                     </div>
                   ))}
               </div>
+            </div>
+          )}
+          {verifyTotal > 0 && (
+            <div className="rounded-md border p-3">
+              <div className="mb-1 text-xs font-semibold">
+                서버 실측 검증 (ok {verifyOk.length} / {verifyTotal} · 배치 {VERIFY_BATCH_MAX}건 ·
+                동시성 5)
+              </div>
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                서버가 각 object 를 직접 내려받아 SHA-256·byte_size 를 실측합니다. 최종 Import 는
+                클라이언트 영수증이 아니라 이 서버 검증 영수증을 정본으로 사용합니다.
+              </p>
+              {verifyFailures.length > 0 && (
+                <div className="max-h-40 overflow-auto font-mono text-[11px] text-destructive">
+                  {verifyFailures.map((f) => (
+                    <div key={f.path}>
+                      [verify-failed] {f.path} — {f.error}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {result && (
