@@ -6,17 +6,18 @@ import {
   bottleneckTeam,
   mergeStats,
   newStats,
+  STAGE_METRICS,
+  type StageMetric,
   type MatrixBlock,
   type MatrixShape,
   type Stats,
   type TeamKey,
 } from "./dashboard-shape";
 
-type Slot = "issued" | "rect" | "closed";
+type Slot = "issued" | StageMetric;
 const SLOTS: Array<{ slot: Slot; label: string }> = [
   { slot: "issued", label: "Issued" },
-  { slot: "rect", label: "Rect" },
-  { slot: "closed", label: "Closed" },
+  ...STAGE_METRICS.map((m) => ({ slot: m.slot as Slot, label: m.label })),
 ];
 const TEAM_LABEL: Record<TeamKey, string> = { ELEC: "Elec", MECH: "Mech", ARCH: "Arch" };
 
@@ -85,7 +86,7 @@ function groupColsFor(block: MatrixBlock) {
     { key: "__TOTAL__", label: "Row Total", total: true },
   ];
 }
-const PER_GROUP = SLOTS.length * TEAM_COL_ORDER.length; // 9
+const PER_GROUP = SLOTS.length * TEAM_COL_ORDER.length;
 
 export function exportSnagMatrixToXlsx(args: {
   matrix: MatrixShape;
@@ -160,18 +161,18 @@ export function exportSnagMatrixToXlsx(args: {
 
     const writeStats = (r: number, stats: Stats, gi: number, isTotalGroup: boolean, emphasize: boolean) => {
       const base = 2 + gi * PER_GROUP;
-      const rectBn = bottleneckTeam(stats.byTeam, "rect");
-      const closedBn = bottleneckTeam(stats.byTeam, "closed");
+      const bn_: Partial<Record<Slot, TeamKey | null>> = {};
+      for (const m of STAGE_METRICS) bn_[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
       SLOTS.forEach((sc, si) => {
         TEAM_COL_ORDER.forEach((team, ti) => {
           const t = stats.byTeam[team];
-          const doneVal = sc.slot === "issued" ? t.issued : sc.slot === "rect" ? t.rect : t.closed;
+          const doneVal = sc.slot === "issued" ? t.issued : t[sc.slot];
           const isRemain = mode === "remain" || mode === "remainPct";
           const count =
             isRemain && sc.slot !== "issued" ? Math.max(0, t.issued - doneVal) : doneVal;
           const showPct = (mode === "pct" || mode === "remainPct") && sc.slot !== "issued";
           const ratio = t.issued > 0 ? count / t.issued : null;
-          const bn = (sc.slot === "rect" && rectBn === team) || (sc.slot === "closed" && closedBn === team);
+          const bn = sc.slot !== "issued" && bn_[sc.slot] === team;
           const bg = bn ? BOTTLENECK_BG : isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2];
           let color = "FF111827";
           if (showPct && ratio != null) {

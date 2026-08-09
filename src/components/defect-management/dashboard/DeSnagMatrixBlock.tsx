@@ -4,6 +4,8 @@ import {
   bottleneckTeam,
   newStats,
   mergeStats,
+  STAGE_METRICS,
+  type StageMetric,
   type MatrixBlock,
   type Stats,
   type TeamKey,
@@ -11,15 +13,14 @@ import {
 
 export type MatrixMode = "count" | "pct" | "remain" | "remainPct";
 
-type StatusSlot = "issued" | "rect" | "closed";
+type StatusSlot = "issued" | StageMetric;
 
 const STATUS_COLS: Array<{ slot: StatusSlot; label: string }> = [
   { slot: "issued", label: "Issued" },
-  { slot: "rect", label: "Rect" },
-  { slot: "closed", label: "Closed" },
+  ...STAGE_METRICS.map((m) => ({ slot: m.slot as StatusSlot, label: m.label })),
 ];
 
-const COLS_PER_GROUP = STATUS_COLS.length * TEAM_COL_ORDER.length; // 9
+const COLS_PER_GROUP = STATUS_COLS.length * TEAM_COL_ORDER.length; // 6 slots × 3 teams
 
 function pctTone(pct: number | null): string {
   if (pct == null) return "text-muted-foreground";
@@ -59,8 +60,8 @@ function TeamCells({
       ? "var(--card)"
       : "color-mix(in oklab, var(--muted) 25%, var(--card))";
 
-  const rectBottleneck = bottleneckTeam(stats.byTeam, "rect");
-  const closedBottleneck = bottleneckTeam(stats.byTeam, "closed");
+  const bottlenecks: Partial<Record<StatusSlot, TeamKey | null>> = {};
+  for (const m of STAGE_METRICS) bottlenecks[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
 
   // 잔여 모드 전용 Room Group 단위 상태 하이라이트
   // Rect 잔여가 3개 팀 모두 0 → Ready for Inspection(하늘색)
@@ -81,7 +82,7 @@ function TeamCells({
       {STATUS_COLS.map((sc, sIdx) =>
         TEAM_COL_ORDER.map((team, tIdx) => {
           const t = stats.byTeam[team];
-          const done = sc.slot === "issued" ? t.issued : sc.slot === "rect" ? t.rect : t.closed;
+          const done = sc.slot === "issued" ? t.issued : t[sc.slot];
           const isRemain = mode === "remain" || mode === "remainPct";
           const count =
             isRemain && sc.slot !== "issued" ? Math.max(0, t.issued - done) : done;
@@ -92,9 +93,7 @@ function TeamCells({
               ? "–"
               : `${Math.round(ratio)}%`
             : count.toLocaleString();
-          const isBottleneck =
-            (sc.slot === "rect" && rectBottleneck === team) ||
-            (sc.slot === "closed" && closedBottleneck === team);
+          const isBottleneck = sc.slot !== "issued" && bottlenecks[sc.slot] === team;
           const readyTone =
             sc.slot === "rect" && rectReady
               ? "ready-inspection"
@@ -323,8 +322,8 @@ export function DeSnagMatrixBlock({
     }
     p.team = team;
     // 정본(_snag_done_asof) 동치: 자기 실적일 ≤ as-of. dateEnd 는 상위에서 as-of 로 채움.
-    if (slot === "rect") p.dateField = "actual_rectified_date";
-    else if (slot === "closed") p.dateField = "actual_closure_date";
+    const sm = STAGE_METRICS.find((m) => m.slot === slot);
+    if (sm) p.dateField = sm.dateField;
     onNavigate(p);
   };
 
