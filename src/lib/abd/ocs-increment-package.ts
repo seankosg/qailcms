@@ -44,8 +44,36 @@ export type PackageBinary = {
   byte_size: number;
 };
 
+/** 신규 이미지 등록 계약 — 앱은 값을 생성하지 않고 패키지 선언값을 그대로 전달한다. */
+export type PackageImageMeta = {
+  source_attachment_id: string;
+  storage_path: string;
+  content_hash: string;
+  byte_size: number;
+  width: number | null;
+  height: number | null;
+  image_format: string | null;
+  mime_type: string | null;
+  source_image_index: number | null;
+  source_parent_comment_id: string | null;
+  atomic_comment_id: string | null;
+  attachment_scope: string;
+};
+
+/**
+ * ZIP bomb 방어 상한 — 운영 실측(2026-08-09) 기준으로 산정한다.
+ * 실측: OCS 이미지 2,310개 / 최대 1.07MB / 합계 181MB, 원본 Excel 298개 / 최대 10.5MB.
+ * 상한은 전량(2,608 object) 대비 약 3배, 최대 단일 파일 대비 약 6배 여유를 둔다.
+ */
+export const ZIP_LIMITS = {
+  maxEntries: 8000,
+  maxSingleFileBytes: 64 * 1024 * 1024,
+  maxTotalUncompressedBytes: 512 * 1024 * 1024,
+} as const;
+
 export type IncrementPackage = {
   file_name: string;
+  file_size: number;
   package_sha256: string;
   manifest: IncrementManifest;
   atomic: V3AtomicParse;
@@ -53,12 +81,27 @@ export type IncrementPackage = {
   policy: V3PolicyParse;
   sourceFiles: PackageBinary[];
   images: PackageBinary[];
+  imageMeta: PackageImageMeta[];
   verifiedFiles: number;
   blockers: string[];
 };
 
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 const REQUIRED_ENTRIES = ["manifest.json", "atomic.json", "response_mapping.json", "policy.json"];
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
+
+/** ZIP entry 경로 안전성 검사 — 위반 사유 배열(빈 배열이면 안전). */
+export function zipPathViolations(path: string): string[] {
+  const out: string[] = [];
+  if (path.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(path)) out.push(`절대경로: ${path}`);
+  if (path.includes("\\")) out.push(`역슬래시 포함 경로: ${path}`);
+  if (CONTROL_CHARS.test(path)) out.push(`제어문자 포함 경로: ${JSON.stringify(path)}`);
+  const segs = path.split("/");
+  if (segs.some((x) => x === "..")) out.push(`상위 경로 탈출(..): ${path}`);
+  if (segs.some((x) => x === "")) out.push(`빈 경로 segment: ${path}`);
+  if (segs.some((x) => x === ".")) out.push(`상대 경로 segment(.): ${path}`);
+  return out;
+}
 
 function parseManifest(json: unknown): IncrementManifest {
   const o = (json ?? {}) as Record<string, unknown>;
