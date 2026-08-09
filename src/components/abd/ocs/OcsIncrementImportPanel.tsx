@@ -114,6 +114,33 @@ export function OcsIncrementImportPanel() {
     verifyTotal === newAssetTotal &&
     verifyPending === 0;
 
+  // Baseline 동일성 — 4개 값이 모두 일치하면 "마지막 Import 이후 변경" 은 경고로만 취급한다.
+  const baselineIdentityOk = useMemo(() => {
+    if (!precheck || !pkg) return false;
+    const base = (precheck["baseline"] ?? {}) as Record<string, unknown>;
+    const mismatched = Array.isArray(precheck["mismatched_core_tables"])
+      ? (precheck["mismatched_core_tables"] as string[])
+      : [];
+    return (
+      precheck["baseline_id_match"] === true &&
+      precheck["base_core_hash_match"] === true &&
+      mismatched.length === 0 &&
+      String(pkg.manifest.base_import_run_id ?? "") ===
+        String(base["latest_success_import_run_id"] ?? "")
+    );
+  }, [precheck, pkg]);
+
+  const warnings = useMemo(() => {
+    const out: string[] = [];
+    const base = (precheck?.["baseline"] ?? {}) as Record<string, unknown>;
+    if (precheck && base["core_changed_since_base"] === true && baselineIdentityOk) {
+      out.push(
+        "경고: 마지막 Import 이후 OCS 정본에 변경 이력이 있으나, Baseline ID·core hash·테이블별 해시·latest import run 이 모두 일치하여 통과 처리합니다.",
+      );
+    }
+    return out;
+  }, [precheck, baselineIdentityOk]);
+
   const blockers = useMemo(() => {
     const out: string[] = [];
     if (!BASELINE_VERIFICATION_IMPLEMENTED) {
@@ -130,7 +157,7 @@ export function OcsIncrementImportPanel() {
       out.push("base_import_run_id 를 정본에서 찾을 수 없습니다.");
     if (precheck && base["is_latest"] !== true)
       out.push("Baseline 이 최신 정본 Import 가 아닙니다.");
-    if (precheck && base["core_changed_since_base"] === true)
+    if (precheck && base["core_changed_since_base"] === true && !baselineIdentityOk)
       out.push("Baseline 이후 OCS 정본이 변경되었습니다.");
     if (precheck && precheck["base_core_hash_match"] === false)
       out.push("manifest.base_core_hash 가 서버 정본 core hash 와 다릅니다.");
@@ -185,6 +212,7 @@ export function OcsIncrementImportPanel() {
     verifyRan,
     newAssetTotal,
     uploadFailedCount,
+    baselineIdentityOk,
   ]);
 
   function resetDownstream() {
