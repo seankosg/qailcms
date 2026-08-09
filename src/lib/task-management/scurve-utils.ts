@@ -221,12 +221,19 @@ export function buildTmSCurve(opts: {
   const n = buckets.length;
   const bucketLabels = buckets.map((b) => labelOf(b, bucket));
 
+  const includedItems: TaskItem[] = [];
   const seriesList: ItemActualSeries[] = [];
   let excludedCount = 0;
   for (const it of items) {
     const s = buildItemAnchors(it, asOf, pointsOf?.(it) ?? null);
-    if (s) seriesList.push(s);
-    else excludedCount++;
+    if (s) {
+      seriesList.push(s);
+      includedItems.push(it);
+    } else excludedCount++;
+  }
+
+  if (includedItems.length === 0) {
+    return { ...empty, excludedCount };
   }
 
   const cumPlan: number[] = new Array(n).fill(0);
@@ -243,8 +250,8 @@ export function buildTmSCurve(opts: {
   for (let i = 0; i < n; i++) {
     const d = buckets[i];
     let planSum = 0;
-    for (const it of items) planSum += cumPlanProgress(it, d);
-    cumPlan[i] = (planSum / items.length) * 100;
+    for (const it of includedItems) planSum += cumPlanProgress(it, d);
+    cumPlan[i] = (planSum / includedItems.length) * 100;
 
     if (d > asOf) continue;
     if (!seriesList.length) continue;
@@ -259,8 +266,8 @@ export function buildTmSCurve(opts: {
   // 창 시작 직전 시점의 누계(기준선) — 창 이전 누계가 첫 막대에 몰리지 않게 한다.
   const baseIso = n > 0 ? iso(addDays(periodStart(buckets[0], bucket), -1)) : windowStart;
   let basePlanSum = 0;
-  for (const it of items) basePlanSum += cumPlanProgress(it, baseIso);
-  const baselinePlan = (basePlanSum / items.length) * 100;
+  for (const it of includedItems) basePlanSum += cumPlanProgress(it, baseIso);
+  const baselinePlan = (basePlanSum / includedItems.length) * 100;
   let baselineActual: number | null = null;
   if (baseIso <= asOf && seriesList.length) {
     let s = 0;
@@ -280,7 +287,7 @@ export function buildTmSCurve(opts: {
     buckets,
     bucketLabels,
     todayIndex,
-    taskCount: items.length,
+    taskCount: includedItems.length,
     excludedCount,
     cumPlan,
     cumActual,
