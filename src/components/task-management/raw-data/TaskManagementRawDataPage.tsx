@@ -1166,6 +1166,17 @@ export function TaskManagementRawDataPage() {
                 // P3-7d: 목록에서 편집하면 상세 캐시도 무효화한다.
                 qc.invalidateQueries({ queryKey: ["task-detail", String(rr.id)] });
                 qc.invalidateQueries({ queryKey: ["tm-rows-as-of"] });
+                // 진척률을 바꾼 경우 그 과업의 진도 곡선만 즉시 재계산한다.
+                if (c.key === "actual_progress") {
+                  const { recalcTaskChartOne } = await import(
+                    "@/lib/task-management/recalc-chart"
+                  );
+                  void recalcTaskChartOne(
+                    (rr as any).discipline ?? null,
+                    (rr as any).task_no ?? null,
+                    qc,
+                  );
+                }
                 try {
                   const km = d.kpiMode;
                   if (km) {

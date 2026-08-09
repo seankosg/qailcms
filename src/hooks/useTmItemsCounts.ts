@@ -67,7 +67,9 @@ export function useTmItemsCounts(params: {
   thresholds?: TaskThresholds;
   enabled?: boolean;
 }) {
-  const { filters, taskScope, asOfDate, enabled = true } = params;
+  const { filters, asOfDate, enabled = true } = params;
+  // 계산 스코프는 Sub 가 기본 — "all" 은 더 이상 허용하지 않는다.
+  const taskScope: TaskScope = params.taskScope === "main" ? "main" : "sub";
   const t = params.thresholds ?? DEFAULT_THRESHOLDS;
   const filterArr = buildFilters(filters);
   const q = filters.q?.trim() ?? "";
@@ -100,13 +102,11 @@ export function useTmItemsCounts(params: {
     _filters: (() => {
       // taskScope 를 서버 필터에 포함시켜 total/counts 와 동일 스코프 보장.
       const base = [...filterArr];
-      if (taskScope !== "all") {
-        base.push({
-          column: "level",
-          op: "in",
-          value: [taskScope === "main" ? "main" : "sub"],
-        } as any);
-      }
+      base.push({
+        column: "level",
+        op: "in",
+        value: [taskScope],
+      } as any);
       return base as unknown as any;
     })(),
     _include_inactive: false,

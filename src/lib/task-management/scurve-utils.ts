@@ -1,9 +1,16 @@
 // TM KPI Analysis — Plan vs Actual S-Curve 시리즈 빌더.
 // 수치 정본: derived.ts 의 cumPlanProgress(=computeTPlan) / normActual.
 // 이 파일은 자체 판정·자체 계획식을 만들지 않는다(시간축 샘플링과 평균만 담당).
+//
+// 시간축 규칙 (2026-08-08 확정)
+//  - 기준 시간대는 도하(Asia/Qatar). 날짜 문자열(YYYY-MM-DD)은 도하 달력일로 해석한다.
+//  - 주는 "토요일 시작" 달력 주. 데이터 시작일과 무관하게 경계가 고정된다.
+//  - 일/주/월 모두 "구간의 마지막 날"에서 누계를 재고, 그 날짜를 라벨로 쓴다.
+//  - 종료일을 마지막 칸으로 강제 추가하지 않는다(짧은 칸이 생기지 않도록).
 
 import type { TaskItem } from "./schedule-utils";
 import { cumPlanProgress, cumActualProgress } from "./derived";
+import { formatDdMmm, formatDdMmmYy } from "@/lib/time/doha";
 
 export type SCurveBucket = "day" | "week" | "month";
 
@@ -18,26 +25,27 @@ export interface TmSCurveResult {
   /** asOf 가 속한(또는 직후) 버킷 인덱스. 없으면 -1 */
   todayIndex: number;
   taskCount: number;
+  /** 실적 시작 앵커를 잡을 수 없어 실적 곡선에서 제외된 과업 수 */
+  excludedCount: number;
   /** 0..100 (%) */
   cumPlan: number[];
   cumActual: (number | null)[];
   /** 버킷 간 증분(pp) */
   dailyPlan: number[];
   dailyActual: (number | null)[];
-  /** 해당 버킷의 Actual 이 저장 스냅샷 실측에 기반하는가 */
-  measured: boolean[];
 }
 
 const MAX_BUCKETS = 800;
 
-function iso(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
+/** ISO(도하 달력일) 문자열을 달력 계산용 Date 로. UTC 컴포넌트 = 도하 달력값. */
 function parse(v: unknown): Date | null {
   if (!v) return null;
   const s = String(v).slice(0, 10);
   const d = new Date(`${s}T00:00:00Z`);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+function iso(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 function addDays(d: Date, n: number): Date {
   return new Date(d.getTime() + n * 86400000);
@@ -45,57 +53,59 @@ function addDays(d: Date, n: number): Date {
 function endOfMonth(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
 }
+/** 해당 날짜가 속한 토요일 시작 주의 마지막 날(금요일). */
+function endOfSatWeek(d: Date): Date {
+  const dow = d.getUTCDay(); // 0=Sun .. 6=Sat
+  const sinceSat = (dow + 1) % 7;
+  const sat = addDays(d, -sinceSat);
+  return addDays(sat, 6);
+}
 function labelOf(isoDate: string, bucket: SCurveBucket): string {
-  const d = new Date(`${isoDate}T00:00:00Z`);
-  const mon = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
-  if (bucket === "month") return `${mon}-${String(d.getUTCFullYear()).slice(2)}`;
-  return `${d.getUTCDate()}-${mon}`;
+  return bucket === "month" ? formatDdMmmYy(isoDate) : formatDdMmm(isoDate);
 }
 
+/** 구간의 마지막 날짜 배열(오름차순). 종료일 강제 추가 없음. */
 function buildBuckets(startIso: string, endIso: string, bucket: SCurveBucket): string[] {
   const start = parse(startIso)!;
   const end = parse(endIso)!;
   const out: string[] = [];
-  if (bucket === "month") {
-    let cur = endOfMonth(start);
-    while (cur <= end && out.length < MAX_BUCKETS) {
-      out.push(iso(cur));
-      cur = endOfMonth(addDays(cur, 1));
-    }
-  } else {
-    const step = bucket === "week" ? 7 : 1;
-    let cur = start;
-    while (cur <= end && out.length < MAX_BUCKETS) {
-      out.push(iso(cur));
-      cur = addDays(cur, step);
-    }
+  let cur =
+    bucket === "month" ? endOfMonth(start) : bucket === "week" ? endOfSatWeek(start) : start;
+  while (cur <= end && out.length < MAX_BUCKETS) {
+    out.push(iso(cur));
+    cur =
+      bucket === "month"
+        ? endOfMonth(addDays(cur, 1))
+        : addDays(cur, bucket === "week" ? 7 : 1);
   }
-  const last = iso(end);
-  if (out.length === 0) out.push(last);
-  else if (out[out.length - 1] !== last && out.length < MAX_BUCKETS) out.push(last);
+  // 종료일이 속한 구간까지 포함한다(마지막 구간이 잘리지 않도록).
+  if (out.length === 0 || (out[out.length - 1] < iso(end) && out.length < MAX_BUCKETS)) {
+    out.push(iso(cur));
+  }
   return out;
 }
 
 interface ItemActualSeries {
-  /** 오름차순 앵커 (ISO, 0..1). 실측 스냅샷 여부 포함 */
-  anchors: Array<{ d: string; v: number; measured: boolean }>;
+  /** 오름차순 앵커 (ISO, 0..1) */
+  anchors: Array<{ d: string; v: number }>;
 }
 
 /** 과업 1건의 실적 앵커 구성.
- *  - 저장 스냅샷 포인트 = 실측(measured=true)
- *  - 시작 앵커 = actual_start ?? plan_start 에서 0
- *  - 끝 앵커 = actual_finish 면 그 날짜 1.0, 아니면 asOf 에서 현재 실적
+ *  시작 앵커 우선순위: actual_start → plan_start → (plan_end − plan_days)
+ *  셋 다 없으면 null 을 돌려 실적 곡선 계산에서 제외한다.
+ *  끝 앵커 = actual_finish 면 그 날짜 1.0, 아니면 asOf 에서 현재 실적.
  *  앵커 사이 구간은 2점 직선(선형 역산)으로 채운다. */
 function buildItemAnchors(
   it: TaskItem,
   asOf: string,
   points: SnapshotPoint[] | null,
-): ItemActualSeries {
-  const anchors: Array<{ d: string; v: number; measured: boolean }> = [];
-  const startIso =
-    (it.actual_start ? String(it.actual_start).slice(0, 10) : null) ??
-    (it.plan_start ? String(it.plan_start).slice(0, 10) : null);
-  if (startIso) anchors.push({ d: startIso, v: 0, measured: false });
+): ItemActualSeries | null {
+  const startIso = resolveStartAnchor(it);
+  if (!startIso) return null;
+
+  const anchors: Array<{ d: string; v: number; measured: boolean }> = [
+    { d: startIso, v: 0, measured: false },
+  ];
 
   for (const p of points ?? []) {
     if (!p || typeof p.d !== "string") continue;
@@ -123,7 +133,17 @@ function buildItemAnchors(
     }
     dedup.push(a);
   }
-  return { anchors: dedup };
+  return { anchors: dedup.map(({ d, v }) => ({ d, v })) };
+}
+
+/** 실적 시작 앵커: actual_start → plan_start → plan_end − plan_days */
+function resolveStartAnchor(it: TaskItem): string | null {
+  if (it.actual_start) return String(it.actual_start).slice(0, 10);
+  if (it.plan_start) return String(it.plan_start).slice(0, 10);
+  const end = parse(it.plan_end);
+  const days = Number(it.plan_days ?? 0);
+  if (end && Number.isFinite(days) && days > 0) return iso(addDays(end, -days));
+  return null;
 }
 
 function valueAt(series: ItemActualSeries, d: string): number {
@@ -145,11 +165,6 @@ function valueAt(series: ItemActualSeries, d: string): number {
   return a[a.length - 1].v;
 }
 
-/** 버킷 구간 내에 실측 스냅샷 앵커가 존재하는가 */
-function hasMeasuredIn(series: ItemActualSeries, from: string, to: string): boolean {
-  return series.anchors.some((a) => a.measured && a.d > from && a.d <= to);
-}
-
 export function buildTmSCurve(opts: {
   items: TaskItem[];
   asOf: string;
@@ -163,18 +178,18 @@ export function buildTmSCurve(opts: {
     bucketLabels: [],
     todayIndex: -1,
     taskCount: 0,
+    excludedCount: 0,
     cumPlan: [],
     cumActual: [],
     dailyPlan: [],
     dailyActual: [],
-    measured: [],
   };
   if (!items.length) return empty;
 
   let minIso: string | null = null;
   let maxIso: string | null = null;
   for (const it of items) {
-    for (const v of [it.plan_start, it.actual_start]) {
+    for (const v of [it.plan_start, it.actual_start, resolveStartAnchor(it)]) {
       const s = v ? String(v).slice(0, 10) : null;
       if (s && (!minIso || s < minIso)) minIso = s;
     }
@@ -190,11 +205,16 @@ export function buildTmSCurve(opts: {
   const n = buckets.length;
   const bucketLabels = buckets.map((b) => labelOf(b, bucket));
 
-  const seriesList = items.map((it) => buildItemAnchors(it, asOf, pointsOf?.(it) ?? null));
+  const seriesList: ItemActualSeries[] = [];
+  let excludedCount = 0;
+  for (const it of items) {
+    const s = buildItemAnchors(it, asOf, pointsOf?.(it) ?? null);
+    if (s) seriesList.push(s);
+    else excludedCount++;
+  }
 
   const cumPlan: number[] = new Array(n).fill(0);
   const cumActual: (number | null)[] = new Array(n).fill(null);
-  const measured: boolean[] = new Array(n).fill(false);
 
   let todayIndex = -1;
   for (let i = 0; i < n; i++) {
@@ -211,15 +231,10 @@ export function buildTmSCurve(opts: {
     cumPlan[i] = (planSum / items.length) * 100;
 
     if (d > asOf) continue;
+    if (!seriesList.length) continue;
     let actSum = 0;
-    let measuredCnt = 0;
-    const from = i > 0 ? buckets[i - 1] : "0000-00-00";
-    for (const s of seriesList) {
-      actSum += valueAt(s, d);
-      if (hasMeasuredIn(s, from, d)) measuredCnt++;
-    }
-    cumActual[i] = (actSum / items.length) * 100;
-    measured[i] = measuredCnt * 2 >= items.length; // 과반 실측 시 실선
+    for (const s of seriesList) actSum += valueAt(s, d);
+    cumActual[i] = (actSum / seriesList.length) * 100;
   }
 
   const dailyPlan: number[] = new Array(n).fill(0);
@@ -237,10 +252,10 @@ export function buildTmSCurve(opts: {
     bucketLabels,
     todayIndex,
     taskCount: items.length,
+    excludedCount,
     cumPlan,
     cumActual,
     dailyPlan,
     dailyActual,
-    measured,
   };
 }

@@ -12,7 +12,7 @@ const searchSchema = z.object({
   ownerDim: fallback(z.string(), "hdec_pic_name").default("hdec_pic_name"),
   dataDate: fallback(z.string(), "").default(""),
   delayFilter: fallback(z.string(), "all").default("all"),
-  taskScope: fallback(z.string(), "all").default("all"),
+  taskScope: fallback(z.string(), "sub").default("sub"),
   q: fallback(z.string(), "").default(""),
 });
 

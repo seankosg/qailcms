@@ -169,11 +169,17 @@ export function addDays(iso: string, n: number): string {
   return toIso(d);
 }
 
+/** 토요일 시작 달력 주의 첫 날(토요일). 도하 달력일 기준. */
 export function weekStartIso(iso: string): string {
   const d = new Date(iso + "T00:00:00Z");
-  const dow = d.getUTCDay() || 7;
-  if (dow !== 1) d.setUTCDate(d.getUTCDate() - (dow - 1));
+  const sinceSat = (d.getUTCDay() + 1) % 7; // 0=Sun..6=Sat → Sat 기준 경과일
+  d.setUTCDate(d.getUTCDate() - sinceSat);
   return toIso(d);
+}
+
+/** 토요일 시작 주의 마지막 날(금요일). */
+export function weekEndIso(iso: string): string {
+  return addDays(weekStartIso(iso), 6);
 }
 
 export function bucketize(iso: string, granularity: TaskScheduleBucket): string {
@@ -203,13 +209,14 @@ export function daysBetween(a: string, b: string): number {
   return Math.round((db - da) / 86400000);
 }
 
-function getIsoWeek(d: Date): number {
-  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const dayNr = (target.getUTCDay() + 6) % 7;
-  target.setUTCDate(target.getUTCDate() - dayNr + 3);
-  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
-  const diff = (target.getTime() - firstThursday.getTime()) / 86400000;
-  return 1 + Math.round((diff - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+/** 토요일 시작 기준 주 번호. ISO(목요일 기준) 주 번호를 쓰지 않는다. */
+function getSatWeek(d: Date): number {
+  const iso = toIso(d);
+  const weekStart = new Date(weekStartIso(iso) + "T00:00:00Z");
+  const jan1 = new Date(Date.UTC(weekStart.getUTCFullYear(), 0, 1));
+  const firstSat = new Date(weekStartIso(toIso(jan1)) + "T00:00:00Z");
+  const diff = (weekStart.getTime() - firstSat.getTime()) / 86400000;
+  return 1 + Math.round(diff / 7);
 }
 
 export function formatBucketLabel(
@@ -223,8 +230,11 @@ export function formatBucketLabel(
     const dow = d.toLocaleString("en-US", { weekday: "short", timeZone: "UTC" });
     return { primary: `${month} ${day}`, secondary: dow };
   }
-  const week = getIsoWeek(d);
-  return { primary: `W${week}`, secondary: `${month} ${day}` };
+  // 주 라벨은 구간의 마지막 날(금요일)을 표기한다.
+  const endIso = weekEndIso(iso);
+  const e = new Date(endIso + "T00:00:00Z");
+  const eMonth = e.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  return { primary: `W${getSatWeek(d)}`, secondary: `${eMonth} ${e.getUTCDate()}` };
 }
 
 // ───── stage accessors ─────

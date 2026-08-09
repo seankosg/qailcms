@@ -178,11 +178,21 @@ export function TaskDetailPage() {
   const canEditRow = isAdminEditor || canRow(row as Record<string, unknown>);
   const editScope = rclScopeOfRow(grants, row as Record<string, unknown>);
 
-  const onFieldSaved = () => {
+  const onFieldSaved = (fieldKey?: string) => {
     refetch();
     // P3-7d: 상세에서 편집하면 목록/정본 캐시도 무효화한다.
     queryClient.invalidateQueries({ queryKey: ["tm-inf"] });
     queryClient.invalidateQueries({ queryKey: ["tm-rows-as-of"] });
+    // 진척률 저장 직후 그 과업의 진도 곡선만 즉시 재계산한다.
+    if (!fieldKey || fieldKey === "actual_progress") {
+      void import("@/lib/task-management/recalc-chart").then((m) =>
+        m.recalcTaskChartOne(
+          (row as any)?.discipline ?? null,
+          (row as any)?.task_no ?? null,
+          queryClient,
+        ),
+      );
+    }
   };
 
   return (
