@@ -13,6 +13,13 @@ export type MetaLookup = (
   paths: string[],
 ) => Promise<MetaRow[]>;
 export type StorageLister = (bucket: string, dir: string) => Promise<string[]>;
+/** Storage object 실측 — 서버가 직접 내려받아 계산한 hash/size (클라이언트 신고값 불신). */
+export type StorageProbe = (
+  bucket: string,
+  path: string,
+) => Promise<{ sha256: string; byte_size: number } | null>;
+
+export type RunIdentity = { run_id: string; package_id: string };
 
 export type ServerCollisionResult = {
   skip_paths: string[];
@@ -23,6 +30,35 @@ export type ServerCollisionResult = {
 
 const dirOf = (p: string) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
 
+/** 서버 입력 최종 방어 — attachment ID/경로 중복 및 ID↔경로 교차 불일치. */
+export function imageMetaIntegrityBlockers(imageMeta: ImageMeta[]): string[] {
+  const out: string[] = [];
+  const byId = new Map<string, ImageMeta>();
+  const byPath = new Map<string, ImageMeta>();
+  for (const m of imageMeta) {
+    const prevId = byId.get(m.source_attachment_id);
+    if (prevId) {
+      out.push(
+        prevId.storage_path === m.storage_path && prevId.content_hash === m.content_hash
+          ? `DUPLICATE_ATTACHMENT_ID: ${m.source_attachment_id}`
+          : `ATTACHMENT_ID_PATH_CONFLICT(input): ${m.source_attachment_id} (${prevId.storage_path} ≠ ${m.storage_path})`,
+      );
+    }
+    byId.set(m.source_attachment_id, m);
+    const prevPath = byPath.get(m.storage_path);
+    if (prevPath) {
+      out.push(
+        prevPath.source_attachment_id === m.source_attachment_id &&
+          prevPath.content_hash === m.content_hash
+          ? `DUPLICATE_STORAGE_PATH: ${m.storage_path}`
+          : `STORAGE_PATH_ID_CONFLICT(input): ${m.storage_path} (${prevPath.source_attachment_id} ≠ ${m.source_attachment_id})`,
+      );
+    }
+    byPath.set(m.storage_path, m);
+  }
+  return out;
+}
+
 export async function recheckCollisionsServerSide(
   assets: AssetRef[],
   sourceMeta: SourceFileMeta[],
@@ -30,8 +66,10 @@ export async function recheckCollisionsServerSide(
   listStorage: StorageLister,
   imageMeta: ImageMeta[] = [],
   receipts: UploadReceipt[] = [],
+  identity?: RunIdentity,
+  probeStorage?: StorageProbe,
 ): Promise<ServerCollisionResult> {
-  const blockers: string[] = [];
+  const blockers: string[] = imageMetaIntegrityBlockers(imageMeta);
   const skip: string[] = [];
   const fresh: string[] = [];
   const declaredNew: string[] = [];
@@ -40,9 +78,28 @@ export async function recheckCollisionsServerSide(
 
   const declared = new Map(sourceMeta.map((m) => [m.storage_path, m.content_hash.toLowerCase()]));
   const declaredImages = new Map(imageMeta.map((m) => [m.storage_path, m]));
+  // receipt 교차검증 — 다른 run/package 영수증 재사용 차단.
+  const foreign = receipts.filter(
+    (r) =>
+      identity !== undefined &&
+      (r.run_id !== identity.run_id || r.package_id !== identity.package_id),
+  );
+  if (foreign.length > 0) {
+    blockers.push(
+      `RECEIPT_FOREIGN_RUN: 다른 run/package 의 업로드 영수증 ${foreign.length}건 (${foreign
+        .slice(0, 3)
+        .map((r) => `${r.run_id}/${r.package_id}`)
+        .join(", ")})`,
+    );
+  }
   const receiptByPath = new Map(
     receipts
-      .filter((r) => r.state === "uploaded" || r.state === "existing")
+      .filter(
+        (r) =>
+          (r.state === "uploaded" || r.state === "declared_new") &&
+          (identity === undefined ||
+            (r.run_id === identity.run_id && r.package_id === identity.package_id)),
+      )
       .map((r) => [`${r.bucket}::${r.path}`, r]),
   );
 
@@ -108,6 +165,20 @@ export async function recheckCollisionsServerSide(
         rec &&
         rec.sha256 === a.sha256
       ) {
+        // 클라이언트 신고 SHA-256 을 믿지 않는다 — 서버가 object 를 직접 실측한다.
+        const probe = probeStorage ? await probeStorage(a.bucket, a.path) : null;
+        if (!probe) {
+          blockers.push(
+            `STORAGE_PROBE_FAILED: ${a.bucket}/${a.path} — 서버가 object 를 실측하지 못했습니다.`,
+          );
+          continue;
+        }
+        if (probe.sha256 !== a.sha256 || probe.byte_size !== decl.byte_size) {
+          blockers.push(
+            `STORAGE_PROBE_MISMATCH: ${a.bucket}/${a.path} (실측 ${probe.sha256.slice(0, 12)}/${probe.byte_size} ≠ 선언 ${a.sha256.slice(0, 12)}/${decl.byte_size})`,
+          );
+          continue;
+        }
         declaredNew.push(a.path);
         continue;
       }

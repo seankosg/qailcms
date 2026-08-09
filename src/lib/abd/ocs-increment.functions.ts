@@ -140,6 +140,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       snapshot_id: string;
       package_name: string;
       package_sha256: string;
+      package_id?: string;
       manifest_name: string;
       manifest_hash: string;
       data_date: string;
@@ -171,6 +172,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       }
       return {
         ...input,
+        package_id: String(input.package_id ?? ""),
         base_core_hash: String(input.base_core_hash).toLowerCase(),
         base_core_table_hashes: input.base_core_table_hashes ?? {},
         allow_retire: input.allow_retire === true,
@@ -246,6 +248,17 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       },
       data.image_meta,
       data.upload_receipts,
+      { run_id: data.run_id, package_id: data.package_id },
+      async (bucket, path) => {
+        const { data: blob, error } = await supabaseAdmin.storage.from(bucket).download(path);
+        if (error || !blob) return null;
+        const buf = await blob.arrayBuffer();
+        const digest = await crypto.subtle.digest("SHA-256", buf);
+        const sha256 = Array.from(new Uint8Array(digest))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        return { sha256, byte_size: buf.byteLength };
+      },
     );
     if (collision.blockers.length > 0) throw new Error(collision.blockers.join(" / "));
 

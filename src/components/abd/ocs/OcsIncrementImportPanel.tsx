@@ -78,7 +78,7 @@ export function OcsIncrementImportPanel() {
   const [receipts, setReceipts] = useState<UploadReceipt[]>([]);
   const [stageLabel, setStageLabel] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  void fileInputRef;
+  const [pickerKey, setPickerKey] = useState(0);
 
   const isAdmin = me?.isStrictAdmin === true;
 
@@ -151,6 +151,7 @@ export function OcsIncrementImportPanel() {
     setPrecheck(null);
     setCollision(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    setPickerKey((k) => k + 1);
   }
 
   async function onPick(files: FileList) {
@@ -162,10 +163,9 @@ export function OcsIncrementImportPanel() {
     setCollision(null);
     resetDownstream();
     if (/\.xlsx?$/i.test(file.name)) {
-      toast.error(
-        "Excel 은 로컬 Codex Skill 에서 처리하고, 완성된 증분 ZIP 을 선택하십시오.",
-      );
+      toast.error("Excel 은 로컬 Codex Skill 에서 처리하고, 완성된 증분 ZIP 을 선택하십시오.");
       if (fileInputRef.current) fileInputRef.current.value = "";
+      setPickerKey((k) => k + 1);
       return;
     }
     setBusy("패키지 검증 중…");
@@ -196,6 +196,7 @@ export function OcsIncrementImportPanel() {
       setPkg(null);
       setPrecheck(null);
       setCollision(null);
+      setPickerKey((k) => k + 1);
     } finally {
       setBusy(null);
       setStageLabel(null);
@@ -271,6 +272,9 @@ export function OcsIncrementImportPanel() {
    */
   async function uploadAssets(p: IncrementPackage, run: string): Promise<UploadReceipt[]> {
     const skip = collision?.skipPaths ?? new Set<string>();
+    const declaredNewPaths = new Set(
+      (collision?.rows ?? []).filter((r) => r.state === "declared_new").map((r) => r.path),
+    );
     const jobs: { bucket: string; path: string; sha256: string; bytes: ArrayBuffer }[] = [
       ...p.images.map((b) => ({
         bucket: OCS_BUCKET,
@@ -312,16 +316,12 @@ export function OcsIncrementImportPanel() {
             .upload(job.path, new Blob([job.bytes]), { upsert: false });
           if (!error) {
             out.push({ ...base, state: "uploaded" });
+          } else if (declaredNewPaths.has(job.path)) {
+            // Storage object 는 있으나 DB metadata 가 없는 경우 — 서버가 실측 검증한다.
+            out.push({ ...base, state: "declared_new" });
           } else {
-            // 문자열만 보고 성공 처리하지 않는다 — 서버 실측으로 존재·크기를 재확인한다.
-            const dir = job.path.includes("/") ? job.path.slice(0, job.path.lastIndexOf("/")) : "";
-            const name = job.path.split("/").pop() as string;
-            const { data: found } = await supabase.storage
-              .from(job.bucket)
-              .list(dir, { search: name, limit: 100 });
-            const hit = (found ?? []).find((f) => f.name === name);
-            if (hit) out.push({ ...base, state: "existing" });
-            else out.push({ ...base, state: "failed", error: error.message });
+            // 파일명이 보인다는 이유만으로 성공 처리하지 않는다 — 검증 불가 object 는 실패다.
+            out.push({ ...base, state: "failed", error: error.message });
           }
         }
         done += 1;
@@ -357,6 +357,7 @@ export function OcsIncrementImportPanel() {
         data: {
           run_id: runId,
           snapshot_id: snapshotId,
+          package_id: pkg.manifest.package_id,
           package_name: pkg.file_name,
           package_sha256: pkg.package_sha256,
           manifest_name: "manifest.json",
@@ -447,6 +448,8 @@ export function OcsIncrementImportPanel() {
               label={pkg ? "Change Increment ZIP" : "Select Increment ZIP"}
               accept=".zip,application/zip"
               disabled={!!busy}
+              inputRef={fileInputRef}
+              resetKey={pickerKey}
               onFiles={(f) => void onPick(f)}
             />
             {(pkg || failure) && (

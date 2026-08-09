@@ -269,7 +269,9 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
     source_row: n(pick(r, K.rowIndex)),
     item_count: n(pick(r, ["item_count", "Item Count"])),
     split_status: s(pick(r, K.splitStatus)),
-    group_contractor_response: s(pick(r, ["group_contractor_response", "Group Contractor Response"])),
+    group_contractor_response: s(
+      pick(r, ["group_contractor_response", "Group Contractor Response"]),
+    ),
     v3_ocs_number: s(pick(r, ["v3_ocs_number", "V3 OCS Number"])),
   }));
 
@@ -338,7 +340,16 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
     }
     if (attIdSeen.has(id)) attIdDup.add(id);
     attIdSeen.add(id);
-    const storagePath = s(pick(r, ["storage_path", "Storage Path"]));
+    // 로컬 패키징 도구 계약: storage_path 가 없으면 relative_path 를 쓰고,
+    // Storage 정본 경로에서는 접두사 "images/" 를 정확히 한 번만 제거한다.
+    const rawPath =
+      s(pick(r, ["storage_path", "Storage Path"])) ??
+      s(pick(r, ["relative_path", "Relative Path"]));
+    const storagePath = rawPath
+      ? rawPath.startsWith("images/")
+        ? rawPath.slice("images/".length)
+        : rawPath
+      : null;
     if (storagePath) {
       if (attPathSeen.has(storagePath)) attPathDup.add(storagePath);
       attPathSeen.add(storagePath);
@@ -352,10 +363,11 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
       atomic_comment_id: s(pick(r, ["atomic_comment_id", "Atomic Comment ID"])),
       attachment_scope: s(pick(r, ["attachment_scope", "Attachment Scope"])),
       storage_path: storagePath,
-      content_hash: (s(pick(r, ["content_hash", "Content Hash", "sha256"])) ?? "").toLowerCase() || null,
+      content_hash:
+        (s(pick(r, ["content_hash", "Content Hash", "sha256"])) ?? "").toLowerCase() || null,
       byte_size: n(pick(r, ["byte_size", "Byte Size", "size"])),
-      width: n(pick(r, ["width", "Width"])),
-      height: n(pick(r, ["height", "Height"])),
+      width: n(pick(r, ["width", "width_px", "Width"])),
+      height: n(pick(r, ["height", "height_px", "Height"])),
       image_format: s(pick(r, ["image_format", "Image Format"])),
       mime_type: s(pick(r, ["mime_type", "Mime Type"])),
       source_image_index: n(pick(r, ["source_image_index", "Source Image Index"])),
@@ -561,7 +573,12 @@ export function crossValidate(input: {
       `Atomic V3 SHA-256 불일치 (정책 ${policy.atomic_v3_sha256.slice(0, 12)}… / 파일 ${atomicHash.slice(0, 12)}…)`,
     );
   }
-  if (policy && respHash && policy.response_mapping_sha256 && policy.response_mapping_sha256 !== respHash) {
+  if (
+    policy &&
+    respHash &&
+    policy.response_mapping_sha256 &&
+    policy.response_mapping_sha256 !== respHash
+  ) {
     issues.push(
       `Response Mapping SHA-256 불일치 (정책 ${policy.response_mapping_sha256.slice(0, 12)}… / 파일 ${respHash.slice(0, 12)}…)`,
     );
@@ -586,7 +603,9 @@ export function crossValidate(input: {
   let confirmedResolved = 0;
   let confirmedUnresolved = 0;
   if (atomic && resp) {
-    const idSet = new Set(atomic.comments.filter((c) => c.is_active).map((c) => c.source_comment_id));
+    const idSet = new Set(
+      atomic.comments.filter((c) => c.is_active).map((c) => c.source_comment_id),
+    );
     const byParent = new Map<string, number>();
     for (const c of atomic.comments)
       byParent.set(c.source_parent_comment_id, (byParent.get(c.source_parent_comment_id) ?? 0) + 1);
