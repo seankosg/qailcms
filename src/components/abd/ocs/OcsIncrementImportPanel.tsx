@@ -81,6 +81,9 @@ export function OcsIncrementImportPanel() {
     currentTable: string | null;
     sizeBytes: number | null;
   } | null>(null);
+  const [importRunning, setImportRunning] = useState(false);
+  const [importElapsed, setImportElapsed] = useState(0);
+  const [importFailStage, setImportFailStage] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
   const [allowRetire, setAllowRetire] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -595,11 +598,17 @@ export function OcsIncrementImportPanel() {
   }
 
   async function runImport() {
-    if (!pkg || !runId || !snapshotId || blockers.length > 0) return;
-    setBusy("증분 Import 실행 중…");
-    setProgress(0);
+    if (!pkg || !runId || !snapshotId || blockers.length > 0 || importRunning) return;
+    setImportRunning(true);
+    setImportElapsed(0);
+    setFailure(null);
+    setImportFailStage(null);
+    const startedAt = Date.now();
+    const tick = setInterval(
+      () => setImportElapsed(Math.floor((Date.now() - startedAt) / 1000)),
+      1000,
+    );
     try {
-      setStageLabel("6/6 Import 실행");
       const rec = receipts;
       const out = (await importFn({
         data: {
@@ -648,14 +657,14 @@ export function OcsIncrementImportPanel() {
           ],
         },
       })) as Record<string, unknown>;
-      setStageLabel("6/6 검증 완료");
       setResult(out);
-      toast.success("증분 Import 완료");
+      toast.success(`Import completed — run ${runId}`);
     } catch (e) {
       setFailure(e instanceof Error ? e.message : String(e));
+      setImportFailStage("Transactional OCS database import");
     } finally {
-      setBusy(null);
-      setProgress(0);
+      clearInterval(tick);
+      setImportRunning(false);
     }
   }
 
@@ -1005,14 +1014,64 @@ export function OcsIncrementImportPanel() {
           </label>
           <Button
             size="sm"
-            disabled={blockers.length > 0 || !!busy || !!result}
+            disabled={blockers.length > 0 || !!busy || !!result || importRunning}
             onClick={() => void runImport()}
           >
-            Run Increment Import
+            {importRunning ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Importing…
+              </>
+            ) : failure ? (
+              "Retry Increment Import"
+            ) : (
+              "Run Increment Import"
+            )}
           </Button>
+          {importRunning && (
+            <div className="space-y-2 rounded-md border p-3">
+              <div className="flex items-center gap-2 text-xs font-medium">
+                <Loader2 className="h-3 w-3 animate-spin" /> Importing…
+                <span className="font-mono text-muted-foreground">
+                  {Math.floor(importElapsed / 60)}m {importElapsed % 60}s
+                </span>
+              </div>
+              {/* 단일 원자적 RPC 트랜잭션이므로 내부 단계 전환을 관측할 수 없다.
+                  백분율 대신 indeterminate 표시와 경과시간만 노출한다. */}
+              <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
+                <div className="h-full w-1/3 animate-[pulse_1.2s_ease-in-out_infinite] rounded bg-primary" />
+              </div>
+              <ul className="space-y-0.5 text-[11px] text-muted-foreground">
+                <li>• Final server validation</li>
+                <li>• Transactional OCS database import</li>
+                <li>• Post-import integrity verification</li>
+              </ul>
+              <p className="text-xs font-medium text-amber-600">
+                Do not refresh or close this page.
+              </p>
+            </div>
+          )}
+          {result && !importRunning && (
+            <div className="rounded-md border p-3 text-xs">
+              <div className="font-medium text-emerald-600">Import completed</div>
+              <div className="font-mono text-muted-foreground">run {runId}</div>
+            </div>
+          )}
           {failure && (
-            <div className="rounded-md border border-destructive/50 p-3 text-xs text-destructive">
-              실패: {failure}
+            <div className="space-y-2 rounded-md border border-destructive/50 p-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-destructive">
+                <AlertTriangle className="h-3 w-3" /> Import failed
+              </div>
+              <div className="font-mono text-[11px] text-muted-foreground">
+                run {runId ?? "—"}
+                {importFailStage ? ` · stage: ${importFailStage}` : ""}
+              </div>
+              <pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-destructive">
+                {failure}
+              </pre>
+              <p className="text-[11px] text-muted-foreground">
+                The import runs in a single transaction — a failure leaves no partial data. Uploaded
+                assets and the pre-import snapshot are kept; retry the import step only.
+              </p>
             </div>
           )}
           {receipts.length > 0 && (
