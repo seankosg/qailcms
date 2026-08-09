@@ -40,6 +40,13 @@ import { OcsBaselineCard } from "@/components/abd/ocs/OcsBaselineCard";
 import { getLatestOcsBaselineInfo } from "@/lib/abd/ocs-baseline.functions";
 import { ocsIncListVerifyReceipts } from "@/lib/abd/ocs-increment-receipts.functions";
 import {
+  classifyImportFailure,
+  evaluateGates,
+  evaluateImportSuccess,
+  type GateInput,
+  type ImportFailureState,
+} from "@/lib/abd/ocs-wizard-gates";
+import {
   OcsWizardStepper,
   type StepStatus,
   type WizardStep,
@@ -120,6 +127,7 @@ export function OcsIncrementImportPanel() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [importFailure, setImportFailure] = useState<ImportFailureState | null>(null);
   const [collision, setCollision] = useState<CollisionReport | null>(null);
   const [receipts, setReceipts] = useState<UploadReceipt[]>([]);
   const [verifyTotal, setVerifyTotal] = useState(0);
@@ -157,11 +165,7 @@ export function OcsIncrementImportPanel() {
       if (!raw) return;
       const s = JSON.parse(raw) as Record<string, unknown>;
       if (Array.isArray(s["checks"]))
-        setPrepChecks([
-          s["checks"][0] === true,
-          s["checks"][1] === true,
-          s["checks"][2] === true,
-        ]);
+        setPrepChecks([s["checks"][0] === true, s["checks"][1] === true, s["checks"][2] === true]);
       setBaselineConfirmed(s["baselineConfirmed"] === true);
       setPackageBuilt(s["packageBuilt"] === true);
       setSkipPreparation(s["skipPreparation"] === true);
@@ -222,13 +226,6 @@ export function OcsIncrementImportPanel() {
 
   const uploadFailures = useMemo(() => receipts.filter((r) => r.state === "failed"), [receipts]);
   const uploadFailedCount = uploadFailures.length;
-  const verifyPending = Math.max(0, verifyTotal - verifyOk.length);
-  const verifyComplete =
-    verifyRan &&
-    uploadFailedCount === 0 &&
-    verifyFailures.length === 0 &&
-    verifyTotal === newAssetTotal &&
-    verifyPending === 0;
 
   // Baseline 동일성 — 4개 값이 모두 일치하면 "마지막 Import 이후 변경" 은 경고로만 취급한다.
   const baselineIdentityOk = useMemo(() => {
@@ -257,83 +254,71 @@ export function OcsIncrementImportPanel() {
     return out;
   }, [precheck, baselineIdentityOk]);
 
-  const blockers = useMemo(() => {
-    const out: string[] = [];
-    if (!BASELINE_VERIFICATION_IMPLEMENTED) {
-      out.push("Baseline 실측 검증(생성·다운로드·내용 대조) 미완료 — 증분 Import 잠금");
-    }
-    if (!pkg) out.push("증분 ZIP 패키지를 선택하십시오.");
-    if (pkg) out.push(...pkg.blockers);
-    if (pkg && !collision) out.push("Storage 충돌 점검 미완료");
-    if (collision) out.push(...collision.blockers);
-    if (precheck?.["duplicate_package"] === true)
-      out.push(
-        precheck?.["duplicate_recovered"] === true
-          ? "이미 반영 및 복구 완료된 패키지입니다. 재실행할 수 없습니다."
-          : "동일 패키지 해시가 이미 반영되었습니다.",
-      );
-    const base = (precheck?.["baseline"] ?? {}) as Record<string, unknown>;
-    if (precheck && base["base_import_run_found"] !== true)
-      out.push("base_import_run_id 를 정본에서 찾을 수 없습니다.");
-    if (precheck && base["is_latest"] !== true)
-      out.push("Baseline 이 최신 정본 Import 가 아닙니다.");
-    if (precheck && base["core_changed_since_base"] === true && !baselineIdentityOk)
-      out.push("Baseline 이후 OCS 정본이 변경되었습니다.");
-    if (precheck && precheck["base_core_hash_match"] === false)
-      out.push("manifest.base_core_hash 가 서버 정본 core hash 와 다릅니다.");
-    if (precheck && precheck["baseline_id_match"] === false)
-      out.push("manifest.base_baseline_id 가 서버 재계산값과 다릅니다.");
-    if (
-      precheck &&
-      Array.isArray(precheck["mismatched_core_tables"]) &&
-      (precheck["mismatched_core_tables"] as string[]).length > 0
-    )
-      out.push(
-        `core 테이블 해시 불일치: ${(precheck["mismatched_core_tables"] as string[]).join(", ")}`,
-      );
-    if (!dry) out.push("Dry-run 미실행");
-    if (dry) {
-      if (
-        num(dry["comments_to_update"]) !==
-        num(dry["comments_unchanged"]) + num(dry["comments_modified"])
-      ) {
-        out.push("Dry-run 항등식 불일치");
-      }
-      if (num(dry["attachments_unresolved"]) > 0)
-        out.push(`미확인 첨부 ${num(dry["attachments_unresolved"])}건`);
-      if (massRetire && !allowRetire) out.push(`대량 퇴역 미승인 (${retire}건 · 임계 30% / 100건)`);
-    }
-    if (!snapshotId) out.push("사전 백업 스냅샷 미완료 (Dry-run 이후 생성분만 인정)");
-    if (uploadFailedCount > 0)
-      out.push(
-        `자산 업로드 실패 ${uploadFailedCount}건 — 재실행으로 실패분만 다시 업로드하십시오.`,
-      );
-    if (!verifyComplete)
-      out.push(
-        !verifyRan
-          ? "신규 자산 업로드 · 서버 실측 검증 미실행"
-          : `서버 실측 검증 미완료 (${verifyOk.length}/${newAssetTotal})`,
-      );
-    if (!approved) out.push("최종 승인 체크 필요");
-    return out;
-  }, [
-    pkg,
-    precheck,
-    dry,
-    snapshotId,
-    approved,
-    massRetire,
-    allowRetire,
-    retire,
-    collision,
-    verifyComplete,
-    verifyTotal,
-    verifyOk.length,
-    verifyRan,
-    newAssetTotal,
-    uploadFailedCount,
-    baselineIdentityOk,
-  ]);
+  // ── 구조화된 blocker 그룹 · 단계 관문 (문구 정규식 판정 금지) ──
+  const duplicatePackage = precheck?.["duplicate_package"] === true;
+  const duplicateRecovered = precheck?.["duplicate_recovered"] === true;
+
+  const gateInput: GateInput = useMemo(
+    () => ({
+      baselineVerificationImplemented: BASELINE_VERIFICATION_IMPLEMENTED,
+      hasPackage: !!pkg,
+      packageFileBlockers: pkg?.blockers ?? [],
+      collisionDone: !!collision,
+      collisionBlockers: collision?.blockers ?? [],
+      collisionCounts: collision
+        ? {
+            hash_mismatch: collision.counts.hash_mismatch,
+            unresolved: collision.counts.unresolved,
+          }
+        : null,
+      duplicatePackage,
+      duplicateRecovered,
+      precheck,
+      baselineIdentityOk,
+      dry,
+      dryIdentityOk: dry
+        ? num(dry["comments_to_update"]) ===
+          num(dry["comments_unchanged"]) + num(dry["comments_modified"])
+        : false,
+      attachmentsUnresolved: num(dry?.["attachments_unresolved"]),
+      massRetire,
+      allowRetire,
+      retireCount: retire,
+      uploadFailedCount,
+      verifyRan,
+      verifyOkCount: verifyOk.length,
+      verifyFailureCount: verifyFailures.length,
+      newAssetTotal,
+      snapshotId,
+      approved,
+    }),
+    [
+      pkg,
+      collision,
+      duplicatePackage,
+      duplicateRecovered,
+      precheck,
+      baselineIdentityOk,
+      dry,
+      massRetire,
+      allowRetire,
+      retire,
+      uploadFailedCount,
+      verifyRan,
+      verifyOk.length,
+      verifyFailures.length,
+      newAssetTotal,
+      snapshotId,
+      approved,
+    ],
+  );
+
+  const gates = useMemo(
+    () => evaluateGates(gateInput, warnings.length),
+    [gateInput, warnings.length],
+  );
+  const blockers = gates.blockers;
+  const verifyComplete = gates.step5Complete;
 
   function resetDownstream() {
     setRunId(null);
@@ -343,6 +328,8 @@ export function OcsIncrementImportPanel() {
     setAllowRetire(false);
     setResult(null);
     setFailure(null);
+    setImportFailure(null);
+    setImportFailStage(null);
     setReceipts([]);
     setVerifyTotal(0);
     setVerifyOk([]);
@@ -408,10 +395,15 @@ export function OcsIncrementImportPanel() {
       try {
         const rec = (await listVerifyReceiptsFn({
           data: { package_id: p.manifest.package_id },
-        })) as { total: number; ok_paths: string[]; failed: { path: string }[] };
+        })) as {
+          total: number;
+          truncated: boolean;
+          ok_count: number;
+          failed: { path: string }[];
+        };
         setRestoredVerify(
           rec.total > 0
-            ? `서버에 이 패키지의 검증 영수증 ${rec.total}건이 있습니다 (ok ${rec.ok_paths.length} · failed ${rec.failed.length}). 이번 실행에서는 새 run ID 로 다시 검증합니다.`
+            ? `Previous verification receipts were found (${rec.total} · ok ${rec.ok_count} · failed ${rec.failed.length}${rec.truncated ? " · truncated" : ""}). For safety, this run will verify all required assets again.`
             : null,
         );
       } catch {
@@ -491,13 +483,16 @@ export function OcsIncrementImportPanel() {
     setSnapshotStatus(null);
     setSnapshotElapsed(0);
 
-    const tick = setInterval(() => setSnapshotElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    const tick = setInterval(
+      () => setSnapshotElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
     const poll = setInterval(() => {
       void (async () => {
         try {
-          const row = (await snapshotStatusFn({ data: { run_id: runId } })) as
-            | { metadata?: Record<string, unknown> | null }
-            | null;
+          const row = (await snapshotStatusFn({ data: { run_id: runId } })) as {
+            metadata?: Record<string, unknown> | null;
+          } | null;
           const m = (row?.metadata ?? null) as Record<string, unknown> | null;
           if (!m) return;
           setSnapshotStatus({
@@ -513,9 +508,10 @@ export function OcsIncrementImportPanel() {
     }, 3000);
 
     try {
-      const res = (await snapshotFn({ data: { module: "abd", run_id: runId } })) as
-        | { id?: string; size_bytes?: number }
-        | null;
+      const res = (await snapshotFn({ data: { module: "abd", run_id: runId } })) as {
+        id?: string;
+        size_bytes?: number;
+      } | null;
       if (!res?.id) throw new Error("스냅샷 ID 를 확인하지 못했습니다.");
       setSnapshotId(res.id);
       setSnapshotStatus((prev) => ({
@@ -735,6 +731,7 @@ export function OcsIncrementImportPanel() {
     setImportElapsed(0);
     setFailure(null);
     setImportFailStage(null);
+    setImportFailure(null);
     const startedAt = Date.now();
     const tick = setInterval(
       () => setImportElapsed(Math.floor((Date.now() - startedAt) / 1000)),
@@ -790,10 +787,15 @@ export function OcsIncrementImportPanel() {
         },
       })) as Record<string, unknown>;
       setResult(out);
-      toast.success(`Import completed — run ${runId}`);
+      const ok = evaluateImportSuccess(out);
+      if (ok.complete) toast.success(`Import completed — run ${runId}`);
+      else toast.warning("Import 결과 검증이 필요합니다. Step 8 안내를 확인하십시오.");
     } catch (e) {
-      setFailure(e instanceof Error ? e.message : String(e));
-      setImportFailStage("Transactional OCS database import");
+      const state = classifyImportFailure(e);
+      setFailure(state.message);
+      setImportFailure(state);
+      setImportFailStage(state.stage);
+      toast.error(state.title);
     } finally {
       clearInterval(tick);
       setImportRunning(false);
@@ -818,8 +820,6 @@ export function OcsIncrementImportPanel() {
   }
 
   // ── Wizard 단계 상태 판정 (기존 blockers/서버 판정을 재사용만 한다) ──
-  const duplicatePackage = precheck?.["duplicate_package"] === true;
-  const duplicateRecovered = precheck?.["duplicate_recovered"] === true;
   const duplicateLog = (precheck?.["duplicate_log"] ?? null) as {
     id?: string;
     data_file_name?: string;
@@ -834,11 +834,12 @@ export function OcsIncrementImportPanel() {
   const step1Done = baselineConfirmed || skipPreparation;
   const step2Done = prepDone || skipPreparation;
   const step3Done = packageBuilt || skipPreparation;
-  const step4Done = !!pkg && !!dry && !duplicatePackage;
-  const step5Done = verifyComplete;
-  const step6Done = !!snapshotId;
+  const step4Done = gates.step4Complete;
+  const step5Done = gates.step5Complete;
+  const step6Done = gates.step6Complete;
+  const importSuccess = evaluateImportSuccess(result);
   const step7Done = !!result;
-  const step8Done = !!result;
+  const step8Done = importSuccess.complete;
 
   const statusOf = (done: boolean, current: boolean, warn = false, blocked = false): StepStatus =>
     blocked ? "blocked" : done ? "done" : warn ? "warning" : current ? "current" : "pending";
@@ -907,13 +908,7 @@ export function OcsIncrementImportPanel() {
   ];
 
   const toggle = (i: number) => setOpenStep((cur) => (cur === i ? 0 : i));
-  const packageStatus: "pass" | "warn" | "fail" = !dry
-    ? "warn"
-    : blockers.some((b) => !/승인|미완료|미실행|스냅샷|검증/.test(b))
-      ? "fail"
-      : warnings.length > 0
-        ? "warn"
-        : "pass";
+  const packageStatus = gates.packageStatus;
 
   return (
     <div className="space-y-4">
@@ -930,6 +925,21 @@ export function OcsIncrementImportPanel() {
         </CardHeader>
         <CardContent className="space-y-4">
           <OcsResponsibilityCard />
+          {!pkg && (
+            <div className="rounded-md border border-dashed p-3 text-[11px] text-muted-foreground">
+              <div className="mb-1 font-semibold text-foreground">
+                새로고침 후 복원되는 항목 / 복원되지 않는 항목
+              </div>
+              <div>
+                복원됨: 최신 Baseline 정보 · 패키지의 과거 검증 영수증 존재 여부 · 완료·복구 패키지
+                중복 차단
+              </div>
+              <div>
+                복원되지 않음: 선택한 ZIP 파일 · Dry-run 결과 · 현재 Snapshot ID · Import 진행
+                상태와 결과 — Re-select the ZIP to restore and verify this workflow.
+              </div>
+            </div>
+          )}
           <OcsWizardStepper steps={steps} onSelect={(i) => setOpenStep(i)} />
           {busy && (
             <div className="space-y-1">
@@ -954,7 +964,8 @@ export function OcsIncrementImportPanel() {
         summary={
           baselineInfo?.exists ? (
             <span className="font-mono text-[11px] text-muted-foreground">
-              {baselineInfo.baseline_id.slice(0, 16)} · {baselineInfo.is_latest ? "Latest" : "Outdated"}
+              {baselineInfo.baseline_id.slice(0, 16)} ·{" "}
+              {baselineInfo.is_latest ? "Latest" : "Outdated"}
             </span>
           ) : null
         }
@@ -989,7 +1000,13 @@ export function OcsIncrementImportPanel() {
               />
               <Row
                 label="Status"
-                value={baselineInfo.exists ? (baselineInfo.is_latest ? "Latest" : "Outdated") : "Not generated"}
+                value={
+                  baselineInfo.exists
+                    ? baselineInfo.is_latest
+                      ? "Latest"
+                      : "Outdated"
+                    : "Not generated"
+                }
                 bad={!baselineInfo.exists}
               />
               {baselineInfo.files.length > 0 && (
@@ -1235,7 +1252,11 @@ export function OcsIncrementImportPanel() {
                 <Row label="comments_to_update" value={dry["comments_to_update"]} />
                 <Row label="comments_unchanged" value={dry["comments_unchanged"]} />
                 <Row label="comments_modified" value={dry["comments_modified"]} />
-                <Row label="comments_to_retire" value={dry["comments_to_retire"]} bad={massRetire} />
+                <Row
+                  label="comments_to_retire"
+                  value={dry["comments_to_retire"]}
+                  bad={massRetire}
+                />
               </div>
               <div className="rounded-md border p-3">
                 <div className="mb-1 text-xs font-semibold">첨부 · 원본 Excel</div>
@@ -1298,8 +1319,12 @@ export function OcsIncrementImportPanel() {
         status={steps[4]!.status}
         open={openStep === 5}
         onToggle={() => toggle(5)}
-        locked={!dry}
-        lockReasons={!dry ? ["Step 4 Dry-run 통과 후 활성화됩니다."] : []}
+        locked={!gates.step5Unlocked}
+        lockReasons={
+          !gates.step5Unlocked
+            ? ["Step 4 (ZIP 계약 · Precheck · Dry-run · 항등식 · blocker 0) 통과 후 활성화됩니다."]
+            : []
+        }
         summary={
           verifyTotal > 0 ? (
             <span className="text-[11px]">
@@ -1397,13 +1422,19 @@ export function OcsIncrementImportPanel() {
         status={steps[5]!.status}
         open={openStep === 6}
         onToggle={() => toggle(6)}
-        locked={!verifyComplete}
-        lockReasons={!verifyComplete ? ["Step 5 서버 실측 검증 완료 후 활성화됩니다."] : []}
+        locked={!gates.step6Unlocked}
+        lockReasons={
+          !gates.step6Unlocked
+            ? [
+                "Step 5 (업로드 실패 0 · 서버 검증 전량 통과 · hash mismatch 0 · unresolved 0) 완료 후 활성화됩니다.",
+              ]
+            : []
+        }
         summary={snapshotId ? <span className="font-mono text-[11px]">{snapshotId}</span> : null}
       >
         <Button
           size="sm"
-          disabled={!dry || !verifyComplete || !!busy || snapshotRunning}
+          disabled={!gates.step6Unlocked || !!busy || snapshotRunning}
           onClick={() => void runSnapshot()}
         >
           {snapshotRunning ? (
@@ -1488,8 +1519,12 @@ export function OcsIncrementImportPanel() {
         status={steps[6]!.status}
         open={openStep === 7}
         onToggle={() => toggle(7)}
-        locked={!snapshotId}
-        lockReasons={!snapshotId ? ["Step 6 Snapshot 성공 후 활성화됩니다."] : []}
+        locked={!gates.step7Unlocked}
+        lockReasons={
+          !gates.step7Unlocked
+            ? ["Step 4~6 이 모두 통과하고 Snapshot 이 성공해야 활성화됩니다."]
+            : []
+        }
       >
         {dry && (
           <div className="grid gap-3 md:grid-cols-2">
@@ -1504,12 +1539,19 @@ export function OcsIncrementImportPanel() {
             </div>
             <div className="rounded-md border p-3">
               <div className="mb-1 text-xs font-semibold">자산 · 백업</div>
-              <Row label="Images new / existing" value={`${num(dry["images_new"])} / ${num(dry["images_existing"])}`} />
+              <Row
+                label="Images new / existing"
+                value={`${num(dry["images_new"])} / ${num(dry["images_existing"])}`}
+              />
               <Row
                 label="Source Excel new / revised / existing"
                 value={`${num(dry["source_files_new"])} / ${num(dry["source_files_revised"])} / ${num(dry["source_files_existing"])}`}
               />
-              <Row label="Unresolved attachments" value={dry["attachments_unresolved"]} bad={num(dry["attachments_unresolved"]) > 0} />
+              <Row
+                label="Unresolved attachments"
+                value={dry["attachments_unresolved"]}
+                bad={num(dry["attachments_unresolved"]) > 0}
+              />
               <Row label="Snapshot ID" value={snapshotId ?? "—"} />
             </div>
           </div>
@@ -1541,13 +1583,19 @@ export function OcsIncrementImportPanel() {
           <AlertDialogTrigger asChild>
             <Button
               size="sm"
-              disabled={blockers.length > 0 || !!busy || !!result || importRunning}
+              disabled={
+                blockers.length > 0 ||
+                !!busy ||
+                !!result ||
+                importRunning ||
+                (importFailure !== null && !importFailure.retryAllowed)
+              }
             >
               {importRunning ? (
                 <>
                   <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Importing…
                 </>
-              ) : failure ? (
+              ) : importFailure?.retryAllowed ? (
                 "Retry Increment Import"
               ) : (
                 "Import OCS Package"
@@ -1587,18 +1635,26 @@ export function OcsIncrementImportPanel() {
             <p className="text-xs font-medium text-amber-600">Do not refresh or close this page.</p>
           </div>
         )}
-        {failure && (
+        {importFailure && (
           <OcsErrorCard
-            title="Import failed"
-            affected="단일 트랜잭션이므로 부분 반영은 남지 않습니다. 업로드된 자산과 사전 스냅샷은 보존됩니다."
-            nextStep={
-              /partial|부분/i.test(failure)
-                ? "Import requires administrator recovery. Do not import this package again."
-                : "Import 단계만 다시 실행하십시오. 파일 재업로드나 백업 재생성은 필요하지 않습니다."
-            }
+            title={importFailure.title}
+            affected={importFailure.affected}
+            nextStep={importFailure.nextStep}
             runId={runId}
             snapshotId={snapshotId}
-            details={`${importFailStage ? `stage: ${importFailStage}\n` : ""}${failure}`}
+            details={`status: ${importFailure.kind}${
+              importFailure.stage ? `\nstage: ${importFailure.stage}` : ""
+            }\n${importFailure.message}`}
+          />
+        )}
+        {failure && !importFailure && (
+          <OcsErrorCard
+            title="Step failed"
+            affected="이 단계만 실패했습니다. 운영 정본 반영 여부는 이 메시지로 판정하지 않습니다."
+            nextStep="run ID 로 Import log 와 운영 정본을 확인한 뒤 진행하십시오."
+            runId={runId}
+            snapshotId={snapshotId}
+            details={failure}
           />
         )}
       </OcsWizardStepCard>
@@ -1616,11 +1672,31 @@ export function OcsIncrementImportPanel() {
       >
         {result ? (
           <div className="space-y-3">
-            <div className="text-sm font-semibold text-emerald-600">OCS Import Completed</div>
+            {importSuccess.complete ? (
+              <div className="text-sm font-semibold text-emerald-600">OCS Import Completed</div>
+            ) : (
+              <div className="space-y-1 rounded-md border border-amber-500 p-3">
+                <div className="text-sm font-semibold text-amber-600">Verification required</div>
+                <p className="text-[11px] text-muted-foreground">
+                  서버 Import log·post-import verify·항등식·보호 해시 대조가 모두 확인되지
+                  않았습니다. 완료로 처리하지 마십시오.
+                </p>
+                <ul className="space-y-0.5 text-[11px] text-destructive">
+                  {importSuccess.reasons.map((r) => (
+                    <li key={r}>• {r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="rounded-md border p-3">
               <Row label="Package ID" value={pkg?.manifest.package_id ?? "—"} />
               <Row label="Import run ID" value={runId} />
               <Row label="import_log_id" value={result["import_log_id"]} />
+              <Row
+                label="import log status"
+                value={result["import_log_status"] ?? "—"}
+                bad={result["import_log_status"] !== "success"}
+              />
               <Row label="Snapshot ID" value={snapshotId ?? "—"} />
               {Object.entries((result["result"] ?? {}) as Record<string, unknown>)
                 .filter(([, v]) => typeof v === "number" || typeof v === "string")

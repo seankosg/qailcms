@@ -21,13 +21,22 @@ async function assertAdmin(supabase: unknown, userId: string) {
 
 export type VerifyReceiptRow = {
   run_id: string;
+  package_id: string;
   bucket: string;
   path: string;
   expected_sha256: string;
+  expected_byte_size: number | null;
   ok: boolean;
   error: string | null;
   verified_at: string;
 };
+
+import {
+  dedupeLatestReceipts,
+  isTruncated,
+  RECEIPT_MAX_ROWS as MAX_ROWS,
+  RECEIPT_PAGE as PAGE,
+} from "@/lib/abd/ocs-increment-receipts";
 
 /**
  * 현재 패키지의 서버 실측 검증 영수증을 조회한다 (읽기 전용).
@@ -42,24 +51,44 @@ export const ocsIncListVerifyReceipts = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const { data: rows, error } = await context.supabase
-      .from("abd_ocs_inc_verify_receipts")
-      .select("run_id, bucket, path, expected_sha256, ok, error, verified_at")
-      .eq("package_id", data.package_id)
-      .order("verified_at", { ascending: false })
-      .limit(5000);
-    if (error) throw new Error(error.message);
-    const list = (rows ?? []) as unknown as VerifyReceiptRow[];
-    // 동일 path 는 최신 영수증만 남긴다.
-    const latest = new Map<string, VerifyReceiptRow>();
-    for (const r of list) if (!latest.has(r.path)) latest.set(r.path, r);
-    const dedup = [...latest.values()];
+    // 조용한 잘림 금지 — 페이지네이션으로 전량 조회하고, 상한 초과 시 truncated 로 표면화한다.
+    const list: VerifyReceiptRow[] = [];
+    let truncated = false;
+    for (let from = 0; from < MAX_ROWS; from += PAGE) {
+      const { data: rows, error } = await context.supabase
+        .from("abd_ocs_inc_verify_receipts")
+        .select(
+          "run_id, package_id, bucket, path, expected_sha256, expected_byte_size, ok, error, verified_at",
+        )
+        .eq("package_id", data.package_id)
+        .order("verified_at", { ascending: false })
+        .order("path", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      const page = (rows ?? []) as unknown as VerifyReceiptRow[];
+      list.push(...page);
+      if (page.length < PAGE) break;
+      if (from + PAGE >= MAX_ROWS) truncated = true;
+    }
+
+    // 최신 영수증 중복 제거 키는 bucket::path (동일 path 가 다른 bucket 에 있을 수 있다).
+    const dedup = dedupeLatestReceipts(list);
+    truncated = truncated || isTruncated(list.length);
     return {
       package_id: data.package_id,
+      truncated,
       total: dedup.length,
-      ok_paths: dedup.filter((r) => r.ok).map((r) => r.path),
+      receipts: dedup.map((r) => ({
+        package_id: r.package_id,
+        bucket: r.bucket,
+        path: r.path,
+        expected_sha256: r.expected_sha256,
+        expected_byte_size: r.expected_byte_size,
+        ok: r.ok,
+      })),
+      ok_count: dedup.filter((r) => r.ok).length,
       failed: dedup
         .filter((r) => !r.ok)
-        .map((r) => ({ path: r.path, error: r.error ?? "verify failed" })),
+        .map((r) => ({ bucket: r.bucket, path: r.path, error: r.error ?? "verify failed" })),
     };
   });

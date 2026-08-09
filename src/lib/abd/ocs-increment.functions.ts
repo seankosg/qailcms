@@ -249,7 +249,9 @@ export const ocsIncImport = createServerFn({ method: "POST" })
     // 서버 실측 검증 영수증 — 신규 object 판정의 유일한 정본 (클라이언트 receipt 는 보조).
     const { data: verifyRows, error: verifyErr } = await context.supabase
       .from("abd_ocs_inc_verify_receipts")
-      .select("bucket, path, expected_sha256, expected_byte_size, actual_sha256, actual_byte_size, ok, package_id")
+      .select(
+        "bucket, path, expected_sha256, expected_byte_size, actual_sha256, actual_byte_size, ok, package_id",
+      )
       .eq("run_id", data.run_id)
       .eq("package_id", data.package_id)
       .eq("ok", true);
@@ -316,16 +318,28 @@ export const ocsIncImport = createServerFn({ method: "POST" })
     if (logErr) throw new Error(logErr.message);
 
     try {
-      const result = await rpc(context.supabase, "abd_ocs_inc_import", {
-        p_run: data.run_id,
-        p_import_log_id: importLogId,
-        p_allow_retire: data.allow_retire,
-        p_source_files: data.source_files,
-        p_source_meta: data.source_meta,
-        p_image_meta: data.image_meta,
-      });
-      const verify = await rpc(context.supabase, "abd_ocs_v3_verify", {});
-      await supabaseAdmin
+      let result: Json;
+      try {
+        result = await rpc(context.supabase, "abd_ocs_inc_import", {
+          p_run: data.run_id,
+          p_import_log_id: importLogId,
+          p_allow_retire: data.allow_retire,
+          p_source_files: data.source_files,
+          p_source_meta: data.source_meta,
+          p_image_meta: data.image_meta,
+        });
+      } catch (e) {
+        // 본체 RPC 는 단일 트랜잭션이므로 실패 = 롤백 확정.
+        throw new Error(`OCS_IMPORT_STAGE[transactional_import]: ${(e as Error).message}`);
+      }
+      let verify: Json;
+      try {
+        verify = await rpc(context.supabase, "abd_ocs_v3_verify", {});
+      } catch (e) {
+        // 본체 반영 이후 단계 — 부분 반영 가능성이 있으므로 재시도 금지 대상이다.
+        throw new Error(`OCS_IMPORT_STAGE[post_import_verify]: ${(e as Error).message}`);
+      }
+      const { error: finErr } = await supabaseAdmin
         .from("abd_ocs_import_logs")
         .update({
           status: "success",
@@ -347,14 +361,31 @@ export const ocsIncImport = createServerFn({ method: "POST" })
           } as never,
         })
         .eq("id", importLogId);
-      return { import_log_id: importLogId, result, verify } as unknown as Json;
+      if (finErr) {
+        throw new Error(`OCS_IMPORT_STAGE[import_log_finalize]: ${finErr.message}`);
+      }
+      const { data: logRow } = await context.supabase
+        .from("abd_ocs_import_logs")
+        .select("status")
+        .eq("id", importLogId)
+        .maybeSingle();
+      return {
+        import_log_id: importLogId,
+        import_log_status: logRow?.status ?? null,
+        result,
+        verify,
+      } as unknown as Json;
     } catch (err) {
+      // 본체 반영 이후(post_import_verify / import_log_finalize) 실패는 failed 로 마감하지 않는다.
+      // failed 로 두면 동일 패키지 중복 판정에서 제외되어 재실행이 허용되기 때문이다.
+      const msg = (err as Error).message;
+      const postApply = /OCS_IMPORT_STAGE\[(post_import_verify|import_log_finalize)\]/.test(msg);
       await supabaseAdmin
         .from("abd_ocs_import_logs")
         .update({
-          status: "failed",
+          status: postApply ? "partial" : "failed",
           finished_at: new Date().toISOString(),
-          errors: [{ message: (err as Error).message }] as never,
+          errors: [{ message: msg }] as never,
           result: { upload_receipts: data.upload_receipts } as never,
         })
         .eq("id", importLogId);
