@@ -35,6 +35,9 @@ const DELAY_FILTER_OPTIONS = [
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/kpi-analysis");
 
+/** S-Curve 차트 시작일 기본값 */
+const DEFAULT_CURVE_START = "2026-07-17";
+
 function isOwnerDim(v: string): v is OwnerDim {
   return v === "team" || v === "hdec_pic_name" || v === "hdec_eng_name";
 }
@@ -97,6 +100,7 @@ export function TmKpiAnalysisPage() {
     row: OwnerLeaderboardRow;
   } | null>(null);
   const [curveOpen, setCurveOpen] = useState(true);
+  const [curveStart, setCurveStart] = useState<string>(DEFAULT_CURVE_START);
   const curveBucket: SCurveBucket =
     search.curveBucket === "day" || search.curveBucket === "month"
       ? search.curveBucket
