@@ -66,11 +66,7 @@ export function SnagPlanVsActualCard({
       return next;
     });
 
-  const stageLabelShort: Record<Stage, string> = {
-    start: STAGE_LABELS.start,
-    rectified: STAGE_LABELS.rectified,
-    closure: STAGE_LABELS.closure,
-  };
+  const stageLabelShort: Record<Stage, string> = { ...STAGE_LABELS };
 
   const data = scurve.bucketLabels.map((label, i) => {
     const row: Record<string, unknown> = {
