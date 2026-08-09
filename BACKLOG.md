@@ -426,3 +426,15 @@
   - DB 내부 무결성 사실(증명 아님): `abd_ocs_comments.source_comment_id` UNIQUE + `abd_ocs_attachments.source_attachment_id` UNIQUE, upsert conflict key = `source_comment_id`. 이는 "동일 revision 내 중복 차단" 만 보장하며, revision 간 ID 안정성(identity stability)을 증명하지 않는다.
   - 로컬 도구가 revision 간 ID 재현 규칙과 그 검증 리포트를 제공해야 한다. 그 전까지 앱은 ID 재생성/보정 로직을 두지 않는다.
 - [x] #0806 **Baseline 생성·다운로드·검증 완료** — 2026-08-08 실측: ZIP 정상 생성·다운로드, 데이터셋 10개/총 35,714행, manifest 행수·크기·SHA-256 일치, 생성 전후 core_hash 일치, 동일 core 재실행 시 baseline_id 및 기존 ZIP 재사용. `OcsIncrementImportPanel.tsx`의 `BASELINE_VERIFICATION_IMPLEMENTED`를 `true`로 활성화. Baseline 최신성 검증 관문(base_baseline_id, base_core_hash, 테이블별 core hash)은 그대로 유지, 불일치 시 Import 차단.
+
+## Retire legacy ABD OCS attachment single-link fields `[등록]` `[설계확정]`
+
+- **대상**: `abd_ocs_attachments.link_status`, `comment_id`
+- **선행조건**: V1/V2 `legacy_comment_id` 폴백 사용 종료
+- **연결 정본**: `abd_ocs_attachment_comment_links`
+- **Baseline/Backup/Restore/Verify 계약을 함께 개정해야 함**
+- **기존 V1/V2 첨부 2,310건의 화면 표시 회귀검사 필요**
+- **컬럼 폐기는 별도 migration과 새 Baseline 계약 버전에서 수행**
+- **현재 운영 영향 없음, 우선순위 Low**
+- **재개 조건**: V1/V2 폴백 사용 종료 및 사용자 명시적 승인
+
