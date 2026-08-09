@@ -21,6 +21,7 @@ import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
 import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { resolveJudgment } from "@/lib/task-management/delay-utils";
 import { todayInDoha } from "@/lib/time/doha";
+import { ChartGuideButton } from "./ChartGuideButton";
 
 const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
 const TASK_SCOPE_OPTIONS = [
@@ -180,6 +181,7 @@ export function TmKpiAnalysisPage() {
             <span className="text-[11px] text-muted-foreground tabular-nums">
               {totalItems.toLocaleString()} items
             </span>
+            <ChartGuideButton />
           </div>
         </div>
 
