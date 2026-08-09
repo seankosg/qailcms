@@ -94,6 +94,9 @@ export type WrtAconexPreview = {
   d_code_count: number;
   /** 심사중(For Review)이라 실적을 기록하지 않은 건수 */
   review_skipped: number;
+  /** 라운드 2 귀속인데 Aconex 코드가 현재 R1 코드와 같아 아무것도 쓰지 않은 건수 */
+  same_as_r1: number;
+  same_as_r1_list: string[];
   /** 제출 실적 없이 R1 회신이 붙는 문서 */
   no_submission_r1: number;
   no_submission_r1_list: string[];
@@ -120,7 +123,9 @@ type ExistingItem = {
   pic: string | null;
   eng: string | null;
   r1_response_code: string | null;
+  r1_response_code_raw: string | null;
   r2_response_code: string | null;
+  r2_response_code_raw: string | null;
   latest_response_code: string | null;
   latest_status_raw: string | null;
   is_final_approved: boolean | null;
@@ -130,6 +135,7 @@ type ExistingItem = {
   exclusion_reason: string | null;
   sb1: string | null;
   sb2: string | null;
+  dr2: string | null;
   rs1: string | null;
   rs2: string | null;
 };
@@ -177,12 +183,15 @@ function computePatch(
   round: 1 | 2;
   patch: Patch;
   changes: WrtAconexChange[];
-  flags: { review_skipped: boolean; no_submission_r1: boolean; unmapped: boolean };
+  flags: { review_skipped: boolean; no_submission_r1: boolean; unmapped: boolean; same_as_r1: boolean };
 } {
-  const round: 1 | 2 = ex.sb2 ? 2 : 1;
+  // 라운드 귀속 — DB 정본(wrt_active_round)과 동일 기준.
+  const r1Code = String(ex.r1_response_code ?? "").trim().toUpperCase();
+  const round: 1 | 2 =
+    ex.r2_response_code || r1Code === "B" || r1Code === "C" || ex.dr2 || ex.sb2 || ex.rs2 ? 2 : 1;
   const patch: Patch = { wrt_number: ex.wrt_number, item: {}, stages: [] };
   const changes: WrtAconexChange[] = [];
-  const flags = { review_skipped: false, no_submission_r1: false, unmapped: false };
+  const flags = { review_skipped: false, no_submission_r1: false, unmapped: false, same_as_r1: false };
   const iso = str(row.date_modified);
   const code = row.code ?? null;
 
@@ -192,6 +201,28 @@ function computePatch(
     if (nextStr === (prev ?? null)) return;
     patch.item[col] = next;
     changes.push({ field, previous: prev, next: nextStr });
+  };
+
+  /** 코드 컬럼과 _raw 컬럼은 한 건으로 센다. 각 컬럼은 자기 이전값과 비교. */
+  const setPair = (
+    field: string,
+    col: string,
+    rawCol: string,
+    next: string,
+    prev: string | null,
+    prevRaw: string | null,
+  ) => {
+    if (!allowed.has(field)) return;
+    let changed = false;
+    if (next !== (prev ?? null)) {
+      patch.item[col] = next;
+      changed = true;
+    }
+    if (next !== (prevRaw ?? null)) {
+      patch.item[rawCol] = next;
+      changed = true;
+    }
+    if (changed) changes.push({ field, previous: prev, next });
   };
 
   switch (row.semantic) {
@@ -218,8 +249,14 @@ function computePatch(
       flags.review_skipped = true;
       const cur = String(ex.latest_response_code ?? "").toUpperCase();
       if (!["A", "B", "C", "D"].includes(cur)) {
-        setItem("latest_status", "latest_response_code", "UR", ex.latest_response_code);
-        setItem("latest_status", "latest_status_raw", "UR", ex.latest_status_raw);
+        setPair(
+          "latest_status",
+          "latest_response_code",
+          "latest_status_raw",
+          "UR",
+          ex.latest_response_code,
+          ex.latest_status_raw,
+        );
       }
       return { round, patch, changes, flags };
     }
@@ -238,13 +275,19 @@ function computePatch(
     return { round, patch, changes, flags };
   }
 
+  // 라운드 2 귀속인데 같은 회신을 다시 본 경우 — 아무것도 쓰지 않는다.
+  if (round === 2 && !ex.r2_response_code && code === r1Code) {
+    flags.same_as_r1 = true;
+    return { round, patch, changes, flags };
+  }
+
   // 제출 실적 없이 R1 회신이 붙는 경우 — 쓰되 목록으로 남긴다.
   if (round === 1 && !ex.sb1) flags.no_submission_r1 = true;
 
   const codeField = round === 1 ? "r1_response_code" : "r2_response_code";
   const prevCode = round === 1 ? ex.r1_response_code : ex.r2_response_code;
-  setItem(codeField, codeField, code, prevCode);
-  setItem(codeField, `${codeField}_raw`, code, prevCode);
+  const prevCodeRaw = round === 1 ? ex.r1_response_code_raw : ex.r2_response_code_raw;
+  setPair(codeField, codeField, `${codeField}_raw`, code, prevCode, prevCodeRaw);
 
   const dateField = round === 1 ? "r1_response_date" : "r2_response_date";
   const stageCode = round === 1 ? "RESPONSE_DATE_R1" : "RESPONSE_DATE_R2";
@@ -254,8 +297,14 @@ function computePatch(
     changes.push({ field: dateField, previous: prevDate, next: iso });
   }
 
-  setItem("latest_status", "latest_response_code", code, ex.latest_response_code);
-  setItem("latest_status", "latest_status_raw", code, ex.latest_status_raw);
+  setPair(
+    "latest_status",
+    "latest_response_code",
+    "latest_status_raw",
+    code,
+    ex.latest_response_code,
+    ex.latest_status_raw,
+  );
 
   if (code === "A") {
     if (allowed.has("final_approved") && ex.is_final_approved !== true) {
@@ -278,7 +327,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
     const items = (await fetchAll(
       supa,
       "wrt_items",
-      "id, wrt_number, team, pic, eng, r1_response_code, r2_response_code, latest_response_code, latest_status_raw, is_final_approved, final_approved_raw, is_active, is_excluded, exclusion_reason",
+      "id, wrt_number, team, pic, eng, r1_response_code, r1_response_code_raw, r2_response_code, r2_response_code_raw, latest_response_code, latest_status_raw, is_final_approved, final_approved_raw, is_active, is_excluded, exclusion_reason",
     )) as any[];
     const progress = (await fetchAll(
       supa,
@@ -293,6 +342,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
         ...i,
         sb1: stageOf.get(`${i.id}|SUBMISSION_R1`)?.actual_finish ?? stageOf.get(`${i.id}|SUBMISSION_R1`)?.actual_start ?? null,
         sb2: stageOf.get(`${i.id}|SUBMISSION_R2`)?.actual_finish ?? stageOf.get(`${i.id}|SUBMISSION_R2`)?.actual_start ?? null,
+        dr2: stageOf.get(`${i.id}|DRAFT_DOC_R2`)?.actual_finish ?? stageOf.get(`${i.id}|DRAFT_DOC_R2`)?.actual_start ?? null,
         rs1: stageOf.get(`${i.id}|RESPONSE_DATE_R1`)?.actual_start ?? null,
         rs2: stageOf.get(`${i.id}|RESPONSE_DATE_R2`)?.actual_start ?? null,
       });
@@ -335,6 +385,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
     const diffRows: WrtAconexDiffRow[] = [];
     const noSubmissionR1: string[] = [];
     const unmappedList: string[] = [];
+    const sameAsR1List: string[] = [];
     let filled = 0;
     let overwritten = 0;
     let blankOverwrites = 0;
@@ -356,6 +407,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
       if (flags.review_skipped) reviewSkipped += 1;
       if (flags.no_submission_r1) noSubmissionR1.push(r.document_no);
       if (flags.unmapped) unmappedList.push(r.document_no);
+      if (flags.same_as_r1) sameAsR1List.push(r.document_no);
       for (const c of changes) {
         fieldDiff.set(c.field, (fieldDiff.get(c.field) ?? 0) + 1);
         if (c.previous == null) filled += 1;
@@ -398,6 +450,8 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
       unmapped_list: unmappedList.slice(0, 200),
       d_code_count: dCode,
       review_skipped: reviewSkipped,
+      same_as_r1: sameAsR1List.length,
+      same_as_r1_list: sameAsR1List.slice(0, 500),
       no_submission_r1: noSubmissionR1.length,
       no_submission_r1_list: noSubmissionR1.slice(0, 500),
       round_counts: roundCounts,
@@ -511,6 +565,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
           `aconex docs=${data.rows.length} matched=${matchedRows.length} aconex_only=${aconexOnly.length} ` +
           `wrt_only=${wrtOnly.length} out_of_scope=${outOfScope.length} cells=${preview.cells_changed} ` +
           `review_skipped=${reviewSkipped} no_sb_r1=${noSubmissionR1.length} unmapped=${unmappedList.length} ` +
+          `same_as_r1=${sameAsR1List.length} ` +
           `rejected=${rejected.length}` +
           (nullTotal > 0
             ? ` ⚠ blank_overwrites: ${Object.entries(nullOverwrites).map(([f, n]) => `${f}=${n}`).join(", ")}`
