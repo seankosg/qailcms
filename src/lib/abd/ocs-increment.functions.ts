@@ -316,16 +316,28 @@ export const ocsIncImport = createServerFn({ method: "POST" })
     if (logErr) throw new Error(logErr.message);
 
     try {
-      const result = await rpc(context.supabase, "abd_ocs_inc_import", {
-        p_run: data.run_id,
-        p_import_log_id: importLogId,
-        p_allow_retire: data.allow_retire,
-        p_source_files: data.source_files,
-        p_source_meta: data.source_meta,
-        p_image_meta: data.image_meta,
-      });
-      const verify = await rpc(context.supabase, "abd_ocs_v3_verify", {});
-      await supabaseAdmin
+      let result: Json;
+      try {
+        result = await rpc(context.supabase, "abd_ocs_inc_import", {
+          p_run: data.run_id,
+          p_import_log_id: importLogId,
+          p_allow_retire: data.allow_retire,
+          p_source_files: data.source_files,
+          p_source_meta: data.source_meta,
+          p_image_meta: data.image_meta,
+        });
+      } catch (e) {
+        // 본체 RPC 는 단일 트랜잭션이므로 실패 = 롤백 확정.
+        throw new Error(`OCS_IMPORT_STAGE[transactional_import]: ${(e as Error).message}`);
+      }
+      let verify: Json;
+      try {
+        verify = await rpc(context.supabase, "abd_ocs_v3_verify", {});
+      } catch (e) {
+        // 본체 반영 이후 단계 — 부분 반영 가능성이 있으므로 재시도 금지 대상이다.
+        throw new Error(`OCS_IMPORT_STAGE[post_import_verify]: ${(e as Error).message}`);
+      }
+      const { error: finErr } = await supabaseAdmin
         .from("abd_ocs_import_logs")
         .update({
           status: "success",
@@ -347,7 +359,20 @@ export const ocsIncImport = createServerFn({ method: "POST" })
           } as never,
         })
         .eq("id", importLogId);
-      return { import_log_id: importLogId, result, verify } as unknown as Json;
+      if (finErr) {
+        throw new Error(`OCS_IMPORT_STAGE[import_log_finalize]: ${finErr.message}`);
+      }
+      const { data: logRow } = await context.supabase
+        .from("abd_ocs_import_logs")
+        .select("status")
+        .eq("id", importLogId)
+        .maybeSingle();
+      return {
+        import_log_id: importLogId,
+        import_log_status: logRow?.status ?? null,
+        result,
+        verify,
+      } as unknown as Json;
     } catch (err) {
       await supabaseAdmin
         .from("abd_ocs_import_logs")
