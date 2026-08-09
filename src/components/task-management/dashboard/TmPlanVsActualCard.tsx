@@ -17,13 +17,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   ChartContainer,
@@ -36,8 +29,6 @@ import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import type { OwnerDim } from "@/lib/task-management/delay-utils";
 import { buildTmSCurve, type SCurveBucket } from "@/lib/task-management/scurve-utils";
 import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
-
-const ALL_KEY = "__all__";
 
 type CurveUnit = "pct" | "tasks";
 
@@ -62,9 +53,8 @@ interface Props {
   items: TaskItem[];
   asOfDate: string;
   dim: OwnerDim;
-  /** 선택 대상 키. 빈 문자열이면 모집단 전체 롤업 */
-  ownerKey: string;
-  onOwnerKeyChange: (key: string) => void;
+  /** 상단 필터 현황(헤더 표시용) */
+  filterSummary: Array<{ label: string; value: string }>;
   bucket: SCurveBucket;
   onBucketChange: (b: SCurveBucket) => void;
   open: boolean;
@@ -75,8 +65,7 @@ export function TmPlanVsActualCard({
   items,
   asOfDate,
   dim,
-  ownerKey,
-  onOwnerKeyChange,
+  filterSummary,
   bucket,
   onBucketChange,
   open,
@@ -93,30 +82,8 @@ export function TmPlanVsActualCard({
       return next;
     });
 
-  const NONE = "(미지정)";
-  const ownerOptions = useMemo(() => {
-    const s = new Set<string>();
-    for (const it of items) {
-      const raw = (it as any)[dim];
-      s.add(raw ? String(raw).trim() || NONE : NONE);
-    }
-    return Array.from(s).sort((a, b) => a.localeCompare(b, "ko"));
-  }, [items, dim]);
-
-  // 상단 필터 변경으로 선택 대상이 목록에서 사라지면 자동으로 전체로 되돌린다.
-  useEffect(() => {
-    if (ownerKey && !ownerOptions.includes(ownerKey)) onOwnerKeyChange("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownerOptions, ownerKey]);
-
-  const scoped = useMemo(() => {
-    if (!ownerKey) return items;
-    return items.filter((it) => {
-      const raw = (it as any)[dim];
-      const key = raw ? String(raw).trim() || NONE : NONE;
-      return key === ownerKey;
-    });
-  }, [items, dim, ownerKey]);
+  // 대상 범위는 상단 필터가 이미 적용된 items 그대로 사용한다(카드 내 담당자 필터 폐기).
+  const scoped = items;
 
   const curve = useMemo(
     () =>
