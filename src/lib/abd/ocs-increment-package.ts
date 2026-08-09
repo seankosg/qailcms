@@ -158,6 +158,65 @@ export function coreTableHashBlockers(hashes: Record<string, string>): string[] 
   return out;
 }
 
+/**
+ * 패키지 이미지 바이너리 ↔ atomic.json attachment metadata 대응 검증.
+ * 앱은 값을 만들지 않는다. 선언이 없거나 필수값이 비면 blocker 다.
+ */
+export function buildImageMeta(
+  attachments: V3StageAttachment[],
+  images: PackageBinary[],
+): { imageMeta: PackageImageMeta[]; blockers: string[] } {
+  const blockers: string[] = [];
+  const byPath = new Map<string, V3StageAttachment>();
+  for (const a of attachments) if (a.storage_path) byPath.set(a.storage_path, a);
+
+  const imageMeta: PackageImageMeta[] = [];
+  for (const bin of images) {
+    const path = bin.relative_path.replace(/^images\//, "");
+    const a = byPath.get(path);
+    if (!a) {
+      blockers.push(`패키지 이미지에 대응하는 attachment metadata 가 없습니다: ${path}`);
+      continue;
+    }
+    const missing: string[] = [];
+    if (!a.content_hash) missing.push("content_hash");
+    if (a.byte_size === null) missing.push("byte_size");
+    if (a.width === null) missing.push("width");
+    if (a.height === null) missing.push("height");
+    if (!a.image_format) missing.push("image_format");
+    if (!a.mime_type) missing.push("mime_type");
+    if (a.source_image_index === null) missing.push("source_image_index");
+    if (!a.attachment_scope) missing.push("attachment_scope");
+    if (missing.length > 0) {
+      blockers.push(`신규 attachment metadata 누락 (${path}): ${missing.join(", ")}`);
+      continue;
+    }
+    if (a.content_hash !== bin.sha256.toLowerCase()) {
+      blockers.push(`attachment content_hash 가 이미지 SHA-256 과 다릅니다: ${path}`);
+      continue;
+    }
+    if (a.byte_size !== bin.byte_size) {
+      blockers.push(`attachment byte_size 가 이미지 실제 크기와 다릅니다: ${path}`);
+      continue;
+    }
+    imageMeta.push({
+      source_attachment_id: a.source_attachment_id,
+      storage_path: path,
+      content_hash: a.content_hash,
+      byte_size: a.byte_size,
+      width: a.width,
+      height: a.height,
+      image_format: a.image_format,
+      mime_type: a.mime_type,
+      source_image_index: a.source_image_index,
+      source_parent_comment_id: a.source_parent_comment_id,
+      atomic_comment_id: a.atomic_comment_id,
+      attachment_scope: a.attachment_scope as string,
+    });
+  }
+  return { imageMeta, blockers };
+}
+
 /** ZIP 1개를 열고 매니페스트 계약·SHA-256 을 전부 검증한다. 운영 DB 는 건드리지 않는다. */
 export async function readIncrementPackage(file: File): Promise<IncrementPackage> {
   const blockers: string[] = [];
