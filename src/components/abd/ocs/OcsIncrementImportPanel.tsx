@@ -328,7 +328,11 @@ export function OcsIncrementImportPanel() {
    * source/ 와 images/ 바이너리 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기).
    * 동시 5개 제한 큐로 실행하고, 성공·기존·실패를 모두 receipt 로 남긴다. 자동 DELETE 없음.
    */
-  async function uploadAssets(p: IncrementPackage, run: string): Promise<UploadReceipt[]> {
+  async function uploadAssets(
+    p: IncrementPackage,
+    run: string,
+    prev: UploadReceipt[],
+  ): Promise<UploadReceipt[]> {
     const skip = collision?.skipPaths ?? new Set<string>();
     const declaredNewPaths = new Set(
       (collision?.rows ?? []).filter((r) => r.state === "declared_new").map((r) => r.path),
@@ -348,7 +352,14 @@ export function OcsIncrementImportPanel() {
       })),
     ];
 
-    const out: UploadReceipt[] = [];
+    // 전체 asset 을 bucket::path 로 정본화하고, 기존 영수증은 조건에 맞을 때만 재사용한다.
+    const key = (bucket: string, path: string) => `${bucket}::${path}`;
+    const prevByKey = new Map(
+      prev
+        .filter((r) => r.run_id === run && r.package_id === p.manifest.package_id)
+        .map((r) => [key(r.bucket, r.path), r]),
+    );
+    const out = new Array<UploadReceipt>(jobs.length);
     let cursor = 0;
     let done = 0;
 
@@ -365,21 +376,30 @@ export function OcsIncrementImportPanel() {
           path: job.path,
           sha256: job.sha256,
         };
+        const prevRec = prevByKey.get(key(job.bucket, job.path));
+        const reusable =
+          prevRec !== undefined &&
+          prevRec.sha256 === job.sha256 &&
+          prevRec.state !== "failed" &&
+          (prevRec.state === "existing" ? skip.has(job.path) : !skip.has(job.path));
         // 기존 동일 hash 는 요청 자체를 보내지 않는다.
-        if (skip.has(job.path)) {
-          out.push({ ...base, state: "existing" });
+        if (reusable) {
+          out[i] = prevRec as UploadReceipt;
+        } else if (skip.has(job.path)) {
+          out[i] = { ...base, state: "existing" };
         } else {
           const { error } = await supabase.storage
             .from(job.bucket)
             .upload(job.path, new Blob([job.bytes]), { upsert: false });
           if (!error) {
-            out.push({ ...base, state: "uploaded" });
+            // 재시도 성공 시 기존 failed 영수증을 uploaded 로 교체한다.
+            out[i] = { ...base, state: "uploaded" };
           } else if (declaredNewPaths.has(job.path)) {
             // Storage object 는 있으나 DB metadata 가 없는 경우 — 서버가 실측 검증한다.
-            out.push({ ...base, state: "declared_new" });
+            out[i] = { ...base, state: "declared_new" };
           } else {
             // 파일명이 보인다는 이유만으로 성공 처리하지 않는다 — 검증 불가 object 는 실패다.
-            out.push({ ...base, state: "failed", error: error.message });
+            out[i] = { ...base, state: "failed", error: error.message };
           }
         }
         done += 1;
@@ -390,17 +410,9 @@ export function OcsIncrementImportPanel() {
     await Promise.all(
       Array.from({ length: Math.min(UPLOAD_CONCURRENCY, Math.max(jobs.length, 1)) }, worker),
     );
-    setReceipts(out);
-    const failed = out.filter((r) => r.state === "failed");
-    if (failed.length > 0) {
-      throw new Error(
-        `자산 업로드 실패 ${failed.length}건 (같은 ZIP 재선택으로 재시도 가능): ${failed
-          .slice(0, 3)
-          .map((r) => `${r.path} — ${r.error ?? ""}`)
-          .join(" / ")}`,
-      );
-    }
-    return out;
+    const list = out.filter(Boolean) as UploadReceipt[];
+    setReceipts(list);
+    return list;
   }
 
   /**
@@ -414,11 +426,10 @@ export function OcsIncrementImportPanel() {
     setProgress(0);
     setFailure(null);
     try {
-      let rec = receipts;
-      if (rec.length === 0) {
-        setStageLabel("4/6 신규 자산 업로드");
-        rec = await uploadAssets(pkg, runId);
-      }
+      // 영수증이 있어도 실패분·누락분은 반드시 다시 업로드한다.
+      setStageLabel("4/6 신규 자산 업로드");
+      const rec = await uploadAssets(pkg, runId, receipts);
+      const failedUploads = rec.filter((r) => r.state === "failed");
 
       const sizeByPath = new Map<string, number>();
       for (const b of pkg.images) sizeByPath.set(imageStoragePath(b.relative_path), b.byte_size);
@@ -427,7 +438,9 @@ export function OcsIncrementImportPanel() {
       }
 
       const targets = rec.filter((r) => r.state === "uploaded" || r.state === "declared_new");
-      setVerifyTotal(targets.length);
+      // 분모는 성공 영수증 수가 아니라 "서버 검증이 필요한 전체 신규 asset 수" 로 고정한다.
+      setVerifyTotal(newAssetTotal);
+      setVerifyRan(true);
       const okSet = new Set(verifyOk);
       const pending = targets.filter((t) => !okSet.has(t.path));
       setStageLabel(`5/6 서버 실측 검증 (${pending.length}건)`);
@@ -451,10 +464,19 @@ export function OcsIncrementImportPanel() {
         setProgress(Math.round(((i + 1) / batches.length) * 100));
       }
       setVerifyFailures(failures);
-      if (failures.length > 0) {
+      if (failedUploads.length > 0) {
+        toast.error(
+          `자산 업로드 실패 ${failedUploads.length}건 — 재실행하면 실패분만 다시 업로드합니다: ${failedUploads
+            .slice(0, 3)
+            .map((r) => `${r.path} — ${r.error ?? ""}`)
+            .join(" / ")}`,
+        );
+      } else if (failures.length > 0) {
         toast.error(`서버 실측 검증 실패 ${failures.length}건 — 실패분만 재실행하십시오.`);
+      } else if (okSet.size < newAssetTotal) {
+        toast.error(`서버 실측 검증 미완료 — ${okSet.size}/${newAssetTotal}`);
       } else {
-        toast.success(`서버 실측 검증 완료 — ${targets.length}건`);
+        toast.success(`서버 실측 검증 완료 — ${okSet.size}/${newAssetTotal}건`);
       }
     } catch (e) {
       setFailure(e instanceof Error ? e.message : String(e));
