@@ -10,6 +10,7 @@ import { getOcsImportStats } from "@/lib/abd/ocs-import.functions";
 import { ocsVerify } from "@/lib/abd/ocs-stage-b.functions";
 import { ocsV3Verify } from "@/lib/abd/ocs-v3-import.functions";
 import { OcsRecountPanel } from "@/components/abd/ocs/OcsRecountPanel";
+import { OcsRecoveryPanel } from "@/components/abd/ocs/OcsRecoveryPanel";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export const Route = createFileRoute("/_authenticated/admin/ocs-import")({
@@ -105,6 +106,8 @@ function OcsMaintenanceBody() {
       </Card>
 
       <OcsRecountPanel />
+
+      <OcsRecoveryPanel />
 
       <Card>
         <CardHeader>
