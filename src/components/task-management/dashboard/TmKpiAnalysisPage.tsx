@@ -34,9 +34,6 @@ const DELAY_FILTER_OPTIONS = [
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/kpi-analysis");
 
-function isOwnerDim(v: string): v is OwnerDim {
-  return v === "team" || v === "hdec_pic_name" || v === "hdec_eng_name";
-}
 
 export function TmKpiAnalysisPage() {
   const search = routeApi.useSearch();
