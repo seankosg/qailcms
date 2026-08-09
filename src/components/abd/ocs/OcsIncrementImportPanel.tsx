@@ -26,7 +26,7 @@ import { ocsIncDryRun, ocsIncImport, ocsIncPrecheck } from "@/lib/abd/ocs-increm
 import { ocsIncVerifyBatch } from "@/lib/abd/ocs-increment-verify.functions";
 import { VERIFY_BATCH_MAX } from "@/lib/abd/ocs-increment-verify";
 import { OcsBaselineCard } from "@/components/abd/ocs/OcsBaselineCard";
-import { createPreImportSnapshot } from "@/lib/backup/backup.functions";
+import { createPreImportSnapshot, getBackupRunStatus } from "@/lib/backup/backup.functions";
 import { OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
 import { OCS_SOURCE_BUCKET } from "@/lib/abd/ocs-source-manifest";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -65,12 +65,22 @@ export function OcsIncrementImportPanel() {
   const importFn = useServerFn(ocsIncImport);
   const verifyFn = useServerFn(ocsIncVerifyBatch);
   const snapshotFn = useServerFn(createPreImportSnapshot);
+  const snapshotStatusFn = useServerFn(getBackupRunStatus);
 
   const [pkg, setPkg] = useState<IncrementPackage | null>(null);
   const [precheck, setPrecheck] = useState<Record<string, unknown> | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [dry, setDry] = useState<Dry | null>(null);
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [snapshotRunning, setSnapshotRunning] = useState(false);
+  const [snapshotElapsed, setSnapshotElapsed] = useState(0);
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
+  const [snapshotStatus, setSnapshotStatus] = useState<{
+    tablesTotal: number;
+    tablesDone: number;
+    currentTable: string | null;
+    sizeBytes: number | null;
+  } | null>(null);
   const [approved, setApproved] = useState(false);
   const [allowRetire, setAllowRetire] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -338,17 +348,56 @@ export function OcsIncrementImportPanel() {
   }
 
   async function runSnapshot() {
-    if (!dry) return;
-    setBusy("사전 백업 스냅샷 생성 중…");
+    if (!dry || snapshotRunning) return;
+    const runId = crypto.randomUUID();
+    const started = Date.now();
+    setSnapshotRunning(true);
+    setSnapshotError(null);
+    setSnapshotStatus(null);
+    setSnapshotElapsed(0);
+
+    const tick = setInterval(() => setSnapshotElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    const poll = setInterval(() => {
+      void (async () => {
+        try {
+          const row = (await snapshotStatusFn({ data: { run_id: runId } })) as
+            | { metadata?: Record<string, unknown> | null }
+            | null;
+          const m = (row?.metadata ?? null) as Record<string, unknown> | null;
+          if (!m) return;
+          setSnapshotStatus({
+            tablesTotal: num(m["tables_total"]),
+            tablesDone: num(m["tables_done"]),
+            currentTable: (m["current_table"] as string | null) ?? null,
+            sizeBytes: m["size_bytes"] == null ? null : num(m["size_bytes"]),
+          });
+        } catch {
+          /* 진행 상태 조회 실패는 스냅샷 자체에 영향 없음 */
+        }
+      })();
+    }, 3000);
+
     try {
-      const res = (await snapshotFn({ data: { module: "abd" } })) as { id?: string } | null;
+      const res = (await snapshotFn({ data: { module: "abd", run_id: runId } })) as
+        | { id?: string; size_bytes?: number }
+        | null;
       if (!res?.id) throw new Error("스냅샷 ID 를 확인하지 못했습니다.");
       setSnapshotId(res.id);
-      toast.success("사전 백업 스냅샷 생성 완료");
+      setSnapshotStatus((prev) => ({
+        tablesTotal: prev?.tablesTotal ?? 0,
+        tablesDone: prev?.tablesTotal ?? prev?.tablesDone ?? 0,
+        currentTable: null,
+        sizeBytes: res.size_bytes ?? prev?.sizeBytes ?? null,
+      }));
+      toast.success(`Snapshot created — ${res.id}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setSnapshotError(msg);
+      toast.error(msg);
     } finally {
-      setBusy(null);
+      clearInterval(tick);
+      clearInterval(poll);
+      setSnapshotRunning(false);
     }
   }
 
