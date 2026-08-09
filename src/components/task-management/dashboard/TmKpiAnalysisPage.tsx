@@ -9,10 +9,9 @@ import { DataDatePicker } from "@/components/task-management/shared/DataDatePick
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
-import { todayIso, type TaskItem } from "@/lib/task-management/schedule-utils";
+import { todayIso } from "@/lib/task-management/schedule-utils";
 import type { OwnerDim, OwnerLeaderboardRow } from "@/lib/task-management/delay-utils";
 import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
-import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { OwnerProgressChart } from "./OwnerProgressChart";
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
 import { TmPlanVsActualCard } from "./TmPlanVsActualCard";
