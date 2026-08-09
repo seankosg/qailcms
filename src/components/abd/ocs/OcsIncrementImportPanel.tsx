@@ -869,6 +869,13 @@ export function OcsIncrementImportPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {warnings.length > 0 && (
+            <ul className="space-y-1 text-xs text-amber-600">
+              {warnings.map((w) => (
+                <li key={w}>• {w}</li>
+              ))}
+            </ul>
+          )}
           {blockers.length > 0 && (
             <ul className="space-y-1 text-xs text-destructive">
               {blockers.map((b) => (
