@@ -164,7 +164,11 @@ export function OcsIncrementImportPanel() {
     if (pkg && !collision) out.push("Storage 충돌 점검 미완료");
     if (collision) out.push(...collision.blockers);
     if (precheck?.["duplicate_package"] === true)
-      out.push("동일 패키지 해시가 이미 반영되었습니다.");
+      out.push(
+        precheck?.["duplicate_recovered"] === true
+          ? "이미 반영 및 복구 완료된 패키지입니다. 재실행할 수 없습니다."
+          : "동일 패키지 해시가 이미 반영되었습니다.",
+      );
     const base = (precheck?.["baseline"] ?? {}) as Record<string, unknown>;
     if (precheck && base["base_import_run_found"] !== true)
       out.push("base_import_run_id 를 정본에서 찾을 수 없습니다.");
@@ -283,6 +287,17 @@ export function OcsIncrementImportPanel() {
         },
       })) as Record<string, unknown>;
       setPrecheck(pc);
+      if (pc["duplicate_package"] === true) {
+        // 이미 반영(및 복구)된 패키지는 선택 즉시 차단한다.
+        toast.error(
+          pc["duplicate_recovered"] === true
+            ? "이미 반영 및 복구 완료된 패키지입니다. 다시 실행할 수 없습니다."
+            : "이미 반영된 패키지입니다. 다시 실행할 수 없습니다.",
+        );
+        setCollision(null);
+        setPickerKey((k) => k + 1);
+        return;
+      }
       const col = await checkPackageStorageCollisions(p);
       setCollision(col);
       toast.success(

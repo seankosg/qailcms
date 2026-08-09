@@ -72,6 +72,22 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
       .limit(1);
     if (dupErr) throw new Error(dupErr.message);
 
+    // 동일 패키지가 이미 반영된 경우, 그 run 을 대상으로 한 복구 run 이 있는지도 함께 조회한다.
+    let recoveryLog: { id: string; started_at: string; status: string } | null = null;
+    const dupId = (dup ?? [])[0]?.id ?? null;
+    if (dupId) {
+      const { data: rec, error: recErr } = await context.supabase
+        .from("abd_ocs_import_logs")
+        .select("id, started_at, status, result")
+        .eq("status", "success")
+        .filter("result->>recovery_of_import_log_id", "eq", dupId)
+        .order("started_at", { ascending: false })
+        .limit(1);
+      if (recErr) throw new Error(recErr.message);
+      const r = (rec ?? [])[0];
+      if (r) recoveryLog = { id: r.id, started_at: r.started_at as string, status: r.status };
+    }
+
     const baseline = await rpc(context.supabase, "abd_ocs_inc_baseline", {
       p_base_import_run_id: data.base_import_run_id || null,
     });
@@ -100,6 +116,8 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
     return {
       duplicate_package: (dup ?? []).length > 0,
       duplicate_log: (dup ?? [])[0] ?? null,
+      duplicate_recovered: recoveryLog !== null,
+      duplicate_recovery_log: recoveryLog as unknown as Json,
       baseline,
       core_hash_current: currentCoreHash,
       core_table_hashes_current: currentTableHashes,
