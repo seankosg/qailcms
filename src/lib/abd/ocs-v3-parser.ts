@@ -314,14 +314,53 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
     });
   });
 
-  const attachments: V3StageAttachment[] = rawAtt.map((r) => ({
-    attachment_id: s(pick(r, ["attachment_id", "Attachment ID"])) ?? "",
-    comment_id: s(pick(r, ["comment_id", "Comment ID"])),
-    source_parent_comment_id: s(pick(r, K.parent)),
-    comment_group_id: s(pick(r, ["comment_group_id", "Comment Group ID"])),
-    atomic_comment_id: s(pick(r, ["atomic_comment_id", "Atomic Comment ID"])),
-    attachment_scope: s(pick(r, ["attachment_scope", "Attachment Scope"])),
-  }));
+  const attachments: V3StageAttachment[] = [];
+  const attachment_invalid_rows: { index: number; reason: string }[] = [];
+  const attIdSeen = new Set<string>();
+  const attIdDup = new Set<string>();
+  const attPathSeen = new Set<string>();
+  const attPathDup = new Set<string>();
+
+  rawAtt.forEach((r, i) => {
+    const sid = s(pick(r, ["source_attachment_id", "Source Attachment ID"]));
+    const alias = s(pick(r, ["attachment_id", "Attachment ID"]));
+    if (sid && alias && sid !== alias) {
+      attachment_invalid_rows.push({
+        index: i,
+        reason: `source_attachment_id(${sid}) 와 attachment_id(${alias}) 가 다릅니다.`,
+      });
+      return;
+    }
+    const id = sid ?? alias;
+    if (!id) {
+      attachment_invalid_rows.push({ index: i, reason: "source_attachment_id 누락" });
+      return;
+    }
+    if (attIdSeen.has(id)) attIdDup.add(id);
+    attIdSeen.add(id);
+    const storagePath = s(pick(r, ["storage_path", "Storage Path"]));
+    if (storagePath) {
+      if (attPathSeen.has(storagePath)) attPathDup.add(storagePath);
+      attPathSeen.add(storagePath);
+    }
+    attachments.push({
+      source_attachment_id: id,
+      attachment_id: id,
+      comment_id: s(pick(r, ["comment_id", "Comment ID"])),
+      source_parent_comment_id: s(pick(r, K.parent)),
+      comment_group_id: s(pick(r, ["comment_group_id", "Comment Group ID"])),
+      atomic_comment_id: s(pick(r, ["atomic_comment_id", "Atomic Comment ID"])),
+      attachment_scope: s(pick(r, ["attachment_scope", "Attachment Scope"])),
+      storage_path: storagePath,
+      content_hash: (s(pick(r, ["content_hash", "Content Hash", "sha256"])) ?? "").toLowerCase() || null,
+      byte_size: n(pick(r, ["byte_size", "Byte Size", "size"])),
+      width: n(pick(r, ["width", "Width"])),
+      height: n(pick(r, ["height", "Height"])),
+      image_format: s(pick(r, ["image_format", "Image Format"])),
+      mime_type: s(pick(r, ["mime_type", "Mime Type"])),
+      source_image_index: n(pick(r, ["source_image_index", "Source Image Index"])),
+    });
+  });
 
   const seen = new Set<string>();
   const dup = new Set<string>();
@@ -368,6 +407,9 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
     distinct_abd_numbers: abdSet.size,
     residual_multi_marker_rows: residual,
     attachment_scope_counts: scopeCounts,
+    attachment_invalid_rows,
+    duplicated_attachment_ids: Array.from(attIdDup),
+    duplicated_attachment_paths: Array.from(attPathDup),
   };
 }
 
