@@ -395,24 +395,10 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       const msg = (err as Error).message;
       const postApply = /OCS_IMPORT_STAGE\[(post_import_verify|import_log_finalize)\]/.test(msg);
       const unconfirmed = /OCS_IMPORT_STAGE\[import_unconfirmed\]/.test(msg);
-      // 미확인(unknown) 은 failed 로 마감하지 않는다. failed 로 두면 중복 판정에서 빠져 재실행이 열린다.
-      let status = postApply ? "partial" : unconfirmed ? "unknown" : "failed";
-      let finalMsg = msg;
-      if (unconfirmed) {
-        // 서버 상태로 커밋 여부를 확인한다. 커밋 흔적이 없으면 롤백 확정으로 강등한다.
-        try {
-          const { count, error: cErr } = await supabaseAdmin
-            .from("abd_ocs_comment_groups")
-            .select("id", { count: "exact", head: true })
-            .eq("import_log_id", importLogId);
-          if (!cErr && (count ?? 0) === 0) {
-            status = "failed";
-            finalMsg = msg.replace("[import_unconfirmed]", "[transactional_import]");
-          }
-        } catch {
-          /* 상태 조회 실패 시 미확인 유지 */
-        }
-      }
+      // 미확인(unknown) 은 failed 로 마감하지 않는다. 단일 테이블 0건은 롤백 증거가 아니며,
+      // 관리자 확인 전 자동 강등하지 않는다.
+      const status = postApply ? "partial" : unconfirmed ? "unknown" : "failed";
+      const finalMsg = msg;
       await supabaseAdmin
         .from("abd_ocs_import_logs")
         .update({
