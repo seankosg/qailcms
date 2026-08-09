@@ -51,11 +51,11 @@ export function TmKpiAnalysisPage() {
     {
       disciplines: search.discipline,
       plots: search.plot,
-      // 담당자 축의 Team 필터는 폐기 — 상단 Team(=discipline) 필터만 사용
+      // 담당자 축 필터 제거 — 상단 Team(=discipline) 필터만 사용
       teams: [],
-      hdecPic: search.hdecPic,
-      hdecEng: search.hdecEng,
-      level: "all",
+      hdecPic: [],
+      hdecEng: [],
+      level: "sub",
       q: "",
     },
     asOfDate,
@@ -72,28 +72,12 @@ export function TmKpiAnalysisPage() {
     return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [items]);
 
-  const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
+  // 차트용 담당자 차원은 로컬 상태로 관리 (search param에서 제거)
+  const [chartDim, setChartDim] = useState<OwnerDim>("hdec_pic_name");
   // 계산은 항상 Sub 기준(기본값). Main 은 명시 선택 시에만.
   const taskScope: TaskScope = search.taskScope === "main" ? "main" : "sub";
 
   const scopedByTaskScope = useMemo(() => scopeItems(items, taskScope), [items, taskScope]);
-
-  const { data: thresholdsData } = useTaskManagementSettings();
-  const thresholds = thresholdsData ?? DEFAULT_THRESHOLDS;
-
-  const [ownerDetail, setOwnerDetail] = useState<{
-    dim: OwnerDim;
-    key: string;
-    row: OwnerLeaderboardRow;
-  } | null>(null);
-  const [curveOpen, setCurveOpen] = useState(true);
-  const curveBucket: SCurveBucket =
-    search.curveBucket === "day" || search.curveBucket === "month"
-      ? search.curveBucket
-      : "week";
-
-  const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
-  const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
   const scopedItems = useMemo(() => {
     const base = scopedByTaskScope;
