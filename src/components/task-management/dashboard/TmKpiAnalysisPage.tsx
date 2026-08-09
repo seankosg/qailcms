@@ -127,7 +127,14 @@ export function TmKpiAnalysisPage() {
   const listLabel = (arr: string[] | undefined) =>
     !arr || arr.length === 0 ? "All" : arr.length <= 3 ? arr.join(", ") : `${arr.length} selected`;
 
+  const selectedOwnerLabel = useMemo(() => {
+    if (ownerDim === "team") return listLabel(disciplines);
+    if (ownerDim === "hdec_pic_name") return listLabel(search.hdecPic);
+    return listLabel(search.hdecEng);
+  }, [ownerDim, disciplines, search.hdecPic, search.hdecEng]);
+
   const filterSummary = useMemo(
+
     () => [
       { label: "Task", value: taskScope === "main" ? "Main" : "Sub" },
       { label: "Team", value: listLabel(disciplines) },
