@@ -62,8 +62,8 @@ export function TmKpiAnalysisPage() {
     {
       disciplines: search.discipline,
       plots: search.plot,
-      teams: search.team,
       // 담당자 축의 Team 필터는 폐기 — 상단 Team(=discipline) 필터만 사용
+      teams: [],
       hdecPic: search.hdecPic,
       hdecEng: search.hdecEng,
       level: "all",
@@ -124,6 +124,12 @@ export function TmKpiAnalysisPage() {
 
   const disciplines = search.discipline ?? [];
   const totalItems = items.length;
+
+  // 폐기된 담당자축 Team 필터의 잔여 선택값 정리
+  useEffect(() => {
+    if ((search.team ?? []).length > 0) patch({ team: [] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.team]);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -191,7 +197,7 @@ export function TmKpiAnalysisPage() {
 
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Discipline
+                  Team
                 </span>
                 <ToggleGroup
                   type="multiple"
@@ -241,10 +247,9 @@ export function TmKpiAnalysisPage() {
 
             <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
               <OwnerQuickFilterPills
-                teamOptions={teamOptions}
                 picOptions={picOptions}
                 engOptions={engOptions}
-                team={search.team}
+                showTeam={false}
                 hdecPic={search.hdecPic}
                 hdecEng={search.hdecEng}
                 onChange={patch}
