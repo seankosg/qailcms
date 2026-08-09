@@ -183,20 +183,20 @@ export function TmPlanVsActualCard({
                 className="flex min-w-0 items-center gap-2 text-left hover:opacity-80"
                 aria-expanded={open}
               >
-                {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm">Plan vs Actual — S-Curve</CardTitle>
+                {open ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                <TrendingUp className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Plan vs Actual — S-Curve</CardTitle>
                 <div className="flex flex-wrap items-center gap-1">
                   {filterSummary.map((f) => (
                     <span
                       key={f.label}
-                      className="rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground"
+                      className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
                     >
                       <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
                       <span className="text-foreground">{f.value}</span>
                     </span>
                   ))}
-                  <span className="rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] tabular-nums text-foreground">
+                  <span className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs tabular-nums text-foreground">
                     n = {n.toLocaleString()} tasks
                   </span>
                 </div>
