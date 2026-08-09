@@ -195,7 +195,7 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
             <div>
               <Label className="text-xs">Work Type</Label>
               <div className="mt-1">
-                <WorkTypeCombo value={rowType} onChange={setRowType} className="h-9" />
+                <WorkTypeCombo value={rowType} onChange={setRowType} allowNew={isAdminEditor} className="h-9" />
               </div>
             </div>
             <div>
