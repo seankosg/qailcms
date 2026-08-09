@@ -13,11 +13,14 @@ export type MetaLookup = (
   paths: string[],
 ) => Promise<MetaRow[]>;
 export type StorageLister = (bucket: string, dir: string) => Promise<string[]>;
-/** Storage object 실측 — 서버가 직접 내려받아 계산한 hash/size (클라이언트 신고값 불신). */
-export type StorageProbe = (
-  bucket: string,
-  path: string,
-) => Promise<{ sha256: string; byte_size: number } | null>;
+/**
+ * 서버 실측 검증 영수증 키 집합 — `bucket::path::sha256::byte_size`.
+ * 별도 batch 서버 함수(ocsIncVerifyBatch)가 object 를 직접 내려받아 계산한 결과만 들어온다.
+ */
+export type VerifiedKeySet = Set<string>;
+
+export const verifiedKey = (bucket: string, path: string, sha256: string, byteSize: number) =>
+  `${bucket}::${path}::${sha256.toLowerCase()}::${byteSize}`;
 
 export type RunIdentity = { run_id: string; package_id: string };
 
@@ -67,7 +70,7 @@ export async function recheckCollisionsServerSide(
   imageMeta: ImageMeta[] = [],
   receipts: UploadReceipt[] = [],
   identity?: RunIdentity,
-  probeStorage?: StorageProbe,
+  verified: VerifiedKeySet = new Set<string>(),
 ): Promise<ServerCollisionResult> {
   const blockers: string[] = imageMetaIntegrityBlockers(imageMeta);
   const skip: string[] = [];
