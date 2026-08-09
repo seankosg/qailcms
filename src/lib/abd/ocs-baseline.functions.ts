@@ -341,6 +341,85 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
   });
 
 /** 만료된 서명 URL 재발급 (strict admin 재검증 후에만) */
+export type LatestBaselineInfo = {
+  exists: boolean;
+  baseline_id: string;
+  core_hash: string;
+  schema_version: string;
+  latest_success_import_run_id: string | null;
+  generated_at: string | null;
+  data_date: string | null;
+  storage_path: string | null;
+  zip_byte_size: number | null;
+  total_rows: number | null;
+  files: BaselineFileInfo[];
+  is_latest: boolean;
+};
+
+/**
+ * 최신 Baseline 조회 (읽기 전용). 생성·업로드·서명 URL 발급을 하지 않는다.
+ * 판정식은 기존과 동일하게 abd_ocs_baseline_core_hash + abd_ocs_inc_baseline + computeBaselineId 만 사용한다.
+ */
+export const getLatestOcsBaselineInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<LatestBaselineInfo> => {
+    await assertAdmin(context.supabase, context.userId);
+
+    const core = await rpc(context.supabase, "abd_ocs_baseline_core_hash");
+    const baselineInfo = await rpc(context.supabase, "abd_ocs_inc_baseline", {
+      p_base_import_run_id: null,
+    });
+    const coreHash = String(core["core_hash"] ?? "");
+    const latestRunId = (baselineInfo["latest_success_import_run_id"] ?? null) as string | null;
+    const baselineId = await computeBaselineId(
+      BASELINE_SCHEMA_VERSION,
+      coreHash,
+      latestRunId ?? "",
+    );
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const existing = await findExisting(supabaseAdmin, baselineId);
+    if (!existing) {
+      return {
+        exists: false,
+        baseline_id: baselineId,
+        core_hash: coreHash,
+        schema_version: BASELINE_SCHEMA_VERSION,
+        latest_success_import_run_id: latestRunId,
+        generated_at: null,
+        data_date: null,
+        storage_path: null,
+        zip_byte_size: null,
+        total_rows: null,
+        files: [],
+        is_latest: false,
+      };
+    }
+
+    const stored = await readSidecar(supabaseAdmin, baselineId);
+    const files: BaselineFileInfo[] = (stored?.files ?? []).map((f) => ({
+      name: f.relative_path,
+      byte_size: f.byte_size,
+      sha256: f.sha256,
+      row_count: f.row_count,
+    }));
+    return {
+      exists: true,
+      baseline_id: baselineId,
+      core_hash: coreHash,
+      schema_version: BASELINE_SCHEMA_VERSION,
+      latest_success_import_run_id: latestRunId,
+      generated_at: stored?.generated_at ?? null,
+      data_date: stored?.data_date ?? null,
+      storage_path: `${baselineFolder(baselineId)}/${existing.name}`,
+      zip_byte_size: existing.metadata?.size ?? null,
+      total_rows: stored?.total_rows ?? files.reduce((s, f) => s + (f.row_count ?? 0), 0),
+      files,
+      // 현재 core 로 산출한 baseline_id 폴더에 ZIP 이 존재하므로 정본과 일치한다.
+      is_latest: true,
+    };
+  });
+
 export const signOcsBaseline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { storage_path: string }) => {
