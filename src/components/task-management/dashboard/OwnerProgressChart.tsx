@@ -31,7 +31,10 @@ interface Props {
   thresholds?: TaskThresholds;
   /** 표시할 상위 그룹 수 (diffPp 오름차순 = 가장 뒤처진 순) */
   limit?: number;
+  /** 제목 옆에 표시할 선택된 팀/사용자 라벨 */
+  titleSuffix?: string;
 }
+
 
 /**
  * Team / Individual Progress 차트.
@@ -51,7 +54,9 @@ export function OwnerProgressChart({
   onOwnerClick,
   thresholds,
   limit = 15,
+  titleSuffix,
 }: Props) {
+
   const viewMode: "team" | "individual" = dim === "team" ? "team" : "individual";
 
   const rows = useMemo(
@@ -145,12 +150,20 @@ export function OwnerProgressChart({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
         <div className="min-w-0">
-          <CardTitle className="text-sm font-semibold">
-            {viewMode === "team" ? "Team Progress" : "Individual Progress"}
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold">
+              {viewMode === "team" ? "Team Progress" : "Individual Progress"}
+            </CardTitle>
+            {titleSuffix && titleSuffix !== "All" && (
+              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
+                {titleSuffix}
+              </Badge>
+            )}
+          </div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             Planned vs Actual — 막대 클릭 시 드릴다운
           </p>
+
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
               전체 {summary.tasks.toLocaleString()}건

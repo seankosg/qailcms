@@ -127,7 +127,14 @@ export function TmKpiAnalysisPage() {
   const listLabel = (arr: string[] | undefined) =>
     !arr || arr.length === 0 ? "All" : arr.length <= 3 ? arr.join(", ") : `${arr.length} selected`;
 
+  const selectedOwnerLabel = useMemo(() => {
+    if (ownerDim === "team") return listLabel(disciplines);
+    if (ownerDim === "hdec_pic_name") return listLabel(search.hdecPic);
+    return listLabel(search.hdecEng);
+  }, [ownerDim, disciplines, search.hdecPic, search.hdecEng]);
+
   const filterSummary = useMemo(
+
     () => [
       { label: "Task", value: taskScope === "main" ? "Main" : "Sub" },
       { label: "Team", value: listLabel(disciplines) },
@@ -283,7 +290,9 @@ export function TmKpiAnalysisPage() {
             items={scopedItems}
             asOfDate={asOfDate}
             dim={ownerDim}
+            titleSuffix={selectedOwnerLabel}
             onDimChange={(dim) => patch({ ownerDim: dim, curveKey: "" })}
+
             onOwnerClick={(dim, key, row) => {
               setOwnerDetail({ dim, key, row });
               // 카드 내 담당자 필터 폐기 — 클릭 시 상단 담당자 필터에 반영한다.
