@@ -275,8 +275,15 @@ function computePatch(
     return { round, patch, changes, flags };
   }
 
-  // 라운드 2 귀속인데 같은 회신을 다시 본 경우 — 아무것도 쓰지 않는다.
-  if (round === 2 && !ex.r2_response_code && code === r1Code) {
+  // 라운드 2 귀속인데, 승격 이유가 R1 코드 B/C 뿐이고 R2 실적이 없는 경우에만
+  // 같은 회신을 다시 본 것으로 본다. R2 실적이 있으면 진짜 R2 회신이다.
+  if (
+    round === 2 &&
+    !ex.r2_response_code &&
+    (r1Code === "B" || r1Code === "C") &&
+    !ex.dr2 && !ex.sb2 && !ex.rs2 &&
+    code === r1Code
+  ) {
     flags.same_as_r1 = true;
     return { round, patch, changes, flags };
   }
