@@ -394,6 +394,7 @@ export function TmPlanVsActualCard({
                     <ChartTooltip content={<ChartTooltipContent />} />
                     {todayLabel && (
                       <ReferenceLine
+                        yAxisId="v"
                         x={todayLabel}
                         stroke="var(--destructive)"
                         strokeDasharray="4 2"
