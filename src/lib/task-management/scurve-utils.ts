@@ -266,8 +266,8 @@ export function buildTmSCurve(opts: {
   // 창 시작 직전 시점의 누계(기준선) — 창 이전 누계가 첫 막대에 몰리지 않게 한다.
   const baseIso = n > 0 ? iso(addDays(periodStart(buckets[0], bucket), -1)) : windowStart;
   let basePlanSum = 0;
-  for (const it of items) basePlanSum += cumPlanProgress(it, baseIso);
-  const baselinePlan = (basePlanSum / items.length) * 100;
+  for (const it of includedItems) basePlanSum += cumPlanProgress(it, baseIso);
+  const baselinePlan = (basePlanSum / includedItems.length) * 100;
   let baselineActual: number | null = null;
   if (baseIso <= asOf && seriesList.length) {
     let s = 0;
