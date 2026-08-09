@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -39,10 +39,17 @@ import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSna
 
 const ALL_KEY = "__all__";
 
+type CurveUnit = "pct" | "tasks";
+
 const BUCKET_OPTIONS: Array<{ value: SCurveBucket; label: string }> = [
   { value: "day", label: "Daily" },
   { value: "week", label: "Weekly" },
   { value: "month", label: "Monthly" },
+];
+
+const UNIT_OPTIONS: Array<{ value: CurveUnit; label: string }> = [
+  { value: "pct", label: "%" },
+  { value: "tasks", label: "Tasks" },
 ];
 
 const DIM_LABEL: Record<OwnerDim, string> = {
@@ -77,6 +84,7 @@ export function TmPlanVsActualCard({
 }: Props) {
   const snap = useTaskProgressSnapshot();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [unit, setUnit] = useState<CurveUnit>("pct");
   const toggle = (key: string) =>
     setHidden((prev) => {
       const next = new Set(prev);
@@ -94,6 +102,12 @@ export function TmPlanVsActualCard({
     }
     return Array.from(s).sort((a, b) => a.localeCompare(b, "ko"));
   }, [items, dim]);
+
+  // 상단 필터 변경으로 선택 대상이 목록에서 사라지면 자동으로 전체로 되돌린다.
+  useEffect(() => {
+    if (ownerKey && !ownerOptions.includes(ownerKey)) onOwnerKeyChange("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerOptions, ownerKey]);
 
   const scoped = useMemo(() => {
     if (!ownerKey) return items;
@@ -118,21 +132,24 @@ export function TmPlanVsActualCard({
     [scoped, asOfDate, bucket, snap.ready],
   );
 
+  const n = curve.taskCount;
+  const isTasks = unit === "tasks";
+  // Tasks 환산 물량 = Σ 진척률 = (pct / 100) × n
+  const conv = (v: number) => (isTasks ? (v / 100) * n : v);
+  const r1 = (v: number) => Number(v.toFixed(1));
+
   const data = curve.buckets.map((b, i) => ({
     bucket: b,
     bucketLabel: curve.bucketLabels[i],
-    planInc: Number(curve.dailyPlan[i].toFixed(3)),
-    actualInc: curve.dailyActual[i] == null ? null : Number((curve.dailyActual[i] as number).toFixed(3)),
-    cumPlan: Number(curve.cumPlan[i].toFixed(2)),
-    cumActual: curve.cumActual[i] == null ? null : Number((curve.cumActual[i] as number).toFixed(2)),
-    cumActualMeasured:
-      curve.measured[i] && curve.cumActual[i] != null
-        ? Number((curve.cumActual[i] as number).toFixed(2))
-        : null,
+    planInc: r1(conv(curve.dailyPlan[i])),
+    actualInc:
+      curve.dailyActual[i] == null ? null : r1(conv(curve.dailyActual[i] as number)),
+    cumPlan: r1(conv(curve.cumPlan[i])),
+    cumActual: curve.cumActual[i] == null ? null : r1(conv(curve.cumActual[i] as number)),
     variance:
       curve.cumActual[i] == null
         ? null
-        : Number(((curve.cumActual[i] as number) - curve.cumPlan[i]).toFixed(2)),
+        : r1(conv((curve.cumActual[i] as number) - curve.cumPlan[i])),
   }));
 
   const todayLabel =
@@ -143,15 +160,21 @@ export function TmPlanVsActualCard({
   const actualNow = idxForKpi >= 0 ? (curve.cumActual[idxForKpi] ?? 0) : 0;
   const deltaNow = actualNow - planNow;
 
+  const unitSuffix = isTasks ? " tasks" : "%";
+  const incLabel = isTasks ? "Plan (increment, tasks)" : "Plan (increment, pp)";
+  const incActualLabel = isTasks ? "Actual (increment, tasks)" : "Actual (increment, pp)";
+  const cumPlanLabel = isTasks ? "Plan (cum tasks)" : "Plan (cum %)";
+  const cumActualLabel = isTasks ? "Actual (cum tasks)" : "Actual (cum %)";
+  const varianceLabel = isTasks ? "Δ Actual − Plan (tasks)" : "Δ Actual − Plan (pp)";
+
   const cfg: ChartConfig = {
-    planInc: { label: "Plan (increment)", color: "var(--muted-foreground)" },
-    actualInc: { label: "Actual (increment)", color: "var(--primary)" },
-    cumPlan: { label: "Plan (cum %)", color: "var(--muted-foreground)" },
-    cumActual: { label: "Actual (cum %, estimated)", color: "var(--primary)" },
-    cumActualMeasured: { label: "Actual (cum %, measured)", color: "var(--primary)" },
+    planInc: { label: incLabel, color: "var(--muted-foreground)" },
+    actualInc: { label: incActualLabel, color: "var(--primary)" },
+    cumPlan: { label: cumPlanLabel, color: "var(--muted-foreground)" },
+    cumActual: { label: cumActualLabel, color: "var(--primary)" },
   };
   const varianceCfg: ChartConfig = {
-    variance: { label: "Δ Actual − Plan (pp)", color: "var(--destructive)" },
+    variance: { label: varianceLabel, color: "var(--destructive)" },
   };
 
   const hasData = curve.buckets.length > 0 && scoped.length > 0;
@@ -162,6 +185,7 @@ export function TmPlanVsActualCard({
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-muted-foreground";
   const sign = deltaNow > 0 ? "+" : "";
+  const appliedLabel = `${DIM_LABEL[dim]}: ${ownerKey || "All"} · n = ${n.toLocaleString()} tasks`;
 
   return (
     <Card>
@@ -178,7 +202,7 @@ export function TmPlanVsActualCard({
                 <TrendingUp className="h-4 w-4 text-primary" />
                 <CardTitle className="text-sm">Plan vs Actual — S-Curve</CardTitle>
                 <span className="text-[11px] text-muted-foreground tabular-nums">
-                  {curve.taskCount.toLocaleString()} tasks
+                  {appliedLabel}
                 </span>
               </button>
             </CollapsibleTrigger>
@@ -202,6 +226,25 @@ export function TmPlanVsActualCard({
                   ))}
                 </SelectContent>
               </Select>
+
+              <ToggleGroup
+                type="single"
+                value={unit}
+                onValueChange={(v) => {
+                  if (v === "pct" || v === "tasks") setUnit(v);
+                }}
+                className="gap-1"
+              >
+                {UNIT_OPTIONS.map((o) => (
+                  <ToggleGroupItem
+                    key={o.value}
+                    value={o.value}
+                    className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    {o.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
 
               <ToggleGroup
                 type="single"
@@ -234,21 +277,33 @@ export function TmPlanVsActualCard({
                 <div className="flex flex-wrap items-stretch gap-2 rounded-md border bg-muted/30 px-3 py-2">
                   <div className="flex flex-col gap-0.5 rounded border-l-4 border-l-primary px-3 py-1">
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {ownerKey || `All ${DIM_LABEL[dim]}`} · as of {asOfDate}
+                      {appliedLabel} · as of {asOfDate}
                     </span>
                     <span className="text-xs tabular-nums">
-                      <span className="text-muted-foreground">P</span> {planNow.toFixed(1)}% ·{" "}
-                      <span className="text-muted-foreground">A</span> {actualNow.toFixed(1)}%
+                      <span className="text-muted-foreground">P</span> {conv(planNow).toFixed(1)}
+                      {unitSuffix} · <span className="text-muted-foreground">A</span>{" "}
+                      {conv(actualNow).toFixed(1)}
+                      {unitSuffix}
                     </span>
                     <span className={cn("text-xs font-semibold tabular-nums", accent)}>
                       Δ {sign}
-                      {deltaNow.toFixed(1)}pp
+                      {conv(deltaNow).toFixed(1)}
+                      {isTasks ? " tasks" : "pp"}
                     </span>
                   </div>
                   <div className="flex flex-col justify-center px-3 py-1 text-[10px] leading-relaxed text-muted-foreground">
-                    <span>Solid = actual · Dashed = plan · Thick = measured · Thin = estimated</span>
-                    <span>Tasks in scope: {curve.taskCount.toLocaleString()}</span>
+                    <span>Solid = actual · Dashed = plan</span>
+                    <span>
+                      {isTasks
+                        ? "Tasks = Σ progress (0.4 진행 = 0.4건)"
+                        : "% = 대상 과업 진척률 단순 평균"}
+                    </span>
                   </div>
+                  {curve.excludedCount > 0 && (
+                    <div className="flex items-center rounded border border-destructive/40 bg-destructive/10 px-3 py-1 text-[11px] font-semibold text-destructive">
+                      실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 실적 곡선 제외
+                    </div>
+                  )}
                 </div>
 
                 <ChartContainer config={cfg} className="h-[340px] w-full">
@@ -258,8 +313,8 @@ export function TmPlanVsActualCard({
                     <YAxis
                       yAxisId="cum"
                       tick={{ fontSize: 11 }}
-                      domain={[0, 100]}
-                      tickFormatter={(v) => `${v}%`}
+                      domain={[0, "auto"]}
+                      tickFormatter={(v) => (isTasks ? `${v}` : `${v}%`)}
                     />
                     <YAxis
                       yAxisId="bar"
@@ -287,7 +342,7 @@ export function TmPlanVsActualCard({
                     <Bar
                       yAxisId="bar"
                       dataKey="planInc"
-                      name="Plan (increment)"
+                      name={incLabel}
                       fill="color-mix(in oklab, var(--muted-foreground) 35%, transparent)"
                       barSize={8}
                       hide={hidden.has("planInc")}
@@ -295,7 +350,7 @@ export function TmPlanVsActualCard({
                     <Bar
                       yAxisId="bar"
                       dataKey="actualInc"
-                      name="Actual (increment)"
+                      name={incActualLabel}
                       fill="var(--primary)"
                       barSize={8}
                       hide={hidden.has("actualInc")}
@@ -304,7 +359,7 @@ export function TmPlanVsActualCard({
                       yAxisId="cum"
                       type="monotone"
                       dataKey="cumPlan"
-                      name="Plan (cum %)"
+                      name={cumPlanLabel}
                       stroke="var(--muted-foreground)"
                       strokeDasharray="6 4"
                       strokeWidth={2.5}
@@ -315,23 +370,12 @@ export function TmPlanVsActualCard({
                       yAxisId="cum"
                       type="monotone"
                       dataKey="cumActual"
-                      name="Actual (cum %, estimated)"
-                      stroke="color-mix(in oklab, var(--primary) 55%, transparent)"
-                      strokeWidth={1.5}
-                      dot={false}
-                      connectNulls={false}
-                      hide={hidden.has("cumActual")}
-                    />
-                    <Line
-                      yAxisId="cum"
-                      type="monotone"
-                      dataKey="cumActualMeasured"
-                      name="Actual (cum %, measured)"
+                      name={cumActualLabel}
                       stroke="var(--primary)"
                       strokeWidth={3.5}
                       dot={false}
                       connectNulls={false}
-                      hide={hidden.has("cumActualMeasured")}
+                      hide={hidden.has("cumActual")}
                     />
                   </ComposedChart>
                 </ChartContainer>
@@ -346,7 +390,7 @@ export function TmPlanVsActualCard({
                       <ReferenceLine x={todayLabel} stroke="var(--destructive)" strokeDasharray="4 2" />
                     )}
                     <ReferenceLine y={0} stroke="var(--border)" />
-                    <Bar dataKey="variance" name="Δ Actual − Plan (pp)" barSize={8}>
+                    <Bar dataKey="variance" name={varianceLabel} barSize={8}>
                       {data.map((row, i) => {
                         const v = row.variance as number | null;
                         const fill =
