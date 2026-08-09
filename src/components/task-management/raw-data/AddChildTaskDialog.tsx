@@ -29,6 +29,7 @@ import {
 import { WorkTypeCombo } from "./WorkTypeCombo";
 import { addChildTask } from "@/lib/task-management/hierarchy.functions";
 import { useRclCan } from "@/hooks/useRclCan";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export interface ParentSeed {
   task_no: string;
@@ -67,6 +68,9 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
   const [planEnd, setPlanEnd] = useState("");
 
   const submit = useServerFn(addChildTask);
+  // ⛔ 임시 조치: Work Type 신규 값 생성은 admin 만 가능(비관리자는 기존 값 선택만).
+  const { data: me } = useCurrentUser();
+  const isAdminEditor = !!me?.isAdmin;
   // 담당자 지정 범위 — 서버 `rcl_can_values` 와 동일 근거(`rcl_grants`).
   const { grants } = useRclCan("TM", "write");
   const ownerLocked = !!grants && !grants.other_team && !grants.own_team;
@@ -191,7 +195,7 @@ export function AddChildTaskDialog({ open, onOpenChange, parent, onCreated }: Pr
             <div>
               <Label className="text-xs">Work Type</Label>
               <div className="mt-1">
-                <WorkTypeCombo value={rowType} onChange={setRowType} className="h-9" />
+                <WorkTypeCombo value={rowType} onChange={setRowType} allowNew={isAdminEditor} className="h-9" />
               </div>
             </div>
             <div>

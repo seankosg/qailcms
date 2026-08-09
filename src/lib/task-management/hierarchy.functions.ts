@@ -38,6 +38,38 @@ async function assertRclRow(
 }
 
 /** RCL 정본 — 생성될 행의 값(담당자·팀)에 대한 판정. */
+/**
+ * ⛔ 임시 조치: Work Type(row_type) 신규 값 생성은 admin 만 가능.
+ * 비관리자는 이미 존재하는 값만 지정할 수 있다.
+ */
+async function assertWorkTypeAllowed(
+  context: { supabase: any; userId: string },
+  values: (string | null | undefined)[],
+) {
+  const wanted = Array.from(
+    new Set(values.map((v) => (v ?? "").trim()).filter((v) => v.length > 0)),
+  );
+  if (wanted.length === 0) return;
+  const { data: isAdmin, error: rErr } = await context.supabase.rpc("has_role", {
+    _user_id: context.userId,
+    _role: "admin",
+  });
+  if (rErr) throw new Error(`권한 판정 실패: ${rErr.message}`);
+  if (isAdmin === true) return;
+  const { data: rows, error } = await context.supabase
+    .from("task_management_raw")
+    .select("row_type")
+    .in("row_type", wanted);
+  if (error) throw new Error(error.message);
+  const existing = new Set(((rows ?? []) as any[]).map((r) => String(r.row_type)));
+  const invalid = wanted.filter((v) => !existing.has(v));
+  if (invalid.length > 0) {
+    throw new Error(
+      `권한 없음: Work Type 신규 값은 현재 관리자만 등록할 수 있습니다(임시 조치) — ${invalid.join(", ")}`,
+    );
+  }
+}
+
 async function assertRclValues(
   context: { supabase: any; userId: string },
   values: Record<string, unknown>,
@@ -83,6 +115,7 @@ export const addChildTask = createServerFn({ method: "POST" })
       hdec_eng_name: data.hdec_eng_name ?? null,
       team: parent.team ?? null,
     });
+    await assertWorkTypeAllowed(context, [data.row_type]);
 
     // 2) 채번: DB advisory lock 기반 RPC (경합 안전)
     const { data: allocated, error: allocErr } = await admin.rpc("allocate_task_no", {
@@ -231,6 +264,10 @@ export const addMainTaskWithSubs = createServerFn({ method: "POST" })
         `권한 없음: Sub Task 담당자 '${s.hdec_pic_name}' 는 등록 범위를 벗어납니다`,
       );
     }
+    await assertWorkTypeAllowed(context, [
+      data.main.row_type,
+      ...data.subs.map((s) => s.row_type),
+    ]);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const admin = supabaseAdmin as any;

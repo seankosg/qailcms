@@ -62,6 +62,8 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
   const { data: me } = useCurrentUser();
   const canCreate = !!me && !me.isGuest && !me.isSuperGuest;
   const roleLocked = !!me && (me.isUser || me.isDSuperUser) && !me.isSeniorUser && !me.isAdmin && !me.isSuperUser;
+  // ⛔ 임시 조치: Work Type 신규 값 생성은 admin 만 가능(비관리자는 기존 값 선택만).
+  const isAdminEditor = !!me?.isAdmin;
   const lockedPic = roleLocked && me?.isUser ? (me.hdec_pic_name ?? "") : "";
   const lockedTeam = roleLocked ? (me?.team ?? "") : "";
   const { data: teamOptions } = useTeamOptions();
@@ -314,7 +316,7 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
                 </Select>
               </Field>
               <Field label={<>Work Type {optHint}</>}>
-                <WorkTypeCombo value={rowType} onChange={setRowType} />
+                <WorkTypeCombo value={rowType} onChange={setRowType} allowNew={isAdminEditor} />
               </Field>
               <ReadOnlyField label="P.Start (Sub 자동 롤업)" value={rollup.plan_start || "—"} />
               <ReadOnlyField label="P.Finish (Sub 자동 롤업)" value={rollup.plan_end || "—"} />
@@ -353,6 +355,7 @@ export function AddMainTaskDialog({ open, onOpenChange, onCreated, defaultDiscip
                       <WorkTypeCombo
                         value={s.row_type}
                         onChange={(v) => updateSub(i, { row_type: v })}
+                        allowNew={isAdminEditor}
                         allowEmpty={false}
                         invalid={!s.row_type.trim()}
                       />
