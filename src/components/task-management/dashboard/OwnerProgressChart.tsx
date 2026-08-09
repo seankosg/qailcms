@@ -31,7 +31,10 @@ interface Props {
   thresholds?: TaskThresholds;
   /** 표시할 상위 그룹 수 (diffPp 오름차순 = 가장 뒤처진 순) */
   limit?: number;
+  /** 제목 옆에 표시할 선택된 팀/사용자 라벨 */
+  titleSuffix?: string;
 }
+
 
 /**
  * Team / Individual Progress 차트.
