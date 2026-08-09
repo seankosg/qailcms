@@ -25,7 +25,10 @@ export function useSnagDashboardMatrix(plot: PlotKey, teams: TeamKey[], asOfDate
         status_raw: r.status_raw ?? null,
         cnt: Number(r.cnt) || 0,
         rect_cnt: Number(r.rect_cnt) || 0,
+        pre_cnt: Number(r.pre_cnt) || 0,
+        dar_cnt: Number(r.dar_cnt) || 0,
         closed_cnt: Number(r.closed_cnt) || 0,
+        ho_cnt: Number(r.ho_cnt) || 0,
       })) as MatrixRawRow[];
     },
     staleTime: 30_000,

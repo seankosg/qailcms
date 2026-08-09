@@ -286,6 +286,9 @@ export function DeSnagDashboardPage() {
           else if (m === "rectified") p.status = "Rectified";
           else if (m === "reopen") p.status = "Re-Opened";
           else if (m === "closed") p.status = "Closed";
+          else if (m === "pre") p.dateField = "actual_pre_inspection_date";
+          else if (m === "dar") p.dateField = "actual_dar_inspection_date";
+          else if (m === "ho") p.dateField = "actual_ho_date";
           goRaw(p);
         }}
       />
@@ -362,7 +365,7 @@ export function DeSnagDashboardPage() {
           엑셀 다운로드
         </Button>
         <span className="text-[11px] text-muted-foreground">
-          Rect% · Closed% = 같은 팀의 Issued 대비. 팀별 최저 비율이 차상위보다 15%p 이상 낮으면 병목 강조.
+          Rect% · Pre-Ins% · DAR-Ins% · Closed% · H/O% = 같은 팀의 Issued 대비. 팀별 최저 비율이 차상위보다 15%p 이상 낮으면 병목 강조.
         </span>
       </div>
 
@@ -379,7 +382,7 @@ export function DeSnagDashboardPage() {
       </div>
 
       <p className="text-[10px] text-muted-foreground">
-        각 셀 = Room Group × (Issued · Rect · Closed) × (Elec · Mech · Arch). Rect/Closed 는 정본(자기 실적일 ≤ 기준일) 기준.
+        각 셀 = Room Group × (Issued · Rect · Pre-Ins · DAR-Ins · Closed · H/O) × (Elec · Mech · Arch). 스테이지 값은 정본(자기 실적일 ≤ 기준일) 기준.
       </p>
     </div>
   );

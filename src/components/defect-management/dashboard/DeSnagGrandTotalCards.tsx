@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Stats } from "@/lib/defect-management/dashboard-shape";
 
-export type MetricSlot = "issued" | "open" | "rectified" | "reopen" | "closed";
+export type MetricSlot = "issued" | "open" | "rectified" | "reopen" | "closed" | "pre" | "dar" | "ho";
 
 type Tone = {
   border: string;
@@ -46,6 +46,30 @@ const TONES: Record<MetricSlot, Tone> = {
     label: "text-rose-700/80 dark:text-rose-300/80",
     barTrack: "bg-rose-500/15",
     barFill: "bg-rose-500",
+  },
+  pre: {
+    border: "border-indigo-500/40",
+    bg: "bg-indigo-500/10",
+    value: "text-indigo-600 dark:text-indigo-400",
+    label: "text-indigo-700/80 dark:text-indigo-300/80",
+    barTrack: "bg-indigo-500/15",
+    barFill: "bg-indigo-500",
+  },
+  dar: {
+    border: "border-violet-500/40",
+    bg: "bg-violet-500/10",
+    value: "text-violet-600 dark:text-violet-400",
+    label: "text-violet-700/80 dark:text-violet-300/80",
+    barTrack: "bg-violet-500/15",
+    barFill: "bg-violet-500",
+  },
+  ho: {
+    border: "border-teal-500/40",
+    bg: "bg-teal-500/10",
+    value: "text-teal-600 dark:text-teal-400",
+    label: "text-teal-700/80 dark:text-teal-300/80",
+    barTrack: "bg-teal-500/15",
+    barFill: "bg-teal-500",
   },
   closed: {
     border: "border-emerald-400/40",
@@ -132,7 +156,7 @@ export function DeSnagGrandTotalCards({
   onMetric: (m: MetricSlot) => void;
   onAll: () => void;
 }) {
-  const { issued, open, rectified, reopen, closed } = stats;
+  const { issued, open, rectified, reopen, closed, preIns, darIns, ho } = stats;
   const ratio = (v: number) => (issued > 0 ? (v / issued) * 100 : null);
   const pending = open + reopen;
   const pendingPct = issued > 0 ? Math.round((pending / issued) * 100) : 0;
@@ -163,7 +187,7 @@ export function DeSnagGrandTotalCards({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8">
         <KpiCard
           slot="issued"
           label="Issued"
@@ -197,12 +221,36 @@ export function DeSnagGrandTotalCards({
           onClick={() => onMetric("rectified")}
         />
         <KpiCard
+          slot="pre"
+          label="Pre-Ins"
+          value={preIns}
+          pct={ratio(preIns)}
+          showBar
+          onClick={() => onMetric("pre")}
+        />
+        <KpiCard
+          slot="dar"
+          label="DAR-Ins"
+          value={darIns}
+          pct={ratio(darIns)}
+          showBar
+          onClick={() => onMetric("dar")}
+        />
+        <KpiCard
           slot="closed"
           label="Closed"
           value={closed}
           pct={ratio(closed)}
           showBar
           onClick={() => onMetric("closed")}
+        />
+        <KpiCard
+          slot="ho"
+          label="H/O"
+          value={ho}
+          pct={ratio(ho)}
+          showBar
+          onClick={() => onMetric("ho")}
         />
       </div>
     </section>

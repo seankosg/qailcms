@@ -40,6 +40,13 @@ const STATUS_META: Record<
 
 const SLOT_ORDER: StatusSlot[] = ["open", "reopen", "rectified", "closed"];
 
+/** 실적일 기준 스테이지 진척 (Pre-Ins · DAR-Ins · H/O) */
+const STAGE_META: Array<{ key: "preIns" | "darIns" | "ho"; label: string; text: string; dateField: string }> = [
+  { key: "preIns", label: "Pre-Ins", text: "text-indigo-600 dark:text-indigo-400", dateField: "actual_pre_inspection_date" },
+  { key: "darIns", label: "DAR-Ins", text: "text-violet-600 dark:text-violet-400", dateField: "actual_dar_inspection_date" },
+  { key: "ho", label: "H/O", text: "text-teal-600 dark:text-teal-400", dateField: "actual_ho_date" },
+];
+
 function StackedBar({
   stats,
   onSegment,
@@ -188,6 +195,29 @@ export function DeSnagRoomGroupCards({
                       }
                     />
                   ))}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/50 pt-1.5">
+                  {STAGE_META.map((m) => {
+                    const c = stats[m.key];
+                    const pct = stats.issued > 0 ? Math.round((c / stats.issued) * 100) : 0;
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigate({ roomGroup: rg, dateField: m.dateField });
+                        }}
+                        className="flex items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted/60"
+                      >
+                        <span className="text-[11px] font-medium text-muted-foreground">{m.label}</span>
+                        <span className={cn("text-xs font-semibold tabular-nums", m.text)}>
+                          {c.toLocaleString()}
+                        </span>
+                        <span className="text-[11px] tabular-nums text-muted-foreground">· {pct}%</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
