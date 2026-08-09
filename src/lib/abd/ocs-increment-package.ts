@@ -166,7 +166,45 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
   }
   const raw = await file.arrayBuffer();
   const packageSha = await hashBytes(raw);
-  const zip = await JSZip.loadAsync(raw);
+  const sig = new Uint8Array(raw.slice(0, 4));
+  if (!(sig[0] === 0x50 && sig[1] === 0x4b)) {
+    throw new Error("ZIP 파일이 아닙니다 (ZIP signature 불일치).");
+  }
+  let zip: JSZip;
+  try {
+    zip = await JSZip.loadAsync(raw);
+  } catch (e) {
+    throw new Error(`ZIP 을 열 수 없습니다: ${(e as Error).message}`);
+  }
+
+  // ZIP 구조 보안 검사 (path traversal · 제어문자 · 대소문자 충돌 · 규모 상한)
+  const entries = Object.values(zip.files).filter((f) => !f.dir);
+  if (entries.length > ZIP_LIMITS.maxEntries) {
+    blockers.push(`ZIP entry 수 상한 초과: ${entries.length} > ${ZIP_LIMITS.maxEntries}`);
+  }
+  const lowerSeen = new Map<string, string>();
+  for (const e of entries) {
+    blockers.push(...zipPathViolations(e.name));
+    const prev = lowerSeen.get(e.name.toLowerCase());
+    if (prev && prev !== e.name) blockers.push(`대소문자만 다른 충돌 경로: ${prev} / ${e.name}`);
+    lowerSeen.set(e.name.toLowerCase(), e.name);
+  }
+  if (blockers.some((b) => b.includes("경로"))) {
+    return {
+      file_name: file.name,
+      file_size: file.size,
+      package_sha256: packageSha,
+      manifest: parseManifest({}),
+      atomic: parseV3Atomic({ comments: [] }),
+      response: parseV3ResponseMapping({}),
+      policy: parseV3Policy({}),
+      sourceFiles: [],
+      images: [],
+      imageMeta: [],
+      verifiedFiles: 0,
+      blockers,
+    };
+  }
 
   for (const name of REQUIRED_ENTRIES) {
     if (!zip.file(name)) blockers.push(`패키지에 ${name} 이 없습니다.`);
@@ -175,6 +213,7 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
   if (!manifestFile) {
     return {
       file_name: file.name,
+      file_size: file.size,
       package_sha256: packageSha,
       manifest: parseManifest({}),
       atomic: parseV3Atomic({ comments: [] }),
@@ -182,12 +221,39 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
       policy: parseV3Policy({}),
       sourceFiles: [],
       images: [],
+      imageMeta: [],
       verifiedFiles: 0,
       blockers,
     };
   }
 
-  const manifest = parseManifest(JSON.parse(await manifestFile.async("string")));
+  let manifestJson: unknown = {};
+  try {
+    manifestJson = JSON.parse(await manifestFile.async("string"));
+  } catch (e) {
+    throw new Error(`manifest.json 파싱 실패: ${(e as Error).message}`);
+  }
+  const manifest = parseManifest(manifestJson);
+
+  // manifest 경로 계약 — 중복/대소문자 충돌/보안 위반
+  const manifestSeen = new Map<string, string>();
+  for (const f of manifest.files) {
+    blockers.push(...zipPathViolations(f.relative_path));
+    const key = f.relative_path.toLowerCase();
+    if (manifestSeen.has(key)) {
+      blockers.push(`manifest 중복 relative_path: ${f.relative_path}`);
+    }
+    manifestSeen.set(key, f.relative_path);
+  }
+  // manifest 에 없는 source/ · images/ 파일 금지
+  for (const e of entries) {
+    if (
+      (e.name.startsWith("source/") || e.name.startsWith("images/")) &&
+      !manifestSeen.has(e.name.toLowerCase())
+    ) {
+      blockers.push(`manifest 에 없는 패키지 파일: ${e.name}`);
+    }
+  }
   if (manifest.schema_version !== INCREMENT_SCHEMA_VERSION) {
     blockers.push(
       `schema_version 불일치: ${manifest.schema_version || "(없음)"} ≠ ${INCREMENT_SCHEMA_VERSION}`,
@@ -207,11 +273,25 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
   // 내부 파일 SHA-256 · byte size 전수 검증
   const bins = new Map<string, PackageBinary>();
   let verified = 0;
+  let totalUncompressed = 0;
   for (const entry of manifest.files) {
     const zf = zip.file(entry.relative_path);
     if (!zf) {
       blockers.push(`매니페스트 경로가 패키지에 없습니다: ${entry.relative_path}`);
       continue;
+    }
+    if (entry.byte_size > ZIP_LIMITS.maxSingleFileBytes) {
+      blockers.push(
+        `단일 파일 크기 상한 초과: ${entry.relative_path} (${entry.byte_size} > ${ZIP_LIMITS.maxSingleFileBytes})`,
+      );
+      continue;
+    }
+    totalUncompressed += entry.byte_size;
+    if (totalUncompressed > ZIP_LIMITS.maxTotalUncompressedBytes) {
+      blockers.push(
+        `총 압축해제 크기 상한 초과: > ${ZIP_LIMITS.maxTotalUncompressedBytes} bytes (ZIP bomb 방어)`,
+      );
+      break;
     }
     const bytes = await zf.async("arraybuffer");
     const sha = await hashBytes(bytes);
@@ -260,8 +340,25 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
   const sourceFiles = [...bins.values()].filter((b) => b.relative_path.startsWith("source/"));
   const images = [...bins.values()].filter((b) => b.relative_path.startsWith("images/"));
 
+  if (atomic.attachment_invalid_rows.length > 0) {
+    blockers.push(
+      `attachment 계약 오류 ${atomic.attachment_invalid_rows.length}건: ${atomic.attachment_invalid_rows
+        .slice(0, 3)
+        .map((r) => r.reason)
+        .join(" / ")}`,
+    );
+  }
+  if (atomic.duplicated_attachment_ids.length > 0)
+    blockers.push(`중복 source_attachment_id ${atomic.duplicated_attachment_ids.length}건`);
+  if (atomic.duplicated_attachment_paths.length > 0)
+    blockers.push(`중복 attachment storage_path ${atomic.duplicated_attachment_paths.length}건`);
+
+  const { imageMeta, blockers: imgBlockers } = buildImageMeta(atomic.attachments, images);
+  blockers.push(...imgBlockers);
+
   return {
     file_name: file.name,
+    file_size: file.size,
     package_sha256: packageSha,
     manifest,
     atomic,
@@ -269,6 +366,7 @@ export async function readIncrementPackage(file: File): Promise<IncrementPackage
     policy,
     sourceFiles,
     images,
+    imageMeta,
     verifiedFiles: verified,
     blockers,
   };
