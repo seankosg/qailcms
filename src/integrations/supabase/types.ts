@@ -7580,7 +7580,7 @@ export type Database = {
         Returns: number
       }
       recalc_task_progress_charts: {
-        Args: { _discipline?: string }
+        Args: { _discipline?: string; _task_no?: string }
         Returns: number
       }
       resolve_login_email: { Args: { _login_id: string }; Returns: string }
