@@ -590,6 +590,9 @@ export function toDefectFieldName(
   for (const f of EXTRA_REIMPORT_FIELDS) {
     if (normalizeHeader(f) === asIs) return f;
   }
+  // 확장 필드 별칭 (하이픈/슬래시 표기)
+  const extraAlias = EXTRA_FIELD_ALIASES[norm];
+  if (extraAlias) return extraAlias;
   // canonical
   const canonical = CANONICAL_HEADERS[norm];
   if (canonical) return canonical;
