@@ -127,7 +127,7 @@ export function TmKpiAnalysisPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <div className="sticky top-0 z-30 -mx-4 -mt-4 flex flex-col gap-3 bg-background/95 px-4 pt-4 pb-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b">
+      <div className="sticky top-0 z-30 -mx-4 -mt-4 flex flex-col gap-3 bg-background px-4 pt-4 pb-3 border-b shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <Link
