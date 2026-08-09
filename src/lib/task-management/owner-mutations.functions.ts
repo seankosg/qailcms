@@ -55,8 +55,8 @@ export const updateTaskOwnerField = createServerFn({ method: "POST" })
     if (!row) throw new Error("대상 행을 찾을 수 없습니다.");
     await assertRcl(context.supabase, context.userId, data.id, "write");
 
-    // ⛔ 임시 조치: Milestone / Work Type(row_type) 은 admin 등급만 수정 가능.
-    if (data.field === "milestone" || data.field === "row_type") {
+    // ⛔ 임시 조치: Milestone 은 admin 등급만 수정 가능.
+    if (data.field === "milestone") {
       const { data: isAdmin, error: rErr } = await (context.supabase as any).rpc("has_role", {
         _user_id: context.userId,
         _role: "admin",
@@ -64,10 +64,31 @@ export const updateTaskOwnerField = createServerFn({ method: "POST" })
       if (rErr) throw new Error(`권한 판정 실패: ${rErr.message}`);
       if (isAdmin !== true) {
         throw new Error(
-          data.field === "milestone"
-            ? "권한 없음: Milestone 은 현재 관리자만 수정할 수 있습니다(임시 조치)."
-            : "권한 없음: Work Type 은 현재 관리자만 수정할 수 있습니다(임시 조치).",
+          "권한 없음: Milestone 은 현재 관리자만 수정할 수 있습니다(임시 조치).",
         );
+      }
+    }
+
+    // Work Type(row_type): 권한 있는 사용자는 수정 가능하되 값은 기존 범주 내여야 한다.
+    // 신규 값 등록은 admin 만 허용.
+    if (data.field === "row_type") {
+      const v = typeof data.value === "string" ? data.value.trim() : data.value;
+      if (v) {
+        const { data: isAdmin } = await (context.supabase as any).rpc("has_role", {
+          _user_id: context.userId,
+          _role: "admin",
+        });
+        if (isAdmin !== true) {
+          const { data: rows, error: qErr } = await (context.supabase as any)
+            .from("task_management_raw")
+            .select("row_type")
+            .eq("row_type", v)
+            .limit(1);
+          if (qErr) throw new Error(qErr.message);
+          if (!rows || rows.length === 0) {
+            throw new Error("Work Type을 범주내에서 택하시오");
+          }
+        }
       }
     }
 

@@ -633,6 +633,22 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       canImportMilestone = (roleRows ?? []).some((r: { role: string }) => r.role === "admin");
     }
 
+    // Work Type(row_type) 허용 범주 — 기존 DB 값 ∪ 코드 기본값.
+    // admin 은 신규 값 등록 가능하므로 검증을 건너뛴다.
+    const isAdminImporter = canImportMilestone;
+    const allowedWorkTypes = new Set<string>();
+    if (!isAdminImporter) {
+      const { data: wtRows } = await (supabase as any)
+        .from("task_management_raw")
+        .select("row_type")
+        .not("row_type", "is", null)
+        .limit(20000);
+      for (const r of (wtRows ?? []) as Array<{ row_type: string | null }>) {
+        const v = (r.row_type ?? "").trim();
+        if (v) allowedWorkTypes.add(v);
+      }
+    }
+
     for (const f of ready) {
       if (cancelRequestedRef.current) {
         setFiles((cur) =>
@@ -987,6 +1003,31 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         );
       }
 
+      // Work Type 범주 검증 — 기존에 없는 값은 그 행 자체를 임포트하지 않는다.
+      const workTypeRejects: { task_no: string; detail: string }[] = [];
+      if (!isAdminImporter) {
+        for (let i = applied.length - 1; i >= 0; i--) {
+          const p = applied[i] as unknown as Record<string, unknown>;
+          const raw = p["row_type"];
+          const v = raw == null ? "" : String(raw).trim();
+          if (!v) continue;
+          if (!allowedWorkTypes.has(v)) {
+            workTypeRejects.push({ task_no: String(p["task_no"] ?? ""), detail: v });
+            applied.splice(i, 1);
+          }
+        }
+      }
+      if (workTypeRejects.length > 0) {
+        const sample = workTypeRejects
+          .slice(0, 3)
+          .map((r) => `${r.task_no}(${r.detail})`)
+          .join(", ");
+        toast.error(
+          `${f.name}: Work Type을 범주내에서 택하시오 — ${workTypeRejects.length}건 임포트되지 않았습니다. 해당 행: ${sample}${workTypeRejects.length > 3 ? " 외" : ""}`,
+          { duration: 12000 },
+        );
+      }
+
       const payloads = applied.map((p) => {
         const isParent = p.level === "main";
         const stripParent = isParent && rollupMode === "auto";
@@ -1084,6 +1125,19 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
         });
       }
       rejected += dateRangeRejects.length;
+      for (const r of workTypeRejects) {
+        rejectedByTaskNo.set(r.task_no, {
+          reason_code: "WORK_TYPE_INVALID",
+          reason_detail: `Work Type을 범주내에서 택하시오 (입력값: ${r.detail})`,
+        });
+        importErrors.push({
+          message: `Work Type을 범주내에서 택하시오 — ${r.task_no}: ${r.detail}`,
+          code: "WORK_TYPE_INVALID",
+          batch: 0,
+          sampleTaskNo: r.task_no,
+        });
+      }
+      rejected += workTypeRejects.length;
 
       try {
         for (let i = 0; i < payloads.length; i += INSERT_CHUNK) {

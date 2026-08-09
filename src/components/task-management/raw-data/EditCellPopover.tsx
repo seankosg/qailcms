@@ -15,6 +15,7 @@ import { Loader2 } from "lucide-react";
 import type { TmColumnDef } from "@/lib/task-management/columns";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
 import { WorkTypeCombo } from "./WorkTypeCombo";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface Props {
   rowId: string;
@@ -46,6 +47,9 @@ export function EditCellPopover({
   const [busy, setBusy] = useState(false);
   const resolveLabel = useTmColumnLabel();
   const displayLabel = resolveLabel(column.key);
+  // Work Type 신규 값 추가는 admin 만. 비관리자는 기존 범주에서 선택.
+  const { data: me } = useCurrentUser();
+  const isAdminEditor = !!me?.isAdmin;
 
   if (!column.editable || !canEdit) return <>{children}</>;
 
@@ -132,6 +136,7 @@ export function EditCellPopover({
           <WorkTypeCombo
             value={val === "__BLANK__" ? "" : val}
             onChange={(v) => setVal(v)}
+            allowNew={isAdminEditor}
             className="h-8 text-xs"
           />
         )}

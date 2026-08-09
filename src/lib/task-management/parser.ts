@@ -115,11 +115,10 @@ export const TASK_TARGET_FIELDS = [
 export type TaskTargetField = (typeof TASK_TARGET_FIELDS)[number];
 
 /**
- * 임시 조치(2026-08-08, 사용자 지시): TM Work Type(row_type) 컬럼은 임포트 매핑을
- * 일시 제한한다. 헤더가 있어도 매핑하지 않고 값을 반영하지 않는다.
- * 해제 시 이 상수를 false 로 바꾸면 원복된다(다른 로직 변경 없음).
+ * 임포트 매핑이 차단된 필드 목록. 2026-08-09 사용자 지시로 Work Type(row_type)
+ * 차단은 해제되었다(권한 기반 편집/임포트 허용 + 범주 검증으로 대체).
  */
-export const TM_IMPORT_BLOCKED_FIELDS = new Set<string>(["row_type"]);
+export const TM_IMPORT_BLOCKED_FIELDS = new Set<string>([]);
 
 /**
  * canonical alias table. `pick()`가 이 표를 사용하며,
@@ -618,13 +617,6 @@ export async function parseTaskManagementExcel(
   clampField("hdec_pic_name", "hdec_pic_name");
   clampField("hdec_eng_name", "hdec_eng_name");
   clampField("row_type", "row_type");
-  // 임시 제한: Work Type(row_type) 은 헤더가 매핑되어도 임포트에서 제외한다.
-  if (TM_IMPORT_BLOCKED_FIELDS.has("row_type") && cols.row_type) {
-    cols.row_type = 0;
-    warnings.push(
-      "Work Type(유형) 컬럼은 현재 임포트 매핑이 임시로 제한되어 있습니다 — 이번 임포트에서 값이 반영되지 않습니다.",
-    );
-  }
   clampField("status_manual", "status_manual");
   clampField("plan_start", "plan_start");
   clampField("plan_end", "plan_end");
