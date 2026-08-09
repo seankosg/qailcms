@@ -319,8 +319,6 @@ export function TaskDetailPage() {
                       effectiveColumn = { ...c, editable: true, editorType: ed.editorType, options: ed.options };
                     }
                   }
-                  // ⛔ 임시 조치: Work Type(row_type) 은 admin 만 수정 가능.
-                  if (c.key === "row_type") effectiveCanEdit = effectiveCanEdit && isAdminEditor;
                   const editable =
                     !!effectiveColumn.editable &&
                     !!effectiveColumn.editorType &&
