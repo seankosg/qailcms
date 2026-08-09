@@ -2082,31 +2082,55 @@ export type Database = {
           atomic_comment_id: string | null
           attachment_id: string
           attachment_scope: string | null
+          byte_size: number | null
           comment_group_id: string | null
           comment_id: string | null
+          content_hash: string | null
           created_at: string
+          height: number | null
+          image_format: string | null
+          mime_type: string | null
+          source_image_index: number | null
           source_parent_comment_id: string | null
           stage_run_id: string
+          storage_path: string | null
+          width: number | null
         }
         Insert: {
           atomic_comment_id?: string | null
           attachment_id: string
           attachment_scope?: string | null
+          byte_size?: number | null
           comment_group_id?: string | null
           comment_id?: string | null
+          content_hash?: string | null
           created_at?: string
+          height?: number | null
+          image_format?: string | null
+          mime_type?: string | null
+          source_image_index?: number | null
           source_parent_comment_id?: string | null
           stage_run_id: string
+          storage_path?: string | null
+          width?: number | null
         }
         Update: {
           atomic_comment_id?: string | null
           attachment_id?: string
           attachment_scope?: string | null
+          byte_size?: number | null
           comment_group_id?: string | null
           comment_id?: string | null
+          content_hash?: string | null
           created_at?: string
+          height?: number | null
+          image_format?: string | null
+          mime_type?: string | null
+          source_image_index?: number | null
           source_parent_comment_id?: string | null
           stage_run_id?: string
+          storage_path?: string | null
+          width?: number | null
         }
         Relationships: []
       }
@@ -6812,6 +6836,7 @@ export type Database = {
         Args: { p_import_log_id: string; p_rows: Json }
         Returns: Json
       }
+      abd_ocs_inc_attachment_stats: { Args: { p_run: string }; Returns: Json }
       abd_ocs_inc_baseline: {
         Args: { p_base_import_run_id?: string }
         Returns: Json
@@ -6823,6 +6848,7 @@ export type Database = {
       abd_ocs_inc_import: {
         Args: {
           p_allow_retire?: boolean
+          p_image_meta?: Json
           p_import_log_id: string
           p_run: string
           p_source_files?: Json
@@ -6840,6 +6866,10 @@ export type Database = {
         Returns: Json
       }
       abd_ocs_inc_outside_hash: { Args: { p_run: string }; Returns: Json }
+      abd_ocs_inc_register_images: {
+        Args: { p_image_meta: Json; p_run: string }
+        Returns: Json
+      }
       abd_ocs_inc_scope: {
         Args: { p_run: string }
         Returns: {

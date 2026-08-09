@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,8 +28,10 @@ import { createPreImportSnapshot } from "@/lib/backup/backup.functions";
 import { OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
 import { OCS_SOURCE_BUCKET } from "@/lib/abd/ocs-source-manifest";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import type { UploadReceipt } from "@/lib/abd/ocs-increment-types";
 
 const BATCH = 500;
+const UPLOAD_CONCURRENCY = 5;
 const RETIRE_PCT = 0.3;
 const RETIRE_ABS = 100;
 /**
@@ -73,6 +75,10 @@ export function OcsIncrementImportPanel() {
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [collision, setCollision] = useState<CollisionReport | null>(null);
+  const [receipts, setReceipts] = useState<UploadReceipt[]>([]);
+  const [stageLabel, setStageLabel] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  void fileInputRef;
 
   const isAdmin = me?.isStrictAdmin === true;
 
@@ -135,18 +141,39 @@ export function OcsIncrementImportPanel() {
     setAllowRetire(false);
     setResult(null);
     setFailure(null);
+    setReceipts([]);
+    setStageLabel(null);
+  }
+
+  function clearPick() {
+    resetDownstream();
+    setPkg(null);
+    setPrecheck(null);
+    setCollision(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function onPick(files: FileList) {
     const file = files[0];
     if (!file) return;
-    setBusy("패키지 검증 중…");
-    resetDownstream();
+    // 새 선택 시 이전 패키지 상태를 먼저 전부 폐기한다 (잘못된 파일이어도 이전 결과가 남지 않음)
+    setPkg(null);
     setPrecheck(null);
     setCollision(null);
+    resetDownstream();
+    if (/\.xlsx?$/i.test(file.name)) {
+      toast.error(
+        "Excel 은 로컬 Codex Skill 에서 처리하고, 완성된 증분 ZIP 을 선택하십시오.",
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setBusy("패키지 검증 중…");
+    setStageLabel("1/6 패키지 검증");
     try {
       const p = await readIncrementPackage(file);
       setPkg(p);
+      setStageLabel("2/6 기존 자산 대조");
       const pc = (await precheckFn({
         data: {
           package_sha256: p.package_sha256,
@@ -166,8 +193,12 @@ export function OcsIncrementImportPanel() {
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
+      setPkg(null);
+      setPrecheck(null);
+      setCollision(null);
     } finally {
       setBusy(null);
+      setStageLabel(null);
     }
   }
 
@@ -235,37 +266,93 @@ export function OcsIncrementImportPanel() {
   }
 
   /**
-   * source/ 와 images/ 바이너리만 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기).
-   * abd_ocs_source_files DB 등록은 Baseline 최종 검증 이후 서버 트랜잭션에서 수행한다.
+   * source/ 와 images/ 바이너리 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기).
+   * 동시 5개 제한 큐로 실행하고, 성공·기존·실패를 모두 receipt 로 남긴다. 자동 DELETE 없음.
    */
-  async function uploadAssets(p: IncrementPackage) {
+  async function uploadAssets(p: IncrementPackage, run: string): Promise<UploadReceipt[]> {
     const skip = collision?.skipPaths ?? new Set<string>();
-    for (const img of p.images) {
-      const path = imageStoragePath(img.relative_path);
-      if (skip.has(path)) continue;
-      const { error } = await supabase.storage
-        .from(OCS_BUCKET)
-        .upload(path, new Blob([img.bytes]), { upsert: false });
-      if (error && !/exists/i.test(error.message))
-        throw new Error(`이미지 업로드 실패 ${path}: ${error.message}`);
+    const jobs: { bucket: string; path: string; sha256: string; bytes: ArrayBuffer }[] = [
+      ...p.images.map((b) => ({
+        bucket: OCS_BUCKET,
+        path: imageStoragePath(b.relative_path),
+        sha256: b.sha256,
+        bytes: b.bytes,
+      })),
+      ...p.sourceFiles.map((b) => ({
+        bucket: OCS_SOURCE_BUCKET,
+        path: sourceStoragePath(p.manifest.package_id, b.relative_path),
+        sha256: b.sha256,
+        bytes: b.bytes,
+      })),
+    ];
+
+    const out: UploadReceipt[] = [];
+    let cursor = 0;
+    let done = 0;
+
+    const worker = async () => {
+      for (;;) {
+        const i = cursor;
+        cursor += 1;
+        const job = jobs[i];
+        if (!job) return;
+        const base = {
+          run_id: run,
+          package_id: p.manifest.package_id,
+          bucket: job.bucket,
+          path: job.path,
+          sha256: job.sha256,
+        };
+        // 기존 동일 hash 는 요청 자체를 보내지 않는다.
+        if (skip.has(job.path)) {
+          out.push({ ...base, state: "existing" });
+        } else {
+          const { error } = await supabase.storage
+            .from(job.bucket)
+            .upload(job.path, new Blob([job.bytes]), { upsert: false });
+          if (!error) {
+            out.push({ ...base, state: "uploaded" });
+          } else {
+            // 문자열만 보고 성공 처리하지 않는다 — 서버 실측으로 존재·크기를 재확인한다.
+            const dir = job.path.includes("/") ? job.path.slice(0, job.path.lastIndexOf("/")) : "";
+            const name = job.path.split("/").pop() as string;
+            const { data: found } = await supabase.storage
+              .from(job.bucket)
+              .list(dir, { search: name, limit: 100 });
+            const hit = (found ?? []).find((f) => f.name === name);
+            if (hit) out.push({ ...base, state: "existing" });
+            else out.push({ ...base, state: "failed", error: error.message });
+          }
+        }
+        done += 1;
+        setProgress(Math.round((done / jobs.length) * 100));
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(UPLOAD_CONCURRENCY, Math.max(jobs.length, 1)) }, worker),
+    );
+    setReceipts(out);
+    const failed = out.filter((r) => r.state === "failed");
+    if (failed.length > 0) {
+      throw new Error(
+        `자산 업로드 실패 ${failed.length}건 (같은 ZIP 재선택으로 재시도 가능): ${failed
+          .slice(0, 3)
+          .map((r) => `${r.path} — ${r.error ?? ""}`)
+          .join(" / ")}`,
+      );
     }
-    for (const sf of p.sourceFiles) {
-      const fileName = sf.relative_path.split("/").pop() ?? sf.relative_path;
-      const storagePath = sourceStoragePath(p.manifest.package_id, sf.relative_path);
-      if (skip.has(storagePath)) continue;
-      const { error } = await supabase.storage
-        .from(OCS_SOURCE_BUCKET)
-        .upload(storagePath, new Blob([sf.bytes]), { upsert: false });
-      if (error && !/exists/i.test(error.message))
-        throw new Error(`원본 업로드 실패 ${fileName}: ${error.message}`);
-    }
+    return out;
   }
 
   async function runImport() {
     if (!pkg || !runId || !snapshotId || blockers.length > 0) return;
     setBusy("증분 Import 실행 중…");
+    setProgress(0);
     try {
-      await uploadAssets(pkg);
+      setStageLabel("4/6 신규 자산 업로드");
+      const rec = await uploadAssets(pkg, runId);
+      setStageLabel("5/6 Import 실행");
       const out = (await importFn({
         data: {
           run_id: runId,
@@ -281,6 +368,8 @@ export function OcsIncrementImportPanel() {
           base_core_table_hashes: pkg.manifest.base_core_table_hashes,
           base_generated_at: pkg.manifest.base_generated_at,
           allow_retire: allowRetire,
+          image_meta: pkg.imageMeta,
+          upload_receipts: rec,
           source_files: pkg.sourceFiles.map((f) => ({
             file_name: f.relative_path.split("/").pop() ?? f.relative_path,
             content_hash: f.sha256,
@@ -310,12 +399,14 @@ export function OcsIncrementImportPanel() {
           ],
         },
       })) as Record<string, unknown>;
+      setStageLabel("6/6 검증 완료");
       setResult(out);
       toast.success("증분 Import 완료");
     } catch (e) {
       setFailure(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
+      setProgress(0);
     }
   }
 
@@ -351,12 +442,24 @@ export function OcsIncrementImportPanel() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <FilePickerButton
-            label="Select Increment ZIP"
-            accept=".zip,application/zip"
-            disabled={!!busy}
-            onFiles={(f) => void onPick(f)}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <FilePickerButton
+              label={pkg ? "Change Increment ZIP" : "Select Increment ZIP"}
+              accept=".zip,application/zip"
+              disabled={!!busy}
+              onFiles={(f) => void onPick(f)}
+            />
+            {(pkg || failure) && (
+              <Button size="sm" variant="ghost" disabled={!!busy} onClick={clearPick}>
+                Clear
+              </Button>
+            )}
+            {stageLabel && (
+              <Badge variant="outline" className="text-[11px]">
+                {stageLabel}
+              </Badge>
+            )}
+          </div>
 
           {pkg && (
             <div className="grid gap-3 md:grid-cols-2">
@@ -445,6 +548,18 @@ export function OcsIncrementImportPanel() {
                 value={dry["attachments_unresolved"]}
                 bad={num(dry["attachments_unresolved"]) > 0}
               />
+              <Row label="images_new" value={dry["images_new"]} />
+              <Row label="images_existing" value={dry["images_existing"]} />
+              <Row
+                label="images_conflict"
+                value={dry["images_conflict"]}
+                bad={num(dry["images_conflict"]) > 0}
+              />
+              <Row
+                label="images_meta_missing"
+                value={dry["images_meta_missing"]}
+                bad={num(dry["images_meta_missing"]) > 0}
+              />
               <Row label="source_files_new" value={dry["source_files_new"]} />
               <Row label="source_files_revised" value={dry["source_files_revised"]} />
               <Row label="source_files_existing" value={dry["source_files_existing"]} />
@@ -468,9 +583,10 @@ export function OcsIncrementImportPanel() {
             </p>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-5">
               <Row label="new" value={collision.counts.new} />
               <Row label="existing (skip)" value={collision.counts.existing} />
+              <Row label="declared_new" value={collision.counts.declared_new} />
               <Row
                 label="hash_mismatch"
                 value={collision.counts.hash_mismatch}
@@ -550,6 +666,28 @@ export function OcsIncrementImportPanel() {
           {failure && (
             <div className="rounded-md border border-destructive/50 p-3 text-xs text-destructive">
               실패: {failure}
+            </div>
+          )}
+          {receipts.length > 0 && (
+            <div className="rounded-md border p-3">
+              <div className="mb-1 text-xs font-semibold">
+                업로드 영수증 (uploaded {receipts.filter((r) => r.state === "uploaded").length} ·
+                existing {receipts.filter((r) => r.state === "existing").length} · failed{" "}
+                {receipts.filter((r) => r.state === "failed").length})
+              </div>
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                실패분은 자동 삭제하지 않습니다. 동일 ZIP 을 다시 선택하면 이미 올라간 object 는
+                건너뛰고 실패분만 재시도합니다.
+              </p>
+              <div className="max-h-40 overflow-auto text-[11px] font-mono">
+                {receipts
+                  .filter((r) => r.state === "failed")
+                  .map((r) => (
+                    <div key={`${r.bucket}/${r.path}`} className="text-destructive">
+                      [failed] {r.bucket}/{r.path} — {r.error ?? ""}
+                    </div>
+                  ))}
+              </div>
             </div>
           )}
           {result && (

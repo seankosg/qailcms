@@ -19,3 +19,30 @@ export type AssetRef = {
   path: string;
   sha256: string;
 };
+
+/** 패키지가 선언한 신규 이미지 metadata (앱은 값을 생성하지 않는다) */
+export type ImageMeta = {
+  source_attachment_id: string;
+  storage_path: string;
+  content_hash: string;
+  byte_size: number;
+  width: number | null;
+  height: number | null;
+  image_format: string | null;
+  mime_type: string | null;
+  source_image_index: number | null;
+  source_parent_comment_id: string | null;
+  atomic_comment_id: string | null;
+  attachment_scope: string;
+};
+
+/** 이번 run 의 업로드 영수증 — 실패해도 보존한다. 자동 DELETE 는 하지 않는다. */
+export type UploadReceipt = {
+  run_id: string;
+  package_id: string;
+  bucket: string;
+  path: string;
+  sha256: string;
+  state: "uploaded" | "existing" | "failed";
+  error?: string;
+};
