@@ -23,6 +23,8 @@ import {
   type V3StageKind,
 } from "@/lib/abd/ocs-v3-import.functions";
 import { ocsIncDryRun, ocsIncImport, ocsIncPrecheck } from "@/lib/abd/ocs-increment.functions";
+import { ocsIncVerifyBatch } from "@/lib/abd/ocs-increment-verify.functions";
+import { VERIFY_BATCH_MAX } from "@/lib/abd/ocs-increment-verify";
 import { OcsBaselineCard } from "@/components/abd/ocs/OcsBaselineCard";
 import { createPreImportSnapshot } from "@/lib/backup/backup.functions";
 import { OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
@@ -61,6 +63,7 @@ export function OcsIncrementImportPanel() {
   const precheckFn = useServerFn(ocsIncPrecheck);
   const dryRunFn = useServerFn(ocsIncDryRun);
   const importFn = useServerFn(ocsIncImport);
+  const verifyFn = useServerFn(ocsIncVerifyBatch);
   const snapshotFn = useServerFn(createPreImportSnapshot);
 
   const [pkg, setPkg] = useState<IncrementPackage | null>(null);
@@ -76,6 +79,9 @@ export function OcsIncrementImportPanel() {
   const [failure, setFailure] = useState<string | null>(null);
   const [collision, setCollision] = useState<CollisionReport | null>(null);
   const [receipts, setReceipts] = useState<UploadReceipt[]>([]);
+  const [verifyTotal, setVerifyTotal] = useState(0);
+  const [verifyOk, setVerifyOk] = useState<string[]>([]);
+  const [verifyFailures, setVerifyFailures] = useState<{ path: string; error: string }[]>([]);
   const [stageLabel, setStageLabel] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pickerKey, setPickerKey] = useState(0);
@@ -85,6 +91,8 @@ export function OcsIncrementImportPanel() {
   const retire = num(dry?.["comments_to_retire"]);
   const scopeActive = num(dry?.["scope_existing_active"]);
   const massRetire = dry ? retire > scopeActive * RETIRE_PCT || retire > RETIRE_ABS : false;
+  const verifyPending = verifyTotal > 0 ? verifyTotal - verifyOk.length : 0;
+  const verifyComplete = verifyTotal > 0 && verifyPending === 0;
 
   const blockers = useMemo(() => {
     const out: string[] = [];
@@ -129,9 +137,28 @@ export function OcsIncrementImportPanel() {
       if (massRetire && !allowRetire) out.push(`대량 퇴역 미승인 (${retire}건 · 임계 30% / 100건)`);
     }
     if (!snapshotId) out.push("사전 백업 스냅샷 미완료 (Dry-run 이후 생성분만 인정)");
+    if (!verifyComplete)
+      out.push(
+        verifyTotal === 0
+          ? "신규 자산 업로드 · 서버 실측 검증 미실행"
+          : `서버 실측 검증 미완료 (${verifyOk.length}/${verifyTotal})`,
+      );
     if (!approved) out.push("최종 승인 체크 필요");
     return out;
-  }, [pkg, precheck, dry, snapshotId, approved, massRetire, allowRetire, retire, collision]);
+  }, [
+    pkg,
+    precheck,
+    dry,
+    snapshotId,
+    approved,
+    massRetire,
+    allowRetire,
+    retire,
+    collision,
+    verifyComplete,
+    verifyTotal,
+    verifyOk.length,
+  ]);
 
   function resetDownstream() {
     setRunId(null);
@@ -142,6 +169,9 @@ export function OcsIncrementImportPanel() {
     setResult(null);
     setFailure(null);
     setReceipts([]);
+    setVerifyTotal(0);
+    setVerifyOk([]);
+    setVerifyFailures([]);
     setStageLabel(null);
   }
 
@@ -345,14 +375,75 @@ export function OcsIncrementImportPanel() {
     return out;
   }
 
+  /**
+   * 신규 자산 업로드 → 서버 실측 검증(배치).
+   * 클라이언트 신고 hash 를 믿지 않는다. 서버가 object 를 직접 내려받아 SHA-256/byte_size 를
+   * 실측하고 run_id/package_id 기준 영수증으로 저장한다. 실패분만 재실행 가능.
+   */
+  async function runUploadVerify() {
+    if (!pkg || !runId) return;
+    setBusy("신규 자산 업로드 · 서버 실측 검증 중…");
+    setProgress(0);
+    setFailure(null);
+    try {
+      let rec = receipts;
+      if (rec.length === 0) {
+        setStageLabel("4/6 신규 자산 업로드");
+        rec = await uploadAssets(pkg, runId);
+      }
+
+      const sizeByPath = new Map<string, number>();
+      for (const b of pkg.images) sizeByPath.set(imageStoragePath(b.relative_path), b.byte_size);
+      for (const b of pkg.sourceFiles) {
+        sizeByPath.set(sourceStoragePath(pkg.manifest.package_id, b.relative_path), b.byte_size);
+      }
+
+      const targets = rec.filter((r) => r.state === "uploaded" || r.state === "declared_new");
+      setVerifyTotal(targets.length);
+      const okSet = new Set(verifyOk);
+      const pending = targets.filter((t) => !okSet.has(t.path));
+      setStageLabel(`5/6 서버 실측 검증 (${pending.length}건)`);
+
+      const failures: { path: string; error: string }[] = [];
+      const batches = chunk(pending, VERIFY_BATCH_MAX) as UploadReceipt[][];
+      for (let i = 0; i < batches.length; i += 1) {
+        const items = batches[i]!.map((t) => ({
+          bucket: t.bucket,
+          path: t.path,
+          expected_sha256: t.sha256,
+          expected_byte_size: sizeByPath.get(t.path) ?? 0,
+        }));
+        const out = (await verifyFn({
+          data: { run_id: runId, package_id: pkg.manifest.package_id, items },
+        })) as { failed?: { path: string; error: string | null }[] };
+        const failedPaths = new Set((out.failed ?? []).map((f) => f.path));
+        for (const f of out.failed ?? []) failures.push({ path: f.path, error: f.error ?? "" });
+        for (const it of items) if (!failedPaths.has(it.path)) okSet.add(it.path);
+        setVerifyOk([...okSet]);
+        setProgress(Math.round(((i + 1) / batches.length) * 100));
+      }
+      setVerifyFailures(failures);
+      if (failures.length > 0) {
+        toast.error(`서버 실측 검증 실패 ${failures.length}건 — 실패분만 재실행하십시오.`);
+      } else {
+        toast.success(`서버 실측 검증 완료 — ${targets.length}건`);
+      }
+    } catch (e) {
+      setFailure(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+      setProgress(0);
+      setStageLabel(null);
+    }
+  }
+
   async function runImport() {
     if (!pkg || !runId || !snapshotId || blockers.length > 0) return;
     setBusy("증분 Import 실행 중…");
     setProgress(0);
     try {
-      setStageLabel("4/6 신규 자산 업로드");
-      const rec = await uploadAssets(pkg, runId);
-      setStageLabel("5/6 Import 실행");
+      setStageLabel("6/6 Import 실행");
+      const rec = receipts;
       const out = (await importFn({
         data: {
           run_id: runId,
@@ -504,6 +595,23 @@ export function OcsIncrementImportPanel() {
             >
               Create Pre-import Snapshot
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!pkg || !!busy || !!result}
+              onClick={() => void runUploadVerify()}
+            >
+              {verifyFailures.length > 0 ? "Retry Failed Verification" : "Upload & Verify Assets"}
+            </Button>
+            {verifyTotal > 0 && (
+              <Badge
+                variant="outline"
+                className={`gap-1 text-[11px] ${verifyComplete ? "" : "text-destructive"}`}
+              >
+                {verifyComplete && <CheckCircle2 className="h-3 w-3 text-emerald-600" />}
+                server-verified {verifyOk.length}/{verifyTotal}
+              </Badge>
+            )}
             {snapshotId && (
               <Badge variant="outline" className="gap-1 text-[11px]">
                 <CheckCircle2 className="h-3 w-3 text-emerald-600" /> snapshot{" "}
@@ -691,6 +799,27 @@ export function OcsIncrementImportPanel() {
                     </div>
                   ))}
               </div>
+            </div>
+          )}
+          {verifyTotal > 0 && (
+            <div className="rounded-md border p-3">
+              <div className="mb-1 text-xs font-semibold">
+                서버 실측 검증 (ok {verifyOk.length} / {verifyTotal} · 배치 {VERIFY_BATCH_MAX}건 ·
+                동시성 5)
+              </div>
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                서버가 각 object 를 직접 내려받아 SHA-256·byte_size 를 실측합니다. 최종 Import 는
+                클라이언트 영수증이 아니라 이 서버 검증 영수증을 정본으로 사용합니다.
+              </p>
+              {verifyFailures.length > 0 && (
+                <div className="max-h-40 overflow-auto font-mono text-[11px] text-destructive">
+                  {verifyFailures.map((f) => (
+                    <div key={f.path}>
+                      [verify-failed] {f.path} — {f.error}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {result && (

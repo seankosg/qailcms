@@ -1868,6 +1868,54 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_ocs_inc_verify_receipts: {
+        Row: {
+          actual_byte_size: number | null
+          actual_sha256: string | null
+          bucket: string
+          error: string | null
+          expected_byte_size: number | null
+          expected_sha256: string
+          id: string
+          ok: boolean
+          package_id: string
+          path: string
+          run_id: string
+          verified_at: string
+          verified_by: string | null
+        }
+        Insert: {
+          actual_byte_size?: number | null
+          actual_sha256?: string | null
+          bucket: string
+          error?: string | null
+          expected_byte_size?: number | null
+          expected_sha256: string
+          id?: string
+          ok?: boolean
+          package_id: string
+          path: string
+          run_id: string
+          verified_at?: string
+          verified_by?: string | null
+        }
+        Update: {
+          actual_byte_size?: number | null
+          actual_sha256?: string | null
+          bucket?: string
+          error?: string | null
+          expected_byte_size?: number | null
+          expected_sha256?: string
+          id?: string
+          ok?: boolean
+          package_id?: string
+          path?: string
+          run_id?: string
+          verified_at?: string
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
       abd_ocs_number_correction_log: {
         Row: {
           abd_number: string

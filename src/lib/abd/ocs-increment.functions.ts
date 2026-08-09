@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BASELINE_SCHEMA_VERSION, computeBaselineId } from "@/lib/abd/ocs-baseline-shared";
 import { assertBaselineGate } from "@/lib/abd/ocs-increment-gate";
-import { recheckCollisionsServerSide } from "@/lib/abd/ocs-increment-collision";
+import { recheckCollisionsServerSide, verifiedKey } from "@/lib/abd/ocs-increment-collision";
 import {
   assetList,
   imageMetaList,
@@ -140,7 +140,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       snapshot_id: string;
       package_name: string;
       package_sha256: string;
-      package_id?: string;
+      package_id: string;
       manifest_name: string;
       manifest_hash: string;
       data_date: string;
@@ -161,6 +161,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         "snapshot_id",
         "package_name",
         "package_sha256",
+        "package_id",
         "data_date",
         "base_import_run_id",
         "base_baseline_id",
@@ -168,11 +169,11 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         "base_generated_at",
       ] as const;
       for (const k of need) {
-        if (!input?.[k]) throw new Error(`${k} 가 필요합니다.`);
+        if (!String(input?.[k] ?? "").trim()) throw new Error(`${k} 가 필요합니다.`);
       }
       return {
         ...input,
-        package_id: String(input.package_id ?? ""),
+        package_id: String(input.package_id).trim(),
         base_core_hash: String(input.base_core_hash).toLowerCase(),
         base_core_table_hashes: input.base_core_table_hashes ?? {},
         allow_retire: input.allow_retire === true,
@@ -217,6 +218,35 @@ export const ocsIncImport = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // 업로드 영수증의 run/package 는 이번 실행과 반드시 일치해야 한다.
+    const badReceipt = data.upload_receipts.find(
+      (r) => r.run_id !== data.run_id || r.package_id !== data.package_id,
+    );
+    if (badReceipt) {
+      throw new Error(
+        `RECEIPT_FOREIGN_RUN: 다른 run/package 영수증 (${badReceipt.run_id}/${badReceipt.package_id})`,
+      );
+    }
+
+    // 서버 실측 검증 영수증 — 신규 object 판정의 유일한 정본 (클라이언트 receipt 는 보조).
+    const { data: verifyRows, error: verifyErr } = await context.supabase
+      .from("abd_ocs_inc_verify_receipts")
+      .select("bucket, path, expected_sha256, expected_byte_size, actual_sha256, actual_byte_size, ok, package_id")
+      .eq("run_id", data.run_id)
+      .eq("package_id", data.package_id)
+      .eq("ok", true);
+    if (verifyErr) throw new Error(`verify receipt 조회 실패: ${verifyErr.message}`);
+    const verified = new Set(
+      (verifyRows ?? []).map((r) =>
+        verifiedKey(
+          r.bucket,
+          r.path,
+          String(r.actual_sha256 ?? r.expected_sha256),
+          Number(r.actual_byte_size ?? r.expected_byte_size ?? 0),
+        ),
+      ),
+    );
+
     // Storage 충돌 최종 재검증 (실행 직전, 서버 기준)
     const collision = await recheckCollisionsServerSide(
       data.assets,
@@ -249,16 +279,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       data.image_meta,
       data.upload_receipts,
       { run_id: data.run_id, package_id: data.package_id },
-      async (bucket, path) => {
-        const { data: blob, error } = await supabaseAdmin.storage.from(bucket).download(path);
-        if (error || !blob) return null;
-        const buf = await blob.arrayBuffer();
-        const digest = await crypto.subtle.digest("SHA-256", buf);
-        const sha256 = Array.from(new Uint8Array(digest))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-        return { sha256, byte_size: buf.byteLength };
-      },
+      verified,
     );
     if (collision.blockers.length > 0) throw new Error(collision.blockers.join(" / "));
 
@@ -300,6 +321,8 @@ export const ocsIncImport = createServerFn({ method: "POST" })
             base_generated_at: data.base_generated_at,
             storage_skipped: collision.skip_paths.length,
             storage_declared_new: collision.declared_new_paths.length,
+            server_verified_objects: verified.size,
+            package_id: data.package_id,
             upload_receipts: data.upload_receipts as never,
             allow_retire: data.allow_retire,
           } as never,

@@ -13,11 +13,14 @@ export type MetaLookup = (
   paths: string[],
 ) => Promise<MetaRow[]>;
 export type StorageLister = (bucket: string, dir: string) => Promise<string[]>;
-/** Storage object 실측 — 서버가 직접 내려받아 계산한 hash/size (클라이언트 신고값 불신). */
-export type StorageProbe = (
-  bucket: string,
-  path: string,
-) => Promise<{ sha256: string; byte_size: number } | null>;
+/**
+ * 서버 실측 검증 영수증 키 집합 — `bucket::path::sha256::byte_size`.
+ * 별도 batch 서버 함수(ocsIncVerifyBatch)가 object 를 직접 내려받아 계산한 결과만 들어온다.
+ */
+export type VerifiedKeySet = Set<string>;
+
+export const verifiedKey = (bucket: string, path: string, sha256: string, byteSize: number) =>
+  `${bucket}::${path}::${sha256.toLowerCase()}::${byteSize}`;
 
 export type RunIdentity = { run_id: string; package_id: string };
 
@@ -67,7 +70,7 @@ export async function recheckCollisionsServerSide(
   imageMeta: ImageMeta[] = [],
   receipts: UploadReceipt[] = [],
   identity?: RunIdentity,
-  probeStorage?: StorageProbe,
+  verified: VerifiedKeySet = new Set<string>(),
 ): Promise<ServerCollisionResult> {
   const blockers: string[] = imageMetaIntegrityBlockers(imageMeta);
   const skip: string[] = [];
@@ -165,17 +168,10 @@ export async function recheckCollisionsServerSide(
         rec &&
         rec.sha256 === a.sha256
       ) {
-        // 클라이언트 신고 SHA-256 을 믿지 않는다 — 서버가 object 를 직접 실측한다.
-        const probe = probeStorage ? await probeStorage(a.bucket, a.path) : null;
-        if (!probe) {
+        // 클라이언트 신고 SHA-256 을 믿지 않는다 — 서버 검증 배치가 남긴 영수증만 인정한다.
+        if (!verified.has(verifiedKey(a.bucket, a.path, a.sha256, decl.byte_size))) {
           blockers.push(
-            `STORAGE_PROBE_FAILED: ${a.bucket}/${a.path} — 서버가 object 를 실측하지 못했습니다.`,
-          );
-          continue;
-        }
-        if (probe.sha256 !== a.sha256 || probe.byte_size !== decl.byte_size) {
-          blockers.push(
-            `STORAGE_PROBE_MISMATCH: ${a.bucket}/${a.path} (실측 ${probe.sha256.slice(0, 12)}/${probe.byte_size} ≠ 선언 ${a.sha256.slice(0, 12)}/${decl.byte_size})`,
+            `SERVER_VERIFY_MISSING: ${a.bucket}/${a.path} — 서버 실측 검증 영수증(hash/size 일치)이 없습니다.`,
           );
           continue;
         }
