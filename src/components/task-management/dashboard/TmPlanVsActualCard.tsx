@@ -145,7 +145,7 @@ export function TmPlanVsActualCard({
     planInc: { label: incLabel, color: "var(--muted-foreground)" },
     actualInc: { label: incActualLabel, color: "var(--primary)" },
     cumPlan: { label: cumPlanLabel, color: "var(--muted-foreground)" },
-    cumActual: { label: cumActualLabel, color: "var(--primary)" },
+    cumActual: { label: cumActualLabel, color: "var(--destructive)" },
   };
   const varianceCfg: ChartConfig = {
     variance: { label: varianceLabel, color: "var(--destructive)" },
@@ -357,7 +357,7 @@ export function TmPlanVsActualCard({
                       type="monotone"
                       dataKey="cumActual"
                       name={cumActualLabel}
-                      stroke="var(--primary)"
+                      stroke="var(--destructive)"
                       strokeWidth={3.5}
                       dot={false}
                       connectNulls={false}
