@@ -79,9 +79,17 @@ describe("wizard gates", () => {
   });
 
   it("5. timeout/네트워크 단절 → unknown · 재시도 금지", () => {
-    const f = classifyImportFailure(new Error("Failed to fetch"));
-    expect(f.kind).toBe("unknown");
-    expect(f.retryAllowed).toBe(false);
+    for (const m of [
+      "Failed to fetch",
+      "network error",
+      "request timeout",
+      "connection reset by peer",
+      "OCS_IMPORT_STAGE[import_unconfirmed]: Failed to fetch",
+    ]) {
+      const f = classifyImportFailure(new Error(m));
+      expect(f.kind).toBe("unknown");
+      expect(f.retryAllowed).toBe(false);
+    }
   });
 
   it("트랜잭션 롤백 확인 시에만 재시도 허용", () => {
@@ -92,7 +100,7 @@ describe("wizard gates", () => {
     expect(f.retryAllowed).toBe(true);
   });
 
-  it("6. 서버 로그 success + 항등식 통과 → Step 8 완료", () => {
+  it("6. 서버 로그 success + 숫자 항등식 정상 → Step 8 완료", () => {
     const ev = evaluateImportSuccess({
       import_log_id: "log-1",
       import_log_status: "success",
@@ -102,15 +110,35 @@ describe("wizard gates", () => {
         attachments_unresolved: 0,
         compliance_user_lost: 0,
       },
-      result: {
-        outside_scope_comment_hash_before: "a",
-        outside_scope_comment_hash_after: "a",
-        outside_scope_link_hash_before: "b",
-        outside_scope_link_hash_after: "b",
-        v3: { identities: { comments_balance: true, links_balance: true } },
-      },
+      result: okResult(),
     });
     expect(ev).toEqual({ complete: true, reasons: [] });
+  });
+
+  it("숫자 항등식 한 쌍 불일치 → 미완료", () => {
+    const bad = okResult();
+    (bad["v3"] as Record<string, unknown>)["abd_links_upserted"] = 664;
+    const ev = evaluateImportSuccess({
+      import_log_status: "success",
+      verify: { cache_mismatch_items: 0, attachment_dup_pairs: 0, attachments_unresolved: 0 },
+      result: bad,
+    });
+    expect(ev.complete).toBe(false);
+    expect(ev.reasons.some((r) => r.includes("staged_abd_associations"))).toBe(true);
+  });
+
+  it("0 이어야 하는 identities 가 0 이 아니면 미완료", () => {
+    const bad = okResult();
+    ((bad["v3"] as Record<string, unknown>)["identities"] as Record<string, unknown>)[
+      "duplicate_attachment_comment_pairs"
+    ] = 3;
+    const ev = evaluateImportSuccess({
+      import_log_status: "success",
+      verify: { cache_mismatch_items: 0, attachment_dup_pairs: 0, attachments_unresolved: 0 },
+      result: bad,
+    });
+    expect(ev.complete).toBe(false);
+    expect(ev.reasons.some((r) => r.includes("duplicate_attachment_comment_pairs"))).toBe(true);
   });
 
   it("result 존재만으로 완료 처리하지 않는다", () => {
@@ -119,7 +147,7 @@ describe("wizard gates", () => {
     expect(ev.reasons.length).toBeGreaterThan(0);
   });
 
-  it("항등식 실패 · 보호 해시 변경 · cache mismatch 를 각각 잡는다", () => {
+  it("항등식 값 누락 · 보호 해시 변경 · cache mismatch 를 각각 잡는다", () => {
     const ev = evaluateImportSuccess({
       import_log_status: "success",
       verify: { cache_mismatch_items: 2, attachment_dup_pairs: 0, attachments_unresolved: 0 },
@@ -128,15 +156,45 @@ describe("wizard gates", () => {
         outside_scope_comment_hash_after: "z",
         outside_scope_link_hash_before: "b",
         outside_scope_link_hash_after: "b",
-        v3: { identities: { comments_balance: false } },
+        v3: { identities: {} },
       },
     });
     expect(ev.complete).toBe(false);
     expect(ev.reasons.some((r) => r.includes("cache mismatch"))).toBe(true);
     expect(ev.reasons.some((r) => r.includes("보호 해시가 변경"))).toBe(true);
-    expect(ev.reasons.some((r) => r.includes("항등식 실패"))).toBe(true);
+    expect(ev.reasons.some((r) => r.includes("항등식 값 누락"))).toBe(true);
   });
 });
+
+/** 2026-08-09 복구 성공 run 과 동일한 형태의 실제 숫자 identities */
+function okResult(): Record<string, unknown> {
+  return {
+    outside_scope_comment_hash_before: "a",
+    outside_scope_comment_hash_after: "a",
+    outside_scope_link_hash_before: "b",
+    outside_scope_link_hash_after: "b",
+    v3: {
+      groups_upserted: 185,
+      comments_inserted: 333,
+      comments_updated: 0,
+      abd_links_upserted: 666,
+      attachment_links: 667,
+      response_segments: 26,
+      identities: {
+        staged_groups: 185,
+        staged_active_comments: 333,
+        active_comments_in_db: 333,
+        staged_abd_associations: 666,
+        staged_response_segments: 26,
+        expected_attachment_links: 667,
+        present_attachment_links: 667,
+        unresolved_abd_numbers: 0,
+        duplicate_active_source_comment_id: 0,
+        duplicate_attachment_comment_pairs: 0,
+      },
+    },
+  };
+}
 
 import { dedupeLatestReceipts, isTruncated } from "./ocs-increment-receipts";
 
