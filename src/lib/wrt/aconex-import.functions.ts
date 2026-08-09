@@ -327,7 +327,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
     const items = (await fetchAll(
       supa,
       "wrt_items",
-      "id, wrt_number, team, pic, eng, r1_response_code, r2_response_code, latest_response_code, latest_status_raw, is_final_approved, final_approved_raw, is_active, is_excluded, exclusion_reason",
+      "id, wrt_number, team, pic, eng, r1_response_code, r1_response_code_raw, r2_response_code, r2_response_code_raw, latest_response_code, latest_status_raw, is_final_approved, final_approved_raw, is_active, is_excluded, exclusion_reason",
     )) as any[];
     const progress = (await fetchAll(
       supa,
@@ -342,6 +342,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
         ...i,
         sb1: stageOf.get(`${i.id}|SUBMISSION_R1`)?.actual_finish ?? stageOf.get(`${i.id}|SUBMISSION_R1`)?.actual_start ?? null,
         sb2: stageOf.get(`${i.id}|SUBMISSION_R2`)?.actual_finish ?? stageOf.get(`${i.id}|SUBMISSION_R2`)?.actual_start ?? null,
+        dr2: stageOf.get(`${i.id}|DRAFT_DOC_R2`)?.actual_finish ?? stageOf.get(`${i.id}|DRAFT_DOC_R2`)?.actual_start ?? null,
         rs1: stageOf.get(`${i.id}|RESPONSE_DATE_R1`)?.actual_start ?? null,
         rs2: stageOf.get(`${i.id}|RESPONSE_DATE_R2`)?.actual_start ?? null,
       });
@@ -384,6 +385,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
     const diffRows: WrtAconexDiffRow[] = [];
     const noSubmissionR1: string[] = [];
     const unmappedList: string[] = [];
+    const sameAsR1List: string[] = [];
     let filled = 0;
     let overwritten = 0;
     let blankOverwrites = 0;
@@ -405,6 +407,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
       if (flags.review_skipped) reviewSkipped += 1;
       if (flags.no_submission_r1) noSubmissionR1.push(r.document_no);
       if (flags.unmapped) unmappedList.push(r.document_no);
+      if (flags.same_as_r1) sameAsR1List.push(r.document_no);
       for (const c of changes) {
         fieldDiff.set(c.field, (fieldDiff.get(c.field) ?? 0) + 1);
         if (c.previous == null) filled += 1;
@@ -447,6 +450,8 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
       unmapped_list: unmappedList.slice(0, 200),
       d_code_count: dCode,
       review_skipped: reviewSkipped,
+      same_as_r1: sameAsR1List.length,
+      same_as_r1_list: sameAsR1List.slice(0, 500),
       no_submission_r1: noSubmissionR1.length,
       no_submission_r1_list: noSubmissionR1.slice(0, 500),
       round_counts: roundCounts,
@@ -560,6 +565,7 @@ export const importWrtAconexBatch = createServerFn({ method: "POST" })
           `aconex docs=${data.rows.length} matched=${matchedRows.length} aconex_only=${aconexOnly.length} ` +
           `wrt_only=${wrtOnly.length} out_of_scope=${outOfScope.length} cells=${preview.cells_changed} ` +
           `review_skipped=${reviewSkipped} no_sb_r1=${noSubmissionR1.length} unmapped=${unmappedList.length} ` +
+          `same_as_r1=${sameAsR1List.length} ` +
           `rejected=${rejected.length}` +
           (nullTotal > 0
             ? ` ⚠ blank_overwrites: ${Object.entries(nullOverwrites).map(([f, n]) => `${f}=${n}`).join(", ")}`
