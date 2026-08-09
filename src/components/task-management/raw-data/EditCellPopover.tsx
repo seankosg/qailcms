@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import type { TmColumnDef } from "@/lib/task-management/columns";
 import { useTmColumnLabel } from "@/hooks/useTaskManagementFieldConfig";
+import { WorkTypeCombo } from "./WorkTypeCombo";
 
 interface Props {
   rowId: string;
@@ -127,7 +128,14 @@ export function EditCellPopover({
         <p className="mb-1 text-[11px] font-medium text-muted-foreground">
           {displayLabel} 편집
         </p>
-        {column.editorType === "select" && (
+        {column.editorType === "select" && column.key === "row_type" && (
+          <WorkTypeCombo
+            value={val === "__BLANK__" ? "" : val}
+            onChange={(v) => setVal(v)}
+            className="h-8 text-xs"
+          />
+        )}
+        {column.editorType === "select" && column.key !== "row_type" && (
           <Select value={val} onValueChange={setVal}>
             <SelectTrigger className="h-8 text-xs">
               <SelectValue placeholder="선택" />
