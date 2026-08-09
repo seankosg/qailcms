@@ -35,6 +35,9 @@ const DELAY_FILTER_OPTIONS = [
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/kpi-analysis");
 
+/** S-Curve 차트 시작일 기본값 */
+const DEFAULT_CURVE_START = "2026-07-17";
+
 function isOwnerDim(v: string): v is OwnerDim {
   return v === "team" || v === "hdec_pic_name" || v === "hdec_eng_name";
 }
@@ -97,10 +100,9 @@ export function TmKpiAnalysisPage() {
     row: OwnerLeaderboardRow;
   } | null>(null);
   const [curveOpen, setCurveOpen] = useState(true);
+  const [curveStart, setCurveStart] = useState<string>(DEFAULT_CURVE_START);
   const curveBucket: SCurveBucket =
-    search.curveBucket === "day" || search.curveBucket === "month"
-      ? search.curveBucket
-      : "week";
+    search.curveBucket === "day" || search.curveBucket === "month" ? search.curveBucket : "week";
 
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
@@ -134,7 +136,6 @@ export function TmKpiAnalysisPage() {
   }, [ownerDim, disciplines, search.hdecPic, search.hdecEng]);
 
   const filterSummary = useMemo(
-
     () => [
       { label: "Task", value: taskScope === "main" ? "Main" : "Sub" },
       { label: "Team", value: listLabel(disciplines) },
@@ -194,6 +195,18 @@ export function TmKpiAnalysisPage() {
                 onReset={() => setSharedDataDate("")}
                 showDataDateChip
               />
+
+              <span className="h-5 w-px bg-border" aria-hidden />
+
+              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <span className="font-medium uppercase tracking-wide">Chart start</span>
+                <input
+                  type="date"
+                  value={curveStart}
+                  onChange={(e) => setCurveStart(e.target.value)}
+                  className="h-8 rounded-md border bg-background px-2 text-xs tabular-nums"
+                />
+              </label>
 
               <span className="h-5 w-px bg-border" aria-hidden />
 
@@ -292,7 +305,6 @@ export function TmKpiAnalysisPage() {
             dim={ownerDim}
             titleSuffix={selectedOwnerLabel}
             onDimChange={(dim) => patch({ ownerDim: dim, curveKey: "" })}
-
             onOwnerClick={(dim, key, row) => {
               setOwnerDetail({ dim, key, row });
               // 카드 내 담당자 필터 폐기 — 클릭 시 상단 담당자 필터에 반영한다.
@@ -304,6 +316,7 @@ export function TmKpiAnalysisPage() {
           <TmPlanVsActualCard
             items={scopedItems}
             asOfDate={asOfDate}
+            startFrom={curveStart || null}
             dim={ownerDim}
             filterSummary={filterSummary}
             bucket={curveBucket}

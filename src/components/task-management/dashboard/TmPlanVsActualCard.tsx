@@ -12,11 +12,7 @@ import {
 } from "recharts";
 import { ChevronDown, ChevronRight, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   ChartContainer,
@@ -52,6 +48,8 @@ const DIM_LABEL: Record<OwnerDim, string> = {
 interface Props {
   items: TaskItem[];
   asOfDate: string;
+  /** 차트 시작일(ISO) */
+  startFrom?: string | null;
   dim: OwnerDim;
   /** 상단 필터 현황(헤더 표시용) */
   filterSummary: Array<{ label: string; value: string }>;
@@ -64,6 +62,7 @@ interface Props {
 export function TmPlanVsActualCard({
   items,
   asOfDate,
+  startFrom,
   dim,
   filterSummary,
   bucket,
@@ -91,12 +90,13 @@ export function TmPlanVsActualCard({
         items: scoped,
         asOf: asOfDate,
         bucket,
+        startFrom: startFrom ?? null,
         pointsOf: (it) =>
           snap.ready ? snap.pointsOf(snapshotKey(it.discipline, it.task_no)) : null,
       }),
     // snap.ready 를 의존성에 포함해 스냅샷 로드 후 재계산한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scoped, asOfDate, bucket, snap.ready],
+    [scoped, asOfDate, bucket, startFrom, snap.ready],
   );
 
   const n = curve.taskCount;
@@ -109,8 +109,7 @@ export function TmPlanVsActualCard({
     bucket: b,
     bucketLabel: curve.bucketLabels[i],
     planInc: r1(conv(curve.dailyPlan[i])),
-    actualInc:
-      curve.dailyActual[i] == null ? null : r1(conv(curve.dailyActual[i] as number)),
+    actualInc: curve.dailyActual[i] == null ? null : r1(conv(curve.dailyActual[i] as number)),
     cumPlan: r1(conv(curve.cumPlan[i])),
     cumActual: curve.cumActual[i] == null ? null : r1(conv(curve.cumActual[i] as number)),
     variance:
@@ -119,12 +118,20 @@ export function TmPlanVsActualCard({
         : r1(conv((curve.cumActual[i] as number) - curve.cumPlan[i])),
   }));
 
-  const todayLabel =
-    curve.todayIndex >= 0 ? curve.bucketLabels[curve.todayIndex] ?? null : null;
+  const todayLabel = curve.todayIndex >= 0 ? (curve.bucketLabels[curve.todayIndex] ?? null) : null;
 
   const idxForKpi = curve.todayIndex >= 0 ? curve.todayIndex : curve.buckets.length - 1;
-  const planNow = idxForKpi >= 0 ? curve.cumPlan[idxForKpi] ?? 0 : 0;
-  const actualNow = idxForKpi >= 0 ? (curve.cumActual[idxForKpi] ?? 0) : 0;
+  const planNow = idxForKpi >= 0 ? (curve.cumPlan[idxForKpi] ?? 0) : 0;
+  // 실적은 버킷 종료일이 기준일보다 뒤면 null 이다(주·월 단위에서 흔함).
+  // 그래서 null 이 아닌 마지막 인덱스의 누계를 쓴다. 계획(P)은 지금대로 둔다.
+  let lastActualIdx = -1;
+  for (let i = curve.cumActual.length - 1; i >= 0; i--) {
+    if (curve.cumActual[i] != null) {
+      lastActualIdx = i;
+      break;
+    }
+  }
+  const actualNow = lastActualIdx >= 0 ? (curve.cumActual[lastActualIdx] as number) : 0;
   const deltaNow = actualNow - planNow;
 
   const unitSuffix = isTasks ? " tasks" : "%";
@@ -145,6 +152,15 @@ export function TmPlanVsActualCard({
   };
 
   const hasData = curve.buckets.length > 0 && scoped.length > 0;
+  // 위·아래 차트의 x축 눈금을 동일하게 맞춘다(그림 영역 폭 + ticks 배열 공유).
+  const xTicks = useMemo(() => {
+    const labels = curve.bucketLabels;
+    if (labels.length <= 12) return labels;
+    const step = Math.ceil(labels.length / 12);
+    return labels.filter((_, i) => i % step === 0);
+  }, [curve.bucketLabels]);
+  const Y_LEFT_WIDTH = 56;
+  const Y_RIGHT_WIDTH = 44;
   const accent =
     deltaNow < 0
       ? "text-destructive"
@@ -262,7 +278,8 @@ export function TmPlanVsActualCard({
                   </div>
                   {curve.excludedCount > 0 && (
                     <div className="flex items-center rounded border border-destructive/40 bg-destructive/10 px-3 py-1 text-[11px] font-semibold text-destructive">
-                      실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 실적 곡선 제외
+                      실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 실적 곡선
+                      제외
                     </div>
                   )}
                 </div>
@@ -270,9 +287,16 @@ export function TmPlanVsActualCard({
                 <ChartContainer config={cfg} className="h-[340px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucketLabel" tick={{ fontSize: 10 }} minTickGap={20} />
+                    <XAxis
+                      dataKey="bucketLabel"
+                      tick={{ fontSize: 10 }}
+                      ticks={xTicks}
+                      interval={0}
+                      minTickGap={0}
+                    />
                     <YAxis
                       yAxisId="cum"
+                      width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
                       domain={[0, "auto"]}
                       tickFormatter={(v) => (isTasks ? `${v}` : `${v}%`)}
@@ -280,6 +304,7 @@ export function TmPlanVsActualCard({
                     <YAxis
                       yAxisId="bar"
                       orientation="right"
+                      width={Y_RIGHT_WIDTH}
                       tick={{ fontSize: 11 }}
                       domain={["auto", "auto"]}
                     />
@@ -344,19 +369,44 @@ export function TmPlanVsActualCard({
                 <ChartContainer config={varianceCfg} className="h-[120px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucketLabel" tick={{ fontSize: 10 }} minTickGap={20} />
-                    <YAxis tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
+                    <XAxis
+                      dataKey="bucketLabel"
+                      tick={{ fontSize: 10 }}
+                      ticks={xTicks}
+                      interval={0}
+                      minTickGap={0}
+                    />
+                    <YAxis
+                      yAxisId="v"
+                      width={Y_LEFT_WIDTH}
+                      tick={{ fontSize: 11 }}
+                      domain={["auto", "auto"]}
+                    />
+                    {/* 위 차트의 우측 Y축과 같은 폭을 확보해 그림 영역을 일치시킨다. */}
+                    <YAxis
+                      yAxisId="spacer"
+                      orientation="right"
+                      width={Y_RIGHT_WIDTH}
+                      tick={false}
+                      axisLine={false}
+                      tickLine={false}
+                    />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     {todayLabel && (
-                      <ReferenceLine x={todayLabel} stroke="var(--destructive)" strokeDasharray="4 2" />
+                      <ReferenceLine
+                        x={todayLabel}
+                        stroke="var(--destructive)"
+                        strokeDasharray="4 2"
+                      />
                     )}
-                    <ReferenceLine y={0} stroke="var(--border)" />
-                    <Bar dataKey="variance" name={varianceLabel} barSize={8}>
+                    <ReferenceLine yAxisId="v" y={0} stroke="var(--border)" />
+                    <Bar yAxisId="v" dataKey="variance" name={varianceLabel} barSize={8}>
                       {data.map((row, i) => {
                         const v = row.variance as number | null;
+                        // 값이 없는 구간(미래)은 그리지 않는다.
                         const fill =
                           v == null
-                            ? "var(--muted)"
+                            ? "transparent"
                             : v < 0
                               ? "var(--destructive)"
                               : "var(--success)";

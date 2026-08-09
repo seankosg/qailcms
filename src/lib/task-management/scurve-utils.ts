@@ -33,6 +33,9 @@ export interface TmSCurveResult {
   /** 버킷 간 증분(pp) */
   dailyPlan: number[];
   dailyActual: (number | null)[];
+  /** 창 시작 직전 시점의 누계(pp) — 첫 막대가 튀지 않도록 기준선으로 뺀다. */
+  baselinePlan: number;
+  baselineActual: number | null;
 }
 
 const MAX_BUCKETS = 800;
@@ -64,6 +67,14 @@ function labelOf(isoDate: string, bucket: SCurveBucket): string {
   return bucket === "month" ? formatDdMmmYy(isoDate) : formatDdMmm(isoDate);
 }
 
+/** 버킷 종료일이 속한 구간의 시작일. */
+function periodStart(bucketEndIso: string, bucket: SCurveBucket): Date {
+  const d = parse(bucketEndIso)!;
+  if (bucket === "day") return d;
+  if (bucket === "week") return addDays(d, -6);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+}
+
 /** 구간의 마지막 날짜 배열(오름차순). 종료일 강제 추가 없음. */
 function buildBuckets(startIso: string, endIso: string, bucket: SCurveBucket): string[] {
   const start = parse(startIso)!;
@@ -74,9 +85,7 @@ function buildBuckets(startIso: string, endIso: string, bucket: SCurveBucket): s
   while (cur <= end && out.length < MAX_BUCKETS) {
     out.push(iso(cur));
     cur =
-      bucket === "month"
-        ? endOfMonth(addDays(cur, 1))
-        : addDays(cur, bucket === "week" ? 7 : 1);
+      bucket === "month" ? endOfMonth(addDays(cur, 1)) : addDays(cur, bucket === "week" ? 7 : 1);
   }
   // 종료일이 속한 구간까지 포함한다(마지막 구간이 잘리지 않도록).
   if (out.length === 0 || (out[out.length - 1] < iso(end) && out.length < MAX_BUCKETS)) {
@@ -169,10 +178,12 @@ export function buildTmSCurve(opts: {
   items: TaskItem[];
   asOf: string;
   bucket: SCurveBucket;
+  /** 차트 시작일(ISO). 모집단 최소일과 비교해 더 늦은 쪽을 창 시작으로 쓴다. */
+  startFrom?: string | null;
   /** 과업별 저장 실적 스냅샷 조회기 */
   pointsOf?: (it: TaskItem) => SnapshotPoint[] | null;
 }): TmSCurveResult {
-  const { items, asOf, bucket, pointsOf } = opts;
+  const { items, asOf, bucket, startFrom, pointsOf } = opts;
   const empty: TmSCurveResult = {
     buckets: [],
     bucketLabels: [],
@@ -183,6 +194,8 @@ export function buildTmSCurve(opts: {
     cumActual: [],
     dailyPlan: [],
     dailyActual: [],
+    baselinePlan: 0,
+    baselineActual: null,
   };
   if (!items.length) return empty;
 
@@ -201,7 +214,10 @@ export function buildTmSCurve(opts: {
   if (!minIso) return empty;
   if (!maxIso || maxIso < asOf) maxIso = asOf;
 
-  const buckets = buildBuckets(minIso, maxIso, bucket);
+  // 창 시작 = max(모집단 최소일, 지정 시작일). 구간 경계 스냅은 buildBuckets 가 수행한다.
+  const startIso = startFrom && startFrom > minIso ? startFrom.slice(0, 10) : minIso;
+  const windowStart = startIso > maxIso ? maxIso : startIso;
+  const buckets = buildBuckets(windowStart, maxIso, bucket);
   const n = buckets.length;
   const bucketLabels = buckets.map((b) => labelOf(b, bucket));
 
@@ -239,12 +255,25 @@ export function buildTmSCurve(opts: {
 
   const dailyPlan: number[] = new Array(n).fill(0);
   const dailyActual: (number | null)[] = new Array(n).fill(null);
+
+  // 창 시작 직전 시점의 누계(기준선) — 창 이전 누계가 첫 막대에 몰리지 않게 한다.
+  const baseIso = n > 0 ? iso(addDays(periodStart(buckets[0], bucket), -1)) : windowStart;
+  let basePlanSum = 0;
+  for (const it of items) basePlanSum += cumPlanProgress(it, baseIso);
+  const baselinePlan = (basePlanSum / items.length) * 100;
+  let baselineActual: number | null = null;
+  if (baseIso <= asOf && seriesList.length) {
+    let s = 0;
+    for (const sr of seriesList) s += valueAt(sr, baseIso);
+    baselineActual = (s / seriesList.length) * 100;
+  }
+
   for (let i = 0; i < n; i++) {
-    dailyPlan[i] = cumPlan[i] - (i > 0 ? cumPlan[i - 1] : 0);
+    dailyPlan[i] = cumPlan[i] - (i > 0 ? cumPlan[i - 1] : baselinePlan);
     const cur = cumActual[i];
     if (cur == null) continue;
-    const prev = i > 0 ? cumActual[i - 1] : 0;
-    dailyActual[i] = cur - (prev ?? 0);
+    const prev = i > 0 ? cumActual[i - 1] : baselineActual;
+    dailyActual[i] = cur - (prev ?? baselineActual ?? 0);
   }
 
   return {
@@ -257,5 +286,7 @@ export function buildTmSCurve(opts: {
     cumActual,
     dailyPlan,
     dailyActual,
+    baselinePlan,
+    baselineActual,
   };
 }
