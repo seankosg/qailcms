@@ -34,7 +34,6 @@ const DELAY_FILTER_OPTIONS = [
 
 const routeApi = getRouteApi("/_authenticated/closure/task-management/kpi-analysis");
 
-
 export function TmKpiAnalysisPage() {
   const search = routeApi.useSearch();
   const navigate = useNavigate();
@@ -236,9 +235,13 @@ export function TmKpiAnalysisPage() {
           <OwnerProgressChart
             items={scopedItems}
             asOfDate={asOfDate}
-            dim={ownerDim}
-            onDimChange={(dim) => patch({ ownerDim: dim, curveKey: "" })}
+            dim={chartDim}
+            onDimChange={(dim) => {
+              setChartDim(dim);
+              patch({ curveKey: "" });
+            }}
             onOwnerClick={(dim, key, row) => {
+              setChartDim(dim);
               setOwnerDetail({ dim, key, row });
               patch({ curveKey: key });
             }}
@@ -247,7 +250,7 @@ export function TmKpiAnalysisPage() {
           <TmPlanVsActualCard
             items={scopedItems}
             asOfDate={asOfDate}
-            dim={ownerDim}
+            dim={chartDim}
             ownerKey={search.curveKey}
             onOwnerKeyChange={(key) => patch({ curveKey: key })}
             bucket={curveBucket}
@@ -261,7 +264,7 @@ export function TmKpiAnalysisPage() {
       <OwnerDetailDialog
         open={ownerDetail !== null}
         onOpenChange={(o) => !o && setOwnerDetail(null)}
-        dim={ownerDetail?.dim ?? ownerDim}
+        dim={ownerDetail?.dim ?? chartDim}
         ownerKey={ownerDetail?.key ?? ""}
         row={ownerDetail?.row ?? null}
         items={scopedItems}
