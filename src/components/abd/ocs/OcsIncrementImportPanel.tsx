@@ -329,6 +329,8 @@ export function OcsIncrementImportPanel() {
     setAllowRetire(false);
     setResult(null);
     setFailure(null);
+    setImportFailure(null);
+    setImportFailStage(null);
     setReceipts([]);
     setVerifyTotal(0);
     setVerifyOk([]);
@@ -920,6 +922,18 @@ export function OcsIncrementImportPanel() {
         </CardHeader>
         <CardContent className="space-y-4">
           <OcsResponsibilityCard />
+          {!pkg && (
+            <div className="rounded-md border border-dashed p-3 text-[11px] text-muted-foreground">
+              <div className="mb-1 font-semibold text-foreground">
+                새로고침 후 복원되는 항목 / 복원되지 않는 항목
+              </div>
+              <div>복원됨: 최신 Baseline 정보 · 패키지의 과거 검증 영수증 존재 여부 · 완료·복구 패키지 중복 차단</div>
+              <div>
+                복원되지 않음: 선택한 ZIP 파일 · Dry-run 결과 · 현재 Snapshot ID · Import 진행 상태와
+                결과 — Re-select the ZIP to restore and verify this workflow.
+              </div>
+            </div>
+          )}
           <OcsWizardStepper steps={steps} onSelect={(i) => setOpenStep(i)} />
           {busy && (
             <div className="space-y-1">
