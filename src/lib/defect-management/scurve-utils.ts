@@ -49,11 +49,13 @@ export function buildSnagSCurve(opts: {
   const idx = new Map<string, number>();
   buckets.forEach((b, i) => idx.set(b, i));
 
-  const series: Record<Stage, SCurveStageSeries> = {
-    start: emptyStage("start", n),
-    rectified: emptyStage("rectified", n),
-    closure: emptyStage("closure", n),
-  };
+  const series: Record<Stage, SCurveStageSeries> = ALL_STAGES.reduce(
+    (acc, s) => {
+      acc[s] = emptyStage(s, n);
+      return acc;
+    },
+    {} as Record<Stage, SCurveStageSeries>,
+  );
 
   for (const c of cells) {
     if (!c.bucket_iso) continue;
@@ -102,5 +104,8 @@ export function buildSnagSCurve(opts: {
 export const SNAG_STAGE_COLORS: Record<Stage, { line: string; bar: string }> = {
   start: { line: "hsl(217, 91%, 60%)", bar: "hsla(217, 91%, 60%, 0.45)" },
   rectified: { line: "hsl(38, 92%, 50%)", bar: "hsla(38, 92%, 50%, 0.45)" },
+  pre_inspection: { line: "hsl(280, 65%, 60%)", bar: "hsla(280, 65%, 60%, 0.45)" },
+  dar_inspection: { line: "hsl(190, 80%, 42%)", bar: "hsla(190, 80%, 42%, 0.45)" },
   closure: { line: "hsl(160, 60%, 45%)", bar: "hsla(160, 60%, 45%, 0.45)" },
+  ho: { line: "hsl(0, 72%, 51%)", bar: "hsla(0, 72%, 51%, 0.45)" },
 };
