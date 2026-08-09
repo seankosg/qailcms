@@ -268,6 +268,7 @@ export async function createSnapshot(
     });
     totalRows += tableRows;
     totalSize += tableSize;
+    await report(tableName, tablesToBackup.indexOf(tableName), "done");
   }
 
   const overallHash = await overallHasher.digest();
