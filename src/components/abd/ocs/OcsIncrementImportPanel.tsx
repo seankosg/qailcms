@@ -265,37 +265,93 @@ export function OcsIncrementImportPanel() {
   }
 
   /**
-   * source/ 와 images/ 바이너리만 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기).
-   * abd_ocs_source_files DB 등록은 Baseline 최종 검증 이후 서버 트랜잭션에서 수행한다.
+   * source/ 와 images/ 바이너리 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기).
+   * 동시 5개 제한 큐로 실행하고, 성공·기존·실패를 모두 receipt 로 남긴다. 자동 DELETE 없음.
    */
-  async function uploadAssets(p: IncrementPackage) {
+  async function uploadAssets(p: IncrementPackage, run: string): Promise<UploadReceipt[]> {
     const skip = collision?.skipPaths ?? new Set<string>();
-    for (const img of p.images) {
-      const path = imageStoragePath(img.relative_path);
-      if (skip.has(path)) continue;
-      const { error } = await supabase.storage
-        .from(OCS_BUCKET)
-        .upload(path, new Blob([img.bytes]), { upsert: false });
-      if (error && !/exists/i.test(error.message))
-        throw new Error(`이미지 업로드 실패 ${path}: ${error.message}`);
+    const jobs: { bucket: string; path: string; sha256: string; bytes: ArrayBuffer }[] = [
+      ...p.images.map((b) => ({
+        bucket: OCS_BUCKET,
+        path: imageStoragePath(b.relative_path),
+        sha256: b.sha256,
+        bytes: b.bytes,
+      })),
+      ...p.sourceFiles.map((b) => ({
+        bucket: OCS_SOURCE_BUCKET,
+        path: sourceStoragePath(p.manifest.package_id, b.relative_path),
+        sha256: b.sha256,
+        bytes: b.bytes,
+      })),
+    ];
+
+    const out: UploadReceipt[] = [];
+    let cursor = 0;
+    let done = 0;
+
+    const worker = async () => {
+      for (;;) {
+        const i = cursor;
+        cursor += 1;
+        const job = jobs[i];
+        if (!job) return;
+        const base = {
+          run_id: run,
+          package_id: p.manifest.package_id,
+          bucket: job.bucket,
+          path: job.path,
+          sha256: job.sha256,
+        };
+        // 기존 동일 hash 는 요청 자체를 보내지 않는다.
+        if (skip.has(job.path)) {
+          out.push({ ...base, state: "existing" });
+        } else {
+          const { error } = await supabase.storage
+            .from(job.bucket)
+            .upload(job.path, new Blob([job.bytes]), { upsert: false });
+          if (!error) {
+            out.push({ ...base, state: "uploaded" });
+          } else {
+            // 문자열만 보고 성공 처리하지 않는다 — 서버 실측으로 존재·크기를 재확인한다.
+            const dir = job.path.includes("/") ? job.path.slice(0, job.path.lastIndexOf("/")) : "";
+            const name = job.path.split("/").pop() as string;
+            const { data: found } = await supabase.storage
+              .from(job.bucket)
+              .list(dir, { search: name, limit: 100 });
+            const hit = (found ?? []).find((f) => f.name === name);
+            if (hit) out.push({ ...base, state: "existing" });
+            else out.push({ ...base, state: "failed", error: error.message });
+          }
+        }
+        done += 1;
+        setProgress(Math.round((done / jobs.length) * 100));
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(UPLOAD_CONCURRENCY, Math.max(jobs.length, 1)) }, worker),
+    );
+    setReceipts(out);
+    const failed = out.filter((r) => r.state === "failed");
+    if (failed.length > 0) {
+      throw new Error(
+        `자산 업로드 실패 ${failed.length}건 (같은 ZIP 재선택으로 재시도 가능): ${failed
+          .slice(0, 3)
+          .map((r) => `${r.path} — ${r.error ?? ""}`)
+          .join(" / ")}`,
+      );
     }
-    for (const sf of p.sourceFiles) {
-      const fileName = sf.relative_path.split("/").pop() ?? sf.relative_path;
-      const storagePath = sourceStoragePath(p.manifest.package_id, sf.relative_path);
-      if (skip.has(storagePath)) continue;
-      const { error } = await supabase.storage
-        .from(OCS_SOURCE_BUCKET)
-        .upload(storagePath, new Blob([sf.bytes]), { upsert: false });
-      if (error && !/exists/i.test(error.message))
-        throw new Error(`원본 업로드 실패 ${fileName}: ${error.message}`);
-    }
+    return out;
   }
 
   async function runImport() {
     if (!pkg || !runId || !snapshotId || blockers.length > 0) return;
     setBusy("증분 Import 실행 중…");
+    setProgress(0);
     try {
-      await uploadAssets(pkg);
+      setStageLabel("4/6 신규 자산 업로드");
+      const rec = await uploadAssets(pkg, runId);
+      setStageLabel("5/6 Import 실행");
       const out = (await importFn({
         data: {
           run_id: runId,
@@ -311,6 +367,8 @@ export function OcsIncrementImportPanel() {
           base_core_table_hashes: pkg.manifest.base_core_table_hashes,
           base_generated_at: pkg.manifest.base_generated_at,
           allow_retire: allowRetire,
+          image_meta: pkg.imageMeta,
+          upload_receipts: rec,
           source_files: pkg.sourceFiles.map((f) => ({
             file_name: f.relative_path.split("/").pop() ?? f.relative_path,
             content_hash: f.sha256,
@@ -340,12 +398,14 @@ export function OcsIncrementImportPanel() {
           ],
         },
       })) as Record<string, unknown>;
+      setStageLabel("6/6 검증 완료");
       setResult(out);
       toast.success("증분 Import 완료");
     } catch (e) {
       setFailure(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
+      setProgress(0);
     }
   }
 
