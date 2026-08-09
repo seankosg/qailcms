@@ -221,12 +221,19 @@ export function buildTmSCurve(opts: {
   const n = buckets.length;
   const bucketLabels = buckets.map((b) => labelOf(b, bucket));
 
+  const includedItems: TaskItem[] = [];
   const seriesList: ItemActualSeries[] = [];
   let excludedCount = 0;
   for (const it of items) {
     const s = buildItemAnchors(it, asOf, pointsOf?.(it) ?? null);
-    if (s) seriesList.push(s);
-    else excludedCount++;
+    if (s) {
+      seriesList.push(s);
+      includedItems.push(it);
+    } else excludedCount++;
+  }
+
+  if (includedItems.length === 0) {
+    return { ...empty, excludedCount };
   }
 
   const cumPlan: number[] = new Array(n).fill(0);
