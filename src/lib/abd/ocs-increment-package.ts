@@ -89,6 +89,8 @@ export type IncrementPackage = {
 
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 const REQUIRED_ENTRIES = ["manifest.json", "atomic.json", "response_mapping.json", "policy.json"];
+// 경로 내 제어문자 탐지는 의도적으로 제어문자 범위를 사용한다.
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 
 /** ZIP entry 경로 안전성 검사 — 위반 사유 배열(빈 배열이면 안전). */
