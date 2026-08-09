@@ -204,6 +204,23 @@ export function classifyImportFailure(err: unknown): ImportFailureState {
   const stage = STAGE_RE.exec(message)?.[1]?.toLowerCase() ?? null;
   const clean = message.replace(STAGE_RE, "").replace(/^[:\s]+/, "");
 
+  // 네트워크·timeout·응답 유실은 서버 상태를 확인하지 못한 것이므로 절대 롤백으로 보지 않는다.
+  const NETWORKISH =
+    /failed to fetch|network|timeout|timed out|econnreset|connection reset|aborted|socket hang up|502|503|504|gateway/i;
+  if (stage === "import_unconfirmed" || (!stage && NETWORKISH.test(message))) {
+    return {
+      kind: "unknown",
+      stage,
+      message: clean,
+      retryAllowed: false,
+      title: "Import result could not be confirmed",
+      affected:
+        "네트워크 오류·timeout·응답 유실 등으로 서버 반영 여부를 확인하지 못했습니다. 운영 정본이 이미 변경되었을 수 있습니다.",
+      nextStep:
+        "Do not retry. run ID 와 Import log 상태(failed / partial / success)를 먼저 확인하십시오.",
+    };
+  }
+
   if (
     stage === "precheck" ||
     stage === "final_validation" ||
@@ -290,25 +307,53 @@ export function evaluateImportSuccess(
     }
   }
 
-  for (const id of collectIdentities(result)) {
-    if (id.ok !== true) reasons.push(`항등식 실패: ${id.name}`);
-  }
+  reasons.push(...checkIdentityContract(result));
 
   return { complete: reasons.length === 0, reasons };
 }
 
-/** 서버가 반환한 identities 객체(중첩 포함)를 모두 모은다. */
-function collectIdentities(root: unknown, depth = 0): { name: string; ok: boolean }[] {
-  if (!root || typeof root !== "object" || depth > 4) return [];
-  const out: { name: string; ok: boolean }[] = [];
-  for (const [k, v] of Object.entries(root as Record<string, unknown>)) {
-    if (k === "identities" && v && typeof v === "object") {
-      for (const [name, ok] of Object.entries(v as Record<string, unknown>)) {
-        out.push({ name, ok: ok === true });
-      }
-    } else if (v && typeof v === "object") {
-      out.push(...collectIdentities(v, depth + 1));
+/**
+ * abd_ocs_v3_import 의 실제 반환 계약(숫자 identities)만 검산한다.
+ * boolean 플래그를 기대하지 않는다.
+ */
+export function checkIdentityContract(result: Record<string, unknown>): string[] {
+  const reasons: string[] = [];
+  const v3 = (result["v3"] ?? result) as Record<string, unknown>;
+  const ids = v3["identities"];
+  if (!ids || typeof ids !== "object") return ["항등식 결과(identities)를 확인하지 못했습니다."];
+  const I = ids as Record<string, unknown>;
+
+  const need = (k: string, src: Record<string, unknown>) => {
+    const v = src[k];
+    if (v === undefined || v === null || Number.isNaN(Number(v))) return null;
+    return Number(v);
+  };
+
+  const pairs: [string, Record<string, unknown>, string, Record<string, unknown>, string][] = [
+    ["staged_groups", I, "groups_upserted", v3, "그룹"],
+    ["staged_active_comments", I, "active_comments_in_db", I, "활성 코멘트"],
+    ["staged_abd_associations", I, "abd_links_upserted", v3, "ABD 연결"],
+    ["expected_attachment_links", I, "present_attachment_links", I, "첨부 링크"],
+  ];
+  for (const [aKey, aSrc, bKey, bSrc, label] of pairs) {
+    const a = need(aKey, aSrc);
+    const b = need(bKey, bSrc);
+    if (a === null || b === null) {
+      reasons.push(`항등식 값 누락: ${aKey} / ${bKey}`);
+    } else if (a !== b) {
+      reasons.push(`항등식 불일치(${label}): ${aKey} ${a} ≠ ${bKey} ${b}`);
     }
   }
-  return out;
+
+  for (const zeroKey of [
+    "unresolved_abd_numbers",
+    "duplicate_active_source_comment_id",
+    "duplicate_attachment_comment_pairs",
+  ]) {
+    const v = need(zeroKey, I);
+    if (v === null) reasons.push(`항등식 값 누락: ${zeroKey}`);
+    else if (v !== 0) reasons.push(`${zeroKey} ${v}건 (0 이어야 함)`);
+  }
+
+  return reasons;
 }
