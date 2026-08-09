@@ -85,7 +85,8 @@ export function BulkEditBar({
       // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 일괄 편집은 admin 만 가능.
       // admin 계정은 파생/자동계산을 제외한 전 항목을 일괄 편집할 수 있다.
       getBulkEditableFields({ milestoneOptions, admin: isStrictAdmin }).filter(
-        (f) => f.field !== "milestone" || isStrictAdmin,
+        // ⛔ 임시 조치: Milestone / Work Type(row_type) 은 admin 만 일괄 수정 가능.
+        (f) => (f.field !== "milestone" && f.field !== "row_type") || isStrictAdmin,
       ),
     [milestoneOptions, isStrictAdmin],
   );
@@ -164,7 +165,7 @@ export function BulkEditBar({
   }
 
   // Detail 과 동일하게 서버 함수 경유가 필요한 필드
-  const OWNER_ROUTED = new Set(["task_no", "team", "data_date", "milestone"]);
+  const OWNER_ROUTED = new Set(["task_no", "team", "data_date", "milestone", "row_type"]);
 
   async function handleApply() {
     if (!field) return;
