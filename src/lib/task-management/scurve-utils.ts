@@ -287,7 +287,7 @@ export function buildTmSCurve(opts: {
     buckets,
     bucketLabels,
     todayIndex,
-    taskCount: items.length,
+    taskCount: includedItems.length,
     excludedCount,
     cumPlan,
     cumActual,
