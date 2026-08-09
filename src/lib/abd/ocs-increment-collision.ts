@@ -1,6 +1,11 @@
 // ABD OCS 증분 Import — Import 직전 서버측 Storage 충돌 최종 판정.
 // 클라이언트 사전 점검과 동일 규칙을 서버에서 다시 적용한다.
-import type { AssetRef, SourceFileMeta } from "@/lib/abd/ocs-increment-types";
+import type {
+  AssetRef,
+  ImageMeta,
+  SourceFileMeta,
+  UploadReceipt,
+} from "@/lib/abd/ocs-increment-types";
 
 export type MetaRow = { storage_path: string; content_hash: string | null };
 export type MetaLookup = (
@@ -12,6 +17,7 @@ export type StorageLister = (bucket: string, dir: string) => Promise<string[]>;
 export type ServerCollisionResult = {
   skip_paths: string[];
   new_paths: string[];
+  declared_new_paths: string[];
   blockers: string[];
 };
 
@@ -22,13 +28,23 @@ export async function recheckCollisionsServerSide(
   sourceMeta: SourceFileMeta[],
   lookupMeta: MetaLookup,
   listStorage: StorageLister,
+  imageMeta: ImageMeta[] = [],
+  receipts: UploadReceipt[] = [],
 ): Promise<ServerCollisionResult> {
   const blockers: string[] = [];
   const skip: string[] = [];
   const fresh: string[] = [];
-  if (assets.length === 0) return { skip_paths: skip, new_paths: fresh, blockers };
+  const declaredNew: string[] = [];
+  if (assets.length === 0)
+    return { skip_paths: skip, new_paths: fresh, declared_new_paths: declaredNew, blockers };
 
   const declared = new Map(sourceMeta.map((m) => [m.storage_path, m.content_hash.toLowerCase()]));
+  const declaredImages = new Map(imageMeta.map((m) => [m.storage_path, m]));
+  const receiptByPath = new Map(
+    receipts
+      .filter((r) => r.state === "uploaded" || r.state === "existing")
+      .map((r) => [`${r.bucket}::${r.path}`, r]),
+  );
 
   // 1) Storage 실제 존재 여부
   const existing = new Set<string>();
@@ -81,10 +97,25 @@ export async function recheckCollisionsServerSide(
       fresh.push(a.path);
       continue;
     }
+    // 신규 이미지: 패키지 선언 + ID/경로/해시 일치 + 이번 run 업로드 receipt 가 모두 있어야 허용
+    if (a.kind === "image") {
+      const decl = declaredImages.get(a.path);
+      const rec = receiptByPath.get(`${a.bucket}::${a.path}`);
+      if (
+        decl &&
+        decl.storage_path === a.path &&
+        decl.content_hash === a.sha256 &&
+        rec &&
+        rec.sha256 === a.sha256
+      ) {
+        declaredNew.push(a.path);
+        continue;
+      }
+    }
     blockers.push(
       `STORAGE_UNRESOLVED: ${a.bucket}/${a.path} — Storage object 는 있으나 DB metadata 가 없습니다.`,
     );
   }
 
-  return { skip_paths: skip, new_paths: fresh, blockers };
+  return { skip_paths: skip, new_paths: fresh, declared_new_paths: declaredNew, blockers };
 }
