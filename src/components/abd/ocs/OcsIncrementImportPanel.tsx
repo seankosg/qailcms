@@ -23,6 +23,8 @@ import {
   type V3StageKind,
 } from "@/lib/abd/ocs-v3-import.functions";
 import { ocsIncDryRun, ocsIncImport, ocsIncPrecheck } from "@/lib/abd/ocs-increment.functions";
+import { ocsIncVerifyBatch } from "@/lib/abd/ocs-increment-verify.functions";
+import { VERIFY_BATCH_MAX } from "@/lib/abd/ocs-increment-verify";
 import { OcsBaselineCard } from "@/components/abd/ocs/OcsBaselineCard";
 import { createPreImportSnapshot } from "@/lib/backup/backup.functions";
 import { OCS_BUCKET } from "@/lib/abd/ocs-import.functions";
@@ -61,6 +63,7 @@ export function OcsIncrementImportPanel() {
   const precheckFn = useServerFn(ocsIncPrecheck);
   const dryRunFn = useServerFn(ocsIncDryRun);
   const importFn = useServerFn(ocsIncImport);
+  const verifyFn = useServerFn(ocsIncVerifyBatch);
   const snapshotFn = useServerFn(createPreImportSnapshot);
 
   const [pkg, setPkg] = useState<IncrementPackage | null>(null);
@@ -76,6 +79,9 @@ export function OcsIncrementImportPanel() {
   const [failure, setFailure] = useState<string | null>(null);
   const [collision, setCollision] = useState<CollisionReport | null>(null);
   const [receipts, setReceipts] = useState<UploadReceipt[]>([]);
+  const [verifyTotal, setVerifyTotal] = useState(0);
+  const [verifyOk, setVerifyOk] = useState<string[]>([]);
+  const [verifyFailures, setVerifyFailures] = useState<{ path: string; error: string }[]>([]);
   const [stageLabel, setStageLabel] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pickerKey, setPickerKey] = useState(0);
@@ -85,6 +91,8 @@ export function OcsIncrementImportPanel() {
   const retire = num(dry?.["comments_to_retire"]);
   const scopeActive = num(dry?.["scope_existing_active"]);
   const massRetire = dry ? retire > scopeActive * RETIRE_PCT || retire > RETIRE_ABS : false;
+  const verifyPending = verifyTotal > 0 ? verifyTotal - verifyOk.length : 0;
+  const verifyComplete = verifyTotal > 0 && verifyPending === 0;
 
   const blockers = useMemo(() => {
     const out: string[] = [];
@@ -129,9 +137,28 @@ export function OcsIncrementImportPanel() {
       if (massRetire && !allowRetire) out.push(`대량 퇴역 미승인 (${retire}건 · 임계 30% / 100건)`);
     }
     if (!snapshotId) out.push("사전 백업 스냅샷 미완료 (Dry-run 이후 생성분만 인정)");
+    if (!verifyComplete)
+      out.push(
+        verifyTotal === 0
+          ? "신규 자산 업로드 · 서버 실측 검증 미실행"
+          : `서버 실측 검증 미완료 (${verifyOk.length}/${verifyTotal})`,
+      );
     if (!approved) out.push("최종 승인 체크 필요");
     return out;
-  }, [pkg, precheck, dry, snapshotId, approved, massRetire, allowRetire, retire, collision]);
+  }, [
+    pkg,
+    precheck,
+    dry,
+    snapshotId,
+    approved,
+    massRetire,
+    allowRetire,
+    retire,
+    collision,
+    verifyComplete,
+    verifyTotal,
+    verifyOk.length,
+  ]);
 
   function resetDownstream() {
     setRunId(null);
@@ -142,6 +169,9 @@ export function OcsIncrementImportPanel() {
     setResult(null);
     setFailure(null);
     setReceipts([]);
+    setVerifyTotal(0);
+    setVerifyOk([]);
+    setVerifyFailures([]);
     setStageLabel(null);
   }
 
