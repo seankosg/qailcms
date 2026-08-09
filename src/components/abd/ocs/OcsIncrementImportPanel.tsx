@@ -78,6 +78,7 @@ export function OcsIncrementImportPanel() {
   const [receipts, setReceipts] = useState<UploadReceipt[]>([]);
   const [stageLabel, setStageLabel] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  void fileInputRef;
 
   const isAdmin = me?.isStrictAdmin === true;
 
@@ -570,9 +571,10 @@ export function OcsIncrementImportPanel() {
             </p>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-5">
               <Row label="new" value={collision.counts.new} />
               <Row label="existing (skip)" value={collision.counts.existing} />
+              <Row label="declared_new" value={collision.counts.declared_new} />
               <Row
                 label="hash_mismatch"
                 value={collision.counts.hash_mismatch}
