@@ -668,6 +668,28 @@ export function OcsIncrementImportPanel() {
               실패: {failure}
             </div>
           )}
+          {receipts.length > 0 && (
+            <div className="rounded-md border p-3">
+              <div className="mb-1 text-xs font-semibold">
+                업로드 영수증 (uploaded {receipts.filter((r) => r.state === "uploaded").length} ·
+                existing {receipts.filter((r) => r.state === "existing").length} · failed{" "}
+                {receipts.filter((r) => r.state === "failed").length})
+              </div>
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                실패분은 자동 삭제하지 않습니다. 동일 ZIP 을 다시 선택하면 이미 올라간 object 는
+                건너뛰고 실패분만 재시도합니다.
+              </p>
+              <div className="max-h-40 overflow-auto text-[11px] font-mono">
+                {receipts
+                  .filter((r) => r.state === "failed")
+                  .map((r) => (
+                    <div key={`${r.bucket}/${r.path}`} className="text-destructive">
+                      [failed] {r.bucket}/{r.path} — {r.error ?? ""}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
           {result && (
             <div className="rounded-md border p-3">
               <Row label="import_log_id" value={result["import_log_id"]} />
