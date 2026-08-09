@@ -81,6 +81,9 @@ export function OcsIncrementImportPanel() {
     currentTable: string | null;
     sizeBytes: number | null;
   } | null>(null);
+  const [importRunning, setImportRunning] = useState(false);
+  const [importElapsed, setImportElapsed] = useState(0);
+  const [importFailStage, setImportFailStage] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
   const [allowRetire, setAllowRetire] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -595,11 +598,17 @@ export function OcsIncrementImportPanel() {
   }
 
   async function runImport() {
-    if (!pkg || !runId || !snapshotId || blockers.length > 0) return;
-    setBusy("증분 Import 실행 중…");
-    setProgress(0);
+    if (!pkg || !runId || !snapshotId || blockers.length > 0 || importRunning) return;
+    setImportRunning(true);
+    setImportElapsed(0);
+    setFailure(null);
+    setImportFailStage(null);
+    const startedAt = Date.now();
+    const tick = setInterval(
+      () => setImportElapsed(Math.floor((Date.now() - startedAt) / 1000)),
+      1000,
+    );
     try {
-      setStageLabel("6/6 Import 실행");
       const rec = receipts;
       const out = (await importFn({
         data: {
@@ -648,14 +657,14 @@ export function OcsIncrementImportPanel() {
           ],
         },
       })) as Record<string, unknown>;
-      setStageLabel("6/6 검증 완료");
       setResult(out);
-      toast.success("증분 Import 완료");
+      toast.success(`Import completed — run ${runId}`);
     } catch (e) {
       setFailure(e instanceof Error ? e.message : String(e));
+      setImportFailStage("Transactional OCS database import");
     } finally {
-      setBusy(null);
-      setProgress(0);
+      clearInterval(tick);
+      setImportRunning(false);
     }
   }
 
