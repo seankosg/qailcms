@@ -85,8 +85,8 @@ export function BulkEditBar({
       // ⛔ 임시 조치(2026-08-06, 원복 예정): Milestone 일괄 편집은 admin 만 가능.
       // admin 계정은 파생/자동계산을 제외한 전 항목을 일괄 편집할 수 있다.
       getBulkEditableFields({ milestoneOptions, admin: isStrictAdmin }).filter(
-        // ⛔ 임시 조치: Milestone / Work Type(row_type) 은 admin 만 일괄 수정 가능.
-        (f) => (f.field !== "milestone" && f.field !== "row_type") || isStrictAdmin,
+        // ⛔ 임시 조치: Milestone 은 admin 만 일괄 수정 가능.
+        (f) => f.field !== "milestone" || isStrictAdmin,
       ),
     [milestoneOptions, isStrictAdmin],
   );
