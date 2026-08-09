@@ -305,6 +305,7 @@ export function TmKpiAnalysisPage() {
           <OwnerProgressChart
             items={scopedItems}
             asOfDate={asOfDate}
+            startFrom={curveStart || null}
             dim={ownerDim}
             titleSuffix={selectedOwnerLabel}
             onDimChange={(dim) => patch({ ownerDim: dim, curveKey: "" })}
