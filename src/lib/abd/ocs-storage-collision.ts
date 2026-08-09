@@ -159,7 +159,15 @@ export async function checkPackageStorageCollisions(pkg: IncrementPackage): Prom
       ),
     ),
     ...pkg.sourceFiles.map((b, i) =>
-      classify("source", OCS_SOURCE_BUCKET, sourcePaths[i]!, b.sha256, srcExists.has(sourcePaths[i]!), srcMeta),
+      classify(
+        "source",
+        OCS_SOURCE_BUCKET,
+        sourcePaths[i]!,
+        b.sha256,
+        srcExists.has(sourcePaths[i]!),
+        srcMeta,
+        b.sha256.toLowerCase(),
+      ),
     ),
   ];
 
