@@ -338,7 +338,16 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
     }
     if (attIdSeen.has(id)) attIdDup.add(id);
     attIdSeen.add(id);
-    const storagePath = s(pick(r, ["storage_path", "Storage Path"]));
+    // 로컬 패키징 도구 계약: storage_path 가 없으면 relative_path 를 쓰고,
+    // Storage 정본 경로에서는 접두사 "images/" 를 정확히 한 번만 제거한다.
+    const rawPath =
+      s(pick(r, ["storage_path", "Storage Path"])) ??
+      s(pick(r, ["relative_path", "Relative Path"]));
+    const storagePath = rawPath
+      ? rawPath.startsWith("images/")
+        ? rawPath.slice("images/".length)
+        : rawPath
+      : null;
     if (storagePath) {
       if (attPathSeen.has(storagePath)) attPathDup.add(storagePath);
       attPathSeen.add(storagePath);
@@ -354,8 +363,8 @@ export function parseV3Atomic(json: unknown): V3AtomicParse {
       storage_path: storagePath,
       content_hash: (s(pick(r, ["content_hash", "Content Hash", "sha256"])) ?? "").toLowerCase() || null,
       byte_size: n(pick(r, ["byte_size", "Byte Size", "size"])),
-      width: n(pick(r, ["width", "Width"])),
-      height: n(pick(r, ["height", "Height"])),
+      width: n(pick(r, ["width", "width_px", "Width"])),
+      height: n(pick(r, ["height", "height_px", "Height"])),
       image_format: s(pick(r, ["image_format", "Image Format"])),
       mime_type: s(pick(r, ["mime_type", "Mime Type"])),
       source_image_index: n(pick(r, ["source_image_index", "Source Image Index"])),
