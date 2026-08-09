@@ -5,7 +5,13 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BASELINE_SCHEMA_VERSION, computeBaselineId } from "@/lib/abd/ocs-baseline-shared";
 import { assertBaselineGate } from "@/lib/abd/ocs-increment-gate";
 import { recheckCollisionsServerSide } from "@/lib/abd/ocs-increment-collision";
-import { assetList, sourceFileList, sourceMetaList } from "@/lib/abd/ocs-increment-normalize";
+import {
+  assetList,
+  imageMetaList,
+  receiptList,
+  sourceFileList,
+  sourceMetaList,
+} from "@/lib/abd/ocs-increment-normalize";
 import type { SourceFileRef } from "@/lib/abd/ocs-increment-types";
 
 export type { AssetRef, SourceFileMeta, SourceFileRef } from "@/lib/abd/ocs-increment-types";
@@ -115,10 +121,14 @@ export const ocsIncDryRun = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
-    return rpc(context.supabase, "abd_ocs_inc_dryrun", {
+    const base = (await rpc(context.supabase, "abd_ocs_inc_dryrun", {
       p_run: data.run_id,
       p_source_files: data.source_files,
-    });
+    })) as Record<string, Json>;
+    const att = (await rpc(context.supabase, "abd_ocs_inc_attachment_stats", {
+      p_run: data.run_id,
+    })) as Record<string, Json>;
+    return { ...base, ...att } as Json;
   });
 
 /** 증분 Import 본체 — 사전 스냅샷 성공 + 패키지 관문 통과 후에만 실행. */
@@ -142,6 +152,8 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       source_files?: SourceFileRef[];
       source_meta?: unknown;
       assets?: unknown;
+      image_meta?: unknown;
+      upload_receipts?: unknown;
     }) => {
       const need = [
         "run_id",
@@ -165,6 +177,8 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         source_files: sourceFileList(input.source_files),
         source_meta: sourceMetaList(input.source_meta),
         assets: assetList(input.assets),
+        image_meta: imageMetaList(input.image_meta),
+        upload_receipts: receiptList(input.upload_receipts),
       };
     },
   )
@@ -230,6 +244,8 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         }
         return names;
       },
+      data.image_meta,
+      data.upload_receipts,
     );
     if (collision.blockers.length > 0) throw new Error(collision.blockers.join(" / "));
 
@@ -253,6 +269,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         p_allow_retire: data.allow_retire,
         p_source_files: data.source_files,
         p_source_meta: data.source_meta,
+        p_image_meta: data.image_meta,
       });
       const verify = await rpc(context.supabase, "abd_ocs_v3_verify", {});
       await supabaseAdmin
@@ -269,6 +286,8 @@ export const ocsIncImport = createServerFn({ method: "POST" })
             base_core_hash: gate.core_hash_current,
             base_generated_at: data.base_generated_at,
             storage_skipped: collision.skip_paths.length,
+            storage_declared_new: collision.declared_new_paths.length,
+            upload_receipts: data.upload_receipts as never,
             allow_retire: data.allow_retire,
           } as never,
         })
@@ -281,6 +300,7 @@ export const ocsIncImport = createServerFn({ method: "POST" })
           status: "failed",
           finished_at: new Date().toISOString(),
           errors: [{ message: (err as Error).message }] as never,
+          result: { upload_receipts: data.upload_receipts } as never,
         })
         .eq("id", importLogId);
       throw err;
