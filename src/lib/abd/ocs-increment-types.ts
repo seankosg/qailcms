@@ -36,13 +36,18 @@ export type ImageMeta = {
   attachment_scope: string;
 };
 
-/** 이번 run 의 업로드 영수증 — 실패해도 보존한다. 자동 DELETE 는 하지 않는다. */
+/**
+ * 이번 run 의 업로드 영수증 — 실패해도 보존한다. 자동 DELETE 는 하지 않는다.
+ * uploaded: upsert:false 업로드 성공 응답만.
+ * existing: 기존 DB metadata 와 ID/path/hash 가 모두 일치하는 object 만.
+ * declared_new: Storage object 는 있으나 DB metadata 가 없는 경우(서버 실측 검증 대상).
+ */
 export type UploadReceipt = {
   run_id: string;
   package_id: string;
   bucket: string;
   path: string;
   sha256: string;
-  state: "uploaded" | "existing" | "failed";
+  state: "uploaded" | "existing" | "declared_new" | "failed";
   error?: string;
 };
