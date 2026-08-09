@@ -18,7 +18,6 @@ import { TmKpiCards } from "./TmKpiCards";
 
 const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
 const TASK_SCOPE_OPTIONS = [
-  { value: "all", label: "All" },
   { value: "main", label: "Main Task" },
   { value: "sub", label: "Sub Task" },
 ] as const;
@@ -97,8 +96,8 @@ export function TmDashboardPage() {
   // 행에는 이미 srv_judgment/srv_plan_pct/srv_actual_pct 가 부착되어 있다(useTmAsOfRows).
   const effectiveItems = items;
 
-  const taskScope: TaskScope =
-    search.taskScope === "main" || search.taskScope === "sub" ? search.taskScope : "all";
+  // 계산은 항상 Sub 기준(기본값). Main 은 명시 선택 시에만.
+  const taskScope: TaskScope = search.taskScope === "main" ? "main" : "sub";
 
   const scopedByTaskScope = useMemo(() => scopeItems(effectiveItems, taskScope), [effectiveItems, taskScope]);
 
@@ -180,7 +179,7 @@ export function TmDashboardPage() {
                 type="single"
                 value={taskScope}
                 onValueChange={(v) => {
-                  if (v === "all" || v === "main" || v === "sub") patch({ taskScope: v });
+                  if (v === "main" || v === "sub") patch({ taskScope: v });
                 }}
                 className="gap-1"
               >
