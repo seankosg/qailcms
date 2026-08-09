@@ -693,27 +693,27 @@ export function OcsIncrementImportPanel() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" disabled={!pkg || !!busy} onClick={() => void runDryRun()}>
-              Run Dry-run
+              1. Run Dry-run
             </Button>
             <Button
               size="sm"
               variant="outline"
-              disabled={!dry || !!busy}
-              onClick={() => void runSnapshot()}
-            >
-              Create Pre-import Snapshot
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!pkg || !!busy || !!result}
+              disabled={!pkg || !dry || !!busy || !!result}
               onClick={() => void runUploadVerify()}
             >
               {uploadFailedCount > 0
-                ? `Retry Failed Uploads (${uploadFailedCount})`
+                ? `2. Retry Failed Uploads (${uploadFailedCount})`
                 : verifyFailures.length > 0
-                  ? "Retry Failed Verification"
-                  : "Upload & Verify Assets"}
+                  ? "2. Retry Failed Verification"
+                  : "2. Upload & Verify Assets"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!dry || !verifyComplete || !!busy}
+              onClick={() => void runSnapshot()}
+            >
+              3. Create Pre-import Snapshot
             </Button>
             {uploadFailedCount > 0 && (
               <Badge variant="outline" className="gap-1 text-[11px] text-destructive">
