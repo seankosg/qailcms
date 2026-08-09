@@ -10,6 +10,7 @@ import {
   type V3AtomicParse,
   type V3PolicyParse,
   type V3ResponseParse,
+  type V3StageAttachment,
 } from "@/lib/abd/ocs-v3-parser";
 
 export const INCREMENT_SCHEMA_VERSION = "ocs-increment/1";
