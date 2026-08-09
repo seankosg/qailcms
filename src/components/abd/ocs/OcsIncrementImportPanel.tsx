@@ -82,6 +82,7 @@ export function OcsIncrementImportPanel() {
   const [verifyTotal, setVerifyTotal] = useState(0);
   const [verifyOk, setVerifyOk] = useState<string[]>([]);
   const [verifyFailures, setVerifyFailures] = useState<{ path: string; error: string }[]>([]);
+  const [verifyRan, setVerifyRan] = useState(false);
   const [stageLabel, setStageLabel] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pickerKey, setPickerKey] = useState(0);
@@ -91,8 +92,27 @@ export function OcsIncrementImportPanel() {
   const retire = num(dry?.["comments_to_retire"]);
   const scopeActive = num(dry?.["scope_existing_active"]);
   const massRetire = dry ? retire > scopeActive * RETIRE_PCT || retire > RETIRE_ABS : false;
-  const verifyPending = verifyTotal > 0 ? verifyTotal - verifyOk.length : 0;
-  const verifyComplete = verifyTotal > 0 && verifyPending === 0;
+
+  /** 서버 검증이 필요한 전체 신규 asset 수 (기존 동일 hash skip 제외) — 성공 receipt 수와 무관하게 고정. */
+  const newAssetTotal = useMemo(() => {
+    if (!pkg) return 0;
+    const skip = collision?.skipPaths ?? new Set<string>();
+    const paths = [
+      ...pkg.images.map((b) => imageStoragePath(b.relative_path)),
+      ...pkg.sourceFiles.map((b) => sourceStoragePath(pkg.manifest.package_id, b.relative_path)),
+    ];
+    return paths.filter((p) => !skip.has(p)).length;
+  }, [pkg, collision]);
+
+  const uploadFailures = useMemo(() => receipts.filter((r) => r.state === "failed"), [receipts]);
+  const uploadFailedCount = uploadFailures.length;
+  const verifyPending = Math.max(0, verifyTotal - verifyOk.length);
+  const verifyComplete =
+    verifyRan &&
+    uploadFailedCount === 0 &&
+    verifyFailures.length === 0 &&
+    verifyTotal === newAssetTotal &&
+    verifyPending === 0;
 
   const blockers = useMemo(() => {
     const out: string[] = [];
@@ -137,11 +157,15 @@ export function OcsIncrementImportPanel() {
       if (massRetire && !allowRetire) out.push(`대량 퇴역 미승인 (${retire}건 · 임계 30% / 100건)`);
     }
     if (!snapshotId) out.push("사전 백업 스냅샷 미완료 (Dry-run 이후 생성분만 인정)");
+    if (uploadFailedCount > 0)
+      out.push(
+        `자산 업로드 실패 ${uploadFailedCount}건 — 재실행으로 실패분만 다시 업로드하십시오.`,
+      );
     if (!verifyComplete)
       out.push(
-        verifyTotal === 0
+        !verifyRan
           ? "신규 자산 업로드 · 서버 실측 검증 미실행"
-          : `서버 실측 검증 미완료 (${verifyOk.length}/${verifyTotal})`,
+          : `서버 실측 검증 미완료 (${verifyOk.length}/${newAssetTotal})`,
       );
     if (!approved) out.push("최종 승인 체크 필요");
     return out;
@@ -158,6 +182,9 @@ export function OcsIncrementImportPanel() {
     verifyComplete,
     verifyTotal,
     verifyOk.length,
+    verifyRan,
+    newAssetTotal,
+    uploadFailedCount,
   ]);
 
   function resetDownstream() {
@@ -172,6 +199,7 @@ export function OcsIncrementImportPanel() {
     setVerifyTotal(0);
     setVerifyOk([]);
     setVerifyFailures([]);
+    setVerifyRan(false);
     setStageLabel(null);
   }
 
