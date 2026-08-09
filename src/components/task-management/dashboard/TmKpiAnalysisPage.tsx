@@ -79,6 +79,20 @@ export function TmKpiAnalysisPage() {
 
   const scopedByTaskScope = useMemo(() => scopeItems(items, taskScope), [items, taskScope]);
 
+  const { data: thresholdsData } = useTaskManagementSettings();
+  const thresholds = thresholdsData ?? DEFAULT_THRESHOLDS;
+
+  const [ownerDetail, setOwnerDetail] = useState<{
+    dim: OwnerDim;
+    key: string;
+    row: OwnerLeaderboardRow;
+  } | null>(null);
+  const [curveOpen, setCurveOpen] = useState(true);
+  const curveBucket: SCurveBucket =
+    search.curveBucket === "day" || search.curveBucket === "month"
+      ? search.curveBucket
+      : "week";
+
   const scopedItems = useMemo(() => {
     const base = scopedByTaskScope;
     if (search.delayFilter === "risk")
