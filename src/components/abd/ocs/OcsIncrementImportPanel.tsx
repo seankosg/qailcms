@@ -40,6 +40,13 @@ import { OcsBaselineCard } from "@/components/abd/ocs/OcsBaselineCard";
 import { getLatestOcsBaselineInfo } from "@/lib/abd/ocs-baseline.functions";
 import { ocsIncListVerifyReceipts } from "@/lib/abd/ocs-increment-receipts.functions";
 import {
+  classifyImportFailure,
+  evaluateGates,
+  evaluateImportSuccess,
+  type GateInput,
+  type ImportFailureState,
+} from "@/lib/abd/ocs-wizard-gates";
+import {
   OcsWizardStepper,
   type StepStatus,
   type WizardStep,
@@ -120,6 +127,7 @@ export function OcsIncrementImportPanel() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [importFailure, setImportFailure] = useState<ImportFailureState | null>(null);
   const [collision, setCollision] = useState<CollisionReport | null>(null);
   const [receipts, setReceipts] = useState<UploadReceipt[]>([]);
   const [verifyTotal, setVerifyTotal] = useState(0);
