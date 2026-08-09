@@ -180,7 +180,7 @@ export function OcsIncrementImportPanel() {
     if (!isAdminRef.current) return;
     void (async () => {
       try {
-        const info = (await baselineInfoFn({ data: {} })) as typeof baselineInfo;
+        const info = (await baselineInfoFn()) as typeof baselineInfo;
         setBaselineInfo(info);
         setBaselineInfoError(null);
       } catch (e) {
