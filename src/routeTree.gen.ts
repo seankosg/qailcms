@@ -48,6 +48,7 @@ import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './rout
 import { Route as AuthenticatedClosureSnagManagementSettingsRouteImport } from './routes/_authenticated/closure/snag-management/settings'
 import { Route as AuthenticatedClosureSnagManagementRawDataRouteImport } from './routes/_authenticated/closure/snag-management/raw-data'
 import { Route as AuthenticatedClosureSnagManagementProgressRouteImport } from './routes/_authenticated/closure/snag-management/progress'
+import { Route as AuthenticatedClosureSnagManagementKpiAnalysisRouteImport } from './routes/_authenticated/closure/snag-management/kpi-analysis'
 import { Route as AuthenticatedClosureSnagManagementDashboardRouteImport } from './routes/_authenticated/closure/snag-management/dashboard'
 import { Route as AuthenticatedClosureDashboardWarrantyRouteImport } from './routes/_authenticated/closure/dashboard/warranty'
 import { Route as AuthenticatedClosureDashboardTaskRouteImport } from './routes/_authenticated/closure/dashboard/task'
@@ -289,6 +290,12 @@ const AuthenticatedClosureSnagManagementProgressRoute =
     path: '/closure/snag-management/progress',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureSnagManagementKpiAnalysisRoute =
+  AuthenticatedClosureSnagManagementKpiAnalysisRouteImport.update({
+    id: '/closure/snag-management/kpi-analysis',
+    path: '/closure/snag-management/kpi-analysis',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureSnagManagementDashboardRoute =
   AuthenticatedClosureSnagManagementDashboardRouteImport.update({
     id: '/closure/snag-management/dashboard',
@@ -411,6 +418,7 @@ export interface FileRoutesByFullPath {
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/closure/snag-management/dashboard': typeof AuthenticatedClosureSnagManagementDashboardRoute
+  '/closure/snag-management/kpi-analysis': typeof AuthenticatedClosureSnagManagementKpiAnalysisRoute
   '/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
@@ -465,6 +473,7 @@ export interface FileRoutesByTo {
   '/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/closure/snag-management/dashboard': typeof AuthenticatedClosureSnagManagementDashboardRoute
+  '/closure/snag-management/kpi-analysis': typeof AuthenticatedClosureSnagManagementKpiAnalysisRoute
   '/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
@@ -522,6 +531,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/dashboard/task': typeof AuthenticatedClosureDashboardTaskRoute
   '/_authenticated/closure/dashboard/warranty': typeof AuthenticatedClosureDashboardWarrantyRoute
   '/_authenticated/closure/snag-management/dashboard': typeof AuthenticatedClosureSnagManagementDashboardRoute
+  '/_authenticated/closure/snag-management/kpi-analysis': typeof AuthenticatedClosureSnagManagementKpiAnalysisRoute
   '/_authenticated/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/_authenticated/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/_authenticated/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
@@ -579,6 +589,7 @@ export interface FileRouteTypes {
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
     | '/closure/snag-management/dashboard'
+    | '/closure/snag-management/kpi-analysis'
     | '/closure/snag-management/progress'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
@@ -633,6 +644,7 @@ export interface FileRouteTypes {
     | '/closure/dashboard/task'
     | '/closure/dashboard/warranty'
     | '/closure/snag-management/dashboard'
+    | '/closure/snag-management/kpi-analysis'
     | '/closure/snag-management/progress'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
@@ -689,6 +701,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/dashboard/task'
     | '/_authenticated/closure/dashboard/warranty'
     | '/_authenticated/closure/snag-management/dashboard'
+    | '/_authenticated/closure/snag-management/kpi-analysis'
     | '/_authenticated/closure/snag-management/progress'
     | '/_authenticated/closure/snag-management/raw-data'
     | '/_authenticated/closure/snag-management/settings'
@@ -1000,6 +1013,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureSnagManagementProgressRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/snag-management/kpi-analysis': {
+      id: '/_authenticated/closure/snag-management/kpi-analysis'
+      path: '/closure/snag-management/kpi-analysis'
+      fullPath: '/closure/snag-management/kpi-analysis'
+      preLoaderRoute: typeof AuthenticatedClosureSnagManagementKpiAnalysisRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/snag-management/dashboard': {
       id: '/_authenticated/closure/snag-management/dashboard'
       path: '/closure/snag-management/dashboard'
@@ -1172,6 +1192,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureDashboardTaskRoute: typeof AuthenticatedClosureDashboardTaskRoute
   AuthenticatedClosureDashboardWarrantyRoute: typeof AuthenticatedClosureDashboardWarrantyRoute
   AuthenticatedClosureSnagManagementDashboardRoute: typeof AuthenticatedClosureSnagManagementDashboardRoute
+  AuthenticatedClosureSnagManagementKpiAnalysisRoute: typeof AuthenticatedClosureSnagManagementKpiAnalysisRoute
   AuthenticatedClosureSnagManagementProgressRoute: typeof AuthenticatedClosureSnagManagementProgressRoute
   AuthenticatedClosureSnagManagementRawDataRoute: typeof AuthenticatedClosureSnagManagementRawDataRoute
   AuthenticatedClosureSnagManagementSettingsRoute: typeof AuthenticatedClosureSnagManagementSettingsRoute
@@ -1216,6 +1237,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureDashboardWarrantyRoute,
   AuthenticatedClosureSnagManagementDashboardRoute:
     AuthenticatedClosureSnagManagementDashboardRoute,
+  AuthenticatedClosureSnagManagementKpiAnalysisRoute:
+    AuthenticatedClosureSnagManagementKpiAnalysisRoute,
   AuthenticatedClosureSnagManagementProgressRoute:
     AuthenticatedClosureSnagManagementProgressRoute,
   AuthenticatedClosureSnagManagementRawDataRoute:
@@ -1270,13 +1293,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
