@@ -56,6 +56,11 @@ interface Props {
   unit: SnagCurveUnit;
   onUnitChange: (u: SnagCurveUnit) => void;
   filterSummary: Array<{ label: string; value: string }>;
+  /** 차트 구간 이전까지의 누계(서버 totals, asOf = rangeStart-1) */
+  baselinePlan: number;
+  baselineActual: number;
+  /** 선택 스테이지 모수 합계 — % 분모 */
+  stageTotal: number;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
@@ -71,6 +76,9 @@ export function SnagKpiPlanVsActualCard({
   unit,
   onUnitChange,
   filterSummary,
+  baselinePlan,
+  baselineActual,
+  stageTotal,
   open,
   onOpenChange,
 }: Props) {
@@ -90,7 +98,7 @@ export function SnagKpiPlanVsActualCard({
   const ser = curve.series[stage];
 
   const idxForKpi = curve.todayIndex >= 0 ? curve.todayIndex : curve.buckets.length - 1;
-  const planNow = idxForKpi >= 0 ? (ser.cumPlan[idxForKpi] ?? 0) : 0;
+  const planNow = baselinePlan + (idxForKpi >= 0 ? (ser.cumPlan[idxForKpi] ?? 0) : 0);
   let lastActualIdx = -1;
   for (let i = ser.cumActual.length - 1; i >= 0; i--) {
     if (ser.cumActual[i] != null) {
@@ -98,13 +106,12 @@ export function SnagKpiPlanVsActualCard({
       break;
     }
   }
-  const actualNow = lastActualIdx >= 0 ? (ser.cumActual[lastActualIdx] as number) : 0;
+  const actualNow = baselineActual + (lastActualIdx >= 0 ? (ser.cumActual[lastActualIdx] as number) : 0);
   const deltaNow = actualNow - planNow;
 
   const isPct = unit === "pct";
-  // % 는 as-of 시점 누적 계획을 분모로 하는 단일 스케일 환산.
-  // 모든 계열에 같은 분모를 적용하므로 실적/계획 비는 건수와 동일하게 유지된다.
-  const denom = planNow > 0 ? planNow : 0;
+  // % 는 선택 스테이지의 모수(total)를 분모로 한다 — 막대 차트와 동일 정의.
+  const denom = stageTotal > 0 ? stageTotal : 0;
   const conv = (v: number) => (isPct ? (denom > 0 ? (v / denom) * 100 : 0) : v);
   const r1 = (v: number) => Number(v.toFixed(1));
 
@@ -113,17 +120,26 @@ export function SnagKpiPlanVsActualCard({
     bucketLabel: curve.bucketLabels[i],
     planInc: r1(conv(ser.dailyPlan[i])),
     actualInc: ser.dailyActual[i] == null ? null : r1(conv(ser.dailyActual[i] as number)),
-    cumPlan: r1(conv(ser.cumPlan[i])),
-    cumActual: ser.cumActual[i] == null ? null : r1(conv(ser.cumActual[i] as number)),
+    cumPlan: r1(conv(baselinePlan + ser.cumPlan[i])),
+    cumActual:
+      ser.cumActual[i] == null
+        ? null
+        : r1(conv(baselineActual + (ser.cumActual[i] as number))),
     variance:
       ser.cumActual[i] == null
         ? null
-        : r1(conv((ser.cumActual[i] as number) - ser.cumPlan[i])),
+        : r1(
+            conv(
+              baselineActual +
+                (ser.cumActual[i] as number) -
+                (baselinePlan + ser.cumPlan[i]),
+            ),
+          ),
   }));
 
   const todayLabel = curve.todayIndex >= 0 ? (curve.bucketLabels[curve.todayIndex] ?? null) : null;
 
-  const n = planNow;
+  const n = stageTotal;
   const unitSuffix = isPct ? "%" : "건";
   const incLabel = isPct ? "Plan (increment, %)" : "Plan (increment, 건)";
   const incActualLabel = isPct ? "Actual (increment, %)" : "Actual (increment, 건)";
@@ -159,7 +175,7 @@ export function SnagKpiPlanVsActualCard({
   const sign = deltaNow > 0 ? "+" : "";
   const appliedLabel = `${filterSummary
     .map((f) => `${f.label}: ${f.value}`)
-    .join(" · ")} · plan = ${n.toLocaleString()} 건`;
+    .join(" · ")} · 모수 ${n.toLocaleString()}건`;
 
   return (
     <Card>
@@ -186,8 +202,17 @@ export function SnagKpiPlanVsActualCard({
                     </span>
                   ))}
                   <span className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs tabular-nums text-foreground">
-                    plan = {n.toLocaleString()} 건
+                    모수 {n.toLocaleString()}건
                   </span>
+                </div>
+              </button>
+            </CollapsibleTrigger>
+            <div className="w-full text-[11px] tabular-nums text-muted-foreground">
+              As of {asOfDate} · 전체 누적 (차트 구간 이전 포함) · 모수 {stageTotal.toLocaleString()}건
+            </div>
+            <div className="hidden">
+              <div>
+                <div>
                 </div>
               </button>
             </CollapsibleTrigger>
