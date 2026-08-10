@@ -1204,6 +1204,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       let processed = 0;
       let skippedLocked = 0;
       const importErrors: DefectImportError[] = [];
+      // 감사 로그 저장 실패 목록 (ABD mutations.functions.ts 의 log_persist_errors 방식과 동일)
+      const logPersistErrors: { source: string; error: string; attempted: number; persisted: number }[] = [];
       // 행별 rejection 사유 맵 — row_logs에 정확히 반영하기 위함.
       // 키: source_issue_no (문자열). preflight/batch 실패 시 채워짐.
       const rejectedByKey = new Map<string, { reason_code: string; reason_detail?: string }>();
