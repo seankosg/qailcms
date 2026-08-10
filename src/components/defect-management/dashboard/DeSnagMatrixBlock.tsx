@@ -420,7 +420,7 @@ export function DeSnagMatrixBlock({
             showHoDate={showHoDate}
           />
           <tbody>
-            {{/* Column Total 행 — 헤더 바로 아래 고정 */}
+            {/* Column Total 행 — 헤더 바로 아래 고정 */}
             <tr className="font-bold">
               <td
                 className="sticky left-0 top-[78px] z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
