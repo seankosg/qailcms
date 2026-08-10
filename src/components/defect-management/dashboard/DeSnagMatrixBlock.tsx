@@ -497,6 +497,8 @@ function FragmentRows({
   mode,
   onNavigate,
   goCell,
+  showHoDate,
+  hoDates,
 }: {
   group: { building: string; rows: MatrixBlock["rows"]; subtotal: Stats };
   block: MatrixBlock;
@@ -510,6 +512,8 @@ function FragmentRows({
     slot: StatusSlot,
     team: TeamKey,
   ) => void;
+  showHoDate: boolean;
+  hoDates: HoDateMap;
 }) {
   const showBuildingSubtotal = block.kind === "podium" && group.rows.length > 1;
   return (
@@ -555,14 +559,21 @@ function FragmentRows({
             </button>
           </td>
           {block.columnKeys.map((rg, gIdx) => (
-            <TeamCells
-              key={rg}
-              stats={r.cells[rg]}
-              mode={mode}
-              onCell={(slot, team) => goCell(r.building, r.levelDisp, rg, slot, team)}
-              dim={r.cells[rg].issued === 0}
-              groupIndex={gIdx}
-            />
+            <Fragment key={rg}>
+              <TeamCells
+                stats={r.cells[rg]}
+                mode={mode}
+                onCell={(slot, team) => goCell(r.building, r.levelDisp, rg, slot, team)}
+                dim={r.cells[rg].issued === 0}
+                groupIndex={gIdx}
+              />
+              {showHoDate && (
+                <HoCell
+                  value={hoDates.cell(block.kind, r.building, r.levelDisp, rg)}
+                  groupIndex={gIdx}
+                />
+              )}
+            </Fragment>
           ))}
           <TeamCells
             stats={r.rowTotal}
@@ -571,6 +582,13 @@ function FragmentRows({
             groupIndex={block.columnKeys.length}
             isTotal
           />
+          {showHoDate && (
+            <HoCell
+              value={hoDates.row(block.kind, r.building, r.levelDisp)}
+              groupIndex={block.columnKeys.length}
+              isTotal
+            />
+          )}
         </tr>
       ))}
       {showBuildingSubtotal && (
@@ -585,13 +603,15 @@ function FragmentRows({
             const sub = newStats();
             for (const r of group.rows) mergeStats(sub, r.cells[rg]);
             return (
-              <TeamCells
-                key={rg}
-                stats={sub}
-                mode={mode}
-                onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
-                groupIndex={gIdx}
-              />
+              <Fragment key={rg}>
+                <TeamCells
+                  stats={sub}
+                  mode={mode}
+                  onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
+                  groupIndex={gIdx}
+                />
+                {showHoDate && <HoCell value={null} groupIndex={gIdx} emphasize />}
+              </Fragment>
             );
           })}
           <TeamCells
@@ -601,6 +621,13 @@ function FragmentRows({
             groupIndex={block.columnKeys.length}
             isTotal
           />
+          {showHoDate && (
+            <HoCell
+              value={hoDates.building(block.kind, group.building)}
+              groupIndex={block.columnKeys.length}
+              isTotal
+            />
+          )}
         </tr>
       )}
     </>
