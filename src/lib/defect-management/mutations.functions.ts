@@ -166,12 +166,21 @@ export const bulkToggleCritical = createServerFn({ method: "POST" })
   .inputValidator((data) => ToggleCriticalSchema.parse(data))
   .handler(async ({ data, context }) => {
     await assertSmWrite(context);
-    const { error } = await (context.supabase as any)
+    // RLS 로 막힌 행은 에러가 아니라 0행으로 돌아온다 → 실제 바뀐 id 만 돌려준다.
+    const { data: updatedRows, error } = await (context.supabase as any)
       .from("defect_items_raw")
       .update({ is_critical: data.value, updated_at: new Date().toISOString() })
-      .in("id", data.ids);
+      .in("id", data.ids)
+      .select("id");
     if (error) throw new Error(error.message);
-    return { ok: true, count: data.ids.length };
+    const updatedIds = ((updatedRows ?? []) as Array<{ id: string }>).map((r) => r.id);
+    return {
+      ok: true,
+      requested: data.ids.length,
+      count: updatedIds.length,
+      ids: updatedIds,
+      blocked: Math.max(0, data.ids.length - updatedIds.length),
+    };
   });
 
 const BulkUpdateSchema = z.object({
