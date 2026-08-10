@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BASELINE_SCHEMA_VERSION, computeBaselineId } from "@/lib/abd/ocs-baseline-shared";
 import { assertBaselineGate } from "@/lib/abd/ocs-increment-gate";
 import { recheckCollisionsServerSide, verifiedKey } from "@/lib/abd/ocs-increment-collision";
+import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 import {
   assetList,
   imageMetaList,
@@ -26,12 +27,7 @@ type LooseClient = {
 };
 
 async function assertAdmin(supabase: unknown, userId: string) {
-  const { data, error } = await (supabase as unknown as LooseClient).rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
+  await assertAbdOcsAccess(supabase, userId);
 }
 
 async function rpc(supabase: unknown, fn: string, args: Record<string, unknown> = {}) {
