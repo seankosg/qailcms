@@ -59,10 +59,10 @@ function parseCsv<T extends string>(v: string, allowed: readonly T[]): T[] {
 
 export function SnagKpiAnalysisPage() {
   const search = routeApi.useSearch();
-  const navigate = useNavigate({ from: routeApi.id });
+  const navigate = useNavigate({ from: "/closure/snag-management/kpi-analysis" });
 
   const setSearch = (patch: Record<string, unknown>) =>
-    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }) as any, replace: true });
+    navigate({ search: (prev) => ({ ...prev, ...patch }) as any, replace: true });
 
   const plot: PlotKey = search.plot as PlotKey;
   const teams = parseCsv<TeamKey>(search.teams, ALL_TEAMS);
