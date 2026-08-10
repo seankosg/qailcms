@@ -6917,6 +6917,7 @@ export type Database = {
         Args: { p_dataset: string; p_limit?: number; p_offset?: number }
         Returns: Json
       }
+      abd_ocs_can_manage: { Args: { _uid?: string }; Returns: boolean }
       abd_ocs_comment_visible: {
         Args: { _comment_id: string }
         Returns: boolean
