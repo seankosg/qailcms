@@ -1149,10 +1149,9 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
 
   return (
     <div className="flex max-h-[calc(100dvh-280px)] flex-col overflow-hidden rounded-md border bg-background">
+      {/* 가로 스크롤바는 스크롤 컨테이너 밖(테이블 위)에 둔다. 안에 두면 헤더를 가린다. */}
+      <TopHorizontalScrollbar targetRef={tableRef} width={totalWidth} frozenWidth={frozenWidth} />
       <div ref={tableRef} className="min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">
-        <div className="sticky top-9 z-[4] bg-background" style={{ width: totalWidth }}>
-          <TopHorizontalScrollbar targetRef={tableRef} width={totalWidth} frozenWidth={frozenWidth} />
-        </div>
         <table
           className="w-full border-separate border-spacing-0 caption-bottom text-sm"
           style={{ width: totalWidth, tableLayout: "fixed" }}
