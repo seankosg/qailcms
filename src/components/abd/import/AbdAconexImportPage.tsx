@@ -491,6 +491,15 @@ export function AbdAconexImportPage() {
                             >
                               unmatched_not exist DB {e.preview.unmatched}
                             </Badge>
+                            {e.preview.out_of_scope > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[10px] border-rose-400/60 bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+                                title="권한 범위 밖이라 반영에서 제외된 문서"
+                              >
+                                out_of_scope {e.preview.out_of_scope}
+                              </Badge>
+                            )}
                             {e.preview.terminated_reset_count > 0 && (
                               <Badge
                                 variant="outline"
