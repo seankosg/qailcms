@@ -368,10 +368,17 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
         );
       }
     }
-    // 필드 변경 로그 flush (실패 시 임포트는 성공 처리)
-    void flushFieldLogs(supa, batchId, context.userId, pendingLogs).catch((e) =>
-      console.warn("[abd_aconex flushFieldLogs]", e),
-    );
+    // 필드 변경 로그 flush — 실패는 조용히 넘기지 않고 결과에 실어 반환한다.
+    const logPersistErrors: { source: string; error: string; attempted: number; persisted: number }[] = [];
+    const fieldLogRes = await flushFieldLogs(supa, batchId, context.userId, pendingLogs);
+    if (!fieldLogRes.ok) {
+      logPersistErrors.push({
+        source: "import_field_logs",
+        error: fieldLogRes.error ?? "unknown",
+        attempted: fieldLogRes.attempted,
+        persisted: fieldLogRes.persisted,
+      });
+    }
 
     // 실제 updated 카운트 반영
     await supa.from("abd_import_logs").update({ updated }).eq("id", batchId);
