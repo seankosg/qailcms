@@ -280,7 +280,7 @@ export function SnagKpiPlanVsActualCard({
                     <span>Solid = actual · Dashed = plan · Week starts Monday</span>
                     <span>
                       {isPct
-                        ? "% = 누적 실적 ÷ 누적 계획 × 100 (as-of 누적 계획 기준 환산)"
+                        ? "% = 값 ÷ 모수(total) × 100 (막대 차트와 동일 분모)"
                         : `건수 = ${STAGE_LABELS[stage]} 스테이지 문서 건수`}
                     </span>
                   </div>
