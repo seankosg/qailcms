@@ -246,11 +246,13 @@ function MatrixHeader({
   buildingParam,
   onNavigate,
   showHoDate,
+  srcRG,
 }: {
   block: MatrixBlock;
   buildingParam: Record<string, string>;
   onNavigate: (p: Record<string, string>) => void;
   showHoDate: boolean;
+  srcRG: (col: string) => string;
 }) {
   const groups: Array<{ key: string; label: string; isTotal?: boolean; isNa?: boolean }> = [
     ...block.columnKeys.map((rg) => ({ key: rg as string, label: rg as string, isNa: rg === "N/A" })),
@@ -299,7 +301,7 @@ function MatrixHeader({
                   if (block.kind === "liftcabin") {
                     p.subcontractor = g.key === "N/A" ? "__EMPTY__" : g.key;
                   } else {
-                    p.roomGroup = g.key === "N/A" ? "__EMPTY__" : g.key;
+                    p.roomGroup = srcRG(g.key);
                   }
                   onNavigate(p);
                 }}
@@ -371,31 +373,36 @@ function MatrixHeader({
 export function DeSnagMatrixBlock({
   block,
   onNavigate,
-  presentBuildings,
   mode,
+  buildingSourceMap,
+  levelSourceMap,
+  roomGroupSourceMap,
   showHoDate = false,
   hoDates = EMPTY_HO_DATE_MAP,
   eachDate = false,
   stageDates = EMPTY_STAGE_DATE_MAP,
 }: {
   block: MatrixBlock;
-  presentBuildings: string[];
   mode: MatrixMode;
+  /** 라벨 → 원본 값 역매핑 (정본 = dashboard-shape.buildMatrix) */
+  buildingSourceMap: Record<string, string[]>;
+  levelSourceMap: Record<string, string[]>;
+  roomGroupSourceMap: Record<string, string[]>;
   onNavigate: (params: Record<string, string>) => void;
   showHoDate?: boolean;
   hoDates?: HoDateMap;
   eachDate?: boolean;
   stageDates?: StageDateMap;
 }) {
-  const buildingMembers = (() => {
-    if (block.kind === "tower") return ["Tower", "Tower 4"];
-    if (block.kind === "basement") return ["BSM"];
-    if (block.kind === "lg") return ["LG"];
-    if (block.kind === "liftcabin") return ["LIFT CABIN"];
-    if (block.kind === "vip") return ["VIP Drop Off (P5)"];
-    if (block.kind === "unassigned") return ["__EMPTY__"];
-    return presentBuildings;
-  })();
+  // 라벨 → 원본 값. 목록을 컴포넌트에 적지 않는다.
+  const srcB = (label: string) => (buildingSourceMap[label] ?? [label]).join(",");
+  const srcL = (label: string) => (levelSourceMap[label] ?? [label]).join(",");
+  const srcRG = (col: string) =>
+    (roomGroupSourceMap[col] ?? [col === "N/A" ? "__EMPTY__" : col]).join(",");
+
+  const buildingMembers = Array.from(
+    new Set(block.rows.flatMap((r) => (buildingSourceMap[r.building] ?? [r.building]))),
+  );
 
   const buildingParam: Record<string, string> = buildingMembers.length
     ? { building: buildingMembers.join(",") }
@@ -411,16 +418,15 @@ export function DeSnagMatrixBlock({
     const p: Record<string, string> = {};
     if (block.kind === "unassigned" || block.kind === "basement" || !rowBuilding)
       Object.assign(p, buildingParam);
-    else p.building = rowBuilding;
+    else p.building = srcB(rowBuilding);
     // LG · LIFT CABIN 블록의 행 라벨은 level_name 이 아니므로 level 필터를 걸지 않는다.
     if (block.kind === "liftcabin") {
       if (rowLevelDisp) p.room = rowLevelDisp === "N/A" ? "__EMPTY__" : rowLevelDisp;
       if (col === "N/A") p.subcontractor = "__EMPTY__";
       else if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.subcontractor = col;
     } else {
-      if (rowLevelDisp && block.kind !== "lg") p.level = rowLevelDisp;
-      if (col === "N/A") p.roomGroup = "__EMPTY__";
-      else if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.roomGroup = col;
+      if (rowLevelDisp && block.kind !== "lg") p.level = srcL(rowLevelDisp);
+      if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.roomGroup = srcRG(col);
     }
     p.team = team;
     // 정본(_snag_done_asof) 동치: 자기 실적일 ≤ as-of. dateEnd 는 상위에서 as-of 로 채움.
@@ -464,6 +470,7 @@ export function DeSnagMatrixBlock({
             buildingParam={buildingParam}
             onNavigate={onNavigate}
             showHoDate={showHoDate}
+            srcRG={srcRG}
           />
           <tbody>
             {/* Column Total 행 — 헤더 바로 아래 고정 */}
@@ -537,6 +544,8 @@ export function DeSnagMatrixBlock({
                     mode={mode}
                 onNavigate={onNavigate}
                 goCell={goCell}
+                srcB={srcB}
+                srcL={srcL}
                 showHoDate={showHoDate}
                 hoDates={hoDates}
                 eachDate={eachDate}
@@ -557,6 +566,8 @@ function FragmentRows({
   mode,
   onNavigate,
   goCell,
+  srcB,
+  srcL,
   showHoDate,
   hoDates,
   eachDate,
@@ -574,6 +585,8 @@ function FragmentRows({
     slot: StatusSlot,
     team: TeamKey,
   ) => void;
+  srcB: (label: string) => string;
+  srcL: (label: string) => string;
   showHoDate: boolean;
   hoDates: HoDateMap;
   eachDate: boolean;
@@ -594,7 +607,7 @@ function FragmentRows({
                 type="button"
                 onClick={() => {
                   const p: Record<string, string> =
-                    block.kind === "unassigned" ? { ...buildingParam } : { building: r.building };
+                    block.kind === "unassigned" ? { ...buildingParam } : { building: srcB(r.building) };
                   onNavigate(p);
                 }}
                 className="hover:text-primary"
@@ -611,10 +624,10 @@ function FragmentRows({
               type="button"
               onClick={() => {
                 const p: Record<string, string> =
-                  block.kind === "unassigned" ? { ...buildingParam } : { building: r.building };
+                  block.kind === "unassigned" ? { ...buildingParam } : { building: srcB(r.building) };
                 // LG · LIFT CABIN 블록 행 라벨은 level_name 이 아니므로 level 필터 제외
                 if (block.kind === "liftcabin") p.room = r.levelDisp === "N/A" ? "__EMPTY__" : r.levelDisp;
-                else if (block.kind !== "lg") p.level = r.levelDisp;
+                else if (block.kind !== "lg") p.level = srcL(r.levelDisp);
                 onNavigate(p);
               }}
               className="hover:text-primary"
