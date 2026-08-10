@@ -367,7 +367,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
         mismatched: unmatched.length,
         imported_by: context.userId,
         build_id: typeof __APP_BUILD_ID__ === "string" ? __APP_BUILD_ID__ : null,
-        note: `Aconex sync — matched=${matched.length} unmatched=${unmatched.length}`,
+        note: `Aconex sync — matched=${matched.length} unmatched=${unmatched.length} in_scope=${inScope.length} out_of_scope=${outOfScope.length}`,
       })
       .select("id")
       .single();
@@ -466,7 +466,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
         await supa
           .from("abd_import_logs")
           .update({
-            note: `Aconex sync — matched=${matched.length} unmatched=${unmatched.length} ⚠ null_overwrites: ${summary}`,
+            note: `Aconex sync — matched=${matched.length} unmatched=${unmatched.length} in_scope=${inScope.length} out_of_scope=${outOfScope.length} ⚠ null_overwrites: ${summary}`,
           })
           .eq("id", batchId);
       }
