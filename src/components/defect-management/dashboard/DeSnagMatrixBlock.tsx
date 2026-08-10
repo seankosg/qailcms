@@ -420,12 +420,12 @@ export function DeSnagMatrixBlock({
             showHoDate={showHoDate}
           />
           <tbody>
-            {/* Column Total 행 — 헤더 바로 아래 고정 */}
-            <tr className="font-medium">
+            {/* Column Total 행 — 헤더 바로 아래 고정 */
+            <tr className="font-bold">
               <td
                 className="sticky left-0 top-[78px] z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
                 colSpan={2}
-                style={{ background: "color-mix(in oklab, var(--primary) 14%, var(--card))" }}
+                style={{ background: "color-mix(in oklab, var(--color-yellow-400) 14%, var(--card))" }}
               >
                 <button
                   type="button"
@@ -442,14 +442,15 @@ export function DeSnagMatrixBlock({
                     mode={mode}
                     onCell={(slot, team) => goCell(null, null, rg, slot, team)}
                     groupIndex={idx}
+                    isTotal
                     stickyTop={78}
                   />
                   {showHoDate && (
                     <HoCell
                       value={hoDates.col(block.kind, rg)}
                       groupIndex={idx}
+                      isTotal
                       stickyTop={78}
-                      emphasize
                     />
                   )}
                 </Fragment>
