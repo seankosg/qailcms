@@ -1457,13 +1457,13 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
             logPersistErrors.push({
               source: "import_field_logs",
               error: msg,
-              attempted: pendingFieldLogs.length,
+              attempted: 0,
               persisted: 0,
             });
             importErrors.push({
               batch: -1,
               code: "LOG_PERSIST_FAILED",
-              message: `import_field_logs 저장 실패 — 저장 0/${pendingFieldLogs.length}`,
+              message: "import_field_logs 저장 실패 — 로그 생성 중 예외",
               details: msg,
             });
           }
