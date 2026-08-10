@@ -192,13 +192,20 @@ export function SnagKpiAnalysisPage() {
     const planUpto = totals.reduce((s: number, t: any) => s + Number(t.plan_upto ?? 0), 0);
     const actualUpto = totals.reduce((s: number, t: any) => s + Number(t.actual_upto ?? 0), 0);
     const bucketSet = new Set(buckets);
+    // 버킷 종료일 — day: 자신, week: +6일, month: 그 달 말일
+    const bucketEnd = (iso: string) => {
+      const d = new Date(`${iso}T00:00:00Z`);
+      if (bucket === "week") d.setUTCDate(d.getUTCDate() + 6);
+      else if (bucket === "month") d.setUTCMonth(d.getUTCMonth() + 1, 0);
+      return d.toISOString().slice(0, 10);
+    };
     let spanPlan = 0;
     let spanActual = 0;
     for (const c of (cellsQ.data ?? []) as any[]) {
       // 서버 집계행(`all|...`)은 제외 — 선택 스테이지 행만 센다.
       if (c.stage !== stage || !c.bucket_iso || !bucketSet.has(c.bucket_iso)) continue;
-      // as-of 이후(미래) 버킷은 누계(plan_upto/actual_upto)에 없으므로 빼지 않는다.
-      if (c.bucket_iso > asOfDate) continue;
+      // 버킷 종료일이 as-of 이후면 그 버킷은 as-of 이후 몫을 포함하므로 빼지 않는다.
+      if (bucketEnd(c.bucket_iso) > asOfDate) continue;
       spanPlan += Number(c.plan_cnt ?? 0);
       spanActual += Number(c.actual_cnt ?? 0);
     }
@@ -209,8 +216,8 @@ export function SnagKpiAnalysisPage() {
         `[SnagKPI] baseline 음수: plan=${plan}, actual=${actual} (stage=${stage}, asOf=${asOfDate}) — 구간합이 누계를 초과했습니다.`,
       );
     }
-    return { plan: Math.max(0, plan), actual: Math.max(0, actual) };
-  }, [totalsQ.data, cellsQ.data, buckets, stage, asOfDate]);
+    return { plan, actual, planUpto, actualUpto };
+  }, [totalsQ.data, cellsQ.data, buckets, stage, asOfDate, bucket]);
 
   const [curveOpen, setCurveOpen] = useState(true);
 
@@ -429,6 +436,8 @@ export function SnagKpiAnalysisPage() {
             filterSummary={filterSummary}
             baselinePlan={baseline.plan}
             baselineActual={baseline.actual}
+            planUpto={baseline.planUpto}
+            actualUpto={baseline.actualUpto}
             stageTotal={stageTotal}
             open={curveOpen}
             onOpenChange={setCurveOpen}
