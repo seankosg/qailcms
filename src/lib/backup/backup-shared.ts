@@ -229,5 +229,6 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "task_management_status_history",
   ],
   spl: ["spl_items", "spl_stage_progress", "spl_change_log", "spl_import_logs"],
+  // 주: staging/verify receipt 성격 테이블은 없으므로 영구 목록에서 제외 대상 없음
   wrt: ["wrt_items", "wrt_stage_progress", "wrt_change_log", "wrt_import_logs"],
 };
