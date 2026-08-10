@@ -77,6 +77,7 @@ import { ColumnOrderMenu } from "./ColumnOrderMenu";
 import { ExportDialog } from "./ExportDialog";
 import { HistoryDrawer } from "./HistoryDrawer";
 import { TopHorizontalScrollbar } from "@/components/common/TopHorizontalScrollbar";
+import { SortPriorityBadge } from "@/components/common/SortPriorityBadge";
 import { AddChildTaskDialog, type ParentSeed } from "./AddChildTaskDialog";
 import { AddMainTaskDialog } from "./AddMainTaskDialog";
 import { AlarmBadge } from "./AlarmBadge";
@@ -1639,6 +1640,12 @@ export function TaskManagementRawDataPage() {
                             <ArrowDown className="h-3 w-3" />
                           ) : (
                             <ArrowUpDown className="h-3 w-3 opacity-30" />
+                          )}
+                          {sort && (
+                            <SortPriorityBadge
+                              index={h.column.getSortIndex()}
+                              total={table.getState().sorting.length}
+                            />
                           )}
                         </button>
                       )}
