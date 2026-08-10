@@ -86,6 +86,22 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   abd_ocs_response_comment_links: ["id"],
   abd_ocs_source_files: ["id"],
   abd_ocs_number_correction_log: ["id"],
+  spl_ocs_import_logs: ["id"],
+  spl_rsp_items: ["id"],
+  spl_ocs_comment_groups: ["id"],
+  spl_ocs_comments: ["id"],
+  spl_ocs_comment_spl_links: ["id"],
+  spl_ocs_comment_rsp_links: ["id"],
+  spl_ocs_categories: ["id"],
+  spl_ocs_categories_mapping: ["id"],
+  spl_ocs_attachments: ["id"],
+  spl_ocs_attachment_comment_links: ["id"],
+  spl_ocs_compliance: ["comment_id"],
+  spl_ocs_compliance_log: ["id"],
+  spl_ocs_source_files: ["id"],
+  spl_documents: ["id"],
+  spl_document_item_links: ["id"],
+  spl_ocs_comment_document_links: ["id"],
 };
 
 function sortKeysFor(tableName: string): string[] {
@@ -464,6 +480,23 @@ export async function restoreSnapshot(
       ["abd_ocs_response_segments", 65],
       ["abd_ocs_response_comment_links", 66],
       ["abd_ocs_source_files", 67],
+      // SPL OCS/RSP/Documents: 로그·카탈로그 → 본체 → 링크 → 준수
+      ["spl_ocs_import_logs", 68],
+      ["spl_ocs_categories", 69],
+      ["spl_rsp_items", 70],
+      ["spl_ocs_comment_groups", 71],
+      ["spl_ocs_comments", 72],
+      ["spl_ocs_source_files", 73],
+      ["spl_documents", 74],
+      ["spl_ocs_attachments", 75],
+      ["spl_ocs_comment_spl_links", 76],
+      ["spl_ocs_comment_rsp_links", 77],
+      ["spl_ocs_categories_mapping", 78],
+      ["spl_ocs_attachment_comment_links", 79],
+      ["spl_document_item_links", 80],
+      ["spl_ocs_comment_document_links", 81],
+      ["spl_ocs_compliance", 82],
+      ["spl_ocs_compliance_log", 83],
     ]);
     return (order.get(a) ?? 99) - (order.get(b) ?? 99);
   });
