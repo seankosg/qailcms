@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { formatHoDate, EMPTY_HO_DATE_MAP, type HoDateMap } from "@/lib/defect-management/ho-dates";
 import {
   TEAM_COL_ORDER,
   bottleneckTeam,
@@ -21,6 +22,41 @@ const STATUS_COLS: Array<{ slot: StatusSlot; label: string }> = [
 ];
 
 const COLS_PER_GROUP = STATUS_COLS.length * TEAM_COL_ORDER.length; // 6 slots × 3 teams
+
+/** HO Planned Date (dd/mmm) 셀 */
+function HoCell({
+  value,
+  groupIndex,
+  isTotal,
+  stickyTop,
+  emphasize,
+}: {
+  value: string | null;
+  groupIndex: number;
+  isTotal?: boolean;
+  stickyTop?: number;
+  emphasize?: boolean;
+}) {
+  const bg = isTotal
+    ? "color-mix(in oklab, var(--primary) 12%, var(--card))"
+    : groupIndex % 2 === 0
+      ? "var(--card)"
+      : "color-mix(in oklab, var(--muted) 25%, var(--card))";
+  return (
+    <td
+      className={cn(
+        "h-7 min-w-[52px] border-b border-l border-l-border/70 px-1 text-center text-[10px] tabular-nums",
+        stickyTop !== undefined && "sticky z-20",
+        value ? "text-foreground" : "text-muted-foreground/50",
+        (emphasize || isTotal) && "font-semibold",
+      )}
+      style={stickyTop !== undefined ? { top: stickyTop, background: bg } : { background: bg }}
+      title={value ?? undefined}
+    >
+      {formatHoDate(value)}
+    </td>
+  );
+}
 
 function pctTone(pct: number | null): string {
   if (pct == null) return "text-muted-foreground";
@@ -165,10 +201,12 @@ function MatrixHeader({
   block,
   buildingParam,
   onNavigate,
+  showHoDate,
 }: {
   block: MatrixBlock;
   buildingParam: Record<string, string>;
   onNavigate: (p: Record<string, string>) => void;
+  showHoDate: boolean;
 }) {
   const groups: Array<{ key: string; label: string; isTotal?: boolean; isNa?: boolean }> = [
     ...block.columnKeys.map((rg) => ({ key: rg as string, label: rg as string, isNa: rg === "N/A" })),
@@ -203,7 +241,7 @@ function MatrixHeader({
         {groups.map((g, idx) => (
           <th
             key={g.key}
-            colSpan={COLS_PER_GROUP}
+            colSpan={COLS_PER_GROUP + (showHoDate ? 1 : 0)}
             className="sticky top-0 z-30 border-b border-l-2 border-l-border px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide"
             style={{ background: groupBg(g, idx) }}
           >
@@ -231,8 +269,9 @@ function MatrixHeader({
       </tr>
       {/* Tier 2: Status */}
       <tr>
-        {groups.map((g, idx) =>
-          STATUS_COLS.map((sc, sIdx) => (
+        {groups.map((g, idx) => (
+          <>
+          {STATUS_COLS.map((sc, sIdx) => (
             <th
               key={`${g.key}-${sc.slot}`}
               colSpan={TEAM_COL_ORDER.length}
@@ -245,8 +284,19 @@ function MatrixHeader({
             >
               {sc.label}
             </th>
-          )),
-        )}
+          ))}
+          {showHoDate && (
+            <th
+              key={`${g.key}-hodate`}
+              rowSpan={2}
+              className="sticky top-[30px] z-30 min-w-[52px] border-b border-l border-l-border/70 px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+              style={{ background: groupBg(g, idx) }}
+            >
+              {g.isTotal ? "Level HO" : "HO Date"}
+            </th>
+          )}
+          </>
+        ))}
       </tr>
       {/* Tier 3: Team */}
       <tr>
