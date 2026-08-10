@@ -1,4 +1,6 @@
 import { cn } from "@/lib/utils";
+import { Fragment } from "react";
+import { formatHoDate, EMPTY_HO_DATE_MAP, type HoDateMap } from "@/lib/defect-management/ho-dates";
 import {
   TEAM_COL_ORDER,
   bottleneckTeam,
@@ -21,6 +23,41 @@ const STATUS_COLS: Array<{ slot: StatusSlot; label: string }> = [
 ];
 
 const COLS_PER_GROUP = STATUS_COLS.length * TEAM_COL_ORDER.length; // 6 slots × 3 teams
+
+/** HO Planned Date (dd/mmm) 셀 */
+function HoCell({
+  value,
+  groupIndex,
+  isTotal,
+  stickyTop,
+  emphasize,
+}: {
+  value: string | null;
+  groupIndex: number;
+  isTotal?: boolean;
+  stickyTop?: number;
+  emphasize?: boolean;
+}) {
+  const bg = isTotal
+    ? "color-mix(in oklab, var(--primary) 12%, var(--card))"
+    : groupIndex % 2 === 0
+      ? "var(--card)"
+      : "color-mix(in oklab, var(--muted) 25%, var(--card))";
+  return (
+    <td
+      className={cn(
+        "h-7 min-w-[52px] border-b border-l border-l-border/70 px-1 text-center text-[10px] tabular-nums",
+        stickyTop !== undefined && "sticky z-20",
+        value ? "text-foreground" : "text-muted-foreground/50",
+        (emphasize || isTotal) && "font-semibold",
+      )}
+      style={stickyTop !== undefined ? { top: stickyTop, background: bg } : { background: bg }}
+      title={value ?? undefined}
+    >
+      {formatHoDate(value)}
+    </td>
+  );
+}
 
 function pctTone(pct: number | null): string {
   if (pct == null) return "text-muted-foreground";
@@ -165,10 +202,12 @@ function MatrixHeader({
   block,
   buildingParam,
   onNavigate,
+  showHoDate,
 }: {
   block: MatrixBlock;
   buildingParam: Record<string, string>;
   onNavigate: (p: Record<string, string>) => void;
+  showHoDate: boolean;
 }) {
   const groups: Array<{ key: string; label: string; isTotal?: boolean; isNa?: boolean }> = [
     ...block.columnKeys.map((rg) => ({ key: rg as string, label: rg as string, isNa: rg === "N/A" })),
@@ -203,7 +242,7 @@ function MatrixHeader({
         {groups.map((g, idx) => (
           <th
             key={g.key}
-            colSpan={COLS_PER_GROUP}
+            colSpan={COLS_PER_GROUP + (showHoDate ? 1 : 0)}
             className="sticky top-0 z-30 border-b border-l-2 border-l-border px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide"
             style={{ background: groupBg(g, idx) }}
           >
@@ -231,8 +270,9 @@ function MatrixHeader({
       </tr>
       {/* Tier 2: Status */}
       <tr>
-        {groups.map((g, idx) =>
-          STATUS_COLS.map((sc, sIdx) => (
+        {groups.map((g, idx) => (
+          <Fragment key={`t2-${g.key}`}>
+          {STATUS_COLS.map((sc, sIdx) => (
             <th
               key={`${g.key}-${sc.slot}`}
               colSpan={TEAM_COL_ORDER.length}
@@ -245,8 +285,19 @@ function MatrixHeader({
             >
               {sc.label}
             </th>
-          )),
-        )}
+          ))}
+          {showHoDate && (
+            <th
+              key={`${g.key}-hodate`}
+              rowSpan={2}
+              className="sticky top-[30px] z-30 min-w-[52px] border-b border-l border-l-border/70 px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+              style={{ background: groupBg(g, idx) }}
+            >
+              {g.isTotal ? "Level HO" : "HO Date"}
+            </th>
+          )}
+          </Fragment>
+        ))}
       </tr>
       {/* Tier 3: Team */}
       <tr>
@@ -279,11 +330,15 @@ export function DeSnagMatrixBlock({
   onNavigate,
   presentBuildings,
   mode,
+  showHoDate = false,
+  hoDates = EMPTY_HO_DATE_MAP,
 }: {
   block: MatrixBlock;
   presentBuildings: string[];
   mode: MatrixMode;
   onNavigate: (params: Record<string, string>) => void;
+  showHoDate?: boolean;
+  hoDates?: HoDateMap;
 }) {
   const buildingMembers = (() => {
     if (block.kind === "tower") return ["Tower", "Tower 4"];
@@ -361,6 +416,7 @@ export function DeSnagMatrixBlock({
             block={block}
             buildingParam={buildingParam}
             onNavigate={onNavigate}
+            showHoDate={showHoDate}
           />
           <tbody>
             {/* Column Total 행 — 헤더 바로 아래 고정 */}
@@ -379,14 +435,23 @@ export function DeSnagMatrixBlock({
                 </button>
               </td>
               {block.columnKeys.map((rg, idx) => (
-                <TeamCells
-                  key={rg}
-                  stats={block.colTotals[rg]}
-                  mode={mode}
-                  onCell={(slot, team) => goCell(null, null, rg, slot, team)}
-                  groupIndex={idx}
-                  stickyTop={78}
-                />
+                <Fragment key={rg}>
+                  <TeamCells
+                    stats={block.colTotals[rg]}
+                    mode={mode}
+                    onCell={(slot, team) => goCell(null, null, rg, slot, team)}
+                    groupIndex={idx}
+                    stickyTop={78}
+                  />
+                  {showHoDate && (
+                    <HoCell
+                      value={hoDates.col(block.kind, rg)}
+                      groupIndex={idx}
+                      stickyTop={78}
+                      emphasize
+                    />
+                  )}
+                </Fragment>
               ))}
               <TeamCells
                 stats={block.blockTotal}
@@ -396,6 +461,14 @@ export function DeSnagMatrixBlock({
                 isTotal
                 stickyTop={78}
               />
+              {showHoDate && (
+                <HoCell
+                  value={hoDates.block(block.kind)}
+                  groupIndex={block.columnKeys.length}
+                  isTotal
+                  stickyTop={78}
+                />
+              )}
             </tr>
             {groups.map((grp) => (
               <FragmentRows
@@ -406,6 +479,8 @@ export function DeSnagMatrixBlock({
                     mode={mode}
                 onNavigate={onNavigate}
                 goCell={goCell}
+                showHoDate={showHoDate}
+                hoDates={hoDates}
               />
             ))}
           </tbody>
@@ -422,6 +497,8 @@ function FragmentRows({
   mode,
   onNavigate,
   goCell,
+  showHoDate,
+  hoDates,
 }: {
   group: { building: string; rows: MatrixBlock["rows"]; subtotal: Stats };
   block: MatrixBlock;
@@ -435,6 +512,8 @@ function FragmentRows({
     slot: StatusSlot,
     team: TeamKey,
   ) => void;
+  showHoDate: boolean;
+  hoDates: HoDateMap;
 }) {
   const showBuildingSubtotal = block.kind === "podium" && group.rows.length > 1;
   return (
@@ -480,14 +559,21 @@ function FragmentRows({
             </button>
           </td>
           {block.columnKeys.map((rg, gIdx) => (
-            <TeamCells
-              key={rg}
-              stats={r.cells[rg]}
-              mode={mode}
-              onCell={(slot, team) => goCell(r.building, r.levelDisp, rg, slot, team)}
-              dim={r.cells[rg].issued === 0}
-              groupIndex={gIdx}
-            />
+            <Fragment key={rg}>
+              <TeamCells
+                stats={r.cells[rg]}
+                mode={mode}
+                onCell={(slot, team) => goCell(r.building, r.levelDisp, rg, slot, team)}
+                dim={r.cells[rg].issued === 0}
+                groupIndex={gIdx}
+              />
+              {showHoDate && (
+                <HoCell
+                  value={hoDates.cell(block.kind, r.building, r.levelDisp, rg)}
+                  groupIndex={gIdx}
+                />
+              )}
+            </Fragment>
           ))}
           <TeamCells
             stats={r.rowTotal}
@@ -496,6 +582,13 @@ function FragmentRows({
             groupIndex={block.columnKeys.length}
             isTotal
           />
+          {showHoDate && (
+            <HoCell
+              value={hoDates.row(block.kind, r.building, r.levelDisp)}
+              groupIndex={block.columnKeys.length}
+              isTotal
+            />
+          )}
         </tr>
       ))}
       {showBuildingSubtotal && (
@@ -509,14 +602,23 @@ function FragmentRows({
           {block.columnKeys.map((rg, gIdx) => {
             const sub = newStats();
             for (const r of group.rows) mergeStats(sub, r.cells[rg]);
+            let colMax: string | null = null;
+            if (showHoDate) {
+              for (const r of group.rows) {
+                const v = hoDates.cell(block.kind, r.building, r.levelDisp, rg);
+                if (v && (!colMax || v > colMax)) colMax = v;
+              }
+            }
             return (
-              <TeamCells
-                key={rg}
-                stats={sub}
-                mode={mode}
-                onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
-                groupIndex={gIdx}
-              />
+              <Fragment key={rg}>
+                <TeamCells
+                  stats={sub}
+                  mode={mode}
+                  onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
+                  groupIndex={gIdx}
+                />
+                {showHoDate && <HoCell value={colMax} groupIndex={gIdx} emphasize />}
+              </Fragment>
             );
           })}
           <TeamCells
@@ -526,6 +628,13 @@ function FragmentRows({
             groupIndex={block.columnKeys.length}
             isTotal
           />
+          {showHoDate && (
+            <HoCell
+              value={hoDates.building(block.kind, group.building)}
+              groupIndex={block.columnKeys.length}
+              isTotal
+            />
+          )}
         </tr>
       )}
     </>

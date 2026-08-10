@@ -12,6 +12,10 @@ import { exportSnagMatrixToXlsx } from "@/lib/defect-management/matrix-excel";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
+import { useSnagHoDates } from "@/hooks/useSnagHoDates";
+import { buildHoDateMap, EMPTY_HO_DATE_MAP } from "@/lib/defect-management/ho-dates";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
 import { useSnagAsOf } from "@/hooks/useSnagAsOf";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -83,6 +87,30 @@ export function DeSnagDashboardPage() {
     () => buildMatrix(appliedPlot, appliedTeams, filteredRows),
     [appliedPlot, appliedTeams, filteredRows],
   );
+
+  // HO Date 열 (기본 꺼짐)
+  const showHoDate = ((search as any).hoDate ?? 0) === 1;
+  const setShowHoDate = (v: boolean) =>
+    navigate({
+      to: "/closure/snag-management/dashboard",
+      search: (prev: Record<string, unknown>) => ({ ...prev, hoDate: v ? 1 : 0 }) as any,
+    });
+  const { data: hoRows = [] } = useSnagHoDates(
+    appliedPlot,
+    appliedTeams,
+    effectiveDataDate || null,
+    showHoDate,
+  );
+  const hoDates = useMemo(() => {
+    if (!showHoDate) return EMPTY_HO_DATE_MAP;
+    const rows =
+      appliedRoomGroups.length === 0
+        ? hoRows
+        : hoRows.filter((r) =>
+            new Set<RoomGroupCol>(appliedRoomGroups).has(normalizeRoomGroup(r.room_group)),
+          );
+    return buildHoDateMap(rows);
+  }, [showHoDate, hoRows, appliedRoomGroups]);
 
   const teamsStr = search.teams ?? "";
   const rgStr = search.roomGroups ?? "";
@@ -339,6 +367,12 @@ export function DeSnagDashboardPage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+        <div className="flex items-center gap-1.5">
+          <Switch id="ho-date-toggle" checked={showHoDate} onCheckedChange={setShowHoDate} />
+          <Label htmlFor="ho-date-toggle" className="cursor-pointer text-xs">
+            HO Date
+          </Label>
+        </div>
         <Button
           type="button"
           size="sm"
@@ -353,6 +387,8 @@ export function DeSnagDashboardPage() {
                 asOf: effectiveDataDate,
                 teams: appliedTeams,
                 roomGroupsFilter: appliedRoomGroups,
+                showHoDate,
+                hoDates,
               });
               toast.success("매트릭스를 엑셀로 내보냈습니다.");
             } catch (e) {
@@ -376,6 +412,8 @@ export function DeSnagDashboardPage() {
             mode={matrixMode}
             presentBuildings={block.kind === "podium" ? presentPodiumBuildings : []}
             onNavigate={goRaw}
+            showHoDate={showHoDate}
+            hoDates={hoDates}
           />
         ))}
       </div>
