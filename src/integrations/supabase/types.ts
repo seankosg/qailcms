@@ -7040,6 +7040,7 @@ export type Database = {
       }
       abd_ocs_v3_stage_reset: { Args: { p_run: string }; Returns: Json }
       abd_ocs_v3_verify: { Args: never; Returns: Json }
+      abd_ocs_v3_verify_internal: { Args: never; Returns: Json }
       abd_ocs_verify: { Args: never; Returns: Json }
       abd_progress_cell_ids: {
         Args: {
