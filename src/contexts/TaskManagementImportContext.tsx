@@ -1111,6 +1111,8 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       let rejected = 0;
       let processed = 0;
       const importErrors: ImportErrorEntry[] = [];
+      // 감사 로그 저장 실패 목록 (ABD mutations.functions.ts 의 log_persist_errors 방식과 동일)
+      const logPersistErrors: { source: string; error: string; attempted: number; persisted: number }[] = [];
       // 실패한 task_no와 사유. row_logs를 정확히 표시하기 위함.
       const rejectedByTaskNo = new Map<string, { reason_code: string; reason_detail?: string }>();
       // 날짜 범위 위반으로 사전 거부된 행 반영
@@ -1361,9 +1363,37 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                 );
               }
             });
-            await flushFieldLogs(supabase, logId, userId, pendingFieldLogs);
+            // 저장 실패는 조용히 넘기지 않는다. 결과에 실어 화면과 로그에 남긴다.
+            const fieldLogRes = await flushFieldLogs(supabase, logId, userId, pendingFieldLogs);
+            if (!fieldLogRes.ok) {
+              logPersistErrors.push({
+                source: "import_field_logs",
+                error: fieldLogRes.error ?? "unknown",
+                attempted: fieldLogRes.attempted,
+                persisted: fieldLogRes.persisted,
+              });
+              importErrors.push({
+                batch: -1,
+                code: "LOG_PERSIST_FAILED",
+                message: `import_field_logs 저장 실패 — 저장 ${fieldLogRes.persisted}/${fieldLogRes.attempted}`,
+                details: fieldLogRes.error ?? undefined,
+              });
+            }
           } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
             console.warn("[task-import] field-log insert failed", e);
+            logPersistErrors.push({
+              source: "import_field_logs",
+              error: msg,
+              attempted: 0,
+              persisted: 0,
+            });
+            importErrors.push({
+              batch: -1,
+              code: "LOG_PERSIST_FAILED",
+              message: "import_field_logs 저장 실패 — 로그 생성 중 예외",
+              details: msg,
+            });
           }
         }
 
@@ -1583,6 +1613,7 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
                     noTeamKeys,
                     unclassified,
                     errors: importErrors.length ? importErrors : undefined,
+                    logPersistErrors: logPersistErrors.length ? logPersistErrors : undefined,
                   },
                 }
               : x,
