@@ -22,6 +22,7 @@ import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { resolveJudgment } from "@/lib/task-management/delay-utils";
 import { todayInDoha } from "@/lib/time/doha";
 import { ChartGuideButton } from "./ChartGuideButton";
+import { useTmWorkTypeOptions } from "@/hooks/useTmWorkTypeOptions";
 
 const DISCIPLINE_KEYS = ["ARCH", "MECH", "ELEC", "DESN", "PRJC", "SUPP"] as const;
 const TASK_SCOPE_OPTIONS = [
@@ -108,15 +109,22 @@ export function TmKpiAnalysisPage() {
   const picOptions = useMemo(() => uniqSorted(items, "hdec_pic_name"), [items]);
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
+  const { data: workTypeOptions = [] } = useTmWorkTypeOptions();
+  const workType = search.workType ?? "all";
+
   const scopedItems = useMemo(() => {
-    const base = scopedByTaskScope;
+    let base = scopedByTaskScope;
+    if (workType !== "all")
+      base = base.filter(
+        (it) => ((it as { row_type?: string | null }).row_type ?? "").trim() === workType,
+      );
     if (search.delayFilter === "risk")
       return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "악화");
     if (search.delayFilter === "delayed")
       return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "지연");
     // "전체" 는 모집단 그대로 — 지연 과업만 남기지 않는다.
     return base;
-  }, [scopedByTaskScope, search.delayFilter, thresholds, asOfDate]);
+  }, [scopedByTaskScope, workType, search.delayFilter, thresholds, asOfDate]);
 
   const patch = (obj: Record<string, unknown>) =>
     navigate({
@@ -142,6 +150,7 @@ export function TmKpiAnalysisPage() {
       { label: "Team", value: listLabel(disciplines) },
       { label: "PIC", value: listLabel(search.hdecPic) },
       { label: "ENG", value: listLabel(search.hdecEng) },
+      { label: "Work Type", value: workType === "all" ? "All" : workType },
       {
         label: "Delay",
         value:
@@ -150,7 +159,7 @@ export function TmKpiAnalysisPage() {
       },
       { label: "As of", value: asOfDate },
     ],
-    [taskScope, disciplines, search.hdecPic, search.hdecEng, search.delayFilter, asOfDate],
+    [taskScope, disciplines, search.hdecPic, search.hdecEng, workType, search.delayFilter, asOfDate],
   );
 
   // 폐기된 담당자축 Team 필터의 잔여 선택값 정리
@@ -256,6 +265,26 @@ export function TmKpiAnalysisPage() {
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
+              </div>
+
+              <span className="h-5 w-px bg-border" aria-hidden />
+
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Work Type
+                </span>
+                <Tabs value={workType} onValueChange={(v) => v && patch({ workType: v })}>
+                  <TabsList className="h-8 flex-wrap">
+                    <TabsTrigger value="all" className="h-6 px-2 text-xs">
+                      전체
+                    </TabsTrigger>
+                    {workTypeOptions.map((o) => (
+                      <TabsTrigger key={o} value={o} className="h-6 px-2 text-xs">
+                        {o}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
               </div>
 
               <span className="h-5 w-px bg-border" aria-hidden />
