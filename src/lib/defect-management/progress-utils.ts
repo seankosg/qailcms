@@ -45,7 +45,7 @@ export function noPlanUnionFromMask(mask: Record<string, number> | null | undefi
   return out;
 }
 
-export type Bucket = "day" | "week";
+export type Bucket = "day" | "week" | "month";
 
 export type GroupBy =
   | "team"
@@ -122,10 +122,35 @@ export function weekStartIso(iso: string): string {
 }
 
 export function bucketize(iso: string, granularity: Bucket): string {
+  if (granularity === "month") return monthStartIso(iso);
   return granularity === "day" ? iso : weekStartIso(iso);
 }
 
+/** 해당 달 1일 */
+export function monthStartIso(iso: string): string {
+  return `${iso.slice(0, 7)}-01`;
+}
+
+function addMonths(iso: string, n: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + n);
+  return toIso(d);
+}
+
 export function buildBucketRange(startIso: string, endIso: string, granularity: Bucket): string[] {
+  if (granularity === "month") {
+    const out: string[] = [];
+    let cur = monthStartIso(startIso);
+    const end = monthStartIso(endIso);
+    let safety = 0;
+    while (cur <= end && safety < 2000) {
+      out.push(cur);
+      cur = addMonths(cur, 1);
+      safety++;
+    }
+    return out;
+  }
   const out: string[] = [];
   let cur = granularity === "day" ? startIso : weekStartIso(startIso);
   const end = granularity === "day" ? endIso : weekStartIso(endIso);
@@ -151,6 +176,9 @@ export function formatBucketLabel(iso: string, bucket: Bucket): { primary: strin
   const d = new Date(iso + "T00:00:00Z");
   const month = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
   const day = d.getUTCDate();
+  if (bucket === "month") {
+    return { primary: month, secondary: String(d.getUTCFullYear()) };
+  }
   if (bucket === "day") {
     const dow = d.toLocaleString("en-US", { weekday: "short", timeZone: "UTC" });
     return { primary: `${month} ${day}`, secondary: dow };
