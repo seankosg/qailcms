@@ -62,7 +62,7 @@ export function SnagKpiAnalysisPage() {
   const navigate = useNavigate({ from: "/closure/snag-management/kpi-analysis" });
 
   const setSearch = (patch: Record<string, unknown>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }) as any, replace: true });
+    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }) as any, replace: true });
 
   const plot: PlotKey = search.plot as PlotKey;
   const teams = parseCsv<TeamKey>(search.teams, ALL_TEAMS);
