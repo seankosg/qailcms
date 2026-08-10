@@ -94,6 +94,7 @@ const NAV: NavSection[] = [
         items: [
           { to: "/closure/snag-management/dashboard", label: "Dashboard", icon: iconDashboard },
           { to: "/closure/snag-management/progress", label: "Progress", icon: iconChartUp },
+          { to: "/closure/snag-management/kpi-analysis", label: "KPI Analysis", icon: iconChartUp },
           { to: "/closure/snag-management/raw-data", label: "Raw Data", icon: iconDatabase },
           { to: "/closure/snag-management/settings", label: "Settings", icon: iconGear, adminOnly: true },
         ],
