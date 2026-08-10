@@ -60,6 +60,7 @@ import { Route as AuthenticatedClosureAbdDashboardRouteImport } from './routes/_
 import { Route as AuthenticatedClosureSnagManagementImportIndexRouteImport } from './routes/_authenticated/closure/snag-management/import.index'
 import { Route as AuthenticatedClosureTaskManagementImportLogsRouteImport } from './routes/_authenticated/closure/task-management/import.logs'
 import { Route as AuthenticatedClosureTaskManagementDetailIdRouteImport } from './routes/_authenticated/closure/task-management/detail.$id'
+import { Route as AuthenticatedClosureSparePartDetailIdRouteImport } from './routes/_authenticated/closure/spare-part/detail.$id'
 import { Route as AuthenticatedClosureSnagManagementImportLogsRouteImport } from './routes/_authenticated/closure/snag-management/import.logs'
 import { Route as AuthenticatedClosureSnagManagementDetailIdRouteImport } from './routes/_authenticated/closure/snag-management/detail.$id'
 import { Route as AuthenticatedClosureAbdImportLogsRouteImport } from './routes/_authenticated/closure/abd/import.logs'
@@ -362,6 +363,12 @@ const AuthenticatedClosureTaskManagementDetailIdRoute =
     path: '/closure/task-management/detail/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureSparePartDetailIdRoute =
+  AuthenticatedClosureSparePartDetailIdRouteImport.update({
+    id: '/closure/spare-part/detail/$id',
+    path: '/closure/spare-part/detail/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureSnagManagementImportLogsRoute =
   AuthenticatedClosureSnagManagementImportLogsRouteImport.update({
     id: '/closure/snag-management/import/logs',
@@ -439,6 +446,7 @@ export interface FileRoutesByFullPath {
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
   '/closure/snag-management/import/logs': typeof AuthenticatedClosureSnagManagementImportLogsRoute
+  '/closure/spare-part/detail/$id': typeof AuthenticatedClosureSparePartDetailIdRoute
   '/closure/task-management/detail/$id': typeof AuthenticatedClosureTaskManagementDetailIdRoute
   '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
   '/closure/snag-management/import/': typeof AuthenticatedClosureSnagManagementImportIndexRoute
@@ -494,6 +502,7 @@ export interface FileRoutesByTo {
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
   '/closure/snag-management/import/logs': typeof AuthenticatedClosureSnagManagementImportLogsRoute
+  '/closure/spare-part/detail/$id': typeof AuthenticatedClosureSparePartDetailIdRoute
   '/closure/task-management/detail/$id': typeof AuthenticatedClosureTaskManagementDetailIdRoute
   '/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
   '/closure/snag-management/import': typeof AuthenticatedClosureSnagManagementImportIndexRoute
@@ -552,6 +561,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
   '/_authenticated/closure/snag-management/detail/$id': typeof AuthenticatedClosureSnagManagementDetailIdRoute
   '/_authenticated/closure/snag-management/import/logs': typeof AuthenticatedClosureSnagManagementImportLogsRoute
+  '/_authenticated/closure/spare-part/detail/$id': typeof AuthenticatedClosureSparePartDetailIdRoute
   '/_authenticated/closure/task-management/detail/$id': typeof AuthenticatedClosureTaskManagementDetailIdRoute
   '/_authenticated/closure/task-management/import/logs': typeof AuthenticatedClosureTaskManagementImportLogsRoute
   '/_authenticated/closure/snag-management/import/': typeof AuthenticatedClosureSnagManagementImportIndexRoute
@@ -610,6 +620,7 @@ export interface FileRouteTypes {
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
     | '/closure/snag-management/import/logs'
+    | '/closure/spare-part/detail/$id'
     | '/closure/task-management/detail/$id'
     | '/closure/task-management/import/logs'
     | '/closure/snag-management/import/'
@@ -665,6 +676,7 @@ export interface FileRouteTypes {
     | '/closure/abd/import/logs'
     | '/closure/snag-management/detail/$id'
     | '/closure/snag-management/import/logs'
+    | '/closure/spare-part/detail/$id'
     | '/closure/task-management/detail/$id'
     | '/closure/task-management/import/logs'
     | '/closure/snag-management/import'
@@ -722,6 +734,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/abd/import/logs'
     | '/_authenticated/closure/snag-management/detail/$id'
     | '/_authenticated/closure/snag-management/import/logs'
+    | '/_authenticated/closure/spare-part/detail/$id'
     | '/_authenticated/closure/task-management/detail/$id'
     | '/_authenticated/closure/task-management/import/logs'
     | '/_authenticated/closure/snag-management/import/'
@@ -1097,6 +1110,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureTaskManagementDetailIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/spare-part/detail/$id': {
+      id: '/_authenticated/closure/spare-part/detail/$id'
+      path: '/closure/spare-part/detail/$id'
+      fullPath: '/closure/spare-part/detail/$id'
+      preLoaderRoute: typeof AuthenticatedClosureSparePartDetailIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/snag-management/import/logs': {
       id: '/_authenticated/closure/snag-management/import/logs'
       path: '/closure/snag-management/import/logs'
@@ -1209,6 +1229,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureAbdDetailIdRoute: typeof AuthenticatedClosureAbdDetailIdRoute
   AuthenticatedClosureSnagManagementDetailIdRoute: typeof AuthenticatedClosureSnagManagementDetailIdRoute
   AuthenticatedClosureSnagManagementImportLogsRoute: typeof AuthenticatedClosureSnagManagementImportLogsRoute
+  AuthenticatedClosureSparePartDetailIdRoute: typeof AuthenticatedClosureSparePartDetailIdRoute
   AuthenticatedClosureTaskManagementDetailIdRoute: typeof AuthenticatedClosureTaskManagementDetailIdRoute
   AuthenticatedClosureTaskManagementImportLogsRoute: typeof AuthenticatedClosureTaskManagementImportLogsRoute
   AuthenticatedClosureSnagManagementImportIndexRoute: typeof AuthenticatedClosureSnagManagementImportIndexRoute
@@ -1269,6 +1290,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureSnagManagementDetailIdRoute,
   AuthenticatedClosureSnagManagementImportLogsRoute:
     AuthenticatedClosureSnagManagementImportLogsRoute,
+  AuthenticatedClosureSparePartDetailIdRoute:
+    AuthenticatedClosureSparePartDetailIdRoute,
   AuthenticatedClosureTaskManagementDetailIdRoute:
     AuthenticatedClosureTaskManagementDetailIdRoute,
   AuthenticatedClosureTaskManagementImportLogsRoute:
