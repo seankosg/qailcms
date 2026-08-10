@@ -141,15 +141,29 @@ export function BulkEditBar({ selectedRows, fields, exportColumns, canEdit, canE
     if (deleteConfirmText !== "DELETE") return;
     setDeleting(true);
     let done = 0;
+    let blocked = 0;
     try {
       for (let i = 0; i < ids.length; i += CHUNK) {
         const slice = ids.slice(i, i + CHUNK);
         if (ids.length > CHUNK) toast.info(`Deleting… (batch ${Math.floor(i / CHUNK) + 1}/${chunkCount})`);
         // eslint-disable-next-line no-await-in-loop
         const res = await bulkDeleteDefects({ data: { ids: slice } });
-        done += res?.count ?? slice.length;
+        done += res?.count ?? 0;
+        blocked += res?.blocked ?? 0;
       }
-      toast.success("영구 삭제 완료", { description: `${done}건이 삭제되었습니다.` });
+      if (done === 0) {
+        // RLS 차단은 에러가 아니라 0행으로 돌아온다. 성공 토스트를 띄우지 않는다.
+        toast.error("삭제되지 않았습니다", {
+          description: `권한이 없어 ${ids.length}건이 삭제되지 않았습니다.`,
+        });
+      } else {
+        toast.success("영구 삭제 완료", { description: `${done}건이 삭제되었습니다.` });
+        if (blocked > 0) {
+          toast.error("일부 행이 삭제되지 않았습니다", {
+            description: `권한이 없어 ${blocked}건이 삭제되지 않았습니다.`,
+          });
+        }
+      }
       setDeleteOpen(false);
       setDeleteConfirmText("");
       onApplied();
