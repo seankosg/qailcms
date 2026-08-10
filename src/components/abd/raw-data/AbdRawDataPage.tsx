@@ -1106,6 +1106,7 @@ interface TableViewProps {
 
 function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q, serverFilters }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
+  const sortCount = table.getState().sorting.length;
   const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
   const { stickyLefts, lastFrozenIndex, frozenWidth } = useMemo(() => {
     const lefts = new Map<string, number>();
@@ -1183,7 +1184,7 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
                         {header.column.getIsSorted() && (
                           <span className="flex flex-shrink-0 items-center">
                             <span>{header.column.getIsSorted() === "asc" ? "▲" : "▼"}</span>
-                            <SortPriorityBadge index={header.column.getSortIndex()} total={sorting.length} />
+                            <SortPriorityBadge index={header.column.getSortIndex()} total={sortCount} />
                           </span>
                         )}
                       </span>
