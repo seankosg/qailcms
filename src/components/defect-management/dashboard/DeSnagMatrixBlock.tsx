@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Fragment } from "react";
 import { formatHoDate, EMPTY_HO_DATE_MAP, type HoDateMap } from "@/lib/defect-management/ho-dates";
 import {
   TEAM_COL_ORDER,
@@ -270,7 +271,7 @@ function MatrixHeader({
       {/* Tier 2: Status */}
       <tr>
         {groups.map((g, idx) => (
-          <>
+          <Fragment key={`t2-${g.key}`}>
           {STATUS_COLS.map((sc, sIdx) => (
             <th
               key={`${g.key}-${sc.slot}`}
@@ -295,7 +296,7 @@ function MatrixHeader({
               {g.isTotal ? "Level HO" : "HO Date"}
             </th>
           )}
-          </>
+          </Fragment>
         ))}
       </tr>
       {/* Tier 3: Team */}
