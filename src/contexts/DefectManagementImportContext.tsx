@@ -1435,12 +1435,37 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                 );
               }
             });
-            // 사용자 체감 응답성을 위해 백그라운드로 전송. 실패해도 임포트 결과에는 영향 없음.
-            void flushFieldLogs(supabase, logId, userId, pendingFieldLogs).catch((e) =>
-              console.warn("[defect-import] field-log flush failed", e),
-            );
+            // 저장 실패는 조용히 넘기지 않는다. 결과에 실어 화면과 로그에 남긴다.
+            const fieldLogRes = await flushFieldLogs(supabase, logId, userId, pendingFieldLogs);
+            if (!fieldLogRes.ok) {
+              logPersistErrors.push({
+                source: "import_field_logs",
+                error: fieldLogRes.error ?? "unknown",
+                attempted: fieldLogRes.attempted,
+                persisted: fieldLogRes.persisted,
+              });
+              importErrors.push({
+                batch: -1,
+                code: "LOG_PERSIST_FAILED",
+                message: `import_field_logs 저장 실패 — 저장 ${fieldLogRes.persisted}/${fieldLogRes.attempted}`,
+                details: fieldLogRes.error ?? undefined,
+              });
+            }
           } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
             console.warn("[defect-import] field-log insert failed", e);
+            logPersistErrors.push({
+              source: "import_field_logs",
+              error: msg,
+              attempted: pendingFieldLogs.length,
+              persisted: 0,
+            });
+            importErrors.push({
+              batch: -1,
+              code: "LOG_PERSIST_FAILED",
+              message: `import_field_logs 저장 실패 — 저장 0/${pendingFieldLogs.length}`,
+              details: msg,
+            });
           }
         }
 
@@ -1483,6 +1508,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                     unmappedCategoryCount: Array.from(unmappedCategories.values()).reduce((a, b) => a + b, 0),
                     unmappedCategories: Array.from(unmappedCategories.entries()).map(([c, n]) => `${c} × ${n}`),
                     errors: importErrors.length ? importErrors : undefined,
+                    logPersistErrors: logPersistErrors.length ? logPersistErrors : undefined,
                   },
                   classificationResult,
                 }
