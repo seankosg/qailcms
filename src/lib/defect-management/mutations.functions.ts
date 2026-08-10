@@ -36,16 +36,6 @@ const ALLOWED_FIELDS = new Set<string>([
   "priority_locked", "hdec_verification_locked",
 ]);
 
-async function assertAdmin(ctx: any) {
-  const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" }),
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "superuser" }),
-  ]);
-  if (!isAdmin && !isSuper) {
-    throw new Error("권한 없음: 관리자만 편집할 수 있습니다");
-  }
-}
-
 /**
  * SM 모듈 쓰기 권한(격자 정본) — 역할 × 범위 격자에서 SM/write 가
  * 한 범위라도 열려 있어야 한다. 행 단위 판정은 `can_edit_row` 가 정본.
