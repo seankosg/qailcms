@@ -346,6 +346,8 @@ export function SnagKpiAnalysisPage() {
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Stage
                 </span>
+              </div>
+              <div className="hidden" aria-hidden />
                 <Tabs value={stage} onValueChange={(v) => v && setSearch({ stageView: v })}>
                   <TabsList className="h-8">
                     {STAGE_OPTIONS.map((s) => (
