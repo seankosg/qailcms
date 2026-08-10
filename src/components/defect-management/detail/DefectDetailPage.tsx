@@ -43,8 +43,8 @@ export function DefectDetailPage() {
   const { data: history = [] } = useQuery({
     queryKey: ["defect-status-history", id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("defect_status_history").select("*").eq("defect_id", id).order("changed_at", { ascending: false });
-      if (error) return [];
+      const { data, error } = await (supabase as any).from("defect_status_history").select("*").eq("defect_raw_id", id).order("changed_at", { ascending: false });
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -165,8 +165,8 @@ export function DefectDetailPage() {
                 {history.map((h: any) => (
                   <li key={h.id} className="rounded border-l-2 border-primary/40 bg-muted/30 px-2 py-1.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-medium">{h.field_name}</span>
-                      <span className="text-muted-foreground">{h.change_type ?? "update"}</span>
+                      <span className="font-medium">{h.field}</span>
+                      <span className="text-muted-foreground">{h.source ?? "update"}</span>
                     </div>
                     <div className="text-[11px] text-muted-foreground">
                       {h.old_value ?? "—"} → <span className="font-medium text-foreground">{h.new_value ?? "—"}</span>
