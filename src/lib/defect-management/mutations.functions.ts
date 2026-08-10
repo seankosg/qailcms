@@ -166,12 +166,21 @@ export const bulkToggleCritical = createServerFn({ method: "POST" })
   .inputValidator((data) => ToggleCriticalSchema.parse(data))
   .handler(async ({ data, context }) => {
     await assertSmWrite(context);
-    const { error } = await (context.supabase as any)
+    // RLS 로 막힌 행은 에러가 아니라 0행으로 돌아온다 → 실제 바뀐 id 만 돌려준다.
+    const { data: updatedRows, error } = await (context.supabase as any)
       .from("defect_items_raw")
       .update({ is_critical: data.value, updated_at: new Date().toISOString() })
-      .in("id", data.ids);
+      .in("id", data.ids)
+      .select("id");
     if (error) throw new Error(error.message);
-    return { ok: true, count: data.ids.length };
+    const updatedIds = ((updatedRows ?? []) as Array<{ id: string }>).map((r) => r.id);
+    return {
+      ok: true,
+      requested: data.ids.length,
+      count: updatedIds.length,
+      ids: updatedIds,
+      blocked: Math.max(0, data.ids.length - updatedIds.length),
+    };
   });
 
 const BulkUpdateSchema = z.object({
@@ -238,24 +247,37 @@ export const bulkDeleteDefects = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => BulkDeleteSchema.parse(data))
   .handler(async ({ data, context }) => {
-    // 순서 고정: 부모(defect_items_raw) → 이력(defect_status_history).
-    // 이력을 먼저 지우면 RLS 로 부모 삭제가 막힌 행의 이력만 사라진다.
-    // 권한은 RLS(rcl 격자)가 판정하며, 막힌 행은 에러가 아니라 0행으로 돌아온다.
+    // 순서 고정: 허용 id 선판정 → 이력(defect_status_history) → 부모(defect_items_raw).
+    // 부모를 먼저 지우면 이력 정책(dsh_delete)이 이미 사라진 부모를 조회하지 못해
+    // 이력이 고아로 남는다. 그래서 rcl_can_rows 로 허용 id 를 먼저 받는다.
+    const allowedIds: string[] = [];
+    for (let i = 0; i < data.ids.length; i += 2000) {
+      const chunk = data.ids.slice(i, i + 2000);
+      const { data: canRes, error: canErr } = await (context.supabase as any).rpc("rcl_can_rows", {
+        _module: "SM",
+        _row_ids: chunk,
+        _action: "delete",
+      });
+      if (canErr) throw new Error(`권한 일괄 판정 실패(SM): ${canErr.message}`);
+      for (const id of ((canRes as any)?.allowed ?? []) as string[]) allowedIds.push(id);
+    }
+    if (allowedIds.length === 0) {
+      return { ok: true, requested: data.ids.length, count: 0, blocked: data.ids.length };
+    }
+    // 1) 허용 id 의 이력 먼저 삭제 (부모가 아직 살아 있어야 정책이 판정할 수 있다)
+    const { error: histErr } = await (context.supabase as any)
+      .from("defect_status_history")
+      .delete()
+      .in("defect_raw_id", allowedIds);
+    if (histErr) throw new Error(histErr.message);
+    // 2) 그 id 로 부모 삭제
     const { data: deletedRows, error } = await (context.supabase as any)
       .from("defect_items_raw")
       .delete()
-      .in("id", data.ids)
+      .in("id", allowedIds)
       .select("id");
     if (error) throw new Error(error.message);
     const deletedIds = ((deletedRows ?? []) as Array<{ id: string }>).map((r) => r.id);
-    if (deletedIds.length > 0) {
-      // 실제로 지워진 부모의 이력만 삭제 (FK cascade 없음)
-      const { error: histErr } = await (context.supabase as any)
-        .from("defect_status_history")
-        .delete()
-        .in("defect_raw_id", deletedIds);
-      if (histErr) throw new Error(histErr.message);
-    }
     return {
       ok: true,
       requested: data.ids.length,
