@@ -67,6 +67,7 @@ import { classifyDefectStage, formatDdMmm, isOverdueDefect } from "@/lib/defect-
 import { getOriginHeaderStyle } from "@/lib/defect-management/origin-header-style";
 import { ColumnFilterDropdown } from "./ColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "./TopHorizontalScrollbar";
+import { SortPriorityBadge } from "@/components/common/SortPriorityBadge";
 import { DefectStatusBadge } from "./DefectStatusBadge";
 import { CriticalPendingBar } from "./CriticalPendingBar";
 import { CriticalBulkBar } from "./CriticalBulkBar";
@@ -1378,7 +1379,12 @@ function DefectRawTableView({ table, tableRef, loading, dataDate, frozenColIds, 
                     <div className="flex w-full items-center justify-between gap-1">
                       <span className="inline-flex min-w-0 items-center gap-1 truncate">
                         <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                        {header.column.getIsSorted() && <span className="flex-shrink-0">{header.column.getIsSorted() === "asc" ? "▲" : "▼"}</span>}
+                        {header.column.getIsSorted() && (
+                          <span className="flex flex-shrink-0 items-center">
+                            <span>{header.column.getIsSorted() === "asc" ? "▲" : "▼"}</span>
+                            <SortPriorityBadge index={header.column.getSortIndex()} total={table.getState().sorting.length} />
+                          </span>
+                        )}
                       </span>
                       {header.column.getCanFilter() && (
                         <span onClick={(e) => e.stopPropagation()}><ColumnFilterDropdown column={header.column} q={q} serverFilters={serverFilters} /></span>

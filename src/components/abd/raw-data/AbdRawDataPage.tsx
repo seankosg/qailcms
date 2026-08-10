@@ -50,6 +50,7 @@ import { EMPTY_TOKEN, DATE_FILTER_FIELDS } from "@/lib/abd/filter-fns";
 import { getOriginHeaderStyle } from "@/lib/abd/origin-header-style";
 import { AbdColumnFilterDropdown } from "./AbdColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "@/components/defect-management/raw-data/TopHorizontalScrollbar";
+import { SortPriorityBadge } from "@/components/common/SortPriorityBadge";
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { isDfActualBlocked, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
 import { AbdExportDialog } from "./AbdExportDialog";
@@ -1106,6 +1107,7 @@ interface TableViewProps {
 
 function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q, serverFilters }: TableViewProps) {
   const leaf = table.getVisibleLeafColumns();
+  const sortCount = table.getState().sorting.length;
   const frozenSet = useMemo(() => new Set(frozenColIds), [frozenColIds]);
   const { stickyLefts, lastFrozenIndex, frozenWidth } = useMemo(() => {
     const lefts = new Map<string, number>();
@@ -1180,7 +1182,12 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
                     <div className="flex w-full items-center justify-between gap-1">
                       <span className="inline-flex min-w-0 items-center gap-1 truncate">
                         <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                        {header.column.getIsSorted() && <span className="flex-shrink-0">{header.column.getIsSorted() === "asc" ? "▲" : "▼"}</span>}
+                        {header.column.getIsSorted() && (
+                          <span className="flex flex-shrink-0 items-center">
+                            <span>{header.column.getIsSorted() === "asc" ? "▲" : "▼"}</span>
+                            <SortPriorityBadge index={header.column.getSortIndex()} total={sortCount} />
+                          </span>
+                        )}
                       </span>
                       {header.column.getCanFilter() && (
                         <span onClick={(e) => e.stopPropagation()}>
