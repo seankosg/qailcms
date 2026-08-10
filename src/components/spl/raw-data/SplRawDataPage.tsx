@@ -1,6 +1,6 @@
 import { ColumnResizeHandle } from "@/components/common/ColumnResizeHandle";
 import { useEffect, useMemo, useState } from "react";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,7 +40,6 @@ import {
 import { SplColumnFilterDropdown } from "./SplColumnFilterDropdowns";
 import { SplColumnOrderMenu } from "./SplColumnOrderMenu";
 import { SplBulkEditBar } from "./SplBulkEditBar";
-import { SplDetailSheet } from "./SplDetailSheet";
 import { SplExportDialog } from "./SplExportDialog";
 
 const routeApi = getRouteApi("/_authenticated/closure/spare-part/raw-data");
@@ -73,6 +72,7 @@ const STATE_CLASS: Record<SplStageCell["st"], string> = {
 export function SplRawDataPage() {
   const search = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
+  const rootNavigate = useNavigate();
   const today = todayInDoha();
   const asOf = search.asOf || today;
   const [exporting, setExporting] = useState(false);
@@ -125,7 +125,6 @@ export function SplRawDataPage() {
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [detailRowState, setDetailRow] = useState<SplRow | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -226,8 +225,6 @@ export function SplRawDataPage() {
   const saveOne = async (id: string, field: string, value: string | null) => {
     await saveField({ data: { id, field, value } });
   };
-  // Keep the open detail sheet bound to the freshest row after a refetch
-  const detailRow = detailRowState ? (rows.find((r) => r.id === detailRowState.id) ?? detailRowState) : null;
   const refetchRows = async () => {
     await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
   };
@@ -498,7 +495,9 @@ export function SplRawDataPage() {
                       onToggleSelect={() =>
                         setSelectedIds((p) => (p.includes(r.id) ? p.filter((x) => x !== r.id) : [...p, r.id]))
                       }
-                      onOpenDetail={() => setDetailRow(r)}
+                      onOpenDetail={() =>
+                        rootNavigate({ to: "/closure/spare-part/detail/$id", params: { id: r.id } })
+                      }
                       canEdit={isToday && canRow(r as unknown as Record<string, unknown>)}
                       onSave={async (field, value) => {
                         await saveField({ data: { id: r.id, field, value } });
@@ -527,18 +526,6 @@ export function SplRawDataPage() {
         onSaveField={saveOne}
         onDone={refetchRows}
         disabledReason={isToday ? null : "Editing is disabled in as-of (historical) view."}
-      />
-
-      <SplDetailSheet
-        row={detailRow}
-        catalog={catalog}
-        canEdit={isToday && !!detailRow && canRow(detailRow as unknown as Record<string, unknown>)}
-        onSave={async (id, field, value) => {
-          await saveOne(id, field, value);
-          await refetchRows();
-        }}
-        onRefresh={refetchRows}
-        onOpenChange={(o) => { if (!o) setDetailRow(null); }}
       />
 
       <SplExportDialog
