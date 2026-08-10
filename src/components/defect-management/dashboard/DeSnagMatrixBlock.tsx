@@ -2,6 +2,10 @@ import { cn } from "@/lib/utils";
 import { Fragment } from "react";
 import { formatHoDate, EMPTY_HO_DATE_MAP, type HoDateMap } from "@/lib/defect-management/ho-dates";
 import {
+  EMPTY_STAGE_DATE_MAP,
+  type StageDateMap,
+} from "@/lib/defect-management/stage-dates";
+import {
   TEAM_COL_ORDER,
   bottleneckTeam,
   newStats,
@@ -16,6 +20,13 @@ import {
 export type MatrixMode = "count" | "pct" | "remain" | "remainPct";
 
 type StatusSlot = "issued" | StageMetric;
+
+/** Each Date 모드에서 한 셀의 스테이지·팀별 날짜를 찾아주는 조회자 */
+export type StageDateLookup = (
+  stage: StageMetric,
+  team: TeamKey,
+  which: "planned" | "actual",
+) => string | null;
 
 const STATUS_COLS: Array<{ slot: StatusSlot; label: string }> = [
   { slot: "issued", label: "Issued" },
@@ -81,6 +92,7 @@ function TeamCells({
   groupIndex,
   isTotal,
   stickyTop,
+  stageDate,
 }: {
   stats: Stats;
   mode: MatrixMode;
@@ -89,6 +101,8 @@ function TeamCells({
   groupIndex: number;
   isTotal?: boolean;
   stickyTop?: number;
+  /** 지정되면 Each Date 모드 — 숫자 대신 날짜(dd/mmm)를 표시한다 */
+  stageDate?: StageDateLookup;
 }) {
   const groupBg = isTotal ? "bg-yellow-400/10" : groupIndex % 2 === 0 ? "bg-transparent" : "bg-muted/20";
   const stickyBg = isTotal
@@ -140,7 +154,19 @@ function TeamCells({
           const isFirstOfGroup = sIdx === 0 && tIdx === 0;
           const isFirstOfStatus = tIdx === 0;
           const zeroDim = !showPct && count === 0 ? "text-muted-foreground/50" : "text-foreground";
+          // Each Date 모드: 스테이지 완료(잔여 0) → 실적일 + 회색 반전, 그 외 → 계획일
+          const eachDate = !!stageDate;
+          const isStageSlot = sc.slot !== "issued";
+          const stageDone = eachDate && isStageSlot && t.issued > 0 && t.issued - done <= 0;
+          const dateValue =
+            eachDate && isStageSlot
+              ? stageDate!(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
+              : null;
+          const dateText = eachDate ? (isStageSlot ? formatHoDate(dateValue) : "–") : null;
           const readyBg =
+            eachDate && stageDone
+              ? "color-mix(in oklab, var(--muted) 90%, var(--card))"
+              :
             readyTone === "ready-inspection"
               ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
               : readyTone === "ready-handover"
@@ -151,12 +177,13 @@ function TeamCells({
               key={`${sc.slot}-${team}`}
               className={cn(
                 "h-7 border-b p-0 tabular-nums",
+                eachDate && "min-w-[54px]",
                 stickyTop === undefined && !readyBg && groupBg,
                 stickyTop !== undefined && "sticky z-20",
                 isFirstOfGroup && "border-l-2 border-l-border",
                 !isFirstOfGroup && isFirstOfStatus && "border-l border-l-border/70",
                 !isFirstOfStatus && "border-r border-r-border/30",
-                isBottleneck && !readyBg && "bg-destructive/15",
+                isBottleneck && !readyBg && !eachDate && "bg-destructive/15",
                 dim && "opacity-50",
               )}
               style={
@@ -178,17 +205,32 @@ function TeamCells({
                     : readyTone === "ready-handover"
                       ? " · Ready for Handover"
                       : ""
+                }${
+                  eachDate && isStageSlot
+                    ? ` · ${stageDone ? "실적일" : "계획일"} ${dateValue ?? "없음"}`
+                    : ""
                 }`}
                 className={cn(
-                  "block h-full w-full px-1 text-right text-xs leading-none hover:bg-primary/10",
-                  sc.slot === "issued" && !isTotal && "font-medium",
-                  showPct ? (isRemain ? remainPctTone(ratio) : pctTone(ratio)) : zeroDim,
-                  isBottleneck && !isTotal && "font-semibold",
-                  readyTone && !isTotal && "font-semibold text-foreground",
+                  "block h-full w-full px-1 leading-none hover:bg-primary/10",
+                  eachDate ? "text-center text-[10px]" : "text-right text-xs",
+                  !eachDate && sc.slot === "issued" && !isTotal && "font-medium",
+                  eachDate
+                    ? stageDone
+                      ? "text-muted-foreground"
+                      : dateValue
+                        ? "text-foreground"
+                        : "text-muted-foreground/50"
+                    : showPct
+                      ? isRemain
+                        ? remainPctTone(ratio)
+                        : pctTone(ratio)
+                      : zeroDim,
+                  !eachDate && isBottleneck && !isTotal && "font-semibold",
+                  !eachDate && readyTone && !isTotal && "font-semibold text-foreground",
                   isTotal && "font-bold",
                 )}
               >
-                {text}
+                {eachDate ? dateText : text}
               </button>
             </td>
           );
@@ -333,6 +375,8 @@ export function DeSnagMatrixBlock({
   mode,
   showHoDate = false,
   hoDates = EMPTY_HO_DATE_MAP,
+  eachDate = false,
+  stageDates = EMPTY_STAGE_DATE_MAP,
 }: {
   block: MatrixBlock;
   presentBuildings: string[];
@@ -340,6 +384,8 @@ export function DeSnagMatrixBlock({
   onNavigate: (params: Record<string, string>) => void;
   showHoDate?: boolean;
   hoDates?: HoDateMap;
+  eachDate?: boolean;
+  stageDates?: StageDateMap;
 }) {
   const buildingMembers = (() => {
     if (block.kind === "tower") return ["Tower", "Tower 4"];
@@ -444,6 +490,11 @@ export function DeSnagMatrixBlock({
                     groupIndex={idx}
                     isTotal
                     stickyTop={78}
+                    stageDate={
+                      eachDate
+                        ? (stage, team, which) => stageDates.col(block.kind, rg, stage, team, which)
+                        : undefined
+                    }
                   />
                   {showHoDate && (
                     <HoCell
@@ -462,6 +513,11 @@ export function DeSnagMatrixBlock({
                 groupIndex={block.columnKeys.length}
                 isTotal
                 stickyTop={78}
+                stageDate={
+                  eachDate
+                    ? (stage, team, which) => stageDates.block(block.kind, stage, team, which)
+                    : undefined
+                }
               />
               {showHoDate && (
                 <HoCell
@@ -483,6 +539,8 @@ export function DeSnagMatrixBlock({
                 goCell={goCell}
                 showHoDate={showHoDate}
                 hoDates={hoDates}
+                eachDate={eachDate}
+                stageDates={stageDates}
               />
             ))}
           </tbody>
@@ -501,6 +559,8 @@ function FragmentRows({
   goCell,
   showHoDate,
   hoDates,
+  eachDate,
+  stageDates,
 }: {
   group: { building: string; rows: MatrixBlock["rows"]; subtotal: Stats };
   block: MatrixBlock;
@@ -516,6 +576,8 @@ function FragmentRows({
   ) => void;
   showHoDate: boolean;
   hoDates: HoDateMap;
+  eachDate: boolean;
+  stageDates: StageDateMap;
 }) {
   const showBuildingSubtotal = block.kind === "podium" && group.rows.length > 1;
   return (
@@ -568,6 +630,12 @@ function FragmentRows({
                 onCell={(slot, team) => goCell(r.building, r.levelDisp, rg, slot, team)}
                 dim={r.cells[rg].issued === 0}
                 groupIndex={gIdx}
+                stageDate={
+                  eachDate
+                    ? (stage, team, which) =>
+                        stageDates.cell(block.kind, r.building, r.levelDisp, rg, stage, team, which)
+                    : undefined
+                }
               />
               {showHoDate && (
                 <HoCell
@@ -583,6 +651,12 @@ function FragmentRows({
             onCell={(slot, team) => goCell(r.building, r.levelDisp, "__ROW_TOTAL__", slot, team)}
             groupIndex={block.columnKeys.length}
             isTotal
+            stageDate={
+              eachDate
+                ? (stage, team, which) =>
+                    stageDates.row(block.kind, r.building, r.levelDisp, stage, team, which)
+                : undefined
+            }
           />
           {showHoDate && (
             <HoCell
@@ -618,6 +692,12 @@ function FragmentRows({
                   mode={mode}
                   onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
                   groupIndex={gIdx}
+                  stageDate={
+                    eachDate
+                      ? (stage, team, which) =>
+                          stageDates.buildingCol(block.kind, group.building, rg, stage, team, which)
+                      : undefined
+                  }
                 />
                 {showHoDate && <HoCell value={colMax} groupIndex={gIdx} emphasize />}
               </Fragment>
@@ -629,6 +709,12 @@ function FragmentRows({
             onCell={(slot, team) => goCell(group.building, null, "__BUILDING_SUBTOTAL__", slot, team)}
             groupIndex={block.columnKeys.length}
             isTotal
+            stageDate={
+              eachDate
+                ? (stage, team, which) =>
+                    stageDates.building(block.kind, group.building, stage, team, which)
+                : undefined
+            }
           />
           {showHoDate && (
             <HoCell
