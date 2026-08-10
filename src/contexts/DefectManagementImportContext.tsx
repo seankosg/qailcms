@@ -117,6 +117,8 @@ export interface DefectImportFile {
     unmappedCategoryCount?: number;
     unmappedCategories?: string[];
     errors?: DefectImportError[];
+    /** 감사 로그(import_field_logs) 저장 실패 — 조용한 실패 금지 */
+    logPersistErrors?: { source: string; error: string; attempted: number; persisted: number }[];
   };
   classificationResult?: {
     skippedRows: number;
