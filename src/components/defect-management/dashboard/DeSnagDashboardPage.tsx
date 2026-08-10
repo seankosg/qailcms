@@ -401,6 +401,12 @@ export function DeSnagDashboardPage() {
             HO Date
           </Label>
         </div>
+        <div className="flex items-center gap-1.5">
+          <Switch id="each-date-toggle" checked={eachDate} onCheckedChange={setEachDate} />
+          <Label htmlFor="each-date-toggle" className="cursor-pointer text-xs">
+            Each Date
+          </Label>
+        </div>
         <Button
           type="button"
           size="sm"
@@ -442,12 +448,15 @@ export function DeSnagDashboardPage() {
             onNavigate={goRaw}
             showHoDate={showHoDate}
             hoDates={hoDates}
+            eachDate={eachDate}
+            stageDates={stageDates}
           />
         ))}
       </div>
 
       <p className="text-[10px] text-muted-foreground">
         각 셀 = Room Group × (Issued · Rect · Pre-Ins · DAR-Ins · Closed · H/O) × (Elec · Mech · Arch). 스테이지 값은 정본(자기 실적일 ≤ 기준일) 기준.
+        {" "}Each Date 켜짐 = 각 셀에 가장 늦은 계획일(dd/mmm), 잔여 0 인 셀은 가장 늦은 실적일 + 회색 반전. Issued 열은 표시하지 않음.
       </p>
     </div>
   );
