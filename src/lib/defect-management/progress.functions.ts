@@ -6,13 +6,14 @@ const InputSchema = z.object({
   planGroups: z.array(z.string()).default([]),
   teams: z.array(z.string()).default([]),
   roomGroups: z.array(z.string()).default([]),
+  buildings: z.array(z.string()).default([]),
   groupBy: z.array(z.string()).min(1),
   asOfDate: z.string(),
   planMode: z.enum(["baseline", "remaining"]).default("baseline"),
 });
 
 const CellsInputSchema = InputSchema.extend({
-  bucket: z.enum(["day", "week"]).default("day"),
+  bucket: z.enum(["day", "week", "month"]).default("day"),
   rangeStart: z.string(),
   rangeEnd: z.string(),
 });
@@ -25,6 +26,7 @@ export const getSnagProgressCells = createServerFn({ method: "POST" })
       _plan_groups: data.planGroups.length ? data.planGroups : null,
       _teams: data.teams.length ? data.teams : null,
       _room_groups: data.roomGroups.length ? data.roomGroups : null,
+      _buildings: data.buildings.length ? data.buildings : null,
       _group_by: data.groupBy,
       _bucket: data.bucket,
       _range_start: data.rangeStart,
@@ -54,6 +56,7 @@ export const getSnagProgressTotals = createServerFn({ method: "POST" })
       _plan_groups: data.planGroups.length ? data.planGroups : null,
       _teams: data.teams.length ? data.teams : null,
       _room_groups: data.roomGroups.length ? data.roomGroups : null,
+      _buildings: data.buildings.length ? data.buildings : null,
       _group_by: data.groupBy,
       _as_of_date: data.asOfDate,
       _plan_mode: data.planMode,

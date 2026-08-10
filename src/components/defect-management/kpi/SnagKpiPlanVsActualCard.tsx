@@ -37,6 +37,7 @@ export type SnagCurveUnit = "cnt" | "pct";
 const BUCKET_OPTIONS: Array<{ value: Bucket; label: string }> = [
   { value: "day", label: "Daily" },
   { value: "week", label: "Weekly" },
+  { value: "month", label: "Monthly" },
 ];
 
 const UNIT_OPTIONS: Array<{ value: SnagCurveUnit; label: string }> = [
@@ -242,7 +243,7 @@ export function SnagKpiPlanVsActualCard({
                 type="single"
                 value={bucket}
                 onValueChange={(v) => {
-                  if (v === "day" || v === "week") onBucketChange(v);
+                  if (v === "day" || v === "week" || v === "month") onBucketChange(v);
                 }}
                 className="gap-1"
               >

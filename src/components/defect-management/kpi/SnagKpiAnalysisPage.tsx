@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { DeSnagRoomGroupFilterBar } from "@/components/defect-management/dashboard/DeSnagRoomGroupFilterBar";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
+import { useDefectFacet } from "@/hooks/useDefectItems";
 import { useSnagAsOf } from "@/hooks/useSnagAsOf";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import {
@@ -27,6 +28,7 @@ import {
   STAGE_LABELS,
   addDays,
   buildBucketRange,
+  monthStartIso,
   todayIso,
   weekStartIso,
   type Bucket,
@@ -67,6 +69,10 @@ export function SnagKpiAnalysisPage() {
   const plot: PlotKey = search.plot as PlotKey;
   const teams = parseCsv<TeamKey>(search.teams, ALL_TEAMS);
   const roomGroups = parseCsv<RoomGroupCol>(search.roomGroups, ROOM_GROUP_ORDER);
+  const buildings = ((search.buildings as string) || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const bucket: Bucket = search.bucket as Bucket;
   const planMode: PlanMode = search.planMode as PlanMode;
   const stage: Stage = (STAGE_OPTIONS.includes(search.stageView as Stage)
@@ -91,7 +97,8 @@ export function SnagKpiAnalysisPage() {
   // Progress 화면과 동일한 구간 규칙(수치 대조를 위해 그대로 복제)
   const rangeStart = useMemo(() => addDays(today, -14), [today]);
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
-  const rpcStart = bucket === "week" ? weekStartIso(rangeStart) : rangeStart;
+  const rpcStart =
+    bucket === "week" ? weekStartIso(rangeStart) : bucket === "month" ? monthStartIso(rangeStart) : rangeStart;
   const rpcEnd = rangeEnd;
   const effectiveRpcStart = bucket === "day" && rpcStart < rangeStart ? rangeStart : rpcStart;
   const buckets = useMemo(
@@ -106,6 +113,16 @@ export function SnagKpiAnalysisPage() {
 
   const teamsKey = [...teams].sort().join(",");
   const roomKey = [...roomGroups].sort().join(",");
+  const buildingKey = [...buildings].sort().join(",");
+
+  const buildingFacetQ = useDefectFacet("building", {
+    statusGroup: "all",
+    includeInactive: false,
+  });
+  const buildingOptions = useMemo(
+    () => (buildingFacetQ.data ?? []).map((f) => f.value).filter(Boolean),
+    [buildingFacetQ.data],
+  );
 
   const cellsQ = useQuery({
     queryKey: [
@@ -113,6 +130,7 @@ export function SnagKpiAnalysisPage() {
       plot,
       teamsKey,
       roomKey,
+      buildingKey,
       bucket,
       effectiveRpcStart,
       rpcEnd,
@@ -125,6 +143,7 @@ export function SnagKpiAnalysisPage() {
           planGroups,
           teams,
           roomGroups,
+          buildings,
           groupBy: ["team"],
           bucket,
           rangeStart: effectiveRpcStart,
@@ -138,13 +157,14 @@ export function SnagKpiAnalysisPage() {
   });
 
   const totalsQ = useQuery({
-    queryKey: ["snag-kpi-totals", plot, teamsKey, roomKey, groupBy, asOfDate, planMode],
+    queryKey: ["snag-kpi-totals", plot, teamsKey, roomKey, buildingKey, groupBy, asOfDate, planMode],
     queryFn: () =>
       totalsFn({
         data: {
           planGroups,
           teams,
           roomGroups,
+          buildings,
           groupBy: [groupBy],
           asOfDate,
           planMode,
@@ -207,10 +227,18 @@ export function SnagKpiAnalysisPage() {
           : "All",
       },
       { label: "Stage", value: STAGE_LABELS[stage] },
+      {
+        label: "Building",
+        value: buildings.length
+          ? buildings.length <= 3
+            ? buildings.join(", ")
+            : `${buildings.length} selected`
+          : "All",
+      },
       { label: "Plan", value: planMode === "remaining" ? "Remaining" : "Baseline" },
       { label: "As of", value: asOfDate },
     ],
-    [plot, teams, roomGroups, stage, planMode, asOfDate],
+    [plot, teams, roomGroups, buildings, stage, planMode, asOfDate],
   );
 
   const handleGroupClick = (dim: GroupBy, key: string) => {
@@ -307,6 +335,30 @@ export function SnagKpiAnalysisPage() {
                       className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                     >
                       {t}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
+
+              <span className="h-5 w-px bg-border" aria-hidden />
+
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Building
+                </span>
+                <ToggleGroup
+                  type="multiple"
+                  value={buildings}
+                  onValueChange={(v) => setSearch({ buildings: (v as string[]).join(",") })}
+                  className="flex-wrap gap-1"
+                >
+                  {buildingOptions.map((b) => (
+                    <ToggleGroupItem
+                      key={b}
+                      value={b}
+                      className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                    >
+                      {b}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
