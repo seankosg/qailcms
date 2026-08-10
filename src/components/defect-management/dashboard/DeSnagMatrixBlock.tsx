@@ -39,7 +39,7 @@ function HoCell({
   emphasize?: boolean;
 }) {
   const bg = isTotal
-    ? "color-mix(in oklab, var(--primary) 12%, var(--card))"
+    ? "color-mix(in oklab, var(--color-yellow-400) 12%, var(--card))"
     : groupIndex % 2 === 0
       ? "var(--card)"
       : "color-mix(in oklab, var(--muted) 25%, var(--card))";
@@ -49,7 +49,7 @@ function HoCell({
         "h-7 min-w-[52px] border-b border-l border-l-border/70 px-1 text-center text-[10px] tabular-nums",
         stickyTop !== undefined && "sticky z-20",
         value ? "text-foreground" : "text-muted-foreground/50",
-        (emphasize || isTotal) && "font-semibold",
+        isTotal ? "font-bold" : emphasize && "font-semibold",
       )}
       style={stickyTop !== undefined ? { top: stickyTop, background: bg } : { background: bg }}
       title={value ?? undefined}
@@ -90,9 +90,9 @@ function TeamCells({
   isTotal?: boolean;
   stickyTop?: number;
 }) {
-  const groupBg = isTotal ? "bg-primary/5" : groupIndex % 2 === 0 ? "bg-transparent" : "bg-muted/20";
+  const groupBg = isTotal ? "bg-yellow-400/10" : groupIndex % 2 === 0 ? "bg-transparent" : "bg-muted/20";
   const stickyBg = isTotal
-    ? "color-mix(in oklab, var(--primary) 12%, var(--card))"
+    ? "color-mix(in oklab, var(--color-yellow-400) 12%, var(--card))"
     : groupIndex % 2 === 0
       ? "var(--card)"
       : "color-mix(in oklab, var(--muted) 25%, var(--card))";
@@ -181,10 +181,11 @@ function TeamCells({
                 }`}
                 className={cn(
                   "block h-full w-full px-1 text-right text-xs leading-none hover:bg-primary/10",
-                  sc.slot === "issued" && "font-medium",
+                  sc.slot === "issued" && !isTotal && "font-medium",
                   showPct ? (isRemain ? remainPctTone(ratio) : pctTone(ratio)) : zeroDim,
-                  isBottleneck && "font-semibold",
-                  readyTone && "font-semibold text-foreground",
+                  isBottleneck && !isTotal && "font-semibold",
+                  readyTone && !isTotal && "font-semibold text-foreground",
+                  isTotal && "font-bold",
                 )}
               >
                 {text}
@@ -420,11 +421,11 @@ export function DeSnagMatrixBlock({
           />
           <tbody>
             {/* Column Total 행 — 헤더 바로 아래 고정 */}
-            <tr className="font-medium">
+            <tr className="font-bold">
               <td
                 className="sticky left-0 top-[78px] z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
                 colSpan={2}
-                style={{ background: "color-mix(in oklab, var(--primary) 14%, var(--card))" }}
+                style={{ background: "color-mix(in oklab, var(--color-yellow-400) 14%, var(--card))" }}
               >
                 <button
                   type="button"
@@ -441,14 +442,15 @@ export function DeSnagMatrixBlock({
                     mode={mode}
                     onCell={(slot, team) => goCell(null, null, rg, slot, team)}
                     groupIndex={idx}
+                    isTotal
                     stickyTop={78}
                   />
                   {showHoDate && (
                     <HoCell
                       value={hoDates.col(block.kind, rg)}
                       groupIndex={idx}
+                      isTotal
                       stickyTop={78}
-                      emphasize
                     />
                   )}
                 </Fragment>
