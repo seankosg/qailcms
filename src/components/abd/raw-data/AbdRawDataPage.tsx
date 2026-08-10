@@ -50,6 +50,7 @@ import { EMPTY_TOKEN, DATE_FILTER_FIELDS } from "@/lib/abd/filter-fns";
 import { getOriginHeaderStyle } from "@/lib/abd/origin-header-style";
 import { AbdColumnFilterDropdown } from "./AbdColumnFilterDropdowns";
 import { TopHorizontalScrollbar } from "@/components/defect-management/raw-data/TopHorizontalScrollbar";
+import { SortPriorityBadge } from "@/components/common/SortPriorityBadge";
 import { AbdEditCellPopover } from "./AbdEditCellPopover";
 import { isDfActualBlocked, OCS_DF_BLOCK_MESSAGE } from "@/lib/abd/ocs-df-guard";
 import { AbdExportDialog } from "./AbdExportDialog";
