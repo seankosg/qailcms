@@ -18,6 +18,7 @@ export interface SplDocumentRow {
   content_hash: string | null;
   number_mismatch: boolean;
   mismatch_warning: string | null;
+  review_note: string | null;
   filename_document_number: string | null;
   internal_document_number: string | null;
   mapping_method: string | null;
@@ -50,7 +51,7 @@ export const listSplDocuments = createServerFn({ method: "POST" })
     const { data: rows, error } = await client
       .from("spl_document_item_links")
       .select(
-        "mapping_method, note, spl_documents!inner(id, document_identity, document_number, revision, title, file_name, byte_size, page_count, content_hash, number_mismatch, mismatch_warning, filename_document_number, internal_document_number, is_active)",
+        "mapping_method, note, spl_documents!inner(id, document_identity, document_number, revision, title, file_name, byte_size, page_count, content_hash, number_mismatch, mismatch_warning, review_note, filename_document_number, internal_document_number, is_active)",
       )
       .eq("spl_item_id", data.splItemId);
     if (error) throw new Error(error.message);
@@ -70,6 +71,7 @@ export const listSplDocuments = createServerFn({ method: "POST" })
         content_hash: doc.content_hash ?? null,
         number_mismatch: !!doc.number_mismatch,
         mismatch_warning: doc.mismatch_warning ?? null,
+        review_note: doc.review_note ?? null,
         filename_document_number: doc.filename_document_number ?? null,
         internal_document_number: doc.internal_document_number ?? null,
         mapping_method: link.mapping_method ?? null,
@@ -81,24 +83,33 @@ export const listSplDocuments = createServerFn({ method: "POST" })
 /** 문서 PDF 열람용 signed URL (5분) */
 export const getSplDocumentUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { documentId: string }) => {
+  .inputValidator((input: { documentId: string; download?: boolean }) => {
     const id = input?.documentId;
     if (typeof id !== "string" || !UUID_RE.test(id)) throw new Error("documentId: invalid id");
-    return { documentId: id };
+    return { documentId: id, download: input?.download === true };
   })
-  .handler(async ({ data, context }): Promise<{ available: boolean; url?: string; file_name?: string }> => {
-    const client = context.supabase as unknown as LooseClient;
-    const { data: doc, error } = await client
-      .from("spl_documents")
-      .select("storage_path, file_name")
-      .eq("id", data.documentId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!doc?.storage_path) return { available: false };
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<{ available: boolean; url?: string; file_name?: string }> => {
+      const client = context.supabase as unknown as LooseClient;
+      const { data: doc, error } = await client
+        .from("spl_documents")
+        .select("storage_path, file_name")
+        .eq("id", data.documentId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!doc?.storage_path) return { available: false };
 
-    const signed = await client.storage
-      .from(SPL_DOCUMENT_BUCKET)
-      .createSignedUrl(doc.storage_path as string, 300);
-    if (signed.error || !signed.data?.signedUrl) return { available: false };
-    return { available: true, url: signed.data.signedUrl, file_name: doc.file_name as string };
-  });
+      const signed = await client.storage
+        .from(SPL_DOCUMENT_BUCKET)
+        .createSignedUrl(
+          doc.storage_path as string,
+          300,
+          data.download ? { download: doc.file_name as string } : undefined,
+        );
+      if (signed.error || !signed.data?.signedUrl) return { available: false };
+      return { available: true, url: signed.data.signedUrl, file_name: doc.file_name as string };
+    },
+  );

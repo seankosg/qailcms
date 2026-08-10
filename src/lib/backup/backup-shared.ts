@@ -239,6 +239,7 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "spl_ocs_comments",
     "spl_ocs_comment_spl_links",
     "spl_ocs_comment_rsp_links",
+    "spl_ocs_categories",
     "spl_ocs_categories_mapping",
     "spl_ocs_attachments",
     "spl_ocs_attachment_comment_links",
