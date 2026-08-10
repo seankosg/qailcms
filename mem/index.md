@@ -7,5 +7,6 @@ TM은 As-of 예외: Actual%·완료는 기준일 무관 불변, Plan%·판정만
 검증 게이트는 절대 수치가 아니라 등식으로 건다(합=count(*)). "0건"에는 항상 모집단을 병기한다.
 
 ## Memories
+- [RCL 권한 격자](mem://features/rcl-permission-grid) — 권한 판정 단일 근거(rcl_permissions 105/67), 행범위 vs 모듈판정, SELECT 불변·FOR ALL 분해·조용한 실패 금지
 - [Sticky columns opaque](mem://design/sticky-columns-opaque) — 테이블 스티키 컬럼 배경 불투명화 규칙 및 oklch 토큰 사용 시 주의사항
 - [TM 실적 체계 정책](mem://features/tm-actuals-policy) — TM As-of 예외, 완료 정본·기준일·자동채움 트리거·곡선 규칙, 검증 방법론, HDEC 양식 근본원인
