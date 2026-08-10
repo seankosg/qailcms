@@ -1,6 +1,7 @@
 // SM 대시보드 매트릭스 → 스타일 적용 Excel 내보내기 (화면 구조 1:1)
 import XLSX from "xlsx-js-style";
 import { dohaDateTime } from "@/lib/time/doha";
+import { formatHoDate, EMPTY_HO_DATE_MAP, type HoDateMap } from "./ho-dates";
 import {
   TEAM_COL_ORDER,
   bottleneckTeam,
@@ -95,8 +96,13 @@ export function exportSnagMatrixToXlsx(args: {
   teams: TeamKey[];
   roomGroupsFilter?: string[];
   userName?: string;
+  showHoDate?: boolean;
+  hoDates?: HoDateMap;
 }) {
   const { matrix, mode, asOf } = args;
+  const showHoDate = !!args.showHoDate;
+  const hoDates = args.hoDates ?? EMPTY_HO_DATE_MAP;
+  const GROUP_SPAN = PER_GROUP + (showHoDate ? 1 : 0);
   const wb = XLSX.utils.book_new();
 
   for (const block of matrix.blocks) {
@@ -104,7 +110,7 @@ export function exportSnagMatrixToXlsx(args: {
     const merges: XLSX.Range[] = [];
     const groupCols = groupColsFor(block);
     const cols: string[] = block.columnKeys;
-    const totalCols = 2 + groupCols.length * PER_GROUP;
+    const totalCols = 2 + groupCols.length * GROUP_SPAN;
 
     // Title / meta
     put(ws, 0, 0, `SM Dashboard Matrix — ${block.title} (PLOT ${matrix.plot})`, sTitle);
@@ -143,11 +149,11 @@ export function exportSnagMatrixToXlsx(args: {
     }
 
     groupCols.forEach((g, gi) => {
-      const base = 2 + gi * PER_GROUP;
+      const base = 2 + gi * GROUP_SPAN;
       const bg1 = g.total ? HDR_TOTAL : HDR_G1;
       put(ws, H1, base, g.label, hdr(bg1, 11));
-      for (let k = 1; k < PER_GROUP; k++) put(ws, H1, base + k, "", hdr(bg1, 11));
-      merges.push({ s: { r: H1, c: base }, e: { r: H1, c: base + PER_GROUP - 1 } });
+      for (let k = 1; k < GROUP_SPAN; k++) put(ws, H1, base + k, "", hdr(bg1, 11));
+      merges.push({ s: { r: H1, c: base }, e: { r: H1, c: base + GROUP_SPAN - 1 } });
       SLOTS.forEach((sc, si) => {
         const sBase = base + si * TEAM_COL_ORDER.length;
         put(ws, H2, sBase, sc.label, hdr(g.total ? HDR_TOTAL : HDR_G2));
@@ -157,10 +163,17 @@ export function exportSnagMatrixToXlsx(args: {
           put(ws, H3, sBase + ti, TEAM_LABEL[team], hdr(g.total ? HDR_TOTAL : HDR_G3));
         });
       });
+      if (showHoDate) {
+        const hBase = base + PER_GROUP;
+        const hb = g.total ? HDR_TOTAL : HDR_G2;
+        put(ws, H2, hBase, g.total ? "Level HO" : "HO Date", hdr(hb));
+        put(ws, H3, hBase, "", hdr(g.total ? HDR_TOTAL : HDR_G3));
+        merges.push({ s: { r: H2, c: hBase }, e: { r: H3, c: hBase } });
+      }
     });
 
     const writeStats = (r: number, stats: Stats, gi: number, isTotalGroup: boolean, emphasize: boolean) => {
-      const base = 2 + gi * PER_GROUP;
+      const base = 2 + gi * GROUP_SPAN;
       const bn_: Partial<Record<Slot, TeamKey | null>> = {};
       for (const m of STAGE_METRICS) bn_[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
       SLOTS.forEach((sc, si) => {
@@ -187,13 +200,29 @@ export function exportSnagMatrixToXlsx(args: {
       });
     };
 
+    const writeHo = (r: number, gi: number, isTotalGroup: boolean, emphasize: boolean, value: string | null) => {
+      if (!showHoDate) return;
+      const c = 2 + gi * GROUP_SPAN + PER_GROUP;
+      const bg = isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2];
+      put(ws, r, c, formatHoDate(value), {
+        font: { name: F, sz: 10, bold: emphasize || isTotalGroup, color: { rgb: value ? "FF111827" : "FF9CA3AF" } },
+        fill: { fgColor: { rgb: bg } },
+        alignment: { vertical: "center", horizontal: "center" },
+        border: BOX,
+      });
+    };
+
     let r = DATA;
     // Column Total
     put(ws, r, 0, "Column Total", { ...sAxis, font: { ...sAxis.font, bold: true }, fill: { fgColor: { rgb: TOTAL_BG } } });
     put(ws, r, 1, "", { ...sAxis, fill: { fgColor: { rgb: TOTAL_BG } } });
     merges.push({ s: { r, c: 0 }, e: { r, c: 1 } });
-    cols.forEach((rg, gi) => writeStats(r, block.colTotals[rg], gi, false, true));
+    cols.forEach((rg, gi) => {
+      writeStats(r, block.colTotals[rg], gi, false, true);
+      writeHo(r, gi, false, true, hoDates.col(block.kind, rg));
+    });
     writeStats(r, block.blockTotal, cols.length, true, true);
+    writeHo(r, cols.length, true, true, hoDates.block(block.kind));
     r++;
 
     // Building 그룹 (podium 소계 포함)
@@ -216,8 +245,12 @@ export function exportSnagMatrixToXlsx(args: {
       grp.rows.forEach((row) => {
         put(ws, r, 0, row.building, sAxis);
         put(ws, r, 1, row.levelDisp, sAxis);
-        cols.forEach((rg, gi) => writeStats(r, row.cells[rg], gi, false, false));
+        cols.forEach((rg, gi) => {
+          writeStats(r, row.cells[rg], gi, false, false);
+          writeHo(r, gi, false, false, hoDates.cell(block.kind, row.building, row.levelDisp, rg));
+        });
         writeStats(r, row.rowTotal, cols.length, true, false);
+        writeHo(r, cols.length, true, false, hoDates.row(block.kind, row.building, row.levelDisp));
         r++;
       });
       if (showSub) {
@@ -227,8 +260,15 @@ export function exportSnagMatrixToXlsx(args: {
           const sub = newStats();
           for (const row of grp.rows) mergeStats(sub, row.cells[rg]);
           writeStats(r, sub, gi, false, true);
+          let colMax: string | null = null;
+          for (const row of grp.rows) {
+            const v = hoDates.cell(block.kind, row.building, row.levelDisp, rg);
+            if (v && (!colMax || v > colMax)) colMax = v;
+          }
+          writeHo(r, gi, false, true, colMax);
         });
         writeStats(r, grp.subtotal, cols.length, true, true);
+        writeHo(r, cols.length, true, true, hoDates.building(block.kind, grp.building));
         r++;
       }
       const endR = r - 1;
@@ -241,7 +281,13 @@ export function exportSnagMatrixToXlsx(args: {
 
     ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(r - 1, DATA), c: totalCols - 1 } });
     ws["!merges"] = merges;
-    ws["!cols"] = [{ wch: 16 }, { wch: 14 }, ...Array.from({ length: totalCols - 2 }, () => ({ wch: 7 }))];
+    ws["!cols"] = [
+      { wch: 16 },
+      { wch: 14 },
+      ...Array.from({ length: totalCols - 2 }, (_, i) =>
+        showHoDate && i % GROUP_SPAN === PER_GROUP ? { wch: 9 } : { wch: 7 },
+      ),
+    ];
     ws["!rows"] = [{ hpt: 22 }, { hpt: 18 }, { hpt: 6 }, { hpt: 20 }, { hpt: 16 }, { hpt: 16 }];
     (ws as any)["!freeze"] = XLSX.utils.encode_cell({ r: DATA, c: 2 });
 
