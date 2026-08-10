@@ -52,7 +52,7 @@ export function TopHorizontalScrollbar({ targetRef, width, frozenWidth = 0, clas
 
   return (
     <div
-      className={cn("flex h-[16px] shrink-0 border-b bg-background", className)}
+      className={cn("flex h-[20px] shrink-0 border-b bg-background", className)}
       aria-hidden
     >
       {frozenWidth > 0 && (
