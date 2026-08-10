@@ -7461,6 +7461,7 @@ export type Database = {
         Args: {
           _as_of_date: string
           _bucket: string
+          _buildings?: string[]
           _group_by: string[]
           _include_agg?: boolean
           _plan_groups: string[]
@@ -7482,6 +7483,7 @@ export type Database = {
         Args: {
           _as_of_date: string
           _bucket: string
+          _buildings?: string[]
           _group_by: string[]
           _include_agg?: boolean
           _plan_groups: string[]
@@ -7496,6 +7498,7 @@ export type Database = {
       defect_snag_progress_totals: {
         Args: {
           _as_of_date: string
+          _buildings?: string[]
           _group_by: string[]
           _plan_groups: string[]
           _plan_mode: string
@@ -7516,6 +7519,7 @@ export type Database = {
       defect_snag_progress_totals_json: {
         Args: {
           _as_of_date: string
+          _buildings?: string[]
           _group_by: string[]
           _plan_groups: string[]
           _plan_mode: string
