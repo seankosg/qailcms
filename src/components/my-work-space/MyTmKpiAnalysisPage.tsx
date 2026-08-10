@@ -21,6 +21,7 @@ import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { resolveJudgment } from "@/lib/task-management/delay-utils";
 import { todayInDoha } from "@/lib/time/doha";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useTmWorkTypeOptions } from "@/hooks/useTmWorkTypeOptions";
 import { ChartGuideButton } from "@/components/task-management/dashboard/ChartGuideButton";
 
 const TASK_SCOPE_OPTIONS = [
@@ -80,6 +81,9 @@ export function MyTmKpiAnalysisPage() {
   const taskScope: TaskScope = search.taskScope === "main" ? "main" : "sub";
   const scopedByTaskScope = useMemo(() => scopeItems(items, taskScope), [items, taskScope]);
 
+  const { data: workTypeOptions = [] } = useTmWorkTypeOptions();
+  const workType = search.workType ?? "all";
+
   const { data: thresholdsData } = useTaskManagementSettings();
   const thresholds = thresholdsData ?? DEFAULT_THRESHOLDS;
 
@@ -94,13 +98,17 @@ export function MyTmKpiAnalysisPage() {
     search.curveBucket === "day" || search.curveBucket === "month" ? search.curveBucket : "week";
 
   const scopedItems = useMemo(() => {
-    const base = scopedByTaskScope;
+    let base = scopedByTaskScope;
+    if (workType !== "all")
+      base = base.filter(
+        (it) => ((it as { row_type?: string | null }).row_type ?? "").trim() === workType,
+      );
     if (search.delayFilter === "risk")
       return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "악화");
     if (search.delayFilter === "delayed")
       return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "지연");
     return base;
-  }, [scopedByTaskScope, search.delayFilter, thresholds, asOfDate]);
+  }, [scopedByTaskScope, workType, search.delayFilter, thresholds, asOfDate]);
 
   const patch = (obj: Record<string, unknown>) =>
     navigate({
@@ -114,6 +122,7 @@ export function MyTmKpiAnalysisPage() {
     () => [
       { label: "Task", value: taskScope === "main" ? "Main" : "Sub" },
       { label: "PIC", value: myName ?? "-" },
+      { label: "Work Type", value: workType === "all" ? "All" : workType },
       {
         label: "Delay",
         value:
@@ -122,7 +131,7 @@ export function MyTmKpiAnalysisPage() {
       },
       { label: "As of", value: asOfDate },
     ],
-    [taskScope, myName, search.delayFilter, asOfDate],
+    [taskScope, myName, workType, search.delayFilter, asOfDate],
   );
 
   return (
@@ -197,6 +206,26 @@ export function MyTmKpiAnalysisPage() {
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
+              </div>
+
+              <span className="h-5 w-px bg-border" aria-hidden />
+
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Work Type
+                </span>
+                <Tabs value={workType} onValueChange={(v) => v && patch({ workType: v })}>
+                  <TabsList className="h-8 flex-wrap">
+                    <TabsTrigger value="all" className="h-6 px-2 text-xs">
+                      전체
+                    </TabsTrigger>
+                    {workTypeOptions.map((o) => (
+                      <TabsTrigger key={o} value={o} className="h-6 px-2 text-xs">
+                        {o}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
               </div>
 
               <span className="h-5 w-px bg-border" aria-hidden />
