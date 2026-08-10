@@ -70,19 +70,48 @@ export interface DefectItemsQueryResult {
 }
 
 // ── defect_items_search ───────────────────────────────────────────────────
+/**
+ * 정렬 안정화: 사용자가 고른 정렬 뒤에 항상 고유키(id)를 붙인다.
+ * 청크 병렬 페이징에서 동값 행의 순서가 청크마다 달라지면 중복/누락이 생기고,
+ * 그 결과 total 미달로 추가 청크를 계속 긁는 상황이 된다.
+ */
+function withTiebreaker(sort?: DefectServerSort[]): DefectServerSort[] {
+  const base = (sort ?? []).filter((s) => s.column !== "id");
+  return [...base, { column: "id", desc: false }];
+}
+
+/** 청크 병렬 페치 동시성 제한 — 무제한 병렬은 커넥션/정렬 비용 폭주로 무한 로딩처럼 보인다. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      out[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 export function useDefectItemsQuery(p: DefectItemsQueryParams) {
   return useQuery<DefectItemsQueryResult>({
     queryKey: ["defect", "items", p],
     queryFn: async () => {
       const offset = Math.max(0, (p.page - 1) * p.pageSize);
       const CHUNK = 999; // 청크 == 상한(1,000) 금지 원칙: 999 고정
+      const sortWithId = withTiebreaker(p.sort);
       const callRpc = async (off: number, lim: number) => {
         const { data, error } = await (supabase as any).rpc("defect_items_search", {
           _status_group: p.statusGroup,
           _include_inactive: p.includeInactive,
           _q: p.q && p.q.trim() ? p.q.trim() : null,
           _filters: p.filters ?? [],
-          _sort: p.sort ?? [],
+          _sort: sortWithId,
           _offset: off,
           _limit: lim,
         });
@@ -109,7 +138,7 @@ export function useDefectItemsQuery(p: DefectItemsQueryParams) {
         for (let i = 1; i <= extraChunks; i++) {
           offsets.push(offset + i * CHUNK);
         }
-        const batches = await Promise.all(offsets.map((off) => callRpc(off, CHUNK)));
+        const batches = await mapWithConcurrency(offsets, 4, (off) => callRpc(off, CHUNK));
         for (const batch of batches) {
           for (const r of batch) collected.push(r.rows as DefectItem);
         }
@@ -122,6 +151,7 @@ export function useDefectItemsQuery(p: DefectItemsQueryParams) {
     },
     staleTime: 30_000,
     gcTime: 5 * 60_000,
+    retry: 1,
     placeholderData: (prev) => prev,
     refetchOnWindowFocus: false,
   });
