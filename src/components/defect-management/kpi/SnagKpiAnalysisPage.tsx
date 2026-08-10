@@ -344,10 +344,32 @@ export function SnagKpiAnalysisPage() {
 
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Building
+                </span>
+                <ToggleGroup
+                  type="multiple"
+                  value={buildings}
+                  onValueChange={(v) => setSearch({ buildings: (v as string[]).join(",") })}
+                  className="flex-wrap gap-1"
+                >
+                  {buildingOptions.map((b) => (
+                    <ToggleGroupItem
+                      key={b}
+                      value={b}
+                      className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                    >
+                      {b}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
+
+              <span className="h-5 w-px bg-border" aria-hidden />
+
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Stage
                 </span>
-              </div>
-              <div className="hidden" aria-hidden />
                 <Tabs value={stage} onValueChange={(v) => v && setSearch({ stageView: v })}>
                   <TabsList className="h-8">
                     {STAGE_OPTIONS.map((s) => (
