@@ -227,10 +227,18 @@ export function SnagKpiAnalysisPage() {
           : "All",
       },
       { label: "Stage", value: STAGE_LABELS[stage] },
+      {
+        label: "Building",
+        value: buildings.length
+          ? buildings.length <= 3
+            ? buildings.join(", ")
+            : `${buildings.length} selected`
+          : "All",
+      },
       { label: "Plan", value: planMode === "remaining" ? "Remaining" : "Baseline" },
       { label: "As of", value: asOfDate },
     ],
-    [plot, teams, roomGroups, stage, planMode, asOfDate],
+    [plot, teams, roomGroups, buildings, stage, planMode, asOfDate],
   );
 
   const handleGroupClick = (dim: GroupBy, key: string) => {
