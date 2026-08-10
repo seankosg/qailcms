@@ -20,10 +20,30 @@ export function CriticalPendingBar({ pending, onApplied, onDiscard }: Props) {
       const trueIds: string[] = [];
       const falseIds: string[] = [];
       pending.forEach((v, id) => (v ? trueIds : falseIds).push(id));
-      if (trueIds.length) await bulkToggleCritical({ data: { ids: trueIds, value: true } });
-      if (falseIds.length) await bulkToggleCritical({ data: { ids: falseIds, value: false } });
-      toast.success(`Critical ${pending.size}건 적용`);
-      onApplied(pending);
+      const applied = new Map<string, boolean>();
+      if (trueIds.length) {
+        const r: any = await bulkToggleCritical({ data: { ids: trueIds, value: true } });
+        for (const id of (r?.ids ?? []) as string[]) applied.set(id, true);
+      }
+      if (falseIds.length) {
+        const r: any = await bulkToggleCritical({ data: { ids: falseIds, value: false } });
+        for (const id of (r?.ids ?? []) as string[]) applied.set(id, false);
+      }
+      const blocked = pending.size - applied.size;
+      if (applied.size === 0) {
+        // RLS 차단은 에러가 아니라 0행으로 돌아온다. 성공 토스트를 띄우지 않는다.
+        toast.error("변경되지 않았습니다", {
+          description: `권한이 없어 ${pending.size}건이 변경되지 않았습니다`,
+        });
+      } else {
+        toast.success(`Critical ${applied.size}건 적용`);
+        if (blocked > 0) {
+          toast.error("일부 행이 변경되지 않았습니다", {
+            description: `권한이 없어 ${blocked}건이 변경되지 않았습니다.`,
+          });
+        }
+      }
+      onApplied(applied);
     } catch (e: any) {
       toast.error(`적용 실패: ${e?.message ?? e}`);
     } finally {
