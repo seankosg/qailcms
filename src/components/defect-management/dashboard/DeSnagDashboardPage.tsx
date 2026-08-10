@@ -206,16 +206,12 @@ export function DeSnagDashboardPage() {
     };
     // 정본 동치 드릴다운: 실적일 스테이지 셀은 as-of 를 상한으로 건다.
     if (merged.dateField) merged.dateEnd = effectiveDataDate;
+    // 대시보드 RPC 모집단 상한(data_date <= as-of)과 동일 조건을 항상 전달한다.
+    merged.asOf = effectiveDataDate;
     // Issued/Rect 셀은 Closed 항목도 포함하므로 전체 탭으로 진입해야 숫자가 일치한다.
     if (!merged.tab) merged.tab = "all";
     navigate({ to: "/closure/snag-management/raw-data", search: merged as any });
   };
-
-  const presentPodiumBuildings = useMemo(() => {
-    const b = matrix.blocks.find((x) => x.kind === "podium");
-    if (!b) return [] as string[];
-    return Array.from(new Set(b.rows.map((r) => r.building)));
-  }, [matrix]);
 
   const roomGroupEntries = useMemo(() => {
     // 블록 배치(LIFT CABIN 등)와 무관하게 원본 room_group 기준 정본 집계를 사용한다.
@@ -444,7 +440,9 @@ export function DeSnagDashboardPage() {
             key={block.kind}
             block={block}
             mode={matrixMode}
-            presentBuildings={block.kind === "podium" ? presentPodiumBuildings : []}
+            buildingSourceMap={matrix.buildingSourceMap}
+            levelSourceMap={matrix.levelSourceMap}
+            roomGroupSourceMap={matrix.roomGroupSourceMap}
             onNavigate={goRaw}
             showHoDate={showHoDate}
             hoDates={hoDates}

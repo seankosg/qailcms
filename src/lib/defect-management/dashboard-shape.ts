@@ -353,6 +353,10 @@ export type MatrixShape = {
   roomGroupTotals: Record<string, Stats>;
   /** 정규화 열 → 원본 room_group 값 목록 (드릴다운 필터용) */
   roomGroupSourceMap: Record<string, string[]>;
+  /** building 라벨 → 원본 building 값 목록 (드릴다운 필터용) */
+  buildingSourceMap: Record<string, string[]>;
+  /** Level 행 라벨 → 원본 level_name 값 목록 (드릴다운 필터용) */
+  levelSourceMap: Record<string, string[]>;
 };
 
 function emptyRoomGroupStats(): Record<string, Stats> {
@@ -382,6 +386,8 @@ export function buildMatrix(
   const unassigned: RowsMap = new Map();
   const roomGroupTotals: Record<string, Stats> = emptyRoomGroupStats();
   const roomGroupSourceMap: Record<string, Set<string>> = {};
+  const buildingSourceMap: Record<string, Set<string>> = {};
+  const levelSourceMap: Record<string, Set<string>> = {};
 
   const ensure = (
     m: RowsMap,
@@ -407,6 +413,12 @@ export function buildMatrix(
     addRow(cellFor(roomGroupTotals, rg), r);
     const srcVal = (r.room_group ?? "").trim() || "__EMPTY__";
     (roomGroupSourceMap[rg] ??= new Set<string>()).add(srcVal);
+    (buildingSourceMap[bld.label] ??= new Set<string>()).add(
+      (r.building ?? "").trim() || "__EMPTY__",
+    );
+    (levelSourceMap[lvl.kind === "unknown" ? "Level ?" : `Level ${lvl.key}`] ??= new Set<string>()).add(
+      (r.level_name ?? "").trim() || "__EMPTY__",
+    );
 
     let block: RowsMap;
     let buildingLabel: string;
@@ -550,6 +562,10 @@ export function buildMatrix(
 
   const srcMap: Record<string, string[]> = {};
   for (const [k, v] of Object.entries(roomGroupSourceMap)) srcMap[k] = Array.from(v);
+  const bldSrcMap: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(buildingSourceMap)) bldSrcMap[k] = Array.from(v);
+  const lvlSrcMap: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(levelSourceMap)) lvlSrcMap[k] = Array.from(v);
 
   return {
     plot,
@@ -559,6 +575,8 @@ export function buildMatrix(
     plotTotal,
     roomGroupTotals,
     roomGroupSourceMap: srcMap,
+    buildingSourceMap: bldSrcMap,
+    levelSourceMap: lvlSrcMap,
   };
 }
 
@@ -581,18 +599,6 @@ export function metricSearchParams(m: MetricKey): Record<string, string> {
     case "closurePct":
       return { status: "Closed" };
   }
-}
-
-// building 그룹 헤더 → members (콤마 결합해 raw-data 필터로 전달)
-export function buildingGroupMembers(kind: BlockKey, presentBuildings: string[]): string[] {
-  if (kind === "tower") return ["Tower", "Tower 3", "Tower 4"];
-  if (kind === "basement") return ["BSM"];
-  if (kind === "lg") return ["LG"];
-  if (kind === "liftcabin") return ["LIFT CABIN"];
-  if (kind === "vip") return [VIP_BUILDING_LABEL];
-  if (kind === "unassigned") return ["__EMPTY__"];
-  // podium
-  return presentBuildings; // 이미 정규화된 라벨 (예: Podium, Podium 1..4, Others)
 }
 
 export function basementLevelParam(): string {
