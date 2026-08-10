@@ -8,6 +8,7 @@ import { Download, Loader2, Database } from "lucide-react";
 import { createOcsBaseline, signOcsBaseline, type BaselineResult } from "@/lib/abd/ocs-baseline.functions";
 import { shortId } from "@/lib/abd/ocs-baseline-shared";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { canAccessAbdOcs } from "@/lib/abd/ocs-access";
 import { formatDdMmmYyyyHm } from "@/lib/time/doha";
 
 function Row({ label, value }: { label: string; value: unknown }) {
@@ -26,7 +27,7 @@ export function OcsBaselineCard() {
   const [busy, setBusy] = useState<string | null>(null);
   const [res, setRes] = useState<BaselineResult | null>(null);
 
-  if (me?.isStrictAdmin !== true) return null;
+  if (!canAccessAbdOcs({ userType: me?.userType, team: me?.team, isStrictAdmin: me?.isStrictAdmin })) return null;
 
   async function onCreate() {
     setBusy("Baseline 생성 중… (정본 추출 → 해시 대조 → ZIP)");
