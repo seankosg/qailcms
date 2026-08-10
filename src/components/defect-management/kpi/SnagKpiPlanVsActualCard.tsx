@@ -92,12 +92,19 @@ export function SnagKpiPlanVsActualCard({
     });
 
   const curve = useMemo(
-    () => buildSnagSCurve({ cells, buckets, stages: [stage], today }),
-    [cells, buckets, stage, today],
+    () => buildSnagSCurve({ cells, buckets, stages: [stage], today: asOfDate }),
+    [cells, buckets, stage, asOfDate],
   );
   const ser = curve.series[stage];
 
-  const idxForKpi = curve.todayIndex >= 0 ? curve.todayIndex : curve.buckets.length - 1;
+  // 머리말 기준: baseline 을 뺄 때와 같은 규칙(bucket_iso <= asOfDate)의 마지막 버킷.
+  let idxForKpi = -1;
+  for (let i = curve.buckets.length - 1; i >= 0; i--) {
+    if (curve.buckets[i] <= asOfDate) {
+      idxForKpi = i;
+      break;
+    }
+  }
   const planNow = baselinePlan + (idxForKpi >= 0 ? (ser.cumPlan[idxForKpi] ?? 0) : 0);
   let lastActualIdx = -1;
   for (let i = ser.cumActual.length - 1; i >= 0; i--) {
