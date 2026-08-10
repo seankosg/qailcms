@@ -12,6 +12,7 @@ import { ocsV3Verify } from "@/lib/abd/ocs-v3-import.functions";
 import { OcsRecountPanel } from "@/components/abd/ocs/OcsRecountPanel";
 // OcsRecoveryPanel: 2026-08-09 일회성 복구 완료 후 렌더 경로 폐쇄 (파일·함수는 감사 목적 보존)
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { canAccessAbdOcs } from "@/lib/abd/ocs-access";
 
 export const Route = createFileRoute("/_authenticated/admin/ocs-import")({
   head: () => ({
@@ -35,7 +36,12 @@ export const Route = createFileRoute("/_authenticated/admin/ocs-import")({
 
 function OcsMaintenancePage() {
   const { data: me, isLoading: meLoading } = useCurrentUser();
-  const isStrictAdmin = me?.isStrictAdmin === true;
+  // admin 과 동일 권한: HDEC PIC(Team DESN)
+  const canManage = canAccessAbdOcs({
+    userType: me?.userType,
+    team: me?.team,
+    isStrictAdmin: me?.isStrictAdmin,
+  });
 
   if (meLoading) {
     return (
@@ -44,14 +50,14 @@ function OcsMaintenancePage() {
       </div>
     );
   }
-  if (!isStrictAdmin) {
+  if (!canManage) {
     return (
       <div className="p-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">접근 권한 없음</CardTitle>
             <CardDescription>
-              OCS Maintenance 는 admin 권한 사용자만 사용할 수 있습니다.
+              OCS Maintenance 는 admin 또는 HDEC PIC(Team DESN) 사용자만 사용할 수 있습니다.
             </CardDescription>
           </CardHeader>
         </Card>
