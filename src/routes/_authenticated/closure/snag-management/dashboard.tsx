@@ -10,6 +10,7 @@ const searchSchema = z.object({
   dataDate: fallback(z.string(), "").default(""),
   matrixMode: fallback(z.string(), "remainPct").default("remainPct"),
   hoDate: fallback(z.union([z.literal(0), z.literal(1)]), 0).default(0),
+  eachDate: fallback(z.union([z.literal(0), z.literal(1)]), 0).default(0),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/snag-management/dashboard")({

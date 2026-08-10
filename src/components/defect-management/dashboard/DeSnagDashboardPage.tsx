@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import { useSnagDashboardMatrix } from "@/hooks/useSnagDashboardMatrix";
 import { useSnagHoDates } from "@/hooks/useSnagHoDates";
 import { buildHoDateMap, EMPTY_HO_DATE_MAP } from "@/lib/defect-management/ho-dates";
+import { useSnagStageDates } from "@/hooks/useSnagStageDates";
+import { buildStageDateMap, EMPTY_STAGE_DATE_MAP } from "@/lib/defect-management/stage-dates";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
@@ -93,7 +95,8 @@ export function DeSnagDashboardPage() {
   const setShowHoDate = (v: boolean) =>
     navigate({
       to: "/closure/snag-management/dashboard",
-      search: (prev: Record<string, unknown>) => ({ ...prev, hoDate: v ? 1 : 0 }) as any,
+      search: (prev: Record<string, unknown>) =>
+        ({ ...prev, hoDate: v ? 1 : 0, eachDate: v ? 0 : (prev as any).eachDate ?? 0 }) as any,
     });
   const { data: hoRows = [] } = useSnagHoDates(
     appliedPlot,
@@ -111,6 +114,31 @@ export function DeSnagDashboardPage() {
           );
     return buildHoDateMap(rows);
   }, [showHoDate, hoRows, appliedRoomGroups]);
+
+  // Each Date — 셀 값을 스테이지별 계획일/실적일(dd/mmm)로 대체 (HO Date 와 상호 배타)
+  const eachDate = ((search as any).eachDate ?? 0) === 1;
+  const setEachDate = (v: boolean) =>
+    navigate({
+      to: "/closure/snag-management/dashboard",
+      search: (prev: Record<string, unknown>) =>
+        ({ ...prev, eachDate: v ? 1 : 0, hoDate: v ? 0 : (prev as any).hoDate ?? 0 }) as any,
+    });
+  const { data: stageRows = [] } = useSnagStageDates(
+    appliedPlot,
+    appliedTeams,
+    effectiveDataDate || null,
+    eachDate,
+  );
+  const stageDates = useMemo(() => {
+    if (!eachDate) return EMPTY_STAGE_DATE_MAP;
+    const rows =
+      appliedRoomGroups.length === 0
+        ? stageRows
+        : stageRows.filter((r) =>
+            new Set<RoomGroupCol>(appliedRoomGroups).has(normalizeRoomGroup(r.room_group)),
+          );
+    return buildStageDateMap(rows);
+  }, [eachDate, stageRows, appliedRoomGroups]);
 
   const teamsStr = search.teams ?? "";
   const rgStr = search.roomGroups ?? "";
