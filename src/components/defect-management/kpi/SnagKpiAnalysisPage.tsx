@@ -116,7 +116,7 @@ export function SnagKpiAnalysisPage() {
   const buildingKey = [...buildings].sort().join(",");
 
   const buildingFacetQ = useDefectFacet("building", {
-    statusGroup: "all" as any,
+    statusGroup: "all",
     includeInactive: false,
   });
   const buildingOptions = useMemo(
