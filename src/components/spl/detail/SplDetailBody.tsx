@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDdMmmYyyy, todayInDoha } from "@/lib/time/doha";
@@ -13,6 +14,8 @@ import { getSplRowsAsOf, type SplCatalogEntry, type SplRow } from "@/lib/spl/row
 import { updateSplField } from "@/lib/spl/mutations.functions";
 import { SPL_EDITABLE_FIELDS, splJudgmentLabel } from "@/components/spl/raw-data/spl-columns";
 import { SplRequiredDocChecklist } from "@/components/spl/raw-data/SplRequiredDocChecklist";
+import { SplDocumentPanel } from "@/components/spl/detail/SplDocumentPanel";
+import { listSplDocuments } from "@/lib/spl/documents.functions";
 
 interface ChangeLogRow {
   id: string;
@@ -54,6 +57,12 @@ export function SplDetailBody({ id }: { id: string }) {
   const qc = useQueryClient();
   const { canRow } = useRclCan("SPL", "write");
   const [changes, setChanges] = useState<ChangeLogRow[]>([]);
+  const [docsOpen, setDocsOpen] = useState(false);
+  const fetchDocs = useServerFn(listSplDocuments);
+  const { data: docs } = useQuery({
+    queryKey: ["spl-documents", id],
+    queryFn: () => fetchDocs({ data: { splItemId: id } }),
+  });
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["spl-rows-as-of", today],
@@ -115,8 +124,18 @@ export function SplDetailBody({ id }: { id: string }) {
           ) : (
             "Loading..."
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 shrink-0 gap-1 text-[11px]"
+            onClick={() => setDocsOpen(true)}
+          >
+            <FileText className="h-3.5 w-3.5" /> Documents {docs?.length ?? 0}
+          </Button>
         </div>
       </div>
+
+      <SplDocumentPanel splItemId={id} open={docsOpen} onOpenChange={setDocsOpen} />
 
       {isLoading && !row ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
