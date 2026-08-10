@@ -154,6 +154,40 @@ export function SnagKpiAnalysisPage() {
     refetchOnWindowFocus: false,
   });
 
+  // 차트 구간 시작 하루 전까지의 누계 = S-Curve baseline (Progress 화면과 동일 방식)
+  const cumIso = useMemo(() => addDays(rangeStart, -1), [rangeStart]);
+  const totalsCumQ = useQuery({
+    queryKey: ["snag-kpi-totals-cum", plot, teamsKey, roomKey, groupBy, planMode, cumIso],
+    queryFn: () =>
+      totalsFn({
+        data: {
+          planGroups,
+          teams,
+          roomGroups,
+          groupBy: [groupBy],
+          asOfDate: cumIso,
+          planMode,
+        },
+      }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const stageTotal = useMemo(
+    () =>
+      (totalsQ.data ?? [])
+        .filter((t: any) => t.stage === stage)
+        .reduce((s: number, t: any) => s + Number(t.total ?? 0), 0),
+    [totalsQ.data, stage],
+  );
+  const baseline = useMemo(() => {
+    const rows = (totalsCumQ.data ?? []).filter((t: any) => t.stage === stage);
+    return {
+      plan: rows.reduce((s: number, t: any) => s + Number(t.plan_upto ?? 0), 0),
+      actual: rows.reduce((s: number, t: any) => s + Number(t.actual_upto ?? 0), 0),
+    };
+  }, [totalsCumQ.data, stage]);
+
   const [curveOpen, setCurveOpen] = useState(true);
 
   const filterSummary = useMemo(
@@ -188,8 +222,8 @@ export function SnagKpiAnalysisPage() {
     window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
   };
 
-  const loading = cellsQ.isPending || totalsQ.isPending;
-  const error = cellsQ.error || totalsQ.error;
+  const loading = cellsQ.isPending || totalsQ.isPending || totalsCumQ.isPending;
+  const error = cellsQ.error || totalsQ.error || totalsCumQ.error;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -337,6 +371,9 @@ export function SnagKpiAnalysisPage() {
             unit={unit}
             onUnitChange={(u) => setSearch({ unit: u })}
             filterSummary={filterSummary}
+            baselinePlan={baseline.plan}
+            baselineActual={baseline.actual}
+            stageTotal={stageTotal}
             open={curveOpen}
             onOpenChange={setCurveOpen}
           />
