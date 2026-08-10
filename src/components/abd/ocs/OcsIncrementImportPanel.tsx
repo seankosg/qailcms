@@ -203,9 +203,14 @@ export function OcsIncrementImportPanel() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me?.isStrictAdmin]);
+  }, [me?.isStrictAdmin, me?.userType, me?.team]);
 
-  const isAdmin = me?.isStrictAdmin === true;
+  // ABD OCS 관리 권한 = admin 또는 HDEC PIC(Team DESN). 관리자와 동일 기능 전부 허용.
+  const isAdmin = canAccessAbdOcs({
+    userType: me?.userType,
+    team: me?.team,
+    isStrictAdmin: me?.isStrictAdmin,
+  });
   const isAdminRef = useRef(false);
   isAdminRef.current = isAdmin;
 
@@ -813,7 +818,8 @@ export function OcsIncrementImportPanel() {
     return (
       <Card className="border-destructive/40">
         <CardContent className="flex items-center gap-2 p-6 text-sm">
-          <AlertTriangle className="h-4 w-4 text-destructive" />이 화면은 관리자(admin) 전용입니다.
+          <AlertTriangle className="h-4 w-4 text-destructive" />이 화면은 관리자(admin) 또는 HDEC
+          PIC(Team DESN) 전용입니다.
         </CardContent>
       </Card>
     );
