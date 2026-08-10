@@ -14,7 +14,7 @@ export interface ImportGateRow {
 
 export async function assertImportScope<T extends ImportGateRow>(
   supa: any,
-  moduleKey: "WRT" | "SPL",
+  moduleKey: "WRT" | "SPL" | "ABD",
   keyCol: string,
   ownerCols: string[],
   rows: T[],
