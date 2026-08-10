@@ -4714,6 +4714,131 @@ export type Database = {
         }
         Relationships: []
       }
+      spl_document_item_links: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          mapping_method: string | null
+          note: string | null
+          page_hint: number | null
+          spl_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          mapping_method?: string | null
+          note?: string | null
+          page_hint?: number | null
+          spl_item_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          mapping_method?: string | null
+          note?: string | null
+          page_hint?: number | null
+          spl_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_document_item_links_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "spl_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_document_item_links_spl_item_id_fkey"
+            columns: ["spl_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_document_item_links_spl_item_id_fkey"
+            columns: ["spl_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_items_judged"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_document_item_links_spl_item_id_fkey"
+            columns: ["spl_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_precedence_violations"
+            referencedColumns: ["item_id"]
+          },
+        ]
+      }
+      spl_documents: {
+        Row: {
+          byte_size: number | null
+          content_hash: string | null
+          created_at: string
+          document_identity: string
+          document_number: string | null
+          file_name: string
+          filename_document_number: string | null
+          id: string
+          import_log_id: string | null
+          internal_document_number: string | null
+          is_active: boolean
+          mismatch_warning: string | null
+          number_mismatch: boolean
+          page_count: number | null
+          review_note: string | null
+          revision: string | null
+          storage_path: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          document_identity: string
+          document_number?: string | null
+          file_name: string
+          filename_document_number?: string | null
+          id?: string
+          import_log_id?: string | null
+          internal_document_number?: string | null
+          is_active?: boolean
+          mismatch_warning?: string | null
+          number_mismatch?: boolean
+          page_count?: number | null
+          review_note?: string | null
+          revision?: string | null
+          storage_path: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          document_identity?: string
+          document_number?: string | null
+          file_name?: string
+          filename_document_number?: string | null
+          id?: string
+          import_log_id?: string | null
+          internal_document_number?: string | null
+          is_active?: boolean
+          mismatch_warning?: string | null
+          number_mismatch?: boolean
+          page_count?: number | null
+          review_note?: string | null
+          revision?: string | null
+          storage_path?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       spl_import_logs: {
         Row: {
           cleared_values: number
@@ -4828,6 +4953,7 @@ export type Database = {
           created_by: string | null
           data_date: string | null
           dis: string | null
+          document_total: number
           eng: string | null
           eng_po: string | null
           exclusion_reason: string | null
@@ -4836,11 +4962,16 @@ export type Database = {
           is_excluded: boolean
           latest_status: string | null
           latest_status_raw: string | null
+          ocs_check: number
+          ocs_complied: number
+          ocs_pending: number
+          ocs_total: number
           owner_user_id: string | null
           pic: string | null
           pic_po: string | null
           plot: string
           revision: string | null
+          rsp_total: number
           service: string | null
           source_file: string | null
           spl_number: string
@@ -4856,6 +4987,7 @@ export type Database = {
           created_by?: string | null
           data_date?: string | null
           dis?: string | null
+          document_total?: number
           eng?: string | null
           eng_po?: string | null
           exclusion_reason?: string | null
@@ -4864,11 +4996,16 @@ export type Database = {
           is_excluded?: boolean
           latest_status?: string | null
           latest_status_raw?: string | null
+          ocs_check?: number
+          ocs_complied?: number
+          ocs_pending?: number
+          ocs_total?: number
           owner_user_id?: string | null
           pic?: string | null
           pic_po?: string | null
           plot: string
           revision?: string | null
+          rsp_total?: number
           service?: string | null
           source_file?: string | null
           spl_number: string
@@ -4884,6 +5021,7 @@ export type Database = {
           created_by?: string | null
           data_date?: string | null
           dis?: string | null
+          document_total?: number
           eng?: string | null
           eng_po?: string | null
           exclusion_reason?: string | null
@@ -4892,11 +5030,16 @@ export type Database = {
           is_excluded?: boolean
           latest_status?: string | null
           latest_status_raw?: string | null
+          ocs_check?: number
+          ocs_complied?: number
+          ocs_pending?: number
+          ocs_total?: number
           owner_user_id?: string | null
           pic?: string | null
           pic_po?: string | null
           plot?: string
           revision?: string | null
+          rsp_total?: number
           service?: string | null
           source_file?: string | null
           spl_number?: string
@@ -4907,6 +5050,683 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      spl_ocs_attachment_comment_links: {
+        Row: {
+          attachment_id: string
+          comment_id: string
+          confidence: number | null
+          created_at: string
+          id: string
+          mapping_method: string | null
+          scope: string | null
+        }
+        Insert: {
+          attachment_id: string
+          comment_id: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          mapping_method?: string | null
+          scope?: string | null
+        }
+        Update: {
+          attachment_id?: string
+          comment_id?: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          mapping_method?: string | null
+          scope?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_ocs_attachment_comment_links_attachment_id_fkey"
+            columns: ["attachment_id"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_ocs_attachment_comment_links_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spl_ocs_attachments: {
+        Row: {
+          byte_size: number | null
+          content_hash: string | null
+          created_at: string
+          format: string | null
+          height: number | null
+          id: string
+          import_log_id: string | null
+          is_active: boolean
+          source_anchor: string | null
+          source_attachment_identity: string
+          source_file_name: string | null
+          source_sheet: string | null
+          storage_path: string
+          updated_at: string
+          width: number | null
+        }
+        Insert: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          format?: string | null
+          height?: number | null
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          source_anchor?: string | null
+          source_attachment_identity: string
+          source_file_name?: string | null
+          source_sheet?: string | null
+          storage_path: string
+          updated_at?: string
+          width?: number | null
+        }
+        Update: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          format?: string | null
+          height?: number | null
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          source_anchor?: string | null
+          source_attachment_identity?: string
+          source_file_name?: string | null
+          source_sheet?: string | null
+          storage_path?: string
+          updated_at?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
+      spl_ocs_categories: {
+        Row: {
+          code: string
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_user_created: boolean
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_user_created?: boolean
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_user_created?: boolean
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      spl_ocs_categories_mapping: {
+        Row: {
+          category_id: string
+          comment_id: string
+          confidence: number | null
+          created_at: string
+          id: string
+          note: string | null
+          source: string
+        }
+        Insert: {
+          category_id: string
+          comment_id: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          source?: string
+        }
+        Update: {
+          category_id?: string
+          comment_id?: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_ocs_categories_mapping_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_ocs_categories_mapping_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spl_ocs_comment_document_links: {
+        Row: {
+          comment_id: string
+          confidence: number | null
+          created_at: string
+          document_id: string
+          id: string
+          mapping_method: string | null
+          note: string | null
+          page_number: number | null
+        }
+        Insert: {
+          comment_id: string
+          confidence?: number | null
+          created_at?: string
+          document_id: string
+          id?: string
+          mapping_method?: string | null
+          note?: string | null
+          page_number?: number | null
+        }
+        Update: {
+          comment_id?: string
+          confidence?: number | null
+          created_at?: string
+          document_id?: string
+          id?: string
+          mapping_method?: string | null
+          note?: string | null
+          page_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_ocs_comment_document_links_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_ocs_comment_document_links_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "spl_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spl_ocs_comment_groups: {
+        Row: {
+          created_at: string
+          id: string
+          import_log_id: string | null
+          is_active: boolean
+          ocs_number: string | null
+          raw_comment_text: string | null
+          revision: string | null
+          source_file_name: string | null
+          source_group_identity: string
+          source_hash: string | null
+          source_row: number | null
+          source_sheet: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          ocs_number?: string | null
+          raw_comment_text?: string | null
+          revision?: string | null
+          source_file_name?: string | null
+          source_group_identity: string
+          source_hash?: string | null
+          source_row?: number | null
+          source_sheet?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          ocs_number?: string | null
+          raw_comment_text?: string | null
+          revision?: string | null
+          source_file_name?: string | null
+          source_group_identity?: string
+          source_hash?: string | null
+          source_row?: number | null
+          source_sheet?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      spl_ocs_comment_rsp_links: {
+        Row: {
+          comment_id: string
+          confidence: number | null
+          created_at: string
+          id: string
+          mapping_method: string | null
+          note: string | null
+          rsp_item_id: string
+          scope: string
+        }
+        Insert: {
+          comment_id: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          mapping_method?: string | null
+          note?: string | null
+          rsp_item_id: string
+          scope?: string
+        }
+        Update: {
+          comment_id?: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          mapping_method?: string | null
+          note?: string | null
+          rsp_item_id?: string
+          scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_ocs_comment_rsp_links_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_ocs_comment_rsp_links_rsp_item_id_fkey"
+            columns: ["rsp_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_rsp_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spl_ocs_comment_spl_links: {
+        Row: {
+          comment_id: string
+          confidence: number | null
+          created_at: string
+          id: string
+          mapping_method: string | null
+          note: string | null
+          spl_item_id: string
+        }
+        Insert: {
+          comment_id: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          mapping_method?: string | null
+          note?: string | null
+          spl_item_id: string
+        }
+        Update: {
+          comment_id?: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          mapping_method?: string | null
+          note?: string | null
+          spl_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_ocs_comment_spl_links_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_ocs_comment_spl_links_spl_item_id_fkey"
+            columns: ["spl_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_ocs_comment_spl_links_spl_item_id_fkey"
+            columns: ["spl_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_items_judged"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_ocs_comment_spl_links_spl_item_id_fkey"
+            columns: ["spl_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_precedence_violations"
+            referencedColumns: ["item_id"]
+          },
+        ]
+      }
+      spl_ocs_comments: {
+        Row: {
+          assessed_code: string | null
+          atomic_item_count: number | null
+          atomic_item_no: number | null
+          comment_text: string | null
+          contractor_response: string | null
+          created_at: string
+          group_id: string | null
+          id: string
+          import_log_id: string | null
+          is_active: boolean
+          is_resolved: boolean
+          ocs_number: string | null
+          resolved_reason: string | null
+          response_mapping_status: string | null
+          revision: string | null
+          sign_off_status: string | null
+          source_comment_id: string
+          source_hash: string | null
+          source_row: number | null
+          source_sheet: string | null
+          superseded_at: string | null
+          superseded_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          assessed_code?: string | null
+          atomic_item_count?: number | null
+          atomic_item_no?: number | null
+          comment_text?: string | null
+          contractor_response?: string | null
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          is_resolved?: boolean
+          ocs_number?: string | null
+          resolved_reason?: string | null
+          response_mapping_status?: string | null
+          revision?: string | null
+          sign_off_status?: string | null
+          source_comment_id: string
+          source_hash?: string | null
+          source_row?: number | null
+          source_sheet?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assessed_code?: string | null
+          atomic_item_count?: number | null
+          atomic_item_no?: number | null
+          comment_text?: string | null
+          contractor_response?: string | null
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          is_resolved?: boolean
+          ocs_number?: string | null
+          resolved_reason?: string | null
+          response_mapping_status?: string | null
+          revision?: string | null
+          sign_off_status?: string | null
+          source_comment_id?: string
+          source_hash?: string | null
+          source_row?: number | null
+          source_sheet?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_ocs_comments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_comment_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_ocs_comments_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spl_ocs_compliance: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          changed_by_name: string | null
+          comment_id: string
+          complied: boolean
+          created_at: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          comment_id: string
+          complied?: boolean
+          created_at?: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          comment_id?: string
+          complied?: boolean
+          created_at?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_ocs_compliance_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: true
+            referencedRelation: "spl_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spl_ocs_compliance_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          changed_by_name: string | null
+          comment_id: string
+          id: string
+          new_value: boolean | null
+          old_value: boolean | null
+          source: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          comment_id: string
+          id?: string
+          new_value?: boolean | null
+          old_value?: boolean | null
+          source: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          comment_id?: string
+          id?: string
+          new_value?: boolean | null
+          old_value?: boolean | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_ocs_compliance_log_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spl_ocs_import_logs: {
+        Row: {
+          counts: Json
+          created_at: string
+          errors: Json
+          file_name: string | null
+          finished_at: string | null
+          id: string
+          imported_by: string | null
+          imported_by_name: string | null
+          package_hash: string | null
+          result: Json
+          snapshot_id: string | null
+          stage: string | null
+          started_at: string
+          status: string
+          updated_at: string
+          warnings: Json
+        }
+        Insert: {
+          counts?: Json
+          created_at?: string
+          errors?: Json
+          file_name?: string | null
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          imported_by_name?: string | null
+          package_hash?: string | null
+          result?: Json
+          snapshot_id?: string | null
+          stage?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+          warnings?: Json
+        }
+        Update: {
+          counts?: Json
+          created_at?: string
+          errors?: Json
+          file_name?: string | null
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          imported_by_name?: string | null
+          package_hash?: string | null
+          result?: Json
+          snapshot_id?: string | null
+          stage?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+          warnings?: Json
+        }
+        Relationships: []
+      }
+      spl_ocs_source_files: {
+        Row: {
+          byte_size: number | null
+          content_hash: string | null
+          created_at: string
+          file_name: string
+          id: string
+          import_log_id: string | null
+          is_active: boolean
+          ocs_number: string | null
+          revision: string | null
+          source_file_identity: string
+          storage_path: string
+          superseded_at: string | null
+          superseded_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          file_name: string
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          ocs_number?: string | null
+          revision?: string | null
+          source_file_identity: string
+          storage_path: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          import_log_id?: string | null
+          is_active?: boolean
+          ocs_number?: string | null
+          revision?: string | null
+          source_file_identity?: string
+          storage_path?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_ocs_source_files_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "spl_ocs_source_files"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spl_owner_backfill_snapshot_20260804: {
         Row: {
@@ -4940,6 +5760,100 @@ export type Database = {
           spl_number?: string | null
         }
         Relationships: []
+      }
+      spl_rsp_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          import_log_id: string | null
+          inactive_at: string | null
+          inactive_reason: string | null
+          is_active: boolean
+          manufacturer: string | null
+          model_or_unique_id: string | null
+          qty_available: number | null
+          qty_required: number | null
+          qty_short: number | null
+          rsp_number: string
+          sort_order: number
+          source_hash: string | null
+          source_identity: string | null
+          source_row: number | null
+          source_sheet: string | null
+          spl_item_id: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          import_log_id?: string | null
+          inactive_at?: string | null
+          inactive_reason?: string | null
+          is_active?: boolean
+          manufacturer?: string | null
+          model_or_unique_id?: string | null
+          qty_available?: number | null
+          qty_required?: number | null
+          qty_short?: number | null
+          rsp_number: string
+          sort_order?: number
+          source_hash?: string | null
+          source_identity?: string | null
+          source_row?: number | null
+          source_sheet?: string | null
+          spl_item_id: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          import_log_id?: string | null
+          inactive_at?: string | null
+          inactive_reason?: string | null
+          is_active?: boolean
+          manufacturer?: string | null
+          model_or_unique_id?: string | null
+          qty_available?: number | null
+          qty_required?: number | null
+          qty_short?: number | null
+          rsp_number?: string
+          sort_order?: number
+          source_hash?: string | null
+          source_identity?: string | null
+          source_row?: number | null
+          source_sheet?: string | null
+          spl_item_id?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_rsp_items_spl_item_id_fkey"
+            columns: ["spl_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_rsp_items_spl_item_id_fkey"
+            columns: ["spl_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_items_judged"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spl_rsp_items_spl_item_id_fkey"
+            columns: ["spl_item_id"]
+            isOneToOne: false
+            referencedRelation: "spl_precedence_violations"
+            referencedColumns: ["item_id"]
+          },
+        ]
       }
       spl_settings: {
         Row: {
@@ -7851,6 +8765,11 @@ export type Database = {
           judgment: Json
         }[]
       }
+      spl_ocs_can_manage: { Args: never; Returns: boolean }
+      spl_ocs_recount_all: { Args: never; Returns: Json }
+      spl_ocs_recount_all_internal: { Args: never; Returns: Json }
+      spl_ocs_verify: { Args: never; Returns: Json }
+      spl_ocs_verify_internal: { Args: never; Returns: Json }
       spl_precheck_patches: { Args: { _patches: Json }; Returns: Json }
       spl_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
       spl_rule_msg: {
