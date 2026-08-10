@@ -330,11 +330,15 @@ export function DeSnagMatrixBlock({
   onNavigate,
   presentBuildings,
   mode,
+  showHoDate = false,
+  hoDates = EMPTY_HO_DATE_MAP,
 }: {
   block: MatrixBlock;
   presentBuildings: string[];
   mode: MatrixMode;
   onNavigate: (params: Record<string, string>) => void;
+  showHoDate?: boolean;
+  hoDates?: HoDateMap;
 }) {
   const buildingMembers = (() => {
     if (block.kind === "tower") return ["Tower", "Tower 4"];
@@ -412,6 +416,7 @@ export function DeSnagMatrixBlock({
             block={block}
             buildingParam={buildingParam}
             onNavigate={onNavigate}
+            showHoDate={showHoDate}
           />
           <tbody>
             {/* Column Total 행 — 헤더 바로 아래 고정 */}
@@ -430,14 +435,23 @@ export function DeSnagMatrixBlock({
                 </button>
               </td>
               {block.columnKeys.map((rg, idx) => (
-                <TeamCells
-                  key={rg}
-                  stats={block.colTotals[rg]}
-                  mode={mode}
-                  onCell={(slot, team) => goCell(null, null, rg, slot, team)}
-                  groupIndex={idx}
-                  stickyTop={78}
-                />
+                <Fragment key={rg}>
+                  <TeamCells
+                    stats={block.colTotals[rg]}
+                    mode={mode}
+                    onCell={(slot, team) => goCell(null, null, rg, slot, team)}
+                    groupIndex={idx}
+                    stickyTop={78}
+                  />
+                  {showHoDate && (
+                    <HoCell
+                      value={hoDates.col(block.kind, rg)}
+                      groupIndex={idx}
+                      stickyTop={78}
+                      emphasize
+                    />
+                  )}
+                </Fragment>
               ))}
               <TeamCells
                 stats={block.blockTotal}
@@ -447,6 +461,14 @@ export function DeSnagMatrixBlock({
                 isTotal
                 stickyTop={78}
               />
+              {showHoDate && (
+                <HoCell
+                  value={hoDates.block(block.kind)}
+                  groupIndex={block.columnKeys.length}
+                  isTotal
+                  stickyTop={78}
+                />
+              )}
             </tr>
             {groups.map((grp) => (
               <FragmentRows
@@ -457,6 +479,8 @@ export function DeSnagMatrixBlock({
                     mode={mode}
                 onNavigate={onNavigate}
                 goCell={goCell}
+                showHoDate={showHoDate}
+                hoDates={hoDates}
               />
             ))}
           </tbody>
