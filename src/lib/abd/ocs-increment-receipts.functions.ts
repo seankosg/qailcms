@@ -2,6 +2,7 @@
 // 저장 정본은 기존 abd_ocs_inc_verify_receipts 하나뿐이며, 여기서는 조회만 한다.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 
 type LooseClient = {
   rpc: (
