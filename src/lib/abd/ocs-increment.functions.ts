@@ -344,7 +344,9 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       }
       let verify: Json;
       try {
-        verify = await rpc(context.supabase, "abd_ocs_v3_verify", {});
+        // post-import verify 는 사용자 권한과 무관한 서버 검증 단계다.
+        // service-role 로 내부 함수(abd_ocs_v3_verify_internal)를 호출한다.
+        verify = await rpc(supabaseAdmin, "abd_ocs_v3_verify_internal", {});
       } catch (e) {
         // 본체 반영 이후 단계 — 부분 반영 가능성이 있으므로 재시도 금지 대상이다.
         throw new Error(`OCS_IMPORT_STAGE[post_import_verify]: ${(e as Error).message}`);
