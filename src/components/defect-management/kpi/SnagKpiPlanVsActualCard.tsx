@@ -60,6 +60,9 @@ interface Props {
   /** 차트 구간 이전까지의 누계(서버 totals, asOf = rangeStart-1) */
   baselinePlan: number;
   baselineActual: number;
+  /** as-of 시점 정본 누계 — 머리말 P/A 는 곡선이 아니라 이 값을 쓴다 */
+  planUpto: number;
+  actualUpto: number;
   /** 선택 스테이지 모수 합계 — % 분모 */
   stageTotal: number;
   open: boolean;
@@ -79,6 +82,8 @@ export function SnagKpiPlanVsActualCard({
   filterSummary,
   baselinePlan,
   baselineActual,
+  planUpto,
+  actualUpto,
   stageTotal,
   open,
   onOpenChange,
@@ -98,23 +103,9 @@ export function SnagKpiPlanVsActualCard({
   );
   const ser = curve.series[stage];
 
-  // 머리말 기준: baseline 을 뺄 때와 같은 규칙(bucket_iso <= asOfDate)의 마지막 버킷.
-  let idxForKpi = -1;
-  for (let i = curve.buckets.length - 1; i >= 0; i--) {
-    if (curve.buckets[i] <= asOfDate) {
-      idxForKpi = i;
-      break;
-    }
-  }
-  const planNow = baselinePlan + (idxForKpi >= 0 ? (ser.cumPlan[idxForKpi] ?? 0) : 0);
-  let lastActualIdx = -1;
-  for (let i = ser.cumActual.length - 1; i >= 0; i--) {
-    if (ser.cumActual[i] != null) {
-      lastActualIdx = i;
-      break;
-    }
-  }
-  const actualNow = baselineActual + (lastActualIdx >= 0 ? (ser.cumActual[lastActualIdx] as number) : 0);
+  // 머리말은 정본(as-of 누계)을 그대로 쓴다 — 버킷이 as-of 를 걸쳐도 오차 0.
+  const planNow = planUpto;
+  const actualNow = actualUpto;
   const deltaNow = actualNow - planNow;
 
   const isPct = unit === "pct";
