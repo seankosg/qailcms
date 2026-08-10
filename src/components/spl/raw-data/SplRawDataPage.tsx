@@ -72,6 +72,7 @@ const STATE_CLASS: Record<SplStageCell["st"], string> = {
 export function SplRawDataPage() {
   const search = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
+  const rootNavigate = useNavigate();
   const today = todayInDoha();
   const asOf = search.asOf || today;
   const [exporting, setExporting] = useState(false);
