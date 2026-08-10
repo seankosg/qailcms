@@ -424,7 +424,14 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       console.warn("[abd_aconex postAudit]", e);
     }
 
-    return { ...preview, updated, batch_id: batchId, null_overwrites: nullOverwrites };
+    return {
+      ...preview,
+      updated,
+      batch_id: batchId,
+      null_overwrites: nullOverwrites,
+      log_persist_failed: logPersistErrors.length > 0,
+      log_persist_errors: logPersistErrors,
+    };
   });
 
 // ------------------------------------------------------------------
