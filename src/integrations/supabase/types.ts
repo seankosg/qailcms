@@ -4773,6 +4773,50 @@ export type Database = {
           },
         ]
       }
+      spl_document_pages: {
+        Row: {
+          created_at: string
+          document_id: string
+          extracted_text: string
+          extraction_version: string
+          id: string
+          normalized_text: string
+          page_number: number
+          text_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          extracted_text?: string
+          extraction_version: string
+          id?: string
+          normalized_text?: string
+          page_number: number
+          text_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          extracted_text?: string
+          extraction_version?: string
+          id?: string
+          normalized_text?: string
+          page_number?: number
+          text_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spl_document_pages_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "spl_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spl_documents: {
         Row: {
           byte_size: number | null
@@ -4786,8 +4830,13 @@ export type Database = {
           import_log_id: string | null
           internal_document_number: string | null
           is_active: boolean
+          is_ocr: boolean
           mismatch_warning: string | null
           number_mismatch: boolean
+          ocr_engine: string | null
+          ocr_language: string | null
+          ocr_processed_at: string | null
+          ocr_text_hash: string | null
           page_count: number | null
           review_note: string | null
           revision: string | null
@@ -4807,8 +4856,13 @@ export type Database = {
           import_log_id?: string | null
           internal_document_number?: string | null
           is_active?: boolean
+          is_ocr?: boolean
           mismatch_warning?: string | null
           number_mismatch?: boolean
+          ocr_engine?: string | null
+          ocr_language?: string | null
+          ocr_processed_at?: string | null
+          ocr_text_hash?: string | null
           page_count?: number | null
           review_note?: string | null
           revision?: string | null
@@ -4828,8 +4882,13 @@ export type Database = {
           import_log_id?: string | null
           internal_document_number?: string | null
           is_active?: boolean
+          is_ocr?: boolean
           mismatch_warning?: string | null
           number_mismatch?: boolean
+          ocr_engine?: string | null
+          ocr_language?: string | null
+          ocr_processed_at?: string | null
+          ocr_text_hash?: string | null
           page_count?: number | null
           review_note?: string | null
           revision?: string | null
