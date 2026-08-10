@@ -375,6 +375,8 @@ export function DeSnagMatrixBlock({
   mode,
   showHoDate = false,
   hoDates = EMPTY_HO_DATE_MAP,
+  eachDate = false,
+  stageDates = EMPTY_STAGE_DATE_MAP,
 }: {
   block: MatrixBlock;
   presentBuildings: string[];
@@ -382,6 +384,8 @@ export function DeSnagMatrixBlock({
   onNavigate: (params: Record<string, string>) => void;
   showHoDate?: boolean;
   hoDates?: HoDateMap;
+  eachDate?: boolean;
+  stageDates?: StageDateMap;
 }) {
   const buildingMembers = (() => {
     if (block.kind === "tower") return ["Tower", "Tower 4"];
@@ -486,6 +490,11 @@ export function DeSnagMatrixBlock({
                     groupIndex={idx}
                     isTotal
                     stickyTop={78}
+                    stageDate={
+                      eachDate
+                        ? (stage, team, which) => stageDates.col(block.kind, rg, stage, team, which)
+                        : undefined
+                    }
                   />
                   {showHoDate && (
                     <HoCell
@@ -504,6 +513,11 @@ export function DeSnagMatrixBlock({
                 groupIndex={block.columnKeys.length}
                 isTotal
                 stickyTop={78}
+                stageDate={
+                  eachDate
+                    ? (stage, team, which) => stageDates.block(block.kind, stage, team, which)
+                    : undefined
+                }
               />
               {showHoDate && (
                 <HoCell
@@ -525,6 +539,8 @@ export function DeSnagMatrixBlock({
                 goCell={goCell}
                 showHoDate={showHoDate}
                 hoDates={hoDates}
+                eachDate={eachDate}
+                stageDates={stageDates}
               />
             ))}
           </tbody>
@@ -543,6 +559,8 @@ function FragmentRows({
   goCell,
   showHoDate,
   hoDates,
+  eachDate,
+  stageDates,
 }: {
   group: { building: string; rows: MatrixBlock["rows"]; subtotal: Stats };
   block: MatrixBlock;
@@ -558,6 +576,8 @@ function FragmentRows({
   ) => void;
   showHoDate: boolean;
   hoDates: HoDateMap;
+  eachDate: boolean;
+  stageDates: StageDateMap;
 }) {
   const showBuildingSubtotal = block.kind === "podium" && group.rows.length > 1;
   return (
@@ -610,6 +630,12 @@ function FragmentRows({
                 onCell={(slot, team) => goCell(r.building, r.levelDisp, rg, slot, team)}
                 dim={r.cells[rg].issued === 0}
                 groupIndex={gIdx}
+                stageDate={
+                  eachDate
+                    ? (stage, team, which) =>
+                        stageDates.cell(block.kind, r.building, r.levelDisp, rg, stage, team, which)
+                    : undefined
+                }
               />
               {showHoDate && (
                 <HoCell
@@ -625,6 +651,12 @@ function FragmentRows({
             onCell={(slot, team) => goCell(r.building, r.levelDisp, "__ROW_TOTAL__", slot, team)}
             groupIndex={block.columnKeys.length}
             isTotal
+            stageDate={
+              eachDate
+                ? (stage, team, which) =>
+                    stageDates.row(block.kind, r.building, r.levelDisp, stage, team, which)
+                : undefined
+            }
           />
           {showHoDate && (
             <HoCell
@@ -660,6 +692,12 @@ function FragmentRows({
                   mode={mode}
                   onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
                   groupIndex={gIdx}
+                  stageDate={
+                    eachDate
+                      ? (stage, team, which) =>
+                          stageDates.buildingCol(block.kind, group.building, rg, stage, team, which)
+                      : undefined
+                  }
                 />
                 {showHoDate && <HoCell value={colMax} groupIndex={gIdx} emphasize />}
               </Fragment>
@@ -671,6 +709,12 @@ function FragmentRows({
             onCell={(slot, team) => goCell(group.building, null, "__BUILDING_SUBTOTAL__", slot, team)}
             groupIndex={block.columnKeys.length}
             isTotal
+            stageDate={
+              eachDate
+                ? (stage, team, which) =>
+                    stageDates.building(block.kind, group.building, stage, team, which)
+                : undefined
+            }
           />
           {showHoDate && (
             <HoCell
