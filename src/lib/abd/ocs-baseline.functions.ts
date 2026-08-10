@@ -2,6 +2,7 @@
 // 정본 테이블은 변경하지 않는다. 산식은 ocs-baseline-shared.ts 하나에만 있다.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 import {
   BASELINE_BUCKET,
   BASELINE_DATASETS,
@@ -22,12 +23,7 @@ type LooseClient = {
 };
 
 async function assertAdmin(supabase: unknown, userId: string) {
-  const { data, error } = await (supabase as unknown as LooseClient).rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
+  await assertAbdOcsAccess(supabase, userId);
 }
 
 async function rpc(supabase: unknown, fn: string, args: Record<string, unknown> = {}) {
