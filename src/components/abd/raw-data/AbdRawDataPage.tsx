@@ -1153,7 +1153,10 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
         <div className="sticky top-9 z-[4] bg-background" style={{ width: totalWidth }}>
           <TopHorizontalScrollbar targetRef={tableRef} width={totalWidth} frozenWidth={frozenWidth} />
         </div>
-        <Table style={{ width: totalWidth, tableLayout: "fixed" }}>
+        <table
+          className="w-full border-separate border-spacing-0 caption-bottom text-sm"
+          style={{ width: totalWidth, tableLayout: "fixed" }}
+        >
           <TableHeader className="bg-background">
             <TableRow className="border-b bg-background [&>th]:sticky [&>th]:top-0 [&>th]:z-[2] [&>th]:bg-background">
               {table.getHeaderGroups().at(-1)?.headers.map((header, i) => {
@@ -1255,7 +1258,7 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
               </>
             )}
           </TableBody>
-        </Table>
+        </table>
       </div>
     </div>
   );
