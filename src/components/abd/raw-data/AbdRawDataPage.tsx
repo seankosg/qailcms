@@ -1180,7 +1180,12 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
                     <div className="flex w-full items-center justify-between gap-1">
                       <span className="inline-flex min-w-0 items-center gap-1 truncate">
                         <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                        {header.column.getIsSorted() && <span className="flex-shrink-0">{header.column.getIsSorted() === "asc" ? "▲" : "▼"}</span>}
+                        {header.column.getIsSorted() && (
+                          <span className="flex flex-shrink-0 items-center">
+                            <span>{header.column.getIsSorted() === "asc" ? "▲" : "▼"}</span>
+                            <SortPriorityBadge index={header.column.getSortIndex()} total={sorting.length} />
+                          </span>
+                        )}
                       </span>
                       {header.column.getCanFilter() && (
                         <span onClick={(e) => e.stopPropagation()}>
