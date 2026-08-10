@@ -36,13 +36,16 @@ const ALLOWED_FIELDS = new Set<string>([
   "priority_locked", "hdec_verification_locked",
 ]);
 
-async function assertAdmin(ctx: any) {
-  const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" }),
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "superuser" }),
-  ]);
-  if (!isAdmin && !isSuper) {
-    throw new Error("권한 없음: 관리자만 편집할 수 있습니다");
+/**
+ * SM 모듈 쓰기 권한(격자 정본) — 역할 × 범위 격자에서 SM/write 가
+ * 한 범위라도 열려 있어야 한다. 행 단위 판정은 `can_edit_row` 가 정본.
+ */
+async function assertSmWrite(ctx: any) {
+  const { data, error } = await ctx.supabase.rpc("rcl_grants", { _module: "SM", _action: "write" });
+  if (error) throw new Error(`권한 조회 실패: ${error.message}`);
+  const g = data as { role: string | null; own: boolean; own_team: boolean; other_team: boolean } | null;
+  if (!g?.role || !(g.own || g.own_team || g.other_team)) {
+    throw new Error("권한 없음: SM 편집 권한이 없습니다");
   }
 }
 
@@ -162,7 +165,7 @@ export const bulkToggleCritical = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => ToggleCriticalSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertSmWrite(context);
     const { error } = await (context.supabase as any)
       .from("defect_items_raw")
       .update({ is_critical: data.value, updated_at: new Date().toISOString() })
@@ -235,17 +238,28 @@ export const bulkDeleteDefects = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => BulkDeleteSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
-    // 관련 이력 먼저 삭제 (FK cascade 없음)
-    const { error: histErr } = await (context.supabase as any)
-      .from("defect_status_history")
-      .delete()
-      .in("defect_raw_id", data.ids);
-    if (histErr) throw new Error(histErr.message);
-    const { error, count } = await (context.supabase as any)
+    // 순서 고정: 부모(defect_items_raw) → 이력(defect_status_history).
+    // 이력을 먼저 지우면 RLS 로 부모 삭제가 막힌 행의 이력만 사라진다.
+    // 권한은 RLS(rcl 격자)가 판정하며, 막힌 행은 에러가 아니라 0행으로 돌아온다.
+    const { data: deletedRows, error } = await (context.supabase as any)
       .from("defect_items_raw")
-      .delete({ count: "exact" })
-      .in("id", data.ids);
+      .delete()
+      .in("id", data.ids)
+      .select("id");
     if (error) throw new Error(error.message);
-    return { ok: true, count: count ?? data.ids.length };
+    const deletedIds = ((deletedRows ?? []) as Array<{ id: string }>).map((r) => r.id);
+    if (deletedIds.length > 0) {
+      // 실제로 지워진 부모의 이력만 삭제 (FK cascade 없음)
+      const { error: histErr } = await (context.supabase as any)
+        .from("defect_status_history")
+        .delete()
+        .in("defect_raw_id", deletedIds);
+      if (histErr) throw new Error(histErr.message);
+    }
+    return {
+      ok: true,
+      requested: data.ids.length,
+      count: deletedIds.length,
+      blocked: Math.max(0, data.ids.length - deletedIds.length),
+    };
   });

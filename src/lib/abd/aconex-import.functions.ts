@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
+import { assertImportScope } from "@/lib/import/rcl-import-gate";
 
 /**
  * Aconex Export 임포트 - 기존 abd_items_raw 행에 대해 UPDATE 전용.
@@ -75,6 +76,10 @@ export type AconexImportPreview = {
   by_status: Array<{ code: string; count: number }>;
   by_semantic: Array<{ semantic: string; count: number }>;
   unmatched_samples: string[];
+  /** 권한 범위 밖이라 제외된 문서 (WRT Aconex 와 동일 규약) */
+  out_of_scope: number;
+  out_of_scope_list: string[];
+  role: string | null;
   /** 필드별 실제 변경 예상 건수 (unchanged 제외). */
   field_diff_counts: Array<{ field: string; changed: number }>;
   /** 미리보기용 상세 diff 샘플 (최대 200 rows). */
@@ -118,18 +123,22 @@ function isDCode(r: { status_code?: string | null }): boolean {
 }
 
 async function assertEditor(ctx: any) {
-  const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" }),
-    ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "superuser" }),
-  ]);
-  if (!isAdmin && !isSuper) throw new Error("권한 없음: 관리자만 Aconex 임포트를 실행할 수 있습니다");
+  // RCL 정본: 역할 × 범위 격자에서 ABD/import 가 한 범위라도 열려 있어야 실행 가능.
+  // 행 단위 판정은 아래 `rcl_import_filter` + `assertImportScope` 가 최종 관문이다.
+  const { data, error } = await ctx.supabase.rpc("rcl_grants", { _module: "ABD", _action: "import" });
+  if (error) throw new Error(`권한 조회 실패: ${error.message}`);
+  const g = data as { role: string | null; own: boolean; own_team: boolean; other_team: boolean } | null;
+  if (!g?.role || !(g.own || g.own_team || g.other_team)) {
+    throw new Error("권한 없음: ABD 임포트 권한이 없습니다");
+  }
+  return g.role;
 }
 
 export const importAbdAconexBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => InputSchema.parse(v))
   .handler(async ({ data, context }): Promise<AconexImportResult> => {
-    await assertEditor(context);
+    const role = await assertEditor(context);
     const supa = context.supabase as any;
 
     // 1) 상태 분포 집계
@@ -188,6 +197,41 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     const matched = data.rows.filter((r) => existingRows.has(r.document_no));
     const unmatched = data.rows.filter((r) => !existingRows.has(r.document_no));
 
+    // 권한 스코프 — 행 단위 판정은 서버 `rcl_import_filter` 가 정본.
+    // 전건이 기존 행이므로 담당자/팀은 DB 저장값으로 판정된다(파일 값 신뢰 안 함).
+    const allowedKeys = new Set<string>();
+    const SCOPE_CHUNK = 1000;
+    for (let i = 0; i < matched.length; i += SCOPE_CHUNK) {
+      const slice = matched.slice(i, i + SCOPE_CHUNK);
+      const { data: res, error } = await supa.rpc("rcl_import_filter", {
+        _module: "ABD",
+        _match_cols: ["abd_number"],
+        _rows: slice.map((r) => ({
+          abd_number: r.document_no,
+          hdec_pic_name: null,
+          hdec_eng_name: null,
+          team: null,
+        })),
+      });
+      if (error) throw new Error(`임포트 권한 판정 실패(ABD Aconex): ${error.message}`);
+      for (const k of ((res as any)?.allowed ?? []) as Array<Record<string, string>>) {
+        allowedKeys.add(String(k.abd_number ?? ""));
+      }
+    }
+    const inScope = matched.filter((r) => allowedKeys.has(r.document_no));
+    const outOfScope = matched.filter((r) => !allowedKeys.has(r.document_no)).map((r) => r.document_no);
+
+    // ★ 서버 최종 관문: 반영 대상(in-scope)만 다시 판정한다(WRT hdec 와 동일 호출 방식).
+    await assertImportScope(
+      supa,
+      "ABD",
+      "abd_number",
+      ["hdec_pic_name", "hdec_eng_name", "team"],
+      inScope.map((r) => ({ document_no: r.document_no, item: {} as Record<string, string | null> })),
+      (r) => r.document_no,
+      null,
+    );
+
     // §1(a) D-코드 감지: 임포트 에러로 기록만 하고 latest_status 반영 금지.
     const dCodeRows = data.rows.filter((r) => isDCode(r));
     if (dCodeRows.length > 0) {
@@ -223,7 +267,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       legacy_r1_attribution: 0,
       skipped_samples: [] as string[],
     };
-    for (const r of matched) {
+    for (const r of inScope) {
       const existing = existingRows.get(r.document_no) ?? {};
       const { patch, guard } = computePatch(r, existing, allowed);
       if (guard === "skipped_r2_no_sb") {
@@ -282,6 +326,9 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
         .map(([semantic, count]) => ({ semantic, count }))
         .sort((a, b) => b.count - a.count),
       unmatched_samples: unmatched.slice(0, 20).map((r) => r.document_no),
+      out_of_scope: outOfScope.length,
+      out_of_scope_list: outOfScope.slice(0, 200),
+      role,
       field_diff_counts: Array.from(fieldDiffCounts.entries())
         .map(([field, changed]) => ({ field, changed }))
         .sort((a, b) => b.changed - a.changed),
