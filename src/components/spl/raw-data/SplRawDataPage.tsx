@@ -1,6 +1,6 @@
 import { ColumnResizeHandle } from "@/components/common/ColumnResizeHandle";
 import { useEffect, useMemo, useState } from "react";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,7 +40,6 @@ import {
 import { SplColumnFilterDropdown } from "./SplColumnFilterDropdowns";
 import { SplColumnOrderMenu } from "./SplColumnOrderMenu";
 import { SplBulkEditBar } from "./SplBulkEditBar";
-import { SplDetailSheet } from "./SplDetailSheet";
 import { SplExportDialog } from "./SplExportDialog";
 
 const routeApi = getRouteApi("/_authenticated/closure/spare-part/raw-data");
@@ -125,7 +124,6 @@ export function SplRawDataPage() {
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [detailRowState, setDetailRow] = useState<SplRow | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -226,8 +224,6 @@ export function SplRawDataPage() {
   const saveOne = async (id: string, field: string, value: string | null) => {
     await saveField({ data: { id, field, value } });
   };
-  // Keep the open detail sheet bound to the freshest row after a refetch
-  const detailRow = detailRowState ? (rows.find((r) => r.id === detailRowState.id) ?? detailRowState) : null;
   const refetchRows = async () => {
     await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
   };
