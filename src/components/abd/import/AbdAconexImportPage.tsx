@@ -99,6 +99,7 @@ interface Entry {
     updated: number;
     batch_id: string | null;
     null_overwrites?: Record<string, number>;
+    log_persist_errors?: { source: string; error: string; attempted: number; persisted: number }[];
   };
   error?: string;
   /** 이 파일에서 체크 해제된 Excel 헤더 목록 (기본 = 전체 포함). */
