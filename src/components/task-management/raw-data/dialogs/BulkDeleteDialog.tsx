@@ -29,9 +29,23 @@ export function BulkDeleteDialog({ open, onOpenChange, ids, onDone }: Props) {
     setBusy(true);
     try {
       const r = await applyBulkHardDelete(ids);
-      toast.success("삭제 완료", {
-        description: `${r.deleted} rows 삭제${r.failed > 0 ? ` · ${r.failed} 실패` : ""}`,
-      });
+      if (r.deleted === 0) {
+        // RLS 차단은 에러가 아니라 0행으로 돌아온다. 성공 토스트를 띄우지 않는다.
+        toast.error("삭제되지 않았습니다", {
+          description: `권한이 없어 ${r.requested}건이 삭제되지 않았습니다${
+            r.failed > 0 ? ` · ${r.failed} 오류` : ""
+          }`,
+        });
+      } else {
+        toast.success("삭제 완료", {
+          description: `${r.deleted} rows 삭제${r.failed > 0 ? ` · ${r.failed} 실패` : ""}`,
+        });
+        if (r.blocked > 0) {
+          toast.error("일부 행이 삭제되지 않았습니다", {
+            description: `권한이 없어 ${r.blocked}건이 삭제되지 않았습니다.`,
+          });
+        }
+      }
       onOpenChange(false);
       setTyped("");
       onDone();

@@ -99,6 +99,7 @@ interface Entry {
     updated: number;
     batch_id: string | null;
     null_overwrites?: Record<string, number>;
+    log_persist_errors?: { source: string; error: string; attempted: number; persisted: number }[];
   };
   error?: string;
   /** 이 파일에서 체크 해제된 Excel 헤더 목록 (기본 = 전체 포함). */
@@ -543,6 +544,21 @@ export function AbdAconexImportPage() {
                             </div>
                           </div>
                         )}
+                      {(e.result?.log_persist_errors?.length ?? 0) > 0 && (
+                        <div className="mt-2 rounded-md border border-destructive/50 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
+                          <div className="font-semibold">
+                            데이터는 반영됐으나 감사 로그 저장에 실패했습니다. 관리자 확인이 필요합니다.
+                          </div>
+                          <div className="mt-0.5 font-mono">run ID: {e.result?.batch_id ?? "-"}</div>
+                          <ul className="mt-1 space-y-0.5">
+                            {e.result!.log_persist_errors!.map((l, i) => (
+                              <li key={`${l.source}-${i}`}>
+                                LOG_PERSIST_FAILED · {l.source} · 저장 {l.persisted}/{l.attempted} — {l.error}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                       {e.preview && e.preview.by_status.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {e.preview.by_status.map((s) => (

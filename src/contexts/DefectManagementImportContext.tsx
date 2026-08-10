@@ -117,6 +117,8 @@ export interface DefectImportFile {
     unmappedCategoryCount?: number;
     unmappedCategories?: string[];
     errors?: DefectImportError[];
+    /** 감사 로그(import_field_logs) 저장 실패 — 조용한 실패 금지 */
+    logPersistErrors?: { source: string; error: string; attempted: number; persisted: number }[];
   };
   classificationResult?: {
     skippedRows: number;
@@ -1202,6 +1204,8 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
       let processed = 0;
       let skippedLocked = 0;
       const importErrors: DefectImportError[] = [];
+      // 감사 로그 저장 실패 목록 (ABD mutations.functions.ts 의 log_persist_errors 방식과 동일)
+      const logPersistErrors: { source: string; error: string; attempted: number; persisted: number }[] = [];
       // 행별 rejection 사유 맵 — row_logs에 정확히 반영하기 위함.
       // 키: source_issue_no (문자열). preflight/batch 실패 시 채워짐.
       const rejectedByKey = new Map<string, { reason_code: string; reason_detail?: string }>();
@@ -1431,12 +1435,37 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                 );
               }
             });
-            // 사용자 체감 응답성을 위해 백그라운드로 전송. 실패해도 임포트 결과에는 영향 없음.
-            void flushFieldLogs(supabase, logId, userId, pendingFieldLogs).catch((e) =>
-              console.warn("[defect-import] field-log flush failed", e),
-            );
+            // 저장 실패는 조용히 넘기지 않는다. 결과에 실어 화면과 로그에 남긴다.
+            const fieldLogRes = await flushFieldLogs(supabase, logId, userId, pendingFieldLogs);
+            if (!fieldLogRes.ok) {
+              logPersistErrors.push({
+                source: "import_field_logs",
+                error: fieldLogRes.error ?? "unknown",
+                attempted: fieldLogRes.attempted,
+                persisted: fieldLogRes.persisted,
+              });
+              importErrors.push({
+                batch: -1,
+                code: "LOG_PERSIST_FAILED",
+                message: `import_field_logs 저장 실패 — 저장 ${fieldLogRes.persisted}/${fieldLogRes.attempted}`,
+                details: fieldLogRes.error ?? undefined,
+              });
+            }
           } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
             console.warn("[defect-import] field-log insert failed", e);
+            logPersistErrors.push({
+              source: "import_field_logs",
+              error: msg,
+              attempted: 0,
+              persisted: 0,
+            });
+            importErrors.push({
+              batch: -1,
+              code: "LOG_PERSIST_FAILED",
+              message: "import_field_logs 저장 실패 — 로그 생성 중 예외",
+              details: msg,
+            });
           }
         }
 
@@ -1479,6 +1508,7 @@ export function DefectManagementImportProvider({ children }: { children: ReactNo
                     unmappedCategoryCount: Array.from(unmappedCategories.values()).reduce((a, b) => a + b, 0),
                     unmappedCategories: Array.from(unmappedCategories.entries()).map(([c, n]) => `${c} × ${n}`),
                     errors: importErrors.length ? importErrors : undefined,
+                    logPersistErrors: logPersistErrors.length ? logPersistErrors : undefined,
                   },
                   classificationResult,
                 }

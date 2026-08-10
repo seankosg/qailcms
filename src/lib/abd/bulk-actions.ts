@@ -95,9 +95,13 @@ export async function applyAbdBulkUpdate(
   return result;
 }
 
+/**
+ * 하드 삭제. RLS 로 막히면 에러가 아니라 0행이 돌아오므로
+ * 요청 수 − 실제 삭제 수 = blocked 로 조용한 실패를 표면화한다.
+ */
 export async function applyAbdBulkHardDelete(
   ids: string[],
-): Promise<{ deleted: number; failed: number }> {
+): Promise<{ requested: number; deleted: number; failed: number; blocked: number }> {
   let deleted = 0;
   let failed = 0;
   for (let i = 0; i < ids.length; i += DELETE_CHUNK) {
@@ -113,7 +117,12 @@ export async function applyAbdBulkHardDelete(
     }
     deleted += (data ?? []).length;
   }
-  return { deleted, failed };
+  return {
+    requested: ids.length,
+    deleted,
+    failed,
+    blocked: Math.max(0, ids.length - deleted - failed),
+  };
 }
 
 // ── Bulk-editable field definitions ─────────────────────────────────────

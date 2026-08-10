@@ -107,6 +107,9 @@ export type AconexImportResult = AconexImportPreview & {
   batch_id: string | null;
   /** Step 4 사후 검증: upload_id 기준 change_log 에서 non-null → null 로 덮어쓴 필드별 건수. */
   null_overwrites?: Record<string, number>;
+  /** 감사 로그(import_field_logs) 저장 실패 — 조용한 실패 금지 */
+  log_persist_failed?: boolean;
+  log_persist_errors?: { source: string; error: string; attempted: number; persisted: number }[];
 };
 
 /** status_code='D' 는 현재 DB/실파일 모두 0건 관측 — 등장 시 매핑 확정 전까지 임포트 에러로 보고. */
@@ -368,10 +371,17 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
         );
       }
     }
-    // 필드 변경 로그 flush (실패 시 임포트는 성공 처리)
-    void flushFieldLogs(supa, batchId, context.userId, pendingLogs).catch((e) =>
-      console.warn("[abd_aconex flushFieldLogs]", e),
-    );
+    // 필드 변경 로그 flush — 실패는 조용히 넘기지 않고 결과에 실어 반환한다.
+    const logPersistErrors: { source: string; error: string; attempted: number; persisted: number }[] = [];
+    const fieldLogRes = await flushFieldLogs(supa, batchId, context.userId, pendingLogs);
+    if (!fieldLogRes.ok) {
+      logPersistErrors.push({
+        source: "import_field_logs",
+        error: fieldLogRes.error ?? "unknown",
+        attempted: fieldLogRes.attempted,
+        persisted: fieldLogRes.persisted,
+      });
+    }
 
     // 실제 updated 카운트 반영
     await supa.from("abd_import_logs").update({ updated }).eq("id", batchId);
@@ -417,7 +427,14 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       console.warn("[abd_aconex postAudit]", e);
     }
 
-    return { ...preview, updated, batch_id: batchId, null_overwrites: nullOverwrites };
+    return {
+      ...preview,
+      updated,
+      batch_id: batchId,
+      null_overwrites: nullOverwrites,
+      log_persist_failed: logPersistErrors.length > 0,
+      log_persist_errors: logPersistErrors,
+    };
   });
 
 // ------------------------------------------------------------------
