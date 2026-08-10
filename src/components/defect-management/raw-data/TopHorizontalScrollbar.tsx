@@ -52,16 +52,16 @@ export function TopHorizontalScrollbar({ targetRef, width, frozenWidth = 0, clas
 
   return (
     <div
-      className={cn("flex h-[16px] shrink-0 border-b bg-muted/30", className)}
+      className={cn("flex h-[20px] shrink-0 border-b bg-background", className)}
       aria-hidden
     >
       {frozenWidth > 0 && (
         <div
           style={{ width: frozenWidth, minWidth: frozenWidth }}
-          className="border-r bg-background"
+          className="sticky left-0 z-10 border-r bg-background"
         />
       )}
-      <div ref={selfRef} className="h-full flex-1 overflow-x-auto overflow-y-hidden">
+      <div ref={selfRef} className="h-full flex-1 overflow-x-auto overflow-y-hidden bg-background">
         <div style={{ width: innerWidth, height: 1 }} />
       </div>
     </div>

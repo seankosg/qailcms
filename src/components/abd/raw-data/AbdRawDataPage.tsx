@@ -1149,8 +1149,10 @@ function AbdRawTableView({ table, tableRef, loading, frozenColIds, onRowClick, q
 
   return (
     <div className="flex max-h-[calc(100dvh-280px)] flex-col overflow-hidden rounded-md border bg-background">
-      <TopHorizontalScrollbar targetRef={tableRef} width={totalWidth} frozenWidth={frozenWidth} />
       <div ref={tableRef} className="min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">
+        <div className="sticky top-9 z-[4] bg-background" style={{ width: totalWidth }}>
+          <TopHorizontalScrollbar targetRef={tableRef} width={totalWidth} frozenWidth={frozenWidth} />
+        </div>
         <Table style={{ width: totalWidth, tableLayout: "fixed" }}>
           <TableHeader className="bg-background">
             <TableRow className="border-b bg-background [&>th]:sticky [&>th]:top-0 [&>th]:z-[2] [&>th]:bg-background">
