@@ -494,7 +494,9 @@ export function SplRawDataPage() {
                       onToggleSelect={() =>
                         setSelectedIds((p) => (p.includes(r.id) ? p.filter((x) => x !== r.id) : [...p, r.id]))
                       }
-                      onOpenDetail={() => setDetailRow(r)}
+                      onOpenDetail={() =>
+                        rootNavigate({ to: "/closure/spare-part/detail/$id", params: { id: r.id } })
+                      }
                       canEdit={isToday && canRow(r as unknown as Record<string, unknown>)}
                       onSave={async (field, value) => {
                         await saveField({ data: { id: r.id, field, value } });
@@ -523,18 +525,6 @@ export function SplRawDataPage() {
         onSaveField={saveOne}
         onDone={refetchRows}
         disabledReason={isToday ? null : "Editing is disabled in as-of (historical) view."}
-      />
-
-      <SplDetailSheet
-        row={detailRow}
-        catalog={catalog}
-        canEdit={isToday && !!detailRow && canRow(detailRow as unknown as Record<string, unknown>)}
-        onSave={async (id, field, value) => {
-          await saveOne(id, field, value);
-          await refetchRows();
-        }}
-        onRefresh={refetchRows}
-        onOpenChange={(o) => { if (!o) setDetailRow(null); }}
       />
 
       <SplExportDialog
