@@ -79,7 +79,24 @@ export type BackupTableName =
   | "abd_ocs_response_segments"
   | "abd_ocs_response_comment_links"
   | "abd_ocs_source_files"
-  | "abd_ocs_number_correction_log";
+  | "abd_ocs_number_correction_log"
+  // === SPL OCS / RSP / Documents ===
+  | "spl_ocs_import_logs"
+  | "spl_rsp_items"
+  | "spl_ocs_comment_groups"
+  | "spl_ocs_comments"
+  | "spl_ocs_comment_spl_links"
+  | "spl_ocs_comment_rsp_links"
+  | "spl_ocs_categories"
+  | "spl_ocs_categories_mapping"
+  | "spl_ocs_attachments"
+  | "spl_ocs_attachment_comment_links"
+  | "spl_ocs_compliance"
+  | "spl_ocs_compliance_log"
+  | "spl_ocs_source_files"
+  | "spl_documents"
+  | "spl_document_item_links"
+  | "spl_ocs_comment_document_links";
 
 /**
  * 백업 대상 정본 목록.
@@ -155,6 +172,22 @@ export const BACKUP_TABLES: BackupTableName[] = [
   "abd_ocs_response_comment_links",
   "abd_ocs_source_files",
   "abd_ocs_number_correction_log",
+  "spl_ocs_import_logs",
+  "spl_rsp_items",
+  "spl_ocs_comment_groups",
+  "spl_ocs_comments",
+  "spl_ocs_comment_spl_links",
+  "spl_ocs_comment_rsp_links",
+  "spl_ocs_categories",
+  "spl_ocs_categories_mapping",
+  "spl_ocs_attachments",
+  "spl_ocs_attachment_comment_links",
+  "spl_ocs_compliance",
+  "spl_ocs_compliance_log",
+  "spl_ocs_source_files",
+  "spl_documents",
+  "spl_document_item_links",
+  "spl_ocs_comment_document_links",
 ];
 
 export const RAW_DATA_TABLES: BackupTableName[] = [
@@ -195,6 +228,26 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "task_schedule_change_audit",
     "task_management_status_history",
   ],
-  spl: ["spl_items", "spl_stage_progress", "spl_change_log", "spl_import_logs"],
+  spl: [
+    "spl_items",
+    "spl_stage_progress",
+    "spl_change_log",
+    "spl_import_logs",
+    "spl_ocs_import_logs",
+    "spl_rsp_items",
+    "spl_ocs_comment_groups",
+    "spl_ocs_comments",
+    "spl_ocs_comment_spl_links",
+    "spl_ocs_comment_rsp_links",
+    "spl_ocs_categories_mapping",
+    "spl_ocs_attachments",
+    "spl_ocs_attachment_comment_links",
+    "spl_ocs_compliance",
+    "spl_ocs_compliance_log",
+    "spl_ocs_source_files",
+    "spl_documents",
+    "spl_document_item_links",
+    "spl_ocs_comment_document_links",
+  ],
   wrt: ["wrt_items", "wrt_stage_progress", "wrt_change_log", "wrt_import_logs"],
 };
