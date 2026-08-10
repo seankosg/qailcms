@@ -391,7 +391,7 @@ export function SnagKpiPlanVsActualCard({
               </>
             )}
           </CardContent>
-        </Collapsible>
+        </CollapsibleContent>
       </Collapsible>
     </Card>
   );
