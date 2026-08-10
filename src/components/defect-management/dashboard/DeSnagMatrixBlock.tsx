@@ -90,9 +90,9 @@ function TeamCells({
   isTotal?: boolean;
   stickyTop?: number;
 }) {
-  const groupBg = isTotal ? "bg-primary/5" : groupIndex % 2 === 0 ? "bg-transparent" : "bg-muted/20";
+  const groupBg = isTotal ? "bg-yellow-400/10" : groupIndex % 2 === 0 ? "bg-transparent" : "bg-muted/20";
   const stickyBg = isTotal
-    ? "color-mix(in oklab, var(--primary) 12%, var(--card))"
+    ? "color-mix(in oklab, var(--color-yellow-400) 12%, var(--card))"
     : groupIndex % 2 === 0
       ? "var(--card)"
       : "color-mix(in oklab, var(--muted) 25%, var(--card))";
