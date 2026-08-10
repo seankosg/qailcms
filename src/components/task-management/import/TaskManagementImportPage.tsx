@@ -1129,6 +1129,20 @@ function FileRow({
           {(f.result.unclassified ?? 0) > 0 ? ` + 미분류 ${f.result.unclassified}` : ""}
         </div>
       )}
+      {(f.result?.logPersistErrors?.length ?? 0) > 0 && (
+        <div className="mt-2 space-y-1 rounded border border-destructive/40 bg-destructive/5 p-2 text-[11px] text-destructive">
+          <div className="font-semibold">
+            데이터는 반영됐으나 감사 로그 저장에 실패했습니다. 관리자 확인이 필요합니다.
+          </div>
+          <ul className="space-y-0.5 font-mono">
+            {f.result!.logPersistErrors!.map((l, i) => (
+              <li key={`${l.source}-${i}`}>
+                LOG_PERSIST_FAILED · {l.source} · 저장 {l.persisted}/{l.attempted} — {l.error}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {f.result?.outOfScopeKeys && f.result.outOfScopeKeys.length > 0 && (
         <div className="mt-2 space-y-1 rounded border border-orange-400/50 bg-orange-500/5 p-2 text-[11px] text-orange-800">
           <div className="font-semibold">
