@@ -2,6 +2,7 @@
 // 단일 요청에 최대 VERIFY_BATCH_MAX 개, 내부 동시성 VERIFY_CONCURRENCY 로 제한한다.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 import {
   VERIFY_BATCH_MAX,
   VERIFY_CONCURRENCY,
@@ -19,12 +20,7 @@ type LooseClient = {
 };
 
 async function assertAdmin(supabase: unknown, userId: string) {
-  const { data, error } = await (supabase as unknown as LooseClient).rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
+  await assertAbdOcsAccess(supabase, userId);
 }
 
 /** 신규 object 배치 검증 — 서버가 직접 다운로드하여 SHA-256/byte_size 를 실측하고 영수증을 저장한다. */

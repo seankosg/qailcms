@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 import { BACKUP_TABLES, MODULE_PRE_IMPORT_TABLES, type BackupTableName, type PreImportModule } from "./backup-shared";
 
 async function assertAdminOrSuper(supabase: any, userId: string) {
@@ -417,7 +418,7 @@ export const getBackupRunStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { run_id: string }) => input)
   .handler(async ({ data, context }) => {
-    await assertAdminOrSuper(context.supabase, context.userId);
+    await assertAbdOcsAccess(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("backup_run_log")

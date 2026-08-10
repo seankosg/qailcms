@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 
 /** OCS 첨부 이미지 보관함(비공개) */
 export const OCS_BUCKET = "abd-ocs-attachments";
@@ -17,10 +18,7 @@ type RpcClient = {
 };
 
 async function assertStrictAdmin(supabase: unknown, userId: string) {
-  const client = supabase as RpcClient;
-  const { data, error } = await client.rpc("has_role", { _user_id: userId, _role: "admin" });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
+  await assertAbdOcsAccess(supabase, userId);
 }
 
 /** 업로드 화면 진입/실행 전 서버측 권한 관문 */

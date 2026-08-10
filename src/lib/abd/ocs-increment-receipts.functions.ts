@@ -2,6 +2,7 @@
 // 저장 정본은 기존 abd_ocs_inc_verify_receipts 하나뿐이며, 여기서는 조회만 한다.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 
 type LooseClient = {
   rpc: (
@@ -11,12 +12,7 @@ type LooseClient = {
 };
 
 async function assertAdmin(supabase: unknown, userId: string) {
-  const { data, error } = await (supabase as unknown as LooseClient).rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
+  await assertAbdOcsAccess(supabase, userId);
 }
 
 export type VerifyReceiptRow = {

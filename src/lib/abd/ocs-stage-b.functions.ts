@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 
 /** OCS 원본 JSON 보관함(비공개) */
 export const OCS_IMPORT_BUCKET = "abd-ocs-imports";
@@ -24,12 +25,7 @@ type LooseClient = {
 };
 
 async function assertAdmin(supabase: unknown, userId: string) {
-  const { data, error } = await (supabase as unknown as LooseClient).rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
+  await assertAbdOcsAccess(supabase, userId);
 }
 
 async function callRpc(supabase: unknown, fn: string, args: Record<string, unknown>) {

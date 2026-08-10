@@ -8,6 +8,7 @@ import { WrtImportPage } from "@/components/wrt/import/WrtImportPage";
 import { getRouteApi } from "@tanstack/react-router";
 import { OcsIncrementImportPanel } from "@/components/abd/ocs/OcsIncrementImportPanel";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { canAccessAbdOcs } from "@/lib/abd/ocs-access";
 
 const routeApi = getRouteApi("/_authenticated/import-log/import");
 
@@ -15,9 +16,13 @@ export function ImportHubPage() {
   const { tab } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const { data: me } = useCurrentUser();
-  const isAdmin = me?.isStrictAdmin === true;
+  const canOcs = canAccessAbdOcs({
+    userType: me?.userType,
+    team: me?.team,
+    isStrictAdmin: me?.isStrictAdmin,
+  });
   const requested = tab ?? "task";
-  const current = requested === "abd-ocs" && !isAdmin ? "task" : requested;
+  const current = requested === "abd-ocs" && !canOcs ? "task" : requested;
 
   return (
     <div className="space-y-4">
@@ -33,7 +38,7 @@ export function ImportHubPage() {
           <TabsTrigger value="task">Task Management</TabsTrigger>
           <TabsTrigger value="snag">Snag List</TabsTrigger>
           <TabsTrigger value="abd">ABD</TabsTrigger>
-          {isAdmin && <TabsTrigger value="abd-ocs">ABD OCS</TabsTrigger>}
+          {canOcs && <TabsTrigger value="abd-ocs">ABD OCS</TabsTrigger>}
           <TabsTrigger value="dmr">DMR</TabsTrigger>
           <TabsTrigger value="spl">Spare Parts</TabsTrigger>
           <TabsTrigger value="warranty">Warranty</TabsTrigger>
@@ -47,7 +52,7 @@ export function ImportHubPage() {
         <TabsContent value="abd" className="mt-4">
           <AbdImportPage />
         </TabsContent>
-        {isAdmin && (
+        {canOcs && (
           <TabsContent value="abd-ocs" className="mt-4">
             <OcsIncrementImportPanel />
           </TabsContent>
