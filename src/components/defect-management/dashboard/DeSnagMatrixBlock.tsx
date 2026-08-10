@@ -602,6 +602,13 @@ function FragmentRows({
           {block.columnKeys.map((rg, gIdx) => {
             const sub = newStats();
             for (const r of group.rows) mergeStats(sub, r.cells[rg]);
+            let colMax: string | null = null;
+            if (showHoDate) {
+              for (const r of group.rows) {
+                const v = hoDates.cell(block.kind, r.building, r.levelDisp, rg);
+                if (v && (!colMax || v > colMax)) colMax = v;
+              }
+            }
             return (
               <Fragment key={rg}>
                 <TeamCells
@@ -610,7 +617,7 @@ function FragmentRows({
                   onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
                   groupIndex={gIdx}
                 />
-                {showHoDate && <HoCell value={null} groupIndex={gIdx} emphasize />}
+                {showHoDate && <HoCell value={colMax} groupIndex={gIdx} emphasize />}
               </Fragment>
             );
           })}
