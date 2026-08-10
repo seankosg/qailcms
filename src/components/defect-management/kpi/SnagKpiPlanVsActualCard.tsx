@@ -210,12 +210,6 @@ export function SnagKpiPlanVsActualCard({
             <div className="w-full text-[11px] tabular-nums text-muted-foreground">
               As of {asOfDate} · 전체 누적 (차트 구간 이전 포함) · 모수 {stageTotal.toLocaleString()}건
             </div>
-            <div className="hidden">
-              <div>
-                <div>
-                </div>
-              </button>
-            </CollapsibleTrigger>
 
             <div className="flex items-center gap-2">
               <ToggleGroup
