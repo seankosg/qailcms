@@ -177,8 +177,10 @@ export function SnagKpiAnalysisPage() {
     for (const c of (cellsQ.data ?? []) as any[]) {
       // 서버 집계행(`all|...`)은 제외 — 선택 스테이지 행만 센다.
       if (c.stage !== stage || !c.bucket_iso || !bucketSet.has(c.bucket_iso)) continue;
+      // as-of 이후(미래) 버킷은 누계(plan_upto/actual_upto)에 없으므로 빼지 않는다.
+      if (c.bucket_iso > asOfDate) continue;
       spanPlan += Number(c.plan_cnt ?? 0);
-      if (c.bucket_iso <= asOfDate) spanActual += Number(c.actual_cnt ?? 0);
+      spanActual += Number(c.actual_cnt ?? 0);
     }
     const plan = planUpto - spanPlan;
     const actual = actualUpto - spanActual;
