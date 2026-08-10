@@ -107,6 +107,9 @@ export type AconexImportResult = AconexImportPreview & {
   batch_id: string | null;
   /** Step 4 사후 검증: upload_id 기준 change_log 에서 non-null → null 로 덮어쓴 필드별 건수. */
   null_overwrites?: Record<string, number>;
+  /** 감사 로그(import_field_logs) 저장 실패 — 조용한 실패 금지 */
+  log_persist_failed?: boolean;
+  log_persist_errors?: { source: string; error: string; attempted: number; persisted: number }[];
 };
 
 /** status_code='D' 는 현재 DB/실파일 모두 0건 관측 — 등장 시 매핑 확정 전까지 임포트 에러로 보고. */
