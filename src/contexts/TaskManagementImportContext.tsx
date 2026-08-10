@@ -118,6 +118,8 @@ export interface TmImportFileItem {
     /** 항등식이 맞지 않을 때의 잔차 */
     unclassified?: number;
     errors?: ImportErrorEntry[];
+    /** 감사 로그(import_field_logs) 저장 실패 — 조용한 실패 금지 */
+    logPersistErrors?: { source: string; error: string; attempted: number; persisted: number }[];
   };
 }
 
