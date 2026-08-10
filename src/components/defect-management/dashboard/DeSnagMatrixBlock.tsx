@@ -39,7 +39,7 @@ function HoCell({
   emphasize?: boolean;
 }) {
   const bg = isTotal
-    ? "color-mix(in oklab, var(--primary) 12%, var(--card))"
+    ? "color-mix(in oklab, var(--color-yellow-400) 12%, var(--card))"
     : groupIndex % 2 === 0
       ? "var(--card)"
       : "color-mix(in oklab, var(--muted) 25%, var(--card))";
@@ -49,7 +49,7 @@ function HoCell({
         "h-7 min-w-[52px] border-b border-l border-l-border/70 px-1 text-center text-[10px] tabular-nums",
         stickyTop !== undefined && "sticky z-20",
         value ? "text-foreground" : "text-muted-foreground/50",
-        (emphasize || isTotal) && "font-semibold",
+        isTotal ? "font-bold" : emphasize && "font-semibold",
       )}
       style={stickyTop !== undefined ? { top: stickyTop, background: bg } : { background: bg }}
       title={value ?? undefined}
