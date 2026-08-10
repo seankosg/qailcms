@@ -154,25 +154,6 @@ export function SnagKpiAnalysisPage() {
     refetchOnWindowFocus: false,
   });
 
-  // 차트 구간 시작 하루 전까지의 누계 = S-Curve baseline (Progress 화면과 동일 방식)
-  const cumIso = useMemo(() => addDays(rangeStart, -1), [rangeStart]);
-  const totalsCumQ = useQuery({
-    queryKey: ["snag-kpi-totals-cum", plot, teamsKey, roomKey, groupBy, planMode, cumIso],
-    queryFn: () =>
-      totalsFn({
-        data: {
-          planGroups,
-          teams,
-          roomGroups,
-          groupBy: [groupBy],
-          asOfDate: cumIso,
-          planMode,
-        },
-      }),
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-
   const stageTotal = useMemo(
     () =>
       (totalsQ.data ?? [])
@@ -180,13 +161,34 @@ export function SnagKpiAnalysisPage() {
         .reduce((s: number, t: any) => s + Number(t.total ?? 0), 0),
     [totalsQ.data, stage],
   );
+  /**
+   * baseline = (as-of 누계 정본) − (차트 구간 합).
+   * 별도 질의로 과거 누계를 묻지 않는다: RPC 의 `_as_of_date` 하나가
+   * "계획일 상한"과 "완료 판정 시점"을 동시에 잡아 구간 경계에서 값이 갈리기 때문.
+   * 빼기 방식은 두 차트가 같은 정본(totalsQ)을 쓰므로 오차가 정의상 0 이다.
+   */
   const baseline = useMemo(() => {
-    const rows = (totalsCumQ.data ?? []).filter((t: any) => t.stage === stage);
-    return {
-      plan: rows.reduce((s: number, t: any) => s + Number(t.plan_upto ?? 0), 0),
-      actual: rows.reduce((s: number, t: any) => s + Number(t.actual_upto ?? 0), 0),
-    };
-  }, [totalsCumQ.data, stage]);
+    const totals = (totalsQ.data ?? []).filter((t: any) => t.stage === stage);
+    const planUpto = totals.reduce((s: number, t: any) => s + Number(t.plan_upto ?? 0), 0);
+    const actualUpto = totals.reduce((s: number, t: any) => s + Number(t.actual_upto ?? 0), 0);
+    const bucketSet = new Set(buckets);
+    let spanPlan = 0;
+    let spanActual = 0;
+    for (const c of (cellsQ.data ?? []) as any[]) {
+      // 서버 집계행(`all|...`)은 제외 — 선택 스테이지 행만 센다.
+      if (c.stage !== stage || !c.bucket_iso || !bucketSet.has(c.bucket_iso)) continue;
+      spanPlan += Number(c.plan_cnt ?? 0);
+      if (c.bucket_iso <= asOfDate) spanActual += Number(c.actual_cnt ?? 0);
+    }
+    const plan = planUpto - spanPlan;
+    const actual = actualUpto - spanActual;
+    if (plan < 0 || actual < 0) {
+      console.warn(
+        `[SnagKPI] baseline 음수: plan=${plan}, actual=${actual} (stage=${stage}, asOf=${asOfDate}) — 구간합이 누계를 초과했습니다.`,
+      );
+    }
+    return { plan: Math.max(0, plan), actual: Math.max(0, actual) };
+  }, [totalsQ.data, cellsQ.data, buckets, stage, asOfDate]);
 
   const [curveOpen, setCurveOpen] = useState(true);
 
@@ -222,8 +224,8 @@ export function SnagKpiAnalysisPage() {
     window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
   };
 
-  const loading = cellsQ.isPending || totalsQ.isPending || totalsCumQ.isPending;
-  const error = cellsQ.error || totalsQ.error || totalsCumQ.error;
+  const loading = cellsQ.isPending || totalsQ.isPending;
+  const error = cellsQ.error || totalsQ.error;
 
   return (
     <div className="flex flex-col gap-4 p-4">
