@@ -13,6 +13,7 @@ const searchSchema = z.object({
   dataDate: fallback(z.string(), "").default(""),
   delayFilter: fallback(z.string(), "all").default("all"),
   taskScope: fallback(z.string(), "sub").default("sub"),
+  workType: fallback(z.string(), "all").default("all"),
   curveKey: fallback(z.string(), "").default(""),
   curveBucket: fallback(z.string(), "week").default("week"),
   q: fallback(z.string(), "").default(""),
