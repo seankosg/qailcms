@@ -1230,6 +1230,34 @@ export function OcsIncrementImportPanel() {
           </span>
         </div>
 
+        {duplicatePackage && (
+          <div className="space-y-1 rounded-md border border-emerald-600 bg-emerald-50/60 p-3 dark:bg-emerald-950/30">
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+              <CheckCircle2 className="h-3.5 w-3.5" /> 이 패키지는 이미 반영 완료되었습니다 — 실패가
+              아닙니다
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              동일한 ZIP(SHA-256)이 과거 Import 에서 이미 운영 DB 에 반영되었습니다. 같은 내용을 다시
+              넣으면 중복이 생기므로 시스템이 재실행을 막습니다. 추가로 하실 일은 없습니다.
+              {duplicateRecovered && " (이후 복구 작업까지 완료된 패키지입니다.)"}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Check Package 결과가 <b>comments_new 0 · unchanged 다수</b> 로 나오는 것도 같은
+              이유이며 정상입니다. 다음 증분 작업은 <b>새 Baseline 생성 후 새 ZIP</b> 으로
+              진행하세요.
+            </p>
+            {(() => {
+              const dl = (precheck?.["duplicate_log"] ?? null) as Record<string, unknown> | null;
+              if (!dl) return null;
+              return (
+                <div className="pt-1 font-mono text-[11px] text-muted-foreground">
+                  기존 Import run: {String(dl["id"] ?? "")} · status {String(dl["status"] ?? "")}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {dry && (
           <>
             <div
@@ -1245,7 +1273,9 @@ export function OcsIncrementImportPanel() {
                 ? "Package check passed"
                 : packageStatus === "warn"
                   ? "Package can proceed with warnings"
-                  : "Package cannot be imported"}
+                  : duplicatePackage
+                    ? "이미 반영 완료된 패키지입니다 — 다시 Import 하지 않습니다"
+                    : "Package cannot be imported"}
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-md border p-3">
