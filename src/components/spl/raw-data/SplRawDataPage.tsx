@@ -555,15 +555,16 @@ export function SplRawDataPage() {
                           />
                         ) : (() => {
                           const label = it.def?.label ?? it.stage?.code ?? it.key;
+                          const fullName = it.stage?.title ?? it.def?.label ?? it.key;
                           return (
                           <span className="flex w-full items-center gap-0.5 overflow-hidden">
                             <button
                               type="button"
                               onClick={() => toggleSort(it.key)}
-                              title="클릭: 오름차순 → 내림차순 → 해제 (클릭 순서가 정렬 우선순위)"
+                              title={`${fullName}\n클릭: 오름차순 → 내림차순 → 해제 (클릭 순서가 정렬 우선순위)`}
                               className="inline-flex min-w-0 items-center gap-0.5 truncate hover:text-primary"
                             >
-                              <span className="truncate">{label}</span>
+                              <span className="truncate" title={fullName}>{label}</span>
                               {(() => {
                                 const idx = sorts.findIndex((s) => s.key === it.key);
                                 if (idx < 0) return null;
