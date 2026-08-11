@@ -4,7 +4,6 @@ import { todayInDoha } from "@/lib/time/doha";
 import { TmDashboardSection } from "./TmDashboardSection";
 import { SmDashboardSection } from "./SmDashboardSection";
 import { AbdDashboardSection } from "./AbdDashboardSection";
-import { PlotColumnHeader } from "./ProjectModuleSection";
 
 export function ProjectSummaryPage() {
   // 기준일 하나 — 세 모듈이 같은 as-of 를 쓴다.
@@ -28,11 +27,6 @@ export function ProjectSummaryPage() {
             className="h-8 w-[150px] text-xs"
           />
         </div>
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-2">
-        <PlotColumnHeader plot="D" />
-        <PlotColumnHeader plot="C" />
       </div>
 
       <TmDashboardSection asOfDate={asOfDate} />
