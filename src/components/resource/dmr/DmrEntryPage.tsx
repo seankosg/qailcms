@@ -8,13 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Save, Download, AlertTriangle } from 'lucide-react';
+import { Plus, Save, Download, AlertTriangle, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { todayInDoha } from '@/lib/time/doha';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useDmrSystemMaster, useDmrContractorMaster, useInvalidateDmr } from '@/hooks/useDmrEntries';
 import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
+import { parseDmrImages } from '@/lib/dmr-parse.functions';
+import { buildDmrEntryRowsFromSection, fileToParseSource } from '@/lib/dmr/entry-import';
 import { exportDmrTeamWorkbook } from '@/lib/dmr/export-dmr-team';
 import {
   DMR_HEADCOUNT_KINDS,
@@ -317,6 +319,60 @@ export function DmrEntryPage() {
   };
 
   const saveFn = useServerFn(saveDmrTaskEntries);
+  const parseFn = useServerFn(parseDmrImages);
+  const [importing, setImporting] = useState(false);
+
+  /** 엑셀·스크린샷 → 같은 표의 행으로 채워 넣는다. 자동 저장하지 않는다. */
+  async function onImportFiles(files: File[]) {
+    if (files.length === 0) return;
+    setImporting(true);
+    try {
+      const storagePaths: string[] = [];
+      const texts: { name: string; content: string }[] = [];
+      for (const f of files.slice(0, 3)) {
+        const src = await fileToParseSource(f);
+        if (src.kind === 'text') {
+          texts.push({ name: f.name, content: src.content });
+        } else {
+          const ext = f.name.split('.').pop() || 'png';
+          const path = `${me.data?.id ?? 'anon'}/${Date.now()}-entry.${ext}`;
+          const up = await supabase.storage.from('dmr-uploads').upload(path, f, { upsert: false });
+          if (up.error) throw new Error(up.error.message);
+          storagePaths.push(path);
+        }
+      }
+      const res: any = await parseFn({
+        data: {
+          ...(storagePaths.length ? { storagePaths } : {}),
+          ...(texts.length ? { texts } : {}),
+        },
+      });
+      const errs = (res?.results ?? []).filter((r: any) => r.error);
+      let added: ReturnType<typeof buildDmrEntryRowsFromSection> = [];
+      for (const r of res?.results ?? []) {
+        if (!r.section) continue;
+        added = [...added, ...buildDmrEntryRowsFromSection(r.section, tmByNo, newEntryRow)];
+      }
+      if (added.length === 0) {
+        toast.error(errs.length ? `파싱 실패: ${errs[0].error}` : '가져온 행이 없습니다');
+        return;
+      }
+      dirtyRef.current = true;
+      setRows((prev) => {
+        const base = prev.filter((p) => p.saved || p.task_no || p.system_name || p.contractor_name);
+        return [...base, ...added];
+      });
+      const unmatched = added.filter((a) => a.unmatched).length;
+      toast.success(
+        `불러오기 ${added.length}행 — TM 미매칭 ${unmatched}건${errs.length ? ` · 실패 ${errs.length}건` : ''}. 확인 후 저장하십시오.`,
+      );
+    } catch (e: any) {
+      toast.error(e?.message ?? '불러오기 실패');
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const valid = rows.filter((r) => r.system_name.trim() && r.contractor_name.trim());
 
   async function onSave() {
@@ -396,6 +452,28 @@ export function DmrEntryPage() {
             <span className="text-xs text-muted-foreground">
               {existingQ.isFetching ? '저장된 행 불러오는 중…' : `저장된 묶음 ${rows.filter((r) => r.saved).length}행`}
             </span>
+            <label className="ml-auto">
+              <input
+                type="file"
+                multiple
+                accept=".xlsx,.xls,.csv,image/*"
+                className="hidden"
+                disabled={!canEdit || importing}
+                onChange={(e) => {
+                  const fs = Array.from(e.target.files ?? []);
+                  e.currentTarget.value = '';
+                  void onImportFiles(fs);
+                }}
+              />
+              <span
+                className={`inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border px-3 text-xs ${
+                  !canEdit || importing ? 'pointer-events-none opacity-50' : 'hover:bg-accent'
+                }`}
+              >
+                {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                {importing ? '읽는 중…' : '엑셀 · 스크린샷 불러오기'}
+              </span>
+            </label>
           </CardContent>
         </Card>
 
