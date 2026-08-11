@@ -5,7 +5,7 @@ import { useAbdScurveData } from "@/hooks/useAbdScurveData";
 import { ALL_STAGES } from "@/lib/abd/progress-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
-function useAbdPlot(plot: "all" | "C" | "D", asOfDate: string) {
+function useAbdPlot(plot: "C" | "D", asOfDate: string) {
   const q = useAbdScurveData({
     plot,
     teams: [],
@@ -37,20 +37,18 @@ function useAbdPlot(plot: "all" | "C" | "D", asOfDate: string) {
 /** ABD — 정본: useAbdScurveData(= ABD Progress 와 동일 훅), Plot 별 호출 */
 export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
   const [open, setOpen] = useState(true);
-  const all = useAbdPlot("all", asOfDate);
   const c = useAbdPlot("C", asOfDate);
   const d = useAbdPlot("D", asOfDate);
-
-  const unclassified = Math.max(0, all.kpi.total - c.kpi.total - d.kpi.total);
 
   return (
     <ProjectModuleSection
       title="As Built Drawing"
       to="/closure/abd/progress"
-      progressPct={all.loading ? null : all.kpi.progressPct}
-      progressHint="진도율 = Approval 실적 누계 ÷ 문서 모수 — ABD Progress 매트릭스와 동일(서버 totals 정본)"
-      asOfNote={`Plot D ${d.kpi.total.toLocaleString()} · C ${c.kpi.total.toLocaleString()}`}
-      unclassified={unclassified}
+      progressHint="진도율 = 해당 Plot Approval 실적 누계 ÷ 문서 모수 — ABD Progress 매트릭스와 동일(서버 totals 정본)"
+      plots={[
+        { plot: "D", progressPct: d.loading ? null : d.kpi.progressPct, total: d.kpi.total },
+        { plot: "C", progressPct: c.loading ? null : c.kpi.progressPct, total: c.kpi.total },
+      ]}
     >
       <div className="grid gap-3 xl:grid-cols-2">
         {([["D", d], ["C", c]] as const).map(([label, q]) => (

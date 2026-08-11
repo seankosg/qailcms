@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import {
   SnagKpiPlanVsActualCard,
@@ -34,28 +34,24 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
   const c = usePlot("C", asOfDate, bucket);
   const d = usePlot("D", asOfDate, bucket);
 
-  const kpi = useMemo(() => {
-    const total = c.stageTotal + d.stageTotal;
-    const actual = c.baseline.actualUpto + d.baseline.actualUpto;
-    const plan = c.baseline.planUpto + d.baseline.planUpto;
-    return {
-      total,
-      actual,
-      plan,
-      behind: Math.max(0, plan - actual),
-      progressPct: total > 0 ? (actual / total) * 100 : null,
-    };
-  }, [c.stageTotal, d.stageTotal, c.baseline, d.baseline]);
-
-  const loading = c.loading || d.loading;
 
   return (
     <ProjectModuleSection
       title="Snag Management"
       to="/closure/snag-management/kpi-analysis"
-      progressPct={loading ? null : kpi.progressPct}
-      progressHint="진도율 = Closure 실적 누계 ÷ Closure 모수 — SM KPI Analysis 와 동일(서버 totals 정본)"
-      asOfNote={`Plot D ${d.stageTotal.toLocaleString()} · C ${c.stageTotal.toLocaleString()}`}
+      progressHint="진도율 = 해당 Plot Closure 실적 누계 ÷ Closure 모수 — SM KPI Analysis 와 동일(서버 totals 정본)"
+      plots={[
+        {
+          plot: "D",
+          progressPct: d.stageTotal === 0 ? null : (d.baseline.actualUpto / d.stageTotal) * 100,
+          total: d.stageTotal,
+        },
+        {
+          plot: "C",
+          progressPct: c.stageTotal === 0 ? null : (c.baseline.actualUpto / c.stageTotal) * 100,
+          total: c.stageTotal,
+        },
+      ]}
     >
       <div className="grid gap-3 xl:grid-cols-2">
         {([["D", d], ["C", c]] as const).map(([label, q]) => (

@@ -41,27 +41,18 @@ function useTmPlot(plot: "C" | "D", asOfDate: string) {
 export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
   const [bucket, setBucket] = useState<SCurveBucket>("week");
   const [open, setOpen] = useState(true);
-  const all = useTmScurveData({ asOfDate, taskScope: "sub", workType: "all", delayFilter: "all" });
   const c = useTmPlot("C", asOfDate);
   const d = useTmPlot("D", asOfDate);
-
-  const overall = useMemo(() => {
-    const total = all.scopedItems.length;
-    let actualSum = 0;
-    for (const it of all.scopedItems) actualSum += resolveActualPct(it);
-    return { total, progressPct: total > 0 ? (actualSum / total) * 100 : null };
-  }, [all.scopedItems]);
-
-  const unclassified = Math.max(0, overall.total - c.kpi.total - d.kpi.total);
 
   return (
     <ProjectModuleSection
       title="Task Management"
       to="/closure/task-management/kpi-analysis"
-      progressPct={all.isLoading ? null : overall.progressPct}
-      progressHint="진도율 = Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 — TM KPI Analysis 와 동일"
-      asOfNote={`Plot D ${d.kpi.total.toLocaleString()} · C ${c.kpi.total.toLocaleString()}`}
-      unclassified={unclassified}
+      progressHint="진도율 = 해당 Plot Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 — TM KPI Analysis 와 동일"
+      plots={[
+        { plot: "D", progressPct: d.isLoading ? null : d.kpi.progressPct, total: d.kpi.total },
+        { plot: "C", progressPct: c.isLoading ? null : c.kpi.progressPct, total: c.kpi.total },
+      ]}
     >
       <div className="grid gap-3 xl:grid-cols-2">
         {([["D", d], ["C", c]] as const).map(([label, q]) => (

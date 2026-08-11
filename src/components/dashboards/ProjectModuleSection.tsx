@@ -1,47 +1,52 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 
+export type PlotHeadStat = {
+  plot: "D" | "C";
+  progressPct: number | null;
+  total: number;
+};
+
 /**
  * 프로젝트 대시보드의 모듈 섹션 껍데기.
- * 제목(모듈 Dashboard 링크) · 진도율 · 기준일/미분류 안내만 담당한다.
+ * 진도율은 플롯별로 각각 — 합산값은 만들지 않는다.
+ * D · C 값은 각각 아래 플롯 열 위에 오도록 2열 격자로 정렬한다.
  */
 export function ProjectModuleSection({
   title,
   to,
-  progressPct,
   progressHint,
-  asOfNote,
-  unclassified,
+  plots,
   children,
 }: {
   title: string;
   to: string;
-  progressPct: number | null;
   progressHint: string;
-  asOfNote?: string | null;
-  unclassified?: number;
+  plots: [PlotHeadStat, PlotHeadStat];
   children: ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline gap-3 border-b pb-2">
+      <div className="border-b pb-2">
         <Link to={to} className="text-2xl font-bold tracking-tight hover:underline">
           {title}
         </Link>
-        <span
-          className="text-2xl font-bold tabular-nums text-primary"
-          title={progressHint}
-        >
-          {progressPct == null ? "—" : `${progressPct.toFixed(0)}%`}
-        </span>
-        {asOfNote && (
-          <span className="text-[11px] tabular-nums text-muted-foreground">{asOfNote}</span>
-        )}
-        {unclassified != null && unclassified > 0 && (
-          <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 tabular-nums">
-            미분류 {unclassified.toLocaleString()}건
-          </span>
-        )}
+        <div className="mt-1 grid gap-3 xl:grid-cols-2">
+          {plots.map((p) => (
+            <div key={p.plot} className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold tracking-tight">Plot {p.plot}</span>
+              <span
+                className="text-2xl font-bold tabular-nums text-primary"
+                title={progressHint}
+              >
+                {p.progressPct == null ? "—" : `${p.progressPct.toFixed(0)}%`}
+              </span>
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                모수 {p.total.toLocaleString()}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
       {children}
     </section>
