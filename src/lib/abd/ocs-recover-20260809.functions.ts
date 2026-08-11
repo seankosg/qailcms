@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 
 /**
  * 2026-08-09 ABD OCS 증분 Import 부분 반영(import_log b558b4bb…) 전용 일회성 복구.
@@ -19,15 +20,6 @@ type LooseClient = {
 const ORIGINAL_IMPORT_LOG_ID = "b558b4bb-69ad-46aa-990e-f55652d72888";
 const STAGE_RUN_ID = "4900545d-f945-43e8-bcda-f78ba9a0f50e";
 
-async function assertAdmin(supabase: unknown, userId: string) {
-  const { data, error } = await (supabase as unknown as LooseClient).rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("관리자(admin) 권한이 필요합니다.");
-}
-
 async function rpc(supabase: unknown, fn: string, args: Record<string, unknown>) {
   const { data, error } = await (supabase as unknown as LooseClient).rpc(fn, args);
   if (error) throw new Error(`${fn}: ${error.message}`);
@@ -38,7 +30,7 @@ async function rpc(supabase: unknown, fn: string, args: Record<string, unknown>)
 export const ocsRecover20260809DryRun = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertAbdOcsAccess(context.supabase, context.userId);
     return rpc(context.supabase, "abd_ocs_recover_20260809_dryrun", {});
   });
 
@@ -50,7 +42,7 @@ export const ocsRecover20260809Run = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertAbdOcsAccess(context.supabase, context.userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const recoveryLogId = crypto.randomUUID();
