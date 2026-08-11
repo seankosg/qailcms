@@ -188,7 +188,11 @@ export function computeOwnerLeaderboard(
   const map = new Map<string, OwnerLeaderboardRow>();
   const NONE = "(미지정)";
   for (const it of items) {
-    const raw = (it as any)[dim];
+    // 위임: HDEC PIC 차원 집계는 유효 담당자 기준(원 담당자는 표시용으로만 보존).
+    const raw =
+      dim === "hdec_pic_name"
+        ? ((it as any).effective_pic ?? (it as any).hdec_pic_name)
+        : (it as any)[dim];
     const key = raw ? String(raw).trim() || NONE : NONE;
     let row = map.get(key);
     if (!row) {

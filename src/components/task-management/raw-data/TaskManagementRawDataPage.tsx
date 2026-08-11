@@ -1031,6 +1031,24 @@ export function TaskManagementRawDataPage() {
         cell: ({ row, getValue }) => {
           const val = getValue();
           const rendered = renderCell(c, val);
+          if (c.key === "hdec_pic_name") {
+            const rr = row.original as any;
+            const eff = rr.effective_pic ?? val;
+            if (rr.is_delegated) {
+              return (
+                <span
+                  className="inline-flex items-center gap-1"
+                  title={`위임 수행: ${String(eff ?? "-")} (원 담당자 ${String(rr.original_pic ?? val ?? "-")})`}
+                >
+                  <span>{String(eff ?? "-")}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    (←{String(rr.original_pic ?? val ?? "-")})
+                  </span>
+                </span>
+              );
+            }
+            return <span>{String(eff ?? "") || "-"}</span>;
+          }
           if (c.key === "auto_judgment") {
             if (val == null || val === "")
               return <span className="text-muted-foreground/40">—</span>;

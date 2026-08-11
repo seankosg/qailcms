@@ -41,6 +41,18 @@ export const CLIENT_ONLY_SORT_COLUMNS = new Set<string>([
 ]);
 
 // ---------------------------------------------------------------------------
+// 위임(부재중 인수인계) — UI 컬럼 id → 서버 판정 컬럼 별칭.
+// 표시 라벨은 그대로 "HDEC PIC" 이지만, 필터/정렬 기준은 유효 담당자다.
+// ---------------------------------------------------------------------------
+export const SERVER_COLUMN_ALIAS: Record<string, string> = {
+  hdec_pic_name: "effective_pic",
+};
+
+export function toServerColumn(id: string): string {
+  return SERVER_COLUMN_ALIAS[id] ?? id;
+}
+
+// ---------------------------------------------------------------------------
 // ColumnFilter value → ServerFilter (op/value)
 // ---------------------------------------------------------------------------
 
@@ -54,6 +66,7 @@ function isMulti(v: unknown): v is MultiValue {
 }
 
 function toServerFilter(column: string, value: unknown): ServerFilter | null {
+  column = toServerColumn(column);
   if (value == null || value === "") return null;
 
   // multi-select (배열) — EMPTY_TOKEN 확장 처리
@@ -154,7 +167,7 @@ export function sortingToServer(
       clientOnly.push(s);
       continue;
     }
-    server.push({ column: s.id, dir: s.desc ? "desc" : "asc" });
+    server.push({ column: toServerColumn(s.id), dir: s.desc ? "desc" : "asc" });
   }
   return { server, clientOnly };
 }

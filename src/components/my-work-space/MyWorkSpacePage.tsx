@@ -25,6 +25,7 @@ import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { ClipboardList, AlertTriangle, FileCheck2 } from "lucide-react";
 import { CommentsInbox } from "./CommentsInbox";
+import { TmDelegationDialog } from "./TmDelegationDialog";
 import { AttentionInbox } from "./AttentionInbox";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
@@ -262,7 +263,24 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
     { key: "task_no", label: "Task No", width: "120px", render: (r) => <span className="font-mono text-[11px]">{r.task_no ?? "-"}</span> },
     { key: "level", label: "Tier", width: "60px", render: (r) => <span className="text-[10px] uppercase text-muted-foreground">{r.level ?? "-"}</span> },
     { key: "name", label: "Task", render: (r) => <span className="truncate block max-w-[420px]">{r.task_name ?? "-"}</span> },
-    ...(isAdmin ? [{ key: "pic", label: "HDEC PIC", width: "120px", render: (r: TmMyRow) => r.hdec_pic_name ?? "-" }] : []),
+    {
+      key: "pic",
+      label: "HDEC PIC",
+      width: "150px",
+      render: (r: TmMyRow) => {
+        const eff = r.effective_pic ?? r.hdec_pic_name;
+        if (!r.is_delegated) return eff ?? "-";
+        return (
+          <span
+            className="inline-flex items-center gap-1"
+            title={`위임 수행: ${eff ?? "-"} (원 담당자 ${r.original_pic ?? "-"})`}
+          >
+            <span>{eff ?? "-"}</span>
+            <span className="text-[10px] text-muted-foreground">(←{r.original_pic ?? "-"})</span>
+          </span>
+        );
+      },
+    },
     { key: "plan_end", label: "P.Finish", width: "100px", render: (r) => <span className="font-mono">{fmtDate(r.plan_end)}</span> },
     { key: "plan_pct", label: "Plan%", width: "70px", className: "text-right", render: (r) => <span className="tabular-nums text-muted-foreground">{Math.round(cumPlanProgress(r as any) * 100)}%</span> },
     { key: "actual", label: "Actual%", width: "70px", className: "text-right", render: (r) => <span className="tabular-nums">{Math.round(Number(r.actual_progress ?? 0) * 100)}%</span> },
@@ -368,6 +386,7 @@ export function MyWorkSpacePage({ scope = "pic" }: MyWorkSpacePageProps = {}) {
           {isAdmin && (
             <Badge variant="secondary" className="uppercase tracking-wide">Admin View</Badge>
           )}
+          <TmDelegationDialog myPic={pic} userId={me?.id ?? null} />
         </div>
       </header>
 

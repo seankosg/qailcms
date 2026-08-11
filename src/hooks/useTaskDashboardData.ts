@@ -17,11 +17,17 @@ function matches(r: any, f: TaskDashboardFilters): boolean {
   if (f.disciplines.length && !f.disciplines.includes(r.discipline)) return false;
   if (f.plots.length && !f.plots.includes(r.plot)) return false;
   if (f.teams.length && !f.teams.includes(r.team)) return false;
-  if (f.hdecPic?.length && !f.hdecPic.includes(r.hdec_pic_name)) return false;
+  // 위임: HDEC PIC 필터는 유효 담당자 기준(원 담당자로도 계속 찾을 수 있게 둘 다 허용).
+  if (
+    f.hdecPic?.length &&
+    !f.hdecPic.includes(r.effective_pic ?? r.hdec_pic_name) &&
+    !f.hdecPic.includes(r.hdec_pic_name)
+  )
+    return false;
   if (f.hdecEng?.length && !f.hdecEng.includes(r.hdec_eng_name)) return false;
   const q = f.q.trim().toLowerCase();
   if (q) {
-    const hay = [r.task_no, r.task_name, r.hdec_pic_name, r.hdec_eng_name, r.category]
+    const hay = [r.task_no, r.task_name, r.hdec_pic_name, r.effective_pic, r.hdec_eng_name, r.category]
       .map((v) => String(v ?? "").toLowerCase())
       .join("|");
     if (!hay.includes(q)) return false;
