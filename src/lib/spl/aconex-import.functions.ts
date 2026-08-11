@@ -388,5 +388,12 @@ export const importSplAconexBatch = createServerFn({ method: "POST" })
       })
       .eq("id", batchId);
 
-    return { ...preview, applied: true, batch_id: batchId, items_updated: itemsUpdated, stagesUpserted: 0 as any, stages_upserted: stagesUpserted, rejected };
+    return {
+      ...preview,
+      applied: true,
+      batch_id: batchId,
+      items_updated: itemsUpdated,
+      stages_upserted: stagesUpserted,
+      rejected,
+    };
   });
