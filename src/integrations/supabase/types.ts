@@ -4898,6 +4898,96 @@ export type Database = {
         }
         Relationships: []
       }
+      spl_field_config: {
+        Row: {
+          created_at: string
+          data_type: string
+          editable: boolean
+          field_key: string
+          group: string | null
+          id: string
+          label: string
+          options: Json | null
+          sort_order: number
+          source_group: string
+          updated_at: string
+          visible: boolean
+        }
+        Insert: {
+          created_at?: string
+          data_type?: string
+          editable?: boolean
+          field_key: string
+          group?: string | null
+          id?: string
+          label: string
+          options?: Json | null
+          sort_order?: number
+          source_group?: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Update: {
+          created_at?: string
+          data_type?: string
+          editable?: boolean
+          field_key?: string
+          group?: string | null
+          id?: string
+          label?: string
+          options?: Json | null
+          sort_order?: number
+          source_group?: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Relationships: []
+      }
+      spl_header_mappings: {
+        Row: {
+          created_at: string
+          form: string
+          id: string
+          is_active: boolean
+          is_custom: boolean
+          note: string | null
+          plan_or_actual: string | null
+          source_header: string
+          stage: string | null
+          target_field: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          form: string
+          id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          note?: string | null
+          plan_or_actual?: string | null
+          source_header: string
+          stage?: string | null
+          target_field: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          form?: string
+          id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          note?: string | null
+          plan_or_actual?: string | null
+          source_header?: string
+          stage?: string | null
+          target_field?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       spl_import_logs: {
         Row: {
           cleared_values: number
@@ -4954,6 +5044,36 @@ export type Database = {
           status?: string
           total_rows?: number
           unmatched?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      spl_import_presets: {
+        Row: {
+          created_at: string
+          fields: string[]
+          id: string
+          label: string
+          mode: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fields?: string[]
+          id?: string
+          label: string
+          mode: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fields?: string[]
+          id?: string
+          label?: string
+          mode?: string
+          sort_order?: number
           updated_at?: string
         }
         Relationships: []
