@@ -730,6 +730,7 @@ export function SplRawDataPage() {
         onOpenChange={setExportOpen}
         rows={sorted}
         exportColumns={exportColumns}
+        cellValue={exportCellValue}
         onRoundtrip={onExport}
       />
 
