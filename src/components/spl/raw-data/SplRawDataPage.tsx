@@ -273,6 +273,7 @@ export function SplRawDataPage() {
     }
     return items;
   }, [order, visibility, frozenExtras, colDefMap, stageColMap, colWidths]);
+  const tableWidth = useMemo(() => layout.reduce((sum, item) => sum + item.width, 0), [layout]);
 
   const exportColumns = useMemo(
     () => layout.filter((i) => i.def).map((i) => ({ key: i.key, label: i.def?.label ?? i.key })),
@@ -538,7 +539,10 @@ export function SplRawDataPage() {
             <div className="p-6 text-sm text-destructive">{(error as Error).message}</div>
           ) : (
             <div className="max-h-[calc(100vh-320px)] overflow-auto">
-              <table className="w-max border-separate border-spacing-0 text-[11px]">
+              <table
+                className="table-fixed border-separate border-spacing-0 text-[11px]"
+                style={{ width: tableWidth, minWidth: tableWidth }}
+              >
                 <thead>
                   <tr>
                     {layout.map((it) => {
