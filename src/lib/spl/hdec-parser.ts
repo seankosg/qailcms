@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { isOcsDocumentNumber } from "./number-normalize";
 
 /**
  * SPL HDEC 임포트 파서 (왕복 임포트 구조).
