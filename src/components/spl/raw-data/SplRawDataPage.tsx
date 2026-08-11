@@ -850,6 +850,10 @@ function SplTableRow({
           <>
             {row.primary_delay ? (
               <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
+                {row.primary_delay.short_code && (
+                  <span className="text-red-500">{row.primary_delay.short_code}</span>
+                )}
+                {row.primary_delay.short_code ? " · " : ""}
                 {row.primary_delay.label} · {row.primary_delay.days}d
               </span>
             ) : (
