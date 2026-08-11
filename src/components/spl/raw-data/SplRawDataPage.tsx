@@ -244,6 +244,42 @@ export function SplRawDataPage() {
     [layout],
   );
 
+  /** 다중 정렬 적용 — 빈 값은 항상 뒤로, 숫자로 읽히면 숫자 비교 */
+  const sorted = useMemo(() => {
+    if (sorts.length === 0) return filtered;
+    const cmpText = (a: string, b: string) => {
+      if (a === b) return 0;
+      if (a === "") return 1;
+      if (b === "") return -1;
+      const na = Number.parseFloat(a);
+      const nb = Number.parseFloat(b);
+      if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return na - nb;
+      return a.localeCompare(b, undefined, { numeric: true });
+    };
+    return [...filtered].sort((ra, rb) => {
+      for (const s of sorts) {
+        const def = colDefMap.get(s.key);
+        if (!def) continue;
+        const r = cmpText(def.get(ra), def.get(rb));
+        if (r !== 0) return s.desc ? -r : r;
+      }
+      return 0;
+    });
+  }, [filtered, sorts, colDefMap]);
+
+  /** 헤더 클릭 = 오름차순 → 내림차순 → 해제. 선택 순서가 우선순위가 된다. */
+  const toggleSort = (key: string) =>
+    setSorts((prev) => {
+      const i = prev.findIndex((s) => s.key === key);
+      if (i < 0) return [...prev, { key, desc: false }];
+      if (!prev[i].desc) {
+        const next = [...prev];
+        next[i] = { key, desc: true };
+        return next;
+      }
+      return prev.filter((s) => s.key !== key);
+    });
+
   const saveOne = async (id: string, field: string, value: string | null) => {
     await saveField({ data: { id, field, value } });
   };
