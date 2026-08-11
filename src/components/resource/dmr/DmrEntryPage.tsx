@@ -279,6 +279,7 @@ export function DmrEntryPage() {
       });
       setMissing(res?.missing_task_nos ?? []);
       invalidate();
+      await existingQ.refetch();
       toast.success(`저장 완료 — ${res?.saved ?? valid.length}행 (TM 연결 ${res?.linked_tasks ?? 0}건)`);
     } catch (e: any) {
       toast.error(e?.message ?? '저장 실패');
@@ -329,6 +330,11 @@ export function DmrEntryPage() {
             <span className="text-xs text-muted-foreground">
               TM 후보 {tmQ.data?.length ?? 0}건 (기준일 {reportDate})
             </span>
+            <span className="text-xs text-muted-foreground">
+              {existingQ.isFetching
+                ? '저장된 행 불러오는 중…'
+                : `저장된 행 ${existingQ.data?.length ?? 0}건`}
+            </span>
           </CardContent>
         </Card>
 
@@ -351,8 +357,14 @@ export function DmrEntryPage() {
               <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setRows((p) => [...p, newRow()])}>
                 <Plus className="h-3.5 w-3.5" />행 추가
               </Button>
-              <Button size="sm" className="h-8 gap-1 text-xs" disabled={!canEdit || saving || valid.length === 0} onClick={onSave}>
-                <Save className="h-3.5 w-3.5" />{saving ? '저장 중…' : '저장'}
+              <Button
+                size="sm"
+                className="h-8 gap-1 text-xs"
+                disabled={!canEdit || saving || existingQ.isFetching || valid.length === 0}
+                onClick={onSave}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saving ? '저장 중…' : existingQ.isFetching ? '불러오는 중…' : '저장'}
               </Button>
             </div>
           </CardHeader>
