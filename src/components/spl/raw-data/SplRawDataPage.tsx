@@ -573,7 +573,7 @@ export function SplRawDataPage() {
                             <span className="shrink-0">
                               <SplColumnFilterDropdown
                                 label={label}
-                                values={distinctValues[it.key] ?? []}
+                                getOptions={() => getColumnFacet(it.key)}
                                 selected={colFilters[it.key] ?? []}
                                 onChange={(next) => setColFilters((p) => ({ ...p, [it.key]: next }))}
                               />
