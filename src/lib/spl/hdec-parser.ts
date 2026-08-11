@@ -112,6 +112,8 @@ export interface ParsedSplRow {
 
 export interface ParsedSplFile {
   file_name: string;
+  /** hdec = 4행 헤더 왕복 양식 / view = Raw Data 화면 표시 그대로 내보낸 양식 */
+  format: "hdec" | "view";
   sheets: Array<{ sheet_name: string; plot: "C" | "D"; rows: number }>;
   rows: ParsedSplRow[];
   /** `-OCS-` 패턴으로 제외된 행 */
@@ -126,6 +128,8 @@ export interface ParsedSplFile {
   present_item_fields: string[];
   /** "NA" 로 표기된 날짜 칸 수 */
   na_cells: number;
+  /** View 양식에서 임포트 대상이 아니어서 무시한 컬럼 (파생·Aconex 정본) */
+  ignored_headers: string[];
 }
 
 /** 파일 셀이 "해당 없음" 표기인지 */
