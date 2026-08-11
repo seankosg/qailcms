@@ -7096,6 +7096,69 @@ export type Database = {
         }
         Relationships: []
       }
+      tm_pic_delegations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_date: string
+          from_pic: string
+          from_pic_norm: string | null
+          id: string
+          note: string | null
+          start_date: string
+          status: string
+          task_raw_id: string
+          to_pic: string
+          to_pic_norm: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          from_pic: string
+          from_pic_norm?: string | null
+          id?: string
+          note?: string | null
+          start_date: string
+          status?: string
+          task_raw_id: string
+          to_pic: string
+          to_pic_norm?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          from_pic?: string
+          from_pic_norm?: string | null
+          id?: string
+          note?: string | null
+          start_date?: string
+          status?: string
+          task_raw_id?: string
+          to_pic?: string
+          to_pic_norm?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tm_pic_delegations_task_raw_id_fkey"
+            columns: ["task_raw_id"]
+            isOneToOne: false
+            referencedRelation: "task_management_raw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tm_pic_delegations_task_raw_id_fkey"
+            columns: ["task_raw_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_management_raw_derived"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -9145,6 +9208,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      tm_effective_pic: {
+        Args: { _as_of?: string; _task_raw_id: string }
+        Returns: string
+      }
       tm_expected_finish: {
         Args: {
           actual_finish: string
@@ -9153,6 +9220,10 @@ export type Database = {
           data_date: string
         }
         Returns: string
+      }
+      tm_is_delegate: {
+        Args: { _as_of?: string; _task_raw_id: string; _user_id: string }
+        Returns: boolean
       }
       tm_items_counts: {
         Args: {
