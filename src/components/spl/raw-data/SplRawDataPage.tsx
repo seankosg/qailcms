@@ -866,7 +866,11 @@ function SplTableRow({
       case "data_date":
         return <span className="text-muted-foreground">{row.data_date ? formatDdMmm(row.data_date) : "—"}</span>;
       default: {
-        const v = (row as any)[key] as string | null | undefined;
+        const rawV = (row as any)[key];
+        const v =
+          rawV != null && typeof rawV === "object"
+            ? ((rawV as any).label ?? null)
+            : (rawV as string | null | undefined);
         const naLike =
           v != null && /^\s*(n\/?a|not\s*applicable|not\s*applicable\s*\(na\))\s*$/i.test(String(v).trim());
         return (
