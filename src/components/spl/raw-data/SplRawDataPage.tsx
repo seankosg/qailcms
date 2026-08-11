@@ -635,6 +635,7 @@ function SplTableRow({
   stageCols,
   estCells,
   layout,
+  stageWidths,
   selected,
   onToggleSelect,
   onOpenDetail,
@@ -647,6 +648,8 @@ function SplTableRow({
   /** 역산 추정 실적 칸 — stage_code -> { as, af } */
   estCells?: Record<string, { as?: boolean; af?: boolean }>;
   layout: Array<{ key: string; def: SplColumnDef | null; width: number; left: number | null }>;
+  /** 사용자가 조절한 스테이지 컬럼 폭 — 키는 `stage:<컬럼키>` */
+  stageWidths?: Record<string, number>;
   selected: boolean;
   onToggleSelect: () => void;
   onOpenDetail: () => void;
