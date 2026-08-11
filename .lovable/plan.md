@@ -14,9 +14,12 @@ KPI 카드와 S-Curve 차트에 동시 적용되게 한다. (같은 모듈 안�
 
 | 모듈 | 필터 |
 |---|---|
-| TM | Task Scope(Main/Sub) · Team(=discipline, 다중) · Work Type · Delay 필터 · Bucket(주/월) |
-| SM | Team(다중) · Room Group(다중) · Building(다중) · Stage · Plan Mode · Bucket · Range(일) |
-| ABD | Team(다중) · Plan Mode · Bucket · Range(일) |
+| TM | Task Scope(Main/Sub) · Team(=discipline, 다중) · Work Type · Delay 필터 · Bucket(일/주/월) · **차트 시작일** |
+| SM | Team(다중) · Room Group(다중) · Building(다중) · Stage · Plan Mode · Bucket · 단위(건수/%) · **차트 시작일** |
+| ABD | Team(다중) · Plan Mode · Bucket · **차트 시작일** |
+
+차트 **끝날짜는 PDB 우측 상단 기준일**을 그대로 쓰므로 세팅 대상이 아니다.
+시작일은 날짜 입력으로 지정하고, 비워두면 현행 기본값(오늘 −14일)을 쓴다.
 
 Plot(C/D)은 PDB 가 구조적으로 좌우 2열이므로 세팅 대상이 아니다(현행 유지).
 저장/초기화 버튼, 마지막 수정자·시각 표시.
@@ -41,9 +44,14 @@ public.pdb_module_filters
 - `TmDashboardSection` / `SmDashboardSection` / `AbdDashboardSection` 은 지금 하드코딩된
   훅 인자(`teams: []`, `bucket: "week"`, `taskScope: "sub"` 등)를 이 값으로 대체.
   계산식·훅·카드 컴포넌트는 **변경하지 않는다**(정본 유지).
-- 차트 카드의 bucket 은 세팅값을 초기값으로 쓰되, 사용자가 화면에서 임시 변경하는 기존
-  토글은 그대로 남긴다.
-- 각 모듈 헤더에 현재 적용 중인 필터 요약 칩을 표시(훅이 이미 내려주는 `filterSummary` 사용).
+- **PDB 차트 안의 조작 UI(Bucket · 단위 토글)는 제거한다.** 세 카드에 선택적 prop
+  `controlsHidden` 을 추가해 PDB 에서만 숨기고, 원래 KPI Analysis / Progress 화면은 그대로 둔다.
+- 대신 각 모듈 블록 상단에 **세팅 페이지에서 설정된 필터 현황**을 칩으로 표시한다
+  (Team · Room Group · Stage · Work Type · Bucket · 시작일 등). 칩 옆에
+  "Admin > Setting 에서 변경" 링크를 둔다.
+- 세 훅(`useTmScurveData` · `useSnagScurveData` · `useAbdScurveData`)에 선택적
+  `startDate` 인자를 추가한다. 값이 없으면 지금과 동일한 `오늘 −14일` 이라
+  기존 KPI Analysis / Progress 화면 수치는 변하지 않는다.
 
 ## 기술 메모
 - 조회는 `createServerFn` 없이 생성된 supabase 클라이언트로 읽기(공개 읽기 아님, 로그인 필요).
