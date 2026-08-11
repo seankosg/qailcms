@@ -39,6 +39,7 @@ import { Route as ApiPublicBackupRunQueuedSnapshotRouteImport } from './routes/a
 import { Route as ApiPublicBackupAutoSnapshotRouteImport } from './routes/api/public/backup/auto-snapshot'
 import { Route as ApiPublicBackupArchiveDownloadRouteImport } from './routes/api/public/backup/archive-download'
 import { Route as AuthenticatedResourceDmrRawDataRouteImport } from './routes/_authenticated/resource/dmr/raw-data'
+import { Route as AuthenticatedResourceDmrEntryRouteImport } from './routes/_authenticated/resource/dmr/entry'
 import { Route as AuthenticatedResourceDmrDashboardRouteImport } from './routes/_authenticated/resource/dmr/dashboard'
 import { Route as AuthenticatedClosureWarrantyRawDataRouteImport } from './routes/_authenticated/closure/warranty/raw-data'
 import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './routes/_authenticated/closure/task-management/tree'
@@ -238,6 +239,12 @@ const AuthenticatedResourceDmrRawDataRoute =
   AuthenticatedResourceDmrRawDataRouteImport.update({
     id: '/resource/dmr/raw-data',
     path: '/resource/dmr/raw-data',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedResourceDmrEntryRoute =
+  AuthenticatedResourceDmrEntryRouteImport.update({
+    id: '/resource/dmr/entry',
+    path: '/resource/dmr/entry',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedResourceDmrDashboardRoute =
@@ -461,6 +468,7 @@ export interface FileRoutesByFullPath {
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
   '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
+  '/resource/dmr/entry': typeof AuthenticatedResourceDmrEntryRoute
   '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
@@ -520,6 +528,7 @@ export interface FileRoutesByTo {
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
   '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
+  '/resource/dmr/entry': typeof AuthenticatedResourceDmrEntryRoute
   '/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
@@ -582,6 +591,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/_authenticated/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
   '/_authenticated/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
+  '/_authenticated/resource/dmr/entry': typeof AuthenticatedResourceDmrEntryRoute
   '/_authenticated/resource/dmr/raw-data': typeof AuthenticatedResourceDmrRawDataRoute
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
@@ -644,6 +654,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/tree'
     | '/closure/warranty/raw-data'
     | '/resource/dmr/dashboard'
+    | '/resource/dmr/entry'
     | '/resource/dmr/raw-data'
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
@@ -703,6 +714,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/tree'
     | '/closure/warranty/raw-data'
     | '/resource/dmr/dashboard'
+    | '/resource/dmr/entry'
     | '/resource/dmr/raw-data'
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
@@ -764,6 +776,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/task-management/tree'
     | '/_authenticated/closure/warranty/raw-data'
     | '/_authenticated/resource/dmr/dashboard'
+    | '/_authenticated/resource/dmr/entry'
     | '/_authenticated/resource/dmr/raw-data'
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
@@ -1000,6 +1013,13 @@ declare module '@tanstack/react-router' {
       path: '/resource/dmr/raw-data'
       fullPath: '/resource/dmr/raw-data'
       preLoaderRoute: typeof AuthenticatedResourceDmrRawDataRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/resource/dmr/entry': {
+      id: '/_authenticated/resource/dmr/entry'
+      path: '/resource/dmr/entry'
+      fullPath: '/resource/dmr/entry'
+      preLoaderRoute: typeof AuthenticatedResourceDmrEntryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/resource/dmr/dashboard': {
@@ -1288,6 +1308,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
   AuthenticatedClosureWarrantyRawDataRoute: typeof AuthenticatedClosureWarrantyRawDataRoute
   AuthenticatedResourceDmrDashboardRoute: typeof AuthenticatedResourceDmrDashboardRoute
+  AuthenticatedResourceDmrEntryRoute: typeof AuthenticatedResourceDmrEntryRoute
   AuthenticatedResourceDmrRawDataRoute: typeof AuthenticatedResourceDmrRawDataRoute
   AuthenticatedClosureDashboardIndexRoute: typeof AuthenticatedClosureDashboardIndexRoute
   AuthenticatedClosureAbdDetailIdRoute: typeof AuthenticatedClosureAbdDetailIdRoute
@@ -1349,6 +1370,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureWarrantyRawDataRoute,
   AuthenticatedResourceDmrDashboardRoute:
     AuthenticatedResourceDmrDashboardRoute,
+  AuthenticatedResourceDmrEntryRoute: AuthenticatedResourceDmrEntryRoute,
   AuthenticatedResourceDmrRawDataRoute: AuthenticatedResourceDmrRawDataRoute,
   AuthenticatedClosureDashboardIndexRoute:
     AuthenticatedClosureDashboardIndexRoute,
