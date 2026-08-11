@@ -425,6 +425,11 @@ export function SplRawDataPage() {
             onOrderChange={setOrder}
             onVisibilityChange={setVisibility}
             onFrozenChange={setFrozenExtras}
+            stageItems={stageMenuItems}
+            stageOrder={stageOrder}
+            stageVisibility={stageVisibility}
+            onStageOrderChange={setStageOrder}
+            onStageVisibilityChange={setStageVisibility}
             onSave={() => {
               persistColumns();
               toast.success("Column settings saved.");
@@ -637,7 +642,7 @@ export function SplRawDataPage() {
                         </th>
                       );
                     })}
-                    {stageCols.map((sc) => (
+                    {visibleStageCols.map((sc) => (
                       <th
                         key={sc.key}
                         title={sc.title}
@@ -655,6 +660,7 @@ export function SplRawDataPage() {
                           sc.bandStart && "border-l-2 border-l-foreground/40",
                         )}
                       >
+                        <span className="inline-flex items-center">
                         <button
                           type="button"
                           onClick={() => toggleSort(`stage:${sc.key}`)}
@@ -677,6 +683,15 @@ export function SplRawDataPage() {
                             );
                           })()}
                         </button>
+                        <SplColumnFilterDropdown
+                          label={sc.code}
+                          values={distinctStageValues[`stage:${sc.key}`] ?? []}
+                          selected={colFilters[`stage:${sc.key}`] ?? []}
+                          onChange={(next) =>
+                            setColFilters((p) => ({ ...p, [`stage:${sc.key}`]: next }))
+                          }
+                        />
+                        </span>
                         <ColumnResizeHandle
                           width={colWidths[`stage:${sc.key}`] ?? 84}
                           min={40}
@@ -693,7 +708,7 @@ export function SplRawDataPage() {
                     <SplTableRow
                       key={r.id}
                       row={r}
-                      stageCols={stageCols}
+                      stageCols={visibleStageCols}
                       estCells={estMap[r.id]}
                       layout={layout}
                       stageWidths={colWidths}
@@ -716,7 +731,7 @@ export function SplRawDataPage() {
                   ))}
                   {sorted.length === 0 && (
                     <tr>
-                      <td colSpan={layout.length + stageCols.length} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={layout.length + visibleStageCols.length} className="p-8 text-center text-muted-foreground">
                         No rows match the current filters.
                       </td>
                     </tr>
