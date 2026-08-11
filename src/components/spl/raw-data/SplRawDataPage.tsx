@@ -23,7 +23,7 @@ import {
   type SplStageCell,
 } from "@/lib/spl/rows.functions";
 import { downloadSplRoundtripWorkbook } from "@/lib/spl/roundtrip-export";
-import { updateSplField } from "@/lib/spl/mutations.functions";
+import { updateSplField, updateSplStageField } from "@/lib/spl/mutations.functions";
 import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
 import { useRclCan } from "@/hooks/useRclCan";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
@@ -326,6 +326,13 @@ export function SplRawDataPage() {
 
   const saveOne = async (id: string, field: string, value: string | null) => {
     await saveField({ data: { id, field, value } });
+  };
+  const saveStageOne = async (
+    id: string,
+    stage: { stage_code: string; field: "ps" | "as" | "pf" | "af" | "fv" },
+    value: string | null,
+  ) => {
+    await saveStage({ data: { item_id: id, stage_code: stage.stage_code, field: stage.field, value } });
   };
   const refetchRows = async () => {
     await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
