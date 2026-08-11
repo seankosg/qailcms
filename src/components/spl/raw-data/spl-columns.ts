@@ -33,7 +33,14 @@ export const SPL_COLUMNS: SplColumnDef[] = [
   { key: "plot", label: "Plot", width: 70, filter: "multi", get: (r) => (r.plot ? `PLOT-${r.plot}` : "") },
   { key: "team", label: "Team", width: 80, filter: "multi", get: (r) => r.team ?? "", edit: "team" },
   { key: "judgment", label: "Status", width: 110, filter: "multi", get: (r) => splJudgmentLabel(r.judgment) },
-  { key: "progress_pct", label: "Progress", width: 90, filter: "multi", get: (r) => (r.progress_pct == null ? "" : `${r.progress_pct}%`) },
+  {
+    key: "progress_pct",
+    label: "Progress",
+    width: 90,
+    filter: "multi",
+    // Actual(분자) / Plan(분모)
+    get: (r) => (r.progress_pct == null ? "" : `${r.progress_pct}%`),
+  },
   { key: "completed_stage", label: "Completed Stage", width: 150, filter: "multi", get: (r) => r.completed_stage?.label ?? "" },
   { key: "current_stage", label: "Current Stage", width: 150, filter: "multi", get: (r) => r.current_stage?.label ?? "" },
   {
