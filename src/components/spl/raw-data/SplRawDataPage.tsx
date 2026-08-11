@@ -809,8 +809,16 @@ function SplTableRow({
         return (
           <td
             key={sc.key}
+            style={
+              stageWidths?.[`stage:${sc.key}`]
+                ? {
+                    width: stageWidths[`stage:${sc.key}`],
+                    minWidth: stageWidths[`stage:${sc.key}`],
+                  }
+                : undefined
+            }
             className={cn(
-              "whitespace-nowrap border-b border-l px-2 py-1 text-center tabular-nums",
+              "overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-center tabular-nums",
               STATE_CLASS[cell?.st ?? "none"],
               isNa && "bg-muted/40",
               isEst && "italic",
