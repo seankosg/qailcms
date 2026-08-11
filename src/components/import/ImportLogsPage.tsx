@@ -54,7 +54,7 @@ import {
 
 const FIELD_OUTCOMES = Object.keys(OUTCOME_LABELS);
 
-type Kind = RollbackKind;
+type Kind = RollbackKind | "spl";
 
 interface Batch {
   id: string;
@@ -77,6 +77,17 @@ interface Batch {
   exclusions?: Record<string, unknown> | null;
   /** 배치 단위 오류 목록(있을 때만) */
   errors?: unknown;
+  /** SPL 전용 지표 (다른 모듈은 undefined) */
+  spl?: {
+    total_rows: number;
+    matched: number;
+    unmatched: number;
+    ocs_excluded: number;
+    items_updated: number;
+    stages_upserted: number;
+    cleared_values: number;
+    sheet_names: string[];
+  };
 }
 
 interface RowLog {
@@ -118,6 +129,8 @@ const CFG = {
     keyLabel: "Task No",
     keyColumn: "task_no",
     extraLabel: "Discipline",
+    rowLogsFk: "upload_id",
+    rollbackKind: "task_management",
   },
   defect_management: {
     title: "Snag List — Import Logs",
@@ -127,6 +140,8 @@ const CFG = {
     deleteFn: "delete_defect_import_batch",
     keyLabel: "Source Issue No",
     keyColumn: "source_issue_no",
+    rowLogsFk: "upload_id",
+    rollbackKind: "defect_management",
     // Team은 파일 단위가 아니라 행 단위 자동매핑 결과이므로 배치 목록에서 노출하지 않음.
     extraLabel: null,
   },
@@ -139,6 +154,22 @@ const CFG = {
     keyLabel: "ABD Number",
     keyColumn: "abd_number",
     extraLabel: "Team",
+    rowLogsFk: "upload_id",
+    rollbackKind: "abd",
+  },
+  spl: {
+    title: "Spare Parts (SPL) — Import Logs",
+    backTo: "/import-log/import",
+    logsTable: "spl_import_logs",
+    rowLogsTable: "spl_import_row_logs",
+    // SPL 행 로그의 배치 외래키는 batch_id (다른 모듈은 upload_id)
+    rowLogsFk: "batch_id",
+    deleteFn: null,
+    keyLabel: "SPL Number",
+    keyColumn: "spl_number",
+    extraLabel: null,
+    // SPL 롤백 DB 함수가 없으므로 롤백 버튼을 렌더하지 않는다.
+    rollbackKind: null,
   },
 } as const;
 
@@ -158,6 +189,7 @@ function fmtDuration(startedAt: string, finishedAt: string | null) {
 
 export function ImportLogsPage({ kind }: { kind: Kind }) {
   const cfg = CFG[kind];
+  const isSpl = kind === "spl";
   const hasExtra = !!cfg.extraLabel;
   const navigate = useNavigate();
   const { data: me } = useCurrentUser();
@@ -245,6 +277,42 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       }));
       setBatches(list);
       await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
+    } else if (kind === "spl") {
+      const { data } = await (supabase as any)
+        .from("spl_import_logs")
+        .select(
+          "id, file_name, status, started_at, finished_at, imported_by, note, total_rows, matched, unmatched, ocs_excluded, items_updated, stages_upserted, cleared_values, sheet_names",
+        )
+        .order("started_at", { ascending: false })
+        .limit(100);
+      const list: Batch[] = (data ?? []).map((r: any) => ({
+        id: r.id,
+        file_name: r.file_name,
+        status: r.status,
+        started_at: r.started_at,
+        finished_at: r.finished_at,
+        imported_by: r.imported_by,
+        // SPL 로그에는 data_date / rolled_back_at 칸이 없다 — 렌더하지 않는다.
+        data_date: null,
+        total: r.total_rows ?? 0,
+        inserted: 0,
+        updated: 0,
+        skipped: 0,
+        rejected: 0,
+        extra: r.note ?? null,
+        spl: {
+          total_rows: r.total_rows ?? 0,
+          matched: r.matched ?? 0,
+          unmatched: r.unmatched ?? 0,
+          ocs_excluded: r.ocs_excluded ?? 0,
+          items_updated: r.items_updated ?? 0,
+          stages_upserted: r.stages_upserted ?? 0,
+          cleared_values: r.cleared_values ?? 0,
+          sheet_names: (r.sheet_names ?? []) as string[],
+        },
+      }));
+      setBatches(list);
+      await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
     } else {
       // abd
       const { data } = await (supabase as any)
@@ -314,25 +382,44 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
           ? "id, raw_row_no, discipline, task_no, action_taken, reason_code, reason_detail, processed_at"
           : kind === "defect_management"
             ? "id, raw_row_no, team, source_issue_no, action_taken, reason_code, reason_detail, processed_at"
-            : "id, raw_row_no, team, abd_number, action_taken, reason_code, reason_detail, processed_at";
-      const rows = await fetchAllByUploadId<any>(cfg.rowLogsTable, cols, id);
+            : kind === "spl"
+              ? "id, excel_row, sheet_name, spl_number, outcome, code, detail, created_at"
+              : "id, raw_row_no, team, abd_number, action_taken, reason_code, reason_detail, processed_at";
+      const rows = await fetchAllByUploadId<any>(
+        cfg.rowLogsTable,
+        cols,
+        id,
+        1000,
+        cfg.rowLogsFk,
+        kind === "spl" ? "created_at" : "processed_at",
+      );
       const mapped: RowLog[] = rows.map((r: any) => ({
         id: r.id,
-        raw_row_no: r.raw_row_no,
-        action_taken: r.action_taken,
-        reason_code: r.reason_code,
-        reason_detail: r.reason_detail,
+        raw_row_no: kind === "spl" ? r.excel_row : r.raw_row_no,
+        action_taken: kind === "spl" ? r.outcome : r.action_taken,
+        reason_code: kind === "spl" ? r.code : r.reason_code,
+        reason_detail:
+          kind === "spl"
+            ? [r.sheet_name ? `sheet ${r.sheet_name}` : null, r.detail].filter(Boolean).join(" · ") || null
+            : r.reason_detail,
         key_value:
           kind === "task_management"
             ? r.task_no
             : kind === "defect_management"
               ? r.source_issue_no
-              : r.abd_number,
-        processed_at: r.processed_at,
+              : kind === "spl"
+                ? r.spl_number
+                : r.abd_number,
+        processed_at: kind === "spl" ? r.created_at : r.processed_at,
       }));
       setRowLogs(mapped);
       // 필드 단위 로그 조회 (SHAW 스타일 확장 상세)
       try {
+        if (kind === "spl") {
+          setFieldKind("spl");
+          setFieldOutcomeCounts({});
+          return;
+        }
         const kindKey =
           kind === "task_management"
             ? "task_management"
@@ -369,6 +456,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
   };
 
   const deleteBatch = async (b: Batch) => {
+    if (!cfg.deleteFn) return;
     setDeletingId(b.id);
     try {
       const { error } = await (supabase as any).rpc(cfg.deleteFn, { _batch_id: b.id });
@@ -550,10 +638,10 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                     <TableHead className="text-xs text-right">Duration</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
                     <TableHead className="text-xs text-right">Total</TableHead>
-                    <TableHead className="text-xs text-right">Inserted</TableHead>
-                    <TableHead className="text-xs text-right">Updated</TableHead>
-                    <TableHead className="text-xs text-right">Skipped</TableHead>
-                    <TableHead className="text-xs text-right">Rejected</TableHead>
+                    <TableHead className="text-xs text-right">{isSpl ? "Matched" : "Inserted"}</TableHead>
+                    <TableHead className="text-xs text-right">{isSpl ? "Items Updated" : "Updated"}</TableHead>
+                    <TableHead className="text-xs text-right">{isSpl ? "Unmatched" : "Skipped"}</TableHead>
+                    <TableHead className="text-xs text-right">{isSpl ? "OCS Excluded" : "Rejected"}</TableHead>
                     <TableHead className="text-xs w-24">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -669,37 +757,37 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                             className="text-xs text-right cursor-pointer"
                             onClick={() => loadDetail(b.id)}
                           >
-                            {b.inserted}
+                            {isSpl ? (b.spl?.matched ?? 0) : b.inserted}
                           </TableCell>
                           <TableCell
                             className="text-xs text-right cursor-pointer"
                             onClick={() => loadDetail(b.id)}
                           >
-                            {b.updated}
+                            {isSpl ? (b.spl?.items_updated ?? 0) : b.updated}
                           </TableCell>
                           <TableCell
                             className="text-xs text-right cursor-pointer"
                             onClick={() => loadDetail(b.id)}
                           >
-                            {b.skipped}
+                            {isSpl ? (b.spl?.unmatched ?? 0) : b.skipped}
                           </TableCell>
                           <TableCell
                             className="text-xs text-right cursor-pointer"
                             onClick={() => loadDetail(b.id)}
                           >
-                            {b.rejected}
+                            {isSpl ? (b.spl?.ocs_excluded ?? 0) : b.rejected}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-0.5">
-                              {canRollback && b.status !== "rolled_back" && (
+                              {cfg.rollbackKind && canRollback && b.status !== "rolled_back" && (
                                 <RollbackDialog
-                                  kind={kind}
+                                  kind={cfg.rollbackKind}
                                   batchId={b.id}
                                   fileName={b.file_name}
                                   onDone={fetchBatches}
                                 />
                               )}
-                              {isAdmin && (
+                              {isAdmin && cfg.deleteFn && (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button

@@ -113,7 +113,16 @@ export function ModuleGuardDialog({
               {suggestedTarget && (
                 <div className="pt-1">
                   <Button asChild size="sm" variant="outline">
-                    <Link to={MODULE_IMPORT_ROUTES[suggestedTarget]}>
+                    <Link
+                      to={MODULE_IMPORT_ROUTES[suggestedTarget].split("?")[0] as string}
+                      search={
+                        (Object.fromEntries(
+                          new URLSearchParams(
+                            MODULE_IMPORT_ROUTES[suggestedTarget].split("?")[1] ?? "",
+                          ),
+                        ) as never)
+                      }
+                    >
                       {MODULE_LABELS[suggestedTarget]} 임포트로 이동
                       <ArrowRight className="ml-1 h-3.5 w-3.5" />
                     </Link>

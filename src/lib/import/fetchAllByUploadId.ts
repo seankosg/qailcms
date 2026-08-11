@@ -6,6 +6,8 @@ export async function fetchAllByUploadId<T>(
   columns: string,
   uploadId: string,
   pageSize = 1000,
+  fkColumn = "upload_id",
+  orderColumn = "processed_at",
 ): Promise<T[]> {
   const out: T[] = [];
   let from = 0;
@@ -15,8 +17,8 @@ export async function fetchAllByUploadId<T>(
     const { data, error } = await (supabase as any)
       .from(table)
       .select(columns)
-      .eq("upload_id", uploadId)
-      .order("processed_at", { ascending: true })
+      .eq(fkColumn, uploadId)
+      .order(orderColumn, { ascending: true })
       .range(from, to);
     if (error) throw error;
     const rows = (data ?? []) as T[];

@@ -5,19 +5,23 @@ import * as XLSX from "xlsx";
  * 파일 선택 직후(파싱 이전)에 호출되어 잘못된 모듈 파일을 사전에 차단한다.
  */
 
-/** [F-3-4] SPL/WRT 편입을 대비해 확장 가능하게 둔다(앵커 예약: SPL NUMBER / WRT NUMBER). */
-export type ModuleId = "abd" | "sm" | "tm";
+/** [F-3-4] SPL/WRT 포함. 두 원본은 머리글이 크게 겹치므로 배타 앵커로만 가른다. */
+export type ModuleId = "abd" | "sm" | "tm" | "spl" | "wrt";
 
 export const MODULE_LABELS: Record<ModuleId, string> = {
   abd: "As Built Drawing",
   sm: "Snag Management",
   tm: "Task Management",
+  spl: "Spare Parts (SPL)",
+  wrt: "Warranty (WRT)",
 };
 
 export const MODULE_IMPORT_ROUTES: Record<ModuleId, string> = {
   abd: "/closure/abd/import",
   sm: "/closure/snag-management/import",
   tm: "/closure/task-management/import",
+  spl: "/import-log/import?tab=spl",
+  wrt: "/import-log/import?tab=warranty",
 };
 
 interface ModuleFingerprint {
@@ -190,6 +194,71 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
     ],
     filenameHints: [/task/i, /\btm\b/i, /schedule/i],
   },
+  spl: {
+    // 배타 앵커만. DIS / SERVICE / DOCUMENT TITLE / TEAM / HDEC PIC / HDEC ENG /
+    // Submission / Response Received / Latest Status / Approval Status 는 WRT 와 공통이라 앵커 금지.
+    anchors: [
+      "SPL NUMBER",
+      "Physical List",
+      "Rec. Letter 2Y",
+      "Rec. Letter 5Y",
+      "Availability 10Y",
+      "RFQ Draft",
+      "Issuance of PO",
+      "Code B to A",
+    ],
+    signature: [
+      "SPL NUMBER",
+      "Physical List",
+      "Rec. Letter 2Y",
+      "Rec. Letter 5Y",
+      "Availability 10Y",
+      "RFQ Draft",
+      "Issuance of PO",
+      "Code B to A",
+      "DIS",
+      "SERVICE",
+      "DOCUMENT TITLE",
+      "TEAM",
+      "HDEC PIC",
+      "HDEC ENG",
+      "Submission",
+      "Response Received",
+      "Latest Status",
+      "Approval Status",
+      "SUPPLIER",
+      "PIC PO",
+      "ENG PO",
+    ],
+    filenameHints: [/spl/i, /spare/i],
+  },
+  wrt: {
+    anchors: [
+      "WRT NUMBER",
+      "Response by dar",
+      "Subcon Stamp",
+      "Final Submission",
+      "Negotiation",
+    ],
+    signature: [
+      "WRT NUMBER",
+      "Response by dar",
+      "Subcon Stamp",
+      "Final Submission",
+      "Negotiation",
+      "DIS",
+      "SERVICE",
+      "DOCUMENT TITLE",
+      "TEAM",
+      "HDEC PIC",
+      "HDEC ENG",
+      "Submission",
+      "Response Received",
+      "Latest Status",
+      "Approval Status",
+    ],
+    filenameHints: [/wrt/i, /warranty/i],
+  },
 };
 
 export interface DetectionResult {
@@ -213,11 +282,15 @@ export function detectModule(
     abd: 0,
     sm: 0,
     tm: 0,
+    spl: 0,
+    wrt: 0,
   };
   const anchorsHit: Record<ModuleId, number> = {
     abd: 0,
     sm: 0,
     tm: 0,
+    spl: 0,
+    wrt: 0,
   };
 
   (Object.keys(MODULE_FINGERPRINTS) as ModuleId[]).forEach((mod) => {
@@ -434,8 +507,8 @@ export async function evaluateFilesForModule(
           detected: target,
           detection: {
             top: target,
-            scores: { abd: 0, sm: 0, tm: 0 },
-            anchorsHit: { abd: 0, sm: 0, tm: 0 },
+            scores: { abd: 0, sm: 0, tm: 0, spl: 0, wrt: 0 },
+            anchorsHit: { abd: 0, sm: 0, tm: 0, spl: 0, wrt: 0 },
             confidenceGap: 0,
             totalHeaders: 0,
           },
@@ -458,8 +531,8 @@ export async function evaluateFilesForModule(
           detected: target,
           detection: {
             top: target,
-            scores: { abd: 0, sm: 0, tm: 0 },
-            anchorsHit: { abd: 0, sm: 0, tm: 0 },
+            scores: { abd: 0, sm: 0, tm: 0, spl: 0, wrt: 0 },
+            anchorsHit: { abd: 0, sm: 0, tm: 0, spl: 0, wrt: 0 },
             confidenceGap: 0,
             totalHeaders: 0,
           },

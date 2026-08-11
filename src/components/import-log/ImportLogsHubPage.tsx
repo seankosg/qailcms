@@ -34,6 +34,7 @@ export function ImportLogsHubPage() {
           <TabsTrigger value="task">Task Management</TabsTrigger>
           <TabsTrigger value="snag">Snag List</TabsTrigger>
           <TabsTrigger value="abd">ABD</TabsTrigger>
+          <TabsTrigger value="spl">Spare Parts</TabsTrigger>
           <TabsTrigger value="warranty">Warranty</TabsTrigger>
         </TabsList>
         <TabsContent value="task" className="mt-4">
@@ -66,6 +67,9 @@ export function ImportLogsHubPage() {
         </TabsContent>
         <TabsContent value="abd" className="mt-4">
           <ImportLogsPage kind="abd" />
+        </TabsContent>
+        <TabsContent value="spl" className="mt-4">
+          <ImportLogsPage kind="spl" />
         </TabsContent>
         <TabsContent value="warranty" className="mt-4">
           <Card>

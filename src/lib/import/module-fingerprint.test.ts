@@ -24,7 +24,7 @@ function loadFile(name: string, renameTo?: string): File {
 type Row = {
   label: string;
   fixture: string;
-  expect: Record<ModuleId, Verdict>;
+  expect: Partial<Record<ModuleId, Verdict>>;
 };
 
 const TABLE: Row[] = [

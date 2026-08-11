@@ -12,6 +12,8 @@ import { parseSplHdecFile, type ParsedSplFile } from "@/lib/spl/hdec-parser";
 import { importSplHdecBatch, type SplHdecResult } from "@/lib/spl/hdec-import.functions";
 import { applyImportScope, type ImportScopeOutcome } from "@/lib/import/import-scope";
 import { AconexPlanGapLine, RejectedRows, ScopeSummary } from "@/components/wrt/import/WrtImportPage";
+import { useModuleGuard } from "@/hooks/useModuleGuard";
+import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 
 type SplParsedRow = ParsedSplFile["rows"][number];
 
@@ -102,9 +104,14 @@ export function SplImportPage() {
 
   const view = result ?? preview;
   const guardBlocked = !!view?.delete_guard.tripped && !allowDeletes;
+  const guard = useModuleGuard("spl", (fs) => {
+    const f = fs[0];
+    if (f) void onFile(f);
+  });
 
   return (
     <div className="space-y-4">
+      <ModuleGuardDialog {...guard.dialogProps} />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Spare Parts (SPL) — HDEC Import</CardTitle>
@@ -122,12 +129,16 @@ export function SplImportPage() {
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) void onFile(f);
+                if (f) void guard.receive([f]);
                 e.target.value = "";
               }}
             />
-            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
-              {busy === "parse" || busy === "scope" ? (
+            <Button
+              variant="outline"
+              onClick={() => fileRef.current?.click()}
+              disabled={busy !== null || guard.checking}
+            >
+              {busy === "parse" || busy === "scope" || guard.checking ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Upload className="mr-2 h-4 w-4" />
