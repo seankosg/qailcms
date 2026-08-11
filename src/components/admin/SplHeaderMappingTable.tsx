@@ -147,10 +147,10 @@ export function SplHeaderMappingTable() {
       source_header: r.source_header,
       target_field: r.target_field,
       is_active: r.is_active,
-      slot: slotKey(r),
     })),
     [rows],
   );
+  const slotById = useMemo(() => new Map(rows.map((r) => [r.id, slotKey(r)])), [rows]);
 
   return (
     <Card>
@@ -237,7 +237,7 @@ export function SplHeaderMappingTable() {
               )}
               {filtered.map((r) => {
                 const slot = slotKey(r);
-                const scoped = rowsForCell.filter((x) => x.slot === slot);
+                const scoped = rowsForCell.filter((x) => slotById.get(x.id) === slot);
                 const self = rowsForCell.find((x) => x.id === r.id)!;
                 return (
                   <TableRow key={r.id} className={r.is_active ? "" : "opacity-50"}>
