@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.abd_dashboard_row1(text[], text[]);
