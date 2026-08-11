@@ -263,6 +263,58 @@ export async function streamXlsxExport(
     await new Promise((r) => setTimeout(r, 0));
   }
 
+  for (const extra of opts.extraSheets ?? []) {
+    const ws2 = wb.addWorksheet(extra.name);
+    const colCount2 = Math.max(extra.columns.length, 2);
+    let r = 0;
+    if (extra.header) {
+      for (let c = 1; c <= colCount2; c++) {
+        const cell = ws2.getCell(1, c);
+        cell.value = c === 1 ? extra.header.title : "";
+        cell.font = { name: FONT_NAME, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = FILL_TITLE;
+      }
+      ws2.getRow(1).height = 24;
+      for (let i = 0; i < 5; i++) {
+        for (let c = 1; c <= colCount2; c++) {
+          const cell = ws2.getCell(2 + i, c);
+          cell.value = c === 1 ? (extra.header.metaRows[i] ?? "") : "";
+          cell.font = { name: FONT_NAME, size: 10, bold: i === 0, color: { argb: "FF111827" } };
+          cell.fill = FILL_META;
+        }
+        ws2.getRow(2 + i).height = 16;
+      }
+      ws2.getRow(7).height = 6;
+      r = 7;
+    }
+    r += 1;
+    for (let c = 0; c < extra.columns.length; c++) {
+      const cell = ws2.getCell(r, c + 1);
+      cell.value = extra.columns[c].label;
+      cell.font = { name: FONT_NAME, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = FILL_HEADER;
+      cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+      cell.border = BORDER_HEADER;
+    }
+    ws2.getRow(r).height = 24;
+    ws2.views = [{ state: "frozen", ySplit: r }];
+    for (let c = 0; c < extra.columns.length; c++) {
+      ws2.getColumn(c + 1).width = extra.columnWidths?.[extra.columns[c].key] ?? 18;
+    }
+    for (const src of extra.rows) {
+      r += 1;
+      const row = ws2.getRow(r);
+      for (let c = 0; c < extra.columns.length; c++) {
+        const cell = row.getCell(c + 1);
+        cell.value = normalizeCell(src[extra.columns[c].key]) as any;
+        cell.font = { name: FONT_NAME, size: 10, color: { argb: "FF111827" } };
+        cell.alignment = { vertical: "middle", horizontal: "left" };
+        cell.border = BORDER_DATA;
+      }
+      row.height = 18;
+    }
+  }
+
   const buf = await wb.xlsx.writeBuffer();
   if (opts.output === "buffer") {
     return { count: fetched, buffer: new Uint8Array(buf as ArrayBuffer) };
