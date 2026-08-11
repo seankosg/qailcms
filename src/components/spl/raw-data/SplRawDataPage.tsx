@@ -219,7 +219,6 @@ export function SplRawDataPage() {
 
   /** 표시 컬럼 배치 — __select 는 항상 좌측 고정, 그다음 사용자 pin */
   const layout = useMemo(() => {
-
     const visibleOrder = order.filter((k) => visibility[k] !== false && colDefMap.has(k));
     const frozen = frozenExtras.filter((k) => visibleOrder.includes(k));
     const rest = visibleOrder.filter((k) => !frozen.includes(k));
