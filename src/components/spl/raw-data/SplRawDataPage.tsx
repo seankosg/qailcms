@@ -952,9 +952,9 @@ function StickyCell({
 }) {
   return (
     <td
-      style={{ left, width, minWidth: width }}
+      style={{ left, width, minWidth: width, maxWidth: width }}
       className={cn(
-        "sticky z-10 whitespace-nowrap border-b border-l px-2 py-1",
+        "sticky z-10 overflow-hidden text-ellipsis whitespace-nowrap border-b border-l px-2 py-1",
         "bg-background [background-image:linear-gradient(hsl(var(--background)),hsl(var(--background)))]",
         className,
       )}
