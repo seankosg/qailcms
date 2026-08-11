@@ -354,7 +354,11 @@ function Page() {
                 />
               </Row>
               <Row label="Bucket">
-                <Single options={BUCKETS} value={abd.bucket} onChange={(v) => setAbd({ ...abd, bucket: v })} />
+                <Single
+                  options={BUCKETS.filter((b) => b.value !== "month")}
+                  value={abd.bucket === "month" ? "week" : abd.bucket}
+                  onChange={(v) => setAbd({ ...abd, bucket: v })}
+                />
               </Row>
               <Row label="차트 시작일">
                 <StartDate value={abd.startDate} onChange={(v) => setAbd({ ...abd, startDate: v })} />
