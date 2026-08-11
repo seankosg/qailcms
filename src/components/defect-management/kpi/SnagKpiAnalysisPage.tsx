@@ -133,8 +133,6 @@ export function SnagKpiAnalysisPage() {
     window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
   };
 
-  const loading = cellsQ.isPending || totalsQ.isPending;
-  const error = cellsQ.error || totalsQ.error;
 
   return (
     <div className="flex flex-col gap-4 p-4">
