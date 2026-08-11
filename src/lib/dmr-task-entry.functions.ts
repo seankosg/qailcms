@@ -49,14 +49,32 @@ export const saveDmrTaskEntries = createServerFn({ method: 'POST' })
       ),
     ];
 
+    // 공종 키 정정: DMR 공종 코드 → TM 공종 어휘.
+    // 매핑은 team_master(code, aliases) 가 유일한 근거다. 코드에 박지 않는다.
+    const { data: teamRow, error: teamErr } = await sb
+      .from('team_master')
+      .select('code, aliases')
+      .eq('code', data.discipline)
+      .maybeSingle();
+    if (teamErr) throw new Error(`team_master 조회 실패: ${teamErr.message}`);
+    if (!teamRow) throw new Error(`team_master 에 공종 코드가 없습니다: ${data.discipline}`);
+    const tmDisciplines = [
+      String(teamRow.code),
+      ...((teamRow.aliases ?? []) as string[]).map((a) => String(a)),
+    ];
+
     // TM 정본 1회 조회 (기준일 = report_date)
+    // 키는 `${discipline}|${task_no}`. task_no 는 전역 유일이 아니다.
     const snapshot = new Map<string, any>();
     if (taskNos.length > 0) {
       const { data: tmRows, error: tmErr } = await sb
         .rpc('tm_rows_as_of', { _as_of: data.report_date })
-        .in('task_no', taskNos);
+        .in('task_no', taskNos)
+        .in('discipline', tmDisciplines);
       if (tmErr) throw new Error(`TM 정본 조회 실패: ${tmErr.message}`);
-      for (const r of tmRows ?? []) snapshot.set(String(r.task_no), r);
+      for (const r of tmRows ?? []) {
+        snapshot.set(`${String(r.discipline)}|${String(r.task_no)}`, r);
+      }
     }
 
     const snapshotAt = new Date().toISOString();
@@ -64,7 +82,11 @@ export const saveDmrTaskEntries = createServerFn({ method: 'POST' })
 
     const payload = data.entries.map((e) => {
       const taskNo = (e.task_no ?? '').trim() || null;
-      const tm = taskNo ? snapshot.get(taskNo) : null;
+      const tm = taskNo
+        ? (tmDisciplines
+            .map((d) => snapshot.get(`${d}|${taskNo}`))
+            .find((r) => !!r) ?? null)
+        : null;
       if (taskNo && !tm) missing.push(taskNo);
       return {
         report_date: data.report_date,

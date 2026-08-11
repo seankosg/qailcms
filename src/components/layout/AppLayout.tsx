@@ -151,6 +151,7 @@ const NAV: NavSection[] = [
         items: [
           { to: "/resource/dmr/dashboard", label: "Dashboard", icon: iconDashboard },
           { to: "/resource/dmr/raw-data", label: "Raw Data", icon: iconDatabase },
+          { to: "/resource/dmr/entry", label: "Daily Entry", icon: iconUpload },
         ],
       },
     ],
