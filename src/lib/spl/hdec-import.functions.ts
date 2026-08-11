@@ -14,7 +14,7 @@ import { assertImportScope } from "@/lib/import/rcl-import-gate";
  */
 
 const STAGE_FIELDS = ["plan_start", "actual_start", "plan_finish", "actual_finish", "flag_value"] as const;
-const ITEM_FIELDS = ["team", "pic", "eng", "pic_po", "eng_po", "supplier"] as const;
+const ITEM_FIELDS = ["team", "pic", "eng", "pic_po", "eng_po", "supplier", "plot"] as const;
 /** Aconex 권위 단계 — actual 은 값이 있을 때만 반영 (빈칸 무시) */
 const ACONEX_STAGES = new Set(["APPROVAL_DATE"]);
 
@@ -135,7 +135,7 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
       data.allowed_keys ?? null,
     );
 
-    const items = await fetchAll(supa, "spl_items", "id, spl_number, team, pic, eng, pic_po, eng_po, supplier");
+    const items = await fetchAll(supa, "spl_items", "id, spl_number, plot, team, pic, eng, pic_po, eng_po, supplier");
     const byNumber = new Map<string, any>(items.map((i) => [i.spl_number, i]));
     const progress = await fetchAll(
       supa,
