@@ -14,11 +14,15 @@ import { applyImportScope, type ImportScopeOutcome } from "@/lib/import/import-s
 import { AconexPlanGapLine, RejectedRows, ScopeSummary } from "@/components/wrt/import/WrtImportPage";
 import { useModuleGuard } from "@/hooks/useModuleGuard";
 import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
+import { Switch } from "@/components/ui/switch";
+import { RefreshCw } from "lucide-react";
+import { SplAconexImportPage } from "./SplAconexImportPage";
 
 type SplParsedRow = ParsedSplFile["rows"][number];
 
 export function SplImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<"hdec" | "aconex">("hdec");
   const [parsed, setParsed] = useState<ParsedSplFile | null>(null);
   const [scope, setScope] = useState<ImportScopeOutcome<SplParsedRow> | null>(null);
   const [preview, setPreview] = useState<SplHdecResult | null>(null);
@@ -111,6 +115,37 @@ export function SplImportPage() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">SPL — Import</h1>
+          <p className="text-sm text-muted-foreground">
+            Choose the source · <b>Import HDEC</b>: upload the round-trip workbook (upsert) · <b>Import Aconex</b>: sync
+            Response Status and Dar Response Date on existing items only.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
+          <div
+            className={`flex items-center gap-1.5 text-sm ${mode === "hdec" ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Import HDEC
+          </div>
+          <Switch
+            checked={mode === "aconex"}
+            onCheckedChange={(v) => setMode(v ? "aconex" : "hdec")}
+            aria-label="Import source"
+          />
+          <div
+            className={`flex items-center gap-1.5 text-sm ${mode === "aconex" ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+          >
+            <RefreshCw className="h-4 w-4" /> Import Aconex
+          </div>
+        </div>
+      </div>
+
+      {mode === "aconex" && <SplAconexImportPage />}
+
+      {mode === "hdec" && (
+        <>
       <ModuleGuardDialog {...guard.dialogProps} />
       <Card>
         <CardHeader>
@@ -319,6 +354,8 @@ export function SplImportPage() {
               </ScrollArea>
             </CardContent>
           </Card>
+        </>
+      )}
         </>
       )}
     </div>
