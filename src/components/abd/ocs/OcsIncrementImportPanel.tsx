@@ -53,6 +53,9 @@ import {
 } from "@/components/abd/ocs/wizard/OcsWizardStepper";
 import { OcsWizardStepCard } from "@/components/abd/ocs/wizard/OcsWizardStepCard";
 import { OcsErrorCard } from "@/components/abd/ocs/wizard/OcsErrorCard";
+
+/** 기존 running 백업 감시 제한 시간(20분). 초과해도 실패로 단정하지 않는다. */
+const SNAPSHOT_WATCH_TIMEOUT_MS = 20 * 60 * 1000;
 import {
   CheckItem,
   OcsResponsibilityCard,
@@ -114,6 +117,11 @@ export function OcsIncrementImportPanel() {
   // React state 는 비동기 배칭되므로 더블클릭을 막지 못한다. 동기 ref 잠금을 함께 둔다.
   const snapshotLockRef = useRef(false);
   const [snapshotRunning, setSnapshotRunning] = useState(false);
+  /** 서버가 already_running 을 반환했거나 기존 run 에 합류했을 때 3초 주기로 감시할 backup run ID */
+  const [watchRunId, setWatchRunId] = useState<string | null>(null);
+  /** 감시 시간 초과 — 실패로 단정하지 않고 "상태 확인 필요" 로만 표시한다. */
+  const [snapshotStale, setSnapshotStale] = useState(false);
+  const snapshotTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [snapshotElapsed, setSnapshotElapsed] = useState(0);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [snapshotStatus, setSnapshotStatus] = useState<{
@@ -513,17 +521,38 @@ export function OcsIncrementImportPanel() {
   /**
    * @param retry true 면 새 run ID 로 시작(명시적 Retry). false 면 기존 run 이 있으면 그 상태에 합류.
    */
+  /** 경과 타이머만 관리한다. 상태 polling 은 watchRunId 감시 effect 가 담당한다. */
+  function startSnapshotTicker(started: number) {
+    if (snapshotTickRef.current) clearInterval(snapshotTickRef.current);
+    snapshotTickRef.current = setInterval(
+      () => setSnapshotElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+  }
+  function stopSnapshotTicker() {
+    if (snapshotTickRef.current) clearInterval(snapshotTickRef.current);
+    snapshotTickRef.current = null;
+  }
+
   async function runSnapshot(retry = false) {
     if (!dry) return;
     if (snapshotLockRef.current) return; // 동기 잠금: 더블클릭·중복 클릭 무시
     snapshotLockRef.current = true;
 
-    // 기존 run 이 있고 명시적 Retry 가 아니면, 새 백업 대신 기존 상태를 먼저 확인한다.
+    // 기존 run 이 있고 명시적 Retry 가 아니면, 새 백업 대신 기존 상태에 합류한다.
     if (!retry && backupRunId) {
       try {
         const row = await refreshBackupRun(backupRunId);
-        if (row && (row.status === "running" || row.status === "queued" || row.status === "success")) {
-          if (row.status !== "success") toast.info("Backup already running");
+        if (row && (row.status === "running" || row.status === "queued")) {
+          toast.info("Backup already running — 기존 실행 상태를 계속 확인합니다.");
+          setSnapshotError(null);
+          setSnapshotStale(false);
+          setSnapshotRunning(true);
+          startSnapshotTicker(Date.now() - snapshotElapsed * 1000);
+          setWatchRunId(backupRunId); // 잠금은 감시 종료 시 해제된다
+          return;
+        }
+        if (row && row.status === "success") {
           snapshotLockRef.current = false;
           return;
         }
@@ -537,32 +566,11 @@ export function OcsIncrementImportPanel() {
     const started = Date.now();
     setSnapshotRunning(true);
     setSnapshotError(null);
+    setSnapshotStale(false);
     setSnapshotStatus(null);
     setSnapshotElapsed(0);
-
-    const tick = setInterval(
-      () => setSnapshotElapsed(Math.floor((Date.now() - started) / 1000)),
-      1000,
-    );
-    const poll = setInterval(() => {
-      void (async () => {
-        try {
-          const row = (await snapshotStatusFn({ data: { run_id: runId } })) as {
-            metadata?: Record<string, unknown> | null;
-          } | null;
-          const m = (row?.metadata ?? null) as Record<string, unknown> | null;
-          if (!m) return;
-          setSnapshotStatus({
-            tablesTotal: num(m["tables_total"]),
-            tablesDone: num(m["tables_done"]),
-            currentTable: (m["current_table"] as string | null) ?? null,
-            sizeBytes: m["size_bytes"] == null ? null : num(m["size_bytes"]),
-          });
-        } catch {
-          /* 진행 상태 조회 실패는 스냅샷 자체에 영향 없음 */
-        }
-      })();
-    }, 3000);
+    startSnapshotTicker(started);
+    setWatchRunId(runId);
 
     try {
       const res = (await snapshotFn({ data: { module: "abd", run_id: runId } })) as {
@@ -571,9 +579,10 @@ export function OcsIncrementImportPanel() {
         already_running?: boolean;
       } | null;
       if (res?.already_running) {
+        // 새 Snapshot·새 run ID 를 만들지 않고 동일 run 을 계속 감시한다.
         toast.info("Backup already running — 기존 실행 상태를 계속 확인합니다.");
         await refreshBackupRun(runId);
-        return;
+        return; // watchRunId 감시 effect 가 success/failed 까지 유지
       }
       if (!res?.id) throw new Error("스냅샷 ID 를 확인하지 못했습니다.");
       setSnapshotId(res.id);
@@ -584,17 +593,73 @@ export function OcsIncrementImportPanel() {
         sizeBytes: res.size_bytes ?? prev?.sizeBytes ?? null,
       }));
       toast.success(`Snapshot created — ${res.id}`);
+      setWatchRunId(null);
+      stopSnapshotTicker();
+      setSnapshotRunning(false);
+      snapshotLockRef.current = false;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setSnapshotError(msg);
       toast.error(msg);
-    } finally {
-      clearInterval(tick);
-      clearInterval(poll);
+      setWatchRunId(null);
+      stopSnapshotTicker();
       setSnapshotRunning(false);
       snapshotLockRef.current = false;
     }
   }
+
+  /**
+   * 기존 running run 감시 — 3초 주기로 동일 run ID 만 조회한다.
+   * success/failed 에서 종료, 시간 초과 시 "상태 확인 필요" 로만 표시하고 실패로 단정하지 않는다.
+   * 중복 interval 생성 없음(단일 effect), unmount 시 정리.
+   */
+  useEffect(() => {
+    if (!watchRunId) return;
+    const deadline = Date.now() + SNAPSHOT_WATCH_TIMEOUT_MS;
+    let stopped = false;
+
+    const finish = () => {
+      stopped = true;
+      clearInterval(timer);
+      stopSnapshotTicker();
+      setSnapshotRunning(false);
+      setWatchRunId(null);
+      snapshotLockRef.current = false;
+    };
+
+    const timer = setInterval(() => {
+      void (async () => {
+        if (stopped) return;
+        try {
+          const row = await refreshBackupRun(watchRunId);
+          if (row?.status === "success" && row.snapshot_id) {
+            toast.success(`Snapshot created — ${row.snapshot_id}`);
+            finish();
+            return;
+          }
+          if (row?.status === "failed") {
+            toast.error(row.error_message ?? "Backup failed");
+            finish();
+            return;
+          }
+        } catch {
+          /* 조회 실패는 백업 자체 실패가 아니다 — 다음 주기에 재시도 */
+        }
+        if (Date.now() > deadline) {
+          setSnapshotStale(true);
+          finish();
+        }
+      })();
+    }, 3000);
+
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchRunId]);
+
+  useEffect(() => () => stopSnapshotTicker(), []);
 
   /**
    * source/ 와 images/ 바이너리 보존 업로드 (upsert:false · 기존 파일 미덮어쓰기).
@@ -1565,6 +1630,35 @@ export function OcsIncrementImportPanel() {
             )}
           </div>
         )}
+        {snapshotStale && !snapshotRunning && !snapshotId && (
+          <div className="space-y-1 rounded-md border border-amber-500/50 p-3 text-xs">
+            <div className="font-medium text-amber-600">상태 확인 필요</div>
+            <p className="text-muted-foreground">
+              제한 시간 안에 백업 완료를 확인하지 못했습니다. 백업이 실패했다고 단정할 수 없으며,
+              서버에서 계속 진행 중일 수 있습니다. 새 백업을 만들지 말고 아래 버튼으로 동일 백업
+              상태를 다시 확인하십시오.
+            </p>
+            {backupRunId && (
+              <div className="font-mono text-[11px] text-muted-foreground">
+                Backup run ID: {backupRunId}
+              </div>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (!backupRunId) return;
+                setSnapshotStale(false);
+                setSnapshotRunning(true);
+                snapshotLockRef.current = true;
+                startSnapshotTicker(Date.now() - snapshotElapsed * 1000);
+                setWatchRunId(backupRunId);
+              }}
+            >
+              상태 다시 확인
+            </Button>
+          </div>
+        )}
         {snapshotId && !snapshotRunning && (
           <div className="space-y-1 rounded-md border p-3 text-xs">
             <div className="font-medium text-emerald-600">Backup completed</div>
@@ -1595,7 +1689,8 @@ export function OcsIncrementImportPanel() {
             title="Backup failed"
             affected="운영 데이터와 업로드된 파일은 변경되지 않았습니다. 백업 단계만 실패했습니다."
             nextStep="Retry Backup 을 눌러 백업만 다시 실행하십시오. 파일을 다시 업로드할 필요는 없습니다."
-            runId={runId}
+            runId={backupRunId}
+            runLabel="Backup run"
             details={snapshotError}
             action={
               <Button size="sm" variant="outline" onClick={() => void runSnapshot(true)}>
