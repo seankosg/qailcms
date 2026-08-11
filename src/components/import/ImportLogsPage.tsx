@@ -637,10 +637,10 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                     <TableHead className="text-xs text-right">Duration</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
                     <TableHead className="text-xs text-right">Total</TableHead>
-                    <TableHead className="text-xs text-right">Inserted</TableHead>
-                    <TableHead className="text-xs text-right">Updated</TableHead>
-                    <TableHead className="text-xs text-right">Skipped</TableHead>
-                    <TableHead className="text-xs text-right">Rejected</TableHead>
+                    <TableHead className="text-xs text-right">{isSpl ? "Matched" : "Inserted"}</TableHead>
+                    <TableHead className="text-xs text-right">{isSpl ? "Items Updated" : "Updated"}</TableHead>
+                    <TableHead className="text-xs text-right">{isSpl ? "Unmatched" : "Skipped"}</TableHead>
+                    <TableHead className="text-xs text-right">{isSpl ? "OCS Excluded" : "Rejected"}</TableHead>
                     <TableHead className="text-xs w-24">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -756,7 +756,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                             className="text-xs text-right cursor-pointer"
                             onClick={() => loadDetail(b.id)}
                           >
-                            {b.inserted}
+                            {isSpl ? (b.spl?.matched ?? 0) : b.inserted}
                           </TableCell>
                           <TableCell
                             className="text-xs text-right cursor-pointer"
