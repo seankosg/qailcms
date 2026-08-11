@@ -49,14 +49,14 @@ export function SplDocumentPanel({
     enabled: open,
   });
 
-  const openPdf = async (documentId: string) => {
+  const openPdf = async (documentId: string, page?: number) => {
     if (busyId) return;
     setBusyId(documentId);
     const tab = window.open("", "_blank");
     try {
       const res = await fetchUrl({ data: { documentId } });
       if (res.available && res.url) {
-        if (tab) tab.location.href = res.url;
+        if (tab) tab.location.href = page ? `${res.url}#page=${page}` : res.url;
         else toast.error("팝업이 차단되어 새 탭을 열 수 없습니다. 팝업 허용 후 다시 시도하세요.");
       } else {
         tab?.close();
