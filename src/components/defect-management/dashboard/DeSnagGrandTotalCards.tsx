@@ -205,11 +205,12 @@ export function DeSnagGrandTotalCards({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3">
         <KpiCard
           slot="issued"
           label="Issued"
           value={issued}
+          total={issued}
           pct={issued > 0 ? 100 : null}
           showBar={false}
           onClick={() => onMetric("issued")}
@@ -218,6 +219,7 @@ export function DeSnagGrandTotalCards({
           slot="open"
           label="Open"
           value={open}
+          total={issued}
           pct={ratio(open)}
           showBar
           onClick={() => onMetric("open")}
@@ -226,6 +228,7 @@ export function DeSnagGrandTotalCards({
           slot="reopen"
           label="Re-Opened"
           value={reopen}
+          total={issued}
           pct={ratio(reopen)}
           showBar
           onClick={() => onMetric("reopen")}
@@ -234,6 +237,7 @@ export function DeSnagGrandTotalCards({
           slot="rectified"
           label="Rectified"
           value={rectified}
+          total={issued}
           pct={ratio(rectified)}
           showBar
           onClick={() => onMetric("rectified")}
@@ -242,6 +246,7 @@ export function DeSnagGrandTotalCards({
           slot="pre"
           label="Pre-Ins"
           value={preIns}
+          total={issued}
           pct={ratio(preIns)}
           showBar
           onClick={() => onMetric("pre")}
@@ -250,6 +255,7 @@ export function DeSnagGrandTotalCards({
           slot="dar"
           label="DAR-Ins"
           value={darIns}
+          total={issued}
           pct={ratio(darIns)}
           showBar
           onClick={() => onMetric("dar")}
@@ -258,6 +264,7 @@ export function DeSnagGrandTotalCards({
           slot="closed"
           label="Closed"
           value={closed}
+          total={issued}
           pct={ratio(closed)}
           showBar
           onClick={() => onMetric("closed")}
@@ -266,6 +273,7 @@ export function DeSnagGrandTotalCards({
           slot="ho"
           label="H/O"
           value={ho}
+          total={issued}
           pct={ratio(ho)}
           showBar
           onClick={() => onMetric("ho")}
