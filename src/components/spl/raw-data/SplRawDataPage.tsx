@@ -781,7 +781,20 @@ function SplTableRow({
       case "current_stage":
         return (
           <span className="text-muted-foreground">
-            {row.current_stage ? row.current_stage.label : row.active_band ? "—" : "All bands closed"}
+            {row.current_stage ? (
+              <>
+                {row.current_stage.short_code && (
+                  <span className="font-mono text-[10px] text-foreground/70">
+                    {splStagePrefix(row.current_stage.short_code)} ·{" "}
+                  </span>
+                )}
+                {row.current_stage.label}
+              </>
+            ) : row.active_band ? (
+              "—"
+            ) : (
+              "All bands closed"
+            )}
           </span>
         );
       case "completed_stage":
