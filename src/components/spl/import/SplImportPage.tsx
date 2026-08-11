@@ -12,6 +12,8 @@ import { parseSplHdecFile, type ParsedSplFile } from "@/lib/spl/hdec-parser";
 import { importSplHdecBatch, type SplHdecResult } from "@/lib/spl/hdec-import.functions";
 import { applyImportScope, type ImportScopeOutcome } from "@/lib/import/import-scope";
 import { AconexPlanGapLine, RejectedRows, ScopeSummary } from "@/components/wrt/import/WrtImportPage";
+import { useModuleGuard } from "@/hooks/useModuleGuard";
+import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 
 type SplParsedRow = ParsedSplFile["rows"][number];
 
@@ -105,6 +107,7 @@ export function SplImportPage() {
 
   return (
     <div className="space-y-4">
+      <ModuleGuardDialog {...guard.dialogProps} />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Spare Parts (SPL) — HDEC Import</CardTitle>
