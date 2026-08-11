@@ -246,7 +246,9 @@ export function SplRawDataPage() {
 
   /** 정렬 키 → 값 접근자. 일반 컬럼은 컬럼 정의, 스테이지 컬럼은 `stage:<stage_code>|<field>` */
   const sortValue = useMemo(() => {
-    const stageMap = new Map(stageCols.map((sc) => [`stage:${sc.key}`, sc] as const));
+    const stageMap = new Map<string, (typeof stageCols)[number]>(
+      stageCols.map((sc) => [`stage:${sc.key}`, sc]),
+    );
     return (key: string, r: SplRow): string => {
       const def = colDefMap.get(key);
       if (def) return def.get(r);
