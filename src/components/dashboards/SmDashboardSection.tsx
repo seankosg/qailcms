@@ -42,7 +42,6 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
       title="Snag Management"
       to="/closure/snag-management/kpi-analysis"
       progressHint="진도율 = 해당 Plot Closure 실적 누계 ÷ Closure 모수 — SM KPI Analysis 와 동일(서버 totals 정본)"
-      filterChips={pdbFilterChips("sm", f, (s) => STAGE_LABELS[s as Stage] ?? s)}
       plots={[
         {
           plot: "D",
