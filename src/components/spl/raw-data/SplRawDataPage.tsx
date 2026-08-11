@@ -808,6 +808,10 @@ function SplTableRow({
             {row.current_stage ? row.current_stage.label : row.active_band ? "—" : "All bands closed"}
           </span>
         );
+      case "completed_stage":
+        return (
+          <span className="text-muted-foreground">{row.completed_stage?.label ?? "—"}</span>
+        );
       case "primary_delay":
         return (
           <>
