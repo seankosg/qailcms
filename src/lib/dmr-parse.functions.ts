@@ -4,9 +4,18 @@ import { z } from 'zod';
 import { dohaDateOnly } from '@/lib/time/doha';
 import { normalizeDmrTeam, normalizeDmrContractor, isDmrDirectContractor } from './dmr/types';
 
-const InputSchema = z.object({
-  storagePaths: z.array(z.string().min(1)).min(1).max(3),
-});
+const InputSchema = z
+  .object({
+    storagePaths: z.array(z.string().min(1)).max(3).optional(),
+    /** 엑셀 시트를 CSV 텍스트로 펴서 같은 파서에 태운다. 파서를 늘리지 않는다. */
+    texts: z
+      .array(z.object({ name: z.string().min(1), content: z.string().min(1).max(200_000) }))
+      .max(3)
+      .optional(),
+  })
+  .refine((v) => (v.storagePaths?.length ?? 0) + (v.texts?.length ?? 0) > 0, {
+    message: '이미지 또는 시트 텍스트가 필요합니다',
+  });
 
 const ValuesSchema = z
   .object({
@@ -19,6 +28,9 @@ const RowSchema = z.object({
   system: z.string().min(1),
   contractor: z.string().min(1),
   is_direct: z.boolean().optional(),
+  task_nos: z.array(z.string()).optional(),
+  pic_name: z.string().optional(),
+  headcount_kind: z.enum(['worker', 'foreman', 'supervisor']).optional(),
   values: z.object({
     plan: ValuesSchema,
     actual: ValuesSchema,
@@ -60,7 +72,7 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
     // Get signed URLs for each storage path.
     const supabase = context.supabase;
     const signed = await Promise.all(
-      data.storagePaths.map(async (p) => {
+      (data.storagePaths ?? []).map(async (p) => {
         const { data: s, error } = await supabase.storage
           .from('dmr-uploads')
           .createSignedUrl(p, 600);
@@ -69,7 +81,7 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
       }),
     );
 
-    async function parseOne(imgUrl: string) {
+    async function parseOne(source: { imgUrl?: string; text?: string }) {
       const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -82,10 +94,17 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
             { role: 'system', content: DMR_SYSTEM_PROMPT },
             {
               role: 'user',
-              content: [
-                { type: 'text', text: 'Parse this Daily Manpower report image. Call report_dmr with the extracted data.' },
-                { type: 'image_url', image_url: { url: imgUrl } },
-              ],
+              content: source.imgUrl
+                ? [
+                    { type: 'text', text: 'Parse this Daily Manpower report image. Call report_dmr with the extracted data.' },
+                    { type: 'image_url', image_url: { url: source.imgUrl } },
+                  ]
+                : [
+                    {
+                      type: 'text',
+                      text: `Parse this Daily Manpower report spreadsheet (CSV text of the sheets). Call report_dmr with the extracted data.\n\n${source.text ?? ''}`,
+                    },
+                  ],
             },
           ],
           tools: [{ type: 'function', function: { name: 'report_dmr', description: 'Return parsed DMR data', parameters: DMR_TOOL_SCHEMA } }],
@@ -124,9 +143,12 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
     }
 
     const results = await Promise.all(
-      signed.map(async (s) => {
+      [
+        ...signed.map((s) => ({ path: s.path, source: { imgUrl: s.url } })),
+        ...(data.texts ?? []).map((t) => ({ path: t.name, source: { text: t.content } })),
+      ].map(async (s) => {
         try {
-          const section = await parseOne(s.url);
+          const section = await parseOne(s.source);
           return { path: s.path, section, error: null as string | null };
         } catch (e: unknown) {
           return { path: s.path, section: null, error: e instanceof Error ? e.message : String(e) };
