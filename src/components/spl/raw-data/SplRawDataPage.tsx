@@ -586,14 +586,14 @@ export function SplRawDataPage() {
                             aria-label="Select all"
                           />
                         ) : (
-                          <span className="inline-flex items-center">
+                          <span className="flex w-full items-center gap-0.5 overflow-hidden">
                             <button
                               type="button"
                               onClick={() => toggleSort(it.key)}
                               title="클릭: 오름차순 → 내림차순 → 해제 (클릭 순서가 정렬 우선순위)"
-                              className="inline-flex items-center gap-0.5 hover:text-primary"
+                              className="inline-flex min-w-0 items-center gap-0.5 truncate hover:text-primary"
                             >
-                              {it.def!.label}
+                              <span className="truncate">{it.def!.label}</span>
                               {(() => {
                                 const idx = sorts.findIndex((s) => s.key === it.key);
                                 if (idx < 0) return null;
@@ -610,12 +610,14 @@ export function SplRawDataPage() {
                               })()}
                             </button>
                             {it.def!.filter === "multi" && (
+                              <span className="shrink-0">
                               <SplColumnFilterDropdown
                                 label={it.def!.label}
                                 values={distinctValues[it.key] ?? []}
                                 selected={colFilters[it.key] ?? []}
                                 onChange={(next) => setColFilters((p) => ({ ...p, [it.key]: next }))}
                               />
+                              </span>
                             )}
                           </span>
                         );
