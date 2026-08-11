@@ -378,15 +378,34 @@ export function DmrEntryPage() {
               </thead>
               <tbody>
                 {rows.map((r) => {
-                  const tm = r.task_no ? tmByNo.get(r.task_no) : null;
+                  const live = r.task_no ? tmByNo.get(r.task_no) : null;
+                  // 불러온 행은 저장된 값 그대로 보여 준다. 새로 친 행만 TM 정본에서 채운다.
+                  const tm = r.saved && r.snap
+                    ? {
+                        task_name: r.snap.task_name,
+                        level: r.snap.task_level,
+                        row_type: r.snap.work_category,
+                        cum_plan_pct: r.snap.tplan_pct,
+                        cum_actual_pct: r.snap.tactual_pct,
+                        data_date: r.snap.task_data_date,
+                        plot: null as string | null,
+                      }
+                    : live;
                   const gap = tm?.data_date
                     ? dmrDataDateGapDays({ report_date: reportDate, task_data_date: tm.data_date })
                     : null;
                   const plotMismatch = !!tm && !!tm.plot && tm.plot !== r.plot;
                   const g = groupTotals.get(`${r.system_name}|${r.contractor_name}|${r.plot}|${r.headcount_kind}`);
                   return (
-                    <tr key={r.key} className="border-t align-top [&>td]:px-2 [&>td]:py-1.5">
-                      <td className="w-52"><SearchSelect value={r.system_name} options={systemOptions} onChange={(v) => patch(r.key, { system_name: v })} placeholder="System 선택" /></td>
+                    <tr key={r.key} className={`border-t align-top [&>td]:px-2 [&>td]:py-1.5 ${r.saved ? 'bg-muted/30' : ''}`}>
+                      <td className="w-52">
+                        <div className="mb-1">
+                          <Badge variant={r.saved ? 'secondary' : 'outline'} className="text-[10px]">
+                            {r.saved ? '저장됨' : '신규'}
+                          </Badge>
+                        </div>
+                        <SearchSelect value={r.system_name} options={systemOptions} onChange={(v) => patch(r.key, { system_name: v })} placeholder="System 선택" />
+                      </td>
                       <td className="w-52"><SearchSelect value={r.contractor_name} options={contractorOptions} onChange={(v) => patch(r.key, { contractor_name: v })} placeholder="Contractor 선택" /></td>
                       <td>
                         <div className="flex gap-1">
