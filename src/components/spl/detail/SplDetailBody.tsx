@@ -148,7 +148,7 @@ export function SplDetailBody({ id }: { id: string }) {
               <span className="text-muted-foreground">Primary delay</span>
               <div className={cn("font-medium", row.primary_delay && "text-destructive")}>
                 {row.primary_delay
-                  ? `${row.primary_delay.short_code ? row.primary_delay.short_code + " · " : ""}${row.primary_delay.label} · ${row.primary_delay.days}d`
+                  ? `${row.primary_delay.short_code ? splStagePrefix(row.primary_delay.short_code) + " · " : ""}${row.primary_delay.label} · ${row.primary_delay.days}d`
                   : "—"}
               </div>
             </div>
