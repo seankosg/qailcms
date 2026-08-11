@@ -175,6 +175,53 @@ export function DmrEntryPage() {
     return m;
   }, [tmQ.data]);
 
+  // 이미 저장된 행을 불러온다 — 저장된 값 그대로. TM 값을 다시 계산하지 않는다.
+  const existingQ = useQuery({
+    queryKey: ['dmr-entry-existing', reportDate, discipline],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dmr_entries')
+        .select('*')
+        .eq('report_date', reportDate)
+        .eq('discipline', discipline)
+        .in('plot', ['C', 'D'])
+        .order('system_name')
+        .order('contractor_name')
+        .order('plot')
+        .order('id');
+      if (error) throw new Error(error.message);
+      return (data ?? []) as any[];
+    },
+    staleTime: 0,
+  });
+
+  const loadedKey = `${reportDate}|${discipline}|${existingQ.dataUpdatedAt}`;
+  useEffect(() => {
+    if (!existingQ.data) return;
+    const loaded: EntryRow[] = existingQ.data.map((r) => ({
+      key: `s${r.id}`,
+      system_name: r.system_name ?? '',
+      contractor_name: r.contractor_name ?? '',
+      plot: (r.plot === 'D' ? 'D' : 'C') as 'C' | 'D',
+      task_no: r.task_no ?? '',
+      headcount_kind: (DMR_HEADCOUNT_KINDS.includes(r.headcount_kind) ? r.headcount_kind : 'worker') as DmrHeadcountKind,
+      pic_name: r.pic_name ?? '',
+      plan_manpower: String(r.plan_manpower ?? 0),
+      actual_manpower: String(r.actual_manpower ?? 0),
+      saved: true,
+      snap: {
+        task_name: r.task_name ?? null,
+        task_level: r.task_level ?? null,
+        work_category: r.work_category ?? null,
+        tplan_pct: r.tplan_pct ?? null,
+        tactual_pct: r.tactual_pct ?? null,
+        task_data_date: r.task_data_date ?? null,
+      },
+    }));
+    setRows(loaded.length > 0 ? loaded : [newRow()]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedKey]);
+
   const tmOptions = useMemo(
     () => (tmQ.data ?? []).map((t) => ({ value: t.task_no, label: t.task_no, hint: t.task_name ?? '' })),
     [tmQ.data],
