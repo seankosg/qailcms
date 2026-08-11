@@ -686,6 +686,34 @@ function SplTableRow({
             {row.req_doc_done}/{row.req_doc_total}
           </span>
         );
+      case "ocs":
+        return (
+          <SplOcsCell
+            total={row.ocs_total}
+            pending={row.ocs_pending}
+            complied={row.ocs_complied}
+            resolved={row.ocs_check}
+            onClick={() => onOpenPanel("ocs")}
+          />
+        );
+      case "rsp":
+        return (
+          <SplCountCell
+            value={row.rsp_total}
+            tone="neutral"
+            title="Recommended Spare Parts"
+            onClick={() => onOpenPanel("rsp")}
+          />
+        );
+      case "documents":
+        return (
+          <SplCountCell
+            value={row.document_total}
+            tone="neutral"
+            title="Submitted documents"
+            onClick={() => onOpenPanel("documents")}
+          />
+        );
       case "data_date":
         return <span className="text-muted-foreground">{row.data_date ? formatDdMmm(row.data_date) : "—"}</span>;
       default:
