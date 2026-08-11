@@ -839,8 +839,16 @@ function SplTableRow({
         );
       case "data_date":
         return <span className="text-muted-foreground">{row.data_date ? formatDdMmm(row.data_date) : "—"}</span>;
-      default:
-        return <span className="text-muted-foreground">{(row as any)[key] ?? "—"}</span>;
+      default: {
+        const v = (row as any)[key] as string | null | undefined;
+        const naLike =
+          v != null && /^\s*(n\/?a|not\s*applicable|not\s*applicable\s*\(na\))\s*$/i.test(String(v).trim());
+        return (
+          <span className={cn(naLike && "rounded bg-slate-200 px-1.5 text-slate-500 dark:bg-slate-800 dark:text-slate-400")}>
+            {v ?? "—"}
+          </span>
+        );
+      }
     }
   };
 
