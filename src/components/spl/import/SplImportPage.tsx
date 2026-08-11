@@ -104,6 +104,10 @@ export function SplImportPage() {
 
   const view = result ?? preview;
   const guardBlocked = !!view?.delete_guard.tripped && !allowDeletes;
+  const guard = useModuleGuard("spl", (fs) => {
+    const f = fs[0];
+    if (f) void onFile(f);
+  });
 
   return (
     <div className="space-y-4">
@@ -125,12 +129,16 @@ export function SplImportPage() {
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) void onFile(f);
+                if (f) void guard.receive([f]);
                 e.target.value = "";
               }}
             />
-            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
-              {busy === "parse" || busy === "scope" ? (
+            <Button
+              variant="outline"
+              onClick={() => fileRef.current?.click()}
+              disabled={busy !== null || guard.checking}
+            >
+              {busy === "parse" || busy === "scope" || guard.checking ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Upload className="mr-2 h-4 w-4" />
