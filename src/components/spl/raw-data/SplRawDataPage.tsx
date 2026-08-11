@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowDown, ArrowUp, Download, Loader2, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Loader2, Search } from "lucide-react";
 import { SortPriorityBadge } from "@/components/common/SortPriorityBadge";
 import { cn } from "@/lib/utils";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -54,7 +54,6 @@ const BAND_LABEL: Record<string, string> = {
   PO: "PO Stage",
 };
 
-const JUDGMENTS = ["제외", "완료", "정상", "지연", "미착수", "미분류"] as const;
 
 /**
  * ★ 계획일 임포트 직후 재실행 필수 검증 체크리스트 (D-4-3)
