@@ -160,6 +160,9 @@ export function SplImportPage() {
               <Badge variant="secondary" className="gap-1">
                 <FileSpreadsheet className="h-3 w-3" /> {parsed.file_name}
               </Badge>
+              <Badge variant={parsed.format === "view" ? "default" : "outline"}>
+                {parsed.format === "view" ? "View 양식 (화면 표시 그대로)" : "HDEC 왕복 양식"}
+              </Badge>
               {parsed.sheets.map((s) => (
                 <Badge key={s.sheet_name} variant="outline">
                   {s.sheet_name} → PLOT-{s.plot} · {s.rows} rows
@@ -176,6 +179,16 @@ export function SplImportPage() {
           )}
 
           {scope && <ScopeSummary scope={scope} />}
+
+          {parsed && parsed.format === "view" && parsed.ignored_headers.length > 0 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>임포트 대상이 아닌 컬럼 {parsed.ignored_headers.length}개 — 무시합니다</AlertTitle>
+              <AlertDescription className="text-xs">
+                {parsed.ignored_headers.join(", ")} (파생·집계 값 또는 Aconex 정본 컬럼)
+              </AlertDescription>
+            </Alert>
+          )}
 
           {parsed && parsed.unknown_headers.length > 0 && (
             <Alert variant="destructive">
