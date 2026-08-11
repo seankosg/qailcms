@@ -2,12 +2,17 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { AlertTriangle, Download, ExternalLink, FileText, Loader2 } from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, FileText, Loader2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getSplDocumentUrl, listSplDocuments } from "@/lib/spl/documents.functions";
+import {
+  getSplDocumentUrl,
+  listSplDocuments,
+  searchSplDocumentPages,
+} from "@/lib/spl/documents.functions";
 
 function fmtBytes(n: number | null) {
   if (n == null) return "—";
@@ -27,7 +32,16 @@ export function SplDocumentPanel({
 }) {
   const fetchDocs = useServerFn(listSplDocuments);
   const fetchUrl = useServerFn(getSplDocumentUrl);
+  const searchPages = useServerFn(searchSplDocumentPages);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [term, setTerm] = useState("");
+  const [query, setQuery] = useState("");
+
+  const searchQ = useQuery({
+    queryKey: ["spl-document-pages-search", splItemId, query],
+    queryFn: () => searchPages({ data: { q: query, splItemId } }),
+    enabled: open && query.trim().length >= 2,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["spl-documents", splItemId],
