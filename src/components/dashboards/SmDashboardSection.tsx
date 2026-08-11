@@ -7,15 +7,15 @@ import {
 import { useSnagScurveData } from "@/hooks/useSnagScurveData";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, pdbFilterChips, type PdbSmFilters } from "@/lib/dashboards/pdb-filters";
-import type { PlotKey } from "@/lib/defect-management/dashboard-shape";
+import type { PlotKey, RoomGroupCol, TeamKey } from "@/lib/defect-management/dashboard-shape";
 import { STAGE_LABELS, type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
 function usePlot(plot: PlotKey, asOfDate: string, f: PdbSmFilters) {
   return useSnagScurveData({
     plot,
-    teams: f.teams,
-    roomGroups: f.roomGroups,
+    teams: f.teams as TeamKey[],
+    roomGroups: f.roomGroups as RoomGroupCol[],
     buildings: f.buildings,
     bucket: f.bucket as Bucket,
     planMode: f.planMode,
