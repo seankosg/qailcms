@@ -365,6 +365,8 @@ export const createPreImportSnapshot = createServerFn({ method: "POST" })
         triggeredBy: "pre-import",
         triggerMetadata: { module: data.module, import_log_id: data.import_log_id ?? null },
         tables,
+        // 사전 스냅샷은 선택된 모듈 목록만 정합성 검사한다(타 모듈 불일치로 차단 금지).
+        parityScope: data.module,
         onTableProgress: async (p) => {
           await supabaseAdmin
             .from("backup_run_log")
