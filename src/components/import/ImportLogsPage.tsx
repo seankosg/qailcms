@@ -193,7 +193,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await supabase
         .from("task_management_import_logs")
         .select(
-          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at, parsed_rows, applied_rows, exclusions",
+          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at, parsed_rows, applied_rows, exclusions, errors",
         )
         .order("started_at", { ascending: false })
         .limit(100);
@@ -215,6 +215,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         parsed_rows: r.parsed_rows ?? null,
         applied_rows: r.applied_rows ?? null,
         exclusions: r.exclusions ?? null,
+        errors: r.errors ?? null,
       }));
       setBatches(list);
       await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
