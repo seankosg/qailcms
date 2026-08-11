@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,11 +10,11 @@ import { DeSnagRoomGroupFilterBar } from "@/components/defect-management/dashboa
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
 import { useDefectFacet } from "@/hooks/useDefectItems";
 import { useSnagAsOf } from "@/hooks/useSnagAsOf";
+import { useSnagScurveData } from "@/hooks/useSnagScurveData";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import {
   ALL_TEAMS,
   ROOM_GROUP_ORDER,
-  planGroupsForPlot,
   type PlotKey,
   type RoomGroupCol,
   type TeamKey,
@@ -26,20 +24,12 @@ import {
   GROUP_LABELS,
   GROUP_QUERY_PARAM,
   STAGE_LABELS,
-  addDays,
-  buildBucketRange,
-  monthStartIso,
   todayIso,
-  weekStartIso,
   type Bucket,
   type GroupBy,
   type PlanMode,
   type Stage,
 } from "@/lib/defect-management/progress-utils";
-import {
-  getSnagProgressCells,
-  getSnagProgressTotals,
-} from "@/lib/defect-management/progress.functions";
 import {
   SnagKpiPlanVsActualCard,
   type SnagCurveUnit,
