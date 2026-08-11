@@ -194,6 +194,71 @@ export const MODULE_FINGERPRINTS: Record<ModuleId, ModuleFingerprint> = {
     ],
     filenameHints: [/task/i, /\btm\b/i, /schedule/i],
   },
+  spl: {
+    // 배타 앵커만. DIS / SERVICE / DOCUMENT TITLE / TEAM / HDEC PIC / HDEC ENG /
+    // Submission / Response Received / Latest Status / Approval Status 는 WRT 와 공통이라 앵커 금지.
+    anchors: [
+      "SPL NUMBER",
+      "Physical List",
+      "Rec. Letter 2Y",
+      "Rec. Letter 5Y",
+      "Availability 10Y",
+      "RFQ Draft",
+      "Issuance of PO",
+      "Code B to A",
+    ],
+    signature: [
+      "SPL NUMBER",
+      "Physical List",
+      "Rec. Letter 2Y",
+      "Rec. Letter 5Y",
+      "Availability 10Y",
+      "RFQ Draft",
+      "Issuance of PO",
+      "Code B to A",
+      "DIS",
+      "SERVICE",
+      "DOCUMENT TITLE",
+      "TEAM",
+      "HDEC PIC",
+      "HDEC ENG",
+      "Submission",
+      "Response Received",
+      "Latest Status",
+      "Approval Status",
+      "SUPPLIER",
+      "PIC PO",
+      "ENG PO",
+    ],
+    filenameHints: [/spl/i, /spare/i],
+  },
+  wrt: {
+    anchors: [
+      "WRT NUMBER",
+      "Response by dar",
+      "Subcon Stamp",
+      "Final Submission",
+      "Negotiation",
+    ],
+    signature: [
+      "WRT NUMBER",
+      "Response by dar",
+      "Subcon Stamp",
+      "Final Submission",
+      "Negotiation",
+      "DIS",
+      "SERVICE",
+      "DOCUMENT TITLE",
+      "TEAM",
+      "HDEC PIC",
+      "HDEC ENG",
+      "Submission",
+      "Response Received",
+      "Latest Status",
+      "Approval Status",
+    ],
+    filenameHints: [/wrt/i, /warranty/i],
+  },
 };
 
 export interface DetectionResult {
@@ -217,11 +282,15 @@ export function detectModule(
     abd: 0,
     sm: 0,
     tm: 0,
+    spl: 0,
+    wrt: 0,
   };
   const anchorsHit: Record<ModuleId, number> = {
     abd: 0,
     sm: 0,
     tm: 0,
+    spl: 0,
+    wrt: 0,
   };
 
   (Object.keys(MODULE_FINGERPRINTS) as ModuleId[]).forEach((mod) => {
@@ -438,8 +507,8 @@ export async function evaluateFilesForModule(
           detected: target,
           detection: {
             top: target,
-            scores: { abd: 0, sm: 0, tm: 0 },
-            anchorsHit: { abd: 0, sm: 0, tm: 0 },
+            scores: { abd: 0, sm: 0, tm: 0, spl: 0, wrt: 0 },
+            anchorsHit: { abd: 0, sm: 0, tm: 0, spl: 0, wrt: 0 },
             confidenceGap: 0,
             totalHeaders: 0,
           },
@@ -462,8 +531,8 @@ export async function evaluateFilesForModule(
           detected: target,
           detection: {
             top: target,
-            scores: { abd: 0, sm: 0, tm: 0 },
-            anchorsHit: { abd: 0, sm: 0, tm: 0 },
+            scores: { abd: 0, sm: 0, tm: 0, spl: 0, wrt: 0 },
+            anchorsHit: { abd: 0, sm: 0, tm: 0, spl: 0, wrt: 0 },
             confidenceGap: 0,
             totalHeaders: 0,
           },
