@@ -112,7 +112,7 @@ export function SplRawDataPage() {
     if (s.colWidths && typeof s.colWidths === "object") {
       const kept: Record<string, number> = {};
       for (const [k, v] of Object.entries(s.colWidths as Record<string, unknown>)) {
-        if (typeof v === "number" && v > 0 && valid.has(k)) kept[k] = v;
+        if (typeof v === "number" && v > 0 && (valid.has(k) || k.startsWith("stage:"))) kept[k] = v;
       }
       setColWidths(kept);
     }
@@ -503,13 +503,28 @@ export function SplRawDataPage() {
                       <th
                         key={sc.key}
                         title={sc.title}
+                        style={
+                          colWidths[`stage:${sc.key}`]
+                            ? {
+                                width: colWidths[`stage:${sc.key}`],
+                                minWidth: colWidths[`stage:${sc.key}`],
+                              }
+                            : undefined
+                        }
                         className={cn(
-                          "whitespace-nowrap border-b border-l px-2 py-1 text-center font-medium",
+                          "relative overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-center font-medium",
                           splBandHeaderClass(sc.band),
                           sc.bandStart && "border-l-2 border-l-foreground/40",
                         )}
                       >
                         {sc.code}
+                        <ColumnResizeHandle
+                          width={colWidths[`stage:${sc.key}`] ?? 84}
+                          min={40}
+                          onChange={(w: number) =>
+                            setColWidths((p) => ({ ...p, [`stage:${sc.key}`]: w }))
+                          }
+                        />
                       </th>
                     ))}
                   </tr>
@@ -522,6 +537,7 @@ export function SplRawDataPage() {
                       stageCols={stageCols}
                       estCells={estMap[r.id]}
                       layout={layout}
+                      stageWidths={colWidths}
                       selected={selectedIds.includes(r.id)}
                       onToggleSelect={() =>
                         setSelectedIds((p) => (p.includes(r.id) ? p.filter((x) => x !== r.id) : [...p, r.id]))
