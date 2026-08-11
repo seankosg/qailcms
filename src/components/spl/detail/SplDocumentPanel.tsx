@@ -100,6 +100,93 @@ export function SplDocumentPanel({
         <SheetHeader>
           <SheetTitle className="text-sm">Documents ({docs.length})</SheetTitle>
         </SheetHeader>
+        <form
+          className="mt-2 flex items-center gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(term.trim());
+          }}
+        >
+          <Input
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            placeholder="PDF 본문 검색 (2자 이상)"
+            className="h-8 text-xs"
+          />
+          <Button type="submit" size="sm" variant="outline" className="h-8 gap-1 text-[11px]">
+            <Search className="h-3 w-3" /> Search
+          </Button>
+          {query && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 text-[11px]"
+              onClick={() => {
+                setTerm("");
+                setQuery("");
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </form>
+        {query.trim().length >= 2 && (
+          <div className="mt-2 rounded-md border p-2 text-xs">
+            {searchQ.isLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> 검색 중...
+              </div>
+            ) : searchQ.isError ? (
+              <div className="text-destructive">
+                검색 실패: {(searchQ.error as Error).message}
+              </div>
+            ) : (
+              <>
+                <div className="mb-1 text-[11px] text-muted-foreground">
+                  결과 {searchQ.data?.rows.length ?? 0} / 전체 {searchQ.data?.total_count ?? 0}
+                  페이지 매칭
+                </div>
+                <ScrollArea className="max-h-52">
+                  <ul className="space-y-1 pr-2">
+                    {(searchQ.data?.rows ?? []).map((h) => (
+                      <li key={`${h.document_id}-${h.page_number}`} className="rounded border p-1.5">
+                        <div className="flex items-center gap-1">
+                          <span className="break-all font-mono text-[10px] font-medium">
+                            {h.document_number}
+                          </span>
+                          <Badge variant="outline" className="text-[10px]">
+                            p.{h.page_number}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {h.hit_count} hit
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-auto h-6 px-1 text-[10px]"
+                            disabled={busyId !== null}
+                            onClick={() => void openPdf(h.document_id, h.page_number)}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <p className="mt-0.5 line-clamp-3 text-[11px] text-muted-foreground">
+                          …{h.snippet}…
+                        </p>
+                      </li>
+                    ))}
+                    {(searchQ.data?.rows.length ?? 0) === 0 && (
+                      <li className="py-3 text-center text-[11px] text-muted-foreground">
+                        일치하는 페이지가 없습니다.
+                      </li>
+                    )}
+                  </ul>
+                </ScrollArea>
+              </>
+            )}
+          </div>
+        )}
         <ScrollArea className="mt-3 h-[calc(100vh-6rem)] pr-3">
           {isLoading ? (
             <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
