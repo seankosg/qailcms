@@ -76,12 +76,12 @@ export function useTmServerItems(params: UseTmServerItemsParams) {
     enabled: params.enabled,
   });
   // 패싯 키 되돌리기: 서버는 effective_pic 축으로 집계하지만 UI 컬럼 id 는 hdec_pic_name 이다.
-  const facets = res.facets as Record<string, unknown> | undefined;
+  const facets = res.facets as Record<string, Array<{ value: string; cnt: number }>> | undefined;
   if (facets && facets["effective_pic"] && !facets["hdec_pic_name"]) {
     return {
       ...res,
       facets: { ...facets, hdec_pic_name: facets["effective_pic"] },
-    } as typeof res;
+    };
   }
   return res;
 }
