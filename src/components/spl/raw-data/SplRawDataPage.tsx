@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowDown, ArrowUp, Download, Loader2, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Loader2, Search } from "lucide-react";
 import { SortPriorityBadge } from "@/components/common/SortPriorityBadge";
 import { cn } from "@/lib/utils";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -54,7 +54,6 @@ const BAND_LABEL: Record<string, string> = {
   PO: "PO Stage",
 };
 
-const JUDGMENTS = ["제외", "완료", "정상", "지연", "미착수", "미분류"] as const;
 
 /**
  * ★ 계획일 임포트 직후 재실행 필수 검증 체크리스트 (D-4-3)
@@ -385,28 +384,8 @@ export function SplRawDataPage() {
     await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
   };
 
-  // Primary delay by band 분포 (Required Doc 은 사슬·판정 제외 → 집계 대상 아님)
-  const delayBands = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const s of catalog) if (!s.chain_excluded) m.set(s.band, m.get(s.band) ?? 0);
-    for (const r of rows) if (r.primary_delay) m.set(r.primary_delay.band, (m.get(r.primary_delay.band) ?? 0) + 1);
-    return [...m.entries()];
-  }, [rows, catalog]);
-
-  // Required Doc 충족률 — 병렬 지표. 판정 5분류에 합산되지 않음
-  const reqDoc = useMemo(() => {
-    const total = rows.length;
-    const full = rows.filter((r) => r.req_doc_total > 0 && r.req_doc_done === r.req_doc_total).length;
-    const sum = rows.reduce((a, r) => a + r.req_doc_done, 0);
-    const denom = rows.reduce((a, r) => a + r.req_doc_total, 0);
-    return { total, full, pct: denom === 0 ? 0 : Math.round((sum * 1000) / denom) / 10 };
-  }, [rows]);
-
-  // 합계 = 모집단 자체 검산 (불일치 시 미분류 노출)
-  const counts = data?.judgment_counts ?? {};
-  const countsSum = JUDGMENTS.reduce((a, j) => a + (counts[j] ?? 0), 0);
+  // 현황 뱃지/칩은 Dashboard 로 이동 — Raw Data 는 필터·표만 유지
   const population = data?.total_count ?? 0;
-  const reconOk = countsSum === population;
 
   async function onExport() {
     setExporting(true);
@@ -420,8 +399,6 @@ export function SplRawDataPage() {
       setExporting(false);
     }
   }
-
-  const viol = data?.violations;
 
   return (
     <div className="space-y-3">
@@ -501,86 +478,27 @@ export function SplRawDataPage() {
             {label}
           </Button>
         ))}
-        {viol && (
-          <>
-          <Badge variant={viol.total > 0 ? "destructive" : "outline"} className="gap-1 text-[11px]">
-            <AlertTriangle className="h-3 w-3" />
-            선후관계 위반 {viol.total}건
-            {viol.total > 0 && <span className="opacity-80">· 최근 임포트 발생 {viol.from_last_import}건</span>}
-          </Badge>
-          <Badge
-            variant="outline"
-            className="text-[11px]"
-            title="No progress row exists for the preceding stage — HDEC import incomplete, not an actual sequence reversal"
-          >
-            Data not loaded {viol.import_incomplete ?? 0}
-          </Badge>
-          </>
-        )}
-        {(data?.plan_items ?? 0) === 0 && (
-          <Badge variant="secondary" className="text-[11px]">
-            No HDEC plan dates loaded — delay judgment not applied (items with a plan date: {data?.plan_items ?? 0})
-          </Badge>
-        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {(["all", ...JUDGMENTS] as const).map((j) => (
+        {(search.judgment && search.judgment !== "all") || search.delayBand || search.hdecMissing ? (
           <Button
-            key={j}
             size="sm"
-            variant={(search.judgment ?? "all") === j && !search.delayBand ? "default" : "outline"}
+            variant="outline"
             className="h-7 text-[11px]"
-            onClick={() =>
-              setSearch({
-                judgment: search.judgment === j ? "all" : j,
-                delayBand: "",
-                hdecMissing: false,
-              })
-            }
+            onClick={() => setSearch({ judgment: "all", delayBand: "", hdecMissing: false })}
           >
-            {j === "all" ? `All (${population})` : `${splJudgmentLabel(j)} ${counts[j] ?? 0}`}
+            Clear dashboard filter
+            {search.judgment && search.judgment !== "all" ? ` · ${splJudgmentLabel(search.judgment as any)}` : ""}
+            {search.delayBand ? ` · ${BAND_LABEL[search.delayBand] ?? search.delayBand}` : ""}
+            {search.hdecMissing ? " · No HDEC actual" : ""}
           </Button>
-        ))}
-        {!reconOk && (
-          <Badge variant="outline" className="text-[11px] text-amber-600">
-            Reconciliation mismatch: sum {countsSum} / population {population}
-          </Badge>
-        )}
+        ) : null}
         {sorts.length > 0 && (
           <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setSorts([])}>
             Clear sort ({sorts.length})
           </Button>
         )}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] text-muted-foreground">Primary delay by band</span>
-        {delayBands.map(([band, n]) => (
-          <Button
-            key={band}
-            size="sm"
-            variant={search.delayBand === band ? "default" : "outline"}
-            className="h-7 text-[11px]"
-            onClick={() => setSearch({ delayBand: search.delayBand === band ? "" : band, judgment: "all" })}
-          >
-            {BAND_LABEL[band] ?? band} {n}
-          </Button>
-        ))}
-        <Badge variant="outline" className="text-[11px]">
-          Required documents ready {reqDoc.pct}% · fully ready {reqDoc.full} (not part of the judgment population)
-        </Badge>
-        <Button
-          size="sm"
-          variant={search.hdecMissing ? "default" : "outline"}
-          className="h-7 text-[11px]"
-          onClick={() => setSearch({ hdecMissing: !search.hdecMissing, delayBand: "" })}
-        >
-          No HDEC actual: {data?.hdec_missing_items ?? 0}
-        </Button>
-        <Badge variant="outline" className="text-[11px]">
-          Estimated actuals: {estimated?.items ?? 0} documents (back-filled · shown in italics)
-        </Badge>
       </div>
 
       <Card>

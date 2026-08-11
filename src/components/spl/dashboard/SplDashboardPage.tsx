@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { todayInDoha } from "@/lib/time/doha";
-import { getSplRowsAsOf, type SplCatalogEntry } from "@/lib/spl/rows.functions";
+import { getSplRowsAsOf, getSplEstimatedCells, type SplCatalogEntry } from "@/lib/spl/rows.functions";
 import { splJudgmentLabel } from "@/components/spl/raw-data/spl-columns";
 import { SplKpiCard } from "./SplKpiCard";
 
@@ -33,6 +33,12 @@ export function SplDashboardPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["spl-rows-as-of", asOf],
     queryFn: () => fetchRows({ data: { as_of: asOf } }),
+  });
+
+  const fetchEstimated = useServerFn(getSplEstimatedCells);
+  const { data: estimated } = useQuery({
+    queryKey: ["spl-estimated-cells"],
+    queryFn: () => fetchEstimated({ data: undefined as never }),
   });
 
   const rows = data?.rows ?? [];
@@ -149,11 +155,36 @@ export function SplDashboardPage() {
               No HDEC actual: {data?.hdec_missing_items ?? 0}
             </Button>
             {viol && (
-              <Badge variant={viol.total > 0 ? "destructive" : "outline"} className="gap-1 text-[11px]">
-                <AlertTriangle className="h-3 w-3" />
-                선후관계 위반 {viol.total}건
+              <>
+                <Badge variant={viol.total > 0 ? "destructive" : "outline"} className="gap-1 text-[11px]">
+                  <AlertTriangle className="h-3 w-3" />
+                  선후관계 위반 {viol.total}건
+                  {viol.total > 0 && (
+                    <span className="opacity-80">· 최근 임포트 발생 {viol.from_last_import}건</span>
+                  )}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="text-[11px]"
+                  title="No progress row exists for the preceding stage — HDEC import incomplete, not an actual sequence reversal"
+                >
+                  Data not loaded {viol.import_incomplete ?? 0}
+                </Badge>
+              </>
+            )}
+            {(data?.plan_items ?? 0) === 0 && (
+              <Badge variant="secondary" className="text-[11px]">
+                No HDEC plan dates loaded — delay judgment not applied (items with a plan date: {data?.plan_items ?? 0})
               </Badge>
             )}
+            {!reconOk && (
+              <Badge variant="outline" className="text-[11px] text-amber-600">
+                Reconciliation mismatch: sum {countsSum} / population {population}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-[11px]">
+              Estimated actuals: {estimated?.items ?? 0} documents (back-filled · shown in italics)
+            </Badge>
           </div>
         </>
       )}
