@@ -175,10 +175,10 @@ export function SplRawDataPage() {
 
   /** 사용자가 지정한 순서·표시 상태를 반영한 실제 렌더 대상 스테이지 컬럼 */
   const visibleStageCols = useMemo(() => {
-    const byKey = new Map(stageCols.map((sc) => [`stage:${sc.key}`, sc] as const));
+    const byKey = new Map<string, SplStageColumn>(stageCols.map((sc) => [`stage:${sc.key}`, sc]));
     const ordered = [
       ...stageOrder.filter((k) => byKey.has(k)),
-      ...stageCols.map((sc) => `stage:${sc.key}`).filter((k) => !stageOrder.includes(k)),
+      ...stageCols.map((sc) => `stage:${sc.key}` as string).filter((k) => !stageOrder.includes(k)),
     ];
     return ordered.filter((k) => stageVisibility[k] !== false).map((k) => byKey.get(k)!);
   }, [stageCols, stageOrder, stageVisibility]);
@@ -230,7 +230,7 @@ export function SplRawDataPage() {
   }, [rows, stageCols]);
 
   const stageColMap = useMemo(
-    () => new Map(stageCols.map((sc) => [`stage:${sc.key}`, sc] as const)),
+    () => new Map<string, SplStageColumn>(stageCols.map((sc) => [`stage:${sc.key}`, sc])),
     [stageCols],
   );
 
