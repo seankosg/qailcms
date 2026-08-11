@@ -318,6 +318,7 @@ export function SnagKpiPlanVsActualCard({
                         ? "% = 값 ÷ 모수(total) × 100 (막대 차트와 동일 분모)"
                         : `건수 = ${STAGE_LABELS[stage]} 스테이지 문서 건수`}
                     </span>
+                    {view.trimmed > 0 && <span>이후 {view.trimmed}개 구간 계획 없음</span>}
                   </div>
                 </div>
 
@@ -330,11 +331,14 @@ export function SnagKpiPlanVsActualCard({
                       ticks={xTicks}
                       interval={0}
                       minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
                     />
                     <YAxis
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={[0, "auto"]}
+                      domain={isPct ? [0, 100] : [0, "auto"]}
                       tickFormatter={(v) => (isPct ? `${v}%` : `${v}`)}
                     />
                     <YAxis
@@ -342,7 +346,7 @@ export function SnagKpiPlanVsActualCard({
                       orientation="right"
                       width={Y_RIGHT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={["auto", "auto"]}
+                      domain={[0, incMax]}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
@@ -364,7 +368,7 @@ export function SnagKpiPlanVsActualCard({
                       yAxisId="bar"
                       dataKey="planInc"
                       name={incLabel}
-                      fill="color-mix(in oklab, var(--muted-foreground) 35%, transparent)"
+                      fill="color-mix(in oklab, var(--muted-foreground) 22%, transparent)"
                       barSize={8}
                       hide={hidden.has("planInc")}
                     />
@@ -372,7 +376,7 @@ export function SnagKpiPlanVsActualCard({
                       yAxisId="bar"
                       dataKey="actualInc"
                       name={incActualLabel}
-                      fill="var(--primary)"
+                      fill="color-mix(in oklab, var(--primary) 30%, transparent)"
                       barSize={8}
                       hide={hidden.has("actualInc")}
                     />
@@ -408,8 +412,11 @@ export function SnagKpiPlanVsActualCard({
                       ticks={xTicks}
                       interval={0}
                       minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
                     />
-                    <YAxis width={Y_LEFT_WIDTH} tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
+                    <YAxis width={Y_LEFT_WIDTH} tick={{ fontSize: 11 }} domain={varDomain} />
                     {/* 위 차트의 우측 Y축과 같은 폭을 확보해 그림 영역을 일치시킨다. */}
                     <YAxis
                       yAxisId="spacer"
