@@ -8795,6 +8795,15 @@ export type Database = {
         }[]
       }
       spl_assert_row_rules: { Args: { _item_id: string }; Returns: undefined }
+      spl_document_pages_search: {
+        Args: {
+          _document_id?: string
+          _limit?: number
+          _q: string
+          _spl_item_id?: string
+        }
+        Returns: Json
+      }
       spl_estimated_cells: { Args: never; Returns: Json }
       spl_eval_as_of: {
         Args: { _as_of?: string }
