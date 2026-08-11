@@ -3684,6 +3684,27 @@ export type Database = {
         }
         Relationships: []
       }
+      pdb_module_filters: {
+        Row: {
+          filters: Json
+          module: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          filters?: Json
+          module: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          filters?: Json
+          module?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

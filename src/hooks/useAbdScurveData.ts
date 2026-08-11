@@ -34,16 +34,18 @@ export interface AbdScurveParams {
   rangeDays: number;
   /** S-Curve 전용 질의(baseline·cum) 활성화 여부 */
   scurveEnabled: boolean;
+  /** 차트 시작일(ISO). 없으면 오늘 −14일(기존 동작) */
+  startDate?: string | null;
 }
 
 export function useAbdScurveData(params: AbdScurveParams) {
-  const { plot, teams, groupBy, bucket, planMode, asOfDate, rangeDays, scurveEnabled } = params;
+  const { plot, teams, groupBy, bucket, planMode, asOfDate, rangeDays, scurveEnabled, startDate } = params;
 
   // Round 필터 제거 — 항상 전 라운드(컬럼 UNION) 집계.
   const round = "all" as const;
   const today = todayIso();
 
-  const rangeStart = useMemo(() => addDays(today, -14), [today]);
+  const rangeStart = useMemo(() => startDate ?? addDays(today, -14), [today, startDate]);
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
   const rpcStart = bucket === "week" ? weekStartIso(rangeStart) : rangeStart;
   const rpcEnd = rangeEnd;

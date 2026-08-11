@@ -40,16 +40,18 @@ export interface SnagScurveParams {
   groupBy: GroupBy;
   asOfDate: string;
   rangeDays: number;
+  /** 차트 시작일(ISO). 없으면 오늘 −14일(기존 동작) */
+  startDate?: string | null;
 }
 
 export function useSnagScurveData(params: SnagScurveParams) {
-  const { plot, teams, roomGroups, buildings, bucket, planMode, stage, groupBy, asOfDate, rangeDays } =
+  const { plot, teams, roomGroups, buildings, bucket, planMode, stage, groupBy, asOfDate, rangeDays, startDate } =
     params;
 
   const today = todayIso();
 
   // Progress 화면과 동일한 구간 규칙(수치 대조를 위해 그대로 복제)
-  const rangeStart = useMemo(() => addDays(today, -14), [today]);
+  const rangeStart = useMemo(() => startDate ?? addDays(today, -14), [today, startDate]);
   const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
   const rpcStart =
     bucket === "week" ? weekStartIso(rangeStart) : bucket === "month" ? monthStartIso(rangeStart) : rangeStart;

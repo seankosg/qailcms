@@ -5,41 +5,44 @@ import {
   type SnagCurveUnit,
 } from "@/components/defect-management/kpi/SnagKpiPlanVsActualCard";
 import { useSnagScurveData } from "@/hooks/useSnagScurveData";
-import type { PlotKey } from "@/lib/defect-management/dashboard-shape";
-import type { Bucket, Stage } from "@/lib/defect-management/progress-utils";
+import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
+import { PDB_DEFAULTS, pdbFilterChips, type PdbSmFilters } from "@/lib/dashboards/pdb-filters";
+import type { PlotKey, RoomGroupCol, TeamKey } from "@/lib/defect-management/dashboard-shape";
+import { STAGE_LABELS, type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
-const STAGE: Stage = "closure";
-
-function usePlot(plot: PlotKey, asOfDate: string, bucket: Bucket) {
+function usePlot(plot: PlotKey, asOfDate: string, f: PdbSmFilters) {
   return useSnagScurveData({
     plot,
-    teams: [],
-    roomGroups: [],
-    buildings: [],
-    bucket,
-    planMode: "baseline",
-    stage: STAGE,
+    teams: f.teams as TeamKey[],
+    roomGroups: f.roomGroups as RoomGroupCol[],
+    buildings: f.buildings,
+    bucket: f.bucket as Bucket,
+    planMode: f.planMode,
+    stage: f.stage as Stage,
     groupBy: "team",
     asOfDate,
     rangeDays: 60,
+    startDate: f.startDate,
   });
 }
 
 /** SM — 정본: useSnagScurveData(= SM KPI Analysis 와 동일 훅), Plot 별 2회 호출 */
 export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
-  const [bucket, setBucket] = useState<Bucket>("week");
-  const [unit, setUnit] = useState<SnagCurveUnit>("cnt");
   const [open, setOpen] = useState(true);
-  const c = usePlot("C", asOfDate, bucket);
-  const d = usePlot("D", asOfDate, bucket);
-
+  const { data: settings } = usePdbModuleFilters();
+  const f = settings?.sm ?? PDB_DEFAULTS.sm;
+  const stage = f.stage as Stage;
+  const unit = f.unit as SnagCurveUnit;
+  const c = usePlot("C", asOfDate, f);
+  const d = usePlot("D", asOfDate, f);
 
   return (
     <ProjectModuleSection
       title="Snag Management"
       to="/closure/snag-management/kpi-analysis"
       progressHint="진도율 = 해당 Plot Closure 실적 누계 ÷ Closure 모수 — SM KPI Analysis 와 동일(서버 totals 정본)"
+      filterChips={pdbFilterChips("sm", f, (s) => STAGE_LABELS[s as Stage] ?? s)}
       plots={[
         {
           plot: "D",
@@ -77,13 +80,14 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
             <SnagKpiPlanVsActualCard
               cells={q.cells as never}
               buckets={q.buckets}
-              stage={STAGE}
+              stage={stage}
               today={q.today}
               asOfDate={asOfDate}
-              bucket={bucket}
-              onBucketChange={setBucket}
+              bucket={f.bucket as Bucket}
+              onBucketChange={() => {}}
               unit={unit}
-              onUnitChange={setUnit}
+              onUnitChange={() => {}}
+              controlsHidden
               filterSummary={q.filterSummary}
               baselinePlan={q.baseline.plan}
               baselineActual={q.baseline.actual}

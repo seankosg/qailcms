@@ -27,6 +27,7 @@ import { Route as AuthenticatedImportLogImportRouteImport } from './routes/_auth
 import { Route as AuthenticatedCloseoutDashboardRouteImport } from './routes/_authenticated/closeout/dashboard'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminTaskThresholdsRouteImport } from './routes/_authenticated/admin/task-thresholds'
+import { Route as AuthenticatedAdminSettingRouteImport } from './routes/_authenticated/admin/setting'
 import { Route as AuthenticatedAdminPermissionsRouteImport } from './routes/_authenticated/admin/permissions'
 import { Route as AuthenticatedAdminOcsImportRouteImport } from './routes/_authenticated/admin/ocs-import'
 import { Route as AuthenticatedAdminMilestonesRouteImport } from './routes/_authenticated/admin/milestones'
@@ -165,6 +166,12 @@ const AuthenticatedAdminTaskThresholdsRoute =
   AuthenticatedAdminTaskThresholdsRouteImport.update({
     id: '/task-thresholds',
     path: '/task-thresholds',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminSettingRoute =
+  AuthenticatedAdminSettingRouteImport.update({
+    id: '/setting',
+    path: '/setting',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
 const AuthenticatedAdminPermissionsRoute =
@@ -424,6 +431,7 @@ export interface FileRoutesByFullPath {
   '/admin/milestones': typeof AuthenticatedAdminMilestonesRoute
   '/admin/ocs-import': typeof AuthenticatedAdminOcsImportRoute
   '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
+  '/admin/setting': typeof AuthenticatedAdminSettingRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
@@ -482,6 +490,7 @@ export interface FileRoutesByTo {
   '/admin/milestones': typeof AuthenticatedAdminMilestonesRoute
   '/admin/ocs-import': typeof AuthenticatedAdminOcsImportRoute
   '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
+  '/admin/setting': typeof AuthenticatedAdminSettingRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
@@ -543,6 +552,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/milestones': typeof AuthenticatedAdminMilestonesRoute
   '/_authenticated/admin/ocs-import': typeof AuthenticatedAdminOcsImportRoute
   '/_authenticated/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
+  '/_authenticated/admin/setting': typeof AuthenticatedAdminSettingRoute
   '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
@@ -604,6 +614,7 @@ export interface FileRouteTypes {
     | '/admin/milestones'
     | '/admin/ocs-import'
     | '/admin/permissions'
+    | '/admin/setting'
     | '/admin/task-thresholds'
     | '/admin/users'
     | '/closeout/dashboard'
@@ -662,6 +673,7 @@ export interface FileRouteTypes {
     | '/admin/milestones'
     | '/admin/ocs-import'
     | '/admin/permissions'
+    | '/admin/setting'
     | '/admin/task-thresholds'
     | '/admin/users'
     | '/closeout/dashboard'
@@ -722,6 +734,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/milestones'
     | '/_authenticated/admin/ocs-import'
     | '/_authenticated/admin/permissions'
+    | '/_authenticated/admin/setting'
     | '/_authenticated/admin/task-thresholds'
     | '/_authenticated/admin/users'
     | '/_authenticated/closeout/dashboard'
@@ -903,6 +916,13 @@ declare module '@tanstack/react-router' {
       path: '/task-thresholds'
       fullPath: '/admin/task-thresholds'
       preLoaderRoute: typeof AuthenticatedAdminTaskThresholdsRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/setting': {
+      id: '/_authenticated/admin/setting'
+      path: '/setting'
+      fullPath: '/admin/setting'
+      preLoaderRoute: typeof AuthenticatedAdminSettingRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/admin/permissions': {
@@ -1195,6 +1215,7 @@ interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminMilestonesRoute: typeof AuthenticatedAdminMilestonesRoute
   AuthenticatedAdminOcsImportRoute: typeof AuthenticatedAdminOcsImportRoute
   AuthenticatedAdminPermissionsRoute: typeof AuthenticatedAdminPermissionsRoute
+  AuthenticatedAdminSettingRoute: typeof AuthenticatedAdminSettingRoute
   AuthenticatedAdminTaskThresholdsRoute: typeof AuthenticatedAdminTaskThresholdsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -1208,6 +1229,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
     AuthenticatedAdminMilestonesRoute: AuthenticatedAdminMilestonesRoute,
     AuthenticatedAdminOcsImportRoute: AuthenticatedAdminOcsImportRoute,
     AuthenticatedAdminPermissionsRoute: AuthenticatedAdminPermissionsRoute,
+    AuthenticatedAdminSettingRoute: AuthenticatedAdminSettingRoute,
     AuthenticatedAdminTaskThresholdsRoute:
       AuthenticatedAdminTaskThresholdsRoute,
     AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
@@ -1361,13 +1383,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

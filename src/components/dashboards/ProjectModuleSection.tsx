@@ -17,12 +17,15 @@ export function ProjectModuleSection({
   to,
   progressHint,
   plots,
+  filterChips,
   children,
 }: {
   title: string;
   to: string;
   progressHint: string;
   plots: [PlotHeadStat, PlotHeadStat];
+  /** Admin > Setting 에서 저장된 현재 필터 현황 */
+  filterChips?: Array<{ label: string; value: string }>;
   children: ReactNode;
 }) {
   return (
@@ -47,6 +50,25 @@ export function ProjectModuleSection({
             </div>
           ))}
         </div>
+        {filterChips && filterChips.length > 0 ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1">
+            {filterChips.map((f) => (
+              <span
+                key={f.label}
+                className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
+              >
+                <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
+                <span className="text-foreground">{f.value}</span>
+              </span>
+            ))}
+            <Link
+              to="/admin/setting"
+              className="rounded-full border border-dashed px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Admin &gt; Setting 에서 변경
+            </Link>
+          </div>
+        ) : null}
       </div>
       {children}
     </section>
