@@ -556,6 +556,12 @@ export function OcsIncrementImportPanel() {
           snapshotLockRef.current = false;
           return;
         }
+        if (row && row.status === "failed") {
+          // 실패 상태는 자동 재실행하지 않는다. 명시적 Retry 클릭에서만 새 run 을 만든다.
+          setSnapshotRunning(false);
+          snapshotLockRef.current = false;
+          return;
+        }
       } catch {
         /* 조회 실패 시 아래 로직으로 진행 */
       }
