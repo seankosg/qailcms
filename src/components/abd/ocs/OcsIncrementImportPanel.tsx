@@ -53,6 +53,9 @@ import {
 } from "@/components/abd/ocs/wizard/OcsWizardStepper";
 import { OcsWizardStepCard } from "@/components/abd/ocs/wizard/OcsWizardStepCard";
 import { OcsErrorCard } from "@/components/abd/ocs/wizard/OcsErrorCard";
+
+/** 기존 running 백업 감시 제한 시간(20분). 초과해도 실패로 단정하지 않는다. */
+const SNAPSHOT_WATCH_TIMEOUT_MS = 20 * 60 * 1000;
 import {
   CheckItem,
   OcsResponsibilityCard,
