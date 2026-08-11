@@ -142,17 +142,26 @@ export const getSplOcsSourceFileUrl = createServerFn({ method: "POST" })
   .inputValidator((v: unknown) => z.object({ commentId: Uuid }).parse(v))
   .handler(async ({ data, context }): Promise<{ available: boolean; url?: string; file_name?: string }> => {
     const supa = context.supabase as any;
+    // 원본 엑셀은 코멘트가 속한 그룹의 source_file_name 으로 찾는다.
+    // (spl_ocs_source_files.ocs_number 는 미채움 컬럼이라 매칭 근거가 아니다)
     const { data: c, error: cErr } = await supa
       .from("spl_ocs_comments")
-      .select("ocs_number, revision")
+      .select("group_id")
       .eq("id", data.commentId)
       .maybeSingle();
     if (cErr) throw new Error(cErr.message);
-    if (!c?.ocs_number) return { available: false };
+    if (!c?.group_id) return { available: false };
+    const { data: g, error: gErr } = await supa
+      .from("spl_ocs_comment_groups")
+      .select("source_file_name")
+      .eq("id", c.group_id)
+      .maybeSingle();
+    if (gErr) throw new Error(gErr.message);
+    if (!g?.source_file_name) return { available: false };
     const { data: f, error: fErr } = await supa
       .from("spl_ocs_source_files")
       .select("storage_path, file_name")
-      .eq("ocs_number", c.ocs_number)
+      .eq("file_name", g.source_file_name)
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(1);
