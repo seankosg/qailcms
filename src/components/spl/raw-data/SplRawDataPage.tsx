@@ -864,7 +864,11 @@ function SplTableRow({
             {inner}
           </StickyCell>
         ) : (
-          <td key={it.key} className="whitespace-nowrap border-b border-l px-2 py-1">
+          <td
+            key={it.key}
+            style={{ width: it.width, minWidth: it.width, maxWidth: it.width }}
+            className="overflow-hidden text-ellipsis whitespace-nowrap border-b border-l px-2 py-1"
+          >
             {inner}
           </td>
         );
