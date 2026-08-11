@@ -42,7 +42,16 @@ export const SPL_COLUMNS: SplColumnDef[] = [
     get: (r) => (r.progress_pct == null ? "" : `${r.progress_pct}%`),
   },
   { key: "completed_stage", label: "Completed Stage", width: 150, filter: "multi", get: (r) => r.completed_stage?.label ?? "" },
-  { key: "current_stage", label: "Current Stage", width: 150, filter: "multi", get: (r) => r.current_stage?.label ?? "" },
+  {
+    key: "current_stage",
+    label: "Current Stage",
+    width: 150,
+    filter: "multi",
+    get: (r) =>
+      r.current_stage
+        ? `${r.current_stage.short_code ? splStagePrefix(r.current_stage.short_code) + " · " : ""}${r.current_stage.label}`
+        : "",
+  },
   {
     key: "primary_delay",
     label: "Primary Delay",
