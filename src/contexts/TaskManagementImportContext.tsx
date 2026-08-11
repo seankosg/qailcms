@@ -738,13 +738,33 @@ export function TaskManagementImportProvider({ children }: { children: ReactNode
       }
 
       // 사용자 선택(mine/all)은 서버 허용 집합 위에 얹는 추가 축소일 뿐이다.
+      // 위임(부재중 인수인계): 파일의 PIC 값만으로는 인수받은 업무를 알 수 없으므로
+      // DB 의 유효 담당자 맵(tm_effective_pic_map)을 함께 조회해 판정한다.
+      let effPicByTaskNo = new Map<string, string>();
+      if (effectiveScope === "mine" && serverAllowed.length > 0) {
+        try {
+          const { data: effMap } = await (supabase as any).rpc("tm_effective_pic_map", {
+            _discipline: discipline,
+            _task_nos: serverAllowed.map((p) => String(p.task_no ?? "")),
+          });
+          for (const [k, v] of Object.entries((effMap ?? {}) as Record<string, any>)) {
+            const ep = v?.effective_pic;
+            if (ep) effPicByTaskNo.set(String(k), String(ep));
+          }
+        } catch {
+          effPicByTaskNo = new Map();
+        }
+      }
       const parsed =
         effectiveScope === "all"
           ? serverAllowed
           : serverAllowed.filter(
               (p) =>
                 mineNames.has(normalizePic(p.hdec_pic_name)) ||
-                mineNames.has(normalizePic((p as any).hdec_eng_name)),
+                mineNames.has(normalizePic((p as any).hdec_eng_name)) ||
+                mineNames.has(
+                  normalizePic(effPicByTaskNo.get(String(p.task_no ?? "")) ?? null),
+                ),
             );
       const filteredOut = parsedAll.length - parsed.length;
       const appliedTaskNos = new Set(parsed.map((p) => String(p.task_no ?? "")));
