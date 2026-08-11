@@ -4,7 +4,7 @@ import { TmPlanVsActualCard } from "@/components/task-management/dashboard/TmPla
 import { useTmScurveData } from "@/hooks/useTmScurveData";
 import { resolveActualPct, resolveIsDelayed } from "@/lib/task-management/delay-utils";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
-import { PDB_DEFAULTS, pdbFilterChips, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
+import { PDB_DEFAULTS, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
 const PROGRESS_HINT =
@@ -52,7 +52,6 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
       title="Task Management"
       to="/closure/task-management/kpi-analysis"
       progressHint="진도율 = 해당 Plot Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 — TM KPI Analysis 와 동일"
-      filterChips={pdbFilterChips("tm", f)}
       plots={[
         { plot: "D", progressPct: d.isLoading ? null : d.kpi.progressPct, total: d.kpi.total },
         { plot: "C", progressPct: c.isLoading ? null : c.kpi.progressPct, total: c.kpi.total },

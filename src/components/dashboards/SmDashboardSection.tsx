@@ -6,9 +6,9 @@ import {
 } from "@/components/defect-management/kpi/SnagKpiPlanVsActualCard";
 import { useSnagScurveData } from "@/hooks/useSnagScurveData";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
-import { PDB_DEFAULTS, pdbFilterChips, type PdbSmFilters } from "@/lib/dashboards/pdb-filters";
+import { PDB_DEFAULTS, type PdbSmFilters } from "@/lib/dashboards/pdb-filters";
 import type { PlotKey, RoomGroupCol, TeamKey } from "@/lib/defect-management/dashboard-shape";
-import { STAGE_LABELS, type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
+import { type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
 function usePlot(plot: PlotKey, asOfDate: string, f: PdbSmFilters) {
@@ -42,7 +42,6 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
       title="Snag Management"
       to="/closure/snag-management/kpi-analysis"
       progressHint="진도율 = 해당 Plot Closure 실적 누계 ÷ Closure 모수 — SM KPI Analysis 와 동일(서버 totals 정본)"
-      filterChips={pdbFilterChips("sm", f, (s) => STAGE_LABELS[s as Stage] ?? s)}
       plots={[
         {
           plot: "D",

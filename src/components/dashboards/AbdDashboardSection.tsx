@@ -3,7 +3,7 @@ import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import { AbdPlanVsActualCard } from "@/components/abd/progress/AbdPlanVsActualCard";
 import { useAbdScurveData } from "@/hooks/useAbdScurveData";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
-import { PDB_DEFAULTS, pdbFilterChips, type PdbAbdFilters } from "@/lib/dashboards/pdb-filters";
+import { PDB_DEFAULTS, type PdbAbdFilters } from "@/lib/dashboards/pdb-filters";
 import { ALL_STAGES } from "@/lib/abd/progress-utils";
 import type { AbdTeam } from "@/lib/abd/columns";
 import { ProjectModuleSection } from "./ProjectModuleSection";
@@ -51,7 +51,6 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
       title="As Built Drawing"
       to="/closure/abd/progress"
       progressHint="진도율 = 해당 Plot Approval 실적 누계 ÷ 문서 모수 — ABD Progress 매트릭스와 동일(서버 totals 정본)"
-      filterChips={pdbFilterChips("abd", f)}
       plots={[
         { plot: "D", progressPct: d.loading ? null : d.kpi.progressPct, total: d.kpi.total },
         { plot: "C", progressPct: c.loading ? null : c.kpi.progressPct, total: c.kpi.total },
