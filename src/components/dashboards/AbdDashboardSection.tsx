@@ -21,17 +21,16 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
 
   const kpi = useMemo(() => {
     const rows = (q.totals ?? []) as Array<Record<string, unknown>>;
-    const pick = (stage: string) =>
-      rows
-        .filter((r) => r.stage === stage)
-        .reduce(
-          (acc, r) => ({
-            total: acc.total + Number(r.total ?? 0),
-            actual: acc.actual + Number(r.actual_upto ?? 0),
-            plan: acc.plan + Number(r.plan_upto ?? 0),
-          }),
-          { total: 0, actual: 0, plan: 0 },
-        );
+    const pick = (stage: string) => {
+      const out = { total: 0, actual: 0, plan: 0 };
+      for (const r of rows) {
+        if (r.stage !== stage) continue;
+        out.total += Number(r.total ?? 0);
+        out.actual += Number(r.actual_upto ?? 0);
+        out.plan += Number(r.plan_upto ?? 0);
+      }
+      return out;
+    };
     const ap = pick("approval");
     const sb = pick("submission");
     return {
