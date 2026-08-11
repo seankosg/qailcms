@@ -9680,6 +9680,7 @@ export type Database = {
         | "super_guest"
         | "senior_user"
         | "d_superuser"
+        | "system_administrator"
       user_type:
         | "subcontractor"
         | "hdec"
@@ -9824,6 +9825,7 @@ export const Constants = {
         "super_guest",
         "senior_user",
         "d_superuser",
+        "system_administrator",
       ],
       user_type: [
         "subcontractor",
