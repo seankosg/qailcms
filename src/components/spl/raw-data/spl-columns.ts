@@ -38,7 +38,7 @@ export const SPL_COLUMNS: SplColumnDef[] = [
     filter: "multi",
     get: (r) =>
       r.primary_delay
-        ? `${r.primary_delay.short_code ? r.primary_delay.short_code + " · " : ""}${r.primary_delay.label} · ${r.primary_delay.days}d`
+        ? `${r.primary_delay.short_code ? splStagePrefix(r.primary_delay.short_code) + " · " : ""}${r.primary_delay.label} · ${r.primary_delay.days}d`
         : "",
   },
   { key: "pic", label: "PIC", width: 90, filter: "multi", get: (r) => r.pic ?? "", edit: "pic" },
