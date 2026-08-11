@@ -9482,67 +9482,65 @@ export type Database = {
       tm_rows_as_of: {
         Args: { _as_of: string }
         Returns: {
-          actual_duration: number | null
-          actual_finish: string | null
-          actual_overdue: string | null
-          actual_progress: number | null
-          actual_start: string | null
-          alarm_reason: string | null
-          auto_judgment: string | null
-          auto_judgment_import: string | null
-          category: string | null
-          created_at: string | null
-          cum_actual_pct: number | null
-          cum_plan_pct: number | null
-          data_date: string | null
-          delay_days: number | null
-          discipline: string | null
-          expected_finish: string | null
-          expected_progress_today: number | null
-          floor_level: string | null
-          forecast_end: string | null
-          gap_pct: number | null
-          hdec_eng_name: string | null
-          hdec_pic_name: string | null
-          id: string | null
-          imported_at: string | null
-          imported_by: string | null
-          is_active: boolean | null
-          is_rollup: boolean | null
-          level: string | null
-          location: string | null
-          main_task_no: string | null
-          milestone: string | null
-          milestone_date: string | null
-          owner_user_id: string | null
-          plan_days: number | null
-          plan_end: string | null
-          plan_overdue: string | null
-          plan_progress: number | null
-          plan_start: string | null
-          plot: string | null
-          progress_variance: number | null
-          risk: string | null
-          row_type: string | null
-          slip_days: number | null
-          sort_order: number | null
-          source_file: string | null
-          source_import_log_id: string | null
-          stage_finish: string | null
-          stage_start: string | null
-          status_manual: string | null
-          sub_task_desc: string | null
-          task_name: string | null
-          task_no: string | null
-          team: string | null
-          updated_at: string | null
+          actual_duration: number
+          actual_finish: string
+          actual_overdue: string
+          actual_progress: number
+          actual_start: string
+          alarm_reason: string
+          auto_judgment: string
+          auto_judgment_import: string
+          category: string
+          created_at: string
+          cum_actual_pct: number
+          cum_plan_pct: number
+          data_date: string
+          delay_days: number
+          delegated_from: string
+          discipline: string
+          effective_pic: string
+          expected_finish: string
+          expected_progress_today: number
+          floor_level: string
+          forecast_end: string
+          gap_pct: number
+          hdec_eng_name: string
+          hdec_pic_name: string
+          id: string
+          imported_at: string
+          imported_by: string
+          is_active: boolean
+          is_delegated: boolean
+          is_rollup: boolean
+          level: string
+          location: string
+          main_task_no: string
+          milestone: string
+          milestone_date: string
+          original_pic: string
+          owner_user_id: string
+          plan_days: number
+          plan_end: string
+          plan_overdue: string
+          plan_progress: number
+          plan_start: string
+          plot: string
+          progress_variance: number
+          risk: string
+          row_type: string
+          slip_days: number
+          sort_order: number
+          source_file: string
+          source_import_log_id: string
+          stage_finish: string
+          stage_start: string
+          status_manual: string
+          sub_task_desc: string
+          task_name: string
+          task_no: string
+          team: string
+          updated_at: string
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "v_task_management_raw_derived"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       tm_rows_as_of_json: { Args: { p_as_of?: string }; Returns: Json }
       tm_thresholds: { Args: never; Returns: Json }
