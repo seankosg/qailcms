@@ -31,7 +31,11 @@ export function trimFlatTail(opts: {
   return { end, trimmed: n - end };
 }
 
-/** windowStart/windowEnd(ISO)로 보이는 구간을 다시 좁힌다. 주지 않으면 그대로. */
+/**
+ * windowStart/windowEnd(ISO)로 보이는 구간을 맞춘다. 주지 않으면 그대로.
+ * 공통 창(합집합)을 받은 경우 자기 절단 구간보다 넓힐 수도 있다 —
+ * 단, 실제 보유한 버킷 범위(0..buckets.length) 안에서만.
+ */
 export function clampWindow(
   buckets: string[],
   start: number,
@@ -43,9 +47,11 @@ export function clampWindow(
   let e = end;
   if (windowStart) {
     while (s < e && buckets[s] < windowStart) s++;
+    while (s > 0 && buckets[s - 1] >= windowStart) s--;
   }
   if (windowEnd) {
     while (e > s && buckets[e - 1] > windowEnd) e--;
+    while (e < buckets.length && buckets[e] <= windowEnd) e++;
   }
   return { start: s, end: e };
 }
