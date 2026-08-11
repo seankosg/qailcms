@@ -357,10 +357,10 @@ export function AbdPlanVsActualCard({
                         const v = row.variance as number | null;
                         const fill =
                           v == null
-                            ? "var(--color-muted)"
+                            ? "transparent"
                             : v < 0
-                              ? "var(--color-destructive)"
-                              : "var(--color-emerald-600)";
+                              ? "var(--destructive)"
+                              : "var(--success)";
                         return <Cell key={i} fill={fill} />;
                       })}
                     </Bar>
