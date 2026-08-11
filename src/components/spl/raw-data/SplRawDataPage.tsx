@@ -38,6 +38,8 @@ import {
   type SplStageColumn,
 } from "./spl-columns";
 import { SplColumnFilterDropdown } from "./SplColumnFilterDropdowns";
+import { SplOcsCell, SplCountCell } from "@/components/spl/ocs/SplOcsCells";
+import { SplOcsPanels, type SplPanelKind, type SplPanelTarget } from "@/components/spl/ocs/SplOcsPanels";
 import { SplColumnOrderMenu } from "./SplColumnOrderMenu";
 import { SplBulkEditBar } from "./SplBulkEditBar";
 import { SplExportDialog } from "./SplExportDialog";
@@ -125,6 +127,7 @@ export function SplRawDataPage() {
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [panelTarget, setPanelTarget] = useState<SplPanelTarget>(null);
   const [exportOpen, setExportOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -498,6 +501,9 @@ export function SplRawDataPage() {
                       onOpenDetail={() =>
                         rootNavigate({ to: "/closure/spare-part/detail/$id", params: { id: r.id } })
                       }
+                      onOpenPanel={(kind) =>
+                        setPanelTarget({ id: r.id, splNumber: r.spl_number, kind })
+                      }
                       canEdit={isToday && canRow(r as unknown as Record<string, unknown>)}
                       onSave={async (field, value) => {
                         await saveField({ data: { id: r.id, field, value } });
@@ -582,6 +588,7 @@ function SplTableRow({
   selected,
   onToggleSelect,
   onOpenDetail,
+  onOpenPanel,
   canEdit,
   onSave,
 }: {
