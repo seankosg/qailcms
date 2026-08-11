@@ -244,6 +244,23 @@ export function SplRawDataPage() {
     [layout],
   );
 
+  /** 정렬 키 → 값 접근자. 일반 컬럼은 컬럼 정의, 스테이지 컬럼은 `stage:<stage_code>|<field>` */
+  const sortValue = useMemo(() => {
+    const stageMap = new Map<string, (typeof stageCols)[number]>(
+      stageCols.map((sc) => [`stage:${sc.key}`, sc]),
+    );
+    return (key: string, r: SplRow): string => {
+      const def = colDefMap.get(key);
+      if (def) return def.get(r);
+      const sc = stageMap.get(key);
+      if (!sc) return "";
+      const cell = r.stages[sc.stage_code];
+      if (!cell) return "";
+      if (cell.na) return "";
+      return ((cell[sc.field] as string | null | undefined) ?? "").toString();
+    };
+  }, [colDefMap, stageCols]);
+
   /** 다중 정렬 적용 — 빈 값은 항상 뒤로, 숫자로 읽히면 숫자 비교 */
   const sorted = useMemo(() => {
     if (sorts.length === 0) return filtered;
@@ -258,14 +275,12 @@ export function SplRawDataPage() {
     };
     return [...filtered].sort((ra, rb) => {
       for (const s of sorts) {
-        const def = colDefMap.get(s.key);
-        if (!def) continue;
-        const r = cmpText(def.get(ra), def.get(rb));
+        const r = cmpText(sortValue(s.key, ra), sortValue(s.key, rb));
         if (r !== 0) return s.desc ? -r : r;
       }
       return 0;
     });
-  }, [filtered, sorts, colDefMap]);
+  }, [filtered, sorts, sortValue]);
 
   /** 헤더 클릭 = 오름차순 → 내림차순 → 해제. 선택 순서가 우선순위가 된다. */
   const toggleSort = (key: string) =>
@@ -580,7 +595,28 @@ export function SplRawDataPage() {
                           sc.bandStart && "border-l-2 border-l-foreground/40",
                         )}
                       >
-                        {sc.code}
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(`stage:${sc.key}`)}
+                          title="클릭: 오름차순 → 내림차순 → 해제 (클릭 순서가 정렬 우선순위)"
+                          className="inline-flex items-center gap-0.5 hover:text-primary"
+                        >
+                          {sc.code}
+                          {(() => {
+                            const idx = sorts.findIndex((s) => s.key === `stage:${sc.key}`);
+                            if (idx < 0) return null;
+                            return (
+                              <>
+                                {sorts[idx].desc ? (
+                                  <ArrowDown className="h-3 w-3" />
+                                ) : (
+                                  <ArrowUp className="h-3 w-3" />
+                                )}
+                                <SortPriorityBadge index={idx} total={sorts.length} />
+                              </>
+                            );
+                          })()}
+                        </button>
                         <ColumnResizeHandle
                           width={colWidths[`stage:${sc.key}`] ?? 84}
                           min={40}
