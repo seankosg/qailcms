@@ -62,6 +62,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 count={q.baseline.actualUpto}
                 total={q.stageTotal}
                 tone="ok"
+                showTotal
                 hint="진도현황 = as-of 기준 Closure actual_upto ÷ Closure 모수 — SM KPI Analysis 와 동일"
               />
               <AbdKpiCard
@@ -69,6 +70,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 count={Math.max(0, q.baseline.planUpto - q.baseline.actualUpto)}
                 total={q.stageTotal}
                 tone="danger"
+                showTotal
                 hint="지연현황 = max(0, 계획 누계 plan_upto − 실적 누계 actual_upto)"
               />
             </div>

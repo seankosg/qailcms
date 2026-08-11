@@ -59,6 +59,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
                 count={q.kpi.actual}
                 total={q.kpi.total}
                 tone="ok"
+                showTotal
                 hint="진도현황 = as-of 기준 Approval actual_upto ÷ 문서 모수"
               />
               <AbdKpiCard
@@ -66,6 +67,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
                 count={q.kpi.behind}
                 total={q.kpi.total}
                 tone="danger"
+                showTotal
                 hint="지연현황 = max(0, Approval 계획 누계 − 실적 누계)"
               />
             </div>

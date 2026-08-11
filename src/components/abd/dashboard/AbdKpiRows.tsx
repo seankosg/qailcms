@@ -44,9 +44,11 @@ interface KpiCardProps {
   stackBar?: Array<{ key: string; label: string; count: number; colorClass: string }>;
   /** 마우스 오버 설명 */
   hint?: string;
+  /** true 면 백분율 대신 "값 / 전체" 형태로 모집단 전체 건수를 함께 표시 */
+  showTotal?: boolean;
 }
 
-export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint }: KpiCardProps) {
+export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal }: KpiCardProps) {
   const pct = total && total > 0 ? Math.round((count / total) * 100) : null;
   const stackTotal = stackBar ? stackBar.reduce((s, x) => s + (x.count || 0), 0) : 0;
   return (
@@ -63,6 +65,12 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
             </div>
             <div className={cn("text-3xl font-bold tabular-nums leading-tight", TONE[tone])}>
               {count.toLocaleString()}
+              {showTotal && total != null && (
+                <span className="text-xl font-semibold text-muted-foreground">
+                  {" / "}
+                  {total.toLocaleString()}
+                </span>
+              )}
             </div>
             {pct != null && (
               <div className="text-[11px] text-muted-foreground tabular-nums">{pct}% of total</div>
