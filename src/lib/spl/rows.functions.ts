@@ -88,6 +88,9 @@ export type SplRow = {
   primary_delay: SplStageRef | null;
   /** 후행 밴드 지연 — 인지용, KPI 지연 카드 미합산 */
   delay_bucket: SplStageRef[];
+  /** Progress = Actual / Plan — 분모: 계획일 보유 단계 수, 분자: 실적 입력 단계 수 */
+  progress_plan: number;
+  progress_actual: number;
   progress_pct: number | null;
   judgment: "제외" | "완료" | "정상" | "지연" | "미분류" | "미착수";
   /** 관계 정본 파생 캐시 — 과거 as-of 조회에서는 null(공란) */
