@@ -3,7 +3,8 @@ import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import { TmPlanVsActualCard } from "@/components/task-management/dashboard/TmPlanVsActualCard";
 import { useTmScurveData } from "@/hooks/useTmScurveData";
 import { resolveActualPct, resolveIsDelayed } from "@/lib/task-management/delay-utils";
-import type { SCurveBucket } from "@/lib/task-management/scurve-utils";
+import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
+import { PDB_DEFAULTS, pdbFilterChips, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
 const PROGRESS_HINT =
@@ -11,13 +12,14 @@ const PROGRESS_HINT =
 const DELAY_HINT =
   "지연현황 = 정본 판정(resolveJudgment)이 지연 또는 악화인 과업 수 — 실적% < 선형 Plan%";
 
-function useTmPlot(plot: "C" | "D", asOfDate: string) {
+function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
   const q = useTmScurveData({
     asOfDate,
     plots: [plot],
-    taskScope: "sub",
-    workType: "all",
-    delayFilter: "all",
+    disciplines: f.disciplines,
+    taskScope: f.taskScope,
+    workType: f.workType,
+    delayFilter: f.delayFilter,
   });
   const kpi = useMemo(() => {
     const total = q.scopedItems.length;
@@ -39,16 +41,18 @@ function useTmPlot(plot: "C" | "D", asOfDate: string) {
 
 /** TM — 정본: useTmScurveData(= TM KPI Analysis 와 동일 훅), Plot 별 2회 호출 */
 export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
-  const [bucket, setBucket] = useState<SCurveBucket>("week");
   const [open, setOpen] = useState(true);
-  const c = useTmPlot("C", asOfDate);
-  const d = useTmPlot("D", asOfDate);
+  const { data: settings } = usePdbModuleFilters();
+  const f = settings?.tm ?? PDB_DEFAULTS.tm;
+  const c = useTmPlot("C", asOfDate, f);
+  const d = useTmPlot("D", asOfDate, f);
 
   return (
     <ProjectModuleSection
       title="Task Management"
       to="/closure/task-management/kpi-analysis"
       progressHint="진도율 = 해당 Plot Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 — TM KPI Analysis 와 동일"
+      filterChips={pdbFilterChips("tm", f)}
       plots={[
         { plot: "D", progressPct: d.isLoading ? null : d.kpi.progressPct, total: d.kpi.total },
         { plot: "C", progressPct: c.isLoading ? null : c.kpi.progressPct, total: c.kpi.total },
@@ -78,10 +82,12 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
             <TmPlanVsActualCard
               items={q.scopedItems}
               asOfDate={asOfDate}
+              startFrom={f.startDate}
               dim="hdec_pic_name"
               filterSummary={q.filterSummary}
-              bucket={bucket}
-              onBucketChange={setBucket}
+              bucket={f.bucket}
+              onBucketChange={() => {}}
+              controlsHidden
               open={open}
               onOpenChange={setOpen}
             />
