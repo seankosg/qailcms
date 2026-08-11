@@ -8,6 +8,9 @@ import { DefectImportPresetTable } from "@/components/admin/DefectImportPresetTa
 import { AbdFieldConfigTable } from "@/components/admin/AbdFieldConfigTable";
 import { AbdHeaderMappingTable } from "@/components/admin/AbdHeaderMappingTable";
 import { AbdImportPresetTable } from "@/components/admin/AbdImportPresetTable";
+import { SplFieldConfigTable } from "@/components/admin/SplFieldConfigTable";
+import { SplHeaderMappingTable } from "@/components/admin/SplHeaderMappingTable";
+import { SplImportPresetTable } from "@/components/admin/SplImportPresetTable";
 
 export const Route = createFileRoute("/_authenticated/admin/mapping")({
   component: MappingPage,
@@ -26,6 +29,7 @@ function MappingPage() {
         <TabsList>
           <TabsTrigger value="as-built">As Built Drawing</TabsTrigger>
           <TabsTrigger value="task-management">Task Management</TabsTrigger>
+          <TabsTrigger value="spare-parts">Spare Parts List</TabsTrigger>
           <TabsTrigger value="defect-management">Snag List Management</TabsTrigger>
         </TabsList>
         <TabsContent value="as-built" className="space-y-4">
@@ -50,6 +54,20 @@ function MappingPage() {
             </TabsList>
             <TabsContent value="field-config"><TmFieldConfigTable /></TabsContent>
             <TabsContent value="header-mapping"><TmHeaderMappingTable /></TabsContent>
+          </Tabs>
+        </TabsContent>
+        <TabsContent value="spare-parts" className="space-y-4">
+          <Tabs defaultValue="field-config" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="field-config">Field Config</TabsTrigger>
+              <TabsTrigger value="header-mapping">Header Mapping</TabsTrigger>
+              <TabsTrigger value="preset-hdec">HDEC Preset</TabsTrigger>
+              <TabsTrigger value="preset-aconex">Aconex Preset</TabsTrigger>
+            </TabsList>
+            <TabsContent value="field-config"><SplFieldConfigTable /></TabsContent>
+            <TabsContent value="header-mapping"><SplHeaderMappingTable /></TabsContent>
+            <TabsContent value="preset-hdec"><SplImportPresetTable mode="hdec" /></TabsContent>
+            <TabsContent value="preset-aconex"><SplImportPresetTable mode="aconex" /></TabsContent>
           </Tabs>
         </TabsContent>
         <TabsContent value="defect-management" className="space-y-4">
