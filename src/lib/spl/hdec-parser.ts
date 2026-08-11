@@ -160,7 +160,8 @@ function norm(v: unknown): string {
 }
 
 export function isOcsNumber(splNumber: string): boolean {
-  return /-OCS-/i.test(splNumber ?? "");
+  // 대시 변종(U+2010 등)이 섞인 `‐OCS-` 도 제외되어야 한다. 정규화 후 판정.
+  return isOcsDocumentNumber(splNumber);
 }
 
 function toIso(v: unknown): string | null {
