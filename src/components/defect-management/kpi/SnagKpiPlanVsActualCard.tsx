@@ -67,6 +67,8 @@ interface Props {
   stageTotal: number;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** PDB 전용 — 카드 내 조작 UI(단위·Bucket 토글) 숨김 */
+  controlsHidden?: boolean;
 }
 
 export function SnagKpiPlanVsActualCard({
@@ -87,6 +89,7 @@ export function SnagKpiPlanVsActualCard({
   stageTotal,
   open,
   onOpenChange,
+  controlsHidden = false,
 }: Props) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
