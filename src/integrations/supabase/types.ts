@@ -8868,8 +8868,70 @@ export type Database = {
         }[]
       }
       spl_ocs_can_manage: { Args: never; Returns: boolean }
+      spl_ocs_can_write_comment: {
+        Args: { _comment_id: string }
+        Returns: boolean
+      }
+      spl_ocs_comments_for_spl: {
+        Args: { _spl_item_id: string }
+        Returns: Json
+      }
+      spl_ocs_deactivate_comment: {
+        Args: { _id: string; _reason: string }
+        Returns: Json
+      }
+      spl_ocs_log: {
+        Args: {
+          _action: string
+          _column: string
+          _item_id: string
+          _new: string
+          _old: string
+          _row_id: string
+          _table: string
+        }
+        Returns: undefined
+      }
       spl_ocs_recount_all: { Args: never; Returns: Json }
       spl_ocs_recount_all_internal: { Args: never; Returns: Json }
+      spl_ocs_set_category: {
+        Args: { _category_id: string; _comment_id: string; _on: boolean }
+        Returns: Json
+      }
+      spl_ocs_set_complied: {
+        Args: { _comment_id: string; _complied: boolean; _expected: boolean }
+        Returns: Json
+      }
+      spl_ocs_set_rsp_link: {
+        Args: { _comment_id: string; _on: boolean; _rsp_item_id: string }
+        Returns: Json
+      }
+      spl_ocs_set_spl_link: {
+        Args: { _comment_id: string; _on: boolean; _spl_item_id: string }
+        Returns: Json
+      }
+      spl_ocs_upsert_category: {
+        Args: {
+          _code: string
+          _id: string
+          _is_active: boolean
+          _label: string
+        }
+        Returns: Json
+      }
+      spl_ocs_upsert_comment: {
+        Args: {
+          _assessed_code: string
+          _comment_text: string
+          _contractor_response: string
+          _id: string
+          _ocs_number: string
+          _revision: string
+          _sign_off_status: string
+          _spl_item_id: string
+        }
+        Returns: Json
+      }
       spl_ocs_v1_import: {
         Args: { p_dry_run?: boolean; p_snapshot_id?: string }
         Returns: Json
@@ -8878,6 +8940,25 @@ export type Database = {
       spl_ocs_verify_internal: { Args: never; Returns: Json }
       spl_precheck_patches: { Args: { _patches: Json }; Returns: Json }
       spl_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
+      spl_rsp_deactivate: {
+        Args: { _id: string; _reason: string }
+        Returns: Json
+      }
+      spl_rsp_for_spl: { Args: { _spl_item_id: string }; Returns: Json }
+      spl_rsp_upsert: {
+        Args: {
+          _description: string
+          _id: string
+          _manufacturer: string
+          _model: string
+          _qty_available: number
+          _qty_required: number
+          _qty_short: number
+          _spl_item_id: string
+          _unit: string
+        }
+        Returns: Json
+      }
       spl_rule_msg: {
         Args: {
           _missing: string[]
