@@ -497,7 +497,8 @@ export const bulkCreateAppUsers = createServerFn({ method: "POST" })
     temp_password: string;
   }) => input)
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    // §5(2026-08-11) 계정 생성 경로는 개별·일괄 모두 최상위 전용이다.
+    await assertSystemAdmin(context.supabase, context.userId);
     // 임시 비밀번호는 호출부가 준 값 하나를 전원에게 사용한다(생성 경로 단일화).
     const sharedPw = String(data.temp_password ?? "");
     if (!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(sharedPw)) {
