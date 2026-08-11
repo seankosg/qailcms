@@ -84,6 +84,7 @@ export function SplRawDataPage() {
   const fetchEstimated = useServerFn(getSplEstimatedCells);
   const fetchExport = useServerFn(getSplExportRows);
   const saveField = useServerFn(updateSplField);
+  const saveStage = useServerFn(updateSplStageField);
   const queryClient = useQueryClient();
   const { canRow } = useRclCan("SPL", "write");
   const isToday = asOf === today;
@@ -277,6 +278,15 @@ export function SplRawDataPage() {
 
   const exportColumns = useMemo(
     () => layout.filter((i) => i.def).map((i) => ({ key: i.key, label: i.def?.label ?? i.key })),
+    [layout],
+  );
+
+  /** Bulk Edit 내보내기 컬럼 — 스테이지 포함 화면 그대로 */
+  const bulkExportColumns = useMemo(
+    () =>
+      layout
+        .filter((i) => i.key !== "__select")
+        .map((i) => ({ key: i.key, label: i.def?.label ?? i.stage?.code ?? i.key, widthPx: i.width })),
     [layout],
   );
 
@@ -668,9 +678,12 @@ export function SplRawDataPage() {
 
       <SplBulkEditBar
         selectedIds={selectedIds}
-        teamOptions={[...SPL_TEAM_OPTIONS]}
+        selectedRows={selectedRowsFlat}
+        stageColumns={stageCols}
+        exportColumns={bulkExportColumns}
         onClear={() => setSelectedIds([])}
         onSaveField={saveOne}
+        onSaveStage={saveStageOne}
         onDone={refetchRows}
         disabledReason={isToday ? null : "Editing is disabled in as-of (historical) view."}
       />
