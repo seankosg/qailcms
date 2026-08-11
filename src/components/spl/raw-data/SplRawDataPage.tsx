@@ -479,86 +479,27 @@ export function SplRawDataPage() {
             {label}
           </Button>
         ))}
-        {viol && (
-          <>
-          <Badge variant={viol.total > 0 ? "destructive" : "outline"} className="gap-1 text-[11px]">
-            <AlertTriangle className="h-3 w-3" />
-            선후관계 위반 {viol.total}건
-            {viol.total > 0 && <span className="opacity-80">· 최근 임포트 발생 {viol.from_last_import}건</span>}
-          </Badge>
-          <Badge
-            variant="outline"
-            className="text-[11px]"
-            title="No progress row exists for the preceding stage — HDEC import incomplete, not an actual sequence reversal"
-          >
-            Data not loaded {viol.import_incomplete ?? 0}
-          </Badge>
-          </>
-        )}
-        {(data?.plan_items ?? 0) === 0 && (
-          <Badge variant="secondary" className="text-[11px]">
-            No HDEC plan dates loaded — delay judgment not applied (items with a plan date: {data?.plan_items ?? 0})
-          </Badge>
-        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {(["all", ...JUDGMENTS] as const).map((j) => (
+        {(search.judgment && search.judgment !== "all") || search.delayBand || search.hdecMissing ? (
           <Button
-            key={j}
             size="sm"
-            variant={(search.judgment ?? "all") === j && !search.delayBand ? "default" : "outline"}
+            variant="outline"
             className="h-7 text-[11px]"
-            onClick={() =>
-              setSearch({
-                judgment: search.judgment === j ? "all" : j,
-                delayBand: "",
-                hdecMissing: false,
-              })
-            }
+            onClick={() => setSearch({ judgment: "all", delayBand: "", hdecMissing: false })}
           >
-            {j === "all" ? `All (${population})` : `${splJudgmentLabel(j)} ${counts[j] ?? 0}`}
+            Clear dashboard filter
+            {search.judgment && search.judgment !== "all" ? ` · ${splJudgmentLabel(search.judgment as any)}` : ""}
+            {search.delayBand ? ` · ${BAND_LABEL[search.delayBand] ?? search.delayBand}` : ""}
+            {search.hdecMissing ? " · No HDEC actual" : ""}
           </Button>
-        ))}
-        {!reconOk && (
-          <Badge variant="outline" className="text-[11px] text-amber-600">
-            Reconciliation mismatch: sum {countsSum} / population {population}
-          </Badge>
-        )}
+        ) : null}
         {sorts.length > 0 && (
           <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setSorts([])}>
             Clear sort ({sorts.length})
           </Button>
         )}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] text-muted-foreground">Primary delay by band</span>
-        {delayBands.map(([band, n]) => (
-          <Button
-            key={band}
-            size="sm"
-            variant={search.delayBand === band ? "default" : "outline"}
-            className="h-7 text-[11px]"
-            onClick={() => setSearch({ delayBand: search.delayBand === band ? "" : band, judgment: "all" })}
-          >
-            {BAND_LABEL[band] ?? band} {n}
-          </Button>
-        ))}
-        <Badge variant="outline" className="text-[11px]">
-          Required documents ready {reqDoc.pct}% · fully ready {reqDoc.full} (not part of the judgment population)
-        </Badge>
-        <Button
-          size="sm"
-          variant={search.hdecMissing ? "default" : "outline"}
-          className="h-7 text-[11px]"
-          onClick={() => setSearch({ hdecMissing: !search.hdecMissing, delayBand: "" })}
-        >
-          No HDEC actual: {data?.hdec_missing_items ?? 0}
-        </Button>
-        <Badge variant="outline" className="text-[11px]">
-          Estimated actuals: {estimated?.items ?? 0} documents (back-filled · shown in italics)
-        </Badge>
       </div>
 
       <Card>
