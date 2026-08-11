@@ -655,19 +655,19 @@ export function SplRawDataPage() {
                             : undefined
                         }
                         className={cn(
-                          "sticky top-0 z-30 relative overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-center font-medium",
+                          "sticky top-0 z-30 relative whitespace-nowrap border-b border-l px-1 py-1 text-center font-medium",
                           splBandHeaderClass(sc.band),
                           sc.bandStart && "border-l-2 border-l-foreground/40",
                         )}
                       >
-                        <span className="inline-flex items-center">
+                        <span className="flex w-full items-center justify-center gap-0.5 overflow-hidden">
                         <button
                           type="button"
                           onClick={() => toggleSort(`stage:${sc.key}`)}
                           title="클릭: 오름차순 → 내림차순 → 해제 (클릭 순서가 정렬 우선순위)"
-                          className="inline-flex items-center gap-0.5 hover:text-primary"
+                          className="inline-flex min-w-0 items-center gap-0.5 truncate hover:text-primary"
                         >
-                          {sc.code}
+                          <span className="truncate">{sc.code}</span>
                           {(() => {
                             const idx = sorts.findIndex((s) => s.key === `stage:${sc.key}`);
                             if (idx < 0) return null;
@@ -683,6 +683,7 @@ export function SplRawDataPage() {
                             );
                           })()}
                         </button>
+                        <span className="shrink-0">
                         <SplColumnFilterDropdown
                           label={sc.code}
                           values={distinctStageValues[`stage:${sc.key}`] ?? []}
@@ -691,6 +692,7 @@ export function SplRawDataPage() {
                             setColFilters((p) => ({ ...p, [`stage:${sc.key}`]: next }))
                           }
                         />
+                        </span>
                         </span>
                         <ColumnResizeHandle
                           width={colWidths[`stage:${sc.key}`] ?? 84}
