@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Link2, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Link2, Loader2, PanelLeft, PanelRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { exportSplRspXlsx } from "./exportSplOcsRsp";
 import { SplRspDialog, type SplRspDraft } from "./SplRspDialog";
 import { useSplOcsMutations, useSplRspItems } from "./useSplOcs";
 import type { SplRspItem } from "@/lib/spl/ocs.functions";
@@ -20,6 +22,9 @@ export function SplRspPanel({
   onOpenChange,
   focusId,
   onOpenOcs,
+  side = "right",
+  dual = false,
+  onToggleCounterpart,
 }: {
   splItemId: string;
   splNumber: string;
@@ -27,12 +32,16 @@ export function SplRspPanel({
   onOpenChange: (v: boolean) => void;
   focusId?: string | null;
   onOpenOcs: (commentId: string) => void;
+  side?: "left" | "right";
+  dual?: boolean;
+  onToggleCounterpart?: () => void;
 }) {
   const { data, isLoading } = useSplRspItems(splItemId, open);
   const m = useSplOcsMutations(splItemId);
   const [term, setTerm] = useState("");
   const [editing, setEditing] = useState<SplRspItem | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const canWrite = data?.can_write ?? false;
   const rows = useMemo(() => {
@@ -63,13 +72,52 @@ export function SplRspPanel({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-2 sm:max-w-2xl">
+    <Sheet open={open} onOpenChange={onOpenChange} modal={!dual}>
+      <SheetContent
+        side={side}
+        hideOverlay={dual}
+        onInteractOutside={dual ? (e) => e.preventDefault() : undefined}
+        className="flex w-full flex-col gap-2 sm:max-w-2xl"
+      >
         <SheetHeader className="space-y-1">
-          <SheetTitle className="text-sm">
-            Recommended Spare Parts — <span className="font-mono">{splNumber}</span>
-          </SheetTitle>
-          <Badge variant="outline" className="w-fit text-[11px]">Total {data?.total ?? 0}</Badge>
+          <div className="flex items-start justify-between gap-2 pr-8">
+            <SheetTitle className="text-sm">
+              Recommended Spare Parts — <span className="font-mono">{splNumber}</span>
+            </SheetTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 gap-1 text-[11px]"
+              disabled={exporting || (data?.rows?.length ?? 0) === 0}
+              onClick={async () => {
+                setExporting(true);
+                try {
+                  await exportSplRspXlsx(splNumber, rows, term.trim() ? `search "${term.trim()}"` : "all");
+                  toast.success(`RSP ${rows.length}행을 Excel 로 내려받았습니다.`);
+                } catch (e) {
+                  toast.error(`Excel 내보내기 실패: ${(e as Error).message}`);
+                } finally {
+                  setExporting(false);
+                }
+              }}
+            >
+              <Download className="h-3.5 w-3.5" /> Excel
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline" className="w-fit text-[11px]">Total {data?.total ?? 0}</Badge>
+            {onToggleCounterpart && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-7 gap-1 text-[11px]"
+                onClick={onToggleCounterpart}
+              >
+                {side === "right" ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelRight className="h-3.5 w-3.5" />}
+                OCS
+              </Button>
+            )}
+          </div>
         </SheetHeader>
 
         <div className="flex items-center gap-2">

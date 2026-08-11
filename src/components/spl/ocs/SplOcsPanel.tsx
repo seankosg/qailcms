@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Plus } from "lucide-react";
+import { Download, Loader2, PanelLeft, PanelRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { exportSplOcsXlsx } from "./exportSplOcsRsp";
 import { SplOcsCommentRow } from "./SplOcsCommentRow";
 import { SplOcsCommentDialog, type SplOcsCommentDraft } from "./SplOcsCommentDialog";
 import { useSplOcsComments, useSplOcsMutations } from "./useSplOcs";
@@ -21,12 +23,18 @@ export function SplOcsPanel({
   open,
   onOpenChange,
   onOpenRsp,
+  side = "right",
+  dual = false,
+  onToggleCounterpart,
 }: {
   splItemId: string;
   splNumber: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onOpenRsp: (rspItemId: string) => void;
+  side?: "left" | "right";
+  dual?: boolean;
+  onToggleCounterpart?: () => void;
 }) {
   const { data, isLoading } = useSplOcsComments(splItemId, open);
   const m = useSplOcsMutations(splItemId);
@@ -35,6 +43,7 @@ export function SplOcsPanel({
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [editing, setEditing] = useState<SplOcsComment | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const canWrite = data?.can_write ?? false;
   const busy =
@@ -74,12 +83,49 @@ export function SplOcsPanel({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-2 sm:max-w-2xl">
+    <Sheet open={open} onOpenChange={onOpenChange} modal={!dual}>
+      <SheetContent
+        side={side}
+        hideOverlay={dual}
+        onInteractOutside={dual ? (e) => e.preventDefault() : undefined}
+        className="flex w-full flex-col gap-2 sm:max-w-2xl"
+      >
         <SheetHeader className="space-y-1">
-          <SheetTitle className="text-sm">
-            OCS Comments — <span className="font-mono">{splNumber}</span>
-          </SheetTitle>
+          <div className="flex items-start justify-between gap-2 pr-8">
+            <SheetTitle className="text-sm">
+              OCS Comments — <span className="font-mono">{splNumber}</span>
+            </SheetTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 gap-1 text-[11px]"
+              disabled={exporting || (data?.comments?.length ?? 0) === 0}
+              onClick={async () => {
+                setExporting(true);
+                try {
+                  await exportSplOcsXlsx(splNumber, rows, `${tab}${term.trim() ? ` / "${term.trim()}"` : ""}`);
+                  toast.success(`OCS ${rows.length}행을 Excel 로 내려받았습니다.`);
+                } catch (e) {
+                  toast.error(`Excel 내보내기 실패: ${(e as Error).message}`);
+                } finally {
+                  setExporting(false);
+                }
+              }}
+            >
+              <Download className="h-3.5 w-3.5" /> Excel
+            </Button>
+          </div>
+          {onToggleCounterpart && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 w-fit gap-1 text-[11px]"
+              onClick={onToggleCounterpart}
+            >
+              {side === "right" ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelRight className="h-3.5 w-3.5" />}
+              RSP
+            </Button>
+          )}
           <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
             <Badge variant="outline">Total {data?.total ?? 0}</Badge>
             <Badge variant={data && data.pending > 0 ? "destructive" : "secondary"}>
