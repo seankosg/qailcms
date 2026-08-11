@@ -29,7 +29,7 @@ function usePlot(plot: PlotKey, asOfDate: string, bucket: Bucket) {
 /** SM — 정본: useSnagScurveData(= SM KPI Analysis 와 동일 훅), Plot 별 2회 호출 */
 export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
   const [bucket, setBucket] = useState<Bucket>("week");
-  const [unit, setUnit] = useState<SnagCurveUnit>("count");
+  const [unit, setUnit] = useState<SnagCurveUnit>("cnt");
   const [open, setOpen] = useState(true);
   const c = usePlot("C", asOfDate, bucket);
   const d = usePlot("D", asOfDate, bucket);
