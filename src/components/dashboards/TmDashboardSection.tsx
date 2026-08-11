@@ -65,7 +65,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
           label="완료"
           count={kpi.done}
           total={kpi.total}
-          tone="good"
+          tone="ok"
           hint="실적% = 100% 인 과업 수"
         />
         <AbdKpiCard
@@ -78,7 +78,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
           label="지연 · 악화"
           count={kpi.delayed}
           total={kpi.total}
-          tone="bad"
+          tone="danger"
           hint="정본 판정(resolveJudgment) 이 지연 또는 악화 — 실적% < 선형 Plan%"
         />
       </div>
