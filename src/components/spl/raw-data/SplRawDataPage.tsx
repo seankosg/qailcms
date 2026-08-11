@@ -604,7 +604,7 @@ export function SplRawDataPage() {
                           style={{ width: it.width, minWidth: it.width, maxWidth: it.width }}
                           title={it.stage?.title}
                           className={cn(
-                            "sticky top-0 z-30 relative overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-left bg-muted [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]",
+                            "sticky top-0 z-30 overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-left bg-muted [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]",
                             it.stage && splBandHeaderClass(it.stage.band),
                             it.stage?.bandStart && "border-l-2 border-l-foreground/40",
                           )}
@@ -937,7 +937,7 @@ function StickyHead({
   return (
     <th
       style={{ left, top: 0, width, minWidth: width, maxWidth: width }}
-      className="sticky z-40 relative overflow-hidden whitespace-nowrap border-b border-l bg-background px-2 py-1 text-left [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
+       className="sticky z-40 overflow-hidden whitespace-nowrap border-b border-l bg-background px-2 py-1 text-left [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
     >
       {children}
     </th>
