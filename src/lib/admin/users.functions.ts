@@ -24,7 +24,7 @@ function tableForKind(kind: MasterKind): string {
 async function assertAdmin(supabase: any, userId: string) {
   const { data, error } = await supabase.rpc("has_any_role", {
     _user_id: userId,
-    _roles: ["admin", "superuser"],
+    _roles: ["admin", "superuser", "system_administrator"],
   });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("관리자 권한이 필요합니다.");
@@ -32,9 +32,9 @@ async function assertAdmin(supabase: any, userId: string) {
 
 /** admin 단독 검사 (superuser 불통과). admin 등급 부여 등 잠금 경로 전용. */
 async function assertStrictAdmin(supabase: any, userId: string) {
-  const { data, error } = await supabase.rpc("has_role", {
+  const { data, error } = await supabase.rpc("has_any_role", {
     _user_id: userId,
-    _role: "admin",
+    _roles: ["admin", "system_administrator"],
   });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("이 작업은 Admin 계정만 수행할 수 있습니다.");
@@ -42,12 +42,13 @@ async function assertStrictAdmin(supabase: any, userId: string) {
 
 /** 화면과 서버 판정 기준을 맞추기 위한 등급 서열 (DB rcl_highest_role 과 동일). */
 const ROLE_RANK_SRV: Record<string, number> = {
-  admin: 100, superuser: 90, d_superuser: 80, senior_user: 70,
+  system_administrator: 110, admin: 100, superuser: 90, d_superuser: 80, senior_user: 70,
   user: 50, super_guest: 30, guest: 10,
 };
 
 type UserType = "subcontractor" | "hdec" | "hdec_pic" | "hdec_eng" | "pm_pd" | "admin" | "subsub" | "guest";
 type AppRole =
+  | "system_administrator"
   | "admin"
   | "superuser"
   | "senior_user"

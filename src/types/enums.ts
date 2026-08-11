@@ -1,4 +1,5 @@
 export type AppRole =
+  | "system_administrator"
   | "admin"
   | "superuser"
   | "senior_user"
@@ -18,10 +19,11 @@ export type UserType =
   | "guest";
 
 /**
- * 권한 rank. admin=100, superuser=90, d_superuser=80(전체 편집 승격),
+ * 권한 rank. system_administrator=110(최상위), admin=100, superuser=90, d_superuser=80(전체 편집 승격),
  * senior_user=70, user=50, super_guest=30, guest=10.
  */
 export const ROLE_RANK: Record<AppRole, number> = {
+  system_administrator: 110,
   admin: 100,
   superuser: 90,
   d_superuser: 80,
@@ -32,6 +34,7 @@ export const ROLE_RANK: Record<AppRole, number> = {
 };
 
 export const ROLE_LABELS: Record<AppRole, string> = {
+  system_administrator: "System Administrator",
   admin: "Admin",
   superuser: "Super User",
   senior_user: "Senior User",
@@ -64,6 +67,7 @@ export function loginIdToEmail(loginId: string): string {
 }
 
 export const ALL_APP_ROLES: AppRole[] = [
+  "system_administrator",
   "admin",
   "superuser",
   "senior_user",

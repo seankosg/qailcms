@@ -27,7 +27,11 @@ export const Route = createFileRoute("/_authenticated/admin/permissions")({
       .from("user_roles")
       .select("role")
       .eq("user_id", authData.user.id);
-    if (!(roles ?? []).some((r: { role: string }) => r.role === "admin")) {
+    if (
+      !(roles ?? []).some(
+        (r: { role: string }) => r.role === "admin" || r.role === "system_administrator",
+      )
+    ) {
       throw redirect({ to: "/admin" });
     }
   },
