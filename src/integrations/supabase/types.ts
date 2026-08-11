@@ -8870,6 +8870,10 @@ export type Database = {
       spl_ocs_can_manage: { Args: never; Returns: boolean }
       spl_ocs_recount_all: { Args: never; Returns: Json }
       spl_ocs_recount_all_internal: { Args: never; Returns: Json }
+      spl_ocs_v1_import: {
+        Args: { p_dry_run?: boolean; p_snapshot_id?: string }
+        Returns: Json
+      }
       spl_ocs_verify: { Args: never; Returns: Json }
       spl_ocs_verify_internal: { Args: never; Returns: Json }
       spl_precheck_patches: { Args: { _patches: Json }; Returns: Json }
