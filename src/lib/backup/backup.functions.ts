@@ -343,19 +343,47 @@ export const createPreImportSnapshot = createServerFn({ method: "POST" })
     const tables = MODULE_PRE_IMPORT_TABLES[data.module] ?? BACKUP_TABLES;
     const name = `pre-import-${data.module}-${new Date().toISOString()}`;
 
-    const { error: logError } = await supabaseAdmin.from("backup_run_log").insert({
-      id: runId,
-      status: "running",
-      snapshot_id: null,
-      metadata: {
+    // run_id 는 요청 멱등성 키다. 원자적 claim(INSERT ... ON CONFLICT DO NOTHING)으로
+    // 동일 run_id 요청 중 정확히 하나만 실제 백업 실행권을 얻는다.
+    const { data: claimRaw, error: claimError } = await supabaseAdmin.rpc("backup_claim_run", {
+      _run_id: runId,
+      _metadata: {
         kind: "pre-import",
         module: data.module,
         tables_total: tables.length,
         tables_done: 0,
         current_table: null,
       } as any,
-    });
-    if (logError) throw new Error(logError.message);
+    } as any);
+    if (claimError) throw new Error(claimError.message);
+    const claim = (claimRaw ?? {}) as {
+      claimed?: boolean;
+      status?: string | null;
+      snapshot_id?: string | null;
+      error_message?: string | null;
+    };
+    if (!claim.claimed) {
+      // 중복 요청: 기존 실행을 덮어쓰지 않고 상태를 그대로 반환한다.
+      if (claim.status === "success" && claim.snapshot_id) {
+        const { data: snap } = await supabaseAdmin
+          .from("database_snapshots")
+          .select("*")
+          .eq("id", claim.snapshot_id)
+          .maybeSingle();
+        return {
+          ...(snap ?? { id: claim.snapshot_id }),
+          reused: true,
+          run_status: "success",
+        } as any;
+      }
+      if (claim.status === "failed") {
+        throw new Error(
+          `이 run 은 이미 실패로 종료되었습니다. 새 Retry 는 새 run ID 로 시작하세요. (원문: ${claim.error_message ?? "-"})`,
+        );
+      }
+      // running / queued: 진행 중인 기존 run 에 합류한다.
+      return { id: null, run_id: runId, run_status: claim.status ?? "running", already_running: true } as any;
+    }
 
     const started = Date.now();
     try {
