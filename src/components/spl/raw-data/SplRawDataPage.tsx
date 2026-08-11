@@ -747,7 +747,7 @@ function SplTableRow({
           <SplEditableCell
             row={row}
             field={key}
-            label={key.toUpperCase()}
+            label={SPL_COLUMNS.find((c) => c.key === key)?.label ?? key.toUpperCase()}
             value={(row as any)[key] ?? null}
             canEdit={canEdit}
             onSave={onSave}
