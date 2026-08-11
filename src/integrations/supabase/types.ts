@@ -8930,6 +8930,10 @@ export type Database = {
           stage: string
         }[]
       }
+      spl_aconex_apply: {
+        Args: { _batch_id: string; _patches: Json }
+        Returns: Json
+      }
       spl_active_round: {
         Args: { _as_of?: string }
         Returns: {
