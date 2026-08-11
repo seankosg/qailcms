@@ -11,6 +11,7 @@ export function OcsErrorCard({
   affected,
   nextStep,
   runId,
+  runLabel = "run",
   snapshotId,
   details,
   action,
@@ -19,12 +20,13 @@ export function OcsErrorCard({
   affected: string;
   nextStep: string;
   runId?: string | null;
+  runLabel?: string;
   snapshotId?: string | null;
   details?: string | null;
   action?: React.ReactNode;
 }) {
   const ids = [
-    runId ? `run ${runId}` : null,
+    runId ? `${runLabel} ${runId}` : null,
     snapshotId ? `snapshot ${snapshotId}` : null,
   ].filter(Boolean) as string[];
 
