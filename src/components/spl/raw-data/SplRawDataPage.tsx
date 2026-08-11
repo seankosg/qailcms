@@ -35,6 +35,7 @@ import {
   buildSplStageColumns,
   splBandHeaderClass,
   splJudgmentLabel,
+  splStagePrefix,
   type SplColumnDef,
   type SplStageColumn,
 } from "./spl-columns";
