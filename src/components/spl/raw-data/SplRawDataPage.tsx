@@ -839,8 +839,16 @@ function SplTableRow({
         );
       case "data_date":
         return <span className="text-muted-foreground">{row.data_date ? formatDdMmm(row.data_date) : "—"}</span>;
-      default:
-        return <span className="text-muted-foreground">{(row as any)[key] ?? "—"}</span>;
+      default: {
+        const v = (row as any)[key] as string | null | undefined;
+        const naLike =
+          v != null && /^\s*(n\/?a|not\s*applicable|not\s*applicable\s*\(na\))\s*$/i.test(String(v).trim());
+        return (
+          <span className={cn(naLike && "rounded bg-slate-200 px-1.5 text-slate-500 dark:bg-slate-800 dark:text-slate-400")}>
+            {v ?? "—"}
+          </span>
+        );
+      }
     }
   };
 
@@ -893,7 +901,7 @@ function SplTableRow({
             className={cn(
               "overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-center tabular-nums",
               STATE_CLASS[cell?.st ?? "none"],
-              isNa && "bg-muted/40",
+              isNa && "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
               isEst && "italic",
             )}
             title={
@@ -905,7 +913,7 @@ function SplTableRow({
             }
           >
             {isNa ? (
-              <span className="rounded bg-muted px-1 text-[9px] font-semibold text-muted-foreground">NA</span>
+              <span className="text-[9px] font-semibold uppercase tracking-wide">N/A</span>
             ) : raw ? (
               sc.field === "fv" ? raw : formatDdMmm(raw)
             ) : (
