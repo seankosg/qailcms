@@ -23,6 +23,11 @@ export function splJudgmentLabel(v: string): string {
   return SPL_JUDGMENT_LABEL[v] ?? v;
 }
 
+/** short_code(예: D-SB, P-PO)에서 접두사만 추출 (예: D-, P-) */
+export function splStagePrefix(shortCode: string): string {
+  return shortCode.split("-")[0] + "-";
+}
+
 export const SPL_COLUMNS: SplColumnDef[] = [
   { key: "spl_number", label: "SPL NUMBER", width: 230, filter: "multi", get: (r) => r.spl_number ?? "" },
   { key: "plot", label: "Plot", width: 70, filter: "multi", get: (r) => (r.plot ? `PLOT-${r.plot}` : "") },
