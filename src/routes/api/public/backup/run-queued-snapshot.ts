@@ -66,6 +66,11 @@ export const Route = createFileRoute("/api/public/backup/run-queued-snapshot")({
               import_log_id: meta.import_log_id ?? null,
             },
             tables: meta.tables,
+            // 사전 스냅샷 잡은 해당 모듈 목록만 정합성 검사한다.
+            parityScope:
+              meta.kind === "pre-import" && meta.module
+                ? (meta.module as "abd" | "sm" | "tm" | "spl" | "wrt")
+                : "global",
           });
           await supabaseAdmin
             .from("backup_run_log")
