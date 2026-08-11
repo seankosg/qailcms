@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -67,6 +67,8 @@ interface Props {
   /** 여러 차트를 나란히 놓을 때 공통 x 창(ISO). 주지 않으면 자기 모집단으로 잡는다. */
   windowStart?: string | null;
   windowEnd?: string | null;
+  /** 절단 후 자기 창(ISO)을 밖으로 알린다 — 공통 창 합집합 계산용 */
+  onWindowResolved?: (start: string, end: string) => void;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
@@ -82,6 +84,7 @@ export function TmPlanVsActualCard({
   controlsHidden = false,
   windowStart,
   windowEnd,
+  onWindowResolved,
   open,
   onOpenChange,
 }: Props) {
@@ -141,10 +144,21 @@ export function TmPlanVsActualCard({
       todayIndex: curve.todayIndex,
     });
     const w = clampWindow(curve.buckets, 0, tail.end, windowStart, windowEnd);
-    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed };
+    const own = {
+      start: curve.buckets[0] ?? null,
+      end: tail.end > 0 ? (curve.buckets[tail.end - 1] ?? null) : null,
+    };
+    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed, own };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curve, windowStart, windowEnd, unit, n]);
   const data = view.rows;
+  const reportRef = useRef(onWindowResolved);
+  reportRef.current = onWindowResolved;
+  const ownStart = view.own.start;
+  const ownEnd = view.own.end;
+  useEffect(() => {
+    if (ownStart && ownEnd) reportRef.current?.(ownStart, ownEnd);
+  }, [ownStart, ownEnd]);
 
   const todayLabel = curve.todayIndex >= 0 ? (curve.bucketLabels[curve.todayIndex] ?? null) : null;
 

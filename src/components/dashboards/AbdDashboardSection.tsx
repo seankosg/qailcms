@@ -4,6 +4,7 @@ import { AbdPlanVsActualCard } from "@/components/abd/progress/AbdPlanVsActualCa
 import { useAbdScurveData } from "@/hooks/useAbdScurveData";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, type PdbAbdFilters } from "@/lib/dashboards/pdb-filters";
+import { useUnionWindow } from "@/lib/charts/use-union-window";
 import { ALL_STAGES } from "@/lib/abd/progress-utils";
 import type { AbdTeam } from "@/lib/abd/columns";
 import { ProjectModuleSection } from "./ProjectModuleSection";
@@ -45,6 +46,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
   const f = settings?.abd ?? PDB_DEFAULTS.abd;
   const c = useAbdPlot("C", asOfDate, f);
   const d = useAbdPlot("D", asOfDate, f);
+  const { window: win, report } = useUnionWindow();
 
   return (
     <ProjectModuleSection
@@ -86,6 +88,9 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
               onOpenChange={setOpen}
               baselines={q.baselines}
               cum={q.cum}
+              windowStart={win.start}
+              windowEnd={win.end}
+              onWindowResolved={(s, e) => report(label, s, e)}
             />
           </div>
         ))}

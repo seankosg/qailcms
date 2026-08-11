@@ -7,6 +7,7 @@ import {
 import { useSnagScurveData } from "@/hooks/useSnagScurveData";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, type PdbSmFilters } from "@/lib/dashboards/pdb-filters";
+import { useUnionWindow } from "@/lib/charts/use-union-window";
 import type { PlotKey, RoomGroupCol, TeamKey } from "@/lib/defect-management/dashboard-shape";
 import { type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
@@ -36,6 +37,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
   const unit = f.unit as SnagCurveUnit;
   const c = usePlot("C", asOfDate, f);
   const d = usePlot("D", asOfDate, f);
+  const { window: win, report } = useUnionWindow();
 
   return (
     <ProjectModuleSection
@@ -87,6 +89,9 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
               unit={unit}
               onUnitChange={() => {}}
               controlsHidden
+              windowStart={win.start}
+              windowEnd={win.end}
+              onWindowResolved={(s, e) => report(label, s, e)}
               filterSummary={q.filterSummary}
               baselinePlan={q.baseline.plan}
               baselineActual={q.baseline.actual}
