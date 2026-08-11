@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -31,6 +31,17 @@ interface EntryRow {
   pic_name: string;
   plan_manpower: string;
   actual_manpower: string;
+  /** 서버에서 불러온 행인가 (신규 입력 행과 구분) */
+  saved?: boolean;
+  /** 저장 당시 박힌 TM 값. 불러온 행은 이 값을 그대로 보여 준다(재계산 금지). */
+  snap?: {
+    task_name: string | null;
+    task_level: string | null;
+    work_category: string | null;
+    tplan_pct: number | null;
+    tactual_pct: number | null;
+    task_data_date: string | null;
+  };
 }
 
 interface TmOption {
