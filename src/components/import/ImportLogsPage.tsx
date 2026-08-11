@@ -649,7 +649,10 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                                   {b.exclusions
                                     ? ` · ${Object.entries(b.exclusions)
                                         .filter(([, v]) => typeof v === "number" && v > 0)
-                                        .map(([k, v]) => `${k}=${v}`)
+                                        .map(
+                                          ([k, v]) =>
+                                            `${describeExclusion(k)?.title ?? k} ${v}건`,
+                                        )
                                         .join(" · ")}`
                                     : ""}
                                 </span>
