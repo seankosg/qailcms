@@ -593,7 +593,7 @@ export function SplRawDataPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r) => (
+                  {sorted.map((r) => (
                     <SplTableRow
                       key={r.id}
                       row={r}
@@ -618,7 +618,7 @@ export function SplRawDataPage() {
                       }}
                     />
                   ))}
-                  {filtered.length === 0 && (
+                  {sorted.length === 0 && (
                     <tr>
                       <td colSpan={layout.length + stageCols.length} className="p-8 text-center text-muted-foreground">
                         No rows match the current filters.
@@ -644,7 +644,7 @@ export function SplRawDataPage() {
       <SplExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
-        rows={filtered}
+        rows={sorted}
         exportColumns={exportColumns}
         onRoundtrip={onExport}
       />
@@ -656,7 +656,7 @@ export function SplRawDataPage() {
       />
 
       <div className="text-[11px] text-muted-foreground">
-        Showing {filtered.length.toLocaleString()} of {population.toLocaleString()} rows · As of {asOf} · NA stages are marked{" "}
+        Showing {sorted.length.toLocaleString()} of {population.toLocaleString()} rows · As of {asOf} · NA stages are marked{" "}
         <span className="rounded bg-muted px-1">NA</span> and excluded from the progress denominator (distinct from blank).
       </div>
     </div>
