@@ -5,19 +5,23 @@ import * as XLSX from "xlsx";
  * 파일 선택 직후(파싱 이전)에 호출되어 잘못된 모듈 파일을 사전에 차단한다.
  */
 
-/** [F-3-4] SPL/WRT 편입을 대비해 확장 가능하게 둔다(앵커 예약: SPL NUMBER / WRT NUMBER). */
-export type ModuleId = "abd" | "sm" | "tm";
+/** [F-3-4] SPL/WRT 포함. 두 원본은 머리글이 크게 겹치므로 배타 앵커로만 가른다. */
+export type ModuleId = "abd" | "sm" | "tm" | "spl" | "wrt";
 
 export const MODULE_LABELS: Record<ModuleId, string> = {
   abd: "As Built Drawing",
   sm: "Snag Management",
   tm: "Task Management",
+  spl: "Spare Parts (SPL)",
+  wrt: "Warranty (WRT)",
 };
 
 export const MODULE_IMPORT_ROUTES: Record<ModuleId, string> = {
   abd: "/closure/abd/import",
   sm: "/closure/snag-management/import",
   tm: "/closure/task-management/import",
+  spl: "/import-log/import?tab=spl",
+  wrt: "/import-log/import?tab=warranty",
 };
 
 interface ModuleFingerprint {
