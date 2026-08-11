@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { AlertTriangle, Download, Loader2, Search } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Download, Loader2, Search } from "lucide-react";
+import { SortPriorityBadge } from "@/components/common/SortPriorityBadge";
 import { cn } from "@/lib/utils";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { todayInDoha, formatDdMmm } from "@/lib/time/doha";
@@ -94,6 +95,8 @@ export function SplRawDataPage() {
   const [frozenExtras, setFrozenExtras] = useState<string[]>(["spl_number"]);
   /** 컬럼 폭(px) — 사용자가 드래그로 조절한 값만 담는다 */
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  /** 다중 정렬 — 클릭한 순서가 곧 우선순위 */
+  const [sorts, setSorts] = useState<Array<{ key: string; desc: boolean }>>([]);
   const [stateLoaded, setStateLoaded] = useState(false);
   useEffect(() => {
     if (!viewPref.ready || stateLoaded) return;
@@ -116,14 +119,21 @@ export function SplRawDataPage() {
       }
       setColWidths(kept);
     }
+    if (Array.isArray(s.sorts)) {
+      setSorts(
+        s.sorts
+          .filter((x: any) => x && typeof x.key === "string" && valid.has(x.key))
+          .map((x: any) => ({ key: x.key as string, desc: !!x.desc })),
+      );
+    }
     setStateLoaded(true);
   }, [viewPref.ready, viewPref.state, stateLoaded]);
-  const persistColumns = () => viewPref.save({ order, visibility, frozenExtras, colWidths } as any);
+  const persistColumns = () => viewPref.save({ order, visibility, frozenExtras, colWidths, sorts } as any);
   useEffect(() => {
     if (!stateLoaded) return;
-    viewPref.save({ order, visibility, frozenExtras, colWidths } as any);
+    viewPref.save({ order, visibility, frozenExtras, colWidths, sorts } as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stateLoaded, order, visibility, frozenExtras, colWidths]);
+  }, [stateLoaded, order, visibility, frozenExtras, colWidths, sorts]);
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -233,6 +243,42 @@ export function SplRawDataPage() {
     () => layout.filter((i) => i.def).map((i) => ({ key: i.key, label: i.def!.label })),
     [layout],
   );
+
+  /** 다중 정렬 적용 — 빈 값은 항상 뒤로, 숫자로 읽히면 숫자 비교 */
+  const sorted = useMemo(() => {
+    if (sorts.length === 0) return filtered;
+    const cmpText = (a: string, b: string) => {
+      if (a === b) return 0;
+      if (a === "") return 1;
+      if (b === "") return -1;
+      const na = Number.parseFloat(a);
+      const nb = Number.parseFloat(b);
+      if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return na - nb;
+      return a.localeCompare(b, undefined, { numeric: true });
+    };
+    return [...filtered].sort((ra, rb) => {
+      for (const s of sorts) {
+        const def = colDefMap.get(s.key);
+        if (!def) continue;
+        const r = cmpText(def.get(ra), def.get(rb));
+        if (r !== 0) return s.desc ? -r : r;
+      }
+      return 0;
+    });
+  }, [filtered, sorts, colDefMap]);
+
+  /** 헤더 클릭 = 오름차순 → 내림차순 → 해제. 선택 순서가 우선순위가 된다. */
+  const toggleSort = (key: string) =>
+    setSorts((prev) => {
+      const i = prev.findIndex((s) => s.key === key);
+      if (i < 0) return [...prev, { key, desc: false }];
+      if (!prev[i].desc) {
+        const next = [...prev];
+        next[i] = { key, desc: true };
+        return next;
+      }
+      return prev.filter((s) => s.key !== key);
+    });
 
   const saveOne = async (id: string, field: string, value: string | null) => {
     await saveField({ data: { id, field, value } });
@@ -379,38 +425,34 @@ export function SplRawDataPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
-        <KpiCard
-          label="Population (documents)"
-          value={population}
-          active={(search.judgment ?? "all") === "all" && !search.delayBand}
-          onClick={() => setSearch({ judgment: "all", delayBand: "" })}
-          note={reconOk ? "Sum = population ✓" : `Reconciliation mismatch: sum ${countsSum}`}
-          tone={reconOk ? undefined : "warn"}
-        />
-        {JUDGMENTS.map((j) => (
-          <KpiCard
+      <div className="flex flex-wrap items-center gap-2">
+        {(["all", ...JUDGMENTS] as const).map((j) => (
+          <Button
             key={j}
-            label={splJudgmentLabel(j)}
-            value={counts[j] ?? 0}
-            active={search.judgment === j && !search.delayBand}
+            size="sm"
+            variant={(search.judgment ?? "all") === j && !search.delayBand ? "default" : "outline"}
+            className="h-7 text-[11px]"
             onClick={() =>
-              setSearch({ judgment: search.judgment === j ? "all" : j, delayBand: "", hdecMissing: false })
+              setSearch({
+                judgment: search.judgment === j ? "all" : j,
+                delayBand: "",
+                hdecMissing: false,
+              })
             }
-            note={
-              j === "미분류"
-                ? "No plan and no actual (denominator 0)"
-                : j === "지연"
-                  ? "Documents with a primary delay"
-                  : j === "미착수"
-                    ? "No judgeable stage in the active band"
-                    : j === "완료"
-                      ? `No HDEC actual: ${data?.hdec_missing_done ?? 0}`
-                      : undefined
-            }
-            tone={j === "지연" ? "bad" : j === "미분류" ? "warn" : undefined}
-          />
+          >
+            {j === "all" ? `All (${population})` : `${splJudgmentLabel(j)} ${counts[j] ?? 0}`}
+          </Button>
         ))}
+        {!reconOk && (
+          <Badge variant="outline" className="text-[11px] text-amber-600">
+            Reconciliation mismatch: sum {countsSum} / population {population}
+          </Badge>
+        )}
+        {sorts.length > 0 && (
+          <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setSorts([])}>
+            Clear sort ({sorts.length})
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -459,13 +501,34 @@ export function SplRawDataPage() {
                       const inner =
                         it.key === "__select" ? (
                           <Checkbox
-                            checked={filtered.length > 0 && selectedIds.length === filtered.length}
-                            onCheckedChange={(v) => setSelectedIds(v ? filtered.map((r) => r.id) : [])}
+                            checked={sorted.length > 0 && selectedIds.length === sorted.length}
+                            onCheckedChange={(v) => setSelectedIds(v ? sorted.map((r) => r.id) : [])}
                             aria-label="Select all"
                           />
                         ) : (
                           <span className="inline-flex items-center">
-                            {it.def!.label}
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(it.key)}
+                              title="클릭: 오름차순 → 내림차순 → 해제 (클릭 순서가 정렬 우선순위)"
+                              className="inline-flex items-center gap-0.5 hover:text-primary"
+                            >
+                              {it.def!.label}
+                              {(() => {
+                                const idx = sorts.findIndex((s) => s.key === it.key);
+                                if (idx < 0) return null;
+                                return (
+                                  <>
+                                    {sorts[idx].desc ? (
+                                      <ArrowDown className="h-3 w-3" />
+                                    ) : (
+                                      <ArrowUp className="h-3 w-3" />
+                                    )}
+                                    <SortPriorityBadge index={idx} total={sorts.length} />
+                                  </>
+                                );
+                              })()}
+                            </button>
                             {it.def!.filter === "multi" && (
                               <SplColumnFilterDropdown
                                 label={it.def!.label}
@@ -530,7 +593,7 @@ export function SplRawDataPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r) => (
+                  {sorted.map((r) => (
                     <SplTableRow
                       key={r.id}
                       row={r}
@@ -555,7 +618,7 @@ export function SplRawDataPage() {
                       }}
                     />
                   ))}
-                  {filtered.length === 0 && (
+                  {sorted.length === 0 && (
                     <tr>
                       <td colSpan={layout.length + stageCols.length} className="p-8 text-center text-muted-foreground">
                         No rows match the current filters.
@@ -581,7 +644,7 @@ export function SplRawDataPage() {
       <SplExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
-        rows={filtered}
+        rows={sorted}
         exportColumns={exportColumns}
         onRoundtrip={onExport}
       />
@@ -593,7 +656,7 @@ export function SplRawDataPage() {
       />
 
       <div className="text-[11px] text-muted-foreground">
-        Showing {filtered.length.toLocaleString()} of {population.toLocaleString()} rows · As of {asOf} · NA stages are marked{" "}
+        Showing {sorted.length.toLocaleString()} of {population.toLocaleString()} rows · As of {asOf} · NA stages are marked{" "}
         <span className="rounded bg-muted px-1">NA</span> and excluded from the progress denominator (distinct from blank).
       </div>
     </div>
@@ -888,44 +951,5 @@ function StickyCell({
     >
       {children}
     </td>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  note,
-  active,
-  onClick,
-  tone,
-}: {
-  label: string;
-  value: number;
-  note?: string;
-  active?: boolean;
-  onClick?: () => void;
-  tone?: "warn" | "bad";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-lg border p-2 text-left transition hover:border-primary/60",
-        active && "border-primary ring-1 ring-primary/30",
-      )}
-    >
-      <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div
-        className={cn(
-          "text-xl font-semibold tabular-nums",
-          tone === "bad" && "text-red-600",
-          tone === "warn" && "text-amber-600",
-        )}
-      >
-        {value.toLocaleString()}
-      </div>
-      {note && <div className="text-[10px] text-muted-foreground">{note}</div>}
-    </button>
   );
 }

@@ -45,6 +45,7 @@ import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from '.
 import { Route as AuthenticatedClosureTaskManagementKpiAnalysisRouteImport } from './routes/_authenticated/closure/task-management/kpi-analysis'
 import { Route as AuthenticatedClosureTaskManagementDashboardRouteImport } from './routes/_authenticated/closure/task-management/dashboard'
 import { Route as AuthenticatedClosureSparePartRawDataRouteImport } from './routes/_authenticated/closure/spare-part/raw-data'
+import { Route as AuthenticatedClosureSparePartDashboardRouteImport } from './routes/_authenticated/closure/spare-part/dashboard'
 import { Route as AuthenticatedClosureSnagManagementSettingsRouteImport } from './routes/_authenticated/closure/snag-management/settings'
 import { Route as AuthenticatedClosureSnagManagementRawDataRouteImport } from './routes/_authenticated/closure/snag-management/raw-data'
 import { Route as AuthenticatedClosureSnagManagementProgressRouteImport } from './routes/_authenticated/closure/snag-management/progress'
@@ -273,6 +274,12 @@ const AuthenticatedClosureSparePartRawDataRoute =
     path: '/closure/spare-part/raw-data',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureSparePartDashboardRoute =
+  AuthenticatedClosureSparePartDashboardRouteImport.update({
+    id: '/closure/spare-part/dashboard',
+    path: '/closure/spare-part/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureSnagManagementSettingsRoute =
   AuthenticatedClosureSnagManagementSettingsRouteImport.update({
     id: '/closure/snag-management/settings',
@@ -429,6 +436,7 @@ export interface FileRoutesByFullPath {
   '/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
+  '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/closure/task-management/kpi-analysis': typeof AuthenticatedClosureTaskManagementKpiAnalysisRoute
@@ -485,6 +493,7 @@ export interface FileRoutesByTo {
   '/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
+  '/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/closure/task-management/kpi-analysis': typeof AuthenticatedClosureTaskManagementKpiAnalysisRoute
@@ -544,6 +553,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/snag-management/progress': typeof AuthenticatedClosureSnagManagementProgressRoute
   '/_authenticated/closure/snag-management/raw-data': typeof AuthenticatedClosureSnagManagementRawDataRoute
   '/_authenticated/closure/snag-management/settings': typeof AuthenticatedClosureSnagManagementSettingsRoute
+  '/_authenticated/closure/spare-part/dashboard': typeof AuthenticatedClosureSparePartDashboardRoute
   '/_authenticated/closure/spare-part/raw-data': typeof AuthenticatedClosureSparePartRawDataRoute
   '/_authenticated/closure/task-management/dashboard': typeof AuthenticatedClosureTaskManagementDashboardRoute
   '/_authenticated/closure/task-management/kpi-analysis': typeof AuthenticatedClosureTaskManagementKpiAnalysisRoute
@@ -603,6 +613,7 @@ export interface FileRouteTypes {
     | '/closure/snag-management/progress'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
+    | '/closure/spare-part/dashboard'
     | '/closure/spare-part/raw-data'
     | '/closure/task-management/dashboard'
     | '/closure/task-management/kpi-analysis'
@@ -659,6 +670,7 @@ export interface FileRouteTypes {
     | '/closure/snag-management/progress'
     | '/closure/snag-management/raw-data'
     | '/closure/snag-management/settings'
+    | '/closure/spare-part/dashboard'
     | '/closure/spare-part/raw-data'
     | '/closure/task-management/dashboard'
     | '/closure/task-management/kpi-analysis'
@@ -717,6 +729,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/snag-management/progress'
     | '/_authenticated/closure/snag-management/raw-data'
     | '/_authenticated/closure/snag-management/settings'
+    | '/_authenticated/closure/spare-part/dashboard'
     | '/_authenticated/closure/spare-part/raw-data'
     | '/_authenticated/closure/task-management/dashboard'
     | '/_authenticated/closure/task-management/kpi-analysis'
@@ -1005,6 +1018,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureSparePartRawDataRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/spare-part/dashboard': {
+      id: '/_authenticated/closure/spare-part/dashboard'
+      path: '/closure/spare-part/dashboard'
+      fullPath: '/closure/spare-part/dashboard'
+      preLoaderRoute: typeof AuthenticatedClosureSparePartDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/snag-management/settings': {
       id: '/_authenticated/closure/snag-management/settings'
       path: '/closure/snag-management/settings'
@@ -1216,6 +1236,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureSnagManagementProgressRoute: typeof AuthenticatedClosureSnagManagementProgressRoute
   AuthenticatedClosureSnagManagementRawDataRoute: typeof AuthenticatedClosureSnagManagementRawDataRoute
   AuthenticatedClosureSnagManagementSettingsRoute: typeof AuthenticatedClosureSnagManagementSettingsRoute
+  AuthenticatedClosureSparePartDashboardRoute: typeof AuthenticatedClosureSparePartDashboardRoute
   AuthenticatedClosureSparePartRawDataRoute: typeof AuthenticatedClosureSparePartRawDataRoute
   AuthenticatedClosureTaskManagementDashboardRoute: typeof AuthenticatedClosureTaskManagementDashboardRoute
   AuthenticatedClosureTaskManagementKpiAnalysisRoute: typeof AuthenticatedClosureTaskManagementKpiAnalysisRoute
@@ -1266,6 +1287,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureSnagManagementRawDataRoute,
   AuthenticatedClosureSnagManagementSettingsRoute:
     AuthenticatedClosureSnagManagementSettingsRoute,
+  AuthenticatedClosureSparePartDashboardRoute:
+    AuthenticatedClosureSparePartDashboardRoute,
   AuthenticatedClosureSparePartRawDataRoute:
     AuthenticatedClosureSparePartRawDataRoute,
   AuthenticatedClosureTaskManagementDashboardRoute:
