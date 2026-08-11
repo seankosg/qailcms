@@ -5,6 +5,7 @@ import { useTmScurveData } from "@/hooks/useTmScurveData";
 import { resolveActualPct, resolveIsDelayed } from "@/lib/task-management/delay-utils";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
+import { useUnionWindow } from "@/lib/charts/use-union-window";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
 const PROGRESS_HINT =
@@ -46,6 +47,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
   const f = settings?.tm ?? PDB_DEFAULTS.tm;
   const c = useTmPlot("C", asOfDate, f);
   const d = useTmPlot("D", asOfDate, f);
+  const { window: win, report } = useUnionWindow();
 
   return (
     <ProjectModuleSection
@@ -87,6 +89,9 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
               bucket={f.bucket}
               onBucketChange={() => {}}
               controlsHidden
+              windowStart={win.start}
+              windowEnd={win.end}
+              onWindowResolved={(s, e) => report(label, s, e)}
               open={open}
               onOpenChange={setOpen}
             />
