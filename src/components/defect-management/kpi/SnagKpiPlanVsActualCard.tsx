@@ -31,6 +31,13 @@ import {
   type Stage,
 } from "@/lib/defect-management/progress-utils";
 import { buildSnagSCurve } from "@/lib/defect-management/scurve-utils";
+import {
+  clampWindow,
+  incAxisMax,
+  pickXTicks,
+  signedDomain,
+  trimFlatTail,
+} from "@/lib/charts/scurve-view";
 
 export type SnagCurveUnit = "cnt" | "pct";
 
@@ -69,6 +76,9 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   /** PDB 전용 — 카드 내 조작 UI(단위·Bucket 토글) 숨김 */
   controlsHidden?: boolean;
+  /** 여러 차트를 나란히 놓을 때 공통 x 창(ISO). 주지 않으면 자기 모집단으로 잡는다. */
+  windowStart?: string | null;
+  windowEnd?: string | null;
 }
 
 export function SnagKpiPlanVsActualCard({
@@ -90,6 +100,8 @@ export function SnagKpiPlanVsActualCard({
   open,
   onOpenChange,
   controlsHidden = false,
+  windowStart,
+  windowEnd,
 }: Props) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
@@ -117,7 +129,7 @@ export function SnagKpiPlanVsActualCard({
   const conv = (v: number) => (isPct ? (denom > 0 ? (v / denom) * 100 : 0) : v);
   const r1 = (v: number) => Number(v.toFixed(1));
 
-  const data = curve.buckets.map((b, i) => ({
+  const allData = curve.buckets.map((b, i) => ({
     bucket: b,
     bucketLabel: curve.bucketLabels[i],
     planInc: r1(conv(ser.dailyPlan[i])),
@@ -139,12 +151,29 @@ export function SnagKpiPlanVsActualCard({
           ),
   }));
 
+  // 보이는 창만 줄인다 — 누계·모수 계산에는 손대지 않는다.
+  const view = useMemo(() => {
+    const tail = trimFlatTail({
+      planInc: allData.map((d) => d.planInc),
+      actualInc: allData.map((d) => d.actualInc),
+      todayIndex: curve.todayIndex,
+    });
+    const w = clampWindow(curve.buckets, 0, tail.end, windowStart, windowEnd);
+    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curve, windowStart, windowEnd, unit, baselinePlan, baselineActual, stageTotal]);
+  const data = view.rows;
+
   const todayLabel = curve.todayIndex >= 0 ? (curve.bucketLabels[curve.todayIndex] ?? null) : null;
 
   const n = stageTotal;
   const unitSuffix = isPct ? "%" : "건";
-  const incLabel = isPct ? "Plan (increment, %)" : "Plan (increment, 건)";
-  const incActualLabel = isPct ? "Actual (increment, %)" : "Actual (increment, 건)";
+  const incLabel = isPct
+    ? "Plan (increment, %) — 오른쪽 축"
+    : "Plan (increment, 건) — 오른쪽 축";
+  const incActualLabel = isPct
+    ? "Actual (increment, %) — 오른쪽 축"
+    : "Actual (increment, 건) — 오른쪽 축";
   const cumPlanLabel = isPct ? "Plan (cum %)" : "Plan (cum 건)";
   const cumActualLabel = isPct ? "Actual (cum %)" : "Actual (cum 건)";
   const varianceLabel = isPct ? "Δ Actual − Plan (%)" : "Δ Actual − Plan (건)";
@@ -159,13 +188,13 @@ export function SnagKpiPlanVsActualCard({
     variance: { label: varianceLabel, color: "var(--destructive)" },
   };
 
-  const hasData = curve.buckets.length > 0 && cells.length > 0;
-  const xTicks = useMemo(() => {
-    const labels = curve.bucketLabels;
-    if (labels.length <= 12) return labels;
-    const step = Math.ceil(labels.length / 12);
-    return labels.filter((_, i) => i % step === 0);
-  }, [curve.bucketLabels]);
+  const hasData = data.length > 0 && cells.length > 0;
+  const xTicks = useMemo(() => pickXTicks(data.map((d) => d.bucketLabel), 7), [data]);
+  const incMax = useMemo(
+    () => incAxisMax(data.flatMap((d) => [d.planInc, d.actualInc])),
+    [data],
+  );
+  const varDomain = useMemo(() => signedDomain(data.map((d) => d.variance)), [data]);
   const Y_LEFT_WIDTH = 56;
   const Y_RIGHT_WIDTH = 44;
   const accent =
@@ -289,6 +318,7 @@ export function SnagKpiPlanVsActualCard({
                         ? "% = 값 ÷ 모수(total) × 100 (막대 차트와 동일 분모)"
                         : `건수 = ${STAGE_LABELS[stage]} 스테이지 문서 건수`}
                     </span>
+                    {view.trimmed > 0 && <span>이후 {view.trimmed}개 구간 계획 없음</span>}
                   </div>
                 </div>
 
@@ -301,11 +331,14 @@ export function SnagKpiPlanVsActualCard({
                       ticks={xTicks}
                       interval={0}
                       minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
                     />
                     <YAxis
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={[0, "auto"]}
+                      domain={isPct ? [0, 100] : [0, "auto"]}
                       tickFormatter={(v) => (isPct ? `${v}%` : `${v}`)}
                     />
                     <YAxis
@@ -313,7 +346,7 @@ export function SnagKpiPlanVsActualCard({
                       orientation="right"
                       width={Y_RIGHT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={["auto", "auto"]}
+                      domain={[0, incMax]}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
@@ -335,7 +368,7 @@ export function SnagKpiPlanVsActualCard({
                       yAxisId="bar"
                       dataKey="planInc"
                       name={incLabel}
-                      fill="color-mix(in oklab, var(--muted-foreground) 35%, transparent)"
+                      fill="color-mix(in oklab, var(--muted-foreground) 22%, transparent)"
                       barSize={8}
                       hide={hidden.has("planInc")}
                     />
@@ -343,7 +376,7 @@ export function SnagKpiPlanVsActualCard({
                       yAxisId="bar"
                       dataKey="actualInc"
                       name={incActualLabel}
-                      fill="var(--primary)"
+                      fill="color-mix(in oklab, var(--primary) 30%, transparent)"
                       barSize={8}
                       hide={hidden.has("actualInc")}
                     />
@@ -379,8 +412,11 @@ export function SnagKpiPlanVsActualCard({
                       ticks={xTicks}
                       interval={0}
                       minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
                     />
-                    <YAxis width={Y_LEFT_WIDTH} tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
+                    <YAxis width={Y_LEFT_WIDTH} tick={{ fontSize: 11 }} domain={varDomain} />
                     {/* 위 차트의 우측 Y축과 같은 폭을 확보해 그림 영역을 일치시킨다. */}
                     <YAxis
                       yAxisId="spacer"

@@ -37,6 +37,13 @@ import {
   type SCurveBaselines,
   type SCurveCum,
 } from "@/lib/abd/scurve-utils";
+import {
+  clampWindow,
+  incAxisMax,
+  pickXTicks,
+  signedDomain,
+  trimFlatTail,
+} from "@/lib/charts/scurve-view";
 
 export interface AbdPlanVsActualCardProps {
   /** 전 라운드 통합 cells (메인 매트릭스 쿼리 재사용) */
@@ -50,6 +57,9 @@ export interface AbdPlanVsActualCardProps {
   baselines?: SCurveBaselines;
   /** 서버 정본 누적(문서 distinct). 종점 = 행 totals */
   cum?: SCurveCum;
+  /** 여러 차트를 나란히 놓을 때 공통 x 창(ISO). 주지 않으면 자기 모집단으로 잡는다. */
+  windowStart?: string | null;
+  windowEnd?: string | null;
 }
 
 export function AbdPlanVsActualCard({
@@ -61,6 +71,8 @@ export function AbdPlanVsActualCard({
   onOpenChange,
   baselines,
   cum,
+  windowStart,
+  windowEnd,
 }: AbdPlanVsActualCardProps) {
   const scurve = useMemo(
     () => buildAbdSCurve({ cells, buckets, stages, today, baselines, cum }),
@@ -79,13 +91,15 @@ export function AbdPlanVsActualCard({
   const seriesByStage = new Map<Stage, (typeof scurve.series)[number]>();
   for (const s of scurve.series) seriesByStage.set(s.stage, s);
 
-  const data = scurve.bucketLabels.map((label, i) => {
+  const allData = scurve.bucketLabels.map((label, i) => {
     const row: Record<string, unknown> = {
       bucket: scurve.buckets[i],
       bucketLabel: label,
     };
     let varSum: number | null = 0;
     let anyNull = false;
+    let planIncSum = 0;
+    let actualIncSum = 0;
     for (const st of stages) {
       const ser = seriesByStage.get(st);
       if (!ser) continue;
@@ -95,12 +109,44 @@ export function AbdPlanVsActualCard({
       row[`cumActual_${st}`] = ser.cumActual[i];
       const a = ser.dailyActual[i];
       const p = ser.dailyPlan[i];
+      planIncSum += p ?? 0;
+      actualIncSum += a ?? 0;
       if (a == null) anyNull = true;
       else if (varSum != null) varSum += a - p;
     }
     row.variance = anyNull ? null : varSum;
+    row.__planIncSum = planIncSum;
+    row.__actualIncSum = actualIncSum;
     return row;
   });
+
+  // 보이는 창만 줄인다 — 누계·모수 계산은 건드리지 않는다.
+  const view = useMemo(() => {
+    const tail = trimFlatTail({
+      planInc: allData.map((d) => d.__planIncSum as number),
+      actualInc: allData.map((d) => d.__actualIncSum as number),
+      todayIndex: scurve.todayIndex,
+    });
+    const w = clampWindow(scurve.buckets, 0, tail.end, windowStart, windowEnd);
+    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scurve, stages, windowStart, windowEnd]);
+  const data = view.rows;
+  const xTicks = useMemo(
+    () => pickXTicks(data.map((d) => String(d.bucketLabel)), 7),
+    [data],
+  );
+  const incMax = useMemo(
+    () =>
+      incAxisMax(
+        data.flatMap((d) => [d.__planIncSum as number, d.__actualIncSum as number]),
+      ),
+    [data],
+  );
+  const varDomain = useMemo(
+    () => signedDomain(data.map((d) => d.variance as number | null)),
+    [data],
+  );
 
   const todayLabel =
     scurve.todayIndex >= 0 ? scurve.bucketLabels[scurve.todayIndex] ?? null : null;
@@ -118,7 +164,7 @@ export function AbdPlanVsActualCard({
     variance: { label: "Δ Actual − Plan", color: "hsl(var(--destructive))" },
   };
 
-  const hasData = buckets.length > 0 && stages.length > 0;
+  const hasData = data.length > 0 && stages.length > 0;
 
   // KPI: 오늘 시점, 스테이지별 P/A/Δ (compact)
   const idxForKpi = scurve.todayIndex >= 0 ? scurve.todayIndex : buckets.length - 1;
@@ -187,14 +233,34 @@ export function AbdPlanVsActualCard({
                       </div>
                     );
                   })}
+                  {view.trimmed > 0 && (
+                    <div className="flex items-center px-3 py-1 text-[10px] text-muted-foreground">
+                      이후 {view.trimmed}개 구간 계획 없음
+                    </div>
+                  )}
                 </div>
 
                 <ChartContainer config={cfg} className="h-[360px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucketLabel" tick={{ fontSize: 10 }} minTickGap={20} />
-                    <YAxis yAxisId="cum" tick={{ fontSize: 11 }} allowDecimals={false} domain={["auto", "auto"]} />
-                    <YAxis yAxisId="bar" orientation="right" tick={{ fontSize: 11 }} allowDecimals={false} domain={["auto", "auto"]} />
+                    <XAxis
+                      dataKey="bucketLabel"
+                      tick={{ fontSize: 10 }}
+                      ticks={xTicks}
+                      interval={0}
+                      minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
+                    />
+                    <YAxis yAxisId="cum" tick={{ fontSize: 11 }} allowDecimals={false} domain={[0, "auto"]} />
+                    <YAxis
+                      yAxisId="bar"
+                      orientation="right"
+                      tick={{ fontSize: 11 }}
+                      allowDecimals={false}
+                      domain={[0, incMax]}
+                    />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
                       wrapperStyle={{ fontSize: 11 }}
@@ -218,8 +284,8 @@ export function AbdPlanVsActualCard({
                         yAxisId="bar"
                         dataKey={`planInc_${s}`}
                         stackId="plan"
-                        fill={ABD_STAGE_COLORS[s].bar}
-                        name={`${STAGE_LABELS[s]} Plan (daily)`}
+                        fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].bar} 45%, transparent)`}
+                        name={`${STAGE_LABELS[s]} Plan (increment) — 오른쪽 축`}
                         barSize={8}
                         hide={hidden.has(`planInc_${s}`)}
                       />
@@ -230,8 +296,8 @@ export function AbdPlanVsActualCard({
                         yAxisId="bar"
                         dataKey={`actualInc_${s}`}
                         stackId="actual"
-                        fill={ABD_STAGE_COLORS[s].line}
-                        name={`${STAGE_LABELS[s]} Actual (daily)`}
+                        fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].line} 35%, transparent)`}
+                        name={`${STAGE_LABELS[s]} Actual (increment) — 오른쪽 축`}
                         barSize={8}
                         hide={hidden.has(`actualInc_${s}`)}
                       />
@@ -244,7 +310,7 @@ export function AbdPlanVsActualCard({
                         dataKey={`cumPlan_${s}`}
                         stroke={ABD_STAGE_COLORS[s].line}
                         strokeDasharray={PLAN_DASH}
-                        strokeWidth={1.5}
+                        strokeWidth={2.5}
                         dot={false}
                         name={`${STAGE_LABELS[s]} Plan (cum)`}
                         hide={hidden.has(`cumPlan_${s}`)}
@@ -257,7 +323,7 @@ export function AbdPlanVsActualCard({
                         type="monotone"
                         dataKey={`cumActual_${s}`}
                         stroke={ABD_STAGE_COLORS[s].line}
-                        strokeWidth={2.5}
+                        strokeWidth={3.5}
                         dot={false}
                         name={`${STAGE_LABELS[s]} Actual (cum)`}
                         connectNulls={false}
@@ -270,8 +336,17 @@ export function AbdPlanVsActualCard({
                 <ChartContainer config={varianceCfg} className="h-[120px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucketLabel" tick={{ fontSize: 10 }} minTickGap={20} />
-                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} domain={["auto", "auto"]} />
+                    <XAxis
+                      dataKey="bucketLabel"
+                      tick={{ fontSize: 10 }}
+                      ticks={xTicks}
+                      interval={0}
+                      minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} domain={varDomain} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     {todayLabel && (
                       <ReferenceLine x={todayLabel} stroke="hsl(var(--destructive))" strokeDasharray="4 2" />
@@ -282,10 +357,10 @@ export function AbdPlanVsActualCard({
                         const v = row.variance as number | null;
                         const fill =
                           v == null
-                            ? "var(--color-muted)"
+                            ? "transparent"
                             : v < 0
-                              ? "var(--color-destructive)"
-                              : "var(--color-emerald-600)";
+                              ? "var(--destructive)"
+                              : "var(--success)";
                         return <Cell key={i} fill={fill} />;
                       })}
                     </Bar>

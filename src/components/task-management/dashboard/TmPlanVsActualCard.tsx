@@ -24,6 +24,13 @@ import { cn } from "@/lib/utils";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import type { OwnerDim } from "@/lib/task-management/delay-utils";
 import { buildTmSCurve, type SCurveBucket } from "@/lib/task-management/scurve-utils";
+import {
+  clampWindow,
+  incAxisMax,
+  pickXTicks,
+  signedDomain,
+  trimFlatTail,
+} from "@/lib/charts/scurve-view";
 import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
 
 type CurveUnit = "pct" | "tasks";
@@ -57,6 +64,9 @@ interface Props {
   onBucketChange: (b: SCurveBucket) => void;
   /** PDB 전용 — 카드 내 조작 UI(단위·Bucket 토글) 숨김 */
   controlsHidden?: boolean;
+  /** 여러 차트를 나란히 놓을 때 공통 x 창(ISO). 주지 않으면 자기 모집단으로 잡는다. */
+  windowStart?: string | null;
+  windowEnd?: string | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
@@ -70,6 +80,8 @@ export function TmPlanVsActualCard({
   bucket,
   onBucketChange,
   controlsHidden = false,
+  windowStart,
+  windowEnd,
   open,
   onOpenChange,
 }: Props) {
@@ -108,7 +120,7 @@ export function TmPlanVsActualCard({
   const conv = (v: number) => (isTasks ? (v / 100) * n : v);
   const r1 = (v: number) => Number(v.toFixed(1));
 
-  const data = curve.buckets.map((b, i) => ({
+  const allData = curve.buckets.map((b, i) => ({
     bucket: b,
     bucketLabel: curve.bucketLabels[i],
     planInc: r1(conv(curve.dailyPlan[i])),
@@ -120,6 +132,19 @@ export function TmPlanVsActualCard({
         ? null
         : r1(conv((curve.cumActual[i] as number) - curve.cumPlan[i])),
   }));
+
+  // 보이는 창만 줄인다 — 누계·모수 계산은 위에서 이미 끝났고 손대지 않는다.
+  const view = useMemo(() => {
+    const tail = trimFlatTail({
+      planInc: allData.map((d) => d.planInc),
+      actualInc: allData.map((d) => d.actualInc),
+      todayIndex: curve.todayIndex,
+    });
+    const w = clampWindow(curve.buckets, 0, tail.end, windowStart, windowEnd);
+    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curve, windowStart, windowEnd, unit, n]);
+  const data = view.rows;
 
   const todayLabel = curve.todayIndex >= 0 ? (curve.bucketLabels[curve.todayIndex] ?? null) : null;
 
@@ -138,8 +163,12 @@ export function TmPlanVsActualCard({
   const deltaNow = actualNow - planNow;
 
   const unitSuffix = isTasks ? " tasks" : "%";
-  const incLabel = isTasks ? "Plan (increment, tasks)" : "Plan (increment, pp)";
-  const incActualLabel = isTasks ? "Actual (increment, tasks)" : "Actual (increment, pp)";
+  const incLabel = isTasks
+    ? "Plan (increment, tasks) — 오른쪽 축"
+    : "Plan (increment, pp) — 오른쪽 축";
+  const incActualLabel = isTasks
+    ? "Actual (increment, tasks) — 오른쪽 축"
+    : "Actual (increment, pp) — 오른쪽 축";
   const cumPlanLabel = isTasks ? "Plan (cum tasks)" : "Plan (cum %)";
   const cumActualLabel = isTasks ? "Actual (cum tasks)" : "Actual (cum %)";
   const varianceLabel = isTasks ? "Δ Actual − Plan (tasks)" : "Δ Actual − Plan (pp)";
@@ -154,14 +183,14 @@ export function TmPlanVsActualCard({
     variance: { label: varianceLabel, color: "var(--destructive)" },
   };
 
-  const hasData = curve.buckets.length > 0 && scoped.length > 0;
+  const hasData = data.length > 0 && scoped.length > 0;
   // 위·아래 차트의 x축 눈금을 동일하게 맞춘다(그림 영역 폭 + ticks 배열 공유).
-  const xTicks = useMemo(() => {
-    const labels = curve.bucketLabels;
-    if (labels.length <= 12) return labels;
-    const step = Math.ceil(labels.length / 12);
-    return labels.filter((_, i) => i % step === 0);
-  }, [curve.bucketLabels]);
+  const xTicks = useMemo(() => pickXTicks(data.map((d) => d.bucketLabel), 7), [data]);
+  const incMax = useMemo(
+    () => incAxisMax(data.flatMap((d) => [d.planInc, d.actualInc])),
+    [data],
+  );
+  const varDomain = useMemo(() => signedDomain(data.map((d) => d.variance)), [data]);
   const Y_LEFT_WIDTH = 56;
   const Y_RIGHT_WIDTH = 44;
   const accent =
@@ -282,6 +311,7 @@ export function TmPlanVsActualCard({
                         ? "Tasks = Σ progress (0.4 진행 = 0.4건)"
                         : "% = 대상 과업 진척률 단순 평균"}
                     </span>
+                    {view.trimmed > 0 && <span>이후 {view.trimmed}개 구간 계획 없음</span>}
                   </div>
                   {curve.excludedCount > 0 && (
                     <div className="flex items-center rounded border border-destructive/40 bg-destructive/10 px-3 py-1 text-[11px] font-semibold text-destructive">
@@ -300,11 +330,14 @@ export function TmPlanVsActualCard({
                       ticks={xTicks}
                       interval={0}
                       minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
                     />
                     <YAxis
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={[0, "auto"]}
+                      domain={isTasks ? [0, "auto"] : [0, 100]}
                       tickFormatter={(v) => (isTasks ? `${v}` : `${v}%`)}
                     />
                     <YAxis
@@ -312,7 +345,7 @@ export function TmPlanVsActualCard({
                       orientation="right"
                       width={Y_RIGHT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={["auto", "auto"]}
+                      domain={[0, incMax]}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
@@ -334,7 +367,7 @@ export function TmPlanVsActualCard({
                       yAxisId="bar"
                       dataKey="planInc"
                       name={incLabel}
-                      fill="color-mix(in oklab, var(--muted-foreground) 35%, transparent)"
+                      fill="color-mix(in oklab, var(--muted-foreground) 22%, transparent)"
                       barSize={8}
                       hide={hidden.has("planInc")}
                     />
@@ -342,7 +375,7 @@ export function TmPlanVsActualCard({
                       yAxisId="bar"
                       dataKey="actualInc"
                       name={incActualLabel}
-                      fill="var(--primary)"
+                      fill="color-mix(in oklab, var(--primary) 30%, transparent)"
                       barSize={8}
                       hide={hidden.has("actualInc")}
                     />
@@ -378,11 +411,14 @@ export function TmPlanVsActualCard({
                       ticks={xTicks}
                       interval={0}
                       minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
                     />
                     <YAxis
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={["auto", "auto"]}
+                      domain={varDomain}
                     />
                     {/* 위 차트의 우측 Y축과 같은 폭을 확보해 그림 영역을 일치시킨다. */}
                     <YAxis
