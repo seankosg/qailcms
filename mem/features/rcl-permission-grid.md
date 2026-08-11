@@ -3,7 +3,7 @@ name: RCL 권한 격자 정본
 description: 권한 판정은 rcl_permissions 격자(105행/allowed 67) 단일 근거. 행 범위 vs 모듈 판정 구분, SELECT 정책 불변, FOR ALL 분해, 조용한 실패 금지 규칙
 type: feature
 ---
-권한 판정 근거는 `rcl_permissions` 격자(role × scope × action) 하나뿐이다. 역할 이름을 정책·앱 코드에 하드코딩하지 않는다. 기준값 105행 / allowed=true 67행 (변경 시 반드시 보고).
+권한 판정 근거는 `rcl_permissions` 격자(role × scope × action) 하나뿐이다. 역할 이름을 정책·앱 코드에 하드코딩하지 않는다. 기준값 105행 / allowed=true 68행 (2026-08-11 `user·write·own_team` 개방 승인 반영, 이전 67행). 변경 시 반드시 보고.
 
 - 소유자 칸(팀·담당자)이 있는 표 → 행 범위 판정 `rcl_can(uid, MODULE, id, action)` / 다건은 `rcl_can_rows`.
 - 소유자 칸이 없는 로그·이력 표 → 모듈 판정 `rcl_grants(MODULE, action)` 세 범위 OR.

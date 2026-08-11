@@ -15,7 +15,8 @@ export type RclCanonAction = "read" | "write" | "delete" | "import" | "export";
 export const RCL_CANONICAL: Record<RclCanonRole, Record<RclCanonScope, boolean[]>> = {
   user: {
     own:        [true, true, true, true, true],
-    own_team:   [true, false, false, false, false],
+    // 2026-08-11 지시자 승인: user 등급 same-team write 개방(전 모듈 파급)
+    own_team:   [true, true, false, false, false],
     other_team: [false, false, false, false, false],
   },
   senior_user: {
