@@ -1,12 +1,7 @@
 import JSZip from "jszip";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import {
-  BACKUP_TABLES,
-  MODULE_PRE_IMPORT_TABLES,
-  type BackupTableName,
-  type PreImportModule,
-} from "./backup-shared";
+import { BACKUP_TABLES, MODULE_PRE_IMPORT_TABLES, type BackupTableName } from "./backup-shared";
 import {
   evaluateParity,
   parityErrorMessage,
@@ -335,10 +330,10 @@ export async function createSnapshot(
   supabaseAdmin: SupabaseClient<Database>,
   opts: CreateSnapshotOptions,
 ): Promise<CreateSnapshotResult> {
-  // 백업 목록 정합성 관문: DB 정본(get_backup_tables)과 코드 목록이 다르면 조용히 진행하지 않는다.
-  // get_backup_tables() 내부에서 information_schema 의 영구 abd_ocs_% 테이블 누락도 EXCEPTION 으로 막는다.
-  await assertBackupTableParity(supabaseAdmin);
-  const { snapshotId, name, triggeredBy, triggerMetadata, tables, onTableProgress } = opts;
+  const { snapshotId, name, triggeredBy, triggerMetadata, tables, onTableProgress, parityScope } =
+    opts;
+  // 백업 목록 정합성 관문. 전체 Backup 은 전역 목록을, 모듈별 사전 스냅샷은 해당 모듈 목록만 검사한다.
+  await assertBackupTableParity(supabaseAdmin, parityScope ?? "global");
   const startedAt = new Date().toISOString();
   const folder = `snapshots/${snapshotId}/`;
   const tablesToBackup = tables && tables.length > 0 ? tables : BACKUP_TABLES;
@@ -548,103 +543,10 @@ export async function restoreSnapshot(
   const restoredTables: string[] = [];
   let totalRows = 0;
 
-  // 실측 FK 의존성(pg_constraint) 기준 복구 순서. 참조되는 테이블이 항상 먼저 복구됩니다.
-  const ordered = tables.slice().sort((a, b) => {
-    const order = new Map<BackupTableName, number>([
-      ["team_master", 1],
-      ["subcontractor_master", 2],
-      ["dmr_contractor_master", 3],
-      ["dmr_system_master", 4],
-      ["defect_category_team_map", 5],
-      ["task_management_settings", 6],
-      ["tm_milestone_kinds", 7],
-      ["abd_field_config", 8],
-      ["defect_field_config", 9],
-      ["task_management_field_config", 10],
-      ["spl_stage_catalog", 11],
-      ["abd_header_mappings", 12],
-      ["defect_header_mappings", 13],
-      ["task_management_header_mappings", 14],
-      ["wrt_stage_catalog", 15],
-      ["user_roles", 16],
-      ["profiles", 17],
-      ["hdec_eng_name_master", 18],
-      ["hdec_pic_name_master", 19],
-      ["hdec_name_propagation_log", 20],
-      ["abd_items_raw", 21],
-      // 번호 교정 기록은 abd_items_raw 복구 이후에 적재한다
-      ["abd_ocs_number_correction_log", 21.5],
-      ["defect_items_raw", 22],
-      // task_management_raw 는 task_management_import_logs 를 참조하므로 로그가 먼저다
-      ["task_management_import_logs", 23],
-      ["task_management_raw", 24],
-      ["dmr_entries", 25],
-      ["abd_import_logs", 26],
-      ["defect_import_logs", 27],
-      ["spl_items", 28],
-      ["spl_stage_progress", 29],
-      ["spl_change_log", 30],
-      ["spl_settings", 31],
-      ["spl_import_logs", 32],
-      ["wrt_items", 33],
-      ["wrt_stage_progress", 34],
-      ["wrt_change_log", 35],
-      ["wrt_settings", 36],
-      ["wrt_import_logs", 37],
-      ["abd_settings", 38],
-      ["abd_import_presets", 39],
-      ["abd_comments", 40],
-      ["abd_change_log", 41],
-      ["task_comments", 42],
-      ["defect_comments", 43],
-      ["defect_status_history", 44],
-      ["task_management_status_history", 45],
-      ["task_schedule_change_audit", 46],
-      ["rcl_permissions", 47],
-      ["rcl_module_config", 48],
-      ["rcl_permissions_audit", 49],
-      ["rcl_module_config_audit", 50],
-      ["user_view_preferences", 51],
-      ["tm_alarm_settings", 52],
-      ["tm_milestone_config", 53],
-      ["tm_milestone_config_audit", 54],
-      ["defect_hdec_pic_rules", 55],
-      ["defect_subcon_rules", 56],
-      ["defect_import_presets", 57],
-      // OCS: 로그 → 코멘트 → 첨부/준수 (FK 의존 순)
-      ["abd_ocs_import_logs", 58],
-      ["abd_ocs_comment_groups", 59],
-      ["abd_ocs_comments", 60],
-      // comment-ABD 링크는 코멘트와 abd_items_raw 복구 이후
-      ["abd_ocs_comment_abd_links", 60.5],
-      ["abd_ocs_attachments", 61],
-      ["abd_ocs_attachment_comment_links", 62],
-      ["abd_ocs_compliance", 63],
-      ["abd_ocs_compliance_log", 64],
-      ["abd_ocs_response_segments", 65],
-      ["abd_ocs_response_comment_links", 66],
-      ["abd_ocs_source_files", 67],
-      // SPL OCS/RSP/Documents: 로그·카탈로그 → 본체 → 링크 → 준수
-      ["spl_ocs_import_logs", 68],
-      ["spl_ocs_categories", 69],
-      ["spl_rsp_items", 70],
-      ["spl_ocs_comment_groups", 71],
-      ["spl_ocs_comments", 72],
-      ["spl_ocs_source_files", 73],
-      ["spl_documents", 74],
-      ["spl_ocs_attachments", 75],
-      ["spl_ocs_comment_spl_links", 76],
-      ["spl_ocs_comment_rsp_links", 77],
-      ["spl_ocs_categories_mapping", 78],
-      ["spl_ocs_attachment_comment_links", 79],
-      ["spl_document_item_links", 80],
-      ["spl_document_pages", 80.5],
-      ["spl_ocs_comment_document_links", 81],
-      ["spl_ocs_compliance", 82],
-      ["spl_ocs_compliance_log", 83],
-    ]);
-    return (order.get(a) ?? 99) - (order.get(b) ?? 99);
-  });
+  // 복구 순서 정본은 모듈 상수 RESTORE_ORDER 를 따른다.
+  const ordered = tables
+    .slice()
+    .sort((a, b) => (RESTORE_ORDER.get(a) ?? 99) - (RESTORE_ORDER.get(b) ?? 99));
 
   for (const tableName of ordered) {
     // 신 포맷: 매니페스트의 parts를 우선 사용, 없으면 레거시 단일 파일로 폴백
