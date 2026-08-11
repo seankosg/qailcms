@@ -24,11 +24,11 @@ export function splJudgmentLabel(v: string): string {
 }
 
 export const SPL_COLUMNS: SplColumnDef[] = [
-  { key: "spl_number", label: "SPL NUMBER", width: 230, filter: "none", get: (r) => r.spl_number ?? "" },
+  { key: "spl_number", label: "SPL NUMBER", width: 230, filter: "multi", get: (r) => r.spl_number ?? "" },
   { key: "plot", label: "Plot", width: 70, filter: "multi", get: (r) => (r.plot ? `PLOT-${r.plot}` : "") },
   { key: "team", label: "Team", width: 80, filter: "multi", get: (r) => r.team ?? "", edit: "team" },
   { key: "judgment", label: "Status", width: 110, filter: "multi", get: (r) => splJudgmentLabel(r.judgment) },
-  { key: "progress_pct", label: "Progress", width: 90, filter: "none", get: (r) => (r.progress_pct == null ? "" : `${r.progress_pct}%`) },
+  { key: "progress_pct", label: "Progress", width: 90, filter: "multi", get: (r) => (r.progress_pct == null ? "" : `${r.progress_pct}%`) },
   { key: "current_stage", label: "Current Stage", width: 150, filter: "multi", get: (r) => r.current_stage?.label ?? "" },
   {
     key: "primary_delay",
@@ -41,20 +41,20 @@ export const SPL_COLUMNS: SplColumnDef[] = [
   { key: "eng", label: "ENG", width: 90, filter: "multi", get: (r) => r.eng ?? "", edit: "eng" },
   { key: "pic_po", label: "PIC PO", width: 90, filter: "multi", get: (r) => r.pic_po ?? "", edit: "pic_po" },
   { key: "eng_po", label: "ENG PO", width: 90, filter: "multi", get: (r) => r.eng_po ?? "", edit: "eng_po" },
-  { key: "req_doc", label: "Req.Doc", width: 90, filter: "none", get: (r) => `${r.req_doc_done}/${r.req_doc_total}` },
+  { key: "req_doc", label: "Req.Doc", width: 90, filter: "multi", get: (r) => `${r.req_doc_done}/${r.req_doc_total}` },
   {
     key: "ocs",
     label: "OCS",
     width: 90,
-    filter: "none",
+    filter: "multi",
     get: (r) => (r.ocs_total == null ? "" : `${r.ocs_total}/${r.ocs_pending ?? 0}`),
   },
-  { key: "rsp", label: "RSP", width: 70, filter: "none", get: (r) => (r.rsp_total == null ? "" : String(r.rsp_total)) },
+  { key: "rsp", label: "RSP", width: 70, filter: "multi", get: (r) => (r.rsp_total == null ? "" : String(r.rsp_total)) },
   {
     key: "documents",
     label: "Documents",
     width: 100,
-    filter: "none",
+    filter: "multi",
     get: (r) => (r.document_total == null ? "" : String(r.document_total)),
   },
   { key: "data_date", label: "Data Date", width: 100, filter: "multi", get: (r) => r.data_date ?? "" },
@@ -62,7 +62,7 @@ export const SPL_COLUMNS: SplColumnDef[] = [
   { key: "latest_status", label: "Latest Status", width: 110, filter: "multi", get: (r) => r.latest_status ?? "" },
   { key: "dis", label: "DIS", width: 90, filter: "multi", get: (r) => r.dis ?? "" },
   { key: "service", label: "Service", width: 120, filter: "multi", get: (r) => r.service ?? "" },
-  { key: "title", label: "Title", width: 280, filter: "none", get: (r) => r.title ?? "" },
+  { key: "title", label: "Title", width: 280, filter: "multi", get: (r) => r.title ?? "" },
 ];
 
 /**
