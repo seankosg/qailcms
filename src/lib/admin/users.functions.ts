@@ -40,6 +40,20 @@ async function assertStrictAdmin(supabase: any, userId: string) {
   if (!data) throw new Error("이 작업은 Admin 계정만 수행할 수 있습니다.");
 }
 
+/** 최상위(System Administrator) 단독 검사. 계정 관리 잠금 경로 전용 술어 — 하나만 둔다. */
+async function assertSystemAdmin(supabase: any, userId: string) {
+  const { data, error } = await supabase.rpc("is_system_admin", { _user_id: userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("이 작업은 System Administrator 계정만 수행할 수 있습니다.");
+}
+
+/** 대상 계정이 최상위 등급인지 + 최상위가 몇 명인지 (최후의 1인 보호용). */
+async function systemAdminState(admin: any, targetUserId: string) {
+  const { data } = await admin.from("user_roles").select("user_id").eq("role", "system_administrator");
+  const ids = (data ?? []).map((r: any) => String(r.user_id));
+  return { targetIsTop: ids.includes(targetUserId), topCount: ids.length };
+}
+
 /** 화면과 서버 판정 기준을 맞추기 위한 등급 서열 (DB rcl_highest_role 과 동일). */
 const ROLE_RANK_SRV: Record<string, number> = {
   system_administrator: 110, admin: 100, superuser: 90, d_superuser: 80, senior_user: 70,
@@ -93,7 +107,7 @@ export const createAppUser = createServerFn({ method: "POST" })
     hdec_eng_name?: string | null;
   }) => input)
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertSystemAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const loginId = data.login_id.trim().toLowerCase();
     if (!/^[a-z0-9._-]+$/.test(loginId)) {
@@ -151,7 +165,7 @@ export const resetUserPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string; temp_password: string }) => input)
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertSystemAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
       password: data.temp_password,
@@ -165,12 +179,16 @@ export const updateUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string; role: AppRole }) => input)
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
-    // §2 admin 승격은 admin 만. superuser 가 admin 계정 수를 늘리지 못하게 한다.
-    if (data.role === "admin") {
-      await assertStrictAdmin(context.supabase, context.userId);
-    }
+    // §5(2026-08-11) 역할 변경은 최상위 전용.
+    await assertSystemAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // §6 최상위 계정 보호 — 최상위가 1명이면 그 등급을 바꿀 수 없다.
+    {
+      const st = await systemAdminState(supabaseAdmin, data.user_id);
+      if (st.targetIsTop && data.role !== "system_administrator" && st.topCount <= 1) {
+        throw new Error("마지막 System Administrator 계정의 등급은 변경할 수 없습니다.");
+      }
+    }
     const { data: curRows } = await supabaseAdmin
       .from("user_roles").select("role").eq("user_id", data.user_id);
     const current = (curRows ?? []).map((r: any) => String(r.role));
@@ -263,9 +281,15 @@ export const deleteAppUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string }) => input)
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertSystemAdmin(context.supabase, context.userId);
     if (data.user_id === context.userId) throw new Error("본인 계정은 삭제할 수 없습니다.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    {
+      const st = await systemAdminState(supabaseAdmin, data.user_id);
+      if (st.targetIsTop && st.topCount <= 1) {
+        throw new Error("마지막 System Administrator 계정은 삭제할 수 없습니다.");
+      }
+    }
     // 명부(hdec_*_name_master) 등에서 linked_user_id 참조가 남아 있으면 삭제가 실패한다.
     for (const t of ["hdec_pic_name_master", "hdec_eng_name_master"]) {
       await (supabaseAdmin as any).from(t).update({ linked_user_id: null }).eq("linked_user_id", data.user_id);
@@ -291,7 +315,7 @@ export const bulkResetTempPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { temp_password: string }) => input)
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertSystemAdmin(context.supabase, context.userId);
     const pw = String(data.temp_password ?? "");
     if (!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(pw)) {
       throw new Error("임시 비밀번호는 영문+숫자 포함 6자 이상이어야 합니다.");
