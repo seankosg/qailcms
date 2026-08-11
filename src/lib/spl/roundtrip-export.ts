@@ -46,7 +46,7 @@ export function buildSplColumns(catalog: SplCatalogEntry[]): Col[] {
   const sorted = [...catalog].sort((a, b) => a.sort_order - b.sort_order);
   for (const s of sorted) {
     // 원본 배치 재현: Approval date 앞에 Approval Status, RFQ Draft 앞에 PO 담당자 2열
-    if (s.stage_code === "APPROVAL_DATE") cols.push({ kind: "status", header: "Approval Status" });
+    if (s.stage_code === "APPROVAL_DATE") cols.push({ kind: "status", header: "Response Status" });
     if (s.stage_code === "RFQ_DRAFT") {
       cols.push({ kind: "item", header: "HDEC PIC (PO)", field: "pic_po" });
       cols.push({ kind: "item", header: "HDEC ENG (PO)", field: "eng_po" });
