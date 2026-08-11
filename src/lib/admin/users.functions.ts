@@ -48,6 +48,7 @@ const ROLE_RANK_SRV: Record<string, number> = {
 
 type UserType = "subcontractor" | "hdec" | "hdec_pic" | "hdec_eng" | "pm_pd" | "admin" | "subsub" | "guest";
 type AppRole =
+  | "system_administrator"
   | "admin"
   | "superuser"
   | "senior_user"
