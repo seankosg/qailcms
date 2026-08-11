@@ -45,6 +45,12 @@ import {
 } from "@/components/import/FieldLogTable";
 import { Fragment } from "react";
 import { formatDdMmmYyyy, formatDdMmmYyyyHm } from "@/lib/time/doha";
+import {
+  describeExclusion,
+  describeReason,
+  batchStatusSummary,
+  type ReasonGuide,
+} from "@/lib/import/reason-guide";
 
 const FIELD_OUTCOMES = Object.keys(OUTCOME_LABELS);
 
@@ -69,6 +75,8 @@ interface Batch {
   parsed_rows?: number | null;
   applied_rows?: number | null;
   exclusions?: Record<string, unknown> | null;
+  /** 배치 단위 오류 목록(있을 때만) */
+  errors?: unknown;
 }
 
 interface RowLog {
@@ -185,7 +193,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       const { data } = await supabase
         .from("task_management_import_logs")
         .select(
-          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at, parsed_rows, applied_rows, exclusions",
+          "id, file_name, status, started_at, finished_at, imported_by, data_date, total_rows, inserted, updated, skipped, rejected, discipline, rolled_back_at, parsed_rows, applied_rows, exclusions, errors",
         )
         .order("started_at", { ascending: false })
         .limit(100);
@@ -207,6 +215,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
         parsed_rows: r.parsed_rows ?? null,
         applied_rows: r.applied_rows ?? null,
         exclusions: r.exclusions ?? null,
+        errors: r.errors ?? null,
       }));
       setBatches(list);
       await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
@@ -397,6 +406,40 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       ).sort(),
     [rowLogs],
   );
+
+  /** 실패/부분반영 배치의 사유를 자연어 설명 + 조치 안내로 묶는다 (표시 전용) */
+  const reasonGuides = useMemo(() => {
+    const out: { key: string; guide: ReasonGuide; count: number }[] = [];
+    const seen = new Set<string>();
+    const excl = (selectedBatch?.exclusions ?? {}) as Record<string, unknown>;
+    for (const [k, v] of Object.entries(excl)) {
+      const n = typeof v === "number" ? v : Array.isArray(v) ? v.length : 0;
+      if (n <= 0) continue;
+      const g = describeExclusion(k);
+      if (!g || seen.has(g.title)) continue;
+      seen.add(g.title);
+      out.push({ key: k, guide: g, count: n });
+    }
+    const codeCounts = new Map<string, number>();
+    for (const r of rowLogs) {
+      if (!r.reason_code) continue;
+      codeCounts.set(r.reason_code, (codeCounts.get(r.reason_code) ?? 0) + 1);
+    }
+    const batchErrors = Array.isArray(selectedBatch?.errors)
+      ? (selectedBatch?.errors as { code?: string }[])
+      : [];
+    for (const e of batchErrors) {
+      if (!e?.code) continue;
+      codeCounts.set(e.code, codeCounts.get(e.code) ?? 0);
+    }
+    for (const [code, n] of codeCounts) {
+      const g = describeReason(code);
+      if (!g || seen.has(g.title)) continue;
+      seen.add(g.title);
+      out.push({ key: code, guide: g, count: n });
+    }
+    return out;
+  }, [selectedBatch, rowLogs]);
 
   const filteredRowLogs = useMemo(() => {
     const q = rowSearch.trim();
@@ -606,7 +649,10 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                                   {b.exclusions
                                     ? ` · ${Object.entries(b.exclusions)
                                         .filter(([, v]) => typeof v === "number" && v > 0)
-                                        .map(([k, v]) => `${k}=${v}`)
+                                        .map(
+                                          ([k, v]) =>
+                                            `${describeExclusion(k)?.title ?? k} ${v}건`,
+                                        )
                                         .join(" · ")}`
                                     : ""}
                                 </span>
@@ -734,10 +780,38 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   Object.entries(selectedBatch.exclusions)
                     .filter(([, v]) => typeof v === "number" && (v as number) > 0)
                     .map(([k, v]) => (
-                      <Badge key={k} variant="outline" className="bg-amber-100 text-amber-800">
-                        제외 {k} {v as number}
+                      <Badge
+                        key={k}
+                        variant="outline"
+                        className="bg-amber-100 text-amber-800"
+                        title={describeExclusion(k)?.what ?? k}
+                      >
+                        제외 · {describeExclusion(k)?.title ?? k} {v as number}
                       </Badge>
                     ))}
+              </div>
+            )}
+            {selectedBatch && (selectedBatch.status === "failed" || selectedBatch.status === "partial" || selectedBatch.status === "rolled_back") && (
+              <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-900 dark:bg-amber-950/40">
+                <div className="font-medium text-amber-900 dark:text-amber-200">
+                  {batchStatusSummary(selectedBatch.status)}
+                </div>
+                {reasonGuides.length > 0 && (
+                  <ul className="mt-2 space-y-2">
+                    {reasonGuides.map((g) => (
+                      <li key={g.key} className="leading-relaxed">
+                        <span className="font-medium">
+                          {g.guide.title}
+                          {g.count ? ` (${g.count}건)` : ""}
+                        </span>
+                        <div className="text-muted-foreground">왜: {g.guide.what}</div>
+                        <div className="text-emerald-800 dark:text-emerald-300">
+                          조치: {g.guide.fix}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -915,9 +989,34 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                                 {r.action_taken}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-xs">{r.reason_code ?? "—"}</TableCell>
+                            <TableCell className="text-xs">
+                              {r.reason_code ? (
+                                <div className="flex flex-col">
+                                  <span>{describeReason(r.reason_code)?.title ?? r.reason_code}</span>
+                                  <span className="text-[10px] text-muted-foreground font-mono">
+                                    {r.reason_code}
+                                  </span>
+                                </div>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs max-w-[420px] whitespace-normal break-words">
-                              {r.reason_detail ?? "—"}
+                              {describeReason(r.reason_code) ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <span>{describeReason(r.reason_code)!.what}</span>
+                                  <span className="text-emerald-700 dark:text-emerald-300">
+                                    조치: {describeReason(r.reason_code)!.fix}
+                                  </span>
+                                  {r.reason_detail && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {r.reason_detail}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                (r.reason_detail ?? "—")
+                              )}
                             </TableCell>
                           </TableRow>
                           {isOpen && (
