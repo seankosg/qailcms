@@ -55,42 +55,47 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
       to="/closure/snag-management/kpi-analysis"
       progressPct={loading ? null : kpi.progressPct}
       progressHint="진도율 = Closure 실적 누계 ÷ Closure 모수 — SM KPI Analysis 와 동일(서버 totals 정본)"
-      asOfNote={`Plot C ${c.stageTotal.toLocaleString()} · D ${d.stageTotal.toLocaleString()}`}
+      asOfNote={`Plot D ${d.stageTotal.toLocaleString()} · C ${c.stageTotal.toLocaleString()}`}
     >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <AbdKpiCard label="Total (Closure 모수)" count={kpi.total} hint="Plot C + D 의 Closure 스테이지 모수" />
-        <AbdKpiCard label="실적 누계" count={kpi.actual} total={kpi.total} tone="ok" hint="as-of 기준 actual_upto 합" />
-        <AbdKpiCard label="계획 누계" count={kpi.plan} total={kpi.total} tone="info" hint="as-of 기준 plan_upto 합" />
-        <AbdKpiCard
-          label="계획 대비 미달"
-          count={kpi.behind}
-          total={kpi.total}
-          tone="danger"
-          hint="max(0, 계획 누계 − 실적 누계)"
-        />
-      </div>
       <div className="grid gap-3 xl:grid-cols-2">
-        {([["C", c], ["D", d]] as const).map(([label, q]) => (
-          <SnagKpiPlanVsActualCard
-            key={label}
-            cells={q.cells as never}
-            buckets={q.buckets}
-            stage={STAGE}
-            today={q.today}
-            asOfDate={asOfDate}
-            bucket={bucket}
-            onBucketChange={setBucket}
-            unit={unit}
-            onUnitChange={setUnit}
-            filterSummary={q.filterSummary}
-            baselinePlan={q.baseline.plan}
-            baselineActual={q.baseline.actual}
-            planUpto={q.baseline.planUpto}
-            actualUpto={q.baseline.actualUpto}
-            stageTotal={q.stageTotal}
-            open={open}
-            onOpenChange={setOpen}
-          />
+        {([["D", d], ["C", c]] as const).map(([label, q]) => (
+          <div key={label} className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <AbdKpiCard
+                label={`Plot ${label} 진도현황`}
+                count={q.baseline.actualUpto}
+                total={q.stageTotal}
+                tone="ok"
+                hint="진도현황 = as-of 기준 Closure actual_upto ÷ Closure 모수 — SM KPI Analysis 와 동일"
+              />
+              <AbdKpiCard
+                label={`Plot ${label} 지연현황`}
+                count={Math.max(0, q.baseline.planUpto - q.baseline.actualUpto)}
+                total={q.stageTotal}
+                tone="danger"
+                hint="지연현황 = max(0, 계획 누계 plan_upto − 실적 누계 actual_upto)"
+              />
+            </div>
+            <SnagKpiPlanVsActualCard
+              cells={q.cells as never}
+              buckets={q.buckets}
+              stage={STAGE}
+              today={q.today}
+              asOfDate={asOfDate}
+              bucket={bucket}
+              onBucketChange={setBucket}
+              unit={unit}
+              onUnitChange={setUnit}
+              filterSummary={q.filterSummary}
+              baselinePlan={q.baseline.plan}
+              baselineActual={q.baseline.actual}
+              planUpto={q.baseline.planUpto}
+              actualUpto={q.baseline.actualUpto}
+              stageTotal={q.stageTotal}
+              open={open}
+              onOpenChange={setOpen}
+            />
+          </div>
         ))}
       </div>
     </ProjectModuleSection>

@@ -73,6 +73,9 @@ const NAV: NavSection[] = [
   {
     label: "Project Wide",
     dashboard: { to: "/project-dashboard", label: "Milestone Timeline", icon: iconDashboard },
+    items: [
+      { to: "/project-summary", label: "Project Dashboard", icon: iconChartUp },
+    ],
   },
   {
     label: "Outstanding Work",
