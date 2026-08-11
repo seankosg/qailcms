@@ -3,7 +3,7 @@ import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import { AbdPlanVsActualCard } from "@/components/abd/progress/AbdPlanVsActualCard";
 import { useAbdScurveData } from "@/hooks/useAbdScurveData";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
-import { PDB_DEFAULTS, pdbFilterChips, type PdbAbdFilters } from "@/lib/dashboards/pdb-filters";
+import { PDB_DEFAULTS, type PdbAbdFilters } from "@/lib/dashboards/pdb-filters";
 import { ALL_STAGES } from "@/lib/abd/progress-utils";
 import type { AbdTeam } from "@/lib/abd/columns";
 import { ProjectModuleSection } from "./ProjectModuleSection";

@@ -4,7 +4,7 @@ import { TmPlanVsActualCard } from "@/components/task-management/dashboard/TmPla
 import { useTmScurveData } from "@/hooks/useTmScurveData";
 import { resolveActualPct, resolveIsDelayed } from "@/lib/task-management/delay-utils";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
-import { PDB_DEFAULTS, pdbFilterChips, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
+import { PDB_DEFAULTS, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
 const PROGRESS_HINT =
