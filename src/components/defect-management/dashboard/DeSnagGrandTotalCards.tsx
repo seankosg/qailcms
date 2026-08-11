@@ -97,6 +97,7 @@ function KpiCard({
   slot,
   label,
   value,
+  total,
   pct,
   showBar,
   onClick,
@@ -104,6 +105,7 @@ function KpiCard({
   slot: MetricSlot;
   label: string;
   value: number;
+  total: number;
   pct: number | null;
   showBar: boolean;
   onClick?: () => void;
@@ -119,27 +121,43 @@ function KpiCard({
         onClick && "cursor-pointer hover:shadow-md hover:-translate-y-0.5",
       )}
     >
-      <CardContent className="flex flex-col gap-1 p-5">
-        <p
-          className={cn(
-            "text-sm font-semibold uppercase tracking-wide",
-            tone.label,
-          )}
-        >
-          {label}
-        </p>
-        <p
-          className={cn(
-            "mt-1 text-4xl font-bold leading-none tabular-nums md:text-5xl",
-            tone.value,
-          )}
-        >
-          {value.toLocaleString()}
-        </p>
-        <p className={cn("mt-1 text-sm font-medium tabular-nums", tone.label)}>
-          {pct == null ? "—" : `${Math.round(pct)}%`}
-        </p>
-        {showBar && <ColoredBar pct={pct ?? 0} tone={tone} />}
+      <CardContent className="flex items-center justify-between gap-3 p-4">
+        {/* 좌측: 라벨 + 메인 값 */}
+        <div className="flex min-w-0 flex-col gap-1">
+          <p
+            className={cn(
+              "text-sm font-semibold uppercase tracking-wide",
+              tone.label,
+            )}
+          >
+            {label}
+          </p>
+          <p
+            className={cn(
+              "text-3xl font-bold leading-none tabular-nums md:text-4xl",
+              tone.value,
+            )}
+          >
+            {value.toLocaleString()}
+          </p>
+          {showBar && <ColoredBar pct={pct ?? 0} tone={tone} />}
+        </div>
+        {/* 우측: 갯수/총갯수 */}
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <span
+            className={cn(
+              "text-lg font-bold tabular-nums leading-none",
+              tone.value,
+            )}
+          >
+            {value.toLocaleString()}
+            <span className="text-muted-foreground/60">/</span>
+            {total.toLocaleString()}
+          </span>
+          <p className={cn("text-xs font-medium tabular-nums", tone.label)}>
+            {pct == null ? "—" : `${Math.round(pct)}%`}
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
