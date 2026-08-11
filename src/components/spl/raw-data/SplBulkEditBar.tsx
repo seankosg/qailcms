@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { rclCanRows } from "@/hooks/useRclCan";
 import { SPL_EDITABLE_FIELDS } from "./spl-columns";
+import { SplBulkDeleteDialog } from "./SplBulkDeleteDialog";
 
 interface Props {
   selectedIds: string[];
@@ -22,22 +23,34 @@ export function SplBulkEditBar({ selectedIds, teamOptions, onClear, onSaveField,
   const [value, setValue] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [allowed, setAllowed] = useState<string[] | null>(null);
+  const [deletable, setDeletable] = useState<string[] | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     let live = true;
     if (selectedIds.length === 0) {
       setAllowed(null);
+      setDeletable(null);
       return;
     }
     void rclCanRows("SPL", selectedIds, "write").then((s) => {
       if (live) setAllowed(selectedIds.filter((id) => s.has(id)));
     });
+    void rclCanRows("SPL", selectedIds, "delete")
+      .then((s) => {
+        if (live) setDeletable(selectedIds.filter((id) => s.has(id)));
+      })
+      .catch(() => {
+        if (live) setDeletable([]);
+      });
     return () => {
       live = false;
     };
   }, [selectedIds]);
 
   const excluded = allowed ? selectedIds.length - allowed.length : 0;
+  const delIds = deletable ?? [];
+  const delExcluded = selectedIds.length - delIds.length;
   const isTeam = field === "team";
   const options = useMemo(() => teamOptions.filter(Boolean), [teamOptions]);
 
@@ -72,6 +85,7 @@ export function SplBulkEditBar({ selectedIds, teamOptions, onClear, onSaveField,
   };
 
   return (
+    <>
     <div className="sticky bottom-2 z-30 flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 shadow-lg">
       <span className="text-xs font-medium">
         {selectedIds.length.toLocaleString()} selected
@@ -120,10 +134,33 @@ export function SplBulkEditBar({ selectedIds, teamOptions, onClear, onSaveField,
         Apply to selection
       </Button>
       {disabledReason && <span className="text-[11px] text-amber-600">{disabledReason}</span>}
+      {delIds.length > 0 && (
+        <Button
+          size="sm"
+          variant="destructive"
+          className="h-8 text-xs"
+          onClick={() => setDeleteOpen(true)}
+          disabled={busy || !!disabledReason}
+        >
+          <Trash2 className="mr-1 h-3 w-3" />
+          삭제 ({delIds.length})
+        </Button>
+      )}
       <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={onClear}>
         <X className="mr-1 h-3 w-3" />
         선택 Clear
       </Button>
     </div>
+    <SplBulkDeleteDialog
+      open={deleteOpen}
+      onOpenChange={setDeleteOpen}
+      ids={delIds}
+      excluded={delExcluded}
+      onDone={async () => {
+        onClear();
+        await onDone();
+      }}
+    />
+    </>
   );
 }
