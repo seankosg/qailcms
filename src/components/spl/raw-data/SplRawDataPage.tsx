@@ -542,6 +542,12 @@ export function SplRawDataPage() {
         onRoundtrip={onExport}
       />
 
+      <SplOcsPanels
+        key={panelTarget ? `${panelTarget.id}:${panelTarget.kind}` : "none"}
+        target={panelTarget}
+        onClose={() => setPanelTarget(null)}
+      />
+
       <div className="text-[11px] text-muted-foreground">
         Showing {filtered.length.toLocaleString()} of {population.toLocaleString()} rows · As of {asOf} · NA stages are marked{" "}
         <span className="rounded bg-muted px-1">NA</span> and excluded from the progress denominator (distinct from blank).
