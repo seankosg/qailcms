@@ -154,7 +154,7 @@ function Page() {
   }, [data]);
 
   const { data: workTypeOptions = [] } = useTmWorkTypeOptions();
-  const buildingFacetQ = useDefectFacet("building");
+  const buildingFacetQ = useDefectFacet("building", { statusGroup: "all", includeInactive: false });
   const buildingOptions = useMemo(
     () => ((buildingFacetQ.data ?? []) as Array<{ value: string }>).map((f) => f.value).filter(Boolean),
     [buildingFacetQ.data],
