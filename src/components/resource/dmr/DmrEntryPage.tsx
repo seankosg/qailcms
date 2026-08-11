@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -31,6 +31,17 @@ interface EntryRow {
   pic_name: string;
   plan_manpower: string;
   actual_manpower: string;
+  /** 서버에서 불러온 행인가 (신규 입력 행과 구분) */
+  saved?: boolean;
+  /** 저장 당시 박힌 TM 값. 불러온 행은 이 값을 그대로 보여 준다(재계산 금지). */
+  snap?: {
+    task_name: string | null;
+    task_level: string | null;
+    work_category: string | null;
+    tplan_pct: number | null;
+    tactual_pct: number | null;
+    task_data_date: string | null;
+  };
 }
 
 interface TmOption {
@@ -164,6 +175,53 @@ export function DmrEntryPage() {
     return m;
   }, [tmQ.data]);
 
+  // 이미 저장된 행을 불러온다 — 저장된 값 그대로. TM 값을 다시 계산하지 않는다.
+  const existingQ = useQuery({
+    queryKey: ['dmr-entry-existing', reportDate, discipline],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dmr_entries')
+        .select('*')
+        .eq('report_date', reportDate)
+        .eq('discipline', discipline)
+        .in('plot', ['C', 'D'])
+        .order('system_name')
+        .order('contractor_name')
+        .order('plot')
+        .order('id');
+      if (error) throw new Error(error.message);
+      return (data ?? []) as any[];
+    },
+    staleTime: 0,
+  });
+
+  const loadedKey = `${reportDate}|${discipline}|${existingQ.dataUpdatedAt}`;
+  useEffect(() => {
+    if (!existingQ.data) return;
+    const loaded: EntryRow[] = existingQ.data.map((r) => ({
+      key: `s${r.id}`,
+      system_name: r.system_name ?? '',
+      contractor_name: r.contractor_name ?? '',
+      plot: (r.plot === 'D' ? 'D' : 'C') as 'C' | 'D',
+      task_no: r.task_no ?? '',
+      headcount_kind: (DMR_HEADCOUNT_KINDS.includes(r.headcount_kind) ? r.headcount_kind : 'worker') as DmrHeadcountKind,
+      pic_name: r.pic_name ?? '',
+      plan_manpower: String(r.plan_manpower ?? 0),
+      actual_manpower: String(r.actual_manpower ?? 0),
+      saved: true,
+      snap: {
+        task_name: r.task_name ?? null,
+        task_level: r.task_level ?? null,
+        work_category: r.work_category ?? null,
+        tplan_pct: r.tplan_pct ?? null,
+        tactual_pct: r.tactual_pct ?? null,
+        task_data_date: r.task_data_date ?? null,
+      },
+    }));
+    setRows(loaded.length > 0 ? loaded : [newRow()]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedKey]);
+
   const tmOptions = useMemo(
     () => (tmQ.data ?? []).map((t) => ({ value: t.task_no, label: t.task_no, hint: t.task_name ?? '' })),
     [tmQ.data],
@@ -221,6 +279,7 @@ export function DmrEntryPage() {
       });
       setMissing(res?.missing_task_nos ?? []);
       invalidate();
+      await existingQ.refetch();
       toast.success(`저장 완료 — ${res?.saved ?? valid.length}행 (TM 연결 ${res?.linked_tasks ?? 0}건)`);
     } catch (e: any) {
       toast.error(e?.message ?? '저장 실패');
@@ -271,6 +330,11 @@ export function DmrEntryPage() {
             <span className="text-xs text-muted-foreground">
               TM 후보 {tmQ.data?.length ?? 0}건 (기준일 {reportDate})
             </span>
+            <span className="text-xs text-muted-foreground">
+              {existingQ.isFetching
+                ? '저장된 행 불러오는 중…'
+                : `저장된 행 ${existingQ.data?.length ?? 0}건`}
+            </span>
           </CardContent>
         </Card>
 
@@ -293,8 +357,14 @@ export function DmrEntryPage() {
               <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setRows((p) => [...p, newRow()])}>
                 <Plus className="h-3.5 w-3.5" />행 추가
               </Button>
-              <Button size="sm" className="h-8 gap-1 text-xs" disabled={!canEdit || saving || valid.length === 0} onClick={onSave}>
-                <Save className="h-3.5 w-3.5" />{saving ? '저장 중…' : '저장'}
+              <Button
+                size="sm"
+                className="h-8 gap-1 text-xs"
+                disabled={!canEdit || saving || existingQ.isFetching || valid.length === 0}
+                onClick={onSave}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saving ? '저장 중…' : existingQ.isFetching ? '불러오는 중…' : '저장'}
               </Button>
             </div>
           </CardHeader>
@@ -308,15 +378,34 @@ export function DmrEntryPage() {
               </thead>
               <tbody>
                 {rows.map((r) => {
-                  const tm = r.task_no ? tmByNo.get(r.task_no) : null;
+                  const live = r.task_no ? tmByNo.get(r.task_no) : null;
+                  // 불러온 행은 저장된 값 그대로 보여 준다. 새로 친 행만 TM 정본에서 채운다.
+                  const tm = r.saved && r.snap
+                    ? {
+                        task_name: r.snap.task_name,
+                        level: r.snap.task_level,
+                        row_type: r.snap.work_category,
+                        cum_plan_pct: r.snap.tplan_pct,
+                        cum_actual_pct: r.snap.tactual_pct,
+                        data_date: r.snap.task_data_date,
+                        plot: null as string | null,
+                      }
+                    : live;
                   const gap = tm?.data_date
                     ? dmrDataDateGapDays({ report_date: reportDate, task_data_date: tm.data_date })
                     : null;
                   const plotMismatch = !!tm && !!tm.plot && tm.plot !== r.plot;
                   const g = groupTotals.get(`${r.system_name}|${r.contractor_name}|${r.plot}|${r.headcount_kind}`);
                   return (
-                    <tr key={r.key} className="border-t align-top [&>td]:px-2 [&>td]:py-1.5">
-                      <td className="w-52"><SearchSelect value={r.system_name} options={systemOptions} onChange={(v) => patch(r.key, { system_name: v })} placeholder="System 선택" /></td>
+                    <tr key={r.key} className={`border-t align-top [&>td]:px-2 [&>td]:py-1.5 ${r.saved ? 'bg-muted/30' : ''}`}>
+                      <td className="w-52">
+                        <div className="mb-1">
+                          <Badge variant={r.saved ? 'secondary' : 'outline'} className="text-[10px]">
+                            {r.saved ? '저장됨' : '신규'}
+                          </Badge>
+                        </div>
+                        <SearchSelect value={r.system_name} options={systemOptions} onChange={(v) => patch(r.key, { system_name: v })} placeholder="System 선택" />
+                      </td>
                       <td className="w-52"><SearchSelect value={r.contractor_name} options={contractorOptions} onChange={(v) => patch(r.key, { contractor_name: v })} placeholder="Contractor 선택" /></td>
                       <td>
                         <div className="flex gap-1">

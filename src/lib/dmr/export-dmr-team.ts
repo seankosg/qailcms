@@ -57,10 +57,11 @@ const HARD_CAP = 20_000;
 export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
   const fetched: any[] = [];
   let capped = false;
+  let serverCount: number | null = null;
   for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('dmr_entries')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('discipline', opts.discipline)
       .eq('report_date', opts.reportDate)
       .in('plot', ['C', 'D'])
@@ -70,6 +71,7 @@ export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
       .order('id') // 페이지 사이 순서 고정용 타이브레이커
       .range(offset, offset + PAGE - 1);
     if (error) throw new Error(error.message);
+    if (count != null) serverCount = count;
     const page = data ?? [];
     fetched.push(...page);
     if (page.length < PAGE) break;
@@ -78,6 +80,12 @@ export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
   if (capped) {
     toast.warning(
       `내보내기 상한 ${HARD_CAP.toLocaleString()}행에 도달해 ${fetched.length.toLocaleString()}행에서 멈췄습니다. 조건을 좁혀 다시 내보내십시오.`,
+    );
+  }
+  // 조용한 절단 감시 — 서버가 아는 모집단과 실제로 받은 행 수를 대조한다.
+  if (!capped && serverCount != null && fetched.length !== serverCount) {
+    toast.error(
+      `내보내기 행 수가 모집단과 다릅니다: 받은 ${fetched.length.toLocaleString()}행 / 서버 ${serverCount.toLocaleString()}행. 결과가 잘렸을 수 있습니다.`,
     );
   }
 
