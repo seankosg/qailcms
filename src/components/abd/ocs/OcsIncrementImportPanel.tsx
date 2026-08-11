@@ -1598,7 +1598,7 @@ export function OcsIncrementImportPanel() {
             runId={runId}
             details={snapshotError}
             action={
-              <Button size="sm" variant="outline" onClick={() => void runSnapshot()}>
+              <Button size="sm" variant="outline" onClick={() => void runSnapshot(true)}>
                 Retry Backup
               </Button>
             }
