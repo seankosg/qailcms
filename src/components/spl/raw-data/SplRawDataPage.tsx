@@ -501,13 +501,34 @@ export function SplRawDataPage() {
                       const inner =
                         it.key === "__select" ? (
                           <Checkbox
-                            checked={filtered.length > 0 && selectedIds.length === filtered.length}
-                            onCheckedChange={(v) => setSelectedIds(v ? filtered.map((r) => r.id) : [])}
+                            checked={sorted.length > 0 && selectedIds.length === sorted.length}
+                            onCheckedChange={(v) => setSelectedIds(v ? sorted.map((r) => r.id) : [])}
                             aria-label="Select all"
                           />
                         ) : (
                           <span className="inline-flex items-center">
-                            {it.def!.label}
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(it.key)}
+                              title="클릭: 오름차순 → 내림차순 → 해제 (클릭 순서가 정렬 우선순위)"
+                              className="inline-flex items-center gap-0.5 hover:text-primary"
+                            >
+                              {it.def!.label}
+                              {(() => {
+                                const idx = sorts.findIndex((s) => s.key === it.key);
+                                if (idx < 0) return null;
+                                return (
+                                  <>
+                                    {sorts[idx].desc ? (
+                                      <ArrowDown className="h-3 w-3" />
+                                    ) : (
+                                      <ArrowUp className="h-3 w-3" />
+                                    )}
+                                    <SortPriorityBadge index={idx} total={sorts.length} />
+                                  </>
+                                );
+                              })()}
+                            </button>
                             {it.def!.filter === "multi" && (
                               <SplColumnFilterDropdown
                                 label={it.def!.label}
