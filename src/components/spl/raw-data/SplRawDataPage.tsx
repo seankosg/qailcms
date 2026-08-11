@@ -845,7 +845,13 @@ function SplTableRow({
   };
 
   return (
-    <tr className={cn("hover:bg-muted/30", selected && "bg-primary/5")}>
+    <tr
+      className={cn(
+        "hover:bg-muted/30",
+        selected && "bg-primary/5",
+        row.judgment === "완료" && "bg-slate-100/70 text-slate-500",
+      )}
+    >
       {layout.map((it) => {
         const inner =
           it.key === "__select" ? (
