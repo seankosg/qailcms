@@ -63,6 +63,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 count={q.kpi.actualCount}
                 total={q.kpi.total}
                 tone="ok"
+                showTotal
                 hint={PROGRESS_HINT}
               />
               <AbdKpiCard
@@ -70,6 +71,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 count={q.kpi.delayed}
                 total={q.kpi.total}
                 tone="danger"
+                showTotal
                 hint={DELAY_HINT}
               />
             </div>
