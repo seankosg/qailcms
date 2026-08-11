@@ -54,7 +54,7 @@ import {
 
 const FIELD_OUTCOMES = Object.keys(OUTCOME_LABELS);
 
-type Kind = RollbackKind;
+type Kind = RollbackKind | "spl";
 
 interface Batch {
   id: string;
@@ -77,6 +77,17 @@ interface Batch {
   exclusions?: Record<string, unknown> | null;
   /** 배치 단위 오류 목록(있을 때만) */
   errors?: unknown;
+  /** SPL 전용 지표 (다른 모듈은 undefined) */
+  spl?: {
+    total_rows: number;
+    matched: number;
+    unmatched: number;
+    ocs_excluded: number;
+    items_updated: number;
+    stages_upserted: number;
+    cleared_values: number;
+    sheet_names: string[];
+  };
 }
 
 interface RowLog {
@@ -118,6 +129,8 @@ const CFG = {
     keyLabel: "Task No",
     keyColumn: "task_no",
     extraLabel: "Discipline",
+    rowLogsFk: "upload_id",
+    rollbackKind: "task_management",
   },
   defect_management: {
     title: "Snag List — Import Logs",
@@ -127,6 +140,8 @@ const CFG = {
     deleteFn: "delete_defect_import_batch",
     keyLabel: "Source Issue No",
     keyColumn: "source_issue_no",
+    rowLogsFk: "upload_id",
+    rollbackKind: "defect_management",
     // Team은 파일 단위가 아니라 행 단위 자동매핑 결과이므로 배치 목록에서 노출하지 않음.
     extraLabel: null,
   },
@@ -139,6 +154,22 @@ const CFG = {
     keyLabel: "ABD Number",
     keyColumn: "abd_number",
     extraLabel: "Team",
+    rowLogsFk: "upload_id",
+    rollbackKind: "abd",
+  },
+  spl: {
+    title: "Spare Parts (SPL) — Import Logs",
+    backTo: "/import-log/import",
+    logsTable: "spl_import_logs",
+    rowLogsTable: "spl_import_row_logs",
+    // SPL 행 로그의 배치 외래키는 batch_id (다른 모듈은 upload_id)
+    rowLogsFk: "batch_id",
+    deleteFn: null,
+    keyLabel: "SPL Number",
+    keyColumn: "spl_number",
+    extraLabel: null,
+    // SPL 롤백 DB 함수가 없으므로 롤백 버튼을 렌더하지 않는다.
+    rollbackKind: null,
   },
 } as const;
 
