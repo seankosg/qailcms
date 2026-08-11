@@ -7873,23 +7873,14 @@ export type Database = {
               team: string
             }[]
           }
-      abd_dashboard_row1:
-        | {
-            Args: { _plots?: string[]; _teams?: string[] }
-            Returns: {
-              bucket: string
-              cnt: number
-              team: string
-            }[]
-          }
-        | {
-            Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
-            Returns: {
-              bucket: string
-              cnt: number
-              team: string
-            }[]
-          }
+      abd_dashboard_row1: {
+        Args: { _batch_no?: string[]; _plots?: string[]; _teams?: string[] }
+        Returns: {
+          bucket: string
+          cnt: number
+          team: string
+        }[]
+      }
       abd_dashboard_row1_json: {
         Args: {
           _as_of?: string
