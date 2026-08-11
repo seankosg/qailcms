@@ -930,8 +930,8 @@ function StickyHead({
 }) {
   return (
     <th
-      style={{ left, top: 0, width, minWidth: width }}
-      className="sticky z-40 relative border-b border-l bg-background px-2 py-1 text-left [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
+      style={{ left, top: 0, width, minWidth: width, maxWidth: width }}
+      className="sticky z-40 relative overflow-hidden whitespace-nowrap border-b border-l bg-background px-2 py-1 text-left [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
     >
       {children}
     </th>
