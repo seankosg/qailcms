@@ -6,92 +6,95 @@ import { resolveActualPct, resolveIsDelayed } from "@/lib/task-management/delay-
 import type { SCurveBucket } from "@/lib/task-management/scurve-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
-const PLOT_C = new Set(["C"]);
-const PLOT_D = new Set(["D"]);
+const PROGRESS_HINT =
+  "진도현황 = Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 · 건수 = 실적 환산 완료분 / 모집단";
+const DELAY_HINT =
+  "지연현황 = 정본 판정(resolveJudgment)이 지연 또는 악화인 과업 수 — 실적% < 선형 Plan%";
 
-/** TM — 정본: useTmScurveData(= TM KPI Analysis 와 동일 훅) */
-export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
-  const [bucket, setBucket] = useState<SCurveBucket>("week");
-  const [open, setOpen] = useState(true);
-  const { scopedItems, thresholds, filterSummary, isLoading } = useTmScurveData({
+function useTmPlot(plot: "C" | "D", asOfDate: string) {
+  const q = useTmScurveData({
     asOfDate,
+    plots: [plot],
     taskScope: "sub",
     workType: "all",
     delayFilter: "all",
   });
-
   const kpi = useMemo(() => {
-    const total = scopedItems.length;
-    let done = 0;
+    const total = q.scopedItems.length;
     let delayed = 0;
-    let plotC = 0;
-    let plotD = 0;
-    let unclassified = 0;
     let actualSum = 0;
-    for (const it of scopedItems) {
-      const a = resolveActualPct(it);
-      actualSum += a;
-      if (a >= 1) done += 1;
-      if (resolveIsDelayed(it, thresholds, asOfDate)) delayed += 1;
-      const p = String((it as { plot?: string | null }).plot ?? "").trim().toUpperCase();
-      if (PLOT_C.has(p)) plotC += 1;
-      else if (PLOT_D.has(p)) plotD += 1;
-      else unclassified += 1;
+    for (const it of q.scopedItems) {
+      actualSum += resolveActualPct(it);
+      if (resolveIsDelayed(it, q.thresholds, asOfDate)) delayed += 1;
     }
     return {
       total,
-      done,
       delayed,
-      wip: Math.max(0, total - done),
-      plotC,
-      plotD,
-      unclassified,
+      actualCount: Math.round(actualSum),
       progressPct: total > 0 ? (actualSum / total) * 100 : null,
     };
-  }, [scopedItems, thresholds, asOfDate]);
+  }, [q.scopedItems, q.thresholds, asOfDate]);
+  return { ...q, kpi };
+}
+
+/** TM — 정본: useTmScurveData(= TM KPI Analysis 와 동일 훅), Plot 별 2회 호출 */
+export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
+  const [bucket, setBucket] = useState<SCurveBucket>("week");
+  const [open, setOpen] = useState(true);
+  const all = useTmScurveData({ asOfDate, taskScope: "sub", workType: "all", delayFilter: "all" });
+  const c = useTmPlot("C", asOfDate);
+  const d = useTmPlot("D", asOfDate);
+
+  const overall = useMemo(() => {
+    const total = all.scopedItems.length;
+    let actualSum = 0;
+    for (const it of all.scopedItems) actualSum += resolveActualPct(it);
+    return { total, progressPct: total > 0 ? (actualSum / total) * 100 : null };
+  }, [all.scopedItems]);
+
+  const unclassified = Math.max(0, overall.total - c.kpi.total - d.kpi.total);
 
   return (
     <ProjectModuleSection
       title="Task Management"
       to="/closure/task-management/kpi-analysis"
-      progressPct={isLoading ? null : kpi.progressPct}
+      progressPct={all.isLoading ? null : overall.progressPct}
       progressHint="진도율 = Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 — TM KPI Analysis 와 동일"
-      asOfNote={`Plot C ${kpi.plotC.toLocaleString()} · D ${kpi.plotD.toLocaleString()}`}
-      unclassified={kpi.unclassified}
+      asOfNote={`Plot D ${d.kpi.total.toLocaleString()} · C ${c.kpi.total.toLocaleString()}`}
+      unclassified={unclassified}
     >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <AbdKpiCard label="Total (Sub)" count={kpi.total} hint="TM Sub 과업 모집단" />
-        <AbdKpiCard
-          label="완료"
-          count={kpi.done}
-          total={kpi.total}
-          tone="ok"
-          hint="실적% = 100% 인 과업 수"
-        />
-        <AbdKpiCard
-          label="진행중"
-          count={kpi.wip}
-          total={kpi.total}
-          hint="완료되지 않은 과업 수"
-        />
-        <AbdKpiCard
-          label="지연 · 악화"
-          count={kpi.delayed}
-          total={kpi.total}
-          tone="danger"
-          hint="정본 판정(resolveJudgment) 이 지연 또는 악화 — 실적% < 선형 Plan%"
-        />
+      <div className="grid gap-3 xl:grid-cols-2">
+        {([["D", d], ["C", c]] as const).map(([label, q]) => (
+          <div key={label} className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <AbdKpiCard
+                label={`Plot ${label} 진도현황`}
+                count={q.kpi.actualCount}
+                total={q.kpi.total}
+                tone="ok"
+                hint={PROGRESS_HINT}
+              />
+              <AbdKpiCard
+                label={`Plot ${label} 지연현황`}
+                count={q.kpi.delayed}
+                total={q.kpi.total}
+                tone="danger"
+                hint={DELAY_HINT}
+              />
+            </div>
+            <TmPlanVsActualCard
+              items={q.scopedItems}
+              asOfDate={asOfDate}
+              dim="hdec_pic_name"
+              filterSummary={q.filterSummary}
+              bucket={bucket}
+              onBucketChange={setBucket}
+              open={open}
+              onOpenChange={setOpen}
+            />
+          </div>
+        ))}
       </div>
-      <TmPlanVsActualCard
-        items={scopedItems}
-        asOfDate={asOfDate}
-        dim="hdec_pic_name"
-        filterSummary={filterSummary}
-        bucket={bucket}
-        onBucketChange={setBucket}
-        open={open}
-        onOpenChange={setOpen}
-      />
     </ProjectModuleSection>
   );
 }

@@ -13,6 +13,7 @@ import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedProjectSummaryRouteImport } from './routes/_authenticated/project-summary'
 import { Route as AuthenticatedProjectDashboardRouteImport } from './routes/_authenticated/project-dashboard'
 import { Route as AuthenticatedMyWorkSpaceRouteImport } from './routes/_authenticated/my-work-space'
 import { Route as AuthenticatedMyTeamWorkSpaceRouteImport } from './routes/_authenticated/my-team-work-space'
@@ -86,6 +87,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedProjectSummaryRoute =
+  AuthenticatedProjectSummaryRouteImport.update({
+    id: '/project-summary',
+    path: '/project-summary',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedProjectDashboardRoute =
   AuthenticatedProjectDashboardRouteImport.update({
     id: '/project-dashboard',
@@ -410,6 +417,7 @@ export interface FileRoutesByFullPath {
   '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/project-dashboard': typeof AuthenticatedProjectDashboardRoute
+  '/project-summary': typeof AuthenticatedProjectSummaryRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
@@ -467,6 +475,7 @@ export interface FileRoutesByTo {
   '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/project-dashboard': typeof AuthenticatedProjectDashboardRoute
+  '/project-summary': typeof AuthenticatedProjectSummaryRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/admin/masters': typeof AuthenticatedAdminMastersRoute
@@ -527,6 +536,7 @@ export interface FileRoutesById {
   '/_authenticated/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/_authenticated/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
   '/_authenticated/project-dashboard': typeof AuthenticatedProjectDashboardRoute
+  '/_authenticated/project-summary': typeof AuthenticatedProjectSummaryRoute
   '/_authenticated/admin/backup': typeof AuthenticatedAdminBackupRoute
   '/_authenticated/admin/mapping': typeof AuthenticatedAdminMappingRoute
   '/_authenticated/admin/masters': typeof AuthenticatedAdminMastersRoute
@@ -587,6 +597,7 @@ export interface FileRouteTypes {
     | '/my-team-work-space'
     | '/my-work-space'
     | '/project-dashboard'
+    | '/project-summary'
     | '/admin/backup'
     | '/admin/mapping'
     | '/admin/masters'
@@ -644,6 +655,7 @@ export interface FileRouteTypes {
     | '/my-team-work-space'
     | '/my-work-space'
     | '/project-dashboard'
+    | '/project-summary'
     | '/admin/backup'
     | '/admin/mapping'
     | '/admin/masters'
@@ -703,6 +715,7 @@ export interface FileRouteTypes {
     | '/_authenticated/my-team-work-space'
     | '/_authenticated/my-work-space'
     | '/_authenticated/project-dashboard'
+    | '/_authenticated/project-summary'
     | '/_authenticated/admin/backup'
     | '/_authenticated/admin/mapping'
     | '/_authenticated/admin/masters'
@@ -793,6 +806,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/project-summary': {
+      id: '/_authenticated/project-summary'
+      path: '/project-summary'
+      fullPath: '/project-summary'
+      preLoaderRoute: typeof AuthenticatedProjectSummaryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/project-dashboard': {
       id: '/_authenticated/project-dashboard'
@@ -1220,6 +1240,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMyTeamWorkSpaceRoute: typeof AuthenticatedMyTeamWorkSpaceRoute
   AuthenticatedMyWorkSpaceRoute: typeof AuthenticatedMyWorkSpaceRoute
   AuthenticatedProjectDashboardRoute: typeof AuthenticatedProjectDashboardRoute
+  AuthenticatedProjectSummaryRoute: typeof AuthenticatedProjectSummaryRoute
   AuthenticatedCloseoutDashboardRoute: typeof AuthenticatedCloseoutDashboardRoute
   AuthenticatedImportLogImportRoute: typeof AuthenticatedImportLogImportRoute
   AuthenticatedImportLogLogsRoute: typeof AuthenticatedImportLogLogsRoute
@@ -1262,6 +1283,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMyTeamWorkSpaceRoute: AuthenticatedMyTeamWorkSpaceRoute,
   AuthenticatedMyWorkSpaceRoute: AuthenticatedMyWorkSpaceRoute,
   AuthenticatedProjectDashboardRoute: AuthenticatedProjectDashboardRoute,
+  AuthenticatedProjectSummaryRoute: AuthenticatedProjectSummaryRoute,
   AuthenticatedCloseoutDashboardRoute: AuthenticatedCloseoutDashboardRoute,
   AuthenticatedImportLogImportRoute: AuthenticatedImportLogImportRoute,
   AuthenticatedImportLogLogsRoute: AuthenticatedImportLogLogsRoute,
@@ -1339,3 +1361,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
