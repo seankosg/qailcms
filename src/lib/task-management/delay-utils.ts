@@ -65,7 +65,8 @@ export function resolvePlanPct(it: TaskItem, asOfDate: string): number {
   return v == null ? cumPlanProgress(it, asOfDate) : Number(v);
 }
 
-function resolveActualPct(it: TaskItem): number {
+/** 정본 실적%(있으면) → 없으면 클라 누적 계산. */
+export function resolveActualPct(it: TaskItem): number {
   const v = srvOf(it).srv_actual_pct;
   return v == null ? cumActualProgress(it) : Number(v);
 }

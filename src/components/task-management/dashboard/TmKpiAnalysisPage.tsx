@@ -7,19 +7,17 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { asOfHeaderLabel } from "@/lib/task-management/as-of";
-import { useTaskDashboardData, getLatestDataDate } from "@/hooks/useTaskDashboardData";
+import { getLatestDataDate } from "@/hooks/useTaskDashboardData";
+import { useTmScurveData } from "@/hooks/useTmScurveData";
 import { useTmAsOf } from "@/hooks/useTmAsOf";
 import { todayIso, type TaskItem } from "@/lib/task-management/schedule-utils";
 import type { OwnerDim, OwnerLeaderboardRow } from "@/lib/task-management/delay-utils";
-import { scopeItems, type TaskScope } from "@/lib/task-management/kpi-utils";
+import { type TaskScope } from "@/lib/task-management/kpi-utils";
 import { OwnerQuickFilterPills } from "./OwnerQuickFilterPills";
 import { OwnerProgressChart } from "./OwnerProgressChart";
 import { OwnerDetailDialog } from "./OwnerDetailDialog";
 import { TmPlanVsActualCard } from "./TmPlanVsActualCard";
 import type { SCurveBucket } from "@/lib/task-management/scurve-utils";
-import { useTaskManagementSettings } from "@/hooks/useTaskManagementSettings";
-import { DEFAULT_THRESHOLDS } from "@/lib/task-management/derived";
-import { resolveJudgment } from "@/lib/task-management/delay-utils";
 import { todayInDoha } from "@/lib/time/doha";
 import { ChartGuideButton } from "./ChartGuideButton";
 import { useTmWorkTypeOptions } from "@/hooks/useTmWorkTypeOptions";
@@ -62,19 +60,21 @@ export function TmKpiAnalysisPage() {
   const selectedDataDate = sharedDataDate || today;
   const asOfDate = selectedDataDate;
 
-  const { data: items = [], isLoading } = useTaskDashboardData(
-    {
-      disciplines: search.discipline,
-      plots: search.plot,
-      // 담당자 축의 Team 필터는 폐기 — 상단 Team(=discipline) 필터만 사용
-      teams: [],
-      hdecPic: search.hdecPic,
-      hdecEng: search.hdecEng,
-      level: "all",
-      q: "",
-    },
+  const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
+  // 계산은 항상 Sub 기준(기본값). Main 은 명시 선택 시에만.
+  const taskScope: TaskScope = search.taskScope === "main" ? "main" : "sub";
+  const workType = search.workType ?? "all";
+
+  const { items, scopedItems, thresholds, isLoading, filterSummary } = useTmScurveData({
     asOfDate,
-  );
+    disciplines: search.discipline,
+    plots: search.plot,
+    hdecPic: search.hdecPic,
+    hdecEng: search.hdecEng,
+    taskScope,
+    workType,
+    delayFilter: search.delayFilter,
+  });
 
   const latestDataDate = getLatestDataDate(items) ?? todayIso();
 
@@ -86,15 +86,6 @@ export function TmKpiAnalysisPage() {
     }
     return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [items]);
-
-  const ownerDim: OwnerDim = isOwnerDim(search.ownerDim) ? search.ownerDim : "hdec_pic_name";
-  // 계산은 항상 Sub 기준(기본값). Main 은 명시 선택 시에만.
-  const taskScope: TaskScope = search.taskScope === "main" ? "main" : "sub";
-
-  const scopedByTaskScope = useMemo(() => scopeItems(items, taskScope), [items, taskScope]);
-
-  const { data: thresholdsData } = useTaskManagementSettings();
-  const thresholds = thresholdsData ?? DEFAULT_THRESHOLDS;
 
   const [ownerDetail, setOwnerDetail] = useState<{
     dim: OwnerDim;
@@ -110,21 +101,6 @@ export function TmKpiAnalysisPage() {
   const engOptions = useMemo(() => uniqSorted(items, "hdec_eng_name"), [items]);
 
   const { data: workTypeOptions = [] } = useTmWorkTypeOptions();
-  const workType = search.workType ?? "all";
-
-  const scopedItems = useMemo(() => {
-    let base = scopedByTaskScope;
-    if (workType !== "all")
-      base = base.filter(
-        (it) => ((it as { row_type?: string | null }).row_type ?? "").trim() === workType,
-      );
-    if (search.delayFilter === "risk")
-      return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "악화");
-    if (search.delayFilter === "delayed")
-      return base.filter((it) => resolveJudgment(it, thresholds, asOfDate) === "지연");
-    // "전체" 는 모집단 그대로 — 지연 과업만 남기지 않는다.
-    return base;
-  }, [scopedByTaskScope, workType, search.delayFilter, thresholds, asOfDate]);
 
   const patch = (obj: Record<string, unknown>) =>
     navigate({
@@ -143,24 +119,6 @@ export function TmKpiAnalysisPage() {
     if (ownerDim === "hdec_pic_name") return listLabel(search.hdecPic);
     return listLabel(search.hdecEng);
   }, [ownerDim, disciplines, search.hdecPic, search.hdecEng]);
-
-  const filterSummary = useMemo(
-    () => [
-      { label: "Task", value: taskScope === "main" ? "Main" : "Sub" },
-      { label: "Team", value: listLabel(disciplines) },
-      { label: "PIC", value: listLabel(search.hdecPic) },
-      { label: "ENG", value: listLabel(search.hdecEng) },
-      { label: "Work Type", value: workType === "all" ? "All" : workType },
-      {
-        label: "Delay",
-        value:
-          DELAY_FILTER_OPTIONS.find((o) => o.value === search.delayFilter)?.label ??
-          String(search.delayFilter ?? "all"),
-      },
-      { label: "As of", value: asOfDate },
-    ],
-    [taskScope, disciplines, search.hdecPic, search.hdecEng, workType, search.delayFilter, asOfDate],
-  );
 
   // 폐기된 담당자축 Team 필터의 잔여 선택값 정리
   useEffect(() => {
