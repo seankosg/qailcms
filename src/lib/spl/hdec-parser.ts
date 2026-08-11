@@ -27,6 +27,9 @@ export const SPL_STAGE_LABELS: Record<
   "dar acceptance": { code: "DAR_ACCEPTANCE", type: "range", authority: "HDEC", short: "D-DA" },
   submission: { code: "SUBMISSION", type: "range", authority: "HDEC", short: "D-SB" },
   "approval date": { code: "APPROVAL_DATE", type: "single", authority: "ACONEX", short: "D-AP" },
+  // 2026-08-11 표시 라벨 개명(Approval Date → Dar Response Date). 옛 헤더는 별칭으로 유지 —
+  // 이미 배포된 왕복 양식이 현장에 돌고 있어 지우면 그 파일이 미매핑된다.
+  "dar response date": { code: "APPROVAL_DATE", type: "single", authority: "ACONEX", short: "D-AP" },
   "code b to a": { code: "CODE_B_TO_A", type: "range", authority: "HDEC", short: "D-BA" },
   "rfq draft": { code: "RFQ_DRAFT", type: "range", authority: "HDEC", short: "P-QD" },
   rfq: { code: "RFQ", type: "single", authority: "HDEC", short: "P-RQ" },
@@ -88,7 +91,14 @@ const ITEM_COLS: Record<string, string> = {
 };
 
 /** Aconex 정본 — HDEC 임포트의 수정·삭제 대상에서 제외 */
-const IGNORED_HEADERS = new Set(["dis", "service", "document title", "approval status"]);
+const IGNORED_HEADERS = new Set([
+  "dis",
+  "service",
+  "document title",
+  "approval status",
+  // 개명 후 헤더. 옛 이름도 그대로 남긴다.
+  "response status",
+]);
 
 export type StageFieldKey = "plan_start" | "actual_start" | "plan_finish" | "actual_finish" | "flag_value";
 
