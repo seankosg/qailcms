@@ -119,144 +119,24 @@ export function AbdProgressPage() {
   const asOfDate = asofMode === "today" || !effectiveDataDate ? today : effectiveDataDate;
   const asOfLabel = asofMode === "today" ? "Today" : "As of";
 
-  const rangeStart = useMemo(() => addDays(today, -14), [today]);
-  const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
-  const rpcStart = bucket === "week" ? weekStartIso(rangeStart) : rangeStart;
-  const rpcEnd = rangeEnd;
-  const baselineAsOf = useMemo(() => addDays(rpcStart, -1), [rpcStart]);
-
-  const cellsFn = useServerFn(getAbdProgressCells);
-  const totalsFn = useServerFn(getAbdProgressTotals);
-
-  const teamsKey = [...teams].sort().join(",");
-  const groupKey = effectiveGroupBy.join(",");
-  const roundKey = round;
-
-  const cellsQ = useQuery({
-    queryKey: [
-      "abd-progress-cells",
-      plot,
-      teamsKey,
-      roundKey,
-      groupKey,
-      bucket,
-      rpcStart,
-      rpcEnd,
-      asOfDate,
-      planMode,
-    ],
-    queryFn: () =>
-      cellsFn({
-        data: {
-          plots: plot === "all" ? [] : [plot],
-          teams,
-          groupBy: effectiveGroupBy,
-          bucket,
-          rangeStart: rpcStart,
-          rangeEnd: rpcEnd,
-          asOfDate,
-          planMode,
-          round,
-        },
-      }),
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
+  // 데이터 정본은 훅 하나 — 프로젝트 대시보드와 동일한 계산을 쓴다.
+  const {
+    buckets,
+    cellsQ,
+    totalsQ,
+    baselines: scurveBaselines,
+    cum: scurveCum,
+  } = useAbdScurveData({
+    plot,
+    teams,
+    groupBy: effectiveGroupBy,
+    bucket,
+    planMode,
+    asOfDate,
+    rangeDays,
+    scurveEnabled: scurveOpen,
   });
 
-  const totalsQ = useQuery({
-    queryKey: ["abd-progress-totals", plot, teamsKey, roundKey, groupKey, asOfDate, planMode],
-    queryFn: () =>
-      totalsFn({
-        data: {
-          plots: plot === "all" ? [] : [plot],
-          teams,
-          groupBy: effectiveGroupBy,
-          asOfDate,
-          planMode,
-          round,
-        },
-      }),
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-
-  const buckets = useMemo(() => buildBucketRange(rpcStart, rpcEnd, bucket), [rpcStart, rpcEnd, bucket]);
-
-  // S-Curve: 메인 cellsQ(전 라운드 통합) 재사용 + baseline totals 1회.
-  const baselineQ = useQuery({
-    queryKey: ["abd-progress-totals-baseline", plot, teamsKey, groupKey, baselineAsOf, planMode],
-    queryFn: () =>
-      totalsFn({
-        data: {
-          plots: plot === "all" ? [] : [plot],
-          teams,
-          groupBy: effectiveGroupBy,
-          asOfDate: baselineAsOf,
-          planMode,
-          round,
-        },
-      }),
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-    enabled: scurveOpen,
-  });
-  const scurveBaselines: SCurveBaselines = useMemo(() => {
-    const out: SCurveBaselines = {};
-    for (const row of (baselineQ.data ?? []) as Array<{
-      stage: Stage; plan_upto: number; actual_upto: number;
-    }>) {
-      const prev = out[row.stage] ?? { plan: 0, actual: 0 };
-      out[row.stage] = {
-        plan: prev.plan + (Number(row.plan_upto) || 0),
-        actual: prev.actual + (Number(row.actual_upto) || 0),
-      };
-    }
-    return out;
-  }, [baselineQ.data]);
-
-  // S-커브 누적 정본: 기간 내 문서 distinct(서버). 종점 = 행 totals.
-  const cumFn = useServerFn(getAbdProgressCum);
-  const cumQ = useQuery({
-    queryKey: ["abd-progress-cum", plot, teamsKey, roundKey, bucket, rpcStart, rpcEnd, asOfDate, planMode],
-    queryFn: () =>
-      cumFn({
-        data: {
-          plots: plot === "all" ? [] : [plot],
-          teams,
-          bucket,
-          rangeStart: rpcStart,
-          rangeEnd: rpcEnd,
-          asOfDate,
-          planMode,
-          round,
-        },
-      }),
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-    enabled: scurveOpen,
-  });
-
-  const scurveCum: SCurveCum = useMemo(() => {
-    const rows = (cumQ.data ?? []) as Array<{
-      bucket_iso: string; stage: Stage; cum_plan: number; cum_actual: number;
-    }>;
-    if (rows.length === 0) return {};
-    const idx = new Map<string, number>();
-    buckets.forEach((b, i) => idx.set(b, i));
-    const out: SCurveCum = {};
-    for (const r of rows) {
-      const i = idx.get(r.bucket_iso);
-      if (i === undefined) continue;
-      let slot = out[r.stage];
-      if (!slot) {
-        slot = { plan: new Array(buckets.length).fill(0), actual: new Array(buckets.length).fill(0) };
-        out[r.stage] = slot;
-      }
-      slot.plan[i] = r.cum_plan;
-      slot.actual[i] = r.cum_actual;
-    }
-    return out;
-  }, [cumQ.data, buckets]);
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
