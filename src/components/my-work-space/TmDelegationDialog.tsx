@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { UserCog } from "lucide-react";
-import { dohaToday } from "@/lib/time/doha";
+import { todayInDoha } from "@/lib/time/doha";
 
 interface Props {
   myPic: string | null;
@@ -34,7 +34,7 @@ interface DelegationRow {
 }
 
 function todayIso(): string {
-  try { return dohaToday(); } catch { return new Date().toISOString().slice(0, 10); }
+  try { return todayInDoha(); } catch { return new Date().toISOString().slice(0, 10); }
 }
 
 export function TmDelegationDialog({ myPic, userId }: Props) {
