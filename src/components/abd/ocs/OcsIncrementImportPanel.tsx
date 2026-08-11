@@ -1530,7 +1530,7 @@ export function OcsIncrementImportPanel() {
         <Button
           size="sm"
           disabled={!gates.step6Unlocked || !!busy || snapshotRunning}
-          onClick={() => void runSnapshot()}
+          onClick={() => void runSnapshot(!!snapshotError)}
         >
           {snapshotRunning ? (
             <>
