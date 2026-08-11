@@ -86,10 +86,12 @@ function UsersAdminPage() {
  * §5 확인창 + §2-2 admin 항목 노출 제한 + §6 최고 등급 표시/복수 역할 배지.
  */
 function RoleCell({
-  user, callerIsAdmin, onChange,
+  user, callerIsAdmin, locked = false, onChange,
 }: {
   user: any;
   callerIsAdmin: boolean;
+  /** §5(2026-08-11) 최상위 전용 조작 — 값은 계속 보여 주고 조작만 막는다. */
+  locked?: boolean;
   onChange: (role: AppRole) => Promise<void>;
 }) {
   const roles: string[] = user.roles ?? [];
@@ -98,7 +100,7 @@ function RoleCell({
   const options = ROLES.filter((r) => r !== "admin" || callerIsAdmin || current === "admin");
   return (
     <div className="flex items-center gap-1">
-      <Select value={current} onValueChange={(v) => setPending(v as AppRole)}>
+      <Select value={current} disabled={locked} onValueChange={(v) => setPending(v as AppRole)}>
         <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
         <SelectContent>{options.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
       </Select>
@@ -217,6 +219,9 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
   const { data, isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: () => list({}) });
   const me = useCurrentUser();
   const callerIsAdmin = (me.data?.roles ?? []).includes("admin");
+  // §5(2026-08-11) 계정 조작(등급 변경 · 생성 · 삭제 · 비밀번호 초기화)은 서버가 최상위 전용이다.
+  // 화면 판정도 permissions.tsx 와 같은 방식(isSystemAdmin) 하나만 쓴다.
+  const canManageAccounts = !!me.data?.isSystemAdmin;
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
   const teams = useTeamOptions();
 
@@ -292,6 +297,13 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
   };
 
   return (
+    <div className="space-y-3">
+      {!canManageAccounts && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">
+          일부 조작이 잠겨 있습니다 — 등급 변경 · 계정 생성 · 계정 삭제 · 비밀번호 초기화(개별 · 일괄)는{" "}
+          <b>System Administrator</b> 계정만 할 수 있습니다. 조회 · 로그인 ID · 프로필 · 활성 토글 · Export 는 그대로 사용할 수 있습니다.
+        </div>
+      )}
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle>사용자 목록</CardTitle>
@@ -314,8 +326,8 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
           <Button variant="outline" size="sm" onClick={() => exportUsersXlsx(rows)}>
             <Download className="mr-1 h-4 w-4" />Export
           </Button>
-          <BulkResetPasswordButton onDone={invalidate} />
-          <NewUserDialog onCreated={invalidate} />
+          <BulkResetPasswordButton onDone={invalidate} disabled={!canManageAccounts} />
+          <NewUserDialog onCreated={invalidate} disabled={!canManageAccounts} />
         </div>
       </CardHeader>
       <CardContent>
@@ -386,6 +398,7 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
                       <RoleCell
                         user={u}
                         callerIsAdmin={callerIsAdmin}
+                        locked={!canManageAccounts}
                         onChange={async (v) => {
                           try { await updRole({ data: { user_id: u.id, role: v as any } }); toast.success("역할 변경됨"); invalidate(); }
                           catch (e: any) { toast.error(e.message); }
@@ -402,13 +415,13 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <ResetPasswordButton onReset={async (pw) => {
+                      <ResetPasswordButton disabled={!canManageAccounts} onReset={async (pw) => {
                         try { await resetPw({ data: { user_id: u.id, temp_password: pw } }); toast.success("임시 PW 재발급됨"); invalidate(); }
                         catch (e: any) { toast.error(e.message); }
                       }} />
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive" disabled={!canManageAccounts}><Trash2 className="h-4 w-4" /></Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -535,13 +548,13 @@ function LinkedMasterCell({ user, onSaved, updProfile }: { user: any; onSaved: (
   );
 }
 
-function ResetPasswordButton({ onReset }: { onReset: (pw: string) => Promise<void> }) {
+function ResetPasswordButton({ onReset, disabled = false }: { onReset: (pw: string) => Promise<void>; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [pw, setPw] = useState(DEFAULT_PASSWORD);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon"><KeyRound className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" disabled={disabled}><KeyRound className="h-4 w-4" /></Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -565,7 +578,7 @@ function ResetPasswordButton({ onReset }: { onReset: (pw: string) => Promise<voi
 }
 
 /** §1 임시 비밀번호 통일 — must_change_password=true 계정 전원 일괄 재설정. */
-function BulkResetPasswordButton({ onDone }: { onDone: () => void }) {
+function BulkResetPasswordButton({ onDone, disabled = false }: { onDone: () => void; disabled?: boolean }) {
   const bulkReset = useServerFn(bulkResetTempPassword);
   const [open, setOpen] = useState(false);
   const [pw, setPw] = useState(DEFAULT_PASSWORD);
@@ -573,7 +586,7 @@ function BulkResetPasswordButton({ onDone }: { onDone: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm"><KeyRound className="mr-1 h-4 w-4" />임시 비밀번호 일괄 재설정</Button>
+        <Button variant="outline" size="sm" disabled={disabled}><KeyRound className="mr-1 h-4 w-4" />임시 비밀번호 일괄 재설정</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -606,7 +619,7 @@ function BulkResetPasswordButton({ onDone }: { onDone: () => void }) {
   );
 }
 
-function NewUserDialog({ onCreated }: { onCreated: () => void }) {
+function NewUserDialog({ onCreated, disabled = false }: { onCreated: () => void; disabled?: boolean }) {
   const create = useServerFn(createAppUser);
   const teams = useTeamOptions();
   const [open, setOpen] = useState(false);
@@ -655,7 +668,7 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button><UserPlus className="mr-1 h-4 w-4" />신규 계정</Button>
+        <Button disabled={disabled}><UserPlus className="mr-1 h-4 w-4" />신규 계정</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
