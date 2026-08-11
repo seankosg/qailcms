@@ -276,6 +276,42 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
       }));
       setBatches(list);
       await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
+    } else if (kind === "spl") {
+      const { data } = await (supabase as any)
+        .from("spl_import_logs")
+        .select(
+          "id, file_name, status, started_at, finished_at, imported_by, note, total_rows, matched, unmatched, ocs_excluded, items_updated, stages_upserted, cleared_values, sheet_names",
+        )
+        .order("started_at", { ascending: false })
+        .limit(100);
+      const list: Batch[] = (data ?? []).map((r: any) => ({
+        id: r.id,
+        file_name: r.file_name,
+        status: r.status,
+        started_at: r.started_at,
+        finished_at: r.finished_at,
+        imported_by: r.imported_by,
+        // SPL 로그에는 data_date / rolled_back_at 칸이 없다 — 렌더하지 않는다.
+        data_date: null,
+        total: r.total_rows ?? 0,
+        inserted: 0,
+        updated: 0,
+        skipped: 0,
+        rejected: 0,
+        extra: r.note ?? null,
+        spl: {
+          total_rows: r.total_rows ?? 0,
+          matched: r.matched ?? 0,
+          unmatched: r.unmatched ?? 0,
+          ocs_excluded: r.ocs_excluded ?? 0,
+          items_updated: r.items_updated ?? 0,
+          stages_upserted: r.stages_upserted ?? 0,
+          cleared_values: r.cleared_values ?? 0,
+          sheet_names: (r.sheet_names ?? []) as string[],
+        },
+      }));
+      setBatches(list);
+      await loadUploaders(list.map((b) => b.imported_by).filter(Boolean) as string[]);
     } else {
       // abd
       const { data } = await (supabase as any)
@@ -345,25 +381,44 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
           ? "id, raw_row_no, discipline, task_no, action_taken, reason_code, reason_detail, processed_at"
           : kind === "defect_management"
             ? "id, raw_row_no, team, source_issue_no, action_taken, reason_code, reason_detail, processed_at"
-            : "id, raw_row_no, team, abd_number, action_taken, reason_code, reason_detail, processed_at";
-      const rows = await fetchAllByUploadId<any>(cfg.rowLogsTable, cols, id);
+            : kind === "spl"
+              ? "id, excel_row, sheet_name, spl_number, outcome, code, detail, created_at"
+              : "id, raw_row_no, team, abd_number, action_taken, reason_code, reason_detail, processed_at";
+      const rows = await fetchAllByUploadId<any>(
+        cfg.rowLogsTable,
+        cols,
+        id,
+        1000,
+        cfg.rowLogsFk,
+        kind === "spl" ? "created_at" : "processed_at",
+      );
       const mapped: RowLog[] = rows.map((r: any) => ({
         id: r.id,
-        raw_row_no: r.raw_row_no,
-        action_taken: r.action_taken,
-        reason_code: r.reason_code,
-        reason_detail: r.reason_detail,
+        raw_row_no: kind === "spl" ? r.excel_row : r.raw_row_no,
+        action_taken: kind === "spl" ? r.outcome : r.action_taken,
+        reason_code: kind === "spl" ? r.code : r.reason_code,
+        reason_detail:
+          kind === "spl"
+            ? [r.sheet_name ? `sheet ${r.sheet_name}` : null, r.detail].filter(Boolean).join(" · ") || null
+            : r.reason_detail,
         key_value:
           kind === "task_management"
             ? r.task_no
             : kind === "defect_management"
               ? r.source_issue_no
-              : r.abd_number,
-        processed_at: r.processed_at,
+              : kind === "spl"
+                ? r.spl_number
+                : r.abd_number,
+        processed_at: kind === "spl" ? r.created_at : r.processed_at,
       }));
       setRowLogs(mapped);
       // 필드 단위 로그 조회 (SHAW 스타일 확장 상세)
       try {
+        if (kind === "spl") {
+          setFieldKind("spl");
+          setFieldOutcomeCounts({});
+          return;
+        }
         const kindKey =
           kind === "task_management"
             ? "task_management"
@@ -400,6 +455,7 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
   };
 
   const deleteBatch = async (b: Batch) => {
+    if (!cfg.deleteFn) return;
     setDeletingId(b.id);
     try {
       const { error } = await (supabase as any).rpc(cfg.deleteFn, { _batch_id: b.id });
@@ -722,15 +778,15 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-0.5">
-                              {canRollback && b.status !== "rolled_back" && (
+                              {cfg.rollbackKind && canRollback && b.status !== "rolled_back" && (
                                 <RollbackDialog
-                                  kind={kind}
+                                  kind={cfg.rollbackKind}
                                   batchId={b.id}
                                   fileName={b.file_name}
                                   onDone={fetchBatches}
                                 />
                               )}
-                              {isAdmin && (
+                              {isAdmin && cfg.deleteFn && (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button
