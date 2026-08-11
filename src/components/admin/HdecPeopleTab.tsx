@@ -9,6 +9,7 @@ import {
   baseLoginIdFromName,
 } from "@/lib/admin/users.functions";
 import { Button } from "@/components/ui/button";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -79,6 +80,9 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
   const updLogin = useServerFn(updateLoginId);
   const suggest = useServerFn(suggestLoginIds);
   const bulkCreate = useServerFn(bulkCreateAppUsers);
+  // §5(2026-08-11) 계정 생성은 서버가 최상위 전용. users.tsx 와 같은 판정 하나만 쓴다.
+  const me = useCurrentUser();
+  const canManageAccounts = !!me.data?.isSystemAdmin;
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["hdec-people"] });
@@ -234,7 +238,7 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
               <Button variant="ghost" size="sm" onClick={() => setSelected({})}>선택 해제</Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button size="sm" disabled={creating}>
+                  <Button size="sm" disabled={creating || !canManageAccounts} title={!canManageAccounts ? "계정 생성은 System Administrator 전용입니다." : undefined}>
                     {creating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UserPlus className="mr-1 h-4 w-4" />}
                     선택 항목 계정 생성
                   </Button>
@@ -440,7 +444,7 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
                             </AlertDialog>
                           </>
                         ) : (
-                          <Button size="sm" variant="outline" disabled={creating} onClick={() => runCreate([r])}>
+                          <Button size="sm" variant="outline" disabled={creating || !canManageAccounts} title={!canManageAccounts ? "계정 생성은 System Administrator 전용입니다." : undefined} onClick={() => runCreate([r])}>
                             <UserPlus className="mr-1 h-3.5 w-3.5" />계정 생성
                           </Button>
                         )}
