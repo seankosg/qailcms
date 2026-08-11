@@ -10,29 +10,57 @@ import * as XLSX from "xlsx";
  * - 번호 패턴 `-OCS-` 는 Aconex 루틴 산출물이므로 항상 제외하고 건수를 보고한다.
  */
 
-export const SPL_STAGE_LABELS: Record<string, { code: string; type: "flag" | "single" | "range"; authority: "HDEC" | "ACONEX" }> = {
-  "physical list": { code: "PHYSICAL_LIST", type: "flag", authority: "HDEC" },
-  "rec. letter 2y": { code: "REC_LETTER_2Y", type: "flag", authority: "HDEC" },
-  "rec. letter 5y": { code: "REC_LETTER_5Y", type: "flag", authority: "HDEC" },
-  "availability 10y": { code: "AVAILABILITY_10Y", type: "flag", authority: "HDEC" },
-  others: { code: "OTHERS_DOC", type: "flag", authority: "HDEC" },
-  "request for resubmission": { code: "REQ_RESUBMISSION", type: "single", authority: "HDEC" },
-  "response received": { code: "RESPONSE_RECEIVED", type: "single", authority: "HDEC" },
-  "review response from sub": { code: "REVIEW_RESPONSE", type: "range", authority: "HDEC" },
-  "internal q'ty verification": { code: "INTERNAL_QTY_VERIF", type: "range", authority: "HDEC" },
-  "substantiation preparation": { code: "SUBSTANTIATION_PREP", type: "range", authority: "HDEC" },
-  "dar acceptance": { code: "DAR_ACCEPTANCE", type: "range", authority: "HDEC" },
-  submission: { code: "SUBMISSION", type: "range", authority: "HDEC" },
-  "approval date": { code: "APPROVAL_DATE", type: "single", authority: "ACONEX" },
-  "code b to a": { code: "CODE_B_TO_A", type: "range", authority: "HDEC" },
-  "rfq draft": { code: "RFQ_DRAFT", type: "range", authority: "HDEC" },
-  rfq: { code: "RFQ", type: "single", authority: "HDEC" },
-  quotation: { code: "QUOTATION", type: "single", authority: "HDEC" },
-  "review quotation": { code: "REVIEW_QUOTATION", type: "range", authority: "HDEC" },
-  "confirmation of quotation": { code: "CONFIRM_QUOTATION", type: "single", authority: "HDEC" },
-  "hq (above 100k)": { code: "HQ_APPROVAL", type: "range", authority: "HDEC" },
-  mrs: { code: "MRS", type: "range", authority: "HDEC" },
-  "issuance of po": { code: "PO_ISSUANCE", type: "single", authority: "HDEC" },
+export const SPL_STAGE_LABELS: Record<
+  string,
+  { code: string; type: "flag" | "single" | "range"; authority: "HDEC" | "ACONEX"; short: string }
+> = {
+  "physical list": { code: "PHYSICAL_LIST", type: "flag", authority: "HDEC", short: "R-PL" },
+  "rec. letter 2y": { code: "REC_LETTER_2Y", type: "flag", authority: "HDEC", short: "R-2Y" },
+  "rec. letter 5y": { code: "REC_LETTER_5Y", type: "flag", authority: "HDEC", short: "R-5Y" },
+  "availability 10y": { code: "AVAILABILITY_10Y", type: "flag", authority: "HDEC", short: "R-10Y" },
+  others: { code: "OTHERS_DOC", type: "flag", authority: "HDEC", short: "R-OT" },
+  "request for resubmission": { code: "REQ_RESUBMISSION", type: "single", authority: "HDEC", short: "D-SU" },
+  "response received": { code: "RESPONSE_RECEIVED", type: "single", authority: "HDEC", short: "D-RV" },
+  "review response from sub": { code: "REVIEW_RESPONSE", type: "range", authority: "HDEC", short: "D-VW" },
+  "internal q'ty verification": { code: "INTERNAL_QTY_VERIF", type: "range", authority: "HDEC", short: "D-QV" },
+  "substantiation preparation": { code: "SUBSTANTIATION_PREP", type: "range", authority: "HDEC", short: "D-PR" },
+  "dar acceptance": { code: "DAR_ACCEPTANCE", type: "range", authority: "HDEC", short: "D-DA" },
+  submission: { code: "SUBMISSION", type: "range", authority: "HDEC", short: "D-SB" },
+  "approval date": { code: "APPROVAL_DATE", type: "single", authority: "ACONEX", short: "D-AP" },
+  "code b to a": { code: "CODE_B_TO_A", type: "range", authority: "HDEC", short: "D-BA" },
+  "rfq draft": { code: "RFQ_DRAFT", type: "range", authority: "HDEC", short: "P-QD" },
+  rfq: { code: "RFQ", type: "single", authority: "HDEC", short: "P-RQ" },
+  quotation: { code: "QUOTATION", type: "single", authority: "HDEC", short: "P-QT" },
+  "review quotation": { code: "REVIEW_QUOTATION", type: "range", authority: "HDEC", short: "P-WQ" },
+  "confirmation of quotation": { code: "CONFIRM_QUOTATION", type: "single", authority: "HDEC", short: "P-CQ" },
+  "hq (above 100k)": { code: "HQ_APPROVAL", type: "range", authority: "HDEC", short: "P-HQ" },
+  mrs: { code: "MRS", type: "range", authority: "HDEC", short: "P-MR" },
+  "issuance of po": { code: "PO_ISSUANCE", type: "single", authority: "HDEC", short: "P-PO" },
+};
+
+/** View 양식(화면 표시 그대로) 헤더 = 카탈로그 short_code (+ 필드 접미사) */
+const SPL_SHORT_CODES: Record<string, { code: string; type: "flag" | "single" | "range" }> = Object.fromEntries(
+  Object.values(SPL_STAGE_LABELS).map((s) => [s.short.toLowerCase(), { code: s.code, type: s.type }]),
+);
+
+const VIEW_SUFFIX: Record<string, StageFieldKey> = {
+  "-pd": "plan_start",
+  "-ad": "actual_start",
+  "-ps": "plan_start",
+  "-as": "actual_start",
+  "-pf": "plan_finish",
+  "-af": "actual_finish",
+};
+
+/** View 양식에서 spl_items 로 반영하는 컬럼 (헤더 라벨 기준) */
+const VIEW_ITEM_COLS: Record<string, string> = {
+  team: "team",
+  pic: "pic",
+  eng: "eng",
+  "pic po": "pic_po",
+  "eng po": "eng_po",
+  supplier: "supplier",
+  plot: "plot",
 };
 
 /** 팀 표기 정규화 — 매핑은 이 한 곳(파서)에서만 한다 */
