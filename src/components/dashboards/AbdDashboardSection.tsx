@@ -2,19 +2,23 @@ import { useMemo, useState } from "react";
 import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import { AbdPlanVsActualCard } from "@/components/abd/progress/AbdPlanVsActualCard";
 import { useAbdScurveData } from "@/hooks/useAbdScurveData";
+import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
+import { PDB_DEFAULTS, pdbFilterChips, type PdbAbdFilters } from "@/lib/dashboards/pdb-filters";
 import { ALL_STAGES } from "@/lib/abd/progress-utils";
+import type { AbdTeam } from "@/lib/abd/columns";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
-function useAbdPlot(plot: "C" | "D", asOfDate: string) {
+function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
   const q = useAbdScurveData({
     plot,
-    teams: [],
+    teams: f.teams as AbdTeam[],
     groupBy: ["team"],
-    bucket: "week",
-    planMode: "baseline",
+    bucket: f.bucket,
+    planMode: f.planMode,
     asOfDate,
     rangeDays: 60,
     scurveEnabled: true,
+    startDate: f.startDate,
   });
   const kpi = useMemo(() => {
     const rows = (q.totals ?? []) as Array<Record<string, unknown>>;
@@ -37,14 +41,17 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string) {
 /** ABD — 정본: useAbdScurveData(= ABD Progress 와 동일 훅), Plot 별 호출 */
 export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
   const [open, setOpen] = useState(true);
-  const c = useAbdPlot("C", asOfDate);
-  const d = useAbdPlot("D", asOfDate);
+  const { data: settings } = usePdbModuleFilters();
+  const f = settings?.abd ?? PDB_DEFAULTS.abd;
+  const c = useAbdPlot("C", asOfDate, f);
+  const d = useAbdPlot("D", asOfDate, f);
 
   return (
     <ProjectModuleSection
       title="As Built Drawing"
       to="/closure/abd/progress"
       progressHint="진도율 = 해당 Plot Approval 실적 누계 ÷ 문서 모수 — ABD Progress 매트릭스와 동일(서버 totals 정본)"
+      filterChips={pdbFilterChips("abd", f)}
       plots={[
         { plot: "D", progressPct: d.loading ? null : d.kpi.progressPct, total: d.kpi.total },
         { plot: "C", progressPct: c.loading ? null : c.kpi.progressPct, total: c.kpi.total },
