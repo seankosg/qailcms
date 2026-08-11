@@ -3363,16 +3363,27 @@ export type Database = {
           created_by: string | null
           diff_manpower: number | null
           discipline: string
+          headcount_kind: string
           id: string
           manpower: number | null
           metric: string | null
+          pic_name: string | null
           plan_manpower: number | null
           plot: string
           report_date: string
+          snapshot_at: string | null
           source_image_path: string | null
           system_id: string | null
           system_name: string
+          tactual_pct: number | null
+          task_actual_start: string | null
+          task_data_date: string | null
+          task_level: string | null
+          task_name: string | null
+          task_no: string | null
+          tplan_pct: number | null
           updated_at: string
+          work_category: string | null
         }
         Insert: {
           actual_manpower?: number | null
@@ -3382,16 +3393,27 @@ export type Database = {
           created_by?: string | null
           diff_manpower?: number | null
           discipline: string
+          headcount_kind?: string
           id?: string
           manpower?: number | null
           metric?: string | null
+          pic_name?: string | null
           plan_manpower?: number | null
           plot: string
           report_date: string
+          snapshot_at?: string | null
           source_image_path?: string | null
           system_id?: string | null
           system_name: string
+          tactual_pct?: number | null
+          task_actual_start?: string | null
+          task_data_date?: string | null
+          task_level?: string | null
+          task_name?: string | null
+          task_no?: string | null
+          tplan_pct?: number | null
           updated_at?: string
+          work_category?: string | null
         }
         Update: {
           actual_manpower?: number | null
@@ -3401,16 +3423,27 @@ export type Database = {
           created_by?: string | null
           diff_manpower?: number | null
           discipline?: string
+          headcount_kind?: string
           id?: string
           manpower?: number | null
           metric?: string | null
+          pic_name?: string | null
           plan_manpower?: number | null
           plot?: string
           report_date?: string
+          snapshot_at?: string | null
           source_image_path?: string | null
           system_id?: string | null
           system_name?: string
+          tactual_pct?: number | null
+          task_actual_start?: string | null
+          task_data_date?: string | null
+          task_level?: string | null
+          task_name?: string | null
+          task_no?: string | null
+          tplan_pct?: number | null
           updated_at?: string
+          work_category?: string | null
         }
         Relationships: [
           {
