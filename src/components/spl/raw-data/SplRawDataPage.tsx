@@ -290,6 +290,19 @@ export function SplRawDataPage() {
     [layout],
   );
 
+  /** 선택 행 평탄화 — Bulk Edit 미리보기/내보내기가 화면 표시값과 동일하게 보이도록 */
+  const selectedRowsFlat = useMemo(() => {
+    const set = new Set(selectedIds);
+    return rows
+      .filter((r) => set.has(r.id))
+      .map((r) => {
+        const out: Record<string, unknown> = { id: r.id, spl_number: r.spl_number };
+        for (const item of allColumnItems) out[item.key] = columnValue(item.key, r);
+        return out;
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, selectedIds, allColumnItems, colDefMap, stageColMap]);
+
   /** 정렬 키 → 값 접근자. 일반 컬럼은 컬럼 정의, 스테이지 컬럼은 `stage:<stage_code>|<field>` */
   const sortValue = useMemo(() => {
     const stageMap = new Map<string, (typeof stageCols)[number]>(
