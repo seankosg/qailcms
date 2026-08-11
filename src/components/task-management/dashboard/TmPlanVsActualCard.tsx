@@ -189,6 +189,7 @@ export function TmPlanVsActualCard({
                 {open ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                 <TrendingUp className="h-5 w-5 text-primary" />
                 <CardTitle className="text-base">Plan vs Actual — S-Curve</CardTitle>
+                {controlsHidden ? null : (
                 <div className="flex flex-wrap items-center gap-1">
                   {filterSummary.map((f) => (
                     <span
@@ -203,6 +204,7 @@ export function TmPlanVsActualCard({
                     n = {n.toLocaleString()} tasks
                   </span>
                 </div>
+                )}
               </button>
             </CollapsibleTrigger>
 
