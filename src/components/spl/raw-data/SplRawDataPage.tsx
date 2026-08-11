@@ -575,7 +575,7 @@ export function SplRawDataPage() {
                             : undefined
                         }
                         className={cn(
-                          "relative overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-center font-medium",
+                          "sticky top-0 z-30 relative overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-center font-medium",
                           splBandHeaderClass(sc.band),
                           sc.bandStart && "border-l-2 border-l-foreground/40",
                         )}
