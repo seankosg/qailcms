@@ -27,6 +27,7 @@ export interface SplDocumentRow {
 
 type LooseClient = {
   from: (t: string) => any;
+  rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: any; error: any }>;
   storage: {
     from: (b: string) => {
       createSignedUrl: (
@@ -111,5 +112,48 @@ export const getSplDocumentUrl = createServerFn({ method: "POST" })
         );
       if (signed.error || !signed.data?.signedUrl) return { available: false };
       return { available: true, url: signed.data.signedUrl, file_name: doc.file_name as string };
+    },
+  );
+
+export interface SplDocumentPageHit {
+  document_id: string;
+  document_number: string;
+  revision: string | null;
+  title: string | null;
+  page_number: number;
+  hit_count: number;
+  snippet: string;
+}
+
+/** SPL 제출 문서 PDF 본문(페이지 단위) 검색 */
+export const searchSplDocumentPages = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { q: string; splItemId?: string | null; documentId?: string | null }) => {
+    const q = typeof input?.q === "string" ? input.q.trim() : "";
+    const splItemId = input?.splItemId ?? null;
+    const documentId = input?.documentId ?? null;
+    if (splItemId != null && !UUID_RE.test(splItemId)) throw new Error("splItemId: invalid id");
+    if (documentId != null && !UUID_RE.test(documentId)) throw new Error("documentId: invalid id");
+    return { q, splItemId, documentId };
+  })
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<{ rows: SplDocumentPageHit[]; total_count: number; query: string }> => {
+      if (data.q.length < 2) return { rows: [], total_count: 0, query: data.q };
+      const client = context.supabase as unknown as LooseClient;
+      const { data: res, error } = await client.rpc("spl_document_pages_search", {
+        _q: data.q,
+        _document_id: data.documentId,
+        _spl_item_id: data.splItemId,
+        _limit: 50,
+      });
+      if (error) throw new Error(error.message);
+      if (!res || typeof res !== "object" || Array.isArray(res)) {
+        throw new Error("spl_document_pages_search: unexpected response shape");
+      }
+      const rows = (res.rows ?? []) as SplDocumentPageHit[];
+      return { rows, total_count: Number(res.total_count ?? 0), query: String(res.query ?? data.q) };
     },
   );
