@@ -3,12 +3,25 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
- * SPL Raw Data 최소 편집 (team · pic · eng · pic_po · eng_po).
+ * SPL Raw Data 편집.
  *
  * 판정 정본 = `rcl_can(uid, 'SPL', id, 'write')` (RLS 정책과 동일 함수).
- * 단계 값(계획/실적)은 임포트 정본 경유이므로 여기서 편집하지 않는다.
+ * 파생값(판정·진도율·집계)은 서버 정본 산출이라 편집 대상이 아니다.
  */
-const EDITABLE = new Set(["team", "pic", "eng", "pic_po", "eng_po"]);
+const EDITABLE = new Set([
+  "team",
+  "pic",
+  "eng",
+  "pic_po",
+  "eng_po",
+  "plot",
+  "dis",
+  "service",
+  "title",
+  "supplier",
+  "latest_status",
+  "data_date",
+]);
 
 const Schema = z.object({
   id: z.string().uuid(),
