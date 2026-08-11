@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { canAccessAbdOcs } from "@/lib/abd/ocs-access";
 import { useQueryClient } from "@tanstack/react-query";
 import { TopBrandHeader } from "@/components/layout/TopBrandHeader";
 import { UpdateAvailableBanner } from "@/components/layout/UpdateAvailableBanner";
@@ -44,6 +45,7 @@ type NavLeaf = {
   badge?: string;
   /** admin 역할 단독 노출(superuser 제외). §1(2026-08-04) */
   strictAdminOnly?: boolean;
+  abdOcsOnly?: boolean;
 };
 type NavModule = {
   label: string;
@@ -166,7 +168,7 @@ const NAV: NavSection[] = [
       { to: "/admin/mapping", label: "Mapping", icon: iconLink, adminOnly: true },
       { to: "/admin/task-thresholds", label: "Task 임계값", icon: iconSlider, adminOnly: true },
       { to: "/admin/milestones", label: "Milestone", icon: iconCalendar, adminOnly: true },
-      { to: "/admin/ocs-import", label: "OCS Maintenance", icon: iconLink, adminOnly: true, strictAdminOnly: true },
+      { to: "/admin/ocs-import", label: "OCS Maintenance", icon: iconLink, abdOcsOnly: true },
       { to: "/admin/backup", label: "Backup", icon: iconDatabase, adminOnly: true },
     ],
   },
@@ -248,6 +250,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     ?? (me?.isDSuperUser ? "D.Superuser" : me?.isSuperUser ? "Superuser" : me?.isAdmin ? "Admin" : me?.isSeniorUser ? "Senior User" : me?.isUser ? "User" : me?.isSuperGuest ? "Super Guest" : "Guest");
 
   const isVisible = (it: NavLeaf) => {
+    if (it.abdOcsOnly) return canAccessAbdOcs({ userType: me?.userType, team: me?.team, isStrictAdmin: me?.isStrictAdmin });
     if (it.adminOnly && !me?.isAdmin) return false;
     if (it.strictAdminOnly && !me?.isStrictAdmin) return false;
     if (it.editorOnly && !me?.isEditor) return false;
@@ -408,7 +411,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden", collapsed ? "px-1.5 py-3" : "p-3")}>
           {NAV.map((section) => {
             // Admin section gate
-            if (section.label === "Admin" && !me?.isAdmin) return null;
+            if (
+              section.label === "Admin" &&
+              !me?.isAdmin &&
+              !canAccessAbdOcs({ userType: me?.userType, team: me?.team, isStrictAdmin: me?.isStrictAdmin })
+            )
+              return null;
 
             const modules = (section.modules ?? [])
               .filter((m) => !m.adminOnly || me?.isAdmin)
