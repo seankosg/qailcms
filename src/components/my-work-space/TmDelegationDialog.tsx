@@ -18,7 +18,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { UserCog } from "lucide-react";
+import { UserCog, Check, ChevronsUpDown, AlertTriangle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { todayInDoha } from "@/lib/time/doha";
 
 interface Props {
@@ -47,6 +48,8 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
   const [end, setEnd] = useState(todayIso());
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [picOpen, setPicOpen] = useState(false);
+  const [picQuery, setPicQuery] = useState("");
 
   const myTasksQ = useQuery<TaskRow[]>({
     queryKey: ["tm-deleg", "my-tasks", myPic],
@@ -104,6 +107,29 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
       .slice(0, 300);
   }, [myTasksQ.data, q]);
 
+  // 본인 제외 + 검색
+  const picOptions = useMemo(() => {
+    const all = (picsQ.data ?? []).filter((n) => n && n !== myPic);
+    const s = picQuery.trim().toLowerCase();
+    const list = s ? all.filter((n) => n.toLowerCase().includes(s)) : all;
+    return list.slice(0, 300);
+  }, [picsQ.data, picQuery, myPic]);
+
+  // 선택한 이름이 실제 계정으로 해석되는지 확인 (이름만 있고 계정 없는 사람 차단)
+  const resolveQ = useQuery<string | null>({
+    queryKey: ["tm-deleg", "resolve-user", toPic],
+    enabled: open && !!toPic,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("resolve_user_by_name", { _name: toPic });
+      if (error) throw new Error(error.message);
+      return (data as string | null) ?? null;
+    },
+  });
+  const resolvedUserId = resolveQ.data ?? null;
+  const resolveChecking = !!toPic && resolveQ.isFetching;
+  const resolveFailed = !!toPic && !resolveQ.isFetching && !resolveQ.isError && !resolvedUserId;
+
   const toggle = (id: string) => {
     setPicked((cur) => {
       const n = new Set(cur);
@@ -115,7 +141,11 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
   const submit = async () => {
     if (!myPic) { toast.error("내 HDEC PIC 이름이 없어 위임할 수 없습니다."); return; }
     if (picked.size === 0) { toast.error("위임할 업무를 선택하세요."); return; }
-    if (!toPic.trim()) { toast.error("인수자를 입력하세요."); return; }
+    if (!toPic) { toast.error("인수자를 선택하세요."); return; }
+    if (!resolvedUserId) {
+      toast.error(`"${toPic}" 은(는) 연결된 계정이 없어 위임할 수 없습니다.`);
+      return;
+    }
     if (end < start) { toast.error("종료일이 시작일보다 빠릅니다."); return; }
     setSaving(true);
     try {
@@ -199,16 +229,61 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs">인수자 (HDEC PIC)</Label>
-              <Input
-                list="tm-deleg-pics"
-                value={toPic}
-                onChange={(e) => setToPic(e.target.value)}
-                placeholder="이름 입력 또는 선택"
-                className="h-8 text-xs"
-              />
-              <datalist id="tm-deleg-pics">
-                {(picsQ.data ?? []).map((n) => <option key={n} value={n} />)}
-              </datalist>
+              <Popover open={picOpen} onOpenChange={(v) => { setPicOpen(v); if (v) setPicQuery(""); }}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={picOpen}
+                    className="h-8 w-full justify-between text-xs font-normal"
+                  >
+                    <span className={toPic ? "" : "text-muted-foreground"}>
+                      {toPic || "명부에서 선택"}
+                    </span>
+                    <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[280px] p-2" align="start">
+                  <Input
+                    value={picQuery}
+                    onChange={(e) => setPicQuery(e.target.value)}
+                    placeholder="이름 검색"
+                    className="h-8 text-xs mb-2"
+                    autoFocus
+                  />
+                  <ScrollArea className="h-56">
+                    <div className="space-y-0.5 pr-2">
+                      {picsQ.isLoading && <div className="text-xs text-muted-foreground px-1 py-2">불러오는 중…</div>}
+                      {!picsQ.isLoading && picOptions.length === 0 && (
+                        <div className="text-xs text-muted-foreground px-1 py-2">일치하는 이름이 없습니다.</div>
+                      )}
+                      {picOptions.map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-accent"
+                          onClick={() => { setToPic(n); setPicOpen(false); }}
+                        >
+                          <Check className={`h-3.5 w-3.5 ${toPic === n ? "opacity-100" : "opacity-0"}`} />
+                          <span className="truncate">{n}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+              {resolveChecking && (
+                <p className="text-[11px] text-muted-foreground">계정 확인 중…</p>
+              )}
+              {resolveFailed && (
+                <p className="flex items-start gap-1 text-[11px] text-destructive">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                  "{toPic}" 은(는) 명부에는 있으나 연결된 계정이 없습니다. 계정이 생성되어야 위임이 실제로 적용됩니다.
+                </p>
+              )}
+              {!!toPic && !!resolvedUserId && (
+                <p className="text-[11px] text-muted-foreground">계정 확인됨</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -265,7 +340,11 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
         </div>
 
         <DialogFooter>
-          <Button size="sm" onClick={submit} disabled={saving}>
+          <Button
+            size="sm"
+            onClick={submit}
+            disabled={saving || !toPic || !resolvedUserId || resolveChecking || picked.size === 0}
+          >
             {saving ? "등록 중…" : "위임 등록"}
           </Button>
         </DialogFooter>
