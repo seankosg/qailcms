@@ -13,7 +13,7 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
     plot,
     teams: f.teams as AbdTeam[],
     groupBy: ["team"],
-    bucket: f.bucket,
+    bucket: (f.bucket === "month" ? "week" : f.bucket) as "day" | "week",
     planMode: f.planMode,
     asOfDate,
     rangeDays: 60,
