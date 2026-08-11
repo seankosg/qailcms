@@ -446,6 +446,7 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }
 
