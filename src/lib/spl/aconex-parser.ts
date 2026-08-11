@@ -180,6 +180,27 @@ function findHeaderRow(ws: XLSX.WorkSheet): { row: number; cols: Record<string, 
 }
 
 /** 관문 통과 여부와 무관하게 헤더/문서번호만 먼저 읽는다 (2차 관문 판정용). */
+export async function readSplAconexHeaders(
+  file: File,
+): Promise<{ headers: string[]; sample: Record<string, unknown> }> {
+  const wb = XLSX.read(await file.arrayBuffer());
+  const sheetName = wb.SheetNames.find((n) => n.toUpperCase() === "DOCS") ?? wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const hdr = findHeaderRow(ws);
+  if (!hdr) return { headers: [], sample: {} };
+  const range = XLSX.utils.decode_range(ws["!ref"]!);
+  const headers: string[] = [];
+  const sample: Record<string, unknown> = {};
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const h = String(ws[XLSX.utils.encode_cell({ r: hdr.row, c })]?.v ?? "").trim();
+    if (!h) continue;
+    headers.push(h);
+    sample[h] = ws[XLSX.utils.encode_cell({ r: hdr.row + 1, c })]?.v ?? "";
+  }
+  return { headers, sample };
+}
+
+/** 관문 통과 여부와 무관하게 문서번호만 먼저 읽는다 (2차 관문 판정용). */
 export async function readSplAconexDocumentNumbers(file: File): Promise<string[]> {
   const wb = XLSX.read(await file.arrayBuffer());
   const sheetName = wb.SheetNames.find((n) => n.toUpperCase() === "DOCS") ?? wb.SheetNames[0];
