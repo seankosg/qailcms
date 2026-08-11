@@ -53,7 +53,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
   return (
     <ProjectModuleSection
       title="Task Management"
-      to="/task-management/kpi"
+      to="/closure/task-management/kpi-analysis"
       progressPct={isLoading ? null : kpi.progressPct}
       progressHint="진도율 = Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 — TM KPI Analysis 와 동일"
       asOfNote={`Plot C ${kpi.plotC.toLocaleString()} · D ${kpi.plotD.toLocaleString()}`}

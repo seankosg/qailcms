@@ -52,7 +52,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
   return (
     <ProjectModuleSection
       title="Snag Management"
-      to="/defect-management/kpi"
+      to="/closure/snag-management/kpi-analysis"
       progressPct={loading ? null : kpi.progressPct}
       progressHint="진도율 = Closure 실적 누계 ÷ Closure 모수 — SM KPI Analysis 와 동일(서버 totals 정본)"
       asOfNote={`Plot C ${c.stageTotal.toLocaleString()} · D ${d.stageTotal.toLocaleString()}`}
