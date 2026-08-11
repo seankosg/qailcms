@@ -110,6 +110,9 @@ export function OcsIncrementImportPanel() {
   const [runId, setRunId] = useState<string | null>(null);
   const [dry, setDry] = useState<Dry | null>(null);
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [backupRunId, setBackupRunId] = useState<string | null>(null);
+  // React state 는 비동기 배칭되므로 더블클릭을 막지 못한다. 동기 ref 잠금을 함께 둔다.
+  const snapshotLockRef = useRef(false);
   const [snapshotRunning, setSnapshotRunning] = useState(false);
   const [snapshotElapsed, setSnapshotElapsed] = useState(0);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
