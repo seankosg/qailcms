@@ -311,6 +311,7 @@ export function TmPlanVsActualCard({
                         ? "Tasks = Σ progress (0.4 진행 = 0.4건)"
                         : "% = 대상 과업 진척률 단순 평균"}
                     </span>
+                    {view.trimmed > 0 && <span>이후 {view.trimmed}개 구간 계획 없음</span>}
                   </div>
                   {curve.excludedCount > 0 && (
                     <div className="flex items-center rounded border border-destructive/40 bg-destructive/10 px-3 py-1 text-[11px] font-semibold text-destructive">
@@ -329,11 +330,14 @@ export function TmPlanVsActualCard({
                       ticks={xTicks}
                       interval={0}
                       minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
                     />
                     <YAxis
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={[0, "auto"]}
+                      domain={isTasks ? [0, "auto"] : [0, 100]}
                       tickFormatter={(v) => (isTasks ? `${v}` : `${v}%`)}
                     />
                     <YAxis
@@ -341,7 +345,7 @@ export function TmPlanVsActualCard({
                       orientation="right"
                       width={Y_RIGHT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={["auto", "auto"]}
+                      domain={[0, incMax]}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
@@ -363,7 +367,7 @@ export function TmPlanVsActualCard({
                       yAxisId="bar"
                       dataKey="planInc"
                       name={incLabel}
-                      fill="color-mix(in oklab, var(--muted-foreground) 35%, transparent)"
+                      fill="color-mix(in oklab, var(--muted-foreground) 22%, transparent)"
                       barSize={8}
                       hide={hidden.has("planInc")}
                     />
@@ -371,7 +375,7 @@ export function TmPlanVsActualCard({
                       yAxisId="bar"
                       dataKey="actualInc"
                       name={incActualLabel}
-                      fill="var(--primary)"
+                      fill="color-mix(in oklab, var(--primary) 30%, transparent)"
                       barSize={8}
                       hide={hidden.has("actualInc")}
                     />
@@ -407,11 +411,14 @@ export function TmPlanVsActualCard({
                       ticks={xTicks}
                       interval={0}
                       minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
                     />
                     <YAxis
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={["auto", "auto"]}
+                      domain={varDomain}
                     />
                     {/* 위 차트의 우측 Y축과 같은 폭을 확보해 그림 영역을 일치시킨다. */}
                     <YAxis
