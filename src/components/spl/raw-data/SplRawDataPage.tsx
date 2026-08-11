@@ -425,38 +425,34 @@ export function SplRawDataPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
-        <KpiCard
-          label="Population (documents)"
-          value={population}
-          active={(search.judgment ?? "all") === "all" && !search.delayBand}
-          onClick={() => setSearch({ judgment: "all", delayBand: "" })}
-          note={reconOk ? "Sum = population ✓" : `Reconciliation mismatch: sum ${countsSum}`}
-          tone={reconOk ? undefined : "warn"}
-        />
-        {JUDGMENTS.map((j) => (
-          <KpiCard
+      <div className="flex flex-wrap items-center gap-2">
+        {(["all", ...JUDGMENTS] as const).map((j) => (
+          <Button
             key={j}
-            label={splJudgmentLabel(j)}
-            value={counts[j] ?? 0}
-            active={search.judgment === j && !search.delayBand}
+            size="sm"
+            variant={(search.judgment ?? "all") === j && !search.delayBand ? "default" : "outline"}
+            className="h-7 text-[11px]"
             onClick={() =>
-              setSearch({ judgment: search.judgment === j ? "all" : j, delayBand: "", hdecMissing: false })
+              setSearch({
+                judgment: search.judgment === j ? "all" : j,
+                delayBand: "",
+                hdecMissing: false,
+              })
             }
-            note={
-              j === "미분류"
-                ? "No plan and no actual (denominator 0)"
-                : j === "지연"
-                  ? "Documents with a primary delay"
-                  : j === "미착수"
-                    ? "No judgeable stage in the active band"
-                    : j === "완료"
-                      ? `No HDEC actual: ${data?.hdec_missing_done ?? 0}`
-                      : undefined
-            }
-            tone={j === "지연" ? "bad" : j === "미분류" ? "warn" : undefined}
-          />
+          >
+            {j === "all" ? `All (${population})` : `${splJudgmentLabel(j)} ${counts[j] ?? 0}`}
+          </Button>
         ))}
+        {!reconOk && (
+          <Badge variant="outline" className="text-[11px] text-amber-600">
+            Reconciliation mismatch: sum {countsSum} / population {population}
+          </Badge>
+        )}
+        {sorts.length > 0 && (
+          <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setSorts([])}>
+            Clear sort ({sorts.length})
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
