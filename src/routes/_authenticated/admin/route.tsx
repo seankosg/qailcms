@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
       .select("role")
       .eq("user_id", authData.user.id);
     const set = new Set((roles ?? []).map((r: { role: string }) => r.role));
-    if (set.has("admin") || set.has("superuser")) return;
+    if (set.has("system_administrator") || set.has("admin") || set.has("superuser")) return;
     // ABD OCS 유지보수 화면은 HDEC PIC(Team DESN) 에게도 관리자와 동일하게 개방한다.
     if (location.pathname.startsWith("/admin/ocs-import")) {
       const { data: profile } = await supabase
