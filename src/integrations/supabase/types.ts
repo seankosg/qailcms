@@ -8862,6 +8862,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_system_admin: { Args: { _user_id?: string }; Returns: boolean }
       plot_module_team_last_date: {
         Args: never
         Returns: {

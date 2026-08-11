@@ -12,6 +12,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ROLE_LABELS, type AppRole } from "@/types/enums";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 type PreviewRow = {
   line: number;
@@ -52,6 +53,9 @@ export function BulkRoleAssignTab() {
   const [preview, setPreview] = useState<PreviewRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // §5(2026-08-11) 역할 변경 실행은 최상위(System Administrator) 전용. 미리보기는 종전대로.
+  const { data: me } = useCurrentUser();
+  const canApply = !!me?.isSystemAdmin;
 
   const items = useMemo(() => parseLines(text), [text]);
 
@@ -64,7 +68,7 @@ export function BulkRoleAssignTab() {
   const sum = counts.change + counts.unchanged + counts.not_found + counts.duplicate + counts.invalid_role;
   const countsMatch = preview !== null && sum === items.length;
   const hasUnresolved = counts.not_found + counts.duplicate + counts.invalid_role > 0;
-  const canRun = preview !== null && countsMatch && !hasUnresolved && counts.change > 0 && !busy;
+  const canRun = preview !== null && countsMatch && !hasUnresolved && counts.change > 0 && !busy && canApply;
 
   const runPreview = async () => {
     setBusy(true);
@@ -123,6 +127,9 @@ export function BulkRoleAssignTab() {
               미리보기
             </Button>
             <Button size="sm" disabled={!canRun} onClick={() => setConfirmOpen(true)}>실행</Button>
+            {!canApply && (
+              <span className="text-xs text-muted-foreground">실행은 System Administrator 계정만 가능합니다.</span>
+            )}
             {preview !== null && !countsMatch && (
               <span className="text-xs text-destructive">
                 입력 줄 {items.length} ≠ 4분류 합 {sum} — 실행 차단

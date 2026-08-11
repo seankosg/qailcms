@@ -13,6 +13,13 @@ async function assertAdminOrSuper(supabase: any, userId: string) {
   if (!data) throw new Error("관리자 또는 Super User 권한이 필요합니다.");
 }
 
+/** 최상위(System Administrator) 단독 — 스냅샷 삭제 전용. */
+async function assertSystemAdmin(supabase: any, userId: string) {
+  const { data, error } = await supabase.rpc("is_system_admin", { _user_id: userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("스냅샷 삭제는 System Administrator 계정만 수행할 수 있습니다.");
+}
+
 async function assertAdmin(supabase: any, userId: string) {
   const { data, error } = await supabase.rpc("has_role", {
     _user_id: userId,
@@ -196,7 +203,7 @@ export const deleteSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { snapshot_id: string }) => input)
   .handler(async ({ data, context }) => {
-    await assertAdminOrSuper(context.supabase, context.userId);
+    await assertSystemAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const core = await import("./backup-core.server");
     await core.deleteSnapshot(supabaseAdmin, data.snapshot_id);
