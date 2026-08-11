@@ -17,6 +17,7 @@ import {
   canonicalAllowed, diffAgainstCanonical, RCL_CANON_CELL_COUNT,
 } from "@/lib/auth/rcl-canonical";
 import { RotateCcw, Save, ShieldCheck } from "lucide-react";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export const Route = createFileRoute("/_authenticated/admin/permissions")({
   // §1(2026-08-04): 이 화면만 admin 단독. 부모 /admin 가드(admin||superuser)는 그대로 둔다.
@@ -71,6 +72,9 @@ function PermissionsAdminPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
+  // §5(2026-08-11) 격자 편집 · 주관팀 변경은 최상위(System Administrator) 전용.
+  const { data: me } = useCurrentUser();
+  const canEditGrid = !!me?.isSystemAdmin;
 
   const permsQ = useQuery({
     queryKey: ["rcl_permissions"],
@@ -262,7 +266,7 @@ function PermissionsAdminPage() {
         </div>
         <div className="flex items-center gap-2">
           {diffs.length > 0 && <Badge variant="secondary">{diffs.length}칸 변경됨</Badge>}
-          <Button size="sm" disabled={diffs.length === 0 || saving} onClick={() => setConfirmOpen(true)}>
+          <Button size="sm" disabled={!canEditGrid || diffs.length === 0 || saving} onClick={() => setConfirmOpen(true)}>
             <Save className="mr-1 h-4 w-4" /> 저장
           </Button>
           {diffs.length > 0 && (
@@ -270,6 +274,12 @@ function PermissionsAdminPage() {
           )}
         </div>
       </div>
+
+      {!canEditGrid && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">
+          읽기 전용입니다 — 권한 격자 편집과 모듈 주관팀 변경은 <b>System Administrator</b> 계정만 할 수 있습니다.
+        </div>
+      )}
 
       {verifyMsg && (
         <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
@@ -319,7 +329,7 @@ function PermissionsAdminPage() {
             </thead>
             <tbody>
               {ROLES.map((role) => {
-                const locked = role === "admin";
+                const locked = !canEditGrid || role === "admin";
                 return (
                   <tr key={role} className={locked ? "bg-muted/60 text-muted-foreground" : undefined}>
                     <td className="border px-2 py-1 whitespace-nowrap">
@@ -375,6 +385,7 @@ function PermissionsAdminPage() {
                   <TableCell>
                     <select
                       className="h-8 rounded-md border bg-background px-2 text-sm"
+                      disabled={!canEditGrid}
                       value={m.owning_team ?? ""}
                       onChange={(e) =>
                         setTeamEdit({
@@ -476,7 +487,7 @@ function PermissionsAdminPage() {
                     {a.old_allowed === null ? "—" : a.old_allowed ? "Y" : "N"} → {a.new_allowed === null ? "—" : a.new_allowed ? "Y" : "N"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" disabled={a.old_allowed === null || a.role === "admin"} onClick={() => revert(a)}>
+                    <Button size="sm" variant="ghost" disabled={!canEditGrid || a.old_allowed === null || a.role === "admin"} onClick={() => revert(a)}>
                       <RotateCcw className="h-3.5 w-3.5" />
                     </Button>
                   </TableCell>
