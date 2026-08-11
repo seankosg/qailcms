@@ -261,7 +261,7 @@ export function TmPlanVsActualCard({
                 <div className="flex flex-wrap items-stretch gap-2 rounded-md border bg-muted/30 px-3 py-2">
                   <div className="flex flex-col gap-0.5 rounded border-l-4 border-l-primary px-3 py-1">
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {appliedLabel} · as of {asOfDate}
+                      {controlsHidden ? `as of ${asOfDate}` : `${appliedLabel} · as of ${asOfDate}`}
                     </span>
                     <span className="text-xs tabular-nums">
                       <span className="text-muted-foreground">P</span> {conv(planNow).toFixed(1)}
