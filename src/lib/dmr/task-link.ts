@@ -86,3 +86,55 @@ export function dmrDailyDelta(
   if (!row.task_no) return null;
   return deltaMap.get(`${row.task_no}|${row.report_date}`) ?? null;
 }
+
+/**
+ * 계획 증분 맵. 실적(buildDmrDailyDeltaMap)과 **같은 규칙·같은 기준 행**을 쓴다.
+ * 계획을 "어제 TM" 기준으로 잡지 않는다 — 두 값의 구간이 어긋나 나란히 놓을 수 없다.
+ */
+export function buildDmrDailyPlanDeltaMap(rows: DmrTaskLinkedRow[]): Map<string, number | null> {
+  return buildDmrDailyDeltaMap(
+    rows.map((r) => ({ ...r, tactual_pct: r.tplan_pct })),
+  );
+}
+
+export interface DmrPrevSnapshot {
+  report_date: string;
+  tplan_pct: number | null;
+  tactual_pct: number | null;
+}
+
+/**
+ * task_no 별 "직전 기록"(report_date < 기준일 중 최신) 한 건.
+ * 계획·실적 증분은 반드시 이 **한 행**을 공통 기준으로 삼는다.
+ */
+export function buildDmrPrevSnapshotMap(
+  rows: Array<DmrPrevSnapshot & { task_no: string | null }>,
+  beforeDate: string,
+): Map<string, DmrPrevSnapshot> {
+  const out = new Map<string, DmrPrevSnapshot>();
+  for (const r of rows) {
+    if (!r.task_no || !r.report_date) continue;
+    if (r.report_date >= beforeDate) continue;
+    const cur = out.get(r.task_no);
+    if (!cur || r.report_date > cur.report_date) {
+      out.set(r.task_no, {
+        report_date: r.report_date,
+        tplan_pct: r.tplan_pct ?? null,
+        tactual_pct: r.tactual_pct ?? null,
+      });
+    }
+  }
+  return out;
+}
+
+/** 오늘 누계 − 직전 기록 누계. 직전이 없거나 어느 쪽이든 값이 없으면 null(빈칸). */
+export function dmrSegmentDelta(today: number | null | undefined, prev: number | null | undefined): number | null {
+  if (today == null || prev == null) return null;
+  return Number(today) - Number(prev);
+}
+
+/** 직전 기록 날짜와의 간격(일). */
+export function dmrSegmentDays(reportDate: string, prevDate: string | null | undefined): number | null {
+  if (!reportDate || !prevDate) return null;
+  return toDays(reportDate, prevDate);
+}

@@ -8,35 +8,50 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Save, Download, AlertTriangle } from 'lucide-react';
+import { Plus, Save, Download, AlertTriangle, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { todayInDoha } from '@/lib/time/doha';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useDmrSystemMaster, useDmrContractorMaster, useInvalidateDmr } from '@/hooks/useDmrEntries';
 import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
+import { parseDmrImages } from '@/lib/dmr-parse.functions';
+import { buildDmrEntryRowsFromSection, fileToParseSource } from '@/lib/dmr/entry-import';
 import { exportDmrTeamWorkbook } from '@/lib/dmr/export-dmr-team';
-import { DMR_HEADCOUNT_KINDS, DMR_HEADCOUNT_KIND_LABEL, dmrDataDateGapDays, type DmrHeadcountKind } from '@/lib/dmr/task-link';
+import {
+  DMR_HEADCOUNT_KINDS,
+  dmrDataDateGapDays,
+  buildDmrPrevSnapshotMap,
+  dmrSegmentDelta,
+  dmrSegmentDays,
+} from '@/lib/dmr/task-link';
 
 type Discipline = 'ARCH' | 'ELEC' | 'MECH';
 const DISCIPLINES: Discipline[] = ['ARCH', 'ELEC', 'MECH'];
 
-interface EntryRow {
+/**
+ * 작성 표는 TM 코드에서 시작한다. Work Type · Plot · 담당자 · 진도율은 코드에서 따라온다.
+ * 화면 1행 = 인원종류 3건(worker/foreman/supervisor). 0 인 종류도 반드시 함께 보낸다.
+ * 계획 인원은 화면에서 받지 않는다(서버로는 항상 0).
+ */
+export interface EntryRow {
   key: string;
+  task_no: string;
   system_name: string;
   contractor_name: string;
   plot: 'C' | 'D';
-  task_no: string;
-  headcount_kind: DmrHeadcountKind;
   pic_name: string;
-  plan_manpower: string;
-  actual_manpower: string;
-  /** 서버에서 불러온 행인가 (신규 입력 행과 구분) */
+  worker: string;
+  foreman: string;
+  supervisor: string;
   saved?: boolean;
-  /** 저장 당시 박힌 TM 값. 불러온 행은 이 값을 그대로 보여 준다(재계산 금지). */
+  /** 파싱(엑셀·이미지)으로 채워 넣은 행 */
+  imported?: boolean;
+  /** TM 에서 코드를 찾지 못한 파싱 행 */
+  unmatched?: boolean;
+  /** 저장 당시 박힌 TM 값 — 불러온 행은 재계산하지 않는다 */
   snap?: {
     task_name: string | null;
-    task_level: string | null;
     work_category: string | null;
     tplan_pct: number | null;
     tactual_pct: number | null;
@@ -53,19 +68,23 @@ interface TmOption {
   cum_actual_pct: number | null;
   data_date: string | null;
   plot: string | null;
+  effective_pic: string | null;
+  original_pic: string | null;
+  is_delegated: boolean | null;
 }
 
 let seq = 0;
-const newRow = (): EntryRow => ({
+export const newEntryRow = (init: Partial<EntryRow> = {}): EntryRow => ({
   key: `r${++seq}`,
+  task_no: '',
   system_name: '',
   contractor_name: '',
   plot: 'C',
-  task_no: '',
-  headcount_kind: 'worker',
   pic_name: '',
-  plan_manpower: '0',
-  actual_manpower: '0',
+  worker: '0',
+  foreman: '0',
+  supervisor: '0',
+  ...init,
 });
 
 function SearchSelect({
@@ -83,7 +102,7 @@ function SearchSelect({
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     const list = t
-      ? options.filter((o) => o.label.toLowerCase().includes(t) || o.value.toLowerCase().includes(t))
+      ? options.filter((o) => o.label.toLowerCase().includes(t) || (o.hint ?? '').toLowerCase().includes(t))
       : options;
     return list.slice(0, 300);
   }, [q, options]);
@@ -122,6 +141,8 @@ function SearchSelect({
   );
 }
 
+const pctText = (v: number | null) => (v == null ? '' : `${Math.round(v * 10) / 10}%`);
+
 export function DmrEntryPage() {
   const me = useCurrentUser();
   const canEdit = me.data?.canEdit === true;
@@ -129,12 +150,10 @@ export function DmrEntryPage() {
 
   const [reportDate, setReportDate] = useState(todayInDoha());
   const [discipline, setDiscipline] = useState<Discipline>('ARCH');
-  const [rows, setRows] = useState<EntryRow[]>([newRow()]);
+  const [rows, setRows] = useState<EntryRow[]>([newEntryRow()]);
   const [saving, setSaving] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
-  /** 사용자가 표를 건드렸는가 — 미저장 변경이 있으면 재조회 결과로 덮지 않는다 */
   const dirtyRef = useRef(false);
-  /** 저장 직후처럼 의도적으로 표를 갈아엎어야 할 때 올린다 */
   const [reloadTick, setReloadTick] = useState(0);
 
   const systemsQ = useDmrSystemMaster();
@@ -168,6 +187,9 @@ export function DmrEntryPage() {
         cum_actual_pct: r.cum_actual_pct ?? null,
         data_date: r.data_date ?? null,
         plot: r.plot ?? null,
+        effective_pic: r.effective_pic ?? null,
+        original_pic: r.original_pic ?? null,
+        is_delegated: r.is_delegated ?? null,
       }));
     },
     staleTime: 60_000,
@@ -179,7 +201,7 @@ export function DmrEntryPage() {
     return m;
   }, [tmQ.data]);
 
-  // 이미 저장된 행을 불러온다 — 저장된 값 그대로. TM 값을 다시 계산하지 않는다.
+  // 이미 저장된 행 — 저장된 값 그대로. (task_no·System·Contractor·Plot) 묶음의 3행을 1행으로 되접는다.
   const existingQ = useQuery({
     queryKey: ['dmr-entry-existing', reportDate, discipline],
     queryFn: async () => {
@@ -199,36 +221,65 @@ export function DmrEntryPage() {
     staleTime: 0,
   });
 
-  // 창 포커스 재조회(dataUpdatedAt 변동)로는 표를 갈아엎지 않는다.
+  // 직전 기록 — 화면에서 한 번만 부른다. 코드마다 따로 부르지 않는다.
+  const prevQ = useQuery({
+    queryKey: ['dmr-entry-prev', reportDate, discipline],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dmr_entries')
+        .select('task_no, report_date, tplan_pct, tactual_pct')
+        .eq('discipline', discipline)
+        .lt('report_date', reportDate)
+        .not('task_no', 'is', null)
+        .order('report_date', { ascending: false })
+        .limit(20000);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as any[];
+    },
+    staleTime: 60_000,
+  });
+
+  const prevMap = useMemo(
+    () => buildDmrPrevSnapshotMap((prevQ.data ?? []) as any[], reportDate),
+    [prevQ.data, reportDate],
+  );
+
   const loadedKey = `${reportDate}|${discipline}|${reloadTick}`;
   useEffect(() => {
     if (!existingQ.data) return;
     if (dirtyRef.current) return; // 미저장 변경 보호
-    const loaded: EntryRow[] = existingQ.data.map((r) => ({
-      key: `s${r.id}`,
-      system_name: r.system_name ?? '',
-      contractor_name: r.contractor_name ?? '',
-      plot: (r.plot === 'D' ? 'D' : 'C') as 'C' | 'D',
-      task_no: r.task_no ?? '',
-      headcount_kind: (DMR_HEADCOUNT_KINDS.includes(r.headcount_kind) ? r.headcount_kind : 'worker') as DmrHeadcountKind,
-      pic_name: r.pic_name ?? '',
-      plan_manpower: String(r.plan_manpower ?? 0),
-      actual_manpower: String(r.actual_manpower ?? 0),
-      saved: true,
-      snap: {
-        task_name: r.task_name ?? null,
-        task_level: r.task_level ?? null,
-        work_category: r.work_category ?? null,
-        tplan_pct: r.tplan_pct ?? null,
-        tactual_pct: r.tactual_pct ?? null,
-        task_data_date: r.task_data_date ?? null,
-      },
-    }));
-    setRows(loaded.length > 0 ? loaded : [newRow()]);
+    const byGroup = new Map<string, EntryRow>();
+    for (const r of existingQ.data) {
+      const gk = `${r.task_no ?? ''}|${r.system_name ?? ''}|${r.contractor_name ?? ''}|${r.plot === 'D' ? 'D' : 'C'}`;
+      let row = byGroup.get(gk);
+      if (!row) {
+        row = newEntryRow({
+          key: `s${gk}`,
+          task_no: r.task_no ?? '',
+          system_name: r.system_name ?? '',
+          contractor_name: r.contractor_name ?? '',
+          plot: (r.plot === 'D' ? 'D' : 'C') as 'C' | 'D',
+          pic_name: r.pic_name ?? '',
+          saved: true,
+          snap: {
+            task_name: r.task_name ?? null,
+            work_category: r.work_category ?? null,
+            tplan_pct: r.tplan_pct ?? null,
+            tactual_pct: r.tactual_pct ?? null,
+            task_data_date: r.task_data_date ?? null,
+          },
+        });
+        byGroup.set(gk, row);
+      }
+      const kind = DMR_HEADCOUNT_KINDS.includes(r.headcount_kind) ? r.headcount_kind : 'worker';
+      (row as any)[kind] = String(r.actual_manpower ?? 0);
+      if (!row.pic_name && r.pic_name) row.pic_name = r.pic_name;
+    }
+    const loaded = [...byGroup.values()];
+    setRows(loaded.length > 0 ? loaded : [newEntryRow()]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedKey, existingQ.data]);
 
-  // 기준일·공종이 바뀌면 새 조합을 불러올 수 있도록 미저장 표시를 푼다.
   useEffect(() => {
     dirtyRef.current = false;
   }, [reportDate, discipline]);
@@ -237,73 +288,118 @@ export function DmrEntryPage() {
     () => (tmQ.data ?? []).map((t) => ({ value: t.task_no, label: t.task_no, hint: t.task_name ?? '' })),
     [tmQ.data],
   );
-  const systemOptions = useMemo(
-    () => (systemsQ.data ?? []).map((s) => ({ value: s.name, label: s.name })),
-    [systemsQ.data],
-  );
   const contractorOptions = useMemo(
     () => (contractorsQ.data ?? []).map((c) => ({ value: c.name, label: c.name })),
     [contractorsQ.data],
   );
 
-  // (System × Contractor × Plot × 인원종류) 묶음 합계 — 저장하지 않는다
-  const groupTotals = useMemo(() => {
-    const m = new Map<string, { plan: number; actual: number }>();
-    for (const r of rows) {
-      const k = `${r.system_name}|${r.contractor_name}|${r.plot}|${r.headcount_kind}`;
-      const cur = m.get(k) ?? { plan: 0, actual: 0 };
-      cur.plan += Number(r.plan_manpower) || 0;
-      cur.actual += Number(r.actual_manpower) || 0;
-      m.set(k, cur);
-    }
-    return m;
-  }, [rows]);
-
   const patch = (key: string, p: Partial<EntryRow>) => {
     dirtyRef.current = true;
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...p } : r)));
   };
+
+  /** TM 코드를 고르면 Work Type · Plot · 담당자가 따라온다. 추정하지 않는다. */
+  const pickTask = (key: string, taskNo: string) => {
+    const t = taskNo ? tmByNo.get(taskNo) : null;
+    patch(key, {
+      task_no: taskNo,
+      unmatched: false,
+      ...(t
+        ? {
+            plot: (t.plot === 'D' ? 'D' : t.plot === 'C' ? 'C' : undefined) as any,
+            pic_name: t.effective_pic ?? '',
+          }
+        : {}),
+    });
+  };
+
   const addRow = () => {
     dirtyRef.current = true;
-    setRows((p) => [...p, newRow()]);
-  };
-  const removeRow = (key: string) => {
-    dirtyRef.current = true;
-    setRows((p) => (p.length > 1 ? p.filter((x) => x.key !== key) : p));
+    setRows((p) => [...p, newEntryRow()]);
   };
 
   const saveFn = useServerFn(saveDmrTaskEntries);
+  const parseFn = useServerFn(parseDmrImages);
+  const [importing, setImporting] = useState(false);
 
-  const valid = rows.filter((r) => r.system_name && r.contractor_name);
+  /** 엑셀·스크린샷 → 같은 표의 행으로 채워 넣는다. 자동 저장하지 않는다. */
+  async function onImportFiles(files: File[]) {
+    if (files.length === 0) return;
+    setImporting(true);
+    try {
+      const storagePaths: string[] = [];
+      const texts: { name: string; content: string }[] = [];
+      for (const f of files.slice(0, 3)) {
+        const src = await fileToParseSource(f);
+        if (src.kind === 'text') {
+          texts.push({ name: f.name, content: src.content });
+        } else {
+          const ext = f.name.split('.').pop() || 'png';
+          const path = `${me.data?.id ?? 'anon'}/${Date.now()}-entry.${ext}`;
+          const up = await supabase.storage.from('dmr-uploads').upload(path, f, { upsert: false });
+          if (up.error) throw new Error(up.error.message);
+          storagePaths.push(path);
+        }
+      }
+      const res: any = await parseFn({
+        data: {
+          ...(storagePaths.length ? { storagePaths } : {}),
+          ...(texts.length ? { texts } : {}),
+        },
+      });
+      const errs = (res?.results ?? []).filter((r: any) => r.error);
+      let added: ReturnType<typeof buildDmrEntryRowsFromSection> = [];
+      for (const r of res?.results ?? []) {
+        if (!r.section) continue;
+        added = [...added, ...buildDmrEntryRowsFromSection(r.section, tmByNo, newEntryRow)];
+      }
+      if (added.length === 0) {
+        toast.error(errs.length ? `파싱 실패: ${errs[0].error}` : '가져온 행이 없습니다');
+        return;
+      }
+      dirtyRef.current = true;
+      setRows((prev) => {
+        const base = prev.filter((p) => p.saved || p.task_no || p.system_name || p.contractor_name);
+        return [...base, ...added];
+      });
+      const unmatched = added.filter((a) => a.unmatched).length;
+      toast.success(
+        `불러오기 ${added.length}행 — TM 미매칭 ${unmatched}건${errs.length ? ` · 실패 ${errs.length}건` : ''}. 확인 후 저장하십시오.`,
+      );
+    } catch (e: any) {
+      toast.error(e?.message ?? '불러오기 실패');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const valid = rows.filter((r) => r.system_name.trim() && r.contractor_name.trim());
 
   async function onSave() {
     if (!canEdit || valid.length === 0) return;
     setSaving(true);
     setMissing([]);
     try {
-      // 사용자가 친 것만 보낸다. TM 파생값은 서버가 다시 읽어 박는다.
-      const res: any = await saveFn({
-        data: {
-          report_date: reportDate,
-          discipline,
-          entries: valid.map((r) => ({
-            system_name: r.system_name,
-            contractor_name: r.contractor_name,
-            plot: r.plot,
-            plan_manpower: Number(r.plan_manpower) || 0,
-            actual_manpower: Number(r.actual_manpower) || 0,
-            task_no: r.task_no || null,
-            headcount_kind: r.headcount_kind,
-            pic_name: r.pic_name || null,
-          })),
-        },
-      });
+      // 화면 1행 → 인원종류 3건. 0 인 종류도 함께 보낸다(3→0 정정이 반영되어야 한다).
+      const entries = valid.flatMap((r) =>
+        DMR_HEADCOUNT_KINDS.map((kind) => ({
+          system_name: r.system_name.trim(),
+          contractor_name: r.contractor_name.trim(),
+          plot: r.plot,
+          plan_manpower: 0,
+          actual_manpower: Number((r as any)[kind]) || 0,
+          task_no: r.task_no || null,
+          headcount_kind: kind,
+          pic_name: r.pic_name || null,
+        })),
+      );
+      const res: any = await saveFn({ data: { report_date: reportDate, discipline, entries } });
       setMissing(res?.missing_task_nos ?? []);
       invalidate();
       dirtyRef.current = false;
-      await existingQ.refetch();
+      await Promise.all([existingQ.refetch(), prevQ.refetch()]);
       setReloadTick((t) => t + 1);
-      toast.success(`저장 완료 — ${res?.saved ?? valid.length}행 (TM 연결 ${res?.linked_tasks ?? 0}건)`);
+      toast.success(`저장 완료 — ${valid.length}행 / ${entries.length}건 (TM 연결 ${res?.linked_tasks ?? 0}건)`);
     } catch (e: any) {
       toast.error(e?.message ?? '저장 실패');
     } finally {
@@ -320,13 +416,15 @@ export function DmrEntryPage() {
     }
   }
 
+  const unmatchedCount = rows.filter((r) => r.unmatched).length;
+
   return (
     <AppLayout>
       <div className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">DMR Daily Entry</h1>
-            <p className="text-xs text-muted-foreground">출면기록부 작성 — 한 행이 곧 기록 한 건이다</p>
+            <p className="text-xs text-muted-foreground">출면기록부 작성 — TM 코드에서 시작한다</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {DISCIPLINES.map((d) => (
@@ -350,20 +448,44 @@ export function DmrEntryPage() {
                 </Button>
               ))}
             </div>
+            <span className="text-xs text-muted-foreground">TM 후보 {tmQ.data?.length ?? 0}건 (기준일 {reportDate})</span>
             <span className="text-xs text-muted-foreground">
-              TM 후보 {tmQ.data?.length ?? 0}건 (기준일 {reportDate})
+              {existingQ.isFetching ? '저장된 행 불러오는 중…' : `저장된 묶음 ${rows.filter((r) => r.saved).length}행`}
             </span>
-            <span className="text-xs text-muted-foreground">
-              {existingQ.isFetching
-                ? '저장된 행 불러오는 중…'
-                : `저장된 행 ${existingQ.data?.length ?? 0}건`}
-            </span>
+            <label className="ml-auto">
+              <input
+                type="file"
+                multiple
+                accept=".xlsx,.xls,.csv,image/*"
+                className="hidden"
+                disabled={!canEdit || importing}
+                onChange={(e) => {
+                  const fs = Array.from(e.target.files ?? []);
+                  e.currentTarget.value = '';
+                  void onImportFiles(fs);
+                }}
+              />
+              <span
+                className={`inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border px-3 text-xs ${
+                  !canEdit || importing ? 'pointer-events-none opacity-50' : 'hover:bg-accent'
+                }`}
+              >
+                {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                {importing ? '읽는 중…' : '엑셀 · 스크린샷 불러오기'}
+              </span>
+            </label>
           </CardContent>
         </Card>
 
         {!canEdit && (
           <div className="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
             읽기 전용입니다. 저장은 senior_user 이상만 가능합니다.
+          </div>
+        )}
+
+        {unmatchedCount > 0 && (
+          <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs">
+            불러온 행 중 TM 에서 찾지 못한 코드 {unmatchedCount}건 — 코드 칸이 비어 있습니다. 직접 고르십시오.
           </div>
         )}
 
@@ -375,7 +497,7 @@ export function DmrEntryPage() {
 
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">입력 표 ({rows.length}행)</CardTitle>
+            <CardTitle className="text-sm">입력 표 ({rows.length}행 · 저장 시 {rows.length * 3}건)</CardTitle>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={addRow}>
                 <Plus className="h-3.5 w-3.5" />행 추가
@@ -392,44 +514,114 @@ export function DmrEntryPage() {
             </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
-            <table className="w-full min-w-[1200px] text-xs">
+            <datalist id="dmr-system-suggestions">
+              {(systemsQ.data ?? []).map((s) => <option key={s.name} value={s.name} />)}
+            </datalist>
+            <table className="w-full min-w-[1500px] text-xs">
               <thead className="bg-muted/50">
                 <tr className="[&>th]:whitespace-nowrap [&>th]:px-2 [&>th]:py-2 [&>th]:text-left">
-                  <th>System</th><th>Contractor</th><th>Plot</th><th>TM Code</th>
-                  <th>인원종류</th><th>담당자</th><th>계획</th><th>실제</th><th>묶음 합계</th><th></th>
+                  <th>TM Code</th><th>Work Type</th><th>당일 계획%</th><th>당일 실적%</th>
+                  <th>Worker</th><th>Foreman</th><th>Supervisor</th><th>총합</th>
+                  <th>System</th><th>Contractor</th><th>Plot</th><th>담당자</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => {
                   const live = r.task_no ? tmByNo.get(r.task_no) : null;
-                  // 불러온 행은 저장된 값 그대로 보여 준다. 새로 친 행만 TM 정본에서 채운다.
                   const tm = r.saved && r.snap
                     ? {
                         task_name: r.snap.task_name,
-                        level: r.snap.task_level,
                         row_type: r.snap.work_category,
                         cum_plan_pct: r.snap.tplan_pct,
                         cum_actual_pct: r.snap.tactual_pct,
                         data_date: r.snap.task_data_date,
-                        plot: null as string | null,
+                        plot: live?.plot ?? null,
+                        effective_pic: live?.effective_pic ?? null,
+                        original_pic: live?.original_pic ?? null,
+                        is_delegated: live?.is_delegated ?? null,
                       }
                     : live;
                   const gap = tm?.data_date
                     ? dmrDataDateGapDays({ report_date: reportDate, task_data_date: tm.data_date })
                     : null;
                   const plotMismatch = !!tm && !!tm.plot && tm.plot !== r.plot;
-                  const g = groupTotals.get(`${r.system_name}|${r.contractor_name}|${r.plot}|${r.headcount_kind}`);
+                  const prev = r.task_no ? prevMap.get(r.task_no) : undefined;
+                  // 계획·실적 증분은 같은 직전 행을 기준으로 잡는다.
+                  const dPlan = dmrSegmentDelta(tm?.cum_plan_pct ?? null, prev?.tplan_pct);
+                  const dActual = dmrSegmentDelta(tm?.cum_actual_pct ?? null, prev?.tactual_pct);
+                  const segDays = dmrSegmentDays(reportDate, prev?.report_date);
+                  const total =
+                    (Number(r.worker) || 0) + (Number(r.foreman) || 0) + (Number(r.supervisor) || 0);
+                  const delegated = !!tm?.is_delegated && !!tm?.original_pic && tm.original_pic !== tm.effective_pic;
                   return (
-                    <tr key={r.key} className={`border-t align-top [&>td]:px-2 [&>td]:py-1.5 ${r.saved ? 'bg-muted/30' : ''}`}>
-                      <td className="w-52">
-                        <div className="mb-1">
+                    <tr
+                      key={r.key}
+                      className={`border-t align-top [&>td]:px-2 [&>td]:py-1.5 ${
+                        r.unmatched ? 'bg-destructive/10' : r.imported ? 'bg-sky-500/10' : r.saved ? 'bg-muted/30' : ''
+                      }`}
+                    >
+                      <td className="w-72">
+                        <div className="mb-1 flex gap-1">
                           <Badge variant={r.saved ? 'secondary' : 'outline'} className="text-[10px]">
                             {r.saved ? '저장됨' : '신규'}
                           </Badge>
+                          {r.imported && <Badge variant="outline" className="text-[10px]">불러온 값</Badge>}
+                          {r.unmatched && <Badge variant="destructive" className="text-[10px]">TM 코드 없음</Badge>}
                         </div>
-                        <SearchSelect value={r.system_name} options={systemOptions} onChange={(v) => patch(r.key, { system_name: v })} placeholder="System 선택" />
+                        <SearchSelect
+                          value={r.task_no}
+                          options={tmOptions}
+                          onChange={(v) => pickTask(r.key, v)}
+                          placeholder="TM Code 선택"
+                        />
+                        {tm && (
+                          <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                            <div className="truncate">{tm.task_name ?? '—'}</div>
+                            <div>누계 계획 {pctText(tm.cum_plan_pct) || '—'} · 누계 실적 {pctText(tm.cum_actual_pct) || '—'}</div>
+                            <div>Data Date {tm.data_date ?? '—'}</div>
+                            {gap != null && gap !== 0 && (
+                              <Badge variant="destructive" className="gap-1 text-[10px]">
+                                <AlertTriangle className="h-3 w-3" />Data Date 격차 {gap}일
+                              </Badge>
+                            )}
+                            {plotMismatch && <div className="text-amber-600">경고: TM Plot {tm.plot} ≠ 입력 Plot {r.plot}</div>}
+                          </div>
+                        )}
                       </td>
-                      <td className="w-52"><SearchSelect value={r.contractor_name} options={contractorOptions} onChange={(v) => patch(r.key, { contractor_name: v })} placeholder="Contractor 선택" /></td>
+                      <td className="w-24 whitespace-nowrap">{tm?.row_type ?? '—'}</td>
+                      <td className="w-32 whitespace-nowrap">
+                        <div>{dPlan == null ? <span className="text-muted-foreground">—</span> : pctText(dPlan)}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {prev ? `직전 기록 ${prev.report_date}${segDays != null ? ` (${segDays}일)` : ''}` : '직전 기록 없음'}
+                        </div>
+                      </td>
+                      <td className="w-32 whitespace-nowrap">
+                        <div>{dActual == null ? <span className="text-muted-foreground">—</span> : pctText(dActual)}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {prev ? `직전 기록 ${prev.report_date}${segDays != null ? ` (${segDays}일)` : ''}` : '직전 기록 없음'}
+                        </div>
+                      </td>
+                      <td className="w-20"><Input type="number" min={0} value={r.worker} onChange={(e) => patch(r.key, { worker: e.target.value })} className="h-8 text-xs" /></td>
+                      <td className="w-20"><Input type="number" min={0} value={r.foreman} onChange={(e) => patch(r.key, { foreman: e.target.value })} className="h-8 text-xs" /></td>
+                      <td className="w-20"><Input type="number" min={0} value={r.supervisor} onChange={(e) => patch(r.key, { supervisor: e.target.value })} className="h-8 text-xs" /></td>
+                      <td className="w-14 font-medium">{total}</td>
+                      <td className="w-52">
+                        <Input
+                          list="dmr-system-suggestions"
+                          value={r.system_name}
+                          onChange={(e) => patch(r.key, { system_name: e.target.value })}
+                          placeholder="System (제안 목록에서 고르거나 직접 입력)"
+                          className="h-8 text-xs"
+                        />
+                      </td>
+                      <td className="w-52">
+                        <SearchSelect
+                          value={r.contractor_name}
+                          options={contractorOptions}
+                          onChange={(v) => patch(r.key, { contractor_name: v })}
+                          placeholder="Contractor 선택"
+                        />
+                      </td>
                       <td>
                         <div className="flex gap-1">
                           {(['C', 'D'] as const).map((p) => (
@@ -437,45 +629,13 @@ export function DmrEntryPage() {
                           ))}
                         </div>
                       </td>
-                      <td className="w-72">
-                        <SearchSelect value={r.task_no} options={tmOptions} onChange={(v) => patch(r.key, { task_no: v })} placeholder="TM Code 선택" />
-                        {tm && (
-                          <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-                            <div className="truncate">{tm.task_name ?? '—'}</div>
-                            <div>
-                              {tm.level ?? '—'} · Work Type {tm.row_type ?? '—'} · 계획 {tm.cum_plan_pct ?? '—'}% · 실적 {tm.cum_actual_pct ?? '—'}%
-                            </div>
-                            <div>Data Date {tm.data_date ?? '—'}</div>
-                            {gap != null && gap !== 0 && (
-                              <Badge variant="destructive" className="gap-1 text-[10px]">
-                                <AlertTriangle className="h-3 w-3" />Data Date 격차 {gap}일
-                              </Badge>
-                            )}
-                            {plotMismatch && (
-                              <div className="text-amber-600">경고: TM Plot {tm.plot} ≠ 입력 Plot {r.plot}</div>
-                            )}
+                      <td className="w-40">
+                        <Input value={r.pic_name} onChange={(e) => patch(r.key, { pic_name: e.target.value })} className="h-8 text-xs" />
+                        {delegated && (
+                          <div className="mt-0.5 text-[10px] text-muted-foreground">
+                            {tm?.effective_pic} (←{tm?.original_pic})
                           </div>
                         )}
-                      </td>
-                      <td>
-                        <div className="flex gap-1">
-                          {DMR_HEADCOUNT_KINDS.map((k) => (
-                            <Button key={k} size="sm" variant={r.headcount_kind === k ? 'default' : 'outline'} className="h-7 px-2 text-[11px]" onClick={() => patch(r.key, { headcount_kind: k })}>
-                              {DMR_HEADCOUNT_KIND_LABEL[k]}
-                            </Button>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="w-32"><Input value={r.pic_name} onChange={(e) => patch(r.key, { pic_name: e.target.value })} className="h-8 text-xs" /></td>
-                      <td className="w-20"><Input type="number" min={0} value={r.plan_manpower} onChange={(e) => patch(r.key, { plan_manpower: e.target.value })} className="h-8 text-xs" /></td>
-                      <td className="w-20"><Input type="number" min={0} value={r.actual_manpower} onChange={(e) => patch(r.key, { actual_manpower: e.target.value })} className="h-8 text-xs" /></td>
-                      <td className="whitespace-nowrap text-[11px] text-muted-foreground">
-                        {g ? `계획 ${g.plan} / 실제 ${g.actual}` : '—'}
-                      </td>
-                      <td>
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => removeRow(r.key)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
                       </td>
                     </tr>
                   );
