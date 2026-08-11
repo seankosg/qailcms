@@ -101,6 +101,7 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   spl_ocs_source_files: ["id"],
   spl_documents: ["id"],
   spl_document_item_links: ["id"],
+  spl_document_pages: ["id"],
   spl_ocs_comment_document_links: ["id"],
 };
 
@@ -494,6 +495,7 @@ export async function restoreSnapshot(
       ["spl_ocs_categories_mapping", 78],
       ["spl_ocs_attachment_comment_links", 79],
       ["spl_document_item_links", 80],
+      ["spl_document_pages", 80.5],
       ["spl_ocs_comment_document_links", 81],
       ["spl_ocs_compliance", 82],
       ["spl_ocs_compliance_log", 83],

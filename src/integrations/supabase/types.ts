@@ -5787,6 +5787,24 @@ export type Database = {
           },
         ]
       }
+      spl_ocs_v1_stage: {
+        Row: {
+          id: number
+          kind: string
+          payload: Json
+        }
+        Insert: {
+          id?: number
+          kind: string
+          payload: Json
+        }
+        Update: {
+          id?: number
+          kind?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       spl_owner_backfill_snapshot_20260804: {
         Row: {
           eng: string | null
