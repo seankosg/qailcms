@@ -593,6 +593,7 @@ function SplTableRow({
   selected: boolean;
   onToggleSelect: () => void;
   onOpenDetail: () => void;
+  onOpenPanel: (kind: SplPanelKind) => void;
   canEdit: boolean;
   onSave: (field: string, value: string | null) => Promise<void>;
 }) {
