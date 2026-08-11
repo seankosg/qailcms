@@ -180,6 +180,15 @@ export function SplRawDataPage() {
       if (search.judgment && search.judgment !== "all" && r.judgment !== search.judgment) return false;
       // HDEC 실적 미확보 드릴다운 — 판정과 독립된 술어
       if (search.hdecMissing && (r.hdec_actual_count ?? 0) !== 0) return false;
+      // OCS 캐시 숫자 필터 — 과거 as-of(캐시 null)에서는 미적용
+      if (isToday && search.ocs && search.ocs !== "all") {
+        const t = r.ocs_total;
+        const p = r.ocs_pending;
+        if (t == null) return false;
+        if (search.ocs === "pending" && !((p ?? 0) > 0)) return false;
+        if (search.ocs === "complied" && !(t > 0 && (p ?? 0) === 0)) return false;
+        if (search.ocs === "none" && t !== 0) return false;
+      }
       // 밴드 지연 셀 드릴다운 = 활성 밴드 + 대표 지연이 그 밴드
       if (search.delayBand) {
         if (r.active_band !== search.delayBand) return false;
@@ -196,7 +205,7 @@ export function SplRawDataPage() {
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, colFilters, colDefMap]);
+  }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, search.ocs, isToday, colFilters, colDefMap]);
 
   /** 표시 컬럼 배치 — __select 는 항상 좌측 고정, 그다음 사용자 pin */
   const layout = useMemo(() => {
@@ -326,6 +335,25 @@ export function SplRawDataPage() {
             onClick={() => setSearch({ plot: p })}
           >
             {p === "all" ? "All Plots" : `PLOT-${p}`}
+          </Button>
+        ))}
+        <span className="ml-1 text-[11px] text-muted-foreground">OCS</span>
+        {([
+          ["all", "All"],
+          ["pending", "Pending OCS"],
+          ["complied", "Complied"],
+          ["none", "No OCS"],
+        ] as const).map(([v, label]) => (
+          <Button
+            key={v}
+            size="sm"
+            variant={(search.ocs ?? "all") === v ? "default" : "outline"}
+            className="h-8 text-xs"
+            disabled={!isToday}
+            title={isToday ? undefined : "과거 As-of 조회에서는 OCS 필터를 사용할 수 없습니다"}
+            onClick={() => setSearch({ ocs: v })}
+          >
+            {label}
           </Button>
         ))}
         {viol && (
