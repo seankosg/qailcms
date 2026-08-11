@@ -1,5 +1,5 @@
 import { ColumnResizeHandle } from "@/components/common/ColumnResizeHandle";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -277,9 +277,32 @@ export function SplRawDataPage() {
   }, [order, visibility, frozenExtras, colDefMap, stageColMap, colWidths]);
   const tableWidth = useMemo(() => layout.reduce((sum, item) => sum + item.width, 0), [layout]);
 
+  /**
+   * View 내보내기 컬럼 — 화면 순서 그대로(정규 + 스테이지).
+   * 스테이지 셀은 재임포트 가능하도록 ISO(YYYY-MM-DD) 원값으로 내보낸다.
+   */
   const exportColumns = useMemo(
-    () => layout.filter((i) => i.def).map((i) => ({ key: i.key, label: i.def?.label ?? i.key })),
+    () =>
+      layout
+        .filter((i) => i.key !== "__select")
+        .map((i) => ({ key: i.key, label: i.def?.label ?? i.stage?.code ?? i.key })),
     [layout],
+  );
+
+  const exportCellValue = useCallback(
+    (r: SplRow, key: string): string => {
+      const def = colDefMap.get(key);
+      if (def) return def.get(r);
+      const sc = stageColMap.get(key);
+      if (!sc) return "";
+      const cell = r.stages[sc.stage_code];
+      if (!cell) return "";
+      if (cell.na) return "NA";
+      const raw = cell[sc.field] as string | null | undefined;
+      if (!raw) return "";
+      return sc.field === "fv" ? String(raw) : String(raw).slice(0, 10);
+    },
+    [colDefMap, stageColMap],
   );
 
   /** Bulk Edit 내보내기 컬럼 — 스테이지 포함 화면 그대로 */
@@ -707,6 +730,7 @@ export function SplRawDataPage() {
         onOpenChange={setExportOpen}
         rows={sorted}
         exportColumns={exportColumns}
+        cellValue={exportCellValue}
         onRoundtrip={onExport}
       />
 
