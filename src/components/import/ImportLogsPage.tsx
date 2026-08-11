@@ -743,10 +743,38 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                   Object.entries(selectedBatch.exclusions)
                     .filter(([, v]) => typeof v === "number" && (v as number) > 0)
                     .map(([k, v]) => (
-                      <Badge key={k} variant="outline" className="bg-amber-100 text-amber-800">
-                        제외 {k} {v as number}
+                      <Badge
+                        key={k}
+                        variant="outline"
+                        className="bg-amber-100 text-amber-800"
+                        title={describeExclusion(k)?.what ?? k}
+                      >
+                        제외 · {describeExclusion(k)?.title ?? k} {v as number}
                       </Badge>
                     ))}
+              </div>
+            )}
+            {selectedBatch && (selectedBatch.status === "failed" || selectedBatch.status === "partial" || selectedBatch.status === "rolled_back") && (
+              <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-900 dark:bg-amber-950/40">
+                <div className="font-medium text-amber-900 dark:text-amber-200">
+                  {batchStatusSummary(selectedBatch.status)}
+                </div>
+                {reasonGuides.length > 0 && (
+                  <ul className="mt-2 space-y-2">
+                    {reasonGuides.map((g) => (
+                      <li key={g.key} className="leading-relaxed">
+                        <span className="font-medium">
+                          {g.guide.title}
+                          {g.count ? ` (${g.count}건)` : ""}
+                        </span>
+                        <div className="text-muted-foreground">왜: {g.guide.what}</div>
+                        <div className="text-emerald-800 dark:text-emerald-300">
+                          조치: {g.guide.fix}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
             <div className="mb-3 flex flex-wrap items-center gap-2">
