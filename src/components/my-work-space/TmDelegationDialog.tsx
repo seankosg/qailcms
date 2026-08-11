@@ -336,7 +336,8 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
                   <span>→ {d.to_pic}</span>
                   <span className="text-muted-foreground">{d.start_date} ~ {d.end_date}</span>
                   <Badge variant={d.status === "active" ? "secondary" : "outline"} className="text-[10px]">{d.status}</Badge>
-                  {d.status === "active" && d.end_date >= todayIso() && (
+                  {d.status === "active" &&
+                    (d.start_date > todayIso() || d.end_date > todayIso()) && (
                     <Button
                       variant="ghost"
                       size="sm"
