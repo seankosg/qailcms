@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2, MessageSquare, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDdMmmYyyy, todayInDoha } from "@/lib/time/doha";
