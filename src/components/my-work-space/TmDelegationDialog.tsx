@@ -173,13 +173,30 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
     }
   };
 
-  const cancelOne = async (id: string) => {
+  /**
+   * 해제 규칙 — 시작 여부로 갈린다.
+   *  start_date >  오늘: 아직 시작 안 함 → status='cancelled'
+   *  start_date <= 오늘: 이미 진행 → end_date=오늘 으로 단축(status 는 active 유지)
+   *  end_date   <  오늘: 이미 끝남 → 해제 대상 아님
+   * 과거를 소급해 바꾸지 않는다. start_date 는 어느 경우에도 바꾸지 않는다.
+   */
+  const cancelOne = async (d: DelegationRow) => {
+    const today = todayIso();
+    if (d.end_date < today) return; // 종료된 위임은 손대지 않는다
+    const started = d.start_date <= today;
+    if (started) {
+      const ok = window.confirm(
+        "오늘까지는 인수자에게 남고 내일부터 원 담당자로 돌아옵니다. 종료하시겠습니까?",
+      );
+      if (!ok) return;
+    }
+    const patch = started ? { end_date: today } : { status: "cancelled" };
     const { error } = await (supabase as any)
       .from("tm_pic_delegations")
-      .update({ status: "cancelled" })
-      .eq("id", id);
+      .update(patch)
+      .eq("id", d.id);
     if (error) { toast.error(error.message); return; }
-    toast.success("위임을 해제했습니다.");
+    toast.success(started ? `위임을 오늘(${today})까지로 종료했습니다.` : "시작 전 위임을 취소했습니다.");
     await qc.invalidateQueries({ queryKey: ["tm-deleg"] });
     await qc.invalidateQueries({ queryKey: ["my-workspace"] });
   };
@@ -319,9 +336,14 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
                   <span>→ {d.to_pic}</span>
                   <span className="text-muted-foreground">{d.start_date} ~ {d.end_date}</span>
                   <Badge variant={d.status === "active" ? "secondary" : "outline"} className="text-[10px]">{d.status}</Badge>
-                  {d.status === "active" && (
-                    <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => cancelOne(d.id)}>
-                      해제
+                  {d.status === "active" && d.end_date >= todayIso() && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px]"
+                      onClick={() => cancelOne(d)}
+                    >
+                      {d.start_date > todayIso() ? "취소" : "종료"}
                     </Button>
                   )}
                 </div>
