@@ -57,9 +57,7 @@ export function evaluateParity(input: ParityInput): ParityResult {
   const isGlobal = input.scope === "global";
   const target = isGlobal ? input.codeTables : input.scopeTables;
 
-  const missingInCode = isGlobal
-    ? [...dbSet].filter((t) => !new Set(input.codeTables).has(t))
-    : [];
+  const missingInCode = isGlobal ? [...dbSet].filter((t) => !new Set(input.codeTables).has(t)) : [];
   const missingInDb = target.filter((t) => !dbSet.has(t));
   const missingSortKey = target.filter((t) => !sortKeySet.has(t));
   const missingRestoreOrder = target.filter((t) => !restoreSet.has(t));
@@ -94,7 +92,8 @@ export function parityErrorMessage(r: ParityResult): string {
   if (r.missingInCode.length) parts.push(`DB에만 있음: [${r.missingInCode.join(", ")}]`);
   if (r.missingInDb.length) parts.push(`DB에 없음: [${r.missingInDb.join(", ")}]`);
   if (r.missingSortKey.length) parts.push(`정렬키 누락: [${r.missingSortKey.join(", ")}]`);
-  if (r.missingRestoreOrder.length) parts.push(`복원 순서 누락: [${r.missingRestoreOrder.join(", ")}]`);
+  if (r.missingRestoreOrder.length)
+    parts.push(`복원 순서 누락: [${r.missingRestoreOrder.join(", ")}]`);
   if (r.missingModuleCanonical.length)
     parts.push(`모듈 정본 테이블 누락: [${r.missingModuleCanonical.join(", ")}]`);
   if (r.duplicates.length) parts.push(`중복 테이블: [${r.duplicates.join(", ")}]`);
