@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -132,6 +132,10 @@ export function DmrEntryPage() {
   const [rows, setRows] = useState<EntryRow[]>([newRow()]);
   const [saving, setSaving] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
+  /** 사용자가 표를 건드렸는가 — 미저장 변경이 있으면 재조회 결과로 덮지 않는다 */
+  const dirtyRef = useRef(false);
+  /** 저장 직후처럼 의도적으로 표를 갈아엎어야 할 때 올린다 */
+  const [reloadTick, setReloadTick] = useState(0);
 
   const systemsQ = useDmrSystemMaster();
   const contractorsQ = useDmrContractorMaster();
@@ -195,9 +199,11 @@ export function DmrEntryPage() {
     staleTime: 0,
   });
 
-  const loadedKey = `${reportDate}|${discipline}|${existingQ.dataUpdatedAt}`;
+  // 창 포커스 재조회(dataUpdatedAt 변동)로는 표를 갈아엎지 않는다.
+  const loadedKey = `${reportDate}|${discipline}|${reloadTick}`;
   useEffect(() => {
     if (!existingQ.data) return;
+    if (dirtyRef.current) return; // 미저장 변경 보호
     const loaded: EntryRow[] = existingQ.data.map((r) => ({
       key: `s${r.id}`,
       system_name: r.system_name ?? '',
@@ -220,7 +226,12 @@ export function DmrEntryPage() {
     }));
     setRows(loaded.length > 0 ? loaded : [newRow()]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedKey]);
+  }, [loadedKey, existingQ.data]);
+
+  // 기준일·공종이 바뀌면 새 조합을 불러올 수 있도록 미저장 표시를 푼다.
+  useEffect(() => {
+    dirtyRef.current = false;
+  }, [reportDate, discipline]);
 
   const tmOptions = useMemo(
     () => (tmQ.data ?? []).map((t) => ({ value: t.task_no, label: t.task_no, hint: t.task_name ?? '' })),
@@ -248,8 +259,18 @@ export function DmrEntryPage() {
     return m;
   }, [rows]);
 
-  const patch = (key: string, p: Partial<EntryRow>) =>
+  const patch = (key: string, p: Partial<EntryRow>) => {
+    dirtyRef.current = true;
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...p } : r)));
+  };
+  const addRow = () => {
+    dirtyRef.current = true;
+    setRows((p) => [...p, newRow()]);
+  };
+  const removeRow = (key: string) => {
+    dirtyRef.current = true;
+    setRows((p) => (p.length > 1 ? p.filter((x) => x.key !== key) : p));
+  };
 
   const saveFn = useServerFn(saveDmrTaskEntries);
 
@@ -279,7 +300,9 @@ export function DmrEntryPage() {
       });
       setMissing(res?.missing_task_nos ?? []);
       invalidate();
+      dirtyRef.current = false;
       await existingQ.refetch();
+      setReloadTick((t) => t + 1);
       toast.success(`저장 완료 — ${res?.saved ?? valid.length}행 (TM 연결 ${res?.linked_tasks ?? 0}건)`);
     } catch (e: any) {
       toast.error(e?.message ?? '저장 실패');
@@ -354,7 +377,7 @@ export function DmrEntryPage() {
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm">입력 표 ({rows.length}행)</CardTitle>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setRows((p) => [...p, newRow()])}>
+              <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={addRow}>
                 <Plus className="h-3.5 w-3.5" />행 추가
               </Button>
               <Button
@@ -450,7 +473,7 @@ export function DmrEntryPage() {
                         {g ? `계획 ${g.plan} / 실제 ${g.actual}` : '—'}
                       </td>
                       <td>
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setRows((p) => (p.length > 1 ? p.filter((x) => x.key !== r.key) : p))}>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => removeRow(r.key)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </td>
