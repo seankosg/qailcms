@@ -986,9 +986,34 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                                 {r.action_taken}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-xs">{r.reason_code ?? "—"}</TableCell>
+                            <TableCell className="text-xs">
+                              {r.reason_code ? (
+                                <div className="flex flex-col">
+                                  <span>{describeReason(r.reason_code)?.title ?? r.reason_code}</span>
+                                  <span className="text-[10px] text-muted-foreground font-mono">
+                                    {r.reason_code}
+                                  </span>
+                                </div>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs max-w-[420px] whitespace-normal break-words">
-                              {r.reason_detail ?? "—"}
+                              {describeReason(r.reason_code) ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <span>{describeReason(r.reason_code)!.what}</span>
+                                  <span className="text-emerald-700 dark:text-emerald-300">
+                                    조치: {describeReason(r.reason_code)!.fix}
+                                  </span>
+                                  {r.reason_detail && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {r.reason_detail}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                (r.reason_detail ?? "—")
+                              )}
                             </TableCell>
                           </TableRow>
                           {isOpen && (
