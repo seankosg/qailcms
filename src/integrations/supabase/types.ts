@@ -9212,6 +9212,10 @@ export type Database = {
         Args: { _as_of?: string; _task_raw_id: string }
         Returns: string
       }
+      tm_effective_pic_map: {
+        Args: { _as_of?: string; _discipline: string; _task_nos: string[] }
+        Returns: Json
+      }
       tm_expected_finish: {
         Args: {
           actual_finish: string
