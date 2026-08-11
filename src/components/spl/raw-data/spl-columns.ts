@@ -106,6 +106,79 @@ export const SPL_EDITABLE_FIELDS: Array<{ field: "team" | "pic" | "eng" | "pic_p
   { field: "eng_po", label: "ENG PO" },
 ];
 
+/**
+ * Bulk Edit 필드 카탈로그 (TM Raw Data 의 Bulk Edit UI 와 동일 규격).
+ * - base   : spl_items 컬럼 직접 쓰기
+ * - derived: 서버 정본 산출값 → 목록에는 노출하되 선택 불가
+ * 스테이지 컬럼은 카탈로그에서 동적으로 만들어 붙인다(`buildSplStageColumns`).
+ */
+export type SplBulkFieldKind = "base" | "stage" | "derived";
+
+export interface SplBulkField {
+  /** 표 컬럼 키와 동일 (파생/기본) 또는 `stage:<stage_code>|<field>` */
+  key: string;
+  label: string;
+  kind: SplBulkFieldKind;
+  group: string;
+  inputType: "text" | "date" | "select";
+  options?: string[];
+  /** base 전용 — spl_items 컬럼명 */
+  column?: string;
+  /** stage 전용 */
+  stage?: { stage_code: string; field: "ps" | "as" | "pf" | "af" | "fv" };
+  /** 선택 불가 사유 (derived) */
+  disabledReason?: string;
+}
+
+const BASE_BULK_FIELDS: SplBulkField[] = [
+  { key: "team", label: "Team", kind: "base", group: "Basic", inputType: "select", options: [...SPL_TEAM_OPTIONS], column: "team" },
+  { key: "pic", label: "PIC", kind: "base", group: "Basic", inputType: "text", column: "pic" },
+  { key: "eng", label: "ENG", kind: "base", group: "Basic", inputType: "text", column: "eng" },
+  { key: "pic_po", label: "PIC PO", kind: "base", group: "Basic", inputType: "text", column: "pic_po" },
+  { key: "eng_po", label: "ENG PO", kind: "base", group: "Basic", inputType: "text", column: "eng_po" },
+  { key: "plot", label: "Plot", kind: "base", group: "Basic", inputType: "text", column: "plot" },
+  { key: "dis", label: "DIS", kind: "base", group: "Basic", inputType: "text", column: "dis" },
+  { key: "service", label: "Service", kind: "base", group: "Basic", inputType: "text", column: "service" },
+  { key: "title", label: "Title", kind: "base", group: "Basic", inputType: "text", column: "title" },
+  { key: "supplier", label: "Supplier", kind: "base", group: "Basic", inputType: "text", column: "supplier" },
+  { key: "latest_status", label: "Latest Status", kind: "base", group: "Basic", inputType: "text", column: "latest_status" },
+  { key: "data_date", label: "Data Date", kind: "base", group: "Basic", inputType: "date", column: "data_date" },
+];
+
+const DERIVED_KEYS: Array<{ key: string; reason: string }> = [
+  { key: "spl_number", reason: "고유 번호 — 일괄 변경 불가" },
+  { key: "judgment", reason: "서버 정본 산출값" },
+  { key: "progress_pct", reason: "서버 정본 산출값" },
+  { key: "completed_stage", reason: "서버 정본 산출값" },
+  { key: "current_stage", reason: "서버 정본 산출값" },
+  { key: "primary_delay", reason: "서버 정본 산출값" },
+  { key: "req_doc", reason: "스테이지 값에서 집계" },
+  { key: "ocs", reason: "OCS 정본에서 집계" },
+  { key: "rsp", reason: "RSP 정본에서 집계" },
+  { key: "documents", reason: "문서 정본에서 집계" },
+];
+
+/** 표에 보이는 모든 컬럼을 Bulk Edit 목록으로 노출한다(파생은 비활성). */
+export function buildSplBulkFields(stageCols: SplStageColumn[]): SplBulkField[] {
+  const derived: SplBulkField[] = DERIVED_KEYS.map((d) => ({
+    key: d.key,
+    label: SPL_COLUMNS.find((c) => c.key === d.key)?.label ?? d.key,
+    kind: "derived",
+    group: "Derived (read-only)",
+    inputType: "text",
+    disabledReason: d.reason,
+  }));
+  const stage: SplBulkField[] = stageCols.map((sc) => ({
+    key: `stage:${sc.key}`,
+    label: `${sc.code}`,
+    kind: "stage",
+    group: `Stage — ${SPL_BAND_LABEL[sc.band] ?? sc.band}`,
+    inputType: sc.field === "fv" ? "text" : "date",
+    stage: { stage_code: sc.stage_code, field: sc.field },
+  }));
+  return [...BASE_BULK_FIELDS, ...stage, ...derived];
+}
+
 /** Band full names used in the single-row header tooltip */
 export const SPL_BAND_LABEL: Record<string, string> = {
   REQUIRED_DOC: "Required Documents",

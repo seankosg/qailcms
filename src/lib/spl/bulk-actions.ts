@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buildStyledWorkbook, saveStyledWorkbook } from "@/lib/excel/styled-workbook";
 
 const DELETE_CHUNK = 200;
 
@@ -65,4 +66,50 @@ export async function applySplBulkHardDelete(ids: string[]): Promise<SplDeleteRe
     blocked: Math.max(0, ids.length - deleted - failed),
     firstError,
   };
+}
+
+export interface SplExportColumn {
+  key: string;
+  label: string;
+  widthPx?: number;
+}
+
+/** 선택 행 xlsx 내보내기 (TM Bulk Edit 과 동일 규격 — 표시값 그대로). */
+export function exportSplRowsToXlsx({
+  rows,
+  columns,
+  fileName,
+}: {
+  rows: Record<string, unknown>[];
+  columns: SplExportColumn[];
+  fileName: string;
+}) {
+  const wb = buildStyledWorkbook({
+    title: "Spare Parts — Selected Rows",
+    columns: columns.map((c) => ({ key: c.key, label: c.label, kind: "text" as const, widthPx: c.widthPx })),
+    rows,
+    sheetName: "Spare Parts",
+    freezeCols: 1,
+  });
+  saveStyledWorkbook(wb, fileName);
+}
+
+/** 선택 행 TSV 클립보드 복사. */
+export async function copySplRowsAsTsv({
+  rows,
+  columns,
+}: {
+  rows: Record<string, unknown>[];
+  columns: SplExportColumn[];
+}): Promise<{ rowCount: number; colCount: number }> {
+  const lines: string[] = [columns.map((c) => c.label).join("\t")];
+  for (const r of rows) {
+    lines.push(
+      columns
+        .map((c) => String(r[c.key] ?? "").replace(/\t/g, " ").replace(/\r?\n/g, " "))
+        .join("\t"),
+    );
+  }
+  await navigator.clipboard.writeText(lines.join("\n"));
+  return { rowCount: rows.length, colCount: columns.length };
 }

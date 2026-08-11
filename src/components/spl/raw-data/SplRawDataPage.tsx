@@ -23,7 +23,7 @@ import {
   type SplStageCell,
 } from "@/lib/spl/rows.functions";
 import { downloadSplRoundtripWorkbook } from "@/lib/spl/roundtrip-export";
-import { updateSplField } from "@/lib/spl/mutations.functions";
+import { updateSplField, updateSplStageField } from "@/lib/spl/mutations.functions";
 import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
 import { useRclCan } from "@/hooks/useRclCan";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
@@ -84,6 +84,7 @@ export function SplRawDataPage() {
   const fetchEstimated = useServerFn(getSplEstimatedCells);
   const fetchExport = useServerFn(getSplExportRows);
   const saveField = useServerFn(updateSplField);
+  const saveStage = useServerFn(updateSplStageField);
   const queryClient = useQueryClient();
   const { canRow } = useRclCan("SPL", "write");
   const isToday = asOf === today;
@@ -280,6 +281,28 @@ export function SplRawDataPage() {
     [layout],
   );
 
+  /** Bulk Edit 내보내기 컬럼 — 스테이지 포함 화면 그대로 */
+  const bulkExportColumns = useMemo(
+    () =>
+      layout
+        .filter((i) => i.key !== "__select")
+        .map((i) => ({ key: i.key, label: i.def?.label ?? i.stage?.code ?? i.key, widthPx: i.width })),
+    [layout],
+  );
+
+  /** 선택 행 평탄화 — Bulk Edit 미리보기/내보내기가 화면 표시값과 동일하게 보이도록 */
+  const selectedRowsFlat = useMemo(() => {
+    const set = new Set(selectedIds);
+    return rows
+      .filter((r) => set.has(r.id))
+      .map((r) => {
+        const out: Record<string, unknown> = { id: r.id, spl_number: r.spl_number };
+        for (const item of allColumnItems) out[item.key] = columnValue(item.key, r);
+        return out;
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, selectedIds, allColumnItems, colDefMap, stageColMap]);
+
   /** 정렬 키 → 값 접근자. 일반 컬럼은 컬럼 정의, 스테이지 컬럼은 `stage:<stage_code>|<field>` */
   const sortValue = useMemo(() => {
     const stageMap = new Map<string, (typeof stageCols)[number]>(
@@ -326,6 +349,13 @@ export function SplRawDataPage() {
 
   const saveOne = async (id: string, field: string, value: string | null) => {
     await saveField({ data: { id, field, value } });
+  };
+  const saveStageOne = async (
+    id: string,
+    stage: { stage_code: string; field: "ps" | "as" | "pf" | "af" | "fv" },
+    value: string | null,
+  ) => {
+    await saveStage({ data: { item_id: id, stage_code: stage.stage_code, field: stage.field, value } });
   };
   const refetchRows = async () => {
     await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
@@ -661,9 +691,12 @@ export function SplRawDataPage() {
 
       <SplBulkEditBar
         selectedIds={selectedIds}
-        teamOptions={[...SPL_TEAM_OPTIONS]}
+        selectedRows={selectedRowsFlat}
+        stageColumns={stageCols}
+        exportColumns={bulkExportColumns}
         onClear={() => setSelectedIds([])}
         onSaveField={saveOne}
+        onSaveStage={saveStageOne}
         onDone={refetchRows}
         disabledReason={isToday ? null : "Editing is disabled in as-of (historical) view."}
       />
