@@ -29,6 +29,8 @@ interface Props {
   rows: SplRow[];
   /** 화면 표시 컬럼 순서 */
   exportColumns: { key: string; label: string }[];
+  /** 컬럼 키 → 내보내기 값 (스테이지 날짜는 재임포트 가능한 ISO) */
+  valueOf?: (row: SplRow, key: string) => string;
   /** 왕복 임포트 양식 — 기존 경로 그대로 */
   onRoundtrip: () => Promise<void>;
 }
@@ -38,7 +40,7 @@ function ts() {
   return `${s.slice(0, 8)}_${s.slice(8)}`;
 }
 
-export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRoundtrip }: Props) {
+export function SplExportDialog({ open, onOpenChange, rows, exportColumns, valueOf, onRoundtrip }: Props) {
   const [format, setFormat] = useState<Format>("view");
   const [axis, setAxis] = useState<Axis>("none");
   const [busy, setBusy] = useState(false);
@@ -46,7 +48,7 @@ export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRou
   const getByKey = new Map(SPL_COLUMNS.map((c) => [c.key, c] as const));
   const toRecord = (r: SplRow) => {
     const out: Record<string, unknown> = {};
-    for (const c of exportColumns) out[c.key] = getByKey.get(c.key)?.get(r) ?? "";
+    for (const c of exportColumns) out[c.key] = valueOf ? valueOf(r, c.key) : (getByKey.get(c.key)?.get(r) ?? "");
     return out;
   };
 
@@ -105,6 +107,9 @@ export function SplExportDialog({ open, onOpenChange, rows, exportColumns, onRou
           <DialogDescription>
             Exports <span className="font-medium tabular-nums">{rows.length.toLocaleString()}</span> rows from the current filter result.
           </DialogDescription>
+          <p className="text-xs text-muted-foreground">
+            View 파일은 그대로 다시 임포트할 수 있습니다. 단계 날짜는 ISO(YYYY-MM-DD)로 내보내며, Plot·Team·PIC/ENG·Supplier·단계 날짜만 반영됩니다.
+          </p>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
