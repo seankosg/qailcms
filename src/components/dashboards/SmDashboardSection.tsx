@@ -8,7 +8,7 @@ import { useSnagScurveData } from "@/hooks/useSnagScurveData";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, type PdbSmFilters } from "@/lib/dashboards/pdb-filters";
 import type { PlotKey, RoomGroupCol, TeamKey } from "@/lib/defect-management/dashboard-shape";
-import { STAGE_LABELS, type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
+import { type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
 function usePlot(plot: PlotKey, asOfDate: string, f: PdbSmFilters) {
