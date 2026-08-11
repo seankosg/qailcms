@@ -210,6 +210,7 @@ export function SnagKpiPlanVsActualCard({
               As of {asOfDate} · 전체 누적 (차트 구간 이전 포함) · 모수 {stageTotal.toLocaleString()}건
             </div>
 
+            {controlsHidden ? null : (
             <div className="flex items-center gap-2">
               <ToggleGroup
                 type="single"
@@ -249,6 +250,7 @@ export function SnagKpiPlanVsActualCard({
                 ))}
               </ToggleGroup>
             </div>
+            )}
           </div>
         </CardHeader>
 
