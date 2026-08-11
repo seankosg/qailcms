@@ -27,6 +27,7 @@ export interface SplDocumentRow {
 
 type LooseClient = {
   from: (t: string) => any;
+  rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: any; error: any }>;
   storage: {
     from: (b: string) => {
       createSignedUrl: (
