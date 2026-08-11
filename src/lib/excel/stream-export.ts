@@ -63,6 +63,15 @@ export interface StreamExportOptions {
   rowFillFor?: (row: Record<string, any>) => string | null | undefined;
   /** When "buffer", skip download and return the workbook bytes instead. */
   output?: "download" | "buffer";
+  /** Additional fully-materialized sheets appended after the main sheet.
+   *  Uses the same SHAW-style header/data styling. */
+  extraSheets?: {
+    name: string;
+    columns: StreamExportColumn[];
+    rows: Record<string, any>[];
+    header?: StyledHeaderBlock;
+    columnWidths?: Record<string, number>;
+  }[];
 }
 
 // ── SHAW-style palette (Calibri) ────────────────────────────────────────────
