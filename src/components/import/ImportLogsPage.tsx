@@ -45,6 +45,12 @@ import {
 } from "@/components/import/FieldLogTable";
 import { Fragment } from "react";
 import { formatDdMmmYyyy, formatDdMmmYyyyHm } from "@/lib/time/doha";
+import {
+  describeExclusion,
+  describeReason,
+  batchStatusSummary,
+  type ReasonGuide,
+} from "@/lib/import/reason-guide";
 
 const FIELD_OUTCOMES = Object.keys(OUTCOME_LABELS);
 
@@ -69,6 +75,8 @@ interface Batch {
   parsed_rows?: number | null;
   applied_rows?: number | null;
   exclusions?: Record<string, unknown> | null;
+  /** 배치 단위 오류 목록(있을 때만) */
+  errors?: unknown;
 }
 
 interface RowLog {
