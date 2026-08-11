@@ -60,6 +60,11 @@ export interface TmMyRow {
   actual_finish: string | null;
   slip_days: number | null;
   created_at: string | null;
+  /** 위임(부재중 인수인계) 파생 — tm_rows_as_of 정본 제공 */
+  effective_pic?: string | null;
+  original_pic?: string | null;
+  delegated_from?: string | null;
+  is_delegated?: boolean | null;
 }
 
 export type MwsScope = "pic" | "team";
