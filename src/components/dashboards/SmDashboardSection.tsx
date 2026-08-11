@@ -43,12 +43,12 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
       plots={[
         {
           plot: "D",
-          progressPct: d.loading || d.stageTotal === 0 ? null : (d.baseline.actualUpto / d.stageTotal) * 100,
+          progressPct: d.stageTotal === 0 ? null : (d.baseline.actualUpto / d.stageTotal) * 100,
           total: d.stageTotal,
         },
         {
           plot: "C",
-          progressPct: c.loading || c.stageTotal === 0 ? null : (c.baseline.actualUpto / c.stageTotal) * 100,
+          progressPct: c.stageTotal === 0 ? null : (c.baseline.actualUpto / c.stageTotal) * 100,
           total: c.stageTotal,
         },
       ]}
