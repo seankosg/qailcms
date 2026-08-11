@@ -19,6 +19,9 @@ Extraction rules:
   Names starting with "HDEC" (after normalization, e.g. "HDEC_Anel", "HDEC_Direct") should be marked as is_direct=true.
 - Preserve System text as printed (trim whitespace only).
 - Return TEAM codes using the app-wide Team master values only: ARCH, ELEC, MECH. If the image says ELECT or Electrical, return ELEC.
+- TM Code: if the sheet has a "TM Code" (or "TM 코드"/"Task No") column, return its codes in task_nos as an array of strings (split on comma/newline/slash, trim). If absent, return an empty array. Never invent or guess a code.
+- 담당자: if a "담당자" / "PIC" column exists, return it as pic_name. Otherwise omit.
+- Headcount kind: if the sheet/section/column indicates Foreman or Supervisor, set headcount_kind accordingly; otherwise "worker".
 
 Return ONLY JSON via the report_dmr tool. Do not include narration.`;
 
@@ -35,6 +38,13 @@ export const DMR_TOOL_SCHEMA = {
           system: { type: 'string' as const },
           contractor: { type: 'string' as const, description: 'Sub Contractor name, already normalized (HDEC,X → HDEC_X ; HDEC → HDEC_Direct)' },
           is_direct: { type: 'boolean' as const },
+          task_nos: {
+            type: 'array' as const,
+            items: { type: 'string' as const },
+            description: 'TM Code values exactly as printed. Empty array when the column is absent.',
+          },
+          pic_name: { type: 'string' as const, description: '담당자 / PIC as printed' },
+          headcount_kind: { type: 'string' as const, enum: ['worker', 'foreman', 'supervisor'] },
           values: {
             type: 'object' as const,
             properties: {
