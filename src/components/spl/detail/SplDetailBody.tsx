@@ -11,7 +11,7 @@ import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover
 import { useRclCan } from "@/hooks/useRclCan";
 import { getSplRowsAsOf, type SplCatalogEntry, type SplRow } from "@/lib/spl/rows.functions";
 import { updateSplField } from "@/lib/spl/mutations.functions";
-import { SPL_EDITABLE_FIELDS, splJudgmentLabel } from "@/components/spl/raw-data/spl-columns";
+import { SPL_EDITABLE_FIELDS, splJudgmentLabel, splStagePrefix } from "@/components/spl/raw-data/spl-columns";
 import { SplRequiredDocChecklist } from "@/components/spl/raw-data/SplRequiredDocChecklist";
 import { listSplDocuments } from "@/lib/spl/documents.functions";
 import { SplOcsPanels, type SplPanelKind, type SplPanelTarget } from "@/components/spl/ocs/SplOcsPanels";
@@ -148,7 +148,7 @@ export function SplDetailBody({ id }: { id: string }) {
               <span className="text-muted-foreground">Primary delay</span>
               <div className={cn("font-medium", row.primary_delay && "text-destructive")}>
                 {row.primary_delay
-                  ? `${row.primary_delay.short_code ? row.primary_delay.short_code + " · " : ""}${row.primary_delay.label} · ${row.primary_delay.days}d`
+                  ? `${row.primary_delay.short_code ? splStagePrefix(row.primary_delay.short_code) + " · " : ""}${row.primary_delay.label} · ${row.primary_delay.days}d`
                   : "—"}
               </div>
             </div>
