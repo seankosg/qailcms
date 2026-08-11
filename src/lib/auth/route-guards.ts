@@ -13,7 +13,7 @@ export async function assertAdminOrRedirect(fallback: string = "/outstanding/das
     .select("role")
     .eq("user_id", authData.user.id);
   const set = new Set((roles ?? []).map((r: { role: string }) => r.role));
-  if (!(set.has("admin") || set.has("superuser"))) {
+  if (!(set.has("system_administrator") || set.has("admin") || set.has("superuser"))) {
     throw redirect({ to: fallback });
   }
 }
