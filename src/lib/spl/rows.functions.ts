@@ -35,6 +35,8 @@ export type SplCatalogEntry = {
 
 export type SplStageRef = {
   stage_code: string;
+  /** 카탈로그 short_code (예: D-SB, P-PO) — 클라이언트 보강 필드 */
+  short_code?: string;
   label: string;
   band: string;
   round_no?: number | null;
