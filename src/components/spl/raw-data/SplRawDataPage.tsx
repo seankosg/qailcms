@@ -97,53 +97,48 @@ export function SplRawDataPage() {
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   /** 다중 정렬 — 클릭한 순서가 곧 우선순위 */
   const [sorts, setSorts] = useState<Array<{ key: string; desc: boolean }>>([]);
-  /** 스테이지 컬럼 순서·표시 — 키는 `stage:<컬럼키>` */
-  const [stageOrder, setStageOrder] = useState<string[]>([]);
-  const [stageVisibility, setStageVisibility] = useState<Record<string, boolean>>({});
   const [stateLoaded, setStateLoaded] = useState(false);
   useEffect(() => {
     if (!viewPref.ready || stateLoaded) return;
     const s = (viewPref.state ?? {}) as any;
-    const valid = new Set(SPL_DEFAULT_ORDER);
     if (Array.isArray(s.order)) {
-      const kept = s.order.filter((k: any) => typeof k === "string" && valid.has(k));
+      const legacyStages = Array.isArray(s.stageOrder)
+        ? s.stageOrder.filter((k: unknown) => typeof k === "string" && k.startsWith("stage:"))
+        : [];
+      const kept = [...s.order, ...legacyStages].filter((k: unknown, index: number, all: unknown[]) =>
+        typeof k === "string" && (SPL_DEFAULT_ORDER.includes(k) || k.startsWith("stage:")) && all.indexOf(k) === index,
+      ) as string[];
       setOrder([...kept, ...SPL_DEFAULT_ORDER.filter((k) => !kept.includes(k))]);
     }
     if (s.visibility && typeof s.visibility === "object") {
-      setVisibility({ ...SPL_DEFAULT_VISIBILITY, ...s.visibility });
+      setVisibility({ ...SPL_DEFAULT_VISIBILITY, ...s.visibility, ...(s.stageVisibility ?? {}) });
     }
     if (Array.isArray(s.frozenExtras)) {
-      setFrozenExtras(s.frozenExtras.filter((k: any) => typeof k === "string" && valid.has(k)));
+      setFrozenExtras(s.frozenExtras.filter((k: unknown) => typeof k === "string" && (SPL_DEFAULT_ORDER.includes(k) || k.startsWith("stage:"))));
     }
     if (s.colWidths && typeof s.colWidths === "object") {
       const kept: Record<string, number> = {};
       for (const [k, v] of Object.entries(s.colWidths as Record<string, unknown>)) {
-        if (typeof v === "number" && v > 0 && (valid.has(k) || k.startsWith("stage:"))) kept[k] = v;
+        if (typeof v === "number" && v > 0 && (SPL_DEFAULT_ORDER.includes(k) || k.startsWith("stage:"))) kept[k] = v;
       }
       setColWidths(kept);
     }
     if (Array.isArray(s.sorts)) {
       setSorts(
         s.sorts
-          .filter((x: any) => x && typeof x.key === "string" && (valid.has(x.key) || x.key.startsWith("stage:")))
+          .filter((x: any) => x && typeof x.key === "string" && (SPL_DEFAULT_ORDER.includes(x.key) || x.key.startsWith("stage:")))
           .map((x: any) => ({ key: x.key as string, desc: !!x.desc })),
       );
-    }
-    if (Array.isArray(s.stageOrder)) {
-      setStageOrder(s.stageOrder.filter((k: any) => typeof k === "string" && k.startsWith("stage:")));
-    }
-    if (s.stageVisibility && typeof s.stageVisibility === "object") {
-      setStageVisibility(s.stageVisibility as Record<string, boolean>);
     }
     setStateLoaded(true);
   }, [viewPref.ready, viewPref.state, stateLoaded]);
   const persistColumns = () =>
-    viewPref.save({ order, visibility, frozenExtras, colWidths, sorts, stageOrder, stageVisibility } as any);
+    viewPref.save({ order, visibility, frozenExtras, colWidths, sorts } as any);
   useEffect(() => {
     if (!stateLoaded) return;
-    viewPref.save({ order, visibility, frozenExtras, colWidths, sorts, stageOrder, stageVisibility } as any);
+    viewPref.save({ order, visibility, frozenExtras, colWidths, sorts } as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stateLoaded, order, visibility, frozenExtras, colWidths, sorts, stageOrder, stageVisibility]);
+  }, [stateLoaded, order, visibility, frozenExtras, colWidths, sorts]);
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -173,20 +168,11 @@ export function SplRawDataPage() {
   /** A. Single-row header — one cell per stage field, code taken from the catalog */
   const stageCols = useMemo(() => buildSplStageColumns(catalog), [catalog]);
 
-  /** 사용자가 지정한 순서·표시 상태를 반영한 실제 렌더 대상 스테이지 컬럼 */
-  const visibleStageCols = useMemo(() => {
-    const byKey = new Map<string, SplStageColumn>(stageCols.map((sc) => [`stage:${sc.key}`, sc]));
-    const ordered = [
-      ...stageOrder.filter((k) => byKey.has(k)),
-      ...stageCols.map((sc) => `stage:${sc.key}` as string).filter((k) => !stageOrder.includes(k)),
-    ];
-    return ordered.filter((k) => stageVisibility[k] !== false).map((k) => byKey.get(k)!);
-  }, [stageCols, stageOrder, stageVisibility]);
-
-  const stageMenuItems = useMemo(
-    () => stageCols.map((sc) => ({ key: `stage:${sc.key}`, label: sc.code, title: sc.title })),
-    [stageCols],
-  );
+  const stageKeys = useMemo(() => stageCols.map((sc) => `stage:${sc.key}`), [stageCols]);
+  useEffect(() => {
+    if (!stateLoaded || stageKeys.length === 0) return;
+    setOrder((prev) => [...prev, ...stageKeys.filter((key) => !prev.includes(key))]);
+  }, [stageKeys, stateLoaded]);
 
   const rows = data?.rows ?? [];
 
@@ -200,41 +186,35 @@ export function SplRawDataPage() {
     return sc.field === "fv" ? String(raw) : formatDdMmm(raw);
   };
 
-  /** 필터 후보값 — 필터 적용 전 원본 행 distinct */
-  const distinctValues = useMemo(() => {
-    const m = new Map<string, Set<string>>();
-    for (const c of SPL_COLUMNS) if (c.filter === "multi") m.set(c.key, new Set<string>());
-    for (const r of rows) {
-      for (const c of SPL_COLUMNS) {
-        if (c.filter !== "multi") continue;
-        m.get(c.key)!.add(c.get(r));
-      }
-    }
-    const out: Record<string, string[]> = {};
-    for (const [k, s] of m) out[k] = [...s].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
-    return out;
-  }, [rows]);
-
-  /** 스테이지 컬럼 필터 후보값 */
-  const distinctStageValues = useMemo(() => {
-    const out: Record<string, string[]> = {};
-    for (const sc of stageCols) {
-      const set = new Set<string>();
-      for (const r of rows) set.add(stageDisplay(r, sc));
-      out[`stage:${sc.key}`] = [...set].sort((a, b) =>
-        a === "" ? 1 : b === "" ? -1 : a.localeCompare(b, undefined, { numeric: true }),
-      );
-    }
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, stageCols]);
-
   const stageColMap = useMemo(
     () => new Map<string, SplStageColumn>(stageCols.map((sc) => [`stage:${sc.key}`, sc])),
     [stageCols],
   );
-
   const colDefMap = useMemo(() => new Map(SPL_COLUMNS.map((c) => [c.key, c] as const)), []);
+  const allColumnItems = useMemo(() => [
+    ...SPL_COLUMNS.map((c) => ({ key: c.key, label: c.label })),
+    ...stageCols.map((sc) => ({ key: `stage:${sc.key}`, label: sc.code, title: sc.title })),
+  ], [stageCols]);
+
+  const columnValue = (key: string, row: SplRow): string => {
+    const def = colDefMap.get(key);
+    if (def) return def.get(row);
+    const stage = stageColMap.get(key);
+    return stage ? stageDisplay(row, stage) : "";
+  };
+
+  /** 필터 후보값 — 정규·스테이지 컬럼 공통 */
+  const distinctValues = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const item of allColumnItems) m.set(item.key, new Set<string>());
+    for (const r of rows) {
+      for (const item of allColumnItems) m.get(item.key)?.add(columnValue(item.key, r));
+    }
+    const out: Record<string, string[]> = {};
+    for (const [k, s] of m) out[k] = [...s].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, allColumnItems, stageColMap, colDefMap]);
 
   const filtered = useMemo(() => {
     const q = (search.q ?? "").trim().toLowerCase();
@@ -260,14 +240,7 @@ export function SplRawDataPage() {
       }
       for (const [key, vals] of Object.entries(colFilters)) {
         if (!vals || vals.length === 0) continue;
-        const sc = stageColMap.get(key);
-        if (sc) {
-          if (!vals.includes(stageDisplay(r, sc))) return false;
-          continue;
-        }
-        const def = colDefMap.get(key);
-        if (!def) continue;
-        if (!vals.includes(def.get(r))) return false;
+        if (!vals.includes(columnValue(key, r))) return false;
       }
       if (!q) return true;
       return [r.spl_number, r.title, r.team, r.pic, r.eng, r.supplier, r.dis, r.service]
@@ -277,30 +250,32 @@ export function SplRawDataPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, search.ocs, isToday, colFilters, colDefMap, stageColMap]);
 
-  /** 표시 컬럼 배치 — __select 는 항상 좌측 고정, 그다음 사용자 pin */
+  /** 단일 표시 컬럼 배치 — 정규·스테이지 모두 동일한 순서/표시/고정/폭 모델 */
   const layout = useMemo(() => {
-    const visibleOrder = order.filter((k) => visibility[k] !== false && colDefMap.has(k));
+    const visibleOrder = order.filter((k) => visibility[k] !== false && (colDefMap.has(k) || stageColMap.has(k)));
     const frozen = frozenExtras.filter((k) => visibleOrder.includes(k));
     const rest = visibleOrder.filter((k) => !frozen.includes(k));
-    const items: Array<{ key: string; def: SplColumnDef | null; width: number; left: number | null }> = [
-      { key: "__select", def: null, width: 36, left: 0 },
+    const items: Array<{ key: string; def: SplColumnDef | null; stage: SplStageColumn | null; width: number; left: number | null }> = [
+      { key: "__select", def: null, stage: null, width: 36, left: 0 },
     ];
     let left = 36;
     for (const k of frozen) {
-      const def = colDefMap.get(k)!;
-      const w = colWidths[k] ?? def.width;
-      items.push({ key: k, def, width: w, left });
+      const def = colDefMap.get(k) ?? null;
+      const stage = stageColMap.get(k) ?? null;
+      const w = colWidths[k] ?? def?.width ?? 84;
+      items.push({ key: k, def, stage, width: w, left });
       left += w;
     }
     for (const k of rest) {
-      const def = colDefMap.get(k)!;
-      items.push({ key: k, def, width: colWidths[k] ?? def.width, left: null });
+      const def = colDefMap.get(k) ?? null;
+      const stage = stageColMap.get(k) ?? null;
+      items.push({ key: k, def, stage, width: colWidths[k] ?? def?.width ?? 84, left: null });
     }
     return items;
-  }, [order, visibility, frozenExtras, colDefMap, colWidths]);
+  }, [order, visibility, frozenExtras, colDefMap, stageColMap, colWidths]);
 
   const exportColumns = useMemo(
-    () => layout.filter((i) => i.def).map((i) => ({ key: i.key, label: i.def!.label })),
+    () => layout.filter((i) => i.def).map((i) => ({ key: i.key, label: i.def?.label ?? i.key })),
     [layout],
   );
 
@@ -310,14 +285,7 @@ export function SplRawDataPage() {
       stageCols.map((sc) => [`stage:${sc.key}`, sc]),
     );
     return (key: string, r: SplRow): string => {
-      const def = colDefMap.get(key);
-      if (def) return def.get(r);
-      const sc = stageMap.get(key);
-      if (!sc) return "";
-      const cell = r.stages[sc.stage_code];
-      if (!cell) return "";
-      if (cell.na) return "";
-      return ((cell[sc.field] as string | null | undefined) ?? "").toString();
+      return columnValue(key, r);
     };
   }, [colDefMap, stageCols]);
 
