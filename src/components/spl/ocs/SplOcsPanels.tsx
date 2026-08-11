@@ -18,42 +18,59 @@ export function SplOcsPanels({
   onClose: () => void;
 }) {
   const [kind, setKind] = useState<SplPanelKind | null>(null);
+  const [secondary, setSecondary] = useState<SplPanelKind | null>(null);
   const [focusRspId, setFocusRspId] = useState<string | null>(null);
-  const active = kind ?? target?.kind ?? null;
+  const primary = kind ?? target?.kind ?? null;
 
   if (!target) return null;
   const close = () => {
     setKind(null);
+    setSecondary(null);
     setFocusRspId(null);
     onClose();
   };
+  const dual = secondary !== null;
+  const isOpen = (k: SplPanelKind) => primary === k || secondary === k;
+  const sideOf = (k: SplPanelKind): "left" | "right" => (secondary === k ? "left" : "right");
+  /** 반대편 패널을 열고/닫는다. 현재 패널은 닫지 않는다. */
+  const toggleSecondary = (k: SplPanelKind) => setSecondary((prev) => (prev === k ? null : k));
+  /** 패널별 닫기: 좌측(보조) 패널이면 그것만 닫고, 우측(정본)이면 전체를 닫는다. */
+  const closeOne = (k: SplPanelKind) => (secondary === k ? setSecondary(null) : close());
 
   return (
     <>
       <SplOcsPanel
         splItemId={target.id}
         splNumber={target.splNumber}
-        open={active === "ocs"}
-        onOpenChange={(v) => !v && close()}
+        open={isOpen("ocs")}
+        side={sideOf("ocs")}
+        dual={dual}
+        onToggleCounterpart={primary === "ocs" ? () => toggleSecondary("rsp") : undefined}
+        onOpenChange={(v) => !v && closeOne("ocs")}
         onOpenRsp={(rspItemId) => {
           setFocusRspId(rspItemId);
-          setKind("rsp");
+          if (primary === "rsp") return;
+          setSecondary("rsp");
         }}
       />
       <SplRspPanel
         splItemId={target.id}
         splNumber={target.splNumber}
-        open={active === "rsp"}
-        onOpenChange={(v) => !v && close()}
+        open={isOpen("rsp")}
+        side={sideOf("rsp")}
+        dual={dual}
+        onToggleCounterpart={primary === "rsp" ? () => toggleSecondary("ocs") : undefined}
+        onOpenChange={(v) => !v && closeOne("rsp")}
         focusId={focusRspId}
         onOpenOcs={() => {
           setFocusRspId(null);
-          setKind("ocs");
+          if (primary === "ocs") return;
+          setSecondary("ocs");
         }}
       />
       <SplDocumentPanel
         splItemId={target.id}
-        open={active === "documents"}
+        open={primary === "documents"}
         onOpenChange={(v) => !v && close()}
       />
     </>
