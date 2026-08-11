@@ -88,9 +88,9 @@ function SearchSelect({
         <ScrollArea className="h-64">
           <div className="space-y-0.5">
             {filtered.length === 0 && <p className="p-2 text-xs text-muted-foreground">결과 없음</p>}
-            {filtered.map((o) => (
+            {filtered.map((o, i) => (
               <button
-                key={o.value}
+                key={`${o.value}#${i}`}
                 type="button"
                 onClick={() => { onChange(o.value); setOpen(false); setQ(''); }}
                 className="w-full rounded px-2 py-1 text-left text-xs hover:bg-accent"
