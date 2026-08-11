@@ -53,10 +53,10 @@ export const SPL_COLUMNS: SplColumnDef[] = [
         ? `${r.primary_delay.short_code ? splStagePrefix(r.primary_delay.short_code) + " · " : ""}${r.primary_delay.label} · ${r.primary_delay.days}d`
         : "",
   },
-  { key: "pic", label: "PIC", width: 90, filter: "multi", get: (r) => r.pic ?? "", edit: "pic" },
-  { key: "eng", label: "ENG", width: 90, filter: "multi", get: (r) => r.eng ?? "", edit: "eng" },
-  { key: "pic_po", label: "PIC PO", width: 90, filter: "multi", get: (r) => r.pic_po ?? "", edit: "pic_po" },
-  { key: "eng_po", label: "ENG PO", width: 90, filter: "multi", get: (r) => r.eng_po ?? "", edit: "eng_po" },
+  { key: "pic", label: "HDEC PIC", width: 110, filter: "multi", get: (r) => r.pic ?? "", edit: "pic" },
+  { key: "eng", label: "HDEC ENG", width: 110, filter: "multi", get: (r) => r.eng ?? "", edit: "eng" },
+  { key: "pic_po", label: "PO HDEC PIC", width: 120, filter: "multi", get: (r) => r.pic_po ?? "", edit: "pic_po" },
+  { key: "eng_po", label: "PO HDEC ENG", width: 120, filter: "multi", get: (r) => r.eng_po ?? "", edit: "eng_po" },
   { key: "req_doc", label: "Req.Doc", width: 90, filter: "multi", get: (r) => `${r.req_doc_done}/${r.req_doc_total}` },
   {
     key: "ocs",
@@ -115,10 +115,10 @@ export const SPL_TEAM_OPTIONS = ["MECH", "ELEC", "PRJC"] as const;
 
 export const SPL_EDITABLE_FIELDS: Array<{ field: "team" | "pic" | "eng" | "pic_po" | "eng_po"; label: string }> = [
   { field: "team", label: "Team" },
-  { field: "pic", label: "PIC" },
-  { field: "eng", label: "ENG" },
-  { field: "pic_po", label: "PIC PO" },
-  { field: "eng_po", label: "ENG PO" },
+  { field: "pic", label: "HDEC PIC" },
+  { field: "eng", label: "HDEC ENG" },
+  { field: "pic_po", label: "PO HDEC PIC" },
+  { field: "eng_po", label: "PO HDEC ENG" },
 ];
 
 /**
@@ -147,10 +147,10 @@ export interface SplBulkField {
 
 const BASE_BULK_FIELDS: SplBulkField[] = [
   { key: "team", label: "Team", kind: "base", group: "Basic", inputType: "select", options: [...SPL_TEAM_OPTIONS], column: "team" },
-  { key: "pic", label: "PIC", kind: "base", group: "Basic", inputType: "text", column: "pic" },
-  { key: "eng", label: "ENG", kind: "base", group: "Basic", inputType: "text", column: "eng" },
-  { key: "pic_po", label: "PIC PO", kind: "base", group: "Basic", inputType: "text", column: "pic_po" },
-  { key: "eng_po", label: "ENG PO", kind: "base", group: "Basic", inputType: "text", column: "eng_po" },
+  { key: "pic", label: "HDEC PIC", kind: "base", group: "Basic", inputType: "text", column: "pic" },
+  { key: "eng", label: "HDEC ENG", kind: "base", group: "Basic", inputType: "text", column: "eng" },
+  { key: "pic_po", label: "PO HDEC PIC", kind: "base", group: "Basic", inputType: "text", column: "pic_po" },
+  { key: "eng_po", label: "PO HDEC ENG", kind: "base", group: "Basic", inputType: "text", column: "eng_po" },
   { key: "plot", label: "Plot", kind: "base", group: "Basic", inputType: "text", column: "plot" },
   { key: "dis", label: "DIS", kind: "base", group: "Basic", inputType: "text", column: "dis" },
   { key: "service", label: "Service", kind: "base", group: "Basic", inputType: "text", column: "service" },
