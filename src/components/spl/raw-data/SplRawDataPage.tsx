@@ -554,8 +554,8 @@ export function SplRawDataPage() {
                       ) : (
                         <th
                           key={it.key}
-                          style={{ width: it.width, minWidth: it.width }}
-                          className="sticky top-0 z-30 relative whitespace-nowrap border-b border-l px-2 py-1 text-left bg-muted [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
+                          style={{ width: it.width, minWidth: it.width, maxWidth: it.width }}
+                          className="sticky top-0 z-30 relative overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-left bg-muted [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
                         >
                           {inner}
                           {resizer}
@@ -864,7 +864,11 @@ function SplTableRow({
             {inner}
           </StickyCell>
         ) : (
-          <td key={it.key} className="whitespace-nowrap border-b border-l px-2 py-1">
+          <td
+            key={it.key}
+            style={{ width: it.width, minWidth: it.width, maxWidth: it.width }}
+            className="overflow-hidden text-ellipsis whitespace-nowrap border-b border-l px-2 py-1"
+          >
             {inner}
           </td>
         );
@@ -926,8 +930,8 @@ function StickyHead({
 }) {
   return (
     <th
-      style={{ left, top: 0, width, minWidth: width }}
-      className="sticky z-40 relative border-b border-l bg-background px-2 py-1 text-left [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
+      style={{ left, top: 0, width, minWidth: width, maxWidth: width }}
+      className="sticky z-40 relative overflow-hidden whitespace-nowrap border-b border-l bg-background px-2 py-1 text-left [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
     >
       {children}
     </th>
@@ -948,9 +952,9 @@ function StickyCell({
 }) {
   return (
     <td
-      style={{ left, width, minWidth: width }}
+      style={{ left, width, minWidth: width, maxWidth: width }}
       className={cn(
-        "sticky z-10 whitespace-nowrap border-b border-l px-2 py-1",
+        "sticky z-10 overflow-hidden text-ellipsis whitespace-nowrap border-b border-l px-2 py-1",
         "bg-background [background-image:linear-gradient(hsl(var(--background)),hsl(var(--background)))]",
         className,
       )}
