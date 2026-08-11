@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { AlertTriangle, Download, Loader2, Search } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Download, Loader2, Search } from "lucide-react";
+import { SortPriorityBadge } from "@/components/common/SortPriorityBadge";
 import { cn } from "@/lib/utils";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { todayInDoha, formatDdMmm } from "@/lib/time/doha";
@@ -94,6 +95,8 @@ export function SplRawDataPage() {
   const [frozenExtras, setFrozenExtras] = useState<string[]>(["spl_number"]);
   /** 컬럼 폭(px) — 사용자가 드래그로 조절한 값만 담는다 */
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  /** 다중 정렬 — 클릭한 순서가 곧 우선순위 */
+  const [sorts, setSorts] = useState<Array<{ key: string; desc: boolean }>>([]);
   const [stateLoaded, setStateLoaded] = useState(false);
   useEffect(() => {
     if (!viewPref.ready || stateLoaded) return;
@@ -116,14 +119,21 @@ export function SplRawDataPage() {
       }
       setColWidths(kept);
     }
+    if (Array.isArray(s.sorts)) {
+      setSorts(
+        s.sorts
+          .filter((x: any) => x && typeof x.key === "string" && valid.has(x.key))
+          .map((x: any) => ({ key: x.key as string, desc: !!x.desc })),
+      );
+    }
     setStateLoaded(true);
   }, [viewPref.ready, viewPref.state, stateLoaded]);
-  const persistColumns = () => viewPref.save({ order, visibility, frozenExtras, colWidths } as any);
+  const persistColumns = () => viewPref.save({ order, visibility, frozenExtras, colWidths, sorts } as any);
   useEffect(() => {
     if (!stateLoaded) return;
-    viewPref.save({ order, visibility, frozenExtras, colWidths } as any);
+    viewPref.save({ order, visibility, frozenExtras, colWidths, sorts } as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stateLoaded, order, visibility, frozenExtras, colWidths]);
+  }, [stateLoaded, order, visibility, frozenExtras, colWidths, sorts]);
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
