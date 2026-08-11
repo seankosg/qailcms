@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -60,6 +60,8 @@ export interface AbdPlanVsActualCardProps {
   /** 여러 차트를 나란히 놓을 때 공통 x 창(ISO). 주지 않으면 자기 모집단으로 잡는다. */
   windowStart?: string | null;
   windowEnd?: string | null;
+  /** 절단 후 자기 창(ISO)을 밖으로 알린다 — 공통 창 합집합 계산용 */
+  onWindowResolved?: (start: string, end: string) => void;
 }
 
 export function AbdPlanVsActualCard({
@@ -73,6 +75,7 @@ export function AbdPlanVsActualCard({
   cum,
   windowStart,
   windowEnd,
+  onWindowResolved,
 }: AbdPlanVsActualCardProps) {
   const scurve = useMemo(
     () => buildAbdSCurve({ cells, buckets, stages, today, baselines, cum }),
@@ -128,10 +131,21 @@ export function AbdPlanVsActualCard({
       todayIndex: scurve.todayIndex,
     });
     const w = clampWindow(scurve.buckets, 0, tail.end, windowStart, windowEnd);
-    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed };
+    const own = {
+      start: scurve.buckets[0] ?? null,
+      end: tail.end > 0 ? (scurve.buckets[tail.end - 1] ?? null) : null,
+    };
+    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed, own };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scurve, stages, windowStart, windowEnd]);
   const data = view.rows;
+  const reportRef = useRef(onWindowResolved);
+  reportRef.current = onWindowResolved;
+  const ownStart = view.own.start;
+  const ownEnd = view.own.end;
+  useEffect(() => {
+    if (ownStart && ownEnd) reportRef.current?.(ownStart, ownEnd);
+  }, [ownStart, ownEnd]);
   const xTicks = useMemo(
     () => pickXTicks(data.map((d) => String(d.bucketLabel)), 7),
     [data],
