@@ -233,14 +233,34 @@ export function AbdPlanVsActualCard({
                       </div>
                     );
                   })}
+                  {view.trimmed > 0 && (
+                    <div className="flex items-center px-3 py-1 text-[10px] text-muted-foreground">
+                      이후 {view.trimmed}개 구간 계획 없음
+                    </div>
+                  )}
                 </div>
 
                 <ChartContainer config={cfg} className="h-[360px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucketLabel" tick={{ fontSize: 10 }} minTickGap={20} />
-                    <YAxis yAxisId="cum" tick={{ fontSize: 11 }} allowDecimals={false} domain={["auto", "auto"]} />
-                    <YAxis yAxisId="bar" orientation="right" tick={{ fontSize: 11 }} allowDecimals={false} domain={["auto", "auto"]} />
+                    <XAxis
+                      dataKey="bucketLabel"
+                      tick={{ fontSize: 10 }}
+                      ticks={xTicks}
+                      interval={0}
+                      minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
+                    />
+                    <YAxis yAxisId="cum" tick={{ fontSize: 11 }} allowDecimals={false} domain={[0, "auto"]} />
+                    <YAxis
+                      yAxisId="bar"
+                      orientation="right"
+                      tick={{ fontSize: 11 }}
+                      allowDecimals={false}
+                      domain={[0, incMax]}
+                    />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
                       wrapperStyle={{ fontSize: 11 }}
@@ -264,8 +284,8 @@ export function AbdPlanVsActualCard({
                         yAxisId="bar"
                         dataKey={`planInc_${s}`}
                         stackId="plan"
-                        fill={ABD_STAGE_COLORS[s].bar}
-                        name={`${STAGE_LABELS[s]} Plan (daily)`}
+                        fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].bar} 45%, transparent)`}
+                        name={`${STAGE_LABELS[s]} Plan (increment) — 오른쪽 축`}
                         barSize={8}
                         hide={hidden.has(`planInc_${s}`)}
                       />
@@ -276,8 +296,8 @@ export function AbdPlanVsActualCard({
                         yAxisId="bar"
                         dataKey={`actualInc_${s}`}
                         stackId="actual"
-                        fill={ABD_STAGE_COLORS[s].line}
-                        name={`${STAGE_LABELS[s]} Actual (daily)`}
+                        fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].line} 35%, transparent)`}
+                        name={`${STAGE_LABELS[s]} Actual (increment) — 오른쪽 축`}
                         barSize={8}
                         hide={hidden.has(`actualInc_${s}`)}
                       />
@@ -290,7 +310,7 @@ export function AbdPlanVsActualCard({
                         dataKey={`cumPlan_${s}`}
                         stroke={ABD_STAGE_COLORS[s].line}
                         strokeDasharray={PLAN_DASH}
-                        strokeWidth={1.5}
+                        strokeWidth={2.5}
                         dot={false}
                         name={`${STAGE_LABELS[s]} Plan (cum)`}
                         hide={hidden.has(`cumPlan_${s}`)}
@@ -303,7 +323,7 @@ export function AbdPlanVsActualCard({
                         type="monotone"
                         dataKey={`cumActual_${s}`}
                         stroke={ABD_STAGE_COLORS[s].line}
-                        strokeWidth={2.5}
+                        strokeWidth={3.5}
                         dot={false}
                         name={`${STAGE_LABELS[s]} Actual (cum)`}
                         connectNulls={false}
@@ -316,8 +336,17 @@ export function AbdPlanVsActualCard({
                 <ChartContainer config={varianceCfg} className="h-[120px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucketLabel" tick={{ fontSize: 10 }} minTickGap={20} />
-                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} domain={["auto", "auto"]} />
+                    <XAxis
+                      dataKey="bucketLabel"
+                      tick={{ fontSize: 10 }}
+                      ticks={xTicks}
+                      interval={0}
+                      minTickGap={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={46}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} domain={varDomain} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     {todayLabel && (
                       <ReferenceLine x={todayLabel} stroke="hsl(var(--destructive))" strokeDasharray="4 2" />
