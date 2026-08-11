@@ -555,7 +555,7 @@ export function SplRawDataPage() {
                         <th
                           key={it.key}
                           style={{ width: it.width, minWidth: it.width }}
-                          className="relative whitespace-nowrap border-b border-l bg-muted px-2 py-1 text-left"
+                          className="sticky top-0 z-30 relative whitespace-nowrap border-b border-l px-2 py-1 text-left bg-muted [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
                         >
                           {inner}
                           {resizer}
