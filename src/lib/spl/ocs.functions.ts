@@ -168,10 +168,21 @@ export const getSplOcsSourceFileUrl = createServerFn({ method: "POST" })
 
 // ───────────────────────── 편집 (권한은 RPC 내부에서 재검증) ─────────────────────────
 
-async function callRpc(supa: any, fn: string, args: Record<string, unknown>) {
+export type SplOcsMutationResult = { ok: boolean; id?: string | null; message?: string | null };
+
+async function callRpc(
+  supa: any,
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<SplOcsMutationResult> {
   const { data, error } = await supa.rpc(fn, args);
   if (error) throw new Error(error.message);
-  return data as { ok: boolean; [k: string]: unknown };
+  const res = (data ?? {}) as Record<string, unknown>;
+  return {
+    ok: res['ok'] !== false,
+    id: (res['id'] as string | null | undefined) ?? null,
+    message: (res['message'] as string | null | undefined) ?? null,
+  };
 }
 
 export const setSplOcsComplied = createServerFn({ method: "POST" })
