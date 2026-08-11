@@ -96,6 +96,7 @@ export type BackupTableName =
   | "spl_ocs_source_files"
   | "spl_documents"
   | "spl_document_item_links"
+  | "spl_document_pages"
   | "spl_ocs_comment_document_links";
 
 /**
@@ -187,6 +188,7 @@ export const BACKUP_TABLES: BackupTableName[] = [
   "spl_ocs_source_files",
   "spl_documents",
   "spl_document_item_links",
+  "spl_document_pages",
   "spl_ocs_comment_document_links",
 ];
 
@@ -248,6 +250,7 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "spl_ocs_source_files",
     "spl_documents",
     "spl_document_item_links",
+    "spl_document_pages",
     "spl_ocs_comment_document_links",
   ],
   wrt: ["wrt_items", "wrt_stage_progress", "wrt_change_log", "wrt_import_logs"],
