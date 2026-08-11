@@ -38,6 +38,8 @@ import {
   type SplStageColumn,
 } from "./spl-columns";
 import { SplColumnFilterDropdown } from "./SplColumnFilterDropdowns";
+import { SplOcsCell, SplCountCell } from "@/components/spl/ocs/SplOcsCells";
+import { SplOcsPanels, type SplPanelKind, type SplPanelTarget } from "@/components/spl/ocs/SplOcsPanels";
 import { SplColumnOrderMenu } from "./SplColumnOrderMenu";
 import { SplBulkEditBar } from "./SplBulkEditBar";
 import { SplExportDialog } from "./SplExportDialog";
@@ -125,6 +127,7 @@ export function SplRawDataPage() {
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [panelTarget, setPanelTarget] = useState<SplPanelTarget>(null);
   const [exportOpen, setExportOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -498,6 +501,9 @@ export function SplRawDataPage() {
                       onOpenDetail={() =>
                         rootNavigate({ to: "/closure/spare-part/detail/$id", params: { id: r.id } })
                       }
+                      onOpenPanel={(kind) =>
+                        setPanelTarget({ id: r.id, splNumber: r.spl_number, kind })
+                      }
                       canEdit={isToday && canRow(r as unknown as Record<string, unknown>)}
                       onSave={async (field, value) => {
                         await saveField({ data: { id: r.id, field, value } });
@@ -534,6 +540,12 @@ export function SplRawDataPage() {
         rows={filtered}
         exportColumns={exportColumns}
         onRoundtrip={onExport}
+      />
+
+      <SplOcsPanels
+        key={panelTarget ? `${panelTarget.id}:${panelTarget.kind}` : "none"}
+        target={panelTarget}
+        onClose={() => setPanelTarget(null)}
       />
 
       <div className="text-[11px] text-muted-foreground">
@@ -582,6 +594,7 @@ function SplTableRow({
   selected,
   onToggleSelect,
   onOpenDetail,
+  onOpenPanel,
   canEdit,
   onSave,
 }: {
@@ -593,6 +606,7 @@ function SplTableRow({
   selected: boolean;
   onToggleSelect: () => void;
   onOpenDetail: () => void;
+  onOpenPanel: (kind: SplPanelKind) => void;
   canEdit: boolean;
   onSave: (field: string, value: string | null) => Promise<void>;
 }) {
@@ -684,6 +698,34 @@ function SplTableRow({
           <span className="tabular-nums text-muted-foreground">
             {row.req_doc_done}/{row.req_doc_total}
           </span>
+        );
+      case "ocs":
+        return (
+          <SplOcsCell
+            total={row.ocs_total}
+            pending={row.ocs_pending}
+            complied={row.ocs_complied}
+            resolved={row.ocs_check}
+            onClick={() => onOpenPanel("ocs")}
+          />
+        );
+      case "rsp":
+        return (
+          <SplCountCell
+            value={row.rsp_total}
+            tone="neutral"
+            title="Recommended Spare Parts"
+            onClick={() => onOpenPanel("rsp")}
+          />
+        );
+      case "documents":
+        return (
+          <SplCountCell
+            value={row.document_total}
+            tone="neutral"
+            title="Submitted documents"
+            onClick={() => onOpenPanel("documents")}
+          />
         );
       case "data_date":
         return <span className="text-muted-foreground">{row.data_date ? formatDdMmm(row.data_date) : "—"}</span>;

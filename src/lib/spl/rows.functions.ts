@@ -88,6 +88,13 @@ export type SplRow = {
   delay_bucket: SplStageRef[];
   progress_pct: number | null;
   judgment: "제외" | "완료" | "정상" | "지연" | "미분류" | "미착수";
+  /** 관계 정본 파생 캐시 — 과거 as-of 조회에서는 null(공란) */
+  ocs_total: number | null;
+  ocs_pending: number | null;
+  ocs_complied: number | null;
+  ocs_check: number | null;
+  rsp_total: number | null;
+  document_total: number | null;
 };
 
 export type SplRowsAsOf = {
