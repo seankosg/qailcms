@@ -37,6 +37,13 @@ import {
   type SCurveBaselines,
   type SCurveCum,
 } from "@/lib/abd/scurve-utils";
+import {
+  clampWindow,
+  incAxisMax,
+  pickXTicks,
+  signedDomain,
+  trimFlatTail,
+} from "@/lib/charts/scurve-view";
 
 export interface AbdPlanVsActualCardProps {
   /** 전 라운드 통합 cells (메인 매트릭스 쿼리 재사용) */
@@ -50,6 +57,9 @@ export interface AbdPlanVsActualCardProps {
   baselines?: SCurveBaselines;
   /** 서버 정본 누적(문서 distinct). 종점 = 행 totals */
   cum?: SCurveCum;
+  /** 여러 차트를 나란히 놓을 때 공통 x 창(ISO). 주지 않으면 자기 모집단으로 잡는다. */
+  windowStart?: string | null;
+  windowEnd?: string | null;
 }
 
 export function AbdPlanVsActualCard({
@@ -61,6 +71,8 @@ export function AbdPlanVsActualCard({
   onOpenChange,
   baselines,
   cum,
+  windowStart,
+  windowEnd,
 }: AbdPlanVsActualCardProps) {
   const scurve = useMemo(
     () => buildAbdSCurve({ cells, buckets, stages, today, baselines, cum }),
@@ -79,13 +91,15 @@ export function AbdPlanVsActualCard({
   const seriesByStage = new Map<Stage, (typeof scurve.series)[number]>();
   for (const s of scurve.series) seriesByStage.set(s.stage, s);
 
-  const data = scurve.bucketLabels.map((label, i) => {
+  const allData = scurve.bucketLabels.map((label, i) => {
     const row: Record<string, unknown> = {
       bucket: scurve.buckets[i],
       bucketLabel: label,
     };
     let varSum: number | null = 0;
     let anyNull = false;
+    let planIncSum = 0;
+    let actualIncSum = 0;
     for (const st of stages) {
       const ser = seriesByStage.get(st);
       if (!ser) continue;
@@ -95,12 +109,44 @@ export function AbdPlanVsActualCard({
       row[`cumActual_${st}`] = ser.cumActual[i];
       const a = ser.dailyActual[i];
       const p = ser.dailyPlan[i];
+      planIncSum += p ?? 0;
+      actualIncSum += a ?? 0;
       if (a == null) anyNull = true;
       else if (varSum != null) varSum += a - p;
     }
     row.variance = anyNull ? null : varSum;
+    row.__planIncSum = planIncSum;
+    row.__actualIncSum = actualIncSum;
     return row;
   });
+
+  // 보이는 창만 줄인다 — 누계·모수 계산은 건드리지 않는다.
+  const view = useMemo(() => {
+    const tail = trimFlatTail({
+      planInc: allData.map((d) => d.__planIncSum as number),
+      actualInc: allData.map((d) => d.__actualIncSum as number),
+      todayIndex: scurve.todayIndex,
+    });
+    const w = clampWindow(scurve.buckets, 0, tail.end, windowStart, windowEnd);
+    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scurve, stages, windowStart, windowEnd]);
+  const data = view.rows;
+  const xTicks = useMemo(
+    () => pickXTicks(data.map((d) => String(d.bucketLabel)), 7),
+    [data],
+  );
+  const incMax = useMemo(
+    () =>
+      incAxisMax(
+        data.flatMap((d) => [d.__planIncSum as number, d.__actualIncSum as number]),
+      ),
+    [data],
+  );
+  const varDomain = useMemo(
+    () => signedDomain(data.map((d) => d.variance as number | null)),
+    [data],
+  );
 
   const todayLabel =
     scurve.todayIndex >= 0 ? scurve.bucketLabels[scurve.todayIndex] ?? null : null;
@@ -118,7 +164,7 @@ export function AbdPlanVsActualCard({
     variance: { label: "Δ Actual − Plan", color: "hsl(var(--destructive))" },
   };
 
-  const hasData = buckets.length > 0 && stages.length > 0;
+  const hasData = data.length > 0 && stages.length > 0;
 
   // KPI: 오늘 시점, 스테이지별 P/A/Δ (compact)
   const idxForKpi = scurve.todayIndex >= 0 ? scurve.todayIndex : buckets.length - 1;
