@@ -385,28 +385,8 @@ export function SplRawDataPage() {
     await queryClient.invalidateQueries({ queryKey: ["spl-rows-as-of"] });
   };
 
-  // Primary delay by band 분포 (Required Doc 은 사슬·판정 제외 → 집계 대상 아님)
-  const delayBands = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const s of catalog) if (!s.chain_excluded) m.set(s.band, m.get(s.band) ?? 0);
-    for (const r of rows) if (r.primary_delay) m.set(r.primary_delay.band, (m.get(r.primary_delay.band) ?? 0) + 1);
-    return [...m.entries()];
-  }, [rows, catalog]);
-
-  // Required Doc 충족률 — 병렬 지표. 판정 5분류에 합산되지 않음
-  const reqDoc = useMemo(() => {
-    const total = rows.length;
-    const full = rows.filter((r) => r.req_doc_total > 0 && r.req_doc_done === r.req_doc_total).length;
-    const sum = rows.reduce((a, r) => a + r.req_doc_done, 0);
-    const denom = rows.reduce((a, r) => a + r.req_doc_total, 0);
-    return { total, full, pct: denom === 0 ? 0 : Math.round((sum * 1000) / denom) / 10 };
-  }, [rows]);
-
-  // 합계 = 모집단 자체 검산 (불일치 시 미분류 노출)
-  const counts = data?.judgment_counts ?? {};
-  const countsSum = JUDGMENTS.reduce((a, j) => a + (counts[j] ?? 0), 0);
+  // 현황 뱃지/칩은 Dashboard 로 이동 — Raw Data 는 필터·표만 유지
   const population = data?.total_count ?? 0;
-  const reconOk = countsSum === population;
 
   async function onExport() {
     setExporting(true);
@@ -420,8 +400,6 @@ export function SplRawDataPage() {
       setExporting(false);
     }
   }
-
-  const viol = data?.violations;
 
   return (
     <div className="space-y-3">
