@@ -189,6 +189,7 @@ function fmtDuration(startedAt: string, finishedAt: string | null) {
 
 export function ImportLogsPage({ kind }: { kind: Kind }) {
   const cfg = CFG[kind];
+  const isSpl = kind === "spl";
   const hasExtra = !!cfg.extraLabel;
   const navigate = useNavigate();
   const { data: me } = useCurrentUser();
@@ -762,19 +763,19 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
                             className="text-xs text-right cursor-pointer"
                             onClick={() => loadDetail(b.id)}
                           >
-                            {b.updated}
+                            {isSpl ? (b.spl?.items_updated ?? 0) : b.updated}
                           </TableCell>
                           <TableCell
                             className="text-xs text-right cursor-pointer"
                             onClick={() => loadDetail(b.id)}
                           >
-                            {b.skipped}
+                            {isSpl ? (b.spl?.unmatched ?? 0) : b.skipped}
                           </TableCell>
                           <TableCell
                             className="text-xs text-right cursor-pointer"
                             onClick={() => loadDetail(b.id)}
                           >
-                            {b.rejected}
+                            {isSpl ? (b.spl?.ocs_excluded ?? 0) : b.rejected}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-0.5">
