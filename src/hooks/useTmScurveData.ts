@@ -46,12 +46,12 @@ export function useTmScurveData(params: TmScurveParams) {
 
   const { data: items = [], isLoading } = useTaskDashboardData(
     {
-      disciplines,
-      plots,
+      disciplines: disciplines ?? [],
+      plots: plots ?? [],
       // 담당자 축의 Team 필터는 폐기 — 상단 Team(=discipline) 필터만 사용
       teams: [],
-      hdecPic,
-      hdecEng,
+      hdecPic: hdecPic ?? [],
+      hdecEng: hdecEng ?? [],
       level: "all",
       q: "",
     },
