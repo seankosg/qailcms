@@ -97,6 +97,9 @@ export function SplRawDataPage() {
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   /** 다중 정렬 — 클릭한 순서가 곧 우선순위 */
   const [sorts, setSorts] = useState<Array<{ key: string; desc: boolean }>>([]);
+  /** 스테이지 컬럼 순서·표시 — 키는 `stage:<컬럼키>` */
+  const [stageOrder, setStageOrder] = useState<string[]>([]);
+  const [stageVisibility, setStageVisibility] = useState<Record<string, boolean>>({});
   const [stateLoaded, setStateLoaded] = useState(false);
   useEffect(() => {
     if (!viewPref.ready || stateLoaded) return;
@@ -122,18 +125,25 @@ export function SplRawDataPage() {
     if (Array.isArray(s.sorts)) {
       setSorts(
         s.sorts
-          .filter((x: any) => x && typeof x.key === "string" && valid.has(x.key))
+          .filter((x: any) => x && typeof x.key === "string" && (valid.has(x.key) || x.key.startsWith("stage:")))
           .map((x: any) => ({ key: x.key as string, desc: !!x.desc })),
       );
     }
+    if (Array.isArray(s.stageOrder)) {
+      setStageOrder(s.stageOrder.filter((k: any) => typeof k === "string" && k.startsWith("stage:")));
+    }
+    if (s.stageVisibility && typeof s.stageVisibility === "object") {
+      setStageVisibility(s.stageVisibility as Record<string, boolean>);
+    }
     setStateLoaded(true);
   }, [viewPref.ready, viewPref.state, stateLoaded]);
-  const persistColumns = () => viewPref.save({ order, visibility, frozenExtras, colWidths, sorts } as any);
+  const persistColumns = () =>
+    viewPref.save({ order, visibility, frozenExtras, colWidths, sorts, stageOrder, stageVisibility } as any);
   useEffect(() => {
     if (!stateLoaded) return;
-    viewPref.save({ order, visibility, frozenExtras, colWidths, sorts } as any);
+    viewPref.save({ order, visibility, frozenExtras, colWidths, sorts, stageOrder, stageVisibility } as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stateLoaded, order, visibility, frozenExtras, colWidths, sorts]);
+  }, [stateLoaded, order, visibility, frozenExtras, colWidths, sorts, stageOrder, stageVisibility]);
 
   const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -163,7 +173,32 @@ export function SplRawDataPage() {
   /** A. Single-row header — one cell per stage field, code taken from the catalog */
   const stageCols = useMemo(() => buildSplStageColumns(catalog), [catalog]);
 
+  /** 사용자가 지정한 순서·표시 상태를 반영한 실제 렌더 대상 스테이지 컬럼 */
+  const visibleStageCols = useMemo(() => {
+    const byKey = new Map(stageCols.map((sc) => [`stage:${sc.key}`, sc] as const));
+    const ordered = [
+      ...stageOrder.filter((k) => byKey.has(k)),
+      ...stageCols.map((sc) => `stage:${sc.key}`).filter((k) => !stageOrder.includes(k)),
+    ];
+    return ordered.filter((k) => stageVisibility[k] !== false).map((k) => byKey.get(k)!);
+  }, [stageCols, stageOrder, stageVisibility]);
+
+  const stageMenuItems = useMemo(
+    () => stageCols.map((sc) => ({ key: `stage:${sc.key}`, label: sc.code, title: sc.title })),
+    [stageCols],
+  );
+
   const rows = data?.rows ?? [];
+
+  /** 스테이지 셀의 필터·표시 문자열 — 화면 표기와 동일 규칙 */
+  const stageDisplay = (r: SplRow, sc: SplStageColumn): string => {
+    const cell = r.stages[sc.stage_code];
+    if (!cell) return "";
+    if (cell.na) return "N/A";
+    const raw = cell[sc.field] as string | null | undefined;
+    if (!raw) return "";
+    return sc.field === "fv" ? String(raw) : formatDdMmm(raw);
+  };
 
   /** 필터 후보값 — 필터 적용 전 원본 행 distinct */
   const distinctValues = useMemo(() => {
@@ -179,6 +214,25 @@ export function SplRawDataPage() {
     for (const [k, s] of m) out[k] = [...s].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
     return out;
   }, [rows]);
+
+  /** 스테이지 컬럼 필터 후보값 */
+  const distinctStageValues = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    for (const sc of stageCols) {
+      const set = new Set<string>();
+      for (const r of rows) set.add(stageDisplay(r, sc));
+      out[`stage:${sc.key}`] = [...set].sort((a, b) =>
+        a === "" ? 1 : b === "" ? -1 : a.localeCompare(b, undefined, { numeric: true }),
+      );
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, stageCols]);
+
+  const stageColMap = useMemo(
+    () => new Map(stageCols.map((sc) => [`stage:${sc.key}`, sc] as const)),
+    [stageCols],
+  );
 
   const colDefMap = useMemo(() => new Map(SPL_COLUMNS.map((c) => [c.key, c] as const)), []);
 
@@ -206,6 +260,11 @@ export function SplRawDataPage() {
       }
       for (const [key, vals] of Object.entries(colFilters)) {
         if (!vals || vals.length === 0) continue;
+        const sc = stageColMap.get(key);
+        if (sc) {
+          if (!vals.includes(stageDisplay(r, sc))) return false;
+          continue;
+        }
         const def = colDefMap.get(key);
         if (!def) continue;
         if (!vals.includes(def.get(r))) return false;
@@ -215,7 +274,8 @@ export function SplRawDataPage() {
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, search.ocs, isToday, colFilters, colDefMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, search.ocs, isToday, colFilters, colDefMap, stageColMap]);
 
   /** 표시 컬럼 배치 — __select 는 항상 좌측 고정, 그다음 사용자 pin */
   const layout = useMemo(() => {
