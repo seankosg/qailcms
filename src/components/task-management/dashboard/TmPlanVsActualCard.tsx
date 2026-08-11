@@ -55,6 +55,8 @@ interface Props {
   filterSummary: Array<{ label: string; value: string }>;
   bucket: SCurveBucket;
   onBucketChange: (b: SCurveBucket) => void;
+  /** PDB 전용 — 카드 내 조작 UI(단위·Bucket 토글) 숨김 */
+  controlsHidden?: boolean;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
@@ -67,6 +69,7 @@ export function TmPlanVsActualCard({
   filterSummary,
   bucket,
   onBucketChange,
+  controlsHidden = false,
   open,
   onOpenChange,
 }: Props) {
@@ -203,6 +206,7 @@ export function TmPlanVsActualCard({
               </button>
             </CollapsibleTrigger>
 
+            {controlsHidden ? null : (
             <div className="flex items-center gap-2">
               <ToggleGroup
                 type="single"
@@ -242,6 +246,7 @@ export function TmPlanVsActualCard({
                 ))}
               </ToggleGroup>
             </div>
+            )}
           </div>
         </CardHeader>
 
