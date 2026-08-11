@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { FileText, Loader2, MessageSquare, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { formatDdMmmYyyy, todayInDoha } from "@/lib/time/doha";
 import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
 import { useRclCan } from "@/hooks/useRclCan";
@@ -16,17 +15,6 @@ import { SPL_EDITABLE_FIELDS, splJudgmentLabel } from "@/components/spl/raw-data
 import { SplRequiredDocChecklist } from "@/components/spl/raw-data/SplRequiredDocChecklist";
 import { listSplDocuments } from "@/lib/spl/documents.functions";
 import { SplOcsPanels, type SplPanelKind, type SplPanelTarget } from "@/components/spl/ocs/SplOcsPanels";
-
-interface ChangeLogRow {
-  id: string;
-  column_name: string | null;
-  stage_code: string | null;
-  action: string | null;
-  old_value: string | null;
-  new_value: string | null;
-  source: string | null;
-  changed_at: string;
-}
 
 const BAND_LABEL: Record<string, string> = {
   REQUIRED_DOC: "Required Doc",
@@ -56,7 +44,6 @@ export function SplDetailBody({ id }: { id: string }) {
   const saveField = useServerFn(updateSplField);
   const qc = useQueryClient();
   const { canRow } = useRclCan("SPL", "write");
-  const [changes, setChanges] = useState<ChangeLogRow[]>([]);
   const [panelTarget, setPanelTarget] = useState<SplPanelTarget>(null);
   const fetchDocs = useServerFn(listSplDocuments);
   const { data: docs } = useQuery({
@@ -74,23 +61,6 @@ export function SplDetailBody({ id }: { id: string }) {
     [data, id],
   );
   const catalog: SplCatalogEntry[] = data?.catalog ?? [];
-
-  useEffect(() => {
-    let cancel = false;
-    const run = async () => {
-      const { data: cl } = await (supabase as any)
-        .from("spl_change_log")
-        .select("id, column_name, stage_code, action, old_value, new_value, source, changed_at")
-        .eq("item_id", id)
-        .order("changed_at", { ascending: false })
-        .limit(20);
-      if (!cancel) setChanges((cl ?? []) as ChangeLogRow[]);
-    };
-    void run();
-    return () => {
-      cancel = true;
-    };
-  }, [id]);
 
   const onFieldSaved = async () => {
     await refetch();
@@ -285,45 +255,6 @@ export function SplDetailBody({ id }: { id: string }) {
             canEdit={canEdit}
             onChanged={onFieldSaved}
           />
-
-          {/* Change Log */}
-          <section>
-            <h3 className="mb-2 text-sm font-semibold">Change Log</h3>
-            {changes.length === 0 ? (
-              <p className="text-muted-foreground">변경 이력이 없습니다.</p>
-            ) : (
-              <div className="overflow-hidden rounded-md border">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-2 py-1.5 text-left">When</th>
-                      <th className="px-2 py-1.5 text-left">Field</th>
-                      <th className="px-2 py-1.5 text-left">Old</th>
-                      <th className="px-2 py-1.5 text-left">New</th>
-                      <th className="px-2 py-1.5 text-left">Src</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {changes.map((c) => (
-                      <tr key={c.id} className="border-t">
-                        <td className="whitespace-nowrap px-2 py-1 text-muted-foreground">
-                          {new Date(c.changed_at).toLocaleString("ko-KR", { hour12: false })}
-                        </td>
-                        <td className="px-2 py-1 font-mono">
-                          {c.stage_code ? `${c.stage_code}.${c.column_name ?? c.action ?? ""}` : (c.column_name ?? c.action ?? "—")}
-                        </td>
-                        <td className="px-2 py-1">{c.old_value ?? "—"}</td>
-                        <td className="px-2 py-1 font-medium">{c.new_value ?? "—"}</td>
-                        <td className="px-2 py-1">
-                          <Badge variant="outline" className="text-[10px]">{c.source ?? "—"}</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
 
           {/* Raw Payload */}
           <section>
