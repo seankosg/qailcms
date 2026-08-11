@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -30,23 +29,15 @@ import {
   type GroupBy,
   type PlanMode,
   type Stage,
-  addDays,
   assembleMatrix,
-  buildBucketRange,
   groupKeyToRawParams,
   todayIso,
-  weekStartIso,
 } from "@/lib/abd/progress-utils";
-import {
-  getAbdProgressCells,
-  getAbdProgressTotals,
-} from "@/lib/abd/progress.functions";
-import { getAbdProgressCum } from "@/lib/abd/progress.functions";
+import { useAbdScurveData } from "@/hooks/useAbdScurveData";
 import { AbdStageGroupStrip } from "@/components/abd/progress/AbdStageGroupStrip";
 import { AbdScheduleMatrix } from "./AbdScheduleMatrix";
 import { Route } from "@/routes/_authenticated/closure/abd/progress";
 import { AbdPlanVsActualCard } from "./AbdPlanVsActualCard";
-import type { SCurveBaselines, SCurveCum } from "@/lib/abd/scurve-utils";
 import { ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
 import {
   Collapsible,
