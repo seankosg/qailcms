@@ -387,17 +387,13 @@ export function SplRawDataPage() {
             onReset={() => setSearch({ asOf: "" })}
           />
           <SplColumnOrderMenu
+            items={allColumnItems}
             order={order}
             visibility={visibility}
             frozenExtras={frozenExtras}
             onOrderChange={setOrder}
             onVisibilityChange={setVisibility}
             onFrozenChange={setFrozenExtras}
-            stageItems={stageMenuItems}
-            stageOrder={stageOrder}
-            stageVisibility={stageVisibility}
-            onStageOrderChange={setStageOrder}
-            onStageVisibilityChange={setStageVisibility}
             onSave={() => {
               persistColumns();
               toast.success("Column settings saved.");
@@ -553,7 +549,9 @@ export function SplRawDataPage() {
                             onCheckedChange={(v) => setSelectedIds(v ? sorted.map((r) => r.id) : [])}
                             aria-label="Select all"
                           />
-                        ) : (
+                        ) : (() => {
+                          const label = it.def?.label ?? it.stage?.code ?? it.key;
+                          return (
                           <span className="flex w-full items-center gap-0.5 overflow-hidden">
                             <button
                               type="button"
@@ -561,7 +559,7 @@ export function SplRawDataPage() {
                               title="클릭: 오름차순 → 내림차순 → 해제 (클릭 순서가 정렬 우선순위)"
                               className="inline-flex min-w-0 items-center gap-0.5 truncate hover:text-primary"
                             >
-                              <span className="truncate">{it.def!.label}</span>
+                              <span className="truncate">{label}</span>
                               {(() => {
                                 const idx = sorts.findIndex((s) => s.key === it.key);
                                 if (idx < 0) return null;
@@ -577,20 +575,19 @@ export function SplRawDataPage() {
                                 );
                               })()}
                             </button>
-                            {it.def!.filter === "multi" && (
-                              <span className="shrink-0">
+                            <span className="shrink-0">
                               <SplColumnFilterDropdown
-                                label={it.def!.label}
+                                label={label}
                                 values={distinctValues[it.key] ?? []}
                                 selected={colFilters[it.key] ?? []}
                                 onChange={(next) => setColFilters((p) => ({ ...p, [it.key]: next }))}
                               />
-                              </span>
-                            )}
+                            </span>
                           </span>
-                        );
+                          );
+                        })();
                       const resizer =
-                        it.def == null ? null : (
+                        it.key === "__select" ? null : (
                           <ColumnResizeHandle
                             width={it.width}
                             onChange={(w: number) => setColWidths((p) => ({ ...p, [it.key]: w }))}
@@ -605,74 +602,18 @@ export function SplRawDataPage() {
                         <th
                           key={it.key}
                           style={{ width: it.width, minWidth: it.width, maxWidth: it.width }}
-                          className="sticky top-0 z-30 relative overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-left bg-muted [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]"
+                          title={it.stage?.title}
+                          className={cn(
+                            "sticky top-0 z-30 relative overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-left bg-muted [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]",
+                            it.stage && splBandHeaderClass(it.stage.band),
+                            it.stage?.bandStart && "border-l-2 border-l-foreground/40",
+                          )}
                         >
                           {inner}
                           {resizer}
                         </th>
                       );
                     })}
-                    {visibleStageCols.map((sc) => (
-                      <th
-                        key={sc.key}
-                        title={sc.title}
-                        style={
-                          colWidths[`stage:${sc.key}`]
-                            ? {
-                                width: colWidths[`stage:${sc.key}`],
-                                minWidth: colWidths[`stage:${sc.key}`],
-                              }
-                            : undefined
-                        }
-                        className={cn(
-                          "sticky top-0 z-30 relative whitespace-nowrap border-b border-l px-1 py-1 text-center font-medium",
-                          splBandHeaderClass(sc.band),
-                          sc.bandStart && "border-l-2 border-l-foreground/40",
-                        )}
-                      >
-                        <span className="flex w-full items-center justify-center gap-0.5 overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => toggleSort(`stage:${sc.key}`)}
-                          title="클릭: 오름차순 → 내림차순 → 해제 (클릭 순서가 정렬 우선순위)"
-                          className="inline-flex min-w-0 items-center gap-0.5 truncate hover:text-primary"
-                        >
-                          <span className="truncate">{sc.code}</span>
-                          {(() => {
-                            const idx = sorts.findIndex((s) => s.key === `stage:${sc.key}`);
-                            if (idx < 0) return null;
-                            return (
-                              <>
-                                {sorts[idx].desc ? (
-                                  <ArrowDown className="h-3 w-3" />
-                                ) : (
-                                  <ArrowUp className="h-3 w-3" />
-                                )}
-                                <SortPriorityBadge index={idx} total={sorts.length} />
-                              </>
-                            );
-                          })()}
-                        </button>
-                        <span className="shrink-0">
-                        <SplColumnFilterDropdown
-                          label={sc.code}
-                          values={distinctStageValues[`stage:${sc.key}`] ?? []}
-                          selected={colFilters[`stage:${sc.key}`] ?? []}
-                          onChange={(next) =>
-                            setColFilters((p) => ({ ...p, [`stage:${sc.key}`]: next }))
-                          }
-                        />
-                        </span>
-                        </span>
-                        <ColumnResizeHandle
-                          width={colWidths[`stage:${sc.key}`] ?? 84}
-                          min={40}
-                          onChange={(w: number) =>
-                            setColWidths((p) => ({ ...p, [`stage:${sc.key}`]: w }))
-                          }
-                        />
-                      </th>
-                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -680,10 +621,8 @@ export function SplRawDataPage() {
                     <SplTableRow
                       key={r.id}
                       row={r}
-                      stageCols={visibleStageCols}
                       estCells={estMap[r.id]}
                       layout={layout}
-                      stageWidths={colWidths}
                       selected={selectedIds.includes(r.id)}
                       onToggleSelect={() =>
                         setSelectedIds((p) => (p.includes(r.id) ? p.filter((x) => x !== r.id) : [...p, r.id]))
@@ -703,7 +642,7 @@ export function SplRawDataPage() {
                   ))}
                   {sorted.length === 0 && (
                     <tr>
-                      <td colSpan={layout.length + visibleStageCols.length} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={layout.length} className="p-8 text-center text-muted-foreground">
                         No rows match the current filters.
                       </td>
                     </tr>
@@ -778,10 +717,8 @@ function SplEditableCell({
 
 function SplTableRow({
   row,
-  stageCols,
   estCells,
   layout,
-  stageWidths,
   selected,
   onToggleSelect,
   onOpenDetail,
@@ -790,12 +727,9 @@ function SplTableRow({
   onSave,
 }: {
   row: SplRow;
-  stageCols: SplStageColumn[];
   /** 역산 추정 실적 칸 — stage_code -> { as, af } */
   estCells?: Record<string, { as?: boolean; af?: boolean }>;
-  layout: Array<{ key: string; def: SplColumnDef | null; width: number; left: number | null }>;
-  /** 사용자가 조절한 스테이지 컬럼 폭 — 키는 `stage:<컬럼키>` */
-  stageWidths?: Record<string, number>;
+  layout: Array<{ key: string; def: SplColumnDef | null; stage: SplStageColumn | null; width: number; left: number | null }>;
   selected: boolean;
   onToggleSelect: () => void;
   onOpenDetail: () => void;
@@ -944,6 +878,28 @@ function SplTableRow({
       )}
     >
       {layout.map((it) => {
+        if (it.stage) {
+          const sc = it.stage;
+          const cell = row.stages[sc.stage_code];
+          const isNa = cell?.na;
+          const raw = cell?.[sc.field] as string | null | undefined;
+          const isEst = !!raw && (sc.field === "as" || sc.field === "af") && !!estCells?.[sc.stage_code]?.[sc.field];
+          return (
+            <td
+              key={it.key}
+              style={{ width: it.width, minWidth: it.width, maxWidth: it.width }}
+              className={cn(
+                "overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-center tabular-nums",
+                STATE_CLASS[cell?.st ?? "none"],
+                isNa && "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+                isEst && "italic",
+              )}
+              title={isNa ? "NA — excluded from the progress denominator" : isEst ? `Estimated (back-filled) — ${sc.title}` : sc.title}
+            >
+              {isNa ? <span className="text-[9px] font-semibold uppercase tracking-wide">N/A</span> : raw ? sc.field === "fv" ? raw : formatDdMmm(raw) : ""}
+            </td>
+          );
+        }
         const inner =
           it.key === "__select" ? (
             <Checkbox checked={selected} onCheckedChange={onToggleSelect} aria-label="Select row" />
@@ -961,47 +917,6 @@ function SplTableRow({
             className="overflow-hidden text-ellipsis whitespace-nowrap border-b border-l px-2 py-1"
           >
             {inner}
-          </td>
-        );
-      })}
-      {stageCols.map((sc) => {
-        const cell = row.stages[sc.stage_code];
-        const isNa = cell?.na;
-        const raw = cell?.[sc.field] as string | null | undefined;
-        const isEst =
-          !!raw && (sc.field === "as" || sc.field === "af") && !!estCells?.[sc.stage_code]?.[sc.field];
-        return (
-          <td
-            key={sc.key}
-            style={
-              stageWidths?.[`stage:${sc.key}`]
-                ? {
-                    width: stageWidths[`stage:${sc.key}`],
-                    minWidth: stageWidths[`stage:${sc.key}`],
-                  }
-                : undefined
-            }
-            className={cn(
-              "overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-center tabular-nums",
-              STATE_CLASS[cell?.st ?? "none"],
-              isNa && "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
-              isEst && "italic",
-            )}
-            title={
-              isNa
-                ? "NA — excluded from the progress denominator"
-                : isEst
-                  ? `Estimated (back-filled) — ${sc.title}`
-                  : sc.title
-            }
-          >
-            {isNa ? (
-              <span className="text-[9px] font-semibold uppercase tracking-wide">N/A</span>
-            ) : raw ? (
-              sc.field === "fv" ? raw : formatDdMmm(raw)
-            ) : (
-              ""
-            )}
           </td>
         );
       })}
