@@ -65,7 +65,16 @@ export const SPL_COLUMNS: SplColumnDef[] = [
   { key: "title", label: "Title", width: 280, filter: "none", get: (r) => r.title ?? "" },
 ];
 
-export const SPL_DEFAULT_ORDER = SPL_COLUMNS.map((c) => c.key);
+/**
+ * 신규 사용자 기본 컬럼 순서.
+ * 앞부분은 고정 지정, 나머지는 SPL_COLUMNS 정의 순서를 그대로 잇는다.
+ * (기존 사용자의 저장된 순서는 초기화하지 않고, 누락된 신규 키만 뒤에 보충한다.)
+ */
+const SPL_LEAD_ORDER = ["spl_number", "ocs", "rsp", "documents", "plot", "team", "judgment"] as const;
+export const SPL_DEFAULT_ORDER = [
+  ...SPL_LEAD_ORDER.filter((k) => SPL_COLUMNS.some((c) => c.key === k)),
+  ...SPL_COLUMNS.map((c) => c.key).filter((k) => !(SPL_LEAD_ORDER as readonly string[]).includes(k)),
+];
 
 export const SPL_DEFAULT_VISIBILITY: Record<string, boolean> = Object.fromEntries(
   SPL_COLUMNS.map((c) => [c.key, !["supplier", "latest_status", "dis", "service", "title"].includes(c.key)]),
