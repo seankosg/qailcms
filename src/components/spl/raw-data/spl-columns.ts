@@ -123,9 +123,9 @@ export type SplStageColumn = {
 
 /** Header tint per band. Keys are catalog band codes. */
 export const SPL_BAND_HEADER_CLASS: Record<string, string> = {
-  REQUIRED_DOC: "bg-slate-200 dark:bg-slate-800/60",
-  DOCUMENTATION: "bg-blue-100 dark:bg-blue-950/40",
-  PO: "bg-violet-100 dark:bg-violet-950/40",
+  REQUIRED_DOC: "bg-slate-200 dark:bg-slate-800",
+  DOCUMENTATION: "bg-blue-100 dark:bg-blue-950",
+  PO: "bg-violet-100 dark:bg-violet-950",
 };
 
 export function splBandHeaderClass(band: string): string {
