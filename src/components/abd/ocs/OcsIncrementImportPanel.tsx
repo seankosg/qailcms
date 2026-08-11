@@ -110,6 +110,9 @@ export function OcsIncrementImportPanel() {
   const [runId, setRunId] = useState<string | null>(null);
   const [dry, setDry] = useState<Dry | null>(null);
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [backupRunId, setBackupRunId] = useState<string | null>(null);
+  // React state 는 비동기 배칭되므로 더블클릭을 막지 못한다. 동기 ref 잠금을 함께 둔다.
+  const snapshotLockRef = useRef(false);
   const [snapshotRunning, setSnapshotRunning] = useState(false);
   const [snapshotElapsed, setSnapshotElapsed] = useState(0);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
@@ -480,9 +483,57 @@ export function OcsIncrementImportPanel() {
     }
   }
 
-  async function runSnapshot() {
-    if (!dry || snapshotRunning) return;
+  /** 기존 run 상태를 조회해 UI 를 복원한다. 새 백업을 시작하지 않는다. */
+  async function refreshBackupRun(id: string) {
+    const row = (await snapshotStatusFn({ data: { run_id: id } })) as {
+      status?: string | null;
+      snapshot_id?: string | null;
+      error_message?: string | null;
+      metadata?: Record<string, unknown> | null;
+    } | null;
+    if (!row) return null;
+    const m = (row.metadata ?? null) as Record<string, unknown> | null;
+    if (m) {
+      setSnapshotStatus({
+        tablesTotal: num(m["tables_total"]),
+        tablesDone: num(m["tables_done"]),
+        currentTable: (m["current_table"] as string | null) ?? null,
+        sizeBytes: m["size_bytes"] == null ? null : num(m["size_bytes"]),
+      });
+    }
+    if (row.status === "success" && row.snapshot_id) {
+      setSnapshotId(row.snapshot_id);
+      setSnapshotError(null);
+    } else if (row.status === "failed") {
+      setSnapshotError(row.error_message ?? "Backup failed");
+    }
+    return row;
+  }
+
+  /**
+   * @param retry true 면 새 run ID 로 시작(명시적 Retry). false 면 기존 run 이 있으면 그 상태에 합류.
+   */
+  async function runSnapshot(retry = false) {
+    if (!dry) return;
+    if (snapshotLockRef.current) return; // 동기 잠금: 더블클릭·중복 클릭 무시
+    snapshotLockRef.current = true;
+
+    // 기존 run 이 있고 명시적 Retry 가 아니면, 새 백업 대신 기존 상태를 먼저 확인한다.
+    if (!retry && backupRunId) {
+      try {
+        const row = await refreshBackupRun(backupRunId);
+        if (row && (row.status === "running" || row.status === "queued" || row.status === "success")) {
+          if (row.status !== "success") toast.info("Backup already running");
+          snapshotLockRef.current = false;
+          return;
+        }
+      } catch {
+        /* 조회 실패 시 아래 로직으로 진행 */
+      }
+    }
+
     const runId = crypto.randomUUID();
+    setBackupRunId(runId);
     const started = Date.now();
     setSnapshotRunning(true);
     setSnapshotError(null);
@@ -517,7 +568,13 @@ export function OcsIncrementImportPanel() {
       const res = (await snapshotFn({ data: { module: "abd", run_id: runId } })) as {
         id?: string;
         size_bytes?: number;
+        already_running?: boolean;
       } | null;
+      if (res?.already_running) {
+        toast.info("Backup already running — 기존 실행 상태를 계속 확인합니다.");
+        await refreshBackupRun(runId);
+        return;
+      }
       if (!res?.id) throw new Error("스냅샷 ID 를 확인하지 못했습니다.");
       setSnapshotId(res.id);
       setSnapshotStatus((prev) => ({
@@ -535,6 +592,7 @@ export function OcsIncrementImportPanel() {
       clearInterval(tick);
       clearInterval(poll);
       setSnapshotRunning(false);
+      snapshotLockRef.current = false;
     }
   }
 
@@ -1472,7 +1530,7 @@ export function OcsIncrementImportPanel() {
         <Button
           size="sm"
           disabled={!gates.step6Unlocked || !!busy || snapshotRunning}
-          onClick={() => void runSnapshot()}
+          onClick={() => void runSnapshot(!!snapshotError)}
         >
           {snapshotRunning ? (
             <>
@@ -1540,7 +1598,7 @@ export function OcsIncrementImportPanel() {
             runId={runId}
             details={snapshotError}
             action={
-              <Button size="sm" variant="outline" onClick={() => void runSnapshot()}>
+              <Button size="sm" variant="outline" onClick={() => void runSnapshot(true)}>
                 Retry Backup
               </Button>
             }

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
 import { BACKUP_TABLES, MODULE_PRE_IMPORT_TABLES, type BackupTableName, type PreImportModule } from "./backup-shared";
+import { resolveBackupClaim, type BackupClaim } from "./backup-claim";
 
 async function assertAdminOrSuper(supabase: any, userId: string) {
   const { data, error } = await supabase.rpc("has_any_role", {
@@ -343,19 +344,32 @@ export const createPreImportSnapshot = createServerFn({ method: "POST" })
     const tables = MODULE_PRE_IMPORT_TABLES[data.module] ?? BACKUP_TABLES;
     const name = `pre-import-${data.module}-${new Date().toISOString()}`;
 
-    const { error: logError } = await supabaseAdmin.from("backup_run_log").insert({
-      id: runId,
-      status: "running",
-      snapshot_id: null,
-      metadata: {
+    // run_id 는 요청 멱등성 키다. 원자적 claim(INSERT ... ON CONFLICT DO NOTHING)으로
+    // 동일 run_id 요청 중 정확히 하나만 실제 백업 실행권을 얻는다.
+    const { data: claimRaw, error: claimError } = await supabaseAdmin.rpc("backup_claim_run", {
+      _run_id: runId,
+      _metadata: {
         kind: "pre-import",
         module: data.module,
         tables_total: tables.length,
         tables_done: 0,
         current_table: null,
       } as any,
-    });
-    if (logError) throw new Error(logError.message);
+    } as any);
+    if (claimError) throw new Error(claimError.message);
+    const action = resolveBackupClaim((claimRaw ?? {}) as BackupClaim);
+    if (action.kind === "reuse") {
+      const { data: snap } = await supabaseAdmin
+        .from("database_snapshots")
+        .select("*")
+        .eq("id", action.snapshotId)
+        .maybeSingle();
+      return { ...(snap ?? { id: action.snapshotId }), reused: true, run_status: "success" } as any;
+    }
+    if (action.kind === "failed") throw new Error(action.message);
+    if (action.kind === "join") {
+      return { id: null, run_id: runId, run_status: action.status, already_running: true } as any;
+    }
 
     const started = Date.now();
     try {

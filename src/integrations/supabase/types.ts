@@ -8315,6 +8315,10 @@ export type Database = {
         Args: { _discipline: string; _main_task_no: string }
         Returns: string
       }
+      backup_claim_run: {
+        Args: { _metadata?: Json; _run_id: string }
+        Returns: Json
+      }
       backup_disable_triggers: {
         Args: { _table_name: string }
         Returns: undefined
