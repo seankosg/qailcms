@@ -407,6 +407,40 @@ export function ImportLogsPage({ kind }: { kind: Kind }) {
     [rowLogs],
   );
 
+  /** 실패/부분반영 배치의 사유를 자연어 설명 + 조치 안내로 묶는다 (표시 전용) */
+  const reasonGuides = useMemo(() => {
+    const out: { key: string; guide: ReasonGuide; count: number }[] = [];
+    const seen = new Set<string>();
+    const excl = (selectedBatch?.exclusions ?? {}) as Record<string, unknown>;
+    for (const [k, v] of Object.entries(excl)) {
+      const n = typeof v === "number" ? v : Array.isArray(v) ? v.length : 0;
+      if (n <= 0) continue;
+      const g = describeExclusion(k);
+      if (!g || seen.has(g.title)) continue;
+      seen.add(g.title);
+      out.push({ key: k, guide: g, count: n });
+    }
+    const codeCounts = new Map<string, number>();
+    for (const r of rowLogs) {
+      if (!r.reason_code) continue;
+      codeCounts.set(r.reason_code, (codeCounts.get(r.reason_code) ?? 0) + 1);
+    }
+    const batchErrors = Array.isArray(selectedBatch?.errors)
+      ? (selectedBatch?.errors as { code?: string }[])
+      : [];
+    for (const e of batchErrors) {
+      if (!e?.code) continue;
+      codeCounts.set(e.code, codeCounts.get(e.code) ?? 0);
+    }
+    for (const [code, n] of codeCounts) {
+      const g = describeReason(code);
+      if (!g || seen.has(g.title)) continue;
+      seen.add(g.title);
+      out.push({ key: code, guide: g, count: n });
+    }
+    return out;
+  }, [selectedBatch, rowLogs]);
+
   const filteredRowLogs = useMemo(() => {
     const q = rowSearch.trim();
     return rowLogs.filter((r) => {
