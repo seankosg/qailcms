@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { dohaStamp } from '@/lib/time/doha';
 import { streamXlsxExport } from '@/lib/excel/stream-export';
 import { dmrDataDateGapDays } from '@/lib/dmr/task-link';
@@ -31,10 +32,14 @@ const SUMMARY_COLUMNS = [
   { key: 'contractor_name', label: 'Contractor' },
   { key: 'c_pic', label: 'Plot C · 담당자' },
   { key: 'c_today', label: 'Plot C · Today' },
+  { key: 'c_foreman', label: 'Plot C · Foreman' },
+  { key: 'c_supervisor', label: 'Plot C · Supervisor' },
   { key: 'c_task_no', label: 'Plot C · TM Code' },
   { key: 'c_task', label: 'Plot C · TASK' },
   { key: 'd_pic', label: 'Plot D · 담당자' },
   { key: 'd_today', label: 'Plot D · Today' },
+  { key: 'd_foreman', label: 'Plot D · Foreman' },
+  { key: 'd_supervisor', label: 'Plot D · Supervisor' },
   { key: 'd_task_no', label: 'Plot D · TM Code' },
   { key: 'd_task', label: 'Plot D · TASK' },
   { key: 'remark', label: 'Remark' },
@@ -45,19 +50,38 @@ export interface DmrTeamExportOptions {
   reportDate: string;
 }
 
-export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
-  const { data, error } = await supabase
-    .from('dmr_entries')
-    .select('*')
-    .eq('discipline', opts.discipline)
-    .eq('report_date', opts.reportDate)
-    .in('plot', ['C', 'D'])
-    .order('system_name')
-    .order('contractor_name')
-    .order('plot');
-  if (error) throw new Error(error.message);
+/** PostgREST db-max-rows(기본 1000)에 조용히 잘리지 않도록 명시 페이징한다. */
+const PAGE = 1000;
+const HARD_CAP = 20_000;
 
-  const rows = (data ?? []).map((r: any) => ({
+export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
+  const fetched: any[] = [];
+  let capped = false;
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase
+      .from('dmr_entries')
+      .select('*')
+      .eq('discipline', opts.discipline)
+      .eq('report_date', opts.reportDate)
+      .in('plot', ['C', 'D'])
+      .order('system_name')
+      .order('contractor_name')
+      .order('plot')
+      .order('id') // 페이지 사이 순서 고정용 타이브레이커
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new Error(error.message);
+    const page = data ?? [];
+    fetched.push(...page);
+    if (page.length < PAGE) break;
+    if (fetched.length >= HARD_CAP) { capped = true; break; }
+  }
+  if (capped) {
+    toast.warning(
+      `내보내기 상한 ${HARD_CAP.toLocaleString()}행에 도달해 ${fetched.length.toLocaleString()}행에서 멈췄습니다. 조건을 좁혀 다시 내보내십시오.`,
+    );
+  }
+
+  const rows = fetched.map((r: any) => ({
     ...r,
     gap_days: dmrDataDateGapDays({
       report_date: r.report_date,
@@ -81,15 +105,20 @@ export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
       s = {
         system_name: r.system_name,
         contractor_name: r.contractor_name,
-        c_pic: '', c_today: 0, c_task_no: '', c_task: '',
-        d_pic: '', d_today: 0, d_task_no: '', d_task: '',
+        c_pic: '', c_today: 0, c_foreman: 0, c_supervisor: 0, c_task_no: '', c_task: '',
+        d_pic: '', d_today: 0, d_foreman: 0, d_supervisor: 0, d_task_no: '', d_task: '',
         remark: '',
       };
       summaryMap.set(key, s);
     }
     const p = r.plot === 'C' ? 'c' : r.plot === 'D' ? 'd' : null;
     if (!p) continue;
-    s[`${p}_today`] = (s[`${p}_today`] || 0) + (Number(r.actual_manpower) || 0);
+    // Today 는 worker 만. foreman · supervisor 는 각각 별도 열. 합치지 않는다.
+    const kind = String(r.headcount_kind ?? '').toLowerCase();
+    const actual = Number(r.actual_manpower) || 0;
+    if (kind === 'worker') s[`${p}_today`] = (s[`${p}_today`] || 0) + actual;
+    else if (kind === 'foreman') s[`${p}_foreman`] = (s[`${p}_foreman`] || 0) + actual;
+    else if (kind === 'supervisor') s[`${p}_supervisor`] = (s[`${p}_supervisor`] || 0) + actual;
     if (r.pic_name && !String(s[`${p}_pic`]).includes(r.pic_name)) {
       s[`${p}_pic`] = s[`${p}_pic`] ? `${s[`${p}_pic`]}, ${r.pic_name}` : r.pic_name;
     }
@@ -110,7 +139,11 @@ export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
     system_name: 'Total',
     contractor_name: '',
     c_today: summaryRows.reduce((s, r) => s + (Number(r.c_today) || 0), 0),
+    c_foreman: summaryRows.reduce((s, r) => s + (Number(r.c_foreman) || 0), 0),
+    c_supervisor: summaryRows.reduce((s, r) => s + (Number(r.c_supervisor) || 0), 0),
     d_today: summaryRows.reduce((s, r) => s + (Number(r.d_today) || 0), 0),
+    d_foreman: summaryRows.reduce((s, r) => s + (Number(r.d_foreman) || 0), 0),
+    d_supervisor: summaryRows.reduce((s, r) => s + (Number(r.d_supervisor) || 0), 0),
   });
 
   const allRows = [...rows, total];
@@ -140,5 +173,5 @@ export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
     ],
   });
 
-  return { rowCount: rows.length, exported: result.count };
+  return { rowCount: rows.length, exported: result.count, capped };
 }
