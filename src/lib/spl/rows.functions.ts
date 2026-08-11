@@ -138,6 +138,16 @@ export const getSplRowsAsOf = createServerFn({ method: "POST" })
     if (out.rows.length !== out.total_count) {
       throw new Error(`SPL 응답 잘림 의심: rows=${out.rows.length} vs total=${out.total_count}`);
     }
+    // 카탈로그 short_code 를 각 행의 stage_ref 에 보강 (primary_delay, completed_stage, current_stage, delay_bucket)
+    const scMap = new Map(out.catalog.map((c) => [c.stage_code, c.short_code]));
+    const enrich = (ref: SplStageRef | null): SplStageRef | null =>
+      ref && scMap.has(ref.stage_code) ? { ...ref, short_code: scMap.get(ref.stage_code)! } : ref;
+    for (const r of out.rows) {
+      r.primary_delay = enrich(r.primary_delay);
+      r.completed_stage = enrich(r.completed_stage);
+      r.current_stage = enrich(r.current_stage);
+      r.delay_bucket = r.delay_bucket.map((d) => enrich(d) ?? d);
+    }
     return out;
   });
 
