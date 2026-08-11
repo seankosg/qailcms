@@ -6,24 +6,36 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Filter, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+export interface SplFacetOption {
+  value: string;
+  count: number;
+}
+
 interface Props {
   label: string;
-  /** 후보값 — 필터 적용 전 원본 행에서 뽑은 distinct */
-  values: string[];
+  /**
+   * 크로스필터 후보값 — "이 컬럼을 제외한" 다른 모든 필터를 적용한 행에서 산출한다.
+   * 팝오버가 열릴 때만 호출되도록 지연 평가한다(SM Raw Data 와 동일 규칙).
+   */
+  getOptions: () => SplFacetOption[];
   selected: string[];
   onChange: (next: string[]) => void;
 }
 
 const BLANK = "(blank)";
 
-export function SplColumnFilterDropdown({ label, values, selected, onChange }: Props) {
+export function SplColumnFilterDropdown({ label, getOptions, selected, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
 
+  // 열릴 때 한 번 산출 — 닫힌 컬럼까지 매 렌더 계산하지 않는다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const facets = useMemo(() => (open ? getOptions() : []), [open]);
+
   const options = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return values.filter((v) => !t || (v || BLANK).toLowerCase().includes(t));
-  }, [values, q]);
+    return facets.filter((o) => !t || (o.value || BLANK).toLowerCase().includes(t));
+  }, [facets, q]);
 
   const active = selected.length > 0;
   const toggle = (v: string) =>
@@ -60,7 +72,12 @@ export function SplColumnFilterDropdown({ label, values, selected, onChange }: P
           className="mb-2 h-7 text-xs"
         />
         <div className="mb-1 flex gap-1">
-          <Button size="sm" variant="outline" className="h-6 flex-1 text-[10px]" onClick={() => onChange(options)}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 flex-1 text-[10px]"
+            onClick={() => onChange(options.map((o) => o.value))}
+          >
             Select all
           </Button>
           <Button size="sm" variant="outline" className="h-6 flex-1 text-[10px]" onClick={() => onChange([])}>
@@ -69,10 +86,19 @@ export function SplColumnFilterDropdown({ label, values, selected, onChange }: P
         </div>
         <div className="max-h-60 space-y-1 overflow-auto">
           {options.length === 0 && <div className="p-2 text-[11px] text-muted-foreground">No values</div>}
-          {options.map((v) => (
-            <label key={v || "__blank__"} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-[11px] hover:bg-muted">
-              <Checkbox checked={selected.includes(v)} onCheckedChange={() => toggle(v)} />
-              <span className={cn("truncate", !v && "italic text-muted-foreground")}>{v || BLANK}</span>
+          {options.map((o) => (
+            <label
+              key={o.value || "__blank__"}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-[11px] hover:bg-muted",
+                o.count === 0 && "text-muted-foreground/60",
+              )}
+            >
+              <Checkbox checked={selected.includes(o.value)} onCheckedChange={() => toggle(o.value)} />
+              <span className={cn("flex-1 truncate", !o.value && "italic text-muted-foreground")}>
+                {o.value || BLANK}
+              </span>
+              <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{o.count}</span>
             </label>
           ))}
         </div>

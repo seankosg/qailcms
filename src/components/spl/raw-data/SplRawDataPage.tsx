@@ -204,50 +204,68 @@ export function SplRawDataPage() {
     return stage ? stageDisplay(row, stage) : "";
   };
 
-  /** 필터 후보값 — 정규·스테이지 컬럼 공통 */
-  const distinctValues = useMemo(() => {
-    const m = new Map<string, Set<string>>();
-    for (const item of allColumnItems) m.set(item.key, new Set<string>());
-    for (const r of rows) {
-      for (const item of allColumnItems) m.get(item.key)?.add(columnValue(item.key, r));
+  /**
+   * 행 술어 — excludeKey 를 주면 그 컬럼의 필터만 빼고 나머지 조건을 모두 적용한다.
+   * 크로스필터 후보값 산출과 실제 표시 행 산출이 같은 술어를 공유하도록 단일화한다.
+   */
+  const rowMatches = (r: SplRow, excludeKey?: string): boolean => {
+    const q = (search.q ?? "").trim().toLowerCase();
+    if (search.plot && search.plot !== "all" && (r.plot ?? "") !== search.plot) return false;
+    // 카드 = 드릴다운: 정본이 내려준 judgment 필드를 그대로 술어로 사용
+    if (search.judgment && search.judgment !== "all" && r.judgment !== search.judgment) return false;
+    // HDEC 실적 미확보 드릴다운 — 판정과 독립된 술어
+    if (search.hdecMissing && (r.hdec_actual_count ?? 0) !== 0) return false;
+    // OCS 캐시 숫자 필터 — 과거 as-of(캐시 null)에서는 미적용
+    if (isToday && search.ocs && search.ocs !== "all") {
+      const t = r.ocs_total;
+      const p = r.ocs_pending;
+      if (t == null) return false;
+      if (search.ocs === "pending" && !((p ?? 0) > 0)) return false;
+      if (search.ocs === "complied" && !(t > 0 && (p ?? 0) === 0)) return false;
+      if (search.ocs === "none" && t !== 0) return false;
     }
-    const out: Record<string, string[]> = {};
-    for (const [k, s] of m) out[k] = [...s].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, allColumnItems, stageColMap, colDefMap]);
+    // 밴드 지연 셀 드릴다운 = 활성 밴드 + 대표 지연이 그 밴드
+    if (search.delayBand) {
+      if (r.active_band !== search.delayBand) return false;
+      if (r.primary_delay?.band !== search.delayBand) return false;
+    }
+    for (const [key, vals] of Object.entries(colFilters)) {
+      if (!vals || vals.length === 0) continue;
+      if (key === excludeKey) continue;
+      if (!vals.includes(columnValue(key, r))) return false;
+    }
+    if (!q) return true;
+    return [r.spl_number, r.title, r.team, r.pic, r.eng, r.supplier, r.dis, r.service]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q));
+  };
+
+  /**
+   * 크로스필터 후보값 — 다른 필터가 걸러낸 결과에 존재하는 값만, 건수와 함께 노출한다.
+   * 이미 선택된 값은 건수 0 이어도 해제 UX 를 위해 남긴다(SM Raw Data 와 동일).
+   */
+  const getColumnFacet = (key: string): { value: string; count: number }[] => {
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      if (!rowMatches(r, key)) continue;
+      const v = columnValue(key, r);
+      counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+    for (const v of colFilters[key] ?? []) if (!counts.has(v)) counts.set(v, 0);
+    const blank = counts.has("") ? { value: "", count: counts.get("") ?? 0 } : null;
+    counts.delete("");
+    const list = [...counts.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) =>
+        b.count !== a.count
+          ? b.count - a.count
+          : a.value.localeCompare(b.value, undefined, { sensitivity: "base" }),
+      );
+    return blank ? [blank, ...list] : list;
+  };
 
   const filtered = useMemo(() => {
-    const q = (search.q ?? "").trim().toLowerCase();
-    return rows.filter((r) => {
-      if (search.plot && search.plot !== "all" && (r.plot ?? "") !== search.plot) return false;
-      // 카드 = 드릴다운: 정본이 내려준 judgment 필드를 그대로 술어로 사용
-      if (search.judgment && search.judgment !== "all" && r.judgment !== search.judgment) return false;
-      // HDEC 실적 미확보 드릴다운 — 판정과 독립된 술어
-      if (search.hdecMissing && (r.hdec_actual_count ?? 0) !== 0) return false;
-      // OCS 캐시 숫자 필터 — 과거 as-of(캐시 null)에서는 미적용
-      if (isToday && search.ocs && search.ocs !== "all") {
-        const t = r.ocs_total;
-        const p = r.ocs_pending;
-        if (t == null) return false;
-        if (search.ocs === "pending" && !((p ?? 0) > 0)) return false;
-        if (search.ocs === "complied" && !(t > 0 && (p ?? 0) === 0)) return false;
-        if (search.ocs === "none" && t !== 0) return false;
-      }
-      // 밴드 지연 셀 드릴다운 = 활성 밴드 + 대표 지연이 그 밴드
-      if (search.delayBand) {
-        if (r.active_band !== search.delayBand) return false;
-        if (r.primary_delay?.band !== search.delayBand) return false;
-      }
-      for (const [key, vals] of Object.entries(colFilters)) {
-        if (!vals || vals.length === 0) continue;
-        if (!vals.includes(columnValue(key, r))) return false;
-      }
-      if (!q) return true;
-      return [r.spl_number, r.title, r.team, r.pic, r.eng, r.supplier, r.dis, r.service]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q));
-    });
+    return rows.filter((r) => rowMatches(r));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, search.ocs, isToday, colFilters, colDefMap, stageColMap]);
 
@@ -555,7 +573,7 @@ export function SplRawDataPage() {
                             <span className="shrink-0">
                               <SplColumnFilterDropdown
                                 label={label}
-                                values={distinctValues[it.key] ?? []}
+                                getOptions={() => getColumnFacet(it.key)}
                                 selected={colFilters[it.key] ?? []}
                                 onChange={(next) => setColFilters((p) => ({ ...p, [it.key]: next }))}
                               />
