@@ -199,10 +199,17 @@ function plotFromSheet(name: string): "C" | "D" | null {
   return null;
 }
 
-export async function parseSplHdecFile(file: File): Promise<ParsedSplFile> {
-  const wb = XLSX.read(await file.arrayBuffer());
-  const out: ParsedSplFile = {
-    file_name: file.name,
+function plotFromValue(v: unknown): "C" | "D" | null {
+  const t = norm(v).replace(/^plot[\s-]*/, "");
+  if (t === "c" || t === "3") return "C";
+  if (t === "d" || t === "4") return "D";
+  return null;
+}
+
+function emptyParsed(fileName: string, format: "hdec" | "view"): ParsedSplFile {
+  return {
+    file_name: fileName,
+    format,
     sheets: [],
     rows: [],
     ocs_excluded: 0,
@@ -212,7 +219,163 @@ export async function parseSplHdecFile(file: File): Promise<ParsedSplFile> {
     present_stage_fields: [],
     present_item_fields: [],
     na_cells: 0,
+    ignored_headers: [],
   };
+}
+
+/** 헤더 1행 구조(화면 표시 그대로) 인지 판정 — "SPL NUMBER" 와 "Plot" 이 같은 행에 있으면 View 양식 */
+function findViewHeader(ws: XLSX.WorkSheet): { row: number; numberCol: number } | null {
+  if (!ws["!ref"]) return null;
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+  for (let r = range.s.r; r <= Math.min(range.e.r, range.s.r + 30); r++) {
+    let numberCol = -1;
+    let hasPlot = false;
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const t = norm(ws[XLSX.utils.encode_cell({ r, c })]?.v ?? null);
+      if (t === "spl number") numberCol = c;
+      if (t === "plot") hasPlot = true;
+    }
+    if (numberCol >= 0 && hasPlot) return { row: r, numberCol };
+  }
+  return null;
+}
+
+/**
+ * View 양식(Raw Data 화면 표시 그대로 내보낸 파일) 파서.
+ * - 헤더 1행. 아이템 컬럼은 라벨, 단계 컬럼은 카탈로그 short_code(+접미사) 로만 매핑한다.
+ * - 파생/Aconex 정본 컬럼은 임포트 대상이 아니므로 무시하고 목록으로 보고한다.
+ */
+function parseSplViewWorkbook(wb: XLSX.WorkBook, fileName: string): ParsedSplFile {
+  const out = emptyParsed(fileName, "view");
+  const presentStage = new Set<string>();
+  const presentItem = new Set<string>();
+  const ignored = new Set<string>();
+  const unknown = new Set<string>();
+  const perPlot = new Map<string, { sheet_name: string; plot: "C" | "D"; rows: number }>();
+
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    const hdr = ws ? findViewHeader(ws) : null;
+    if (!ws || !hdr || !ws["!ref"]) continue;
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    const cell = (r: number, c: number) => ws[XLSX.utils.encode_cell({ r, c })]?.v ?? null;
+
+    type ColMap =
+      | { kind: "item"; col: number; field: string }
+      | { kind: "stage"; col: number; stage_code: string; field: StageFieldKey };
+    const cols: ColMap[] = [];
+    let plotCol = -1;
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const raw = String(cell(hdr.row, c) ?? "").trim();
+      const label = norm(raw);
+      if (!label || label === "spl number") continue;
+      if (label === "plot") {
+        plotCol = c;
+        cols.push({ kind: "item", col: c, field: "plot" });
+        presentItem.add("plot");
+        continue;
+      }
+      const itemField = VIEW_ITEM_COLS[label];
+      if (itemField) {
+        cols.push({ kind: "item", col: c, field: itemField });
+        presentItem.add(itemField);
+        continue;
+      }
+      const m = label.match(/^([a-z0-9]-[a-z0-9]{1,3})(-(pd|ad|ps|as|pf|af))?$/);
+      const stage = m ? SPL_SHORT_CODES[m[1]] : undefined;
+      if (stage) {
+        const field: StageFieldKey = m![2] ? VIEW_SUFFIX[m![2]] : "flag_value";
+        if (stage.type === "flag" && field !== "flag_value") {
+          unknown.add(raw);
+          continue;
+        }
+        cols.push({ kind: "stage", col: c, stage_code: stage.code, field });
+        presentStage.add(`${stage.code}|${field}`);
+        continue;
+      }
+      ignored.add(raw);
+    }
+
+    if (plotCol < 0) {
+      throw new Error(
+        `시트 "${sheetName}": View 양식 임포트에는 'Plot' 컬럼이 필요합니다. Raw Data 화면에서 Plot 컬럼을 표시한 뒤 다시 내보내세요.`,
+      );
+    }
+
+    for (let r = hdr.row + 1; r <= range.e.r; r++) {
+      const splNumber = String(cell(r, hdr.numberCol) ?? "").trim();
+      if (!splNumber) {
+        out.skipped_rows += 1;
+        continue;
+      }
+      if (isOcsNumber(splNumber)) {
+        out.ocs_excluded += 1;
+        if (out.ocs_samples.length < 20) out.ocs_samples.push(splNumber);
+        continue;
+      }
+      const plot = plotFromValue(cell(r, plotCol));
+      if (!plot) {
+        out.skipped_rows += 1;
+        continue;
+      }
+      const item: Record<string, string | null> = {};
+      const stageMap = new Map<string, ParsedSplStage>();
+      for (const cm of cols) {
+        const raw = cell(r, cm.col);
+        if (cm.kind === "item") {
+          if (cm.field === "plot") {
+            item.plot = plot;
+            continue;
+          }
+          const s = String(raw ?? "").trim();
+          const val = s === "" ? null : s;
+          item[cm.field] = cm.field === "team" ? normalizeTeam(val) : val;
+        } else {
+          let entry = stageMap.get(cm.stage_code);
+          if (!entry) {
+            entry = { stage_code: cm.stage_code, fields: {} };
+            stageMap.set(cm.stage_code, entry);
+          }
+          if (cm.field === "flag_value") {
+            const s = String(raw ?? "").trim();
+            entry.fields.flag_value = s === "" ? null : s;
+          } else if (isNaMarker(raw)) {
+            entry.na = true;
+            entry.fields[cm.field] = null;
+            out.na_cells += 1;
+          } else {
+            entry.fields[cm.field] = raw == null || String(raw).trim() === "" ? null : toIso(raw);
+          }
+        }
+      }
+      out.rows.push({ spl_number: splNumber, sheet_name: sheetName, plot, excel_row: r + 1, item, stages: Array.from(stageMap.values()) });
+      const agg = perPlot.get(plot) ?? { sheet_name: sheetName, plot, rows: 0 };
+      agg.rows += 1;
+      perPlot.set(plot, agg);
+    }
+  }
+
+  if (out.rows.length === 0) {
+    throw new Error("View 양식에서 임포트할 행을 찾지 못했습니다. 'SPL NUMBER' 와 'Plot' 컬럼이 포함된 파일인지 확인하세요.");
+  }
+  out.sheets = Array.from(perPlot.values());
+  out.unknown_headers = Array.from(unknown);
+  out.ignored_headers = Array.from(ignored);
+  out.present_item_fields = Array.from(presentItem);
+  out.present_stage_fields = Array.from(presentStage).map((k) => {
+    const [stage_code, field] = k.split("|");
+    return { stage_code, field: field as StageFieldKey };
+  });
+  return out;
+}
+
+export async function parseSplHdecFile(file: File): Promise<ParsedSplFile> {
+  const wb = XLSX.read(await file.arrayBuffer());
+  // View 양식(1행 헤더 + Plot 컬럼)이면 그 경로로 파싱한다.
+  if (wb.SheetNames.some((n) => wb.Sheets[n] && findViewHeader(wb.Sheets[n]))) {
+    return parseSplViewWorkbook(wb, file.name);
+  }
+  const out = emptyParsed(file.name, "hdec");
   const presentStage = new Set<string>();
   const presentItem = new Set<string>();
   const unknown = new Set<string>();
