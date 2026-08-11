@@ -28,8 +28,8 @@ export interface ImportedRowSeed {
   worker: string;
   foreman: string;
   supervisor: string;
-  imported: boolean;
-  unmatched: boolean;
+  imported?: boolean;
+  unmatched?: boolean;
 }
 
 interface TmLike {
