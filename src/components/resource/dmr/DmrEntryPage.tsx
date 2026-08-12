@@ -16,7 +16,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useDmrSystemMaster, useDmrContractorMaster, useInvalidateDmr } from '@/hooks/useDmrEntries';
 import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
 import { parseDmrImages } from '@/lib/dmr-parse.functions';
-import { buildDmrEntryRowsFromSection, fileToParseSource } from '@/lib/dmr/entry-import';
+import { buildDmrEntryRowsFromSection } from '@/lib/dmr/entry-import';
 import { exportDmrTeamWorkbook } from '@/lib/dmr/export-dmr-team';
 import { DMR_HEADCOUNT_KINDS, dmrDataDateGapDays } from '@/lib/dmr/task-link';
 
@@ -39,10 +39,12 @@ export interface EntryRow {
   foreman: string;
   supervisor: string;
   saved?: boolean;
-  /** 파싱(엑셀·이미지)으로 채워 넣은 행 */
+  /** 스크린샷 파싱으로 채워 넣은 행 */
   imported?: boolean;
   /** TM 에서 코드를 찾지 못한 파싱 행 */
   unmatched?: boolean;
+  /** 한 줄에 코드가 여럿 — 인원은 첫 코드에만 실렸다 */
+  multiCode?: boolean;
   /** 저장 당시 박힌 TM 값 — 불러온 행은 재계산하지 않는다 */
   snap?: {
     task_name: string | null;
@@ -298,39 +300,42 @@ export function DmrEntryPage() {
   const parseFn = useServerFn(parseDmrImages);
   const [importing, setImporting] = useState(false);
 
-  /** 엑셀·스크린샷 → 같은 표의 행으로 채워 넣는다. 자동 저장하지 않는다. */
+  /** 스크린샷 → 같은 표의 행으로 채워 넣는다. 자동 저장하지 않는다. */
   async function onImportFiles(files: File[]) {
     if (files.length === 0) return;
     setImporting(true);
     try {
       const storagePaths: string[] = [];
-      const texts: { name: string; content: string }[] = [];
       for (const f of files.slice(0, 3)) {
-        const src = await fileToParseSource(f);
-        if (src.kind === 'text') {
-          texts.push({ name: f.name, content: src.content });
-        } else {
-          const ext = f.name.split('.').pop() || 'png';
-          const path = `${me.data?.id ?? 'anon'}/${Date.now()}-entry.${ext}`;
-          const up = await supabase.storage.from('dmr-uploads').upload(path, f, { upsert: false });
-          if (up.error) throw new Error(up.error.message);
-          storagePaths.push(path);
-        }
+        const ext = f.name.split('.').pop() || 'png';
+        const path = `${me.data?.id ?? 'anon'}/${Date.now()}-entry.${ext}`;
+        const up = await supabase.storage.from('dmr-uploads').upload(path, f, { upsert: false });
+        if (up.error) throw new Error(up.error.message);
+        storagePaths.push(path);
       }
-      const res: any = await parseFn({
-        data: {
-          ...(storagePaths.length ? { storagePaths } : {}),
-          ...(texts.length ? { texts } : {}),
-        },
-      });
+      if (storagePaths.length === 0) {
+        toast.error('스크린샷 이미지 파일만 읽을 수 있습니다');
+        return;
+      }
+      const res: any = await parseFn({ data: { storagePaths } });
       const errs = (res?.results ?? []).filter((r: any) => r.error);
       let added: ReturnType<typeof buildDmrEntryRowsFromSection> = [];
+      const warns: string[] = [];
       for (const r of res?.results ?? []) {
         if (!r.section) continue;
+        // 공종·보고일은 경고용으로만 쓴다. 기준일을 자동으로 바꾸지 않는다.
+        if (r.section.discipline && r.section.discipline !== discipline) {
+          warns.push(`제목 공종 ${r.section.discipline} — 화면 공종 ${discipline} 과 다릅니다. 넣지 않았습니다`);
+          continue;
+        }
+        if (r.section.report_date && r.section.report_date !== reportDate) {
+          warns.push(`시트 보고일 ${r.section.report_date} — 기준일 ${reportDate} 과 다릅니다`);
+        }
         added = [...added, ...buildDmrEntryRowsFromSection(r.section, tmByNo, newEntryRow)];
       }
+      for (const w of warns) toast.warning(w);
       if (added.length === 0) {
-        toast.error(errs.length ? `파싱 실패: ${errs[0].error}` : '가져온 행이 없습니다');
+        toast.error(errs.length ? `파싱 실패: ${errs[0].error}` : warns.length ? '넣은 행이 없습니다' : '가져온 행이 없습니다');
         return;
       }
       dirtyRef.current = true;
@@ -339,8 +344,9 @@ export function DmrEntryPage() {
         return [...base, ...added];
       });
       const unmatched = added.filter((a) => a.unmatched).length;
+      const multi = added.filter((a) => a.multiCode).length;
       toast.success(
-        `불러오기 ${added.length}행 — TM 미매칭 ${unmatched}건${errs.length ? ` · 실패 ${errs.length}건` : ''}. 확인 후 저장하십시오.`,
+        `불러오기 ${added.length}행 — TM 미매칭 ${unmatched}건 · 복수 코드 ${multi}건${errs.length ? ` · 실패 ${errs.length}건` : ''}. 확인 후 저장하십시오.`,
       );
     } catch (e: any) {
       toast.error(e?.message ?? '불러오기 실패');
@@ -393,6 +399,7 @@ export function DmrEntryPage() {
   }
 
   const unmatchedCount = rows.filter((r) => r.unmatched).length;
+  const multiCodeCount = rows.filter((r) => r.multiCode).length;
 
   return (
     <AppLayout>
@@ -432,7 +439,7 @@ export function DmrEntryPage() {
               <input
                 type="file"
                 multiple
-                accept=".xlsx,.xls,.csv,image/*"
+                accept="image/*"
                 className="hidden"
                 disabled={!canEdit || importing}
                 onChange={(e) => {
@@ -447,7 +454,7 @@ export function DmrEntryPage() {
                 }`}
               >
                 {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                {importing ? '읽는 중…' : '엑셀 · 스크린샷 불러오기'}
+                {importing ? '읽는 중…' : '스크린샷 불러오기'}
               </span>
             </label>
           </CardContent>
@@ -462,6 +469,12 @@ export function DmrEntryPage() {
         {unmatchedCount > 0 && (
           <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs">
             불러온 행 중 TM 에서 찾지 못한 코드 {unmatchedCount}건 — 코드 칸이 비어 있습니다. 직접 고르십시오.
+          </div>
+        )}
+
+        {multiCodeCount > 0 && (
+          <div className="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+            한 줄에 코드가 여럿인 행 {multiCodeCount}건 — 인원은 첫 코드에만 실었습니다. 자동으로 나누지 않으니 직접 나눠 적으십시오.
           </div>
         )}
 
@@ -541,6 +554,11 @@ export function DmrEntryPage() {
                           </Badge>
                           {r.imported && <Badge variant="outline" className="text-[10px]">불러온 값</Badge>}
                           {r.unmatched && <Badge variant="destructive" className="text-[10px]">TM 코드 없음</Badge>}
+                          {r.multiCode && (
+                            <Badge variant="outline" className="border-amber-500 text-[10px] text-amber-600">
+                              복수 코드 — 인원을 나눠 적으십시오
+                            </Badge>
+                          )}
                         </div>
                         <SearchSelect
                           value={r.task_no}

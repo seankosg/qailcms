@@ -1,27 +1,26 @@
-export const DMR_SYSTEM_PROMPT = `You parse a construction "SUMMARY OF DAILY MANPOWER MOBILIZATION STATUS" image into strict JSON.
+export const DMR_SYSTEM_PROMPT = `You read a screenshot of a construction sheet titled "Daily Manpower Mobilization Status (ARCH | ELECT | MECH)" and return strict JSON.
 
-Image layout:
-- Title contains the TEAM: "ARCH", "ELECT"/"ELEC" (Electrical), or "MECH"/"Mechanical".
-- Report date is shown on the header, often as YYYY.MM.DD or YYYY-MM-DD or DD/MM/YYYY.
-- Table has one row per (System, Sub Contractor) combination.
-- Columns (grouped): Target | Today | Yesterday | Difference. Each group is further split into Plot C / Plot D / Total.
-- Map "Target" -> plan, "Today" -> actual. Ignore the "Yesterday" and "Difference" columns entirely — they are not needed.
+Sheet layout:
+- Title contains the discipline: ARCH, ELECT (return as ELEC), or MECH.
+- The report date is at the top right, e.g. "11/8/26" or "11/Aug/26".
+- The header spans two lines:
+    [Type] | System | Contractor Subcon. | PLOT_C | PLOT_D | Remark
+    and under each PLOT group: 담당자 | Today | TM Code | TASK
+- The last rows are "Total", "HDEC_Total", "SUBCON_Total".
 
-Extraction rules:
-- Empty cells, dashes ("-"), or blanks -> 0 (integer).
-- Strip commas from numbers. Never return decimals.
-- Skip any "Sub Total", "Grand Total", or summary rows.
-- Do NOT return the TOTAL column. Return only C and D per metric — the app will compute TOTAL = C + D.
-- Sub Contractor name normalization (apply BEFORE returning):
-    * "HDEC, Anel" or "HDEC,Anel" (any HDEC + comma + name) → "HDEC_Anel"
-    * bare "HDEC" (no comma, no other name) → "HDEC_Direct"
-    * All other names: keep as printed (trim only).
-  Names starting with "HDEC" (after normalization, e.g. "HDEC_Anel", "HDEC_Direct") should be marked as is_direct=true.
-- Preserve System text as printed (trim whitespace only).
-- Return TEAM codes using the app-wide Team master values only: ARCH, ELEC, MECH. If the image says ELECT or Electrical, return ELEC.
-- TM Code: if the sheet has a "TM Code" (or "TM 코드"/"Task No") column, return its codes in task_nos as an array of strings (split on comma/newline/slash, trim). If absent, return an empty array. Never invent or guess a code.
-- 담당자: if a "담당자" / "PIC" column exists, return it as pic_name. Otherwise omit.
-- Headcount kind: if the sheet/section/column indicates Foreman or Supervisor, set headcount_kind accordingly; otherwise "worker".
+READ ONLY THESE FOUR per data row: TM Code, Today (headcount), System, Contractor.
+IGNORE everything else: Type, 담당자, TASK, Remark, PLOT group headers, and all totals.
+
+Rules:
+- "Today" is ALWAYS the cell immediately to the LEFT of its TM Code cell. Do not interpret the PLOT_C / PLOT_D grouping — the app resolves plot from its own data.
+- Emit one row object per printed data row (per Today value). If the same TM Code appears in several rows, emit each occurrence separately — do NOT sum them yourself.
+- count: integer. Strip commas. Never decimals. If the cell is "-", blank, or 0, SKIP that row entirely.
+- task_no: the TM Code exactly as printed. If the cell is empty or does not look like a code (e.g. "Monitoring"), return an empty string "". Never invent or guess a code.
+- If a cell holds several codes, return them as printed separated by a comma.
+- Skip the "Total", "HDEC_Total", "SUBCON_Total" rows and any other summary line.
+- System and Contractor cells are merged vertically: when a row's cell is blank, carry down the value from the row above.
+- Contractor normalization before returning: "HDEC, X" → "HDEC_X" ; bare "HDEC" → "HDEC_Direct" ; otherwise keep as printed (trim only).
+- discipline and report_date are returned for warning purposes only. ELECT means ELEC.
 
 Return ONLY JSON via the report_dmr tool. Do not include narration.`;
 
@@ -35,40 +34,15 @@ export const DMR_TOOL_SCHEMA = {
       items: {
         type: 'object' as const,
         properties: {
-          system: { type: 'string' as const },
-          contractor: { type: 'string' as const, description: 'Sub Contractor name, already normalized (HDEC,X → HDEC_X ; HDEC → HDEC_Direct)' },
-          is_direct: { type: 'boolean' as const },
-          task_nos: {
-            type: 'array' as const,
-            items: { type: 'string' as const },
-            description: 'TM Code values exactly as printed. Empty array when the column is absent.',
+          task_no: {
+            type: 'string' as const,
+            description: 'TM Code exactly as printed. Empty string when absent or not code-shaped.',
           },
-          pic_name: { type: 'string' as const, description: '담당자 / PIC as printed' },
-          headcount_kind: { type: 'string' as const, enum: ['worker', 'foreman', 'supervisor'] },
-          values: {
-            type: 'object' as const,
-            properties: {
-              plan: {
-                type: 'object' as const,
-                properties: {
-                  C: { type: 'integer' as const },
-                  D: { type: 'integer' as const },
-                },
-                required: ['C', 'D'],
-              },
-              actual: {
-                type: 'object' as const,
-                properties: {
-                  C: { type: 'integer' as const },
-                  D: { type: 'integer' as const },
-                },
-                required: ['C', 'D'],
-              },
-            },
-            required: ['plan', 'actual'],
-          },
+          count: { type: 'integer' as const, description: 'Today headcount. Integer, no commas, no decimals.' },
+          system: { type: 'string' as const, description: 'System name, carried down when merged/blank.' },
+          contractor: { type: 'string' as const, description: 'Contractor Subcon., normalized (HDEC,X → HDEC_X ; HDEC → HDEC_Direct)' },
         },
-        required: ['system', 'contractor', 'values'],
+        required: ['task_no', 'count', 'system', 'contractor'],
       },
     },
   },

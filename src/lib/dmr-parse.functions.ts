@@ -4,18 +4,10 @@ import { z } from 'zod';
 import { dohaDateOnly } from '@/lib/time/doha';
 import { normalizeDmrTeam, normalizeDmrContractor, isDmrDirectContractor } from './dmr/types';
 
-const InputSchema = z
-  .object({
-    storagePaths: z.array(z.string().min(1)).max(3).optional(),
-    /** 엑셀 시트를 CSV 텍스트로 펴서 같은 파서에 태운다. 파서를 늘리지 않는다. */
-    texts: z
-      .array(z.object({ name: z.string().min(1), content: z.string().min(1).max(200_000) }))
-      .max(3)
-      .optional(),
-  })
-  .refine((v) => (v.storagePaths?.length ?? 0) + (v.texts?.length ?? 0) > 0, {
-    message: '이미지 또는 시트 텍스트가 필요합니다',
-  });
+/** 입력은 스크린샷(이미지)뿐이다. 엑셀 업로드 경로는 폐지됐다. */
+const InputSchema = z.object({
+  storagePaths: z.array(z.string().min(1)).min(1).max(3),
+});
 
 const ValuesSchema = z
   .object({
@@ -25,16 +17,16 @@ const ValuesSchema = z
   })
   .transform((v) => ({ C: v.C ?? 0, D: v.D ?? 0, TOTAL: (v.C ?? 0) + (v.D ?? 0) }));
 const RowSchema = z.object({
-  system: z.string().min(1),
-  contractor: z.string().min(1),
+  system: z.string().default(''),
+  contractor: z.string().default(''),
+  /** 이 양식이 주는 넷 중 둘 */
+  task_no: z.string().default(''),
+  count: z.coerce.number().int().default(0),
   is_direct: z.boolean().optional(),
-  task_nos: z.array(z.string()).optional(),
-  pic_name: z.string().optional(),
-  headcount_kind: z.enum(['worker', 'foreman', 'supervisor']).optional(),
-  values: z.object({
-    plan: ValuesSchema,
-    actual: ValuesSchema,
-  }),
+  /** 기존 미리보기 화면(DmrImportPage) 호환용 — 파서는 더 이상 채우지 않는다. */
+  values: z
+    .object({ plan: ValuesSchema, actual: ValuesSchema })
+    .optional(),
 });
 const SectionSchema = z.object({
   discipline: z.preprocess((v) => normalizeDmrTeam(v), z.enum(['ARCH', 'ELEC', 'MECH'])),
@@ -81,7 +73,7 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
       }),
     );
 
-    async function parseOne(source: { imgUrl?: string; text?: string }) {
+    async function parseOne(source: { imgUrl: string }) {
       const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -94,17 +86,10 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
             { role: 'system', content: DMR_SYSTEM_PROMPT },
             {
               role: 'user',
-              content: source.imgUrl
-                ? [
-                    { type: 'text', text: 'Parse this Daily Manpower report image. Call report_dmr with the extracted data.' },
-                    { type: 'image_url', image_url: { url: source.imgUrl } },
-                  ]
-                : [
-                    {
-                      type: 'text',
-                      text: `Parse this Daily Manpower report spreadsheet (CSV text of the sheets). Call report_dmr with the extracted data.\n\n${source.text ?? ''}`,
-                    },
-                  ],
+              content: [
+                { type: 'text', text: 'Parse this Daily Manpower Mobilization Status screenshot. Call report_dmr with the extracted data.' },
+                { type: 'image_url', image_url: { url: source.imgUrl } },
+              ],
             },
           ],
           tools: [{ type: 'function', function: { name: 'report_dmr', description: 'Return parsed DMR data', parameters: DMR_TOOL_SCHEMA } }],
@@ -122,13 +107,13 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
       const parsed = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
       const section = SectionSchema.parse(parsed);
       section.report_date = normalizeDate(section.report_date);
-      // Normalize contractor names + force TOTAL = C + D (ignore any TOTAL the AI returned)
-      section.rows = section.rows.map((r) => {
+      // Contractor 정규화 + 기존 미리보기(DmrImportPage) 호환용 values 채우기
+      const rows = section.rows.map((r) => {
         const contractor = normalizeDmrContractor(r.contractor);
-        const planC = r.values.plan.C ?? 0;
-        const planD = r.values.plan.D ?? 0;
-        const actC = r.values.actual.C ?? 0;
-        const actD = r.values.actual.D ?? 0;
+        const planC = r.values?.plan.C ?? 0;
+        const planD = r.values?.plan.D ?? 0;
+        const actC = r.values?.actual.C ?? 0;
+        const actD = r.values?.actual.D ?? 0;
         return {
           ...r,
           contractor,
@@ -139,14 +124,11 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
           },
         };
       });
-      return section;
+      return { ...section, rows };
     }
 
     const results = await Promise.all(
-      [
-        ...signed.map((s) => ({ path: s.path, source: { imgUrl: s.url } })),
-        ...(data.texts ?? []).map((t) => ({ path: t.name, source: { text: t.content } })),
-      ].map(async (s) => {
+      signed.map((s) => ({ path: s.path, source: { imgUrl: s.url } })).map(async (s) => {
         try {
           const section = await parseOne(s.source);
           return { path: s.path, section, error: null as string | null };

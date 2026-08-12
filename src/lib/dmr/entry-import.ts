@@ -1,22 +1,10 @@
 import type { DmrParsedSection } from './types';
-import type { DmrHeadcountKind } from './task-link';
 
 /**
- * 엑셀·스크린샷 → 작성 표의 행. 저장하지 않는다.
- * 새 파서를 만들지 않는다 — 시트를 CSV 텍스트로 펴서 기존 파서(dmr-parse.functions)에 태운다.
+ * 스크린샷 파싱 결과 → 작성 표의 행. 저장하지 않는다.
+ * 양식에서 읽는 것은 넷뿐이다 — TM Code · Today(인원) · System · Contractor.
+ * Plot · 담당자 · Work Type · 계획/실적% 는 전부 TM 에서 온다.
  */
-export type ParseSource = { kind: 'text'; content: string } | { kind: 'image' };
-
-const SHEET_EXT = /\.(xlsx|xls|csv)$/i;
-
-export async function fileToParseSource(file: File): Promise<ParseSource> {
-  if (!SHEET_EXT.test(file.name)) return { kind: 'image' };
-  const XLSX = await import('xlsx');
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array' });
-  const parts = wb.SheetNames.map((n) => `### SHEET: ${n}\n${XLSX.utils.sheet_to_csv(wb.Sheets[n])}`);
-  return { kind: 'text', content: parts.join('\n\n').slice(0, 190_000) };
-}
 
 export interface ImportedRowSeed {
   key: string;
@@ -29,12 +17,33 @@ export interface ImportedRowSeed {
   foreman: string;
   supervisor: string;
   imported?: boolean;
+  /** TM 에서 찾지 못한 코드 */
   unmatched?: boolean;
+  /** 한 줄에 코드가 여럿 — 인원은 첫 코드에만 실린다 */
+  multiCode?: boolean;
 }
 
 interface TmLike {
   plot: string | null;
   effective_pic: string | null;
+}
+
+/** 코드 모양인가 (ME-C-06 · AR-C-T-12 · ME-D-08-06). "Monitoring" 같은 말은 코드가 아니다. */
+const CODE_RE = /^[A-Za-z]{1,4}-[A-Za-z0-9]{1,4}(?:-[A-Za-z0-9]{1,4})+$/;
+const TOTAL_RE = /(^|[\s_])(total|합계)([\s_]|$)/i;
+
+function splitCodes(raw: unknown): string[] {
+  return String(raw ?? '')
+    .split(/[,\n/·|]+/)
+    .map((s) => s.trim())
+    .filter((s) => CODE_RE.test(s));
+}
+
+interface Agg {
+  codes: string[];
+  count: number;
+  system: string;
+  contractor: string;
 }
 
 /**
@@ -46,39 +55,63 @@ export function buildDmrEntryRowsFromSection(
   tmByNo: Map<string, TmLike>,
   make: (init: Partial<ImportedRowSeed>) => ImportedRowSeed,
 ): ImportedRowSeed[] {
-  const out: ImportedRowSeed[] = [];
-  for (const raw of section.rows ?? []) {
-    const r = raw as typeof raw & {
-      task_nos?: string[];
-      pic_name?: string;
-      headcount_kind?: DmrHeadcountKind;
-    };
-    const kind: DmrHeadcountKind = r.headcount_kind ?? 'worker';
-    const codes = (r.task_nos ?? []).map((c) => String(c).trim()).filter(Boolean);
-    const codeList = codes.length > 0 ? codes : [''];
-    for (const code of codeList) {
-      const tm = code ? tmByNo.get(code) : undefined;
-      const unmatched = !!code && !tm;
-      for (const plot of ['C', 'D'] as const) {
-        const count = Math.max(0, Math.round(Number(r.values?.actual?.[plot] ?? 0)));
-        if (count <= 0) continue;
-        out.push(
-          make({
-            task_no: unmatched ? '' : code,
-            system_name: String(r.system ?? '').trim(),
-            contractor_name: String(r.contractor ?? '').trim(),
-            // 인원 수는 시트의 Plot 열에서 왔다. TM Plot 과 다르면 행에서 경고로 드러난다.
-            plot,
-            pic_name: tm?.effective_pic ?? (r.pic_name ?? '').trim(),
-            worker: kind === 'worker' ? String(count) : '0',
-            foreman: kind === 'foreman' ? String(count) : '0',
-            supervisor: kind === 'supervisor' ? String(count) : '0',
-            imported: true,
-            unmatched,
-          }),
-        );
-      }
+  // ① 같은 코드가 두 번 나오면 합친다. 합치지 않으면 UPSERT 에서 뒤엣것이 앞엣것을 덮는다.
+  const byCode = new Map<string, Agg>();
+  const codeless: Agg[] = [];
+
+  for (const raw of (section.rows ?? []) as unknown as Array<Record<string, unknown>>) {
+    const system = String(raw.system ?? '').trim();
+    const contractor = String(raw.contractor ?? '').trim();
+    // ⑤ 합계 줄은 버린다
+    if (TOTAL_RE.test(system) || TOTAL_RE.test(contractor)) continue;
+
+    const count = Math.max(0, Math.round(Number(raw.count ?? 0) || 0));
+    if (count <= 0) continue; // '-' · 빈칸 · 0 은 건너뛴다
+
+    // ②③ 코드 모양이 아니거나 아예 없으면 코드 없음으로 다룬다. 인원은 살린다.
+    const codes = splitCodes(raw.task_no ?? (raw as { task_nos?: unknown }).task_nos);
+    if (codes.length === 0) {
+      codeless.push({ codes: [], count, system, contractor });
+      continue;
+    }
+    const key = codes[0];
+    const prev = byCode.get(key);
+    if (prev) {
+      prev.count += count;
+      for (const c of codes) if (!prev.codes.includes(c)) prev.codes.push(c);
+    } else {
+      byCode.set(key, { codes: [...codes], count, system, contractor });
     }
   }
+
+  const out: ImportedRowSeed[] = [];
+
+  const emit = (a: Agg, code: string, count: number, multiCode: boolean) => {
+    const tm = code ? tmByNo.get(code) : undefined;
+    const unmatched = !!code && !tm;
+    out.push(
+      make({
+        task_no: unmatched ? '' : code,
+        system_name: a.system,
+        contractor_name: a.contractor,
+        // Plot 은 TM 에서 온다. 시트의 열을 보고 고치지 않는다.
+        plot: tm?.plot === 'D' ? 'D' : 'C',
+        pic_name: tm?.effective_pic ?? '',
+        worker: String(count),
+        foreman: '0',
+        supervisor: '0',
+        imported: true,
+        unmatched,
+        multiCode,
+      }),
+    );
+  };
+
+  for (const a of byCode.values()) {
+    // ⑤(§5) 코드가 여럿이면 첫 코드에만 인원을 싣는다. 자동 등분하지 않는다.
+    a.codes.forEach((code, i) => emit(a, code, i === 0 ? a.count : 0, a.codes.length > 1));
+  }
+  for (const a of codeless) emit(a, '', a.count, false);
+
   return out;
 }
