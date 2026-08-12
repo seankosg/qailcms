@@ -9,6 +9,17 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Save } from 'lucide-react';
 import { SortPriorityBadge } from '@/components/common/SortPriorityBadge';
 import type { EntryRow, TmOption } from './entry-types';
 
+/** 검색 대조용 접기 — 대시·공백·기호를 지운다. "AR-C-06" → "ARC06" */
+const foldCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+/** a 가 b 의 부분수열인가 — "ARC06" 은 "ARCT06" 안에 순서대로 들어 있다. */
+function isSubsequence(a: string, b: string) {
+  if (!a) return true;
+  let i = 0;
+  for (let j = 0; j < b.length && i < a.length; j++) if (a[i] === b[j]) i++;
+  return i === a.length;
+}
+
 function SearchSelect({
   value, options, onChange, placeholder, width = 'w-full', disabled,
 }: {
@@ -23,9 +34,13 @@ function SearchSelect({
   const [q, setQ] = useState('');
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    const list = t
-      ? options.filter((o) => o.label.toLowerCase().includes(t) || (o.hint ?? '').toLowerCase().includes(t))
-      : options;
+    if (!t) return options.slice(0, 300);
+    const folded = foldCode(t);
+    const list = options.filter((o) => {
+      if (o.label.toLowerCase().includes(t) || (o.hint ?? '').toLowerCase().includes(t)) return true;
+      // 중간 마디가 빠진 코드(AR-C-06 ↔ AR-C-T-06)도 찾히게 한다.
+      return !!folded && isSubsequence(folded, foldCode(o.label));
+    });
     return list.slice(0, 300);
   }, [q, options]);
   return (
