@@ -45,8 +45,16 @@ const SUMMARY_COLUMNS = [
   { key: 'remark', label: 'Remark' },
 ];
 
+export type DmrExportDiscipline = 'ARCH' | 'ELEC' | 'MECH';
+
 export interface DmrTeamExportOptions {
-  discipline: 'ARCH' | 'ELEC' | 'MECH';
+  discipline: DmrExportDiscipline;
+  reportDate: string;
+}
+
+export interface DmrTeamsExportOptions {
+  /** 탭 순서 = 여기 준 순서 */
+  disciplines: DmrExportDiscipline[];
   reportDate: string;
 }
 
@@ -54,7 +62,8 @@ export interface DmrTeamExportOptions {
 const PAGE = 1000;
 const HARD_CAP = 20_000;
 
-export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
+/** 공종 한 벌의 원자료·요약을 만든다. 파일로 쓰지 않는다. */
+async function buildDmrTeamSheets(opts: DmrTeamExportOptions) {
   const fetched: any[] = [];
   let capped = false;
   let serverCount: number | null = null;
@@ -155,31 +164,64 @@ export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
   });
 
   const allRows = [...rows, total];
+  const header = {
+    title: `DMR — ${opts.discipline} (${opts.reportDate})`,
+    metaRows: [
+      `Exported at: ${dohaStamp()} (Doha)`,
+      'Source: dmr_entries',
+      'Search: —',
+      `Filters: discipline=${opts.discipline}, report_date=${opts.reportDate}, plot in (C,D)`,
+      'Sort: system_name, contractor_name, plot',
+    ] as [string, string, string, string, string],
+    freezeCols: 4,
+  };
+
+  return { rowCount: rows.length, capped, allRows, summaryRows, header };
+}
+
+const SUMMARY_WIDTHS = { system_name: 28, contractor_name: 24, c_task: 30, d_task: 30, remark: 28 };
+
+/**
+ * 공종 여럿을 파일 하나로 내보낸다. 공종마다 탭 둘 — `{공종} Raw` · `{공종} Summary`.
+ */
+export async function exportDmrTeamsWorkbook(opts: DmrTeamsExportOptions) {
+  const list = opts.disciplines.length > 0 ? opts.disciplines : (['ARCH', 'ELEC', 'MECH'] as DmrExportDiscipline[]);
+  const built: Array<{ discipline: DmrExportDiscipline } & Awaited<ReturnType<typeof buildDmrTeamSheets>>> = [];
+  for (const d of list) {
+    built.push({ discipline: d, ...(await buildDmrTeamSheets({ discipline: d, reportDate: opts.reportDate })) });
+  }
+
+  const first = built[0];
+  const extraSheets = [
+    { name: `${first.discipline} Summary`, columns: SUMMARY_COLUMNS, rows: first.summaryRows, columnWidths: SUMMARY_WIDTHS },
+    ...built.slice(1).flatMap((b) => [
+      { name: `${b.discipline} Raw`, columns: RAW_COLUMNS, rows: b.allRows, header: b.header },
+      { name: `${b.discipline} Summary`, columns: SUMMARY_COLUMNS, rows: b.summaryRows, columnWidths: SUMMARY_WIDTHS },
+    ]),
+  ];
 
   const result = await streamXlsxExport({
-    filename: `CMS_DMR_${opts.discipline}_${opts.reportDate}.xlsx`,
-    sheetName: 'Raw Data',
+    filename: `CMS_DMR_${list.join('-')}_${opts.reportDate}.xlsx`,
+    sheetName: `${first.discipline} Raw`,
     columns: RAW_COLUMNS,
     dateFields: ['report_date', 'task_data_date'],
-    header: {
-      title: `DMR — ${opts.discipline} (${opts.reportDate})`,
-      metaRows: [
-        `Exported at: ${dohaStamp()} (Doha)`,
-        'Source: dmr_entries',
-        'Search: —',
-        `Filters: discipline=${opts.discipline}, report_date=${opts.reportDate}, plot in (C,D)`,
-        'Sort: system_name, contractor_name, plot',
-      ],
-      freezeCols: 4,
-    },
+    header: first.header,
     fetchPage: async (offset, limit) => ({
-      rows: allRows.slice(offset, offset + limit),
-      total: allRows.length,
+      rows: first.allRows.slice(offset, offset + limit),
+      total: first.allRows.length,
     }),
-    extraSheets: [
-      { name: 'Summary', columns: SUMMARY_COLUMNS, rows: summaryRows, columnWidths: { system_name: 28, contractor_name: 24, c_task: 30, d_task: 30, remark: 28 } },
-    ],
+    extraSheets,
   });
 
-  return { rowCount: rows.length, exported: result.count, capped };
+  return {
+    rowCount: built.reduce((s, b) => s + b.rowCount, 0),
+    byDiscipline: built.map((b) => ({ discipline: b.discipline, rowCount: b.rowCount })),
+    exported: result.count,
+    capped: built.some((b) => b.capped),
+  };
+}
+
+/** 공종 하나만 내보내는 기존 진입점 — 같은 파일 규칙을 쓴다. */
+export async function exportDmrTeamWorkbook(opts: DmrTeamExportOptions) {
+  return exportDmrTeamsWorkbook({ disciplines: [opts.discipline], reportDate: opts.reportDate });
 }
