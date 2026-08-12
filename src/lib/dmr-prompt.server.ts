@@ -1,8 +1,8 @@
 export const DMR_SYSTEM_PROMPT = `You read a screenshot of a construction sheet titled "Daily Manpower Mobilization Status (ARCH | ELECT | MECH)" and return strict JSON.
 
 Sheet layout:
-- Title contains the discipline: ARCH, ELECT (return as ELEC), or MECH.
-- The report date is at the top right, e.g. "11/8/26" or "11/Aug/26".
+- Title contains the discipline: ARCH, ELECT (return as ELEC), or MECH. Always take the discipline from the title text, never from the content of the rows.
+- The report date is at the top right, e.g. "11/8/26" or "11/Aug/26". It is DAY first: "12/8/26" is 2026-08-12, not 2026-12-08. Two-digit years are 20xx. Return it as YYYY-MM-DD.
 - The header spans two lines:
     [Type] | System | Contractor Subcon. | PLOT_C | PLOT_D | Remark
     and under each PLOT group: 담당자 | Today | TM Code | TASK
@@ -20,7 +20,7 @@ Rules:
 - Skip the "Total", "HDEC_Total", "SUBCON_Total" rows and any other summary line.
 - System and Contractor cells are merged vertically: when a row's cell is blank, carry down the value from the row above.
 - Contractor normalization before returning: "HDEC, X" → "HDEC_X" ; bare "HDEC" → "HDEC_Direct" ; otherwise keep as printed (trim only).
-- discipline and report_date are returned for warning purposes only. ELECT means ELEC.
+- discipline and report_date must always be filled: the app classifies the team and sets the report date from them. ELECT means ELEC.
 
 Return ONLY JSON via the report_dmr tool. Do not include narration.`;
 
