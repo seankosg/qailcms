@@ -66,16 +66,17 @@ const pctText = (v: number | null) => (v == null ? '' : `${Math.round(v * 10) / 
 
 export interface DmrEntryRecordCardProps {
   reportDate: string;
-  discipline: string;
   rows: EntryRow[];
-  tmByNo: Map<string, TmOption>;
-  tmOptions: { value: string; label: string; hint?: string }[];
+  /** `${discipline}|${task_no}` 키 */
+  tmByKey: Map<string, TmOption>;
+  tmOptionsByDiscipline: Record<string, { value: string; label: string; hint?: string }[]>;
   contractorOptions: { value: string; label: string }[];
   systemOptions: string[];
   canEdit: boolean;
   saving: boolean;
   loading: boolean;
   validCount: number;
+  totalCount: number;
   onPatch: (key: string, patch: Partial<EntryRow>) => void;
   onPickTask: (key: string, taskNo: string) => void;
   onAddRow: () => void;
@@ -84,13 +85,15 @@ export interface DmrEntryRecordCardProps {
 
 /** Daily Entry Record — 입력 표 하나만 다룬다. 생산성 분석과 섞지 않는다. */
 export function DmrEntryRecordCard({
-  reportDate, discipline, rows, tmByNo, tmOptions, contractorOptions, systemOptions,
-  canEdit, saving, loading, validCount, onPatch, onPickTask, onAddRow, onSave,
+  reportDate, rows, tmByKey, tmOptionsByDiscipline, contractorOptions, systemOptions,
+  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave,
 }: DmrEntryRecordCardProps) {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm">Daily Entry Record ({rows.length}행 · 저장 시 {rows.length * 3}건)</CardTitle>
+        <CardTitle className="text-sm">
+          Daily Entry Record (보이는 {rows.length}행 · 전체 {totalCount}행 · 저장 시 {validCount * 3}건)
+        </CardTitle>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={onAddRow}>
             <Plus className="h-3.5 w-3.5" />행 추가
