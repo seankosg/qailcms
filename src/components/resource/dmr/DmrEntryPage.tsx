@@ -398,6 +398,7 @@ export function DmrEntryPage() {
           actual_manpower: Number(r.manpower) || 0,
           task_no: r.task_no || null,
           task_name: r.task_name?.trim() || null,
+          work_type: r.work_type?.trim() || null,
           headcount_kind: 'worker' as const,
           pic_name: r.pic_name || null,
         }));
