@@ -249,6 +249,18 @@ export function DmrEntryPage() {
     setRows((p) => [...p, newEntryRow({ discipline })]);
   };
 
+  /** 선택한 행을 표에서 지운다. 저장 전 편집 상태만 바꾼다. */
+  const deleteRows = (keys: string[]) => {
+    if (keys.length === 0) return;
+    const set = new Set(keys);
+    dirtyRef.current = true;
+    setRows((p) => {
+      const next = p.filter((r) => !set.has(r.key));
+      return next.length > 0 ? next : [newEntryRow({ discipline })];
+    });
+    toast.success(`${keys.length}행을 표에서 지웠습니다 — 저장해야 확정됩니다`);
+  };
+
   const saveFn = useServerFn(saveDmrTaskEntries);
   const parseFn = useServerFn(parseDmrImages);
   const [importing, setImporting] = useState(false);
@@ -482,6 +494,7 @@ export function DmrEntryPage() {
           onPatch={patch}
           onPickTask={pickTask}
           onAddRow={addRow}
+          onDeleteRows={deleteRows}
           onSave={() => void onSave()}
         />
 
