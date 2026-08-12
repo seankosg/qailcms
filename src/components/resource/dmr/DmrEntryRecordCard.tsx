@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, Plus, RefreshCcw, Save, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SortPriorityBadge } from '@/components/common/SortPriorityBadge';
 import { DmrColumnOrderMenu } from './DmrColumnOrderMenu';
