@@ -18,6 +18,8 @@ const EntrySchema = z.object({
   task_no: z.string().trim().min(1).nullable().optional(),
   /** 사용자가 직접 적은 Task/Subtask — 있으면 TM 명칭 대신 이 값을 저장한다 */
   task_name: z.string().trim().min(1).nullable().optional(),
+  /** 사용자가 직접 적은 Work Type — TM 코드 없는 행에서만 사용 */
+  work_type: z.string().trim().min(1).nullable().optional(),
   headcount_kind: z.enum(['worker', 'foreman', 'supervisor']).default('worker'),
   pic_name: z.string().trim().nullable().optional(),
 });
