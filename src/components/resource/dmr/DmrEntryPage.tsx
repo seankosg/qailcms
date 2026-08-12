@@ -531,6 +531,7 @@ export function DmrEntryPage() {
           tmOptionsByDiscipline={tmOptionsByDiscipline}
           contractorOptions={contractorOptions}
           systemOptions={systemOptions}
+          workTypeOptions={workTypeOptions}
           canEdit={canEdit}
           saving={saving}
           loading={existingQ.isFetching}
