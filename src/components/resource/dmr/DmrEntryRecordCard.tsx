@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, Plus, Save, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SortPriorityBadge } from '@/components/common/SortPriorityBadge';
 import { DmrColumnOrderMenu } from './DmrColumnOrderMenu';
@@ -117,7 +117,7 @@ const DEFAULT_ORDER: string[] = SORT_COLUMNS.map((c) => c.id);
 const COL_LABELS: Record<string, string> = Object.fromEntries(SORT_COLUMNS.map((c) => [c.id, c.label]));
 const LAYOUT_KEY = 'dmr-entry-record-columns-v1';
 /** 선택 칸 너비 — 항상 맨 왼쪽 고정 */
-const SELECT_COL_W = 40;
+const SELECT_COL_W = 76;
 
 interface Layout { order: string[]; visibility: Record<string, boolean>; frozen: string[] }
 
@@ -159,12 +159,14 @@ export interface DmrEntryRecordCardProps {
   onSave: () => void;
   /** 선택한 행을 표에서 지운다 (저장 전 편집 상태 기준) */
   onDeleteRows: (keys: string[]) => void;
+  /** 행을 위/아래로 한 칸 옮긴다 */
+  onMoveRow: (key: string, dir: -1 | 1) => void;
 }
 
 /** Daily Entry Record — 입력 표 하나만 다룬다. 생산성 분석과 섞지 않는다. */
 export function DmrEntryRecordCard({
   reportDate, rows, tmByKey, tmOptionsByDiscipline, contractorOptions, systemOptions,
-  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave, onDeleteRows,
+  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave, onDeleteRows, onMoveRow,
 }: DmrEntryRecordCardProps) {
   const [sorting, setSorting] = useState<SortEntry[]>([]);
   const [layout, setLayout] = useState<Layout>(() => loadLayout());
@@ -503,13 +505,41 @@ export function DmrEntryRecordCard({
                       style={{ width: SELECT_COL_W, minWidth: SELECT_COL_W }}
                     >
                       <div className={cn('-mx-2 -my-1.5 px-2 py-1.5', rowTone)}>
-                        <Checkbox
-                          checked={selected.includes(r.key)}
-                          onCheckedChange={(v) =>
-                            setSelected((p) => (v === true ? [...new Set([...p, r.key])] : p.filter((k) => k !== r.key)))
-                          }
-                          aria-label="행 선택"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Checkbox
+                            checked={selected.includes(r.key)}
+                            onCheckedChange={(v) =>
+                              setSelected((p) => (v === true ? [...new Set([...p, r.key])] : p.filter((k) => k !== r.key)))
+                            }
+                            aria-label="행 선택"
+                          />
+                          <div className="flex flex-col">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-4 w-5"
+                              title={sorting.length > 0 ? '정렬을 해제해야 이동할 수 있습니다' : '위로 이동'}
+                              disabled={sorting.length > 0 || sortedRows.findIndex((x) => x.key === r.key) === 0}
+                              onClick={() => onMoveRow(r.key, -1)}
+                              aria-label="위로 이동"
+                            >
+                              <ChevronUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-4 w-5"
+                              title={sorting.length > 0 ? '정렬을 해제해야 이동할 수 있습니다' : '아래로 이동'}
+                              disabled={sorting.length > 0 || sortedRows.findIndex((x) => x.key === r.key) === sortedRows.length - 1}
+                              onClick={() => onMoveRow(r.key, 1)}
+                              aria-label="아래로 이동"
+                            >
+                              <ChevronDown className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </td>
                     {shownKeys.map((k) => {
