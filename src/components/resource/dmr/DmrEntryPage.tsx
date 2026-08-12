@@ -359,9 +359,12 @@ export function DmrEntryPage() {
           <CardContent className="flex flex-wrap items-center gap-3">
             <Input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="h-8 w-40 text-xs" />
             <div className="flex gap-1">
-              {DISCIPLINES.map((d) => (
-                <Button key={d} size="sm" variant={discipline === d ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setDiscipline(d)}>
-                  {d}
+              {(['ALL', ...DISCIPLINES] as const).map((d) => (
+                <Button key={d} size="sm" variant={view === d ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setView(d)}>
+                  {d === 'ALL' ? '전체' : d}
+                  <span className="ml-1 text-[10px] opacity-70">
+                    {d === 'ALL' ? rows.length : rows.filter((r) => r.discipline === d).length}
+                  </span>
                 </Button>
               ))}
             </div>
