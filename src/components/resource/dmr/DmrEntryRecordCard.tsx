@@ -283,6 +283,9 @@ export function DmrEntryRecordCard({
         <datalist id="dmr-system-suggestions">
           {systemOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
+        <datalist id="dmr-task-suggestions">
+          {taskNameOptions.map((s) => <option key={s} value={s} />)}
+        </datalist>
         <div className="max-h-[70vh] overflow-auto">
           <table className="w-full text-xs" style={{ minWidth: shownKeys.reduce((n, k) => n + (COL_BY_ID[k]?.width ?? 120), 0) }}>
             <thead>
