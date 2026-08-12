@@ -67,6 +67,7 @@ export function buildDmrEntryRowsFromSection(
   section: DmrParsedSection,
   tmByNo: Map<string, TmLike>,
   make: (init: Partial<ImportedRowSeed>) => ImportedRowSeed,
+  baseIndex = 0,
 ): ImportedRowSeed[] {
   // TM 코드도 같은 규칙으로 접어 대조한다 (대소문자·대시 모양 차이 흡수).
   const tmNorm = new Map<string, { code: string; tm: TmLike }>();
