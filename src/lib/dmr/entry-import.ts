@@ -81,7 +81,7 @@ export function buildDmrEntryRowsFromSection(
   const byCode = new Map<string, Agg>();
   const codeless: Agg[] = [];
 
-  for (const raw of (section.rows ?? []) as unknown as Array<Record<string, unknown>>) {
+  for (const [raw, idx] of ((section.rows ?? []) as unknown as Array<Record<string, unknown>>).entries()) {
     const system = String(raw.system ?? '').trim();
     const contractor = String(raw.contractor ?? '').trim();
     // ⑤ 합계 줄은 버린다
@@ -90,10 +90,12 @@ export function buildDmrEntryRowsFromSection(
     const count = Math.max(0, Math.round(Number(raw.count ?? 0) || 0));
     if (count <= 0) continue; // '-' · 빈칸 · 0 은 건너뛴다
 
+    const importIndex = baseIndex + idx;
+
     // ②③ 코드 모양이 아니거나 아예 없으면 코드 없음으로 다룬다. 인원은 살린다.
     const codes = splitCodes(raw.task_no ?? (raw as { task_nos?: unknown }).task_nos);
     if (codes.length === 0) {
-      codeless.push({ codes: [], count, system, contractor });
+      codeless.push({ codes: [], count, system, contractor, importIndex });
       continue;
     }
     const key = codes.join('+');
@@ -101,7 +103,7 @@ export function buildDmrEntryRowsFromSection(
     if (prev) {
       prev.count += count;
     } else {
-      byCode.set(key, { codes: [...codes], count, system, contractor });
+      byCode.set(key, { codes: [...codes], count, system, contractor, importIndex });
     }
   }
 
