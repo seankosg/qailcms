@@ -26,8 +26,10 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
     const total = q.scopedItems.length;
     let delayed = 0;
     let actualSum = 0;
+    let planSum = 0;
     for (const it of q.scopedItems) {
       actualSum += resolveActualPct(it);
+      planSum += resolvePlanPct(it, asOfDate);
       if (resolveIsDelayed(it, q.thresholds, asOfDate)) delayed += 1;
     }
     return {
@@ -35,6 +37,8 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       delayed,
       actualCount: Math.round(actualSum),
       progressPct: total > 0 ? (actualSum / total) * 100 : null,
+      planPct: total > 0 ? (planSum / total) * 100 : null,
+      actualPct: total > 0 ? (actualSum / total) * 100 : null,
     };
   }, [q.scopedItems, q.thresholds, asOfDate]);
   return { ...q, kpi };
