@@ -61,15 +61,24 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
 
     const { DMR_SYSTEM_PROMPT, DMR_TOOL_SCHEMA } = await import('./dmr-prompt.server');
 
-    // Get signed URLs for each storage path.
+    // 이미지는 URL 로 넘기지 않는다. 모델 제공자가 원격 URL 을 못 읽어 400 을 내는 일이 있어,
+    // 바이트를 직접 받아 data URL 로 실어 보낸다.
     const supabase = context.supabase;
     const signed = await Promise.all(
       (data.storagePaths ?? []).map(async (p) => {
-        const { data: s, error } = await supabase.storage
-          .from('dmr-uploads')
-          .createSignedUrl(p, 600);
-        if (error || !s) throw new Error(`signed url failed: ${p} ${error?.message ?? ''}`);
-        return { path: p, url: s.signedUrl };
+        const { data: blob, error } = await supabase.storage.from('dmr-uploads').download(p);
+        if (error || !blob) throw new Error(`download failed: ${p} ${error?.message ?? ''}`);
+        const buf = Buffer.from(await blob.arrayBuffer());
+        const ext = (p.split('.').pop() ?? '').toLowerCase();
+        const mime =
+          blob.type && blob.type.startsWith('image/')
+            ? blob.type
+            : ext === 'png'
+              ? 'image/png'
+              : ext === 'webp'
+                ? 'image/webp'
+                : 'image/jpeg';
+        return { path: p, url: `data:${mime};base64,${buf.toString('base64')}` };
       }),
     );
 
