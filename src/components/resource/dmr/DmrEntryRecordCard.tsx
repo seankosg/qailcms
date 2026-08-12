@@ -311,7 +311,11 @@ export function DmrEntryRecordCard({
       </CardHeader>
       <CardContent className="p-0">
         <datalist id="dmr-system-suggestions">
-          {systemOptions.map((s) => <option key={s} value={s} />)}
+          {systemOptions
+            .filter((s) => s && String(s).trim())
+            .map((s, i) => (
+              <option key={`${s}#${i}`} value={s} />
+            ))}
         </datalist>
         <datalist id="dmr-task-suggestions">
           {taskNameOptions.map((s) => <option key={s} value={s} />)}
@@ -474,9 +478,10 @@ export function DmrEntryRecordCard({
                       return (
                         <Input
                           list="dmr-system-suggestions"
+                          autoComplete="on"
                           value={r.system_name}
                           onChange={(e) => onPatch(r.key, { system_name: e.target.value })}
-                          placeholder="System"
+                          placeholder="System (직접 입력 또는 제안 선택)"
                           className="h-8 text-xs"
                         />
                       );
