@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { EMPTY_TOKEN, useDmrFacet } from '@/hooks/useDmrEntries';
+import { EMPTY_TOKEN, useDmrFacet, type DmrScope } from '@/hooks/useDmrEntries';
 
 function MultiSelect({ column, options }: { column: any; options: { value: string; label: string }[] }) {
   const selected: string[] = (column.getFilterValue() as string[]) ?? [];
@@ -13,7 +13,7 @@ function MultiSelect({ column, options }: { column: any; options: { value: strin
   const [query, setQuery] = useState('');
   const meta = (column.columnDef.meta ?? {}) as any;
   const facetCol: string | null = meta.serverFacet ?? null;
-  const { data: facet } = useDmrFacet(open ? facetCol : null, { enabled: open && !!facetCol });
+  const { data: facet } = useDmrFacet(open ? facetCol : null, { enabled: open && !!facetCol, scope });
 
   const items = useMemo(() => {
     const counts = new Map<string, number>();
@@ -179,7 +179,7 @@ function NumRange({ column }: { column: any }) {
   );
 }
 
-export function DmrColumnFilterDropdown({ column }: { column: any }) {
+export function DmrColumnFilterDropdown({ column, scope }: { column: any; scope?: DmrScope }) {
   const meta = (column.columnDef.meta ?? {}) as any;
   const t = meta.filterType ?? 'text';
   if (t === 'multi-select') return <MultiSelect column={column} options={meta.filterOptions ?? []} />;
