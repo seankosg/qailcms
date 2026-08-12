@@ -116,6 +116,8 @@ const COL_BY_ID = Object.fromEntries(SORT_COLUMNS.map((c) => [c.id, c])) as Reco
 const DEFAULT_ORDER: string[] = SORT_COLUMNS.map((c) => c.id);
 const COL_LABELS: Record<string, string> = Object.fromEntries(SORT_COLUMNS.map((c) => [c.id, c.label]));
 const LAYOUT_KEY = 'dmr-entry-record-columns-v1';
+/** 선택 칸 너비 — 항상 맨 왼쪽 고정 */
+const SELECT_COL_W = 40;
 
 interface Layout { order: string[]; visibility: Record<string, boolean>; frozen: string[] }
 
@@ -263,6 +265,19 @@ export function DmrEntryRecordCard({
           Daily Entry Record (보이는 {rows.length}행 · 전체 {totalCount}행 · 저장 시 {validCount}건)
         </CardTitle>
         <div className="flex gap-2">
+          {selected.length > 0 && (
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-8 gap-1 text-xs"
+              onClick={() => {
+                onDeleteRows(selected);
+                setSelected([]);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />선택 삭제 ({selected.length})
+            </Button>
+          )}
           <DmrColumnOrderMenu
             order={layout.order}
             visibility={layout.visibility}
@@ -300,9 +315,19 @@ export function DmrEntryRecordCard({
           {taskNameOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
         <div className="max-h-[70vh] overflow-auto">
-          <table className="w-full text-xs" style={{ minWidth: shownKeys.reduce((n, k) => n + (COL_BY_ID[k]?.width ?? 120), 0) }}>
+          <table className="w-full text-xs" style={{ minWidth: SELECT_COL_W + shownKeys.reduce((n, k) => n + (COL_BY_ID[k]?.width ?? 120), 0) }}>
             <thead>
               <tr>
+                <th
+                  className="sticky top-0 left-0 z-30 border-b bg-muted px-2 py-2 text-left"
+                  style={{ width: SELECT_COL_W, minWidth: SELECT_COL_W }}
+                >
+                  <Checkbox
+                    checked={sortedRows.length > 0 && selected.length === sortedRows.length}
+                    onCheckedChange={(v) => setSelected(v === true ? sortedRows.map((r) => r.key) : [])}
+                    aria-label="전체 선택"
+                  />
+                </th>
                 {shownKeys.map((k) => {
                   const c = COL_BY_ID[k];
                   const idx = sorting.findIndex((s) => s.id === k);
@@ -473,6 +498,20 @@ export function DmrEntryRecordCard({
                 const rowTone = r.unmatched ? 'bg-destructive/10' : r.imported ? 'bg-sky-500/10' : r.saved ? 'bg-muted/30' : '';
                 return (
                   <tr key={r.key} className={cn('border-t align-top', rowTone)}>
+                    <td
+                      className={cn('sticky left-0 z-10 bg-background px-2 py-1.5')}
+                      style={{ width: SELECT_COL_W, minWidth: SELECT_COL_W }}
+                    >
+                      <div className={cn('-mx-2 -my-1.5 px-2 py-1.5', rowTone)}>
+                        <Checkbox
+                          checked={selected.includes(r.key)}
+                          onCheckedChange={(v) =>
+                            setSelected((p) => (v === true ? [...new Set([...p, r.key])] : p.filter((k) => k !== r.key)))
+                          }
+                          aria-label="행 선택"
+                        />
+                      </div>
+                    </td>
                     {shownKeys.map((k) => {
                       const c = COL_BY_ID[k];
                       const frozen = isFrozen(k);
