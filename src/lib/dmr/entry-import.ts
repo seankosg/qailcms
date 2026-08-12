@@ -81,7 +81,9 @@ export function buildDmrEntryRowsFromSection(
   const byCode = new Map<string, Agg>();
   const codeless: Agg[] = [];
 
-  for (const [raw, idx] of ((section.rows ?? []) as unknown as Array<Record<string, unknown>>).entries()) {
+  const sectionRows = (section.rows ?? []) as unknown as Array<Record<string, unknown>>;
+  for (let idx = 0; idx < sectionRows.length; idx++) {
+    const raw = sectionRows[idx];
     const system = String(raw.system ?? '').trim();
     const contractor = String(raw.contractor ?? '').trim();
     // ⑤ 합계 줄은 버린다
