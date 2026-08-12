@@ -474,7 +474,7 @@ export function DmrEntryPage() {
 
         {multiCodeCount > 0 && (
           <div className="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
-            한 줄에 코드가 여럿인 행 {multiCodeCount}건 — 인원은 첫 코드에만 실었습니다. 자동으로 나누지 않으니 직접 나눠 적으십시오.
+            한 줄에 코드가 여럿인 행 {multiCodeCount}건 — 코드마다 같은 인원을 실었습니다. 다르면 직접 고치십시오.
           </div>
         )}
 
