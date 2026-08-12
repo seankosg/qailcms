@@ -57,6 +57,7 @@ interface Agg {
   count: number;
   system: string;
   contractor: string;
+  importIndex: number;
 }
 
 /**
