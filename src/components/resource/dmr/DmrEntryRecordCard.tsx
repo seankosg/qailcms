@@ -84,6 +84,7 @@ const pctText = (v: number | null) => (v == null ? '' : `${Math.round(v * 10) / 
 
 /** ARCH 는 Task 명칭이 비고 System 만 채워지는 경우가 있다. 그럴 때만 System 값을 Task 로 쓴다. */
 function resolveTaskName(r: EntryRow, name: string | null): string | null {
+  if (r.task_name?.trim()) return r.task_name.trim();
   if (name && String(name).trim()) return name;
   if (r.discipline === 'ARCH' && r.system_name?.trim()) return r.system_name.trim();
   return name;
@@ -162,6 +163,15 @@ export function DmrEntryRecordCard({
 }: DmrEntryRecordCardProps) {
   const [sorting, setSorting] = useState<SortEntry[]>([]);
   const [layout, setLayout] = useState<Layout>(() => loadLayout());
+
+  /** Task/Subtask 자유 입력 보조 목록 — TM 명칭을 제안으로만 쓴다 */
+  const taskNameOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const list of Object.values(tmOptionsByDiscipline)) {
+      for (const o of list) if (o.hint?.trim()) set.add(o.hint.trim());
+    }
+    return [...set].slice(0, 500);
+  }, [tmOptionsByDiscipline]);
 
   useEffect(() => {
     try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* 저장 실패는 무시 */ }
@@ -282,6 +292,9 @@ export function DmrEntryRecordCard({
         <datalist id="dmr-system-suggestions">
           {systemOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
+        <datalist id="dmr-task-suggestions">
+          {taskNameOptions.map((s) => <option key={s} value={s} />)}
+        </datalist>
         <div className="max-h-[70vh] overflow-auto">
           <table className="w-full text-xs" style={{ minWidth: shownKeys.reduce((n, k) => n + (COL_BY_ID[k]?.width ?? 120), 0) }}>
             <thead>
@@ -388,8 +401,18 @@ export function DmrEntryRecordCard({
                           />
                         </>
                       );
-                    case 'task_name':
-                      return <div className="truncate">{resolveTaskName(r, tm?.task_name ?? null) ?? '—'}</div>;
+                    case 'task_name': {
+                      const fallback = resolveTaskName({ ...r, task_name: '' }, (r.saved && r.snap ? r.snap.task_name : tm?.task_name) ?? null) ?? '';
+                      return (
+                        <Input
+                          list="dmr-task-suggestions"
+                          value={r.task_name?.trim() ? r.task_name : fallback}
+                          onChange={(e) => onPatch(r.key, { task_name: e.target.value })}
+                          placeholder="Task / Subtask"
+                          className="h-8 text-xs"
+                        />
+                      );
+                    }
                     case 'pic_name':
                       return (
                         <>

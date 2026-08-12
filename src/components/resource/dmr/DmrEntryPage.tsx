@@ -176,6 +176,7 @@ export function DmrEntryPage() {
           discipline: (DISCIPLINES.includes(r.discipline) ? r.discipline : 'ARCH') as Discipline,
           task_no: r.task_no ?? '',
           system_name: r.system_name ?? '',
+          task_name: r.task_name ?? '',
           contractor_name: r.contractor_name ?? '',
           plot: (r.plot === 'D' ? 'D' : 'C') as 'C' | 'D',
           pic_name: r.pic_name ?? '',
@@ -233,6 +234,7 @@ export function DmrEntryPage() {
     patch(key, {
       task_no: taskNo,
       unmatched: false,
+      task_name: '',
       ...(t
         ? {
             plot: (t.plot === 'D' ? 'D' : t.plot === 'C' ? 'C' : undefined) as any,
@@ -353,6 +355,7 @@ export function DmrEntryPage() {
           plan_manpower: 0,
           actual_manpower: Number(r.manpower) || 0,
           task_no: r.task_no || null,
+          task_name: r.task_name?.trim() || null,
           headcount_kind: 'worker' as const,
           pic_name: r.pic_name || null,
         }));
