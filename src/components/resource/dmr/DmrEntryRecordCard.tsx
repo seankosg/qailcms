@@ -124,7 +124,7 @@ export function DmrEntryRecordCard({
           </thead>
           <tbody>
             {rows.map((r) => {
-              const live = r.task_no ? tmByNo.get(r.task_no) : null;
+              const live = r.task_no ? tmByKey.get(`${r.discipline}|${r.task_no}`) : null;
               const tm = r.saved && r.snap
                 ? {
                     task_name: r.snap.task_name,
@@ -159,7 +159,22 @@ export function DmrEntryRecordCard({
                     </div>
                     {plotMismatch && <div className="mt-0.5 text-[10px] text-amber-600">TM Plot {tm?.plot}</div>}
                   </td>
-                  <td className="w-16 whitespace-nowrap">{discipline}</td>
+                  <td className="w-24">
+                    <div className="flex gap-0.5">
+                      {(['ARCH', 'ELEC', 'MECH'] as const).map((d) => (
+                        <Button
+                          key={d}
+                          size="sm"
+                          variant={r.discipline === d ? 'default' : 'outline'}
+                          className="h-7 px-1 text-[10px]"
+                          disabled={r.saved}
+                          onClick={() => onPatch(r.key, { discipline: d, task_no: '' })}
+                        >
+                          {d}
+                        </Button>
+                      ))}
+                    </div>
+                  </td>
                   <td className="w-64">
                     <div className="mb-1 flex flex-wrap gap-1">
                       {r.unmatched && <Badge variant="destructive" className="text-[10px]">TM 코드 없음</Badge>}
@@ -169,7 +184,7 @@ export function DmrEntryRecordCard({
                     </div>
                     <SearchSelect
                       value={r.task_no}
-                      options={tmOptions}
+                      options={tmOptionsByDiscipline[r.discipline] ?? []}
                       onChange={(v) => onPickTask(r.key, v)}
                       placeholder="TM Code 선택"
                     />
