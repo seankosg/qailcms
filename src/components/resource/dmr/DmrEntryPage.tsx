@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -295,7 +294,7 @@ export function DmrEntryPage() {
   const multiCodeCount = rows.filter((r) => r.multiCode).length;
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -396,6 +395,6 @@ export function DmrEntryPage() {
 
         <DmrEntryProductivityCard reportDate={reportDate} />
       </div>
-    </AppLayout>
+    </>
   );
 }
