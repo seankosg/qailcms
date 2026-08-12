@@ -15,6 +15,7 @@ export function DmrRawData2Page() {
       routePath="/resource/dmr/raw-data-2"
       routeId="/_authenticated/resource/dmr/raw-data-2"
       showImport={false}
+      scope="entry"
       exportFilePrefix="CMS_DMR_RawData2"
     />
   );

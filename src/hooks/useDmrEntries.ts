@@ -3,6 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const EMPTY_TOKEN = '__EMPTY__';
 
+/**
+ * DMR 화면 구분.
+ * - import : DMR Raw Data (스크린샷/임포트 유래, task_no 없음)
+ * - entry  : DMR Raw Data 2 (Daily Entry 저장분, task_no 있음)
+ * 두 화면은 서로의 행을 절대 보지 않는다.
+ */
+export type DmrScope = 'import' | 'entry' | 'all';
+
+export function applyDmrScope(q: any, scope: DmrScope | undefined) {
+  if (scope === 'import') return q.is('task_no', null);
+  if (scope === 'entry') return q.not('task_no', 'is', null);
+  return q;
+}
+
 export type DmrFilterOp =
   | 'in'
   | 'text'
@@ -42,6 +56,7 @@ export interface DmrItemsParams {
   page: number;
   pageSize: number;
   directMap?: Map<string, boolean>; // for direct_flag resolution
+  scope?: DmrScope;
 }
 
 /** Client-side helper — apply filters via supabase-js query builder */
@@ -50,6 +65,7 @@ export function useDmrItemsQuery(p: DmrItemsParams) {
     queryKey: ['dmr', 'items', p],
     queryFn: async () => {
       let q: any = supabase.from('dmr_entries').select('*', { count: 'exact' });
+      q = applyDmrScope(q, p.scope);
 
       const q_text = (p.q ?? '').trim();
       if (q_text) {
@@ -129,14 +145,16 @@ export interface DmrFacetItem {
   cnt: number;
 }
 
-export function useDmrFacet(column: string | null, opts: { enabled?: boolean } = {}) {
+export function useDmrFacet(column: string | null, opts: { enabled?: boolean; scope?: DmrScope } = {}) {
+  const scope = opts.scope ?? 'all';
   return useQuery<DmrFacetItem[]>({
-    queryKey: ['dmr', 'facet', column],
+    queryKey: ['dmr', 'facet', column, scope],
     queryFn: async () => {
       if (!column) return [];
       const { data, error } = await (supabase as any).rpc('dmr_facets', {
         _column: column,
         _filters: [],
+        _scope: scope,
       });
       if (error) throw new Error(error.message);
       return ((data ?? []) as any[]).map((r) => ({

@@ -4,16 +4,16 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { EMPTY_TOKEN, useDmrFacet } from '@/hooks/useDmrEntries';
+import { EMPTY_TOKEN, useDmrFacet, type DmrScope } from '@/hooks/useDmrEntries';
 
-function MultiSelect({ column, options }: { column: any; options: { value: string; label: string }[] }) {
+function MultiSelect({ column, options, scope }: { column: any; options: { value: string; label: string }[]; scope?: DmrScope }) {
   const selected: string[] = (column.getFilterValue() as string[]) ?? [];
   const isActive = selected.length > 0;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const meta = (column.columnDef.meta ?? {}) as any;
   const facetCol: string | null = meta.serverFacet ?? null;
-  const { data: facet } = useDmrFacet(open ? facetCol : null, { enabled: open && !!facetCol });
+  const { data: facet } = useDmrFacet(open ? facetCol : null, { enabled: open && !!facetCol, scope });
 
   const items = useMemo(() => {
     const counts = new Map<string, number>();
@@ -179,10 +179,10 @@ function NumRange({ column }: { column: any }) {
   );
 }
 
-export function DmrColumnFilterDropdown({ column }: { column: any }) {
+export function DmrColumnFilterDropdown({ column, scope }: { column: any; scope?: DmrScope }) {
   const meta = (column.columnDef.meta ?? {}) as any;
   const t = meta.filterType ?? 'text';
-  if (t === 'multi-select') return <MultiSelect column={column} options={meta.filterOptions ?? []} />;
+  if (t === 'multi-select') return <MultiSelect column={column} options={meta.filterOptions ?? []} scope={scope} />;
   if (t === 'date-range') return <DateRange column={column} />;
   if (t === 'number-range') return <NumRange column={column} />;
   return <TextDropdown column={column} />;
