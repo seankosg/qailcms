@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, Plus, RefreshCcw, Save, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SortPriorityBadge } from '@/components/common/SortPriorityBadge';
 import { DmrColumnOrderMenu } from './DmrColumnOrderMenu';
@@ -162,12 +162,14 @@ export interface DmrEntryRecordCardProps {
   onDeleteRows: (keys: string[]) => void;
   /** 행을 위/아래로 한 칸 옮긴다 */
   onMoveRow: (key: string, dir: -1 | 1) => void;
+  /** 페이지에 로딩된 내용(로컬 초안)을 삭제한다. DB/Raw Data에는 반영하지 않는다. */
+  onReset: () => void;
 }
 
 /** Daily Entry Record — 입력 표 하나만 다룬다. 생산성 분석과 섞지 않는다. */
 export function DmrEntryRecordCard({
   reportDate, rows, tmByKey, tmOptionsByDiscipline, contractorOptions, systemOptions, workTypeOptions,
-  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave, onDeleteRows, onMoveRow,
+  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave, onDeleteRows, onMoveRow, onReset,
 }: DmrEntryRecordCardProps) {
   const [sorting, setSorting] = useState<SortEntry[]>([]);
   const [layout, setLayout] = useState<Layout>(() => loadLayout());
@@ -281,6 +283,15 @@ export function DmrEntryRecordCard({
               <Trash2 className="h-3.5 w-3.5" />선택 삭제 ({selected.length})
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1 text-xs"
+            title="페이지에 로딩된 내용을 지웁니다 (DB/Raw Data에는 반영되지 않음)"
+            onClick={onReset}
+          >
+            <RefreshCcw className="h-3.5 w-3.5" /> 초기화
+          </Button>
           <DmrColumnOrderMenu
             order={layout.order}
             visibility={layout.visibility}
