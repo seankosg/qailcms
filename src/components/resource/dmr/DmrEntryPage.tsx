@@ -423,16 +423,16 @@ export function DmrEntryPage() {
 
         <DmrEntryRecordCard
           reportDate={reportDate}
-          discipline={discipline}
-          rows={rows}
-          tmByNo={tmByNo}
-          tmOptions={tmOptions}
+          rows={view === 'ALL' ? rows : rows.filter((r) => r.discipline === view)}
+          tmByKey={tmByKey}
+          tmOptionsByDiscipline={tmOptionsByDiscipline}
           contractorOptions={contractorOptions}
           systemOptions={systemOptions}
           canEdit={canEdit}
           saving={saving}
           loading={existingQ.isFetching}
           validCount={valid.length}
+          totalCount={rows.length}
           onPatch={patch}
           onPickTask={pickTask}
           onAddRow={addRow}
