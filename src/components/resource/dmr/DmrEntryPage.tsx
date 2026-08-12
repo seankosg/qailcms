@@ -447,6 +447,7 @@ export function DmrEntryPage() {
 
         <DmrEntryProductivityCard reportDate={reportDate} />
       </div>
+      <DmrExportDialog open={exportOpen} onOpenChange={setExportOpen} defaultDate={reportDate} />
     </>
   );
 }
