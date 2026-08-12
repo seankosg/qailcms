@@ -496,7 +496,7 @@ export function DmrEntryPage() {
             <table className="w-full min-w-[1500px] text-xs">
               <thead className="bg-muted/50">
                 <tr className="[&>th]:whitespace-nowrap [&>th]:px-2 [&>th]:py-2 [&>th]:text-left">
-                  <th>TM Code</th><th>Work Type</th><th>당일 계획%</th><th>당일 실적%</th>
+                  <th>TM Code</th><th>Work Type</th><th>TC.Plan%</th><th>TC.Actual%</th>
                   <th>Worker</th><th>Foreman</th><th>Supervisor</th><th>총합</th>
                   <th>System</th><th>Contractor</th><th>Plot</th><th>담당자</th>
                 </tr>
@@ -565,15 +565,11 @@ export function DmrEntryPage() {
                       <td className="w-24 whitespace-nowrap">{tm?.row_type ?? '—'}</td>
                       <td className="w-32 whitespace-nowrap">
                         <div>{dPlan == null ? <span className="text-muted-foreground">—</span> : pctText(dPlan)}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {prev ? `직전 기록 ${prev.report_date}${segDays != null ? ` (${segDays}일)` : ''}` : '직전 기록 없음'}
-                        </div>
+                        <div className="text-[10px] text-muted-foreground">{reportDate} 하루치</div>
                       </td>
                       <td className="w-32 whitespace-nowrap">
                         <div>{dActual == null ? <span className="text-muted-foreground">—</span> : pctText(dActual)}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {prev ? `직전 기록 ${prev.report_date}${segDays != null ? ` (${segDays}일)` : ''}` : '직전 기록 없음'}
-                        </div>
+                        <div className="text-[10px] text-muted-foreground">{reportDate} 하루치</div>
                       </td>
                       <td className="w-20"><Input type="number" min={0} value={r.worker} onChange={(e) => patch(r.key, { worker: e.target.value })} className="h-8 text-xs" /></td>
                       <td className="w-20"><Input type="number" min={0} value={r.foreman} onChange={(e) => patch(r.key, { foreman: e.target.value })} className="h-8 text-xs" /></td>
