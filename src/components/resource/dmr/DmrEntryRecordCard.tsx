@@ -95,19 +95,46 @@ type SortKey =
 
 interface SortEntry { id: SortKey; desc: boolean }
 
-const SORT_COLUMNS: { id: SortKey; label: string }[] = [
-  { id: 'plot', label: 'Plot' },
-  { id: 'discipline', label: 'Team' },
-  { id: 'task_no', label: 'Task No (TM Code)' },
-  { id: 'task_name', label: 'Task / Subtask' },
-  { id: 'pic_name', label: 'HDEC PIC' },
-  { id: 'work_type', label: 'Work Type' },
-  { id: 'contractor_name', label: 'Sub Contractor' },
-  { id: 'system_name', label: 'System' },
-  { id: 'tc_plan_pct', label: 'TC Plan %' },
-  { id: 'tc_actual_pct', label: 'TC Actual %' },
-  { id: 'manpower', label: 'Total' },
+/** 열 정의 — 순서·표시·고정 설정과 정렬 키를 한 곳에서 관리한다. */
+const SORT_COLUMNS: { id: SortKey; label: string; width: number }[] = [
+  { id: 'plot', label: 'Plot', width: 88 },
+  { id: 'discipline', label: 'Team', width: 108 },
+  { id: 'task_no', label: 'Task No (TM Code)', width: 260 },
+  { id: 'task_name', label: 'Task / Subtask', width: 260 },
+  { id: 'pic_name', label: 'HDEC PIC', width: 168 },
+  { id: 'work_type', label: 'Work Type', width: 112 },
+  { id: 'contractor_name', label: 'Sub Contractor', width: 212 },
+  { id: 'system_name', label: 'System', width: 212 },
+  { id: 'tc_plan_pct', label: 'TC Plan %', width: 116 },
+  { id: 'tc_actual_pct', label: 'TC Actual %', width: 116 },
+  { id: 'manpower', label: 'Total', width: 100 },
 ];
+
+const COL_BY_ID = Object.fromEntries(SORT_COLUMNS.map((c) => [c.id, c])) as Record<SortKey, { id: SortKey; label: string; width: number }>;
+const DEFAULT_ORDER: string[] = SORT_COLUMNS.map((c) => c.id);
+const COL_LABELS: Record<string, string> = Object.fromEntries(SORT_COLUMNS.map((c) => [c.id, c.label]));
+const LAYOUT_KEY = 'dmr-entry-record-columns-v1';
+
+interface Layout { order: string[]; visibility: Record<string, boolean>; frozen: string[] }
+
+function loadLayout(): Layout {
+  const fallback: Layout = { order: DEFAULT_ORDER, visibility: {}, frozen: [] };
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_KEY);
+    if (!raw) return fallback;
+    const p = JSON.parse(raw) as Partial<Layout>;
+    const order = Array.isArray(p.order) ? p.order.filter((k) => DEFAULT_ORDER.includes(k)) : [];
+    for (const k of DEFAULT_ORDER) if (!order.includes(k)) order.push(k);
+    return {
+      order,
+      visibility: p.visibility && typeof p.visibility === 'object' ? p.visibility : {},
+      frozen: Array.isArray(p.frozen) ? p.frozen.filter((k) => DEFAULT_ORDER.includes(k)) : [],
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 export interface DmrEntryRecordCardProps {
   reportDate: string;
