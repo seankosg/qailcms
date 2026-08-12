@@ -101,23 +101,12 @@ export function DmrEntryPage() {
     enabled: !!teamQ.data,
     queryFn: async () => {
       const terms = DISCIPLINES.flatMap((d) => teamQ.data?.[d] ?? []);
-      // PostgREST 응답 행 상한(1,000) 때문에 한 번에 다 오지 않는다. 전량을 청크로 받는다.
-      const PAGE = 1000;
-      const HARD_CAP = 50_000;
-      const all: any[] = [];
-      for (let from = 0; from < HARD_CAP; from += PAGE) {
-        const { data, error } = await (supabase as any)
-          .rpc('tm_rows_as_of', { _as_of: reportDate })
-          .in('discipline', terms)
-          .range(from, from + PAGE - 1);
-        if (error) throw new Error(error.message);
-        const chunk = (data ?? []) as any[];
-        all.push(...chunk);
-        if (chunk.length < PAGE) break;
-        if (from + PAGE >= HARD_CAP) {
-          console.warn(`[DMR] TM 후보가 상한 ${HARD_CAP}건에 도달했습니다 — 일부가 잘렸을 수 있습니다`);
-        }
-      }
+      // 행별 반환 RPC 는 PostgREST 응답 상한(1,000)에 걸린다 → jsonb 스칼라 정본으로 전량 수신.
+      const termSet = new Set(terms.map((t) => String(t).toUpperCase()));
+      const { data: payload, error } = await (supabase as any).rpc('tm_rows_as_of_json', { p_as_of: reportDate });
+      if (error) throw new Error(error.message);
+      const rows: any[] = Array.isArray(payload) ? payload : ((payload?.rows ?? []) as any[]);
+      const all = rows.filter((r) => termSet.has(String(r.discipline ?? '').toUpperCase()));
       return all.map<TmOption & { _d: string }>((r) => ({
         _d: String(r.discipline ?? '').toUpperCase(),
         task_no: String(r.task_no),
