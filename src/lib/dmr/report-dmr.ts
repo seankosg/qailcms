@@ -47,7 +47,6 @@ async function fetchRows(opts: DmrReportOptions): Promise<Row[]> {
       .gte('report_date', opts.from)
       .lte('report_date', opts.to)
       .in('plot', ['C', 'D'])
-      .not('task_no', 'is', null)
       .order('report_date')
       .order('discipline')
       .order('work_category')
