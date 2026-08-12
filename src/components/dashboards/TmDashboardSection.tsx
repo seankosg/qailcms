@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import { TmPlanVsActualCard } from "@/components/task-management/dashboard/TmPlanVsActualCard";
 import { useTmScurveData } from "@/hooks/useTmScurveData";
-import { resolveActualPct, resolveIsDelayed } from "@/lib/task-management/delay-utils";
+import { resolveActualPct, resolveIsDelayed, resolvePlanPct } from "@/lib/task-management/delay-utils";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
 import { useUnionWindow } from "@/lib/charts/use-union-window";
