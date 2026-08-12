@@ -291,6 +291,16 @@ export function DmrEntryPage() {
     toast.success(`${keys.length}행을 표에서 지웠습니다 — 저장해야 확정됩니다`);
   };
 
+  /** 페이지에 로딩된 내용(로컬 초안)만 삭제한다. DB/Raw Data에는 반영되지 않는다. */
+  const resetRows = () => {
+    dirtyRef.current = true;
+    setRows([newEntryRow({ discipline })]);
+    if (typeof window !== 'undefined') {
+      try { window.sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    }
+    toast.info('페이지에 로딩된 내용을 지웠습니다. 저장하지 않으면 DB/Raw Data에 반영되지 않습니다.');
+  };
+
   const saveFn = useServerFn(saveDmrTaskEntries);
   const parseFn = useServerFn(parseDmrImages);
   const [importing, setImporting] = useState(false);
