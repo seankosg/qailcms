@@ -108,7 +108,7 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
       const section = SectionSchema.parse(parsed);
       section.report_date = normalizeDate(section.report_date);
       // Contractor 정규화 + 기존 미리보기(DmrImportPage) 호환용 values 채우기
-      section.rows = section.rows.map((r) => {
+      const rows = section.rows.map((r) => {
         const contractor = normalizeDmrContractor(r.contractor);
         const planC = r.values?.plan.C ?? 0;
         const planD = r.values?.plan.D ?? 0;
@@ -124,7 +124,7 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
           },
         };
       });
-      return section;
+      return { ...section, rows };
     }
 
     const results = await Promise.all(
