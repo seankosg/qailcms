@@ -13,6 +13,8 @@ import { useDmrSystemMaster, useDmrContractorMaster, useInvalidateDmr } from '@/
 import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
 import { parseDmrImages } from '@/lib/dmr-parse.functions';
 import { buildDmrEntryRowsFromSection } from '@/lib/dmr/entry-import';
+import { downscaleImage } from '@/lib/dmr/image-downscale';
+import { Progress } from '@/components/ui/progress';
 import { DmrExportDialog } from './DmrExportDialog';
 import { DmrReportDialog } from './DmrReportDialog';
 import { DmrTemplateBar } from './DmrTemplateBar';
@@ -310,26 +312,50 @@ export function DmrEntryPage() {
   const saveFn = useServerFn(saveDmrTaskEntries);
   const parseFn = useServerFn(parseDmrImages);
   const [importing, setImporting] = useState(false);
+  /** 읽기 진행 상태 — 파일별 단계(줄이기/올리기/읽기)를 %로 보여준다. */
+  const [importProgress, setImportProgress] = useState<{ pct: number; label: string } | null>(null);
 
   /** 스크린샷 → 같은 표의 행으로 채워 넣는다. 자동 저장하지 않는다. */
   async function onImportFiles(files: File[]) {
     if (files.length === 0) return;
     setImporting(true);
+    const picked = files.filter((f) => f.type.startsWith('image/')).slice(0, 3);
+    const stepsTotal = picked.length * 3; // 줄이기 + 올리기 + 읽기
+    let stepsDone = 0;
+    const bump = (label: string) => {
+      setImportProgress({ pct: stepsTotal ? Math.round((stepsDone / stepsTotal) * 100) : 0, label });
+    };
+    bump('준비 중…');
     try {
-      const storagePaths: string[] = [];
-      for (const f of files.slice(0, 3)) {
-        const ext = f.name.split('.').pop() || 'png';
-        const path = `${me.data?.id ?? 'anon'}/${Date.now()}-entry.${ext}`;
-        const up = await supabase.storage.from('dmr-uploads').upload(path, f, { upsert: false });
-        if (up.error) throw new Error(up.error.message);
-        storagePaths.push(path);
-      }
-      if (storagePaths.length === 0) {
+      if (picked.length === 0) {
         toast.error('스크린샷 이미지 파일만 읽을 수 있습니다');
         return;
       }
-      const res: any = await parseFn({ data: { storagePaths } });
-      const errs = (res?.results ?? []).filter((r: any) => r.error);
+      // 한 번에 몰아 보내면 오래 걸리고 어디서 막혔는지도 알 수 없다. 장당 따로 처리한다.
+      const allResults: any[] = [];
+      for (let i = 0; i < picked.length; i++) {
+        const n = `${i + 1}/${picked.length}`;
+        bump(`이미지 ${n} 줄이는 중…`);
+        const small = await downscaleImage(picked[i]);
+        stepsDone++;
+        bump(`이미지 ${n} 올리는 중…`);
+        const ext = small.name.split('.').pop() || 'jpg';
+        const path = `${me.data?.id ?? 'anon'}/${Date.now()}-${i}-entry.${ext}`;
+        const up = await supabase.storage.from('dmr-uploads').upload(path, small, { upsert: false });
+        if (up.error) throw new Error(up.error.message);
+        stepsDone++;
+        bump(`이미지 ${n} 읽는 중…`);
+        try {
+          const one: any = await parseFn({ data: { storagePaths: [path] } });
+          allResults.push(...(one?.results ?? []));
+        } catch (e: any) {
+          allResults.push({ path, section: null, error: e?.message ?? '읽기 실패' });
+        }
+        stepsDone++;
+        bump(`이미지 ${n} 완료`);
+      }
+      const res: any = { results: allResults };
+      const errs = allResults.filter((r: any) => r.error);
       let added: ReturnType<typeof buildDmrEntryRowsFromSection> = [];
       let addedRows: EntryRow[] = [];
       const warns: string[] = [];
@@ -388,6 +414,7 @@ export function DmrEntryPage() {
       toast.error(e?.message ?? '불러오기 실패');
     } finally {
       setImporting(false);
+      setImportProgress(null);
     }
   }
 
@@ -512,6 +539,14 @@ export function DmrEntryPage() {
             <span className="text-xs text-muted-foreground">
               {existingQ.isFetching ? '저장된 행 불러오는 중…' : `저장된 묶음 ${rows.filter((r) => r.saved).length}행`}
             </span>
+            {importProgress && (
+              <div className="flex w-full min-w-[200px] items-center gap-2 sm:w-64">
+                <Progress value={importProgress.pct} className="h-2 flex-1" />
+                <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                  {importProgress.pct}% · {importProgress.label}
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
