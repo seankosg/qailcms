@@ -230,6 +230,11 @@ export function DmrEntryPage() {
       ),
     [systemsQ.data],
   );
+  const workTypeOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tmQ.data ?? []) if (t.row_type?.trim()) set.add(t.row_type.trim());
+    return [...set].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+  }, [tmQ.data]);
 
   const patch = (key: string, p: Partial<EntryRow>) => {
     dirtyRef.current = true;
