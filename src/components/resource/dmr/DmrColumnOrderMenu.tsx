@@ -10,6 +10,10 @@ interface Props {
   order: string[];
   visibility: Record<string, boolean>;
   frozenExtras: string[];
+  /** 열 라벨 조회 (기본: DMR Raw Data 열 묶음) */
+  labelByKey?: Record<string, string>;
+  /** Reset 시 되돌릴 기본 순서 */
+  defaultOrder?: string[];
   onOrderChange: (next: string[]) => void;
   onVisibilityChange: (next: Record<string, boolean>) => void;
   onFrozenChange: (next: string[]) => void;
@@ -17,9 +21,9 @@ interface Props {
   onSaveLayout?: () => void;
 }
 
-export function DmrColumnOrderMenu({ order, visibility, frozenExtras, onOrderChange, onVisibilityChange, onFrozenChange, onSaveLayout }: Props) {
+export function DmrColumnOrderMenu({ order, visibility, frozenExtras, labelByKey, defaultOrder, onOrderChange, onVisibilityChange, onFrozenChange, onSaveLayout }: Props) {
   const [dragKey, setDragKey] = useState<string | null>(null);
-  const label = (k: string) => DMR_COLUMN_BY_KEY[k]?.label ?? k;
+  const label = (k: string) => labelByKey?.[k] ?? DMR_COLUMN_BY_KEY[k]?.label ?? k;
 
   const toggleFrozen = (k: string) => {
     if (frozenExtras.includes(k)) onFrozenChange(frozenExtras.filter((x) => x !== k));
@@ -40,7 +44,7 @@ export function DmrColumnOrderMenu({ order, visibility, frozenExtras, onOrderCha
           <button className="text-primary hover:underline" onClick={() => {
             onVisibilityChange({});
             onFrozenChange([]);
-            onOrderChange(DMR_COLUMN_KEYS);
+            onOrderChange(defaultOrder ?? DMR_COLUMN_KEYS);
           }}>Reset</button>
         </div>
         {onSaveLayout ? (
