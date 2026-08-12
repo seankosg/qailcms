@@ -222,7 +222,13 @@ export function DmrEntryPage() {
     () => (contractorsQ.data ?? []).map((c) => ({ value: c.name, label: c.name })),
     [contractorsQ.data],
   );
-  const systemOptions = useMemo(() => (systemsQ.data ?? []).map((s) => s.name), [systemsQ.data]);
+  const systemOptions = useMemo(
+    () =>
+      [...new Set((systemsQ.data ?? []).map((s) => s.name).filter((s) => s && String(s).trim()))].sort((a, b) =>
+        a.localeCompare(b, 'en', { sensitivity: 'base' }),
+      ),
+    [systemsQ.data],
+  );
 
   const patch = (key: string, p: Partial<EntryRow>) => {
     dirtyRef.current = true;
