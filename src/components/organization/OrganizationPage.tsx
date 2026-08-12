@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { todayInDoha } from "@/lib/time/doha";
-import { ArrowRight, Users, UserCog, CalendarClock, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Users, UserCog, CalendarClock, CheckCircle2, Pencil } from "lucide-react";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { DelegationEditDialog } from "./DelegationEditDialog";
 
 interface Row {
   id: string;
@@ -24,6 +26,7 @@ interface Row {
   end_date: string;
   status: string;
   note: string | null;
+  created_by?: string | null;
   task?: { task_no: string | null; task_name: string | null; team: string | null; plot: string | null; discipline: string | null } | null;
 }
 
@@ -51,6 +54,18 @@ export function OrganizationPage() {
   const [asOf, setAsOf] = useState(todayIso());
   const [q, setQ] = useState("");
   const [phase, setPhase] = useState<Phase | "all">("active");
+  const { data: me } = useCurrentUser();
+  const [editRow, setEditRow] = useState<Row | null>(null);
+
+  /** 수정·삭제 게이트 — 본인(등록자/인계자) 또는 Superuser 이상. 정본은 서버 RLS. */
+  const canManage = (r: Row) => {
+    if (!me) return false;
+    if (me.isSystemAdmin || me.isAdmin || me.isSuperUser) return true;
+    if (r.created_by && r.created_by === me.id) return true;
+    const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+    const mine = norm(me.hdec_pic_name ?? me.name);
+    return !!mine && norm(r.from_pic) === mine;
+  };
 
   const rowsQ = useQuery<Row[]>({
     queryKey: ["organization", "delegations"],
@@ -59,7 +74,7 @@ export function OrganizationPage() {
       const { data, error } = await (supabase as any)
         .from("tm_pic_delegations")
         .select(
-          "id,task_raw_id,from_pic,to_pic,start_date,end_date,status,note,task:task_management_raw(task_no,task_name,team,plot,discipline)",
+          "id,task_raw_id,from_pic,to_pic,start_date,end_date,status,note,created_by,task:task_management_raw(task_no,task_name,team,plot,discipline)",
         )
         .order("start_date", { ascending: false })
         .limit(5000);
@@ -261,11 +276,12 @@ export function OrganizationPage() {
                     <th className="py-1 text-left font-medium">인계 → 인수</th>
                     <th className="py-1 text-left font-medium">기간</th>
                     <th className="py-1 text-left font-medium">사유</th>
+                    <th className="py-1 text-right font-medium">관리</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={8} className="py-6 text-center text-muted-foreground">표시할 이관이 없습니다.</td></tr>
+                    <tr><td colSpan={9} className="py-6 text-center text-muted-foreground">표시할 이관이 없습니다.</td></tr>
                   )}
                   {filtered.map(({ r, p }) => (
                     <tr key={r.id} className="border-b last:border-0">
@@ -281,6 +297,21 @@ export function OrganizationPage() {
                       <td className="whitespace-nowrap py-1">{r.from_pic} → <span className="font-medium">{r.to_pic}</span></td>
                       <td className="whitespace-nowrap py-1 text-muted-foreground">{r.start_date} ~ {r.end_date}</td>
                       <td className="max-w-[160px] truncate py-1 text-muted-foreground">{r.note ?? ""}</td>
+                      <td className="py-1 text-right">
+                        {canManage(r) ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 gap-1 px-2 text-[11px]"
+                            onClick={() => setEditRow(r)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                            수정
+                          </Button>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -289,6 +320,12 @@ export function OrganizationPage() {
           )}
         </CardContent>
       </Card>
+
+      <DelegationEditDialog
+        row={editRow}
+        open={!!editRow}
+        onOpenChange={(v) => { if (!v) setEditRow(null); }}
+      />
     </div>
   );
 }
