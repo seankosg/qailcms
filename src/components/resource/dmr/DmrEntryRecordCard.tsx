@@ -65,6 +65,26 @@ function SearchSelect({
 
 const pctText = (v: number | null) => (v == null ? '' : `${Math.round(v * 10) / 10}%`);
 
+type SortKey =
+  | 'plot' | 'discipline' | 'task_no' | 'task_name' | 'pic_name' | 'work_type'
+  | 'contractor_name' | 'system_name' | 'tc_plan_pct' | 'tc_actual_pct' | 'manpower';
+
+interface SortEntry { id: SortKey; desc: boolean }
+
+const SORT_COLUMNS: { id: SortKey; label: string }[] = [
+  { id: 'plot', label: 'Plot' },
+  { id: 'discipline', label: 'Team' },
+  { id: 'task_no', label: 'Task No (TM Code)' },
+  { id: 'task_name', label: 'Task / Subtask' },
+  { id: 'pic_name', label: 'HDEC PIC' },
+  { id: 'work_type', label: 'Work Type' },
+  { id: 'contractor_name', label: 'Sub Contractor' },
+  { id: 'system_name', label: 'System' },
+  { id: 'tc_plan_pct', label: 'TC Plan %' },
+  { id: 'tc_actual_pct', label: 'TC Actual %' },
+  { id: 'manpower', label: 'Total' },
+];
+
 export interface DmrEntryRecordCardProps {
   reportDate: string;
   rows: EntryRow[];
