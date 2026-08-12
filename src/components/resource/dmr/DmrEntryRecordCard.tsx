@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Save } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Save, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { SortPriorityBadge } from '@/components/common/SortPriorityBadge';
 import { DmrColumnOrderMenu } from './DmrColumnOrderMenu';
 import { cn } from '@/lib/utils';
@@ -154,15 +155,18 @@ export interface DmrEntryRecordCardProps {
   onPickTask: (key: string, taskNo: string) => void;
   onAddRow: () => void;
   onSave: () => void;
+  /** 선택한 행을 표에서 지운다 (저장 전 편집 상태 기준) */
+  onDeleteRows: (keys: string[]) => void;
 }
 
 /** Daily Entry Record — 입력 표 하나만 다룬다. 생산성 분석과 섞지 않는다. */
 export function DmrEntryRecordCard({
   reportDate, rows, tmByKey, tmOptionsByDiscipline, contractorOptions, systemOptions,
-  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave,
+  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave, onDeleteRows,
 }: DmrEntryRecordCardProps) {
   const [sorting, setSorting] = useState<SortEntry[]>([]);
   const [layout, setLayout] = useState<Layout>(() => loadLayout());
+  const [selected, setSelected] = useState<string[]>([]);
 
   /** Task/Subtask 자유 입력 보조 목록 — TM 명칭을 제안으로만 쓴다 */
   const taskNameOptions = useMemo(() => {
@@ -186,7 +190,7 @@ export function DmrEntryRecordCard({
 
   const stickyLeft = useMemo(() => {
     const map: Record<string, number> = {};
-    let acc = 0;
+    let acc = SELECT_COL_W; // 선택 칸이 항상 맨 왼쪽에 고정된다
     for (const k of layout.frozen) {
       if (layout.visibility[k] === false) continue;
       map[k] = acc;
