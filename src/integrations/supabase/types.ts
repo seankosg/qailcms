@@ -8780,7 +8780,7 @@ export type Database = {
         Returns: Json
       }
       dmr_facets: {
-        Args: { _column: string; _filters?: Json }
+        Args: { _column: string; _filters?: Json; _scope?: string }
         Returns: {
           cnt: number
           value: string
