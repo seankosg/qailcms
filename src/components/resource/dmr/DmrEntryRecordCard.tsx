@@ -283,6 +283,15 @@ export function DmrEntryRecordCard({
               <Trash2 className="h-3.5 w-3.5" />선택 삭제 ({selected.length})
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1 text-xs"
+            title="페이지에 로딩된 내용을 지웁니다 (DB/Raw Data에는 반영되지 않음)"
+            onClick={onReset}
+          >
+            <RefreshCcw className="h-3.5 w-3.5" /> 초기화
+          </Button>
           <DmrColumnOrderMenu
             order={layout.order}
             visibility={layout.visibility}
@@ -293,15 +302,6 @@ export function DmrEntryRecordCard({
             onVisibilityChange={(visibility) => setLayout((p) => ({ ...p, visibility }))}
             onFrozenChange={(frozen) => setLayout((p) => ({ ...p, frozen }))}
           />
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1 text-xs"
-            title="페이지에 로딩된 내용을 지웁니다 (DB/Raw Data에는 반영되지 않음)"
-            onClick={onReset}
-          >
-            <RefreshCcw className="h-3.5 w-3.5" /> 초기화
-          </Button>
           {sorting.length > 0 && (
             <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSorting([])}>
               정렬 해제 ({sorting.length})
