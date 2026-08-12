@@ -17,9 +17,9 @@ import { exportDmrTeamsWorkbook } from '@/lib/dmr/export-dmr-team';
 import { DMR_HEADCOUNT_KINDS } from '@/lib/dmr/task-link';
 import { DmrEntryRecordCard } from './DmrEntryRecordCard';
 import { DmrEntryProductivityCard } from './DmrEntryProductivityCard';
-import { newEntryRow, type EntryRow, type TmOption } from './entry-types';
+import { newEntryRow, type EntryRow, type TmOption, type DmrDiscipline } from './entry-types';
 
-type Discipline = 'ARCH' | 'ELEC' | 'MECH';
+type Discipline = DmrDiscipline;
 const DISCIPLINES: Discipline[] = ['ARCH', 'ELEC', 'MECH'];
 
 export type { EntryRow } from './entry-types';
@@ -31,7 +31,9 @@ export function DmrEntryPage() {
   const invalidate = useInvalidateDmr();
 
   const [reportDate, setReportDate] = useState(todayInDoha());
-  const [discipline, setDiscipline] = useState<Discipline>('ARCH');
+  // 공종 탭은 보기 필터일 뿐이다. 하루치 기록은 세 공종이 한 표에 함께 있다.
+  const [view, setView] = useState<Discipline | 'ALL'>('ALL');
+  const discipline: Discipline = view === 'ALL' ? 'ARCH' : view;
   const [rows, setRows] = useState<EntryRow[]>([newEntryRow()]);
   const [saving, setSaving] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
@@ -41,26 +43,39 @@ export function DmrEntryPage() {
   const systemsQ = useDmrSystemMaster();
   const contractorsQ = useDmrContractorMaster();
 
-  // 공종 어휘 매핑은 team_master 가 유일한 근거다.
+  // 공종 어휘 매핑은 team_master 가 유일한 근거다. 세 공종 모두 읽는다.
   const teamQ = useQuery({
-    queryKey: ['team_master', discipline],
+    queryKey: ['team_master', 'dmr-all'],
     queryFn: async () => {
-      const { data } = await supabase.from('team_master').select('code, aliases').eq('code', discipline).maybeSingle();
-      const t = data as any;
-      return t ? [String(t.code), ...((t.aliases ?? []) as string[])] : [discipline];
+      const { data } = await supabase.from('team_master').select('code, aliases').in('code', DISCIPLINES);
+      const map: Record<string, string[]> = {};
+      for (const d of DISCIPLINES) {
+        const t = (data ?? []).find((x: any) => String(x.code) === d) as any;
+        map[d] = t ? [String(t.code), ...((t.aliases ?? []) as string[]).map(String)] : [d];
+      }
+      return map;
     },
     staleTime: 300_000,
   });
+
+  /** TM 공종 어휘 → DMR 공종 코드 */
+  const disciplineOfTerm = useMemo(() => {
+    const m = new Map<string, Discipline>();
+    for (const d of DISCIPLINES) for (const t of teamQ.data?.[d] ?? []) m.set(String(t).toUpperCase(), d);
+    return m;
+  }, [teamQ.data]);
 
   const tmQ = useQuery({
     queryKey: ['dmr-entry-tm', reportDate, teamQ.data],
     enabled: !!teamQ.data,
     queryFn: async () => {
+      const terms = DISCIPLINES.flatMap((d) => teamQ.data?.[d] ?? []);
       const { data, error } = await (supabase as any)
         .rpc('tm_rows_as_of', { _as_of: reportDate })
-        .in('discipline', teamQ.data as string[]);
+        .in('discipline', terms);
       if (error) throw new Error(error.message);
-      return ((data ?? []) as any[]).map<TmOption>((r) => ({
+      return ((data ?? []) as any[]).map<TmOption & { _d: string }>((r) => ({
+        _d: String(r.discipline ?? '').toUpperCase(),
         task_no: String(r.task_no),
         task_name: r.task_name ?? null,
         level: r.level ?? null,
@@ -79,22 +94,29 @@ export function DmrEntryPage() {
     staleTime: 60_000,
   });
 
-  const tmByNo = useMemo(() => {
+  /** `${공종}|${task_no}` 키 */
+  const tmByKey = useMemo(() => {
     const m = new Map<string, TmOption>();
-    for (const t of tmQ.data ?? []) if (!m.has(t.task_no)) m.set(t.task_no, t);
+    for (const t of tmQ.data ?? []) {
+      const d = disciplineOfTerm.get(t._d);
+      if (!d) continue;
+      const k = `${d}|${t.task_no}`;
+      if (!m.has(k)) m.set(k, t);
+    }
     return m;
-  }, [tmQ.data]);
+  }, [tmQ.data, disciplineOfTerm]);
 
-  // 이미 저장된 행 — 저장된 값 그대로. (task_no·System·Contractor·Plot) 묶음의 3행을 1행으로 되접는다.
+  // 이미 저장된 행 — 저장된 값 그대로. 세 공종을 모두 불러온다.
   const existingQ = useQuery({
-    queryKey: ['dmr-entry-existing', reportDate, discipline],
+    queryKey: ['dmr-entry-existing', reportDate],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('dmr_entries')
         .select('*')
         .eq('report_date', reportDate)
-        .eq('discipline', discipline)
+        .in('discipline', DISCIPLINES)
         .in('plot', ['C', 'D'])
+        .order('discipline')
         .order('system_name')
         .order('contractor_name')
         .order('plot')
@@ -105,17 +127,18 @@ export function DmrEntryPage() {
     staleTime: 0,
   });
 
-  const loadedKey = `${reportDate}|${discipline}|${reloadTick}`;
+  const loadedKey = `${reportDate}|${reloadTick}`;
   useEffect(() => {
     if (!existingQ.data) return;
     if (dirtyRef.current) return; // 미저장 변경 보호
     const byGroup = new Map<string, EntryRow>();
     for (const r of existingQ.data) {
-      const gk = `${r.task_no ?? ''}|${r.system_name ?? ''}|${r.contractor_name ?? ''}|${r.plot === 'D' ? 'D' : 'C'}`;
+      const gk = `${r.discipline ?? 'ARCH'}|${r.task_no ?? ''}|${r.system_name ?? ''}|${r.contractor_name ?? ''}|${r.plot === 'D' ? 'D' : 'C'}`;
       let row = byGroup.get(gk);
       if (!row) {
         row = newEntryRow({
           key: `s${gk}`,
+          discipline: (DISCIPLINES.includes(r.discipline) ? r.discipline : 'ARCH') as Discipline,
           task_no: r.task_no ?? '',
           system_name: r.system_name ?? '',
           contractor_name: r.contractor_name ?? '',
@@ -143,12 +166,16 @@ export function DmrEntryPage() {
 
   useEffect(() => {
     dirtyRef.current = false;
-  }, [reportDate, discipline]);
+  }, [reportDate]);
 
-  const tmOptions = useMemo(
-    () => (tmQ.data ?? []).map((t) => ({ value: t.task_no, label: t.task_no, hint: t.task_name ?? '' })),
-    [tmQ.data],
-  );
+  const tmOptionsByDiscipline = useMemo(() => {
+    const out: Record<string, { value: string; label: string; hint?: string }[]> = { ARCH: [], ELEC: [], MECH: [] };
+    for (const [k, t] of tmByKey) {
+      const d = k.split('|')[0];
+      (out[d] ??= []).push({ value: t.task_no, label: t.task_no, hint: t.task_name ?? '' });
+    }
+    return out;
+  }, [tmByKey]);
   const contractorOptions = useMemo(
     () => (contractorsQ.data ?? []).map((c) => ({ value: c.name, label: c.name })),
     [contractorsQ.data],
@@ -162,7 +189,8 @@ export function DmrEntryPage() {
 
   /** TM 코드를 고르면 Work Type · Plot · 담당자가 따라온다. 추정하지 않는다. */
   const pickTask = (key: string, taskNo: string) => {
-    const t = taskNo ? tmByNo.get(taskNo) : null;
+    const row = rows.find((r) => r.key === key);
+    const t = taskNo && row ? tmByKey.get(`${row.discipline}|${taskNo}`) : null;
     patch(key, {
       task_no: taskNo,
       unmatched: false,
@@ -177,7 +205,7 @@ export function DmrEntryPage() {
 
   const addRow = () => {
     dirtyRef.current = true;
-    setRows((p) => [...p, newEntryRow()]);
+    setRows((p) => [...p, newEntryRow({ discipline })]);
   };
 
   const saveFn = useServerFn(saveDmrTaskEntries);
