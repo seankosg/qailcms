@@ -127,6 +127,7 @@ export function buildDmrEntryRowsFromSection(
         imported: true,
         unmatched,
         multiCode,
+        importIndex: a.importIndex,
       }),
     );
   };
