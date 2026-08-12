@@ -148,6 +148,7 @@ export interface DmrEntryRecordCardProps {
   tmOptionsByDiscipline: Record<string, { value: string; label: string; hint?: string }[]>;
   contractorOptions: { value: string; label: string }[];
   systemOptions: string[];
+  workTypeOptions: string[];
   canEdit: boolean;
   saving: boolean;
   loading: boolean;
