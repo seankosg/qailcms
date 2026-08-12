@@ -4,7 +4,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, Upload, Loader2 } from 'lucide-react';
+import { Download, Upload, Loader2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { todayInDoha } from '@/lib/time/doha';
@@ -14,6 +14,7 @@ import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
 import { parseDmrImages } from '@/lib/dmr-parse.functions';
 import { buildDmrEntryRowsFromSection } from '@/lib/dmr/entry-import';
 import { DmrExportDialog } from './DmrExportDialog';
+import { DmrReportDialog } from './DmrReportDialog';
 import { DmrTemplateBar } from './DmrTemplateBar';
 import { DmrEntryRecordCard } from './DmrEntryRecordCard';
 import { DmrEntryProductivityCard } from './DmrEntryProductivityCard';
@@ -406,6 +407,7 @@ export function DmrEntryPage() {
   }
 
   const [exportOpen, setExportOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const unmatchedCount = rows.filter((r) => r.unmatched).length;
   const multiCodeCount = rows.filter((r) => r.multiCode).length;
@@ -428,6 +430,10 @@ export function DmrEntryPage() {
                 setRows(loaded);
               }}
             />
+            <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setReportOpen(true)}>
+              <FileText className="h-3.5 w-3.5" />
+              Report
+            </Button>
             <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setExportOpen(true)}>
               <Download className="h-3.5 w-3.5" />
               엑셀 내보내기
@@ -527,6 +533,7 @@ export function DmrEntryPage() {
         <DmrEntryProductivityCard reportDate={reportDate} />
       </div>
       <DmrExportDialog open={exportOpen} onOpenChange={setExportOpen} defaultDate={reportDate} />
+      <DmrReportDialog open={reportOpen} onOpenChange={setReportOpen} defaultDate={reportDate} />
     </>
   );
 }
