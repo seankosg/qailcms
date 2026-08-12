@@ -118,9 +118,37 @@ export const saveDmrTaskEntries = createServerFn({ method: 'POST' })
       };
     });
 
+    // 동일 충돌 키가 한 배치에 두 번 들어오면 Postgres 가
+    // "ON CONFLICT DO UPDATE command cannot affect row a second time" 로 실패한다.
+    // 저장 전에 충돌 키 기준으로 합산 병합한다(인원은 합, 나머지는 나중 값 우선).
+    const mergedMap = new Map<string, (typeof payload)[number]>();
+    for (const row of payload) {
+      const key = [
+        row.report_date,
+        row.discipline,
+        row.system_name,
+        row.contractor_name,
+        row.plot,
+        row.task_no ?? '',
+        row.headcount_kind,
+      ].join('\u0001');
+      const prev = mergedMap.get(key);
+      if (!prev) {
+        mergedMap.set(key, { ...row });
+        continue;
+      }
+      mergedMap.set(key, {
+        ...prev,
+        ...row,
+        plan_manpower: (prev.plan_manpower ?? 0) + (row.plan_manpower ?? 0),
+        actual_manpower: (prev.actual_manpower ?? 0) + (row.actual_manpower ?? 0),
+      });
+    }
+    const mergedPayload = [...mergedMap.values()];
+
     const { data: saved, error } = await sb
       .from('dmr_entries')
-      .upsert(payload, {
+      .upsert(mergedPayload, {
         onConflict:
           'report_date,discipline,system_name,contractor_name,plot,task_no,headcount_kind',
       })
@@ -129,7 +157,8 @@ export const saveDmrTaskEntries = createServerFn({ method: 'POST' })
 
     return {
       ok: true,
-      saved: saved?.length ?? payload.length,
+      saved: saved?.length ?? mergedPayload.length,
+      merged: payload.length - mergedPayload.length,
       snapshot_at: snapshotAt,
       linked_tasks: snapshot.size,
       missing_task_nos: [...new Set(missing)],
