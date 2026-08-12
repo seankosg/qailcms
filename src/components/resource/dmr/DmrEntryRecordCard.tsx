@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, Plus, RefreshC
 import { Checkbox } from '@/components/ui/checkbox';
 import { SortPriorityBadge } from '@/components/common/SortPriorityBadge';
 import { DmrColumnOrderMenu } from './DmrColumnOrderMenu';
+import { useUserViewPreference } from '@/hooks/useUserViewPreference';
 import { cn } from '@/lib/utils';
 import type { EntryRow, TmOption } from './entry-types';
 
@@ -121,6 +122,17 @@ const SELECT_COL_W = 76;
 
 interface Layout { order: string[]; visibility: Record<string, boolean>; frozen: string[] }
 
+/** 임의 객체를 Layout 형태로 정규화한다 (서버/로컬 공통). */
+function normalizeLayout(p: Partial<Layout> | null | undefined): Layout {
+  const order = Array.isArray(p?.order) ? p!.order.filter((k) => DEFAULT_ORDER.includes(k)) : [];
+  for (const k of DEFAULT_ORDER) if (!order.includes(k)) order.push(k);
+  return {
+    order,
+    visibility: p?.visibility && typeof p.visibility === 'object' ? p.visibility : {},
+    frozen: Array.isArray(p?.frozen) ? p!.frozen.filter((k) => DEFAULT_ORDER.includes(k)) : [],
+  };
+}
+
 function loadLayout(): Layout {
   const fallback: Layout = { order: DEFAULT_ORDER, visibility: {}, frozen: [] };
   if (typeof window === 'undefined') return fallback;
@@ -128,13 +140,7 @@ function loadLayout(): Layout {
     const raw = window.localStorage.getItem(LAYOUT_KEY);
     if (!raw) return fallback;
     const p = JSON.parse(raw) as Partial<Layout>;
-    const order = Array.isArray(p.order) ? p.order.filter((k) => DEFAULT_ORDER.includes(k)) : [];
-    for (const k of DEFAULT_ORDER) if (!order.includes(k)) order.push(k);
-    return {
-      order,
-      visibility: p.visibility && typeof p.visibility === 'object' ? p.visibility : {},
-      frozen: Array.isArray(p.frozen) ? p.frozen.filter((k) => DEFAULT_ORDER.includes(k)) : [],
-    };
+    return normalizeLayout(p);
   } catch {
     return fallback;
   }
@@ -175,6 +181,15 @@ export function DmrEntryRecordCard({
   const [layout, setLayout] = useState<Layout>(() => loadLayout());
   const [selected, setSelected] = useState<string[]>([]);
 
+  /** 컬럼 설정은 계정 단위로 서버에 저장한다 (로컬은 캐시 겸 폴백). */
+  const columnPref = useUserViewPreference(LAYOUT_KEY);
+  const prefAppliedRef = useRef(false);
+  useEffect(() => {
+    if (prefAppliedRef.current || !columnPref.ready) return;
+    prefAppliedRef.current = true;
+    if (columnPref.state) setLayout(normalizeLayout(columnPref.state as Partial<Layout>));
+  }, [columnPref.ready, columnPref.state]);
+
   /** Task/Subtask 자유 입력 보조 목록 — TM 명칭을 제안으로만 쓴다 */
   const taskNameOptions = useMemo(() => {
     const set = new Set<string>();
@@ -186,6 +201,8 @@ export function DmrEntryRecordCard({
 
   useEffect(() => {
     try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* 저장 실패는 무시 */ }
+    if (prefAppliedRef.current) columnPref.save(layout as unknown as Record<string, unknown>);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout]);
 
   /** 좌측 고정열 먼저, 그 뒤 나머지 순서. 숨김열은 제외. */
