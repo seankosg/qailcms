@@ -21,6 +21,22 @@ import { newEntryRow, type EntryRow, type TmOption, type DmrDiscipline } from '.
 type Discipline = DmrDiscipline;
 const DISCIPLINES: Discipline[] = ['ARCH', 'ELEC', 'MECH'];
 
+/** 화면을 떠났다 돌아와도 작성 중 내용이 남도록 세션에 초안을 둔다. 저장 전까지만 유효하다. */
+const DRAFT_KEY = 'dmr-entry-draft-v1';
+type Draft = { reportDate: string; view: Discipline | 'ALL'; rows: EntryRow[]; dirty: boolean };
+function readDraft(): Draft | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Draft;
+    if (!d || !Array.isArray(d.rows) || d.rows.length === 0) return null;
+    return d;
+  } catch {
+    return null;
+  }
+}
+
 export type { EntryRow } from './entry-types';
 export { newEntryRow } from './entry-types';
 
@@ -29,14 +45,28 @@ export function DmrEntryPage() {
   const canEdit = me.data?.canEdit === true;
   const invalidate = useInvalidateDmr();
 
-  const [reportDate, setReportDate] = useState(todayInDoha());
+  const draft0 = useRef<Draft | null>(readDraft()).current;
+  const [reportDate, setReportDate] = useState(draft0?.reportDate ?? todayInDoha());
   // 공종 탭은 보기 필터일 뿐이다. 하루치 기록은 세 공종이 한 표에 함께 있다.
-  const [view, setView] = useState<Discipline | 'ALL'>('ALL');
+  const [view, setView] = useState<Discipline | 'ALL'>(draft0?.view ?? 'ALL');
   const discipline: Discipline = view === 'ALL' ? 'ARCH' : view;
-  const [rows, setRows] = useState<EntryRow[]>([newEntryRow()]);
+  const [rows, setRows] = useState<EntryRow[]>(draft0?.rows ?? [newEntryRow()]);
   const [saving, setSaving] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
-  const dirtyRef = useRef(false);
+  const dirtyRef = useRef(draft0?.dirty === true);
+
+  // 작성 중 내용은 매 변경마다 세션에 남긴다 (다른 페이지로 갔다 와도 유지).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ reportDate, view, rows, dirty: dirtyRef.current } satisfies Draft),
+      );
+    } catch {
+      /* 저장 공간 초과는 무시한다 */
+    }
+  }, [reportDate, view, rows, saving]);
   // 스크린샷의 보고일을 자동 반영할 때, 기준일 변경으로 표가 초기화되지 않게 막는다.
   const keepRowsOnDateChangeRef = useRef(false);
   const [reloadTick, setReloadTick] = useState(0);
