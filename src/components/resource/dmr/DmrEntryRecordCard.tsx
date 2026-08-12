@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, Plus, RefreshC
 import { Checkbox } from '@/components/ui/checkbox';
 import { SortPriorityBadge } from '@/components/common/SortPriorityBadge';
 import { DmrColumnOrderMenu } from './DmrColumnOrderMenu';
+import { useUserViewPreference } from '@/hooks/useUserViewPreference';
 import { cn } from '@/lib/utils';
 import type { EntryRow, TmOption } from './entry-types';
 
