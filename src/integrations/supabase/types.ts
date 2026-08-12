@@ -3475,6 +3475,33 @@ export type Database = {
           },
         ]
       }
+      dmr_entry_templates: {
+        Row: {
+          row_count: number
+          rows: Json
+          scope: string
+          updated_at: string
+          updated_by: string | null
+          updated_by_name: string | null
+        }
+        Insert: {
+          row_count?: number
+          rows?: Json
+          scope: string
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+        }
+        Update: {
+          row_count?: number
+          rows?: Json
+          scope?: string
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+        }
+        Relationships: []
+      }
       dmr_system_master: {
         Row: {
           created_at: string
