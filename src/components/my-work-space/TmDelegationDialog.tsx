@@ -18,9 +18,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { UserCog, Check, ChevronsUpDown, AlertTriangle } from "lucide-react";
+import { UserCog, Check, ChevronsUpDown, AlertTriangle, FileDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { todayInDoha } from "@/lib/time/doha";
+import { exportDelegationsToExcel } from "@/lib/organization/export-delegations";
 
 interface Props {
   myPic: string | null;
@@ -31,6 +32,7 @@ interface TaskRow { id: string; task_no: string | null; task_name: string | null
 interface DelegationRow {
   id: string; task_raw_id: string; from_pic: string; to_pic: string;
   start_date: string; end_date: string; status: string;
+  note?: string | null;
   task?: { task_no: string | null; task_name: string | null } | null;
 }
 
@@ -90,7 +92,7 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("tm_pic_delegations")
-        .select("id,task_raw_id,from_pic,to_pic,start_date,end_date,status,task:task_management_raw(task_no,task_name)")
+        .select("id,task_raw_id,from_pic,to_pic,start_date,end_date,status,note,task:task_management_raw(task_no,task_name)")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw new Error(error.message);
