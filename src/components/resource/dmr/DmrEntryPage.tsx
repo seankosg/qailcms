@@ -539,6 +539,14 @@ export function DmrEntryPage() {
             <span className="text-xs text-muted-foreground">
               {existingQ.isFetching ? '저장된 행 불러오는 중…' : `저장된 묶음 ${rows.filter((r) => r.saved).length}행`}
             </span>
+            {importProgress && (
+              <div className="flex w-full min-w-[200px] items-center gap-2 sm:w-64">
+                <Progress value={importProgress.pct} className="h-2 flex-1" />
+                <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                  {importProgress.pct}% · {importProgress.label}
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
