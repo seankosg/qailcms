@@ -9,6 +9,8 @@ export interface EntryRow {
   system_name: string;
   /** Task/Subtask 직접 입력값 — 비어 있으면 TM 정본 명칭을 따른다 */
   task_name?: string;
+  /** Work Type 직접 입력값 — TM 코드 없는 행에서만 사용 */
+  work_type?: string;
   contractor_name: string;
   plot: 'C' | 'D';
   pic_name: string;
@@ -56,6 +58,8 @@ export const newEntryRow = (init: Partial<EntryRow> = {}): EntryRow => ({
   discipline: 'ARCH',
   task_no: '',
   system_name: '',
+  task_name: '',
+  work_type: '',
   contractor_name: '',
   plot: 'C',
   pic_name: '',

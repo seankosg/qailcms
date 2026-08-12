@@ -18,6 +18,8 @@ const EntrySchema = z.object({
   task_no: z.string().trim().min(1).nullable().optional(),
   /** 사용자가 직접 적은 Task/Subtask — 있으면 TM 명칭 대신 이 값을 저장한다 */
   task_name: z.string().trim().min(1).nullable().optional(),
+  /** 사용자가 직접 적은 Work Type — TM 코드 없는 행에서만 사용 */
+  work_type: z.string().trim().min(1).nullable().optional(),
   headcount_kind: z.enum(['worker', 'foreman', 'supervisor']).default('worker'),
   pic_name: z.string().trim().nullable().optional(),
 });
@@ -103,7 +105,7 @@ export const saveDmrTaskEntries = createServerFn({ method: 'POST' })
         pic_name: e.pic_name?.trim() || null,
         task_level: tm ? (tm.level ?? null) : null,
         task_name: (e.task_name ?? '').trim() || (tm ? (tm.task_name ?? null) : null),
-        work_category: tm ? (tm.row_type ?? null) : null,
+        work_category: (e.work_type ?? '').trim() || (tm ? (tm.row_type ?? null) : null),
         tplan_pct: tm ? (tm.cum_plan_pct ?? null) : null,
         tactual_pct: tm ? (tm.cum_actual_pct ?? null) : null,
         // 하루치 증분 — tm_rows_as_of 정본 값을 저장 시점에 그대로 박는다.

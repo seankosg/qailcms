@@ -173,16 +173,17 @@ export function DmrEntryPage() {
       const gk = `${r.discipline ?? 'ARCH'}|${r.task_no ?? ''}|${r.system_name ?? ''}|${r.contractor_name ?? ''}|${r.plot === 'D' ? 'D' : 'C'}`;
       let row = byGroup.get(gk);
       if (!row) {
-        row = newEntryRow({
-          key: `s${gk}`,
-          discipline: (DISCIPLINES.includes(r.discipline) ? r.discipline : 'ARCH') as Discipline,
-          task_no: r.task_no ?? '',
-          system_name: r.system_name ?? '',
-          task_name: r.task_name ?? '',
-          contractor_name: r.contractor_name ?? '',
-          plot: (r.plot === 'D' ? 'D' : 'C') as 'C' | 'D',
-          pic_name: r.pic_name ?? '',
-          saved: true,
+          row = newEntryRow({
+            key: `s${gk}`,
+            discipline: (DISCIPLINES.includes(r.discipline) ? r.discipline : 'ARCH') as Discipline,
+            task_no: r.task_no ?? '',
+            system_name: r.system_name ?? '',
+            task_name: r.task_name ?? '',
+            work_type: r.work_category ?? '',
+            contractor_name: r.contractor_name ?? '',
+            plot: (r.plot === 'D' ? 'D' : 'C') as 'C' | 'D',
+            pic_name: r.pic_name ?? '',
+            saved: true,
           snap: {
             task_name: r.task_name ?? null,
             work_category: r.work_category ?? null,
@@ -229,6 +230,11 @@ export function DmrEntryPage() {
       ),
     [systemsQ.data],
   );
+  const workTypeOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tmQ.data ?? []) if (t.row_type?.trim()) set.add(t.row_type.trim());
+    return [...set].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+  }, [tmQ.data]);
 
   const patch = (key: string, p: Partial<EntryRow>) => {
     dirtyRef.current = true;
@@ -243,6 +249,7 @@ export function DmrEntryPage() {
       task_no: taskNo,
       unmatched: false,
       task_name: '',
+      work_type: '',
       ...(t
         ? {
             plot: (t.plot === 'D' ? 'D' : t.plot === 'C' ? 'C' : undefined) as any,
@@ -391,6 +398,7 @@ export function DmrEntryPage() {
           actual_manpower: Number(r.manpower) || 0,
           task_no: r.task_no || null,
           task_name: r.task_name?.trim() || null,
+          work_type: r.work_type?.trim() || null,
           headcount_kind: 'worker' as const,
           pic_name: r.pic_name || null,
         }));
@@ -523,6 +531,7 @@ export function DmrEntryPage() {
           tmOptionsByDiscipline={tmOptionsByDiscipline}
           contractorOptions={contractorOptions}
           systemOptions={systemOptions}
+          workTypeOptions={workTypeOptions}
           canEdit={canEdit}
           saving={saving}
           loading={existingQ.isFetching}

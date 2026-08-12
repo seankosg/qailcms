@@ -148,6 +148,7 @@ export interface DmrEntryRecordCardProps {
   tmOptionsByDiscipline: Record<string, { value: string; label: string; hint?: string }[]>;
   contractorOptions: { value: string; label: string }[];
   systemOptions: string[];
+  workTypeOptions: string[];
   canEdit: boolean;
   saving: boolean;
   loading: boolean;
@@ -165,7 +166,7 @@ export interface DmrEntryRecordCardProps {
 
 /** Daily Entry Record — 입력 표 하나만 다룬다. 생산성 분석과 섞지 않는다. */
 export function DmrEntryRecordCard({
-  reportDate, rows, tmByKey, tmOptionsByDiscipline, contractorOptions, systemOptions,
+  reportDate, rows, tmByKey, tmOptionsByDiscipline, contractorOptions, systemOptions, workTypeOptions,
   canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave, onDeleteRows, onMoveRow,
 }: DmrEntryRecordCardProps) {
   const [sorting, setSorting] = useState<SortEntry[]>([]);
@@ -233,7 +234,7 @@ export function DmrEntryRecordCard({
         case 'task_name':
           return resolveTaskName(r, (r.saved && r.snap ? r.snap.task_name : live?.task_name) ?? null) ?? '';
         case 'pic_name': return r.pic_name ?? '';
-        case 'work_type': return (r.saved && r.snap ? r.snap.work_category : live?.row_type) ?? '';
+        case 'work_type': return (r.work_type?.trim() || (r.saved && r.snap ? r.snap.work_category : live?.row_type)) ?? '';
         case 'contractor_name': return r.contractor_name ?? '';
         case 'system_name': return r.system_name ?? '';
         case 'tc_plan_pct': return live?.tc_plan_pct ?? null;
@@ -319,6 +320,9 @@ export function DmrEntryRecordCard({
         </datalist>
         <datalist id="dmr-task-suggestions">
           {taskNameOptions.map((s) => <option key={s} value={s} />)}
+        </datalist>
+        <datalist id="dmr-work-type-suggestions">
+          {workTypeOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
         <datalist id="dmr-contractor-suggestions">
           {contractorOptions.map((o) => <option key={o.value} value={o.value} />)}
@@ -441,15 +445,18 @@ export function DmrEntryRecordCard({
                       );
                     case 'task_name': {
                       const fallback = resolveTaskName({ ...r, task_name: '' }, (r.saved && r.snap ? r.snap.task_name : tm?.task_name) ?? null) ?? '';
-                      return (
-                        <Input
-                          list="dmr-task-suggestions"
-                          value={r.task_name?.trim() ? r.task_name : fallback}
-                          onChange={(e) => onPatch(r.key, { task_name: e.target.value })}
-                          placeholder="Task / Subtask"
-                          className="h-8 text-xs"
-                        />
-                      );
+                      if (!r.task_no) {
+                        return (
+                          <Input
+                            list="dmr-task-suggestions"
+                            value={r.task_name?.trim() ? r.task_name : fallback}
+                            onChange={(e) => onPatch(r.key, { task_name: e.target.value })}
+                            placeholder="Task / Subtask"
+                            className="h-8 text-xs"
+                          />
+                        );
+                      }
+                      return <span className="whitespace-nowrap">{fallback || '—'}</span>;
                     }
                     case 'pic_name':
                       return (
@@ -462,8 +469,21 @@ export function DmrEntryRecordCard({
                           )}
                         </>
                       );
-                    case 'work_type':
-                      return <span className="whitespace-nowrap">{tm?.row_type ?? '—'}</span>;
+                    case 'work_type': {
+                      const fallback = (r.saved && r.snap ? r.snap.work_category : tm?.row_type) ?? '';
+                      if (!r.task_no) {
+                        return (
+                          <Input
+                            list="dmr-work-type-suggestions"
+                            value={r.work_type?.trim() ? r.work_type : fallback}
+                            onChange={(e) => onPatch(r.key, { work_type: e.target.value })}
+                            placeholder="Work Type"
+                            className="h-8 text-xs"
+                          />
+                        );
+                      }
+                      return <span className="whitespace-nowrap">{fallback || '—'}</span>;
+                    }
                     case 'contractor_name':
                       return (
                         <Input
