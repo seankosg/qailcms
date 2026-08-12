@@ -471,11 +471,7 @@ export function DmrEntryPage() {
                 </Button>
               ))}
             </div>
-            <span className="text-xs text-muted-foreground">TM 후보 {tmQ.data?.length ?? 0}건 (기준일 {reportDate})</span>
-            <span className="text-xs text-muted-foreground">
-              {existingQ.isFetching ? '저장된 행 불러오는 중…' : `저장된 묶음 ${rows.filter((r) => r.saved).length}행`}
-            </span>
-            <label className="ml-auto">
+            <label>
               <input
                 type="file"
                 multiple
@@ -497,6 +493,9 @@ export function DmrEntryPage() {
                 {importing ? '읽는 중…' : '스크린샷 불러오기'}
               </span>
             </label>
+            <span className="text-xs text-muted-foreground">
+              {existingQ.isFetching ? '저장된 행 불러오는 중…' : `저장된 묶음 ${rows.filter((r) => r.saved).length}행`}
+            </span>
           </CardContent>
         </Card>
 
