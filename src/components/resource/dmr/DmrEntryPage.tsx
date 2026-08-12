@@ -472,6 +472,12 @@ export function DmrEntryPage() {
           </div>
         )}
 
+        {multiCodeCount > 0 && (
+          <div className="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+            한 줄에 코드가 여럿인 행 {multiCodeCount}건 — 인원은 첫 코드에만 실었습니다. 자동으로 나누지 않으니 직접 나눠 적으십시오.
+          </div>
+        )}
+
         {missing.length > 0 && (
           <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs">
             TM 에서 찾지 못한 코드: {missing.join(', ')} — 해당 행은 TM 값 없이 저장되었습니다.
