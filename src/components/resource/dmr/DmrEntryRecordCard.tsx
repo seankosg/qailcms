@@ -234,7 +234,7 @@ export function DmrEntryRecordCard({
         case 'task_name':
           return resolveTaskName(r, (r.saved && r.snap ? r.snap.task_name : live?.task_name) ?? null) ?? '';
         case 'pic_name': return r.pic_name ?? '';
-        case 'work_type': return (r.saved && r.snap ? r.snap.work_category : live?.row_type) ?? '';
+        case 'work_type': return r.work_type?.trim() || (r.saved && r.snap ? r.snap.work_category : live?.row_type) ?? '';
         case 'contractor_name': return r.contractor_name ?? '';
         case 'system_name': return r.system_name ?? '';
         case 'tc_plan_pct': return live?.tc_plan_pct ?? null;
