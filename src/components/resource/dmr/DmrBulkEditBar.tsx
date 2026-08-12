@@ -55,11 +55,13 @@ interface Props {
   selectedIds: string[];
   sampleRows: Record<string, any>[];
   canEdit: boolean;
+  /** 삭제 스코프 가드 — 화면(Raw Data / Raw Data 2) 밖의 행은 서버에서 삭제되지 않는다. */
+  scope?: 'import' | 'entry' | 'all';
   onClearSelection: () => void;
   onApplied: () => void;
 }
 
-export function DmrBulkEditBar({ selectedIds, sampleRows, canEdit, onClearSelection, onApplied }: Props) {
+export function DmrBulkEditBar({ selectedIds, sampleRows, canEdit, scope = 'all', onClearSelection, onApplied }: Props) {
   const [fieldName, setFieldName] = useState<string>('');
   const [rawValue, setRawValue] = useState<string>('');
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -146,7 +148,7 @@ export function DmrBulkEditBar({ selectedIds, sampleRows, canEdit, onClearSelect
       for (let i = 0; i < ids.length; i += CHUNK) {
         const slice = ids.slice(i, i + CHUNK);
         if (ids.length > CHUNK) toast.info(`삭제 중… (${Math.floor(i / CHUNK) + 1}/${chunkCount})`);
-        const res = await bulkDeleteDmrEntries({ data: { ids: slice } });
+        const res = await bulkDeleteDmrEntries({ data: { ids: slice, scope } });
         done += res?.count ?? slice.length;
       }
       toast.success('영구 삭제 완료', { description: `${done}건 삭제` });
