@@ -46,11 +46,16 @@ interface KpiCardProps {
   hint?: string;
   /** true 면 백분율 대신 "값 / 전체" 형태로 모집단 전체 건수를 함께 표시 */
   showTotal?: boolean;
+  /** TM/SM 진도 카드용 — as-of 기준 Actual% 와 Plan% (0~100). */
+  actualPct?: number;
+  planPct?: number;
 }
 
-export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal }: KpiCardProps) {
+export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal, actualPct, planPct }: KpiCardProps) {
   const pct = total && total > 0 ? Math.round((count / total) * 100) : null;
   const stackTotal = stackBar ? stackBar.reduce((s, x) => s + (x.count || 0), 0) : 0;
+  const hasGap = actualPct != null && planPct != null;
+  const diffPp = hasGap ? actualPct - planPct : null;
   return (
     <Card
       onClick={onClick}
