@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Save } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Save } from 'lucide-react';
+import { SortPriorityBadge } from '@/components/common/SortPriorityBadge';
 import type { EntryRow, TmOption } from './entry-types';
 
 function SearchSelect({
@@ -64,6 +65,26 @@ function SearchSelect({
 
 const pctText = (v: number | null) => (v == null ? '' : `${Math.round(v * 10) / 10}%`);
 
+type SortKey =
+  | 'plot' | 'discipline' | 'task_no' | 'task_name' | 'pic_name' | 'work_type'
+  | 'contractor_name' | 'system_name' | 'tc_plan_pct' | 'tc_actual_pct' | 'manpower';
+
+interface SortEntry { id: SortKey; desc: boolean }
+
+const SORT_COLUMNS: { id: SortKey; label: string }[] = [
+  { id: 'plot', label: 'Plot' },
+  { id: 'discipline', label: 'Team' },
+  { id: 'task_no', label: 'Task No (TM Code)' },
+  { id: 'task_name', label: 'Task / Subtask' },
+  { id: 'pic_name', label: 'HDEC PIC' },
+  { id: 'work_type', label: 'Work Type' },
+  { id: 'contractor_name', label: 'Sub Contractor' },
+  { id: 'system_name', label: 'System' },
+  { id: 'tc_plan_pct', label: 'TC Plan %' },
+  { id: 'tc_actual_pct', label: 'TC Actual %' },
+  { id: 'manpower', label: 'Total' },
+];
+
 export interface DmrEntryRecordCardProps {
   reportDate: string;
   rows: EntryRow[];
@@ -88,6 +109,58 @@ export function DmrEntryRecordCard({
   reportDate, rows, tmByKey, tmOptionsByDiscipline, contractorOptions, systemOptions,
   canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave,
 }: DmrEntryRecordCardProps) {
+  const [sorting, setSorting] = useState<SortEntry[]>([]);
+
+  const toggleSort = (id: SortKey) => {
+    setSorting((prev) => {
+      const i = prev.findIndex((s) => s.id === id);
+      if (i === -1) return [...prev, { id, desc: false }];
+      if (!prev[i].desc) {
+        const next = [...prev];
+        next[i] = { id, desc: true };
+        return next;
+      }
+      return prev.filter((s) => s.id !== id);
+    });
+  };
+
+  const sortedRows = useMemo(() => {
+    if (sorting.length === 0) return rows;
+    const valueOf = (r: EntryRow, id: SortKey): string | number | null => {
+      const live = r.task_no ? tmByKey.get(`${r.discipline}|${r.task_no}`) : null;
+      switch (id) {
+        case 'plot': return r.plot ?? '';
+        case 'discipline': return r.discipline ?? '';
+        case 'task_no': return r.task_no ?? '';
+        case 'task_name': return (r.saved && r.snap ? r.snap.task_name : live?.task_name) ?? '';
+        case 'pic_name': return r.pic_name ?? '';
+        case 'work_type': return (r.saved && r.snap ? r.snap.work_category : live?.row_type) ?? '';
+        case 'contractor_name': return r.contractor_name ?? '';
+        case 'system_name': return r.system_name ?? '';
+        case 'tc_plan_pct': return live?.tc_plan_pct ?? null;
+        case 'tc_actual_pct': return live?.tc_actual_pct ?? null;
+        case 'manpower': return r.manpower === '' || r.manpower == null ? null : Number(r.manpower);
+        default: return '';
+      }
+    };
+    const cmp = (a: string | number | null, b: string | number | null) => {
+      const aEmpty = a === null || a === '';
+      const bEmpty = b === null || b === '';
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1; // 빈 값은 항상 뒤로
+      if (bEmpty) return -1;
+      if (typeof a === 'number' && typeof b === 'number') return a - b;
+      return String(a).localeCompare(String(b), 'en', { numeric: true, sensitivity: 'base' });
+    };
+    return [...rows].sort((ra, rb) => {
+      for (const s of sorting) {
+        const c = cmp(valueOf(ra, s.id), valueOf(rb, s.id));
+        if (c !== 0) return s.desc ? -c : c;
+      }
+      return 0;
+    });
+  }, [rows, sorting, tmByKey]);
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
@@ -95,6 +168,11 @@ export function DmrEntryRecordCard({
           Daily Entry Record (보이는 {rows.length}행 · 전체 {totalCount}행 · 저장 시 {validCount}건)
         </CardTitle>
         <div className="flex gap-2">
+          {sorting.length > 0 && (
+            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSorting([])}>
+              정렬 해제 ({sorting.length})
+            </Button>
+          )}
           <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={onAddRow}>
             <Plus className="h-3.5 w-3.5" />행 추가
           </Button>
@@ -116,14 +194,32 @@ export function DmrEntryRecordCard({
         <table className="w-full min-w-[1700px] text-xs">
           <thead className="bg-muted/50">
             <tr className="[&>th]:whitespace-nowrap [&>th]:px-2 [&>th]:py-2 [&>th]:text-left">
-              <th>Plot</th><th>Team</th><th>Task No (TM Code)</th><th>Task / Subtask</th>
-              <th>HDEC PIC</th><th>Work Type</th><th>Sub Contractor</th><th>System</th>
-              <th>TC Plan %</th><th>TC Actual %</th>
-              <th>Total</th>
+              {SORT_COLUMNS.map((c) => {
+                const idx = sorting.findIndex((s) => s.id === c.id);
+                const entry = idx >= 0 ? sorting[idx] : null;
+                return (
+                  <th key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(c.id)}
+                      title="클릭: 오름차순 → 내림차순 → 해제 (여러 컬럼 클릭 시 순서대로 우선순위)"
+                      className="inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium hover:bg-muted"
+                    >
+                      <span>{c.label}</span>
+                      {entry ? (
+                        entry.desc ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />
+                      )}
+                      <SortPriorityBadge index={idx} total={sorting.length} />
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {sortedRows.map((r) => {
               const live = r.task_no ? tmByKey.get(`${r.discipline}|${r.task_no}`) : null;
               const tm = r.saved && r.snap
                 ? {
