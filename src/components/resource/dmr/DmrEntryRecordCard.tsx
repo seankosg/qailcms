@@ -163,10 +163,6 @@ export function DmrEntryRecordCard({
                   <td className="w-16 whitespace-nowrap">{discipline}</td>
                   <td className="w-64">
                     <div className="mb-1 flex flex-wrap gap-1">
-                      <Badge variant={r.saved ? 'secondary' : 'outline'} className="text-[10px]">
-                        {r.saved ? '저장됨' : '신규'}
-                      </Badge>
-                      {r.imported && <Badge variant="outline" className="text-[10px]">불러온 값</Badge>}
                       {r.unmatched && <Badge variant="destructive" className="text-[10px]">TM 코드 없음</Badge>}
                       {r.multiCode && (
                         <Badge variant="outline" className="border-amber-500 text-[10px] text-amber-600">복수 코드</Badge>
@@ -178,17 +174,6 @@ export function DmrEntryRecordCard({
                       onChange={(v) => onPickTask(r.key, v)}
                       placeholder="TM Code 선택"
                     />
-                    {tm && (
-                      <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-                        <div>누계 계획 {pctText(tm.cum_plan_pct) || '—'} · 누계 실적 {pctText(tm.cum_actual_pct) || '—'}</div>
-                        <div>Data Date {tm.data_date ?? '—'}</div>
-                        {gap != null && gap !== 0 && (
-                          <Badge variant="destructive" className="gap-1 text-[10px]">
-                            <AlertTriangle className="h-3 w-3" />Data Date 격차 {gap}일
-                          </Badge>
-                        )}
-                      </div>
-                    )}
                   </td>
                   <td className="w-64"><div className="truncate">{tm?.task_name ?? '—'}</div></td>
                   <td className="w-40">
