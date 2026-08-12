@@ -232,18 +232,22 @@ export function DmrEntryPage() {
       const res: any = await parseFn({ data: { storagePaths } });
       const errs = (res?.results ?? []).filter((r: any) => r.error);
       let added: ReturnType<typeof buildDmrEntryRowsFromSection> = [];
+      let addedRows: EntryRow[] = [];
       const warns: string[] = [];
       for (const r of res?.results ?? []) {
         if (!r.section) continue;
-        // 공종·보고일은 경고용으로만 쓴다. 기준일을 자동으로 바꾸지 않는다.
-        if (r.section.discipline && r.section.discipline !== discipline) {
-          warns.push(`제목 공종 ${r.section.discipline} — 화면 공종 ${discipline} 과 다릅니다. 넣지 않았습니다`);
-          continue;
-        }
+        // 시트 제목의 공종이 그 행들의 공종이다. 세 공종이 한 표에 함께 쌓인다.
+        const secD: Discipline = DISCIPLINES.includes(r.section.discipline as Discipline)
+          ? (r.section.discipline as Discipline)
+          : discipline;
         if (r.section.report_date && r.section.report_date !== reportDate) {
           warns.push(`시트 보고일 ${r.section.report_date} — 기준일 ${reportDate} 과 다릅니다`);
         }
-        added = [...added, ...buildDmrEntryRowsFromSection(r.section, tmByNo, newEntryRow)];
+        const tmForD = new Map<string, TmOption>();
+        for (const [k, t] of tmByKey) if (k.startsWith(`${secD}|`)) tmForD.set(t.task_no, t);
+        const seeds = buildDmrEntryRowsFromSection(r.section, tmForD, newEntryRow);
+        added = [...added, ...seeds];
+        addedRows = [...addedRows, ...seeds.map((s) => ({ ...(s as unknown as EntryRow), discipline: secD }))];
       }
       for (const w of warns) toast.warning(w);
       if (added.length === 0) {
@@ -253,7 +257,7 @@ export function DmrEntryPage() {
       dirtyRef.current = true;
       setRows((prev) => {
         const base = prev.filter((p) => p.saved || p.task_no || p.system_name || p.contractor_name);
-        return [...base, ...added];
+        return [...base, ...addedRows];
       });
       const unmatched = added.filter((a) => a.unmatched).length;
       const multi = added.filter((a) => a.multiCode).length;
@@ -275,25 +279,36 @@ export function DmrEntryPage() {
     setMissing([]);
     try {
       // 화면 1행 → 인원종류 3건. 0 인 종류도 함께 보낸다(3→0 정정이 반영되어야 한다).
-      const entries = valid.flatMap((r) =>
-        DMR_HEADCOUNT_KINDS.map((kind) => ({
-          system_name: r.system_name.trim(),
-          contractor_name: r.contractor_name.trim(),
-          plot: r.plot,
-          plan_manpower: 0,
-          actual_manpower: Number((r as any)[kind]) || 0,
-          task_no: r.task_no || null,
-          headcount_kind: kind,
-          pic_name: r.pic_name || null,
-        })),
-      );
-      const res: any = await saveFn({ data: { report_date: reportDate, discipline, entries } });
-      setMissing(res?.missing_task_nos ?? []);
+      // 공종별로 나눠 같은 날짜로 저장한다 — 저장 버튼 한 번이 하루치 전체를 확정한다.
+      const missingAll: string[] = [];
+      let total = 0;
+      let linked = 0;
+      for (const d of DISCIPLINES) {
+        const part = valid.filter((r) => r.discipline === d);
+        if (part.length === 0) continue;
+        const entries = part.flatMap((r) =>
+          DMR_HEADCOUNT_KINDS.map((kind) => ({
+            system_name: r.system_name.trim(),
+            contractor_name: r.contractor_name.trim(),
+            plot: r.plot,
+            plan_manpower: 0,
+            actual_manpower: Number((r as any)[kind]) || 0,
+            task_no: r.task_no || null,
+            headcount_kind: kind,
+            pic_name: r.pic_name || null,
+          })),
+        );
+        const res: any = await saveFn({ data: { report_date: reportDate, discipline: d, entries } });
+        missingAll.push(...(res?.missing_task_nos ?? []));
+        linked += res?.linked_tasks ?? 0;
+        total += entries.length;
+      }
+      setMissing([...new Set(missingAll)]);
       invalidate();
       dirtyRef.current = false;
       await existingQ.refetch();
       setReloadTick((t) => t + 1);
-      toast.success(`저장 완료 — ${valid.length}행 / ${entries.length}건 (TM 연결 ${res?.linked_tasks ?? 0}건)`);
+      toast.success(`저장 완료 — ${valid.length}행 / ${total}건 (TM 연결 ${linked}건)`);
     } catch (e: any) {
       toast.error(e?.message ?? '저장 실패');
     } finally {
