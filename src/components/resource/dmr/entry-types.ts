@@ -58,6 +58,8 @@ export const newEntryRow = (init: Partial<EntryRow> = {}): EntryRow => ({
   discipline: 'ARCH',
   task_no: '',
   system_name: '',
+  task_name: '',
+  work_type: '',
   contractor_name: '',
   plot: 'C',
   pic_name: '',
