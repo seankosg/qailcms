@@ -1,6 +1,10 @@
+export type DmrDiscipline = 'ARCH' | 'ELEC' | 'MECH';
+
 /** Daily Entry 화면이 쓰는 행 모양. 화면 1행 = 인원종류 3건으로 저장된다. */
 export interface EntryRow {
   key: string;
+  /** 공종 — 하루치 기록은 ARCH·ELEC·MECH 가 한 표에 섞인다 */
+  discipline: DmrDiscipline;
   task_no: string;
   system_name: string;
   contractor_name: string;
@@ -46,6 +50,7 @@ export interface TmOption {
 let seq = 0;
 export const newEntryRow = (init: Partial<EntryRow> = {}): EntryRow => ({
   key: `r${++seq}`,
+  discipline: 'ARCH',
   task_no: '',
   system_name: '',
   contractor_name: '',

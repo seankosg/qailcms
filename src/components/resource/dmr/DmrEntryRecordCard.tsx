@@ -66,16 +66,17 @@ const pctText = (v: number | null) => (v == null ? '' : `${Math.round(v * 10) / 
 
 export interface DmrEntryRecordCardProps {
   reportDate: string;
-  discipline: string;
   rows: EntryRow[];
-  tmByNo: Map<string, TmOption>;
-  tmOptions: { value: string; label: string; hint?: string }[];
+  /** `${discipline}|${task_no}` 키 */
+  tmByKey: Map<string, TmOption>;
+  tmOptionsByDiscipline: Record<string, { value: string; label: string; hint?: string }[]>;
   contractorOptions: { value: string; label: string }[];
   systemOptions: string[];
   canEdit: boolean;
   saving: boolean;
   loading: boolean;
   validCount: number;
+  totalCount: number;
   onPatch: (key: string, patch: Partial<EntryRow>) => void;
   onPickTask: (key: string, taskNo: string) => void;
   onAddRow: () => void;
@@ -84,13 +85,15 @@ export interface DmrEntryRecordCardProps {
 
 /** Daily Entry Record — 입력 표 하나만 다룬다. 생산성 분석과 섞지 않는다. */
 export function DmrEntryRecordCard({
-  reportDate, discipline, rows, tmByNo, tmOptions, contractorOptions, systemOptions,
-  canEdit, saving, loading, validCount, onPatch, onPickTask, onAddRow, onSave,
+  reportDate, rows, tmByKey, tmOptionsByDiscipline, contractorOptions, systemOptions,
+  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave,
 }: DmrEntryRecordCardProps) {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm">Daily Entry Record ({rows.length}행 · 저장 시 {rows.length * 3}건)</CardTitle>
+        <CardTitle className="text-sm">
+          Daily Entry Record (보이는 {rows.length}행 · 전체 {totalCount}행 · 저장 시 {validCount * 3}건)
+        </CardTitle>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={onAddRow}>
             <Plus className="h-3.5 w-3.5" />행 추가
@@ -121,7 +124,7 @@ export function DmrEntryRecordCard({
           </thead>
           <tbody>
             {rows.map((r) => {
-              const live = r.task_no ? tmByNo.get(r.task_no) : null;
+              const live = r.task_no ? tmByKey.get(`${r.discipline}|${r.task_no}`) : null;
               const tm = r.saved && r.snap
                 ? {
                     task_name: r.snap.task_name,
@@ -156,7 +159,22 @@ export function DmrEntryRecordCard({
                     </div>
                     {plotMismatch && <div className="mt-0.5 text-[10px] text-amber-600">TM Plot {tm?.plot}</div>}
                   </td>
-                  <td className="w-16 whitespace-nowrap">{discipline}</td>
+                  <td className="w-24">
+                    <div className="flex gap-0.5">
+                      {(['ARCH', 'ELEC', 'MECH'] as const).map((d) => (
+                        <Button
+                          key={d}
+                          size="sm"
+                          variant={r.discipline === d ? 'default' : 'outline'}
+                          className="h-7 px-1 text-[10px]"
+                          disabled={r.saved}
+                          onClick={() => onPatch(r.key, { discipline: d, task_no: '' })}
+                        >
+                          {d}
+                        </Button>
+                      ))}
+                    </div>
+                  </td>
                   <td className="w-64">
                     <div className="mb-1 flex flex-wrap gap-1">
                       {r.unmatched && <Badge variant="destructive" className="text-[10px]">TM 코드 없음</Badge>}
@@ -166,7 +184,7 @@ export function DmrEntryRecordCard({
                     </div>
                     <SearchSelect
                       value={r.task_no}
-                      options={tmOptions}
+                      options={tmOptionsByDiscipline[r.discipline] ?? []}
                       onChange={(v) => onPickTask(r.key, v)}
                       placeholder="TM Code 선택"
                     />

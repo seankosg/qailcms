@@ -17,9 +17,9 @@ import { exportDmrTeamsWorkbook } from '@/lib/dmr/export-dmr-team';
 import { DMR_HEADCOUNT_KINDS } from '@/lib/dmr/task-link';
 import { DmrEntryRecordCard } from './DmrEntryRecordCard';
 import { DmrEntryProductivityCard } from './DmrEntryProductivityCard';
-import { newEntryRow, type EntryRow, type TmOption } from './entry-types';
+import { newEntryRow, type EntryRow, type TmOption, type DmrDiscipline } from './entry-types';
 
-type Discipline = 'ARCH' | 'ELEC' | 'MECH';
+type Discipline = DmrDiscipline;
 const DISCIPLINES: Discipline[] = ['ARCH', 'ELEC', 'MECH'];
 
 export type { EntryRow } from './entry-types';
@@ -31,7 +31,9 @@ export function DmrEntryPage() {
   const invalidate = useInvalidateDmr();
 
   const [reportDate, setReportDate] = useState(todayInDoha());
-  const [discipline, setDiscipline] = useState<Discipline>('ARCH');
+  // 공종 탭은 보기 필터일 뿐이다. 하루치 기록은 세 공종이 한 표에 함께 있다.
+  const [view, setView] = useState<Discipline | 'ALL'>('ALL');
+  const discipline: Discipline = view === 'ALL' ? 'ARCH' : view;
   const [rows, setRows] = useState<EntryRow[]>([newEntryRow()]);
   const [saving, setSaving] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
@@ -41,26 +43,39 @@ export function DmrEntryPage() {
   const systemsQ = useDmrSystemMaster();
   const contractorsQ = useDmrContractorMaster();
 
-  // 공종 어휘 매핑은 team_master 가 유일한 근거다.
+  // 공종 어휘 매핑은 team_master 가 유일한 근거다. 세 공종 모두 읽는다.
   const teamQ = useQuery({
-    queryKey: ['team_master', discipline],
+    queryKey: ['team_master', 'dmr-all'],
     queryFn: async () => {
-      const { data } = await supabase.from('team_master').select('code, aliases').eq('code', discipline).maybeSingle();
-      const t = data as any;
-      return t ? [String(t.code), ...((t.aliases ?? []) as string[])] : [discipline];
+      const { data } = await supabase.from('team_master').select('code, aliases').in('code', DISCIPLINES);
+      const map: Record<string, string[]> = {};
+      for (const d of DISCIPLINES) {
+        const t = (data ?? []).find((x: any) => String(x.code) === d) as any;
+        map[d] = t ? [String(t.code), ...((t.aliases ?? []) as string[]).map(String)] : [d];
+      }
+      return map;
     },
     staleTime: 300_000,
   });
+
+  /** TM 공종 어휘 → DMR 공종 코드 */
+  const disciplineOfTerm = useMemo(() => {
+    const m = new Map<string, Discipline>();
+    for (const d of DISCIPLINES) for (const t of teamQ.data?.[d] ?? []) m.set(String(t).toUpperCase(), d);
+    return m;
+  }, [teamQ.data]);
 
   const tmQ = useQuery({
     queryKey: ['dmr-entry-tm', reportDate, teamQ.data],
     enabled: !!teamQ.data,
     queryFn: async () => {
+      const terms = DISCIPLINES.flatMap((d) => teamQ.data?.[d] ?? []);
       const { data, error } = await (supabase as any)
         .rpc('tm_rows_as_of', { _as_of: reportDate })
-        .in('discipline', teamQ.data as string[]);
+        .in('discipline', terms);
       if (error) throw new Error(error.message);
-      return ((data ?? []) as any[]).map<TmOption>((r) => ({
+      return ((data ?? []) as any[]).map<TmOption & { _d: string }>((r) => ({
+        _d: String(r.discipline ?? '').toUpperCase(),
         task_no: String(r.task_no),
         task_name: r.task_name ?? null,
         level: r.level ?? null,
@@ -79,22 +94,29 @@ export function DmrEntryPage() {
     staleTime: 60_000,
   });
 
-  const tmByNo = useMemo(() => {
+  /** `${공종}|${task_no}` 키 */
+  const tmByKey = useMemo(() => {
     const m = new Map<string, TmOption>();
-    for (const t of tmQ.data ?? []) if (!m.has(t.task_no)) m.set(t.task_no, t);
+    for (const t of tmQ.data ?? []) {
+      const d = disciplineOfTerm.get(t._d);
+      if (!d) continue;
+      const k = `${d}|${t.task_no}`;
+      if (!m.has(k)) m.set(k, t);
+    }
     return m;
-  }, [tmQ.data]);
+  }, [tmQ.data, disciplineOfTerm]);
 
-  // 이미 저장된 행 — 저장된 값 그대로. (task_no·System·Contractor·Plot) 묶음의 3행을 1행으로 되접는다.
+  // 이미 저장된 행 — 저장된 값 그대로. 세 공종을 모두 불러온다.
   const existingQ = useQuery({
-    queryKey: ['dmr-entry-existing', reportDate, discipline],
+    queryKey: ['dmr-entry-existing', reportDate],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('dmr_entries')
         .select('*')
         .eq('report_date', reportDate)
-        .eq('discipline', discipline)
+        .in('discipline', DISCIPLINES)
         .in('plot', ['C', 'D'])
+        .order('discipline')
         .order('system_name')
         .order('contractor_name')
         .order('plot')
@@ -105,17 +127,18 @@ export function DmrEntryPage() {
     staleTime: 0,
   });
 
-  const loadedKey = `${reportDate}|${discipline}|${reloadTick}`;
+  const loadedKey = `${reportDate}|${reloadTick}`;
   useEffect(() => {
     if (!existingQ.data) return;
     if (dirtyRef.current) return; // 미저장 변경 보호
     const byGroup = new Map<string, EntryRow>();
     for (const r of existingQ.data) {
-      const gk = `${r.task_no ?? ''}|${r.system_name ?? ''}|${r.contractor_name ?? ''}|${r.plot === 'D' ? 'D' : 'C'}`;
+      const gk = `${r.discipline ?? 'ARCH'}|${r.task_no ?? ''}|${r.system_name ?? ''}|${r.contractor_name ?? ''}|${r.plot === 'D' ? 'D' : 'C'}`;
       let row = byGroup.get(gk);
       if (!row) {
         row = newEntryRow({
           key: `s${gk}`,
+          discipline: (DISCIPLINES.includes(r.discipline) ? r.discipline : 'ARCH') as Discipline,
           task_no: r.task_no ?? '',
           system_name: r.system_name ?? '',
           contractor_name: r.contractor_name ?? '',
@@ -143,12 +166,16 @@ export function DmrEntryPage() {
 
   useEffect(() => {
     dirtyRef.current = false;
-  }, [reportDate, discipline]);
+  }, [reportDate]);
 
-  const tmOptions = useMemo(
-    () => (tmQ.data ?? []).map((t) => ({ value: t.task_no, label: t.task_no, hint: t.task_name ?? '' })),
-    [tmQ.data],
-  );
+  const tmOptionsByDiscipline = useMemo(() => {
+    const out: Record<string, { value: string; label: string; hint?: string }[]> = { ARCH: [], ELEC: [], MECH: [] };
+    for (const [k, t] of tmByKey) {
+      const d = k.split('|')[0];
+      (out[d] ??= []).push({ value: t.task_no, label: t.task_no, hint: t.task_name ?? '' });
+    }
+    return out;
+  }, [tmByKey]);
   const contractorOptions = useMemo(
     () => (contractorsQ.data ?? []).map((c) => ({ value: c.name, label: c.name })),
     [contractorsQ.data],
@@ -162,7 +189,8 @@ export function DmrEntryPage() {
 
   /** TM 코드를 고르면 Work Type · Plot · 담당자가 따라온다. 추정하지 않는다. */
   const pickTask = (key: string, taskNo: string) => {
-    const t = taskNo ? tmByNo.get(taskNo) : null;
+    const row = rows.find((r) => r.key === key);
+    const t = taskNo && row ? tmByKey.get(`${row.discipline}|${taskNo}`) : null;
     patch(key, {
       task_no: taskNo,
       unmatched: false,
@@ -177,7 +205,7 @@ export function DmrEntryPage() {
 
   const addRow = () => {
     dirtyRef.current = true;
-    setRows((p) => [...p, newEntryRow()]);
+    setRows((p) => [...p, newEntryRow({ discipline })]);
   };
 
   const saveFn = useServerFn(saveDmrTaskEntries);
@@ -204,18 +232,22 @@ export function DmrEntryPage() {
       const res: any = await parseFn({ data: { storagePaths } });
       const errs = (res?.results ?? []).filter((r: any) => r.error);
       let added: ReturnType<typeof buildDmrEntryRowsFromSection> = [];
+      let addedRows: EntryRow[] = [];
       const warns: string[] = [];
       for (const r of res?.results ?? []) {
         if (!r.section) continue;
-        // 공종·보고일은 경고용으로만 쓴다. 기준일을 자동으로 바꾸지 않는다.
-        if (r.section.discipline && r.section.discipline !== discipline) {
-          warns.push(`제목 공종 ${r.section.discipline} — 화면 공종 ${discipline} 과 다릅니다. 넣지 않았습니다`);
-          continue;
-        }
+        // 시트 제목의 공종이 그 행들의 공종이다. 세 공종이 한 표에 함께 쌓인다.
+        const secD: Discipline = DISCIPLINES.includes(r.section.discipline as Discipline)
+          ? (r.section.discipline as Discipline)
+          : discipline;
         if (r.section.report_date && r.section.report_date !== reportDate) {
           warns.push(`시트 보고일 ${r.section.report_date} — 기준일 ${reportDate} 과 다릅니다`);
         }
-        added = [...added, ...buildDmrEntryRowsFromSection(r.section, tmByNo, newEntryRow)];
+        const tmForD = new Map<string, TmOption>();
+        for (const [k, t] of tmByKey) if (k.startsWith(`${secD}|`)) tmForD.set(t.task_no, t);
+        const seeds = buildDmrEntryRowsFromSection(r.section, tmForD, newEntryRow);
+        added = [...added, ...seeds];
+        addedRows = [...addedRows, ...seeds.map((s) => ({ ...(s as unknown as EntryRow), discipline: secD }))];
       }
       for (const w of warns) toast.warning(w);
       if (added.length === 0) {
@@ -225,7 +257,7 @@ export function DmrEntryPage() {
       dirtyRef.current = true;
       setRows((prev) => {
         const base = prev.filter((p) => p.saved || p.task_no || p.system_name || p.contractor_name);
-        return [...base, ...added];
+        return [...base, ...addedRows];
       });
       const unmatched = added.filter((a) => a.unmatched).length;
       const multi = added.filter((a) => a.multiCode).length;
@@ -247,25 +279,36 @@ export function DmrEntryPage() {
     setMissing([]);
     try {
       // 화면 1행 → 인원종류 3건. 0 인 종류도 함께 보낸다(3→0 정정이 반영되어야 한다).
-      const entries = valid.flatMap((r) =>
-        DMR_HEADCOUNT_KINDS.map((kind) => ({
-          system_name: r.system_name.trim(),
-          contractor_name: r.contractor_name.trim(),
-          plot: r.plot,
-          plan_manpower: 0,
-          actual_manpower: Number((r as any)[kind]) || 0,
-          task_no: r.task_no || null,
-          headcount_kind: kind,
-          pic_name: r.pic_name || null,
-        })),
-      );
-      const res: any = await saveFn({ data: { report_date: reportDate, discipline, entries } });
-      setMissing(res?.missing_task_nos ?? []);
+      // 공종별로 나눠 같은 날짜로 저장한다 — 저장 버튼 한 번이 하루치 전체를 확정한다.
+      const missingAll: string[] = [];
+      let total = 0;
+      let linked = 0;
+      for (const d of DISCIPLINES) {
+        const part = valid.filter((r) => r.discipline === d);
+        if (part.length === 0) continue;
+        const entries = part.flatMap((r) =>
+          DMR_HEADCOUNT_KINDS.map((kind) => ({
+            system_name: r.system_name.trim(),
+            contractor_name: r.contractor_name.trim(),
+            plot: r.plot,
+            plan_manpower: 0,
+            actual_manpower: Number((r as any)[kind]) || 0,
+            task_no: r.task_no || null,
+            headcount_kind: kind,
+            pic_name: r.pic_name || null,
+          })),
+        );
+        const res: any = await saveFn({ data: { report_date: reportDate, discipline: d, entries } });
+        missingAll.push(...(res?.missing_task_nos ?? []));
+        linked += res?.linked_tasks ?? 0;
+        total += entries.length;
+      }
+      setMissing([...new Set(missingAll)]);
       invalidate();
       dirtyRef.current = false;
       await existingQ.refetch();
       setReloadTick((t) => t + 1);
-      toast.success(`저장 완료 — ${valid.length}행 / ${entries.length}건 (TM 연결 ${res?.linked_tasks ?? 0}건)`);
+      toast.success(`저장 완료 — ${valid.length}행 / ${total}건 (TM 연결 ${linked}건)`);
     } catch (e: any) {
       toast.error(e?.message ?? '저장 실패');
     } finally {
@@ -316,9 +359,12 @@ export function DmrEntryPage() {
           <CardContent className="flex flex-wrap items-center gap-3">
             <Input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="h-8 w-40 text-xs" />
             <div className="flex gap-1">
-              {DISCIPLINES.map((d) => (
-                <Button key={d} size="sm" variant={discipline === d ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setDiscipline(d)}>
-                  {d}
+              {(['ALL', ...DISCIPLINES] as const).map((d) => (
+                <Button key={d} size="sm" variant={view === d ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setView(d)}>
+                  {d === 'ALL' ? '전체' : d}
+                  <span className="ml-1 text-[10px] opacity-70">
+                    {d === 'ALL' ? rows.length : rows.filter((r) => r.discipline === d).length}
+                  </span>
                 </Button>
               ))}
             </div>
@@ -377,16 +423,16 @@ export function DmrEntryPage() {
 
         <DmrEntryRecordCard
           reportDate={reportDate}
-          discipline={discipline}
-          rows={rows}
-          tmByNo={tmByNo}
-          tmOptions={tmOptions}
+          rows={view === 'ALL' ? rows : rows.filter((r) => r.discipline === view)}
+          tmByKey={tmByKey}
+          tmOptionsByDiscipline={tmOptionsByDiscipline}
           contractorOptions={contractorOptions}
           systemOptions={systemOptions}
           canEdit={canEdit}
           saving={saving}
           loading={existingQ.isFetching}
           validCount={valid.length}
+          totalCount={rows.length}
           onPatch={patch}
           onPickTask={pickTask}
           onAddRow={addRow}
