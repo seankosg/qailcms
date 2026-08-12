@@ -161,6 +161,31 @@ export function DmrEntryRecordCard({
   canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave,
 }: DmrEntryRecordCardProps) {
   const [sorting, setSorting] = useState<SortEntry[]>([]);
+  const [layout, setLayout] = useState<Layout>(() => loadLayout());
+
+  useEffect(() => {
+    try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* 저장 실패는 무시 */ }
+  }, [layout]);
+
+  /** 좌측 고정열 먼저, 그 뒤 나머지 순서. 숨김열은 제외. */
+  const shownKeys = useMemo(() => {
+    const frozen = layout.frozen.filter((k) => layout.visibility[k] !== false);
+    const rest = layout.order.filter((k) => !frozen.includes(k) && layout.visibility[k] !== false);
+    return [...frozen, ...rest] as SortKey[];
+  }, [layout]);
+
+  const stickyLeft = useMemo(() => {
+    const map: Record<string, number> = {};
+    let acc = 0;
+    for (const k of layout.frozen) {
+      if (layout.visibility[k] === false) continue;
+      map[k] = acc;
+      acc += COL_BY_ID[k as SortKey]?.width ?? 120;
+    }
+    return map;
+  }, [layout]);
+
+  const isFrozen = (k: string) => layout.frozen.includes(k) && layout.visibility[k] !== false;
 
   const toggleSort = (id: SortKey) => {
     setSorting((prev) => {
@@ -224,6 +249,16 @@ export function DmrEntryRecordCard({
           Daily Entry Record (보이는 {rows.length}행 · 전체 {totalCount}행 · 저장 시 {validCount}건)
         </CardTitle>
         <div className="flex gap-2">
+          <DmrColumnOrderMenu
+            order={layout.order}
+            visibility={layout.visibility}
+            frozenExtras={layout.frozen}
+            labelByKey={COL_LABELS}
+            defaultOrder={DEFAULT_ORDER}
+            onOrderChange={(order) => setLayout((p) => ({ ...p, order }))}
+            onVisibilityChange={(visibility) => setLayout((p) => ({ ...p, visibility }))}
+            onFrozenChange={(frozen) => setLayout((p) => ({ ...p, frozen }))}
+          />
           {sorting.length > 0 && (
             <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSorting([])}>
               정렬 해제 ({sorting.length})
