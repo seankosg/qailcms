@@ -164,6 +164,15 @@ export function DmrEntryRecordCard({
   const [sorting, setSorting] = useState<SortEntry[]>([]);
   const [layout, setLayout] = useState<Layout>(() => loadLayout());
 
+  /** Task/Subtask 자유 입력 보조 목록 — TM 명칭을 제안으로만 쓴다 */
+  const taskNameOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const list of Object.values(tmOptionsByDiscipline)) {
+      for (const o of list) if (o.hint?.trim()) set.add(o.hint.trim());
+    }
+    return [...set].slice(0, 500);
+  }, [tmOptionsByDiscipline]);
+
   useEffect(() => {
     try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* 저장 실패는 무시 */ }
   }, [layout]);
