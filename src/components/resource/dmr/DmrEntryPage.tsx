@@ -249,6 +249,21 @@ export function DmrEntryPage() {
     setRows((p) => [...p, newEntryRow({ discipline })]);
   };
 
+  /** 행을 위/아래로 한 칸 옮긴다. 화면 기본 순서(importIndex)를 다시 매긴다. */
+  const moveRow = (key: string, dir: -1 | 1) => {
+    dirtyRef.current = true;
+    setRows((p) => {
+      const ordered = [...p].sort(
+        (a, b) => (a.importIndex ?? Number.MAX_SAFE_INTEGER) - (b.importIndex ?? Number.MAX_SAFE_INTEGER),
+      );
+      const i = ordered.findIndex((r) => r.key === key);
+      const j = i + dir;
+      if (i === -1 || j < 0 || j >= ordered.length) return p;
+      [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+      return ordered.map((r, idx) => ({ ...r, importIndex: idx }));
+    });
+  };
+
   /** 선택한 행을 표에서 지운다. 저장 전 편집 상태만 바꾼다. */
   const deleteRows = (keys: string[]) => {
     if (keys.length === 0) return;
