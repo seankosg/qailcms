@@ -196,8 +196,43 @@ export function DmrEntryRecordCard({
     for (const list of Object.values(tmOptionsByDiscipline)) {
       for (const o of list) if (o.hint?.trim()) set.add(o.hint.trim());
     }
-    return [...set].slice(0, 500);
+    return [...set]
+      .sort((a, b) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }))
+      .slice(0, 500);
   }, [tmOptionsByDiscipline]);
+
+  /** HDEC PIC 자유 입력 보조 목록 — TM 담당자와 이미 입력된 값을 제안한다 */
+  const picNameOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tmByKey.values()) {
+      if (t.effective_pic?.trim()) set.add(t.effective_pic.trim());
+      if (t.original_pic?.trim()) set.add(t.original_pic.trim());
+    }
+    for (const r of rows) if (r.pic_name?.trim()) set.add(r.pic_name.trim());
+    return [...set].sort((a, b) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }));
+  }, [tmByKey, rows]);
+
+  const sortedSystemOptions = useMemo(
+    () =>
+      [...new Set(systemOptions.filter((s) => s && String(s).trim()).map((s) => String(s).trim()))].sort((a, b) =>
+        a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }),
+      ),
+    [systemOptions],
+  );
+  const sortedWorkTypeOptions = useMemo(
+    () =>
+      [...new Set(workTypeOptions.filter((s) => s && String(s).trim()).map((s) => String(s).trim()))].sort((a, b) =>
+        a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }),
+      ),
+    [workTypeOptions],
+  );
+  const sortedContractorOptions = useMemo(
+    () =>
+      [...new Set(contractorOptions.map((o) => o.value).filter((s) => s && String(s).trim()))].sort((a, b) =>
+        a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }),
+      ),
+    [contractorOptions],
+  );
 
   useEffect(() => {
     try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* 저장 실패는 무시 */ }
@@ -340,20 +375,19 @@ export function DmrEntryRecordCard({
       </CardHeader>
       <CardContent className="p-0">
         <datalist id="dmr-system-suggestions">
-          {systemOptions
-            .filter((s) => s && String(s).trim())
-            .map((s, i) => (
-              <option key={`${s}#${i}`} value={s} />
-            ))}
+          {sortedSystemOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
         <datalist id="dmr-task-suggestions">
           {taskNameOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
         <datalist id="dmr-work-type-suggestions">
-          {workTypeOptions.map((s) => <option key={s} value={s} />)}
+          {sortedWorkTypeOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
         <datalist id="dmr-contractor-suggestions">
-          {contractorOptions.map((o) => <option key={o.value} value={o.value} />)}
+          {sortedContractorOptions.map((s) => <option key={s} value={s} />)}
+        </datalist>
+        <datalist id="dmr-pic-suggestions">
+          {picNameOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
         <div className="max-h-[70vh] overflow-auto">
           <table className="w-full text-xs" style={{ minWidth: SELECT_COL_W + shownKeys.reduce((n, k) => n + (COL_BY_ID[k]?.width ?? 120), 0) }}>
@@ -489,7 +523,13 @@ export function DmrEntryRecordCard({
                     case 'pic_name':
                       return (
                         <>
-                          <Input value={r.pic_name} onChange={(e) => onPatch(r.key, { pic_name: e.target.value })} className="h-8 text-xs" />
+                          <Input
+                            list="dmr-pic-suggestions"
+                            value={r.pic_name}
+                            onChange={(e) => onPatch(r.key, { pic_name: e.target.value })}
+                            placeholder="HDEC PIC"
+                            className="h-8 text-xs"
+                          />
                           {delegated && (
                             <div className="mt-0.5 text-[10px] text-muted-foreground">
                               {tm?.effective_pic} (←{tm?.original_pic})

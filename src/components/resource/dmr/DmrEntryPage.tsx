@@ -217,10 +217,16 @@ export function DmrEntryPage() {
       const d = k.split('|')[0];
       (out[d] ??= []).push({ value: t.task_no, label: t.task_no, hint: t.task_name ?? '' });
     }
+    for (const list of Object.values(out)) {
+      list.sort((a, b) => a.label.localeCompare(b.label, 'en', { numeric: true, sensitivity: 'base' }));
+    }
     return out;
   }, [tmByKey]);
   const contractorOptions = useMemo(
-    () => (contractorsQ.data ?? []).map((c) => ({ value: c.name, label: c.name })),
+    () =>
+      [...new Set((contractorsQ.data ?? []).map((c) => c.name).filter((n) => n && String(n).trim()))]
+        .sort((a, b) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }))
+        .map((n) => ({ value: n, label: n })),
     [contractorsQ.data],
   );
   const systemOptions = useMemo(
