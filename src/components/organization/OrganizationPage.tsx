@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { todayInDoha } from "@/lib/time/doha";
 import { ArrowRight, Users, UserCog, CalendarClock, CheckCircle2 } from "lucide-react";
 
@@ -83,7 +84,7 @@ export function OrganizationPage() {
   const scheduledRows = useMemo(() => tagged.filter((t) => t.p === "scheduled").map((t) => t.r), [tagged]);
 
   /** 사용자별 인계·인수 집계 — 단계별로 따로 센다 */
-  const summarize = (list: DelegRow[]) => {
+  const summarize = (list: Row[]) => {
     const m = new Map<string, { name: string; out: number; inn: number }>();
     const touch = (n: string) => {
       if (!m.has(n)) m.set(n, { name: n, out: 0, inn: 0 });
