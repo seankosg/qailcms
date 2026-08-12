@@ -100,10 +100,12 @@ export function buildDmrEntryRowsFromSection(
       codeless.push({ codes: [], count, system, contractor, importIndex });
       continue;
     }
-    const key = codes.join('+');
+    // 같은 코드라도 Contractor(Subcon)가 다르면 별개의 행이다. 합치지 않는다.
+    const key = `${codes.join('+')}@@${contractor.toUpperCase()}`;
     const prev = byCode.get(key);
     if (prev) {
       prev.count += count;
+      if (!prev.system && system) prev.system = system;
     } else {
       byCode.set(key, { codes: [...codes], count, system, contractor, importIndex });
     }
@@ -137,6 +139,14 @@ export function buildDmrEntryRowsFromSection(
     a.codes.forEach((code) => emit(a, code, a.count, a.codes.length > 1));
   }
   for (const a of codeless) emit(a, '', a.count, false);
+
+  // 정렬: 팀(=이 섹션) 안에서 Plot C → Plot D, 각 Plot 안에서는 스크린샷 순서.
+  out.sort((x, y) => {
+    const p = (x.plot === 'C' ? 0 : 1) - (y.plot === 'C' ? 0 : 1);
+    if (p !== 0) return p;
+    return (x.importIndex ?? 0) - (y.importIndex ?? 0);
+  });
+  out.forEach((r, i) => { r.importIndex = baseIndex + i; });
 
   return out;
 }
