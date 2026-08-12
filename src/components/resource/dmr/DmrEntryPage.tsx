@@ -241,6 +241,7 @@ export function DmrEntryPage() {
       const warns: string[] = [];
       const teamCount: Record<string, number> = {};
       const sheetDates = new Set<string>();
+      let importIndex = 0;
       for (const r of res?.results ?? []) {
         if (!r.section) continue;
         // 시트 제목의 공종이 그 행들의 공종이다 (ELECT → ELEC). 화면의 탭은 보기 필터일 뿐 분류에 쓰지 않는다.
@@ -253,7 +254,8 @@ export function DmrEntryPage() {
         if (/^\d{4}-\d{2}-\d{2}$/.test(String(r.section.report_date ?? ''))) sheetDates.add(r.section.report_date);
         const tmForD = new Map<string, TmOption>();
         for (const [k, t] of tmByKey) if (k.startsWith(`${secD}|`)) tmForD.set(t.task_no, t);
-        const seeds = buildDmrEntryRowsFromSection(r.section, tmForD, newEntryRow);
+        const seeds = buildDmrEntryRowsFromSection(r.section, tmForD, newEntryRow, importIndex);
+        importIndex += r.section.rows?.length ?? 0;
         added = [...added, ...seeds];
         addedRows = [...addedRows, ...seeds.map((s) => ({ ...(s as unknown as EntryRow), discipline: secD }))];
         teamCount[secD] = (teamCount[secD] ?? 0) + seeds.length;

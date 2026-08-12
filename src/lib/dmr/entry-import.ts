@@ -19,6 +19,8 @@ export interface ImportedRowSeed {
   unmatched?: boolean;
   /** 한 줄에 코드가 여럿 — 코드마다 같은 인원이 실린다 */
   multiCode?: boolean;
+  /** 스크린샷 내 원래 행 순서 */
+  importIndex?: number;
 }
 
 interface TmLike {
@@ -55,6 +57,7 @@ interface Agg {
   count: number;
   system: string;
   contractor: string;
+  importIndex: number;
 }
 
 /**
@@ -65,6 +68,7 @@ export function buildDmrEntryRowsFromSection(
   section: DmrParsedSection,
   tmByNo: Map<string, TmLike>,
   make: (init: Partial<ImportedRowSeed>) => ImportedRowSeed,
+  baseIndex = 0,
 ): ImportedRowSeed[] {
   // TM 코드도 같은 규칙으로 접어 대조한다 (대소문자·대시 모양 차이 흡수).
   const tmNorm = new Map<string, { code: string; tm: TmLike }>();
@@ -77,7 +81,9 @@ export function buildDmrEntryRowsFromSection(
   const byCode = new Map<string, Agg>();
   const codeless: Agg[] = [];
 
-  for (const raw of (section.rows ?? []) as unknown as Array<Record<string, unknown>>) {
+  const sectionRows = (section.rows ?? []) as unknown as Array<Record<string, unknown>>;
+  for (let idx = 0; idx < sectionRows.length; idx++) {
+    const raw = sectionRows[idx];
     const system = String(raw.system ?? '').trim();
     const contractor = String(raw.contractor ?? '').trim();
     // ⑤ 합계 줄은 버린다
@@ -86,10 +92,12 @@ export function buildDmrEntryRowsFromSection(
     const count = Math.max(0, Math.round(Number(raw.count ?? 0) || 0));
     if (count <= 0) continue; // '-' · 빈칸 · 0 은 건너뛴다
 
+    const importIndex = baseIndex + idx;
+
     // ②③ 코드 모양이 아니거나 아예 없으면 코드 없음으로 다룬다. 인원은 살린다.
     const codes = splitCodes(raw.task_no ?? (raw as { task_nos?: unknown }).task_nos);
     if (codes.length === 0) {
-      codeless.push({ codes: [], count, system, contractor });
+      codeless.push({ codes: [], count, system, contractor, importIndex });
       continue;
     }
     const key = codes.join('+');
@@ -97,7 +105,7 @@ export function buildDmrEntryRowsFromSection(
     if (prev) {
       prev.count += count;
     } else {
-      byCode.set(key, { codes: [...codes], count, system, contractor });
+      byCode.set(key, { codes: [...codes], count, system, contractor, importIndex });
     }
   }
 
@@ -119,6 +127,7 @@ export function buildDmrEntryRowsFromSection(
         imported: true,
         unmatched,
         multiCode,
+        importIndex: a.importIndex,
       }),
     );
   };

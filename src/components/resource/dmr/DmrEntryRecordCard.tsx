@@ -125,7 +125,11 @@ export function DmrEntryRecordCard({
   };
 
   const sortedRows = useMemo(() => {
-    if (sorting.length === 0) return rows;
+    // 기본 정렬: 스크린샷에서 불러온 원래 순서. importIndex 없는 행은 뒤로.
+    const base = sorting.length === 0
+      ? [...rows].sort((a, b) => (a.importIndex ?? Number.MAX_SAFE_INTEGER) - (b.importIndex ?? Number.MAX_SAFE_INTEGER))
+      : [...rows];
+    if (sorting.length === 0) return base;
     const valueOf = (r: EntryRow, id: SortKey): string | number | null => {
       const live = r.task_no ? tmByKey.get(`${r.discipline}|${r.task_no}`) : null;
       switch (id) {
@@ -152,7 +156,7 @@ export function DmrEntryRecordCard({
       if (typeof a === 'number' && typeof b === 'number') return a - b;
       return String(a).localeCompare(String(b), 'en', { numeric: true, sensitivity: 'base' });
     };
-    return [...rows].sort((ra, rb) => {
+    return base.sort((ra, rb) => {
       for (const s of sorting) {
         const c = cmp(valueOf(ra, s.id), valueOf(rb, s.id));
         if (c !== 0) return s.desc ? -c : c;
