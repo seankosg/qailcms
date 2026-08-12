@@ -276,11 +276,12 @@ export function OrganizationPage() {
                     <th className="py-1 text-left font-medium">인계 → 인수</th>
                     <th className="py-1 text-left font-medium">기간</th>
                     <th className="py-1 text-left font-medium">사유</th>
+                    <th className="py-1 text-right font-medium">관리</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={8} className="py-6 text-center text-muted-foreground">표시할 이관이 없습니다.</td></tr>
+                    <tr><td colSpan={9} className="py-6 text-center text-muted-foreground">표시할 이관이 없습니다.</td></tr>
                   )}
                   {filtered.map(({ r, p }) => (
                     <tr key={r.id} className="border-b last:border-0">
@@ -296,6 +297,21 @@ export function OrganizationPage() {
                       <td className="whitespace-nowrap py-1">{r.from_pic} → <span className="font-medium">{r.to_pic}</span></td>
                       <td className="whitespace-nowrap py-1 text-muted-foreground">{r.start_date} ~ {r.end_date}</td>
                       <td className="max-w-[160px] truncate py-1 text-muted-foreground">{r.note ?? ""}</td>
+                      <td className="py-1 text-right">
+                        {canManage(r) ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 gap-1 px-2 text-[11px]"
+                            onClick={() => setEditRow(r)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                            수정
+                          </Button>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -304,6 +320,12 @@ export function OrganizationPage() {
           )}
         </CardContent>
       </Card>
+
+      <DelegationEditDialog
+        row={editRow}
+        open={!!editRow}
+        onOpenChange={(v) => { if (!v) setEditRow(null); }}
+      />
     </div>
   );
 }
