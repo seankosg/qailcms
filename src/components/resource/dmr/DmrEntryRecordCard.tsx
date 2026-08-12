@@ -321,6 +321,9 @@ export function DmrEntryRecordCard({
         <datalist id="dmr-task-suggestions">
           {taskNameOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
+        <datalist id="dmr-work-type-suggestions">
+          {workTypeOptions.map((s) => <option key={s} value={s} />)}
+        </datalist>
         <datalist id="dmr-contractor-suggestions">
           {contractorOptions.map((o) => <option key={o.value} value={o.value} />)}
         </datalist>
