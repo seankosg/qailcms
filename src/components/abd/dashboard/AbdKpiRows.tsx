@@ -46,11 +46,16 @@ interface KpiCardProps {
   hint?: string;
   /** true 면 백분율 대신 "값 / 전체" 형태로 모집단 전체 건수를 함께 표시 */
   showTotal?: boolean;
+  /** TM/SM 진도 카드용 — as-of 기준 Actual% 와 Plan% (0~100). */
+  actualPct?: number;
+  planPct?: number;
 }
 
-export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal }: KpiCardProps) {
+export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal, actualPct, planPct }: KpiCardProps) {
   const pct = total && total > 0 ? Math.round((count / total) * 100) : null;
   const stackTotal = stackBar ? stackBar.reduce((s, x) => s + (x.count || 0), 0) : 0;
+  const hasGap = actualPct != null && planPct != null;
+  const diffPp = hasGap ? actualPct - planPct : null;
   return (
     <Card
       onClick={onClick}
@@ -63,18 +68,34 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
             <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
               {label}
             </div>
-            <div className={cn("text-3xl font-bold tabular-nums leading-tight", TONE[tone])}>
-              {count.toLocaleString()}
-              {showTotal && total != null && (
+            <div
+              className={cn(
+                "text-3xl font-bold tabular-nums leading-tight",
+                hasGap ? (diffPp! >= 0 ? TONE["ok"] : TONE["danger"]) : TONE[tone],
+              )}
+            >
+              {hasGap ? (
+                <>
+                  {diffPp! > 0 ? "+" : ""}
+                  {diffPp!.toFixed(1)}pp
+                </>
+              ) : (
+                count.toLocaleString()
+              )}
+              {showTotal && total != null && !hasGap && (
                 <span className="text-xl font-semibold text-muted-foreground">
                   {" / "}
                   {total.toLocaleString()}
                 </span>
               )}
             </div>
-            {pct != null && (
-              <div className="text-[11px] text-muted-foreground tabular-nums">{pct}% of total</div>
-            )}
+            {hasGap ? (
+              <div className="text-[11px] tabular-nums text-muted-foreground">
+                Actual {actualPct!.toFixed(1)}% / Plan {planPct!.toFixed(1)}%
+              </div>
+            ) : pct != null ? (
+              <div className="text-[11px] tabular-nums text-muted-foreground">{pct}% of total</div>
+            ) : null}
           </div>
           {breakdown && breakdown.length > 0 && (
             <div

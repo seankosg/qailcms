@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import { TmPlanVsActualCard } from "@/components/task-management/dashboard/TmPlanVsActualCard";
 import { useTmScurveData } from "@/hooks/useTmScurveData";
-import { resolveActualPct, resolveIsDelayed } from "@/lib/task-management/delay-utils";
+import { resolveActualPct, resolveIsDelayed, resolvePlanPct } from "@/lib/task-management/delay-utils";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
 import { useUnionWindow } from "@/lib/charts/use-union-window";
@@ -26,8 +26,10 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
     const total = q.scopedItems.length;
     let delayed = 0;
     let actualSum = 0;
+    let planSum = 0;
     for (const it of q.scopedItems) {
       actualSum += resolveActualPct(it);
+      planSum += resolvePlanPct(it, asOfDate);
       if (resolveIsDelayed(it, q.thresholds, asOfDate)) delayed += 1;
     }
     return {
@@ -35,6 +37,8 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       delayed,
       actualCount: Math.round(actualSum),
       progressPct: total > 0 ? (actualSum / total) * 100 : null,
+      planPct: total > 0 ? (planSum / total) * 100 : null,
+      actualPct: total > 0 ? (actualSum / total) * 100 : null,
     };
   }, [q.scopedItems, q.thresholds, asOfDate]);
   return { ...q, kpi };
@@ -70,6 +74,8 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 tone="ok"
                 showTotal
                 hint={PROGRESS_HINT}
+                actualPct={q.kpi.actualPct ?? undefined}
+                planPct={q.kpi.planPct ?? undefined}
               />
               <AbdKpiCard
                 label={`Plot ${label} 지연현황`}
