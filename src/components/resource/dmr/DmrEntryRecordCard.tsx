@@ -316,6 +316,9 @@ export function DmrEntryRecordCard({
         <datalist id="dmr-task-suggestions">
           {taskNameOptions.map((s) => <option key={s} value={s} />)}
         </datalist>
+        <datalist id="dmr-contractor-suggestions">
+          {contractorOptions.map((o) => <option key={o.value} value={o.value} />)}
+        </datalist>
         <div className="max-h-[70vh] overflow-auto">
           <table className="w-full text-xs" style={{ minWidth: SELECT_COL_W + shownKeys.reduce((n, k) => n + (COL_BY_ID[k]?.width ?? 120), 0) }}>
             <thead>
@@ -459,11 +462,12 @@ export function DmrEntryRecordCard({
                       return <span className="whitespace-nowrap">{tm?.row_type ?? '—'}</span>;
                     case 'contractor_name':
                       return (
-                        <SearchSelect
+                        <Input
+                          list="dmr-contractor-suggestions"
                           value={r.contractor_name}
-                          options={contractorOptions}
-                          onChange={(v) => onPatch(r.key, { contractor_name: v })}
-                          placeholder="Contractor 선택"
+                          onChange={(e) => onPatch(r.key, { contractor_name: e.target.value })}
+                          placeholder="Sub Contractor"
+                          className="h-8 text-xs"
                         />
                       );
                     case 'system_name':
