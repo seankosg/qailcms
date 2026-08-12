@@ -17,7 +17,7 @@ import { useDmrSystemMaster, useDmrContractorMaster, useInvalidateDmr } from '@/
 import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
 import { parseDmrImages } from '@/lib/dmr-parse.functions';
 import { buildDmrEntryRowsFromSection } from '@/lib/dmr/entry-import';
-import { exportDmrTeamWorkbook } from '@/lib/dmr/export-dmr-team';
+import { exportDmrTeamsWorkbook } from '@/lib/dmr/export-dmr-team';
 import { DMR_HEADCOUNT_KINDS, dmrDataDateGapDays } from '@/lib/dmr/task-link';
 
 type Discipline = 'ARCH' | 'ELEC' | 'MECH';
@@ -389,12 +389,20 @@ export function DmrEntryPage() {
     }
   }
 
-  async function onExport(d: Discipline) {
+  const [exporting, setExporting] = useState(false);
+
+  /** 공종 셋을 파일 하나로. 공종은 탭으로 나뉜다. */
+  async function onExport() {
+    setExporting(true);
     try {
-      const r = await exportDmrTeamWorkbook({ discipline: d, reportDate });
-      toast.success(`${d} 엑셀 ${r.rowCount}행 내보냄`);
+      const r = await exportDmrTeamsWorkbook({ disciplines: [...DISCIPLINES], reportDate });
+      toast.success(
+        `엑셀 1개 파일 — ${r.byDiscipline.map((b) => `${b.discipline} ${b.rowCount}행`).join(' · ')}`,
+      );
     } catch (e: any) {
       toast.error(e?.message ?? '내보내기 실패');
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -410,11 +418,10 @@ export function DmrEntryPage() {
             <p className="text-xs text-muted-foreground">출면기록부 작성 — TM 코드에서 시작한다</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {DISCIPLINES.map((d) => (
-              <Button key={d} variant="outline" size="sm" className="gap-1 text-xs" onClick={() => onExport(d)}>
-                <Download className="h-3.5 w-3.5" />{d} 엑셀
-              </Button>
-            ))}
+            <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => void onExport()} disabled={exporting}>
+              {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              엑셀 (ARCH·ELEC·MECH 탭)
+            </Button>
           </div>
         </div>
 
