@@ -311,7 +311,11 @@ export function DmrEntryRecordCard({
       </CardHeader>
       <CardContent className="p-0">
         <datalist id="dmr-system-suggestions">
-          {systemOptions.map((s) => <option key={s} value={s} />)}
+          {systemOptions
+            .filter((s) => s && String(s).trim())
+            .map((s, i) => (
+              <option key={`${s}#${i}`} value={s} />
+            ))}
         </datalist>
         <datalist id="dmr-task-suggestions">
           {taskNameOptions.map((s) => <option key={s} value={s} />)}
