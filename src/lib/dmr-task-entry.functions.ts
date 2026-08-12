@@ -104,6 +104,9 @@ export const saveDmrTaskEntries = createServerFn({ method: 'POST' })
         work_category: tm ? (tm.row_type ?? null) : null,
         tplan_pct: tm ? (tm.cum_plan_pct ?? null) : null,
         tactual_pct: tm ? (tm.cum_actual_pct ?? null) : null,
+        // 하루치 증분 — tm_rows_as_of 정본 값을 저장 시점에 그대로 박는다.
+        tc_plan_pct: tm ? (tm.tc_plan_pct ?? null) : null,
+        tc_actual_pct: tm ? (tm.tc_actual_pct ?? null) : null,
         task_actual_start: tm ? (tm.actual_start ?? null) : null,
         task_data_date: tm ? (tm.data_date ?? null) : null,
         snapshot_at: taskNo ? snapshotAt : null,

@@ -5,6 +5,9 @@ import { DMR_COLUMNS, type DmrColumnDef } from './columns';
 
 export interface DmrExportOptions {
   visibleKeys: string[];
+  /** 열 정의 묶음 (Raw Data 2 는 다른 묶음을 쓴다) */
+  columnDefs?: DmrColumnDef[];
+  sheetTitle?: string;
   directMap?: Map<string, boolean>;
   applyFiltersToQuery: (q: any) => any;
   applySortToQuery: (q: any) => any;
@@ -13,8 +16,9 @@ export interface DmrExportOptions {
 }
 
 export async function exportDmrRawData(opts: DmrExportOptions) {
+  const defs = opts.columnDefs ?? DMR_COLUMNS;
   const cols: DmrColumnDef[] = opts.visibleKeys
-    .map((k) => DMR_COLUMNS.find((c) => c.key === k))
+    .map((k) => defs.find((c) => c.key === k))
     .filter((c): c is DmrColumnDef => !!c);
 
   const dateFields = cols.filter((c) => c.type === 'date').map((c) => c.key);
@@ -25,7 +29,7 @@ export async function exportDmrRawData(opts: DmrExportOptions) {
     columns: cols.map((c) => ({ key: c.key, label: c.label })),
     dateFields,
     header: {
-      title: 'DMR — Raw Data',
+      title: opts.sheetTitle ?? 'DMR — Raw Data',
       metaRows: [
         `Exported at: ${dohaStamp()} (Doha)`,
         'Source: dmr_entries',

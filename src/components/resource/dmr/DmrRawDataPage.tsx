@@ -28,7 +28,7 @@ import {
   type DmrEntry,
   type DmrServerFilter,
 } from '@/hooks/useDmrEntries';
-import { DMR_COLUMNS, DMR_COLUMN_KEYS, DMR_COLUMN_BY_KEY, type DmrColumnDef } from '@/lib/dmr/columns';
+import { DMR_COLUMNS, type DmrColumnDef } from '@/lib/dmr/columns';
 import { DmrColumnFilterDropdown } from './DmrColumnFilterDropdown';
 import { DmrColumnOrderMenu } from './DmrColumnOrderMenu';
 import { DmrEditCellPopover } from './DmrEditCellPopover';
@@ -46,10 +46,10 @@ function decodeState<T>(s: string, fallback: T): T {
 }
 
 // ── Filter conversion (TanStack ColumnFilters → server filters) ─────────
-function toServerFilters(cf: ColumnFiltersState): DmrServerFilter[] {
+function toServerFilters(cf: ColumnFiltersState, byKey: Record<string, DmrColumnDef>): DmrServerFilter[] {
   const out: DmrServerFilter[] = [];
   for (const f of cf) {
-    const col = DMR_COLUMN_BY_KEY[f.id];
+    const col = byKey[f.id];
     if (!col) continue;
     const v = f.value as any;
     if (col.filterType === 'multi-select') {
@@ -173,11 +173,39 @@ function CellRenderer({ row, col, canEdit, directMap }: { row: DmrEntry; col: Dm
 }
 
 // ── Main page ────────────────────────────────────────────────────────────
-export function DmrRawDataPage() {
+export interface DmrRawDataPageProps {
+  /** 열 묶음 (기본: DMR Raw Data) */
+  columnDefs?: DmrColumnDef[];
+  title?: string;
+  subtitle?: string;
+  /** 사용자 컬럼 설정 저장 키 */
+  prefKey?: string;
+  /** 라우트 경로 (URL 상태 동기화) */
+  routePath?: string;
+  routeId?: string;
+  showImport?: boolean;
+  exportFilePrefix?: string;
+}
+
+export function DmrRawDataPage({
+  columnDefs = DMR_COLUMNS,
+  title = 'DMR Raw Data',
+  subtitle = '일자별·TEAM별·협력사별 인원 실적 (롱포맷)',
+  prefKey = 'dmr-raw-data',
+  routePath = '/resource/dmr/raw-data',
+  routeId = '/_authenticated/resource/dmr/raw-data',
+  showImport = true,
+  exportFilePrefix,
+}: DmrRawDataPageProps = {}) {
+  const colKeys = useMemo(() => columnDefs.map((c) => c.key), [columnDefs]);
+  const byKey = useMemo(
+    () => Object.fromEntries(columnDefs.map((c) => [c.key, c])) as Record<string, DmrColumnDef>,
+    [columnDefs],
+  );
   const { data: me } = useCurrentUser();
   const canEdit = !!me?.canEdit || !!me?.isAdmin;
-  const navigate = useNavigate({ from: '/resource/dmr/raw-data' });
-  const search = useSearch({ from: '/_authenticated/resource/dmr/raw-data' });
+  const navigate = useNavigate({ from: routePath as any });
+  const search = useSearch({ from: routeId as any }) as any;
   const fetchIds = useServerFn(fetchDmrFilteredIds);
 
   // URL-synced state
@@ -205,8 +233,8 @@ export function DmrRawDataPage() {
   const setQ = (q: string) => navigate({ to: '.', search: (prev: any) => ({ ...prev, q, page: 1 }) });
 
   // View preferences
-  const { state: viewPref, ready: prefReady, save: savePref } = useUserViewPreference('dmr-raw-data');
-  const [order, setOrder] = useState<string[]>(DMR_COLUMN_KEYS);
+  const { state: viewPref, ready: prefReady, save: savePref } = useUserViewPreference(prefKey);
+  const [order, setOrder] = useState<string[]>(colKeys);
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [frozenExtras, setFrozenExtras] = useState<string[]>([]);
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
@@ -216,7 +244,7 @@ export function DmrRawDataPage() {
     loadedPrefRef.current = true;
     if (viewPref) {
       const p: any = viewPref;
-      if (Array.isArray(p.order)) setOrder([...new Set([...p.order, ...DMR_COLUMN_KEYS])].filter((k) => DMR_COLUMN_KEYS.includes(k)));
+      if (Array.isArray(p.order)) setOrder([...new Set([...p.order, ...colKeys])].filter((k) => colKeys.includes(k)));
       if (p.visibility) setVisibility(p.visibility);
       if (Array.isArray(p.frozenExtras)) setFrozenExtras(p.frozenExtras);
       if (p.columnSizing) setColumnSizing(p.columnSizing);
@@ -235,7 +263,7 @@ export function DmrRawDataPage() {
   }, [contractorMaster]);
 
   // Fetch data
-  const serverFilters = useMemo(() => toServerFilters(columnFilters), [columnFilters]);
+  const serverFilters = useMemo(() => toServerFilters(columnFilters, byKey), [columnFilters, byKey]);
   const serverSort = useMemo(() => sorting.map((s) => ({ column: s.id, desc: !!s.desc })), [sorting]);
   const pageIndex = Math.max(1, Number(search.page ?? 1));
   const pageSize = Math.max(20, Number(search.pageSize ?? 100));
@@ -326,7 +354,7 @@ export function DmrRawDataPage() {
       ),
     };
     const dataCols: ColumnDef<DmrEntry>[] = order.map((k) => {
-      const c = DMR_COLUMN_BY_KEY[k];
+      const c = byKey[k];
       if (!c) return null as any;
       return {
         id: k,
@@ -345,7 +373,7 @@ export function DmrRawDataPage() {
       } as ColumnDef<DmrEntry>;
     }).filter(Boolean);
     return [selectCol, ...dataCols];
-  }, [order, columnSizing, canEdit, directMap, selection, pageAllSelected, pageSomeSelected, rows]);
+  }, [order, columnSizing, canEdit, directMap, selection, pageAllSelected, pageSomeSelected, rows, byKey]);
 
   const table = useReactTable({
     data: rows,
@@ -390,11 +418,11 @@ export function DmrRawDataPage() {
     let acc = 0;
     for (const k of stickyKeys) {
       offsets[k] = acc;
-      const size = k === '__select' ? 34 : (columnSizing[k] ?? DMR_COLUMN_BY_KEY[k]?.width ?? 120);
+      const size = k === '__select' ? 34 : (columnSizing[k] ?? byKey[k]?.width ?? 120);
       acc += size;
     }
     return offsets;
-  }, [stickyKeys, columnSizing]);
+  }, [stickyKeys, columnSizing, byKey]);
 
   const visibleHeaders = table.getFlatHeaders();
   // Reorder headers so sticky keys come first
@@ -427,11 +455,14 @@ export function DmrRawDataPage() {
     try {
       const visibleKeys = order.filter((k) => visibility[k] !== false);
       const summary = {
-        filters: columnFilters.map((f) => `${DMR_COLUMN_BY_KEY[f.id]?.label ?? f.id}=${JSON.stringify(f.value)}`).join(', ') || '—',
-        sort: sorting.map((s) => `${DMR_COLUMN_BY_KEY[s.id]?.label ?? s.id} ${s.desc ? 'DESC' : 'ASC'}`).join(', ') || 'default',
+        filters: columnFilters.map((f) => `${byKey[f.id]?.label ?? f.id}=${JSON.stringify(f.value)}`).join(', ') || '—',
+        sort: sorting.map((s) => `${byKey[s.id]?.label ?? s.id} ${s.desc ? 'DESC' : 'ASC'}`).join(', ') || 'default',
       };
       await exportDmrRawData({
         visibleKeys,
+        columnDefs,
+        sheetTitle: `${title}`,
+        ...(exportFilePrefix ? { filename: `${exportFilePrefix}_${new Date().toISOString().slice(0, 10)}.xlsx` } : {}),
         directMap,
         applyFiltersToQuery: (q) => applyToSupabaseQuery(q, serverFilters, [], qInput, directMap),
         applySortToQuery: (q) => {
@@ -451,14 +482,16 @@ export function DmrRawDataPage() {
     <div className="flex h-full flex-col space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">DMR Raw Data</h1>
-          <p className="text-xs text-muted-foreground">일자별·TEAM별·협력사별 인원 실적 (롱포맷)</p>
+          <h1 className="text-xl font-semibold">{title}</h1>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <DmrColumnOrderMenu
             order={order}
             visibility={visibility as Record<string, boolean>}
             frozenExtras={frozenExtras}
+            labelByKey={Object.fromEntries(columnDefs.map((c) => [c.key, c.label]))}
+            defaultOrder={colKeys}
             onOrderChange={(o) => { setOrder(o); persistPref({ order: o }); }}
             onVisibilityChange={(v) => { setVisibility(v); persistPref({ visibility: v }); }}
             onFrozenChange={(f) => { setFrozenExtras(f); persistPref({ frozenExtras: f }); }}
@@ -467,7 +500,7 @@ export function DmrRawDataPage() {
               toast.success('컬럼 설정을 저장했습니다');
             }}
           />
-          {canEdit && (
+          {showImport && canEdit && (
             <Button asChild variant="outline" size="sm">
               <Link to="/import-log/import" search={{ tab: "dmr" }}><Upload className="mr-1 h-3.5 w-3.5" />Import</Link>
             </Button>
@@ -550,7 +583,7 @@ export function DmrRawDataPage() {
             {orderedHeaders.map((h) => {
               const isSticky = stickyKeys.includes(h.column.id);
               const size = h.getSize();
-              const col = DMR_COLUMN_BY_KEY[h.column.id];
+              const col = byKey[h.column.id];
               return (
                 <div
                   key={h.id}
@@ -594,7 +627,7 @@ export function DmrRawDataPage() {
                           'flex items-center overflow-hidden border-r px-2 text-xs',
                           isSticky && 'sticky z-20 bg-background',
                           selected && isSticky && 'bg-primary/5',
-                          DMR_COLUMN_BY_KEY[h.column.id]?.align === 'right' && 'justify-end',
+                          byKey[h.column.id]?.align === 'right' && 'justify-end',
                         )}
                         style={{ width: size, minWidth: size, left: isSticky ? stickyOffsets[h.column.id] : undefined }}
                       >
