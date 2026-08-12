@@ -9219,6 +9219,16 @@ export type Database = {
         }
         Returns: string
       }
+      tm_actual_at_set: {
+        Args: { _as_of: string; _ids?: string[] }
+        Returns: {
+          a_asof: number
+          a_prev: number
+          b_asof: number
+          b_prev: number
+          task_raw_id: string
+        }[]
+      }
       tm_classify_overdue: {
         Args: { buffer_days: number; mstone: string; target: string }
         Returns: string
@@ -9587,6 +9597,69 @@ export type Database = {
         }[]
       }
       tm_rows_as_of_json: { Args: { p_as_of?: string }; Returns: Json }
+      tm_rows_as_of_notc: {
+        Args: { _as_of: string }
+        Returns: {
+          actual_duration: number
+          actual_finish: string
+          actual_overdue: string
+          actual_progress: number
+          actual_start: string
+          alarm_reason: string
+          auto_judgment: string
+          auto_judgment_import: string
+          category: string
+          created_at: string
+          cum_actual_pct: number
+          cum_plan_pct: number
+          data_date: string
+          delay_days: number
+          delegated_from: string
+          discipline: string
+          effective_pic: string
+          expected_finish: string
+          expected_progress_today: number
+          floor_level: string
+          forecast_end: string
+          gap_pct: number
+          hdec_eng_name: string
+          hdec_pic_name: string
+          id: string
+          imported_at: string
+          imported_by: string
+          is_active: boolean
+          is_delegated: boolean
+          is_rollup: boolean
+          level: string
+          location: string
+          main_task_no: string
+          milestone: string
+          milestone_date: string
+          original_pic: string
+          owner_user_id: string
+          plan_days: number
+          plan_end: string
+          plan_overdue: string
+          plan_progress: number
+          plan_start: string
+          plot: string
+          progress_variance: number
+          risk: string
+          row_type: string
+          slip_days: number
+          sort_order: number
+          source_file: string
+          source_import_log_id: string
+          stage_finish: string
+          stage_start: string
+          status_manual: string
+          sub_task_desc: string
+          task_name: string
+          task_no: string
+          team: string
+          updated_at: string
+        }[]
+      }
       tm_thresholds: { Args: never; Returns: Json }
       tm_today_actual: {
         Args: { _as_of: string; _ids: string[] }
