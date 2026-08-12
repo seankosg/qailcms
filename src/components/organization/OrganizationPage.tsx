@@ -80,15 +80,22 @@ export function OrganizationPage() {
   const givers = new Set(activeRows.map((r) => r.from_pic));
   const takers = new Set(activeRows.map((r) => r.to_pic));
 
-  const perPerson = useMemo(() => {
+  const scheduledRows = useMemo(() => tagged.filter((t) => t.p === "scheduled").map((t) => t.r), [tagged]);
+
+  /** 사용자별 인계·인수 집계 — 단계별로 따로 센다 */
+  const summarize = (list: DelegRow[]) => {
     const m = new Map<string, { name: string; out: number; inn: number }>();
     const touch = (n: string) => {
       if (!m.has(n)) m.set(n, { name: n, out: 0, inn: 0 });
       return m.get(n)!;
     };
-    activeRows.forEach((r) => { touch(r.from_pic).out += 1; touch(r.to_pic).inn += 1; });
+    list.forEach((r) => { touch(r.from_pic).out += 1; touch(r.to_pic).inn += 1; });
     return Array.from(m.values()).sort((x, y) => (y.inn + y.out) - (x.inn + x.out) || x.name.localeCompare(y.name));
-  }, [activeRows]);
+  };
+  const perPersonActive = useMemo(() => summarize(activeRows), [activeRows]);
+  const perPersonScheduled = useMemo(() => summarize(scheduledRows), [scheduledRows]);
+  const [summaryTab, setSummaryTab] = useState<"scheduled" | "active">("active");
+  const perPerson = summaryTab === "active" ? perPersonActive : perPersonScheduled;
 
   const flows = useMemo(() => {
     const m = new Map<string, { from: string; to: string; n: number }>();
@@ -142,8 +149,18 @@ export function OrganizationPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">사용자별 이관 요약 (진행 중)</CardTitle>
+          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm">사용자별 이관 요약</CardTitle>
+            <Tabs value={summaryTab} onValueChange={(v) => setSummaryTab(v as "scheduled" | "active")}>
+              <TabsList className="h-8">
+                <TabsTrigger value="scheduled" className="h-6 px-2 text-xs">
+                  예정 <span className="ml-1 tabular-nums opacity-70">{counts.scheduled}</span>
+                </TabsTrigger>
+                <TabsTrigger value="active" className="h-6 px-2 text-xs">
+                  진행 중 <span className="ml-1 tabular-nums opacity-70">{counts.active}</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-72">
@@ -158,7 +175,7 @@ export function OrganizationPage() {
                 </thead>
                 <tbody>
                   {perPerson.length === 0 && (
-                    <tr><td colSpan={4} className="py-4 text-center text-muted-foreground">진행 중 이관이 없습니다.</td></tr>
+                    <tr><td colSpan={4} className="py-4 text-center text-muted-foreground">{summaryTab === "active" ? "진행 중" : "예정된"} 이관이 없습니다.</td></tr>
                   )}
                   {perPerson.map((p) => {
                     const net = p.inn - p.out;
