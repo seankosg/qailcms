@@ -373,7 +373,7 @@ export function DmrEntryPage() {
       setMissing(res?.missing_task_nos ?? []);
       invalidate();
       dirtyRef.current = false;
-      await Promise.all([existingQ.refetch(), prevQ.refetch()]);
+      await existingQ.refetch();
       setReloadTick((t) => t + 1);
       toast.success(`저장 완료 — ${valid.length}행 / ${entries.length}건 (TM 연결 ${res?.linked_tasks ?? 0}건)`);
     } catch (e: any) {
@@ -521,11 +521,9 @@ export function DmrEntryPage() {
                     ? dmrDataDateGapDays({ report_date: reportDate, task_data_date: tm.data_date })
                     : null;
                   const plotMismatch = !!tm && !!tm.plot && tm.plot !== r.plot;
-                  const prev = r.task_no ? prevMap.get(r.task_no) : undefined;
-                  // 계획·실적 증분은 같은 직전 행을 기준으로 잡는다.
-                  const dPlan = dmrSegmentDelta(tm?.cum_plan_pct ?? null, prev?.tplan_pct);
-                  const dActual = dmrSegmentDelta(tm?.cum_actual_pct ?? null, prev?.tactual_pct);
-                  const segDays = dmrSegmentDays(reportDate, prev?.report_date);
+                  // 증분은 서버 정본(tm_rows_as_of)의 기준일 하루치 값만 쓴다.
+                  const dPlan = live?.tc_plan_pct ?? null;
+                  const dActual = live?.tc_actual_pct ?? null;
                   const total =
                     (Number(r.worker) || 0) + (Number(r.foreman) || 0) + (Number(r.supervisor) || 0);
                   const delegated = !!tm?.is_delegated && !!tm?.original_pic && tm.original_pic !== tm.effective_pic;
