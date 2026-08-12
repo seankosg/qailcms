@@ -131,9 +131,12 @@ export function DmrEntryPage() {
     const m = new Map<string, TmOption>();
     for (const t of tmQ.data ?? []) {
       const d = disciplineOfTerm.get(t._d);
-      if (!d) continue;
-      const k = `${d}|${t.task_no}`;
-      if (!m.has(k)) m.set(k, t);
+      // 공종이 ARCH·ELEC·MECH 로 접히지 않는 행(PRJC 등)은 세 공종 모두에서 고를 수 있게 둔다.
+      const targets = d ? [d] : DISCIPLINES;
+      for (const dd of targets) {
+        const k = `${dd}|${t.task_no}`;
+        if (!m.has(k)) m.set(k, t);
+      }
     }
     return m;
   }, [tmQ.data, disciplineOfTerm]);
