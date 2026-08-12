@@ -100,13 +100,12 @@ export function DmrEntryPage() {
     queryKey: ['dmr-entry-tm', reportDate, teamQ.data],
     enabled: !!teamQ.data,
     queryFn: async () => {
-      const terms = DISCIPLINES.flatMap((d) => teamQ.data?.[d] ?? []);
       // 행별 반환 RPC 는 PostgREST 응답 상한(1,000)에 걸린다 → jsonb 스칼라 정본으로 전량 수신.
-      const termSet = new Set(terms.map((t) => String(t).toUpperCase()));
       const { data: payload, error } = await (supabase as any).rpc('tm_rows_as_of_json', { p_as_of: reportDate });
       if (error) throw new Error(error.message);
       const rows: any[] = Array.isArray(payload) ? payload : ((payload?.rows ?? []) as any[]);
-      const all = rows.filter((r) => termSet.has(String(r.discipline ?? '').toUpperCase()));
+      // 후보는 TM Raw Data 전체다 (Main · Sub 포함, 공종 불문). 공종은 분류에만 쓴다.
+      const all = rows;
       return all.map<TmOption & { _d: string }>((r) => ({
         _d: String(r.discipline ?? '').toUpperCase(),
         task_no: String(r.task_no),
@@ -132,9 +131,12 @@ export function DmrEntryPage() {
     const m = new Map<string, TmOption>();
     for (const t of tmQ.data ?? []) {
       const d = disciplineOfTerm.get(t._d);
-      if (!d) continue;
-      const k = `${d}|${t.task_no}`;
-      if (!m.has(k)) m.set(k, t);
+      // 공종이 ARCH·ELEC·MECH 로 접히지 않는 행(PRJC 등)은 세 공종 모두에서 고를 수 있게 둔다.
+      const targets = d ? [d] : DISCIPLINES;
+      for (const dd of targets) {
+        const k = `${dd}|${t.task_no}`;
+        if (!m.has(k)) m.set(k, t);
+      }
     }
     return m;
   }, [tmQ.data, disciplineOfTerm]);
