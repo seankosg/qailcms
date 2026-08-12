@@ -18,13 +18,7 @@ import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
 import { parseDmrImages } from '@/lib/dmr-parse.functions';
 import { buildDmrEntryRowsFromSection, fileToParseSource } from '@/lib/dmr/entry-import';
 import { exportDmrTeamWorkbook } from '@/lib/dmr/export-dmr-team';
-import {
-  DMR_HEADCOUNT_KINDS,
-  dmrDataDateGapDays,
-  buildDmrPrevSnapshotMap,
-  dmrSegmentDelta,
-  dmrSegmentDays,
-} from '@/lib/dmr/task-link';
+import { DMR_HEADCOUNT_KINDS, dmrDataDateGapDays } from '@/lib/dmr/task-link';
 
 type Discipline = 'ARCH' | 'ELEC' | 'MECH';
 const DISCIPLINES: Discipline[] = ['ARCH', 'ELEC', 'MECH'];
@@ -66,6 +60,9 @@ interface TmOption {
   row_type: string | null;
   cum_plan_pct: number | null;
   cum_actual_pct: number | null;
+  /** 기준일 하루치 증분 — 서버 tm_rows_as_of 정본. 화면에서 다시 계산하지 않는다. */
+  tc_plan_pct: number | null;
+  tc_actual_pct: number | null;
   data_date: string | null;
   plot: string | null;
   effective_pic: string | null;
@@ -185,6 +182,8 @@ export function DmrEntryPage() {
         row_type: r.row_type ?? null,
         cum_plan_pct: r.cum_plan_pct ?? null,
         cum_actual_pct: r.cum_actual_pct ?? null,
+        tc_plan_pct: r.tc_plan_pct ?? null,
+        tc_actual_pct: r.tc_actual_pct ?? null,
         data_date: r.data_date ?? null,
         plot: r.plot ?? null,
         effective_pic: r.effective_pic ?? null,
@@ -220,29 +219,6 @@ export function DmrEntryPage() {
     },
     staleTime: 0,
   });
-
-  // 직전 기록 — 화면에서 한 번만 부른다. 코드마다 따로 부르지 않는다.
-  const prevQ = useQuery({
-    queryKey: ['dmr-entry-prev', reportDate, discipline],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('dmr_entries')
-        .select('task_no, report_date, tplan_pct, tactual_pct')
-        .eq('discipline', discipline)
-        .lt('report_date', reportDate)
-        .not('task_no', 'is', null)
-        .order('report_date', { ascending: false })
-        .limit(20000);
-      if (error) throw new Error(error.message);
-      return (data ?? []) as any[];
-    },
-    staleTime: 60_000,
-  });
-
-  const prevMap = useMemo(
-    () => buildDmrPrevSnapshotMap((prevQ.data ?? []) as any[], reportDate),
-    [prevQ.data, reportDate],
-  );
 
   const loadedKey = `${reportDate}|${discipline}|${reloadTick}`;
   useEffect(() => {
@@ -397,7 +373,7 @@ export function DmrEntryPage() {
       setMissing(res?.missing_task_nos ?? []);
       invalidate();
       dirtyRef.current = false;
-      await Promise.all([existingQ.refetch(), prevQ.refetch()]);
+      await existingQ.refetch();
       setReloadTick((t) => t + 1);
       toast.success(`저장 완료 — ${valid.length}행 / ${entries.length}건 (TM 연결 ${res?.linked_tasks ?? 0}건)`);
     } catch (e: any) {
@@ -520,7 +496,7 @@ export function DmrEntryPage() {
             <table className="w-full min-w-[1500px] text-xs">
               <thead className="bg-muted/50">
                 <tr className="[&>th]:whitespace-nowrap [&>th]:px-2 [&>th]:py-2 [&>th]:text-left">
-                  <th>TM Code</th><th>Work Type</th><th>당일 계획%</th><th>당일 실적%</th>
+                  <th>TM Code</th><th>Work Type</th><th>TC.Plan%</th><th>TC.Actual%</th>
                   <th>Worker</th><th>Foreman</th><th>Supervisor</th><th>총합</th>
                   <th>System</th><th>Contractor</th><th>Plot</th><th>담당자</th>
                 </tr>
@@ -545,11 +521,9 @@ export function DmrEntryPage() {
                     ? dmrDataDateGapDays({ report_date: reportDate, task_data_date: tm.data_date })
                     : null;
                   const plotMismatch = !!tm && !!tm.plot && tm.plot !== r.plot;
-                  const prev = r.task_no ? prevMap.get(r.task_no) : undefined;
-                  // 계획·실적 증분은 같은 직전 행을 기준으로 잡는다.
-                  const dPlan = dmrSegmentDelta(tm?.cum_plan_pct ?? null, prev?.tplan_pct);
-                  const dActual = dmrSegmentDelta(tm?.cum_actual_pct ?? null, prev?.tactual_pct);
-                  const segDays = dmrSegmentDays(reportDate, prev?.report_date);
+                  // 증분은 서버 정본(tm_rows_as_of)의 기준일 하루치 값만 쓴다.
+                  const dPlan = live?.tc_plan_pct ?? null;
+                  const dActual = live?.tc_actual_pct ?? null;
                   const total =
                     (Number(r.worker) || 0) + (Number(r.foreman) || 0) + (Number(r.supervisor) || 0);
                   const delegated = !!tm?.is_delegated && !!tm?.original_pic && tm.original_pic !== tm.effective_pic;
@@ -591,15 +565,11 @@ export function DmrEntryPage() {
                       <td className="w-24 whitespace-nowrap">{tm?.row_type ?? '—'}</td>
                       <td className="w-32 whitespace-nowrap">
                         <div>{dPlan == null ? <span className="text-muted-foreground">—</span> : pctText(dPlan)}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {prev ? `직전 기록 ${prev.report_date}${segDays != null ? ` (${segDays}일)` : ''}` : '직전 기록 없음'}
-                        </div>
+                        <div className="text-[10px] text-muted-foreground">{reportDate} 하루치</div>
                       </td>
                       <td className="w-32 whitespace-nowrap">
                         <div>{dActual == null ? <span className="text-muted-foreground">—</span> : pctText(dActual)}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {prev ? `직전 기록 ${prev.report_date}${segDays != null ? ` (${segDays}일)` : ''}` : '직전 기록 없음'}
-                        </div>
+                        <div className="text-[10px] text-muted-foreground">{reportDate} 하루치</div>
                       </td>
                       <td className="w-20"><Input type="number" min={0} value={r.worker} onChange={(e) => patch(r.key, { worker: e.target.value })} className="h-8 text-xs" /></td>
                       <td className="w-20"><Input type="number" min={0} value={r.foreman} onChange={(e) => patch(r.key, { foreman: e.target.value })} className="h-8 text-xs" /></td>

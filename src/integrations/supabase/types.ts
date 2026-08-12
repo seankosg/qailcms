@@ -9235,6 +9235,10 @@ export type Database = {
         }
         Returns: Json
       }
+      tm_cum_actual_at: {
+        Args: { _d: string; _fallback: number; _task_raw_id: string }
+        Returns: number
+      }
       tm_edit_record_daily: {
         Args: { p_from: string; p_to: string }
         Returns: {
@@ -9576,6 +9580,8 @@ export type Database = {
           sub_task_desc: string
           task_name: string
           task_no: string
+          tc_actual_pct: number
+          tc_plan_pct: number
           team: string
           updated_at: string
         }[]
