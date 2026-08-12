@@ -380,6 +380,8 @@ export const TM_ADMIN_LOCKED_FIELDS: string[] = [
   "stage_progress",
   "today_actual",
   "today_gap",
+  "tc_plan_pct",
+  "tc_actual_pct",
   "expected_progress_today",
   "imported_at",
   "source_file",
