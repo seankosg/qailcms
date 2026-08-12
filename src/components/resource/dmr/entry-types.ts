@@ -1,6 +1,6 @@
 export type DmrDiscipline = 'ARCH' | 'ELEC' | 'MECH';
 
-/** Daily Entry 화면이 쓰는 행 모양. 화면 1행 = 인원종류 3건으로 저장된다. */
+/** Daily Entry 화면이 쓰는 행 모양. 화면 1행 = 저장 1건. */
 export interface EntryRow {
   key: string;
   /** 공종 — 하루치 기록은 ARCH·ELEC·MECH 가 한 표에 섞인다 */
@@ -10,9 +10,8 @@ export interface EntryRow {
   contractor_name: string;
   plot: 'C' | 'D';
   pic_name: string;
-  worker: string;
-  foreman: string;
-  supervisor: string;
+  /** 총원 — 인원 종류 구분 없이 한 칸 */
+  manpower: string;
   saved?: boolean;
   /** 스크린샷 파싱으로 채워 넣은 행 */
   imported?: boolean;
@@ -56,8 +55,6 @@ export const newEntryRow = (init: Partial<EntryRow> = {}): EntryRow => ({
   contractor_name: '',
   plot: 'C',
   pic_name: '',
-  worker: '0',
-  foreman: '0',
-  supervisor: '0',
+  manpower: '0',
   ...init,
 });

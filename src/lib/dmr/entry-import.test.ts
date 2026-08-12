@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildDmrEntryRowsFromSection } from '@/lib/dmr/entry-import';
 
 let n = 0;
-const make = (i: any) => ({ key: String(++n), task_no: '', system_name: '', contractor_name: '', plot: 'C', pic_name: '', worker: '0', foreman: '0', supervisor: '0', ...i });
+const make = (i: any) => ({ key: String(++n), task_no: '', system_name: '', contractor_name: '', plot: 'C', pic_name: '', manpower: '0', ...i });
 const tm = new Map<string, any>([
   ['ME-C-06', { plot: 'C', effective_pic: 'A' }],
   ['ME-D-05', { plot: 'D', effective_pic: 'B' }],
@@ -31,13 +31,13 @@ describe('dmr entry import', () => {
       { task_no: '', count: 240, system: 'Total', contractor: '' },
       { task_no: '', count: 97, system: 'HDEC_Total', contractor: '' },
     ]), tm, make as any);
-    const by = (c: string) => out.filter(r => r.task_no === c).reduce((s, r) => s + Number(r.worker), 0);
+    const by = (c: string) => out.filter(r => r.task_no === c).reduce((s, r) => s + Number(r.manpower), 0);
     expect(by('ME-C-06')).toBe(36);
     expect(by('ME-D-05')).toBe(24);
     expect(by('ME-C-11')).toBe(77);
     expect(by('ME-C-17')).toBe(18);
     expect(out.find(r => r.task_no === 'ME-D-08-06')!.plot).toBe('D');
-    expect(out.filter(r => !r.task_no).map(r => Number(r.worker)).sort()).toEqual([3, 5, 7]);
+    expect(out.filter(r => !r.task_no).map(r => Number(r.manpower)).sort()).toEqual([3, 5, 7]);
     expect(out.some(r => /Total/i.test(r.system_name))).toBe(false);
     expect(out.some(r => r.system_name === 'Zero')).toBe(false);
   });
@@ -47,7 +47,7 @@ describe('dmr entry import', () => {
       { task_no: 'AR-C-T-12, AR-C-P-02', count: 4, system: 'S', contractor: 'X' },
     ]), tm, make as any);
     expect(out.length).toBe(2);
-    expect(out.map(r => Number(r.worker))).toEqual([4, 4]);
+    expect(out.map(r => Number(r.manpower))).toEqual([4, 4]);
     expect(out.every(r => r.multiCode)).toBe(true);
     expect(out.every(r => !r.unmatched)).toBe(true);
   });
