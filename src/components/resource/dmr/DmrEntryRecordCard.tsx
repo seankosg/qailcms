@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Save } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Save } from 'lucide-react';
+import { SortPriorityBadge } from '@/components/common/SortPriorityBadge';
 import type { EntryRow, TmOption } from './entry-types';
 
 function SearchSelect({
