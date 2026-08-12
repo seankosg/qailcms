@@ -92,7 +92,7 @@ export function DmrEntryRecordCard({
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm">
-          Daily Entry Record (보이는 {rows.length}행 · 전체 {totalCount}행 · 저장 시 {validCount * 3}건)
+          Daily Entry Record (보이는 {rows.length}행 · 전체 {totalCount}행 · 저장 시 {validCount}건)
         </CardTitle>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={onAddRow}>
@@ -119,7 +119,7 @@ export function DmrEntryRecordCard({
               <th>Plot</th><th>Team</th><th>Task No (TM Code)</th><th>Task / Subtask</th>
               <th>HDEC PIC</th><th>Work Type</th><th>Sub Contractor</th><th>System</th>
               <th>TC Plan %</th><th>TC Actual %</th>
-              <th>Worker</th><th>Foreman</th><th>Supervisor</th><th>Total</th>
+              <th>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -143,6 +143,7 @@ export function DmrEntryRecordCard({
               const dPlan = live?.tc_plan_pct ?? null;
               const dActual = live?.tc_actual_pct ?? null;
               const total = (Number(r.worker) || 0) + (Number(r.foreman) || 0) + (Number(r.supervisor) || 0);
+              void 0;
               const delegated = !!tm?.is_delegated && !!tm?.original_pic && tm.original_pic !== tm.effective_pic;
               return (
                 <tr
@@ -224,10 +225,7 @@ export function DmrEntryRecordCard({
                     <div>{dActual == null ? <span className="text-muted-foreground">—</span> : pctText(dActual)}</div>
                     <div className="text-[10px] text-muted-foreground">{reportDate} 하루치</div>
                   </td>
-                  <td className="w-20"><Input type="number" min={0} value={r.worker} onChange={(e) => onPatch(r.key, { worker: e.target.value })} className="h-8 text-xs" /></td>
-                  <td className="w-20"><Input type="number" min={0} value={r.foreman} onChange={(e) => onPatch(r.key, { foreman: e.target.value })} className="h-8 text-xs" /></td>
-                  <td className="w-20"><Input type="number" min={0} value={r.supervisor} onChange={(e) => onPatch(r.key, { supervisor: e.target.value })} className="h-8 text-xs" /></td>
-                  <td className="w-14 font-medium">{total}</td>
+                  <td className="w-24"><Input type="number" min={0} value={r.manpower} onChange={(e) => onPatch(r.key, { manpower: e.target.value })} className="h-8 text-xs" /></td>
                 </tr>
               );
             })}
