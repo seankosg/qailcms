@@ -397,6 +397,7 @@ export function DmrEntryPage() {
   }
 
   const unmatchedCount = rows.filter((r) => r.unmatched).length;
+  const multiCodeCount = rows.filter((r) => r.multiCode).length;
 
   return (
     <AppLayout>
@@ -436,7 +437,7 @@ export function DmrEntryPage() {
               <input
                 type="file"
                 multiple
-                accept=".xlsx,.xls,.csv,image/*"
+                accept="image/*"
                 className="hidden"
                 disabled={!canEdit || importing}
                 onChange={(e) => {
@@ -451,7 +452,7 @@ export function DmrEntryPage() {
                 }`}
               >
                 {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                {importing ? '읽는 중…' : '엑셀 · 스크린샷 불러오기'}
+                {importing ? '읽는 중…' : '스크린샷 불러오기'}
               </span>
             </label>
           </CardContent>
@@ -545,6 +546,11 @@ export function DmrEntryPage() {
                           </Badge>
                           {r.imported && <Badge variant="outline" className="text-[10px]">불러온 값</Badge>}
                           {r.unmatched && <Badge variant="destructive" className="text-[10px]">TM 코드 없음</Badge>}
+                          {r.multiCode && (
+                            <Badge variant="outline" className="border-amber-500 text-[10px] text-amber-600">
+                              복수 코드 — 인원을 나눠 적으십시오
+                            </Badge>
+                          )}
                         </div>
                         <SearchSelect
                           value={r.task_no}
