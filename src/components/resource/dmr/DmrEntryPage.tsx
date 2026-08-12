@@ -37,6 +37,8 @@ export function DmrEntryPage() {
   const [saving, setSaving] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
   const dirtyRef = useRef(false);
+  // 스크린샷의 보고일을 자동 반영할 때, 기준일 변경으로 표가 초기화되지 않게 막는다.
+  const keepRowsOnDateChangeRef = useRef(false);
   const [reloadTick, setReloadTick] = useState(0);
 
   const systemsQ = useDmrSystemMaster();
@@ -164,6 +166,10 @@ export function DmrEntryPage() {
   }, [loadedKey, existingQ.data]);
 
   useEffect(() => {
+    if (keepRowsOnDateChangeRef.current) {
+      keepRowsOnDateChangeRef.current = false;
+      return;
+    }
     dirtyRef.current = false;
   }, [reportDate]);
 
@@ -233,20 +239,37 @@ export function DmrEntryPage() {
       let added: ReturnType<typeof buildDmrEntryRowsFromSection> = [];
       let addedRows: EntryRow[] = [];
       const warns: string[] = [];
+      const teamCount: Record<string, number> = {};
+      const sheetDates = new Set<string>();
       for (const r of res?.results ?? []) {
         if (!r.section) continue;
-        // 시트 제목의 공종이 그 행들의 공종이다. 세 공종이 한 표에 함께 쌓인다.
+        // 시트 제목의 공종이 그 행들의 공종이다 (ELECT → ELEC). 화면의 탭은 보기 필터일 뿐 분류에 쓰지 않는다.
         const secD: Discipline = DISCIPLINES.includes(r.section.discipline as Discipline)
           ? (r.section.discipline as Discipline)
           : discipline;
-        if (r.section.report_date && r.section.report_date !== reportDate) {
-          warns.push(`시트 보고일 ${r.section.report_date} — 기준일 ${reportDate} 과 다릅니다`);
+        if (!DISCIPLINES.includes(r.section.discipline as Discipline)) {
+          warns.push(`시트 제목에서 공종을 읽지 못해 ${secD} 로 두었습니다 — 표에서 Team 을 고치십시오`);
         }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(String(r.section.report_date ?? ''))) sheetDates.add(r.section.report_date);
         const tmForD = new Map<string, TmOption>();
         for (const [k, t] of tmByKey) if (k.startsWith(`${secD}|`)) tmForD.set(t.task_no, t);
         const seeds = buildDmrEntryRowsFromSection(r.section, tmForD, newEntryRow);
         added = [...added, ...seeds];
         addedRows = [...addedRows, ...seeds.map((s) => ({ ...(s as unknown as EntryRow), discipline: secD }))];
+        teamCount[secD] = (teamCount[secD] ?? 0) + seeds.length;
+      }
+      // 보고일은 스크린샷에서 읽어 자동으로 채운다. 사용자가 이어서 고칠 수 있다.
+      let appliedDate = reportDate;
+      if (sheetDates.size === 1) {
+        const d = [...sheetDates][0];
+        if (d !== reportDate) {
+          appliedDate = d;
+          keepRowsOnDateChangeRef.current = true;
+          setReportDate(d);
+          warns.push(`시트 보고일 ${d} 로 기준일을 맞췄습니다 — 필요하면 직접 고치십시오`);
+        }
+      } else if (sheetDates.size > 1) {
+        warns.push(`시트마다 보고일이 다릅니다 (${[...sheetDates].join(', ')}) — 기준일 ${reportDate} 을 그대로 씁니다`);
       }
       for (const w of warns) toast.warning(w);
       if (added.length === 0) {
@@ -260,8 +283,9 @@ export function DmrEntryPage() {
       });
       const unmatched = added.filter((a) => a.unmatched).length;
       const multi = added.filter((a) => a.multiCode).length;
+      const teamText = DISCIPLINES.filter((d) => teamCount[d]).map((d) => `${d} ${teamCount[d]}행`).join(' · ');
       toast.success(
-        `불러오기 ${added.length}행 — TM 미매칭 ${unmatched}건 · 복수 코드 ${multi}건${errs.length ? ` · 실패 ${errs.length}건` : ''}. 확인 후 저장하십시오.`,
+        `불러오기 ${added.length}행 (${teamText}) · 보고일 ${appliedDate} — TM 미매칭 ${unmatched}건 · 복수 코드 ${multi}건${errs.length ? ` · 실패 ${errs.length}건` : ''}. 확인 후 저장하십시오.`,
       );
     } catch (e: any) {
       toast.error(e?.message ?? '불러오기 실패');
