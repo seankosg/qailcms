@@ -121,6 +121,17 @@ const SELECT_COL_W = 76;
 
 interface Layout { order: string[]; visibility: Record<string, boolean>; frozen: string[] }
 
+/** 임의 객체를 Layout 형태로 정규화한다 (서버/로컬 공통). */
+function normalizeLayout(p: Partial<Layout> | null | undefined): Layout {
+  const order = Array.isArray(p?.order) ? p!.order.filter((k) => DEFAULT_ORDER.includes(k)) : [];
+  for (const k of DEFAULT_ORDER) if (!order.includes(k)) order.push(k);
+  return {
+    order,
+    visibility: p?.visibility && typeof p.visibility === 'object' ? p.visibility : {},
+    frozen: Array.isArray(p?.frozen) ? p!.frozen.filter((k) => DEFAULT_ORDER.includes(k)) : [],
+  };
+}
+
 function loadLayout(): Layout {
   const fallback: Layout = { order: DEFAULT_ORDER, visibility: {}, frozen: [] };
   if (typeof window === 'undefined') return fallback;
@@ -128,13 +139,7 @@ function loadLayout(): Layout {
     const raw = window.localStorage.getItem(LAYOUT_KEY);
     if (!raw) return fallback;
     const p = JSON.parse(raw) as Partial<Layout>;
-    const order = Array.isArray(p.order) ? p.order.filter((k) => DEFAULT_ORDER.includes(k)) : [];
-    for (const k of DEFAULT_ORDER) if (!order.includes(k)) order.push(k);
-    return {
-      order,
-      visibility: p.visibility && typeof p.visibility === 'object' ? p.visibility : {},
-      frozen: Array.isArray(p.frozen) ? p.frozen.filter((k) => DEFAULT_ORDER.includes(k)) : [],
-    };
+    return normalizeLayout(p);
   } catch {
     return fallback;
   }
