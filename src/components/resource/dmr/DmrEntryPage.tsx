@@ -14,7 +14,6 @@ import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
 import { parseDmrImages } from '@/lib/dmr-parse.functions';
 import { buildDmrEntryRowsFromSection } from '@/lib/dmr/entry-import';
 import { exportDmrTeamsWorkbook } from '@/lib/dmr/export-dmr-team';
-import { DMR_HEADCOUNT_KINDS } from '@/lib/dmr/task-link';
 import { DmrEntryRecordCard } from './DmrEntryRecordCard';
 import { DmrEntryProductivityCard } from './DmrEntryProductivityCard';
 import { newEntryRow, type EntryRow, type TmOption, type DmrDiscipline } from './entry-types';
@@ -155,8 +154,8 @@ export function DmrEntryPage() {
         });
         byGroup.set(gk, row);
       }
-      const kind = DMR_HEADCOUNT_KINDS.includes(r.headcount_kind) ? r.headcount_kind : 'worker';
-      (row as any)[kind] = String(r.actual_manpower ?? 0);
+      // 인원 종류 구분은 폐기됐다. 과거 3행 구조도 총원으로 합쳐 1행으로 보인다.
+      row.manpower = String((Number(row.manpower) || 0) + (Number(r.actual_manpower) || 0));
       if (!row.pic_name && r.pic_name) row.pic_name = r.pic_name;
     }
     const loaded = [...byGroup.values()];
@@ -278,7 +277,7 @@ export function DmrEntryPage() {
     setSaving(true);
     setMissing([]);
     try {
-      // 화면 1행 → 인원종류 3건. 0 인 종류도 함께 보낸다(3→0 정정이 반영되어야 한다).
+      // 화면 1행 → 저장 1건. 인원 종류 구분 없이 총원 하나만 저장한다.
       // 공종별로 나눠 같은 날짜로 저장한다 — 저장 버튼 한 번이 하루치 전체를 확정한다.
       const missingAll: string[] = [];
       let total = 0;
@@ -286,18 +285,16 @@ export function DmrEntryPage() {
       for (const d of DISCIPLINES) {
         const part = valid.filter((r) => r.discipline === d);
         if (part.length === 0) continue;
-        const entries = part.flatMap((r) =>
-          DMR_HEADCOUNT_KINDS.map((kind) => ({
-            system_name: r.system_name.trim(),
-            contractor_name: r.contractor_name.trim(),
-            plot: r.plot,
-            plan_manpower: 0,
-            actual_manpower: Number((r as any)[kind]) || 0,
-            task_no: r.task_no || null,
-            headcount_kind: kind,
-            pic_name: r.pic_name || null,
-          })),
-        );
+        const entries = part.map((r) => ({
+          system_name: r.system_name.trim(),
+          contractor_name: r.contractor_name.trim(),
+          plot: r.plot,
+          plan_manpower: 0,
+          actual_manpower: Number(r.manpower) || 0,
+          task_no: r.task_no || null,
+          headcount_kind: 'worker' as const,
+          pic_name: r.pic_name || null,
+        }));
         const res: any = await saveFn({ data: { report_date: reportDate, discipline: d, entries } });
         missingAll.push(...(res?.missing_task_nos ?? []));
         linked += res?.linked_tasks ?? 0;
