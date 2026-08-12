@@ -180,6 +180,15 @@ export function DmrEntryRecordCard({
   const [layout, setLayout] = useState<Layout>(() => loadLayout());
   const [selected, setSelected] = useState<string[]>([]);
 
+  /** 컬럼 설정은 계정 단위로 서버에 저장한다 (로컬은 캐시 겸 폴백). */
+  const columnPref = useUserViewPreference(LAYOUT_KEY);
+  const prefAppliedRef = useRef(false);
+  useEffect(() => {
+    if (prefAppliedRef.current || !columnPref.ready) return;
+    prefAppliedRef.current = true;
+    if (columnPref.state) setLayout(normalizeLayout(columnPref.state as Partial<Layout>));
+  }, [columnPref.ready, columnPref.state]);
+
   /** Task/Subtask 자유 입력 보조 목록 — TM 명칭을 제안으로만 쓴다 */
   const taskNameOptions = useMemo(() => {
     const set = new Set<string>();
@@ -191,6 +200,8 @@ export function DmrEntryRecordCard({
 
   useEffect(() => {
     try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* 저장 실패는 무시 */ }
+    if (prefAppliedRef.current) columnPref.save(layout as unknown as Record<string, unknown>);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout]);
 
   /** 좌측 고정열 먼저, 그 뒤 나머지 순서. 숨김열은 제외. */
