@@ -7,6 +7,8 @@ export interface EntryRow {
   discipline: DmrDiscipline;
   task_no: string;
   system_name: string;
+  /** Task/Subtask 직접 입력값 — 비어 있으면 TM 정본 명칭을 따른다 */
+  task_name?: string;
   contractor_name: string;
   plot: 'C' | 'D';
   pic_name: string;
