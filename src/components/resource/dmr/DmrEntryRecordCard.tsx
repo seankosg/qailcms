@@ -84,6 +84,7 @@ const pctText = (v: number | null) => (v == null ? '' : `${Math.round(v * 10) / 
 
 /** ARCH 는 Task 명칭이 비고 System 만 채워지는 경우가 있다. 그럴 때만 System 값을 Task 로 쓴다. */
 function resolveTaskName(r: EntryRow, name: string | null): string | null {
+  if (r.task_name?.trim()) return r.task_name.trim();
   if (name && String(name).trim()) return name;
   if (r.discipline === 'ARCH' && r.system_name?.trim()) return r.system_name.trim();
   return name;
