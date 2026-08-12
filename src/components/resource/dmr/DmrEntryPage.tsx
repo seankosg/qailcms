@@ -18,13 +18,7 @@ import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
 import { parseDmrImages } from '@/lib/dmr-parse.functions';
 import { buildDmrEntryRowsFromSection, fileToParseSource } from '@/lib/dmr/entry-import';
 import { exportDmrTeamWorkbook } from '@/lib/dmr/export-dmr-team';
-import {
-  DMR_HEADCOUNT_KINDS,
-  dmrDataDateGapDays,
-  buildDmrPrevSnapshotMap,
-  dmrSegmentDelta,
-  dmrSegmentDays,
-} from '@/lib/dmr/task-link';
+import { DMR_HEADCOUNT_KINDS, dmrDataDateGapDays } from '@/lib/dmr/task-link';
 
 type Discipline = 'ARCH' | 'ELEC' | 'MECH';
 const DISCIPLINES: Discipline[] = ['ARCH', 'ELEC', 'MECH'];
@@ -66,6 +60,9 @@ interface TmOption {
   row_type: string | null;
   cum_plan_pct: number | null;
   cum_actual_pct: number | null;
+  /** 기준일 하루치 증분 — 서버 tm_rows_as_of 정본. 화면에서 다시 계산하지 않는다. */
+  tc_plan_pct: number | null;
+  tc_actual_pct: number | null;
   data_date: string | null;
   plot: string | null;
   effective_pic: string | null;
@@ -185,6 +182,8 @@ export function DmrEntryPage() {
         row_type: r.row_type ?? null,
         cum_plan_pct: r.cum_plan_pct ?? null,
         cum_actual_pct: r.cum_actual_pct ?? null,
+        tc_plan_pct: r.tc_plan_pct ?? null,
+        tc_actual_pct: r.tc_actual_pct ?? null,
         data_date: r.data_date ?? null,
         plot: r.plot ?? null,
         effective_pic: r.effective_pic ?? null,
@@ -220,29 +219,6 @@ export function DmrEntryPage() {
     },
     staleTime: 0,
   });
-
-  // 직전 기록 — 화면에서 한 번만 부른다. 코드마다 따로 부르지 않는다.
-  const prevQ = useQuery({
-    queryKey: ['dmr-entry-prev', reportDate, discipline],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('dmr_entries')
-        .select('task_no, report_date, tplan_pct, tactual_pct')
-        .eq('discipline', discipline)
-        .lt('report_date', reportDate)
-        .not('task_no', 'is', null)
-        .order('report_date', { ascending: false })
-        .limit(20000);
-      if (error) throw new Error(error.message);
-      return (data ?? []) as any[];
-    },
-    staleTime: 60_000,
-  });
-
-  const prevMap = useMemo(
-    () => buildDmrPrevSnapshotMap((prevQ.data ?? []) as any[], reportDate),
-    [prevQ.data, reportDate],
-  );
 
   const loadedKey = `${reportDate}|${discipline}|${reloadTick}`;
   useEffect(() => {
