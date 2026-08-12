@@ -46,10 +46,10 @@ function decodeState<T>(s: string, fallback: T): T {
 }
 
 // ── Filter conversion (TanStack ColumnFilters → server filters) ─────────
-function toServerFilters(cf: ColumnFiltersState): DmrServerFilter[] {
+function toServerFilters(cf: ColumnFiltersState, byKey: Record<string, DmrColumnDef>): DmrServerFilter[] {
   const out: DmrServerFilter[] = [];
   for (const f of cf) {
-    const col = DMR_COLUMN_BY_KEY[f.id];
+    const col = byKey[f.id];
     if (!col) continue;
     const v = f.value as any;
     if (col.filterType === 'multi-select') {
