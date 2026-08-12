@@ -551,6 +551,7 @@ export function DmrEntryPage() {
           onAddRow={addRow}
           onDeleteRows={deleteRows}
           onMoveRow={moveRow}
+          onReset={resetRows}
           onSave={() => void onSave()}
         />
 
