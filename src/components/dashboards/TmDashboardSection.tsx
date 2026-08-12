@@ -74,6 +74,8 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 tone="ok"
                 showTotal
                 hint={PROGRESS_HINT}
+                actualPct={q.kpi.actualPct ?? undefined}
+                planPct={q.kpi.planPct ?? undefined}
               />
               <AbdKpiCard
                 label={`Plot ${label} 지연현황`}
