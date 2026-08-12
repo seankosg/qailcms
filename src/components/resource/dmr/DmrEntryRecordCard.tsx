@@ -401,8 +401,18 @@ export function DmrEntryRecordCard({
                           />
                         </>
                       );
-                    case 'task_name':
-                      return <div className="truncate">{resolveTaskName(r, tm?.task_name ?? null) ?? '—'}</div>;
+                    case 'task_name': {
+                      const fallback = resolveTaskName({ ...r, task_name: '' }, (r.saved && r.snap ? r.snap.task_name : tm?.task_name) ?? null) ?? '';
+                      return (
+                        <Input
+                          list="dmr-task-suggestions"
+                          value={r.task_name?.trim() ? r.task_name : fallback}
+                          onChange={(e) => onPatch(r.key, { task_name: e.target.value })}
+                          placeholder="Task / Subtask"
+                          className="h-8 text-xs"
+                        />
+                      );
+                    }
                     case 'pic_name':
                       return (
                         <>
