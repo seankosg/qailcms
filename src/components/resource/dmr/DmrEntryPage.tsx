@@ -477,7 +477,7 @@ export function DmrEntryPage() {
           </CardHeader>
           <CardContent className="flex flex-wrap items-center gap-3">
             <Input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="h-8 w-40 text-xs" />
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {(['ALL', ...DISCIPLINES] as const).map((d) => (
                 <Button key={d} size="sm" variant={view === d ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setView(d)}>
                   {d === 'ALL' ? '전체' : d}
