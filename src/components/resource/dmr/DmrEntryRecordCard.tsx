@@ -65,6 +65,13 @@ function SearchSelect({
 
 const pctText = (v: number | null) => (v == null ? '' : `${Math.round(v * 10) / 10}%`);
 
+/** ARCH 는 Task 명칭이 비고 System 만 채워지는 경우가 있다. 그럴 때만 System 값을 Task 로 쓴다. */
+function resolveTaskName(r: EntryRow, name: string | null): string | null {
+  if (name && String(name).trim()) return name;
+  if (r.discipline === 'ARCH' && r.system_name?.trim()) return r.system_name.trim();
+  return name;
+}
+
 type SortKey =
   | 'plot' | 'discipline' | 'task_no' | 'task_name' | 'pic_name' | 'work_type'
   | 'contractor_name' | 'system_name' | 'tc_plan_pct' | 'tc_actual_pct' | 'manpower';
@@ -136,7 +143,8 @@ export function DmrEntryRecordCard({
         case 'plot': return r.plot ?? '';
         case 'discipline': return r.discipline ?? '';
         case 'task_no': return r.task_no ?? '';
-        case 'task_name': return (r.saved && r.snap ? r.snap.task_name : live?.task_name) ?? '';
+        case 'task_name':
+          return resolveTaskName(r, (r.saved && r.snap ? r.snap.task_name : live?.task_name) ?? null) ?? '';
         case 'pic_name': return r.pic_name ?? '';
         case 'work_type': return (r.saved && r.snap ? r.snap.work_category : live?.row_type) ?? '';
         case 'contractor_name': return r.contractor_name ?? '';
@@ -288,7 +296,9 @@ export function DmrEntryRecordCard({
                       placeholder="TM Code 선택"
                     />
                   </td>
-                  <td className="w-64"><div className="truncate">{tm?.task_name ?? '—'}</div></td>
+                  <td className="w-64">
+                    <div className="truncate">{resolveTaskName(r, tm?.task_name ?? null) ?? '—'}</div>
+                  </td>
                   <td className="w-40">
                     <Input value={r.pic_name} onChange={(e) => onPatch(r.key, { pic_name: e.target.value })} className="h-8 text-xs" />
                     {delegated && (
