@@ -206,6 +206,39 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
   const mine = (listQ.data ?? []).filter((d) => d.from_pic === myPic);
   const received = (listQ.data ?? []).filter((d) => d.to_pic === myPic);
 
+  /** 내가 위임한 건 중 기간이 겹치는 것만 내보낸다. 겹치는 게 없으면 전체. */
+  const exportRows = useMemo(() => {
+    const inRange = mine.filter((d) => d.start_date <= end && d.end_date >= start);
+    const base = inRange.length > 0 ? inRange : mine;
+    return base.map((d) => ({
+      task_no: d.task?.task_no ?? null,
+      task_name: d.task?.task_name ?? null,
+      from_pic: d.from_pic,
+      to_pic: d.to_pic,
+      start_date: d.start_date,
+      end_date: d.end_date,
+      status: d.status,
+      note: d.note ?? null,
+    }));
+  }, [mine, start, end]);
+
+  const doExport = async () => {
+    if (exportRows.length === 0) { toast.error("내보낼 인수인계 내역이 없습니다."); return; }
+    const s = exportRows.reduce((a, r) => (r.start_date < a ? r.start_date : a), exportRows[0].start_date);
+    const e = exportRows.reduce((a, r) => (r.end_date > a ? r.end_date : a), exportRows[0].end_date);
+    try {
+      await exportDelegationsToExcel({
+        userName: myPic ?? "미상",
+        startDate: s,
+        endDate: e,
+        rows: exportRows,
+      });
+      toast.success(`엑셀 ${exportRows.length}건 내보냈습니다.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -365,6 +398,16 @@ export function TmDelegationDialog({ myPic, userId }: Props) {
         </div>
 
         <DialogFooter>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={doExport}
+            disabled={exportRows.length === 0}
+          >
+            <FileDown className="h-4 w-4" />
+            엑셀 내보내기
+          </Button>
           <Button
             size="sm"
             onClick={submit}
