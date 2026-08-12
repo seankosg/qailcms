@@ -14,6 +14,7 @@ import { saveDmrTaskEntries } from '@/lib/dmr-task-entry.functions';
 import { parseDmrImages } from '@/lib/dmr-parse.functions';
 import { buildDmrEntryRowsFromSection } from '@/lib/dmr/entry-import';
 import { DmrExportDialog } from './DmrExportDialog';
+import { DmrTemplateBar } from './DmrTemplateBar';
 import { DmrEntryRecordCard } from './DmrEntryRecordCard';
 import { DmrEntryProductivityCard } from './DmrEntryProductivityCard';
 import { newEntryRow, type EntryRow, type TmOption, type DmrDiscipline } from './entry-types';
@@ -418,6 +419,15 @@ export function DmrEntryPage() {
             <p className="text-xs text-muted-foreground">출면기록부 작성 — TM 코드에서 시작한다</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <DmrTemplateBar
+              rows={rows}
+              canEdit={canEdit}
+              onLoad={(loaded) => {
+                dirtyRef.current = true;
+                keepRowsOnDateChangeRef.current = true;
+                setRows(loaded);
+              }}
+            />
             <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setExportOpen(true)}>
               <Download className="h-3.5 w-3.5" />
               엑셀 내보내기
