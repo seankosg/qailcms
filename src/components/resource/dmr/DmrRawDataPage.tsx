@@ -490,6 +490,8 @@ export function DmrRawDataPage({
             order={order}
             visibility={visibility as Record<string, boolean>}
             frozenExtras={frozenExtras}
+            labelByKey={Object.fromEntries(columnDefs.map((c) => [c.key, c.label]))}
+            defaultOrder={colKeys}
             onOrderChange={(o) => { setOrder(o); persistPref({ order: o }); }}
             onVisibilityChange={(v) => { setVisibility(v); persistPref({ visibility: v }); }}
             onFrozenChange={(f) => { setFrozenExtras(f); persistPref({ frozenExtras: f }); }}
