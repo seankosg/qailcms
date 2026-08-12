@@ -317,11 +317,11 @@ export function DmrEntryRecordCard({
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm">
+      <CardHeader className="flex flex-col gap-2 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
+        <CardTitle className="text-sm leading-snug">
           Daily Entry Record (보이는 {rows.length}행 · 전체 {totalCount}행 · 저장 시 {validCount}건)
         </CardTitle>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {selected.length > 0 && (
             <Button
               size="sm"

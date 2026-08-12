@@ -312,8 +312,8 @@ export function DmrProductivityPage() {
             {loading ? (
               <Skeleton className="m-4 h-64" />
             ) : (
-              <div className="overflow-auto">
-                <table className="w-full text-xs">
+              <div className="max-h-[70vh] overflow-auto">
+                <table className="w-full min-w-[840px] text-xs">
                   <thead className="sticky top-0 z-10 bg-muted/60">
                     <tr className="[&>th]:whitespace-nowrap [&>th]:px-2 [&>th]:py-2 [&>th]:text-left">
                       <th>TM Code</th>

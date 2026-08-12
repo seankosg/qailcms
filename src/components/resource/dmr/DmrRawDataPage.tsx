@@ -487,12 +487,12 @@ export function DmrRawDataPage({
 
   return (
     <div className="flex h-full flex-col space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-xl font-semibold">{title}</h1>
           <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <DmrColumnOrderMenu
             order={order}
             visibility={visibility as Record<string, boolean>}
@@ -567,7 +567,7 @@ export function DmrRawDataPage({
         />
       )}
 
-      <div className="flex items-center justify-between rounded-md border p-2 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-xs">
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">Rows per page:</span>
           <select className="h-7 rounded border bg-background px-2" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
@@ -584,7 +584,7 @@ export function DmrRawDataPage({
       </div>
 
       {/* Table */}
-      <div ref={parentRef} className="relative flex-1 overflow-auto rounded-md border">
+      <div ref={parentRef} className="relative min-h-[50vh] flex-1 overflow-auto rounded-md border">
         <div style={{ width: totalWidth, minWidth: '100%' }} className="relative">
           {/* Header */}
           <div className="sticky top-0 z-30 flex h-9 border-b bg-muted/60 backdrop-blur">
