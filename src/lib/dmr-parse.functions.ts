@@ -85,6 +85,8 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
     async function parseOne(source: { imgUrl: string }) {
       const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
+        // 응답이 오지 않으면 화면이 끝없이 도는 일이 있어 상한을 둔다.
+        signal: AbortSignal.timeout(120_000),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${LOVABLE_API_KEY}`,
