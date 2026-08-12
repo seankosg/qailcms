@@ -445,15 +445,18 @@ export function DmrEntryRecordCard({
                       );
                     case 'task_name': {
                       const fallback = resolveTaskName({ ...r, task_name: '' }, (r.saved && r.snap ? r.snap.task_name : tm?.task_name) ?? null) ?? '';
-                      return (
-                        <Input
-                          list="dmr-task-suggestions"
-                          value={r.task_name?.trim() ? r.task_name : fallback}
-                          onChange={(e) => onPatch(r.key, { task_name: e.target.value })}
-                          placeholder="Task / Subtask"
-                          className="h-8 text-xs"
-                        />
-                      );
+                      if (!r.task_no) {
+                        return (
+                          <Input
+                            list="dmr-task-suggestions"
+                            value={r.task_name?.trim() ? r.task_name : fallback}
+                            onChange={(e) => onPatch(r.key, { task_name: e.target.value })}
+                            placeholder="Task / Subtask"
+                            className="h-8 text-xs"
+                          />
+                        );
+                      }
+                      return <span className="whitespace-nowrap">{fallback || '—'}</span>;
                     }
                     case 'pic_name':
                       return (
