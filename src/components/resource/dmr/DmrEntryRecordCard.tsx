@@ -169,7 +169,7 @@ export interface DmrEntryRecordCardProps {
 /** Daily Entry Record — 입력 표 하나만 다룬다. 생산성 분석과 섞지 않는다. */
 export function DmrEntryRecordCard({
   reportDate, rows, tmByKey, tmOptionsByDiscipline, contractorOptions, systemOptions, workTypeOptions,
-  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave, onDeleteRows, onMoveRow,
+  canEdit, saving, loading, validCount, totalCount, onPatch, onPickTask, onAddRow, onSave, onDeleteRows, onMoveRow, onReset,
 }: DmrEntryRecordCardProps) {
   const [sorting, setSorting] = useState<SortEntry[]>([]);
   const [layout, setLayout] = useState<Layout>(() => loadLayout());
