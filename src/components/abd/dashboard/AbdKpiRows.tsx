@@ -68,18 +68,34 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
             <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
               {label}
             </div>
-            <div className={cn("text-3xl font-bold tabular-nums leading-tight", TONE[tone])}>
-              {count.toLocaleString()}
-              {showTotal && total != null && (
+            <div
+              className={cn(
+                "text-3xl font-bold tabular-nums leading-tight",
+                hasGap ? (diffPp! >= 0 ? TONE["ok"] : TONE["danger"]) : TONE[tone],
+              )}
+            >
+              {hasGap ? (
+                <>
+                  {diffPp! > 0 ? "+" : ""}
+                  {diffPp!.toFixed(1)}pp
+                </>
+              ) : (
+                count.toLocaleString()
+              )}
+              {showTotal && total != null && !hasGap && (
                 <span className="text-xl font-semibold text-muted-foreground">
                   {" / "}
                   {total.toLocaleString()}
                 </span>
               )}
             </div>
-            {pct != null && (
-              <div className="text-[11px] text-muted-foreground tabular-nums">{pct}% of total</div>
-            )}
+            {hasGap ? (
+              <div className="text-[11px] tabular-nums text-muted-foreground">
+                Actual {actualPct!.toFixed(1)}% / Plan {planPct!.toFixed(1)}%
+              </div>
+            ) : pct != null ? (
+              <div className="text-[11px] tabular-nums text-muted-foreground">{pct}% of total</div>
+            ) : null}
           </div>
           {breakdown && breakdown.length > 0 && (
             <div
