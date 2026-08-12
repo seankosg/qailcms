@@ -73,7 +73,7 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
       }),
     );
 
-    async function parseOne(source: { imgUrl?: string; text?: string }) {
+    async function parseOne(source: { imgUrl: string }) {
       const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -86,17 +86,10 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
             { role: 'system', content: DMR_SYSTEM_PROMPT },
             {
               role: 'user',
-              content: source.imgUrl
-                ? [
-                    { type: 'text', text: 'Parse this Daily Manpower report image. Call report_dmr with the extracted data.' },
-                    { type: 'image_url', image_url: { url: source.imgUrl } },
-                  ]
-                : [
-                    {
-                      type: 'text',
-                      text: `Parse this Daily Manpower report spreadsheet (CSV text of the sheets). Call report_dmr with the extracted data.\n\n${source.text ?? ''}`,
-                    },
-                  ],
+              content: [
+                { type: 'text', text: 'Parse this Daily Manpower Mobilization Status screenshot. Call report_dmr with the extracted data.' },
+                { type: 'image_url', image_url: { url: source.imgUrl } },
+              ],
             },
           ],
           tools: [{ type: 'function', function: { name: 'report_dmr', description: 'Return parsed DMR data', parameters: DMR_TOOL_SCHEMA } }],
@@ -114,13 +107,13 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
       const parsed = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
       const section = SectionSchema.parse(parsed);
       section.report_date = normalizeDate(section.report_date);
-      // Normalize contractor names + force TOTAL = C + D (ignore any TOTAL the AI returned)
+      // Contractor 정규화 + 기존 미리보기(DmrImportPage) 호환용 values 채우기
       section.rows = section.rows.map((r) => {
         const contractor = normalizeDmrContractor(r.contractor);
-        const planC = r.values.plan.C ?? 0;
-        const planD = r.values.plan.D ?? 0;
-        const actC = r.values.actual.C ?? 0;
-        const actD = r.values.actual.D ?? 0;
+        const planC = r.values?.plan.C ?? 0;
+        const planD = r.values?.plan.D ?? 0;
+        const actC = r.values?.actual.C ?? 0;
+        const actD = r.values?.actual.D ?? 0;
         return {
           ...r,
           contractor,
@@ -135,10 +128,7 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
     }
 
     const results = await Promise.all(
-      [
-        ...signed.map((s) => ({ path: s.path, source: { imgUrl: s.url } })),
-        ...(data.texts ?? []).map((t) => ({ path: t.name, source: { text: t.content } })),
-      ].map(async (s) => {
+      signed.map((s) => ({ path: s.path, source: { imgUrl: s.url } })).map(async (s) => {
         try {
           const section = await parseOne(s.source);
           return { path: s.path, section, error: null as string | null };
