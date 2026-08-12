@@ -510,6 +510,7 @@ export function DmrEntryPage() {
           onPickTask={pickTask}
           onAddRow={addRow}
           onDeleteRows={deleteRows}
+          onMoveRow={moveRow}
           onSave={() => void onSave()}
         />
 
