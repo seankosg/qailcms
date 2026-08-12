@@ -28,7 +28,7 @@ import {
   type DmrEntry,
   type DmrServerFilter,
 } from '@/hooks/useDmrEntries';
-import { DMR_COLUMNS, DMR_COLUMN_KEYS, DMR_COLUMN_BY_KEY, type DmrColumnDef } from '@/lib/dmr/columns';
+import { DMR_COLUMNS, type DmrColumnDef } from '@/lib/dmr/columns';
 import { DmrColumnFilterDropdown } from './DmrColumnFilterDropdown';
 import { DmrColumnOrderMenu } from './DmrColumnOrderMenu';
 import { DmrEditCellPopover } from './DmrEditCellPopover';
