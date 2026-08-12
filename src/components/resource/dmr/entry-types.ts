@@ -19,6 +19,8 @@ export interface EntryRow {
   unmatched?: boolean;
   /** 한 줄에 코드가 여럿 */
   multiCode?: boolean;
+  /** 스크린샷에서 불러온 원래 순서 — 기본 정렬에 쓰인다 */
+  importIndex?: number;
   /** 저장 당시 박힌 TM 값 — 불러온 행은 재계산하지 않는다 */
   snap?: {
     task_name: string | null;

@@ -19,6 +19,8 @@ export interface ImportedRowSeed {
   unmatched?: boolean;
   /** 한 줄에 코드가 여럿 — 코드마다 같은 인원이 실린다 */
   multiCode?: boolean;
+  /** 스크린샷 내 원래 행 순서 */
+  importIndex?: number;
 }
 
 interface TmLike {
