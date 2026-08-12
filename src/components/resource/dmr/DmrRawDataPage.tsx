@@ -27,6 +27,8 @@ import {
   EMPTY_TOKEN,
   type DmrEntry,
   type DmrServerFilter,
+  type DmrScope,
+  applyDmrScope,
 } from '@/hooks/useDmrEntries';
 import { DMR_COLUMNS, type DmrColumnDef } from '@/lib/dmr/columns';
 import { DmrColumnFilterDropdown } from './DmrColumnFilterDropdown';
@@ -111,7 +113,7 @@ function applyToSupabaseQuery(
 }
 
 // ── Header cell with sort + filter ───────────────────────────────────────
-function HeaderCell({ header, col }: { header: any; col: DmrColumnDef }) {
+function HeaderCell({ header, col, scope }: { header: any; col: DmrColumnDef; scope?: DmrScope }) {
   const sortState = header.column.getIsSorted();
   const canSort = col.type !== 'enum' || col.key === 'discipline' || col.key === 'plot' || col.key === 'direct_flag';
   const Icon = sortState === 'asc' ? ArrowUp : sortState === 'desc' ? ArrowDown : ArrowUpDown;
@@ -129,7 +131,7 @@ function HeaderCell({ header, col }: { header: any; col: DmrColumnDef }) {
         <span className="truncate">{col.label}</span>
         {canSort && <Icon className={cn('h-3 w-3 shrink-0', !sortState && 'text-muted-foreground/40')} />}
       </button>
-      <DmrColumnFilterDropdown column={header.column} />
+      <DmrColumnFilterDropdown column={header.column} scope={scope} />
       <div
         onMouseDown={header.getResizeHandler()}
         onTouchStart={header.getResizeHandler()}
@@ -185,6 +187,8 @@ export interface DmrRawDataPageProps {
   routeId?: string;
   showImport?: boolean;
   exportFilePrefix?: string;
+  /** 행 범위 — Raw Data 와 Raw Data 2 는 서로의 행을 보지 않는다 */
+  scope?: DmrScope;
 }
 
 export function DmrRawDataPage({
@@ -196,6 +200,7 @@ export function DmrRawDataPage({
   routeId = '/_authenticated/resource/dmr/raw-data',
   showImport = true,
   exportFilePrefix,
+  scope = 'import',
 }: DmrRawDataPageProps = {}) {
   const colKeys = useMemo(() => columnDefs.map((c) => c.key), [columnDefs]);
   const byKey = useMemo(
@@ -275,6 +280,7 @@ export function DmrRawDataPage({
     page: pageIndex,
     pageSize,
     directMap,
+    scope,
   });
   const rows = query.data?.rows ?? [];
   const total = query.data?.total ?? 0;
@@ -311,6 +317,7 @@ export function DmrRawDataPage({
           toDate: dateF?.to ?? null,
           q: qInput.trim() || null,
           directOnly: (directF ?? []) as ('direct' | 'sub')[],
+          scope,
         },
       });
       const next: Record<string, boolean> = {};
@@ -464,7 +471,7 @@ export function DmrRawDataPage({
         sheetTitle: `${title}`,
         ...(exportFilePrefix ? { filename: `${exportFilePrefix}_${new Date().toISOString().slice(0, 10)}.xlsx` } : {}),
         directMap,
-        applyFiltersToQuery: (q) => applyToSupabaseQuery(q, serverFilters, [], qInput, directMap),
+        applyFiltersToQuery: (q) => applyToSupabaseQuery(applyDmrScope(q, scope), serverFilters, [], qInput, directMap),
         applySortToQuery: (q) => {
           for (const s of serverSort) q = q.order(s.column, { ascending: !s.desc });
           if (serverSort.length === 0) q = q.order('report_date', { ascending: false });

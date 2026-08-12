@@ -121,6 +121,7 @@ const FilterIdsSchema = z.object({
   toDate: z.string().optional().nullable(),
   q: z.string().optional().nullable(),
   directOnly: z.array(z.enum(['direct', 'sub'])).optional().default([]),
+  scope: z.enum(['import', 'entry', 'all']).optional().default('all'),
 });
 
 export const fetchDmrFilteredIds = createServerFn({ method: 'POST' })
@@ -128,6 +129,8 @@ export const fetchDmrFilteredIds = createServerFn({ method: 'POST' })
   .inputValidator((data) => FilterIdsSchema.parse(data))
   .handler(async ({ data, context }) => {
     let sq = (context.supabase as any).from('dmr_entries').select('id').limit(10000);
+    if (data.scope === 'import') sq = sq.is('task_no', null);
+    else if (data.scope === 'entry') sq = sq.not('task_no', 'is', null);
     if (data.discipline && data.discipline !== 'all') sq = sq.eq('discipline', data.discipline);
     if (data.plot && data.plot !== 'all') sq = sq.eq('plot', data.plot);
     if (data.systems.length) sq = sq.in('system_name', data.systems);
