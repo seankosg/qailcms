@@ -162,6 +162,8 @@ export interface DmrEntryRecordCardProps {
   onDeleteRows: (keys: string[]) => void;
   /** 행을 위/아래로 한 칸 옮긴다 */
   onMoveRow: (key: string, dir: -1 | 1) => void;
+  /** 페이지에 로딩된 내용(로컬 초안)을 삭제한다. DB/Raw Data에는 반영하지 않는다. */
+  onReset: () => void;
 }
 
 /** Daily Entry Record — 입력 표 하나만 다룬다. 생산성 분석과 섞지 않는다. */
