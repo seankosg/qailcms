@@ -96,6 +96,8 @@ export const bulkUpdateDmrEntries = createServerFn({ method: 'POST' })
 
 const BulkDeleteSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(5000),
+  // 화면 스코프 가드 — Raw Data(import: task_no NULL) / Raw Data 2(entry: task_no NOT NULL)
+  scope: z.enum(['import', 'entry', 'all']).optional().default('all'),
 });
 
 export const bulkDeleteDmrEntries = createServerFn({ method: 'POST' })
@@ -103,10 +105,13 @@ export const bulkDeleteDmrEntries = createServerFn({ method: 'POST' })
   .inputValidator((data) => BulkDeleteSchema.parse(data))
   .handler(async ({ data, context }) => {
     await assertCanEdit(context);
-    const { error, count } = await (context.supabase as any)
+    let dq = (context.supabase as any)
       .from('dmr_entries')
       .delete({ count: 'exact' })
       .in('id', data.ids);
+    if (data.scope === 'import') dq = dq.is('task_no', null);
+    else if (data.scope === 'entry') dq = dq.not('task_no', 'is', null);
+    const { error, count } = await dq;
     if (error) throw new Error(error.message);
     return { ok: true, count: count ?? data.ids.length };
   });
