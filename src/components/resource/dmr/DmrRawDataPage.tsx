@@ -561,6 +561,7 @@ export function DmrRawDataPage({
           selectedIds={selectedIds}
           sampleRows={selectedRows}
           canEdit={canEdit}
+          scope={scope}
           onClearSelection={() => setSelection({})}
           onApplied={() => { setSelection({}); query.refetch(); }}
         />
