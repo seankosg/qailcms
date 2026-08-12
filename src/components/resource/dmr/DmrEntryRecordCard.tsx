@@ -478,9 +478,10 @@ export function DmrEntryRecordCard({
                       return (
                         <Input
                           list="dmr-system-suggestions"
+                          autoComplete="on"
                           value={r.system_name}
                           onChange={(e) => onPatch(r.key, { system_name: e.target.value })}
-                          placeholder="System"
+                          placeholder="System (직접 입력 또는 제안 선택)"
                           className="h-8 text-xs"
                         />
                       );
