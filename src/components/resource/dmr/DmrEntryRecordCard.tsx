@@ -142,8 +142,6 @@ export function DmrEntryRecordCard({
               // 증분은 서버 정본(tm_rows_as_of)의 기준일 하루치 값만 쓴다.
               const dPlan = live?.tc_plan_pct ?? null;
               const dActual = live?.tc_actual_pct ?? null;
-              const total = (Number(r.worker) || 0) + (Number(r.foreman) || 0) + (Number(r.supervisor) || 0);
-              void 0;
               const delegated = !!tm?.is_delegated && !!tm?.original_pic && tm.original_pic !== tm.effective_pic;
               return (
                 <tr
