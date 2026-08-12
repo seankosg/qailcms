@@ -39,10 +39,12 @@ export interface EntryRow {
   foreman: string;
   supervisor: string;
   saved?: boolean;
-  /** 파싱(엑셀·이미지)으로 채워 넣은 행 */
+  /** 스크린샷 파싱으로 채워 넣은 행 */
   imported?: boolean;
   /** TM 에서 코드를 찾지 못한 파싱 행 */
   unmatched?: boolean;
+  /** 한 줄에 코드가 여럿 — 인원은 첫 코드에만 실렸다 */
+  multiCode?: boolean;
   /** 저장 당시 박힌 TM 값 — 불러온 행은 재계산하지 않는다 */
   snap?: {
     task_name: string | null;
