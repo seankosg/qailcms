@@ -469,8 +469,21 @@ export function DmrEntryRecordCard({
                           )}
                         </>
                       );
-                    case 'work_type':
-                      return <span className="whitespace-nowrap">{tm?.row_type ?? '—'}</span>;
+                    case 'work_type': {
+                      const fallback = (r.saved && r.snap ? r.snap.work_category : tm?.row_type) ?? '';
+                      if (!r.task_no) {
+                        return (
+                          <Input
+                            list="dmr-work-type-suggestions"
+                            value={r.work_type?.trim() ? r.work_type : fallback}
+                            onChange={(e) => onPatch(r.key, { work_type: e.target.value })}
+                            placeholder="Work Type"
+                            className="h-8 text-xs"
+                          />
+                        );
+                      }
+                      return <span className="whitespace-nowrap">{fallback || '—'}</span>;
+                    }
                     case 'contractor_name':
                       return (
                         <Input
