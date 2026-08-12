@@ -3381,6 +3381,8 @@ export type Database = {
           task_level: string | null
           task_name: string | null
           task_no: string | null
+          tc_actual_pct: number | null
+          tc_plan_pct: number | null
           tplan_pct: number | null
           updated_at: string
           work_category: string | null
@@ -3411,6 +3413,8 @@ export type Database = {
           task_level?: string | null
           task_name?: string | null
           task_no?: string | null
+          tc_actual_pct?: number | null
+          tc_plan_pct?: number | null
           tplan_pct?: number | null
           updated_at?: string
           work_category?: string | null
@@ -3441,6 +3445,8 @@ export type Database = {
           task_level?: string | null
           task_name?: string | null
           task_no?: string | null
+          tc_actual_pct?: number | null
+          tc_plan_pct?: number | null
           tplan_pct?: number | null
           updated_at?: string
           work_category?: string | null
