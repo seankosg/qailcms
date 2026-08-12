@@ -5,8 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Save, AlertTriangle } from 'lucide-react';
-import { dmrDataDateGapDays } from '@/lib/dmr/task-link';
+import { Plus, Save } from 'lucide-react';
 import type { EntryRow, TmOption } from './entry-types';
 
 function SearchSelect({
@@ -136,9 +135,6 @@ export function DmrEntryRecordCard({
                     is_delegated: live?.is_delegated ?? null,
                   }
                 : live;
-              const gap = tm?.data_date
-                ? dmrDataDateGapDays({ report_date: reportDate, task_data_date: tm.data_date })
-                : null;
               const plotMismatch = !!tm && !!tm.plot && tm.plot !== r.plot;
               // 증분은 서버 정본(tm_rows_as_of)의 기준일 하루치 값만 쓴다.
               const dPlan = live?.tc_plan_pct ?? null;
