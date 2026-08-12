@@ -13,9 +13,7 @@ export interface ImportedRowSeed {
   contractor_name: string;
   plot: 'C' | 'D';
   pic_name: string;
-  worker: string;
-  foreman: string;
-  supervisor: string;
+  manpower: string;
   imported?: boolean;
   /** TM 에서 찾지 못한 코드 */
   unmatched?: boolean;
@@ -117,9 +115,7 @@ export function buildDmrEntryRowsFromSection(
         // Plot 은 TM 에서 온다. 시트의 열을 보고 고치지 않는다.
         plot: tm?.plot === 'D' ? 'D' : 'C',
         pic_name: tm?.effective_pic ?? '',
-        worker: String(count),
-        foreman: '0',
-        supervisor: '0',
+        manpower: String(count),
         imported: true,
         unmatched,
         multiCode,
