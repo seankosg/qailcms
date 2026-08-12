@@ -42,12 +42,22 @@ describe('dmr entry import', () => {
     expect(out.some(r => r.system_name === 'Zero')).toBe(false);
   });
 
-  it('multi-code row does not double headcount', () => {
+  it('multi-code row gives each code the full headcount', () => {
     const out = buildDmrEntryRowsFromSection(sec([
-      { task_no: 'AR-C-T-12, AR-C-P-02', count: 8, system: 'S', contractor: 'X' },
+      { task_no: 'AR-C-T-12, AR-C-P-02', count: 4, system: 'S', contractor: 'X' },
     ]), tm, make as any);
-    expect(out.reduce((s, r) => s + Number(r.worker), 0)).toBe(8);
     expect(out.length).toBe(2);
+    expect(out.map(r => Number(r.worker))).toEqual([4, 4]);
     expect(out.every(r => r.multiCode)).toBe(true);
+    expect(out.every(r => !r.unmatched)).toBe(true);
+  });
+
+  it('matches codes written with en-dash / lowercase / spaces', () => {
+    const out = buildDmrEntryRowsFromSection(sec([
+      { task_no: 'me–c–11', count: 12, system: 'HVAC', contractor: 'X' },
+      { task_no: 'ME - C - 17', count: 3, system: 'HVAC', contractor: 'X' },
+    ]), tm, make as any);
+    expect(out.map(r => r.task_no).sort()).toEqual(['ME-C-11', 'ME-C-17']);
+    expect(out.every(r => !r.unmatched)).toBe(true);
   });
 });
