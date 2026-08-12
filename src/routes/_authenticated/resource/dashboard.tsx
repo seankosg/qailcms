@@ -1,13 +1,11 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Upload, Database, LayoutDashboard } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/resource/dashboard')({
   head: () => ({ meta: [{ title: 'Resource · QAIL CMS' }] }),
   component: () => (
-    <AppLayout>
-      <div className="space-y-4">
+    <div className="space-y-4">
         <div>
           <h1 className="text-xl font-semibold">Resource</h1>
           <p className="text-xs text-muted-foreground">인력 자원 관리</p>
@@ -17,8 +15,7 @@ export const Route = createFileRoute('/_authenticated/resource/dashboard')({
           <ModCard to="/resource/dmr/raw-data" icon={Database} title="DMR Raw Data" desc="롱포맷 원본 데이터" />
           <ModCard to="/import-log/import?tab=dmr" icon={Upload} title="DMR Import" desc="이미지 3장 AI 자동 파싱" />
         </div>
-      </div>
-    </AppLayout>
+    </div>
   ),
 });
 
