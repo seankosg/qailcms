@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedProjectSummaryRouteImport } from './routes/_authenticated/project-summary'
 import { Route as AuthenticatedProjectDashboardRouteImport } from './routes/_authenticated/project-dashboard'
+import { Route as AuthenticatedOrganizationRouteImport } from './routes/_authenticated/organization'
 import { Route as AuthenticatedMyWorkSpaceRouteImport } from './routes/_authenticated/my-work-space'
 import { Route as AuthenticatedMyTeamWorkSpaceRouteImport } from './routes/_authenticated/my-team-work-space'
 import { Route as AuthenticatedMyKpiAnalysisRouteImport } from './routes/_authenticated/my-kpi-analysis'
@@ -101,6 +102,12 @@ const AuthenticatedProjectDashboardRoute =
   AuthenticatedProjectDashboardRouteImport.update({
     id: '/project-dashboard',
     path: '/project-dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedOrganizationRoute =
+  AuthenticatedOrganizationRouteImport.update({
+    id: '/organization',
+    path: '/organization',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedMyWorkSpaceRoute =
@@ -444,6 +451,7 @@ export interface FileRoutesByFullPath {
   '/my-kpi-analysis': typeof AuthenticatedMyKpiAnalysisRoute
   '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
+  '/organization': typeof AuthenticatedOrganizationRoute
   '/project-dashboard': typeof AuthenticatedProjectDashboardRoute
   '/project-summary': typeof AuthenticatedProjectSummaryRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
@@ -506,6 +514,7 @@ export interface FileRoutesByTo {
   '/my-kpi-analysis': typeof AuthenticatedMyKpiAnalysisRoute
   '/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
+  '/organization': typeof AuthenticatedOrganizationRoute
   '/project-dashboard': typeof AuthenticatedProjectDashboardRoute
   '/project-summary': typeof AuthenticatedProjectSummaryRoute
   '/admin/backup': typeof AuthenticatedAdminBackupRoute
@@ -571,6 +580,7 @@ export interface FileRoutesById {
   '/_authenticated/my-kpi-analysis': typeof AuthenticatedMyKpiAnalysisRoute
   '/_authenticated/my-team-work-space': typeof AuthenticatedMyTeamWorkSpaceRoute
   '/_authenticated/my-work-space': typeof AuthenticatedMyWorkSpaceRoute
+  '/_authenticated/organization': typeof AuthenticatedOrganizationRoute
   '/_authenticated/project-dashboard': typeof AuthenticatedProjectDashboardRoute
   '/_authenticated/project-summary': typeof AuthenticatedProjectSummaryRoute
   '/_authenticated/admin/backup': typeof AuthenticatedAdminBackupRoute
@@ -636,6 +646,7 @@ export interface FileRouteTypes {
     | '/my-kpi-analysis'
     | '/my-team-work-space'
     | '/my-work-space'
+    | '/organization'
     | '/project-dashboard'
     | '/project-summary'
     | '/admin/backup'
@@ -698,6 +709,7 @@ export interface FileRouteTypes {
     | '/my-kpi-analysis'
     | '/my-team-work-space'
     | '/my-work-space'
+    | '/organization'
     | '/project-dashboard'
     | '/project-summary'
     | '/admin/backup'
@@ -762,6 +774,7 @@ export interface FileRouteTypes {
     | '/_authenticated/my-kpi-analysis'
     | '/_authenticated/my-team-work-space'
     | '/_authenticated/my-work-space'
+    | '/_authenticated/organization'
     | '/_authenticated/project-dashboard'
     | '/_authenticated/project-summary'
     | '/_authenticated/admin/backup'
@@ -871,6 +884,13 @@ declare module '@tanstack/react-router' {
       path: '/project-dashboard'
       fullPath: '/project-dashboard'
       preLoaderRoute: typeof AuthenticatedProjectDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/organization': {
+      id: '/_authenticated/organization'
+      path: '/organization'
+      fullPath: '/organization'
+      preLoaderRoute: typeof AuthenticatedOrganizationRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/my-work-space': {
@@ -1321,6 +1341,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMyKpiAnalysisRoute: typeof AuthenticatedMyKpiAnalysisRoute
   AuthenticatedMyTeamWorkSpaceRoute: typeof AuthenticatedMyTeamWorkSpaceRoute
   AuthenticatedMyWorkSpaceRoute: typeof AuthenticatedMyWorkSpaceRoute
+  AuthenticatedOrganizationRoute: typeof AuthenticatedOrganizationRoute
   AuthenticatedProjectDashboardRoute: typeof AuthenticatedProjectDashboardRoute
   AuthenticatedProjectSummaryRoute: typeof AuthenticatedProjectSummaryRoute
   AuthenticatedCloseoutDashboardRoute: typeof AuthenticatedCloseoutDashboardRoute
@@ -1367,6 +1388,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMyKpiAnalysisRoute: AuthenticatedMyKpiAnalysisRoute,
   AuthenticatedMyTeamWorkSpaceRoute: AuthenticatedMyTeamWorkSpaceRoute,
   AuthenticatedMyWorkSpaceRoute: AuthenticatedMyWorkSpaceRoute,
+  AuthenticatedOrganizationRoute: AuthenticatedOrganizationRoute,
   AuthenticatedProjectDashboardRoute: AuthenticatedProjectDashboardRoute,
   AuthenticatedProjectSummaryRoute: AuthenticatedProjectSummaryRoute,
   AuthenticatedCloseoutDashboardRoute: AuthenticatedCloseoutDashboardRoute,
