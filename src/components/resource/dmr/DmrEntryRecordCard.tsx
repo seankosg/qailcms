@@ -505,13 +505,41 @@ export function DmrEntryRecordCard({
                       style={{ width: SELECT_COL_W, minWidth: SELECT_COL_W }}
                     >
                       <div className={cn('-mx-2 -my-1.5 px-2 py-1.5', rowTone)}>
-                        <Checkbox
-                          checked={selected.includes(r.key)}
-                          onCheckedChange={(v) =>
-                            setSelected((p) => (v === true ? [...new Set([...p, r.key])] : p.filter((k) => k !== r.key)))
-                          }
-                          aria-label="행 선택"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Checkbox
+                            checked={selected.includes(r.key)}
+                            onCheckedChange={(v) =>
+                              setSelected((p) => (v === true ? [...new Set([...p, r.key])] : p.filter((k) => k !== r.key)))
+                            }
+                            aria-label="행 선택"
+                          />
+                          <div className="flex flex-col">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-4 w-5"
+                              title={sorting.length > 0 ? '정렬을 해제해야 이동할 수 있습니다' : '위로 이동'}
+                              disabled={sorting.length > 0 || sortedRows.findIndex((x) => x.key === r.key) === 0}
+                              onClick={() => onMoveRow(r.key, -1)}
+                              aria-label="위로 이동"
+                            >
+                              <ChevronUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-4 w-5"
+                              title={sorting.length > 0 ? '정렬을 해제해야 이동할 수 있습니다' : '아래로 이동'}
+                              disabled={sorting.length > 0 || sortedRows.findIndex((x) => x.key === r.key) === sortedRows.length - 1}
+                              onClick={() => onMoveRow(r.key, 1)}
+                              aria-label="아래로 이동"
+                            >
+                              <ChevronDown className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </td>
                     {shownKeys.map((k) => {
