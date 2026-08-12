@@ -173,16 +173,17 @@ export function DmrEntryPage() {
       const gk = `${r.discipline ?? 'ARCH'}|${r.task_no ?? ''}|${r.system_name ?? ''}|${r.contractor_name ?? ''}|${r.plot === 'D' ? 'D' : 'C'}`;
       let row = byGroup.get(gk);
       if (!row) {
-        row = newEntryRow({
-          key: `s${gk}`,
-          discipline: (DISCIPLINES.includes(r.discipline) ? r.discipline : 'ARCH') as Discipline,
-          task_no: r.task_no ?? '',
-          system_name: r.system_name ?? '',
-          task_name: r.task_name ?? '',
-          contractor_name: r.contractor_name ?? '',
-          plot: (r.plot === 'D' ? 'D' : 'C') as 'C' | 'D',
-          pic_name: r.pic_name ?? '',
-          saved: true,
+          row = newEntryRow({
+            key: `s${gk}`,
+            discipline: (DISCIPLINES.includes(r.discipline) ? r.discipline : 'ARCH') as Discipline,
+            task_no: r.task_no ?? '',
+            system_name: r.system_name ?? '',
+            task_name: r.task_name ?? '',
+            work_type: r.work_category ?? '',
+            contractor_name: r.contractor_name ?? '',
+            plot: (r.plot === 'D' ? 'D' : 'C') as 'C' | 'D',
+            pic_name: r.pic_name ?? '',
+            saved: true,
           snap: {
             task_name: r.task_name ?? null,
             work_category: r.work_category ?? null,
