@@ -249,6 +249,7 @@ export function DmrEntryPage() {
       task_no: taskNo,
       unmatched: false,
       task_name: '',
+      work_type: '',
       ...(t
         ? {
             plot: (t.plot === 'D' ? 'D' : t.plot === 'C' ? 'C' : undefined) as any,
