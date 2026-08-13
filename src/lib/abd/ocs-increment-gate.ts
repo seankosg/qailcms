@@ -1,9 +1,6 @@
 // ABD OCS 증분 Import — 서버 최종 관문 (Baseline 정합 + Storage 충돌 재검증).
 // 클라이언트 precheck 결과는 신뢰하지 않는다. 여기서 서버가 다시 계산·대조한다.
-import {
-  BASELINE_CORE_TABLES,
-  computeBaselineIdCandidates,
-} from "@/lib/abd/ocs-baseline-shared";
+import { computeBaselineIdCandidates } from "@/lib/abd/ocs-baseline-shared";
 
 export type RpcFn = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -20,21 +17,8 @@ export type BaselineGateResult = {
   baseline_id_expected: string;
 };
 
-/** 패키지 manifest 계약 — Core 8개 테이블 해시가 정확히 모두, 공백 없이 존재해야 한다. */
-export function assertCoreTableHashContract(hashes: Record<string, string>): void {
-  const keys = Object.keys(hashes ?? {});
-  if (keys.length === 0) throw new Error("BASELINE_CONTRACT: base_core_table_hashes 가 없습니다.");
-  const missing = BASELINE_CORE_TABLES.filter((t) => !keys.includes(t));
-  const extra = keys.filter((k) => !(BASELINE_CORE_TABLES as readonly string[]).includes(k));
-  const blank = BASELINE_CORE_TABLES.filter((t) => !String(hashes[t] ?? "").trim());
-  if (missing.length || extra.length || blank.length) {
-    throw new Error(
-      `BASELINE_CONTRACT: core table hashes 계약 위반 (누락 ${missing.join(",") || "없음"} / 추가 ${
-        extra.join(",") || "없음"
-      } / 공백 ${blank.join(",") || "없음"})`,
-    );
-  }
-}
+// manifest 정적 계약(core 8개 테이블 해시 전수)은 브라우저 로컬 검증으로 이관했다.
+// (ocs-local-validation.ts · MANIFEST_CORE_TABLE_CONTRACT)
 
 /**
  * Import 직전 서버 정본 재계산 — core hash · 테이블별 hash · baseline_id · lineage.
@@ -44,7 +28,6 @@ export async function assertBaselineGate(
   rpc: RpcFn,
   claim: BaselineClaim,
 ): Promise<BaselineGateResult> {
-  assertCoreTableHashContract(claim.base_core_table_hashes);
   if (!claim.base_baseline_id) throw new Error("BASELINE_CONTRACT: base_baseline_id 가 없습니다.");
   if (!claim.base_core_hash) throw new Error("BASELINE_CONTRACT: base_core_hash 가 없습니다.");
   if (!claim.base_import_run_id)
@@ -74,15 +57,8 @@ export async function assertBaselineGate(
     );
   }
 
-  const mismatched = BASELINE_CORE_TABLES.filter(
-    (t) =>
-      String(currentTables[t] ?? "").toLowerCase() !==
-      String(claim.base_core_table_hashes[t] ?? "").toLowerCase(),
-  );
-  if (mismatched.length) {
-    throw new Error(`BASELINE_STALE: core 테이블 해시 불일치 — ${mismatched.join(", ")}`);
-  }
-
+  // 테이블별 해시 전수 대조는 브라우저(BASELINE_TABLE_HASH_MISMATCH)로 이관.
+  // 서버는 core_hash 단일 대조(위)로 운영 정본 변경 여부만 판정한다.
   // v1/v2 Baseline 계약 모두 읽기 호환 — 산식은 동일하고 schema_version 만 다르다.
   const cand = await computeBaselineIdCandidates(currentCoreHash, claim.base_import_run_id);
   const expected = cand.v2;
