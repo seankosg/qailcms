@@ -180,17 +180,18 @@ export function SnagKpiPlanVsActualCard({
 
   const n = stageTotal;
   const unitSuffix = isPct ? "%" : "건";
+  const term = bucketTargetTerm(bucket);
   const incLabel = isPct
-    ? "Plan (increment, %) — 오른쪽 축"
-    : "Plan (increment, 건) — 오른쪽 축";
+    ? `Plan (${term}, %) — 오른쪽 축`
+    : `Plan (${term}, 건) — 오른쪽 축`;
   const incActualLabel = isPct
-    ? "Actual (increment, %) — 오른쪽 축"
-    : "Actual (increment, 건) — 오른쪽 축";
+    ? `Actual (${term}, %) — 오른쪽 축`
+    : `Actual (${term}, 건) — 오른쪽 축`;
   const cumPlanLabel = isPct ? "Plan (cum %)" : "Plan (cum 건)";
   const cumActualLabel = isPct ? "Actual (cum %)" : "Actual (cum 건)";
   const varianceLabel = isPct
-    ? "Δ Actual − Plan (증분, %)"
-    : "Δ Actual − Plan (증분, 건)";
+    ? `Δ Actual − Plan (${term}, %)`
+    : `Δ Actual − Plan (${term}, 건)`;
 
   const cfg: ChartConfig = {
     planInc: { label: incLabel, color: "var(--muted-foreground)" },
