@@ -72,7 +72,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 label={`Plot ${label} 진도현황`}
                 count={actualCnt}
                 total={q.stageTotal}
-                tone={actualPct != null && planPct != null && actualPct - planPct < 0 ? "danger" : "ok"}
+                tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
                 showTotal
                 hint="진도현황 = as-of 기준 Closure actual_upto ÷ Closure 모수 — SM KPI Analysis 와 동일"
                 actualPct={actualPct ?? undefined}
@@ -80,9 +80,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 variant="tm-progress"
                 leftSub={`A ${actualCnt.toLocaleString()} / P ${planCnt.toLocaleString()}`}
                 rightValue={
-                  actualPct != null && planPct != null
-                    ? `${actualPct - planPct > 0 ? "+" : ""}${(actualPct - planPct).toFixed(1)}%`
-                    : "—"
+                  diffPct != null ? `${diffPct > 0 ? "+" : ""}${diffPct.toFixed(1)}%` : "—"
                 }
                 rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
               />
