@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getAbdDashboardRow1, getAbdDashboardRow2, pivotRows } from "@/lib/abd/dashboard.functions";
+import { pdbT, type PdbLang } from "@/lib/dashboards/pdb-i18n";
 
 type Tone = "neutral" | "ok" | "info" | "warn" | "danger";
 
@@ -58,6 +59,8 @@ interface KpiCardProps {
    * "project-summary" 는 Project Dashboard 전용 개선 디자인(단순 제목 + 카드 높이 정렬).
    */
   presentation?: "abd-dashboard" | "project-summary";
+  /** 진도 막대 라벨(계획/실적) 표시 언어. 기본 "ko". */
+  lang?: PdbLang;
 }
 
 export function AbdKpiCard({
@@ -77,6 +80,7 @@ export function AbdKpiCard({
   rightSub,
   variant = "default",
   presentation = "abd-dashboard",
+  lang = "ko",
 }: KpiCardProps) {
   const ps = presentation === "project-summary";
   const labelCls = ps
@@ -127,12 +131,16 @@ export function AbdKpiCard({
             <div className="mt-2 flex flex-col gap-1.5">
               {(
                 [
-                  { k: "계획", v: planPct!, cls: "bg-muted-foreground/50" },
-                  { k: "실적", v: actualPct!, cls: diffPp! >= 0 ? "bg-emerald-500" : "bg-red-500" },
+                  { k: pdbT(lang, "planned"), v: planPct!, cls: "bg-muted-foreground/50" },
+                  {
+                    k: pdbT(lang, "actual"),
+                    v: actualPct!,
+                    cls: diffPp! >= 0 ? "bg-emerald-500" : "bg-red-500",
+                  },
                 ] as const
               ).map((b) => (
                 <div key={b.k} className="flex items-center gap-2">
-                  <span className="w-7 shrink-0 text-[10px] font-medium text-muted-foreground">
+                  <span className="w-12 shrink-0 text-[10px] font-medium text-muted-foreground">
                     {b.k}
                   </span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
