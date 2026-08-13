@@ -39,6 +39,7 @@ import {
   trimFlatTail,
 } from "@/lib/charts/scurve-view";
 import { bucketTargetTerm } from "@/lib/charts/bucket-terms";
+import { pdbBucketTerm, pdbT, type PdbLang } from "@/lib/dashboards/pdb-i18n";
 
 export type SnagCurveUnit = "cnt" | "pct";
 
@@ -48,8 +49,8 @@ const BUCKET_OPTIONS: Array<{ value: Bucket; label: string }> = [
   { value: "month", label: "Monthly" },
 ];
 
-const UNIT_OPTIONS: Array<{ value: SnagCurveUnit; label: string }> = [
-  { value: "cnt", label: "건수" },
+const unitOptions = (lang: PdbLang): Array<{ value: SnagCurveUnit; label: string }> => [
+  { value: "cnt", label: pdbT(lang, "unitCount") },
   { value: "pct", label: "%" },
 ];
 
@@ -84,6 +85,8 @@ interface Props {
   onWindowResolved?: (start: string, end: string) => void;
   /** 메인 S-Curve 차트 높이(px). 미지정 시 340px. */
   chartHeight?: number;
+  /** 표시 언어. 기본 "ko". */
+  lang?: PdbLang;
 }
 
 export function SnagKpiPlanVsActualCard({

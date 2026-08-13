@@ -140,7 +140,12 @@ export function AbdKpiCard({
                 ] as const
               ).map((b) => (
                 <div key={b.k} className="flex items-center gap-2">
-                  <span className="w-12 shrink-0 text-[10px] font-medium text-muted-foreground">
+                  <span
+                    className={cn(
+                      "shrink-0 text-[10px] font-medium text-muted-foreground",
+                      lang === "en" ? "w-12" : "w-7",
+                    )}
+                  >
                     {b.k}
                   </span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
