@@ -53,7 +53,7 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
       progressPct: out.total > 0 ? (out.actual / out.total) * 100 : null,
     };
   }, [q.totals, f.kpiStage]);
-  return { ...q, kpi };
+  return { ...q, kpi, stages };
 }
 
 /** ABD — 정본: useAbdScurveData(= ABD Progress 와 동일 훅), Plot 별 호출 */
