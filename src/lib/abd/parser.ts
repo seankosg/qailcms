@@ -295,33 +295,42 @@ function findHeader(ws: XLSX.WorkSheet): HeaderMap | null {
   const stageRow = anchorRow - 1;
   const colIndex: Record<string, number> = {};
 
-  // Fill forward for merged cells (row-level)
-  const roundBands: string[] = [];
-  const stageBands: string[] = [];
-  {
-    let lastR = "";
-    let lastS = "";
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const rCell = roundRow >= 0 ? ws[XLSX.utils.encode_cell({ r: roundRow, c })] : undefined;
-      const sCell = stageRow >= 0 ? ws[XLSX.utils.encode_cell({ r: stageRow, c })] : undefined;
-      const rv = normText(rCell?.v);
-      const sv = normText(sCell?.v);
-      if (rv) lastR = rv; roundBands.push(lastR);
-      if (sv) lastS = sv; stageBands.push(lastS);
-    }
+  // ROUND 밴드는 "추측 금지" 원칙에 따라 **무제한 fill-forward 하지 않는다**.
+  // 자체 셀 값 + 병합(merge) 범위 안에서만 유효하다. ROUND 3 구역을 지난 뒤의
+  // 공통 컬럼(파일 끝의 Approval / DAR Response 등)이 ROUND 3 으로 상속되어
+  // r3_* 필드에 잘못 귀속되던 문제를 차단한다.
+  const width = range.e.c - range.s.c + 1;
+  const roundBands: string[] = new Array(width).fill("");
+  const stageBands: string[] = new Array(width).fill("");
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const rCell = roundRow >= 0 ? ws[XLSX.utils.encode_cell({ r: roundRow, c })] : undefined;
+    const sCell = stageRow >= 0 ? ws[XLSX.utils.encode_cell({ r: stageRow, c })] : undefined;
+    roundBands[c - range.s.c] = normText(rCell?.v);
+    stageBands[c - range.s.c] = normText(sCell?.v);
   }
-  // Merges also help
+  // 병합 범위만큼 확장 (merge 가 밴드의 실제 폭이다)
   const merges = ws["!merges"] ?? [];
   for (const m of merges) {
     if (m.s.r === roundRow) {
-      const rCell = ws[XLSX.utils.encode_cell({ r: m.s.r, c: m.s.c })];
-      const v = normText(rCell?.v);
+      const v = normText(ws[XLSX.utils.encode_cell({ r: m.s.r, c: m.s.c })]?.v);
       if (v) for (let c = m.s.c; c <= m.e.c; c++) roundBands[c - range.s.c] = v;
     }
     if (m.s.r === stageRow) {
-      const sCell = ws[XLSX.utils.encode_cell({ r: m.s.r, c: m.s.c })];
-      const v = normText(sCell?.v);
+      const v = normText(ws[XLSX.utils.encode_cell({ r: m.s.r, c: m.s.c })]?.v);
       if (v) for (let c = m.s.c; c <= m.e.c; c++) stageBands[c - range.s.c] = v;
+    }
+  }
+  // 스테이지 밴드는 ROUND 밴드가 살아있는 구간 안에서만 fill-forward 한다.
+  // (PLAN/ACTUAL 쌍이 병합 없이 두 컬럼으로 나뉜 파일 대응)
+  {
+    let lastS = "";
+    let lastR = "";
+    for (let i = 0; i < width; i++) {
+      const r = roundBands[i];
+      if (!r) { lastS = ""; lastR = ""; continue; }   // ROUND 밴드 밖 → 상속 중단
+      if (r !== lastR) { lastS = ""; lastR = r; }      // 라운드가 바뀌면 초기화
+      if (stageBands[i]) lastS = stageBands[i];
+      else stageBands[i] = lastS;
     }
   }
 

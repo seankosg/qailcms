@@ -258,6 +258,9 @@ export const importAbdBatch = createServerFn({ method: "POST" })
     let inserted = 0, updated = 0;
     let dfBlocked = 0;
     const dfBlockedSamples: string[] = [];
+    // 라운드 정합 가드: 해당 라운드의 Submission(SB) 실적이 없으면
+    // 같은 라운드의 DAR Response 실적을 쓰지 않는다 (Aconex 임포트와 동일 규칙).
+    const darGuardSkipped: Array<{ abd_number: string; round: number }> = [];
     // B안 — OCS 미완료 위반 행은 "행 단위로 통째 제외". 나머지 행은 정상 반영.
     const ocsSkipped: Array<{
       abd_number: string;
