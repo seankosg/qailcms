@@ -421,6 +421,21 @@ export const importAbdBatch = createServerFn({ method: "POST" })
             (row as any)[srcKey] = "hdec";
           }
         }
+        // 라운드 정합 가드 — R2/R3 의 DAR 실적은 같은 라운드 SB 실적이 있어야만 기록
+        {
+          const merged = { ...(src ?? {}), ...(row as any) };
+          for (const n of [2, 3] as const) {
+            const darKey = `r${n}_dar_actual`;
+            const sbKey = `r${n}_submission_actual`;
+            const incoming = (row as any)[darKey];
+            if (incoming == null || incoming === "") continue;
+            const sb = (merged as any)[sbKey];
+            if (sb == null || sb === "") {
+              delete (row as any)[darKey];
+              darGuardSkipped.push({ abd_number: String((row as any).abd_number), round: n });
+            }
+          }
+        }
       }
 
       // 위반 행을 payload 에서 제거 (행 단위 제외)
