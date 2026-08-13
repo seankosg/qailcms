@@ -221,9 +221,6 @@ export function SnagKpiPlanVsActualCard({
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-muted-foreground";
   const sign = deltaNow > 0 ? "+" : "";
-  const appliedLabel = `${filterSummary
-    .map((f) => `${f.label}: ${f.value}`)
-    .join(" · ")} · 모수 ${n.toLocaleString()}건`;
 
   return (
     <Card>
