@@ -8,6 +8,7 @@ import { useUnionWindow } from "@/lib/charts/use-union-window";
 import { ALL_STAGES, type Stage } from "@/lib/abd/progress-utils";
 import type { AbdTeam } from "@/lib/abd/columns";
 import { ProjectModuleSection } from "./ProjectModuleSection";
+import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
 
 function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
   const q = useAbdScurveData({
@@ -25,15 +26,25 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
     const rows = (q.totals ?? []) as Array<Record<string, unknown>>;
     const out = { total: 0, actual: 0, plan: 0 };
     const kpiStage = f.kpiStage || "approval";
+    const byTeam = new Map<string, { count: number; actual: number }>();
     for (const r of rows) {
       if (r.stage !== kpiStage) continue;
       out.total += Number(r.total ?? 0);
       out.actual += Number(r.actual_upto ?? 0);
       out.plan += Number(r.plan_upto ?? 0);
+      const gk = (r.group_key ?? []) as string[];
+      const key = (gk[0] ?? "").trim() || "(미지정)";
+      const cur = byTeam.get(key) ?? { count: 0, actual: 0 };
+      cur.count += Number(r.total ?? 0);
+      cur.actual += Number(r.actual_upto ?? 0) * 100;
+      byTeam.set(key, cur);
     }
     return {
       ...out,
       behind: Math.max(0, out.plan - out.actual),
+      teams: foldTop4(
+        [...byTeam.entries()].map(([key, v]) => ({ key, count: v.count, actual: v.actual })),
+      ),
       progressPct: out.total > 0 ? (out.actual / out.total) * 100 : null,
     };
   }, [q.totals, f.kpiStage]);
@@ -84,13 +95,10 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
                 rightValue={`${actualPct?.toFixed(1) ?? "—"}%`}
                 rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
               />
-              <AbdKpiCard
-                label={`Plot ${label} 지연현황`}
-                count={q.kpi.behind}
-                total={q.kpi.total}
-                tone="danger"
-                showTotal
-                hint="지연현황 = max(0, Approval 계획 누계 − 실적 누계)"
+              <PdbBreakdownCard
+                label={`Plot ${label} Team 진도`}
+                rows={q.kpi.teams}
+                hint="Team 별 문서 수 상위 4개 + Others · 진도율 = 실적 누계 ÷ 문서 모수"
               />
             </div>
             <AbdPlanVsActualCard
