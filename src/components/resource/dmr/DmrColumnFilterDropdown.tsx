@@ -221,10 +221,20 @@ function NumRange({ column }: { column: any }) {
   );
 }
 
-export function DmrColumnFilterDropdown({ column, scope }: { column: any; scope?: DmrScope }) {
+export function DmrColumnFilterDropdown({
+  column,
+  scope,
+  q,
+  serverFilters,
+}: {
+  column: any;
+  scope?: DmrScope;
+  q?: string;
+  serverFilters?: DmrServerFilter[];
+}) {
   const meta = (column.columnDef.meta ?? {}) as any;
   const t = meta.filterType ?? 'text';
-  if (t === 'multi-select') return <MultiSelect column={column} options={meta.filterOptions ?? []} scope={scope} />;
+  if (t === 'multi-select') return <MultiSelect column={column} options={meta.filterOptions ?? []} scope={scope} q={q} serverFilters={serverFilters} />;
   if (t === 'date-range') return <DateRange column={column} />;
   if (t === 'number-range') return <NumRange column={column} />;
   return <TextDropdown column={column} />;
