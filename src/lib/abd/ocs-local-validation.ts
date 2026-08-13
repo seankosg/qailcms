@@ -15,6 +15,32 @@ import {
 
 export const LOCAL_VALIDATION_SCHEMA = "ocs-local-validation/1";
 export const VALIDATOR_VERSION = "ocs-local-validator/1.0.0";
+/** 영수증 파일명 — 계약상 이 이름 하나만 사용한다. */
+export const LOCAL_RECEIPT_PATH = "local_validation_receipt.json";
+/** payload digest 대상과 canonical 순서 — 코드 상수로 고정한다(영수증 자체는 제외). */
+export const PAYLOAD_DIGEST_PARTS = [
+  "manifest",
+  "atomic",
+  "response_mapping",
+  "policy",
+  "corrections",
+] as const;
+/** v1 Baseline 안내 — 문구 고정 */
+export const BASELINE_V1_NOTICE =
+  "This Baseline can still be used by the legacy import flow, but it does not contain the ABD validation index.\nGenerate and download a new Baseline to use browser-local validation.";
+
+/**
+ * digest 대상 manifest canonical view — 영수증 entry 를 files 목록에서 제외해 digest 순환을 끊는다.
+ */
+export function manifestPayloadView(manifest: unknown): unknown {
+  const m = { ...((manifest ?? {}) as Record<string, unknown>) };
+  if (Array.isArray(m["files"])) {
+    m["files"] = (m["files"] as Record<string, unknown>[]).filter(
+      (f) => String(f["relative_path"]) !== LOCAL_RECEIPT_PATH,
+    );
+  }
+  return m;
+}
 
 export type LocalValidationIssue = {
   severity: "blocker" | "warning";
