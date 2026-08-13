@@ -69,7 +69,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
           <div key={label} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
               <AbdKpiCard
-                label={`Plot ${label} 진도현황`}
+                label={`${label} 진도현황`}
                 count={actualCnt}
                 total={q.stageTotal}
                 tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
@@ -85,7 +85,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
               />
               <AbdKpiCard
-                label={`Plot ${label} 지연현황`}
+                label={`${label} 지연현황`}
                 count={Math.max(0, q.baseline.planUpto - q.baseline.actualUpto)}
                 total={q.stageTotal}
                 tone="danger"
