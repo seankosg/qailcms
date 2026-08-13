@@ -289,18 +289,17 @@ export function SnagKpiPlanVsActualCard({
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-1">
-                  {filterSummary.map((f) => (
-                    <span
-                      key={f.label}
-                      className="rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
-                    >
-                      <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
-                      <span className="text-foreground">{f.value}</span>
-                    </span>
-                  ))}
-                  <span className="rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] tabular-nums text-foreground">
-                    모수 {stageTotal.toLocaleString()}건
-                  </span>
+                  {filterSummary
+                    .filter((f) => f.label !== "Plot" && f.label !== "As of")
+                    .map((f) => (
+                      <span
+                        key={f.label}
+                        className="rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
+                      >
+                        <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
+                        <span className="text-foreground">{f.value}</span>
+                      </span>
+                    ))}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2 text-xs">
