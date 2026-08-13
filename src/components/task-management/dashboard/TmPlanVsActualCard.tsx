@@ -231,7 +231,7 @@ export function TmPlanVsActualCard({
               >
                 {open ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                 <TrendingUp className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Progress Status</CardTitle>
+                <CardTitle className="text-base">Progress Status 차트</CardTitle>
               </button>
             </CollapsibleTrigger>
 
