@@ -22,6 +22,10 @@ import { useDefectFacet } from "@/hooks/useDefectItems";
 import { ALL_TEAMS, ROOM_GROUP_ORDER } from "@/lib/defect-management/dashboard-shape";
 import { ALL_STAGES, STAGE_LABELS } from "@/lib/defect-management/progress-utils";
 import { ABD_TEAMS } from "@/lib/abd/columns";
+import {
+  ALL_STAGES as ABD_ALL_STAGES,
+  STAGE_LABELS as ABD_STAGE_LABELS,
+} from "@/lib/abd/progress-utils";
 
 export const Route = createFileRoute("/_authenticated/admin/setting")({
   head: () => ({
@@ -63,7 +67,7 @@ function Multi({
   value,
   onChange,
 }: {
-  options: readonly string[];
+  options: ReadonlyArray<string | { value: string; label: string }>;
   value: string[];
   onChange: (v: string[]) => void;
 }) {
@@ -74,15 +78,18 @@ function Multi({
       onValueChange={(v) => onChange(v as string[])}
       className="flex-wrap justify-start gap-1"
     >
-      {options.map((o) => (
-        <ToggleGroupItem
-          key={o}
-          value={o}
-          className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-        >
-          {o}
-        </ToggleGroupItem>
-      ))}
+      {options.map((raw) => {
+        const o = typeof raw === "string" ? { value: raw, label: raw } : raw;
+        return (
+          <ToggleGroupItem
+            key={o.value}
+            value={o.value}
+            className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+          >
+            {o.label}
+          </ToggleGroupItem>
+        );
+      })}
     </ToggleGroup>
   );
 }
@@ -341,6 +348,25 @@ function Page() {
                   options={ABD_TEAMS.map((t) => t.value)}
                   value={abd.teams}
                   onChange={(v) => setAbd({ ...abd, teams: v })}
+                />
+              </Row>
+              <Row label="Stage">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Multi
+                    options={ABD_ALL_STAGES.map((s) => ({ value: s as string, label: ABD_STAGE_LABELS[s] }))}
+                    value={abd.stages}
+                    onChange={(v) => setAbd({ ...abd, stages: v })}
+                  />
+                  <span className="text-[11px] text-muted-foreground">
+                    비우면 전체 스테이지 · 차트/매트릭스 표시에만 적용
+                  </span>
+                </div>
+              </Row>
+              <Row label="KPI 기준 Stage">
+                <Single
+                  options={ABD_ALL_STAGES.map((s) => ({ value: s as string, label: ABD_STAGE_LABELS[s] }))}
+                  value={abd.kpiStage}
+                  onChange={(v) => setAbd({ ...abd, kpiStage: v })}
                 />
               </Row>
               <Row label="Plan Mode">
