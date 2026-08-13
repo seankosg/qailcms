@@ -789,6 +789,10 @@ export function SnagProgressPage() {
             stages={effectiveStages}
             today={today}
             cum={scurveCum}
+            bucket={bucket}
+            denomByStage={Object.fromEntries(
+              effectiveStages.map((s) => [s, kpis.byStage[s]?.total ?? 0]),
+            )}
             open={scurveOpen}
             onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
           />
