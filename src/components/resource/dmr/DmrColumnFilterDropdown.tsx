@@ -141,7 +141,8 @@ function TextDropdown({ column }: { column: any }) {
         <div className="flex items-center justify-end px-1">
           <button className="text-[11px] text-muted-foreground hover:underline" onClick={() => column.setFilterValue(undefined)}>Clear</button>
         </div>
-        <Input placeholder="검색..." value={text} onChange={(e) => update({ text: e.target.value || undefined })} className="h-7 text-xs" disabled={emptyOnly} />
+        <Input placeholder="Search... (use , for AND)" value={text} onChange={(e) => update({ text: e.target.value || undefined })} className="h-7 text-xs" disabled={emptyOnly} />
+        <p className="text-[10px] text-muted-foreground">Tip: 쉼표로 AND 조건 (예: <code>slab, rebar</code>)</p>
         <label className="flex cursor-pointer items-center gap-2 text-xs">
           <Checkbox checked={emptyOnly} onCheckedChange={(c) => update({ emptyOnly: !!c, text: undefined })} className="h-3.5 w-3.5" />
           Empty only
