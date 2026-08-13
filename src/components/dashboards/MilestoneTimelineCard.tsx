@@ -123,13 +123,15 @@ export function MilestoneTimelineCard({ hidePlotG }: { hidePlotG?: boolean }) {
     }
     return Array.from(byPlot.entries())
       .filter(([, list]) => list.length > 0)
+      .filter(([plot]) => !hidePlotG || plot !== "G")
       .sort((a, b) => {
         const ia = PLOT_ORDER.indexOf(a[0]);
         const ib = PLOT_ORDER.indexOf(b[0]);
         if (ia !== ib) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
         return a[0].localeCompare(b[0]);
       });
-  }, [data, todayNum, showAuto]);
+  }, [data, todayNum, showAuto, hidePlotG]);
+
 
   return (
     <Card className="overflow-hidden">
