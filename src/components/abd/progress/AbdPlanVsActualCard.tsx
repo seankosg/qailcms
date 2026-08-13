@@ -57,6 +57,8 @@ export interface AbdPlanVsActualCardProps {
   baselines?: SCurveBaselines;
   /** 서버 정본 누적(문서 distinct). 종점 = 행 totals */
   cum?: SCurveCum;
+  /** 스테이지별 문서 모수(분모) — 누적곡선을 진도율 %로 그린다 */
+  denomByStage?: Partial<Record<Stage, number>>;
   /** 여러 차트를 나란히 놓을 때 공통 x 창(ISO). 주지 않으면 자기 모집단으로 잡는다. */
   windowStart?: string | null;
   windowEnd?: string | null;
@@ -73,6 +75,7 @@ export function AbdPlanVsActualCard({
   onOpenChange,
   baselines,
   cum,
+  denomByStage,
   windowStart,
   windowEnd,
   onWindowResolved,
