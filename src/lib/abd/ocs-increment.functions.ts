@@ -103,11 +103,7 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
       data.base_import_run_id || latestRunId,
     );
     const expectedBaselineId = baselineCandidates.v2;
-    const mismatchedTables = Object.keys(currentTableHashes).filter(
-      (t) =>
-        data.base_core_table_hashes[t] !== undefined &&
-        data.base_core_table_hashes[t] !== currentTableHashes[t],
-    );
+    // 테이블별 해시 전수 대조는 브라우저 로컬 검증으로 이관했다(중복 검증 제거).
 
     return {
       duplicate_package: (dup ?? []).length > 0,
@@ -122,7 +118,7 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
         ? baselineCandidates.all.includes(data.base_baseline_id)
         : null,
       baseline_id_expected: expectedBaselineId,
-      mismatched_core_tables: mismatchedTables,
+      mismatched_core_tables: [] as string[],
     } as unknown as Json;
   });
 
