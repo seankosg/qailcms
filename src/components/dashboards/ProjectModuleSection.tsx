@@ -78,7 +78,7 @@ export function ProjectModuleSection({
 
 export function PlotColumnHeader({ plot }: { plot: "C" | "D" }) {
   return (
-    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="text-2xl font-bold uppercase tracking-wide text-muted-foreground">
       Plot {plot}
     </div>
   );
