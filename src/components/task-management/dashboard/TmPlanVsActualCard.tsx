@@ -365,7 +365,6 @@ export function TmPlanVsActualCard({
                       />
                     )}
                     <Bar
-                      yAxisId="bar"
                       dataKey="planInc"
                       name={incLabel}
                       fill="color-mix(in oklab, var(--muted-foreground) 22%, transparent)"
@@ -373,7 +372,6 @@ export function TmPlanVsActualCard({
                       hide={hidden.has("planInc")}
                     />
                     <Bar
-                      yAxisId="bar"
                       dataKey="actualInc"
                       name={incActualLabel}
                       fill="color-mix(in oklab, var(--primary) 30%, transparent)"
@@ -381,6 +379,7 @@ export function TmPlanVsActualCard({
                       hide={hidden.has("actualInc")}
                     />
                     <Line
+                      yAxisId="cum"
                       type="monotone"
                       dataKey="cumPlan"
                       name={cumPlanLabel}
@@ -391,6 +390,7 @@ export function TmPlanVsActualCard({
                       hide={hidden.has("cumPlan")}
                     />
                     <Line
+                      yAxisId="cum"
                       type="monotone"
                       dataKey="cumActual"
                       name={cumActualLabel}
