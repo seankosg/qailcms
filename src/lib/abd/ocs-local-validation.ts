@@ -569,26 +569,40 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
  * 로컬 검증 영수증 — ZIP 자기참조 hash 를 쓰지 않는다.
  * payload_sha256 = manifest + atomic + response + policy + corrections 의 canonical digest.
  */
+export async function computeLocalPayloadDigest(args: {
+  pkg: IncrementPackage;
+  corrections: CorrectionsDoc | null;
+  manifestForPayload: unknown;
+}): Promise<string> {
+  // PAYLOAD_DIGEST_PARTS 순서를 코드 상수로 고정한다. 영수증 자체는 대상에서 제외한다.
+  const parts: Record<(typeof PAYLOAD_DIGEST_PARTS)[number], unknown> = {
+    manifest: manifestPayloadView(args.manifestForPayload),
+    atomic: {
+      comments: args.pkg.atomic.comments,
+      groups: args.pkg.atomic.groups,
+      attachments: args.pkg.atomic.attachments,
+    },
+    response_mapping: args.pkg.response.segments,
+    policy: args.pkg.policy,
+    corrections: args.corrections
+      ? { ...args.corrections, corrections_sha256: await correctionsSha256(args.corrections) }
+      : null,
+  };
+  const ordered = PAYLOAD_DIGEST_PARTS.map((k) => [k, parts[k]] as const);
+  return sha256Hex(canonicalJson({ parts: ordered.map(([k, v]) => ({ key: k, value: v })) }));
+}
+
 export async function buildLocalValidationReceipt(args: {
   pkg: IncrementPackage;
   result: LocalValidationResult;
   corrections: CorrectionsDoc | null;
   manifestForPayload: unknown;
 }): Promise<LocalValidationReceipt> {
-  const payload = {
-    manifest: args.manifestForPayload,
-    atomic: {
-      comments: args.pkg.atomic.comments,
-      groups: args.pkg.atomic.groups,
-      attachments: args.pkg.atomic.attachments,
-    },
-    response: args.pkg.response.segments,
-    policy: args.pkg.policy,
-    corrections: args.corrections
-      ? { ...args.corrections, corrections_sha256: await correctionsSha256(args.corrections) }
-      : null,
-  };
-  const payload_sha256 = await sha256Hex(canonicalJson(payload));
+  const payload_sha256 = await computeLocalPayloadDigest({
+    pkg: args.pkg,
+    corrections: args.corrections,
+    manifestForPayload: args.manifestForPayload,
+  });
   const contract_hash = await sha256Hex(
     canonicalJson({
       clean: args.result.clean,
@@ -612,5 +626,29 @@ export async function buildLocalValidationReceipt(args: {
     blocker_count: args.result.blocker_count,
     warning_count: args.result.warning_count,
     contract_hash,
+    payload_parts: PAYLOAD_DIGEST_PARTS,
   };
+}
+
+/** 영수증 재계산 대조 — 변조된 payload digest 를 차단한다. */
+export async function verifyLocalValidationReceipt(args: {
+  receipt: LocalValidationReceipt;
+  pkg: IncrementPackage;
+  corrections: CorrectionsDoc | null;
+  manifestForPayload: unknown;
+}): Promise<{ ok: boolean; reasons: string[] }> {
+  const reasons: string[] = [];
+  if (args.receipt.schema_version !== LOCAL_VALIDATION_SCHEMA)
+    reasons.push(`영수증 schema_version 불일치: ${args.receipt.schema_version}`);
+  const expected = await computeLocalPayloadDigest({
+    pkg: args.pkg,
+    corrections: args.corrections,
+    manifestForPayload: args.manifestForPayload,
+  });
+  if (expected !== args.receipt.payload_sha256)
+    reasons.push("payload_sha256 가 재계산값과 다릅니다 (영수증 변조).");
+  if (args.receipt.package_id !== args.pkg.manifest.package_id)
+    reasons.push("영수증 package_id 가 패키지와 다릅니다.");
+  if (!args.receipt.clean) reasons.push("영수증이 CLEAN 이 아닙니다.");
+  return { ok: reasons.length === 0, reasons };
 }
