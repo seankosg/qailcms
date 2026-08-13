@@ -1,16 +1,23 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { todayInDoha } from "@/lib/time/doha";
 import { TmDashboardSection } from "./TmDashboardSection";
 import { SmDashboardSection } from "./SmDashboardSection";
 import { AbdDashboardSection } from "./AbdDashboardSection";
+import { LazySection } from "./LazySection";
 
 
 export function ProjectSummaryPage() {
   // 기준일 하나 — 세 모듈이 같은 as-of 를 쓴다.
   const [asOfDate, setAsOfDate] = useState<string>(() => todayInDoha());
+  // 기준일 입력 디바운스 — 타이핑 중 재조회 폭주를 막는다(표시값은 즉시 갱신).
+  const [appliedDate, setAppliedDate] = useState<string>(asOfDate);
+  useEffect(() => {
+    const t = setTimeout(() => setAppliedDate(asOfDate), 400);
+    return () => clearTimeout(t);
+  }, [asOfDate]);
 
   return (
     <div className="flex flex-col gap-8 p-4">
@@ -40,9 +47,13 @@ export function ProjectSummaryPage() {
       </div>
 
 
-      <TmDashboardSection asOfDate={asOfDate} />
-      <SmDashboardSection asOfDate={asOfDate} />
-      <AbdDashboardSection asOfDate={asOfDate} />
+      <TmDashboardSection asOfDate={appliedDate} />
+      <LazySection>
+        <SmDashboardSection asOfDate={appliedDate} />
+      </LazySection>
+      <LazySection>
+        <AbdDashboardSection asOfDate={appliedDate} />
+      </LazySection>
     </div>
   );
 }
