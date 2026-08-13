@@ -11,11 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { todayInDoha } from "@/lib/time/doha";
 import { ArrowRight, Users, UserCog, CalendarClock, CheckCircle2, Pencil } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { DelegationEditDialog } from "./DelegationEditDialog";
+import { OrgChartTab } from "./OrgChartTab";
 
 interface Row {
   id: string;
@@ -51,6 +52,7 @@ function todayIso() {
 }
 
 export function OrganizationPage() {
+  const [mainTab, setMainTab] = useState<"delegation" | "chart">("delegation");
   const [asOf, setAsOf] = useState(todayIso());
   const [q, setQ] = useState("");
   const [phase, setPhase] = useState<Phase | "all">("active");
@@ -140,6 +142,17 @@ export function OrganizationPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "delegation" | "chart")}>
+        <TabsList>
+          <TabsTrigger value="delegation">업무 이관</TabsTrigger>
+          <TabsTrigger value="chart">Organization Chart</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="chart" className="mt-4">
+          <OrgChartTab />
+        </TabsContent>
+
+        <TabsContent value="delegation" className="mt-4 flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Organization</h1>
@@ -326,6 +339,8 @@ export function OrganizationPage() {
         open={!!editRow}
         onOpenChange={(v) => { if (!v) setEditRow(null); }}
       />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
