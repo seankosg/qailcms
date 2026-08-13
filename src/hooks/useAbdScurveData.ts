@@ -36,6 +36,8 @@ export interface AbdScurveParams {
   rangeDays: number;
   /** S-Curve 전용 질의(baseline·cum) 활성화 여부 */
   scurveEnabled: boolean;
+  /** 차트에 표시할 스테이지(필터 요약용). 비어 있으면 전체 */
+  stages?: Stage[];
   /** 차트 시작일(ISO). 없으면 오늘 −14일(기존 동작) */
   startDate?: string | null;
 }
