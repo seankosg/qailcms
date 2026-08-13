@@ -91,16 +91,17 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 label={`Plot ${label} 진도현황`}
                 count={q.kpi.actualCount}
                 total={q.kpi.total}
-                tone="ok"
+                tone={q.kpi.diffPct != null && q.kpi.diffPct < 0 ? "danger" : "ok"}
                 showTotal
                 hint={PROGRESS_HINT}
                 actualPct={q.kpi.actualPct ?? undefined}
                 planPct={q.kpi.planPct ?? undefined}
                 variant="tm-progress"
                 leftSub={`A ${q.kpi.actualCount.toLocaleString()} / P ${q.kpi.planCount.toLocaleString()}`}
-                rightValue={`${q.kpi.actualPct?.toFixed(1) ?? "—"}%`}
+                rightValue={`${q.kpi.diffPct != null ? `${q.kpi.diffPct > 0 ? "+" : ""}${q.kpi.diffPct.toFixed(1)}` : "—"}%`}
                 rightSub={`A ${q.kpi.actualPct?.toFixed(1) ?? "—"}% / P ${q.kpi.planPct?.toFixed(1) ?? "—"}%`}
               />
+
               <PdbBreakdownCard
                 label={`Plot ${label} Work Type 진도`}
                 rows={q.kpi.workTypes}
