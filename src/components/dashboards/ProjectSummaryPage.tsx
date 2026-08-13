@@ -21,16 +21,24 @@ export function ProjectSummaryPage() {
             TM · SM · ABD 진행 현황 요약 — Plot 별 좌우 비교.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">기준일</span>
-          <Input
-            type="date"
-            value={asOfDate}
-            onChange={(e) => setAsOfDate(e.target.value || todayInDoha())}
-            className="h-8 w-[150px] text-xs"
-          />
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">기준일</span>
+            <Input
+              type="date"
+              value={asOfDate}
+              onChange={(e) => setAsOfDate(e.target.value || todayInDoha())}
+              className="h-8 w-[150px] text-xs"
+            />
+          </div>
+          <Link to="/admin/setting">
+            <Button variant="outline" size="sm" className="h-7 text-xs">
+              Setting
+            </Button>
+          </Link>
         </div>
       </div>
+
 
       <TmDashboardSection asOfDate={asOfDate} />
       <SmDashboardSection asOfDate={asOfDate} />
