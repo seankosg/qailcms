@@ -73,7 +73,7 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
       <CardContent className="p-3">
         {variant === "tm-progress" && hasGap ? (
           <div className="flex flex-col gap-1">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="mb-1 inline-block rounded-md bg-muted px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
               {label}
             </div>
             <div className="flex items-end justify-between gap-2">
@@ -137,7 +137,7 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
         ) : (
           <div className="flex items-start gap-3">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              <div className="mb-1 inline-block rounded-md bg-muted px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                 {label}
               </div>
               <div

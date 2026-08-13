@@ -44,7 +44,7 @@ export function PdbBreakdownCard({
   return (
     <Card title={hint}>
       <CardContent className="p-3">
-        <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        <div className="mb-1 inline-block rounded-md bg-muted px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
           {label}
         </div>
         <div className="mt-1.5 flex flex-col gap-1">
