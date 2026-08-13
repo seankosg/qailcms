@@ -49,9 +49,17 @@ interface KpiCardProps {
   /** TM/SM 진도 카드용 — as-of 기준 Actual% 와 Plan% (0~100). */
   actualPct?: number;
   planPct?: number;
+  /** 좌측 하단 보조 문구 (예: "실적갯수/계획갯수"). */
+  leftSub?: string;
+  /** 우측 상단 값 (예: "12.3%"). */
+  rightValue?: string;
+  /** 우측 하단 보조 문구 (예: "A 12.3% / P 15.0%"). */
+  rightSub?: string;
+  /** 카드 레이아웃 변형. */
+  variant?: "default" | "tm-progress";
 }
 
-export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal, actualPct, planPct }: KpiCardProps) {
+export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal, actualPct, planPct, leftSub, rightValue, rightSub, variant = "default" }: KpiCardProps) {
   const pct = total && total > 0 ? Math.round((count / total) * 100) : null;
   const stackTotal = stackBar ? stackBar.reduce((s, x) => s + (x.count || 0), 0) : 0;
   const hasGap = actualPct != null && planPct != null;
