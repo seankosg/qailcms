@@ -338,15 +338,15 @@ export function TmPlanVsActualCard({
                     <YAxis
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={isTasks ? [0, "auto"] : [0, 100]}
-                      tickFormatter={(v) => (isTasks ? `${v}` : `${v}%`)}
+                      domain={[0, incMax]}
                     />
                     <YAxis
-                      yAxisId="bar"
+                      yAxisId="cum"
                       orientation="right"
                       width={Y_RIGHT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={[0, incMax]}
+                      domain={isTasks ? [0, "auto"] : [0, 100]}
+                      tickFormatter={(v) => (isTasks ? `${v}` : `${v}%`)}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
