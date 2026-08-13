@@ -64,6 +64,8 @@ export interface AbdPlanVsActualCardProps {
   windowEnd?: string | null;
   /** 절단 후 자기 창(ISO)을 밖으로 알린다 — 공통 창 합집합 계산용 */
   onWindowResolved?: (start: string, end: string) => void;
+  /** 메인 S-Curve 차트 높이(px). 미지정 시 360px. */
+  chartHeight?: number;
 }
 
 export function AbdPlanVsActualCard({
@@ -79,6 +81,7 @@ export function AbdPlanVsActualCard({
   windowStart,
   windowEnd,
   onWindowResolved,
+  chartHeight = 360,
 }: AbdPlanVsActualCardProps) {
   const scurve = useMemo(
     () => buildAbdSCurve({ cells, buckets, stages, today, baselines, cum }),
@@ -260,7 +263,7 @@ export function AbdPlanVsActualCard({
                   )}
                 </div>
 
-                <ChartContainer config={cfg} className="h-[360px] w-full">
+                <ChartContainer config={cfg} className="w-full" style={{ height: chartHeight }}>
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis

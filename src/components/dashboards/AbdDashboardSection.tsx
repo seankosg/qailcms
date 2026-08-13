@@ -115,6 +115,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
               windowStart={win.start}
               windowEnd={win.end}
               onWindowResolved={(s, e) => report(label, s, e)}
+              chartHeight={324}
             />
           </div>
           );
