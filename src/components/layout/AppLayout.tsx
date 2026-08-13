@@ -122,21 +122,21 @@ const NAV: NavSection[] = [
         ],
       },
       {
-        label: "Warranty & License",
-        icon: iconCertificate,
-        matchPrefix: "/closure/warranty",
-        adminOnly: true,
-        items: [
-          { to: "/closure/warranty/raw-data", label: "Raw Data", icon: iconDatabase },
-        ],
-      },
-      {
         label: "Spare Part List",
         icon: iconDatabase,
         matchPrefix: "/closure/spare-part",
         items: [
           { to: "/closure/spare-part/dashboard", label: "Dashboard", icon: iconDashboard },
           { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: iconDatabase },
+        ],
+      },
+      {
+        label: "Warranty & License",
+        icon: iconCertificate,
+        matchPrefix: "/closure/warranty",
+        adminOnly: true,
+        items: [
+          { to: "/closure/warranty/raw-data", label: "Raw Data", icon: iconDatabase },
         ],
       },
     ],
