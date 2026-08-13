@@ -229,6 +229,12 @@ export function SplRawDataPage() {
       if (r.active_band !== search.delayBand) return false;
       if (r.primary_delay?.band !== search.delayBand) return false;
     }
+    // 팀 필터 (Progress 화면과 같은 이름)
+    if (search.team && search.team !== "all" && (r.team ?? "") !== search.team) return false;
+    // Progress 단계 드릴다운 — 단계와 상태가 둘 다 있을 때만 적용
+    if (search.stage && search.stageState) {
+      if (r.stages[search.stage]?.st !== search.stageState) return false;
+    }
     for (const [key, vals] of Object.entries(colFilters)) {
       if (!vals || vals.length === 0) continue;
       if (key === excludeKey) continue;
@@ -267,7 +273,7 @@ export function SplRawDataPage() {
   const filtered = useMemo(() => {
     return rows.filter((r) => rowMatches(r));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, search.ocs, isToday, colFilters, colDefMap, stageColMap]);
+  }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, search.ocs, search.team, search.stage, search.stageState, isToday, colFilters, colDefMap, stageColMap]);
 
   /** 단일 표시 컬럼 배치 — 정규·스테이지 모두 동일한 순서/표시/고정/폭 모델 */
   const layout = useMemo(() => {
@@ -499,17 +505,34 @@ export function SplRawDataPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {(search.judgment && search.judgment !== "all") || search.delayBand || search.hdecMissing ? (
+        {(search.judgment && search.judgment !== "all") ||
+        search.delayBand ||
+        search.hdecMissing ||
+        search.stage ||
+        (search.team && search.team !== "all") ? (
           <Button
             size="sm"
             variant="outline"
             className="h-7 text-[11px]"
-            onClick={() => setSearch({ judgment: "all", delayBand: "", hdecMissing: false })}
+            onClick={() =>
+              setSearch({
+                judgment: "all",
+                delayBand: "",
+                hdecMissing: false,
+                stage: "",
+                stageState: undefined,
+                team: "all",
+              })
+            }
           >
             Clear dashboard filter
             {search.judgment && search.judgment !== "all" ? ` · ${splJudgmentLabel(search.judgment as any)}` : ""}
             {search.delayBand ? ` · ${BAND_LABEL[search.delayBand] ?? search.delayBand}` : ""}
             {search.hdecMissing ? " · No HDEC actual" : ""}
+            {search.stage
+              ? ` · ${catalog.find((c) => c.stage_code === search.stage)?.short_code ?? search.stage}${search.stageState ? ` (${search.stageState})` : ""}`
+              : ""}
+            {search.team && search.team !== "all" ? ` · ${search.team}` : ""}
           </Button>
         ) : null}
         {sorts.length > 0 && (

@@ -40,7 +40,8 @@ export const setSplRequiredDoc = createServerFn({ method: "POST" })
     if (permErr) throw new Error(permErr.message);
     if (!ok) throw new Error("Permission denied: you cannot edit this row.");
 
-    const value = data.required ? "Yes" : null;
+    // DB 정본 어휘는 'REQUIRED' — spl_eval_as_of / spl_assert_row_rules 가 이 값만 센다.
+    const value = data.required ? "REQUIRED" : null;
     const now = new Date().toISOString();
 
     const { data: existing, error: selErr } = await supa
