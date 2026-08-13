@@ -64,7 +64,6 @@ export function usePdbCache() {
         unsubscribe = persistQueryClientSubscribe({
           queryClient,
           persister: p,
-          maxAge: MAX_AGE,
           dehydrateOptions: {
             shouldDehydrateQuery: (q) => q.state.status === "success" && isPdbKey(q.queryKey),
           },
