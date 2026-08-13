@@ -1,37 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Bar,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Legend,
-  Line,
-  ReferenceLine,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { ChevronDown, ChevronRight, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import type { OwnerDim } from "@/lib/task-management/delay-utils";
 import { buildTmSCurve, type SCurveBucket } from "@/lib/task-management/scurve-utils";
-import {
-  clampWindow,
-  incAxisMax,
-  pickXTicks,
-  signedDomain,
-  trimFlatTail,
-} from "@/lib/charts/scurve-view";
 import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
+
 
 type CurveUnit = "pct" | "tasks";
 
