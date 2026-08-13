@@ -289,32 +289,36 @@ export function SnagKpiPlanVsActualCard({
               <p className="py-12 text-center text-sm text-muted-foreground">No data in range.</p>
             ) : (
               <>
-                <div className="flex flex-wrap items-stretch gap-2 rounded-md border bg-muted/30 px-3 py-2">
-                  <div className="flex flex-col gap-0.5 rounded border-l-4 border-l-primary px-3 py-1">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {controlsHidden ? `as of ${asOfDate}` : `${appliedLabel} · as of ${asOfDate}`}
+                <div className="flex flex-wrap items-center gap-1">
+                  {filterSummary.map((f) => (
+                    <span
+                      key={f.label}
+                      className="rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
+                    >
+                      <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
+                      <span className="text-foreground">{f.value}</span>
                     </span>
-                    <span className="text-xs tabular-nums">
-                      <span className="text-muted-foreground">P</span> {conv(planNow).toFixed(1)}
-                      {unitSuffix} · <span className="text-muted-foreground">A</span>{" "}
-                      {conv(actualNow).toFixed(1)}
-                      {unitSuffix}
+                  ))}
+                  <span className="rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] tabular-nums text-foreground">
+                    모수 {stageTotal.toLocaleString()}건
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+                  <span className="font-semibold text-primary">{STAGE_LABELS[stage]}</span>
+                  <span className="text-muted-foreground">P</span>
+                  <span className="tabular-nums">{conv(planNow).toFixed(1)}{unitSuffix}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground">A</span>
+                  <span className="tabular-nums">{conv(actualNow).toFixed(1)}{unitSuffix}</span>
+                  <span className={cn("font-semibold tabular-nums", accent)}>
+                    Δ {sign}{conv(deltaNow).toFixed(1)}{unitSuffix}
+                  </span>
+                  {view.trimmed > 0 && (
+                    <span className="text-[11px] text-muted-foreground">
+                      · 이후 {view.trimmed}개 구간 계획 없음
                     </span>
-                    <span className={cn("text-xs font-semibold tabular-nums", accent)}>
-                      Δ {sign}
-                      {conv(deltaNow).toFixed(1)}
-                      {unitSuffix}
-                    </span>
-                  </div>
-                  <div className="flex flex-col justify-center px-3 py-1 text-[10px] leading-relaxed text-muted-foreground">
-                    <span>Solid = actual · Dashed = plan · Week starts Monday</span>
-                    <span>
-                      {isPct
-                        ? "% = 값 ÷ 모수(total) × 100 (막대 차트와 동일 분모)"
-                        : `건수 = ${STAGE_LABELS[stage]} 스테이지 문서 건수`}
-                    </span>
-                    {view.trimmed > 0 && <span>이후 {view.trimmed}개 구간 계획 없음</span>}
-                  </div>
+                  )}
                 </div>
 
                 <ChartContainer config={cfg} className="w-full" style={{ height: chartHeight }}>
