@@ -210,17 +210,12 @@ export function AbdPlanVsActualCard({
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-2 text-left hover:opacity-80"
+              className="flex w-full items-center gap-2 text-left hover:opacity-80"
               aria-expanded={open}
             >
-              <div className="flex items-center gap-2">
-                {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm">Plan vs Actual — S-Curve</CardTitle>
-              </div>
-              <span className="text-[11px] text-muted-foreground">
-                {ALL_STAGES.filter((s) => stages.includes(s)).map((s) => STAGE_LABELS[s]).join(" / ")}
-              </span>
+              {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm">Progress Status</CardTitle>
             </button>
           </CollapsibleTrigger>
         </CardHeader>
@@ -230,8 +225,21 @@ export function AbdPlanVsActualCard({
               <p className="py-12 text-center text-sm text-muted-foreground">No data in range.</p>
             ) : (
               <>
-                <div className="flex flex-wrap items-stretch gap-2 rounded-md border bg-muted/30 px-3 py-2">
-                  {kpis.map((k) => {
+                {filterSummary.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    {filterSummary.map((f) => (
+                      <span
+                        key={f.label}
+                        className="rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
+                      >
+                        <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
+                        <span className="text-foreground">{f.value}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+                  {kpis.map((k, i) => {
                     const accent =
                       k.delta < 0
                         ? "text-destructive"
@@ -239,30 +247,33 @@ export function AbdPlanVsActualCard({
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-muted-foreground";
                     const sign = k.delta > 0 ? "+" : "";
+                    const isLast = i === kpis.length - 1;
                     return (
-                      <div
-                        key={k.stage}
-                        className="flex flex-col gap-0.5 rounded border-l-4 px-3 py-1"
-                        style={{ borderLeftColor: ABD_STAGE_COLORS[k.stage].line }}
-                      >
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <span key={k.stage} className="inline-flex items-center gap-1">
+                        <span
+                          className="font-semibold"
+                          style={{ color: ABD_STAGE_COLORS[k.stage].line }}
+                        >
                           {STAGE_LABELS[k.stage]}
                         </span>
-                        <span className="text-xs tabular-nums">
-                          <span className="text-muted-foreground">P</span> {k.plan.toLocaleString()}{" "}
-                          · <span className="text-muted-foreground">A</span>{" "}
-                          {k.actual.toLocaleString()}
-                        </span>
-                        <span className={cn("text-xs font-semibold tabular-nums", accent)}>
+                        <span className="text-muted-foreground">P</span>
+                        <span className="tabular-nums">{k.plan.toLocaleString()}</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-muted-foreground">A</span>
+                        <span className="tabular-nums">{k.actual.toLocaleString()}</span>
+                        <span className={cn("font-semibold tabular-nums", accent)}>
                           Δ {sign}{k.delta.toLocaleString()} ({sign}{k.pct.toFixed(1)}%)
                         </span>
-                      </div>
+                        {!isLast && (
+                          <span className="mx-1 text-muted-foreground">|</span>
+                        )}
+                      </span>
                     );
                   })}
                   {view.trimmed > 0 && (
-                    <div className="flex items-center px-3 py-1 text-[10px] text-muted-foreground">
-                      이후 {view.trimmed}개 구간 계획 없음
-                    </div>
+                    <span className="text-[11px] text-muted-foreground">
+                      · 이후 {view.trimmed}개 구간 계획 없음
+                    </span>
                   )}
                 </div>
 
