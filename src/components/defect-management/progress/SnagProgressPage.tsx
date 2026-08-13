@@ -51,6 +51,7 @@ import {
 } from "@/lib/defect-management/progress-utils";
 import {
   getSnagProgressCells,
+  getSnagProgressCum,
   getSnagProgressTotals,
 } from "@/lib/defect-management/progress.functions";
 import { SnagScheduleMatrix } from "./SnagScheduleMatrix";
