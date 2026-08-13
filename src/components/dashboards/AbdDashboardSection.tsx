@@ -64,7 +64,10 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
       ]}
     >
       <div className="grid gap-3 xl:grid-cols-2">
-        {([["D", d], ["C", c]] as const).map(([label, q]) => (
+        {([["D", d], ["C", c]] as const).map(([label, q]) => {
+          const actualPct = q.kpi.total > 0 ? (q.kpi.actual / q.kpi.total) * 100 : null;
+          const planPct = q.kpi.total > 0 ? (q.kpi.plan / q.kpi.total) * 100 : null;
+          return (
           <div key={label} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
               <AbdKpiCard
@@ -74,6 +77,12 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
                 tone="ok"
                 showTotal
                 hint="진도현황 = as-of 기준 Approval actual_upto ÷ 문서 모수"
+                actualPct={actualPct ?? undefined}
+                planPct={planPct ?? undefined}
+                variant="tm-progress"
+                leftSub={`A ${q.kpi.actual.toLocaleString()} / P ${q.kpi.plan.toLocaleString()}`}
+                rightValue={`${actualPct?.toFixed(1) ?? "—"}%`}
+                rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
               />
               <AbdKpiCard
                 label={`Plot ${label} 지연현황`}
@@ -98,7 +107,8 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
               onWindowResolved={(s, e) => report(label, s, e)}
             />
           </div>
-        ))}
+          );
+        })}
       </div>
     </ProjectModuleSection>
   );
