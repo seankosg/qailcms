@@ -198,6 +198,27 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
     }
   }
 
+  // 1-1) manifest 정적 계약 — core 8개 테이블 해시 전수 (서버에서 브라우저로 이관)
+  {
+    const keys = Object.keys(pkg.manifest.base_core_table_hashes ?? {});
+    const missing = BASELINE_CORE_TABLES.filter((t) => !keys.includes(t));
+    const extra = keys.filter((k) => !(BASELINE_CORE_TABLES as readonly string[]).includes(k));
+    const blank = BASELINE_CORE_TABLES.filter(
+      (t) => !String(pkg.manifest.base_core_table_hashes?.[t] ?? "").trim(),
+    );
+    if (missing.length || extra.length || blank.length) {
+      issues.push(
+        issue({
+          code: "MANIFEST_CORE_TABLE_CONTRACT",
+          field: "base_core_table_hashes",
+          message: `core table hashes 계약 위반 (누락 ${missing.join(",") || "없음"} / 추가 ${
+            extra.join(",") || "없음"
+          } / 공백 ${blank.join(",") || "없음"})`,
+        }),
+      );
+    }
+  }
+
   // 2) 교정 적용
   let comments: V3StageComment[] = pkg.atomic.comments;
   let correctionCount = 0;
