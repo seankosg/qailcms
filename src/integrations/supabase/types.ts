@@ -3520,6 +3520,105 @@ export type Database = {
           },
         ]
       }
+      dmr_entries_datefix_snapshot_20260813: {
+        Row: {
+          actual_manpower: number | null
+          contractor_id: string | null
+          contractor_name: string | null
+          created_at: string | null
+          created_by: string | null
+          diff_manpower: number | null
+          discipline: string | null
+          headcount_kind: string | null
+          id: string | null
+          manpower: number | null
+          metric: string | null
+          pic_name: string | null
+          plan_manpower: number | null
+          plot: string | null
+          report_date: string | null
+          snapshot_at: string | null
+          source_image_path: string | null
+          system_id: string | null
+          system_name: string | null
+          tactual_pct: number | null
+          task_actual_start: string | null
+          task_data_date: string | null
+          task_level: string | null
+          task_name: string | null
+          task_no: string | null
+          tc_actual_pct: number | null
+          tc_plan_pct: number | null
+          tplan_pct: number | null
+          updated_at: string | null
+          work_category: string | null
+        }
+        Insert: {
+          actual_manpower?: number | null
+          contractor_id?: string | null
+          contractor_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          diff_manpower?: number | null
+          discipline?: string | null
+          headcount_kind?: string | null
+          id?: string | null
+          manpower?: number | null
+          metric?: string | null
+          pic_name?: string | null
+          plan_manpower?: number | null
+          plot?: string | null
+          report_date?: string | null
+          snapshot_at?: string | null
+          source_image_path?: string | null
+          system_id?: string | null
+          system_name?: string | null
+          tactual_pct?: number | null
+          task_actual_start?: string | null
+          task_data_date?: string | null
+          task_level?: string | null
+          task_name?: string | null
+          task_no?: string | null
+          tc_actual_pct?: number | null
+          tc_plan_pct?: number | null
+          tplan_pct?: number | null
+          updated_at?: string | null
+          work_category?: string | null
+        }
+        Update: {
+          actual_manpower?: number | null
+          contractor_id?: string | null
+          contractor_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          diff_manpower?: number | null
+          discipline?: string | null
+          headcount_kind?: string | null
+          id?: string | null
+          manpower?: number | null
+          metric?: string | null
+          pic_name?: string | null
+          plan_manpower?: number | null
+          plot?: string | null
+          report_date?: string | null
+          snapshot_at?: string | null
+          source_image_path?: string | null
+          system_id?: string | null
+          system_name?: string | null
+          tactual_pct?: number | null
+          task_actual_start?: string | null
+          task_data_date?: string | null
+          task_level?: string | null
+          task_name?: string | null
+          task_no?: string | null
+          tc_actual_pct?: number | null
+          tc_plan_pct?: number | null
+          tplan_pct?: number | null
+          updated_at?: string | null
+          work_category?: string | null
+        }
+        Relationships: []
+      }
       dmr_entry_templates: {
         Row: {
           row_count: number
