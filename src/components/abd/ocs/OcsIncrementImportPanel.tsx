@@ -112,10 +112,11 @@ export function OcsIncrementImportPanel() {
   const [pkg, setPkg] = useState<IncrementPackage | null>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   // 브라우저 로컬 검증 결과 — null 이면 미실행. clean 이 아니면 서버 단계로 진행하지 않는다.
-  const [localValid, setLocalValid] = useState<{ clean: boolean | null; blockerCount: number }>({
-    clean: null,
-    blockerCount: 0,
-  });
+  const [localValid, setLocalValid] = useState<{
+    clean: boolean | null;
+    blockerCount: number;
+    receipt?: LocalValidationReceipt | null;
+  }>({ clean: null, blockerCount: 0, receipt: null });
   const [precheck, setPrecheck] = useState<Record<string, unknown> | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [dry, setDry] = useState<Dry | null>(null);
@@ -907,6 +908,15 @@ export function OcsIncrementImportPanel() {
           allow_retire: allowRetire,
           image_meta: pkg.imageMeta,
           upload_receipts: rec,
+          local_validation: localValid.receipt
+            ? {
+                payload_sha256: localValid.receipt.payload_sha256,
+                package_sha256: pkg.package_sha256,
+                clean: localValid.receipt.clean,
+                baseline_id: localValid.receipt.baseline_id,
+                validator_version: localValid.receipt.validator_version,
+              }
+            : null,
           source_files: pkg.sourceFiles.map((f) => ({
             file_name: f.relative_path.split("/").pop() ?? f.relative_path,
             content_hash: f.sha256,
