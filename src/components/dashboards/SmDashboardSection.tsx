@@ -24,7 +24,7 @@ import {
 } from "@/lib/defect-management/dashboard-shape";
 import { type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
-import { PdbBreakdownCard, type BreakdownRow } from "./PdbBreakdownCard";
+import { PdbBreakdownCard, foldTop4, type BreakdownRow } from "./PdbBreakdownCard";
 
 const ROOM_HINT =
   "지역별현황 = Room Group 별 Issued 건수와 Closure 진도율(Closed ÷ Issued) · SM Dashboard Room Group 카드와 동일한 정본 집계 · LG Podium 은 통합";
