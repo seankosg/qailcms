@@ -35,6 +35,7 @@ import {
   SNAG_STAGE_COLORS,
   type SnagSCurveCum,
 } from "@/lib/defect-management/scurve-utils";
+import { bucketTargetTerm } from "@/lib/charts/bucket-terms";
 
 export interface SnagPlanVsActualCardProps {
   cells: CellRaw[];
@@ -45,6 +46,10 @@ export interface SnagPlanVsActualCardProps {
   onOpenChange: (v: boolean) => void;
   /** 서버 정본 누계(있으면 곡선에 사용). 막대는 항상 cells 기반 일일 절대값. */
   cum?: SnagSCurveCum;
+  /** 시간 단위(day/week/month) — 막대 라벨 용어 */
+  bucket?: string;
+  /** 스테이지별 모수(분모) — 누계 곡선을 진도율 %로 그린다 */
+  denomByStage?: Partial<Record<Stage, number>>;
 }
 
 export function SnagPlanVsActualCard({
@@ -55,7 +60,10 @@ export function SnagPlanVsActualCard({
   open,
   onOpenChange,
   cum,
+  bucket,
+  denomByStage,
 }: SnagPlanVsActualCardProps) {
+  const term = bucketTargetTerm(bucket);
   const scurve = useMemo(
     () => buildSnagSCurve({ cells, buckets, stages, today, cum }),
     [cells, buckets, stages, today, cum],
@@ -83,8 +91,11 @@ export function SnagPlanVsActualCard({
       const ser = scurve.series[s];
       row[`planInc_${s}`] = ser.dailyPlan[i];
       row[`actualInc_${s}`] = ser.dailyActual[i];
-      row[`cumPlan_${s}`] = ser.cumPlan[i];
-      row[`cumActual_${s}`] = ser.cumActual[i];
+      const denom = denomByStage?.[s] ?? 0;
+      const toPct = (v: number | null) =>
+        v == null ? null : denom > 0 ? Math.round((v / denom) * 1000) / 10 : null;
+      row[`cumPlan_${s}`] = toPct(ser.cumPlan[i] as number | null);
+      row[`cumActual_${s}`] = toPct(ser.cumActual[i] as number | null);
       const a = ser.dailyActual[i];
       const p = ser.dailyPlan[i];
       if (a == null) anyNull = true;
@@ -99,10 +110,10 @@ export function SnagPlanVsActualCard({
 
   const cfg: ChartConfig = Object.fromEntries(
     stages.flatMap((s) => [
-      [`planInc_${s}`, { label: `${stageLabelShort[s]} Plan (daily)`, color: SNAG_STAGE_COLORS[s].bar }],
-      [`actualInc_${s}`, { label: `${stageLabelShort[s]} Actual (daily)`, color: SNAG_STAGE_COLORS[s].line }],
-      [`cumPlan_${s}`, { label: `${stageLabelShort[s]} Plan (cum)`, color: SNAG_STAGE_COLORS[s].line }],
-      [`cumActual_${s}`, { label: `${stageLabelShort[s]} Actual (cum)`, color: SNAG_STAGE_COLORS[s].line }],
+      [`planInc_${s}`, { label: `${stageLabelShort[s]} Plan (${term})`, color: SNAG_STAGE_COLORS[s].bar }],
+      [`actualInc_${s}`, { label: `${stageLabelShort[s]} Actual (${term})`, color: SNAG_STAGE_COLORS[s].line }],
+      [`cumPlan_${s}`, { label: `${stageLabelShort[s]} Plan (누적 %)`, color: SNAG_STAGE_COLORS[s].line }],
+      [`cumActual_${s}`, { label: `${stageLabelShort[s]} Actual (누적 %)`, color: SNAG_STAGE_COLORS[s].line }],
     ]),
   ) as ChartConfig;
 
@@ -184,8 +195,15 @@ export function SnagPlanVsActualCard({
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="bucketLabel" tick={{ fontSize: 10 }} minTickGap={20} />
-                    <YAxis yAxisId="cum" tick={{ fontSize: 11 }} allowDecimals={false} domain={["auto", "auto"]} />
-                    <YAxis yAxisId="bar" orientation="right" tick={{ fontSize: 11 }} allowDecimals={false} domain={["auto", "auto"]} />
+                    <YAxis
+                      yAxisId="cum"
+                      orientation="right"
+                      tick={{ fontSize: 11 }}
+                      domain={[0, 100]}
+                      ticks={[0, 20, 40, 60, 80, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                    />
+                    <YAxis yAxisId="bar" tick={{ fontSize: 11 }} allowDecimals={false} domain={[0, "auto"]} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
                       wrapperStyle={{ fontSize: 11 }}
@@ -210,7 +228,7 @@ export function SnagPlanVsActualCard({
                         dataKey={`planInc_${s}`}
                         stackId="plan"
                         fill={SNAG_STAGE_COLORS[s].bar}
-                        name={`${stageLabelShort[s]} Plan (daily)`}
+                        name={`${stageLabelShort[s]} Plan (${term}, 건) — 왼쪽 축`}
                         barSize={10}
                         hide={hidden.has(`planInc_${s}`)}
                       />
@@ -222,7 +240,7 @@ export function SnagPlanVsActualCard({
                         dataKey={`actualInc_${s}`}
                         stackId="actual"
                         fill={SNAG_STAGE_COLORS[s].line}
-                        name={`${stageLabelShort[s]} Actual (daily)`}
+                        name={`${stageLabelShort[s]} Actual (${term}, 건) — 왼쪽 축`}
                         barSize={10}
                         hide={hidden.has(`actualInc_${s}`)}
                       />
@@ -237,7 +255,7 @@ export function SnagPlanVsActualCard({
                         strokeDasharray="5 3"
                         strokeWidth={1.5}
                         dot={false}
-                        name={`${stageLabelShort[s]} Plan (cum)`}
+                        name={`${stageLabelShort[s]} Plan (누적 %) — 오른쪽 축`}
                         hide={hidden.has(`cumPlan_${s}`)}
                       />
                     ))}
@@ -250,7 +268,7 @@ export function SnagPlanVsActualCard({
                         stroke={SNAG_STAGE_COLORS[s].line}
                         strokeWidth={2.5}
                         dot={false}
-                        name={`${stageLabelShort[s]} Actual (cum)`}
+                        name={`${stageLabelShort[s]} Actual (누적 %) — 오른쪽 축`}
                         connectNulls={false}
                         hide={hidden.has(`cumActual_${s}`)}
                       />
