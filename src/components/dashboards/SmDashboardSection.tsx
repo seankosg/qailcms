@@ -140,7 +140,17 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 }
                 rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
               />
-              <PdbBreakdownCard label="지역별현황" rows={rooms} hint={ROOM_HINT} scrollAfter={5} />
+              <PdbBreakdownCard
+                label="주요지역별 현황"
+                rows={foldTop4(
+                  rooms.map((r) => ({
+                    key: r.key,
+                    count: r.count,
+                    actual: ((r.pct ?? 0) * r.count) / 100,
+                  })),
+                )}
+                hint={ROOM_HINT}
+              />
             </div>
             <SnagKpiPlanVsActualCard
               cells={q.cells as never}
