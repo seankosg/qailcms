@@ -189,6 +189,32 @@ export function useAbdScurveData(params: AbdScurveParams) {
     return out;
   }, [totalsQ.data]);
 
+  const filterSummary = useMemo(() => {
+    const stageList = (stages ?? []).length ? stages! : ALL_STAGES;
+    return [
+      { label: "Plot", value: plot === "all" ? "All" : `Plot ${plot}` },
+      {
+        label: "Team",
+        value: teams.length
+          ? teams.length <= 3
+            ? teams.join(", ")
+            : `${teams.length} selected`
+          : "All",
+      },
+      {
+        label: "Stage",
+        value:
+          stageList.length === ALL_STAGES.length
+            ? "All"
+            : stageList.length <= 3
+              ? stageList.map((s) => STAGE_LABELS[s]).join(", ")
+              : `${stageList.length} selected`,
+      },
+      { label: "Plan", value: planMode === "remaining" ? "Remaining" : "Baseline" },
+      { label: "As of", value: asOfDate },
+    ];
+  }, [plot, teams, stages, planMode, asOfDate]);
+
   return {
     today,
     buckets,
@@ -199,6 +225,7 @@ export function useAbdScurveData(params: AbdScurveParams) {
     baselines,
     cum,
     denomByStage,
+    filterSummary,
     loading: cellsQ.isPending || totalsQ.isPending,
     error: cellsQ.error || totalsQ.error,
   };
