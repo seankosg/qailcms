@@ -9077,15 +9077,30 @@ export type Database = {
           item_id: string
         }[]
       }
-      snag_progress_events: {
-        Args: { _as_of_date: string; _plan_mode?: string }
-        Returns: {
-          edate: string
-          field: string
-          item_id: string
-          stage: string
-        }[]
-      }
+      snag_progress_events:
+        | {
+            Args: { _as_of_date: string; _plan_mode?: string }
+            Returns: {
+              edate: string
+              field: string
+              item_id: string
+              stage: string
+            }[]
+          }
+        | {
+            Args: {
+              _as_of_date: string
+              _plan_mode: string
+              _range_end: string
+              _range_start: string
+            }
+            Returns: {
+              edate: string
+              field: string
+              item_id: string
+              stage: string
+            }[]
+          }
       spl_aconex_apply: {
         Args: { _batch_id: string; _patches: Json }
         Returns: Json
