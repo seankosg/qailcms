@@ -18,6 +18,8 @@ import { readBaselineZip, type BaselineRead } from "@/lib/abd/ocs-baseline-reade
 import {
   buildLocalValidationReceipt,
   validateIncrementLocally,
+  BASELINE_V1_NOTICE,
+  type LocalValidationReceipt,
   type LocalValidationIssue,
   type LocalValidationResult,
 } from "@/lib/abd/ocs-local-validation";
@@ -29,7 +31,11 @@ import type { IncrementPackage } from "@/lib/abd/ocs-increment-package";
 type Props = {
   file: File | null;
   pkg: IncrementPackage | null;
-  onCleanChange: (state: { clean: boolean | null; blockerCount: number }) => void;
+  onCleanChange: (state: {
+    clean: boolean | null;
+    blockerCount: number;
+    receipt?: LocalValidationReceipt | null;
+  }) => void;
 };
 
 const issueKey = (i: LocalValidationIssue) =>
@@ -85,8 +91,9 @@ export function OcsLocalValidationCard({ file, pkg, onCleanChange }: Props) {
       const b = await readBaselineZip(f);
       setBaseline(b);
       setResult(null);
-      onCleanChange({ clean: null, blockerCount: 0 });
-      toast.success(`Baseline 판독 완료 — ABD 인덱스 ${b.abdIndex?.length ?? 0}건`);
+      onCleanChange({ clean: null, blockerCount: 0, receipt: null });
+      if (!b.abdIndex) toast.warning("이 Baseline 에는 ABD 검증 인덱스가 없습니다 (v1).");
+      else toast.success(`Baseline 판독 완료 — ABD 인덱스 ${b.abdIndex.length}건`);
     } catch (e) {
       setBaseline(null);
       toast.error(e instanceof Error ? e.message : String(e));
@@ -95,7 +102,7 @@ export function OcsLocalValidationCard({ file, pkg, onCleanChange }: Props) {
     }
   }
 
-  function runValidation() {
+  async function runValidation() {
     if (!pkg || !baseline) return;
     setBusy("로컬 검증 중…");
     try {
@@ -103,7 +110,15 @@ export function OcsLocalValidationCard({ file, pkg, onCleanChange }: Props) {
       setResult(r);
       setChoices({});
       setConfirmed({});
-      onCleanChange({ clean: r.clean, blockerCount: r.blocker_count });
+      const receipt = r.clean
+        ? await buildLocalValidationReceipt({
+            pkg,
+            result: r,
+            corrections: null,
+            manifestForPayload: pkg.manifest,
+          })
+        : null;
+      onCleanChange({ clean: r.clean, blockerCount: r.blocker_count, receipt });
       if (r.clean) toast.success("CLEAN — 로컬 검증 blocker 0건");
       else toast.error(`로컬 검증 blocker ${r.blocker_count}건`);
     } catch (e) {
@@ -188,7 +203,11 @@ export function OcsLocalValidationCard({ file, pkg, onCleanChange }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={runValidation} disabled={!baseline || !!busy}>
+          <Button
+            size="sm"
+            onClick={() => void runValidation()}
+            disabled={!baseline || !baseline.abdIndex || !!busy}
+          >
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Check This Package on My Computer
           </Button>
@@ -204,6 +223,13 @@ export function OcsLocalValidationCard({ file, pkg, onCleanChange }: Props) {
             </>
           )}
         </div>
+
+        {baseline && !baseline.abdIndex && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />
+            <p className="whitespace-pre-line">{BASELINE_V1_NOTICE}</p>
+          </div>
+        )}
 
         {result && result.clean && (
           <div className="flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 text-sm">
