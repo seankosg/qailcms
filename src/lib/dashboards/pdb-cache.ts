@@ -60,6 +60,11 @@ export function usePdbCache() {
     void persistQueryClientRestore({ queryClient, persister: p, maxAge: MAX_AGE })
       .catch(() => undefined)
       .finally(() => {
+        // PDB 진입 시 복원된 캐시를 즉시 stale 로 보지 않도록 무제한 유효로 설정.
+        // Refresh 버튼을 누르기 전까지는 기존 캐시값을 그대로 보여준다.
+        for (const prefix of PDB_KEY_PREFIXES) {
+          queryClient.setQueryDefaults([prefix], { staleTime: Infinity });
+        }
         setRestored(true);
         unsubscribe = persistQueryClientSubscribe({
           queryClient,
