@@ -85,7 +85,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
           <div key={label} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
               <AbdKpiCard
-                label={`${label} 진도현황`}
+                label="진도현황"
                 count={q.kpi.actual}
                 total={q.kpi.total}
                 tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
@@ -99,7 +99,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
                 rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
               />
               <PdbBreakdownCard
-                label={`${label} Team 진도`}
+                label="Team 진도"
                 rows={q.kpi.teams}
                 hint="Team 별 문서 수 상위 4개 + Others · 진도율 = 실적 누계 ÷ 문서 모수"
               />
