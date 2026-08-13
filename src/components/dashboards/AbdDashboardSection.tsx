@@ -5,7 +5,7 @@ import { useAbdScurveData } from "@/hooks/useAbdScurveData";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, type PdbAbdFilters } from "@/lib/dashboards/pdb-filters";
 import { useUnionWindow } from "@/lib/charts/use-union-window";
-import { ALL_STAGES } from "@/lib/abd/progress-utils";
+import { ALL_STAGES, type Stage } from "@/lib/abd/progress-utils";
 import type { AbdTeam } from "@/lib/abd/columns";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 
@@ -24,8 +24,9 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
   const kpi = useMemo(() => {
     const rows = (q.totals ?? []) as Array<Record<string, unknown>>;
     const out = { total: 0, actual: 0, plan: 0 };
+    const kpiStage = f.kpiStage || "approval";
     for (const r of rows) {
-      if (r.stage !== "approval") continue;
+      if (r.stage !== kpiStage) continue;
       out.total += Number(r.total ?? 0);
       out.actual += Number(r.actual_upto ?? 0);
       out.plan += Number(r.plan_upto ?? 0);
@@ -35,7 +36,7 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
       behind: Math.max(0, out.plan - out.actual),
       progressPct: out.total > 0 ? (out.actual / out.total) * 100 : null,
     };
-  }, [q.totals]);
+  }, [q.totals, f.kpiStage]);
   return { ...q, kpi };
 }
 
@@ -47,6 +48,10 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
   const c = useAbdPlot("C", asOfDate, f);
   const d = useAbdPlot("D", asOfDate, f);
   const { window: win, report } = useUnionWindow();
+  const shownStages = useMemo<Stage[]>(() => {
+    const sel = ALL_STAGES.filter((s) => f.stages.includes(s));
+    return sel.length > 0 ? sel : ALL_STAGES;
+  }, [f.stages]);
 
   return (
     <ProjectModuleSection
@@ -82,7 +87,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
             <AbdPlanVsActualCard
               cells={q.cells as never}
               buckets={q.buckets}
-              stages={ALL_STAGES}
+              stages={shownStages}
               today={q.today}
               open={open}
               onOpenChange={setOpen}
