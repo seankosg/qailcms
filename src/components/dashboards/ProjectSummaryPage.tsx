@@ -1,8 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { todayInDoha } from "@/lib/time/doha";
+import { usePdbCache } from "@/lib/dashboards/pdb-cache";
 import { TmDashboardSection } from "./TmDashboardSection";
 import { SmDashboardSection } from "./SmDashboardSection";
 import { AbdDashboardSection } from "./AbdDashboardSection";
@@ -18,6 +20,8 @@ export function ProjectSummaryPage() {
     const t = setTimeout(() => setAppliedDate(asOfDate), 400);
     return () => clearTimeout(t);
   }, [asOfDate]);
+  // 캐시 복원(localStorage) — 복원 전에는 섹션 마운트를 미뤄 중복 조회를 막는다.
+  const { restored, refresh, refreshing } = usePdbCache();
 
   return (
     <div className="flex flex-col gap-8 p-4">
@@ -38,22 +42,41 @@ export function ProjectSummaryPage() {
               className="h-8 w-[150px] text-xs"
             />
           </div>
-          <Link to="/admin/setting">
-            <Button variant="outline" size="sm" className="h-7 text-xs">
-              Setting
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 text-xs"
+              onClick={() => void refresh()}
+              disabled={refreshing || !restored}
+              title="저장된 캐시를 비우고 최신 데이터를 다시 불러온다"
+            >
+              <RefreshCw className={refreshing ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+              Refresh
             </Button>
-          </Link>
+            <Link to="/admin/setting">
+              <Button variant="outline" size="sm" className="h-7 text-xs">
+                Setting
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
 
-      <TmDashboardSection asOfDate={appliedDate} />
-      <LazySection>
-        <SmDashboardSection asOfDate={appliedDate} />
-      </LazySection>
-      <LazySection>
-        <AbdDashboardSection asOfDate={appliedDate} />
-      </LazySection>
+      {restored ? (
+        <>
+          <TmDashboardSection asOfDate={appliedDate} />
+          <LazySection>
+            <SmDashboardSection asOfDate={appliedDate} />
+          </LazySection>
+          <LazySection>
+            <AbdDashboardSection asOfDate={appliedDate} />
+          </LazySection>
+        </>
+      ) : (
+        <div className="py-10 text-center text-sm text-muted-foreground">캐시 복원 중…</div>
+      )}
     </div>
   );
 }
