@@ -64,6 +64,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
           const planCnt = q.baseline.planUpto;
           const actualPct = q.stageTotal > 0 ? (actualCnt / q.stageTotal) * 100 : null;
           const planPct = q.stageTotal > 0 ? (planCnt / q.stageTotal) * 100 : null;
+          const diffPct = actualPct != null && planPct != null ? actualPct - planPct : null;
           return (
           <div key={label} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
@@ -71,14 +72,16 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 label={`Plot ${label} 진도현황`}
                 count={actualCnt}
                 total={q.stageTotal}
-                tone="ok"
+                tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
                 showTotal
                 hint="진도현황 = as-of 기준 Closure actual_upto ÷ Closure 모수 — SM KPI Analysis 와 동일"
                 actualPct={actualPct ?? undefined}
                 planPct={planPct ?? undefined}
                 variant="tm-progress"
                 leftSub={`A ${actualCnt.toLocaleString()} / P ${planCnt.toLocaleString()}`}
-                rightValue={`${actualPct?.toFixed(1) ?? "—"}%`}
+                rightValue={
+                  diffPct != null ? `${diffPct > 0 ? "+" : ""}${diffPct.toFixed(1)}%` : "—"
+                }
                 rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
               />
               <AbdKpiCard
