@@ -2,7 +2,11 @@ import { useMemo, useState } from "react";
 import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import { TmPlanVsActualCard } from "@/components/task-management/dashboard/TmPlanVsActualCard";
 import { useTmScurveData } from "@/hooks/useTmScurveData";
-import { resolveActualPct, resolveIsDelayed, resolvePlanPct } from "@/lib/task-management/delay-utils";
+import {
+  resolveActualPct,
+  resolveIsDelayed,
+  resolvePlanPct,
+} from "@/lib/task-management/delay-utils";
 import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
 import { useUnionWindow } from "@/lib/charts/use-union-window";
@@ -84,10 +88,16 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
       ]}
     >
       <div className="grid gap-3 xl:grid-cols-2">
-        {([["D", d], ["C", c]] as const).map(([label, q]) => (
+        {(
+          [
+            ["D", d],
+            ["C", c],
+          ] as const
+        ).map(([label, q]) => (
           <div key={label} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
               <AbdKpiCard
+                presentation="project-summary"
                 label="계획 vs 실적 현황"
                 count={q.kpi.actualCount}
                 total={q.kpi.total}

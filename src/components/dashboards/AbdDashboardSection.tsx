@@ -77,50 +77,56 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
       ]}
     >
       <div className="grid gap-3 xl:grid-cols-2">
-        {([["D", d], ["C", c]] as const).map(([label, q]) => {
+        {(
+          [
+            ["D", d],
+            ["C", c],
+          ] as const
+        ).map(([label, q]) => {
           const actualPct = q.kpi.total > 0 ? (q.kpi.actual / q.kpi.total) * 100 : null;
           const planPct = q.kpi.total > 0 ? (q.kpi.plan / q.kpi.total) * 100 : null;
           const diffPct = actualPct != null && planPct != null ? actualPct - planPct : null;
           return (
-          <div key={label} className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-3">
-              <AbdKpiCard
-                label="진도현황"
-                count={q.kpi.actual}
-                total={q.kpi.total}
-                tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
-                showTotal
-                hint="진도현황 = as-of 기준 Approval actual_upto ÷ 문서 모수"
-                actualPct={actualPct ?? undefined}
-                planPct={planPct ?? undefined}
-                variant="tm-progress"
-                leftSub={`A ${q.kpi.actual.toLocaleString()} / P ${q.kpi.plan.toLocaleString()}`}
-                rightValue={`${diffPct != null ? `${diffPct > 0 ? "+" : ""}${diffPct.toFixed(1)}` : "—"}%`}
-                rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
-              />
-              <PdbBreakdownCard
-                label="Team 진도"
-                rows={q.kpi.teams}
-                hint="Team 별 문서 수 상위 4개 + Others · 진도율 = 실적 누계 ÷ 문서 모수"
+            <div key={label} className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <AbdKpiCard
+                  presentation="project-summary"
+                  label="진도현황"
+                  count={q.kpi.actual}
+                  total={q.kpi.total}
+                  tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
+                  showTotal
+                  hint="진도현황 = as-of 기준 Approval actual_upto ÷ 문서 모수"
+                  actualPct={actualPct ?? undefined}
+                  planPct={planPct ?? undefined}
+                  variant="tm-progress"
+                  leftSub={`A ${q.kpi.actual.toLocaleString()} / P ${q.kpi.plan.toLocaleString()}`}
+                  rightValue={`${diffPct != null ? `${diffPct > 0 ? "+" : ""}${diffPct.toFixed(1)}` : "—"}%`}
+                  rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
+                />
+                <PdbBreakdownCard
+                  label="Team 진도"
+                  rows={q.kpi.teams}
+                  hint="Team 별 문서 수 상위 4개 + Others · 진도율 = 실적 누계 ÷ 문서 모수"
+                />
+              </div>
+              <AbdPlanVsActualCard
+                cells={q.cells as never}
+                buckets={q.buckets}
+                stages={q.stages as Stage[]}
+                today={q.today}
+                open={open}
+                onOpenChange={setOpen}
+                baselines={q.baselines}
+                cum={q.cum}
+                denomByStage={q.denomByStage}
+                windowStart={win.start}
+                windowEnd={win.end}
+                onWindowResolved={(s, e) => report(label, s, e)}
+                chartHeight={324}
+                filterSummary={q.filterSummary}
               />
             </div>
-            <AbdPlanVsActualCard
-              cells={q.cells as never}
-              buckets={q.buckets}
-              stages={q.stages as Stage[]}
-              today={q.today}
-              open={open}
-              onOpenChange={setOpen}
-              baselines={q.baselines}
-              cum={q.cum}
-              denomByStage={q.denomByStage}
-              windowStart={win.start}
-              windowEnd={win.end}
-              onWindowResolved={(s, e) => report(label, s, e)}
-              chartHeight={324}
-              filterSummary={q.filterSummary}
-            />
-          </div>
           );
         })}
       </div>
