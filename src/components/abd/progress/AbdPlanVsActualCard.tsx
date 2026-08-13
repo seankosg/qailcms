@@ -166,6 +166,7 @@ export function AbdPlanVsActualCard({
     () =>
       incAxisMax(
         data.flatMap((d) => [d.__planIncSum as number, d.__actualIncSum as number]),
+        1.15,
       ),
     [data],
   );
