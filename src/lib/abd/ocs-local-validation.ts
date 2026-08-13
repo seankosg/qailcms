@@ -609,10 +609,15 @@ export async function buildLocalValidationReceipt(args: {
   corrections: CorrectionsDoc | null;
   manifestForPayload: unknown;
 }): Promise<LocalValidationReceipt> {
-  const payload_sha256 = await computeLocalPayloadDigest({
+  const package_payload_sha256 = await computeLocalPayloadDigest({
     pkg: args.pkg,
     corrections: args.corrections,
     manifestForPayload: args.manifestForPayload,
+  });
+  // staging 재현 digest — 서버가 abd_ocs_v3_stage_* 로 동일하게 재계산할 수 있는 대상만 포함한다.
+  const staging = await computeStagingPayloadDigest({
+    atomic: args.pkg.atomic,
+    response: args.pkg.response,
   });
   const contract_hash = await sha256Hex(
     canonicalJson({
@@ -628,7 +633,10 @@ export async function buildLocalValidationReceipt(args: {
   return {
     schema_version: LOCAL_VALIDATION_SCHEMA,
     package_id: args.result.package_id,
-    payload_sha256,
+    payload_sha256: staging.payload_sha256,
+    digest_version: PAYLOAD_DIGEST_VERSION,
+    package_payload_sha256,
+    staging_counts: staging.counts,
     baseline_id: args.result.baseline_id,
     baseline_core_hash: args.result.baseline_core_hash,
     validator_version: VALIDATOR_VERSION,
@@ -656,8 +664,14 @@ export async function verifyLocalValidationReceipt(args: {
     corrections: args.corrections,
     manifestForPayload: args.manifestForPayload,
   });
-  if (expected !== args.receipt.payload_sha256)
-    reasons.push("payload_sha256 가 재계산값과 다릅니다 (영수증 변조).");
+  if (expected !== args.receipt.package_payload_sha256)
+    reasons.push("package_payload_sha256 가 재계산값과 다릅니다 (영수증 변조).");
+  const staging = await computeStagingPayloadDigest({
+    atomic: args.pkg.atomic,
+    response: args.pkg.response,
+  });
+  if (staging.payload_sha256 !== args.receipt.payload_sha256)
+    reasons.push("payload_sha256 가 staging canonical 재계산값과 다릅니다 (영수증 변조).");
   if (args.receipt.package_id !== args.pkg.manifest.package_id)
     reasons.push("영수증 package_id 가 패키지와 다릅니다.");
   if (!args.receipt.clean) reasons.push("영수증이 CLEAN 이 아닙니다.");
