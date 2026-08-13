@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function ProjectDashboardPage() {
-  const [hidePlotG, setHidePlotG] = useState(false);
+  const [hidePlotG, setHidePlotG] = useState(true);
 
   return (
     <div className="flex flex-col gap-8 p-4">
@@ -26,7 +26,7 @@ export function ProjectDashboardPage() {
             )}
             title={hidePlotG ? "Plot G 표시" : "Plot G 숨기기"}
           >
-            {hidePlotG ? "on" : "off"}
+            {hidePlotG ? "G off" : "G on"}
           </Button>
           <MilestoneReferenceButton />
         </div>
