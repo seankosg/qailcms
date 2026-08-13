@@ -1,15 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { usePdbModuleFilters, PDB_FILTERS_QUERY_KEY } from "@/hooks/usePdbModuleFilters";
+import { usePdbModuleFilters, useSavePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import {
   PDB_DEFAULTS,
   type PdbAbdFilters,
@@ -146,8 +144,8 @@ function StartDate({
 }
 
 function Page() {
-  const qc = useQueryClient();
   const { data, isLoading } = usePdbModuleFilters();
+  const saveLocal = useSavePdbModuleFilters();
   const [tm, setTm] = useState<PdbTmFilters>(PDB_DEFAULTS.tm);
   const [sm, setSm] = useState<PdbSmFilters>(PDB_DEFAULTS.sm);
   const [abd, setAbd] = useState<PdbAbdFilters>(PDB_DEFAULTS.abd);
@@ -170,19 +168,8 @@ function Page() {
   async function save() {
     setSaving(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id ?? null;
-      const rows = [
-        { module: "tm", filters: tm, updated_at: new Date().toISOString(), updated_by: uid },
-        { module: "sm", filters: sm, updated_at: new Date().toISOString(), updated_by: uid },
-        { module: "abd", filters: abd, updated_at: new Date().toISOString(), updated_by: uid },
-      ];
-      const { error } = await (supabase as any)
-        .from("pdb_module_filters")
-        .upsert(rows, { onConflict: "module" });
-      if (error) throw new Error(error.message);
-      await qc.invalidateQueries({ queryKey: PDB_FILTERS_QUERY_KEY });
-      toast.success("Project Dashboard 필터 세팅을 저장했습니다.");
+      saveLocal({ tm, sm, abd });
+      toast.success("이 브라우저(내 계정)에만 저장했습니다. 다른 사용자에게는 영향이 없습니다.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "저장에 실패했습니다.");
     } finally {
@@ -202,7 +189,8 @@ function Page() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Setting — Project Dashboard 필터</h1>
           <p className="text-sm text-muted-foreground">
-            여기서 저장한 값이 Project Dashboard 의 KPI 카드와 S-Curve 에 그대로 적용됩니다. HDEC PIC ·
+            여기서 저장한 값은 <b>내 계정·이 브라우저에만</b> 저장되며 Project Dashboard 의 KPI 카드와
+            S-Curve 에 적용됩니다. 다른 사용자가 세팅을 바꿔도 내 화면은 바뀌지 않습니다. HDEC PIC ·
             HDEC ENG 는 항상 전체이므로 설정 대상이 아닙니다.
           </p>
         </div>
