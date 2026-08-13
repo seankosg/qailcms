@@ -26,7 +26,7 @@ export function ProjectDashboardPage() {
             )}
             title={hidePlotG ? "Plot G 표시" : "Plot G 숨기기"}
           >
-            off
+            {hidePlotG ? "on" : "off"}
           </Button>
           <MilestoneReferenceButton />
         </div>
