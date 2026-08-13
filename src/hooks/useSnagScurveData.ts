@@ -97,6 +97,7 @@ export function useSnagScurveData(params: SnagScurveParams) {
           rangeEnd: rpcEnd,
           asOfDate,
           planMode,
+          includeAgg: false,
         },
       }),
     staleTime: 10 * 60_000,
