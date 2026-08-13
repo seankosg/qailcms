@@ -400,9 +400,11 @@ function PlotRow({
                 <span className="whitespace-nowrap rounded bg-background px-1 font-mono text-[10px] font-semibold text-foreground">
                   {fmtDate(n.date)}
                 </span>
-                <span className="whitespace-nowrap rounded bg-background px-1 font-mono text-[10px] font-extrabold text-destructive">
-                  {dLabel(n.diff)}
-                </span>
+                {n.diff >= 0 ? (
+                  <span className="whitespace-nowrap rounded bg-background px-1 font-mono text-[10px] font-extrabold text-destructive">
+                    {dLabel(n.diff)}
+                  </span>
+                ) : null}
               </div>
             );
           }
