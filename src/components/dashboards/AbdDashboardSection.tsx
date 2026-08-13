@@ -106,7 +106,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
             <AbdPlanVsActualCard
               cells={q.cells as never}
               buckets={q.buckets}
-              stages={shownStages}
+              stages={q.stages as Stage[]}
               today={q.today}
               open={open}
               onOpenChange={setOpen}
@@ -117,6 +117,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
               windowEnd={win.end}
               onWindowResolved={(s, e) => report(label, s, e)}
               chartHeight={324}
+              filterSummary={q.filterSummary}
             />
           </div>
           );
