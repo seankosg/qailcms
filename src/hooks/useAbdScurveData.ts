@@ -43,7 +43,7 @@ export interface AbdScurveParams {
 }
 
 export function useAbdScurveData(params: AbdScurveParams) {
-  const { plot, teams, groupBy, bucket, planMode, asOfDate, rangeDays, scurveEnabled, startDate } = params;
+  const { plot, teams, groupBy, bucket, planMode, asOfDate, rangeDays, scurveEnabled, stages, startDate } = params;
 
   // Round 필터 제거 — 항상 전 라운드(컬럼 UNION) 집계.
   const round = "all" as const;
