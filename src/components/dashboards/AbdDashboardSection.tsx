@@ -69,6 +69,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
     <ProjectModuleSection
       title="As Built Drawing"
       to="/closure/abd/progress"
+      tone="abd"
       progressHint="진도율 = 해당 Plot Approval 실적 누계 ÷ 문서 모수 — ABD Progress 매트릭스와 동일(서버 totals 정본)"
       plots={[
         { plot: "D", progressPct: d.loading ? null : d.kpi.progressPct, total: d.kpi.total },
