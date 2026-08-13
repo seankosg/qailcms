@@ -84,6 +84,7 @@ export function AbdPlanVsActualCard({
   windowEnd,
   onWindowResolved,
   chartHeight = 360,
+  filterSummary = [],
 }: AbdPlanVsActualCardProps) {
   const scurve = useMemo(
     () => buildAbdSCurve({ cells, buckets, stages, today, baselines, cum }),
