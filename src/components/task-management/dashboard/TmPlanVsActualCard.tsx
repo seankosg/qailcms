@@ -338,7 +338,7 @@ export function TmPlanVsActualCard({
                   )}
                 </div>
 
-                <ChartContainer config={cfg} className="h-[340px] w-full">
+                <ChartContainer config={cfg} className={`h-[${chartHeight}px] w-full`}>
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
