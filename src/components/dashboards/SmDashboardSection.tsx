@@ -111,6 +111,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
               stageTotal={q.stageTotal}
               open={open}
               onOpenChange={setOpen}
+              chartHeight={306}
             />
           </div>
           );
