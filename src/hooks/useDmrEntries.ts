@@ -99,13 +99,24 @@ export function useDmrItemsQuery(p: DmrItemsParams) {
       for (const f of p.filters ?? []) {
         if (f.column === 'direct_flag') continue;
         if (f.op === 'in') {
-          const arr = (f.value as any[]).filter((v) => v !== EMPTY_TOKEN);
-          if (arr.length) q = q.in(f.column, arr);
+          const all = (f.value as any[]) ?? [];
+          const arr = all.filter((v) => v !== EMPTY_TOKEN);
+          const wantEmpty = all.length !== arr.length;
+          if (wantEmpty && arr.length) {
+            const list = arr.map((v) => `"${String(v).replace(/"/g, '\\"')}"`).join(',');
+            q = q.or(`${f.column}.in.(${list}),${f.column}.is.null`);
+          } else if (wantEmpty) {
+            q = q.is(f.column, null);
+          } else if (arr.length) {
+            q = q.in(f.column, arr);
+          }
         } else if (f.op === 'empty') {
           q = q.is(f.column, null);
         } else if (f.op === 'text') {
-          const t = String(f.value ?? '').trim();
-          if (t) q = q.ilike(f.column, `%${t}%`);
+          // 쉼표 = AND 조건 (SM 동일)
+          for (const term of String(f.value ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
+            q = q.ilike(f.column, `%${term}%`);
+          }
         } else if (f.op === 'date_range') {
           const v = f.value ?? {};
           if (v.from) q = q.gte(f.column, v.from);
