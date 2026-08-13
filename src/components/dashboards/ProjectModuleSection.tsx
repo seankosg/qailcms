@@ -1,10 +1,26 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { cn } from "@/lib/utils";
 
 export type PlotHeadStat = {
   plot: "D" | "C";
   progressPct: number | null;
   total: number;
+};
+
+/** 모듈 구분용 연한 테두리 + 바탕색 */
+export type ModuleTone = "tm" | "sm" | "abd";
+
+const TONE: Record<ModuleTone, string> = {
+  tm: "border-sky-200/70 bg-sky-50/50 dark:border-sky-900/60 dark:bg-sky-950/20",
+  sm: "border-amber-200/70 bg-amber-50/50 dark:border-amber-900/60 dark:bg-amber-950/20",
+  abd: "border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-900/60 dark:bg-emerald-950/20",
+};
+
+const TONE_DIVIDER: Record<ModuleTone, string> = {
+  tm: "border-b-sky-200/80 dark:border-b-sky-900/70",
+  sm: "border-b-amber-200/80 dark:border-b-amber-900/70",
+  abd: "border-b-emerald-200/80 dark:border-b-emerald-900/70",
 };
 
 /**
@@ -17,17 +33,24 @@ export function ProjectModuleSection({
   to,
   progressHint,
   plots,
+  tone,
   children,
 }: {
   title: string;
   to: string;
   progressHint: string;
   plots: [PlotHeadStat, PlotHeadStat];
+  tone?: ModuleTone;
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-3">
-      <div className="border-b pb-2">
+    <section
+      className={cn(
+        "flex flex-col gap-3 rounded-lg border p-3",
+        tone ? TONE[tone] : "bg-card/40",
+      )}
+    >
+      <div className={cn("border-b pb-2", tone && TONE_DIVIDER[tone])}>
         <Link to={to} className="text-2xl font-bold tracking-tight hover:underline">
           {title}
         </Link>
