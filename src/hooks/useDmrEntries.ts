@@ -99,13 +99,24 @@ export function useDmrItemsQuery(p: DmrItemsParams) {
       for (const f of p.filters ?? []) {
         if (f.column === 'direct_flag') continue;
         if (f.op === 'in') {
-          const arr = (f.value as any[]).filter((v) => v !== EMPTY_TOKEN);
-          if (arr.length) q = q.in(f.column, arr);
+          const all = (f.value as any[]) ?? [];
+          const arr = all.filter((v) => v !== EMPTY_TOKEN);
+          const wantEmpty = all.length !== arr.length;
+          if (wantEmpty && arr.length) {
+            const list = arr.map((v) => `"${String(v).replace(/"/g, '\\"')}"`).join(',');
+            q = q.or(`${f.column}.in.(${list}),${f.column}.is.null`);
+          } else if (wantEmpty) {
+            q = q.is(f.column, null);
+          } else if (arr.length) {
+            q = q.in(f.column, arr);
+          }
         } else if (f.op === 'empty') {
           q = q.is(f.column, null);
         } else if (f.op === 'text') {
-          const t = String(f.value ?? '').trim();
-          if (t) q = q.ilike(f.column, `%${t}%`);
+          // 쉼표 = AND 조건 (SM 동일)
+          for (const term of String(f.value ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
+            q = q.ilike(f.column, `%${term}%`);
+          }
         } else if (f.op === 'date_range') {
           const v = f.value ?? {};
           if (v.from) q = q.gte(f.column, v.from);
@@ -164,16 +175,29 @@ export interface DmrFacetItem {
   cnt: number;
 }
 
-export function useDmrFacet(column: string | null, opts: { enabled?: boolean; scope?: DmrScope } = {}) {
+export function useDmrFacet(
+  column: string | null,
+  opts: {
+    enabled?: boolean;
+    scope?: DmrScope;
+    /** 크로스 필터: 현재 적용 중인 다른 컬럼 필터 (자기 자신은 서버에서 제외) */
+    filters?: DmrServerFilter[];
+    /** 크로스 필터: 전역 검색어 */
+    q?: string;
+  } = {},
+) {
   const scope = opts.scope ?? 'all';
+  const filters = opts.filters ?? [];
+  const q = (opts.q ?? '').trim();
   return useQuery<DmrFacetItem[]>({
-    queryKey: ['dmr', 'facet', column, scope],
+    queryKey: ['dmr', 'facet', column, scope, q, filters],
     queryFn: async () => {
       if (!column) return [];
       const { data, error } = await (supabase as any).rpc('dmr_facets', {
         _column: column,
-        _filters: [],
+        _filters: filters,
         _scope: scope,
+        _q: q,
       });
       if (error) throw new Error(error.message);
       return ((data ?? []) as any[]).map((r) => ({
@@ -182,7 +206,7 @@ export function useDmrFacet(column: string | null, opts: { enabled?: boolean; sc
       }));
     },
     enabled: !!column && opts.enabled !== false,
-    staleTime: 60_000,
+    staleTime: 30_000,
   });
 }
 

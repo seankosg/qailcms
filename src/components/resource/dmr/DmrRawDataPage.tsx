@@ -94,10 +94,24 @@ function applyToSupabaseQuery(
   for (const f of filters) {
     if (f.column === 'direct_flag') continue;
     if (f.op === 'in') {
-      const arr = (f.value as any[]).filter((v) => v !== EMPTY_TOKEN);
-      if (arr.length) q = q.in(f.column, arr);
+      const all = (f.value as any[]) ?? [];
+      const arr = all.filter((v) => v !== EMPTY_TOKEN);
+      const wantEmpty = all.length !== arr.length;
+      if (wantEmpty && arr.length) {
+        const list = arr.map((v) => `"${String(v).replace(/"/g, '\\"')}"`).join(',');
+        q = q.or(`${f.column}.in.(${list}),${f.column}.is.null`);
+      } else if (wantEmpty) {
+        q = q.is(f.column, null);
+      } else if (arr.length) {
+        q = q.in(f.column, arr);
+      }
     } else if (f.op === 'empty') q = q.is(f.column, null);
-    else if (f.op === 'text') { const t = String(f.value ?? '').trim(); if (t) q = q.ilike(f.column, `%${t}%`); }
+    else if (f.op === 'text') {
+      // 쉼표 = AND 조건 (SM 동일)
+      for (const term of String(f.value ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
+        q = q.ilike(f.column, `%${term}%`);
+      }
+    }
     else if (f.op === 'date_range') { if (f.value.from) q = q.gte(f.column, f.value.from); if (f.value.to) q = q.lte(f.column, f.value.to); }
     else if (f.op === 'num_range') {
       if (f.value.min != null && f.value.min !== '') q = q.gte(f.column, Number(f.value.min));
@@ -113,7 +127,7 @@ function applyToSupabaseQuery(
 }
 
 // ── Header cell with sort + filter ───────────────────────────────────────
-function HeaderCell({ header, col, scope }: { header: any; col: DmrColumnDef; scope?: DmrScope }) {
+function HeaderCell({ header, col, scope, q, serverFilters }: { header: any; col: DmrColumnDef; scope?: DmrScope; q?: string; serverFilters?: DmrServerFilter[] }) {
   const sortState = header.column.getIsSorted();
   const canSort = col.type !== 'enum' || col.key === 'discipline' || col.key === 'plot' || col.key === 'direct_flag';
   const Icon = sortState === 'asc' ? ArrowUp : sortState === 'desc' ? ArrowDown : ArrowUpDown;
@@ -131,7 +145,7 @@ function HeaderCell({ header, col, scope }: { header: any; col: DmrColumnDef; sc
         <span className="truncate">{col.label}</span>
         {canSort && <Icon className={cn('h-3 w-3 shrink-0', !sortState && 'text-muted-foreground/40')} />}
       </button>
-      <DmrColumnFilterDropdown column={header.column} scope={scope} />
+      <DmrColumnFilterDropdown column={header.column} scope={scope} q={q} serverFilters={serverFilters} />
       <div
         onMouseDown={header.getResizeHandler()}
         onTouchStart={header.getResizeHandler()}
@@ -377,12 +391,12 @@ export function DmrRawDataPage({
           filterOptions: (c.enumOptions ?? []).map((v) => ({ value: v, label: v })),
           serverFacet: c.serverFacet,
         },
-        header: ({ header }) => <HeaderCell header={header} col={c} scope={scope} />,
+        header: ({ header }) => <HeaderCell header={header} col={c} scope={scope} q={qInput} serverFilters={serverFilters} />,
         cell: ({ row }) => <CellRenderer row={row.original} col={c} canEdit={canEdit} directMap={directMap} />,
       } as ColumnDef<DmrEntry>;
     }).filter(Boolean);
     return [selectCol, ...dataCols];
-  }, [order, columnSizing, canEdit, directMap, selection, pageAllSelected, pageSomeSelected, rows, byKey]);
+  }, [order, columnSizing, canEdit, directMap, selection, pageAllSelected, pageSomeSelected, rows, byKey, scope, qInput, serverFilters]);
 
   const table = useReactTable({
     data: rows,
@@ -606,7 +620,7 @@ export function DmrRawDataPage({
                   style={{ width: size, minWidth: size, left: isSticky ? stickyOffsets[h.column.id] : undefined }}
                 >
                   {h.column.id === '__select' ? flexRender(h.column.columnDef.header, h.getContext()) :
-                    col ? <HeaderCell header={h} col={col} scope={scope} /> : null}
+                    col ? <HeaderCell header={h} col={col} scope={scope} q={qInput} serverFilters={serverFilters} /> : null}
                 </div>
               );
             })}
