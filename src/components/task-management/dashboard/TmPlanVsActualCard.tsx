@@ -181,11 +181,11 @@ export function TmPlanVsActualCard({
 
   const unitSuffix = isTasks ? " tasks" : "%";
   const incLabel = isTasks
-    ? "Plan (increment, tasks) — 오른쪽 축"
-    : "Plan (increment, pp) — 오른쪽 축";
+    ? "Plan (increment, tasks)"
+    : "Plan (increment, pp)";
   const incActualLabel = isTasks
-    ? "Actual (increment, tasks) — 오른쪽 축"
-    : "Actual (increment, pp) — 오른쪽 축";
+    ? "Actual (increment, tasks)"
+    : "Actual (increment, pp)";
   const cumPlanLabel = isTasks ? "Plan (cum tasks)" : "Plan (cum %)";
   const cumActualLabel = isTasks ? "Actual (cum tasks)" : "Actual (cum %)";
   const varianceLabel = isTasks ? "Δ Actual − Plan (tasks)" : "Δ Actual − Plan (pp)";
@@ -231,7 +231,7 @@ export function TmPlanVsActualCard({
               >
                 {open ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                 <TrendingUp className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Progress Status</CardTitle>
+                <CardTitle className="text-base">Progress Status 차트</CardTitle>
               </button>
             </CollapsibleTrigger>
 
@@ -338,15 +338,15 @@ export function TmPlanVsActualCard({
                     <YAxis
                       width={Y_LEFT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={isTasks ? [0, "auto"] : [0, 100]}
-                      tickFormatter={(v) => (isTasks ? `${v}` : `${v}%`)}
+                      domain={[0, incMax]}
                     />
                     <YAxis
-                      yAxisId="bar"
+                      yAxisId="cum"
                       orientation="right"
                       width={Y_RIGHT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={[0, incMax]}
+                      domain={isTasks ? [0, "auto"] : [0, 100]}
+                      tickFormatter={(v) => (isTasks ? `${v}` : `${v}%`)}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
@@ -365,7 +365,6 @@ export function TmPlanVsActualCard({
                       />
                     )}
                     <Bar
-                      yAxisId="bar"
                       dataKey="planInc"
                       name={incLabel}
                       fill="color-mix(in oklab, var(--muted-foreground) 22%, transparent)"
@@ -373,7 +372,6 @@ export function TmPlanVsActualCard({
                       hide={hidden.has("planInc")}
                     />
                     <Bar
-                      yAxisId="bar"
                       dataKey="actualInc"
                       name={incActualLabel}
                       fill="color-mix(in oklab, var(--primary) 30%, transparent)"
@@ -381,6 +379,7 @@ export function TmPlanVsActualCard({
                       hide={hidden.has("actualInc")}
                     />
                     <Line
+                      yAxisId="cum"
                       type="monotone"
                       dataKey="cumPlan"
                       name={cumPlanLabel}
@@ -391,6 +390,7 @@ export function TmPlanVsActualCard({
                       hide={hidden.has("cumPlan")}
                     />
                     <Line
+                      yAxisId="cum"
                       type="monotone"
                       dataKey="cumActual"
                       name={cumActualLabel}
