@@ -41,6 +41,9 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       cur.actual += a;
       byType.set(wt, cur);
     }
+    const progressPct = total > 0 ? (actualSum / total) * 100 : null;
+    const planPct = total > 0 ? (planSum / total) * 100 : null;
+    const diffPct = progressPct != null && planPct != null ? progressPct - planPct : null;
     return {
       total,
       delayed,
@@ -50,11 +53,13 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       ),
       actualCount: Math.round(actualSum),
       planCount: Math.round(planSum),
-      progressPct: total > 0 ? (actualSum / total) * 100 : null,
-      planPct: total > 0 ? (planSum / total) * 100 : null,
-      actualPct: total > 0 ? (actualSum / total) * 100 : null,
+      progressPct,
+      planPct,
+      actualPct: progressPct,
+      diffPct,
     };
   }, [q.scopedItems, q.thresholds, asOfDate]);
+
   return { ...q, kpi };
 }
 
