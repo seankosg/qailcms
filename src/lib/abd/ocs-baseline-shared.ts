@@ -1,7 +1,17 @@
 // ABD OCS Latest Baseline — 클라이언트/서버 공용 상수·산식.
 // baseline_id 산식은 여기 하나에만 존재한다. (증분 Import precheck 도 동일 산식을 쓴다)
 
-export const BASELINE_SCHEMA_VERSION = "ocs-baseline-v1";
+/** 현재 생성 계약. v2 = 기존 10개 데이터셋 + validation/abd_items_index.json */
+export const BASELINE_SCHEMA_VERSION = "ocs-baseline-v2";
+/** 읽기 호환을 유지하는 구 계약 */
+export const BASELINE_SCHEMA_VERSION_V1 = "ocs-baseline-v1";
+export const BASELINE_SCHEMA_VERSIONS_READABLE = [
+  BASELINE_SCHEMA_VERSION,
+  BASELINE_SCHEMA_VERSION_V1,
+] as const;
+/** 로컬 검증 참조 인덱스 (v2 전용, 읽기 전용 최소 필드) */
+export const BASELINE_ABD_INDEX_PATH = "validation/abd_items_index.json";
+export const ABD_ITEMS_INDEX_SCHEMA = "abd-items-index/1";
 export const BASELINE_BUCKET = "db-backups";
 export const BASELINE_PREFIX = "ocs-baselines";
 export const BASELINE_SIGNED_URL_SECONDS = 600;
@@ -61,6 +71,19 @@ export async function computeBaselineId(
   latestRunId: string,
 ): Promise<string> {
   return sha256Hex(baselineIdInput(schemaVersion, coreHash, latestRunId));
+}
+
+/**
+ * v1/v2 baseline_id 후보 — 읽기 호환용. 서버 관문은 두 값 중 하나와 일치하면 통과시킨다.
+ * 산식 자체는 변경하지 않는다 (schema_version 만 다름).
+ */
+export async function computeBaselineIdCandidates(
+  coreHash: string,
+  latestRunId: string,
+): Promise<{ v2: string; v1: string; all: string[] }> {
+  const v2 = await computeBaselineId(BASELINE_SCHEMA_VERSION, coreHash, latestRunId);
+  const v1 = await computeBaselineId(BASELINE_SCHEMA_VERSION_V1, coreHash, latestRunId);
+  return { v2, v1, all: [v2, v1] };
 }
 
 export const shortId = (v: string | null | undefined) => (v ? v.slice(0, 16) : "");

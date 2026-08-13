@@ -8,12 +8,15 @@ import {
   BASELINE_DATASETS,
   BASELINE_SCHEMA_VERSION,
   BASELINE_SIGNED_URL_SECONDS,
+  BASELINE_ABD_INDEX_PATH,
+  ABD_ITEMS_INDEX_SCHEMA,
   baselineFileName,
   baselineFolder,
   computeBaselineId,
   sha256Hex,
   type BaselineDataset,
 } from "@/lib/abd/ocs-baseline-shared";
+import { normalizeAbdNumber } from "@/lib/abd/ocs-number-normalize";
 
 type LooseClient = {
   rpc: (
@@ -59,6 +62,82 @@ export type BaselineFileInfo = {
   sha256: string;
   row_count: number;
 };
+
+type AbdIndexRow = {
+  abd_item_id: string;
+  abd_number: string;
+  normalized_abd_number: string;
+  is_active: boolean;
+};
+
+/**
+ * 로컬 검증용 ABD 번호 인덱스 (읽기 전용 최소 필드).
+ * 이름·팀·PIC·날짜 등 검증에 불필요한 Raw Data 필드는 담지 않는다.
+ * active 정규화 키가 복수 ABD 에 걸리면 Baseline 생성 자체를 차단한다.
+ */
+async function buildAbdItemsIndex(supabase: unknown): Promise<AbdIndexRow[]> {
+  const client = supabase as {
+    from: (t: string) => {
+      select: (
+        c: string,
+      ) => {
+        order: (
+          c: string,
+          o: { ascending: boolean },
+        ) => {
+          range: (
+            a: number,
+            b: number,
+          ) => Promise<{
+            data: { id: string; abd_number: string | null; is_active: boolean | null }[] | null;
+            error: { message: string } | null;
+          }>;
+        };
+      };
+    };
+  };
+  const PAGE = 1000;
+  const rows: AbdIndexRow[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await client
+      .from("abd_items_raw")
+      .select("id, abd_number, is_active")
+      .order("id", { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new Error(`abd_items_index: ${error.message}`);
+    const page = data ?? [];
+    for (const r of page) {
+      const num = String(r.abd_number ?? "").trim();
+      if (!num) continue;
+      rows.push({
+        abd_item_id: r.id,
+        abd_number: num,
+        normalized_abd_number: normalizeAbdNumber(num),
+        is_active: r.is_active !== false,
+      });
+    }
+    if (page.length < PAGE) break;
+    if (offset > 500_000) throw new Error("ABD_INDEX_RUNAWAY");
+  }
+
+  const byNorm = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (!r.is_active) continue;
+    const set = byNorm.get(r.normalized_abd_number) ?? new Set<string>();
+    set.add(r.abd_number);
+    byNorm.set(r.normalized_abd_number, set);
+  }
+  const ambiguous = [...byNorm.entries()].filter(([, v]) => v.size > 1);
+  if (ambiguous.length > 0) {
+    throw new Error(
+      `ABD_INDEX_AMBIGUOUS: 정규화 키가 복수 active ABD 에 해당합니다 — ${ambiguous
+        .slice(0, 5)
+        .map(([k, v]) => `${k} → ${[...v].join(" / ")}`)
+        .join(" ; ")}`,
+    );
+  }
+  return rows;
+}
 
 export type BaselineResult = {
   baseline_id: string;
@@ -251,6 +330,27 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         row_count: counts[ds] ?? 0,
       });
       zip.file(name, text);
+    }
+
+    // 5-1) v2 — 로컬 검증용 ABD 번호 인덱스 (읽기 전용, core hash 의미는 바뀌지 않는다)
+    {
+      const indexRows = await buildAbdItemsIndex(context.supabase);
+      const text = JSON.stringify(
+        {
+          schema_version: ABD_ITEMS_INDEX_SCHEMA,
+          generated_at: new Date().toISOString(),
+          rows: indexRows,
+        },
+        null,
+        0,
+      );
+      files.push({
+        name: BASELINE_ABD_INDEX_PATH,
+        byte_size: new TextEncoder().encode(text).byteLength,
+        sha256: await sha256Hex(text),
+        row_count: indexRows.length,
+      });
+      zip.file(BASELINE_ABD_INDEX_PATH, text);
     }
 
     const generatedAt = new Date();

@@ -2,8 +2,7 @@
 // 클라이언트 precheck 결과는 신뢰하지 않는다. 여기서 서버가 다시 계산·대조한다.
 import {
   BASELINE_CORE_TABLES,
-  BASELINE_SCHEMA_VERSION,
-  computeBaselineId,
+  computeBaselineIdCandidates,
 } from "@/lib/abd/ocs-baseline-shared";
 
 export type RpcFn = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
@@ -84,12 +83,10 @@ export async function assertBaselineGate(
     throw new Error(`BASELINE_STALE: core 테이블 해시 불일치 — ${mismatched.join(", ")}`);
   }
 
-  const expected = await computeBaselineId(
-    BASELINE_SCHEMA_VERSION,
-    currentCoreHash,
-    claim.base_import_run_id,
-  );
-  if (expected !== claim.base_baseline_id) {
+  // v1/v2 Baseline 계약 모두 읽기 호환 — 산식은 동일하고 schema_version 만 다르다.
+  const cand = await computeBaselineIdCandidates(currentCoreHash, claim.base_import_run_id);
+  const expected = cand.v2;
+  if (!cand.all.includes(claim.base_baseline_id)) {
     throw new Error(
       `BASELINE_ID_MISMATCH: 서버 재계산 baseline_id 가 패키지 값과 다릅니다 (${expected.slice(
         0,

@@ -14,7 +14,8 @@ import {
 } from "@/lib/abd/ocs-v3-parser";
 
 export const INCREMENT_SCHEMA_VERSION = "ocs-increment/1";
-export const PACKAGE_NAME_RE = /^OCS_Increment_(\d{8})_(\d+)\.zip$/;
+/** 교정본은 `_corrected_<n>` 접미사를 허용한다 (브라우저 로컬 교정 산출물). */
+export const PACKAGE_NAME_RE = /^OCS_Increment_(\d{8})_(\d+)(?:_corrected_(\d+))?\.zip$/;
 
 export type ManifestFileEntry = {
   relative_path: string;
@@ -249,7 +250,7 @@ export function buildImageMeta(
 export async function readIncrementPackage(file: File): Promise<IncrementPackage> {
   const blockers: string[] = [];
   if (!PACKAGE_NAME_RE.test(file.name)) {
-    blockers.push(`파일명이 계약과 다릅니다: ${file.name} (OCS_Increment_<YYYYMMDD>_<seq>.zip)`);
+    blockers.push(`파일명이 계약과 다릅니다: ${file.name} (OCS_Increment_<YYYYMMDD>_<seq>[_corrected_<n>].zip)`);
   }
   const raw = await file.arrayBuffer();
   const packageSha = await hashBytes(raw);

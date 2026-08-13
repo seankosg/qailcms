@@ -62,6 +62,7 @@ import {
   Step2PrepareFiles,
   Step3BuildPackage,
 } from "@/components/abd/ocs/wizard/OcsPreparationSteps";
+import { OcsLocalValidationCard } from "@/components/abd/ocs/wizard/OcsLocalValidationCard";
 import { Copy, ExternalLink } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { createPreImportSnapshot, getBackupRunStatus } from "@/lib/backup/backup.functions";
@@ -109,6 +110,12 @@ export function OcsIncrementImportPanel() {
   const listVerifyReceiptsFn = useServerFn(ocsIncListVerifyReceipts);
 
   const [pkg, setPkg] = useState<IncrementPackage | null>(null);
+  const [pickedFile, setPickedFile] = useState<File | null>(null);
+  // 브라우저 로컬 검증 결과 — null 이면 미실행. clean 이 아니면 서버 단계로 진행하지 않는다.
+  const [localValid, setLocalValid] = useState<{ clean: boolean | null; blockerCount: number }>({
+    clean: null,
+    blockerCount: 0,
+  });
   const [precheck, setPrecheck] = useState<Record<string, unknown> | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [dry, setDry] = useState<Dry | null>(null);
@@ -290,6 +297,8 @@ export function OcsIncrementImportPanel() {
         : null,
       duplicatePackage,
       duplicateRecovered,
+      localValidationClean: localValid.clean,
+      localValidationBlockerCount: localValid.blockerCount,
       precheck,
       baselineIdentityOk,
       dry,
@@ -314,6 +323,7 @@ export function OcsIncrementImportPanel() {
       collision,
       duplicatePackage,
       duplicateRecovered,
+      localValid,
       precheck,
       baselineIdentityOk,
       dry,
@@ -358,6 +368,8 @@ export function OcsIncrementImportPanel() {
   function clearPick() {
     resetDownstream();
     setPkg(null);
+    setPickedFile(null);
+    setLocalValid({ clean: null, blockerCount: 0 });
     setPrecheck(null);
     setCollision(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -369,6 +381,8 @@ export function OcsIncrementImportPanel() {
     if (!file) return;
     // 새 선택 시 이전 패키지 상태를 먼저 전부 폐기한다 (잘못된 파일이어도 이전 결과가 남지 않음)
     setPkg(null);
+    setPickedFile(null);
+    setLocalValid({ clean: null, blockerCount: 0 });
     setPrecheck(null);
     setCollision(null);
     resetDownstream();
@@ -383,6 +397,7 @@ export function OcsIncrementImportPanel() {
     try {
       const p = await readIncrementPackage(file);
       setPkg(p);
+      setPickedFile(file);
       setStageLabel("2/6 기존 자산 대조");
       const pc = (await precheckFn({
         data: {
@@ -1257,6 +1272,12 @@ export function OcsIncrementImportPanel() {
           )}
         </div>
 
+        <OcsLocalValidationCard
+          file={pickedFile}
+          pkg={pkg}
+          onCleanChange={(st) => setLocalValid(st)}
+        />
+
         {duplicatePackage && (
           <div className="space-y-2 rounded-md border border-destructive/50 p-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-destructive">
@@ -1349,7 +1370,7 @@ export function OcsIncrementImportPanel() {
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
-            disabled={!pkg || !!busy || duplicatePackage}
+            disabled={!pkg || !!busy || duplicatePackage || localValid.clean !== true}
             onClick={() => void runDryRun()}
           >
             Check Package — No Data Will Be Changed

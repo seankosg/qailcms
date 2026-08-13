@@ -18,6 +18,9 @@ export type GateInput = {
   collisionCounts: { hash_mismatch: number; unresolved: number } | null;
   duplicatePackage: boolean;
   duplicateRecovered: boolean;
+  /** 브라우저 로컬 검증 — null 이면 미실행 */
+  localValidationClean: boolean | null;
+  localValidationBlockerCount: number;
   precheck: Record<string, unknown> | null;
   baselineIdentityOk: boolean;
   dry: Record<string, unknown> | null;
@@ -47,6 +50,12 @@ export function buildBlockerGroups(i: GateInput): BlockerGroups {
   }
   if (!i.hasPackage) packageBlockers.push("증분 ZIP 패키지를 선택하십시오.");
   packageBlockers.push(...i.packageFileBlockers);
+  if (i.hasPackage && i.localValidationClean === null)
+    packageBlockers.push("브라우저 로컬 검증 미실행 — Baseline ZIP 을 선택해 로컬 검증하십시오.");
+  if (i.localValidationClean === false)
+    packageBlockers.push(
+      `로컬 검증 blocker ${i.localValidationBlockerCount}건 — 교정 후 CLEAN 판정을 받아야 서버 단계로 진행할 수 있습니다.`,
+    );
   if (i.hasPackage && !i.collisionDone) packageBlockers.push("Storage 충돌 점검 미완료");
   packageBlockers.push(...i.collisionBlockers);
   if (i.collisionCounts) {

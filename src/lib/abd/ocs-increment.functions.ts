@@ -2,7 +2,7 @@
 // 판정식은 DB 함수(abd_ocs_inc_scope / _dryrun / _import) 하나에만 존재한다. 여기서 재구현하지 않는다.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { BASELINE_SCHEMA_VERSION, computeBaselineId } from "@/lib/abd/ocs-baseline-shared";
+import { computeBaselineIdCandidates } from "@/lib/abd/ocs-baseline-shared";
 import { assertBaselineGate } from "@/lib/abd/ocs-increment-gate";
 import { recheckCollisionsServerSide, verifiedKey } from "@/lib/abd/ocs-increment-collision";
 import { assertAbdOcsAccess } from "@/lib/abd/ocs-access";
@@ -98,11 +98,11 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
     const latestRunId = String(
       (baseline as Record<string, unknown>)["latest_success_import_run_id"] ?? "",
     );
-    const expectedBaselineId = await computeBaselineId(
-      BASELINE_SCHEMA_VERSION,
+    const baselineCandidates = await computeBaselineIdCandidates(
       data.base_core_hash || currentCoreHash,
       data.base_import_run_id || latestRunId,
     );
+    const expectedBaselineId = baselineCandidates.v2;
     const mismatchedTables = Object.keys(currentTableHashes).filter(
       (t) =>
         data.base_core_table_hashes[t] !== undefined &&
@@ -119,7 +119,7 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
       core_table_hashes_current: currentTableHashes,
       base_core_hash_match: data.base_core_hash ? data.base_core_hash === currentCoreHash : null,
       baseline_id_match: data.base_baseline_id
-        ? data.base_baseline_id === expectedBaselineId
+        ? baselineCandidates.all.includes(data.base_baseline_id)
         : null,
       baseline_id_expected: expectedBaselineId,
       mismatched_core_tables: mismatchedTables,
