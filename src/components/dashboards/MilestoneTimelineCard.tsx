@@ -58,7 +58,8 @@ function dLabel(diff: number): string {
  * 정본: tm_milestone_config × tm_milestone_kinds (기준일 오름차순, 미지정·비활성 제외).
  * 상태는 날짜 기준 자동 판정 — 경과=완료, 첫 도래=진행중, 이후=예정.
  */
-export function MilestoneTimelineCard() {
+export function MilestoneTimelineCard({ hidePlotG }: { hidePlotG?: boolean }) {
+
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["tm_milestone_timeline"],
     staleTime: 60_000,
@@ -122,13 +123,15 @@ export function MilestoneTimelineCard() {
     }
     return Array.from(byPlot.entries())
       .filter(([, list]) => list.length > 0)
+      .filter(([plot]) => !hidePlotG || plot !== "G")
       .sort((a, b) => {
         const ia = PLOT_ORDER.indexOf(a[0]);
         const ib = PLOT_ORDER.indexOf(b[0]);
         if (ia !== ib) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
         return a[0].localeCompare(b[0]);
       });
-  }, [data, todayNum, showAuto]);
+  }, [data, todayNum, showAuto, hidePlotG]);
+
 
   return (
     <Card className="overflow-hidden">
