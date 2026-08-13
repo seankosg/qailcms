@@ -217,9 +217,6 @@ export function TmPlanVsActualCard({
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-muted-foreground";
   const sign = deltaNow > 0 ? "+" : "";
-  const appliedLabel = `${filterSummary
-    .map((f) => `${f.label}: ${f.value}`)
-    .join(" · ")} · n = ${n.toLocaleString()} tasks`;
 
   return (
     <Card>
