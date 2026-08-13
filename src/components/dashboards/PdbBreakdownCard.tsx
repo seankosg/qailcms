@@ -35,19 +35,25 @@ export function PdbBreakdownCard({
   rows,
   hint,
   emptyText = "데이터 없음",
+  scrollAfter,
 }: {
   label: string;
   rows: BreakdownRow[];
   hint?: string;
   emptyText?: string;
+  /** 행 수가 이 값을 넘으면 목록에 스크롤을 준다 */
+  scrollAfter?: number;
 }) {
+  const scroll = scrollAfter != null && rows.length > scrollAfter;
   return (
     <Card title={hint}>
       <CardContent className="p-3">
         <div className="mb-1 inline-block rounded-md bg-muted px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
           {label}
         </div>
-        <div className="mt-1.5 flex flex-col gap-1">
+        <div
+          className={`mt-1.5 flex flex-col gap-1 ${scroll ? "max-h-[132px] overflow-y-auto pr-1" : ""}`}
+        >
           {rows.length === 0 ? (
             <div className="py-2 text-xs text-muted-foreground">{emptyText}</div>
           ) : (
