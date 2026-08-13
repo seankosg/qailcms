@@ -333,18 +333,15 @@ export function SnagKpiPlanVsActualCard({
                       textAnchor="end"
                       height={46}
                     />
+                    {/* 왼쪽 = 건수(막대), 오른쪽 = %(누계 곡선) */}
+                    <YAxis width={Y_LEFT_WIDTH} tick={{ fontSize: 11 }} domain={[0, incMax]} />
                     <YAxis
-                      width={Y_LEFT_WIDTH}
-                      tick={{ fontSize: 11 }}
-                      domain={isPct ? [0, 100] : [0, "auto"]}
-                      tickFormatter={(v) => (isPct ? `${v}%` : `${v}`)}
-                    />
-                    <YAxis
-                      yAxisId="bar"
+                      yAxisId="cum"
                       orientation="right"
                       width={Y_RIGHT_WIDTH}
                       tick={{ fontSize: 11 }}
-                      domain={[0, incMax]}
+                      domain={isPct ? [0, 100] : [0, "auto"]}
+                      tickFormatter={(v) => (isPct ? `${v}%` : `${v}`)}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend
@@ -362,7 +359,6 @@ export function SnagKpiPlanVsActualCard({
                       />
                     )}
                     <Bar
-                      yAxisId="bar"
                       dataKey="planInc"
                       name={incLabel}
                       fill="color-mix(in oklab, var(--muted-foreground) 22%, transparent)"
@@ -370,7 +366,6 @@ export function SnagKpiPlanVsActualCard({
                       hide={hidden.has("planInc")}
                     />
                     <Bar
-                      yAxisId="bar"
                       dataKey="actualInc"
                       name={incActualLabel}
                       fill="color-mix(in oklab, var(--primary) 30%, transparent)"
@@ -378,6 +373,7 @@ export function SnagKpiPlanVsActualCard({
                       hide={hidden.has("actualInc")}
                     />
                     <Line
+                      yAxisId="cum"
                       type="monotone"
                       dataKey="cumPlan"
                       name={cumPlanLabel}
@@ -388,6 +384,7 @@ export function SnagKpiPlanVsActualCard({
                       hide={hidden.has("cumPlan")}
                     />
                     <Line
+                      yAxisId="cum"
                       type="monotone"
                       dataKey="cumActual"
                       name={cumActualLabel}
