@@ -1,0 +1,206 @@
+import { describe, expect, it } from "vitest";
+import { validateIncrementLocally } from "./ocs-local-validation";
+import type { BaselineRead, AbdIndexRow } from "./ocs-baseline-reader";
+import type { IncrementPackage } from "./ocs-increment-package";
+import type { V3StageComment } from "./ocs-v3-parser";
+
+const idx = (n: string, active = true): AbdIndexRow => ({
+  abd_item_id: `id-${n}`,
+  abd_number: n,
+  normalized_abd_number: n.toUpperCase(),
+  is_active: active,
+});
+
+function baseline(rows: AbdIndexRow[] | null): BaselineRead {
+  const byNormalized = new Map<string, AbdIndexRow[]>();
+  const byExact = new Map<string, AbdIndexRow>();
+  for (const r of rows ?? []) {
+    byExact.set(r.abd_number, r);
+    if (r.is_active) byNormalized.set(r.normalized_abd_number, [
+      ...(byNormalized.get(r.normalized_abd_number) ?? []),
+      r,
+    ]);
+  }
+  return {
+    file_name: "b.zip",
+    schema_version: "ocs-baseline-v2",
+    baseline_id: "B1",
+    base_import_run_id: "R1",
+    core_hash: "abc",
+    core_table_hashes: {},
+    generated_at: null,
+    abdIndex: rows,
+    byNormalized,
+    byExact,
+    blockers: [],
+  };
+}
+
+const comment = (over: Partial<V3StageComment>): V3StageComment => ({
+  source_comment_id: "C1",
+  source_parent_comment_id: "P1",
+  comment_group_id: null,
+  atomic_item_no: 1,
+  atomic_item_count: 1,
+  split_status: null,
+  comment_part: null,
+  ocs_comment: "x",
+  assessed_code: null,
+  contractor_response: null,
+  ocs_number: "OCS-1",
+  drawing_number: null,
+  source_file_name: "a.xlsx",
+  source_sheet_name: "S",
+  source_row_index: 3,
+  abd_numbers: [],
+  link_status: null,
+  link_scope: null,
+  link_method: null,
+  is_active: true,
+  retired_reason: null,
+  initial_complied: false,
+  compliance_source: null,
+  compliance_reason: null,
+  ...over,
+});
+
+function pkg(comments: V3StageComment[]): IncrementPackage {
+  return {
+    file_name: "OCS_Increment_20260101_1.zip",
+    file_size: 1,
+    package_sha256: "sha",
+    manifest: {
+      schema_version: "ocs-increment/1",
+      package_id: "P",
+      data_date: "2026-01-01",
+      base_baseline_id: "B1",
+      base_import_run_id: "R1",
+      base_core_hash: "abc",
+      base_core_table_hashes: {},
+      base_generated_at: "",
+      target_ocs_numbers: [],
+      change_type: "new",
+      files: [],
+      generated_at: "",
+      tool_version: "",
+    },
+    atomic: {
+      summary: {},
+      link_correction_summary: {},
+      payload_sha256: null,
+      groups: [
+        {
+          group_id: "G1",
+          source_parent_comment_id: "P1",
+          ocs_number: "OCS-1",
+          drawing_number: null,
+          source_file_name: "a.xlsx",
+          source_sheet: "S",
+          source_row: 3,
+          item_count: 1,
+          split_status: null,
+          group_contractor_response: null,
+          v3_ocs_number: null,
+        },
+      ],
+      comments,
+      attachments: [],
+      invalid_rows: [],
+      duplicated_atomic_ids: [],
+      source_parent_count: 1,
+      active_count: comments.length,
+      inactive_count: 0,
+      linked_count: 0,
+      linked_multi_count: 0,
+      abd_link_associations: 0,
+      distinct_abd_numbers: 0,
+      residual_multi_marker_rows: 0,
+      attachment_scope_counts: {},
+      attachment_invalid_rows: [],
+      duplicated_attachment_ids: [],
+      duplicated_attachment_paths: [],
+    },
+    response: {
+      total_raw: 0,
+      segments: [],
+      invalid_rows: [],
+      reviewed_source_groups: 0,
+      atomic_comments_in_groups: 0,
+      status_counts: {},
+      confirmed_high: 0,
+      probable: 0,
+      requires_review: 0,
+      duplicate_ignored: 0,
+      open_segments: 0,
+      open_groups: 0,
+      confirmed_high_unique_targets: 0,
+      duplicate_links: 0,
+    },
+    policy: {
+      policy_version: null,
+      generated_at: null,
+      atomic_v3_file: null,
+      atomic_v3_sha256: null,
+      response_mapping_file: null,
+      response_mapping_sha256: null,
+      open_segment_count: 0,
+      open_group_count: 0,
+      group_inherited_attachment_count: 0,
+      raw_data_ocs_change_count: 0,
+      group_response_decisions: 0,
+    },
+    sourceFiles: [
+      { relative_path: "source/a.xlsx", bytes: new ArrayBuffer(1), sha256: "h1", byte_size: 1 },
+    ],
+    images: [],
+    imageMeta: [],
+    verifiedFiles: 0,
+    blockers: [],
+  };
+}
+
+describe("validateIncrementLocally", () => {
+  it("정확히 일치하는 ABD 는 CLEAN", () => {
+    const r = validateIncrementLocally({
+      pkg: pkg([comment({ abd_numbers: ["ABD-001"] })]),
+      baseline: baseline([idx("ABD-001")]),
+    });
+    expect(r.clean).toBe(true);
+    expect(r.unresolved_abd_count).toBe(0);
+  });
+
+  it("표기만 다른 값은 후보를 제시하되 blocker 로 남긴다", () => {
+    const r = validateIncrementLocally({
+      pkg: pkg([comment({ abd_numbers: ["abd-001 "] })]),
+      baseline: baseline([idx("ABD-001")]),
+    });
+    expect(r.clean).toBe(false);
+    const i = r.issues.find((x) => x.code === "ABD_NUMBER_NORMALIZATION");
+    expect(i?.candidates[0]?.abd_number).toBe("ABD-001");
+    expect(i?.correction_mode).toBe("inline_mapping");
+  });
+
+  it("Baseline 에 없는 번호는 후보 없이 unresolved", () => {
+    const r = validateIncrementLocally({
+      pkg: pkg([comment({ abd_numbers: ["ABD-999"] })]),
+      baseline: baseline([idx("ABD-001")]),
+    });
+    expect(r.issues.some((x) => x.code === "ABD_NUMBER_UNRESOLVED")).toBe(true);
+  });
+
+  it("v1 Baseline(인덱스 없음)은 로컬 해소 불가로 차단", () => {
+    const r = validateIncrementLocally({
+      pkg: pkg([comment({ abd_numbers: ["ABD-001"] })]),
+      baseline: baseline(null),
+    });
+    expect(r.issues.some((x) => x.code === "BASELINE_INDEX_MISSING")).toBe(true);
+  });
+
+  it("active identity 중복을 차단한다", () => {
+    const r = validateIncrementLocally({
+      pkg: pkg([comment({ abd_numbers: [] }), comment({ abd_numbers: [] })]),
+      baseline: baseline([idx("ABD-001")]),
+    });
+    expect(r.duplicate_identity_count).toBe(1);
+  });
+});

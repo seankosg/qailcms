@@ -15,6 +15,8 @@ const baseInput: GateInput = {
   collisionCounts: { hash_mismatch: 0, unresolved: 0 },
   duplicatePackage: false,
   duplicateRecovered: false,
+  localValidationClean: true,
+  localValidationBlockerCount: 0,
   precheck: {
     baseline: { base_import_run_found: true, is_latest: true, core_changed_since_base: false },
     base_core_hash_match: true,
