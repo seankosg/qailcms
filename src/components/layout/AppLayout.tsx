@@ -63,19 +63,19 @@ type NavSection = {
 
 const NAV: NavSection[] = [
   {
-    label: "Work Space",
-    dashboard: { to: "/my-work-space", label: "My Work Space", icon: iconUser },
-    items: [
-      { to: "/my-kpi-analysis", label: "My KPI Analysis", icon: iconChartUp },
-      { to: "/my-team-work-space", label: "My Team Work Space", icon: iconPeople },
-    ],
-  },
-  {
     label: "Project Wide",
     dashboard: { to: "/project-dashboard", label: "Milestone Timeline", icon: iconDashboard },
     items: [
       { to: "/project-summary", label: "Project Dashboard", icon: iconChartUp },
       { to: "/organization", label: "Organization", icon: iconPeople },
+    ],
+  },
+  {
+    label: "Work Space",
+    dashboard: { to: "/my-work-space", label: "My Work Space", icon: iconUser },
+    items: [
+      { to: "/my-kpi-analysis", label: "My KPI Analysis", icon: iconChartUp },
+      { to: "/my-team-work-space", label: "My Team Work Space", icon: iconPeople },
     ],
   },
   {
