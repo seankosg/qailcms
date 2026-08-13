@@ -1,12 +1,31 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { yesterdayInDoha } from '@/lib/time/doha';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChevronDown } from 'lucide-react';
+import {
+  PERIOD_LABEL,
+  aggregateByContractor,
+  aggregateByTeam,
+  contractorSubtotals,
+  fmtExtra,
+  fmtPct,
+  fmtProd,
+  resolvePeriod,
+  summarize,
+  useProductivity,
+  useTmHistoryStart,
+  type PeriodKind,
+  type ProductivityRow,
+} from '@/lib/dmr/productivity';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar } from 'recharts';
 import { DMR_DISCIPLINES, DISCIPLINE_LABEL, type DmrDiscipline } from '@/lib/dmr/types';
 import { cn } from '@/lib/utils';
@@ -392,6 +411,9 @@ export function DmrDashboardPage() {
         ))}
       </div>
 
+      {/* 생산성 — 계산은 src/lib/dmr/productivity.ts 한 벌만 쓴다 */}
+      <ProductivitySection baseDate={currentAsOf} />
+
       {/* Daily Manpower Record — Subcon / System tabs */}
       <Card>
         <CardHeader className="pb-2">
@@ -676,5 +698,327 @@ function MultiSelectPopover({
         </div>
       )}
     </div>
+  );
+}
+/* ────────────────────────── 생산성 ──────────────────────────
+ * 계산은 src/lib/dmr/productivity.ts 한 벌만 쓴다. 여기서 다시 계산하지 않는다.
+ * 스탯 타일 KpiCard · MiniStat · Tabs · Table · Badge 는 이 파일/공용 UI 의 기존 것을 그대로 쓴다.
+ */
+const PERIOD_KINDS: PeriodKind[] = ['day', 'week', 'month', 'range', 'all'];
+
+function sortByProductivity(rows: ProductivityRow[]) {
+  return [...rows].sort((a, b) => {
+    const av = a.productivity;
+    const bv = b.productivity;
+    if (av == null && bv == null) return a.task_no.localeCompare(b.task_no);
+    if (av == null) return 1; // 빈칸은 맨 아래
+    if (bv == null) return -1;
+    return bv - av;
+  });
+}
+
+function ProductivitySection({ baseDate }: { baseDate: string }) {
+  const [kind, setKind] = useState<PeriodKind>('day');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [tab, setTab] = useState<'code' | 'team' | 'contractor'>('code');
+
+  const historyQ = useTmHistoryStart();
+  // 기준일이 아직 정해지기 전(빈 값)이면 계산을 걸지 않는다.
+  const ready = /^\d{4}-\d{2}-\d{2}$/.test(baseDate);
+  const safeBase = ready ? baseDate : yesterdayInDoha();
+  const period = useMemo(
+    () => resolvePeriod(kind, safeBase, { from, to, historyStart: historyQ.data ?? null }),
+    [kind, safeBase, from, to, historyQ.data],
+  );
+
+  const prodQ = useProductivity(period, ready);
+  const rows = useMemo(() => sortByProductivity(prodQ.data?.rows ?? []), [prodQ.data]);
+  const summary = useMemo(() => summarize(rows, period), [rows, period]);
+  const teamRows = useMemo(() => aggregateByTeam(rows), [rows]);
+  const contractor = useMemo(() => aggregateByContractor(rows), [rows]);
+  const subtotals = useMemo(() => contractorSubtotals(contractor.rows), [contractor.rows]);
+
+  // 인원 종류 칸은 foreman/supervisor 행이 하나라도 생겨야 나타난다.
+  const kinds = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of prodQ.data?.dmrRows ?? []) if (r.headcount_kind) s.add(r.headcount_kind);
+    return s;
+  }, [prodQ.data]);
+  const showKindColumns = kinds.has('foreman') || kinds.has('supervisor');
+
+  const loading = prodQ.isLoading || prodQ.isFetching;
+  const ratio = summary.recordRatioMedian;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-sm">생산성 (당일실적% ÷ 인원)</CardTitle>
+          <div className="flex flex-wrap items-center gap-1">
+            {PERIOD_KINDS.map((k) => (
+              <FilterToggleButton
+                key={k}
+                active={kind === k}
+                className="h-7 px-2 text-[11px]"
+                onClick={() => setKind(k)}
+              >
+                {PERIOD_LABEL[k]}
+              </FilterToggleButton>
+            ))}
+            {kind === 'range' && (
+              <>
+                <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-7 w-36 text-xs" />
+                <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-7 w-36 text-xs" />
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          <Badge variant="outline" className="text-[10px]">{period.start} ~ {period.end}</Badge>
+          {kind === 'all' && (
+            <Badge variant="outline" className="text-[10px]">
+              이력 개시일 기준 · 시작 {period.start}
+            </Badge>
+          )}
+          <span>계획 생산성 회복 가정 · 인원과 진도가 비례한다고 봄</span>
+        </div>
+
+        {/* 믿을 수 있는 숫자인지 먼저 보여 준다 */}
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
+          <span className={cn('font-medium', ratio != null && ratio < 0.9 ? 'text-red-600' : 'text-muted-foreground')}>
+            기록일 비율(중앙값) {ratio == null ? '—' : ratio.toFixed(2)}
+            {ratio != null && ratio < 0.9 && ` · 분모가 기록된 날만 더해져 생산성이 약 ${(1 / ratio).toFixed(2)}배 부풀 수 있음`}
+          </span>
+          <span className={cn(summary.actualWithoutManpower > 0 ? 'text-red-600' : 'text-muted-foreground')}>
+            인원 없이 실적만 오른 코드 {summary.actualWithoutManpower.toLocaleString()}건
+          </span>
+          <span className={cn(summary.dataDateGapCodes > 0 ? 'text-red-600' : 'text-muted-foreground')}>
+            Data Date 격차 ≠ 0 코드 {summary.dataDateGapCodes.toLocaleString()}건
+          </span>
+        </div>
+        <div className="mt-1 text-[11px] text-red-600">
+          출면 데이터 정비 중 — 인원 합계가 실제와 다를 수 있습니다
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-3">
+        {loading ? (
+          <Skeleton className="h-64 w-full" />
+        ) : (
+          <>
+            <div className="grid gap-3 md:grid-cols-5">
+              <KpiCard label="인원 (인·일)" value={summary.manpower} />
+              <KpiCard
+                label="당일실적%"
+                value={fmtPct(summary.actualSum) || '—'}
+                sub={`당일계획% ${fmtPct(summary.planSum) || '—'}`}
+              />
+              <KpiCard
+                label="생산성"
+                value={fmtProd(summary.productivity) || '—'}
+                sub={`계획 생산성 ${fmtProd(summary.planProductivity) || '—'}`}
+              />
+              <KpiCard
+                label="계획 달성률"
+                value={summary.achievement == null ? '—' : `${(summary.achievement * 100).toFixed(1)}%`}
+                sub={summary.achievement == null ? '계획 구간 밖' : summary.achievement >= 1 ? '증원 불필요' : '계획 미달'}
+                subColor={summary.achievement == null ? 'muted' : summary.achievement >= 1 ? 'emerald' : 'red'}
+              />
+              <KpiCard
+                label="추가 필요 인원 (인·일)"
+                value={summary.extraManpower > 0 ? fmtExtra(summary.extraManpower, '') : '0'}
+                sub={summary.extraManpower > 0 ? '계획 생산성 회복 가정' : '증원 불필요'}
+                subColor={summary.extraManpower > 0 ? 'red' : 'emerald'}
+              />
+            </div>
+
+            <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+              <TabsList className="h-7">
+                <TabsTrigger value="code" className="px-3 text-xs">TM Code</TabsTrigger>
+                <TabsTrigger value="team" className="px-3 text-xs">팀</TabsTrigger>
+                <TabsTrigger value="contractor" className="px-3 text-xs">업체</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="code" className="mt-2">
+                <div className="max-h-[420px] overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">TM Code</TableHead>
+                        <TableHead className="text-xs">Task</TableHead>
+                        <TableHead className="text-xs">Work Type</TableHead>
+                        <TableHead className="text-xs">팀</TableHead>
+                        <TableHead className="text-right text-xs">인원</TableHead>
+                        {showKindColumns && <TableHead className="text-right text-xs">Foreman</TableHead>}
+                        {showKindColumns && <TableHead className="text-right text-xs">Supervisor</TableHead>}
+                        <TableHead className="text-right text-xs">기록일</TableHead>
+                        <TableHead className="text-right text-xs">당일계획%</TableHead>
+                        <TableHead className="text-right text-xs">당일실적%</TableHead>
+                        <TableHead className="text-right text-xs">생산성</TableHead>
+                        <TableHead className="text-right text-xs">달성률</TableHead>
+                        <TableHead className="text-right text-xs">추가 인원</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((r) => (
+                        <TableRow key={r.task_no}>
+                          <TableCell className="font-mono text-xs">{r.task_no}</TableCell>
+                          <TableCell className="max-w-[240px] truncate text-xs" title={r.task_name}>{r.task_name}</TableCell>
+                          <TableCell className="text-xs">{r.work_type}</TableCell>
+                          <TableCell className="text-xs">{r.team}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{r.manpower.toLocaleString()}</TableCell>
+                          {showKindColumns && <TableCell className="text-right text-xs tabular-nums">—</TableCell>}
+                          {showKindColumns && <TableCell className="text-right text-xs tabular-nums">—</TableCell>}
+                          <TableCell className="text-right text-xs tabular-nums">{r.record_days} / {summary.calendarDays}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{fmtPct(r.plan_pct)}</TableCell>
+                          <TableCell className={cn('text-right text-xs tabular-nums', (r.actual_pct ?? 0) < 0 && 'text-red-600')}>{fmtPct(r.actual_pct)}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">
+                            {r.productivity == null
+                              ? <Badge variant="outline" className="text-[10px]">{r.kind === '다' ? '산출 불가' : '—'}</Badge>
+                              : fmtProd(r.productivity)}
+                          </TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">
+                            {r.achievement == null
+                              ? <Badge variant="outline" className="text-[10px]">계획 없음</Badge>
+                              : <span className={r.achievement >= 1 ? 'text-emerald-600' : 'text-red-600'}>{(r.achievement * 100).toFixed(1)}%</span>}
+                          </TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">
+                            {r.plan_pct == null || r.plan_pct <= 0
+                              ? <Badge variant="outline" className="text-[10px]">해당 없음</Badge>
+                              : r.extra_manpower === 0
+                                ? <span className="text-emerald-600">증원 불필요</span>
+                                : <span className="text-red-600">{fmtExtra(r.extra_manpower_per_day)}</span>}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {rows.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={showKindColumns ? 14 : 12} className="p-6 text-center text-xs text-muted-foreground">표시할 코드가 없습니다</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="team" className="mt-2">
+                <div className="max-h-[420px] overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">팀</TableHead>
+                        <TableHead className="text-right text-xs">코드 수</TableHead>
+                        <TableHead className="text-right text-xs">인원</TableHead>
+                        <TableHead className="text-right text-xs">Σ계획%</TableHead>
+                        <TableHead className="text-right text-xs">Σ실적%</TableHead>
+                        <TableHead className="text-right text-xs">생산성</TableHead>
+                        <TableHead className="text-right text-xs">달성률</TableHead>
+                        <TableHead className="text-right text-xs">추가 인원(인·일)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {teamRows.map((t) => (
+                        <TableRow key={t.team}>
+                          <TableCell className="text-xs font-medium">{t.team}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{t.codes.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{t.manpower.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{fmtPct(t.planSum)}</TableCell>
+                          <TableCell className={cn('text-right text-xs tabular-nums', t.actualSum < 0 && 'text-red-600')}>{fmtPct(t.actualSum)}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{fmtProd(t.productivity) || '—'}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">
+                            {t.achievement == null
+                              ? <Badge variant="outline" className="text-[10px]">계획 없음</Badge>
+                              : <span className={t.achievement >= 1 ? 'text-emerald-600' : 'text-red-600'}>{(t.achievement * 100).toFixed(1)}%</span>}
+                          </TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">
+                            {t.extraManpower > 0 ? fmtExtra(t.extraManpower, '') : '0'}
+                            {t.crossTeamCodes.length > 0 && (
+                              <Badge variant="secondary" className="ml-1 text-[10px]" title={t.crossTeamCodes.join(', ')}>
+                                두 공종 코드 {t.crossTeamCodes.length}
+                              </Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {teamRows.length === 0 && (
+                        <TableRow><TableCell colSpan={8} className="p-6 text-center text-xs text-muted-foreground">표시할 팀이 없습니다</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="contractor" className="mt-2 space-y-2">
+                <div className="text-[11px] text-muted-foreground">
+                  단독 코드 {contractor.soloCodes.toLocaleString()}건 · 공동 코드 {contractor.sharedCodes.toLocaleString()}건
+                  {' · '}소계 실적은 단독 코드만 더한다
+                </div>
+                <div className="max-h-[420px] overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">업체</TableHead>
+                        <TableHead className="text-xs">TM Code</TableHead>
+                        <TableHead className="text-xs">Task</TableHead>
+                        <TableHead className="text-right text-xs">인원(그 업체)</TableHead>
+                        <TableHead className="text-right text-xs">당일실적%</TableHead>
+                        <TableHead className="text-right text-xs">생산성</TableHead>
+                        <TableHead className="text-xs">비고</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {contractor.rows.map((r) => (
+                        <TableRow key={`${r.contractor}@@${r.task_no}`}>
+                          <TableCell className="text-xs font-medium">{r.contractor}</TableCell>
+                          <TableCell className="font-mono text-xs">{r.task_no}</TableCell>
+                          <TableCell className="max-w-[240px] truncate text-xs" title={r.task_name}>{r.task_name}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{r.manpower.toLocaleString()}</TableCell>
+                          <TableCell className={cn('text-right text-xs tabular-nums', (r.actual_pct ?? 0) < 0 && 'text-red-600')}>{fmtPct(r.actual_pct)}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{fmtProd(r.productivity) || '—'}</TableCell>
+                          <TableCell className="text-xs">
+                            {r.shared
+                              ? <Badge variant="secondary" className="text-[10px]">공동 {r.sharedCount}사 · 코드 전체 인원 {r.codeManpower.toLocaleString()} 기준</Badge>
+                              : <Badge variant="outline" className="text-[10px]">단독</Badge>}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {contractor.rows.length === 0 && (
+                        <TableRow><TableCell colSpan={7} className="p-6 text-center text-xs text-muted-foreground">표시할 업체가 없습니다</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="max-h-[240px] overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">업체 소계 (단독 코드 기준)</TableHead>
+                        <TableHead className="text-right text-xs">단독 인원</TableHead>
+                        <TableHead className="text-right text-xs">Σ실적%</TableHead>
+                        <TableHead className="text-right text-xs">생산성</TableHead>
+                        <TableHead className="text-xs">공동 포함 인원</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {subtotals.map((s) => (
+                        <TableRow key={s.contractor}>
+                          <TableCell className="text-xs font-medium">{s.contractor}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{s.soloManpower.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{fmtPct(s.actualSum)}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{fmtProd(s.productivity) || '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">공동 포함 인원 {(s.soloManpower + s.sharedManpower).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
