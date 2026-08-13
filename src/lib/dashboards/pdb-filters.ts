@@ -28,6 +28,10 @@ export interface PdbSmFilters {
 
 export interface PdbAbdFilters {
   teams: string[];
+  /** S-Curve/매트릭스에 표시할 스테이지. 빈 배열이면 전체 */
+  stages: string[];
+  /** KPI 카드(진도·지연) 산출 기준 스테이지 */
+  kpiStage: string;
   planMode: "baseline" | "remaining";
   bucket: "day" | "week" | "month";
   startDate: string | null;
@@ -60,6 +64,8 @@ export const PDB_DEFAULTS: PdbFilters = {
   },
   abd: {
     teams: [],
+    stages: [],
+    kpiStage: "approval",
     planMode: "baseline",
     bucket: "week",
     startDate: null,
@@ -105,6 +111,8 @@ export function normalizePdbFilters(module: PdbModule, raw: unknown): PdbFilters
   const d = PDB_DEFAULTS.abd;
   return {
     teams: strArr(o.teams, d.teams),
+    stages: strArr(o.stages, d.stages),
+    kpiStage: str(o.kpiStage, d.kpiStage),
     planMode: str(o.planMode, d.planMode),
     bucket: str(o.bucket, d.bucket),
     startDate: dateOrNull(o.startDate),
@@ -150,6 +158,8 @@ export function pdbFilterChips(
   const a = f as PdbAbdFilters;
   return [
     { label: "Team", value: listLabel(a.teams) },
+    { label: "Stage", value: listLabel(a.stages) },
+    { label: "KPI Stage", value: stageLabel ? stageLabel(a.kpiStage) : a.kpiStage },
     { label: "Plan", value: a.planMode === "remaining" ? "Remaining" : "Baseline" },
     { label: "Bucket", value: BUCKET_LABEL[a.bucket] ?? a.bucket },
     { label: "차트 시작", value: a.startDate ?? "기본(−14일)" },
