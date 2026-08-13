@@ -38,6 +38,7 @@ import {
   signedDomain,
   trimFlatTail,
 } from "@/lib/charts/scurve-view";
+import { bucketTargetTerm } from "@/lib/charts/bucket-terms";
 
 export type SnagCurveUnit = "cnt" | "pct";
 
@@ -145,7 +146,7 @@ export function SnagKpiPlanVsActualCard({
       ser.cumActual[i] == null
         ? null
         : r1(conv(baselineActual + (ser.cumActual[i] as number))),
-    // Δ 는 증분 기준(해당 버킷 Actual − Plan) — ABD/SM Progress 카드와 동일 정의.
+    // Δ 는 당일/금주/당월 목표 기준(해당 버킷 Actual − Plan) — ABD/SM Progress 카드와 동일 정의.
     variance:
       ser.dailyActual[i] == null
         ? null
