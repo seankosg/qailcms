@@ -145,16 +145,11 @@ export function SnagKpiPlanVsActualCard({
       ser.cumActual[i] == null
         ? null
         : r1(conv(baselineActual + (ser.cumActual[i] as number))),
+    // Δ 는 증분 기준(해당 버킷 Actual − Plan) — ABD/SM Progress 카드와 동일 정의.
     variance:
-      ser.cumActual[i] == null
+      ser.dailyActual[i] == null
         ? null
-        : r1(
-            conv(
-              baselineActual +
-                (ser.cumActual[i] as number) -
-                (baselinePlan + ser.cumPlan[i]),
-            ),
-          ),
+        : r1(conv((ser.dailyActual[i] as number) - ser.dailyPlan[i])),
   }));
 
   // 보이는 창만 줄인다 — 누계·모수 계산에는 손대지 않는다.
