@@ -64,6 +64,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
           const planCnt = q.baseline.planUpto;
           const actualPct = q.stageTotal > 0 ? (actualCnt / q.stageTotal) * 100 : null;
           const planPct = q.stageTotal > 0 ? (planCnt / q.stageTotal) * 100 : null;
+          const diffPct = actualPct != null && planPct != null ? actualPct - planPct : null;
           return (
           <div key={label} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
