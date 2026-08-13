@@ -238,28 +238,9 @@ export function SnagKpiPlanVsActualCard({
               >
                 {open ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                 <TrendingUp className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Plan vs Actual — S-Curve</CardTitle>
-                {controlsHidden ? null : (
-                <div className="flex flex-wrap items-center gap-1">
-                  {filterSummary.map((f) => (
-                    <span
-                      key={f.label}
-                      className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
-                    >
-                      <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
-                      <span className="text-foreground">{f.value}</span>
-                    </span>
-                  ))}
-                  <span className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs tabular-nums text-foreground">
-                    모수 {n.toLocaleString()}건
-                  </span>
-                </div>
-                )}
+                <CardTitle className="text-base">Progress Status</CardTitle>
               </button>
             </CollapsibleTrigger>
-            <div className="w-full text-[11px] tabular-nums text-muted-foreground">
-              As of {asOfDate} · 전체 누적 (차트 구간 이전 포함) · 모수 {stageTotal.toLocaleString()}건
-            </div>
 
             {controlsHidden ? null : (
             <div className="flex items-center gap-2">
