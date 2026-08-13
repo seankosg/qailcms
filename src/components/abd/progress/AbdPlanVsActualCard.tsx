@@ -275,6 +275,7 @@ export function AbdPlanVsActualCard({
                     />
                     <YAxis
                       yAxisId="cum"
+                      orientation="right"
                       tick={{ fontSize: 11 }}
                       domain={[0, 100]}
                       ticks={[0, 20, 40, 60, 80, 100]}
@@ -282,7 +283,6 @@ export function AbdPlanVsActualCard({
                     />
                     <YAxis
                       yAxisId="bar"
-                      orientation="right"
                       tick={{ fontSize: 11 }}
                       allowDecimals={false}
                       domain={[0, incMax]}
