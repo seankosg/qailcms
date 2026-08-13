@@ -87,7 +87,8 @@ export function useAbdScurveData(params: AbdScurveParams) {
           round,
         },
       }),
-    staleTime: 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
   });
 
@@ -97,7 +98,8 @@ export function useAbdScurveData(params: AbdScurveParams) {
       totalsFn({
         data: { plots, teams, groupBy, asOfDate, planMode, round },
       }),
-    staleTime: 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
   });
 
@@ -110,7 +112,8 @@ export function useAbdScurveData(params: AbdScurveParams) {
       totalsFn({
         data: { plots, teams, groupBy, asOfDate: baselineAsOf, planMode, round },
       }),
-    staleTime: 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
     enabled: scurveEnabled,
   });
@@ -145,7 +148,8 @@ export function useAbdScurveData(params: AbdScurveParams) {
           round,
         },
       }),
-    staleTime: 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
     enabled: scurveEnabled,
   });

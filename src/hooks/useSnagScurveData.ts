@@ -99,7 +99,8 @@ export function useSnagScurveData(params: SnagScurveParams) {
           planMode,
         },
       }),
-    staleTime: 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
   });
 
@@ -117,7 +118,8 @@ export function useSnagScurveData(params: SnagScurveParams) {
           planMode,
         },
       }),
-    staleTime: 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
   });
 
