@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { validateIncrementLocally } from "./ocs-local-validation";
+import {
+  BASELINE_V1_NOTICE,
+  buildLocalValidationReceipt,
+  validateIncrementLocally,
+  verifyLocalValidationReceipt,
+} from "./ocs-local-validation";
+import { BASELINE_CORE_TABLES } from "./ocs-baseline-shared";
+import { nextPackageFileName, PACKAGE_NAME_RE } from "./ocs-increment-package";
+import { correctedFileName } from "./ocs-corrected-package";
+import { makeCorrectionsDoc, type CorrectionItem } from "./ocs-local-corrections";
 import type { BaselineRead, AbdIndexRow } from "./ocs-baseline-reader";
 import type { IncrementPackage } from "./ocs-increment-package";
 import type { V3StageComment } from "./ocs-v3-parser";
@@ -76,7 +85,9 @@ function pkg(comments: V3StageComment[]): IncrementPackage {
       base_baseline_id: "B1",
       base_import_run_id: "R1",
       base_core_hash: "abc",
-      base_core_table_hashes: {},
+      base_core_table_hashes: Object.fromEntries(
+        BASELINE_CORE_TABLES.map((t) => [t, "h"]),
+      ) as Record<string, string>,
       base_generated_at: "",
       target_ocs_numbers: [],
       change_type: "new",
@@ -194,6 +205,102 @@ describe("validateIncrementLocally", () => {
       baseline: baseline(null),
     });
     expect(r.issues.some((x) => x.code === "BASELINE_INDEX_MISSING")).toBe(true);
+    expect(r.clean).toBe(false);
+    expect(r.baseline_supports_local_validation).toBe(false);
+    expect(r.issues.find((x) => x.code === "BASELINE_INDEX_MISSING")?.message).toBe(
+      BASELINE_V1_NOTICE,
+    );
+  });
+
+  it("v2 Baseline 은 정상 검증된다", () => {
+    const r = validateIncrementLocally({
+      pkg: pkg([comment({ abd_numbers: ["ABD-001"] })]),
+      baseline: baseline([idx("ABD-001")]),
+    });
+    expect(r.baseline_supports_local_validation).toBe(true);
+    expect(r.clean).toBe(true);
+  });
+
+  it("unresolved 1건 → canonical 교정 후 unresolved 0 · 항등식 유지", async () => {
+    const before = validateIncrementLocally({
+      pkg: pkg([comment({ abd_numbers: ["abd-001 "] })]),
+      baseline: baseline([idx("ABD-001")]),
+    });
+    expect(before.unresolved_abd_count).toBe(1);
+    expect(before.abd_link_associations).toBe(1);
+
+    const item: CorrectionItem = {
+      source_file_hash: "h1",
+      source_file_name: "a.xlsx",
+      sheet_name: "S",
+      source_row: 3,
+      sn: "C1",
+      atomic_item_no: 1,
+      field: "abd_number",
+      before: "abd-001 ",
+      after: "ABD-001",
+      after_abd_item_id: "id-ABD-001",
+      reason: "user_selected_canonical_mapping",
+    };
+    const doc = makeCorrectionsDoc("P", "sha", "B1", [item]);
+    const after = validateIncrementLocally({
+      pkg: pkg([comment({ abd_numbers: ["abd-001 "] })]),
+      baseline: baseline([idx("ABD-001")]),
+      corrections: doc,
+    });
+    expect(after.unresolved_abd_count).toBe(0);
+    expect(after.clean).toBe(true);
+    expect(after.abd_link_associations).toBe(1);
+    expect(after.distinct_linked_abd).toBe(1);
+    expect(after.duplicate_identity_count).toBe(0);
+    expect(after.duplicate_pair_count).toBe(0);
+    expect(
+      after.single_linked_comments + after.multi_linked_comments + after.unmatched_comments,
+    ).toBe(after.active_comments);
+
+    // 변조된 locator 는 적용되지 않고 차단된다.
+    const tampered = makeCorrectionsDoc("P", "sha", "B1", [{ ...item, source_row: 999 }]);
+    const bad = validateIncrementLocally({
+      pkg: pkg([comment({ abd_numbers: ["abd-001 "] })]),
+      baseline: baseline([idx("ABD-001")]),
+      corrections: tampered,
+    });
+    expect(bad.clean).toBe(false);
+    expect(bad.unresolved_abd_count).toBe(1);
+  });
+
+  it("교정 ZIP 파일명은 계약(OCS_Increment_<YYYYMMDD>_<seq>.zip)을 지킨다", () => {
+    const name = correctedFileName("OCS_Increment_20260101_1.zip", 1);
+    expect(name).toBe("OCS_Increment_20260101_2.zip");
+    expect(PACKAGE_NAME_RE.test(name)).toBe(true);
+    expect(nextPackageFileName("OCS_Increment_20260101_09.zip")).toBe(
+      "OCS_Increment_20260101_10.zip",
+    );
+  });
+
+  it("변조된 payload digest 는 영수증 대조에서 차단된다", async () => {
+    const p = pkg([comment({ abd_numbers: ["ABD-001"] })]);
+    const r = validateIncrementLocally({ pkg: p, baseline: baseline([idx("ABD-001")]) });
+    const receipt = await buildLocalValidationReceipt({
+      pkg: p,
+      result: r,
+      corrections: null,
+      manifestForPayload: p.manifest,
+    });
+    const okCheck = await verifyLocalValidationReceipt({
+      receipt,
+      pkg: p,
+      corrections: null,
+      manifestForPayload: p.manifest,
+    });
+    expect(okCheck.ok).toBe(true);
+    const badCheck = await verifyLocalValidationReceipt({
+      receipt: { ...receipt, payload_sha256: "deadbeef" },
+      pkg: p,
+      corrections: null,
+      manifestForPayload: p.manifest,
+    });
+    expect(badCheck.ok).toBe(false);
   });
 
   it("active identity 중복을 차단한다", () => {

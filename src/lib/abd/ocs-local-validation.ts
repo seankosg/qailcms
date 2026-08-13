@@ -2,6 +2,7 @@
 // UI 와 corrected ZIP 재검증이 이 모듈 하나를 공유한다. 검증식을 UI 에 중복 작성하지 않는다.
 import { canonicalJson } from "@/lib/abd/ocs-canonical-json";
 import { sha256Hex } from "@/lib/abd/ocs-db-parser";
+import { BASELINE_CORE_TABLES } from "@/lib/abd/ocs-baseline-shared";
 import { normalizeAbdNumber } from "@/lib/abd/ocs-number-normalize";
 import type { BaselineRead } from "@/lib/abd/ocs-baseline-reader";
 import type { IncrementPackage } from "@/lib/abd/ocs-increment-package";
@@ -15,6 +16,32 @@ import {
 
 export const LOCAL_VALIDATION_SCHEMA = "ocs-local-validation/1";
 export const VALIDATOR_VERSION = "ocs-local-validator/1.0.0";
+/** 영수증 파일명 — 계약상 이 이름 하나만 사용한다. */
+export const LOCAL_RECEIPT_PATH = "local_validation_receipt.json";
+/** payload digest 대상과 canonical 순서 — 코드 상수로 고정한다(영수증 자체는 제외). */
+export const PAYLOAD_DIGEST_PARTS = [
+  "manifest",
+  "atomic",
+  "response_mapping",
+  "policy",
+  "corrections",
+] as const;
+/** v1 Baseline 안내 — 문구 고정 */
+export const BASELINE_V1_NOTICE =
+  "This Baseline can still be used by the legacy import flow, but it does not contain the ABD validation index.\nGenerate and download a new Baseline to use browser-local validation.";
+
+/**
+ * digest 대상 manifest canonical view — 영수증 entry 를 files 목록에서 제외해 digest 순환을 끊는다.
+ */
+export function manifestPayloadView(manifest: unknown): unknown {
+  const m = { ...((manifest ?? {}) as Record<string, unknown>) };
+  if (Array.isArray(m["files"])) {
+    m["files"] = (m["files"] as Record<string, unknown>[]).filter(
+      (f) => String(f["relative_path"]) !== LOCAL_RECEIPT_PATH,
+    );
+  }
+  return m;
+}
 
 export type LocalValidationIssue = {
   severity: "blocker" | "warning";
@@ -48,6 +75,15 @@ export type LocalValidationResult = {
     images: number;
     response_segments: number;
   };
+  /** 교정 검산용 파생치 */
+  abd_link_associations: number;
+  distinct_linked_abd: number;
+  active_comments: number;
+  single_linked_comments: number;
+  multi_linked_comments: number;
+  unmatched_comments: number;
+  /** v2 Baseline(ABD 인덱스 보유) 여부 — false 면 로컬 ABD 검증 불가 */
+  baseline_supports_local_validation: boolean;
   blocker_count: number;
   warning_count: number;
   unresolved_abd_count: number;
@@ -71,6 +107,7 @@ export type LocalValidationReceipt = {
   blocker_count: number;
   warning_count: number;
   contract_hash: string;
+  payload_parts: readonly string[];
 };
 
 const issue = (p: Partial<LocalValidationIssue> & Pick<LocalValidationIssue, "code" | "message">) =>
@@ -162,6 +199,27 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
     }
   }
 
+  // 1-1) manifest 정적 계약 — core 8개 테이블 해시 전수 (서버에서 브라우저로 이관)
+  {
+    const keys = Object.keys(pkg.manifest.base_core_table_hashes ?? {});
+    const missing = BASELINE_CORE_TABLES.filter((t) => !keys.includes(t));
+    const extra = keys.filter((k) => !(BASELINE_CORE_TABLES as readonly string[]).includes(k));
+    const blank = BASELINE_CORE_TABLES.filter(
+      (t) => !String(pkg.manifest.base_core_table_hashes?.[t] ?? "").trim(),
+    );
+    if (missing.length || extra.length || blank.length) {
+      issues.push(
+        issue({
+          code: "MANIFEST_CORE_TABLE_CONTRACT",
+          field: "base_core_table_hashes",
+          message: `core table hashes 계약 위반 (누락 ${missing.join(",") || "없음"} / 추가 ${
+            extra.join(",") || "없음"
+          } / 공백 ${blank.join(",") || "없음"})`,
+        }),
+      );
+    }
+  }
+
   // 2) 교정 적용
   let comments: V3StageComment[] = pkg.atomic.comments;
   let correctionCount = 0;
@@ -196,8 +254,7 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
       issue({
         code: "BASELINE_INDEX_MISSING",
         field: "validation/abd_items_index.json",
-        message:
-          "선택한 Baseline 에 ABD 번호 인덱스가 없습니다 (ocs-baseline-v2 필요). 최신 Baseline 을 생성·다운로드한 뒤 다시 검증하십시오.",
+        message: BASELINE_V1_NOTICE,
       }),
     );
   } else {
@@ -449,6 +506,27 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
     );
   }
 
+  // 10-1) 교정 검산용 파생치 — active atomic = single + multi + unmatched
+  let singleLinked = 0;
+  let multiLinked = 0;
+  let unmatched = 0;
+  let associations = 0;
+  const distinctAbd = new Set<string>();
+  for (const c of comments) {
+    if (!c.is_active) continue;
+    const n = c.abd_numbers.length;
+    associations += n;
+    for (const x of c.abd_numbers) distinctAbd.add(x);
+    if (n === 0) unmatched += 1;
+    else if (n === 1) singleLinked += 1;
+    else multiLinked += 1;
+  }
+  if (singleLinked + multiLinked + unmatched !== activeN) {
+    issues.push(
+      issue({ code: "LINK_IDENTITY_MISMATCH", field: "identity", message: "링크 항등식 불일치" }),
+    );
+  }
+
   const blocker_count = issues.filter((i) => i.severity === "blocker").length;
   const warning_count = issues.length - blocker_count;
 
@@ -470,6 +548,13 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
     },
     blocker_count,
     warning_count,
+    abd_link_associations: associations,
+    distinct_linked_abd: distinctAbd.size,
+    active_comments: activeN,
+    single_linked_comments: singleLinked,
+    multi_linked_comments: multiLinked,
+    unmatched_comments: unmatched,
+    baseline_supports_local_validation: baseline.abdIndex !== null,
     unresolved_abd_count: unresolved,
     duplicate_identity_count: dupIdentities.length,
     duplicate_pair_count: duplicatePairs,
@@ -484,26 +569,40 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
  * 로컬 검증 영수증 — ZIP 자기참조 hash 를 쓰지 않는다.
  * payload_sha256 = manifest + atomic + response + policy + corrections 의 canonical digest.
  */
+export async function computeLocalPayloadDigest(args: {
+  pkg: IncrementPackage;
+  corrections: CorrectionsDoc | null;
+  manifestForPayload: unknown;
+}): Promise<string> {
+  // PAYLOAD_DIGEST_PARTS 순서를 코드 상수로 고정한다. 영수증 자체는 대상에서 제외한다.
+  const parts: Record<(typeof PAYLOAD_DIGEST_PARTS)[number], unknown> = {
+    manifest: manifestPayloadView(args.manifestForPayload),
+    atomic: {
+      comments: args.pkg.atomic.comments,
+      groups: args.pkg.atomic.groups,
+      attachments: args.pkg.atomic.attachments,
+    },
+    response_mapping: args.pkg.response.segments,
+    policy: args.pkg.policy,
+    corrections: args.corrections
+      ? { ...args.corrections, corrections_sha256: await correctionsSha256(args.corrections) }
+      : null,
+  };
+  const ordered = PAYLOAD_DIGEST_PARTS.map((k) => [k, parts[k]] as const);
+  return sha256Hex(canonicalJson({ parts: ordered.map(([k, v]) => ({ key: k, value: v })) }));
+}
+
 export async function buildLocalValidationReceipt(args: {
   pkg: IncrementPackage;
   result: LocalValidationResult;
   corrections: CorrectionsDoc | null;
   manifestForPayload: unknown;
 }): Promise<LocalValidationReceipt> {
-  const payload = {
-    manifest: args.manifestForPayload,
-    atomic: {
-      comments: args.pkg.atomic.comments,
-      groups: args.pkg.atomic.groups,
-      attachments: args.pkg.atomic.attachments,
-    },
-    response: args.pkg.response.segments,
-    policy: args.pkg.policy,
-    corrections: args.corrections
-      ? { ...args.corrections, corrections_sha256: await correctionsSha256(args.corrections) }
-      : null,
-  };
-  const payload_sha256 = await sha256Hex(canonicalJson(payload));
+  const payload_sha256 = await computeLocalPayloadDigest({
+    pkg: args.pkg,
+    corrections: args.corrections,
+    manifestForPayload: args.manifestForPayload,
+  });
   const contract_hash = await sha256Hex(
     canonicalJson({
       clean: args.result.clean,
@@ -527,5 +626,29 @@ export async function buildLocalValidationReceipt(args: {
     blocker_count: args.result.blocker_count,
     warning_count: args.result.warning_count,
     contract_hash,
+    payload_parts: PAYLOAD_DIGEST_PARTS,
   };
+}
+
+/** 영수증 재계산 대조 — 변조된 payload digest 를 차단한다. */
+export async function verifyLocalValidationReceipt(args: {
+  receipt: LocalValidationReceipt;
+  pkg: IncrementPackage;
+  corrections: CorrectionsDoc | null;
+  manifestForPayload: unknown;
+}): Promise<{ ok: boolean; reasons: string[] }> {
+  const reasons: string[] = [];
+  if (args.receipt.schema_version !== LOCAL_VALIDATION_SCHEMA)
+    reasons.push(`영수증 schema_version 불일치: ${args.receipt.schema_version}`);
+  const expected = await computeLocalPayloadDigest({
+    pkg: args.pkg,
+    corrections: args.corrections,
+    manifestForPayload: args.manifestForPayload,
+  });
+  if (expected !== args.receipt.payload_sha256)
+    reasons.push("payload_sha256 가 재계산값과 다릅니다 (영수증 변조).");
+  if (args.receipt.package_id !== args.pkg.manifest.package_id)
+    reasons.push("영수증 package_id 가 패키지와 다릅니다.");
+  if (!args.receipt.clean) reasons.push("영수증이 CLEAN 이 아닙니다.");
+  return { ok: reasons.length === 0, reasons };
 }

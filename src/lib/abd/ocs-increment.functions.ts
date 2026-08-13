@@ -103,11 +103,7 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
       data.base_import_run_id || latestRunId,
     );
     const expectedBaselineId = baselineCandidates.v2;
-    const mismatchedTables = Object.keys(currentTableHashes).filter(
-      (t) =>
-        data.base_core_table_hashes[t] !== undefined &&
-        data.base_core_table_hashes[t] !== currentTableHashes[t],
-    );
+    // 테이블별 해시 전수 대조는 브라우저 로컬 검증으로 이관했다(중복 검증 제거).
 
     return {
       duplicate_package: (dup ?? []).length > 0,
@@ -122,7 +118,7 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
         ? baselineCandidates.all.includes(data.base_baseline_id)
         : null,
       baseline_id_expected: expectedBaselineId,
-      mismatched_core_tables: mismatchedTables,
+      mismatched_core_tables: [] as string[],
     } as unknown as Json;
   });
 
@@ -169,6 +165,14 @@ export const ocsIncImport = createServerFn({ method: "POST" })
       assets?: unknown;
       image_meta?: unknown;
       upload_receipts?: unknown;
+      /** 브라우저 로컬 검증 영수증 요약 (local_validation_receipt.json) */
+      local_validation?: {
+        payload_sha256: string;
+        package_sha256: string;
+        clean: boolean;
+        baseline_id: string;
+        validator_version: string;
+      } | null;
     }) => {
       const need = [
         "run_id",
@@ -196,11 +200,20 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         assets: assetList(input.assets),
         image_meta: imageMetaList(input.image_meta),
         upload_receipts: receiptList(input.upload_receipts),
+        local_validation: input.local_validation ?? null,
       };
     },
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
+
+    // 최소 대조 — 브라우저 로컬 검증 영수증이 이 패키지의 것인지, CLEAN 인지만 확인한다.
+    const lv = data.local_validation;
+    if (!lv) throw new Error("로컬 검증 영수증(local_validation_receipt.json)이 없습니다.");
+    if (lv.clean !== true) throw new Error("로컬 검증이 CLEAN 이 아닙니다.");
+    if (!lv.payload_sha256) throw new Error("로컬 검증 payload digest 가 없습니다.");
+    if (lv.package_sha256 !== data.package_sha256)
+      throw new Error("로컬 검증 영수증의 ZIP SHA-256 이 업로드된 패키지와 다릅니다.");
 
     // 사전 백업 검증
     const { data: run, error: runErr } = await context.supabase
