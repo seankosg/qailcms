@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { z } from 'zod';
-import { dohaDateOnly } from '@/lib/time/doha';
+import { normalizeDmrReportDate, assertNotFutureReportDate } from './dmr/report-date';
 import { normalizeDmrTeam, normalizeDmrContractor, isDmrDirectContractor } from './dmr/types';
 
 /** 입력은 스크린샷(이미지)뿐이다. 엑셀 업로드 경로는 폐지됐다. */
@@ -35,22 +35,8 @@ const SectionSchema = z.object({
   warnings: z.array(z.string()).optional(),
 });
 
-function normalizeDate(raw: string): string {
-  const s = String(raw).trim();
-  // YYYY.MM.DD or YYYY-MM-DD or YYYY/MM/DD
-  const m1 = s.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/);
-  if (m1) {
-    return `${m1[1]}-${m1[2].padStart(2, '0')}-${m1[3].padStart(2, '0')}`;
-  }
-  // DD/MM/YYYY
-  const m2 = s.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})$/);
-  if (m2) {
-    return `${m2[3]}-${m2[2].padStart(2, '0')}-${m2[1].padStart(2, '0')}`;
-  }
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) return dohaDateOnly(d) ?? s;
-  return s;
-}
+// 날짜 정규화는 src/lib/dmr/report-date.ts 가 유일한 근거다.
+// `new Date(문자열)` 폴백(미국식 월-우선)은 2026-11-08 오적재의 원인이라 폐지됐다.
 
 export const parseDmrImages = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
@@ -117,7 +103,8 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
       const argsRaw = toolCall.function?.arguments;
       const parsed = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
       const section = SectionSchema.parse(parsed);
-      section.report_date = normalizeDate(section.report_date);
+      section.report_date = normalizeDmrReportDate(section.report_date);
+      assertNotFutureReportDate(section.report_date);
       // Contractor 정규화 + 기존 미리보기(DmrImportPage) 호환용 values 채우기
       const rows = section.rows.map((r) => {
         const contractor = normalizeDmrContractor(r.contractor);

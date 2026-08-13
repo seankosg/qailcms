@@ -1,6 +1,8 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { normalizeDmrReportDate, assertNotFutureReportDate } from './dmr/report-date';
+import { dmrPayloadFingerprint, totalActual } from './dmr/duplicate-guard';
 
 /**
  * 출면기록부 저장 경로 (2단계).
@@ -25,9 +27,11 @@ const EntrySchema = z.object({
 });
 
 const InputSchema = z.object({
-  report_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  report_date: z.preprocess((v) => normalizeDmrReportDate(v), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   discipline: z.enum(['ARCH', 'ELEC', 'MECH']),
   entries: z.array(EntrySchema).min(1).max(2000),
+  /** 다른 날짜와 완전히 같은 표임을 사용자가 확인한 경우에만 true */
+  confirm_duplicate: z.boolean().default(false),
 });
 
 export const saveDmrTaskEntries = createServerFn({ method: 'POST' })
@@ -35,6 +39,9 @@ export const saveDmrTaskEntries = createServerFn({ method: 'POST' })
   .inputValidator((data) => InputSchema.parse(data))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
+
+    // 미래 날짜는 저장하지 않는다 (날짜 오적재의 가장 흔한 신호).
+    assertNotFutureReportDate(data.report_date);
 
     const roles = await Promise.all(
       ['admin', 'superuser', 'd_superuser', 'senior_user'].map((r) =>
@@ -145,6 +152,35 @@ export const saveDmrTaskEntries = createServerFn({ method: 'POST' })
       });
     }
     const mergedPayload = [...mergedMap.values()];
+
+    // 같은 표를 다른 날짜로 다시 넣는 사고 차단.
+    if (!data.confirm_duplicate) {
+      const fp = dmrPayloadFingerprint(mergedPayload as any);
+      const from = new Date(new Date(`${data.report_date}T00:00:00Z`).getTime() - 45 * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      const { data: near } = await sb
+        .from('dmr_entries')
+        .select('report_date, system_name, contractor_name, plot, actual_manpower')
+        .eq('discipline', data.discipline)
+        .neq('report_date', data.report_date)
+        .gte('report_date', from)
+        .lte('report_date', data.report_date);
+      const byDate = new Map<string, any[]>();
+      for (const r of near ?? []) {
+        const k = String(r.report_date);
+        if (!byDate.has(k)) byDate.set(k, []);
+        byDate.get(k)!.push(r);
+      }
+      for (const [d, rows] of byDate) {
+        if (dmrPayloadFingerprint(rows) === fp) {
+          throw new Error(
+            `중복 의심: ${d} 자료와 행 구성·인원(총 ${totalActual(rows)}명)이 완전히 같습니다. ` +
+              `보고일(${data.report_date})이 맞는지 확인하고, 그래도 저장하려면 중복 저장을 확인해 주세요.`,
+          );
+        }
+      }
+    }
 
     const { data: saved, error } = await sb
       .from('dmr_entries')
