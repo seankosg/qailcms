@@ -3642,6 +3642,7 @@ export type Database = {
       hdec_pic_name_master: {
         Row: {
           created_at: string
+          duty_title: string | null
           id: string
           is_active: boolean
           last_seen_at: string | null
@@ -3651,11 +3652,17 @@ export type Database = {
           name_norm: string
           name_variants: string[]
           note: string | null
+          parent_pic_id: string | null
+          rank_level: number | null
+          rank_title: string | null
+          sort_order: number
+          team_code: string | null
           updated_at: string
           verified: boolean
         }
         Insert: {
           created_at?: string
+          duty_title?: string | null
           id?: string
           is_active?: boolean
           last_seen_at?: string | null
@@ -3665,11 +3672,17 @@ export type Database = {
           name_norm: string
           name_variants?: string[]
           note?: string | null
+          parent_pic_id?: string | null
+          rank_level?: number | null
+          rank_title?: string | null
+          sort_order?: number
+          team_code?: string | null
           updated_at?: string
           verified?: boolean
         }
         Update: {
           created_at?: string
+          duty_title?: string | null
           id?: string
           is_active?: boolean
           last_seen_at?: string | null
@@ -3679,6 +3692,11 @@ export type Database = {
           name_norm?: string
           name_variants?: string[]
           note?: string | null
+          parent_pic_id?: string | null
+          rank_level?: number | null
+          rank_title?: string | null
+          sort_order?: number
+          team_code?: string | null
           updated_at?: string
           verified?: boolean
         }
@@ -3693,6 +3711,13 @@ export type Database = {
           {
             foreignKeyName: "hdec_pic_name_master_merged_into_fk"
             columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "hdec_pic_name_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hdec_pic_name_master_parent_pic_id_fkey"
+            columns: ["parent_pic_id"]
             isOneToOne: false
             referencedRelation: "hdec_pic_name_master"
             referencedColumns: ["id"]
@@ -7030,6 +7055,7 @@ export type Database = {
           is_active: boolean
           name: string
           sort_order: number
+          target_headcount: number
           updated_at: string
         }
         Insert: {
@@ -7040,6 +7066,7 @@ export type Database = {
           is_active?: boolean
           name: string
           sort_order?: number
+          target_headcount?: number
           updated_at?: string
         }
         Update: {
@@ -7050,6 +7077,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           sort_order?: number
+          target_headcount?: number
           updated_at?: string
         }
         Relationships: []
