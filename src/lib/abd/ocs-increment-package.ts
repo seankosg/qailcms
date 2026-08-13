@@ -265,7 +265,7 @@ export function buildImageMeta(
 export async function readIncrementPackage(file: File): Promise<IncrementPackage> {
   const blockers: string[] = [];
   if (!PACKAGE_NAME_RE.test(file.name)) {
-    blockers.push(`파일명이 계약과 다릅니다: ${file.name} (OCS_Increment_<YYYYMMDD>_<seq>[_corrected_<n>].zip)`);
+    blockers.push(`파일명이 계약과 다릅니다: ${file.name} (OCS_Increment_<YYYYMMDD>_<seq>.zip)`);
   }
   const raw = await file.arrayBuffer();
   const packageSha = await hashBytes(raw);
