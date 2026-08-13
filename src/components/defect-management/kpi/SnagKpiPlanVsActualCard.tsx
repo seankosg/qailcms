@@ -359,7 +359,6 @@ export function SnagKpiPlanVsActualCard({
                         x={todayLabel}
                         stroke="var(--destructive)"
                         strokeDasharray="4 2"
-                        label={{ value: "As of", fontSize: 10, fill: "var(--destructive)" }}
                       />
                     )}
                     <Bar
