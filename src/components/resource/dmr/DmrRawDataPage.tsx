@@ -382,7 +382,7 @@ export function DmrRawDataPage({
       } as ColumnDef<DmrEntry>;
     }).filter(Boolean);
     return [selectCol, ...dataCols];
-  }, [order, columnSizing, canEdit, directMap, selection, pageAllSelected, pageSomeSelected, rows, byKey]);
+  }, [order, columnSizing, canEdit, directMap, selection, pageAllSelected, pageSomeSelected, rows, byKey, scope, qInput, serverFilters]);
 
   const table = useReactTable({
     data: rows,
