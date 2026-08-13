@@ -112,6 +112,27 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
                 )}
               </div>
             </div>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {([
+                { k: "계획", v: planPct!, cls: "bg-muted-foreground/50" },
+                { k: "실적", v: actualPct!, cls: diffPp! >= 0 ? "bg-emerald-500" : "bg-red-500" },
+              ] as const).map((b) => (
+                <div key={b.k} className="flex items-center gap-2">
+                  <span className="w-7 shrink-0 text-[10px] font-medium text-muted-foreground">
+                    {b.k}
+                  </span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn("h-full rounded-full transition-all", b.cls)}
+                      style={{ width: `${Math.max(0, Math.min(100, b.v))}%` }}
+                    />
+                  </div>
+                  <span className="w-11 shrink-0 text-right text-[10px] font-semibold tabular-nums text-muted-foreground">
+                    {b.v.toFixed(1)}%
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="flex items-start gap-3">
