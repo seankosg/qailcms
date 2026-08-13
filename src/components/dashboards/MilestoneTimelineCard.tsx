@@ -332,7 +332,10 @@ function PlotRow({
   const lanes: number[] = []; // 레인별 마지막 라벨 우측 끝(px)
   const placed = nodes.map((n) => {
     const left = pct(dayNum(n.date));
-    const textLen = Math.max(n.label.length, `${fmtDate(n.date)} · ${dLabel(n.diff)}`.length);
+    const labelForWidth = n.auto && n.diff < 0
+      ? `${n.label} · ${fmtDate(n.date)}`
+      : `${n.label} · ${fmtDate(n.date)} · ${dLabel(n.diff)}`;
+    const textLen = Math.max(n.label.length, labelForWidth.length);
     const half = (textLen * (n.auto ? 6 : 8) + 22) / 2;
     const leftPx = (left / 100) * TRACK_PX;
     let lane = 0;
