@@ -10,7 +10,6 @@ import { SmDashboardSection } from "./SmDashboardSection";
 import { AbdDashboardSection } from "./AbdDashboardSection";
 import { LazySection } from "./LazySection";
 
-
 export function ProjectSummaryPage() {
   // 기준일 하나 — 세 모듈이 같은 as-of 를 쓴다.
   const [asOfDate, setAsOfDate] = useState<string>(() => todayInDoha());
@@ -24,45 +23,41 @@ export function ProjectSummaryPage() {
   const { restored, refresh, refreshing } = usePdbCache();
 
   return (
-    <div className="flex flex-col gap-8 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Project Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
+    <div className="flex flex-col gap-6 p-4">
+      {/* 페이지 제목이 화면의 유일한 최상위 위계 — 모듈 제목은 한 단계 아래 */}
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b pb-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight">Project Dashboard</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             TM · SM · ABD 진행 현황 요약 — Plot 별 좌우 비교.
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">기준일</span>
-            <Input
-              type="date"
-              value={asOfDate}
-              onChange={(e) => setAsOfDate(e.target.value || todayInDoha())}
-              className="h-8 w-[150px] text-xs"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              onClick={() => void refresh()}
-              disabled={refreshing || !restored}
-              title="저장된 캐시를 비우고 최신 데이터를 다시 불러온다"
-            >
-              <RefreshCw className={refreshing ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
-              Refresh
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">기준일</span>
+          <Input
+            type="date"
+            value={asOfDate}
+            onChange={(e) => setAsOfDate(e.target.value || todayInDoha())}
+            className="h-8 w-[150px] text-xs"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1 text-xs"
+            onClick={() => void refresh()}
+            disabled={refreshing || !restored}
+            title="저장된 캐시를 비우고 최신 데이터를 다시 불러온다"
+          >
+            <RefreshCw className={refreshing ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+            Refresh
+          </Button>
+          <Link to="/admin/setting">
+            <Button variant="outline" size="sm" className="h-8 text-xs">
+              Setting
             </Button>
-            <Link to="/admin/setting">
-              <Button variant="outline" size="sm" className="h-7 text-xs">
-                Setting
-              </Button>
-            </Link>
-          </div>
+          </Link>
         </div>
-      </div>
-
+      </header>
 
       {restored ? (
         <>
