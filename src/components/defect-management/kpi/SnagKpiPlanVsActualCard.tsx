@@ -81,6 +81,8 @@ interface Props {
   windowEnd?: string | null;
   /** 절단 후 자기 창(ISO)을 밖으로 알린다 — 공통 창 합집합 계산용 */
   onWindowResolved?: (start: string, end: string) => void;
+  /** 메인 S-Curve 차트 높이(px). 미지정 시 340px. */
+  chartHeight?: number;
 }
 
 export function SnagKpiPlanVsActualCard({
@@ -105,6 +107,7 @@ export function SnagKpiPlanVsActualCard({
   windowStart,
   windowEnd,
   onWindowResolved,
+  chartHeight = 340,
 }: Props) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
