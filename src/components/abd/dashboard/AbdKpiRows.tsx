@@ -68,12 +68,12 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
     <Card
       onClick={onClick}
       title={hint}
-      className={cn(onClick && "cursor-pointer transition-colors hover:bg-primary/10")}
+      className={cn("h-full", onClick && "cursor-pointer transition-colors hover:bg-primary/10")}
     >
-      <CardContent className="p-3">
+      <CardContent className="flex h-full flex-col justify-start p-3">
         {variant === "tm-progress" && hasGap ? (
-          <div className="flex flex-col gap-1">
-            <div className="mb-1 inline-block rounded-md bg-muted px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+          <div className="flex flex-col gap-1.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               {label}
             </div>
             <div className="flex items-end justify-between gap-2">
@@ -136,8 +136,8 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
           </div>
         ) : (
           <div className="flex items-start gap-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="mb-1 inline-block rounded-md bg-muted px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {label}
               </div>
               <div
