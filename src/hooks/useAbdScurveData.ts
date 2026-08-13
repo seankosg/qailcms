@@ -176,6 +176,15 @@ export function useAbdScurveData(params: AbdScurveParams) {
     return out;
   }, [cumQ.data, buckets]);
 
+  // 스테이지별 문서 모수(분모) — 누적곡선 진도율 % 산출용
+  const denomByStage = useMemo(() => {
+    const out: Partial<Record<Stage, number>> = {};
+    for (const row of (totalsQ.data ?? []) as Array<{ stage: Stage; total: number }>) {
+      out[row.stage] = (out[row.stage] ?? 0) + (Number(row.total) || 0);
+    }
+    return out;
+  }, [totalsQ.data]);
+
   return {
     today,
     buckets,
@@ -185,6 +194,7 @@ export function useAbdScurveData(params: AbdScurveParams) {
     totals: totalsQ.data ?? [],
     baselines,
     cum,
+    denomByStage,
     loading: cellsQ.isPending || totalsQ.isPending,
     error: cellsQ.error || totalsQ.error,
   };

@@ -57,6 +57,8 @@ export interface AbdPlanVsActualCardProps {
   baselines?: SCurveBaselines;
   /** 서버 정본 누적(문서 distinct). 종점 = 행 totals */
   cum?: SCurveCum;
+  /** 스테이지별 문서 모수(분모) — 누적곡선을 진도율 %로 그린다 */
+  denomByStage?: Partial<Record<Stage, number>>;
   /** 여러 차트를 나란히 놓을 때 공통 x 창(ISO). 주지 않으면 자기 모집단으로 잡는다. */
   windowStart?: string | null;
   windowEnd?: string | null;
@@ -73,6 +75,7 @@ export function AbdPlanVsActualCard({
   onOpenChange,
   baselines,
   cum,
+  denomByStage,
   windowStart,
   windowEnd,
   onWindowResolved,
@@ -108,8 +111,11 @@ export function AbdPlanVsActualCard({
       if (!ser) continue;
       row[`planInc_${st}`] = ser.dailyPlan[i];
       row[`actualInc_${st}`] = ser.dailyActual[i];
-      row[`cumPlan_${st}`] = ser.cumPlan[i];
-      row[`cumActual_${st}`] = ser.cumActual[i];
+      const denom = denomByStage?.[st] ?? 0;
+      const toPct = (v: number | null) =>
+        v == null ? null : denom > 0 ? Math.round((v / denom) * 1000) / 10 : null;
+      row[`cumPlan_${st}`] = toPct(ser.cumPlan[i]);
+      row[`cumActual_${st}`] = toPct(ser.cumActual[i] as number | null);
       const a = ser.dailyActual[i];
       const p = ser.dailyPlan[i];
       planIncSum += p ?? 0;
@@ -169,8 +175,8 @@ export function AbdPlanVsActualCard({
     stages.flatMap((s) => [
       [`planInc_${s}`, { label: `${STAGE_LABELS[s]} Plan (daily)`, color: ABD_STAGE_COLORS[s].bar }],
       [`actualInc_${s}`, { label: `${STAGE_LABELS[s]} Actual (daily)`, color: ABD_STAGE_COLORS[s].line }],
-      [`cumPlan_${s}`, { label: `${STAGE_LABELS[s]} Plan (cum)`, color: ABD_STAGE_COLORS[s].line }],
-      [`cumActual_${s}`, { label: `${STAGE_LABELS[s]} Actual (cum)`, color: ABD_STAGE_COLORS[s].line }],
+      [`cumPlan_${s}`, { label: `${STAGE_LABELS[s]} Plan (누적 %)`, color: ABD_STAGE_COLORS[s].line }],
+      [`cumActual_${s}`, { label: `${STAGE_LABELS[s]} Actual (누적 %)`, color: ABD_STAGE_COLORS[s].line }],
     ]),
   ) as ChartConfig;
 
@@ -267,7 +273,13 @@ export function AbdPlanVsActualCard({
                       textAnchor="end"
                       height={46}
                     />
-                    <YAxis yAxisId="cum" tick={{ fontSize: 11 }} allowDecimals={false} domain={[0, "auto"]} />
+                    <YAxis
+                      yAxisId="cum"
+                      tick={{ fontSize: 11 }}
+                      domain={[0, 100]}
+                      ticks={[0, 20, 40, 60, 80, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                    />
                     <YAxis
                       yAxisId="bar"
                       orientation="right"
@@ -326,7 +338,7 @@ export function AbdPlanVsActualCard({
                         strokeDasharray={PLAN_DASH}
                         strokeWidth={2.5}
                         dot={false}
-                        name={`${STAGE_LABELS[s]} Plan (cum)`}
+                        name={`${STAGE_LABELS[s]} Plan (누적 %)`}
                         hide={hidden.has(`cumPlan_${s}`)}
                       />
                     ))}
@@ -339,7 +351,7 @@ export function AbdPlanVsActualCard({
                         stroke={ABD_STAGE_COLORS[s].line}
                         strokeWidth={3.5}
                         dot={false}
-                        name={`${STAGE_LABELS[s]} Actual (cum)`}
+                        name={`${STAGE_LABELS[s]} Actual (누적 %)`}
                         connectNulls={false}
                         hide={hidden.has(`cumActual_${s}`)}
                       />

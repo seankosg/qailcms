@@ -110,6 +110,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
               onOpenChange={setOpen}
               baselines={q.baselines}
               cum={q.cum}
+              denomByStage={q.denomByStage}
               windowStart={win.start}
               windowEnd={win.end}
               onWindowResolved={(s, e) => report(label, s, e)}
