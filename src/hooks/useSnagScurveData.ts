@@ -102,7 +102,6 @@ export function useSnagScurveData(params: SnagScurveParams) {
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
-    refetchOnWindowFocus: false,
   });
 
   const totalsQ = useQuery({
@@ -121,7 +120,6 @@ export function useSnagScurveData(params: SnagScurveParams) {
       }),
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
-    refetchOnWindowFocus: false,
     refetchOnWindowFocus: false,
   });
 

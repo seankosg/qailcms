@@ -90,7 +90,6 @@ export function useAbdScurveData(params: AbdScurveParams) {
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
-    refetchOnWindowFocus: false,
   });
 
   const totalsQ = useQuery({
@@ -101,7 +100,6 @@ export function useAbdScurveData(params: AbdScurveParams) {
       }),
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
-    refetchOnWindowFocus: false,
     refetchOnWindowFocus: false,
   });
 
@@ -116,7 +114,6 @@ export function useAbdScurveData(params: AbdScurveParams) {
       }),
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
-    refetchOnWindowFocus: false,
     refetchOnWindowFocus: false,
     enabled: scurveEnabled,
   });
@@ -153,7 +150,6 @@ export function useAbdScurveData(params: AbdScurveParams) {
       }),
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
-    refetchOnWindowFocus: false,
     refetchOnWindowFocus: false,
     enabled: scurveEnabled,
   });
