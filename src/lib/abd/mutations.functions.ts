@@ -804,6 +804,8 @@ export const importAbdBatch = createServerFn({ method: "POST" })
       total: rowsToImport.length,
       df_actual_blocked: dfBlocked,
       df_actual_blocked_samples: dfBlockedSamples,
+      dar_round_guard_blocked: darGuardSkipped.length,
+      dar_round_guard_samples: darGuardSkipped.slice(0, 20),
       ocs_skipped_rows: ocsSkipped,
       applied_count: inserted + updated,
       skipped_ocs_count: ocsSkipped.length,
