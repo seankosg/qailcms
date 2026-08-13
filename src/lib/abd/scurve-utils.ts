@@ -74,19 +74,19 @@ export function buildAbdSCurve(opts: {
     if (serverCum && serverCum.plan.length === n) {
       const cumPlan = serverCum.plan.slice();
       const cumActualRaw = serverCum.actual.slice();
-      const basePlan = baselines?.[st]?.plan ?? 0;
-      const baseActual = baselines?.[st]?.actual ?? 0;
       const dailyPlan: number[] = new Array(n).fill(0);
       const dailyActual: (number | null)[] = new Array(n).fill(0);
       const cumActual: (number | null)[] = new Array(n).fill(0);
       for (let i = 0; i < n; i++) {
-        dailyPlan[i] = cumPlan[i] - (i === 0 ? basePlan : cumPlan[i - 1]);
+        // 막대 = 버킷별 일일 절대값(Progress 매트릭스 셀과 1:1 정합).
+        // 누계 곡선(cumPlan/cumActual)은 서버 정본 누계를 그대로 유지한다.
+        dailyPlan[i] = d.p[i];
         const isFuture = todayIndex >= 0 && i > todayIndex;
         if (isFuture) {
           dailyActual[i] = null;
           cumActual[i] = null;
         } else {
-          dailyActual[i] = cumActualRaw[i] - (i === 0 ? baseActual : cumActualRaw[i - 1]);
+          dailyActual[i] = d.a[i];
           cumActual[i] = cumActualRaw[i];
         }
       }

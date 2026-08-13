@@ -328,7 +328,7 @@ export function AbdPlanVsActualCard({
                         dataKey={`planInc_${s}`}
                         stackId="plan"
                         fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].bar} 45%, transparent)`}
-                        name={`${STAGE_LABELS[s]} Plan (increment) — 오른쪽 축`}
+                        name={`${STAGE_LABELS[s]} Plan (daily) — 오른쪽 축`}
                         barSize={8}
                         hide={hidden.has(`planInc_${s}`)}
                       />
@@ -340,7 +340,7 @@ export function AbdPlanVsActualCard({
                         dataKey={`actualInc_${s}`}
                         stackId="actual"
                         fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].line} 35%, transparent)`}
-                        name={`${STAGE_LABELS[s]} Actual (increment) — 오른쪽 축`}
+                        name={`${STAGE_LABELS[s]} Actual (daily) — 오른쪽 축`}
                         barSize={8}
                         hide={hidden.has(`actualInc_${s}`)}
                       />
