@@ -36,6 +36,7 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       total,
       delayed,
       actualCount: Math.round(actualSum),
+      planCount: Math.round(planSum),
       progressPct: total > 0 ? (actualSum / total) * 100 : null,
       planPct: total > 0 ? (planSum / total) * 100 : null,
       actualPct: total > 0 ? (actualSum / total) * 100 : null,
