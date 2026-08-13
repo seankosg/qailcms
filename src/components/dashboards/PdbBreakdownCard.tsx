@@ -48,11 +48,12 @@ export function PdbBreakdownCard({
   return (
     <Card title={hint}>
       <CardContent className="p-3">
-        <div className="mb-1 inline-block rounded-md bg-muted px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        {/* KPI 카드 제목과 같은 위계 */}
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {label}
         </div>
         <div
-          className={`mt-1.5 flex flex-col gap-1 ${scroll ? "max-h-[132px] overflow-y-auto pr-1" : ""}`}
+          className={`mt-2 flex flex-col gap-1 ${scroll ? "max-h-[132px] overflow-y-auto pr-1" : ""}`}
         >
           {rows.length === 0 ? (
             <div className="py-2 text-xs text-muted-foreground">{emptyText}</div>
@@ -62,10 +63,10 @@ export function PdbBreakdownCard({
                 <div className="min-w-0 flex-1 truncate text-[11px] font-medium" title={r.key}>
                   {r.key}
                 </div>
-                <div className="w-10 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                <div className="w-12 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
                   {r.count.toLocaleString()}
                 </div>
-                <div className="w-11 shrink-0 text-right text-[11px] font-semibold tabular-nums">
+                <div className="w-12 shrink-0 text-right text-[11px] font-semibold tabular-nums">
                   {r.pct == null ? "—" : `${r.pct.toFixed(1)}%`}
                 </div>
                 <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:w-20">
