@@ -103,7 +103,8 @@ export const parseDmrImages = createServerFn({ method: 'POST' })
       const argsRaw = toolCall.function?.arguments;
       const parsed = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
       const section = SectionSchema.parse(parsed);
-      section.report_date = normalizeDate(section.report_date);
+      section.report_date = normalizeDmrReportDate(section.report_date);
+      assertNotFutureReportDate(section.report_date);
       // Contractor 정규화 + 기존 미리보기(DmrImportPage) 호환용 values 채우기
       const rows = section.rows.map((r) => {
         const contractor = normalizeDmrContractor(r.contractor);
