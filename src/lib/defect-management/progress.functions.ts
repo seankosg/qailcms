@@ -75,3 +75,30 @@ export const getSnagProgressTotals = createServerFn({ method: "POST" })
       np_mask: (r.np_mask ?? null) as Record<string, number> | null,
     }));
   });
+
+// S-Curve 누계 정본: 버킷별 문서 distinct 누적(계획/실적). 막대(일일 절대값)와 달리
+// 곡선은 이 값을 그대로 사용해 종점이 전체 문서 수(= totals)와 일치하게 한다.
+export const getSnagProgressCum = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => CellsInputSchema.parse(v))
+  .handler(async ({ data, context }) => {
+    const { data: payload, error } = await (context.supabase as any).rpc("defect_snag_progress_cum_json", {
+      _plan_groups: data.planGroups.length ? data.planGroups : null,
+      _teams: data.teams.length ? data.teams : null,
+      _room_groups: data.roomGroups.length ? data.roomGroups : null,
+      _buildings: data.buildings.length ? data.buildings : null,
+      _bucket: data.bucket,
+      _range_start: data.rangeStart,
+      _range_end: data.rangeEnd,
+      _as_of_date: data.asOfDate,
+      _plan_mode: data.planMode,
+    });
+    if (error) throw new Error(error.message);
+    if (!Array.isArray(payload)) throw new Error("defect_snag_progress_cum_json RPC contract mismatch");
+    return payload.map((r: any) => ({
+      bucket_iso: String(r.bucket_iso).slice(0, 10),
+      stage: r.stage as import("./progress-utils").Stage,
+      cum_plan: Number(r.cum_plan) || 0,
+      cum_actual: Number(r.cum_actual) || 0,
+    }));
+  });
