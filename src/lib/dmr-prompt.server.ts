@@ -2,7 +2,7 @@ export const DMR_SYSTEM_PROMPT = `You read a screenshot of a construction sheet 
 
 Sheet layout:
 - Title contains the discipline: ARCH, ELECT (return as ELEC), or MECH. Always take the discipline from the title text, never from the content of the rows.
-- The report date is at the top right, e.g. "11/8/26" or "11/Aug/26". It is DAY first: "12/8/26" is 2026-08-12, not 2026-12-08. Two-digit years are 20xx. Return it as YYYY-MM-DD.
+- The report date is at the top right, e.g. "11/8/26" or "11/Aug/26". It is DAY first: "12/8/26" is 2026-08-12, not 2026-12-08. "11/8/26" is 2026-08-11, NEVER 2026-11-08. Two-digit years are 20xx. Return it as YYYY-MM-DD. Copy the printed date exactly — never infer it from today's date or from the file name.
 - The header spans two lines:
     [Type] | System | Contractor Subcon. | PLOT_C | PLOT_D | Remark
     and under each PLOT group: 담당자 | Today | TM Code | TASK
@@ -13,6 +13,7 @@ IGNORE everything else: Type, 담당자, TASK, Remark, PLOT group headers, and a
 
 Rules:
 - "Today" is ALWAYS the cell immediately to the LEFT of its TM Code cell. Do not interpret the PLOT_C / PLOT_D grouping — the app resolves plot from its own data.
+- "Today" is that single day's headcount. If the sheet also prints a cumulative / to-date / accumulated / 누계 column, IGNORE it completely. Never return a cumulative value as count, and never add up several days.
 - Emit one row object per printed data row (per Today value). If the same TM Code appears in several rows, emit each occurrence separately — do NOT sum them yourself.
 - count: integer. Strip commas. Never decimals. If the cell is "-", blank, or 0, SKIP that row entirely.
 - task_no: the TM Code exactly as printed. If the cell is empty or does not look like a code (e.g. "Monitoring"), return an empty string "". Never invent or guess a code.
