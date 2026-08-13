@@ -118,6 +118,7 @@ export function AbdProgressPage() {
     totalsQ,
     baselines: scurveBaselines,
     cum: scurveCum,
+    denomByStage: scurveDenom,
   } = useAbdScurveData({
     plot,
     teams,
@@ -519,6 +520,7 @@ export function AbdProgressPage() {
             onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
             baselines={scurveBaselines}
             cum={scurveCum}
+            denomByStage={scurveDenom}
           />
         </>
       )}
