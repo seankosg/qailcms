@@ -1,37 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Bar,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Legend,
-  Line,
-  ReferenceLine,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import type { TaskItem } from "@/lib/task-management/schedule-utils";
 import type { OwnerDim } from "@/lib/task-management/delay-utils";
 import { buildTmSCurve, type SCurveBucket } from "@/lib/task-management/scurve-utils";
-import {
-  clampWindow,
-  incAxisMax,
-  pickXTicks,
-  signedDomain,
-  trimFlatTail,
-} from "@/lib/charts/scurve-view";
 import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
+
 
 type CurveUnit = "pct" | "tasks";
 
@@ -92,18 +69,11 @@ export function TmPlanVsActualCard({
   chartHeight = 340,
 }: Props) {
   const snap = useTaskProgressSnapshot();
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [unit, setUnit] = useState<CurveUnit>("pct");
-  const toggle = (key: string) =>
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
 
   // 대상 범위는 상단 필터가 이미 적용된 items 그대로 사용한다(카드 내 담당자 필터 폐기).
   const scoped = items;
+
 
   const curve = useMemo(
     () =>
@@ -124,46 +94,6 @@ export function TmPlanVsActualCard({
   const isTasks = unit === "tasks";
   // Tasks 환산 물량 = Σ 진척률 = (pct / 100) × n
   const conv = (v: number) => (isTasks ? (v / 100) * n : v);
-  const r1 = (v: number) => Number(v.toFixed(1));
-
-  const allData = curve.buckets.map((b, i) => ({
-    bucket: b,
-    bucketLabel: curve.bucketLabels[i],
-    planInc: r1(conv(curve.dailyPlan[i])),
-    actualInc: curve.dailyActual[i] == null ? null : r1(conv(curve.dailyActual[i] as number)),
-    cumPlan: r1(conv(curve.cumPlan[i])),
-    cumActual: curve.cumActual[i] == null ? null : r1(conv(curve.cumActual[i] as number)),
-    variance:
-      curve.cumActual[i] == null
-        ? null
-        : r1(conv((curve.cumActual[i] as number) - curve.cumPlan[i])),
-  }));
-
-  // 보이는 창만 줄인다 — 누계·모수 계산은 위에서 이미 끝났고 손대지 않는다.
-  const view = useMemo(() => {
-    const tail = trimFlatTail({
-      planInc: allData.map((d) => d.planInc),
-      actualInc: allData.map((d) => d.actualInc),
-      todayIndex: curve.todayIndex,
-    });
-    const w = clampWindow(curve.buckets, 0, tail.end, windowStart, windowEnd);
-    const own = {
-      start: curve.buckets[0] ?? null,
-      end: tail.end > 0 ? (curve.buckets[tail.end - 1] ?? null) : null,
-    };
-    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed, own };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curve, windowStart, windowEnd, unit, n]);
-  const data = view.rows;
-  const reportRef = useRef(onWindowResolved);
-  reportRef.current = onWindowResolved;
-  const ownStart = view.own.start;
-  const ownEnd = view.own.end;
-  useEffect(() => {
-    if (ownStart && ownEnd) reportRef.current?.(ownStart, ownEnd);
-  }, [ownStart, ownEnd]);
-
-  const todayLabel = curve.todayIndex >= 0 ? (curve.bucketLabels[curve.todayIndex] ?? null) : null;
 
   const idxForKpi = curve.todayIndex >= 0 ? curve.todayIndex : curve.buckets.length - 1;
   const planNow = idxForKpi >= 0 ? (curve.cumPlan[idxForKpi] ?? 0) : 0;
@@ -180,36 +110,6 @@ export function TmPlanVsActualCard({
   const deltaNow = actualNow - planNow;
 
   const unitSuffix = isTasks ? " tasks" : "%";
-  const incLabel = isTasks
-    ? "Plan (increment, tasks)"
-    : "Plan (increment, pp)";
-  const incActualLabel = isTasks
-    ? "Actual (increment, tasks)"
-    : "Actual (increment, pp)";
-  const cumPlanLabel = isTasks ? "Plan (cum tasks)" : "Plan (cum %)";
-  const cumActualLabel = isTasks ? "Actual (cum tasks)" : "Actual (cum %)";
-  const varianceLabel = isTasks ? "Δ Actual − Plan (tasks)" : "Δ Actual − Plan (pp)";
-
-  const cfg: ChartConfig = {
-    planInc: { label: incLabel, color: "var(--muted-foreground)" },
-    actualInc: { label: incActualLabel, color: "var(--primary)" },
-    cumPlan: { label: cumPlanLabel, color: "var(--muted-foreground)" },
-    cumActual: { label: cumActualLabel, color: "var(--destructive)" },
-  };
-  const varianceCfg: ChartConfig = {
-    variance: { label: varianceLabel, color: "var(--destructive)" },
-  };
-
-  const hasData = data.length > 0 && scoped.length > 0;
-  // 위·아래 차트의 x축 눈금을 동일하게 맞춘다(그림 영역 폭 + ticks 배열 공유).
-  const xTicks = useMemo(() => pickXTicks(data.map((d) => d.bucketLabel), 7), [data]);
-  const incMax = useMemo(
-    () => incAxisMax(data.flatMap((d) => [d.planInc, d.actualInc])),
-    [data],
-  );
-  const varDomain = useMemo(() => signedDomain(data.map((d) => d.variance)), [data]);
-  const Y_LEFT_WIDTH = 56;
-  const Y_RIGHT_WIDTH = 44;
   const accent =
     deltaNow < 0
       ? "text-destructive"
@@ -217,6 +117,9 @@ export function TmPlanVsActualCard({
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-muted-foreground";
   const sign = deltaNow > 0 ? "+" : "";
+
+  const hasData = scoped.length > 0;
+
 
   return (
     <Card>
@@ -315,144 +218,13 @@ export function TmPlanVsActualCard({
                       실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 제외
                     </span>
                   )}
-                  {view.trimmed > 0 && (
-                    <span className="text-[11px] text-muted-foreground">
-                      · 이후 {view.trimmed}개 구간 계획 없음
+                  {curve.excludedCount > 0 && (
+                    <span className="ml-2 rounded border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
+                      실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 제외
                     </span>
                   )}
                 </div>
 
-                <ChartContainer config={cfg} className="w-full" style={{ height: chartHeight }}>
-                  <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="bucketLabel"
-                      tick={{ fontSize: 10 }}
-                      ticks={xTicks}
-                      interval={0}
-                      minTickGap={0}
-                      angle={-30}
-                      textAnchor="end"
-                      height={46}
-                    />
-                    <YAxis
-                      width={Y_LEFT_WIDTH}
-                      tick={{ fontSize: 11 }}
-                      domain={[0, incMax]}
-                    />
-                    <YAxis
-                      yAxisId="cum"
-                      orientation="right"
-                      width={Y_RIGHT_WIDTH}
-                      tick={{ fontSize: 11 }}
-                      domain={isTasks ? [0, "auto"] : [0, 100]}
-                      tickFormatter={(v) => (isTasks ? `${v}` : `${v}%`)}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend
-                      wrapperStyle={{ fontSize: 11 }}
-                      onClick={(o) => {
-                        const dk = (o as { dataKey?: string })?.dataKey;
-                        if (dk) toggle(String(dk));
-                      }}
-                    />
-                    {todayLabel && (
-                      <ReferenceLine
-                        x={todayLabel}
-                        stroke="var(--destructive)"
-                        strokeDasharray="4 2"
-                      />
-                    )}
-                    <Bar
-                      dataKey="planInc"
-                      name={incLabel}
-                      fill="color-mix(in oklab, var(--muted-foreground) 22%, transparent)"
-                      barSize={8}
-                      hide={hidden.has("planInc")}
-                    />
-                    <Bar
-                      dataKey="actualInc"
-                      name={incActualLabel}
-                      fill="color-mix(in oklab, var(--primary) 30%, transparent)"
-                      barSize={8}
-                      hide={hidden.has("actualInc")}
-                    />
-                    <Line
-                      yAxisId="cum"
-                      type="monotone"
-                      dataKey="cumPlan"
-                      name={cumPlanLabel}
-                      stroke="var(--muted-foreground)"
-                      strokeDasharray="6 4"
-                      strokeWidth={2.5}
-                      dot={false}
-                      hide={hidden.has("cumPlan")}
-                    />
-                    <Line
-                      yAxisId="cum"
-                      type="monotone"
-                      dataKey="cumActual"
-                      name={cumActualLabel}
-                      stroke="var(--destructive)"
-                      strokeWidth={3.5}
-                      dot={false}
-                      connectNulls={false}
-                      hide={hidden.has("cumActual")}
-                    />
-                  </ComposedChart>
-                </ChartContainer>
-
-                <ChartContainer config={varianceCfg} className="h-[120px] w-full">
-                  <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="bucketLabel"
-                      tick={{ fontSize: 10 }}
-                      ticks={xTicks}
-                      interval={0}
-                      minTickGap={0}
-                      angle={-30}
-                      textAnchor="end"
-                      height={46}
-                    />
-                    <YAxis
-                      width={Y_LEFT_WIDTH}
-                      tick={{ fontSize: 11 }}
-                      domain={varDomain}
-                    />
-                    {/* 위 차트의 우측 Y축과 같은 폭을 확보해 그림 영역을 일치시킨다. */}
-                    <YAxis
-                      yAxisId="spacer"
-                      orientation="right"
-                      width={Y_RIGHT_WIDTH}
-                      tick={false}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    {todayLabel && (
-                      <ReferenceLine
-                        x={todayLabel}
-                        stroke="var(--destructive)"
-                        strokeDasharray="4 2"
-                      />
-                    )}
-                    <ReferenceLine y={0} stroke="var(--border)" />
-                    <Bar dataKey="variance" name={varianceLabel} barSize={8}>
-                      {data.map((row, i) => {
-                        const v = row.variance as number | null;
-                        // 값이 없는 구간(미래)은 그리지 않는다.
-                        const fill =
-                          v == null
-                            ? "transparent"
-                            : v < 0
-                              ? "var(--destructive)"
-                              : "var(--success)";
-                        return <Cell key={i} fill={fill} />;
-                      })}
-                    </Bar>
-                  </ComposedChart>
-                </ChartContainer>
               </>
             )}
           </CardContent>
