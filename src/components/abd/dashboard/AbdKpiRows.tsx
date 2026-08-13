@@ -53,6 +53,11 @@ interface KpiCardProps {
   rightSub?: string;
   /** 카드 레이아웃 변형. */
   variant?: "default" | "tm-progress";
+  /**
+   * 표현 방식. 기본값 "abd-dashboard" 는 기존 ABD Dashboard 디자인(회색 pill 라벨).
+   * "project-summary" 는 Project Dashboard 전용 개선 디자인(단순 제목 + 카드 높이 정렬).
+   */
+  presentation?: "abd-dashboard" | "project-summary";
 }
 
 export function AbdKpiCard({
@@ -71,7 +76,13 @@ export function AbdKpiCard({
   rightValue,
   rightSub,
   variant = "default",
+  presentation = "abd-dashboard",
 }: KpiCardProps) {
+  const ps = presentation === "project-summary";
+  const labelCls = ps
+    ? "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+    : "mb-1 inline-block rounded-md bg-muted px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground";
+  const stackCls = ps ? "flex flex-col gap-1.5" : "flex flex-col gap-1";
   const pct = total && total > 0 ? Math.round((count / total) * 100) : null;
   const stackTotal = stackBar ? stackBar.reduce((s, x) => s + (x.count || 0), 0) : 0;
   const hasGap = actualPct != null && planPct != null;
@@ -80,14 +91,15 @@ export function AbdKpiCard({
     <Card
       onClick={onClick}
       title={hint}
-      className={cn("h-full", onClick && "cursor-pointer transition-colors hover:bg-primary/10")}
+      className={cn(
+        ps && "h-full",
+        onClick && "cursor-pointer transition-colors hover:bg-primary/10",
+      )}
     >
-      <CardContent className="flex h-full flex-col justify-start p-3">
+      <CardContent className={cn("p-3", ps && "flex h-full flex-col justify-start")}>
         {variant === "tm-progress" && hasGap ? (
-          <div className="flex flex-col gap-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {label}
-            </div>
+          <div className={stackCls}>
+            <div className={labelCls}>{label}</div>
             <div className="flex items-end justify-between gap-2">
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className={cn("text-3xl font-bold tabular-nums leading-tight", TONE[tone])}>
@@ -138,10 +150,8 @@ export function AbdKpiCard({
           </div>
         ) : (
           <div className="flex items-start gap-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {label}
-              </div>
+            <div className={cn("min-w-0 flex-1", stackCls)}>
+              <div className={labelCls}>{label}</div>
               <div
                 className={cn(
                   "text-3xl font-bold tabular-nums leading-tight",

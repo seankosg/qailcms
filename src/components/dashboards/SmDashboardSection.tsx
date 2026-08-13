@@ -39,10 +39,8 @@ function useRoomGroupRows(plot: PlotKey, asOfDate: string, f: PdbSmFilters): Bre
     const sel = new Set(selectedKey ? selectedKey.split(",") : []);
     const rows =
       sel.size === 0 ? rawRows : rawRows.filter((r) => sel.has(normalizeRoomGroup(r.room_group)));
-    const totals = buildMatrix(plot, teams.length ? teams : [...ALL_TEAMS], rows).roomGroupTotals as Record<
-      string,
-      Stats
-    >;
+    const totals = buildMatrix(plot, teams.length ? teams : [...ALL_TEAMS], rows)
+      .roomGroupTotals as Record<string, Stats>;
     const get = (rg: string) => totals[rg] ?? newStats();
     const out: BreakdownRow[] = Object.keys(totals)
       .filter((c) => !isLgRoomGroup(c) && get(c).issued > 0)
@@ -115,68 +113,74 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
       ]}
     >
       <div className="grid gap-3 xl:grid-cols-2">
-        {([["D", d, roomsD], ["C", c, roomsC]] as const).map(([label, q, rooms]) => {
+        {(
+          [
+            ["D", d, roomsD],
+            ["C", c, roomsC],
+          ] as const
+        ).map(([label, q, rooms]) => {
           const actualCnt = q.baseline.actualUpto;
           const planCnt = q.baseline.planUpto;
           const actualPct = q.stageTotal > 0 ? (actualCnt / q.stageTotal) * 100 : null;
           const planPct = q.stageTotal > 0 ? (planCnt / q.stageTotal) * 100 : null;
           const diffPct = actualPct != null && planPct != null ? actualPct - planPct : null;
           return (
-          <div key={label} className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-3">
-              <AbdKpiCard
-                label="진도현황"
-                count={actualCnt}
-                total={q.stageTotal}
-                tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
-                showTotal
-                hint="진도현황 = as-of 기준 Closure actual_upto ÷ Closure 모수 — SM KPI Analysis 와 동일"
-                actualPct={actualPct ?? undefined}
-                planPct={planPct ?? undefined}
-                variant="tm-progress"
-                leftSub={`A ${actualCnt.toLocaleString()} / P ${planCnt.toLocaleString()}`}
-                rightValue={
-                  diffPct != null ? `${diffPct > 0 ? "+" : ""}${diffPct.toFixed(1)}%` : "—"
-                }
-                rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
-              />
-              <PdbBreakdownCard
-                label="주요지역별 현황"
-                rows={foldTop4(
-                  rooms.map((r) => ({
-                    key: r.key,
-                    count: r.count,
-                    actual: ((r.pct ?? 0) * r.count) / 100,
-                  })),
-                )}
-                hint={ROOM_HINT}
+            <div key={label} className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <AbdKpiCard
+                  presentation="project-summary"
+                  label="진도현황"
+                  count={actualCnt}
+                  total={q.stageTotal}
+                  tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
+                  showTotal
+                  hint="진도현황 = as-of 기준 Closure actual_upto ÷ Closure 모수 — SM KPI Analysis 와 동일"
+                  actualPct={actualPct ?? undefined}
+                  planPct={planPct ?? undefined}
+                  variant="tm-progress"
+                  leftSub={`A ${actualCnt.toLocaleString()} / P ${planCnt.toLocaleString()}`}
+                  rightValue={
+                    diffPct != null ? `${diffPct > 0 ? "+" : ""}${diffPct.toFixed(1)}%` : "—"
+                  }
+                  rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
+                />
+                <PdbBreakdownCard
+                  label="주요지역별 현황"
+                  rows={foldTop4(
+                    rooms.map((r) => ({
+                      key: r.key,
+                      count: r.count,
+                      actual: ((r.pct ?? 0) * r.count) / 100,
+                    })),
+                  )}
+                  hint={ROOM_HINT}
+                />
+              </div>
+              <SnagKpiPlanVsActualCard
+                cells={q.cells as never}
+                buckets={q.buckets}
+                stage={stage}
+                today={q.today}
+                asOfDate={asOfDate}
+                bucket={f.bucket as Bucket}
+                onBucketChange={() => {}}
+                unit={unit}
+                onUnitChange={() => {}}
+                controlsHidden
+                windowStart={win.start}
+                windowEnd={win.end}
+                onWindowResolved={(s, e) => report(label, s, e)}
+                filterSummary={q.filterSummary}
+                baselinePlan={q.baseline.plan}
+                baselineActual={q.baseline.actual}
+                planUpto={q.baseline.planUpto}
+                actualUpto={q.baseline.actualUpto}
+                stageTotal={q.stageTotal}
+                open={open}
+                onOpenChange={setOpen}
+                chartHeight={306}
               />
             </div>
-            <SnagKpiPlanVsActualCard
-              cells={q.cells as never}
-              buckets={q.buckets}
-              stage={stage}
-              today={q.today}
-              asOfDate={asOfDate}
-              bucket={f.bucket as Bucket}
-              onBucketChange={() => {}}
-              unit={unit}
-              onUnitChange={() => {}}
-              controlsHidden
-              windowStart={win.start}
-              windowEnd={win.end}
-              onWindowResolved={(s, e) => report(label, s, e)}
-              filterSummary={q.filterSummary}
-              baselinePlan={q.baseline.plan}
-              baselineActual={q.baseline.actual}
-              planUpto={q.baseline.planUpto}
-              actualUpto={q.baseline.actualUpto}
-              stageTotal={q.stageTotal}
-              open={open}
-              onOpenChange={setOpen}
-              chartHeight={306}
-            />
-          </div>
           );
         })}
       </div>
