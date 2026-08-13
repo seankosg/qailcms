@@ -36,7 +36,7 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
       const key = (gk[0] ?? "").trim() || "(미지정)";
       const cur = byTeam.get(key) ?? { count: 0, actual: 0 };
       cur.count += Number(r.total ?? 0);
-      cur.actual += Number(r.actual_upto ?? 0) * 100;
+      cur.actual += Number(r.actual_upto ?? 0);
       byTeam.set(key, cur);
     }
     return {
