@@ -29,12 +29,12 @@ export const Route = createFileRoute('/_authenticated/resource/dmr/raw-data')({
     <DmrRawDataPage
       columnDefs={DMR2_COLUMNS}
       title="DMR Raw Data"
-      subtitle="Daily Entry 저장 원본 — TM 코드·담당자·하루치 증분·인원"
+      subtitle="Daily Entry 저장 원본 전체 — TM 코드 유무 관계없이 모든 Daily Entry 행"
       prefKey="dmr-raw-data-2"
       routePath="/resource/dmr/raw-data"
       routeId="/_authenticated/resource/dmr/raw-data"
       showImport={false}
-      scope="entry"
+      scope="all"
       exportFilePrefix="CMS_DMR_RawData"
     />
   ),
