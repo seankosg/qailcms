@@ -132,7 +132,14 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
               lang={lang}
               startFrom={f.startDate}
               dim="hdec_pic_name"
-              filterSummary={q.filterSummary}
+              filterSummary={
+                lang === "en"
+                  ? q.filterSummary.map((s) => ({
+                      ...s,
+                      value: DELAY_EN[s.value] ?? s.value,
+                    }))
+                  : q.filterSummary
+              }
               bucket={f.bucket}
               onBucketChange={() => {}}
               controlsHidden
