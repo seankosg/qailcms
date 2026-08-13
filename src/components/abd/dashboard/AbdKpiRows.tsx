@@ -49,9 +49,17 @@ interface KpiCardProps {
   /** TM/SM 진도 카드용 — as-of 기준 Actual% 와 Plan% (0~100). */
   actualPct?: number;
   planPct?: number;
+  /** 좌측 하단 보조 문구 (예: "실적갯수/계획갯수"). */
+  leftSub?: string;
+  /** 우측 상단 값 (예: "12.3%"). */
+  rightValue?: string;
+  /** 우측 하단 보조 문구 (예: "A 12.3% / P 15.0%"). */
+  rightSub?: string;
+  /** 카드 레이아웃 변형. */
+  variant?: "default" | "tm-progress";
 }
 
-export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal, actualPct, planPct }: KpiCardProps) {
+export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal, actualPct, planPct, leftSub, rightValue, rightSub, variant = "default" }: KpiCardProps) {
   const pct = total && total > 0 ? Math.round((count / total) * 100) : null;
   const stackTotal = stackBar ? stackBar.reduce((s, x) => s + (x.count || 0), 0) : 0;
   const hasGap = actualPct != null && planPct != null;
@@ -63,65 +71,109 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
       className={cn(onClick && "cursor-pointer transition-colors hover:bg-primary/10")}
     >
       <CardContent className="p-3">
-        <div className="flex items-start gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
+        {variant === "tm-progress" && hasGap ? (
+          <div className="flex flex-col gap-1">
             <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
               {label}
             </div>
-            <div
-              className={cn(
-                "text-3xl font-bold tabular-nums leading-tight",
-                hasGap ? (diffPp! >= 0 ? TONE["ok"] : TONE["danger"]) : TONE[tone],
-              )}
-            >
-              {hasGap ? (
-                <>
-                  {diffPp! > 0 ? "+" : ""}
-                  {diffPp!.toFixed(1)}pp
-                </>
-              ) : (
-                count.toLocaleString()
-              )}
-              {showTotal && total != null && !hasGap && (
-                <span className="text-xl font-semibold text-muted-foreground">
-                  {" / "}
-                  {total.toLocaleString()}
-                </span>
-              )}
-            </div>
-            {hasGap ? (
-              <div className="text-[11px] tabular-nums text-muted-foreground">
-                Actual {actualPct!.toFixed(1)}% / Plan {planPct!.toFixed(1)}%
-              </div>
-            ) : pct != null ? (
-              <div className="text-[11px] tabular-nums text-muted-foreground">{pct}% of total</div>
-            ) : null}
-          </div>
-          {breakdown && breakdown.length > 0 && (
-            <div
-              className="flex max-h-28 min-w-[92px] flex-col gap-0.5 overflow-y-auto border-l pl-2"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {breakdown.map((b, i) => (
-                <button
-                  key={`${b.team}-${i}`}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    b.onClick?.();
-                  }}
+            <div className="flex items-end justify-between gap-2">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <div
                   className={cn(
-                    "flex h-5 items-center justify-between gap-2 rounded px-1 text-[11px] tabular-nums",
-                    b.onClick && "hover:bg-primary/10 cursor-pointer",
+                    "text-3xl font-bold tabular-nums leading-tight",
+                    TONE[tone],
                   )}
                 >
-                  <span className="truncate">{b.team || "—"}</span>
-                  <span className={cn("font-medium", TONE[tone])}>{b.count.toLocaleString()}</span>
-                </button>
-              ))}
+                  {count.toLocaleString()}
+                  <span className="text-xl font-semibold text-muted-foreground">
+                    {" / "}
+                    {total?.toLocaleString() ?? "—"}
+                  </span>
+                </div>
+                {leftSub && (
+                  <div className="text-[11px] tabular-nums text-muted-foreground truncate">
+                    {leftSub}
+                  </div>
+                )}
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-0.5">
+                <div
+                  className={cn(
+                    "text-2xl font-bold tabular-nums leading-tight",
+                    TONE[tone],
+                  )}
+                >
+                  {rightValue}
+                </div>
+                {rightSub && (
+                  <div className="text-[11px] tabular-nums text-muted-foreground">
+                    {rightSub}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                {label}
+              </div>
+              <div
+                className={cn(
+                  "text-3xl font-bold tabular-nums leading-tight",
+                  hasGap ? (diffPp! >= 0 ? TONE["ok"] : TONE["danger"]) : TONE[tone],
+                )}
+              >
+                {hasGap ? (
+                  <>
+                    {diffPp! > 0 ? "+" : ""}
+                    {diffPp!.toFixed(1)}pp
+                  </>
+                ) : (
+                  count.toLocaleString()
+                )}
+                {showTotal && total != null && !hasGap && (
+                  <span className="text-xl font-semibold text-muted-foreground">
+                    {" / "}
+                    {total.toLocaleString()}
+                  </span>
+                )}
+              </div>
+              {hasGap ? (
+                <div className="text-[11px] tabular-nums text-muted-foreground">
+                  Actual {actualPct!.toFixed(1)}% / Plan {planPct!.toFixed(1)}%
+                </div>
+              ) : pct != null ? (
+                <div className="text-[11px] tabular-nums text-muted-foreground">{pct}% of total</div>
+              ) : null}
+            </div>
+            {breakdown && breakdown.length > 0 && (
+              <div
+                className="flex max-h-28 min-w-[92px] flex-col gap-0.5 overflow-y-auto border-l pl-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {breakdown.map((b, i) => (
+                  <button
+                    key={`${b.team}-${i}`}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      b.onClick?.();
+                    }}
+                    className={cn(
+                      "flex h-5 items-center justify-between gap-2 rounded px-1 text-[11px] tabular-nums",
+                      b.onClick && "hover:bg-primary/10 cursor-pointer",
+                    )}
+                  >
+                    <span className="truncate">{b.team || "—"}</span>
+                    <span className={cn("font-medium", TONE[tone])}>{b.count.toLocaleString()}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {stackBar && stackTotal > 0 && (
           <div className="mt-2 space-y-1">
             <div className="flex h-1.5 w-full overflow-hidden rounded bg-muted">

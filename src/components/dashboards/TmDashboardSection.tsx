@@ -36,6 +36,7 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       total,
       delayed,
       actualCount: Math.round(actualSum),
+      planCount: Math.round(planSum),
       progressPct: total > 0 ? (actualSum / total) * 100 : null,
       planPct: total > 0 ? (planSum / total) * 100 : null,
       actualPct: total > 0 ? (actualSum / total) * 100 : null,
@@ -76,6 +77,10 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 hint={PROGRESS_HINT}
                 actualPct={q.kpi.actualPct ?? undefined}
                 planPct={q.kpi.planPct ?? undefined}
+                variant="tm-progress"
+                leftSub={`A ${q.kpi.actualCount.toLocaleString()} / P ${q.kpi.planCount.toLocaleString()}`}
+                rightValue={`${q.kpi.actualPct?.toFixed(1) ?? "—"}%`}
+                rightSub={`A ${q.kpi.actualPct?.toFixed(1) ?? "—"}% / P ${q.kpi.planPct?.toFixed(1) ?? "—"}%`}
               />
               <AbdKpiCard
                 label={`Plot ${label} 지연현황`}
