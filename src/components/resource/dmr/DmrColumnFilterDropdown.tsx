@@ -181,6 +181,10 @@ function DateRange({ column }: { column: any }) {
           <label className="text-[11px] text-muted-foreground">To</label>
           <Input type="date" value={fv?.to ?? ''} onChange={(e) => update({ to: e.target.value || undefined })} className="h-7 text-xs" disabled={!!fv?.emptyOnly} />
         </div>
+        <label className="flex cursor-pointer items-center gap-2 pt-1 text-xs">
+          <Checkbox checked={!!fv?.emptyOnly} onCheckedChange={(c) => update({ emptyOnly: !!c, from: undefined, to: undefined })} className="h-3.5 w-3.5" />
+          Empty only
+        </label>
       </PopoverContent>
     </Popover>
   );
