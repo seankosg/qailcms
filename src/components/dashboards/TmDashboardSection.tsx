@@ -113,6 +113,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
               onWindowResolved={(s, e) => report(label, s, e)}
               open={open}
               onOpenChange={setOpen}
+              chartHeight={306}
             />
           </div>
         ))}
