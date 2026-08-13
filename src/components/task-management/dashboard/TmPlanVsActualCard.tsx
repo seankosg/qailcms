@@ -181,11 +181,11 @@ export function TmPlanVsActualCard({
 
   const unitSuffix = isTasks ? " tasks" : "%";
   const incLabel = isTasks
-    ? "Plan (increment, tasks) — 오른쪽 축"
-    : "Plan (increment, pp) — 오른쪽 축";
+    ? "Plan (increment, tasks)"
+    : "Plan (increment, pp)";
   const incActualLabel = isTasks
-    ? "Actual (increment, tasks) — 오른쪽 축"
-    : "Actual (increment, pp) — 오른쪽 축";
+    ? "Actual (increment, tasks)"
+    : "Actual (increment, pp)";
   const cumPlanLabel = isTasks ? "Plan (cum tasks)" : "Plan (cum %)";
   const cumActualLabel = isTasks ? "Actual (cum tasks)" : "Actual (cum %)";
   const varianceLabel = isTasks ? "Δ Actual − Plan (tasks)" : "Δ Actual − Plan (pp)";
