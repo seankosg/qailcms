@@ -69,18 +69,11 @@ export function TmPlanVsActualCard({
   chartHeight = 340,
 }: Props) {
   const snap = useTaskProgressSnapshot();
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [unit, setUnit] = useState<CurveUnit>("pct");
-  const toggle = (key: string) =>
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
 
   // 대상 범위는 상단 필터가 이미 적용된 items 그대로 사용한다(카드 내 담당자 필터 폐기).
   const scoped = items;
+
 
   const curve = useMemo(
     () =>
