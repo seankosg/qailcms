@@ -14,6 +14,12 @@ const searchSchema = z.object({
   ocs: z.enum(["all", "pending", "complied", "none"]).optional().default("all"),
   /** 밴드별 대표 지연 셀 드릴다운 — 활성 밴드이면서 대표 지연이 그 밴드에 속한 행만 */
   delayBand: z.string().optional().default(""),
+  /** Progress 드릴다운 — 단계 코드(catalog.stage_code) */
+  stage: z.string().optional().default(""),
+  /** Progress 드릴다운 — 그 단계의 상태. stage 와 함께 있을 때만 적용 */
+  stageState: z.enum(["na", "done", "wip", "delayed", "planned", "none"]).optional(),
+  /** 팀 필터 */
+  team: z.string().optional().default("all"),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/spare-part/raw-data")({
