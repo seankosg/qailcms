@@ -13,6 +13,11 @@ import {
   correctionsSha256,
   type CorrectionsDoc,
 } from "@/lib/abd/ocs-local-corrections";
+import {
+  computeStagingPayloadDigest,
+  PAYLOAD_DIGEST_VERSION,
+  type StagingPayloadCounts,
+} from "@/lib/abd/ocs-payload-digest";
 
 export const LOCAL_VALIDATION_SCHEMA = "ocs-local-validation/1";
 export const VALIDATOR_VERSION = "ocs-local-validator/1.0.0";
@@ -99,6 +104,12 @@ export type LocalValidationReceipt = {
   schema_version: string;
   package_id: string;
   payload_sha256: string;
+  /** staging 재현 digest 규칙 버전 */
+  digest_version: string;
+  /** ZIP 전체(manifest·policy·corrections 포함) canonical digest — 영수증 변조 감지용 */
+  package_payload_sha256: string;
+  /** payload_sha256 대상 dataset 행수 */
+  staging_counts: StagingPayloadCounts;
   baseline_id: string;
   baseline_core_hash: string;
   validator_version: string;
