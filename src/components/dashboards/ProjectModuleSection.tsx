@@ -56,19 +56,17 @@ export function ProjectModuleSection({
         </Link>
         <div className="mt-1 grid gap-3 xl:grid-cols-2">
           {plots.map((p) => (
-            <div key={p.plot} className="flex flex-col gap-0.5">
+            <div key={p.plot} className="flex items-baseline gap-2">
               <PlotColumnHeader plot={p.plot} />
-              <div className="flex items-baseline gap-2">
-                <span
-                  className="text-2xl font-bold tabular-nums text-primary"
-                  title={progressHint}
-                >
-                  {p.progressPct == null ? "—" : `${p.progressPct.toFixed(0)}%`}
-                </span>
-                <span className="text-[11px] tabular-nums text-muted-foreground">
-                  모수 {p.total.toLocaleString()}
-                </span>
-              </div>
+              <span
+                className="text-2xl font-bold tabular-nums text-primary"
+                title={progressHint}
+              >
+                {p.progressPct == null ? "—" : `${p.progressPct.toFixed(0)}%`}
+              </span>
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                모수 {p.total.toLocaleString()}
+              </span>
             </div>
           ))}
         </div>
