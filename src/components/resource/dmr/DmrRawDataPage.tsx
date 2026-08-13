@@ -113,7 +113,7 @@ function applyToSupabaseQuery(
 }
 
 // ── Header cell with sort + filter ───────────────────────────────────────
-function HeaderCell({ header, col, scope }: { header: any; col: DmrColumnDef; scope?: DmrScope }) {
+function HeaderCell({ header, col, scope, q, serverFilters }: { header: any; col: DmrColumnDef; scope?: DmrScope; q?: string; serverFilters?: DmrServerFilter[] }) {
   const sortState = header.column.getIsSorted();
   const canSort = col.type !== 'enum' || col.key === 'discipline' || col.key === 'plot' || col.key === 'direct_flag';
   const Icon = sortState === 'asc' ? ArrowUp : sortState === 'desc' ? ArrowDown : ArrowUpDown;
@@ -131,7 +131,7 @@ function HeaderCell({ header, col, scope }: { header: any; col: DmrColumnDef; sc
         <span className="truncate">{col.label}</span>
         {canSort && <Icon className={cn('h-3 w-3 shrink-0', !sortState && 'text-muted-foreground/40')} />}
       </button>
-      <DmrColumnFilterDropdown column={header.column} scope={scope} />
+      <DmrColumnFilterDropdown column={header.column} scope={scope} q={q} serverFilters={serverFilters} />
       <div
         onMouseDown={header.getResizeHandler()}
         onTouchStart={header.getResizeHandler()}
