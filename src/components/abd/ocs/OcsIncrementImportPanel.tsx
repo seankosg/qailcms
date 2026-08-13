@@ -63,6 +63,7 @@ import {
   Step3BuildPackage,
 } from "@/components/abd/ocs/wizard/OcsPreparationSteps";
 import { OcsLocalValidationCard } from "@/components/abd/ocs/wizard/OcsLocalValidationCard";
+import type { LocalValidationReceipt } from "@/lib/abd/ocs-local-validation";
 import { Copy, ExternalLink } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { createPreImportSnapshot, getBackupRunStatus } from "@/lib/backup/backup.functions";
