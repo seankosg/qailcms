@@ -28,6 +28,20 @@ export const Route = createFileRoute("/_authenticated/admin/milestones")({
 function Page() {
   const qc = useQueryClient();
   const [deletingCell, setDeletingCell] = useState<string | null>(null);
+  const [hidePlotG, setHidePlotG] = useState(() => {
+    try {
+      return localStorage.getItem("admin_milestones_hide_plot_g") === "true";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("admin_milestones_hide_plot_g", String(hidePlotG));
+    } catch {
+      // ignore
+    }
+  }, [hidePlotG]);
 
   // 특정 Plot의 특정 Milestone 행만 삭제 (다른 Plot의 동일 Kind는 유지)
   async function deletePlotKind(plot: string, kind: string) {
