@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Toggle } from "@/components/ui/toggle";
 
 type Row = { plot: string; kind: string; target_date: string | null; updated_at: string };
 type Kind = { kind_code: string; label: string; sort_order: number; is_active: boolean };
@@ -27,6 +28,20 @@ export const Route = createFileRoute("/_authenticated/admin/milestones")({
 function Page() {
   const qc = useQueryClient();
   const [deletingCell, setDeletingCell] = useState<string | null>(null);
+  const [hidePlotG, setHidePlotG] = useState(() => {
+    try {
+      return localStorage.getItem("admin_milestones_hide_plot_g") === "true";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("admin_milestones_hide_plot_g", String(hidePlotG));
+    } catch {
+      // ignore
+    }
+  }, [hidePlotG]);
 
   // 특정 Plot의 특정 Milestone 행만 삭제 (다른 Plot의 동일 Kind는 유지)
   async function deletePlotKind(plot: string, kind: string) {
@@ -132,14 +147,15 @@ function Page() {
   const grouped = useMemo(() => {
     const g = new Map<string, Row[]>();
     for (const r of rows) {
+      if (hidePlotG && r.plot === "G") continue;
       const arr = g.get(r.plot) ?? [];
       arr.push(r);
       g.set(r.plot, arr);
     }
     // 기존 Plot 목록이 하나도 없어도 'G' 카드는 노출 (신규 프로젝트 초기 상태 지원)
-    if (g.size === 0) g.set("G", []);
+    if (g.size === 0 && !hidePlotG) g.set("G", []);
     return Array.from(g.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [rows]);
+  }, [rows, hidePlotG]);
 
   const plotList = useMemo(() => grouped.map(([p]) => p), [grouped]);
 
@@ -178,12 +194,37 @@ function Page() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Admin — Milestone 일정</h1>
-        <p className="text-sm text-muted-foreground">
-          Plot × Milestone(HO / COC / DLP) 목표 일자를 관리합니다. Raw Data의 Overdue / Expected
-          Finish 판정 기준으로 사용됩니다.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Admin — Milestone 일정</h1>
+          <p className="text-sm text-muted-foreground">
+            Plot × Milestone(HO / COC / DLP) 목표 일자를 관리합니다. Raw Data의 Overdue / Expected
+            Finish 판정 기준으로 사용됩니다.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => {
+              qc.invalidateQueries({ queryKey: ["tm_milestone_kinds"] });
+              qc.invalidateQueries({ queryKey: ["tm_milestone_config"] });
+              qc.invalidateQueries({ queryKey: ["tm_milestone_distribution"] });
+            }}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            새로고침
+          </Button>
+          <Toggle
+            aria-label="Plot G 숨김"
+            pressed={hidePlotG}
+            onPressedChange={setHidePlotG}
+            className="h-8 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+          >
+            Plot G 숨김
+          </Toggle>
+        </div>
       </div>
 
       <KindManager kinds={kinds} plots={plotList} />
