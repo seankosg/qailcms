@@ -57,7 +57,6 @@ export function ProjectModuleSection({
         <div className="mt-1 grid gap-3 xl:grid-cols-2">
           {plots.map((p) => (
             <div key={p.plot} className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight">Plot {p.plot}</span>
               <span
                 className="text-2xl font-bold tabular-nums text-primary"
                 title={progressHint}

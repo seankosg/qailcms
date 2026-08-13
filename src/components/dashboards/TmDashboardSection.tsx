@@ -88,7 +88,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
           <div key={label} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
               <AbdKpiCard
-                label={`${label} 계획 vs 실적 현황`}
+                label="계획 vs 실적 현황"
                 count={q.kpi.actualCount}
                 total={q.kpi.total}
                 tone={q.kpi.diffPct != null && q.kpi.diffPct < 0 ? "danger" : "ok"}
@@ -103,7 +103,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
               />
 
               <PdbBreakdownCard
-                label={`${label} 업무타입별 실적`}
+                label="업무타입별 실적"
                 rows={q.kpi.workTypes}
                 hint={WORKTYPE_HINT}
               />
