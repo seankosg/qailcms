@@ -234,23 +234,7 @@ export function TmPlanVsActualCard({
               >
                 {open ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                 <TrendingUp className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Plan vs Actual — S-Curve</CardTitle>
-                {controlsHidden ? null : (
-                <div className="flex flex-wrap items-center gap-1">
-                  {filterSummary.map((f) => (
-                    <span
-                      key={f.label}
-                      className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
-                    >
-                      <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
-                      <span className="text-foreground">{f.value}</span>
-                    </span>
-                  ))}
-                  <span className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs tabular-nums text-foreground">
-                    n = {n.toLocaleString()} tasks
-                  </span>
-                </div>
-                )}
+                <CardTitle className="text-base">Progress Status</CardTitle>
               </button>
             </CollapsibleTrigger>
 
