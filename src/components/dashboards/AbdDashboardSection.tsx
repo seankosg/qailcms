@@ -11,10 +11,15 @@ import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
 
 function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
+  const stages = useMemo<Stage[]>(() => {
+    const sel = ALL_STAGES.filter((s) => f.stages.includes(s));
+    return sel.length > 0 ? sel : ALL_STAGES;
+  }, [f.stages]);
   const q = useAbdScurveData({
     plot,
     teams: f.teams as AbdTeam[],
     groupBy: ["team"],
+    stages,
     bucket: (f.bucket === "month" ? "week" : f.bucket) as "day" | "week",
     planMode: f.planMode,
     asOfDate,
