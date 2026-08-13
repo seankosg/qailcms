@@ -528,6 +528,51 @@ export type Database = {
           },
         ]
       }
+      abd_dar_reattr_snapshot_20260813: {
+        Row: {
+          abd_number: string | null
+          decision: string
+          id: string
+          moved_to_round: number | null
+          r1_dar_actual: string | null
+          r1_submission_actual: string | null
+          r2_dar_actual: string | null
+          r2_submission_actual: string | null
+          r3_dar_actual: string | null
+          r3_submission_actual: string | null
+          taken_at: string
+          team: string | null
+        }
+        Insert: {
+          abd_number?: string | null
+          decision: string
+          id: string
+          moved_to_round?: number | null
+          r1_dar_actual?: string | null
+          r1_submission_actual?: string | null
+          r2_dar_actual?: string | null
+          r2_submission_actual?: string | null
+          r3_dar_actual?: string | null
+          r3_submission_actual?: string | null
+          taken_at?: string
+          team?: string | null
+        }
+        Update: {
+          abd_number?: string | null
+          decision?: string
+          id?: string
+          moved_to_round?: number | null
+          r1_dar_actual?: string | null
+          r1_submission_actual?: string | null
+          r2_dar_actual?: string | null
+          r2_submission_actual?: string | null
+          r3_dar_actual?: string | null
+          r3_submission_actual?: string | null
+          taken_at?: string
+          team?: string | null
+        }
+        Relationships: []
+      }
       abd_field_config: {
         Row: {
           created_at: string
