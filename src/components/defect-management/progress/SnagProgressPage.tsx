@@ -113,6 +113,7 @@ export function SnagProgressPage() {
 
   const cellsFn = useServerFn(getSnagProgressCells);
   const totalsFn = useServerFn(getSnagProgressTotals);
+  const cumFn = useServerFn(getSnagProgressCum);
 
   const teamsKey = [...teams].sort().join(",");
   const roomKey = [...roomGroups].sort().join(",");
@@ -193,6 +194,49 @@ export function SnagProgressPage() {
     () => buildBucketRange(effectiveRpcStart, rpcEnd, bucket),
     [effectiveRpcStart, rpcEnd, bucket],
   );
+
+  // S-Curve 누계 정본(문서 distinct). 막대는 cells 기반 일일 절대값을 유지한다.
+  const scurveCumQ = useQuery({
+    queryKey: [
+      "snag-progress-cum",
+      plot, teamsKey, roomKey, bucket, effectiveRpcStart, rpcEnd, asOfDate, planMode,
+    ],
+    queryFn: () =>
+      cumFn({
+        data: {
+          planGroups,
+          teams,
+          roomGroups,
+          groupBy: effectiveGroupBy,
+          bucket,
+          rangeStart: effectiveRpcStart,
+          rangeEnd: rpcEnd,
+          asOfDate,
+          planMode,
+        },
+      }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const scurveCum = useMemo(() => {
+    const rows = scurveCumQ.data ?? [];
+    if (!rows.length) return undefined;
+    const idx = new Map<string, number>();
+    buckets.forEach((b, i) => idx.set(b, i));
+    const out: Record<string, { plan: number[]; actual: number[] }> = {};
+    for (const r of rows) {
+      const i = idx.get(r.bucket_iso);
+      if (i === undefined) continue;
+      const e = (out[r.stage] ??= {
+        plan: new Array(buckets.length).fill(0),
+        actual: new Array(buckets.length).fill(0),
+      });
+      e.plan[i] = r.cum_plan;
+      e.actual[i] = r.cum_actual;
+    }
+    return out as import("@/lib/defect-management/scurve-utils").SnagSCurveCum;
+  }, [scurveCumQ.data, buckets]);
 
   const matrix = useMemo(() => {
     const cells = cellsQ.data ?? [];
@@ -744,6 +788,7 @@ export function SnagProgressPage() {
             buckets={buckets}
             stages={effectiveStages}
             today={today}
+            cum={scurveCum}
             open={scurveOpen}
             onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
           />
