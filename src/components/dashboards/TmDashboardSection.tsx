@@ -12,7 +12,7 @@ import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
 const PROGRESS_HINT =
   "진도현황 = Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 · 건수 = 실적 환산 완료분 / 모집단";
 const WORKTYPE_HINT =
-  "Work Type(row_type) 별 과업 수 상위 4개 + Others · 진도율 = 해당 그룹 실적% 단순 평균";
+  "Work Type(row_type) 별 과업 수 상위 4개 + 그 외 합계 · Work Type = Others 는 집계에서 제외 · 진도율 = 해당 그룹 실적% 단순 평균";
 
 function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
   const q = useTmScurveData({
@@ -35,6 +35,7 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       planSum += resolvePlanPct(it, asOfDate);
       if (resolveIsDelayed(it, q.thresholds, asOfDate)) delayed += 1;
       const wt = ((it as { row_type?: string | null }).row_type ?? "").trim() || "(미지정)";
+      if (wt.toLowerCase() === "others") continue;
       const cur = byType.get(wt) ?? { count: 0, actual: 0 };
       cur.count += 1;
       cur.actual += a;
@@ -45,6 +46,7 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       delayed,
       workTypes: foldTop4(
         [...byType.entries()].map(([key, v]) => ({ key, count: v.count, actual: v.actual })),
+        "그 외",
       ),
       actualCount: Math.round(actualSum),
       planCount: Math.round(planSum),

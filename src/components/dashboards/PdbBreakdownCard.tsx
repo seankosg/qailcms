@@ -8,9 +8,10 @@ export interface BreakdownRow {
   pct: number | null;
 }
 
-/** Top 4 + Others 5행으로 접는다(가중 평균 유지). */
+/** Top 4 + 나머지 합계 5행으로 접는다(가중 평균 유지). */
 export function foldTop4(
   rows: Array<{ key: string; count: number; actual: number }>,
+  restLabel = "Others",
 ): BreakdownRow[] {
   const sorted = [...rows].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
   const top = sorted.slice(0, 4);
@@ -23,7 +24,7 @@ export function foldTop4(
   if (rest.length > 0) {
     const count = rest.reduce((s, r) => s + r.count, 0);
     const actual = rest.reduce((s, r) => s + r.actual, 0);
-    out.push({ key: "Others", count, pct: count > 0 ? (actual / count) * 100 : null });
+    out.push({ key: restLabel, count, pct: count > 0 ? (actual / count) * 100 : null });
   }
   return out;
 }
