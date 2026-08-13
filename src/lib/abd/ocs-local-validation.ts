@@ -506,6 +506,27 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
     );
   }
 
+  // 10-1) 교정 검산용 파생치 — active atomic = single + multi + unmatched
+  let singleLinked = 0;
+  let multiLinked = 0;
+  let unmatched = 0;
+  let associations = 0;
+  const distinctAbd = new Set<string>();
+  for (const c of comments) {
+    if (!c.is_active) continue;
+    const n = c.abd_numbers.length;
+    associations += n;
+    for (const x of c.abd_numbers) distinctAbd.add(x);
+    if (n === 0) unmatched += 1;
+    else if (n === 1) singleLinked += 1;
+    else multiLinked += 1;
+  }
+  if (singleLinked + multiLinked + unmatched !== activeN) {
+    issues.push(
+      issue({ code: "LINK_IDENTITY_MISMATCH", field: "identity", message: "링크 항등식 불일치" }),
+    );
+  }
+
   const blocker_count = issues.filter((i) => i.severity === "blocker").length;
   const warning_count = issues.length - blocker_count;
 
@@ -527,6 +548,13 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
     },
     blocker_count,
     warning_count,
+    abd_link_associations: associations,
+    distinct_linked_abd: distinctAbd.size,
+    active_comments: activeN,
+    single_linked_comments: singleLinked,
+    multi_linked_comments: multiLinked,
+    unmatched_comments: unmatched,
+    baseline_supports_local_validation: baseline.abdIndex !== null,
     unresolved_abd_count: unresolved,
     duplicate_identity_count: dupIdentities.length,
     duplicate_pair_count: duplicatePairs,
