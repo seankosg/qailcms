@@ -16,6 +16,8 @@ const CellsInputSchema = InputSchema.extend({
   bucket: z.enum(["day", "week", "month"]).default("day"),
   rangeStart: z.string(),
   rangeEnd: z.string(),
+  // 매트릭스는 합계행(`all|...`)이 필요하지만 차트는 필요 없다(서버 집계 생략 = 더 빠름).
+  includeAgg: z.boolean().default(true),
 });
 
 export const getSnagProgressCells = createServerFn({ method: "POST" })
@@ -34,7 +36,7 @@ export const getSnagProgressCells = createServerFn({ method: "POST" })
       _as_of_date: data.asOfDate,
       _plan_mode: data.planMode,
       // 문서 단위 집계행(`all|...`)은 신버전 매트릭스에서만 사용한다(구 배포본 하위호환).
-      _include_agg: true,
+      _include_agg: data.includeAgg,
     });
     if (error) throw new Error(error.message);
     if (!Array.isArray(payload)) throw new Error("defect_snag_progress_cells_json RPC contract mismatch");
