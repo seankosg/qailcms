@@ -271,7 +271,9 @@ export function DmrRawDataPage({
   const serverFilters = useMemo(() => toServerFilters(columnFilters, byKey), [columnFilters, byKey]);
   const serverSort = useMemo(() => sorting.map((s) => ({ column: s.id, desc: !!s.desc })), [sorting]);
   const pageIndex = Math.max(1, Number(search.page ?? 1));
-  const pageSize = Math.max(20, Number(search.pageSize ?? 100));
+  const rawPageSize = Number(search.pageSize ?? 100);
+  const isAll = rawPageSize === 0;
+  const pageSize = isAll ? 0 : Math.max(20, rawPageSize || 100);
 
   const query = useDmrItemsQuery({
     q: qInput,
@@ -284,7 +286,7 @@ export function DmrRawDataPage({
   });
   const rows = query.data?.rows ?? [];
   const total = query.data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const totalPages = isAll ? 1 : Math.max(1, Math.ceil(total / pageSize));
 
   // Selection
   const [selection, setSelection] = useState<Record<string, boolean>>({});
@@ -572,7 +574,9 @@ export function DmrRawDataPage({
           <span className="text-muted-foreground">Rows per page:</span>
           <select className="h-7 rounded border bg-background px-2" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
             {[50, 100, 200, 500, 1000].map((n) => <option key={n} value={n}>{n}</option>)}
+            <option value={0}>ALL</option>
           </select>
+          <span className="text-muted-foreground">총 {total.toLocaleString()}행{isAll ? ` · 표시 ${rows.length.toLocaleString()}행` : ''}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">Page {pageIndex} / {totalPages}</span>
