@@ -377,7 +377,7 @@ export function DmrRawDataPage({
           filterOptions: (c.enumOptions ?? []).map((v) => ({ value: v, label: v })),
           serverFacet: c.serverFacet,
         },
-        header: ({ header }) => <HeaderCell header={header} col={c} scope={scope} />,
+        header: ({ header }) => <HeaderCell header={header} col={c} scope={scope} q={qInput} serverFilters={serverFilters} />,
         cell: ({ row }) => <CellRenderer row={row.original} col={c} canEdit={canEdit} directMap={directMap} />,
       } as ColumnDef<DmrEntry>;
     }).filter(Boolean);
@@ -606,7 +606,7 @@ export function DmrRawDataPage({
                   style={{ width: size, minWidth: size, left: isSticky ? stickyOffsets[h.column.id] : undefined }}
                 >
                   {h.column.id === '__select' ? flexRender(h.column.columnDef.header, h.getContext()) :
-                    col ? <HeaderCell header={h} col={col} scope={scope} /> : null}
+                    col ? <HeaderCell header={h} col={col} scope={scope} q={qInput} serverFilters={serverFilters} /> : null}
                 </div>
               );
             })}
