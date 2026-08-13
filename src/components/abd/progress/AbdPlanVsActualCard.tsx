@@ -66,6 +66,8 @@ export interface AbdPlanVsActualCardProps {
   onWindowResolved?: (start: string, end: string) => void;
   /** 메인 S-Curve 차트 높이(px). 미지정 시 360px. */
   chartHeight?: number;
+  /** 상단 필터 현황(헤더 표시용) */
+  filterSummary?: Array<{ label: string; value: string }>;
 }
 
 export function AbdPlanVsActualCard({
