@@ -64,10 +64,6 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
   const c = useAbdPlot("C", asOfDate, f);
   const d = useAbdPlot("D", asOfDate, f);
   const { window: win, report } = useUnionWindow();
-  const shownStages = useMemo<Stage[]>(() => {
-    const sel = ALL_STAGES.filter((s) => f.stages.includes(s));
-    return sel.length > 0 ? sel : ALL_STAGES;
-  }, [f.stages]);
 
   return (
     <ProjectModuleSection
