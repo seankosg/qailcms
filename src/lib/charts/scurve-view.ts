@@ -56,14 +56,18 @@ export function clampWindow(
   return { start: s, end: e };
 }
 
-/** 증분 막대가 차트 높이의 절반을 넘지 않도록 우측 축 최대값을 잡는다. */
-export function incAxisMax(values: Array<number | null | undefined>): number {
+/**
+ * 막대 축 최대값. headroom 은 실제 최대값 대비 여유 배율(기본 2 = 차트 절반 높이).
+ * 값에 연동해 눈금이 "딱 맞게" 잡히길 원하면 1.1~1.2 를 준다.
+ */
+export function incAxisMax(values: Array<number | null | undefined>, headroom = 2): number {
   let max = 0;
   for (const v of values) if (v != null && Number.isFinite(v)) max = Math.max(max, Math.abs(v));
   if (max <= 0) return 1;
-  const doubled = max * 2;
-  const mag = Math.pow(10, Math.floor(Math.log10(doubled)));
-  return Math.ceil(doubled / (mag / 2)) * (mag / 2);
+  const target = max * headroom;
+  const mag = Math.pow(10, Math.floor(Math.log10(target)));
+  const step = mag / 2;
+  return Math.max(step, Math.ceil(target / step) * step);
 }
 
 /** 부호 있는 변동 축 — 0 을 반드시 포함한다. */
