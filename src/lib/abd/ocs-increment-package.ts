@@ -14,8 +14,23 @@ import {
 } from "@/lib/abd/ocs-v3-parser";
 
 export const INCREMENT_SCHEMA_VERSION = "ocs-increment/1";
-/** 교정본은 `_corrected_<n>` 접미사를 허용한다 (브라우저 로컬 교정 산출물). */
-export const PACKAGE_NAME_RE = /^OCS_Increment_(\d{8})_(\d+)(?:_corrected_(\d+))?\.zip$/;
+/**
+ * 패키지 파일명 계약 — 교정본도 동일 계약을 지킨다.
+ * 교정본은 파일명이 아니라 manifest.supersedes_package_id 로 계보를 남긴다.
+ */
+export const PACKAGE_NAME_RE = /^OCS_Increment_(\d{8})_(\d+)\.zip$/;
+
+/** 원본 파일명에서 sequence 만 올린 새 파일명(계약 유지). */
+export function nextPackageFileName(originalName: string, bump = 1): string {
+  const m = PACKAGE_NAME_RE.exec(originalName);
+  if (!m) {
+    throw new Error(
+      `파일명이 계약과 다릅니다: ${originalName} (OCS_Increment_<YYYYMMDD>_<seq>.zip)`,
+    );
+  }
+  const seq = Number(m[2]) + bump;
+  return `OCS_Increment_${m[1]}_${String(seq).padStart(m[2]!.length, "0")}.zip`;
+}
 
 export type ManifestFileEntry = {
   relative_path: string;
