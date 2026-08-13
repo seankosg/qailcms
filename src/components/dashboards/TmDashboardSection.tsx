@@ -12,13 +12,14 @@ import { PDB_DEFAULTS, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
 import { useUnionWindow } from "@/lib/charts/use-union-window";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
+import { usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
 
-const PROGRESS_HINT =
-  "진도현황 = Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 · 건수 = 실적 환산 완료분 / 모집단";
-const WORKTYPE_HINT =
-  "Work Type(row_type) 별 과업 수 상위 4개 + 그 외 합계 · Work Type = Others 는 집계에서 제외 · 진도율 = 해당 그룹 실적% 단순 평균";
-
-function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
+function useTmPlot(
+  plot: "C" | "D",
+  asOfDate: string,
+  f: PdbTmFilters,
+  labels: { others: string; unassigned: string },
+) {
   const q = useTmScurveData({
     asOfDate,
     plots: [plot],
@@ -38,7 +39,7 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       actualSum += a;
       planSum += resolvePlanPct(it, asOfDate);
       if (resolveIsDelayed(it, q.thresholds, asOfDate)) delayed += 1;
-      const wt = ((it as { row_type?: string | null }).row_type ?? "").trim() || "(미지정)";
+      const wt = ((it as { row_type?: string | null }).row_type ?? "").trim() || labels.unassigned;
       if (wt.toLowerCase() === "others") continue;
       const cur = byType.get(wt) ?? { count: 0, actual: 0 };
       cur.count += 1;
@@ -53,7 +54,7 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       delayed,
       workTypes: foldTop4(
         [...byType.entries()].map(([key, v]) => ({ key, count: v.count, actual: v.actual })),
-        "그 외",
+        labels.others,
       ),
       actualCount: Math.round(actualSum),
       planCount: Math.round(planSum),
@@ -62,7 +63,7 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       actualPct: progressPct,
       diffPct,
     };
-  }, [q.scopedItems, q.thresholds, asOfDate]);
+  }, [q.scopedItems, q.thresholds, asOfDate, labels.others, labels.unassigned]);
 
   return { ...q, kpi };
 }
@@ -72,8 +73,14 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
   const [open, setOpen] = useState(true);
   const { data: settings } = usePdbModuleFilters();
   const f = settings?.tm ?? PDB_DEFAULTS.tm;
-  const c = useTmPlot("C", asOfDate, f);
-  const d = useTmPlot("D", asOfDate, f);
+  const t = usePdbT();
+  const { lang } = usePdbLang();
+  const labels = useMemo(
+    () => ({ others: t("others"), unassigned: t("unassigned") }),
+    [t],
+  );
+  const c = useTmPlot("C", asOfDate, f, labels);
+  const d = useTmPlot("D", asOfDate, f, labels);
   const { window: win, report } = useUnionWindow();
 
   return (
@@ -81,7 +88,7 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
       title="Task Management"
       to="/closure/task-management/dashboard"
       tone="tm"
-      progressHint="진도율 = 해당 Plot Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 — TM KPI Analysis 와 동일"
+      progressHint={t("hintTmSection")}
       plots={[
         { plot: "D", progressPct: d.isLoading ? null : d.kpi.progressPct, total: d.kpi.total },
         { plot: "C", progressPct: c.isLoading ? null : c.kpi.progressPct, total: c.kpi.total },
@@ -98,12 +105,13 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
             <div className="grid grid-cols-2 gap-3">
               <AbdKpiCard
                 presentation="project-summary"
-                label="계획 vs 실적 현황"
+                lang={lang}
+                label={t("plannedVsActual")}
                 count={q.kpi.actualCount}
                 total={q.kpi.total}
                 tone={q.kpi.diffPct != null && q.kpi.diffPct < 0 ? "danger" : "ok"}
                 showTotal
-                hint={PROGRESS_HINT}
+                hint={t("hintTmProgress")}
                 actualPct={q.kpi.actualPct ?? undefined}
                 planPct={q.kpi.planPct ?? undefined}
                 variant="tm-progress"
@@ -113,14 +121,15 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
               />
 
               <PdbBreakdownCard
-                label="업무타입별 실적"
+                label={t("byWorkType")}
                 rows={q.kpi.workTypes}
-                hint={WORKTYPE_HINT}
+                hint={t("hintTmWorkType")}
               />
             </div>
             <TmPlanVsActualCard
               items={q.scopedItems}
               asOfDate={asOfDate}
+              lang={lang}
               startFrom={f.startDate}
               dim="hdec_pic_name"
               filterSummary={q.filterSummary}
