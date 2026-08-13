@@ -90,9 +90,8 @@ export function useTmScurveData(params: TmScurveParams) {
           TM_DELAY_FILTER_OPTIONS.find((o) => o.value === delayFilter)?.label ??
           String(delayFilter ?? "all"),
       },
-      { label: "As of", value: asOfDate },
     ],
-    [taskScope, disciplines, hdecPic, hdecEng, workType, delayFilter, asOfDate],
+    [taskScope, disciplines, hdecPic, hdecEng, workType, delayFilter],
   );
 
   return { items, scopedItems, thresholds, isLoading, filterSummary };
