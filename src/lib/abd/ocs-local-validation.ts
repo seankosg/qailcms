@@ -74,6 +74,15 @@ export type LocalValidationResult = {
     images: number;
     response_segments: number;
   };
+  /** 교정 검산용 파생치 */
+  abd_link_associations: number;
+  distinct_linked_abd: number;
+  active_comments: number;
+  single_linked_comments: number;
+  multi_linked_comments: number;
+  unmatched_comments: number;
+  /** v2 Baseline(ABD 인덱스 보유) 여부 — false 면 로컬 ABD 검증 불가 */
+  baseline_supports_local_validation: boolean;
   blocker_count: number;
   warning_count: number;
   unresolved_abd_count: number;
@@ -97,6 +106,7 @@ export type LocalValidationReceipt = {
   blocker_count: number;
   warning_count: number;
   contract_hash: string;
+  payload_parts: readonly string[];
 };
 
 const issue = (p: Partial<LocalValidationIssue> & Pick<LocalValidationIssue, "code" | "message">) =>
