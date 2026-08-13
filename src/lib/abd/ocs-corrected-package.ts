@@ -1,24 +1,40 @@
 // ABD OCS — 브라우저에서 교정본 Clean ZIP 을 재조립한다.
-// 원본 ZIP 은 손대지 않는다. atomic.json 의 ABD Number 필드만 치환하고
-// corrections.json(교정 이력) · local_validation.json(영수증)을 추가한다.
+// 원본 ZIP 은 손대지 않는다. atomic.json 의 ABD Number 필드만 locator 로 찾아 치환하고
+// corrections.json(교정 이력) · local_validation_receipt.json(영수증)을 추가한다.
 import JSZip from "jszip";
 import { sha256Hex } from "@/lib/abd/ocs-db-parser";
-import type { IncrementPackage } from "@/lib/abd/ocs-increment-package";
+import { nextPackageFileName, type IncrementPackage } from "@/lib/abd/ocs-increment-package";
 import {
   correctionsSha256,
   locatorKey,
   type CorrectionItem,
   type CorrectionsDoc,
 } from "@/lib/abd/ocs-local-corrections";
-import type { LocalValidationReceipt } from "@/lib/abd/ocs-local-validation";
+import {
+  LOCAL_RECEIPT_PATH,
+  type LocalValidationReceipt,
+} from "@/lib/abd/ocs-local-validation";
 
 const ABD_LIST_KEYS = ["V3 ABD Numbers", "v3_abd_numbers"];
 const ABD_ONE_KEYS = ["V3 ABD Number", "v3_abd_number"];
 const ID_KEYS = ["Atomic Comment ID", "atomic_comment_id", "Comment ID", "comment_id"];
+const FILE_KEYS = ["Source File Name", "source_file_name"];
+const SHEET_KEYS = ["Source Sheet", "source_sheet", "source_sheet_name"];
+const ROW_KEYS = ["Source Row", "source_row", "source_row_index"];
+const ITEM_NO_KEYS = ["Atomic Item No", "atomic_item_no"];
 
 const pick = (r: Record<string, unknown>, keys: string[]) => {
   for (const k of keys) if (r[k] !== undefined && r[k] !== null) return k;
   return null;
+};
+const val = (r: Record<string, unknown>, keys: string[]): unknown => {
+  const k = pick(r, keys);
+  return k ? r[k] : null;
+};
+const sv = (v: unknown) => (v === null || v === undefined ? "" : String(v).trim());
+const nv = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : "";
 };
 
 const asList = (v: unknown): string[] =>
@@ -37,10 +53,28 @@ export type CorrectedPackage = {
   applied: number;
 };
 
-/** 교정본 파일명: 원본 뒤에 `_corrected_<n>` 을 붙여 원본과 구분한다. */
+/**
+ * 교정본 파일명 — 계약(OCS_Increment_<YYYYMMDD>_<seq>.zip)을 그대로 지키고 sequence 만 올린다.
+ * 계보는 파일명이 아니라 manifest.supersedes_package_id 에 기록한다.
+ */
 export function correctedFileName(original: string, revision: number): string {
-  const base = original.replace(/\.zip$/i, "");
-  return `${base.replace(/_corrected_\d+$/i, "")}_corrected_${revision}.zip`;
+  return nextPackageFileName(original, Math.max(1, revision));
+}
+
+/** 원본 파일명(hash 포함) 기반 locator 키 — corrections 와 동일 산식 */
+function rowLocatorKey(
+  r: Record<string, unknown>,
+  sourceFileHashByName: Map<string, string>,
+): string {
+  const name = sv(val(r, FILE_KEYS));
+  return [
+    sourceFileHashByName.get(name) ?? "",
+    name,
+    sv(val(r, SHEET_KEYS)),
+    nv(val(r, ROW_KEYS)),
+    sv(val(r, ID_KEYS)),
+    nv(val(r, ITEM_NO_KEYS)),
+  ].join("|");
 }
 
 export async function buildCorrectedPackage(args: {
@@ -58,11 +92,14 @@ export async function buildCorrectedPackage(args: {
   if (!atomicEntry) throw new Error("원본 패키지에 atomic.json 이 없습니다.");
   const atomicRaw = JSON.parse(await atomicEntry.async("string")) as Record<string, unknown>;
 
-  const byId = new Map<string, CorrectionItem[]>();
+  const nameToHash = new Map<string, string>();
+  for (const f of pkg.sourceFiles) {
+    nameToHash.set(f.relative_path.replace(/^source\//, ""), f.sha256);
+  }
+  const byLocator = new Map<string, CorrectionItem[]>();
   for (const it of args.corrections) {
-    const list = byId.get(it.sn ?? "") ?? [];
-    list.push(it);
-    byId.set(it.sn ?? "", list);
+    const k = locatorKey(it);
+    byLocator.set(k, [...(byLocator.get(k) ?? []), it]);
   }
 
   const listKey = (["atomic_comments", "comments", "atomic_rows"] as const).find((k) =>
@@ -75,11 +112,10 @@ export async function buildCorrectedPackage(args: {
   const missing: string[] = [];
   const seen = new Set<string>();
   for (const r of rows) {
-    const idKey = pick(r, ID_KEYS);
-    const id = idKey ? String(r[idKey] ?? "").trim() : "";
-    const items = byId.get(id);
-    if (!id || !items) continue;
-    seen.add(id);
+    const key = rowLocatorKey(r, nameToHash);
+    const items = byLocator.get(key);
+    if (!items) continue;
+    seen.add(key);
     const lk = pick(r, ABD_LIST_KEYS);
     const ok = pick(r, ABD_ONE_KEYS);
     let numbers = lk ? asList(r[lk]) : ok ? asList(r[ok]) : [];
@@ -97,7 +133,7 @@ export async function buildCorrectedPackage(args: {
     else if (ok) r[ok] = numbers.join("; ");
     else r["V3 ABD Numbers"] = numbers;
   }
-  for (const [id] of byId) if (!seen.has(id)) missing.push(`대상 행 없음: ${id}`);
+  for (const [k] of byLocator) if (!seen.has(k)) missing.push(`대상 행 없음(locator): ${k}`);
   if (missing.length > 0) {
     throw new Error(`교정을 적용할 수 없는 항목이 있습니다: ${missing.slice(0, 5).join(" ; ")}`);
   }
@@ -144,8 +180,13 @@ export async function buildCorrectedPackage(args: {
   upsert("corrections.json", correctionsText, correctionsSha);
   mf["files"] = files;
 
+  // 영수증은 digest 대상 manifest(영수증 entry 제외) 기준으로 계산한다 → digest 순환 없음.
   const receipt = await args.receiptOf(mf, corrections);
-  zip.file("local_validation.json", JSON.stringify(receipt));
+  const receiptText = JSON.stringify(receipt);
+  const receiptSha = await sha256Hex(receiptText);
+  zip.file(LOCAL_RECEIPT_PATH, receiptText);
+  upsert(LOCAL_RECEIPT_PATH, receiptText, receiptSha);
+  mf["files"] = files;
   zip.file("manifest.json", JSON.stringify(mf));
 
   const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
