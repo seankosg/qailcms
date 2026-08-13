@@ -78,6 +78,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
         {([["D", d], ["C", c]] as const).map(([label, q]) => {
           const actualPct = q.kpi.total > 0 ? (q.kpi.actual / q.kpi.total) * 100 : null;
           const planPct = q.kpi.total > 0 ? (q.kpi.plan / q.kpi.total) * 100 : null;
+          const diffPct = actualPct != null && planPct != null ? actualPct - planPct : null;
           return (
           <div key={label} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
@@ -85,14 +86,14 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
                 label={`Plot ${label} 진도현황`}
                 count={q.kpi.actual}
                 total={q.kpi.total}
-                tone="ok"
+                tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
                 showTotal
                 hint="진도현황 = as-of 기준 Approval actual_upto ÷ 문서 모수"
                 actualPct={actualPct ?? undefined}
                 planPct={planPct ?? undefined}
                 variant="tm-progress"
                 leftSub={`A ${q.kpi.actual.toLocaleString()} / P ${q.kpi.plan.toLocaleString()}`}
-                rightValue={`${actualPct?.toFixed(1) ?? "—"}%`}
+                rightValue={`${diffPct != null ? `${diffPct > 0 ? "+" : ""}${diffPct.toFixed(1)}` : "—"}%`}
                 rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
               />
               <PdbBreakdownCard
