@@ -2,6 +2,7 @@
 // UI 와 corrected ZIP 재검증이 이 모듈 하나를 공유한다. 검증식을 UI 에 중복 작성하지 않는다.
 import { canonicalJson } from "@/lib/abd/ocs-canonical-json";
 import { sha256Hex } from "@/lib/abd/ocs-db-parser";
+import { BASELINE_CORE_TABLES } from "@/lib/abd/ocs-baseline-shared";
 import { normalizeAbdNumber } from "@/lib/abd/ocs-number-normalize";
 import type { BaselineRead } from "@/lib/abd/ocs-baseline-reader";
 import type { IncrementPackage } from "@/lib/abd/ocs-increment-package";
@@ -253,8 +254,7 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
       issue({
         code: "BASELINE_INDEX_MISSING",
         field: "validation/abd_items_index.json",
-        message:
-          "선택한 Baseline 에 ABD 번호 인덱스가 없습니다 (ocs-baseline-v2 필요). 최신 Baseline 을 생성·다운로드한 뒤 다시 검증하십시오.",
+        message: BASELINE_V1_NOTICE,
       }),
     );
   } else {
