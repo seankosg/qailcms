@@ -7,11 +7,12 @@ import { usePdbModuleFilters } from "@/hooks/usePdbModuleFilters";
 import { PDB_DEFAULTS, type PdbTmFilters } from "@/lib/dashboards/pdb-filters";
 import { useUnionWindow } from "@/lib/charts/use-union-window";
 import { ProjectModuleSection } from "./ProjectModuleSection";
+import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
 
 const PROGRESS_HINT =
   "진도현황 = Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 · 건수 = 실적 환산 완료분 / 모집단";
-const DELAY_HINT =
-  "지연현황 = 정본 판정(resolveJudgment)이 지연 또는 악화인 과업 수 — 실적% < 선형 Plan%";
+const WORKTYPE_HINT =
+  "Work Type(row_type) 별 과업 수 상위 4개 + Others · 진도율 = 해당 그룹 실적% 단순 평균";
 
 function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
   const q = useTmScurveData({
@@ -27,14 +28,24 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
     let delayed = 0;
     let actualSum = 0;
     let planSum = 0;
+    const byType = new Map<string, { count: number; actual: number }>();
     for (const it of q.scopedItems) {
-      actualSum += resolveActualPct(it);
+      const a = resolveActualPct(it);
+      actualSum += a;
       planSum += resolvePlanPct(it, asOfDate);
       if (resolveIsDelayed(it, q.thresholds, asOfDate)) delayed += 1;
+      const wt = ((it as { row_type?: string | null }).row_type ?? "").trim() || "(미지정)";
+      const cur = byType.get(wt) ?? { count: 0, actual: 0 };
+      cur.count += 1;
+      cur.actual += a;
+      byType.set(wt, cur);
     }
     return {
       total,
       delayed,
+      workTypes: foldTop4(
+        [...byType.entries()].map(([key, v]) => ({ key, count: v.count, actual: v.actual })),
+      ),
       actualCount: Math.round(actualSum),
       planCount: Math.round(planSum),
       progressPct: total > 0 ? (actualSum / total) * 100 : null,
@@ -82,13 +93,10 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 rightValue={`${q.kpi.actualPct?.toFixed(1) ?? "—"}%`}
                 rightSub={`A ${q.kpi.actualPct?.toFixed(1) ?? "—"}% / P ${q.kpi.planPct?.toFixed(1) ?? "—"}%`}
               />
-              <AbdKpiCard
-                label={`Plot ${label} 지연현황`}
-                count={q.kpi.delayed}
-                total={q.kpi.total}
-                tone="danger"
-                showTotal
-                hint={DELAY_HINT}
+              <PdbBreakdownCard
+                label={`Plot ${label} Work Type 진도`}
+                rows={q.kpi.workTypes}
+                hint={WORKTYPE_HINT}
               />
             </div>
             <TmPlanVsActualCard
