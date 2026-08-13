@@ -45,6 +45,7 @@ import {
   trimFlatTail,
 } from "@/lib/charts/scurve-view";
 import { bucketTargetTerm } from "@/lib/charts/bucket-terms";
+import { pdbBucketTerm, pdbT, type PdbLang } from "@/lib/dashboards/pdb-i18n";
 
 export interface AbdPlanVsActualCardProps {
   /** 전 라운드 통합 cells (메인 매트릭스 쿼리 재사용) */
@@ -71,6 +72,8 @@ export interface AbdPlanVsActualCardProps {
   filterSummary?: Array<{ label: string; value: string }>;
   /** 시간 단위(day/week/month) — 막대 라벨 용어에 사용 */
   bucket?: string;
+  /** 표시 언어. 기본 "ko". */
+  lang?: PdbLang;
 }
 
 export function AbdPlanVsActualCard({
@@ -89,8 +92,13 @@ export function AbdPlanVsActualCard({
   chartHeight = 360,
   filterSummary = [],
   bucket,
+  lang = "ko",
 }: AbdPlanVsActualCardProps) {
-  const term = bucketTargetTerm(bucket);
+  const term = lang === "en" ? pdbBucketTerm(bucket, lang) : bucketTargetTerm(bucket);
+  const cntUnit = pdbT(lang, "unitCountSuffix");
+  const cumPctLabel = pdbT(lang, "cumPct");
+  const leftAxis = pdbT(lang, "leftAxis");
+  const rightAxis = pdbT(lang, "rightAxis");
   const scurve = useMemo(
     () => buildAbdSCurve({ cells, buckets, stages, today, baselines, cum }),
     [cells, buckets, stages, today, baselines, cum],
@@ -187,8 +195,8 @@ export function AbdPlanVsActualCard({
     stages.flatMap((s) => [
       [`planInc_${s}`, { label: `${STAGE_LABELS[s]} Plan (${term})`, color: ABD_STAGE_COLORS[s].bar }],
       [`actualInc_${s}`, { label: `${STAGE_LABELS[s]} Actual (${term})`, color: ABD_STAGE_COLORS[s].line }],
-      [`cumPlan_${s}`, { label: `${STAGE_LABELS[s]} Plan (누적 %)`, color: ABD_STAGE_COLORS[s].line }],
-      [`cumActual_${s}`, { label: `${STAGE_LABELS[s]} Actual (누적 %)`, color: ABD_STAGE_COLORS[s].line }],
+      [`cumPlan_${s}`, { label: `${STAGE_LABELS[s]} Plan (${cumPctLabel})`, color: ABD_STAGE_COLORS[s].line }],
+      [`cumActual_${s}`, { label: `${STAGE_LABELS[s]} Actual (${cumPctLabel})`, color: ABD_STAGE_COLORS[s].line }],
     ]),
   ) as ChartConfig;
 
@@ -278,7 +286,7 @@ export function AbdPlanVsActualCard({
                   })}
                   {view.trimmed > 0 && (
                     <span className="text-[11px] text-muted-foreground">
-                      · 이후 {view.trimmed}개 구간 계획 없음
+                      {pdbT(lang, "trimmedPrefix")} {view.trimmed} {pdbT(lang, "trimmedNote")}
                     </span>
                   )}
                 </div>
@@ -334,7 +342,7 @@ export function AbdPlanVsActualCard({
                         dataKey={`planInc_${s}`}
                         stackId="plan"
                         fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].bar} 45%, transparent)`}
-                        name={`${STAGE_LABELS[s]} Plan (${term}, 건) — 왼쪽 축`}
+                        name={`${STAGE_LABELS[s]} Plan (${term}, ${cntUnit}) — ${leftAxis}`}
                         barSize={8}
                         hide={hidden.has(`planInc_${s}`)}
                       />
@@ -346,7 +354,7 @@ export function AbdPlanVsActualCard({
                         dataKey={`actualInc_${s}`}
                         stackId="actual"
                         fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].line} 35%, transparent)`}
-                        name={`${STAGE_LABELS[s]} Actual (${term}, 건) — 왼쪽 축`}
+                        name={`${STAGE_LABELS[s]} Actual (${term}, ${cntUnit}) — ${leftAxis}`}
                         barSize={8}
                         hide={hidden.has(`actualInc_${s}`)}
                       />
@@ -361,7 +369,7 @@ export function AbdPlanVsActualCard({
                         strokeDasharray={PLAN_DASH}
                         strokeWidth={2.5}
                         dot={false}
-                        name={`${STAGE_LABELS[s]} Plan (누적 %) — 오른쪽 축`}
+                        name={`${STAGE_LABELS[s]} Plan (${cumPctLabel}) — ${rightAxis}`}
                         hide={hidden.has(`cumPlan_${s}`)}
                       />
                     ))}
@@ -374,7 +382,7 @@ export function AbdPlanVsActualCard({
                         stroke={ABD_STAGE_COLORS[s].line}
                         strokeWidth={3.5}
                         dot={false}
-                        name={`${STAGE_LABELS[s]} Actual (누적 %) — 오른쪽 축`}
+                        name={`${STAGE_LABELS[s]} Actual (${cumPctLabel}) — ${rightAxis}`}
                         connectNulls={false}
                         hide={hidden.has(`cumActual_${s}`)}
                       />
