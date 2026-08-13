@@ -49,7 +49,10 @@ export function useTmAsOfRows(asOf: string, enabled = true) {
     queryKey: ["tm-rows-as-of", asOf],
     queryFn: () => fetchRows(asOf),
     enabled: enabled && !!asOf,
-    staleTime: 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev: TmAsOfRow[] | undefined) => prev,
   });
 }
 
