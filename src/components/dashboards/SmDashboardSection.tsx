@@ -42,7 +42,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
   return (
     <ProjectModuleSection
       title="Snag Management"
-      to="/closure/snag-management/kpi-analysis"
+      to="/closure/snag-management/dashboard"
       tone="sm"
       progressHint="진도율 = 해당 Plot Closure 실적 누계 ÷ Closure 모수 — SM KPI Analysis 와 동일(서버 totals 정본)"
       plots={[
