@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { validateIncrementLocally } from "./ocs-local-validation";
+import {
+  BASELINE_V1_NOTICE,
+  buildLocalValidationReceipt,
+  validateIncrementLocally,
+  verifyLocalValidationReceipt,
+} from "./ocs-local-validation";
+import { BASELINE_CORE_TABLES } from "./ocs-baseline-shared";
+import { nextPackageFileName, PACKAGE_NAME_RE } from "./ocs-increment-package";
+import { correctedFileName } from "./ocs-corrected-package";
+import { makeCorrectionsDoc, type CorrectionItem } from "./ocs-local-corrections";
 import type { BaselineRead, AbdIndexRow } from "./ocs-baseline-reader";
 import type { IncrementPackage } from "./ocs-increment-package";
 import type { V3StageComment } from "./ocs-v3-parser";
@@ -76,7 +85,9 @@ function pkg(comments: V3StageComment[]): IncrementPackage {
       base_baseline_id: "B1",
       base_import_run_id: "R1",
       base_core_hash: "abc",
-      base_core_table_hashes: {},
+      base_core_table_hashes: Object.fromEntries(
+        BASELINE_CORE_TABLES.map((t) => [t, "h"]),
+      ) as Record<string, string>,
       base_generated_at: "",
       target_ocs_numbers: [],
       change_type: "new",
