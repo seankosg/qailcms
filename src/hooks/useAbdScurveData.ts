@@ -7,6 +7,8 @@ import {
   buildBucketRange,
   todayIso,
   weekStartIso,
+  ALL_STAGES,
+  STAGE_LABELS,
   type Bucket,
   type GroupBy,
   type PlanMode,
@@ -34,12 +36,14 @@ export interface AbdScurveParams {
   rangeDays: number;
   /** S-Curve 전용 질의(baseline·cum) 활성화 여부 */
   scurveEnabled: boolean;
+  /** 차트에 표시할 스테이지(필터 요약용). 비어 있으면 전체 */
+  stages?: Stage[];
   /** 차트 시작일(ISO). 없으면 오늘 −14일(기존 동작) */
   startDate?: string | null;
 }
 
 export function useAbdScurveData(params: AbdScurveParams) {
-  const { plot, teams, groupBy, bucket, planMode, asOfDate, rangeDays, scurveEnabled, startDate } = params;
+  const { plot, teams, groupBy, bucket, planMode, asOfDate, rangeDays, scurveEnabled, stages, startDate } = params;
 
   // Round 필터 제거 — 항상 전 라운드(컬럼 UNION) 집계.
   const round = "all" as const;
@@ -185,6 +189,32 @@ export function useAbdScurveData(params: AbdScurveParams) {
     return out;
   }, [totalsQ.data]);
 
+  const filterSummary = useMemo(() => {
+    const stageList = (stages ?? []).length ? stages! : ALL_STAGES;
+    return [
+      { label: "Plot", value: plot === "all" ? "All" : `Plot ${plot}` },
+      {
+        label: "Team",
+        value: teams.length
+          ? teams.length <= 3
+            ? teams.join(", ")
+            : `${teams.length} selected`
+          : "All",
+      },
+      {
+        label: "Stage",
+        value:
+          stageList.length === ALL_STAGES.length
+            ? "All"
+            : stageList.length <= 3
+              ? stageList.map((s) => STAGE_LABELS[s]).join(", ")
+              : `${stageList.length} selected`,
+      },
+      { label: "Plan", value: planMode === "remaining" ? "Remaining" : "Baseline" },
+      { label: "As of", value: asOfDate },
+    ];
+  }, [plot, teams, stages, planMode, asOfDate]);
+
   return {
     today,
     buckets,
@@ -195,6 +225,7 @@ export function useAbdScurveData(params: AbdScurveParams) {
     baselines,
     cum,
     denomByStage,
+    filterSummary,
     loading: cellsQ.isPending || totalsQ.isPending,
     error: cellsQ.error || totalsQ.error,
   };

@@ -119,10 +119,12 @@ export function AbdProgressPage() {
     baselines: scurveBaselines,
     cum: scurveCum,
     denomByStage: scurveDenom,
+    filterSummary: scurveFilterSummary,
   } = useAbdScurveData({
     plot,
     teams,
     groupBy: effectiveGroupBy,
+    stages: effectiveStages,
     bucket,
     planMode,
     asOfDate,
@@ -521,6 +523,7 @@ export function AbdProgressPage() {
             baselines={scurveBaselines}
             cum={scurveCum}
             denomByStage={scurveDenom}
+            filterSummary={scurveFilterSummary}
           />
         </>
       )}

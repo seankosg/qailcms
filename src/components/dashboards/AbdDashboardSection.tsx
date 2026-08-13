@@ -11,10 +11,15 @@ import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
 
 function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
+  const stages = useMemo<Stage[]>(() => {
+    const sel = ALL_STAGES.filter((s) => f.stages.includes(s));
+    return sel.length > 0 ? sel : ALL_STAGES;
+  }, [f.stages]);
   const q = useAbdScurveData({
     plot,
     teams: f.teams as AbdTeam[],
     groupBy: ["team"],
+    stages,
     bucket: (f.bucket === "month" ? "week" : f.bucket) as "day" | "week",
     planMode: f.planMode,
     asOfDate,
@@ -48,7 +53,7 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
       progressPct: out.total > 0 ? (out.actual / out.total) * 100 : null,
     };
   }, [q.totals, f.kpiStage]);
-  return { ...q, kpi };
+  return { ...q, kpi, stages };
 }
 
 /** ABD — 정본: useAbdScurveData(= ABD Progress 와 동일 훅), Plot 별 호출 */
@@ -59,10 +64,6 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
   const c = useAbdPlot("C", asOfDate, f);
   const d = useAbdPlot("D", asOfDate, f);
   const { window: win, report } = useUnionWindow();
-  const shownStages = useMemo<Stage[]>(() => {
-    const sel = ALL_STAGES.filter((s) => f.stages.includes(s));
-    return sel.length > 0 ? sel : ALL_STAGES;
-  }, [f.stages]);
 
   return (
     <ProjectModuleSection
@@ -105,7 +106,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
             <AbdPlanVsActualCard
               cells={q.cells as never}
               buckets={q.buckets}
-              stages={shownStages}
+              stages={q.stages as Stage[]}
               today={q.today}
               open={open}
               onOpenChange={setOpen}
@@ -116,6 +117,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
               windowEnd={win.end}
               onWindowResolved={(s, e) => report(label, s, e)}
               chartHeight={324}
+              filterSummary={q.filterSummary}
             />
           </div>
           );
