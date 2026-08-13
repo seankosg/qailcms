@@ -14,6 +14,13 @@ import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
 import { usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
 
+/** 필터 요약 배지의 한국어 값(Delay 옵션 라벨)만 영문으로 옮긴다. */
+const DELAY_EN: Record<string, string> = {
+  전체: "All",
+  지연: "Delayed",
+  악화: "At Risk",
+};
+
 function useTmPlot(
   plot: "C" | "D",
   asOfDate: string,
