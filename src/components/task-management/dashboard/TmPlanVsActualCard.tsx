@@ -32,6 +32,7 @@ import {
   trimFlatTail,
 } from "@/lib/charts/scurve-view";
 import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
+import { pdbT, type PdbLang } from "@/lib/dashboards/pdb-i18n";
 
 type CurveUnit = "pct" | "tasks";
 
