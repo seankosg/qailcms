@@ -41,6 +41,9 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       cur.actual += a;
       byType.set(wt, cur);
     }
+    const progressPct = total > 0 ? (actualSum / total) * 100 : null;
+    const planPct = total > 0 ? (planSum / total) * 100 : null;
+    const diffPct = progressPct != null && planPct != null ? progressPct - planPct : null;
     return {
       total,
       delayed,
@@ -50,11 +53,13 @@ function useTmPlot(plot: "C" | "D", asOfDate: string, f: PdbTmFilters) {
       ),
       actualCount: Math.round(actualSum),
       planCount: Math.round(planSum),
-      progressPct: total > 0 ? (actualSum / total) * 100 : null,
-      planPct: total > 0 ? (planSum / total) * 100 : null,
-      actualPct: total > 0 ? (actualSum / total) * 100 : null,
+      progressPct,
+      planPct,
+      actualPct: progressPct,
+      diffPct,
     };
   }, [q.scopedItems, q.thresholds, asOfDate]);
+
   return { ...q, kpi };
 }
 
@@ -86,16 +91,17 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 label={`Plot ${label} 진도현황`}
                 count={q.kpi.actualCount}
                 total={q.kpi.total}
-                tone="ok"
+                tone={q.kpi.diffPct != null && q.kpi.diffPct < 0 ? "danger" : "ok"}
                 showTotal
                 hint={PROGRESS_HINT}
                 actualPct={q.kpi.actualPct ?? undefined}
                 planPct={q.kpi.planPct ?? undefined}
                 variant="tm-progress"
                 leftSub={`A ${q.kpi.actualCount.toLocaleString()} / P ${q.kpi.planCount.toLocaleString()}`}
-                rightValue={`${q.kpi.actualPct?.toFixed(1) ?? "—"}%`}
+                rightValue={`${q.kpi.diffPct != null ? `${q.kpi.diffPct > 0 ? "+" : ""}${q.kpi.diffPct.toFixed(1)}` : "—"}%`}
                 rightSub={`A ${q.kpi.actualPct?.toFixed(1) ?? "—"}% / P ${q.kpi.planPct?.toFixed(1) ?? "—"}%`}
               />
+
               <PdbBreakdownCard
                 label={`Plot ${label} Work Type 진도`}
                 rows={q.kpi.workTypes}
