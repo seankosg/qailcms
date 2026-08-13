@@ -25,9 +25,7 @@ import {
 import { type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4, type BreakdownRow } from "./PdbBreakdownCard";
-
-const ROOM_HINT =
-  "지역별현황 = Room Group 별 Issued 건수와 Closure 진도율(Closed ÷ Issued) · SM Dashboard Room Group 카드와 동일한 정본 집계 · LG Podium 은 통합";
+import { usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
 
 /** Room Group 별 Issued / Closure% — SM Dashboard 의 roomGroupTotals 정본을 그대로 쓴다. */
 function useRoomGroupRows(plot: PlotKey, asOfDate: string, f: PdbSmFilters): BreakdownRow[] {
@@ -85,6 +83,8 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
   const [open, setOpen] = useState(true);
   const { data: settings } = usePdbModuleFilters();
   const f = settings?.sm ?? PDB_DEFAULTS.sm;
+  const t = usePdbT();
+  const { lang } = usePdbLang();
   const stage = f.stage as Stage;
   const unit = f.unit as SnagCurveUnit;
   const c = usePlot("C", asOfDate, f);
@@ -98,7 +98,7 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
       title="Snag Management"
       to="/closure/snag-management/dashboard"
       tone="sm"
-      progressHint="진도율 = 해당 Plot Closure 실적 누계 ÷ Closure 모수 — SM KPI Analysis 와 동일(서버 totals 정본)"
+      progressHint={t("hintSmSection")}
       plots={[
         {
           plot: "D",
@@ -129,12 +129,13 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
               <div className="grid grid-cols-2 gap-3">
                 <AbdKpiCard
                   presentation="project-summary"
-                  label="진도현황"
+                  lang={lang}
+                  label={t("progressStatus")}
                   count={actualCnt}
                   total={q.stageTotal}
                   tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
                   showTotal
-                  hint="진도현황 = as-of 기준 Closure actual_upto ÷ Closure 모수 — SM KPI Analysis 와 동일"
+                  hint={t("hintSmProgress")}
                   actualPct={actualPct ?? undefined}
                   planPct={planPct ?? undefined}
                   variant="tm-progress"
@@ -145,19 +146,21 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
                   rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
                 />
                 <PdbBreakdownCard
-                  label="주요지역별 현황"
+                  label={t("byMainArea")}
                   rows={foldTop4(
                     rooms.map((r) => ({
                       key: r.key,
                       count: r.count,
                       actual: ((r.pct ?? 0) * r.count) / 100,
                     })),
+                    t("others"),
                   )}
-                  hint={ROOM_HINT}
+                  hint={t("hintSmRoom")}
                 />
               </div>
               <SnagKpiPlanVsActualCard
                 cells={q.cells as never}
+                lang={lang}
                 buckets={q.buckets}
                 stage={stage}
                 today={q.today}

@@ -39,6 +39,7 @@ import {
   trimFlatTail,
 } from "@/lib/charts/scurve-view";
 import { bucketTargetTerm } from "@/lib/charts/bucket-terms";
+import { pdbBucketTerm, pdbT, type PdbLang } from "@/lib/dashboards/pdb-i18n";
 
 export type SnagCurveUnit = "cnt" | "pct";
 
@@ -48,8 +49,8 @@ const BUCKET_OPTIONS: Array<{ value: Bucket; label: string }> = [
   { value: "month", label: "Monthly" },
 ];
 
-const UNIT_OPTIONS: Array<{ value: SnagCurveUnit; label: string }> = [
-  { value: "cnt", label: "건수" },
+const unitOptions = (lang: PdbLang): Array<{ value: SnagCurveUnit; label: string }> => [
+  { value: "cnt", label: pdbT(lang, "unitCount") },
   { value: "pct", label: "%" },
 ];
 
@@ -84,6 +85,8 @@ interface Props {
   onWindowResolved?: (start: string, end: string) => void;
   /** 메인 S-Curve 차트 높이(px). 미지정 시 340px. */
   chartHeight?: number;
+  /** 표시 언어. 기본 "ko". */
+  lang?: PdbLang;
 }
 
 export function SnagKpiPlanVsActualCard({
@@ -109,6 +112,7 @@ export function SnagKpiPlanVsActualCard({
   windowEnd,
   onWindowResolved,
   chartHeight = 340,
+  lang = "ko",
 }: Props) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
@@ -180,19 +184,21 @@ export function SnagKpiPlanVsActualCard({
   const todayLabel = curve.todayIndex >= 0 ? (curve.bucketLabels[curve.todayIndex] ?? null) : null;
 
   const n = stageTotal;
-  const unitSuffix = isPct ? "%" : "건";
-  const term = bucketTargetTerm(bucket);
+  const cntUnit = pdbT(lang, "unitCountSuffix");
+  const rightAxis = pdbT(lang, "rightAxis");
+  const unitSuffix = isPct ? "%" : cntUnit;
+  const term = lang === "en" ? pdbBucketTerm(bucket, lang) : bucketTargetTerm(bucket);
   const incLabel = isPct
-    ? `Plan (${term}, %) — 오른쪽 축`
-    : `Plan (${term}, 건) — 오른쪽 축`;
+    ? `Plan (${term}, %) — ${rightAxis}`
+    : `Plan (${term}, ${cntUnit}) — ${rightAxis}`;
   const incActualLabel = isPct
-    ? `Actual (${term}, %) — 오른쪽 축`
-    : `Actual (${term}, 건) — 오른쪽 축`;
-  const cumPlanLabel = isPct ? "Plan (cum %)" : "Plan (cum 건)";
-  const cumActualLabel = isPct ? "Actual (cum %)" : "Actual (cum 건)";
+    ? `Actual (${term}, %) — ${rightAxis}`
+    : `Actual (${term}, ${cntUnit}) — ${rightAxis}`;
+  const cumPlanLabel = isPct ? "Plan (cum %)" : `Plan (cum ${cntUnit})`;
+  const cumActualLabel = isPct ? "Actual (cum %)" : `Actual (cum ${cntUnit})`;
   const varianceLabel = isPct
     ? `Δ Actual − Plan (${term}, %)`
-    : `Δ Actual − Plan (${term}, 건)`;
+    : `Δ Actual − Plan (${term}, ${cntUnit})`;
 
   const cfg: ChartConfig = {
     planInc: { label: incLabel, color: "var(--muted-foreground)" },
@@ -248,7 +254,7 @@ export function SnagKpiPlanVsActualCard({
                 }}
                 className="gap-1"
               >
-                {UNIT_OPTIONS.map((o) => (
+                {unitOptions(lang).map((o) => (
                   <ToggleGroupItem
                     key={o.value}
                     value={o.value}
@@ -314,7 +320,7 @@ export function SnagKpiPlanVsActualCard({
                   </span>
                   {view.trimmed > 0 && (
                     <span className="text-[11px] text-muted-foreground">
-                      · 이후 {view.trimmed}개 구간 계획 없음
+                      {pdbT(lang, "trimmedPrefix")} {view.trimmed} {pdbT(lang, "trimmedNote")}
                     </span>
                   )}
                 </div>

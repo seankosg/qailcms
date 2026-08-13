@@ -9,8 +9,17 @@ import { TmDashboardSection } from "./TmDashboardSection";
 import { SmDashboardSection } from "./SmDashboardSection";
 import { AbdDashboardSection } from "./AbdDashboardSection";
 import { LazySection } from "./LazySection";
+import { PdbLangProvider, usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
 
 export function ProjectSummaryPage() {
+  return (
+    <PdbLangProvider>
+      <ProjectSummaryBody />
+    </PdbLangProvider>
+  );
+}
+
+function ProjectSummaryBody() {
   // 기준일 하나 — 세 모듈이 같은 as-of 를 쓴다.
   const [asOfDate, setAsOfDate] = useState<string>(() => todayInDoha());
   // 기준일 입력 디바운스 — 타이핑 중 재조회 폭주를 막는다(표시값은 즉시 갱신).
@@ -21,6 +30,8 @@ export function ProjectSummaryPage() {
   }, [asOfDate]);
   // 캐시 복원(localStorage) — 복원 전에는 섹션 마운트를 미뤄 중복 조회를 막는다.
   const { restored, refresh, refreshing } = usePdbCache();
+  const { lang, setLang } = usePdbLang();
+  const t = usePdbT();
 
   return (
     <div className="flex flex-col gap-6 p-4">
@@ -30,7 +41,7 @@ export function ProjectSummaryPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Project Dashboard</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">기준일</span>
+          <span className="text-xs font-medium text-muted-foreground">{t("dataDate")}</span>
           <Input
             type="date"
             value={asOfDate}
@@ -43,7 +54,7 @@ export function ProjectSummaryPage() {
             className="h-8 gap-1 text-xs"
             onClick={() => void refresh()}
             disabled={refreshing || !restored}
-            title="저장된 캐시를 비우고 최신 데이터를 다시 불러온다"
+            title={t("refreshHint")}
           >
             <RefreshCw className={refreshing ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
             Refresh
@@ -53,6 +64,22 @@ export function ProjectSummaryPage() {
               Setting
             </Button>
           </Link>
+          <div className="inline-flex h-8 items-center overflow-hidden rounded-md border">
+            {(["ko", "en"] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setLang(l)}
+                className={
+                  lang === l
+                    ? "h-full px-2 text-xs font-semibold bg-primary text-primary-foreground"
+                    : "h-full px-2 text-xs font-medium text-muted-foreground hover:bg-muted"
+                }
+              >
+                {l === "ko" ? "KOR" : "ENG"}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -67,7 +94,7 @@ export function ProjectSummaryPage() {
           </LazySection>
         </>
       ) : (
-        <div className="py-10 text-center text-sm text-muted-foreground">캐시 복원 중…</div>
+        <div className="py-10 text-center text-sm text-muted-foreground">{t("restoring")}</div>
       )}
     </div>
   );

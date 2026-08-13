@@ -32,6 +32,7 @@ import {
   trimFlatTail,
 } from "@/lib/charts/scurve-view";
 import { useTaskProgressSnapshot, snapshotKey } from "@/hooks/useTaskProgressSnapshot";
+import { pdbT, type PdbLang } from "@/lib/dashboards/pdb-i18n";
 
 type CurveUnit = "pct" | "tasks";
 
@@ -73,6 +74,8 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   /** 메인 S-Curve 차트 높이(px). 미지정 시 340px. */
   chartHeight?: number;
+  /** 표시 언어. 기본 "ko". */
+  lang?: PdbLang;
 }
 
 export function TmPlanVsActualCard({
@@ -90,6 +93,7 @@ export function TmPlanVsActualCard({
   open,
   onOpenChange,
   chartHeight = 340,
+  lang = "ko",
 }: Props) {
   const snap = useTaskProgressSnapshot();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -312,12 +316,14 @@ export function TmPlanVsActualCard({
                   </span>
                   {curve.excludedCount > 0 && (
                     <span className="ml-2 rounded border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
-                      실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 제외
+                      {pdbT(lang, "noActualStart")} — {curve.excludedCount.toLocaleString()}
+                      {lang === "en" ? " " : ""}
+                      {pdbT(lang, "excludedSuffix")}
                     </span>
                   )}
                   {view.trimmed > 0 && (
                     <span className="text-[11px] text-muted-foreground">
-                      · 이후 {view.trimmed}개 구간 계획 없음
+                      {pdbT(lang, "trimmedPrefix")} {view.trimmed} {pdbT(lang, "trimmedNote")}
                     </span>
                   )}
                 </div>

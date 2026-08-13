@@ -9,8 +9,9 @@ import { ALL_STAGES, type Stage } from "@/lib/abd/progress-utils";
 import type { AbdTeam } from "@/lib/abd/columns";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
+import { usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
 
-function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
+function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters, unassigned: string) {
   const stages = useMemo<Stage[]>(() => {
     const sel = ALL_STAGES.filter((s) => f.stages.includes(s));
     return sel.length > 0 ? sel : ALL_STAGES;
@@ -38,7 +39,7 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
       out.actual += Number(r.actual_upto ?? 0);
       out.plan += Number(r.plan_upto ?? 0);
       const gk = (r.group_key ?? []) as string[];
-      const key = (gk[0] ?? "").trim() || "(미지정)";
+      const key = (gk[0] ?? "").trim() || unassigned;
       const cur = byTeam.get(key) ?? { count: 0, actual: 0 };
       cur.count += Number(r.total ?? 0);
       cur.actual += Number(r.actual_upto ?? 0);
@@ -52,7 +53,7 @@ function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters) {
       ),
       progressPct: out.total > 0 ? (out.actual / out.total) * 100 : null,
     };
-  }, [q.totals, f.kpiStage]);
+  }, [q.totals, f.kpiStage, unassigned]);
   return { ...q, kpi, stages };
 }
 
@@ -61,8 +62,10 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
   const [open, setOpen] = useState(true);
   const { data: settings } = usePdbModuleFilters();
   const f = settings?.abd ?? PDB_DEFAULTS.abd;
-  const c = useAbdPlot("C", asOfDate, f);
-  const d = useAbdPlot("D", asOfDate, f);
+  const t = usePdbT();
+  const { lang } = usePdbLang();
+  const c = useAbdPlot("C", asOfDate, f, t("unassigned"));
+  const d = useAbdPlot("D", asOfDate, f, t("unassigned"));
   const { window: win, report } = useUnionWindow();
 
   return (
@@ -70,7 +73,7 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
       title="As Built Drawing"
       to="/closure/abd/dashboard"
       tone="abd"
-      progressHint="진도율 = 해당 Plot Approval 실적 누계 ÷ 문서 모수 — ABD Progress 매트릭스와 동일(서버 totals 정본)"
+      progressHint={t("hintAbdSection")}
       plots={[
         { plot: "D", progressPct: d.loading ? null : d.kpi.progressPct, total: d.kpi.total },
         { plot: "C", progressPct: c.loading ? null : c.kpi.progressPct, total: c.kpi.total },
@@ -91,12 +94,13 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
               <div className="grid grid-cols-2 gap-3">
                 <AbdKpiCard
                   presentation="project-summary"
-                  label="진도현황"
+                  lang={lang}
+                  label={t("progressStatus")}
                   count={q.kpi.actual}
                   total={q.kpi.total}
                   tone={diffPct != null && diffPct < 0 ? "danger" : "ok"}
                   showTotal
-                  hint="진도현황 = as-of 기준 Approval actual_upto ÷ 문서 모수"
+                  hint={t("hintAbdProgress")}
                   actualPct={actualPct ?? undefined}
                   planPct={planPct ?? undefined}
                   variant="tm-progress"
@@ -105,13 +109,14 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
                   rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
                 />
                 <PdbBreakdownCard
-                  label="Team 진도"
+                  label={t("teamPerformance")}
                   rows={q.kpi.teams}
-                  hint="Team 별 문서 수 상위 4개 + Others · 진도율 = 실적 누계 ÷ 문서 모수"
+                  hint={t("hintAbdTeam")}
                 />
               </div>
               <AbdPlanVsActualCard
                 cells={q.cells as never}
+                lang={lang}
                 buckets={q.buckets}
                 stages={q.stages as Stage[]}
                 today={q.today}

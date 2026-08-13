@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+import { usePdbT } from "@/lib/dashboards/pdb-i18n";
 
 export type PlotHeadStat = {
   plot: "D" | "C";
@@ -37,6 +38,7 @@ export function ProjectModuleSection({
   tone?: ModuleTone;
   children: ReactNode;
 }) {
+  const t = usePdbT();
   return (
     <section
       className={cn(
@@ -66,7 +68,7 @@ export function ProjectModuleSection({
                 {p.progressPct == null ? "—" : `${p.progressPct.toFixed(0)}%`}
               </span>
               <span className="text-[11px] tabular-nums text-muted-foreground">
-                모수 {p.total.toLocaleString()}
+                {t("totalQty")} {p.total.toLocaleString()}
               </span>
             </div>
           ))}
