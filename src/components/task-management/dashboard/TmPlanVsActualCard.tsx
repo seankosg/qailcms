@@ -288,37 +288,40 @@ export function TmPlanVsActualCard({
               <p className="py-12 text-center text-sm text-muted-foreground">No data in range.</p>
             ) : (
               <>
-                <div className="flex flex-wrap items-stretch gap-2 rounded-md border bg-muted/30 px-3 py-2">
-                  <div className="flex flex-col gap-0.5 rounded border-l-4 border-l-primary px-3 py-1">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {controlsHidden ? `as of ${asOfDate}` : `${appliedLabel} · as of ${asOfDate}`}
+                <div className="flex flex-wrap items-center gap-1">
+                  {filterSummary.map((f) => (
+                    <span
+                      key={f.label}
+                      className="rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
+                    >
+                      <span className="font-semibold uppercase tracking-wide">{f.label}</span>{" "}
+                      <span className="text-foreground">{f.value}</span>
                     </span>
-                    <span className="text-xs tabular-nums">
-                      <span className="text-muted-foreground">P</span> {conv(planNow).toFixed(1)}
-                      {unitSuffix} · <span className="text-muted-foreground">A</span>{" "}
-                      {conv(actualNow).toFixed(1)}
-                      {unitSuffix}
-                    </span>
-                    <span className={cn("text-xs font-semibold tabular-nums", accent)}>
-                      Δ {sign}
-                      {conv(deltaNow).toFixed(1)}
-                      {isTasks ? " tasks" : "pp"}
-                    </span>
-                  </div>
-                  <div className="flex flex-col justify-center px-3 py-1 text-[10px] leading-relaxed text-muted-foreground">
-                    <span>Solid = actual · Dashed = plan</span>
-                    <span>
-                      {isTasks
-                        ? "Tasks = Σ progress (0.4 진행 = 0.4건)"
-                        : "% = 대상 과업 진척률 단순 평균"}
-                    </span>
-                    {view.trimmed > 0 && <span>이후 {view.trimmed}개 구간 계획 없음</span>}
-                  </div>
+                  ))}
+                  <span className="rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] tabular-nums text-foreground">
+                    n = {n.toLocaleString()} tasks
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+                  <span className="font-semibold text-primary">{DIM_LABEL[dim]}</span>
+                  <span className="text-muted-foreground">P</span>
+                  <span className="tabular-nums">{conv(planNow).toFixed(1)}{unitSuffix}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground">A</span>
+                  <span className="tabular-nums">{conv(actualNow).toFixed(1)}{unitSuffix}</span>
+                  <span className={cn("font-semibold tabular-nums", accent)}>
+                    Δ {sign}{conv(deltaNow).toFixed(1)}{isTasks ? " tasks" : "pp"}
+                  </span>
                   {curve.excludedCount > 0 && (
-                    <div className="flex items-center rounded border border-destructive/40 bg-destructive/10 px-3 py-1 text-[11px] font-semibold text-destructive">
-                      실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 실적 곡선
-                      제외
-                    </div>
+                    <span className="ml-2 rounded border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
+                      실적 시작 기준일 없음 — {curve.excludedCount.toLocaleString()}건 제외
+                    </span>
+                  )}
+                  {view.trimmed > 0 && (
+                    <span className="text-[11px] text-muted-foreground">
+                      · 이후 {view.trimmed}개 구간 계획 없음
+                    </span>
                   )}
                 </div>
 
