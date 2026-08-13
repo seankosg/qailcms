@@ -101,46 +101,6 @@ export function TmPlanVsActualCard({
   const isTasks = unit === "tasks";
   // Tasks 환산 물량 = Σ 진척률 = (pct / 100) × n
   const conv = (v: number) => (isTasks ? (v / 100) * n : v);
-  const r1 = (v: number) => Number(v.toFixed(1));
-
-  const allData = curve.buckets.map((b, i) => ({
-    bucket: b,
-    bucketLabel: curve.bucketLabels[i],
-    planInc: r1(conv(curve.dailyPlan[i])),
-    actualInc: curve.dailyActual[i] == null ? null : r1(conv(curve.dailyActual[i] as number)),
-    cumPlan: r1(conv(curve.cumPlan[i])),
-    cumActual: curve.cumActual[i] == null ? null : r1(conv(curve.cumActual[i] as number)),
-    variance:
-      curve.cumActual[i] == null
-        ? null
-        : r1(conv((curve.cumActual[i] as number) - curve.cumPlan[i])),
-  }));
-
-  // 보이는 창만 줄인다 — 누계·모수 계산은 위에서 이미 끝났고 손대지 않는다.
-  const view = useMemo(() => {
-    const tail = trimFlatTail({
-      planInc: allData.map((d) => d.planInc),
-      actualInc: allData.map((d) => d.actualInc),
-      todayIndex: curve.todayIndex,
-    });
-    const w = clampWindow(curve.buckets, 0, tail.end, windowStart, windowEnd);
-    const own = {
-      start: curve.buckets[0] ?? null,
-      end: tail.end > 0 ? (curve.buckets[tail.end - 1] ?? null) : null,
-    };
-    return { rows: allData.slice(w.start, w.end), trimmed: tail.trimmed, own };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curve, windowStart, windowEnd, unit, n]);
-  const data = view.rows;
-  const reportRef = useRef(onWindowResolved);
-  reportRef.current = onWindowResolved;
-  const ownStart = view.own.start;
-  const ownEnd = view.own.end;
-  useEffect(() => {
-    if (ownStart && ownEnd) reportRef.current?.(ownStart, ownEnd);
-  }, [ownStart, ownEnd]);
-
-  const todayLabel = curve.todayIndex >= 0 ? (curve.bucketLabels[curve.todayIndex] ?? null) : null;
 
   const idxForKpi = curve.todayIndex >= 0 ? curve.todayIndex : curve.buckets.length - 1;
   const planNow = idxForKpi >= 0 ? (curve.cumPlan[idxForKpi] ?? 0) : 0;
@@ -157,36 +117,6 @@ export function TmPlanVsActualCard({
   const deltaNow = actualNow - planNow;
 
   const unitSuffix = isTasks ? " tasks" : "%";
-  const incLabel = isTasks
-    ? "Plan (increment, tasks)"
-    : "Plan (increment, pp)";
-  const incActualLabel = isTasks
-    ? "Actual (increment, tasks)"
-    : "Actual (increment, pp)";
-  const cumPlanLabel = isTasks ? "Plan (cum tasks)" : "Plan (cum %)";
-  const cumActualLabel = isTasks ? "Actual (cum tasks)" : "Actual (cum %)";
-  const varianceLabel = isTasks ? "Δ Actual − Plan (tasks)" : "Δ Actual − Plan (pp)";
-
-  const cfg: ChartConfig = {
-    planInc: { label: incLabel, color: "var(--muted-foreground)" },
-    actualInc: { label: incActualLabel, color: "var(--primary)" },
-    cumPlan: { label: cumPlanLabel, color: "var(--muted-foreground)" },
-    cumActual: { label: cumActualLabel, color: "var(--destructive)" },
-  };
-  const varianceCfg: ChartConfig = {
-    variance: { label: varianceLabel, color: "var(--destructive)" },
-  };
-
-  const hasData = data.length > 0 && scoped.length > 0;
-  // 위·아래 차트의 x축 눈금을 동일하게 맞춘다(그림 영역 폭 + ticks 배열 공유).
-  const xTicks = useMemo(() => pickXTicks(data.map((d) => d.bucketLabel), 7), [data]);
-  const incMax = useMemo(
-    () => incAxisMax(data.flatMap((d) => [d.planInc, d.actualInc])),
-    [data],
-  );
-  const varDomain = useMemo(() => signedDomain(data.map((d) => d.variance)), [data]);
-  const Y_LEFT_WIDTH = 56;
-  const Y_RIGHT_WIDTH = 44;
   const accent =
     deltaNow < 0
       ? "text-destructive"
@@ -194,6 +124,9 @@ export function TmPlanVsActualCard({
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-muted-foreground";
   const sign = deltaNow > 0 ? "+" : "";
+
+  const hasData = scoped.length > 0;
+
 
   return (
     <Card>
