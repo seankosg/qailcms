@@ -12,7 +12,7 @@ Project Dashboard(`/project-summary`) 상단 Setting 버튼 오른쪽에 KOR·EN
 | 기준일 | Data Date |
 | 저장된 캐시를 비우고 최신 데이터를 다시 불러온다 | Clear cached data and reload the latest |
 | 캐시 복원 중… | Restoring cached data… |
-| 모수 (모듈 헤더의 "모수 1,234") | Scope (예: `Scope 1,234`) |
+| 모수 (모듈 헤더의 "모수 1,234") | Total Q'ty (예: `Total Q'ty 1,234`) |
 | 데이터 없음 | No data |
 | 그 외 / Others | Others |
 | (미지정) | (Unassigned) |
@@ -20,13 +20,13 @@ Project Dashboard(`/project-summary`) 상단 Setting 버튼 오른쪽에 KOR·EN
 ### KPI 카드
 | 한국어 | English |
 | --- | --- |
-| 진도현황 | Progress |
+| 진도현황 | Progress Status |
 | 계획 vs 실적 현황 | Planned vs Actual |
 | 계획 (막대 라벨) | Planned |
 | 실적 (막대 라벨) | Actual |
 | 업무타입별 실적 | Progress by Work Type |
-| 주요지역별 현황 | Progress by Key Area |
-| Team 진도 | Progress by Team |
+| 주요지역별 현황 | Progress by Main Area |
+| Team 진도 | Team Performance |
 
 ### 툴팁(hint) 문구
 | 한국어 | English |
@@ -45,14 +45,14 @@ Project Dashboard(`/project-summary`) 상단 Setting 버튼 오른쪽에 KOR·EN
 | 한국어 | English |
 | --- | --- |
 | 당일목표 / 금주목표 / 당월목표 / 기간목표 | Daily Target / Weekly Target / Monthly Target / Period Target |
-| 건수 (단위 토글) | Count |
-| 건 (단위 접미사) | ea |
+| 건수 (단위 토글) | Nos. |
+| 건 (단위 접미사) | No. |
 | 오른쪽 축 / 왼쪽 축 | right axis / left axis |
 | 누적 % | Cumulative % |
 | 실적 시작 기준일 없음 — N건 제외 | No actual start date — N items excluded |
 | · 이후 N개 구간 계획 없음 | · no plan for the last N periods |
 
-건설 용어 선택 근거: 진도현황·진도율은 실무 표준어인 **Progress**, 계획·실적은 **Planned / Actual**, 모수는 물량 기준을 뜻하므로 **Scope**(카드 안의 분모는 Total), 지연 대비 차이는 **Variance** 계열로 통일한다. Plot / Room Group / Work Type / Team / Approval / Closure / Issued 는 이미 영문 고유 용어라 그대로 둔다.
+건설 용어 선택 근거: 진도현황은 **Progress Status**, 툴팁 본문의 진도율은 **Progress**, 계획·실적은 **Planned / Actual**, 모수는 물량 기준이므로 **Total Q'ty**, 건수 단위는 **Nos. / No.** 로 통일한다. Plot / Room Group / Work Type / Team / Approval / Closure / Issued 는 이미 영문 고유 용어라 그대로 둔다.
 
 ## 기술 노트
 
