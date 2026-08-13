@@ -111,8 +111,11 @@ export function AbdPlanVsActualCard({
       if (!ser) continue;
       row[`planInc_${st}`] = ser.dailyPlan[i];
       row[`actualInc_${st}`] = ser.dailyActual[i];
-      row[`cumPlan_${st}`] = ser.cumPlan[i];
-      row[`cumActual_${st}`] = ser.cumActual[i];
+      const denom = denomByStage?.[st] ?? 0;
+      const toPct = (v: number | null) =>
+        v == null ? null : denom > 0 ? (v / denom) * 100 : null;
+      row[`cumPlan_${st}`] = toPct(ser.cumPlan[i]);
+      row[`cumActual_${st}`] = toPct(ser.cumActual[i] as number | null);
       const a = ser.dailyActual[i];
       const p = ser.dailyPlan[i];
       planIncSum += p ?? 0;
@@ -172,8 +175,8 @@ export function AbdPlanVsActualCard({
     stages.flatMap((s) => [
       [`planInc_${s}`, { label: `${STAGE_LABELS[s]} Plan (daily)`, color: ABD_STAGE_COLORS[s].bar }],
       [`actualInc_${s}`, { label: `${STAGE_LABELS[s]} Actual (daily)`, color: ABD_STAGE_COLORS[s].line }],
-      [`cumPlan_${s}`, { label: `${STAGE_LABELS[s]} Plan (cum)`, color: ABD_STAGE_COLORS[s].line }],
-      [`cumActual_${s}`, { label: `${STAGE_LABELS[s]} Actual (cum)`, color: ABD_STAGE_COLORS[s].line }],
+      [`cumPlan_${s}`, { label: `${STAGE_LABELS[s]} Plan (누적 %)`, color: ABD_STAGE_COLORS[s].line }],
+      [`cumActual_${s}`, { label: `${STAGE_LABELS[s]} Actual (누적 %)`, color: ABD_STAGE_COLORS[s].line }],
     ]),
   ) as ChartConfig;
 
@@ -270,7 +273,13 @@ export function AbdPlanVsActualCard({
                       textAnchor="end"
                       height={46}
                     />
-                    <YAxis yAxisId="cum" tick={{ fontSize: 11 }} allowDecimals={false} domain={[0, "auto"]} />
+                    <YAxis
+                      yAxisId="cum"
+                      tick={{ fontSize: 11 }}
+                      domain={[0, 100]}
+                      ticks={[0, 20, 40, 60, 80, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                    />
                     <YAxis
                       yAxisId="bar"
                       orientation="right"
