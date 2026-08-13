@@ -916,6 +916,8 @@ export function OcsIncrementImportPanel() {
                 clean: localValid.receipt.clean,
                 baseline_id: localValid.receipt.baseline_id,
                 validator_version: localValid.receipt.validator_version,
+                digest_version: localValid.receipt.digest_version,
+                staging_counts: localValid.receipt.staging_counts,
               }
             : null,
           source_files: pkg.sourceFiles.map((f) => ({

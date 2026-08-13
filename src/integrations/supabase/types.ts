@@ -8400,7 +8400,13 @@ export type Database = {
           ocs_norm: string
         }[]
       }
+      abd_ocs_inc_stage_payload_digest: {
+        Args: { p_run: string }
+        Returns: Json
+      }
       abd_ocs_norm: { Args: { v: string }; Returns: string }
+      abd_ocs_pd_tok: { Args: { v: string }; Returns: string }
+      abd_ocs_pd_tok_arr: { Args: { v: string[] }; Returns: string }
       abd_ocs_recount_all: { Args: never; Returns: Json }
       abd_ocs_recount_item: { Args: { p_item_id: string }; Returns: undefined }
       abd_ocs_recover_20260809: {

@@ -172,6 +172,13 @@ export const ocsIncImport = createServerFn({ method: "POST" })
         clean: boolean;
         baseline_id: string;
         validator_version: string;
+        digest_version?: string;
+        staging_counts?: {
+          groups: number;
+          comments: number;
+          attachments: number;
+          responses: number;
+        };
       } | null;
     }) => {
       const need = [
@@ -214,6 +221,27 @@ export const ocsIncImport = createServerFn({ method: "POST" })
     if (!lv.payload_sha256) throw new Error("로컬 검증 payload digest 가 없습니다.");
     if (lv.package_sha256 !== data.package_sha256)
       throw new Error("로컬 검증 영수증의 ZIP SHA-256 이 업로드된 패키지와 다릅니다.");
+
+    // 유일한 서버 결합 — 브라우저가 CLEAN 판정한 canonical payload = staging 실제 payload.
+    {
+      const stage = (await rpc(context.supabase, "abd_ocs_inc_stage_payload_digest", {
+        p_run: data.run_id,
+      })) as Record<string, unknown>;
+      const mismatch =
+        String(stage["digest_version"] ?? "") !== String(lv.digest_version ?? "") ||
+        String(stage["payload_sha256"] ?? "") !== lv.payload_sha256 ||
+        (lv.staging_counts
+          ? Number(stage["groups"] ?? -1) !== lv.staging_counts.groups ||
+            Number(stage["comments"] ?? -1) !== lv.staging_counts.comments ||
+            Number(stage["attachments"] ?? -1) !== lv.staging_counts.attachments ||
+            Number(stage["responses"] ?? -1) !== lv.staging_counts.responses
+          : true);
+      if (mismatch) {
+        throw new Error(
+          "LOCAL_VALIDATION_PAYLOAD_MISMATCH: The staged payload differs from the package that passed browser-local validation. Re-select the ZIP and run local validation again.",
+        );
+      }
+    }
 
     // 사전 백업 검증
     const { data: run, error: runErr } = await context.supabase
