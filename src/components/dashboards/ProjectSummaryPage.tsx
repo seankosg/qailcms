@@ -28,9 +28,6 @@ export function ProjectSummaryPage() {
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b pb-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">Project Dashboard</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            TM · SM · ABD 진행 현황 요약 — Plot 별 좌우 비교.
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground">기준일</span>
