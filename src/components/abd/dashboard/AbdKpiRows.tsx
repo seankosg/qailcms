@@ -4,11 +4,7 @@ import { useAbdDataDate } from "@/hooks/useAbdDataDate";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import {
-  getAbdDashboardRow1,
-  getAbdDashboardRow2,
-  pivotRows,
-} from "@/lib/abd/dashboard.functions";
+import { getAbdDashboardRow1, getAbdDashboardRow2, pivotRows } from "@/lib/abd/dashboard.functions";
 
 type Tone = "neutral" | "ok" | "info" | "warn" | "danger";
 
@@ -59,7 +55,23 @@ interface KpiCardProps {
   variant?: "default" | "tm-progress";
 }
 
-export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, onClick, stackBar, hint, showTotal, actualPct, planPct, leftSub, rightValue, rightSub, variant = "default" }: KpiCardProps) {
+export function AbdKpiCard({
+  label,
+  count,
+  total,
+  tone = "neutral",
+  breakdown,
+  onClick,
+  stackBar,
+  hint,
+  showTotal,
+  actualPct,
+  planPct,
+  leftSub,
+  rightValue,
+  rightSub,
+  variant = "default",
+}: KpiCardProps) {
   const pct = total && total > 0 ? Math.round((count / total) * 100) : null;
   const stackTotal = stackBar ? stackBar.reduce((s, x) => s + (x.count || 0), 0) : 0;
   const hasGap = actualPct != null && planPct != null;
@@ -78,12 +90,7 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
             </div>
             <div className="flex items-end justify-between gap-2">
               <div className="flex min-w-0 flex-col gap-0.5">
-                <div
-                  className={cn(
-                    "text-3xl font-bold tabular-nums leading-tight",
-                    TONE[tone],
-                  )}
-                >
+                <div className={cn("text-3xl font-bold tabular-nums leading-tight", TONE[tone])}>
                   {count.toLocaleString()}
                   <span className="text-xl font-semibold text-muted-foreground">
                     {" / "}
@@ -97,26 +104,21 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
                 )}
               </div>
               <div className="flex shrink-0 flex-col items-end gap-0.5">
-                <div
-                  className={cn(
-                    "text-2xl font-bold tabular-nums leading-tight",
-                    TONE[tone],
-                  )}
-                >
+                <div className={cn("text-2xl font-bold tabular-nums leading-tight", TONE[tone])}>
                   {rightValue}
                 </div>
                 {rightSub && (
-                  <div className="text-[11px] tabular-nums text-muted-foreground">
-                    {rightSub}
-                  </div>
+                  <div className="text-[11px] tabular-nums text-muted-foreground">{rightSub}</div>
                 )}
               </div>
             </div>
             <div className="mt-2 flex flex-col gap-1.5">
-              {([
-                { k: "계획", v: planPct!, cls: "bg-muted-foreground/50" },
-                { k: "실적", v: actualPct!, cls: diffPp! >= 0 ? "bg-emerald-500" : "bg-red-500" },
-              ] as const).map((b) => (
+              {(
+                [
+                  { k: "계획", v: planPct!, cls: "bg-muted-foreground/50" },
+                  { k: "실적", v: actualPct!, cls: diffPp! >= 0 ? "bg-emerald-500" : "bg-red-500" },
+                ] as const
+              ).map((b) => (
                 <div key={b.k} className="flex items-center gap-2">
                   <span className="w-7 shrink-0 text-[10px] font-medium text-muted-foreground">
                     {b.k}
@@ -166,7 +168,9 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
                   Actual {actualPct!.toFixed(1)}% / Plan {planPct!.toFixed(1)}%
                 </div>
               ) : pct != null ? (
-                <div className="text-[11px] tabular-nums text-muted-foreground">{pct}% of total</div>
+                <div className="text-[11px] tabular-nums text-muted-foreground">
+                  {pct}% of total
+                </div>
               ) : null}
             </div>
             {breakdown && breakdown.length > 0 && (
@@ -188,7 +192,9 @@ export function AbdKpiCard({ label, count, total, tone = "neutral", breakdown, o
                     )}
                   >
                     <span className="truncate">{b.team || "—"}</span>
-                    <span className={cn("font-medium", TONE[tone])}>{b.count.toLocaleString()}</span>
+                    <span className={cn("font-medium", TONE[tone])}>
+                      {b.count.toLocaleString()}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -265,9 +271,7 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         agg.set(b.team, (agg.get(b.team) ?? 0) + b.count);
       }
     }
-    return sortByTeamOrder(
-      Array.from(agg.entries()).map(([team, count]) => ({ team, count })),
-    );
+    return sortByTeamOrder(Array.from(agg.entries()).map(([team, count]) => ({ team, count })));
   }, [byTeam]);
 
   const mk = (label: string, key: string, tone: Tone, statusGroup?: string, hint?: string) => (
@@ -292,11 +296,26 @@ export function AbdRow1Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
   );
 
   const totalStackBar = [
-    { key: "Approved", label: "Approved", count: totals.get("Approved") ?? 0, colorClass: "bg-emerald-500" },
+    {
+      key: "Approved",
+      label: "Approved",
+      count: totals.get("Approved") ?? 0,
+      colorClass: "bg-emerald-500",
+    },
     { key: "UR", label: "UR", count: totals.get("UR") ?? 0, colorClass: "bg-blue-500" },
     { key: "DS", label: "DS", count: totals.get("DS") ?? 0, colorClass: "bg-amber-500" },
-    { key: "RESUBMIT", label: "Resubmit by TM", count: totals.get("RESUBMIT") ?? 0, colorClass: "bg-rose-500" },
-    { key: "CANCELLED", label: "Cancelled", count: totals.get("CANCELLED") ?? 0, colorClass: "bg-muted-foreground" },
+    {
+      key: "RESUBMIT",
+      label: "Resubmit by TM",
+      count: totals.get("RESUBMIT") ?? 0,
+      colorClass: "bg-rose-500",
+    },
+    {
+      key: "CANCELLED",
+      label: "Cancelled",
+      count: totals.get("CANCELLED") ?? 0,
+      colorClass: "bg-muted-foreground",
+    },
   ];
 
   return (
@@ -357,9 +376,7 @@ export function AbdRow2Kpis({ plots = [], teams = [], batchNo = [], onOpenRaw }:
         acc.set(b.team, (acc.get(b.team) ?? 0) + b.count);
       }
     }
-    return sortByTeamOrder(
-      Array.from(acc, ([team, count]) => ({ team, count })),
-    );
+    return sortByTeamOrder(Array.from(acc, ([team, count]) => ({ team, count })));
   }, [byTeam]);
 
   const mk = (label: string, key: string, statusGroup: string) => (

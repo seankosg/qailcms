@@ -62,10 +62,7 @@ export function ProjectModuleSection({
               )}
             >
               <PlotColumnHeader plot={p.plot} />
-              <span
-                className="text-xl font-bold tabular-nums text-primary"
-                title={progressHint}
-              >
+              <span className="text-xl font-bold tabular-nums text-primary" title={progressHint}>
                 {p.progressPct == null ? "—" : `${p.progressPct.toFixed(0)}%`}
               </span>
               <span className="text-[11px] tabular-nums text-muted-foreground">

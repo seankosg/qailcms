@@ -10,7 +10,6 @@ import { SmDashboardSection } from "./SmDashboardSection";
 import { AbdDashboardSection } from "./AbdDashboardSection";
 import { LazySection } from "./LazySection";
 
-
 export function ProjectSummaryPage() {
   // 기준일 하나 — 세 모듈이 같은 as-of 를 쓴다.
   const [asOfDate, setAsOfDate] = useState<string>(() => todayInDoha());
