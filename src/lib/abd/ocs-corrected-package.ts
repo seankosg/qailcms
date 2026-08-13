@@ -122,7 +122,7 @@ export async function buildCorrectedPackage(args: {
     for (const it of items) {
       const idx = numbers.indexOf(it.before);
       if (idx < 0) {
-        missing.push(`${it.sn ?? id} / ${it.before}`);
+        missing.push(`${it.sn ?? key} / ${it.before}`);
         continue;
       }
       numbers[idx] = it.after;
