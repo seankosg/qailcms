@@ -33,6 +33,7 @@ import {
 import {
   buildSnagSCurve,
   SNAG_STAGE_COLORS,
+  type SnagSCurveCum,
 } from "@/lib/defect-management/scurve-utils";
 
 export interface SnagPlanVsActualCardProps {
@@ -42,6 +43,8 @@ export interface SnagPlanVsActualCardProps {
   today: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** 서버 정본 누계(있으면 곡선에 사용). 막대는 항상 cells 기반 일일 절대값. */
+  cum?: SnagSCurveCum;
 }
 
 export function SnagPlanVsActualCard({
@@ -51,10 +54,11 @@ export function SnagPlanVsActualCard({
   today,
   open,
   onOpenChange,
+  cum,
 }: SnagPlanVsActualCardProps) {
   const scurve = useMemo(
-    () => buildSnagSCurve({ cells, buckets, stages, today }),
-    [cells, buckets, stages, today],
+    () => buildSnagSCurve({ cells, buckets, stages, today, cum }),
+    [cells, buckets, stages, today, cum],
   );
 
   const [hidden, setHidden] = useState<Set<string>>(new Set());
