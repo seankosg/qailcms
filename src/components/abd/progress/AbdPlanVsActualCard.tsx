@@ -113,7 +113,7 @@ export function AbdPlanVsActualCard({
       row[`actualInc_${st}`] = ser.dailyActual[i];
       const denom = denomByStage?.[st] ?? 0;
       const toPct = (v: number | null) =>
-        v == null ? null : denom > 0 ? (v / denom) * 100 : null;
+        v == null ? null : denom > 0 ? Math.round((v / denom) * 1000) / 10 : null;
       row[`cumPlan_${st}`] = toPct(ser.cumPlan[i]);
       row[`cumActual_${st}`] = toPct(ser.cumActual[i] as number | null);
       const a = ser.dailyActual[i];
@@ -338,7 +338,7 @@ export function AbdPlanVsActualCard({
                         strokeDasharray={PLAN_DASH}
                         strokeWidth={2.5}
                         dot={false}
-                        name={`${STAGE_LABELS[s]} Plan (cum)`}
+                        name={`${STAGE_LABELS[s]} Plan (누적 %)`}
                         hide={hidden.has(`cumPlan_${s}`)}
                       />
                     ))}
@@ -351,7 +351,7 @@ export function AbdPlanVsActualCard({
                         stroke={ABD_STAGE_COLORS[s].line}
                         strokeWidth={3.5}
                         dot={false}
-                        name={`${STAGE_LABELS[s]} Actual (cum)`}
+                        name={`${STAGE_LABELS[s]} Actual (누적 %)`}
                         connectNulls={false}
                         hide={hidden.has(`cumActual_${s}`)}
                       />
