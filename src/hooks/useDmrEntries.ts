@@ -54,6 +54,7 @@ export interface DmrItemsParams {
   filters?: DmrServerFilter[];
   sort?: DmrServerSort[];
   page: number;
+  /** 0 = ALL (전체 행) */
   pageSize: number;
   directMap?: Map<string, boolean>; // for direct_flag resolution
   scope?: DmrScope;
@@ -64,6 +65,7 @@ export function useDmrItemsQuery(p: DmrItemsParams) {
   return useQuery({
     queryKey: ['dmr', 'items', p],
     queryFn: async () => {
+      const build = () => {
       let q: any = supabase.from('dmr_entries').select('*', { count: 'exact' });
       q = applyDmrScope(q, p.scope);
 
@@ -124,12 +126,29 @@ export function useDmrItemsQuery(p: DmrItemsParams) {
       } else {
         for (const s of sort) q = q.order(s.column, { ascending: !s.desc });
       }
+      return q;
+      };
+
+      // ALL(pageSize=0) — 1,000 행 응답 상한을 넘기 위해 청크로 나눠 전부 가져온다.
+      if (!p.pageSize || p.pageSize <= 0) {
+        const CHUNK = 1000;
+        const HARD_CAP = 100_000;
+        const all: DmrEntry[] = [];
+        let total = 0;
+        for (let offset = 0; offset < HARD_CAP; offset += CHUNK) {
+          const { data, count, error } = await build().range(offset, offset + CHUNK - 1);
+          if (error) throw new Error(error.message);
+          total = count ?? total;
+          const chunk = (data ?? []) as DmrEntry[];
+          all.push(...chunk);
+          if (chunk.length < CHUNK || all.length >= total) break;
+        }
+        return { rows: all, total: total || all.length };
+      }
 
       const from = Math.max(0, (p.page - 1) * p.pageSize);
       const to = from + p.pageSize - 1;
-      q = q.range(from, to);
-
-      const { data, count, error } = await q;
+      const { data, count, error } = await build().range(from, to);
       if (error) throw new Error(error.message);
       return { rows: (data ?? []) as DmrEntry[], total: count ?? 0 };
     },
