@@ -523,6 +523,7 @@ export function AbdProgressPage() {
             baselines={scurveBaselines}
             cum={scurveCum}
             denomByStage={scurveDenom}
+            bucket={bucket}
             filterSummary={scurveFilterSummary}
           />
         </>
