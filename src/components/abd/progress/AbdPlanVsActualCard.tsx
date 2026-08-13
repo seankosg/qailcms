@@ -44,6 +44,7 @@ import {
   signedDomain,
   trimFlatTail,
 } from "@/lib/charts/scurve-view";
+import { bucketTargetTerm } from "@/lib/charts/bucket-terms";
 
 export interface AbdPlanVsActualCardProps {
   /** 전 라운드 통합 cells (메인 매트릭스 쿼리 재사용) */
@@ -68,6 +69,8 @@ export interface AbdPlanVsActualCardProps {
   chartHeight?: number;
   /** 상단 필터 현황(헤더 표시용) */
   filterSummary?: Array<{ label: string; value: string }>;
+  /** 시간 단위(day/week/month) — 막대 라벨 용어에 사용 */
+  bucket?: string;
 }
 
 export function AbdPlanVsActualCard({
@@ -85,7 +88,9 @@ export function AbdPlanVsActualCard({
   onWindowResolved,
   chartHeight = 360,
   filterSummary = [],
+  bucket,
 }: AbdPlanVsActualCardProps) {
+  const term = bucketTargetTerm(bucket);
   const scurve = useMemo(
     () => buildAbdSCurve({ cells, buckets, stages, today, baselines, cum }),
     [cells, buckets, stages, today, baselines, cum],
@@ -180,8 +185,8 @@ export function AbdPlanVsActualCard({
 
   const cfg: ChartConfig = Object.fromEntries(
     stages.flatMap((s) => [
-      [`planInc_${s}`, { label: `${STAGE_LABELS[s]} Plan (daily)`, color: ABD_STAGE_COLORS[s].bar }],
-      [`actualInc_${s}`, { label: `${STAGE_LABELS[s]} Actual (daily)`, color: ABD_STAGE_COLORS[s].line }],
+      [`planInc_${s}`, { label: `${STAGE_LABELS[s]} Plan (${term})`, color: ABD_STAGE_COLORS[s].bar }],
+      [`actualInc_${s}`, { label: `${STAGE_LABELS[s]} Actual (${term})`, color: ABD_STAGE_COLORS[s].line }],
       [`cumPlan_${s}`, { label: `${STAGE_LABELS[s]} Plan (누적 %)`, color: ABD_STAGE_COLORS[s].line }],
       [`cumActual_${s}`, { label: `${STAGE_LABELS[s]} Actual (누적 %)`, color: ABD_STAGE_COLORS[s].line }],
     ]),
@@ -329,7 +334,7 @@ export function AbdPlanVsActualCard({
                         dataKey={`planInc_${s}`}
                         stackId="plan"
                         fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].bar} 45%, transparent)`}
-                        name={`${STAGE_LABELS[s]} Plan (daily) — 오른쪽 축`}
+                        name={`${STAGE_LABELS[s]} Plan (${term}, 건) — 왼쪽 축`}
                         barSize={8}
                         hide={hidden.has(`planInc_${s}`)}
                       />
@@ -341,7 +346,7 @@ export function AbdPlanVsActualCard({
                         dataKey={`actualInc_${s}`}
                         stackId="actual"
                         fill={`color-mix(in oklab, ${ABD_STAGE_COLORS[s].line} 35%, transparent)`}
-                        name={`${STAGE_LABELS[s]} Actual (daily) — 오른쪽 축`}
+                        name={`${STAGE_LABELS[s]} Actual (${term}, 건) — 왼쪽 축`}
                         barSize={8}
                         hide={hidden.has(`actualInc_${s}`)}
                       />
@@ -356,7 +361,7 @@ export function AbdPlanVsActualCard({
                         strokeDasharray={PLAN_DASH}
                         strokeWidth={2.5}
                         dot={false}
-                        name={`${STAGE_LABELS[s]} Plan (누적 %)`}
+                        name={`${STAGE_LABELS[s]} Plan (누적 %) — 오른쪽 축`}
                         hide={hidden.has(`cumPlan_${s}`)}
                       />
                     ))}
@@ -369,7 +374,7 @@ export function AbdPlanVsActualCard({
                         stroke={ABD_STAGE_COLORS[s].line}
                         strokeWidth={3.5}
                         dot={false}
-                        name={`${STAGE_LABELS[s]} Actual (누적 %)`}
+                        name={`${STAGE_LABELS[s]} Actual (누적 %) — 오른쪽 축`}
                         connectNulls={false}
                         hide={hidden.has(`cumActual_${s}`)}
                       />
