@@ -24,7 +24,7 @@ import {
 } from "@/lib/defect-management/dashboard-shape";
 import { type Bucket, type Stage } from "@/lib/defect-management/progress-utils";
 import { ProjectModuleSection } from "./ProjectModuleSection";
-import { PdbBreakdownCard, type BreakdownRow } from "./PdbBreakdownCard";
+import { PdbBreakdownCard, foldTop4, type BreakdownRow } from "./PdbBreakdownCard";
 
 const ROOM_HINT =
   "지역별현황 = Room Group 별 Issued 건수와 Closure 진도율(Closed ÷ Issued) · SM Dashboard Room Group 카드와 동일한 정본 집계 · LG Podium 은 통합";
@@ -140,7 +140,17 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
                 }
                 rightSub={`A ${actualPct?.toFixed(1) ?? "—"}% / P ${planPct?.toFixed(1) ?? "—"}%`}
               />
-              <PdbBreakdownCard label="지역별현황" rows={rooms} hint={ROOM_HINT} scrollAfter={5} />
+              <PdbBreakdownCard
+                label="주요지역별 현황"
+                rows={foldTop4(
+                  rooms.map((r) => ({
+                    key: r.key,
+                    count: r.count,
+                    actual: ((r.pct ?? 0) * r.count) / 100,
+                  })),
+                )}
+                hint={ROOM_HINT}
+              />
             </div>
             <SnagKpiPlanVsActualCard
               cells={q.cells as never}
