@@ -71,6 +71,8 @@ interface Props {
   onWindowResolved?: (start: string, end: string) => void;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** 메인 S-Curve 차트 높이(px). 미지정 시 340px. */
+  chartHeight?: number;
 }
 
 export function TmPlanVsActualCard({
@@ -87,6 +89,7 @@ export function TmPlanVsActualCard({
   onWindowResolved,
   open,
   onOpenChange,
+  chartHeight = 340,
 }: Props) {
   const snap = useTaskProgressSnapshot();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
