@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { usePdbT } from "@/lib/dashboards/pdb-i18n";
 
 export interface BreakdownRow {
   key: string;
@@ -34,7 +35,7 @@ export function PdbBreakdownCard({
   label,
   rows,
   hint,
-  emptyText = "데이터 없음",
+  emptyText,
   scrollAfter,
 }: {
   label: string;
@@ -44,6 +45,7 @@ export function PdbBreakdownCard({
   /** 행 수가 이 값을 넘으면 목록에 스크롤을 준다 */
   scrollAfter?: number;
 }) {
+  const t = usePdbT();
   const scroll = scrollAfter != null && rows.length > scrollAfter;
   return (
     <Card title={hint}>
@@ -56,7 +58,7 @@ export function PdbBreakdownCard({
           className={`mt-2 flex flex-col gap-1 ${scroll ? "max-h-[132px] overflow-y-auto pr-1" : ""}`}
         >
           {rows.length === 0 ? (
-            <div className="py-2 text-xs text-muted-foreground">{emptyText}</div>
+            <div className="py-2 text-xs text-muted-foreground">{emptyText ?? t("noData")}</div>
           ) : (
             rows.map((r) => (
               <div key={r.key} className="flex items-center gap-2">
