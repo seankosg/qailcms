@@ -8759,6 +8759,20 @@ export type Database = {
         }
         Returns: Json
       }
+      defect_snag_progress_cum_json: {
+        Args: {
+          _as_of_date: string
+          _bucket: string
+          _buildings: string[]
+          _plan_groups: string[]
+          _plan_mode: string
+          _range_end: string
+          _range_start: string
+          _room_groups: string[]
+          _teams: string[]
+        }
+        Returns: Json
+      }
       defect_snag_progress_totals: {
         Args: {
           _as_of_date: string
