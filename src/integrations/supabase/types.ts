@@ -9533,6 +9533,10 @@ export type Database = {
         Returns: string
       }
       thread_can_see: { Args: { _thread_id: string }; Returns: boolean }
+      thread_can_watch: {
+        Args: { _item_id: string; _module: string; _stage_code: string }
+        Returns: boolean
+      }
       thread_ensure: {
         Args: { _item_id: string; _module: string; _stage_code: string }
         Returns: string
