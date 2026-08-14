@@ -117,6 +117,10 @@ export function OcsIncrementImportPanel() {
   const [baseline, setBaseline] = useState<BaselineRead | null>(null);
   const [baselineFileName, setBaselineFileName] = useState<string | null>(null);
   const [baselinePickerKey, setBaselinePickerKey] = useState(0);
+  /** Baseline ZIP 과 Increment 패키지의 Baseline ID 불일치 (UI 잠금 사유) */
+  const baselineMismatch = Boolean(
+    baseline && pkg && baseline.baseline_id !== pkg.manifest.base_baseline_id,
+  );
   // 브라우저 로컬 검증 결과 — null 이면 미실행. clean 이 아니면 서버 단계로 진행하지 않는다.
   const [localValid, setLocalValid] = useState<{
     clean: boolean | null;
