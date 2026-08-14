@@ -99,6 +99,23 @@ export function TaskProgressChartDialog({
           </DialogHeader>
 
           <div className="h-[360px] w-full">
+            {!isLoading && !error && data && series.length > 0 && (
+              <ProgressChartLegend
+                className="mb-2"
+                mode="simple-plan-actual"
+                lang="ko"
+                metrics={[
+                  { key: "plan", label: "계획", sample: "line-dashed", color: "hsl(215 90% 55%)" },
+                  { key: "actual", label: "실적", sample: "line-solid", color: "hsl(0 80% 55%)" },
+                ]}
+                axes={{ left: "진도 (%)" }}
+                marker={
+                  data.data_date
+                    ? { label: "Data Date", date: String(data.data_date).slice(0, 10) }
+                    : undefined
+                }
+              />
+            )}
             {isLoading && (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
