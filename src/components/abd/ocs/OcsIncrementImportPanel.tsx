@@ -1467,17 +1467,27 @@ export function OcsIncrementImportPanel() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="space-y-2 rounded-md border p-3">
+          <div className="text-sm font-semibold">4C. Check Current Server State</div>
           <Button
             size="sm"
-            disabled={!pkg || !!busy || duplicatePackage || localValid.clean !== true}
+            disabled={
+              !pkg || !!busy || duplicatePackage || localValid.clean !== true || baselineMismatch
+            }
             onClick={() => void runDryRun()}
           >
-            Check Package — No Data Will Be Changed
+            4. Check Current Server State — No Data Will Be Changed
           </Button>
-          <span className="text-[11px] text-muted-foreground">
-            현재 운영 DB 와 패키지를 비교하지만 데이터를 수정하지 않습니다.
-          </span>
+          <p className="text-[11px] text-muted-foreground">
+            Only current production state, duplicate package, Storage, Compliance, and scope changes
+            are checked on the server. 현재 운영 DB 와 패키지를 비교하지만 데이터를 수정하지
+            않습니다.
+          </p>
+          {localValid.clean !== true && (
+            <p className="text-[11px] text-muted-foreground">
+              4B 로컬 검증에서 CLEAN 판정을 받은 뒤에 활성화됩니다.
+            </p>
+          )}
         </div>
 
         {duplicatePackage && (
