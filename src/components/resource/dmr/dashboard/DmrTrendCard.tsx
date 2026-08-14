@@ -14,6 +14,10 @@ import {
 import type { DmrDailyProductivityPoint } from '@/lib/dmr/productivity';
 import type { TrendGroupBy } from '@/lib/dmr/dashboard-model';
 import { FilterToggleButton, LINE_COLORS, fmtDate } from './ui';
+import {
+  ProgressChartLegend,
+  defaultMetrics,
+} from '@/components/shared/charts/ProgressChartLegend';
 
 const GROUP_OPTIONS: Array<{ value: TrendGroupBy; label: string }> = [
   { value: 'total', label: '전체' },
