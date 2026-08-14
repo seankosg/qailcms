@@ -20,6 +20,8 @@ const searchSchema = z.object({
   stageState: z.enum(["na", "done", "wip", "delayed", "planned", "none"]).optional(),
   /** 팀 필터 */
   team: z.string().optional().default("all"),
+  /** Required Document 미충족 — req_doc_total>0 이고 req_doc_done<req_doc_total */
+  reqDocShort: z.boolean().optional().default(false),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/spare-part/raw-data")({

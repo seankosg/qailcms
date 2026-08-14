@@ -231,6 +231,9 @@ export function SplRawDataPage() {
     }
     // 팀 필터 (Progress 화면과 같은 이름)
     if (search.team && search.team !== "all" && (r.team ?? "") !== search.team) return false;
+    // Required Document 미충족 — 이미 내려온 행 값으로만 판정한다(새 조회 없음)
+    if (search.reqDocShort && !((r.req_doc_total ?? 0) > 0 && (r.req_doc_done ?? 0) < (r.req_doc_total ?? 0)))
+      return false;
     // Progress 단계 드릴다운 — 단계와 상태가 둘 다 있을 때만 적용
     if (search.stage && search.stageState) {
       if (r.stages[search.stage]?.st !== search.stageState) return false;
@@ -273,7 +276,7 @@ export function SplRawDataPage() {
   const filtered = useMemo(() => {
     return rows.filter((r) => rowMatches(r));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, search.ocs, search.team, search.stage, search.stageState, isToday, colFilters, colDefMap, stageColMap]);
+  }, [rows, search.q, search.plot, search.judgment, search.delayBand, search.hdecMissing, search.ocs, search.team, search.stage, search.stageState, search.reqDocShort, isToday, colFilters, colDefMap, stageColMap]);
 
   /** 단일 표시 컬럼 배치 — 정규·스테이지 모두 동일한 순서/표시/고정/폭 모델 */
   const layout = useMemo(() => {
@@ -509,6 +512,7 @@ export function SplRawDataPage() {
         search.delayBand ||
         search.hdecMissing ||
         search.stage ||
+        search.reqDocShort ||
         (search.team && search.team !== "all") ? (
           <Button
             size="sm"
@@ -522,6 +526,7 @@ export function SplRawDataPage() {
                 stage: "",
                 stageState: undefined,
                 team: "all",
+                reqDocShort: false,
               })
             }
           >
@@ -529,6 +534,7 @@ export function SplRawDataPage() {
             {search.judgment && search.judgment !== "all" ? ` · ${splJudgmentLabel(search.judgment as any)}` : ""}
             {search.delayBand ? ` · ${BAND_LABEL[search.delayBand] ?? search.delayBand}` : ""}
             {search.hdecMissing ? " · No HDEC actual" : ""}
+            {search.reqDocShort ? " · Required Doc 미충족" : ""}
             {search.stage
               ? ` · ${catalog.find((c) => c.stage_code === search.stage)?.short_code ?? search.stage}${search.stageState ? ` (${search.stageState})` : ""}`
               : ""}
