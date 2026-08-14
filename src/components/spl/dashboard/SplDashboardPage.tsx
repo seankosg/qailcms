@@ -1,16 +1,13 @@
 import { useMemo } from "react";
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { todayInDoha } from "@/lib/time/doha";
 import { getSplRowsAsOf, getSplEstimatedCells, type SplCatalogEntry } from "@/lib/spl/rows.functions";
-import { splJudgmentLabel } from "@/components/spl/raw-data/spl-columns";
-import { SplKpiCard } from "./SplKpiCard";
 import { SplBreakdownCards } from "./SplBreakdownCards";
 import { SplPlanVsActualCard } from "./SplPlanVsActualCard";
 import { splSeriesColor, type SplBucket, type SplPlanMode, type SplSeriesGroup } from "@/lib/spl/scurve";
@@ -23,8 +20,6 @@ const BAND_LABEL: Record<string, string> = {
   DOCUMENTATION: "Documentation Stage",
   PO: "PO Stage",
 };
-
-const JUDGMENTS = ["제외", "완료", "정상", "지연", "미착수", "미분류"] as const;
 
 const BUCKETS: Array<{ v: SplBucket; label: string }> = [
   { v: "day", label: "Day" },
