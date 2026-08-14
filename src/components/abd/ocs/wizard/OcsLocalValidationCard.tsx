@@ -302,7 +302,8 @@ export function OcsLocalValidationCard({
               </Button>
               {downloaded && (
                 <span className="text-xs text-muted-foreground">
-                  저장됨: {downloaded} — 이 파일을 다시 선택해 CLEAN 을 확인하십시오.
+                  저장됨: {downloaded} — 위 4A 의 <b>2. Choose Increment ZIP</b> 에서 이 파일을 다시
+                  선택해 CLEAN 을 확인하십시오.
                 </span>
               )}
             </div>
