@@ -3,7 +3,7 @@
  * 값은 public.pdb_module_filters 에 모듈당 1행(jsonb)으로 저장된다.
  * 계산식은 각 모듈 정본 훅 그대로이며, 여기서는 훅 인자만 결정한다.
  */
-export type PdbModule = "tm" | "sm" | "abd";
+export type PdbModule = "tm" | "sm" | "abd" | "spl";
 
 export interface PdbTmFilters {
   taskScope: "main" | "sub" | "all";
@@ -37,10 +37,21 @@ export interface PdbAbdFilters {
   startDate: string | null;
 }
 
+export interface PdbSplFilters {
+  teams: string[];
+  /** 표시할 밴드. 빈 배열이면 전체(Required Doc · Documentation · PO) */
+  bands: string[];
+  planMode: "baseline" | "remaining";
+  bucket: "day" | "week" | "month";
+  /** 차트 표시 창(기준일 ±일수) */
+  rangeDays: number;
+}
+
 export interface PdbFilters {
   tm: PdbTmFilters;
   sm: PdbSmFilters;
   abd: PdbAbdFilters;
+  spl: PdbSplFilters;
 }
 
 export const PDB_DEFAULTS: PdbFilters = {
@@ -70,6 +81,13 @@ export const PDB_DEFAULTS: PdbFilters = {
     bucket: "week",
     startDate: null,
   },
+  spl: {
+    teams: [],
+    bands: [],
+    planMode: "baseline",
+    bucket: "week",
+    rangeDays: 120,
+  },
 };
 
 function strArr(v: unknown, fb: string[]) {
@@ -80,6 +98,9 @@ function str<T extends string>(v: unknown, fb: T): T {
 }
 function dateOrNull(v: unknown): string | null {
   return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+}
+function num(v: unknown, fb: number): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : fb;
 }
 
 export function normalizePdbFilters(module: PdbModule, raw: unknown): PdbFilters[PdbModule] {
@@ -107,6 +128,16 @@ export function normalizePdbFilters(module: PdbModule, raw: unknown): PdbFilters
       unit: str(o.unit, d.unit),
       startDate: dateOrNull(o.startDate),
     } satisfies PdbSmFilters;
+  }
+  if (module === "spl") {
+    const s = PDB_DEFAULTS.spl;
+    return {
+      teams: strArr(o.teams, s.teams),
+      bands: strArr(o.bands, s.bands),
+      planMode: str(o.planMode, s.planMode),
+      bucket: str(o.bucket, s.bucket),
+      rangeDays: num(o.rangeDays, s.rangeDays),
+    } satisfies PdbSplFilters;
   }
   const d = PDB_DEFAULTS.abd;
   return {
@@ -156,6 +187,16 @@ export function pdbFilterChips(
     ];
   }
   const a = f as PdbAbdFilters;
+  if (module === "spl") {
+    const s = f as PdbSplFilters;
+    return [
+      { label: "Team", value: listLabel(s.teams) },
+      { label: "Band", value: listLabel(s.bands) },
+      { label: "Plan", value: s.planMode === "remaining" ? "Remaining" : "Baseline" },
+      { label: "Bucket", value: BUCKET_LABEL[s.bucket] ?? s.bucket },
+      { label: "Range", value: `±${s.rangeDays}d` },
+    ];
+  }
   return [
     { label: "Team", value: listLabel(a.teams) },
     { label: "Stage", value: listLabel(a.stages) },
