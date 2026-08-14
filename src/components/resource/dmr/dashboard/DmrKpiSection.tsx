@@ -1,37 +1,59 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { fmtExtra, fmtPct, fmtProd } from '@/lib/dmr/productivity';
+import { fmtPp, fmtProductivityPpPerPersonDay } from '@/lib/dmr/productivity';
 import type { DmrDashboardModel, QualityFilter } from '@/lib/dmr/dashboard-model';
 import { KpiCard, MiniStat } from './ui';
 
-/** 성과 KPI 4장 — 값은 정본 summarize() 가 낸 것만 쓴다. */
+/** 성과 KPI 4장 — 값은 정본 summarize() 가 낸 것만 쓴다(재계산·재분류 금지). */
 export function DmrOutcomeKpis({ model }: { model: DmrDashboardModel }) {
   const s = model.summary;
+  const isDay = model.period.kind === 'day';
+  const diff = s.actualSum - s.planSum;
+  const noPlan = s.achievement == null;
+  const achColor: 'emerald' | 'red' | 'muted' | 'amber' = noPlan
+    ? 'muted'
+    : s.achievement! >= 1
+      ? 'emerald'
+      : s.achievement! >= 0.8
+        ? 'amber'
+        : 'red';
   return (
     <div className="grid gap-3 md:grid-cols-4">
       <KpiCard
-        label="생산성 (실적% ÷ 인원)"
-        value={fmtProd(s.productivity) || '—'}
-        sub={`계획 생산성 ${fmtProd(s.planProductivity) || '—'}`}
-      />
-      <KpiCard
-        label="기간 실적%"
-        value={fmtPct(s.actualSum) || '—'}
-        sub={`기간 계획% ${fmtPct(s.planSum) || '—'}`}
-        subColor={s.actualSum < 0 ? 'red' : 'muted'}
+        label={isDay ? '당일 실적 진도' : '기간 실적 진도'}
+        value={fmtPp(s.actualSum) || '—'}
+        sub={`계획 ${fmtPp(s.planSum) || '—'} · 차이 ${diff > 0 ? '+' : ''}${fmtPp(diff)}`}
+        subColor={diff < 0 ? 'red' : 'muted'}
+        hint="선택된 Task Code별 기간 진도 증가분을 합산한 값이며 프로젝트 전체 진도율이 아닙니다."
       />
       <KpiCard
         label="계획 달성률"
-        value={s.achievement == null ? '—' : `${(s.achievement * 100).toFixed(1)}%`}
-        sub={s.achievement == null ? '계획 구간 밖' : s.achievement >= 1 ? '증원 불필요' : '계획 미달'}
-        subColor={s.achievement == null ? 'muted' : s.achievement >= 1 ? 'emerald' : 'red'}
+        value={noPlan ? '—' : `${(s.achievement! * 100).toFixed(1)}%`}
+        sub={noPlan ? '계획 없음' : `실적 ${fmtPp(s.actualSum)} / 계획 ${fmtPp(s.planSum)}`}
+        subColor={achColor}
       />
       <KpiCard
-        label="추가 필요 인원 (인·일)"
-        value={s.extraManpower > 0 ? fmtExtra(s.extraManpower, '') : '0'}
-        sub={s.extraManpower > 0 ? '계획 생산성 회복 가정' : '증원 불필요'}
-        subColor={s.extraManpower > 0 ? 'red' : 'emerald'}
+        label={isDay ? '당일 실적 작업' : '기간 실적 작업'}
+        value={`${s.productiveCodes.toLocaleString()}건`}
+        sub={`대상 ${s.codes.toLocaleString()}건 · 무실적 ${s.noProgressCodes.toLocaleString()}건`}
+        hint={
+          s.correctedCodes > 0 || s.exceptionalCodes > 0 ? (
+            <>
+              {s.correctedCodes > 0 && <span>진도 정정 {s.correctedCodes.toLocaleString()}건</span>}
+              {s.correctedCodes > 0 && s.exceptionalCodes > 0 && <span> · </span>}
+              {s.exceptionalCodes > 0 && (
+                <span>인원 없이 실적 {s.exceptionalCodes.toLocaleString()}건</span>
+              )}
+            </>
+          ) : undefined
+        }
+      />
+      <KpiCard
+        label={isDay ? '일일 생산성' : '기간 생산성'}
+        value={fmtProductivityPpPerPersonDay(s.productivity) || '—'}
+        sub={`계획 생산성 ${fmtProductivityPpPerPersonDay(s.planProductivity) || '—'}`}
+        hint="실적 진도 합계 ÷ 실제 투입인원"
       />
     </div>
   );
