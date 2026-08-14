@@ -57,6 +57,7 @@ export function KpiCard({
   value,
   sub,
   subColor = 'muted',
+  hint,
   right,
   onClick,
 }: {
@@ -64,6 +65,7 @@ export function KpiCard({
   value: number | string;
   sub?: ReactNode;
   subColor?: 'emerald' | 'red' | 'muted';
+  hint?: ReactNode;
   right?: ReactNode;
   onClick?: () => void;
 }) {
@@ -86,6 +88,7 @@ export function KpiCard({
                 {sub}
               </div>
             )}
+            {hint && <div className="mt-1 text-[10px] leading-tight text-muted-foreground">{hint}</div>}
           </div>
           {right && <div className="shrink-0 text-right">{right}</div>}
         </div>
