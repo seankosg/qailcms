@@ -63,6 +63,8 @@ export interface DmrDashboardState {
   to: string;
   filters: DmrDashFilters;
   groupBy: TrendGroupBy;
+  /** 차트가 화면에 가까워졌을 때만 날짜별 배치 RPC 를 부른다 */
+  dailyEnabled?: boolean;
 }
 
 export interface DmrDashboardResult {
@@ -97,7 +99,7 @@ export function useDmrDashboardModel(state: DmrDashboardState): DmrDashboardResu
   const prodQ = useProductivity(period, ready);
   const dates = useMemo(() => periodDates(period), [period]);
   const tooLong = dates.length > DAILY_SERIES_MAX_DAYS;
-  const dailyQ = useDailyCanon(period, ready && !tooLong);
+  const dailyQ = useDailyCanon(period, ready && !tooLong && state.dailyEnabled !== false);
 
   const model = useMemo(() => {
     if (!prodQ.data) return null;
@@ -131,7 +133,7 @@ export function useDmrDashboardModel(state: DmrDashboardState): DmrDashboardResu
       ? `기간이 ${dates.length}일 — 날짜별 추이는 ${DAILY_SERIES_MAX_DAYS}일까지만 그립니다`
       : null,
     loading: prodQ.isLoading || prodQ.isFetching,
-    dailyLoading: dailyQ.isLoading || dailyQ.isFetching,
+    dailyLoading: dailyQ.isFetching || (state.dailyEnabled !== false && !dailyQ.data && !dailyQ.error && !tooLong),
     error: (prodQ.error as Error | null)?.message ?? (dailyQ.error as Error | null)?.message ?? null,
   };
 }

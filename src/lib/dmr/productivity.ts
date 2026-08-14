@@ -510,20 +510,40 @@ async function fetchDmrRange(start: string, end: string): Promise<DmrManpowerRow
   return out;
 }
 
-async function fetchTmRows(asOf: string): Promise<Array<Record<string, any>>> {
-  const { data, error } = await (supabase as any).rpc('tm_rows_as_of_json', { p_as_of: asOf });
-  if (error) throw new Error(error.message);
-  if (data != null && !Array.isArray(data)) {
-    throw new Error('tm_rows_as_of_json RPC contract mismatch: expected jsonb array');
-  }
-  return (data ?? []) as Array<Record<string, any>>;
+/**
+ * 기간 TM 정본 축소 배치 — 서버가 tm_rows_as_of / tm_actual_at_set 정본을 그대로 호출하고
+ * buildProductivity 에 필요한 필드만 돌려준다. 산식은 서버에 복제하지 않는다.
+ */
+interface DmrPeriodCanonRow {
+  task_no: string;
+  task_name: string | null;
+  row_type: string | null;
+  discipline: string | null;
+  team: string | null;
+  plot: string | null;
+  data_date: string | null;
+  cum_plan_pct: number | string | null;
+  plan_prev: number | string | null;
+  actual_end: number | string | null;
+  actual_prev: number | string | null;
 }
 
-/** as-of 누계 실적(정규화) — id 기준. tm_actual_at_set 한 번. */
-async function fetchActualSet(asOf: string): Promise<Array<Record<string, any>>> {
-  const { data, error } = await (supabase as any).rpc('tm_actual_at_set', { _as_of: asOf });
+async function fetchPeriodCanon(
+  start: string,
+  end: string,
+  fromZero: boolean,
+): Promise<DmrPeriodCanonRow[]> {
+  const { data, error } = await (supabase as any).rpc('dmr_period_canon', {
+    _start: start,
+    _end: end,
+    _from_zero: fromZero,
+  });
   if (error) throw new Error(error.message);
-  return (data ?? []) as Array<Record<string, any>>;
+  const rows = (data as any)?.rows;
+  if (!Array.isArray(rows)) {
+    throw new Error('dmr_period_canon RPC contract mismatch: expected { rows: [] }');
+  }
+  return rows as DmrPeriodCanonRow[];
 }
 
 /** 진도 이력 개시일 (누계 전체의 시작점). */
@@ -553,7 +573,6 @@ export function useTmHistoryStart() {
  */
 export function useProductivity(period: Period, enabled = true) {
   const fromZero = period.kind === 'all';
-  const prevDay = addDays(period.start, -1);
 
   return useQuery({
     queryKey: ['dmr-productivity', period.kind, period.start, period.end],
@@ -562,35 +581,34 @@ export function useProductivity(period: Period, enabled = true) {
     gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<{ rows: ProductivityRow[]; dmrRows: DmrManpowerRow[] }> => {
-      const [dmrRows, tmEnd, actEnd, tmPrev, actPrev] = await Promise.all([
+      const [dmrRows, canon] = await Promise.all([
         fetchDmrRange(period.start, period.end),
-        fetchTmRows(period.end),
-        fetchActualSet(period.end),
-        fromZero ? Promise.resolve([]) : fetchTmRows(prevDay),
-        fromZero ? Promise.resolve([]) : fetchActualSet(period.start),
+        fetchPeriodCanon(period.start, period.end, fromZero),
       ]);
 
-      const idToCode = new Map<string, string>();
-      for (const t of tmEnd) idToCode.set(String(t.id), String(t.task_no ?? '').trim());
-
+      // adapter — 서버 축소 응답을 기존 ProductivityInput 형태로만 되돌린다.
+      const tmEnd: Array<Record<string, any>> = [];
       const actualEndByCode = new Map<string, number>();
-      for (const a of actEnd) {
-        const code = idToCode.get(String(a.task_raw_id));
-        if (!code) continue;
-        actualEndByCode.set(code, normActual(a.b_asof ?? a.a_asof ?? 0));
-      }
       const actualPrevByCode = new Map<string, number>();
-      for (const a of actPrev) {
-        const code = idToCode.get(String(a.task_raw_id));
-        if (!code) continue;
-        // tm_actual_at_set(start) 의 prev = start−1 시점 누계
-        actualPrevByCode.set(code, normActual(a.b_prev ?? a.a_prev ?? 0));
-      }
       const planPrevByCode = new Map<string, number>();
-      for (const t of tmPrev) {
-        const code = String(t.task_no ?? '').trim();
-        if (!code || t.cum_plan_pct == null) continue;
-        if (!planPrevByCode.has(code)) planPrevByCode.set(code, Number(t.cum_plan_pct));
+      for (const c of canon) {
+        const code = String(c.task_no ?? '').trim();
+        if (!code) continue;
+        tmEnd.push({
+          task_no: code,
+          task_name: c.task_name,
+          row_type: c.row_type,
+          discipline: c.discipline,
+          team: c.team,
+          plot: c.plot,
+          data_date: c.data_date,
+          cum_plan_pct: c.cum_plan_pct,
+        });
+        actualEndByCode.set(code, Number(c.actual_end ?? 0) || 0);
+        if (!fromZero) {
+          actualPrevByCode.set(code, Number(c.actual_prev ?? 0) || 0);
+          if (c.plan_prev != null) planPrevByCode.set(code, Number(c.plan_prev));
+        }
       }
 
       const rows = buildProductivity({
@@ -635,30 +653,66 @@ export function periodDates(period: Period): string[] {
   return out;
 }
 
-async function fetchTmDaily(date: string): Promise<Map<string, DmrDailyCodeValue>> {
-  const out = new Map<string, DmrDailyCodeValue>();
-  const CHUNK = 1000;
-  for (let from = 0; from < 20_000; from += CHUNK) {
-    const { data, error } = await (supabase as any)
-      .rpc('tm_rows_as_of', { _as_of: date })
-      .select('task_no, tc_plan_pct, tc_actual_pct')
-      .range(from, from + CHUNK - 1);
-    if (error) throw new Error(error.message);
-    const rows = (data ?? []) as Array<Record<string, any>>;
-    for (const r of rows) {
-      const code = String(r.task_no ?? '').trim();
-      if (!code || out.has(code)) continue;
-      out.set(code, {
-        plan: r.tc_plan_pct == null ? null : Number(r.tc_plan_pct),
-        actual: Number(r.tc_actual_pct ?? 0) || 0,
-      });
+/**
+ * 날짜별 정본 배치 조회 — 서버가 날짜마다 tm_rows_as_of 정본을 부르고 4개 필드만 돌려준다.
+ * 한 번에 부를 수 있는 일수는 DB 실행시간 상한(8초) 때문에 아래 값으로 자른다.
+ * 페이지 나눔(1,000행) 없이 날짜 묶음을 통째로 받는다.
+ */
+const DAILY_BATCH_DAYS = 2;
+const DAILY_BATCH_CONCURRENCY = 2;
+
+function mergeDailyRows(
+  byDate: Map<string, Map<string, DmrDailyCodeValue>>,
+  rows: Array<Record<string, any>>,
+): void {
+  for (const r of rows) {
+    const d = String(r.as_of ?? '').slice(0, 10);
+    const code = String(r.task_no ?? '').trim();
+    if (!d || !code) continue;
+    let m = byDate.get(d);
+    if (!m) {
+      m = new Map<string, DmrDailyCodeValue>();
+      byDate.set(d, m);
     }
-    if (rows.length < CHUNK) break;
+    if (m.has(code)) continue;
+    m.set(code, {
+      plan: r.tc_plan_pct == null ? null : Number(r.tc_plan_pct),
+      actual: Number(r.tc_actual_pct ?? 0) || 0,
+    });
   }
-  return out;
 }
 
-/** 날짜별 정본 조회 — 동시 실행 수를 제한한다. */
+async function fetchDailyCanonChunk(start: string, end: string): Promise<Array<Record<string, any>>> {
+  const { data, error } = await (supabase as any).rpc('dmr_daily_canon', {
+    _start: start,
+    _end: end,
+  });
+  if (error) throw new Error(error.message);
+  const rows = (data as any)?.rows;
+  if (!Array.isArray(rows)) {
+    throw new Error('dmr_daily_canon RPC contract mismatch: expected { rows: [] }');
+  }
+  return rows as Array<Record<string, any>>;
+}
+
+async function fetchDailyCanonBatch(
+  dates: string[],
+): Promise<Map<string, Map<string, DmrDailyCodeValue>>> {
+  const chunks: Array<[string, string]> = [];
+  for (let i = 0; i < dates.length; i += DAILY_BATCH_DAYS) {
+    const slice = dates.slice(i, i + DAILY_BATCH_DAYS);
+    chunks.push([slice[0], slice[slice.length - 1]]);
+  }
+  const byDate = new Map<string, Map<string, DmrDailyCodeValue>>();
+  for (let i = 0; i < chunks.length; i += DAILY_BATCH_CONCURRENCY) {
+    const group = chunks.slice(i, i + DAILY_BATCH_CONCURRENCY);
+    const res = await Promise.all(group.map(([s, e]) => fetchDailyCanonChunk(s, e)));
+    for (const rows of res) mergeDailyRows(byDate, rows);
+  }
+  return byDate;
+}
+
+/** 날짜별 정본 조회 — 배치 RPC 한 번. */
 export function useDailyCanon(period: Period, enabled = true) {
   const dates = periodDates(period);
   const tooLong = dates.length > DAILY_SERIES_MAX_DAYS;
@@ -669,13 +723,8 @@ export function useDailyCanon(period: Period, enabled = true) {
     gcTime: 60 * 60_000,
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<Map<string, Map<string, DmrDailyCodeValue>>> => {
-      const byDate = new Map<string, Map<string, DmrDailyCodeValue>>();
-      const CONCURRENCY = 4;
-      for (let i = 0; i < dates.length; i += CONCURRENCY) {
-        const slice = dates.slice(i, i + CONCURRENCY);
-        const res = await Promise.all(slice.map((d) => fetchTmDaily(d)));
-        slice.forEach((d, k) => byDate.set(d, res[k]));
-      }
+      const byDate = await fetchDailyCanonBatch(dates);
+      for (const d of dates) if (!byDate.has(d)) byDate.set(d, new Map());
       return byDate;
     },
   });

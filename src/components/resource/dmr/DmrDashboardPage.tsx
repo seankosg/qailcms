@@ -5,7 +5,7 @@
  * 모든 계산은 src/lib/dmr/productivity.ts(정본) + src/lib/dmr/dashboard-model.ts(조립)에서 끝난다.
  * 이 파일은 값을 만들지 않는다 — 받아서 그리기만 한다.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -97,6 +97,10 @@ export function DmrDashboardPage() {
       q: f.search.trim() || undefined,
     });
 
+  // 차트가 화면에 가까워지거나 상세창을 열 때만 날짜별 배치 RPC 를 부른다.
+  const trendRef = useRef<HTMLDivElement | null>(null);
+  const [dailyEnabled, setDailyEnabled] = useState(false);
+
   const result = useDmrDashboardModel({
     kind,
     baseDate,
@@ -104,8 +108,33 @@ export function DmrDashboardPage() {
     to: search.to ?? '',
     filters,
     groupBy,
+    dailyEnabled,
   });
   const { model } = result;
+
+  useEffect(() => {
+    if (dailyEnabled) return;
+    const el = trendRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setDailyEnabled(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setDailyEnabled(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '400px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [dailyEnabled, model]);
+  useEffect(() => {
+    if (detail) setDailyEnabled(true);
+  }, [detail]);
 
   const isFuture = baseDate >= new Date().toISOString().slice(0, 10);
 
@@ -179,14 +208,16 @@ export function DmrDashboardPage() {
           <DmrOutcomeKpis model={model} />
           <DmrQualityStrip model={model} onQuality={(q) => patch({ quality: q === 'all' ? undefined : q })} />
           <DmrManpowerCard model={model} />
-          <DmrTrendCard
-            points={result.dailyPoints}
-            dates={result.dailyDates}
-            groupBy={groupBy}
-            onGroupBy={(g) => patch({ group: g })}
-            loading={result.dailyLoading}
-            disabledReason={result.dailyDisabledReason}
-          />
+          <div ref={trendRef}>
+            <DmrTrendCard
+              points={result.dailyPoints}
+              dates={result.dailyDates}
+              groupBy={groupBy}
+              onGroupBy={(g) => patch({ group: g })}
+              loading={result.dailyLoading}
+              disabledReason={result.dailyDisabledReason}
+            />
+          </div>
           <DmrDetailTables model={model} onSelectCode={setDetail} />
           <DmrManpowerDetails dmrRows={model.dmrRowsInScope} directNames={directNames} />
         </>
