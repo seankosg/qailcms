@@ -1,10 +1,17 @@
 import { useState } from "react";
 import { SplDocumentPanel } from "@/components/spl/detail/SplDocumentPanel";
+import { ThreadPanel, type ThreadStageOption } from "@/components/thread/ThreadPanel";
 import { SplOcsPanel } from "./SplOcsPanel";
 import { SplRspPanel } from "./SplRspPanel";
 
-export type SplPanelKind = "ocs" | "rsp" | "documents";
-export type SplPanelTarget = { id: string; splNumber: string; kind: SplPanelKind } | null;
+export type SplPanelKind = "ocs" | "rsp" | "documents" | "thread";
+export type SplPanelTarget = {
+  id: string;
+  splNumber: string;
+  kind: SplPanelKind;
+  /** thread 패널을 특정 단계로 걸러 열 때 */
+  stageCode?: string | null;
+} | null;
 
 /**
  * SPL OCS · RSP · Documents 패널 묶음.
@@ -13,9 +20,12 @@ export type SplPanelTarget = { id: string; splNumber: string; kind: SplPanelKind
 export function SplOcsPanels({
   target,
   onClose,
+  threadStages = [],
 }: {
   target: SplPanelTarget;
   onClose: () => void;
+  /** Thread 패널의 단계 목록 (SPL 카탈로그) */
+  threadStages?: ThreadStageOption[];
 }) {
   const [kind, setKind] = useState<SplPanelKind | null>(null);
   const [secondary, setSecondary] = useState<SplPanelKind | null>(null);
@@ -73,6 +83,17 @@ export function SplOcsPanels({
         open={primary === "documents"}
         onOpenChange={(v) => !v && close()}
       />
+      {primary === "thread" && (
+        <ThreadPanel
+          module="SPL"
+          itemId={target.id}
+          itemLabel={target.splNumber}
+          stages={threadStages}
+          initialStage={target.stageCode ?? null}
+          open
+          onOpenChange={(v) => !v && close()}
+        />
+      )}
     </>
   );
 }
