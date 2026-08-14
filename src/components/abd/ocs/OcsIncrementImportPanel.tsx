@@ -1285,37 +1285,95 @@ export function OcsIncrementImportPanel() {
       {/* ───────── Step 4 ───────── */}
       <OcsWizardStepCard
         index={4}
-        title="Select and Check the Increment Package"
-        description="완성된 Increment ZIP 한 개만 선택하고, 운영 DB 와 비교하는 Dry-run 을 실행합니다."
+        title="Validate and Check the Increment Package"
+        description="Select the matching Baseline and Increment ZIP, validate them on this computer, correct any issues, and then check only the current server state."
         status={steps[3]!.status}
         open={openStep === 4}
         onToggle={() => toggle(4)}
         summary={pkg ? <span className="font-mono text-[11px]">{pkg.file_name}</span> : null}
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <FilePickerButton
-            label={pkg ? "Change Increment ZIP" : "Choose Increment ZIP"}
-            accept=".zip,application/zip"
-            disabled={!!busy}
-            inputRef={fileInputRef}
-            resetKey={pickerKey}
-            onFiles={(f) => void onPick(f)}
-          />
-          {pkg && (
-            <Badge variant="outline" className="gap-1 text-[11px]">
-              <CheckCircle2 className="h-3 w-3 text-emerald-600" /> {pkg.file_name}
-            </Badge>
-          )}
-          {(pkg || failure) && (
-            <Button size="sm" variant="ghost" disabled={!!busy} onClick={clearPick}>
-              Clear
-            </Button>
+        <div className="space-y-3 rounded-md border p-3">
+          <div className="text-sm font-semibold">4A. Select Files</div>
+
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <FilePickerButton
+                label={baseline ? "Change Baseline ZIP" : "1. Choose Baseline ZIP"}
+                accept=".zip,application/zip"
+                disabled={!!busy}
+                resetKey={baselinePickerKey}
+                onFiles={(f) => void onPickBaseline(f)}
+              />
+              {baseline && (
+                <Badge variant="outline" className="gap-1 text-[11px]">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                  {baselineFileName}
+                </Badge>
+              )}
+            </div>
+            {baseline && (
+              <div className="grid gap-x-6 md:grid-cols-2">
+                <Row label="schema version" value={baseline.schema_version} />
+                <Row label="Baseline ID" value={baseline.baseline_id} />
+                <Row label="ABD index rows" value={baseline.abdIndex?.length ?? 0} />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <FilePickerButton
+                label={pkg ? "Change Increment ZIP" : "2. Choose Increment ZIP"}
+                accept=".zip,application/zip"
+                disabled={!!busy}
+                inputRef={fileInputRef}
+                resetKey={pickerKey}
+                onFiles={(f) => void onPick(f)}
+              />
+              {pkg && (
+                <Badge variant="outline" className="gap-1 text-[11px]">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" /> {pkg.file_name}
+                </Badge>
+              )}
+              {(pkg || failure) && (
+                <Button size="sm" variant="ghost" disabled={!!busy} onClick={clearPick}>
+                  Clear
+                </Button>
+              )}
+            </div>
+            {pkg && (
+              <div className="grid gap-x-6 md:grid-cols-2">
+                <Row label="Package file" value={pkg.file_name} />
+                <Row label="Package ID" value={pkg.manifest.package_id} />
+                <Row label="Package Baseline ID" value={pkg.manifest.base_baseline_id} />
+                <Row label="OCS files" value={pkg.manifest.target_ocs_numbers.length} />
+                <Row label="Atomic comments" value={pkg.atomic.comments.length} />
+              </div>
+            )}
+          </div>
+
+          {baselineMismatch && (
+            <div className="space-y-1 rounded-md border border-destructive/60 bg-destructive/5 p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-destructive">
+                <AlertTriangle className="h-3.5 w-3.5" /> Baseline ID does not match this Increment
+                package.
+              </div>
+              <Row label="Baseline ZIP" value={baseline?.baseline_id ?? "—"} bad />
+              <Row label="Increment package" value={pkg?.manifest.base_baseline_id ?? "—"} bad />
+              <div className="text-[11px] text-muted-foreground">
+                이 증분 패키지를 만들 때 사용한 Baseline ZIP 을 선택하십시오.
+              </div>
+            </div>
           )}
         </div>
 
         <OcsLocalValidationCard
           file={pickedFile}
           pkg={pkg}
+          baseline={baseline}
+          lockedReason={
+            baselineMismatch ? "Baseline ID 가 일치하지 않아 로컬 검증을 실행할 수 없습니다." : null
+          }
           onCleanChange={(st) => setLocalValid(st)}
         />
 
@@ -1345,10 +1403,7 @@ export function OcsIncrementImportPanel() {
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-md border p-3">
               <div className="mb-1 text-xs font-semibold">패키지</div>
-              <Row label="Package file" value={pkg.file_name} />
-              <Row label="Package ID" value={pkg.manifest.package_id} />
               <Row label="Data date" value={pkg.manifest.data_date} bad={!pkg.manifest.data_date} />
-              <Row label="Baseline ID" value={pkg.manifest.base_baseline_id} />
               <Row label="Base Import run" value={pkg.manifest.base_import_run_id} />
               <Row label="OCS files" value={pkg.manifest.target_ocs_numbers.length} />
               <Row label="구분" value={pkg.manifest.change_type} />
