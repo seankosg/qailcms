@@ -11,17 +11,10 @@ import {
 import { Check, CircleDashed, Loader2, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { setSplRequiredDoc } from "@/lib/spl/required-doc.functions";
+import { setSplRequiredDoc, setSplRequiredDocReady } from "@/lib/spl/required-doc.functions";
+import { normalizeSplFlagValue, SPL_FLAG_REQUIRED } from "@/lib/spl/flag-value";
+import { formatDdMmm } from "@/lib/time/doha";
 import type { SplCatalogEntry, SplRow } from "@/lib/spl/rows.functions";
-
-/** Values that mean "not required". Everything else present means required. */
-const NOT_REQUIRED = new Set(["x", "n/a", "na", "0", "no", "not rqrd", "not required", "not provided", "-", "—"]);
-
-export function isRequiredDocRequired(flagValue: string | null | undefined): boolean {
-  const v = (flagValue ?? "").trim().toLowerCase();
-  if (v === "") return false;
-  return !NOT_REQUIRED.has(v);
-}
 
 export function SplRequiredDocChecklist({
   row,
@@ -35,6 +28,7 @@ export function SplRequiredDocChecklist({
   onChanged: () => Promise<void> | void;
 }) {
   const setFlag = useServerFn(setSplRequiredDoc);
+  const setReady = useServerFn(setSplRequiredDocReady);
   const [busy, setBusy] = useState<string | null>(null);
 
   const entries = useMemo(() => {
@@ -42,10 +36,11 @@ export function SplRequiredDocChecklist({
       .filter((s) => s.band === "REQUIRED_DOC")
       .map((s) => {
         const c = row.stages[s.stage_code];
-        const required = isRequiredDocRequired(c?.fv);
-        // Ready = the stage has an actual finish date. Nothing is ready until that exists.
-        const ready = required && !!c?.af;
-        return { stage: s, required, ready, value: c?.fv ?? null };
+        // 사전은 flag-value.ts 하나뿐이다.
+        const required = normalizeSplFlagValue(c?.fv) === SPL_FLAG_REQUIRED;
+        // Ready = actual_start (spl_eval_as_of · spl_assert_row_rules 와 같은 칸)
+        const ready = required && !!c?.as;
+        return { stage: s, required, ready, receivedAt: c?.as ?? null, value: c?.fv ?? null };
       });
   }, [catalog, row]);
 
@@ -58,6 +53,18 @@ export function SplRequiredDocChecklist({
     setBusy(stageCode);
     try {
       await setFlag({ data: { item_id: row.id, stage_code: stageCode, required } });
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Update failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function toggleReady(stageCode: string, ready: boolean) {
+    setBusy(stageCode);
+    try {
+      await setReady({ data: { item_id: row.id, stage_code: stageCode, ready } });
       await onChanged();
     } catch (e: any) {
       toast.error(e?.message ?? "Update failed");
@@ -103,8 +110,9 @@ export function SplRequiredDocChecklist({
           <tr className="bg-muted">
             <th className="border-b px-2 py-1 text-left">Document</th>
             <th className="border-b px-2 py-1 w-28">Requirement</th>
-            <th className="border-b px-2 py-1 w-28">Ready</th>
-            <th className="border-b px-2 py-1 w-24"></th>
+            <th className="border-b px-2 py-1 w-28">Received</th>
+            <th className="border-b px-2 py-1 w-24">받은 날</th>
+            <th className="border-b px-2 py-1 w-40"></th>
           </tr>
         </thead>
         <tbody>
@@ -130,27 +138,41 @@ export function SplRequiredDocChecklist({
                   <span>—</span>
                 ) : e.ready ? (
                   <Badge className="gap-1 text-[10px]">
-                    <Check className="h-3 w-3" /> Ready
+                    <Check className="h-3 w-3" /> Received
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="gap-1 text-[10px]">
-                    <CircleDashed className="h-3 w-3" /> Not ready
+                    <CircleDashed className="h-3 w-3" /> Not received
                   </Badge>
                 )}
+              </td>
+              <td className="border-b px-2 py-1 text-center tabular-nums">
+                {e.receivedAt ? formatDdMmm(e.receivedAt) : "—"}
               </td>
               <td className="border-b px-2 py-1 text-center">
                 {busy === e.stage.stage_code ? (
                   <Loader2 className="mx-auto h-3.5 w-3.5 animate-spin" />
                 ) : (
                   canEdit && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 px-2 text-[10px]"
-                      onClick={() => void toggle(e.stage.stage_code, !e.required)}
-                    >
-                      {e.required ? "Set not required" : "Set required"}
-                    </Button>
+                    <div className="flex items-center justify-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => void toggle(e.stage.stage_code, !e.required)}
+                      >
+                        {e.required ? "Set not required" : "Set required"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-[10px]"
+                        disabled={!e.required}
+                        onClick={() => void toggleReady(e.stage.stage_code, !e.ready)}
+                      >
+                        {e.ready ? "Undo received" : "Mark received"}
+                      </Button>
+                    </div>
                   )
                 )}
               </td>
