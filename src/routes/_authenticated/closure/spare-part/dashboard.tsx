@@ -5,6 +5,16 @@ import { SplDashboardPage } from "@/components/spl/dashboard/SplDashboardPage";
 
 const searchSchema = z.object({
   asOf: z.string().optional().default(""),
+  plot: z.string().optional().default("all"),
+  team: z.string().optional().default("all"),
+  /** 계열 단위: band | stage */
+  stageMode: z.string().optional().default("band"),
+  /** 선택 단계(csv). 비면 전체 */
+  stages: z.string().optional().default(""),
+  bucket: z.string().optional().default("week"),
+  range: z.number().optional().default(120),
+  planMode: z.string().optional().default("baseline"),
+  scurveOpen: z.number().optional().default(1),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/spare-part/dashboard")({
