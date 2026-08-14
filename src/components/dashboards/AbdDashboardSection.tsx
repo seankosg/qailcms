@@ -67,6 +67,14 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
   const c = useAbdPlot("C", asOfDate, f, t("unassigned"));
   const d = useAbdPlot("D", asOfDate, f, t("unassigned"));
   const { window: win, report } = useUnionWindow();
+  const { plotFilter } = usePdbPlot();
+  const columns = filterByPlot(
+    [
+      { plot: "D" as const, q: d },
+      { plot: "C" as const, q: c },
+    ],
+    plotFilter,
+  );
 
   return (
     <ProjectModuleSection
@@ -75,17 +83,12 @@ export function AbdDashboardSection({ asOfDate }: { asOfDate: string }) {
       tone="abd"
       progressHint={t("hintAbdSection")}
       plots={[
-        { plot: "D", progressPct: d.loading ? null : d.kpi.progressPct, total: d.kpi.total },
-        { plot: "C", progressPct: c.loading ? null : c.kpi.progressPct, total: c.kpi.total },
+        { plot: "D" as const, progressPct: d.loading ? null : d.kpi.progressPct, total: d.kpi.total },
+        { plot: "C" as const, progressPct: c.loading ? null : c.kpi.progressPct, total: c.kpi.total },
       ]}
     >
-      <div className="grid gap-3 xl:grid-cols-2">
-        {(
-          [
-            ["D", d],
-            ["C", c],
-          ] as const
-        ).map(([label, q]) => {
+      <div className={plotGridClass(plotFilter)}>
+        {columns.map(({ plot: label, q }) => {
           const actualPct = q.kpi.total > 0 ? (q.kpi.actual / q.kpi.total) * 100 : null;
           const planPct = q.kpi.total > 0 ? (q.kpi.plan / q.kpi.total) * 100 : null;
           const diffPct = actualPct != null && planPct != null ? actualPct - planPct : null;
