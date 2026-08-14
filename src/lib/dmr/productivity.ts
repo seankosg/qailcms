@@ -653,30 +653,40 @@ export function periodDates(period: Period): string[] {
   return out;
 }
 
-async function fetchTmDaily(date: string): Promise<Map<string, DmrDailyCodeValue>> {
-  const out = new Map<string, DmrDailyCodeValue>();
-  const CHUNK = 1000;
-  for (let from = 0; from < 20_000; from += CHUNK) {
-    const { data, error } = await (supabase as any)
-      .rpc('tm_rows_as_of', { _as_of: date })
-      .select('task_no, tc_plan_pct, tc_actual_pct')
-      .range(from, from + CHUNK - 1);
-    if (error) throw new Error(error.message);
-    const rows = (data ?? []) as Array<Record<string, any>>;
-    for (const r of rows) {
-      const code = String(r.task_no ?? '').trim();
-      if (!code || out.has(code)) continue;
-      out.set(code, {
-        plan: r.tc_plan_pct == null ? null : Number(r.tc_plan_pct),
-        actual: Number(r.tc_actual_pct ?? 0) || 0,
-      });
-    }
-    if (rows.length < CHUNK) break;
+/** 날짜별 정본 배치 조회 — 서버가 날짜마다 tm_rows_as_of 정본을 부르고 4개 필드만 돌려준다. */
+async function fetchDailyCanonBatch(
+  start: string,
+  end: string,
+): Promise<Map<string, Map<string, DmrDailyCodeValue>>> {
+  const { data, error } = await (supabase as any).rpc('dmr_daily_canon', {
+    _start: start,
+    _end: end,
+  });
+  if (error) throw new Error(error.message);
+  const rows = (data as any)?.rows;
+  if (!Array.isArray(rows)) {
+    throw new Error('dmr_daily_canon RPC contract mismatch: expected { rows: [] }');
   }
-  return out;
+  const byDate = new Map<string, Map<string, DmrDailyCodeValue>>();
+  for (const r of rows as Array<Record<string, any>>) {
+    const d = String(r.as_of ?? '').slice(0, 10);
+    const code = String(r.task_no ?? '').trim();
+    if (!d || !code) continue;
+    let m = byDate.get(d);
+    if (!m) {
+      m = new Map<string, DmrDailyCodeValue>();
+      byDate.set(d, m);
+    }
+    if (m.has(code)) continue;
+    m.set(code, {
+      plan: r.tc_plan_pct == null ? null : Number(r.tc_plan_pct),
+      actual: Number(r.tc_actual_pct ?? 0) || 0,
+    });
+  }
+  return byDate;
 }
 
-/** 날짜별 정본 조회 — 동시 실행 수를 제한한다. */
+/** 날짜별 정본 조회 — 배치 RPC 한 번. */
 export function useDailyCanon(period: Period, enabled = true) {
   const dates = periodDates(period);
   const tooLong = dates.length > DAILY_SERIES_MAX_DAYS;
@@ -687,13 +697,8 @@ export function useDailyCanon(period: Period, enabled = true) {
     gcTime: 60 * 60_000,
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<Map<string, Map<string, DmrDailyCodeValue>>> => {
-      const byDate = new Map<string, Map<string, DmrDailyCodeValue>>();
-      const CONCURRENCY = 4;
-      for (let i = 0; i < dates.length; i += CONCURRENCY) {
-        const slice = dates.slice(i, i + CONCURRENCY);
-        const res = await Promise.all(slice.map((d) => fetchTmDaily(d)));
-        slice.forEach((d, k) => byDate.set(d, res[k]));
-      }
+      const byDate = await fetchDailyCanonBatch(dates[0], dates[dates.length - 1]);
+      for (const d of dates) if (!byDate.has(d)) byDate.set(d, new Map());
       return byDate;
     },
   });
