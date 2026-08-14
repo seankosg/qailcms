@@ -170,13 +170,6 @@ export function SplProgressPage() {
     setSearch({ stage: stage_code, stageState: state ?? undefined });
   };
 
-  const slipDays = (r: SplRow, code: string): number | null => {
-    const cell = r.stages[code];
-    const plan = cell?.pf ?? cell?.ps;
-    if (!plan) return null;
-    const d = Math.floor((Date.parse(asOf) - Date.parse(plan)) / 86_400_000);
-    return d > 0 ? d : null;
-  };
 
   return (
     <div className="space-y-3">
