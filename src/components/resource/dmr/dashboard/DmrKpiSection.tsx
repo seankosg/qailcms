@@ -11,7 +11,7 @@ export function DmrOutcomeKpis({ model }: { model: DmrDashboardModel }) {
   const isDay = model.period.kind === 'day';
   const diff = s.actualSum - s.planSum;
   const noPlan = s.achievement == null;
-  const achColor: 'emerald' | 'red' | 'muted' | 'amber' = noPlan
+  const achColor: 'emerald' | 'amber' | 'red' | 'muted' = noPlan
     ? 'muted'
     : s.achievement! >= 1
       ? 'emerald'

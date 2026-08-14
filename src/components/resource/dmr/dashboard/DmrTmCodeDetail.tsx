@@ -16,8 +16,8 @@ import {
 import {
   buildDailyPoints,
   fmtExtra,
-  fmtPct,
-  fmtProd,
+  fmtPp,
+  fmtProductivityPpPerPersonDay,
   type DmrDailyCodeValue,
   type DmrManpowerRow,
   type ProductivityRow,
@@ -81,10 +81,17 @@ export function DmrTmCodeDetail({
             </SheetHeader>
 
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="기간 계획%" value={fmtPct(row.plan_pct) || '—'} />
-              <Stat label="기간 실적%" value={fmtPct(row.actual_pct) || '—'} bad={(row.actual_pct ?? 0) < 0} />
+              <Stat label="기간 계획 진도 (%p)" value={fmtPp(row.plan_pct) || '—'} />
+              <Stat
+                label="기간 실적 진도 (%p)"
+                value={fmtPp(row.actual_pct) || '—'}
+                bad={(row.actual_pct ?? 0) < 0}
+              />
               <Stat label="인원 (인·일)" value={row.manpower.toLocaleString()} />
-              <Stat label="생산성" value={fmtProd(row.productivity) || '—'} />
+              <Stat
+                label="실제 생산성 (%p/인·일)"
+                value={fmtProductivityPpPerPersonDay(row.productivity) || '—'}
+              />
               <Stat
                 label="달성률"
                 value={row.achievement == null ? '—' : `${(row.achievement * 100).toFixed(1)}%`}
@@ -158,27 +165,33 @@ export function DmrTmCodeDetail({
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-xs">날짜</TableHead>
-                      <TableHead className="text-right text-xs">계획%</TableHead>
-                      <TableHead className="text-right text-xs">실적%</TableHead>
-                      <TableHead className="text-right text-xs">인원</TableHead>
-                      <TableHead className="text-right text-xs">생산성</TableHead>
+                      <TableHead className="text-right text-xs">계획 진도 (%p)</TableHead>
+                      <TableHead className="text-right text-xs">실적 진도 (%p)</TableHead>
+                      <TableHead className="text-right text-xs">인원 (인·일)</TableHead>
+                      <TableHead className="text-right text-xs">계획 생산성 (%p/인·일)</TableHead>
+                      <TableHead className="text-right text-xs">실제 생산성 (%p/인·일)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {points.map((p) => (
                       <TableRow key={p.date}>
                         <TableCell className="text-xs tabular-nums">{p.date}</TableCell>
-                        <TableCell className="text-right text-xs tabular-nums">{fmtPct(p.planProgress)}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{fmtPp(p.planProgress)}</TableCell>
                         <TableCell className={cn('text-right text-xs tabular-nums', p.actualProgress < 0 && 'text-destructive')}>
-                          {fmtPct(p.actualProgress)}
+                          {fmtPp(p.actualProgress)}
                         </TableCell>
                         <TableCell className="text-right text-xs tabular-nums">{p.manpower.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-xs tabular-nums">{fmtProd(p.actualProductivity) || '—'}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums text-muted-foreground">
+                          {fmtProductivityPpPerPersonDay(p.plannedProductivity) || '—'}
+                        </TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">
+                          {fmtProductivityPpPerPersonDay(p.actualProductivity) || '—'}
+                        </TableCell>
                       </TableRow>
                     ))}
                     {points.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="p-4 text-center text-xs text-muted-foreground">
+                        <TableCell colSpan={6} className="p-4 text-center text-xs text-muted-foreground">
                           일자 데이터가 없습니다
                         </TableCell>
                       </TableRow>

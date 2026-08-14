@@ -64,7 +64,7 @@ export function KpiCard({
   label: string;
   value: number | string;
   sub?: ReactNode;
-  subColor?: 'emerald' | 'red' | 'muted';
+  subColor?: 'emerald' | 'amber' | 'red' | 'muted';
   hint?: ReactNode;
   right?: ReactNode;
   onClick?: () => void;
@@ -82,7 +82,13 @@ export function KpiCard({
               <div
                 className={cn(
                   'mt-1 text-xs font-medium',
-                  subColor === 'emerald' ? 'text-emerald-600' : subColor === 'red' ? 'text-red-600' : 'text-muted-foreground',
+                  subColor === 'emerald'
+                    ? 'text-emerald-600'
+                    : subColor === 'amber'
+                      ? 'text-amber-600'
+                      : subColor === 'red'
+                        ? 'text-red-600'
+                        : 'text-muted-foreground',
                 )}
               >
                 {sub}

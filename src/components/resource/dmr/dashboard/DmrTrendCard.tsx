@@ -26,9 +26,9 @@ const GROUP_OPTIONS: Array<{ value: TrendGroupBy; label: string }> = [
 
 type Metric = 'productivity' | 'progress' | 'manpower';
 const METRICS: Array<{ value: Metric; label: string }> = [
-  { value: 'productivity', label: '생산성' },
-  { value: 'progress', label: '진도%' },
-  { value: 'manpower', label: '인원' },
+  { value: 'productivity', label: '생산성 (%p/인·일)' },
+  { value: 'progress', label: '진도 합계 (%p)' },
+  { value: 'manpower', label: '투입인원 (인·일)' },
 ];
 
 const MAX_SERIES = 10;
@@ -79,14 +79,14 @@ export function DmrTrendCard({
     };
   }, [points, dates, metric]);
 
-  const unit = metric === 'manpower' ? '명' : metric === 'progress' ? '%' : '%/인';
+  const unit = metric === 'manpower' ? '인·일' : metric === 'progress' ? '%p' : '%p/인·일';
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-sm">생산성 추이 (일자별 · 계획 vs 실적)</CardTitle>
+            <CardTitle className="text-sm">생산성 추이 — 계획 생산성 vs 실제 생산성</CardTitle>
             <Badge variant="outline" className="text-[10px]">
               실선 = 실적 · 점선 = 계획
             </Badge>
@@ -138,7 +138,11 @@ export function DmrTrendCard({
               <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={fmtDate} />
-                <YAxis tick={{ fontSize: 11 }} width={64} tickFormatter={(v) => `${Number(v).toFixed(metric === 'manpower' ? 0 : 2)}`} />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  width={78}
+                  tickFormatter={(v) => `${Number(v).toFixed(metric === 'manpower' ? 0 : 2)}${unit}`}
+                />
                 <Tooltip
                   labelFormatter={fmtDate}
                   formatter={(v: any, n: any) => [
