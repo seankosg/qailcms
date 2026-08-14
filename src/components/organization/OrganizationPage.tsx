@@ -59,6 +59,10 @@ export function OrganizationPage() {
   const { data: me } = useCurrentUser();
   const [editRow, setEditRow] = useState<Row | null>(null);
 
+  /** 2026-08-14: Organization Chart 열람 = HDEC PIC 사용자 전체(+관리자). 편집은 admin 전용(OrgChartTab). */
+  const canReadChart =
+    !!me && (me.isStrictAdmin || me.userType === "hdec_pic" || !!me.hdec_pic_name);
+
   /** 수정·삭제 게이트 — 본인(등록자/인계자) 또는 Superuser 이상. 정본은 서버 RLS. */
   const canManage = (r: Row) => {
     if (!me) return false;
@@ -145,12 +149,14 @@ export function OrganizationPage() {
       <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "delegation" | "chart")}>
         <TabsList>
           <TabsTrigger value="delegation">업무 이관</TabsTrigger>
-          <TabsTrigger value="chart">Organization Chart</TabsTrigger>
+          {canReadChart ? <TabsTrigger value="chart">Organization Chart</TabsTrigger> : null}
         </TabsList>
 
-        <TabsContent value="chart" className="mt-4">
-          <OrgChartTab />
-        </TabsContent>
+        {canReadChart ? (
+          <TabsContent value="chart" className="mt-4">
+            <OrgChartTab />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="delegation" className="mt-4 flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
