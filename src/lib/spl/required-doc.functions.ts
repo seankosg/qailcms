@@ -3,11 +3,12 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
- * SPL Required Document — mark a checklist entry as required / not required.
+ * SPL Required Document — 「필요」/「받았음」 두 토글.
  *
- * `flag_value` is canonical. `na_flag` is NOT used here.
- * Write permission is decided by `rcl_can(uid, 'SPL', row, 'write')`, the same
- * function the RLS policies use.
+ * 저장은 DB 정본 RPC(`spl_reqdoc_set_required` / `spl_reqdoc_set_ready`)만 쓴다.
+ * 그 안에서 band 검사 · `rcl_can(uid,'SPL',row,'write')` 권한 검사 ·
+ * `spl.change_source='reqdoc_ready_toggle'` 감사 소스가 한 트랜잭션으로 처리된다.
+ * flag 단계의 실적 칸은 `actual_start` 하나다(`actual_finish` 미사용).
  */
 const Schema = z.object({
   item_id: z.string().uuid(),
@@ -20,53 +21,36 @@ export const setSplRequiredDoc = createServerFn({ method: "POST" })
   .inputValidator((v: unknown) => Schema.parse(v))
   .handler(async ({ data, context }) => {
     const supa = context.supabase as any;
-
-    const { data: cat, error: catErr } = await supa
-      .from("spl_stage_catalog")
-      .select("stage_code, band")
-      .eq("stage_code", data.stage_code)
-      .maybeSingle();
-    if (catErr) throw new Error(catErr.message);
-    if (!cat || cat.band !== "REQUIRED_DOC") {
-      throw new Error(`Stage '${data.stage_code}' is not a Required Document entry.`);
-    }
-
-    const { data: ok, error: permErr } = await supa.rpc("rcl_can", {
-      _user_id: context.userId,
-      _module: "SPL",
-      _row_id: data.item_id,
-      _action: "write",
+    // 「필요」를 끄면 RPC 안에서 actual_start 도 함께 지운다.
+    const { error } = await supa.rpc("spl_reqdoc_set_required", {
+      _item_id: data.item_id,
+      _stage_code: data.stage_code,
+      _required: data.required,
     });
-    if (permErr) throw new Error(permErr.message);
-    if (!ok) throw new Error("Permission denied: you cannot edit this row.");
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
 
-    // DB 정본 어휘는 'REQUIRED' — spl_eval_as_of / spl_assert_row_rules 가 이 값만 센다.
-    const value = data.required ? "REQUIRED" : null;
-    const now = new Date().toISOString();
+const ReadySchema = z.object({
+  item_id: z.string().uuid(),
+  stage_code: z.string().min(1),
+  ready: z.boolean(),
+});
 
-    const { data: existing, error: selErr } = await supa
-      .from("spl_stage_progress")
-      .select("id")
-      .eq("item_id", data.item_id)
-      .eq("stage_code", data.stage_code)
-      .maybeSingle();
-    if (selErr) throw new Error(selErr.message);
-
-    if (existing?.id) {
-      const { error } = await supa
-        .from("spl_stage_progress")
-        .update({ flag_value: value, updated_at: now, updated_by: context.userId })
-        .eq("id", existing.id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await supa.from("spl_stage_progress").insert({
-        item_id: data.item_id,
-        stage_code: data.stage_code,
-        flag_value: value,
-        created_by: context.userId,
-        updated_by: context.userId,
-      });
-      if (error) throw new Error(error.message);
-    }
+/**
+ * 「받았음」 토글 — 날짜는 사람이 입력하지 않는다.
+ * ready=true → actual_start = 오늘(Asia/Qatar), ready=false → null.
+ */
+export const setSplRequiredDocReady = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => ReadySchema.parse(v))
+  .handler(async ({ data, context }) => {
+    const supa = context.supabase as any;
+    const { error } = await supa.rpc("spl_reqdoc_set_ready", {
+      _item_id: data.item_id,
+      _stage_code: data.stage_code,
+      _ready: data.ready,
+    });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
