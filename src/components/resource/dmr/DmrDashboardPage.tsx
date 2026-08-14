@@ -104,6 +104,7 @@ export function DmrDashboardPage() {
     to: search.to ?? '',
     filters,
     groupBy,
+    dailyEnabled,
   });
   const { model } = result;
 
