@@ -26,6 +26,8 @@ import {
   STAGE_LABELS as ABD_STAGE_LABELS,
 } from "@/lib/abd/progress-utils";
 import { SPL_TEAM_OPTIONS } from "@/components/spl/raw-data/spl-columns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const SPL_BAND_OPTIONS = [
   { value: "REQUIRED_DOC", label: "Required Doc" },
@@ -37,6 +39,27 @@ const SPL_RANGE_OPTIONS = [30, 60, 120, 240, 480].map((n) => ({
   value: String(n),
   label: `±${n}d`,
 }));
+
+/** SPL 단계 카탈로그 — Setting 의 Stage 선택지 */
+function useSplStageCatalog() {
+  return useQuery({
+    queryKey: ["spl-stage-catalog", "setting"] as const,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("spl_stage_catalog")
+        .select("stage_code, short_code, band, sort_order")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        stage_code: string;
+        short_code: string | null;
+        band: string;
+        sort_order: number;
+      }>;
+    },
+  });
+}
 
 export const Route = createFileRoute("/_authenticated/admin/setting")({
   head: () => ({
