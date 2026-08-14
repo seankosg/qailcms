@@ -114,7 +114,7 @@ export function SplProgressPage() {
   }, [catalog, filtered]);
 
   /**
-   * 「지금 여기」 — 레인(밴드)별로 따로 계산한다.
+   * Current Stage — 레인(밴드)별로 따로 계산한다.
    * rows[].current_stage 는 활성 밴드 하나 안에서만 고르므로 PO 레인이 통째로 비어 쓸 수 없다.
    */
   const hereCounts = useMemo(() => {
