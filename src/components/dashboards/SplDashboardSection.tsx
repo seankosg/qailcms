@@ -24,12 +24,25 @@ const BAND_LABEL: Record<string, string> = {
   PO: "PO Stage",
 };
 
-/** 밴드 계열 — 설정에서 고른 밴드만, 카탈로그 sort_order 순서 유지 */
-function buildBandGroups(catalog: SplCatalogEntry[], bands: string[]): SplSeriesGroup[] {
+/** 계열 구성 — 설정의 계열 단위(밴드/단계)와 선택 목록을 그대로 따른다 */
+function buildGroups(catalog: SplCatalogEntry[], f: PdbSplFilters): SplSeriesGroup[] {
   const ordered = [...catalog].sort((a, b) => a.sort_order - b.sort_order);
+  if (f.stageMode === "stage") {
+    const picked =
+      f.stages.length > 0 ? ordered.filter((c) => f.stages.includes(c.stage_code)) : ordered;
+    return picked.map((c) => ({
+      key: c.stage_code,
+      label: c.short_code || c.stage_code,
+      color: splSeriesColor(
+        ordered.findIndex((x) => x.stage_code === c.stage_code),
+        ordered.length,
+      ),
+      stages: [c.stage_code],
+    }));
+  }
   const all: string[] = [];
   for (const c of ordered) if (!all.includes(c.band)) all.push(c.band);
-  const picked = bands.length > 0 ? all.filter((b) => bands.includes(b)) : all;
+  const picked = f.bands.length > 0 ? all.filter((b) => f.bands.includes(b)) : all;
   return picked.map((b) => ({
     key: b,
     label: BAND_LABEL[b] ?? b,
@@ -54,7 +67,10 @@ function usePlotView(
       ),
     [rows, plot, f.teams],
   );
-  const groups = useMemo(() => buildBandGroups(catalog, f.bands), [catalog, f.bands]);
+  const groups = useMemo(
+    () => buildGroups(catalog, f),
+    [catalog, f.stageMode, f.bands.join(","), f.stages.join(",")],
+  );
   const scurve = useMemo(
     () =>
       buildSplSCurve({

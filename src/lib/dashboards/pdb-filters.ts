@@ -41,6 +41,10 @@ export interface PdbSplFilters {
   teams: string[];
   /** 표시할 밴드. 빈 배열이면 전체(Required Doc · Documentation · PO) */
   bands: string[];
+  /** 계열 단위 — band(밴드별) 또는 stage(단계별) */
+  stageMode: "band" | "stage";
+  /** stageMode = 'stage' 일 때 표시할 stage_code. 빈 배열이면 전체 */
+  stages: string[];
   planMode: "baseline" | "remaining";
   bucket: "day" | "week" | "month";
   /** 차트 표시 창(기준일 ±일수) */
@@ -84,6 +88,8 @@ export const PDB_DEFAULTS: PdbFilters = {
   spl: {
     teams: [],
     bands: [],
+    stageMode: "band",
+    stages: [],
     planMode: "baseline",
     bucket: "week",
     rangeDays: 120,
@@ -134,6 +140,8 @@ export function normalizePdbFilters(module: PdbModule, raw: unknown): PdbFilters
     return {
       teams: strArr(o.teams, s.teams),
       bands: strArr(o.bands, s.bands),
+      stageMode: str(o.stageMode, s.stageMode),
+      stages: strArr(o.stages, s.stages),
       planMode: str(o.planMode, s.planMode),
       bucket: str(o.bucket, s.bucket),
       rangeDays: num(o.rangeDays, s.rangeDays),
@@ -191,7 +199,11 @@ export function pdbFilterChips(
     const s = f as PdbSplFilters;
     return [
       { label: "Team", value: listLabel(s.teams) },
-      { label: "Band", value: listLabel(s.bands) },
+      { label: "계열", value: s.stageMode === "stage" ? "Stage" : "Band" },
+      {
+        label: s.stageMode === "stage" ? "Stage" : "Band",
+        value: s.stageMode === "stage" ? listLabel(s.stages) : listLabel(s.bands),
+      },
       { label: "Plan", value: s.planMode === "remaining" ? "Remaining" : "Baseline" },
       { label: "Bucket", value: BUCKET_LABEL[s.bucket] ?? s.bucket },
       { label: "Range", value: `±${s.rangeDays}d` },

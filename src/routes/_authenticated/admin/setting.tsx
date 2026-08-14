@@ -26,6 +26,8 @@ import {
   STAGE_LABELS as ABD_STAGE_LABELS,
 } from "@/lib/abd/progress-utils";
 import { SPL_TEAM_OPTIONS } from "@/components/spl/raw-data/spl-columns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const SPL_BAND_OPTIONS = [
   { value: "REQUIRED_DOC", label: "Required Doc" },
@@ -37,6 +39,27 @@ const SPL_RANGE_OPTIONS = [30, 60, 120, 240, 480].map((n) => ({
   value: String(n),
   label: `±${n}d`,
 }));
+
+/** SPL 단계 카탈로그 — Setting 의 Stage 선택지 */
+function useSplStageCatalog() {
+  return useQuery({
+    queryKey: ["spl-stage-catalog", "setting"] as const,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("spl_stage_catalog")
+        .select("stage_code, short_code, band, sort_order")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        stage_code: string;
+        short_code: string | null;
+        band: string;
+        sort_order: number;
+      }>;
+    },
+  });
+}
 
 export const Route = createFileRoute("/_authenticated/admin/setting")({
   head: () => ({
@@ -164,6 +187,7 @@ function Page() {
   const [abd, setAbd] = useState<PdbAbdFilters>(PDB_DEFAULTS.abd);
   const [spl, setSpl] = useState<PdbSplFilters>(PDB_DEFAULTS.spl);
   const [saving, setSaving] = useState(false);
+  const { data: splCatalog } = useSplStageCatalog();
 
   useEffect(() => {
     if (!data) return;
@@ -402,10 +426,6 @@ function Page() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">SPL 필터</CardTitle>
-              <CardDescription>
-                Spare Part List 는 정본(spl_rows_as_of) 값을 그대로 세어 KPI · Progress Status 차트에
-                적용합니다.
-              </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               <Row label="Team">
@@ -415,16 +435,44 @@ function Page() {
                   onChange={(v) => setSpl({ ...spl, teams: v })}
                 />
               </Row>
-              <Row label="Band">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Multi
-                    options={[...SPL_BAND_OPTIONS]}
-                    value={spl.bands}
-                    onChange={(v) => setSpl({ ...spl, bands: v })}
-                  />
-                  <span className="text-[11px] text-muted-foreground">비우면 전체 밴드</span>
-                </div>
+              <Row label="계열 단위">
+                <Single
+                  options={[
+                    { value: "band", label: "Band 별" },
+                    { value: "stage", label: "Stage 별" },
+                  ] as const}
+                  value={spl.stageMode}
+                  onChange={(v) => setSpl({ ...spl, stageMode: v })}
+                />
               </Row>
+              {spl.stageMode === "band" ? (
+                <Row label="Band">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Multi
+                      options={[...SPL_BAND_OPTIONS]}
+                      value={spl.bands}
+                      onChange={(v) => setSpl({ ...spl, bands: v })}
+                    />
+                    <span className="text-[11px] text-muted-foreground">비우면 전체 밴드</span>
+                  </div>
+                </Row>
+              ) : (
+                <Row label="Stage">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Multi
+                      options={(splCatalog ?? []).map((c) => ({
+                        value: c.stage_code,
+                        label: c.short_code || c.stage_code,
+                      }))}
+                      value={spl.stages}
+                      onChange={(v) => setSpl({ ...spl, stages: v })}
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      비우면 전체 단계 · 차트 계열에만 적용
+                    </span>
+                  </div>
+                </Row>
+              )}
               <Row label="Plan Mode">
                 <Single
                   options={[
@@ -444,6 +492,9 @@ function Page() {
                   value={String(spl.rangeDays)}
                   onChange={(v) => setSpl({ ...spl, rangeDays: Number(v) })}
                 />
+                <span className="text-[11px] text-muted-foreground">
+                  기준일 ±일수 · 차트에만 적용(KPI 카드는 미적용)
+                </span>
               </Row>
             </CardContent>
           </Card>
