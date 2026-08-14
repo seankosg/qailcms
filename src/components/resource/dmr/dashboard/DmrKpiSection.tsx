@@ -115,6 +115,7 @@ export function DmrQualityStrip({
 /** 인원 복합 카드 — 실제/계획/차이/달성률 + 공종별. */
 export function DmrManpowerCard({ model }: { model: DmrDashboardModel }) {
   const s = model.summary;
+  const isDay = model.period.kind === 'day';
   const byTeam = new Map<string, { plan: number; actual: number }>();
   for (const r of model.dmrRowsInScope) {
     const k = r.discipline || '(미지정)';
@@ -128,13 +129,15 @@ export function DmrManpowerCard({ model }: { model: DmrDashboardModel }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">인원 (Manpower · 인·일)</CardTitle>
+        <CardTitle className="text-sm">
+          {isDay ? '당일 투입인원 (인·일)' : '기간 누적 투입인원 (인·일)'}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <div className="grid grid-cols-2 gap-3">
-            <MiniStat label="실제" value={s.manpower} />
-            <MiniStat label="계획" value={s.planManpower} />
+            <MiniStat label="실제 (인·일)" value={s.manpower} />
+            <MiniStat label="계획 (인·일)" value={s.planManpower} />
             <div>
               <div className="text-[10px] uppercase text-muted-foreground">Δ (실제−계획)</div>
               <div
@@ -149,7 +152,11 @@ export function DmrManpowerCard({ model }: { model: DmrDashboardModel }) {
             </div>
             <MiniStat
               label="인원 달성률"
-              value={s.manpowerAchievement == null ? '—' : `${(s.manpowerAchievement * 100).toFixed(1)}%`}
+              value={
+                s.manpowerAchievement == null || s.planManpower <= 0
+                  ? '— / 계획 없음'
+                  : `${(s.manpowerAchievement * 100).toFixed(1)}%`
+              }
             />
           </div>
           <div className="space-y-1">
