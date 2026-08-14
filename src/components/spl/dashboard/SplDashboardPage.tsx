@@ -139,36 +139,9 @@ export function SplDashboardPage() {
     { label: "Items", value: filteredRows.length.toLocaleString() },
   ];
 
-  const delayBands = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const s of catalog) if (!s.chain_excluded) m.set(s.band, m.get(s.band) ?? 0);
-    for (const r of filteredRows)
-      if (r.primary_delay) m.set(r.primary_delay.band, (m.get(r.primary_delay.band) ?? 0) + 1);
-    return [...m.entries()];
-  }, [filteredRows, catalog]);
-
-  const reqDoc = useMemo(() => {
-    const full = filteredRows.filter((r) => r.req_doc_total > 0 && r.req_doc_done === r.req_doc_total).length;
-    const sum = filteredRows.reduce((a, r) => a + r.req_doc_done, 0);
-    const denom = filteredRows.reduce((a, r) => a + r.req_doc_total, 0);
-    return { full, pct: denom === 0 ? 0 : Math.round((sum * 1000) / denom) / 10 };
-  }, [filteredRows]);
-
-  /** 필터가 걸리면 판정 카운트도 같은 모집단에서 다시 센다 (합계 = 모집단 검산 유지) */
-  const counts = useMemo(() => {
-    if (plot === "all" && team === "all") return data?.judgment_counts ?? {};
-    const m: Record<string, number> = {};
-    for (const r of filteredRows) m[r.judgment] = (m[r.judgment] ?? 0) + 1;
-    return m;
-  }, [data?.judgment_counts, filteredRows, plot, team]);
-  const countsSum = JUDGMENTS.reduce((a, j) => a + (counts[j] ?? 0), 0);
-  const population = plot === "all" && team === "all" ? (data?.total_count ?? 0) : filteredRows.length;
-  const reconOk = countsSum === population;
-  const viol = data?.violations;
-
   /** 카드 = 드릴다운 — Raw Data 로 이동하며 동일 술어를 검색 파라미터로 전달 */
   const drill = (patch: Record<string, unknown>) =>
-    (rootNavigate as (opts: unknown) => void)({
+    (navigate as (opts: unknown) => void)({
       to: "/closure/spare-part/raw-data",
       search: {
         asOf: search.asOf ?? "",
