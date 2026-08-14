@@ -10,6 +10,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Check, CircleDashed, Loader2, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { setSplRequiredDoc, setSplRequiredDocReady } from "@/lib/spl/required-doc.functions";
 import { normalizeSplFlagValue, SPL_FLAG_REQUIRED } from "@/lib/spl/flag-value";
@@ -30,6 +40,9 @@ export function SplRequiredDocChecklist({
   const setFlag = useServerFn(setSplRequiredDoc);
   const setReady = useServerFn(setSplRequiredDocReady);
   const [busy, setBusy] = useState<string | null>(null);
+  // 일괄은 켜는 쪽만 만든다(끄는 일괄은 만들지 않는다 — 되돌릴 수 없다).
+  const [bulk, setBulk] = useState<null | "required" | "ready">(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
 
   const entries = useMemo(() => {
     return catalog
@@ -48,6 +61,42 @@ export function SplRequiredDocChecklist({
   const readyCount = entries.filter((e) => e.ready).length;
   const allDone = requiredCount > 0 && readyCount === requiredCount;
   const addable = entries.filter((e) => !e.required);
+  const missingRequired = entries.filter((e) => !e.required);
+  const notReady = entries.filter((e) => e.required && !e.ready);
+
+  /** 기존 RPC 를 그대로 반복 호출한다 — 새 일괄 RPC 를 만들지 않는다(검사·감사 로그 우회 방지). */
+  async function runBulk() {
+    if (!bulk) return;
+    setBulkRunning(true);
+    let ok = 0;
+    let failed = 0;
+    let firstError: string | null = null;
+    try {
+      const targets = bulk === "required" ? missingRequired : notReady;
+      for (const e of targets) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          if (bulk === "required") {
+            await setFlag({ data: { item_id: row.id, stage_code: e.stage.stage_code, required: true } });
+          } else {
+            await setReady({ data: { item_id: row.id, stage_code: e.stage.stage_code, ready: true } });
+          }
+          ok += 1;
+        } catch (err: any) {
+          failed += 1;
+          if (!firstError) firstError = err?.message ?? String(err);
+        }
+      }
+      toast[failed > 0 ? "warning" : "success"](
+        failed > 0 ? "부분 반영" : "완료",
+        { description: `${ok}건 처리${failed > 0 ? ` · ${failed}건 실패 — ${firstError}` : ""}` },
+      );
+      setBulk(null);
+      await onChanged();
+    } finally {
+      setBulkRunning(false);
+    }
+  }
 
   async function toggle(stageCode: string, required: boolean) {
     setBusy(stageCode);
@@ -84,6 +133,25 @@ export function SplRequiredDocChecklist({
           {allDone ? "Completed" : "In progress"}
         </Badge>
         <div className="ml-auto">
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px]"
+              disabled={!canEdit || missingRequired.length === 0}
+              onClick={() => setBulk("required")}
+            >
+              필요 전부 켜기
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px]"
+              disabled={!canEdit || notReady.length === 0}
+              onClick={() => setBulk("ready")}
+            >
+              받았음 전부 켜기
+            </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline" className="h-7 text-[11px]" disabled={!canEdit || addable.length === 0}>
@@ -102,8 +170,37 @@ export function SplRequiredDocChecklist({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </div>
+
+      <AlertDialog open={bulk !== null} onOpenChange={(o) => !o && !bulkRunning && setBulk(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulk === "required" ? "필요 문서 일괄 지정" : "받았음 일괄 표시"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulk === "required"
+                ? `이 아이템의 ${missingRequired.length}개 문서를 필요로 표시합니다.`
+                : `이 아이템의 ${notReady.length}개 문서를 받았음으로 표시합니다.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkRunning}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={bulkRunning}
+              onClick={(e) => {
+                e.preventDefault();
+                void runBulk();
+              }}
+            >
+              {bulkRunning ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+              적용
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <table className="w-full border-separate border-spacing-0 text-[11px]">
         <thead>
