@@ -397,6 +397,57 @@ function Page() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="spl">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">SPL 필터</CardTitle>
+              <CardDescription>
+                Spare Part List 는 정본(spl_rows_as_of) 값을 그대로 세어 KPI · Progress Status 차트에
+                적용합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <Row label="Team">
+                <Multi
+                  options={[...SPL_TEAM_OPTIONS]}
+                  value={spl.teams}
+                  onChange={(v) => setSpl({ ...spl, teams: v })}
+                />
+              </Row>
+              <Row label="Band">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Multi
+                    options={[...SPL_BAND_OPTIONS]}
+                    value={spl.bands}
+                    onChange={(v) => setSpl({ ...spl, bands: v })}
+                  />
+                  <span className="text-[11px] text-muted-foreground">비우면 전체 밴드</span>
+                </div>
+              </Row>
+              <Row label="Plan Mode">
+                <Single
+                  options={[
+                    { value: "baseline", label: "Baseline" },
+                    { value: "remaining", label: "Remaining" },
+                  ] as const}
+                  value={spl.planMode}
+                  onChange={(v) => setSpl({ ...spl, planMode: v })}
+                />
+              </Row>
+              <Row label="Bucket">
+                <Single options={BUCKETS} value={spl.bucket} onChange={(v) => setSpl({ ...spl, bucket: v })} />
+              </Row>
+              <Row label="차트 범위">
+                <Single
+                  options={SPL_RANGE_OPTIONS}
+                  value={String(spl.rangeDays)}
+                  onChange={(v) => setSpl({ ...spl, rangeDays: Number(v) })}
+                />
+              </Row>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
