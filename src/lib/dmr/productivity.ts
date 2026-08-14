@@ -573,7 +573,6 @@ export function useTmHistoryStart() {
  */
 export function useProductivity(period: Period, enabled = true) {
   const fromZero = period.kind === 'all';
-  const prevDay = addDays(period.start, -1);
 
   return useQuery({
     queryKey: ['dmr-productivity', period.kind, period.start, period.end],
