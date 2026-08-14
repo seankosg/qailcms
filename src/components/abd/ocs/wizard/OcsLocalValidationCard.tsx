@@ -1,6 +1,6 @@
 // Step 4B — 브라우저 로컬 검증·교정 카드 (presentation + 브라우저 전용 로직).
 // DB·Storage·서버 staging 을 건드리지 않는다. 검증식은 ocs-local-validation.ts 하나만 쓴다.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertTriangle, CheckCircle2, Download, Loader2, ShieldCheck } from "lucide-react";
-import { readBaselineZip, type BaselineRead } from "@/lib/abd/ocs-baseline-reader";
+import { type BaselineRead } from "@/lib/abd/ocs-baseline-reader";
 import {
   buildLocalValidationReceipt,
   validateIncrementLocally,
@@ -31,6 +31,9 @@ import type { IncrementPackage } from "@/lib/abd/ocs-increment-package";
 type Props = {
   file: File | null;
   pkg: IncrementPackage | null;
+  baseline: BaselineRead | null;
+  /** Baseline ID 불일치 등으로 로컬 검증을 잠글 때 사유 */
+  lockedReason?: string | null;
   onCleanChange: (state: {
     clean: boolean | null;
     blockerCount: number;
@@ -41,14 +44,27 @@ type Props = {
 const issueKey = (i: LocalValidationIssue) =>
   [i.code, i.source_file, i.sheet_name, i.source_row, i.sn, i.field, i.original_value].join("|");
 
-export function OcsLocalValidationCard({ file, pkg, onCleanChange }: Props) {
-  const [baseline, setBaseline] = useState<BaselineRead | null>(null);
+export function OcsLocalValidationCard({
+  file,
+  pkg,
+  baseline,
+  lockedReason,
+  onCleanChange,
+}: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<LocalValidationResult | null>(null);
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
   const [downloaded, setDownloaded] = useState<string | null>(null);
   const [revision, setRevision] = useState(1);
+
+  // 파일(Baseline 또는 Increment)이 바뀌면 로컬 검증 결과·교정 선택만 초기화한다.
+  useEffect(() => {
+    setResult(null);
+    setChoices({});
+    setConfirmed({});
+    setDownloaded(null);
+  }, [file, baseline]);
 
   const mappable = useMemo(
     () => (result?.issues ?? []).filter((i) => i.correction_mode === "inline_mapping"),
@@ -82,25 +98,6 @@ export function OcsLocalValidationCard({ file, pkg, onCleanChange }: Props) {
     }
     return out;
   }, [mappable, choices, confirmed, pkg, result]);
-
-  async function onPickBaseline(files: FileList | null) {
-    const f = files?.[0];
-    if (!f) return;
-    setBusy("Baseline 판독 중…");
-    try {
-      const b = await readBaselineZip(f);
-      setBaseline(b);
-      setResult(null);
-      onCleanChange({ clean: null, blockerCount: 0, receipt: null });
-      if (!b.abdIndex) toast.warning("이 Baseline 에는 ABD 검증 인덱스가 없습니다 (v1).");
-      else toast.success(`Baseline 판독 완료 — ABD 인덱스 ${b.abdIndex.length}건`);
-    } catch (e) {
-      setBaseline(null);
-      toast.error(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function runValidation() {
     if (!pkg || !baseline) return;
