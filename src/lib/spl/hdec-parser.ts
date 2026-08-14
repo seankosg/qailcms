@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { isOcsDocumentNumber } from "./number-normalize";
+import { normalizeSplFlagValue, SPL_FLAG_UNKNOWN } from "./flag-value";
 
 /**
  * SPL HDEC 임포트 파서 (왕복 임포트 구조).
@@ -141,6 +142,14 @@ export interface ParsedSplFile {
   na_cells: number;
   /** View 양식에서 임포트 대상이 아니어서 무시한 컬럼 (파생·Aconex 정본) */
   ignored_headers: string[];
+  /** 사전에 없는 Required Document 값 (저장 단계에서 거부된다) */
+  unknown_flag_values: Array<{
+    value: string;
+    spl_number: string;
+    sheet_name: string;
+    excel_row: number;
+    stage_code: string;
+  }>;
 }
 
 /** 파일 셀이 "해당 없음" 표기인지 */
@@ -232,6 +241,7 @@ function emptyParsed(fileName: string, format: "hdec" | "view"): ParsedSplFile {
     present_item_fields: [],
     na_cells: 0,
     ignored_headers: [],
+    unknown_flag_values: [],
   };
 }
 
@@ -349,8 +359,22 @@ function parseSplViewWorkbook(wb: XLSX.WorkBook, fileName: string): ParsedSplFil
             stageMap.set(cm.stage_code, entry);
           }
           if (cm.field === "flag_value") {
+            // 사전 정본은 flag-value.ts 한 곳뿐이다. 사전에 없으면 경고 목록에만 담고 원문을 유지한다
+            // (파서는 던지지 않는다 — 미리보기는 끝까지 보여야 한다). 저장은 서버가 거부한다.
             const s = String(raw ?? "").trim();
-            entry.fields.flag_value = s === "" ? null : s;
+            const norm = normalizeSplFlagValue(s);
+            if (norm === SPL_FLAG_UNKNOWN) {
+              entry.fields.flag_value = s;
+              out.unknown_flag_values.push({
+                value: s,
+                spl_number: splNumber,
+                sheet_name: sheetName,
+                excel_row: r + 1,
+                stage_code: cm.stage_code,
+              });
+            } else {
+              entry.fields.flag_value = norm;
+            }
           } else if (isNaMarker(raw)) {
             entry.na = true;
             entry.fields[cm.field] = null;
@@ -476,8 +500,22 @@ export async function parseSplHdecFile(file: File): Promise<ParsedSplFile> {
             stageMap.set(cm.stage_code, entry);
           }
           if (cm.field === "flag_value") {
+            // 사전 정본은 flag-value.ts 한 곳뿐이다. 사전에 없으면 경고 목록에만 담고 원문을 유지한다
+            // (파서는 던지지 않는다 — 미리보기는 끝까지 보여야 한다). 저장은 서버가 거부한다.
             const s = String(raw ?? "").trim();
-            entry.fields.flag_value = s === "" ? null : s;
+            const norm = normalizeSplFlagValue(s);
+            if (norm === SPL_FLAG_UNKNOWN) {
+              entry.fields.flag_value = s;
+              out.unknown_flag_values.push({
+                value: s,
+                spl_number: splNumber,
+                sheet_name: sheetName,
+                excel_row: r + 1,
+                stage_code: cm.stage_code,
+              });
+            } else {
+              entry.fields.flag_value = norm;
+            }
           } else if (isNaMarker(raw)) {
             entry.na = true;
             entry.fields[cm.field] = null;

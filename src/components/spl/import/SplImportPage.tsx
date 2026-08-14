@@ -232,6 +232,32 @@ export function SplImportPage() {
               <AlertDescription className="text-xs">{parsed.unknown_headers.join(", ")}</AlertDescription>
             </Alert>
           )}
+
+          {parsed && parsed.unknown_flag_values.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>
+                Required Document 값이 사전에 없습니다 — {parsed.unknown_flag_values.length}건 (저장이 거부됩니다)
+              </AlertTitle>
+              <AlertDescription className="text-xs space-y-1">
+                {Array.from(
+                  parsed.unknown_flag_values.reduce((m, u) => {
+                    const cur = m.get(u.value) ?? { count: 0, samples: [] as string[] };
+                    cur.count += 1;
+                    if (cur.samples.length < 3) cur.samples.push(`${u.spl_number} (${u.sheet_name} / ${u.excel_row}행)`);
+                    m.set(u.value, cur);
+                    return m;
+                  }, new Map<string, { count: number; samples: string[] }>()),
+                )
+                  .sort((a, b) => b[1].count - a[1].count)
+                  .map(([value, b]) => (
+                    <div key={value}>
+                      "{value}" {b.count}건 — 예: {b.samples.join(" / ")}
+                    </div>
+                  ))}
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
