@@ -8,6 +8,7 @@ import { usePdbCache } from "@/lib/dashboards/pdb-cache";
 import { TmDashboardSection } from "./TmDashboardSection";
 import { SmDashboardSection } from "./SmDashboardSection";
 import { AbdDashboardSection } from "./AbdDashboardSection";
+import { SplDashboardSection } from "./SplDashboardSection";
 import { LazySection } from "./LazySection";
 import { PdbLangProvider, usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
 import { PdbPlotProvider, usePdbPlot, type PdbPlotFilter } from "@/lib/dashboards/pdb-plot";
@@ -109,6 +110,9 @@ function ProjectSummaryBody() {
           <TmDashboardSection asOfDate={appliedDate} />
           <LazySection>
             <AbdDashboardSection asOfDate={appliedDate} />
+          </LazySection>
+          <LazySection>
+            <SplDashboardSection asOfDate={appliedDate} />
           </LazySection>
           <LazySection>
             <SmDashboardSection asOfDate={appliedDate} />

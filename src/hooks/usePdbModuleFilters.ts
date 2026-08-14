@@ -25,6 +25,7 @@ function normalizeAll(raw: Record<string, unknown> | null | undefined): PdbFilte
     tm: normalizePdbFilters("tm", o.tm) as PdbFilters["tm"],
     sm: normalizePdbFilters("sm", o.sm) as PdbFilters["sm"],
     abd: normalizePdbFilters("abd", o.abd) as PdbFilters["abd"],
+    spl: normalizePdbFilters("spl", o.spl) as PdbFilters["spl"],
   };
 }
 
@@ -63,6 +64,7 @@ export function usePdbModuleFilters() {
         tm: { ...PDB_DEFAULTS.tm },
         sm: { ...PDB_DEFAULTS.sm },
         abd: { ...PDB_DEFAULTS.abd },
+        spl: { ...PDB_DEFAULTS.spl },
       };
       try {
         const { data, error } = await (supabase as any)
@@ -73,6 +75,7 @@ export function usePdbModuleFilters() {
           if (r.module === "tm") out.tm = normalizePdbFilters("tm", r.filters) as PdbFilters["tm"];
           else if (r.module === "sm") out.sm = normalizePdbFilters("sm", r.filters) as PdbFilters["sm"];
           else if (r.module === "abd") out.abd = normalizePdbFilters("abd", r.filters) as PdbFilters["abd"];
+          else if (r.module === "spl") out.spl = normalizePdbFilters("spl", r.filters) as PdbFilters["spl"];
         }
       } catch {
         // 서버 조회 실패 시 기본값 사용

@@ -12,6 +12,7 @@ import {
   PDB_DEFAULTS,
   type PdbAbdFilters,
   type PdbSmFilters,
+  type PdbSplFilters,
   type PdbTmFilters,
 } from "@/lib/dashboards/pdb-filters";
 import { DISCIPLINES } from "@/lib/task-management/columns";
@@ -24,6 +25,18 @@ import {
   ALL_STAGES as ABD_ALL_STAGES,
   STAGE_LABELS as ABD_STAGE_LABELS,
 } from "@/lib/abd/progress-utils";
+import { SPL_TEAM_OPTIONS } from "@/components/spl/raw-data/spl-columns";
+
+const SPL_BAND_OPTIONS = [
+  { value: "REQUIRED_DOC", label: "Required Doc" },
+  { value: "DOCUMENTATION", label: "Documentation Stage" },
+  { value: "PO", label: "PO Stage" },
+] as const;
+
+const SPL_RANGE_OPTIONS = [30, 60, 120, 240, 480].map((n) => ({
+  value: String(n),
+  label: `±${n}d`,
+}));
 
 export const Route = createFileRoute("/_authenticated/admin/setting")({
   head: () => ({
@@ -149,6 +162,7 @@ function Page() {
   const [tm, setTm] = useState<PdbTmFilters>(PDB_DEFAULTS.tm);
   const [sm, setSm] = useState<PdbSmFilters>(PDB_DEFAULTS.sm);
   const [abd, setAbd] = useState<PdbAbdFilters>(PDB_DEFAULTS.abd);
+  const [spl, setSpl] = useState<PdbSplFilters>(PDB_DEFAULTS.spl);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -156,6 +170,7 @@ function Page() {
     setTm(data.tm);
     setSm(data.sm);
     setAbd(data.abd);
+    setSpl(data.spl);
   }, [data]);
 
   const { data: workTypeOptions = [] } = useTmWorkTypeOptions();
@@ -168,7 +183,7 @@ function Page() {
   async function save() {
     setSaving(true);
     try {
-      saveLocal({ tm, sm, abd });
+      saveLocal({ tm, sm, abd, spl });
       toast.success("이 브라우저(내 계정)에만 저장했습니다. 다른 사용자에게는 영향이 없습니다.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "저장에 실패했습니다.");
@@ -181,6 +196,7 @@ function Page() {
     setTm(PDB_DEFAULTS.tm);
     setSm(PDB_DEFAULTS.sm);
     setAbd(PDB_DEFAULTS.abd);
+    setSpl(PDB_DEFAULTS.spl);
   }
 
   return (
@@ -210,6 +226,7 @@ function Page() {
           <TabsTrigger value="tm">Task Management</TabsTrigger>
           <TabsTrigger value="sm">Snag Management</TabsTrigger>
           <TabsTrigger value="abd">As Built Drawing</TabsTrigger>
+          <TabsTrigger value="spl">Spare Part List</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tm">
@@ -376,6 +393,57 @@ function Page() {
               </Row>
               <Row label="차트 시작일">
                 <StartDate value={abd.startDate} onChange={(v) => setAbd({ ...abd, startDate: v })} />
+              </Row>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="spl">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">SPL 필터</CardTitle>
+              <CardDescription>
+                Spare Part List 는 정본(spl_rows_as_of) 값을 그대로 세어 KPI · Progress Status 차트에
+                적용합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <Row label="Team">
+                <Multi
+                  options={[...SPL_TEAM_OPTIONS]}
+                  value={spl.teams}
+                  onChange={(v) => setSpl({ ...spl, teams: v })}
+                />
+              </Row>
+              <Row label="Band">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Multi
+                    options={[...SPL_BAND_OPTIONS]}
+                    value={spl.bands}
+                    onChange={(v) => setSpl({ ...spl, bands: v })}
+                  />
+                  <span className="text-[11px] text-muted-foreground">비우면 전체 밴드</span>
+                </div>
+              </Row>
+              <Row label="Plan Mode">
+                <Single
+                  options={[
+                    { value: "baseline", label: "Baseline" },
+                    { value: "remaining", label: "Remaining" },
+                  ] as const}
+                  value={spl.planMode}
+                  onChange={(v) => setSpl({ ...spl, planMode: v })}
+                />
+              </Row>
+              <Row label="Bucket">
+                <Single options={BUCKETS} value={spl.bucket} onChange={(v) => setSpl({ ...spl, bucket: v })} />
+              </Row>
+              <Row label="차트 범위">
+                <Single
+                  options={SPL_RANGE_OPTIONS}
+                  value={String(spl.rangeDays)}
+                  onChange={(v) => setSpl({ ...spl, rangeDays: Number(v) })}
+                />
               </Row>
             </CardContent>
           </Card>

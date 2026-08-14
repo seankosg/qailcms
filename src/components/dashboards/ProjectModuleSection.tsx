@@ -11,12 +11,13 @@ export type PlotHeadStat = {
 };
 
 /** 모듈 구분용 accent (좌측 라인) — 섹션 전체를 색으로 채우지 않는다 */
-export type ModuleTone = "tm" | "sm" | "abd";
+export type ModuleTone = "tm" | "sm" | "abd" | "spl";
 
 const TONE: Record<ModuleTone, string> = {
   tm: "border-l-sky-500 dark:border-l-sky-400",
   sm: "border-l-amber-500 dark:border-l-amber-400",
   abd: "border-l-emerald-500 dark:border-l-emerald-400",
+  spl: "border-l-violet-500 dark:border-l-violet-400",
 };
 
 /**

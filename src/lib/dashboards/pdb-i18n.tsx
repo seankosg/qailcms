@@ -27,6 +27,7 @@ const KO: Dict = {
   byWorkType: "업무타입별 실적",
   byMainArea: "주요지역별 현황",
   teamPerformance: "Team 진도",
+  bandProgress: "Band 진도",
 
   hintTmProgress:
     "진도현황 = Sub 과업 실적%(서버 정본 srv_actual_pct, 없으면 누적 실적) 단순 평균 · 건수 = 실적 환산 완료분 / 모집단",
@@ -44,6 +45,12 @@ const KO: Dict = {
   hintAbdTeam: "Team 별 문서 수 상위 4개 + Others · 진도율 = 실적 누계 ÷ 문서 모수",
   hintAbdSection:
     "진도율 = 해당 Plot Approval 실적 누계 ÷ 문서 모수 — ABD Progress 매트릭스와 동일(서버 totals 정본)",
+  hintSplProgress:
+    "진도현황 = as-of 기준 실적 단계 수 ÷ N/A 제외 단계 수 (정본 spl_rows_as_of)",
+  hintSplBand:
+    "밴드별 진도율 = 해당 밴드 실적 누계 ÷ 밴드 단계 모수 (N/A 제외)",
+  hintSplSection:
+    "진도율 = 해당 Plot 실적 단계 누계 ÷ 단계 모수 — SPL Dashboard Progress Status 와 동일",
 
   unitCount: "건수",
   unitCountSuffix: "건",
@@ -80,6 +87,7 @@ const EN: Dict = {
   byWorkType: "Progress by Work Type",
   byMainArea: "Progress by Main Area",
   teamPerformance: "Team Performance",
+  bandProgress: "Band Progress",
 
   hintTmProgress:
     "Progress = simple average of Sub-task actual % · Count = earned-value equivalent complete / total",
@@ -98,6 +106,11 @@ const EN: Dict = {
     "Top 4 teams by drawing count plus Others · Progress = cumulative actual ÷ total drawings",
   hintAbdSection:
     "Progress = cumulative Approval actual for the plot ÷ total drawings — same basis as the ABD Progress matrix",
+  hintSplProgress:
+    "Progress = actual stages as of date ÷ stage scope excluding N/A (canonical spl_rows_as_of)",
+  hintSplBand: "Band progress = cumulative actual in the band ÷ band stage scope (N/A excluded)",
+  hintSplSection:
+    "Progress = cumulative actual stages for the plot ÷ stage scope — same basis as the SPL Dashboard Progress Status",
 
   unitCount: "Nos.",
   unitCountSuffix: "No.",
