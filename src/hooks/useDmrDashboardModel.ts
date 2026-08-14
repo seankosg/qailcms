@@ -9,7 +9,9 @@ import {
   useDailyCanon,
   useProductivity,
   useTmHistoryStart,
+  type DmrDailyCodeValue,
   type DmrDailyProductivityPoint,
+  type DmrManpowerRow,
   type PeriodKind,
 } from '@/lib/dmr/productivity';
 import {
@@ -67,6 +69,9 @@ export interface DmrDashboardResult {
   model: DmrDashboardModel | null;
   dailyPoints: DmrDailyProductivityPoint[];
   dailyDates: string[];
+  /** 상세창이 같은 정본 배열을 다시 쓰도록 그대로 넘긴다 */
+  dailyCanon: Map<string, Map<string, DmrDailyCodeValue>> | undefined;
+  dmrRowsAll: DmrManpowerRow[];
   dailyDisabledReason: string | null;
   loading: boolean;
   dailyLoading: boolean;
@@ -120,6 +125,8 @@ export function useDmrDashboardModel(state: DmrDashboardState): DmrDashboardResu
     model,
     dailyPoints,
     dailyDates: dates,
+    dailyCanon: dailyQ.data,
+    dmrRowsAll: prodQ.data?.dmrRows ?? [],
     dailyDisabledReason: tooLong
       ? `기간이 ${dates.length}일 — 날짜별 추이는 ${DAILY_SERIES_MAX_DAYS}일까지만 그립니다`
       : null,
