@@ -252,28 +252,28 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
         case "name":
           av = (a.name ?? a.display_name ?? "").toString();
           bv = (b.name ?? b.display_name ?? "").toString();
-          return av.localeCompare(bv, "ko") * dir;
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "team":
           av = (a.team ?? "").toString();
           bv = (b.team ?? "").toString();
-          return av.localeCompare(bv, "ko") * dir;
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "login_id":
           av = (a.login_id ?? "").toString();
           bv = (b.login_id ?? "").toString();
-          return av.localeCompare(bv, "ko") * dir;
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "user_type":
           av = USER_TYPE_LABELS[(a.user_type ?? "") as UserType] ?? "";
           bv = USER_TYPE_LABELS[(b.user_type ?? "") as UserType] ?? "";
-          return av.localeCompare(bv, "ko") * dir;
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "linked":
           av = linkedMasterText(a);
           bv = linkedMasterText(b);
-          return av.localeCompare(bv, "ko") * dir;
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "role":
           // §6-1 표시·정렬 모두 DB rcl_highest_role 과 동일한 최고 등급 기준.
           av = ROLE_LABELS[highestRole(a.roles)] ?? "";
           bv = ROLE_LABELS[highestRole(b.roles)] ?? "";
-          return av.localeCompare(bv, "ko") * dir;
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "active":
           av = a.is_active ? 1 : 0;
           bv = b.is_active ? 1 : 0;
