@@ -3,6 +3,7 @@ import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
@@ -18,6 +19,9 @@ import {
   type SplStageState,
 } from "@/lib/spl/stage-state";
 import { SplStageBox, type StageCounts } from "./SplStageBox";
+import { SplColumnOrderMenu } from "@/components/spl/raw-data/SplColumnOrderMenu";
+import { useSplColumnPrefs } from "@/components/spl/raw-data/useSplColumnPrefs";
+import { splBandHeaderClass, type SplStageColumn } from "@/components/spl/raw-data/spl-columns";
 
 const routeApi = getRouteApi("/_authenticated/closure/spare-part/progress");
 
