@@ -15,6 +15,12 @@ import { cn } from "@/lib/utils";
 
 const routeApi = getRouteApi("/_authenticated/closure/spare-part/dashboard");
 
+const BAND_LABEL: Record<string, string> = {
+  REQUIRED_DOC: "Required Doc",
+  DOCUMENTATION: "Documentation Stage",
+  PO: "PO Stage",
+};
+
 const BUCKETS: Array<{ v: SplBucket; label: string }> = [
   { v: "day", label: "Day" },
   { v: "week", label: "Week" },
