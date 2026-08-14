@@ -66,11 +66,13 @@ export interface DmrManpowerRow {
   report_date: string;
   task_no: string | null;
   actual_manpower: number | null;
+  plan_manpower: number | null;
   headcount_kind: string | null;
   discipline: string | null;
   system_name: string | null;
   plot: string | null;
   contractor_name: string | null;
+  work_category: string | null;
 }
 
 export interface ProductivityInput {
@@ -104,11 +106,19 @@ export interface ProductivityRow {
   systems: string[];
   /** DMR 상 그 코드에 붙은 공종 (둘 이상이면 두 공종에 걸쳐 들어온 코드) */
   dmr_teams: string[];
+  /** DMR 상 그 코드에 붙은 Plot */
+  dmr_plots: string[];
+  /** DMR 상 그 코드에 붙은 Work Type(work_category) */
+  dmr_work_categories: string[];
+  /** DMR 상 그 코드에 기록된 인원 종류 */
+  headcount_kinds: string[];
   /** 당일계획% (기간 증가분, 0..1) */
   plan_pct: number | null;
   /** 당일실적% (기간 증가분, 0..1 · 음수 가능) */
   actual_pct: number | null;
   manpower: number;
+  /** 계획 투입인원 합 (인·일) */
+  plan_manpower: number;
   /** 그 코드에 인원 기록이 있는 날 수 */
   record_days: number;
   /** 당일실적% ÷ 인원 */
@@ -130,12 +140,21 @@ export interface ProductivityRow {
 export interface ProductivitySummary {
   codes: number;
   manpower: number;
+  /** 계획 투입인원 합 (인·일) */
+  planManpower: number;
+  manpowerVariance: number;
+  manpowerAchievement: number | null;
   planSum: number;
   actualSum: number;
   productivity: number | null;
   planProductivity: number | null;
   achievement: number | null;
   extraManpower: number;
+  /** 상호배타 분류 (합계 = codes) */
+  productiveCodes: number;
+  noProgressCodes: number;
+  correctedCodes: number;
+  exceptionalCodes: number;
   /** 기록일 비율 중앙값 */
   recordRatioMedian: number | null;
   /** 인원 없이 실적만 오른 코드 수 */
@@ -150,11 +169,18 @@ export function buildProductivity(input: ProductivityInput): ProductivityRow[] {
   const { dmrRows, tmEnd, period, fromZero } = input;
 
   const mp = new Map<string, number>();
+  const planMp = new Map<string, number>();
   const days = new Map<string, Set<string>>();
   const systems = new Map<string, Set<string>>();
   const contractors = new Map<string, Map<string, number>>();
   const dTeams = new Map<string, Set<string>>();
   const dPlots = new Map<string, Set<string>>();
+  const dWork = new Map<string, Set<string>>();
+  const dKinds = new Map<string, Set<string>>();
+  const addTo = (m: Map<string, Set<string>>, c: string, v: string) => {
+    if (!m.has(c)) m.set(c, new Set());
+    m.get(c)!.add(v);
+  };
 
   for (const r of dmrRows) {
     const code = (r.task_no ?? '').trim();
@@ -162,6 +188,9 @@ export function buildProductivity(input: ProductivityInput): ProductivityRow[] {
     const n = Number(r.actual_manpower ?? 0) || 0;
     // headcount_kind 는 전 종류를 더한다(현재는 worker 뿐).
     mp.set(code, (mp.get(code) ?? 0) + n);
+    planMp.set(code, (planMp.get(code) ?? 0) + (Number(r.plan_manpower ?? 0) || 0));
+    if (r.work_category) addTo(dWork, code, r.work_category);
+    if (r.headcount_kind) addTo(dKinds, code, r.headcount_kind);
     if (n > 0) {
       if (!days.has(code)) days.set(code, new Set());
       days.get(code)!.add(r.report_date);
@@ -194,6 +223,7 @@ export function buildProductivity(input: ProductivityInput): ProductivityRow[] {
     seen.add(code);
 
     const manpower = mp.get(code) ?? 0;
+    const plan_manpower = planMp.get(code) ?? 0;
 
     const aEnd = input.actualEndByCode.get(code) ?? 0;
     const aPrev = fromZero ? 0 : (input.actualPrevByCode.get(code) ?? 0);
@@ -244,9 +274,13 @@ export function buildProductivity(input: ProductivityInput): ProductivityRow[] {
         .sort((a, b) => b.manpower - a.manpower || a.name.localeCompare(b.name)),
       systems: Array.from(systems.get(code) ?? []).sort(),
       dmr_teams: Array.from(dTeams.get(code) ?? []).sort(),
+      dmr_plots: Array.from(dPlots.get(code) ?? []).sort(),
+      dmr_work_categories: Array.from(dWork.get(code) ?? []).sort(),
+      headcount_kinds: Array.from(dKinds.get(code) ?? []).sort(),
       plan_pct,
       actual_pct,
       manpower,
+      plan_manpower,
       record_days,
       productivity,
       plan_productivity,
@@ -269,36 +303,67 @@ function median(xs: number[]): number | null {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
+/**
+ * 코드 분류 — 상호배타 우선순위.
+ * 예외(인원 없이 실적) > 진도 정정(음수) > 실적 있음 > 무실적
+ */
+export type CodeClass = 'exceptional' | 'corrected' | 'productive' | 'noProgress';
+export function classifyCode(r: ProductivityRow): CodeClass {
+  const a = r.actual_pct ?? 0;
+  if (r.manpower <= 0 && a !== 0) return 'exceptional';
+  if (a < 0) return 'corrected';
+  if (a > 0) return 'productive';
+  return 'noProgress';
+}
+
 /** 합계는 합 ÷ 합이다 — 행별 생산성의 평균이 아니다. */
 export function summarize(rows: ProductivityRow[], period: Period): ProductivitySummary {
   const calendarDays = Math.max(1, diffDays(period.start, period.end) + 1);
   let manpower = 0;
+  let planManpower = 0;
   let planSum = 0;
   let actualSum = 0;
   let extra = 0;
   const ratios: number[] = [];
   let noMp = 0;
   let gapCodes = 0;
+  let productiveCodes = 0;
+  let noProgressCodes = 0;
+  let correctedCodes = 0;
+  let exceptionalCodes = 0;
   for (const r of rows) {
     manpower += r.manpower;
+    planManpower += r.plan_manpower;
     if (r.plan_pct != null) planSum += r.plan_pct;
     if (r.actual_pct != null) actualSum += r.actual_pct;
     if (r.extra_manpower != null) extra += r.extra_manpower;
     if (r.manpower > 0) ratios.push(Math.min(1, r.record_days / calendarDays));
     if (r.kind === '다') noMp += 1;
     if (r.data_date_gap != null && r.data_date_gap !== 0) gapCodes += 1;
+    const cls = classifyCode(r);
+    if (cls === 'productive') productiveCodes += 1;
+    else if (cls === 'noProgress') noProgressCodes += 1;
+    else if (cls === 'corrected') correctedCodes += 1;
+    else exceptionalCodes += 1;
   }
   const productivity = manpower > 0 ? actualSum / manpower : null;
   const planProductivity = manpower > 0 && planSum > 0 ? planSum / manpower : null;
   return {
     codes: rows.length,
     manpower,
+    planManpower,
+    manpowerVariance: manpower - planManpower,
+    manpowerAchievement: planManpower > 0 ? manpower / planManpower : null,
     planSum,
     actualSum,
     productivity,
     planProductivity,
     achievement: planSum > 0 ? actualSum / planSum : null,
     extraManpower: extra,
+    productiveCodes,
+    noProgressCodes,
+    correctedCodes,
+    exceptionalCodes,
     recordRatioMedian: median(ratios),
     actualWithoutManpower: noMp,
     dataDateGapCodes: gapCodes,
@@ -431,7 +496,9 @@ async function fetchDmrRange(start: string, end: string): Promise<DmrManpowerRow
   for (let from = 0; from < 100_000; from += PAGE) {
     const { data, error } = await supabase
       .from('dmr_entries')
-      .select('report_date, task_no, actual_manpower, headcount_kind, discipline, system_name, plot, contractor_name')
+      .select(
+        'report_date, task_no, actual_manpower, plan_manpower, headcount_kind, discipline, system_name, plot, contractor_name, work_category',
+      )
       .gte('report_date', start)
       .lte('report_date', end)
       .range(from, from + PAGE - 1);
@@ -540,3 +607,150 @@ export const fmtProd = (v: number | null | undefined) =>
   v == null ? '' : `${(v * 100).toFixed(3)}%/인`;
 export const fmtExtra = (v: number | null | undefined, unit = '명/일') =>
   v == null ? '' : `${v > 0 ? '+' : ''}${v.toFixed(1)}${unit}`;
+
+/* ────────────────────────── 날짜별 정본 (차트 · 상세창 공용) ──────────────────────────
+ * 하루치 계획/실적 증가분은 TM 정본 tm_rows_as_of 의 tc_plan_pct · tc_actual_pct 만 쓴다.
+ * 화면과 상세창이 같은 배열을 본다 — 상세창 전용 산식은 만들지 않는다.
+ */
+
+export interface DmrDailyCodeValue {
+  plan: number | null;
+  actual: number;
+}
+
+/** 차트에 허용하는 최대 일수 — 넘으면 날짜별 조회를 걸지 않는다(배치 RPC 부재). */
+export const DAILY_SERIES_MAX_DAYS = 31;
+
+export function periodDates(period: Period): string[] {
+  const out: string[] = [];
+  const n = diffDays(period.start, period.end);
+  if (n < 0) return [period.end];
+  for (let i = 0; i <= n; i += 1) out.push(addDays(period.start, i));
+  return out;
+}
+
+async function fetchTmDaily(date: string): Promise<Map<string, DmrDailyCodeValue>> {
+  const out = new Map<string, DmrDailyCodeValue>();
+  const CHUNK = 1000;
+  for (let from = 0; from < 20_000; from += CHUNK) {
+    const { data, error } = await (supabase as any)
+      .rpc('tm_rows_as_of', { _as_of: date })
+      .select('task_no, tc_plan_pct, tc_actual_pct')
+      .range(from, from + CHUNK - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as Array<Record<string, any>>;
+    for (const r of rows) {
+      const code = String(r.task_no ?? '').trim();
+      if (!code || out.has(code)) continue;
+      out.set(code, {
+        plan: r.tc_plan_pct == null ? null : Number(r.tc_plan_pct),
+        actual: Number(r.tc_actual_pct ?? 0) || 0,
+      });
+    }
+    if (rows.length < CHUNK) break;
+  }
+  return out;
+}
+
+/** 날짜별 정본 조회 — 동시 실행 수를 제한한다. */
+export function useDailyCanon(period: Period, enabled = true) {
+  const dates = periodDates(period);
+  const tooLong = dates.length > DAILY_SERIES_MAX_DAYS;
+  return useQuery({
+    queryKey: ['dmr-daily-canon', dates[0], dates[dates.length - 1], dates.length],
+    enabled: enabled && !tooLong && dates.length > 0,
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async (): Promise<Map<string, Map<string, DmrDailyCodeValue>>> => {
+      const byDate = new Map<string, Map<string, DmrDailyCodeValue>>();
+      const CONCURRENCY = 4;
+      for (let i = 0; i < dates.length; i += CONCURRENCY) {
+        const slice = dates.slice(i, i + CONCURRENCY);
+        const res = await Promise.all(slice.map((d) => fetchTmDaily(d)));
+        slice.forEach((d, k) => byDate.set(d, res[k]));
+      }
+      return byDate;
+    },
+  });
+}
+
+export interface DmrDailyProductivityPoint {
+  date: string;
+  /** 그룹 키 ('' = 전체) */
+  group: string;
+  planProgress: number;
+  actualProgress: number;
+  manpower: number;
+  productiveCodes: number;
+  actualProductivity: number | null;
+  plannedProductivity: number | null;
+}
+
+/**
+ * 날짜별 생산성 — 정본 한 벌.
+ * 실제 생산성(D) = 당일실적 진도(D) ÷ 실제 투입인원(D)
+ * 계획 생산성(D) = 당일계획 진도(D) ÷ 실제 투입인원(D)
+ */
+export function buildDailyPoints(args: {
+  dates: string[];
+  byDate: Map<string, Map<string, DmrDailyCodeValue>>;
+  dmrRows: DmrManpowerRow[];
+  /** 대상 코드 → 그룹 키 목록. 코드가 여러 그룹에 걸치면 각 그룹에 넣는다. */
+  codeGroups: Map<string, string[]>;
+}): DmrDailyProductivityPoint[] {
+  const { dates, byDate, dmrRows, codeGroups } = args;
+  // 날짜·코드별 인원
+  const mpByDateCode = new Map<string, Map<string, number>>();
+  for (const r of dmrRows) {
+    const code = (r.task_no ?? '').trim();
+    if (!code || !codeGroups.has(code)) continue;
+    if (!mpByDateCode.has(r.report_date)) mpByDateCode.set(r.report_date, new Map());
+    const m = mpByDateCode.get(r.report_date)!;
+    m.set(code, (m.get(code) ?? 0) + (Number(r.actual_manpower ?? 0) || 0));
+  }
+
+  const out: DmrDailyProductivityPoint[] = [];
+  for (const d of dates) {
+    const canon = byDate.get(d);
+    const acc = new Map<
+      string,
+      { plan: number; actual: number; manpower: number; productive: number }
+    >();
+    const bump = (g: string) => {
+      let a = acc.get(g);
+      if (!a) {
+        a = { plan: 0, actual: 0, manpower: 0, productive: 0 };
+        acc.set(g, a);
+      }
+      return a;
+    };
+    for (const [code, groups] of codeGroups) {
+      const v = canon?.get(code);
+      const mp = mpByDateCode.get(d)?.get(code) ?? 0;
+      const plan = v?.plan ?? 0;
+      const actual = v?.actual ?? 0;
+      if (!v && mp === 0) continue;
+      for (const g of groups) {
+        const a = bump(g);
+        a.plan += plan;
+        a.actual += actual;
+        a.manpower += mp;
+        if (actual > 0) a.productive += 1;
+      }
+    }
+    for (const [g, a] of acc) {
+      out.push({
+        date: d,
+        group: g,
+        planProgress: a.plan,
+        actualProgress: a.actual,
+        manpower: a.manpower,
+        productiveCodes: a.productive,
+        actualProductivity: a.manpower > 0 ? a.actual / a.manpower : null,
+        plannedProductivity: a.manpower > 0 ? a.plan / a.manpower : null,
+      });
+    }
+  }
+  return out;
+}
