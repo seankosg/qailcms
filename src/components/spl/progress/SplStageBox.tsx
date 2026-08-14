@@ -59,9 +59,9 @@ export function SplStageBox({
           </div>
           <span
             className="rounded border px-1 text-[9px] tabular-nums text-muted-foreground"
-            title="이 밴드에서 지금 이 단계에 서 있는 행"
+            title="Current stage rows in this band"
           >
-            지금 여기 {hereCount}
+            Current Stage {hereCount}
           </span>
         </div>
         <div className="truncate text-[10px] text-muted-foreground" title={label}>
