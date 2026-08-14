@@ -263,6 +263,9 @@ export function SplProgressPage() {
                     <span className="rounded-sm border px-1 text-[10px]">{BAND_TAG[band]?.tag ?? band[0]}</span>
                     {BAND_TAG[band]?.label ?? band}
                   </div>
+                  <div className="mt-1 text-[10px] font-semibold text-foreground tabular-nums">
+                    진도율 {(bandProgress.get(band)?.pct ?? 0).toFixed(1)}%
+                  </div>
                   <div className="mt-1 text-[10px] text-muted-foreground">
                     {stages.length}단계
                     {BAND_TAG[band]?.note ? ` · ${BAND_TAG[band].note}` : ""}
