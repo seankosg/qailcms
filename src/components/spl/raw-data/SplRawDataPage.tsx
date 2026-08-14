@@ -430,8 +430,8 @@ export function SplRawDataPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Spare Part List — Raw Data</h1>
           <p className="text-xs text-muted-foreground">
-            All displayed and aggregated figures come from the canonical functions (spl_rows_as_of → spl_eval_as_of → spl_judge_v1) and are recomputed on read. Data Date
-            is per row and for display only.
+            All displayed and aggregated figures come from the canonical functions (spl_rows_as_of → spl_eval_as_of)
+            and are recomputed on read. Data Date is per row and for display only.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -77,8 +77,8 @@ export function SplDashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Spare Part List — Dashboard</h1>
           <p className="text-xs text-muted-foreground">
-            All figures come from the canonical functions (spl_rows_as_of → spl_eval_as_of → spl_judge_v1) and are
-            recomputed on read. Clicking a card opens the matching Raw Data drill-down.
+            All figures come from the canonical functions (spl_rows_as_of → spl_eval_as_of) and are recomputed on
+            read. Clicking a card opens the matching Raw Data drill-down.
           </p>
         </div>
         <DataDatePicker
