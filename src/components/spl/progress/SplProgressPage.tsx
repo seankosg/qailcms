@@ -379,60 +379,97 @@ export function SplProgressPage() {
                   >
                     닫기
                   </Button>
+                  <span className="ml-auto">
+                    <SplColumnOrderMenu
+                      items={cols.allColumnItems}
+                      order={cols.order}
+                      visibility={cols.visibility}
+                      frozenExtras={cols.frozenExtras}
+                      onOrderChange={cols.setOrder}
+                      onVisibilityChange={cols.setVisibility}
+                      onFrozenChange={cols.setFrozenExtras}
+                      onSave={() => {
+                        cols.persist();
+                        toast.success("Column settings saved.");
+                      }}
+                    />
+                  </span>
                 </div>
                 <div className="max-h-[420px] overflow-auto rounded border">
-                  <table className="w-full text-[11px]">
-                    <thead className="sticky top-0 bg-background">
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="px-2 py-1">SPL NUMBER</th>
-                        <th className="px-2 py-1">Title</th>
-                        <th className="px-2 py-1">Team</th>
-                        <th className="px-2 py-1">Plot</th>
-                        <th className="px-2 py-1">PIC / ENG</th>
-                        <th className="px-2 py-1">Plan</th>
-                        <th className="px-2 py-1">Actual</th>
-                        <th className="px-2 py-1 text-right">Slip</th>
+                  <table
+                    className="text-[11px]"
+                    style={{ width: cols.layout.reduce((s, i) => s + i.width, 0) }}
+                  >
+                    <thead>
+                      <tr>
+                        {cols.layout.map((it) => {
+                          const label = it.def?.label ?? it.stage?.code ?? it.key;
+                          const base = cn(
+                            "sticky top-0 z-30 overflow-hidden whitespace-nowrap border-b border-l px-2 py-1 text-left bg-muted [background-image:linear-gradient(hsl(var(--muted)),hsl(var(--muted)))]",
+                            it.stage && splBandHeaderClass(it.stage.band),
+                            it.stage?.bandStart && "border-l-2 border-l-foreground/40",
+                          );
+                          return (
+                            <th
+                              key={it.key}
+                              title={it.stage?.title}
+                              style={{
+                                width: it.width,
+                                minWidth: it.width,
+                                maxWidth: it.width,
+                                ...(it.left != null ? { left: it.left } : {}),
+                              }}
+                              className={cn(base, it.left != null && "sticky z-40")}
+                            >
+                              {label}
+                            </th>
+                          );
+                        })}
                       </tr>
                     </thead>
                     <tbody>
-                      {detailRows.map((r) => {
-                        const cell = r.stages[selectedStage.stage_code];
-                        const slip = slipDays(r, selectedStage.stage_code);
-                        return (
-                          <tr
-                            key={r.id}
-                            className="cursor-pointer border-b hover:bg-muted/50"
-                            onClick={() =>
-                              (rootNavigate as (opts: unknown) => void)({
-                                to: "/closure/spare-part/detail/$id",
-                                params: { id: r.id },
-                              })
-                            }
-                          >
-                            <td className="px-2 py-1 font-medium">{r.spl_number}</td>
-                            <td className="max-w-[320px] truncate px-2 py-1" title={r.title ?? ""}>
-                              {r.title}
-                            </td>
-                            <td className="px-2 py-1">{r.team}</td>
-                            <td className="px-2 py-1">{r.plot}</td>
-                            <td className="px-2 py-1">
-                              {[r.pic, r.eng].filter(Boolean).join(" / ")}
-                            </td>
-                            <td className="px-2 py-1 tabular-nums">
-                              {cell?.pf ? formatDdMmm(cell.pf) : cell?.ps ? formatDdMmm(cell.ps) : ""}
-                            </td>
-                            <td className="px-2 py-1 tabular-nums">
-                              {cell?.af ? formatDdMmm(cell.af) : cell?.as ? formatDdMmm(cell.as) : ""}
-                            </td>
-                            <td className="px-2 py-1 text-right tabular-nums text-[color:var(--destructive)]">
-                              {slip ?? ""}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {detailRows.map((r) => (
+                        <tr
+                          key={r.id}
+                          className="cursor-pointer border-b hover:bg-muted/50"
+                          onClick={() =>
+                            (rootNavigate as (opts: unknown) => void)({
+                              to: "/closure/spare-part/detail/$id",
+                              params: { id: r.id },
+                            })
+                          }
+                        >
+                          {cols.layout.map((it) => {
+                            const v = columnValue(it.key, r);
+                            return (
+                              <td
+                                key={it.key}
+                                title={v}
+                                style={{
+                                  width: it.width,
+                                  minWidth: it.width,
+                                  maxWidth: it.width,
+                                  ...(it.left != null ? { left: it.left } : {}),
+                                }}
+                                className={cn(
+                                  "overflow-hidden truncate whitespace-nowrap border-l px-2 py-1",
+                                  it.stage && "tabular-nums",
+                                  it.left != null &&
+                                    "sticky z-20 bg-background [background-image:linear-gradient(hsl(var(--background)),hsl(var(--background)))]",
+                                )}
+                              >
+                                {v}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
                       {detailRows.length === 0 && (
                         <tr>
-                          <td colSpan={8} className="px-2 py-6 text-center text-muted-foreground">
+                          <td
+                            colSpan={Math.max(1, cols.layout.length)}
+                            className="px-2 py-6 text-center text-muted-foreground"
+                          >
                             해당 행이 없습니다.
                           </td>
                         </tr>
