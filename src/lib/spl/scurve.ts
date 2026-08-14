@@ -101,8 +101,8 @@ export function buildSplSCurve(opts: {
   const winEnd = bucketStart(addDaysIso(asOf, rangeDays), bucket);
 
   // 관측된 날짜 범위 ∩ 표시 창
-  let minD: string | null = null;
-  let maxD: string | null = null;
+  let minD = "";
+  let maxD = "";
   const touch = (d: string | null) => {
     if (!d) return;
     if (!minD || d < minD) minD = d;
