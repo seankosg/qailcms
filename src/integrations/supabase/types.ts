@@ -9346,6 +9346,14 @@ export type Database = {
       spl_ocs_verify: { Args: never; Returns: Json }
       spl_ocs_verify_internal: { Args: never; Returns: Json }
       spl_precheck_patches: { Args: { _patches: Json }; Returns: Json }
+      spl_reqdoc_set_ready: {
+        Args: { _item_id: string; _ready: boolean; _stage_code: string }
+        Returns: Json
+      }
+      spl_reqdoc_set_required: {
+        Args: { _item_id: string; _required: boolean; _stage_code: string }
+        Returns: Json
+      }
       spl_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
       spl_rsp_deactivate: {
         Args: { _id: string; _reason: string }
