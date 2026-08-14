@@ -13,6 +13,7 @@ import { useUnionWindow } from "@/lib/charts/use-union-window";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
 import { usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
+import { usePdbPlot, filterByPlot, plotGridClass } from "@/lib/dashboards/pdb-plot";
 
 /** 필터 요약 배지의 한국어 값(Delay 옵션 라벨)만 영문으로 옮긴다. */
 const DELAY_EN: Record<string, string> = {
@@ -89,6 +90,14 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
   const c = useTmPlot("C", asOfDate, f, labels);
   const d = useTmPlot("D", asOfDate, f, labels);
   const { window: win, report } = useUnionWindow();
+  const { plotFilter } = usePdbPlot();
+  const columns = filterByPlot(
+    [
+      { plot: "D" as const, q: d },
+      { plot: "C" as const, q: c },
+    ],
+    plotFilter,
+  );
 
   return (
     <ProjectModuleSection
@@ -101,13 +110,8 @@ export function TmDashboardSection({ asOfDate }: { asOfDate: string }) {
         { plot: "C", progressPct: c.isLoading ? null : c.kpi.progressPct, total: c.kpi.total },
       ]}
     >
-      <div className="grid gap-3 xl:grid-cols-2">
-        {(
-          [
-            ["D", d],
-            ["C", c],
-          ] as const
-        ).map(([label, q]) => (
+      <div className={plotGridClass(plotFilter)}>
+        {columns.map(({ plot: label, q }) => (
           <div key={label} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
               <AbdKpiCard

@@ -26,6 +26,7 @@ import { type Bucket, type Stage } from "@/lib/defect-management/progress-utils"
 import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4, type BreakdownRow } from "./PdbBreakdownCard";
 import { usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
+import { usePdbPlot, filterByPlot, plotGridClass } from "@/lib/dashboards/pdb-plot";
 
 /** Room Group 별 Issued / Closure% — SM Dashboard 의 roomGroupTotals 정본을 그대로 쓴다. */
 function useRoomGroupRows(plot: PlotKey, asOfDate: string, f: PdbSmFilters): BreakdownRow[] {
@@ -92,6 +93,14 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
   const roomsC = useRoomGroupRows("C", asOfDate, f);
   const roomsD = useRoomGroupRows("D", asOfDate, f);
   const { window: win, report } = useUnionWindow();
+  const { plotFilter } = usePdbPlot();
+  const columns = filterByPlot(
+    [
+      { plot: "D" as const, q: d, rooms: roomsD },
+      { plot: "C" as const, q: c, rooms: roomsC },
+    ],
+    plotFilter,
+  );
 
   return (
     <ProjectModuleSection
@@ -112,13 +121,8 @@ export function SmDashboardSection({ asOfDate }: { asOfDate: string }) {
         },
       ]}
     >
-      <div className="grid gap-3 xl:grid-cols-2">
-        {(
-          [
-            ["D", d, roomsD],
-            ["C", c, roomsC],
-          ] as const
-        ).map(([label, q, rooms]) => {
+      <div className={plotGridClass(plotFilter)}>
+        {columns.map(({ plot: label, q, rooms }) => {
           const actualCnt = q.baseline.actualUpto;
           const planCnt = q.baseline.planUpto;
           const actualPct = q.stageTotal > 0 ? (actualCnt / q.stageTotal) * 100 : null;
