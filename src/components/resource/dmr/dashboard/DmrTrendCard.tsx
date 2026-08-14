@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -15,6 +14,10 @@ import {
 import type { DmrDailyProductivityPoint } from '@/lib/dmr/productivity';
 import type { TrendGroupBy } from '@/lib/dmr/dashboard-model';
 import { FilterToggleButton, LINE_COLORS, fmtDate } from './ui';
+import {
+  ProgressChartLegend,
+  defaultMetrics,
+} from '@/components/shared/charts/ProgressChartLegend';
 
 const GROUP_OPTIONS: Array<{ value: TrendGroupBy; label: string }> = [
   { value: 'total', label: '전체' },
@@ -122,6 +125,20 @@ export function DmrTrendCard({
         </div>
       </CardHeader>
       <CardContent>
+        {!disabledReason && !loading && groups.length > 0 && (
+          <ProgressChartLegend
+            className="mb-2"
+            mode="line-plan-actual"
+            lang="ko"
+            metrics={defaultMetrics("line-plan-actual", "ko")}
+            series={groups.map((g, i) => ({
+              key: g,
+              label: g,
+              color: LINE_COLORS[i % LINE_COLORS.length],
+            }))}
+            axes={{ left: `${METRICS.find((m) => m.value === metric)?.label ?? ""} (${unit || "-"})` }}
+          />
+        )}
         <div className="h-[320px]">
           {disabledReason ? (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
@@ -150,7 +167,6 @@ export function DmrTrendCard({
                     String(n).replace('__plan', ' (Plan)'),
                   ]}
                 />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
                 {groups.flatMap((g, i) => {
                   const color = LINE_COLORS[i % LINE_COLORS.length];
                   const out = [

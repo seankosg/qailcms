@@ -4,7 +4,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   Line,
   ReferenceLine,
   XAxis,
@@ -36,6 +35,20 @@ import {
   type SnagSCurveCum,
 } from "@/lib/defect-management/scurve-utils";
 import { bucketTargetTerm } from "@/lib/charts/bucket-terms";
+import {
+  ProgressChartLegend,
+  VarianceLegend,
+  defaultMetrics,
+} from "@/components/shared/charts/ProgressChartLegend";
+import { useProgressLegend } from "@/components/shared/charts/useProgressLegend";
+
+const METRIC_KEYS = ["periodPlan", "periodActual", "cumPlan", "cumActual"];
+const METRIC_PREFIX: Record<string, string> = {
+  periodPlan: "planInc",
+  periodActual: "actualInc",
+  cumPlan: "cumPlan",
+  cumActual: "cumActual",
+};
 
 export interface SnagPlanVsActualCardProps {
   cells: CellRaw[];
@@ -69,14 +82,12 @@ export function SnagPlanVsActualCard({
     [cells, buckets, stages, today, cum],
   );
 
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const toggle = (key: string) =>
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const legend = useProgressLegend({
+    metricKeys: METRIC_KEYS,
+    seriesKeys: stages as unknown as string[],
+    dataKey: (m, s) => `${METRIC_PREFIX[m]}_${s}`,
+  });
+  const hidden = legend.hidden;
 
   const stageLabelShort: Record<Stage, string> = { ...STAGE_LABELS };
 
@@ -191,6 +202,27 @@ export function SnagPlanVsActualCard({
                   })}
                 </div>
 
+                <ProgressChartLegend
+                  mode="period-cumulative"
+                  metrics={defaultMetrics("period-cumulative", "ko").map((m) => ({
+                    ...m,
+                    color: "var(--muted-foreground)",
+                  }))}
+                  series={stages.map((s) => ({
+                    key: s,
+                    label: stageLabelShort[s],
+                    color: SNAG_STAGE_COLORS[s].line,
+                  }))}
+                  hiddenMetrics={legend.hiddenMetrics}
+                  hiddenSeries={legend.hiddenSeries}
+                  onToggleMetric={legend.toggleMetric}
+                  onToggleSeries={legend.toggleSeries}
+                  onReset={legend.reset}
+                  canReset={legend.canReset}
+                  axes={{ left: "기간 (건)", right: "누적 (%)" }}
+                  marker={todayLabel ? { label: "기준일", date: today } : undefined}
+                />
+
                 <ChartContainer config={cfg} className="h-[340px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -205,13 +237,6 @@ export function SnagPlanVsActualCard({
                     />
                     <YAxis yAxisId="bar" tick={{ fontSize: 11 }} allowDecimals={false} domain={[0, "auto"]} />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend
-                      wrapperStyle={{ fontSize: 11 }}
-                      onClick={(o) => {
-                        const dk = (o as { dataKey?: string })?.dataKey;
-                        if (dk) toggle(String(dk));
-                      }}
-                    />
                     {todayLabel && (
                       <ReferenceLine
                         yAxisId="cum"
@@ -277,6 +302,12 @@ export function SnagPlanVsActualCard({
                 </ChartContainer>
 
                 {/* Variance bars */}
+                <VarianceLegend
+                  lang="ko"
+                  aheadColor="var(--success)"
+                  behindColor="var(--destructive)"
+                  unitNote="차이 (건)"
+                />
                 <ChartContainer config={varianceCfg} className="h-[120px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />

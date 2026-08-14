@@ -16,13 +16,14 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
+
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import { getTaskProgressChartDetail } from "@/lib/task-management/progress-chart.functions";
 import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDrawer";
 import { formatDdMmm, formatDdMmmYyyy } from "@/lib/time/doha";
+import { ProgressChartLegend } from "@/components/shared/charts/ProgressChartLegend";
 
 interface Props {
   open: boolean;
@@ -99,6 +100,23 @@ export function TaskProgressChartDialog({
           </DialogHeader>
 
           <div className="h-[360px] w-full">
+            {!isLoading && !error && data && series.length > 0 && (
+              <ProgressChartLegend
+                className="mb-2"
+                mode="simple-plan-actual"
+                lang="ko"
+                metrics={[
+                  { key: "plan", label: "계획", sample: "line-dashed", color: "hsl(215 90% 55%)" },
+                  { key: "actual", label: "실적", sample: "line-solid", color: "hsl(0 80% 55%)" },
+                ]}
+                axes={{ left: "진도 (%)" }}
+                marker={
+                  data.data_date
+                    ? { label: "Data Date", date: String(data.data_date).slice(0, 10) }
+                    : undefined
+                }
+              />
+            )}
             {isLoading && (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -135,9 +153,6 @@ export function TaskProgressChartDialog({
                       name === "plan" ? "계획" : "실적",
                     ]}
                     labelFormatter={(l) => `날짜: ${formatDdMmmYyyy(String(l)) || l}`}
-                  />
-                  <Legend
-                    formatter={(v) => (v === "plan" ? "계획" : "실적")}
                   />
                   {data.data_date && (
                     <ReferenceLine

@@ -6,7 +6,6 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -23,6 +22,10 @@ import {
   type ProductivityRow,
 } from '@/lib/dmr/productivity';
 import { ACTUAL_COLOR, LINE_COLORS, fmtDate } from './ui';
+import {
+  ProgressChartLegend,
+  defaultMetrics,
+} from '@/components/shared/charts/ProgressChartLegend';
 import { cn } from '@/lib/utils';
 
 export function DmrTmCodeDetail({
@@ -113,6 +116,21 @@ export function DmrTmCodeDetail({
             <div className="mt-4">
               <div className="mb-1 text-xs font-medium">일별 생산성 (막대 = 인원, 선 = 생산성)</div>
               <div className="h-[260px]">
+                {!disabledReason && chart.length > 0 && (
+                  <ProgressChartLegend
+                    className="mb-2"
+                    mode="line-plan-actual"
+                    lang="ko"
+                    metrics={[
+                      { key: "manpower", label: "인원", sample: "bar-actual", color: LINE_COLORS[4] },
+                      ...defaultMetrics("line-plan-actual", "ko").map((m) => ({
+                        ...m,
+                        color: ACTUAL_COLOR,
+                      })),
+                    ]}
+                    axes={{ left: "인원 (인·일)", right: "생산성 (%p/인·일)" }}
+                  />
+                )}
                 {disabledReason ? (
                   <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                     {disabledReason}
@@ -129,7 +147,6 @@ export function DmrTmCodeDetail({
                       <YAxis yAxisId="mp" tick={{ fontSize: 10 }} width={40} />
                       <YAxis yAxisId="pr" orientation="right" tick={{ fontSize: 10 }} width={56} />
                       <Tooltip labelFormatter={fmtDate} />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Bar yAxisId="mp" dataKey="manpower" name="인원" fill={LINE_COLORS[4]} barSize={14} />
                       <Line
                         yAxisId="pr"

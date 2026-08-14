@@ -7,7 +7,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   Line,
   ReferenceLine,
   XAxis,
@@ -40,6 +39,21 @@ import {
 } from "@/lib/charts/scurve-view";
 import { bucketTargetTerm } from "@/lib/charts/bucket-terms";
 import { pdbBucketTerm, pdbT, type PdbLang } from "@/lib/dashboards/pdb-i18n";
+import {
+  ProgressChartLegend,
+  VarianceLegend,
+  defaultMetrics,
+} from "@/components/shared/charts/ProgressChartLegend";
+import { useProgressLegend } from "@/components/shared/charts/useProgressLegend";
+
+const SNAG_METRIC_KEYS = ["periodPlan", "periodActual", "cumPlan", "cumActual"];
+const SINGLE_SERIES = ["__single"];
+const SNAG_DATAKEY: Record<string, string> = {
+  periodPlan: "planInc",
+  periodActual: "actualInc",
+  cumPlan: "cumPlan",
+  cumActual: "cumActual",
+};
 
 export type SnagCurveUnit = "cnt" | "pct";
 
@@ -114,14 +128,12 @@ export function SnagKpiPlanVsActualCard({
   chartHeight = 340,
   lang = "ko",
 }: Props) {
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const toggle = (key: string) =>
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const legend = useProgressLegend({
+    metricKeys: SNAG_METRIC_KEYS,
+    seriesKeys: SINGLE_SERIES,
+    dataKey: (m) => SNAG_DATAKEY[m],
+  });
+  const hidden = legend.hidden;
 
   const curve = useMemo(
     () => buildSnagSCurve({ cells, buckets, stages: [stage], today: asOfDate }),
@@ -325,6 +337,33 @@ export function SnagKpiPlanVsActualCard({
                   )}
                 </div>
 
+                <ProgressChartLegend
+                  mode="period-cumulative"
+                  lang={lang}
+                  metrics={defaultMetrics("period-cumulative", lang).map((m) => ({
+                    ...m,
+                    color:
+                      m.key === "periodActual"
+                        ? "var(--primary)"
+                        : m.key === "cumActual"
+                          ? "var(--destructive)"
+                          : "var(--muted-foreground)",
+                  }))}
+                  hiddenMetrics={legend.hiddenMetrics}
+                  onToggleMetric={legend.toggleMetric}
+                  onReset={legend.reset}
+                  canReset={legend.canReset}
+                  axes={{
+                    left: `${lang === "en" ? "Period" : "기간"} (${isPct ? "%" : cntUnit})`,
+                    right: `${lang === "en" ? "Cumulative" : "누적"} (${isPct ? "%" : cntUnit})`,
+                  }}
+                  marker={
+                    todayLabel
+                      ? { label: lang === "en" ? "As-of" : "기준일", date: asOfDate }
+                      : undefined
+                  }
+                />
+
                 <ChartContainer config={cfg} className="w-full" style={{ height: chartHeight }}>
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -349,13 +388,6 @@ export function SnagKpiPlanVsActualCard({
                       tickFormatter={(v) => (isPct ? `${v}%` : `${v}`)}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend
-                      wrapperStyle={{ fontSize: 11 }}
-                      onClick={(o) => {
-                        const dk = (o as { dataKey?: string })?.dataKey;
-                        if (dk) toggle(String(dk));
-                      }}
-                    />
                     {todayLabel && (
                       <ReferenceLine
                         x={todayLabel}
@@ -402,6 +434,12 @@ export function SnagKpiPlanVsActualCard({
                   </ComposedChart>
                 </ChartContainer>
 
+                <VarianceLegend
+                  lang={lang}
+                  aheadColor="var(--success)"
+                  behindColor="var(--destructive)"
+                  unitNote={varianceLabel}
+                />
                 <ChartContainer config={varianceCfg} className="h-[120px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
