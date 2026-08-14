@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertImportScope } from "@/lib/import/rcl-import-gate";
+import { normalizeSplFlagValue, SPL_FLAG_UNKNOWN } from "@/lib/spl/flag-value";
 
 /**
  * SPL HDEC 임포트 (왕복 임포트).
@@ -123,6 +124,9 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<SplHdecResult> => {
     await assertEditor(context);
     const supa = context.supabase as any;
+
+    // ★ Required Document 어휘 관문: 사전에 없는 값이 하나라도 있으면 저장하지 않는다(추측 금지).
+    assertKnownFlagValues(data.file_name, data.rows);
 
     // ★ 서버 최종 관문: SECURITY DEFINER apply 전에 행 단위 스코프를 재판정한다.
     await assertImportScope(
@@ -388,4 +392,40 @@ export const importSplHdecBatch = createServerFn({ method: "POST" })
 
 function pick(row: { spl_number: string; sheet_name: string; excel_row: number }) {
   return { spl_number: row.spl_number, sheet_name: row.sheet_name, excel_row: row.excel_row };
+}
+
+/**
+ * 사전(flag-value.ts)에 없는 Required Document 값을 값·건수·예시와 함께 보고하고 저장을 거부한다.
+ * 자동 추측은 하지 않는다 — 모르면 막는 것이 정책이다.
+ */
+function assertKnownFlagValues(
+  fileName: string,
+  rows: Array<{ spl_number: string; sheet_name: string; excel_row: number; stages: Array<{ stage_code: string; fields: any }> }>,
+) {
+  const buckets = new Map<string, { count: number; samples: string[] }>();
+  for (const row of rows) {
+    for (const st of row.stages) {
+      if (!("flag_value" in st.fields)) continue;
+      const raw = st.fields.flag_value;
+      if (normalizeSplFlagValue(raw) !== SPL_FLAG_UNKNOWN) continue;
+      const key = String(raw);
+      const b = buckets.get(key) ?? { count: 0, samples: [] };
+      b.count += 1;
+      if (b.samples.length < 3) {
+        b.samples.push(`${row.spl_number} (${fileName} / ${row.sheet_name} / ${row.excel_row}행, ${st.stage_code})`);
+      }
+      buckets.set(key, b);
+    }
+  }
+  if (buckets.size === 0) return;
+  const lines = Array.from(buckets.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([value, b]) => `· "${value}" ${b.count}건 — 예: ${b.samples.join(" / ")}`);
+  throw new Error(
+    [
+      "Required Document 값이 사전에 없어 저장을 중단했습니다. 파일에서 값을 고친 뒤 다시 실행하세요.",
+      "허용 값: REQUIRED 계열(REQUIRED, O, yes, Not yet, 지정 서술 4종) / N/A 계열(N/A, X, 0) / 빈 칸",
+      ...lines,
+    ].join("\n"),
+  );
 }
