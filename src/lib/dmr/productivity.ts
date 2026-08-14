@@ -66,11 +66,13 @@ export interface DmrManpowerRow {
   report_date: string;
   task_no: string | null;
   actual_manpower: number | null;
+  plan_manpower: number | null;
   headcount_kind: string | null;
   discipline: string | null;
   system_name: string | null;
   plot: string | null;
   contractor_name: string | null;
+  work_category: string | null;
 }
 
 export interface ProductivityInput {
@@ -104,11 +106,19 @@ export interface ProductivityRow {
   systems: string[];
   /** DMR 상 그 코드에 붙은 공종 (둘 이상이면 두 공종에 걸쳐 들어온 코드) */
   dmr_teams: string[];
+  /** DMR 상 그 코드에 붙은 Plot */
+  dmr_plots: string[];
+  /** DMR 상 그 코드에 붙은 Work Type(work_category) */
+  dmr_work_categories: string[];
+  /** DMR 상 그 코드에 기록된 인원 종류 */
+  headcount_kinds: string[];
   /** 당일계획% (기간 증가분, 0..1) */
   plan_pct: number | null;
   /** 당일실적% (기간 증가분, 0..1 · 음수 가능) */
   actual_pct: number | null;
   manpower: number;
+  /** 계획 투입인원 합 (인·일) */
+  plan_manpower: number;
   /** 그 코드에 인원 기록이 있는 날 수 */
   record_days: number;
   /** 당일실적% ÷ 인원 */
