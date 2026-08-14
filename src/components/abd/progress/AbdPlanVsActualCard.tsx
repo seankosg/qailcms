@@ -4,7 +4,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   Line,
   ReferenceLine,
   XAxis,
@@ -46,6 +45,20 @@ import {
 } from "@/lib/charts/scurve-view";
 import { bucketTargetTerm } from "@/lib/charts/bucket-terms";
 import { pdbBucketTerm, pdbT, type PdbLang } from "@/lib/dashboards/pdb-i18n";
+import {
+  ProgressChartLegend,
+  VarianceLegend,
+  defaultMetrics,
+} from "@/components/shared/charts/ProgressChartLegend";
+import { useProgressLegend } from "@/components/shared/charts/useProgressLegend";
+
+const METRIC_KEYS = ["periodPlan", "periodActual", "cumPlan", "cumActual"];
+const METRIC_PREFIX: Record<string, string> = {
+  periodPlan: "planInc",
+  periodActual: "actualInc",
+  cumPlan: "cumPlan",
+  cumActual: "cumActual",
+};
 
 export interface AbdPlanVsActualCardProps {
   /** 전 라운드 통합 cells (메인 매트릭스 쿼리 재사용) */
@@ -104,14 +117,12 @@ export function AbdPlanVsActualCard({
     [cells, buckets, stages, today, baselines, cum],
   );
 
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const toggle = (k: string) =>
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(k)) next.delete(k);
-      else next.add(k);
-      return next;
-    });
+  const legend = useProgressLegend({
+    metricKeys: METRIC_KEYS,
+    seriesKeys: stages as unknown as string[],
+    dataKey: (m, s) => `${METRIC_PREFIX[m]}_${s}`,
+  });
+  const hidden = legend.hidden;
 
   const seriesByStage = new Map<Stage, (typeof scurve.series)[number]>();
   for (const s of scurve.series) seriesByStage.set(s.stage, s);
@@ -291,6 +302,31 @@ export function AbdPlanVsActualCard({
                   )}
                 </div>
 
+                <ProgressChartLegend
+                  mode="period-cumulative"
+                  lang={lang}
+                  metrics={defaultMetrics("period-cumulative", lang).map((m) => ({
+                    ...m,
+                    color: "var(--muted-foreground)",
+                  }))}
+                  series={stages.map((s) => ({
+                    key: s,
+                    label: STAGE_LABELS[s],
+                    color: ABD_STAGE_COLORS[s].line,
+                  }))}
+                  hiddenMetrics={legend.hiddenMetrics}
+                  hiddenSeries={legend.hiddenSeries}
+                  onToggleMetric={legend.toggleMetric}
+                  onToggleSeries={legend.toggleSeries}
+                  onReset={legend.reset}
+                  canReset={legend.canReset}
+                  axes={{
+                    left: `${lang === "en" ? "Period" : "기간"} (${cntUnit})`,
+                    right: `${lang === "en" ? "Cumulative" : "누적"} (%)`,
+                  }}
+                  marker={todayLabel ? { label: lang === "en" ? "Today" : "오늘", date: today } : undefined}
+                />
+
                 <ChartContainer config={cfg} className="w-full" style={{ height: chartHeight }}>
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -319,13 +355,6 @@ export function AbdPlanVsActualCard({
                       domain={[0, incMax]}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend
-                      wrapperStyle={{ fontSize: 11 }}
-                      onClick={(o) => {
-                        const dk = (o as { dataKey?: string })?.dataKey;
-                        if (dk) toggle(String(dk));
-                      }}
-                    />
                     {todayLabel && (
                       <ReferenceLine
                         yAxisId="cum"
@@ -390,6 +419,12 @@ export function AbdPlanVsActualCard({
                   </ComposedChart>
                 </ChartContainer>
 
+                <VarianceLegend
+                  lang={lang}
+                  aheadColor="var(--success)"
+                  behindColor="var(--destructive)"
+                  unitNote={`${lang === "en" ? "Variance" : "차이"} (${cntUnit})`}
+                />
                 <ChartContainer config={varianceCfg} className="h-[120px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />

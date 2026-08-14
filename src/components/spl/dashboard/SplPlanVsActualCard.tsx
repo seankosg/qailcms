@@ -4,7 +4,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   Line,
   ReferenceLine,
   XAxis,
@@ -32,6 +31,20 @@ import {
   type SplSeriesGroup,
 } from "@/lib/spl/scurve";
 import type { SplRow } from "@/lib/spl/rows.functions";
+import {
+  ProgressChartLegend,
+  VarianceLegend,
+  defaultMetrics,
+} from "@/components/shared/charts/ProgressChartLegend";
+import { useProgressLegend } from "@/components/shared/charts/useProgressLegend";
+
+const METRIC_KEYS = ["periodPlan", "periodActual", "cumPlan", "cumActual"];
+const METRIC_PREFIX: Record<string, string> = {
+  periodPlan: "planInc",
+  periodActual: "actualInc",
+  cumPlan: "cumPlan",
+  cumActual: "cumActual",
+};
 
 const TERM: Record<SplBucket, string> = { day: "Daily", week: "Weekly", month: "Monthly" };
 
@@ -65,14 +78,12 @@ export function SplPlanVsActualCard({
     [rows, groups, bucket, planMode, asOf, rangeDays],
   );
 
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const toggle = (k: string) =>
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(k)) next.delete(k);
-      else next.add(k);
-      return next;
-    });
+  const legend = useProgressLegend({
+    metricKeys: METRIC_KEYS,
+    seriesKeys: groups.map((g) => g.key),
+    dataKey: (m, s) => `${METRIC_PREFIX[m]}_${s}`,
+  });
+  const hidden = legend.hidden;
 
   const byKey = new Map(scurve.series.map((s) => [s.key, s]));
 
@@ -205,6 +216,24 @@ export function SplPlanVsActualCard({
                   )}
                 </div>
 
+                <ProgressChartLegend
+                  mode="period-cumulative"
+                  lang="en"
+                  metrics={defaultMetrics("period-cumulative", "en").map((m) => ({
+                    ...m,
+                    color: "var(--muted-foreground)",
+                  }))}
+                  series={groups.map((g) => ({ key: g.key, label: g.label, color: g.color }))}
+                  hiddenMetrics={legend.hiddenMetrics}
+                  hiddenSeries={legend.hiddenSeries}
+                  onToggleMetric={legend.toggleMetric}
+                  onToggleSeries={legend.toggleSeries}
+                  onReset={legend.reset}
+                  canReset={legend.canReset}
+                  axes={{ left: "Period (No.)", right: "Cumulative (%)" }}
+                  marker={todayLabel ? { label: "As-of", date: asOf } : undefined}
+                />
+
                 <ChartContainer config={cfg} className="w-full" style={{ height: 380 }}>
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -228,13 +257,6 @@ export function SplPlanVsActualCard({
                     />
                     <YAxis yAxisId="bar" tick={{ fontSize: 11 }} allowDecimals={false} domain={[0, incMax]} />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend
-                      wrapperStyle={{ fontSize: 11 }}
-                      onClick={(o) => {
-                        const dk = (o as { dataKey?: string })?.dataKey;
-                        if (dk) toggle(String(dk));
-                      }}
-                    />
                     {todayLabel && (
                       <ReferenceLine
                         yAxisId="cum"
@@ -299,6 +321,12 @@ export function SplPlanVsActualCard({
                   </ComposedChart>
                 </ChartContainer>
 
+                <VarianceLegend
+                  lang="en"
+                  aheadColor="var(--success)"
+                  behindColor="var(--destructive)"
+                  unitNote="Variance (No.)"
+                />
                 <ChartContainer config={varianceCfg} className="h-[120px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
