@@ -11,6 +11,9 @@ import { todayInDoha } from "@/lib/time/doha";
 import { getSplRowsAsOf, getSplEstimatedCells, type SplCatalogEntry } from "@/lib/spl/rows.functions";
 import { splJudgmentLabel } from "@/components/spl/raw-data/spl-columns";
 import { SplKpiCard } from "./SplKpiCard";
+import { SplPlanVsActualCard } from "./SplPlanVsActualCard";
+import { splSeriesColor, type SplBucket, type SplPlanMode, type SplSeriesGroup } from "@/lib/spl/scurve";
+import { cn } from "@/lib/utils";
 
 const routeApi = getRouteApi("/_authenticated/closure/spare-part/dashboard");
 
@@ -21,6 +24,31 @@ const BAND_LABEL: Record<string, string> = {
 };
 
 const JUDGMENTS = ["제외", "완료", "정상", "지연", "미착수", "미분류"] as const;
+
+const BUCKETS: Array<{ v: SplBucket; label: string }> = [
+  { v: "day", label: "Day" },
+  { v: "week", label: "Week" },
+  { v: "month", label: "Month" },
+];
+const RANGES = [30, 60, 120, 240, 480];
+const PLAN_MODES: Array<{ v: SplPlanMode; label: string }> = [
+  { v: "baseline", label: "Baseline Plan" },
+  { v: "remaining", label: "Remaining Plan" },
+];
+
+/** 탭형 필터 버튼 — 모듈 공통 룩 */
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <Button
+      size="sm"
+      variant={active ? "default" : "outline"}
+      className={cn("h-7 text-[11px]")}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+}
 
 export function SplDashboardPage() {
   const search = routeApi.useSearch();
@@ -44,23 +72,102 @@ export function SplDashboardPage() {
   const rows = data?.rows ?? [];
   const catalog: SplCatalogEntry[] = data?.catalog ?? [];
 
+  /* ── 탭형 필터 ─────────────────────────────────────────── */
+  const plot = search.plot ?? "all";
+  const team = search.team ?? "all";
+  const stageMode = search.stageMode === "stage" ? "stage" : "band";
+  const bucket = (BUCKETS.find((b) => b.v === search.bucket)?.v ?? "week") as SplBucket;
+  const rangeDays = search.range ?? 120;
+  const planMode = (search.planMode === "remaining" ? "remaining" : "baseline") as SplPlanMode;
+  const scurveOpen = (search.scurveOpen ?? 1) === 1;
+  const selectedStages = (search.stages ?? "").split(",").filter(Boolean);
+
+  const setSearch = (patch: Record<string, unknown>) =>
+    (navigate as (opts: unknown) => void)({ search: { ...search, ...patch }, replace: true });
+
+  const teams = useMemo(
+    () => [...new Set(rows.map((r) => r.team).filter(Boolean) as string[])].sort(),
+    [rows],
+  );
+
+  const filteredRows = useMemo(
+    () =>
+      rows.filter((r) => {
+        if (plot !== "all" && (r.plot ?? "") !== plot) return false;
+        if (team !== "all" && (r.team ?? "") !== team) return false;
+        return true;
+      }),
+    [rows, plot, team],
+  );
+
+  const orderedCatalog = useMemo(
+    () => [...catalog].sort((a, b) => a.sort_order - b.sort_order),
+    [catalog],
+  );
+
+  /** 차트 계열 = 밴드 3개 또는 단계 22개 (단계 탭 선택 시 부분집합) */
+  const seriesGroups: SplSeriesGroup[] = useMemo(() => {
+    if (stageMode === "band") {
+      const bands: string[] = [];
+      for (const c of orderedCatalog) if (!bands.includes(c.band)) bands.push(c.band);
+      const picked = selectedStages.length > 0 ? bands.filter((b) => selectedStages.includes(b)) : bands;
+      return picked.map((b, i) => ({
+        key: b,
+        label: BAND_LABEL[b] ?? b,
+        color: splSeriesColor(bands.indexOf(b), bands.length),
+        stages: orderedCatalog.filter((c) => c.band === b).map((c) => c.stage_code),
+      }));
+    }
+    const picked =
+      selectedStages.length > 0
+        ? orderedCatalog.filter((c) => selectedStages.includes(c.stage_code))
+        : orderedCatalog;
+    return picked.map((c) => ({
+      key: c.stage_code,
+      label: c.short_code || c.label,
+      color: splSeriesColor(orderedCatalog.findIndex((x) => x.stage_code === c.stage_code), orderedCatalog.length),
+      stages: [c.stage_code],
+    }));
+  }, [orderedCatalog, stageMode, selectedStages.join(",")]);
+
+  const toggleStage = (key: string) => {
+    const next = selectedStages.includes(key)
+      ? selectedStages.filter((s) => s !== key)
+      : [...selectedStages, key];
+    setSearch({ stages: next.join(",") });
+  };
+
+  const filterSummary = [
+    { label: "Plot", value: plot === "all" ? "All" : `PLOT-${plot}` },
+    { label: "Team", value: team === "all" ? "All" : team },
+    { label: "As-of", value: asOf },
+    { label: "Items", value: filteredRows.length.toLocaleString() },
+  ];
+
   const delayBands = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of catalog) if (!s.chain_excluded) m.set(s.band, m.get(s.band) ?? 0);
-    for (const r of rows) if (r.primary_delay) m.set(r.primary_delay.band, (m.get(r.primary_delay.band) ?? 0) + 1);
+    for (const r of filteredRows)
+      if (r.primary_delay) m.set(r.primary_delay.band, (m.get(r.primary_delay.band) ?? 0) + 1);
     return [...m.entries()];
-  }, [rows, catalog]);
+  }, [filteredRows, catalog]);
 
   const reqDoc = useMemo(() => {
-    const full = rows.filter((r) => r.req_doc_total > 0 && r.req_doc_done === r.req_doc_total).length;
-    const sum = rows.reduce((a, r) => a + r.req_doc_done, 0);
-    const denom = rows.reduce((a, r) => a + r.req_doc_total, 0);
+    const full = filteredRows.filter((r) => r.req_doc_total > 0 && r.req_doc_done === r.req_doc_total).length;
+    const sum = filteredRows.reduce((a, r) => a + r.req_doc_done, 0);
+    const denom = filteredRows.reduce((a, r) => a + r.req_doc_total, 0);
     return { full, pct: denom === 0 ? 0 : Math.round((sum * 1000) / denom) / 10 };
-  }, [rows]);
+  }, [filteredRows]);
 
-  const counts = data?.judgment_counts ?? {};
+  /** 필터가 걸리면 판정 카운트도 같은 모집단에서 다시 센다 (합계 = 모집단 검산 유지) */
+  const counts = useMemo(() => {
+    if (plot === "all" && team === "all") return data?.judgment_counts ?? {};
+    const m: Record<string, number> = {};
+    for (const r of filteredRows) m[r.judgment] = (m[r.judgment] ?? 0) + 1;
+    return m;
+  }, [data?.judgment_counts, filteredRows, plot, team]);
   const countsSum = JUDGMENTS.reduce((a, j) => a + (counts[j] ?? 0), 0);
-  const population = data?.total_count ?? 0;
+  const population = plot === "all" && team === "all" ? (data?.total_count ?? 0) : filteredRows.length;
   const reconOk = countsSum === population;
   const viol = data?.violations;
 
@@ -68,7 +175,12 @@ export function SplDashboardPage() {
   const drill = (patch: Record<string, unknown>) =>
     (rootNavigate as (opts: unknown) => void)({
       to: "/closure/spare-part/raw-data",
-      search: { asOf: search.asOf ?? "", ...patch },
+      search: {
+        asOf: search.asOf ?? "",
+        ...(plot !== "all" ? { plot } : {}),
+        ...(team !== "all" ? { team } : {}),
+        ...patch,
+      },
     });
 
   return (
@@ -85,9 +197,77 @@ export function SplDashboardPage() {
           value={search.asOf ?? ""}
           latest={data?.as_of ?? today}
           options={[]}
-          onChange={(v) => (navigate as (opts: unknown) => void)({ search: { ...search, asOf: v } })}
-          onReset={() => (navigate as (opts: unknown) => void)({ search: { ...search, asOf: "" } })}
+          onChange={(v) => setSearch({ asOf: v })}
+          onReset={() => setSearch({ asOf: "" })}
         />
+      </div>
+
+      {/* 탭형 필터 — Plot · Team · 계열 단위 · 단계 · 버킷 · 기간 · 계획 모드 */}
+      <div className="space-y-1.5 rounded-lg border p-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="w-[52px] text-[11px] text-muted-foreground">Plot</span>
+          {["all", "C", "D"].map((p) => (
+            <TabButton key={p} active={plot === p} onClick={() => setSearch({ plot: p })}>
+              {p === "all" ? "All Plots" : `PLOT-${p}`}
+            </TabButton>
+          ))}
+          <span className="ml-3 w-[40px] text-[11px] text-muted-foreground">Team</span>
+          {["all", ...teams].map((t) => (
+            <TabButton key={t} active={team === t} onClick={() => setSearch({ team: t })}>
+              {t === "all" ? "All Teams" : t}
+            </TabButton>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="w-[52px] text-[11px] text-muted-foreground">Stage</span>
+          <TabButton active={stageMode === "band"} onClick={() => setSearch({ stageMode: "band", stages: "" })}>
+            Band (3)
+          </TabButton>
+          <TabButton active={stageMode === "stage"} onClick={() => setSearch({ stageMode: "stage", stages: "" })}>
+            Stage (22)
+          </TabButton>
+          <span className="mx-1 h-4 w-px bg-border" />
+          <TabButton active={selectedStages.length === 0} onClick={() => setSearch({ stages: "" })}>
+            All
+          </TabButton>
+          {stageMode === "band"
+            ? [...new Set(orderedCatalog.map((c) => c.band))].map((b) => (
+                <TabButton key={b} active={selectedStages.includes(b)} onClick={() => toggleStage(b)}>
+                  {BAND_LABEL[b] ?? b}
+                </TabButton>
+              ))
+            : orderedCatalog.map((c) => (
+                <TabButton
+                  key={c.stage_code}
+                  active={selectedStages.includes(c.stage_code)}
+                  onClick={() => toggleStage(c.stage_code)}
+                >
+                  {c.short_code || c.label}
+                </TabButton>
+              ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="w-[52px] text-[11px] text-muted-foreground">Bucket</span>
+          {BUCKETS.map((b) => (
+            <TabButton key={b.v} active={bucket === b.v} onClick={() => setSearch({ bucket: b.v })}>
+              {b.label}
+            </TabButton>
+          ))}
+          <span className="ml-3 w-[40px] text-[11px] text-muted-foreground">Range</span>
+          {RANGES.map((r) => (
+            <TabButton key={r} active={rangeDays === r} onClick={() => setSearch({ range: r })}>
+              ±{r}d
+            </TabButton>
+          ))}
+          <span className="ml-3 w-[52px] text-[11px] text-muted-foreground">Plan</span>
+          {PLAN_MODES.map((m) => (
+            <TabButton key={m.v} active={planMode === m.v} onClick={() => setSearch({ planMode: m.v })}>
+              {m.label}
+            </TabButton>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (
@@ -100,6 +280,18 @@ export function SplDashboardPage() {
         <div className="p-6 text-sm text-destructive">{(error as Error).message}</div>
       ) : (
         <>
+          <SplPlanVsActualCard
+            rows={filteredRows}
+            groups={seriesGroups}
+            bucket={bucket}
+            planMode={planMode}
+            asOf={asOf}
+            rangeDays={rangeDays}
+            open={scurveOpen}
+            onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
+            filterSummary={filterSummary}
+          />
+
           <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
             <SplKpiCard
               label="Population (documents)"
