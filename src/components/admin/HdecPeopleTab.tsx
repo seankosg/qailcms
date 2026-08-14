@@ -139,7 +139,7 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+    const arr = rows.filter((r) => {
       if (onlyNoAccount && r.has_account) return false;
       if (onlyZeroUsage && r.total > 0) return false;
       if (q) {
@@ -148,6 +148,7 @@ export function HdecPeopleTab({ kind }: { kind: "pic" | "eng" }) {
       }
       return true;
     });
+    return arr.sort((a, b) => a.name.localeCompare(b.name, "ko"));
   }, [rows, search, onlyNoAccount, onlyZeroUsage]);
 
   const totalCount = rows.length;
