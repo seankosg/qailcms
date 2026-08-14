@@ -13,6 +13,7 @@ import { useUnionWindow } from "@/lib/charts/use-union-window";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
 import { usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
+import { usePdbPlot, filterByPlot, plotGridClass } from "@/lib/dashboards/pdb-plot";
 
 /** 필터 요약 배지의 한국어 값(Delay 옵션 라벨)만 영문으로 옮긴다. */
 const DELAY_EN: Record<string, string> = {

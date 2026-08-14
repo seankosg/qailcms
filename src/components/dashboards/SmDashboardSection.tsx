@@ -26,6 +26,7 @@ import { type Bucket, type Stage } from "@/lib/defect-management/progress-utils"
 import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4, type BreakdownRow } from "./PdbBreakdownCard";
 import { usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
+import { usePdbPlot, filterByPlot, plotGridClass } from "@/lib/dashboards/pdb-plot";
 
 /** Room Group 별 Issued / Closure% — SM Dashboard 의 roomGroupTotals 정본을 그대로 쓴다. */
 function useRoomGroupRows(plot: PlotKey, asOfDate: string, f: PdbSmFilters): BreakdownRow[] {
