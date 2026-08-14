@@ -5249,6 +5249,9 @@ export type Database = {
           matched: number
           note: string | null
           ocs_excluded: number
+          rollback_force: boolean
+          rolled_back_at: string | null
+          rolled_back_by: string | null
           sheet_names: string[]
           stages_upserted: number
           started_at: string
@@ -5268,6 +5271,9 @@ export type Database = {
           matched?: number
           note?: string | null
           ocs_excluded?: number
+          rollback_force?: boolean
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
           sheet_names?: string[]
           stages_upserted?: number
           started_at?: string
@@ -5287,6 +5293,9 @@ export type Database = {
           matched?: number
           note?: string | null
           ocs_excluded?: number
+          rollback_force?: boolean
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
           sheet_names?: string[]
           stages_upserted?: number
           started_at?: string
@@ -9040,6 +9049,10 @@ export type Database = {
         Args: { _batch_id: string }
         Returns: Json
       }
+      preview_rollback_spl_import: {
+        Args: { _batch_id: string }
+        Returns: Json
+      }
       preview_rollback_task_management_import: {
         Args: { _batch_id: string }
         Returns: Json
@@ -9131,6 +9144,10 @@ export type Database = {
         Returns: Json
       }
       rollback_defect_import: {
+        Args: { _batch_id: string; _force?: boolean }
+        Returns: Json
+      }
+      rollback_spl_import: {
         Args: { _batch_id: string; _force?: boolean }
         Returns: Json
       }
