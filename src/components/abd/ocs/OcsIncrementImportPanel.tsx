@@ -64,6 +64,7 @@ import {
 } from "@/components/abd/ocs/wizard/OcsPreparationSteps";
 import { OcsLocalValidationCard } from "@/components/abd/ocs/wizard/OcsLocalValidationCard";
 import type { LocalValidationReceipt } from "@/lib/abd/ocs-local-validation";
+import { readBaselineZip, type BaselineRead } from "@/lib/abd/ocs-baseline-reader";
 import { Copy, ExternalLink } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { createPreImportSnapshot, getBackupRunStatus } from "@/lib/backup/backup.functions";
@@ -112,6 +113,10 @@ export function OcsIncrementImportPanel() {
 
   const [pkg, setPkg] = useState<IncrementPackage | null>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
+  // Step 4A — Baseline ZIP 은 패널이 소유한다 (로컬 검증 카드는 props 로만 받는다).
+  const [baseline, setBaseline] = useState<BaselineRead | null>(null);
+  const [baselineFileName, setBaselineFileName] = useState<string | null>(null);
+  const [baselinePickerKey, setBaselinePickerKey] = useState(0);
   // 브라우저 로컬 검증 결과 — null 이면 미실행. clean 이 아니면 서버 단계로 진행하지 않는다.
   const [localValid, setLocalValid] = useState<{
     clean: boolean | null;
