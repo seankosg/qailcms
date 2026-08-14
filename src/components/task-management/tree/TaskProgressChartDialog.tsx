@@ -23,6 +23,7 @@ import {
 import { getTaskProgressChartDetail } from "@/lib/task-management/progress-chart.functions";
 import { HistoryDrawer } from "@/components/task-management/raw-data/HistoryDrawer";
 import { formatDdMmm, formatDdMmmYyyy } from "@/lib/time/doha";
+import { ProgressChartLegend } from "@/components/shared/charts/ProgressChartLegend";
 
 interface Props {
   open: boolean;
