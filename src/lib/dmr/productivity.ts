@@ -658,8 +658,8 @@ export function periodDates(period: Period): string[] {
  * 한 번에 부를 수 있는 일수는 DB 실행시간 상한(8초) 때문에 아래 값으로 자른다.
  * 페이지 나눔(1,000행) 없이 날짜 묶음을 통째로 받는다.
  */
-const DAILY_BATCH_DAYS = 3;
-const DAILY_BATCH_CONCURRENCY = 3;
+const DAILY_BATCH_DAYS = 2;
+const DAILY_BATCH_CONCURRENCY = 2;
 
 function mergeDailyRows(
   byDate: Map<string, Map<string, DmrDailyCodeValue>>,
