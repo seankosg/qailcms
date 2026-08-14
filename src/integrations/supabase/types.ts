@@ -9053,12 +9053,17 @@ export type Database = {
         Args: { _batch_id: string }
         Returns: Json
       }
+      dmr_daily_canon: { Args: { _end: string; _start: string }; Returns: Json }
       dmr_facets: {
         Args: { _column: string; _filters?: Json; _q?: string; _scope?: string }
         Returns: {
           cnt: number
           value: string
         }[]
+      }
+      dmr_period_canon: {
+        Args: { _end: string; _from_zero?: boolean; _start: string }
+        Returns: Json
       }
       get_backup_tables: { Args: never; Returns: string[] }
       get_module_backup_tables: { Args: { _module: string }; Returns: string[] }
