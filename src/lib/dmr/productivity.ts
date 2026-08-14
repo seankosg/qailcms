@@ -653,22 +653,19 @@ export function periodDates(period: Period): string[] {
   return out;
 }
 
-/** 날짜별 정본 배치 조회 — 서버가 날짜마다 tm_rows_as_of 정본을 부르고 4개 필드만 돌려준다. */
-async function fetchDailyCanonBatch(
-  start: string,
-  end: string,
-): Promise<Map<string, Map<string, DmrDailyCodeValue>>> {
-  const { data, error } = await (supabase as any).rpc('dmr_daily_canon', {
-    _start: start,
-    _end: end,
-  });
-  if (error) throw new Error(error.message);
-  const rows = (data as any)?.rows;
-  if (!Array.isArray(rows)) {
-    throw new Error('dmr_daily_canon RPC contract mismatch: expected { rows: [] }');
-  }
-  const byDate = new Map<string, Map<string, DmrDailyCodeValue>>();
-  for (const r of rows as Array<Record<string, any>>) {
+/**
+ * 날짜별 정본 배치 조회 — 서버가 날짜마다 tm_rows_as_of 정본을 부르고 4개 필드만 돌려준다.
+ * 한 번에 부를 수 있는 일수는 DB 실행시간 상한(8초) 때문에 아래 값으로 자른다.
+ * 페이지 나눔(1,000행) 없이 날짜 묶음을 통째로 받는다.
+ */
+const DAILY_BATCH_DAYS = 3;
+const DAILY_BATCH_CONCURRENCY = 3;
+
+function mergeDailyRows(
+  byDate: Map<string, Map<string, DmrDailyCodeValue>>,
+  rows: Array<Record<string, any>>,
+): void {
+  for (const r of rows) {
     const d = String(r.as_of ?? '').slice(0, 10);
     const code = String(r.task_no ?? '').trim();
     if (!d || !code) continue;
@@ -682,6 +679,35 @@ async function fetchDailyCanonBatch(
       plan: r.tc_plan_pct == null ? null : Number(r.tc_plan_pct),
       actual: Number(r.tc_actual_pct ?? 0) || 0,
     });
+  }
+}
+
+async function fetchDailyCanonChunk(start: string, end: string): Promise<Array<Record<string, any>>> {
+  const { data, error } = await (supabase as any).rpc('dmr_daily_canon', {
+    _start: start,
+    _end: end,
+  });
+  if (error) throw new Error(error.message);
+  const rows = (data as any)?.rows;
+  if (!Array.isArray(rows)) {
+    throw new Error('dmr_daily_canon RPC contract mismatch: expected { rows: [] }');
+  }
+  return rows as Array<Record<string, any>>;
+}
+
+async function fetchDailyCanonBatch(
+  dates: string[],
+): Promise<Map<string, Map<string, DmrDailyCodeValue>>> {
+  const chunks: Array<[string, string]> = [];
+  for (let i = 0; i < dates.length; i += DAILY_BATCH_DAYS) {
+    const slice = dates.slice(i, i + DAILY_BATCH_DAYS);
+    chunks.push([slice[0], slice[slice.length - 1]]);
+  }
+  const byDate = new Map<string, Map<string, DmrDailyCodeValue>>();
+  for (let i = 0; i < chunks.length; i += DAILY_BATCH_CONCURRENCY) {
+    const group = chunks.slice(i, i + DAILY_BATCH_CONCURRENCY);
+    const res = await Promise.all(group.map(([s, e]) => fetchDailyCanonChunk(s, e)));
+    for (const rows of res) mergeDailyRows(byDate, rows);
   }
   return byDate;
 }
@@ -697,7 +723,7 @@ export function useDailyCanon(period: Period, enabled = true) {
     gcTime: 60 * 60_000,
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<Map<string, Map<string, DmrDailyCodeValue>>> => {
-      const byDate = await fetchDailyCanonBatch(dates[0], dates[dates.length - 1]);
+      const byDate = await fetchDailyCanonBatch(dates);
       for (const d of dates) if (!byDate.has(d)) byDate.set(d, new Map());
       return byDate;
     },
