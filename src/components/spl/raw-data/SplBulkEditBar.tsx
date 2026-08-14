@@ -191,7 +191,6 @@ export function SplBulkEditBar({
   }
 
   function handleExportXlsx() {
-    // noop marker
     try {
       exportSplRowsToXlsx({
         rows: selectedRows,
@@ -379,6 +378,26 @@ export function SplBulkEditBar({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[200px]">
+                {onReqDocReadyAll && (
+                  <>
+                    <DropdownMenuItem
+                      disabled={ids.length === 0 || !!disabledReason || reqDocRunning}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setReqDocRunning(true);
+                        void onReqDocReadyAll(ids).finally(() => setReqDocRunning(false));
+                      }}
+                    >
+                      {reqDocRunning ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCheck className="mr-2 h-4 w-4" />
+                      )}
+                      선택한 행의 필요 문서를 전부 받았음으로 ({ids.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   disabled={delIds.length === 0 || !!disabledReason}
