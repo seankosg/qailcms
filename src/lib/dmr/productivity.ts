@@ -140,12 +140,21 @@ export interface ProductivityRow {
 export interface ProductivitySummary {
   codes: number;
   manpower: number;
+  /** 계획 투입인원 합 (인·일) */
+  planManpower: number;
+  manpowerVariance: number;
+  manpowerAchievement: number | null;
   planSum: number;
   actualSum: number;
   productivity: number | null;
   planProductivity: number | null;
   achievement: number | null;
   extraManpower: number;
+  /** 상호배타 분류 (합계 = codes) */
+  productiveCodes: number;
+  noProgressCodes: number;
+  correctedCodes: number;
+  exceptionalCodes: number;
   /** 기록일 비율 중앙값 */
   recordRatioMedian: number | null;
   /** 인원 없이 실적만 오른 코드 수 */
@@ -160,11 +169,18 @@ export function buildProductivity(input: ProductivityInput): ProductivityRow[] {
   const { dmrRows, tmEnd, period, fromZero } = input;
 
   const mp = new Map<string, number>();
+  const planMp = new Map<string, number>();
   const days = new Map<string, Set<string>>();
   const systems = new Map<string, Set<string>>();
   const contractors = new Map<string, Map<string, number>>();
   const dTeams = new Map<string, Set<string>>();
   const dPlots = new Map<string, Set<string>>();
+  const dWork = new Map<string, Set<string>>();
+  const dKinds = new Map<string, Set<string>>();
+  const addTo = (m: Map<string, Set<string>>, c: string, v: string) => {
+    if (!m.has(c)) m.set(c, new Set());
+    m.get(c)!.add(v);
+  };
 
   for (const r of dmrRows) {
     const code = (r.task_no ?? '').trim();
@@ -172,6 +188,9 @@ export function buildProductivity(input: ProductivityInput): ProductivityRow[] {
     const n = Number(r.actual_manpower ?? 0) || 0;
     // headcount_kind 는 전 종류를 더한다(현재는 worker 뿐).
     mp.set(code, (mp.get(code) ?? 0) + n);
+    planMp.set(code, (planMp.get(code) ?? 0) + (Number(r.plan_manpower ?? 0) || 0));
+    if (r.work_category) addTo(dWork, code, r.work_category);
+    if (r.headcount_kind) addTo(dKinds, code, r.headcount_kind);
     if (n > 0) {
       if (!days.has(code)) days.set(code, new Set());
       days.get(code)!.add(r.report_date);
@@ -204,6 +223,7 @@ export function buildProductivity(input: ProductivityInput): ProductivityRow[] {
     seen.add(code);
 
     const manpower = mp.get(code) ?? 0;
+    const plan_manpower = planMp.get(code) ?? 0;
 
     const aEnd = input.actualEndByCode.get(code) ?? 0;
     const aPrev = fromZero ? 0 : (input.actualPrevByCode.get(code) ?? 0);
@@ -254,9 +274,13 @@ export function buildProductivity(input: ProductivityInput): ProductivityRow[] {
         .sort((a, b) => b.manpower - a.manpower || a.name.localeCompare(b.name)),
       systems: Array.from(systems.get(code) ?? []).sort(),
       dmr_teams: Array.from(dTeams.get(code) ?? []).sort(),
+      dmr_plots: Array.from(dPlots.get(code) ?? []).sort(),
+      dmr_work_categories: Array.from(dWork.get(code) ?? []).sort(),
+      headcount_kinds: Array.from(dKinds.get(code) ?? []).sort(),
       plan_pct,
       actual_pct,
       manpower,
+      plan_manpower,
       record_days,
       productivity,
       plan_productivity,
