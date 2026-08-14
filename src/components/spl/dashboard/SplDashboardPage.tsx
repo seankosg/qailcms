@@ -11,6 +11,7 @@ import { todayInDoha } from "@/lib/time/doha";
 import { getSplRowsAsOf, getSplEstimatedCells, type SplCatalogEntry } from "@/lib/spl/rows.functions";
 import { splJudgmentLabel } from "@/components/spl/raw-data/spl-columns";
 import { SplKpiCard } from "./SplKpiCard";
+import { SplBreakdownCards } from "./SplBreakdownCards";
 import { SplPlanVsActualCard } from "./SplPlanVsActualCard";
 import { splSeriesColor, type SplBucket, type SplPlanMode, type SplSeriesGroup } from "@/lib/spl/scurve";
 import { cn } from "@/lib/utils";
@@ -378,6 +379,13 @@ export function SplDashboardPage() {
               Estimated actuals: {estimated?.items ?? 0} documents (back-filled · shown in italics)
             </Badge>
           </div>
+
+          <SplBreakdownCards
+            rows={filteredRows}
+            catalog={orderedCatalog}
+            onTeam={(t) => setSearch({ team: t })}
+            onDrill={drill}
+          />
         </>
       )}
     </div>
