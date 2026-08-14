@@ -128,6 +128,13 @@ function RootComponent() {
   const currentHref = useRouterState({
     select: (state) => state.location.href,
   });
+  // 404(매칭 실패) 화면은 저장하지 않는다 — 재진입 루프 방지
+  const isMatchedRoute = useRouterState({
+    select: (state) => {
+      const last = state.matches[state.matches.length - 1];
+      return Boolean(last) && last.routeId !== "__root__";
+    },
+  });
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
@@ -140,6 +147,7 @@ function RootComponent() {
 
   // 현재 경로 저장 — 화면 회전 등으로 재로드돼도 같은 페이지로 복귀
   useEffect(() => {
+    if (!isMatchedRoute) return;
     saveLastRoute(currentHref);
 
     const preserveCurrentRoute = () => saveLastRoute(currentHref);
@@ -149,7 +157,7 @@ function RootComponent() {
       window.removeEventListener("pagehide", preserveCurrentRoute);
       window.removeEventListener("orientationchange", preserveCurrentRoute);
     };
-  }, [currentHref]);
+  }, [currentHref, isMatchedRoute]);
 
   return (
     <QueryClientProvider client={queryClient}>
