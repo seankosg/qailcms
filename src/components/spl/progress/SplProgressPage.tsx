@@ -148,8 +148,22 @@ export function SplProgressPage() {
     const short = filtered.filter(
       (r) => (r.req_doc_total ?? 0) > 0 && (r.req_doc_done ?? 0) < (r.req_doc_total ?? 0),
     ).length;
-    return { n, N, short, pct: N === 0 ? 0 : Math.round((n * 1000) / N) / 10 };
-  }, [filtered]);
+  /** 레인(밴드)별 진도율 — N/A 제외, done / (done+wip+delayed+planned+none) */
+  const bandProgress = useMemo(() => {
+    const m = new Map<string, { done: number; total: number; pct: number }>();
+    for (const [band, stages] of lanes) {
+      let done = 0;
+      let total = 0;
+      for (const c of stages) {
+        const counts = stageCounts.get(c.stage_code) ?? emptyCounts();
+        done += counts.done;
+        total += counts.done + counts.wip + counts.delayed + counts.planned + counts.none;
+      }
+      m.set(band, { done, total, pct: total === 0 ? 0 : Math.round((done * 1000) / total) / 10 });
+    }
+    return m;
+  }, [lanes, stageCounts]);
+
 
   const selectedStage = search.stage ? catalog.find((c) => c.stage_code === search.stage) ?? null : null;
   const selectedState = (search.stageState ?? null) as SplStageState | null;
