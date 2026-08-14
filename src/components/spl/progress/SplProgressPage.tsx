@@ -148,6 +148,9 @@ export function SplProgressPage() {
     const short = filtered.filter(
       (r) => (r.req_doc_total ?? 0) > 0 && (r.req_doc_done ?? 0) < (r.req_doc_total ?? 0),
     ).length;
+    return { n, N, short, pct: N === 0 ? 0 : Math.round((n * 1000) / N) / 10 };
+  }, [filtered]);
+
   /** 레인(밴드)별 진도율 — N/A 제외, done / (done+wip+delayed+planned+none) */
   const bandProgress = useMemo(() => {
     const m = new Map<string, { done: number; total: number; pct: number }>();
