@@ -383,6 +383,29 @@ export function OcsIncrementImportPanel() {
     setPickerKey((k) => k + 1);
   }
 
+  async function onPickBaseline(files: FileList) {
+    const f = files[0];
+    if (!f) return;
+    setBusy("Baseline 판독 중…");
+    try {
+      const b = await readBaselineZip(f);
+      setBaseline(b);
+      setBaselineFileName(f.name);
+      // 파일이 바뀌면 로컬 검증 결과만 초기화한다 (하위 서버 단계는 기존 안전 규칙대로 함께 리셋).
+      setLocalValid({ clean: null, blockerCount: 0, receipt: null });
+      resetDownstream();
+      if (!b.abdIndex) toast.warning("이 Baseline 에는 ABD 검증 인덱스가 없습니다 (v1).");
+      else toast.success(`Baseline 판독 완료 — ABD 인덱스 ${b.abdIndex.length}건`);
+    } catch (e) {
+      setBaseline(null);
+      setBaselineFileName(null);
+      setBaselinePickerKey((k) => k + 1);
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onPick(files: FileList) {
     const file = files[0];
     if (!file) return;
