@@ -136,9 +136,6 @@ export function TaskProgressChartDialog({
                     ]}
                     labelFormatter={(l) => `날짜: ${formatDdMmmYyyy(String(l)) || l}`}
                   />
-                  <Legend
-                    formatter={(v) => (v === "plan" ? "계획" : "실적")}
-                  />
                   {data.data_date && (
                     <ReferenceLine
                       x={String(data.data_date).slice(0, 10)}
