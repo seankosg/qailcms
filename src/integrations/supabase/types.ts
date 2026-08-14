@@ -5017,13 +5017,6 @@ export type Database = {
             foreignKeyName: "spl_document_item_links_spl_item_id_fkey"
             columns: ["spl_item_id"]
             isOneToOne: false
-            referencedRelation: "spl_items_judged"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "spl_document_item_links_spl_item_id_fkey"
-            columns: ["spl_item_id"]
-            isOneToOne: false
             referencedRelation: "spl_precedence_violations"
             referencedColumns: ["item_id"]
           },
@@ -5860,13 +5853,6 @@ export type Database = {
             foreignKeyName: "spl_ocs_comment_spl_links_spl_item_id_fkey"
             columns: ["spl_item_id"]
             isOneToOne: false
-            referencedRelation: "spl_items_judged"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "spl_ocs_comment_spl_links_spl_item_id_fkey"
-            columns: ["spl_item_id"]
-            isOneToOne: false
             referencedRelation: "spl_precedence_violations"
             referencedColumns: ["item_id"]
           },
@@ -6296,13 +6282,6 @@ export type Database = {
             foreignKeyName: "spl_rsp_items_spl_item_id_fkey"
             columns: ["spl_item_id"]
             isOneToOne: false
-            referencedRelation: "spl_items_judged"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "spl_rsp_items_spl_item_id_fkey"
-            columns: ["spl_item_id"]
-            isOneToOne: false
             referencedRelation: "spl_precedence_violations"
             referencedColumns: ["item_id"]
           },
@@ -6441,13 +6420,6 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "spl_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "spl_stage_progress_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "spl_items_judged"
             referencedColumns: ["id"]
           },
           {
@@ -7863,42 +7835,6 @@ export type Database = {
           is_active: boolean | null
           name: string | null
           updated_at: string | null
-        }
-        Relationships: []
-      }
-      spl_items_judged: {
-        Row: {
-          approval_status_raw: string | null
-          created_at: string | null
-          created_by: string | null
-          data_date: string | null
-          dis: string | null
-          eng: string | null
-          eng_po: string | null
-          exclusion_reason: string | null
-          id: string | null
-          is_active: boolean | null
-          is_excluded: boolean | null
-          j_active_round: string | null
-          j_bucket_top: string | null
-          j_completed_stage: string | null
-          j_current_stage: string | null
-          judgment: Json | null
-          latest_status: string | null
-          latest_status_raw: string | null
-          owner_user_id: string | null
-          pic: string | null
-          pic_po: string | null
-          plot: string | null
-          revision: string | null
-          service: string | null
-          source_file: string | null
-          spl_number: string | null
-          supplier: string | null
-          team: string | null
-          title: string | null
-          updated_at: string | null
-          updated_by: string | null
         }
         Relationships: []
       }
@@ -9337,17 +9273,6 @@ export type Database = {
           _patches: Json
         }
         Returns: Json
-      }
-      spl_judge_one: {
-        Args: { _as_of?: string; _item_id: string }
-        Returns: Json
-      }
-      spl_judge_v1: {
-        Args: { _as_of?: string }
-        Returns: {
-          item_id: string
-          judgment: Json
-        }[]
       }
       spl_ocs_can_manage: { Args: never; Returns: boolean }
       spl_ocs_can_write_comment: {
