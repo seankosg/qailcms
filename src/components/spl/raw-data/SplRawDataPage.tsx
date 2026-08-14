@@ -24,6 +24,8 @@ import {
 } from "@/lib/spl/rows.functions";
 import { downloadSplRoundtripWorkbook } from "@/lib/spl/roundtrip-export";
 import { updateSplField, updateSplStageField } from "@/lib/spl/mutations.functions";
+import { setSplRequiredDocReady } from "@/lib/spl/required-doc.functions";
+import { normalizeSplFlagValue, SPL_FLAG_REQUIRED } from "@/lib/spl/flag-value";
 import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
 import { useRclCan } from "@/hooks/useRclCan";
 import { useUserViewPreference } from "@/hooks/useUserViewPreference";
@@ -81,6 +83,7 @@ export function SplRawDataPage() {
   const [exporting, setExporting] = useState(false);
 
   const fetchRows = useServerFn(getSplRowsAsOf);
+  const setReqDocReady = useServerFn(setSplRequiredDocReady);
   const fetchEstimated = useServerFn(getSplEstimatedCells);
   const fetchExport = useServerFn(getSplExportRows);
   const saveField = useServerFn(updateSplField);
@@ -688,6 +691,42 @@ export function SplRawDataPage() {
         onSaveStage={saveStageOne}
         onDone={refetchRows}
         disabledReason={isToday ? null : "Editing is disabled in as-of (historical) view."}
+        onReqDocReadyAll={async (ids) => {
+          // 기존 RPC 를 그대로 반복 호출한다(새 일괄 RPC 금지).
+          const reqStages = catalog.filter((c) => c.band === "REQUIRED_DOC");
+          const idSet = new Set(ids);
+          const targets: Array<{ id: string; stage_code: string }> = [];
+          for (const r of rows) {
+            if (!idSet.has(r.id)) continue;
+            for (const s of reqStages) {
+              const cell = r.stages[s.stage_code];
+              if (normalizeSplFlagValue(cell?.fv) !== SPL_FLAG_REQUIRED) continue;
+              if (cell?.as) continue;
+              targets.push({ id: r.id, stage_code: s.stage_code });
+            }
+          }
+          if (targets.length === 0) {
+            toast.info("대상 없음", { description: "선택한 행에 미수령 필요 문서가 없습니다." });
+            return;
+          }
+          let ok = 0;
+          let failed = 0;
+          let firstError: string | null = null;
+          for (const t of targets) {
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              await setReqDocReady({ data: { item_id: t.id, stage_code: t.stage_code, ready: true } });
+              ok += 1;
+            } catch (e: any) {
+              failed += 1;
+              if (!firstError) firstError = e?.message ?? String(e);
+            }
+          }
+          toast[failed > 0 ? "warning" : "success"](failed > 0 ? "부분 반영" : "완료", {
+            description: `${ok}건 받았음 처리${failed > 0 ? ` · ${failed}건 실패 — ${firstError}` : ""}`,
+          });
+          await refetchRows();
+        }}
       />
 
       <SplExportDialog

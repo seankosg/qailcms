@@ -21,6 +21,7 @@ import {
 import {
   ChevronDown,
   ClipboardCopy,
+  CheckCheck,
   FileSpreadsheet,
   Loader2,
   MoreHorizontal,
@@ -59,6 +60,11 @@ interface Props {
   ) => Promise<void>;
   onDone: () => Promise<void> | void;
   disabledReason?: string | null;
+  /**
+   * 선택 행의 REQUIRED 문서를 전부 「받았음」으로. 기존 RPC 반복 호출이며,
+   * 대상 계산은 행 데이터를 가진 화면(SplRawDataPage)이 한다.
+   */
+  onReqDocReadyAll?: (ids: string[]) => Promise<void>;
 }
 
 export function SplBulkEditBar({
@@ -71,6 +77,7 @@ export function SplBulkEditBar({
   onSaveStage,
   onDone,
   disabledReason,
+  onReqDocReadyAll,
 }: Props) {
   const [fieldKey, setFieldKey] = useState<string>("");
   const [rawValue, setRawValue] = useState<string>("");
@@ -81,6 +88,7 @@ export function SplBulkEditBar({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [allowed, setAllowed] = useState<string[] | null>(null);
   const [deletable, setDeletable] = useState<string[] | null>(null);
+  const [reqDocRunning, setReqDocRunning] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -370,6 +378,26 @@ export function SplBulkEditBar({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[200px]">
+                {onReqDocReadyAll && (
+                  <>
+                    <DropdownMenuItem
+                      disabled={ids.length === 0 || !!disabledReason || reqDocRunning}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setReqDocRunning(true);
+                        void onReqDocReadyAll(ids).finally(() => setReqDocRunning(false));
+                      }}
+                    >
+                      {reqDocRunning ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCheck className="mr-2 h-4 w-4" />
+                      )}
+                      선택한 행의 필요 문서를 전부 받았음으로 ({ids.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   disabled={delIds.length === 0 || !!disabledReason}
