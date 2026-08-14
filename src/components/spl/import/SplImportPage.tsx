@@ -17,6 +17,7 @@ import { ModuleGuardDialog } from "@/components/import/ModuleGuardDialog";
 import { Switch } from "@/components/ui/switch";
 import { RefreshCw } from "lucide-react";
 import { SplAconexImportPage } from "./SplAconexImportPage";
+import { DateIssuesPanel } from "@/components/import/DateIssuesPanel";
 
 type SplParsedRow = ParsedSplFile["rows"][number];
 
@@ -29,6 +30,8 @@ export function SplImportPage() {
   const [result, setResult] = useState<SplHdecResult | null>(null);
   const [busy, setBusy] = useState<null | "parse" | "scope" | "preview" | "apply">(null);
   const [allowDeletes, setAllowDeletes] = useState(false);
+  const [lastFile, setLastFile] = useState<File | null>(null);
+  const [dateOverrides, setDateOverrides] = useState<Record<string, string>>({});
   const runImport = useServerFn(importSplHdecBatch);
 
   const scopeNote = scope
@@ -47,16 +50,23 @@ export function SplImportPage() {
     };
   }, [parsed, scope, scopeNote]);
 
-  async function onFile(file: File) {
+  async function onFile(file: File, overrides?: Record<string, string>) {
     setBusy("parse");
     setParsed(null);
     setScope(null);
     setPreview(null);
     setResult(null);
     setAllowDeletes(false);
+    setLastFile(file);
+    setDateOverrides(overrides ?? {});
     try {
-      const p = await parseSplHdecFile(file);
+      const p = await parseSplHdecFile(file, { dateOverrides: overrides });
       setParsed(p);
+      if (p.dateIssues.length > 0) {
+        toast.warning(
+          `${file.name}: 날짜 형식 오류 ${p.dateIssues.length}건 — 아래 목록에서 수정 후 재파싱하세요.`,
+        );
+      }
       toast.success(`Parsed — ${p.rows.length} rows (OCS excluded ${p.ocs_excluded})`);
       setBusy("scope");
       const sc = await applyImportScope<SplParsedRow>(
@@ -180,11 +190,18 @@ export function SplImportPage() {
               )}
               Choose file
             </Button>
-            <Button onClick={onPreview} disabled={!payload || busy !== null}>
+            <Button
+              onClick={onPreview}
+              disabled={!payload || busy !== null || (parsed?.dateIssues.length ?? 0) > 0}
+            >
               {busy === "preview" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Preview (Diff)
             </Button>
-            <Button variant="default" onClick={onApply} disabled={!preview || busy !== null || guardBlocked}>
+            <Button
+              variant="default"
+              onClick={onApply}
+              disabled={!preview || busy !== null || guardBlocked || (parsed?.dateIssues.length ?? 0) > 0}
+            >
               {busy === "apply" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Apply
             </Button>
@@ -214,6 +231,17 @@ export function SplImportPage() {
           )}
 
           {scope && <ScopeSummary scope={scope} />}
+
+          {parsed && parsed.dateIssues.length > 0 && lastFile && (
+            <DateIssuesPanel
+              fileName={parsed.file_name}
+              sheetName={null}
+              issues={parsed.dateIssues}
+              currentOverrides={dateOverrides}
+              onApply={(ovr) => onFile(lastFile, ovr)}
+              disabled={busy !== null}
+            />
+          )}
 
           {parsed && parsed.format === "view" && parsed.ignored_headers.length > 0 && (
             <Alert>

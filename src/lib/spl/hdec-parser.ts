@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { isOcsDocumentNumber } from "./number-normalize";
 import { normalizeSplFlagValue, SPL_FLAG_UNKNOWN } from "./flag-value";
+import { makeDateAudit, toCellRef, type DateIssue } from "@/lib/import/date-audit";
 
 /**
  * SPL HDEC 임포트 파서 (왕복 임포트 구조).
@@ -150,6 +151,13 @@ export interface ParsedSplFile {
     excel_row: number;
     stage_code: string;
   }>;
+  /** 날짜 감사(date-audit) 가 잡은 파싱 실패 셀 — ABD/TM 과 같은 규칙 */
+  dateIssues: DateIssue[];
+}
+
+export interface ParseSplOptions {
+  /** DateIssuesPanel 에서 사용자가 입력한 셀별 override (cellRef → YYYY-MM-DD) */
+  dateOverrides?: Record<string, string>;
 }
 
 /** 파일 셀이 "해당 없음" 표기인지 */
@@ -174,30 +182,8 @@ export function isOcsNumber(splNumber: string): boolean {
   return isOcsDocumentNumber(splNumber);
 }
 
-function toIso(v: unknown): string | null {
-  if (v == null || v === "") return null;
-  if (v instanceof Date) {
-    if (isNaN(v.getTime())) return null;
-    return `${v.getUTCFullYear()}-${String(v.getUTCMonth() + 1).padStart(2, "0")}-${String(v.getUTCDate()).padStart(2, "0")}`;
-  }
-  if (typeof v === "number") {
-    const p = XLSX.SSF?.parse_date_code?.(v);
-    if (!p || !p.y || !p.m || !p.d) return null;
-    return `${p.y}-${String(p.m).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`;
-  }
-  const s = String(v).trim();
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
-  if (dmy) {
-    const da = Number(dmy[1]);
-    const mo = Number(dmy[2]);
-    if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
-    const yy = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
-    return `${yy}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
-  }
-  return null;
-}
+// 날짜 파싱은 src/lib/import/date-audit.ts 한 곳이 정본이다 (ABD·TM·DM 과 동일).
+// SPL 전용 파싱을 여기 다시 두지 마라 — 두 벌이 되면 규칙이 갈라진다.
 
 function subFieldKey(sub: string, type: "flag" | "single" | "range"): StageFieldKey | null {
   const s = norm(sub);
@@ -242,6 +228,7 @@ function emptyParsed(fileName: string, format: "hdec" | "view"): ParsedSplFile {
     na_cells: 0,
     ignored_headers: [],
     unknown_flag_values: [],
+    dateIssues: [],
   };
 }
 
@@ -267,8 +254,13 @@ function findViewHeader(ws: XLSX.WorkSheet): { row: number; numberCol: number } 
  * - 헤더 1행. 아이템 컬럼은 라벨, 단계 컬럼은 카탈로그 short_code(+접미사) 로만 매핑한다.
  * - 파생/Aconex 정본 컬럼은 임포트 대상이 아니므로 무시하고 목록으로 보고한다.
  */
-function parseSplViewWorkbook(wb: XLSX.WorkBook, fileName: string): ParsedSplFile {
+function parseSplViewWorkbook(
+  wb: XLSX.WorkBook,
+  fileName: string,
+  options?: ParseSplOptions,
+): ParsedSplFile {
   const out = emptyParsed(fileName, "view");
+  const { audit, read: readDateCell } = makeDateAudit(options?.dateOverrides);
   const presentStage = new Set<string>();
   const presentItem = new Set<string>();
   const ignored = new Set<string>();
@@ -380,7 +372,13 @@ function parseSplViewWorkbook(wb: XLSX.WorkBook, fileName: string): ParsedSplFil
             entry.fields[cm.field] = null;
             out.na_cells += 1;
           } else {
-            entry.fields[cm.field] = raw == null || String(raw).trim() === "" ? null : toIso(raw);
+            entry.fields[cm.field] = readDateCell(raw, {
+              cellRef: `${sheetName}!${toCellRef(r + 1, cm.col + 1)}`,
+              row: r + 1,
+              col: cm.col + 1,
+              field: cm.field,
+              header: `${cm.stage_code} · ${cm.field}`,
+            });
           }
         }
       }
@@ -402,16 +400,21 @@ function parseSplViewWorkbook(wb: XLSX.WorkBook, fileName: string): ParsedSplFil
     const [stage_code, field] = k.split("|");
     return { stage_code, field: field as StageFieldKey };
   });
+  out.dateIssues = audit.issues;
   return out;
 }
 
-export async function parseSplHdecFile(file: File): Promise<ParsedSplFile> {
+export async function parseSplHdecFile(
+  file: File,
+  options?: ParseSplOptions,
+): Promise<ParsedSplFile> {
   const wb = XLSX.read(await file.arrayBuffer());
   // View 양식(1행 헤더 + Plot 컬럼)이면 그 경로로 파싱한다.
   if (wb.SheetNames.some((n) => wb.Sheets[n] && findViewHeader(wb.Sheets[n]))) {
-    return parseSplViewWorkbook(wb, file.name);
+    return parseSplViewWorkbook(wb, file.name, options);
   }
   const out = emptyParsed(file.name, "hdec");
+  const { audit, read: readDateCell } = makeDateAudit(options?.dateOverrides);
   const presentStage = new Set<string>();
   const presentItem = new Set<string>();
   const unknown = new Set<string>();
@@ -521,7 +524,13 @@ export async function parseSplHdecFile(file: File): Promise<ParsedSplFile> {
             entry.fields[cm.field] = null;
             out.na_cells += 1;
           } else {
-            entry.fields[cm.field] = raw == null || String(raw).trim() === "" ? null : toIso(raw);
+            entry.fields[cm.field] = readDateCell(raw, {
+              cellRef: `${sheetName}!${toCellRef(r + 1, cm.col + 1)}`,
+              row: r + 1,
+              col: cm.col + 1,
+              field: cm.field,
+              header: `${cm.stage_code} · ${cm.field}`,
+            });
           }
         }
       }
@@ -547,5 +556,6 @@ export async function parseSplHdecFile(file: File): Promise<ParsedSplFile> {
     const [stage_code, field] = k.split("|");
     return { stage_code, field: field as StageFieldKey };
   });
+  out.dateIssues = audit.issues;
   return out;
 }
