@@ -27,7 +27,8 @@ const sortPics = (a: OrgPic, b: OrgPic) =>
 export function OrgChartTab() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
-  const canManage = !!me && (me.isSystemAdmin || me.isAdmin || me.isSuperUser);
+  // 2026-08-14: 조직도 편집은 admin(및 system_administrator) 전용. 읽기는 HDEC PIC 사용자 전체.
+  const canManage = !!me && me.isStrictAdmin;
   const [editPic, setEditPic] = useState<OrgPic | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
