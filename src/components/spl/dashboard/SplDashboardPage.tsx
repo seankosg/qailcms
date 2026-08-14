@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { todayInDoha } from "@/lib/time/doha";
-import { getSplRowsAsOf, getSplEstimatedCells, type SplCatalogEntry } from "@/lib/spl/rows.functions";
+import { getSplRowsAsOf, type SplCatalogEntry } from "@/lib/spl/rows.functions";
 import { SplBreakdownCards } from "./SplBreakdownCards";
 import { SplPlanVsActualCard } from "./SplPlanVsActualCard";
 import { splSeriesColor, type SplBucket, type SplPlanMode, type SplSeriesGroup } from "@/lib/spl/scurve";
