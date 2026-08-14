@@ -54,7 +54,7 @@ import {
 
 const FIELD_OUTCOMES = Object.keys(OUTCOME_LABELS);
 
-type Kind = RollbackKind | "spl";
+type Kind = RollbackKind;
 
 interface Batch {
   id: string;
@@ -168,8 +168,7 @@ const CFG = {
     keyLabel: "SPL Number",
     keyColumn: "spl_number",
     extraLabel: null,
-    // SPL 롤백 DB 함수가 없으므로 롤백 버튼을 렌더하지 않는다.
-    rollbackKind: null,
+    rollbackKind: "spl",
   },
 } as const;
 
