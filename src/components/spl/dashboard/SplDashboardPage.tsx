@@ -203,74 +203,6 @@ export function SplDashboardPage() {
         />
       </div>
 
-      {/* 탭형 필터 — Plot · Team · 계열 단위 · 단계 · 버킷 · 기간 · 계획 모드 */}
-      <div className="space-y-1.5 rounded-lg border p-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="w-[52px] text-[11px] text-muted-foreground">Plot</span>
-          {["all", "C", "D"].map((p) => (
-            <TabButton key={p} active={plot === p} onClick={() => setSearch({ plot: p })}>
-              {p === "all" ? "All Plots" : `PLOT-${p}`}
-            </TabButton>
-          ))}
-          <span className="ml-3 w-[40px] text-[11px] text-muted-foreground">Team</span>
-          {["all", ...teams].map((t) => (
-            <TabButton key={t} active={team === t} onClick={() => setSearch({ team: t })}>
-              {t === "all" ? "All Teams" : t}
-            </TabButton>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="w-[52px] text-[11px] text-muted-foreground">Stage</span>
-          <TabButton active={stageMode === "band"} onClick={() => setSearch({ stageMode: "band", stages: "" })}>
-            Band (3)
-          </TabButton>
-          <TabButton active={stageMode === "stage"} onClick={() => setSearch({ stageMode: "stage", stages: "" })}>
-            Stage (22)
-          </TabButton>
-          <span className="mx-1 h-4 w-px bg-border" />
-          <TabButton active={selectedStages.length === 0} onClick={() => setSearch({ stages: "" })}>
-            All
-          </TabButton>
-          {stageMode === "band"
-            ? [...new Set(orderedCatalog.map((c) => c.band))].map((b) => (
-                <TabButton key={b} active={selectedStages.includes(b)} onClick={() => toggleStage(b)}>
-                  {BAND_LABEL[b] ?? b}
-                </TabButton>
-              ))
-            : orderedCatalog.map((c) => (
-                <TabButton
-                  key={c.stage_code}
-                  active={selectedStages.includes(c.stage_code)}
-                  onClick={() => toggleStage(c.stage_code)}
-                >
-                  {c.short_code || c.label}
-                </TabButton>
-              ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="w-[52px] text-[11px] text-muted-foreground">Bucket</span>
-          {BUCKETS.map((b) => (
-            <TabButton key={b.v} active={bucket === b.v} onClick={() => setSearch({ bucket: b.v })}>
-              {b.label}
-            </TabButton>
-          ))}
-          <span className="ml-3 w-[40px] text-[11px] text-muted-foreground">Range</span>
-          {RANGES.map((r) => (
-            <TabButton key={r} active={rangeDays === r} onClick={() => setSearch({ range: r })}>
-              ±{r}d
-            </TabButton>
-          ))}
-          <span className="ml-3 w-[52px] text-[11px] text-muted-foreground">Plan</span>
-          {PLAN_MODES.map((m) => (
-            <TabButton key={m.v} active={planMode === m.v} onClick={() => setSearch({ planMode: m.v })}>
-              {m.label}
-            </TabButton>
-          ))}
-        </div>
-      </div>
-
       {isLoading ? (
         <Card>
           <CardContent className="flex h-48 items-center justify-center text-sm text-muted-foreground">
@@ -281,18 +213,6 @@ export function SplDashboardPage() {
         <div className="p-6 text-sm text-destructive">{(error as Error).message}</div>
       ) : (
         <>
-          <SplPlanVsActualCard
-            rows={filteredRows}
-            groups={seriesGroups}
-            bucket={bucket}
-            planMode={planMode}
-            asOf={asOf}
-            rangeDays={rangeDays}
-            open={scurveOpen}
-            onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
-            filterSummary={filterSummary}
-          />
-
           <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
             <SplKpiCard
               label="Population (documents)"
@@ -385,6 +305,86 @@ export function SplDashboardPage() {
             catalog={orderedCatalog}
             onTeam={(t) => setSearch({ team: t })}
             onDrill={drill}
+          />
+
+          {/* 탭형 필터 — Plot · Team · 계열 단위 · 단계 · 버킷 · 기간 · 계획 모드 */}
+          <div className="space-y-1.5 rounded-lg border p-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="w-[52px] text-[11px] text-muted-foreground">Plot</span>
+              {["all", "C", "D"].map((p) => (
+                <TabButton key={p} active={plot === p} onClick={() => setSearch({ plot: p })}>
+                  {p === "all" ? "All Plots" : `PLOT-${p}`}
+                </TabButton>
+              ))}
+              <span className="ml-3 w-[40px] text-[11px] text-muted-foreground">Team</span>
+              {["all", ...teams].map((t) => (
+                <TabButton key={t} active={team === t} onClick={() => setSearch({ team: t })}>
+                  {t === "all" ? "All Teams" : t}
+                </TabButton>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="w-[52px] text-[11px] text-muted-foreground">Stage</span>
+              <TabButton active={stageMode === "band"} onClick={() => setSearch({ stageMode: "band", stages: "" })}>
+                Band (3)
+              </TabButton>
+              <TabButton active={stageMode === "stage"} onClick={() => setSearch({ stageMode: "stage", stages: "" })}>
+                Stage (22)
+              </TabButton>
+              <span className="mx-1 h-4 w-px bg-border" />
+              <TabButton active={selectedStages.length === 0} onClick={() => setSearch({ stages: "" })}>
+                All
+              </TabButton>
+              {stageMode === "band"
+                ? [...new Set(orderedCatalog.map((c) => c.band))].map((b) => (
+                    <TabButton key={b} active={selectedStages.includes(b)} onClick={() => toggleStage(b)}>
+                      {BAND_LABEL[b] ?? b}
+                    </TabButton>
+                  ))
+                : orderedCatalog.map((c) => (
+                    <TabButton
+                      key={c.stage_code}
+                      active={selectedStages.includes(c.stage_code)}
+                      onClick={() => toggleStage(c.stage_code)}
+                    >
+                      {c.short_code || c.label}
+                    </TabButton>
+                  ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="w-[52px] text-[11px] text-muted-foreground">Bucket</span>
+              {BUCKETS.map((b) => (
+                <TabButton key={b.v} active={bucket === b.v} onClick={() => setSearch({ bucket: b.v })}>
+                  {b.label}
+                </TabButton>
+              ))}
+              <span className="ml-3 w-[40px] text-[11px] text-muted-foreground">Range</span>
+              {RANGES.map((r) => (
+                <TabButton key={r} active={rangeDays === r} onClick={() => setSearch({ range: r })}>
+                  ±{r}d
+                </TabButton>
+              ))}
+              <span className="ml-3 w-[52px] text-[11px] text-muted-foreground">Plan</span>
+              {PLAN_MODES.map((m) => (
+                <TabButton key={m.v} active={planMode === m.v} onClick={() => setSearch({ planMode: m.v })}>
+                  {m.label}
+                </TabButton>
+              ))}
+            </div>
+          </div>
+
+          <SplPlanVsActualCard
+            rows={filteredRows}
+            groups={seriesGroups}
+            bucket={bucket}
+            planMode={planMode}
+            asOf={asOf}
+            rangeDays={rangeDays}
+            open={scurveOpen}
+            onOpenChange={(v) => setSearch({ scurveOpen: v ? 1 : 0 })}
+            filterSummary={filterSummary}
           />
         </>
       )}
