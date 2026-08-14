@@ -10,11 +10,14 @@ import { SmDashboardSection } from "./SmDashboardSection";
 import { AbdDashboardSection } from "./AbdDashboardSection";
 import { LazySection } from "./LazySection";
 import { PdbLangProvider, usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
+import { PdbPlotProvider, usePdbPlot, type PdbPlotFilter } from "@/lib/dashboards/pdb-plot";
 
 export function ProjectSummaryPage() {
   return (
     <PdbLangProvider>
-      <ProjectSummaryBody />
+      <PdbPlotProvider>
+        <ProjectSummaryBody />
+      </PdbPlotProvider>
     </PdbLangProvider>
   );
 }
@@ -31,6 +34,7 @@ function ProjectSummaryBody() {
   // 캐시 복원(localStorage) — 복원 전에는 섹션 마운트를 미뤄 중복 조회를 막는다.
   const { restored, refresh, refreshing } = usePdbCache();
   const { lang, setLang } = usePdbLang();
+  const { plotFilter, setPlotFilter } = usePdbPlot();
   const t = usePdbT();
 
   return (
@@ -77,6 +81,23 @@ function ProjectSummaryBody() {
                 }
               >
                 {l === "ko" ? "KOR" : "ENG"}
+              </button>
+            ))}
+          </div>
+          {/* Plot 탭 — 한 플롯만 고르면 아래 모든 섹션이 1열로 좁혀진다 */}
+          <div className="inline-flex h-8 items-center overflow-hidden rounded-md border">
+            {(["D", "C", "all"] as const).map((p: PdbPlotFilter) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPlotFilter(p)}
+                className={
+                  plotFilter === p
+                    ? "h-full px-2.5 text-xs font-semibold bg-primary text-primary-foreground"
+                    : "h-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted"
+                }
+              >
+                {p === "all" ? "All" : `Plot ${p}`}
               </button>
             ))}
           </div>
