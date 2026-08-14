@@ -605,6 +605,12 @@ export const fmtPct = (v: number | null | undefined, digits = 2) =>
   v == null ? '' : `${(v * 100).toFixed(digits)}%`;
 export const fmtProd = (v: number | null | undefined) =>
   v == null ? '' : `${(v * 100).toFixed(3)}%/인`;
+/** 진도 증가분 표기 — 프로젝트 전체 진도율이 아니라 "증가분(%p)" 임을 명시한다. */
+export const fmtPp = (v: number | null | undefined, digits = 2) =>
+  v == null ? '' : `${(v * 100).toFixed(digits)}%p`;
+/** 생산성 표기 — 진도 증가분(%p) ÷ 투입인원(인·일). */
+export const fmtProductivityPpPerPersonDay = (v: number | null | undefined) =>
+  v == null ? '' : `${(v * 100).toFixed(3)}%p/인·일`;
 export const fmtExtra = (v: number | null | undefined, unit = '명/일') =>
   v == null ? '' : `${v > 0 ? '+' : ''}${v.toFixed(1)}${unit}`;
 
