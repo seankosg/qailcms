@@ -109,7 +109,6 @@ const NAV: NavSection[] = [
   },
   {
     label: "Close-Out Doc",
-    dashboard: { to: "/closeout/dashboard", label: "Dashboard", icon: iconDashboard },
     modules: [
       {
         label: "As Built Drawing",
