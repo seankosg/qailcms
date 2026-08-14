@@ -87,6 +87,7 @@ const EN: Dict = {
   byWorkType: "Progress by Work Type",
   byMainArea: "Progress by Main Area",
   teamPerformance: "Team Performance",
+  bandProgress: "Band Progress",
 
   hintTmProgress:
     "Progress = simple average of Sub-task actual % · Count = earned-value equivalent complete / total",
@@ -105,6 +106,11 @@ const EN: Dict = {
     "Top 4 teams by drawing count plus Others · Progress = cumulative actual ÷ total drawings",
   hintAbdSection:
     "Progress = cumulative Approval actual for the plot ÷ total drawings — same basis as the ABD Progress matrix",
+  hintSplProgress:
+    "Progress = actual stages as of date ÷ stage scope excluding N/A (canonical spl_rows_as_of)",
+  hintSplBand: "Band progress = cumulative actual in the band ÷ band stage scope (N/A excluded)",
+  hintSplSection:
+    "Progress = cumulative actual stages for the plot ÷ stage scope — same basis as the SPL Dashboard Progress Status",
 
   unitCount: "Nos.",
   unitCountSuffix: "No.",
