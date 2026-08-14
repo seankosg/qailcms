@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { usePdbT } from "@/lib/dashboards/pdb-i18n";
+import { usePdbPlot, filterByPlot, plotGridClass } from "@/lib/dashboards/pdb-plot";
 
 export type PlotHeadStat = {
   plot: "D" | "C";
@@ -34,11 +35,13 @@ export function ProjectModuleSection({
   title: string;
   to: string;
   progressHint: string;
-  plots: [PlotHeadStat, PlotHeadStat];
+  plots: PlotHeadStat[];
   tone?: ModuleTone;
   children: ReactNode;
 }) {
   const t = usePdbT();
+  const { plotFilter } = usePdbPlot();
+  const shown = filterByPlot(plots, plotFilter);
   return (
     <section
       className={cn(
@@ -53,14 +56,14 @@ export function ProjectModuleSection({
             {title}
           </Link>
         </h2>
-        <div className="mt-1.5 grid gap-3 xl:grid-cols-2">
-          {plots.map((p, i) => (
+        <div className={cn("mt-1.5", plotGridClass(plotFilter))}>
+          {shown.map((p, i) => (
             <div
               key={p.plot}
               className={cn(
                 "flex items-baseline gap-2",
                 // 데스크톱 2열일 때만 열 사이 약한 세로 구분선
-                i === 1 && "xl:border-l xl:pl-4",
+                plotFilter === "all" && i === 1 && "xl:border-l xl:pl-4",
               )}
             >
               <PlotColumnHeader plot={p.plot} />
