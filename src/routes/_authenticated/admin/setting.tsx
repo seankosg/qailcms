@@ -12,6 +12,7 @@ import {
   PDB_DEFAULTS,
   type PdbAbdFilters,
   type PdbSmFilters,
+  type PdbSplFilters,
   type PdbTmFilters,
 } from "@/lib/dashboards/pdb-filters";
 import { DISCIPLINES } from "@/lib/task-management/columns";
@@ -24,6 +25,18 @@ import {
   ALL_STAGES as ABD_ALL_STAGES,
   STAGE_LABELS as ABD_STAGE_LABELS,
 } from "@/lib/abd/progress-utils";
+import { SPL_TEAM_OPTIONS } from "@/components/spl/raw-data/spl-columns";
+
+const SPL_BAND_OPTIONS = [
+  { value: "REQUIRED_DOC", label: "Required Doc" },
+  { value: "DOCUMENTATION", label: "Documentation Stage" },
+  { value: "PO", label: "PO Stage" },
+] as const;
+
+const SPL_RANGE_OPTIONS = [30, 60, 120, 240, 480].map((n) => ({
+  value: String(n),
+  label: `±${n}d`,
+}));
 
 export const Route = createFileRoute("/_authenticated/admin/setting")({
   head: () => ({
@@ -149,6 +162,7 @@ function Page() {
   const [tm, setTm] = useState<PdbTmFilters>(PDB_DEFAULTS.tm);
   const [sm, setSm] = useState<PdbSmFilters>(PDB_DEFAULTS.sm);
   const [abd, setAbd] = useState<PdbAbdFilters>(PDB_DEFAULTS.abd);
+  const [spl, setSpl] = useState<PdbSplFilters>(PDB_DEFAULTS.spl);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -156,6 +170,7 @@ function Page() {
     setTm(data.tm);
     setSm(data.sm);
     setAbd(data.abd);
+    setSpl(data.spl);
   }, [data]);
 
   const { data: workTypeOptions = [] } = useTmWorkTypeOptions();
@@ -168,7 +183,7 @@ function Page() {
   async function save() {
     setSaving(true);
     try {
-      saveLocal({ tm, sm, abd });
+      saveLocal({ tm, sm, abd, spl });
       toast.success("이 브라우저(내 계정)에만 저장했습니다. 다른 사용자에게는 영향이 없습니다.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "저장에 실패했습니다.");
@@ -181,6 +196,7 @@ function Page() {
     setTm(PDB_DEFAULTS.tm);
     setSm(PDB_DEFAULTS.sm);
     setAbd(PDB_DEFAULTS.abd);
+    setSpl(PDB_DEFAULTS.spl);
   }
 
   return (
@@ -210,6 +226,7 @@ function Page() {
           <TabsTrigger value="tm">Task Management</TabsTrigger>
           <TabsTrigger value="sm">Snag Management</TabsTrigger>
           <TabsTrigger value="abd">As Built Drawing</TabsTrigger>
+          <TabsTrigger value="spl">Spare Part List</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tm">
