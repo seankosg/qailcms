@@ -302,6 +302,12 @@ export function SnagPlanVsActualCard({
                 </ChartContainer>
 
                 {/* Variance bars */}
+                <VarianceLegend
+                  lang="ko"
+                  aheadColor="var(--success)"
+                  behindColor="var(--destructive)"
+                  unitNote="차이 (건)"
+                />
                 <ChartContainer config={varianceCfg} className="h-[120px] w-full">
                   <ComposedChart data={data} margin={{ left: 12, right: 16, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
