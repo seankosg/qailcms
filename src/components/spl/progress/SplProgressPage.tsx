@@ -123,7 +123,11 @@ export function SplProgressPage() {
   const gate = useMemo(() => {
     const n = filtered.reduce((a, r) => a + (r.req_doc_done ?? 0), 0);
     const N = filtered.reduce((a, r) => a + (r.req_doc_total ?? 0), 0);
-    return { n, N, pct: N === 0 ? 0 : Math.round((n * 1000) / N) / 10 };
+    // 미충족 = Raw Data 의 reqDocShort=1 과 같은 술어
+    const short = filtered.filter(
+      (r) => (r.req_doc_total ?? 0) > 0 && (r.req_doc_done ?? 0) < (r.req_doc_total ?? 0),
+    ).length;
+    return { n, N, short, pct: N === 0 ? 0 : Math.round((n * 1000) / N) / 10 };
   }, [filtered]);
 
   const selectedStage = search.stage ? catalog.find((c) => c.stage_code === search.stage) ?? null : null;
@@ -252,6 +256,24 @@ export function SplProgressPage() {
                         />
                       </div>
                       <div className="mt-1 text-[10px] text-muted-foreground tabular-nums">{gate.pct}%</div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-1 h-6 w-full text-[10px]"
+                        onClick={() =>
+                          (rootNavigate as (opts: unknown) => void)({
+                            to: "/closure/spare-part/raw-data",
+                            search: {
+                              asOf: search.asOf ?? "",
+                              plot: search.plot ?? "all",
+                              team: search.team ?? "all",
+                              reqDocShort: true,
+                            },
+                          })
+                        }
+                      >
+                        미충족 {gate.short.toLocaleString()}건
+                      </Button>
                     </div>
                   )}
                   {stages.map((c, i) => (
