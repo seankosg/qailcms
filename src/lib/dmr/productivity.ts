@@ -524,8 +524,11 @@ interface DmrPeriodCanonRow {
   data_date: string | null;
   cum_plan_pct: number | string | null;
   plan_prev: number | string | null;
-  actual_end: number | string | null;
-  actual_prev: number | string | null;
+  /** tm_actual_at_set 원시값 — 정규화는 클라이언트 normActual() 한 곳에서만 한다. */
+  actual_end_b_asof: number | string | null;
+  actual_end_a_asof: number | string | null;
+  actual_prev_b_prev: number | string | null;
+  actual_prev_a_prev: number | string | null;
 }
 
 async function fetchPeriodCanon(
@@ -604,9 +607,12 @@ export function useProductivity(period: Period, enabled = true) {
           data_date: c.data_date,
           cum_plan_pct: c.cum_plan_pct,
         });
-        actualEndByCode.set(code, Number(c.actual_end ?? 0) || 0);
+        actualEndByCode.set(code, normActual(c.actual_end_b_asof ?? c.actual_end_a_asof ?? 0));
         if (!fromZero) {
-          actualPrevByCode.set(code, Number(c.actual_prev ?? 0) || 0);
+          actualPrevByCode.set(
+            code,
+            normActual(c.actual_prev_b_prev ?? c.actual_prev_a_prev ?? 0),
+          );
           if (c.plan_prev != null) planPrevByCode.set(code, Number(c.plan_prev));
         }
       }
