@@ -151,6 +151,23 @@ export function SplProgressPage() {
     return { n, N, short, pct: N === 0 ? 0 : Math.round((n * 1000) / N) / 10 };
   }, [filtered]);
 
+  /** 레인(밴드)별 진도율 — N/A 제외, done / (done+wip+delayed+planned+none) */
+  const bandProgress = useMemo(() => {
+    const m = new Map<string, { done: number; total: number; pct: number }>();
+    for (const [band, stages] of lanes) {
+      let done = 0;
+      let total = 0;
+      for (const c of stages) {
+        const counts = stageCounts.get(c.stage_code) ?? emptyCounts();
+        done += counts.done;
+        total += counts.done + counts.wip + counts.delayed + counts.planned + counts.none;
+      }
+      m.set(band, { done, total, pct: total === 0 ? 0 : Math.round((done * 1000) / total) / 10 });
+    }
+    return m;
+  }, [lanes, stageCounts]);
+
+
   const selectedStage = search.stage ? catalog.find((c) => c.stage_code === search.stage) ?? null : null;
   const selectedState = (search.stageState ?? null) as SplStageState | null;
 
@@ -245,6 +262,9 @@ export function SplProgressPage() {
                   <div className="inline-flex items-center gap-1 rounded border bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-foreground">
                     <span className="rounded-sm border px-1 text-[10px]">{BAND_TAG[band]?.tag ?? band[0]}</span>
                     {BAND_TAG[band]?.label ?? band}
+                  </div>
+                  <div className="mt-1 text-[10px] font-semibold text-foreground tabular-nums">
+                    진도율 {(bandProgress.get(band)?.pct ?? 0).toFixed(1)}%
                   </div>
                   <div className="mt-1 text-[10px] text-muted-foreground">
                     {stages.length}단계
