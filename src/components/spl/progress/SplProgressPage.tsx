@@ -56,6 +56,23 @@ export function SplProgressPage() {
   const catalog: SplCatalogEntry[] = data?.catalog ?? [];
   const rows = data?.rows ?? [];
 
+  /** Raw Data 와 같은 컬럼 설정(순서·표시·고정·폭)을 공유한다 */
+  const cols = useSplColumnPrefs(catalog);
+  const stageDisplay = (r: SplRow, sc: SplStageColumn): string => {
+    const cell = r.stages[sc.stage_code];
+    if (!cell) return "";
+    if (cell.na) return "N/A";
+    const raw = cell[sc.field] as string | null | undefined;
+    if (!raw) return "";
+    return sc.field === "fv" ? String(raw) : formatDdMmm(raw);
+  };
+  const columnValue = (key: string, row: SplRow): string => {
+    const def = cols.colDefMap.get(key);
+    if (def) return def.get(row);
+    const stage = cols.stageColMap.get(key);
+    return stage ? stageDisplay(row, stage) : "";
+  };
+
   const teams = useMemo(
     () => [...new Set(rows.map((r) => r.team).filter(Boolean) as string[])].sort(),
     [rows],
