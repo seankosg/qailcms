@@ -250,40 +250,39 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
       let bv: string | number;
       switch (sortKey) {
         case "name":
-          av = (a.name ?? a.display_name ?? "").toString().toLowerCase();
-          bv = (b.name ?? b.display_name ?? "").toString().toLowerCase();
-          break;
+          av = (a.name ?? a.display_name ?? "").toString();
+          bv = (b.name ?? b.display_name ?? "").toString();
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "team":
-          av = (a.team ?? "").toString().toLowerCase();
-          bv = (b.team ?? "").toString().toLowerCase();
-          break;
+          av = (a.team ?? "").toString();
+          bv = (b.team ?? "").toString();
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "login_id":
-          av = (a.login_id ?? "").toString().toLowerCase();
-          bv = (b.login_id ?? "").toString().toLowerCase();
-          break;
+          av = (a.login_id ?? "").toString();
+          bv = (b.login_id ?? "").toString();
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "user_type":
           av = USER_TYPE_LABELS[(a.user_type ?? "") as UserType] ?? "";
           bv = USER_TYPE_LABELS[(b.user_type ?? "") as UserType] ?? "";
-          break;
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "linked":
           av = linkedMasterText(a);
           bv = linkedMasterText(b);
-          break;
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "role":
           // §6-1 표시·정렬 모두 DB rcl_highest_role 과 동일한 최고 등급 기준.
           av = ROLE_LABELS[highestRole(a.roles)] ?? "";
           bv = ROLE_LABELS[highestRole(b.roles)] ?? "";
-          break;
+          return String(av).localeCompare(String(bv), "ko") * dir;
         case "active":
           av = a.is_active ? 1 : 0;
           bv = b.is_active ? 1 : 0;
-          break;
+          if (av < bv) return -1 * dir;
+          if (av > bv) return 1 * dir;
+          return 0;
         default:
           return 0;
       }
-      if (av < bv) return -1 * dir;
-      if (av > bv) return 1 * dir;
-      return 0;
     });
   }, [data, filterRole, filterType, search, sortKey, sortDir]);
 
