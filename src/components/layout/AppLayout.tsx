@@ -127,8 +127,8 @@ const NAV: NavSection[] = [
         matchPrefix: "/closure/spare-part",
         items: [
           { to: "/closure/spare-part/dashboard", label: "Dashboard", icon: iconDashboard },
-          { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: iconDatabase },
           { to: "/closure/spare-part/progress", label: "Progress", icon: iconChartUp },
+          { to: "/closure/spare-part/raw-data", label: "Raw Data", icon: iconDatabase },
         ],
       },
       {
