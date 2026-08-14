@@ -13,6 +13,7 @@ const PDB_KEY_PREFIXES = [
   "task-settings",
   "abd-progress",
   "snag-kpi",
+  "spl-rows-as-of",
   "pdb-module-filters",
 ];
 
