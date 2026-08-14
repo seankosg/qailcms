@@ -25,7 +25,6 @@ import { Route as ApiPublicVersionRouteImport } from './routes/api/public/versio
 import { Route as AuthenticatedResourceDashboardRouteImport } from './routes/_authenticated/resource/dashboard'
 import { Route as AuthenticatedImportLogLogsRouteImport } from './routes/_authenticated/import-log/logs'
 import { Route as AuthenticatedImportLogImportRouteImport } from './routes/_authenticated/import-log/import'
-import { Route as AuthenticatedCloseoutDashboardRouteImport } from './routes/_authenticated/closeout/dashboard'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminTaskThresholdsRouteImport } from './routes/_authenticated/admin/task-thresholds'
 import { Route as AuthenticatedAdminSettingRouteImport } from './routes/_authenticated/admin/setting'
@@ -160,12 +159,6 @@ const AuthenticatedImportLogImportRoute =
   AuthenticatedImportLogImportRouteImport.update({
     id: '/import-log/import',
     path: '/import-log/import',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedCloseoutDashboardRoute =
-  AuthenticatedCloseoutDashboardRouteImport.update({
-    id: '/closeout/dashboard',
-    path: '/closeout/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
@@ -470,7 +463,6 @@ export interface FileRoutesByFullPath {
   '/admin/setting': typeof AuthenticatedAdminSettingRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
   '/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
@@ -534,7 +526,6 @@ export interface FileRoutesByTo {
   '/admin/setting': typeof AuthenticatedAdminSettingRoute
   '/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
   '/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/import-log/logs': typeof AuthenticatedImportLogLogsRoute
   '/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
@@ -601,7 +592,6 @@ export interface FileRoutesById {
   '/_authenticated/admin/setting': typeof AuthenticatedAdminSettingRoute
   '/_authenticated/admin/task-thresholds': typeof AuthenticatedAdminTaskThresholdsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/_authenticated/closeout/dashboard': typeof AuthenticatedCloseoutDashboardRoute
   '/_authenticated/import-log/import': typeof AuthenticatedImportLogImportRoute
   '/_authenticated/import-log/logs': typeof AuthenticatedImportLogLogsRoute
   '/_authenticated/resource/dashboard': typeof AuthenticatedResourceDashboardRoute
@@ -668,7 +658,6 @@ export interface FileRouteTypes {
     | '/admin/setting'
     | '/admin/task-thresholds'
     | '/admin/users'
-    | '/closeout/dashboard'
     | '/import-log/import'
     | '/import-log/logs'
     | '/resource/dashboard'
@@ -732,7 +721,6 @@ export interface FileRouteTypes {
     | '/admin/setting'
     | '/admin/task-thresholds'
     | '/admin/users'
-    | '/closeout/dashboard'
     | '/import-log/import'
     | '/import-log/logs'
     | '/resource/dashboard'
@@ -798,7 +786,6 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/setting'
     | '/_authenticated/admin/task-thresholds'
     | '/_authenticated/admin/users'
-    | '/_authenticated/closeout/dashboard'
     | '/_authenticated/import-log/import'
     | '/_authenticated/import-log/logs'
     | '/_authenticated/resource/dashboard'
@@ -967,13 +954,6 @@ declare module '@tanstack/react-router' {
       path: '/import-log/import'
       fullPath: '/import-log/import'
       preLoaderRoute: typeof AuthenticatedImportLogImportRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/closeout/dashboard': {
-      id: '/_authenticated/closeout/dashboard'
-      path: '/closeout/dashboard'
-      fullPath: '/closeout/dashboard'
-      preLoaderRoute: typeof AuthenticatedCloseoutDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/users': {
@@ -1364,7 +1344,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedOrganizationRoute: typeof AuthenticatedOrganizationRoute
   AuthenticatedProjectDashboardRoute: typeof AuthenticatedProjectDashboardRoute
   AuthenticatedProjectSummaryRoute: typeof AuthenticatedProjectSummaryRoute
-  AuthenticatedCloseoutDashboardRoute: typeof AuthenticatedCloseoutDashboardRoute
   AuthenticatedImportLogImportRoute: typeof AuthenticatedImportLogImportRoute
   AuthenticatedImportLogLogsRoute: typeof AuthenticatedImportLogLogsRoute
   AuthenticatedResourceDashboardRoute: typeof AuthenticatedResourceDashboardRoute
@@ -1412,7 +1391,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedOrganizationRoute: AuthenticatedOrganizationRoute,
   AuthenticatedProjectDashboardRoute: AuthenticatedProjectDashboardRoute,
   AuthenticatedProjectSummaryRoute: AuthenticatedProjectSummaryRoute,
-  AuthenticatedCloseoutDashboardRoute: AuthenticatedCloseoutDashboardRoute,
   AuthenticatedImportLogImportRoute: AuthenticatedImportLogImportRoute,
   AuthenticatedImportLogLogsRoute: AuthenticatedImportLogLogsRoute,
   AuthenticatedResourceDashboardRoute: AuthenticatedResourceDashboardRoute,
