@@ -97,6 +97,10 @@ export function DmrDashboardPage() {
       q: f.search.trim() || undefined,
     });
 
+  // 차트가 화면에 가까워지거나 상세창을 열 때만 날짜별 배치 RPC 를 부른다.
+  const trendRef = useRef<HTMLDivElement | null>(null);
+  const [dailyEnabled, setDailyEnabled] = useState(false);
+
   const result = useDmrDashboardModel({
     kind,
     baseDate,
@@ -108,9 +112,6 @@ export function DmrDashboardPage() {
   });
   const { model } = result;
 
-  // 차트가 화면에 가까워지거나 상세창을 열 때만 날짜별 배치 RPC 를 부른다.
-  const trendRef = useRef<HTMLDivElement | null>(null);
-  const [dailyEnabled, setDailyEnabled] = useState(false);
   useEffect(() => {
     if (dailyEnabled) return;
     const el = trendRef.current;
