@@ -496,7 +496,9 @@ async function fetchDmrRange(start: string, end: string): Promise<DmrManpowerRow
   for (let from = 0; from < 100_000; from += PAGE) {
     const { data, error } = await supabase
       .from('dmr_entries')
-      .select('report_date, task_no, actual_manpower, headcount_kind, discipline, system_name, plot, contractor_name')
+      .select(
+        'report_date, task_no, actual_manpower, plan_manpower, headcount_kind, discipline, system_name, plot, contractor_name, work_category',
+      )
       .gte('report_date', start)
       .lte('report_date', end)
       .range(from, from + PAGE - 1);
