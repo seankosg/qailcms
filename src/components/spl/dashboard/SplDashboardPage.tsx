@@ -58,12 +58,6 @@ export function SplDashboardPage() {
     queryFn: () => fetchRows({ data: { as_of: asOf } }),
   });
 
-  const fetchEstimated = useServerFn(getSplEstimatedCells);
-  const { data: estimated } = useQuery({
-    queryKey: ["spl-estimated-cells"],
-    queryFn: () => fetchEstimated({ data: undefined as never }),
-  });
-
   const rows = data?.rows ?? [];
   const catalog: SplCatalogEntry[] = data?.catalog ?? [];
 
