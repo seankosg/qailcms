@@ -3919,6 +3919,116 @@ export type Database = {
         }
         Relationships: []
       }
+      module_thread_messages: {
+        Row: {
+          author_role: string
+          author_user_id: string
+          body: string
+          compliance: string | null
+          created_at: string
+          id: string
+          kind: string
+          reason_text: string | null
+          reply_to_id: string | null
+          thread_id: string
+          to_user_id: string | null
+        }
+        Insert: {
+          author_role: string
+          author_user_id: string
+          body: string
+          compliance?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          reason_text?: string | null
+          reply_to_id?: string | null
+          thread_id: string
+          to_user_id?: string | null
+        }
+        Update: {
+          author_role?: string
+          author_user_id?: string
+          body?: string
+          compliance?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          reason_text?: string | null
+          reply_to_id?: string | null
+          thread_id?: string
+          to_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_thread_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "module_thread_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_thread_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "module_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_thread_watchers: {
+        Row: {
+          created_at: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_thread_watchers_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "module_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_threads: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          module: string
+          stage_code: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          module: string
+          stage_code: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          module?: string
+          stage_code?: string
+        }
+        Relationships: []
+      }
       pdb_module_filters: {
         Row: {
           filters: Json
@@ -9413,6 +9523,49 @@ export type Database = {
         }
         Returns: string
       }
+      thread_assignee_of: {
+        Args: {
+          _item_id: string
+          _module: string
+          _role: string
+          _stage_code: string
+        }
+        Returns: string
+      }
+      thread_can_see: { Args: { _thread_id: string }; Returns: boolean }
+      thread_ensure: {
+        Args: { _item_id: string; _module: string; _stage_code: string }
+        Returns: string
+      }
+      thread_is_admin: { Args: { _uid: string }; Returns: boolean }
+      thread_post_message: {
+        Args: {
+          _body: string
+          _compliance?: string
+          _item_id: string
+          _kind: string
+          _module: string
+          _reason_text?: string
+          _reply_to_id?: string
+          _stage_code: string
+          _to_user_id?: string
+        }
+        Returns: Json
+      }
+      thread_rows_as_of: {
+        Args: { _as_of?: string; _item_id: string; _module: string }
+        Returns: Json
+      }
+      thread_set_watch: {
+        Args: {
+          _item_id: string
+          _module: string
+          _on: boolean
+          _stage_code: string
+        }
+        Returns: Json
+      }
+      thread_user_options: { Args: never; Returns: Json }
       tm_actual_at_set: {
         Args: { _as_of: string; _ids?: string[] }
         Returns: {

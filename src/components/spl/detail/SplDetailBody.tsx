@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Loader2, MessageSquare, Package } from "lucide-react";
+import { FileText, Loader2, MessageSquare, MessagesSquare, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDdMmmYyyy, todayInDoha } from "@/lib/time/doha";
 import { AbdEditCellPopover } from "@/components/abd/raw-data/AbdEditCellPopover";
@@ -15,6 +15,8 @@ import { SPL_EDITABLE_FIELDS, splJudgmentLabel, splStagePrefix } from "@/compone
 import { SplRequiredDocChecklist } from "@/components/spl/raw-data/SplRequiredDocChecklist";
 import { listSplDocuments } from "@/lib/spl/documents.functions";
 import { SplOcsPanels, type SplPanelKind, type SplPanelTarget } from "@/components/spl/ocs/SplOcsPanels";
+import { useThreadRows } from "@/lib/thread/useThread";
+import { THREAD_KIND_LABEL } from "@/lib/thread/vocab";
 
 const BAND_LABEL: Record<string, string> = {
   REQUIRED_DOC: "Required Doc",
@@ -50,6 +52,7 @@ export function SplDetailBody({ id }: { id: string }) {
     queryKey: ["spl-documents", id],
     queryFn: () => fetchDocs({ data: { splItemId: id } }),
   });
+  const { data: thread } = useThreadRows("SPL", id);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["spl-rows-as-of", today],
@@ -99,6 +102,7 @@ export function SplDetailBody({ id }: { id: string }) {
               { kind: "ocs" as const, icon: MessageSquare, label: "OCS", count: row?.ocs_total ?? 0, pending: row?.ocs_pending ?? 0 },
               { kind: "rsp" as const, icon: Package, label: "RSP", count: row?.rsp_total ?? 0, pending: 0 },
               { kind: "documents" as const, icon: FileText, label: "Documents", count: docs?.length ?? 0, pending: 0 },
+              { kind: "thread" as const, icon: MessagesSquare, label: "Thread", count: thread?.total ?? 0, pending: thread?.open_instructions ?? 0 },
             ] satisfies Array<{ kind: SplPanelKind; icon: typeof FileText; label: string; count: number; pending: number }>).map((b) => (
               <Button
                 key={b.kind}
@@ -122,7 +126,22 @@ export function SplDetailBody({ id }: { id: string }) {
         key={panelTarget ? `${panelTarget.id}:${panelTarget.kind}` : "none"}
         target={panelTarget}
         onClose={() => setPanelTarget(null)}
+        threadStages={catalog.map((c) => ({ code: c.stage_code, label: c.label }))}
       />
+
+      {thread?.latest_decision && (
+        <div className="rounded-md border border-l-4 border-l-[color:var(--primary)] bg-[color-mix(in_oklab,var(--primary)_8%,transparent)] p-2 text-xs">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline" className="text-[10px]">{THREAD_KIND_LABEL.decision}</Badge>
+            <span className="text-[10px] text-muted-foreground">
+              {catalog.find((c) => c.stage_code === thread.latest_decision!.stage_code)?.label ?? thread.latest_decision.stage_code}
+              {" · "}{thread.latest_decision.author_role}
+              {" · "}{fmtDate(thread.latest_decision.created_at)}
+            </span>
+          </div>
+          <p className="whitespace-pre-wrap">{thread.latest_decision.body}</p>
+        </div>
+      )}
 
       {isLoading && !row ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
@@ -215,6 +234,7 @@ export function SplDetailBody({ id }: { id: string }) {
                           <th className="px-2 py-1 text-left">Plan Finish</th>
                           <th className="px-2 py-1 text-left">Actual Finish</th>
                           <th className="px-2 py-1 text-left">Value</th>
+                          <th className="w-16 px-2 py-1 text-right">Thread</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -222,6 +242,8 @@ export function SplDetailBody({ id }: { id: string }) {
                           const c = row.stages[s.stage_code];
                           const lateS = isLate(c?.ps, c?.as);
                           const lateF = isLate(c?.pf, c?.af);
+                          const tc = thread?.stage_counts?.[s.stage_code];
+                          const tOpen = tc?.open_instructions ?? 0;
                           return (
                             <tr key={s.stage_code} className={cn("border-t", c?.na && "bg-muted/40")}>
                               <td className="px-2 py-1">
@@ -239,6 +261,29 @@ export function SplDetailBody({ id }: { id: string }) {
                                 {fmtDate(c?.af)}{lateF && " ⚠"}
                               </td>
                               <td className="px-2 py-1">{c?.na ? "NA" : (c?.fv ?? "—")}</td>
+                              <td className="px-2 py-1 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPanelTarget({
+                                      id: row.id,
+                                      splNumber: row.spl_number,
+                                      kind: "thread",
+                                      stageCode: s.stage_code,
+                                    })
+                                  }
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]",
+                                    tOpen > 0
+                                      ? "bg-[color-mix(in_oklab,var(--destructive)_12%,transparent)] text-[color:var(--destructive)]"
+                                      : "text-muted-foreground/70",
+                                  )}
+                                  title="Thread"
+                                >
+                                  {tOpen > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--destructive)]" />}
+                                  {tc?.total ?? 0}
+                                </button>
+                              </td>
                             </tr>
                           );
                         })}
