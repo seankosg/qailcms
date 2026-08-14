@@ -607,3 +607,150 @@ export const fmtProd = (v: number | null | undefined) =>
   v == null ? '' : `${(v * 100).toFixed(3)}%/인`;
 export const fmtExtra = (v: number | null | undefined, unit = '명/일') =>
   v == null ? '' : `${v > 0 ? '+' : ''}${v.toFixed(1)}${unit}`;
+
+/* ────────────────────────── 날짜별 정본 (차트 · 상세창 공용) ──────────────────────────
+ * 하루치 계획/실적 증가분은 TM 정본 tm_rows_as_of 의 tc_plan_pct · tc_actual_pct 만 쓴다.
+ * 화면과 상세창이 같은 배열을 본다 — 상세창 전용 산식은 만들지 않는다.
+ */
+
+export interface DmrDailyCodeValue {
+  plan: number | null;
+  actual: number;
+}
+
+/** 차트에 허용하는 최대 일수 — 넘으면 날짜별 조회를 걸지 않는다(배치 RPC 부재). */
+export const DAILY_SERIES_MAX_DAYS = 31;
+
+export function periodDates(period: Period): string[] {
+  const out: string[] = [];
+  const n = diffDays(period.start, period.end);
+  if (n < 0) return [period.end];
+  for (let i = 0; i <= n; i += 1) out.push(addDays(period.start, i));
+  return out;
+}
+
+async function fetchTmDaily(date: string): Promise<Map<string, DmrDailyCodeValue>> {
+  const out = new Map<string, DmrDailyCodeValue>();
+  const CHUNK = 1000;
+  for (let from = 0; from < 20_000; from += CHUNK) {
+    const { data, error } = await (supabase as any)
+      .rpc('tm_rows_as_of', { _as_of: date })
+      .select('task_no, tc_plan_pct, tc_actual_pct')
+      .range(from, from + CHUNK - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as Array<Record<string, any>>;
+    for (const r of rows) {
+      const code = String(r.task_no ?? '').trim();
+      if (!code || out.has(code)) continue;
+      out.set(code, {
+        plan: r.tc_plan_pct == null ? null : Number(r.tc_plan_pct),
+        actual: Number(r.tc_actual_pct ?? 0) || 0,
+      });
+    }
+    if (rows.length < CHUNK) break;
+  }
+  return out;
+}
+
+/** 날짜별 정본 조회 — 동시 실행 수를 제한한다. */
+export function useDailyCanon(period: Period, enabled = true) {
+  const dates = periodDates(period);
+  const tooLong = dates.length > DAILY_SERIES_MAX_DAYS;
+  return useQuery({
+    queryKey: ['dmr-daily-canon', dates[0], dates[dates.length - 1], dates.length],
+    enabled: enabled && !tooLong && dates.length > 0,
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async (): Promise<Map<string, Map<string, DmrDailyCodeValue>>> => {
+      const byDate = new Map<string, Map<string, DmrDailyCodeValue>>();
+      const CONCURRENCY = 4;
+      for (let i = 0; i < dates.length; i += CONCURRENCY) {
+        const slice = dates.slice(i, i + CONCURRENCY);
+        const res = await Promise.all(slice.map((d) => fetchTmDaily(d)));
+        slice.forEach((d, k) => byDate.set(d, res[k]));
+      }
+      return byDate;
+    },
+  });
+}
+
+export interface DmrDailyProductivityPoint {
+  date: string;
+  /** 그룹 키 ('' = 전체) */
+  group: string;
+  planProgress: number;
+  actualProgress: number;
+  manpower: number;
+  productiveCodes: number;
+  actualProductivity: number | null;
+  plannedProductivity: number | null;
+}
+
+/**
+ * 날짜별 생산성 — 정본 한 벌.
+ * 실제 생산성(D) = 당일실적 진도(D) ÷ 실제 투입인원(D)
+ * 계획 생산성(D) = 당일계획 진도(D) ÷ 실제 투입인원(D)
+ */
+export function buildDailyPoints(args: {
+  dates: string[];
+  byDate: Map<string, Map<string, DmrDailyCodeValue>>;
+  dmrRows: DmrManpowerRow[];
+  /** 대상 코드 → 그룹 키 목록. 코드가 여러 그룹에 걸치면 각 그룹에 넣는다. */
+  codeGroups: Map<string, string[]>;
+}): DmrDailyProductivityPoint[] {
+  const { dates, byDate, dmrRows, codeGroups } = args;
+  // 날짜·코드별 인원
+  const mpByDateCode = new Map<string, Map<string, number>>();
+  for (const r of dmrRows) {
+    const code = (r.task_no ?? '').trim();
+    if (!code || !codeGroups.has(code)) continue;
+    if (!mpByDateCode.has(r.report_date)) mpByDateCode.set(r.report_date, new Map());
+    const m = mpByDateCode.get(r.report_date)!;
+    m.set(code, (m.get(code) ?? 0) + (Number(r.actual_manpower ?? 0) || 0));
+  }
+
+  const out: DmrDailyProductivityPoint[] = [];
+  for (const d of dates) {
+    const canon = byDate.get(d);
+    const acc = new Map<
+      string,
+      { plan: number; actual: number; manpower: number; productive: number }
+    >();
+    const bump = (g: string) => {
+      let a = acc.get(g);
+      if (!a) {
+        a = { plan: 0, actual: 0, manpower: 0, productive: 0 };
+        acc.set(g, a);
+      }
+      return a;
+    };
+    for (const [code, groups] of codeGroups) {
+      const v = canon?.get(code);
+      const mp = mpByDateCode.get(d)?.get(code) ?? 0;
+      const plan = v?.plan ?? 0;
+      const actual = v?.actual ?? 0;
+      if (!v && mp === 0) continue;
+      for (const g of groups) {
+        const a = bump(g);
+        a.plan += plan;
+        a.actual += actual;
+        a.manpower += mp;
+        if (actual > 0) a.productive += 1;
+      }
+    }
+    for (const [g, a] of acc) {
+      out.push({
+        date: d,
+        group: g,
+        planProgress: a.plan,
+        actualProgress: a.actual,
+        manpower: a.manpower,
+        productiveCodes: a.productive,
+        actualProductivity: a.manpower > 0 ? a.actual / a.manpower : null,
+        plannedProductivity: a.manpower > 0 ? a.plan / a.manpower : null,
+      });
+    }
+  }
+  return out;
+}
