@@ -303,36 +303,67 @@ function median(xs: number[]): number | null {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
+/**
+ * 코드 분류 — 상호배타 우선순위.
+ * 예외(인원 없이 실적) > 진도 정정(음수) > 실적 있음 > 무실적
+ */
+export type CodeClass = 'exceptional' | 'corrected' | 'productive' | 'noProgress';
+export function classifyCode(r: ProductivityRow): CodeClass {
+  const a = r.actual_pct ?? 0;
+  if (r.manpower <= 0 && a !== 0) return 'exceptional';
+  if (a < 0) return 'corrected';
+  if (a > 0) return 'productive';
+  return 'noProgress';
+}
+
 /** 합계는 합 ÷ 합이다 — 행별 생산성의 평균이 아니다. */
 export function summarize(rows: ProductivityRow[], period: Period): ProductivitySummary {
   const calendarDays = Math.max(1, diffDays(period.start, period.end) + 1);
   let manpower = 0;
+  let planManpower = 0;
   let planSum = 0;
   let actualSum = 0;
   let extra = 0;
   const ratios: number[] = [];
   let noMp = 0;
   let gapCodes = 0;
+  let productiveCodes = 0;
+  let noProgressCodes = 0;
+  let correctedCodes = 0;
+  let exceptionalCodes = 0;
   for (const r of rows) {
     manpower += r.manpower;
+    planManpower += r.plan_manpower;
     if (r.plan_pct != null) planSum += r.plan_pct;
     if (r.actual_pct != null) actualSum += r.actual_pct;
     if (r.extra_manpower != null) extra += r.extra_manpower;
     if (r.manpower > 0) ratios.push(Math.min(1, r.record_days / calendarDays));
     if (r.kind === '다') noMp += 1;
     if (r.data_date_gap != null && r.data_date_gap !== 0) gapCodes += 1;
+    const cls = classifyCode(r);
+    if (cls === 'productive') productiveCodes += 1;
+    else if (cls === 'noProgress') noProgressCodes += 1;
+    else if (cls === 'corrected') correctedCodes += 1;
+    else exceptionalCodes += 1;
   }
   const productivity = manpower > 0 ? actualSum / manpower : null;
   const planProductivity = manpower > 0 && planSum > 0 ? planSum / manpower : null;
   return {
     codes: rows.length,
     manpower,
+    planManpower,
+    manpowerVariance: manpower - planManpower,
+    manpowerAchievement: planManpower > 0 ? manpower / planManpower : null,
     planSum,
     actualSum,
     productivity,
     planProductivity,
     achievement: planSum > 0 ? actualSum / planSum : null,
     extraManpower: extra,
+    productiveCodes,
+    noProgressCodes,
+    correctedCodes,
+    exceptionalCodes,
     recordRatioMedian: median(ratios),
     actualWithoutManpower: noMp,
     dataDateGapCodes: gapCodes,
