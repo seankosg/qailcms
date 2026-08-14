@@ -49,7 +49,6 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 export function SplDashboardPage() {
   const search = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
-  const rootNavigate = useNavigate();
   const today = todayInDoha();
   const asOf = search.asOf || today;
 
