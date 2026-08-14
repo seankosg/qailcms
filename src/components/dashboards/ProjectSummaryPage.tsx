@@ -108,10 +108,10 @@ function ProjectSummaryBody() {
         <>
           <TmDashboardSection asOfDate={appliedDate} />
           <LazySection>
-            <SmDashboardSection asOfDate={appliedDate} />
+            <AbdDashboardSection asOfDate={appliedDate} />
           </LazySection>
           <LazySection>
-            <AbdDashboardSection asOfDate={appliedDate} />
+            <SmDashboardSection asOfDate={appliedDate} />
           </LazySection>
         </>
       ) : (
