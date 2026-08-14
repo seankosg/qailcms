@@ -174,11 +174,11 @@ export function SplProgressPage() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Spare Part List — Progress</h1>
-          <p className="text-xs text-muted-foreground">
-            단계 상태는 정본(spl_rows_as_of → spl_eval_as_of → spl_stage_state)이 내려준 값을 세기만 합니다.
-          </p>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">Progress Status</h1>
+          <span className="rounded border px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+            {filtered.length.toLocaleString()} items
+          </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {(["all", "C", "D"] as const).map((p) => (
