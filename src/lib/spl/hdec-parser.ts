@@ -359,8 +359,22 @@ function parseSplViewWorkbook(wb: XLSX.WorkBook, fileName: string): ParsedSplFil
             stageMap.set(cm.stage_code, entry);
           }
           if (cm.field === "flag_value") {
+            // 사전 정본은 flag-value.ts 한 곳뿐이다. 사전에 없으면 경고 목록에만 담고 원문을 유지한다
+            // (파서는 던지지 않는다 — 미리보기는 끝까지 보여야 한다). 저장은 서버가 거부한다.
             const s = String(raw ?? "").trim();
-            entry.fields.flag_value = s === "" ? null : s;
+            const norm = normalizeSplFlagValue(s);
+            if (norm === SPL_FLAG_UNKNOWN) {
+              entry.fields.flag_value = s;
+              out.unknown_flag_values.push({
+                value: s,
+                spl_number: splNumber,
+                sheet_name: sheetName,
+                excel_row: r + 1,
+                stage_code: cm.stage_code,
+              });
+            } else {
+              entry.fields.flag_value = norm;
+            }
           } else if (isNaMarker(raw)) {
             entry.na = true;
             entry.fields[cm.field] = null;
@@ -486,8 +500,22 @@ export async function parseSplHdecFile(file: File): Promise<ParsedSplFile> {
             stageMap.set(cm.stage_code, entry);
           }
           if (cm.field === "flag_value") {
+            // 사전 정본은 flag-value.ts 한 곳뿐이다. 사전에 없으면 경고 목록에만 담고 원문을 유지한다
+            // (파서는 던지지 않는다 — 미리보기는 끝까지 보여야 한다). 저장은 서버가 거부한다.
             const s = String(raw ?? "").trim();
-            entry.fields.flag_value = s === "" ? null : s;
+            const norm = normalizeSplFlagValue(s);
+            if (norm === SPL_FLAG_UNKNOWN) {
+              entry.fields.flag_value = s;
+              out.unknown_flag_values.push({
+                value: s,
+                spl_number: splNumber,
+                sheet_name: sheetName,
+                excel_row: r + 1,
+                stage_code: cm.stage_code,
+              });
+            } else {
+              entry.fields.flag_value = norm;
+            }
           } else if (isNaMarker(raw)) {
             entry.na = true;
             entry.fields[cm.field] = null;
