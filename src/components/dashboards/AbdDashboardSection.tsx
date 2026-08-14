@@ -10,6 +10,7 @@ import type { AbdTeam } from "@/lib/abd/columns";
 import { ProjectModuleSection } from "./ProjectModuleSection";
 import { PdbBreakdownCard, foldTop4 } from "./PdbBreakdownCard";
 import { usePdbLang, usePdbT } from "@/lib/dashboards/pdb-i18n";
+import { usePdbPlot, filterByPlot, plotGridClass } from "@/lib/dashboards/pdb-plot";
 
 function useAbdPlot(plot: "C" | "D", asOfDate: string, f: PdbAbdFilters, unassigned: string) {
   const stages = useMemo<Stage[]>(() => {
