@@ -234,6 +234,7 @@ export function SplDetailBody({ id }: { id: string }) {
                           <th className="px-2 py-1 text-left">Plan Finish</th>
                           <th className="px-2 py-1 text-left">Actual Finish</th>
                           <th className="px-2 py-1 text-left">Value</th>
+                          <th className="w-16 px-2 py-1 text-right">Thread</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -241,6 +242,8 @@ export function SplDetailBody({ id }: { id: string }) {
                           const c = row.stages[s.stage_code];
                           const lateS = isLate(c?.ps, c?.as);
                           const lateF = isLate(c?.pf, c?.af);
+                          const tc = thread?.stage_counts?.[s.stage_code];
+                          const tOpen = tc?.open_instructions ?? 0;
                           return (
                             <tr key={s.stage_code} className={cn("border-t", c?.na && "bg-muted/40")}>
                               <td className="px-2 py-1">
@@ -258,6 +261,29 @@ export function SplDetailBody({ id }: { id: string }) {
                                 {fmtDate(c?.af)}{lateF && " ⚠"}
                               </td>
                               <td className="px-2 py-1">{c?.na ? "NA" : (c?.fv ?? "—")}</td>
+                              <td className="px-2 py-1 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPanelTarget({
+                                      id: row.id,
+                                      splNumber: row.spl_number,
+                                      kind: "thread",
+                                      stageCode: s.stage_code,
+                                    })
+                                  }
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]",
+                                    tOpen > 0
+                                      ? "bg-[color-mix(in_oklab,var(--destructive)_12%,transparent)] text-[color:var(--destructive)]"
+                                      : "text-muted-foreground/70",
+                                  )}
+                                  title="Thread"
+                                >
+                                  {tOpen > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--destructive)]" />}
+                                  {tc?.total ?? 0}
+                                </button>
+                              </td>
                             </tr>
                           );
                         })}
