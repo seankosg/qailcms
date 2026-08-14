@@ -145,12 +145,14 @@ export function OrganizationPage() {
       <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "delegation" | "chart")}>
         <TabsList>
           <TabsTrigger value="delegation">업무 이관</TabsTrigger>
-          <TabsTrigger value="chart">Organization Chart</TabsTrigger>
+          {canReadChart ? <TabsTrigger value="chart">Organization Chart</TabsTrigger> : null}
         </TabsList>
 
-        <TabsContent value="chart" className="mt-4">
-          <OrgChartTab />
-        </TabsContent>
+        {canReadChart ? (
+          <TabsContent value="chart" className="mt-4">
+            <OrgChartTab />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="delegation" className="mt-4 flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
