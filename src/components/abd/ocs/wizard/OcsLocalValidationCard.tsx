@@ -161,52 +161,28 @@ export function OcsLocalValidationCard({
     }
   }
 
-  if (!pkg) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">로컬 검증 (서버 업로드 전)</CardTitle>
-          <CardDescription>먼저 증분 ZIP 을 선택하십시오.</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheck className="h-4 w-4" /> 로컬 검증 · 교정 (내 컴퓨터에서만 실행)
+          <ShieldCheck className="h-4 w-4" /> 4B. Validate and Correct Locally (내 컴퓨터에서만
+          실행)
         </CardTitle>
         <CardDescription>
-          이 단계에서는 서버·데이터베이스·저장소를 전혀 변경하지 않습니다. 오류를 먼저 확인하고
-          안전한 항목만 교정한 뒤, 교정본 ZIP 을 다시 검증해 CLEAN 판정을 받으십시오.
+          Both the matching Baseline ZIP and Increment ZIP are required. 이 단계에서는
+          서버·데이터베이스·저장소를 전혀 변경하지 않습니다. 오류를 먼저 확인하고 안전한 항목만
+          교정한 뒤, 교정본 ZIP 을 다시 검증해 CLEAN 판정을 받으십시오.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="text-sm font-medium">1) Baseline ZIP 선택</label>
-          <input
-            type="file"
-            accept=".zip"
-            className="text-sm"
-            onChange={(e) => void onPickBaseline(e.target.files)}
-          />
-          {baseline && (
-            <Badge variant="outline">
-              {baseline.schema_version} · ABD {baseline.abdIndex?.length ?? 0}건
-            </Badge>
-          )}
-        </div>
-
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             onClick={() => void runValidation()}
-            disabled={!baseline || !baseline.abdIndex || !!busy}
+            disabled={!baseline || !baseline.abdIndex || !pkg || !!busy || !!lockedReason}
           >
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Check This Package on My Computer
+            3. Validate Locally — No Server Upload
           </Button>
           {result && (
             <>
@@ -220,6 +196,18 @@ export function OcsLocalValidationCard({
             </>
           )}
         </div>
+
+        {(!baseline || !pkg || lockedReason) && (
+          <p className="text-xs text-muted-foreground">
+            {lockedReason
+              ? lockedReason
+              : !baseline && !pkg
+                ? "Baseline ZIP 과 Increment ZIP 을 모두 선택하십시오."
+                : !baseline
+                  ? "Baseline ZIP 을 선택하십시오."
+                  : "Increment ZIP 을 선택하십시오."}
+          </p>
+        )}
 
         {baseline && !baseline.abdIndex && (
           <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
