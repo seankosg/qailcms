@@ -33,7 +33,7 @@ import {
 } from "@/lib/spl/scurve";
 import type { SplRow } from "@/lib/spl/rows.functions";
 
-const TERM: Record<SplBucket, string> = { day: "일별", week: "주별", month: "월별" };
+const TERM: Record<SplBucket, string> = { day: "Daily", week: "Weekly", month: "Monthly" };
 
 /**
  * SPL Progress Status — 계획 대비 실적(다른 모듈의 Plan vs Actual 카드와 동일 구성).
@@ -127,8 +127,8 @@ export function SplPlanVsActualCard({
     groups.flatMap((g) => [
       [`planInc_${g.key}`, { label: `${g.label} Plan (${TERM[bucket]})`, color: g.color }],
       [`actualInc_${g.key}`, { label: `${g.label} Actual (${TERM[bucket]})`, color: g.color }],
-      [`cumPlan_${g.key}`, { label: `${g.label} Plan (누적%)`, color: g.color }],
-      [`cumActual_${g.key}`, { label: `${g.label} Actual (누적%)`, color: g.color }],
+      [`cumPlan_${g.key}`, { label: `${g.label} Plan (Cumulative %)`, color: g.color }],
+      [`cumActual_${g.key}`, { label: `${g.label} Actual (Cumulative %)`, color: g.color }],
     ]),
   ) as ChartConfig;
 
@@ -159,7 +159,7 @@ export function SplPlanVsActualCard({
         <CollapsibleContent>
           <CardContent className="space-y-3">
             {!hasData ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">표시할 데이터가 없습니다.</p>
+              <p className="py-12 text-center text-sm text-muted-foreground">No data to display.</p>
             ) : (
               <>
                 {filterSummary.length > 0 && (
@@ -201,7 +201,7 @@ export function SplPlanVsActualCard({
                     );
                   })}
                   {view.trimmed > 0 && (
-                    <span className="text-[11px] text-muted-foreground">뒤쪽 빈 구간 {view.trimmed}개 생략</span>
+                    <span className="text-[11px] text-muted-foreground">{view.trimmed} empty trailing buckets omitted</span>
                   )}
                 </div>
 
@@ -251,7 +251,7 @@ export function SplPlanVsActualCard({
                         dataKey={`planInc_${g.key}`}
                         stackId="plan"
                         fill={`color-mix(in oklab, ${g.color} 45%, transparent)`}
-                        name={`${g.label} Plan (${TERM[bucket]}, 건) — 좌축`}
+                        name={`${g.label} Plan (${TERM[bucket]}, No.) — left axis`}
                         barSize={8}
                         hide={hidden.has(`planInc_${g.key}`)}
                       />
@@ -263,7 +263,7 @@ export function SplPlanVsActualCard({
                         dataKey={`actualInc_${g.key}`}
                         stackId="actual"
                         fill={`color-mix(in oklab, ${g.color} 80%, transparent)`}
-                        name={`${g.label} Actual (${TERM[bucket]}, 건) — 좌축`}
+                        name={`${g.label} Actual (${TERM[bucket]}, No.) — left axis`}
                         barSize={8}
                         hide={hidden.has(`actualInc_${g.key}`)}
                       />
@@ -278,7 +278,7 @@ export function SplPlanVsActualCard({
                         strokeDasharray="6 4"
                         strokeWidth={2}
                         dot={false}
-                        name={`${g.label} Plan (누적%) — 우축`}
+                        name={`${g.label} Plan (Cumulative %) — right axis`}
                         hide={hidden.has(`cumPlan_${g.key}`)}
                       />
                     ))}
@@ -291,7 +291,7 @@ export function SplPlanVsActualCard({
                         stroke={g.color}
                         strokeWidth={3}
                         dot={false}
-                        name={`${g.label} Actual (누적%) — 우축`}
+                        name={`${g.label} Actual (Cumulative %) — right axis`}
                         connectNulls={false}
                         hide={hidden.has(`cumActual_${g.key}`)}
                       />
