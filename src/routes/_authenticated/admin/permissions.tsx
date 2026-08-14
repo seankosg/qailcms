@@ -291,13 +291,13 @@ function PermissionsAdminPage() {
       {permsQ.data && (
         <div className={`rounded-md border px-3 py-2 text-sm ${canonDiffs.length === 0 ? "border-emerald-500/30 bg-emerald-500/5" : "border-destructive/40 bg-destructive/5"}`}>
           <ShieldCheck className="mr-1 inline h-4 w-4" />
-          정본 대조 (ㄷ): 어긋난 칸 {canonDiffs.length} / {RCL_CANON_CELL_COUNT}칸(4역할 × 3범위 × 5동작)
+          정본 대조 (ㄷ): 어긋난 칸 {canonDiffs.length} / {RCL_CANON_CELL_COUNT}칸(5역할 × 3범위 × 5동작)
           {canonDiffs.length > 0 && (
             <span className="ml-2 font-mono text-xs">
               {canonDiffs.map((d) => `${d.role}·${d.scope}·${d.action}: live ${d.live ? "Y" : "N"} / 정본 ${d.canon ? "Y" : "N"}`).join(" · ")}
             </span>
           )}
-          <span className="ml-2 text-xs text-muted-foreground">guest · super_guest 는 정본 미확정(BACKLOG #0804)으로 대조 제외.</span>
+          <span className="ml-2 text-xs text-muted-foreground">super_guest 는 전 모듈 읽기 전용으로 정본화(2026-08-14). guest 는 정본 미확정(BACKLOG #0804)으로 대조 제외.</span>
           <div className="mt-1 text-xs text-muted-foreground">
             어긋난 칸은 <b>알림만</b> 합니다. 자동 정정하지 않습니다 — 어느 쪽이 맞는지는 지시자가 정합니다.
             {" "}격자 값은 <b>DB(rcl_permissions)</b> 에서 읽고 기준표는 <b>코드(src/lib/auth/rcl-canonical.ts)</b> 에 있습니다.
