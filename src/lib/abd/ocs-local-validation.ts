@@ -33,7 +33,7 @@ export const PAYLOAD_DIGEST_PARTS = [
 ] as const;
 /** v1 Baseline 안내 — 문구 고정 */
 export const BASELINE_V1_NOTICE =
-  "This Baseline can still be used by the legacy import flow, but it does not contain the ABD validation index.\nGenerate and download a new Baseline to use browser-local validation.";
+  "이 Baseline 에는 브라우저 검증 인덱스가 없습니다. Latest OCS Baseline 을 새로 생성·다운로드하십시오.";
 
 /**
  * digest 대상 manifest canonical view — 영수증 entry 를 files 목록에서 제외해 digest 순환을 끊는다.
@@ -258,7 +258,7 @@ export function validateIncrementLocally(input: ValidateInput): LocalValidationR
     }
   }
 
-  // 3) ABD Number 해소 (Baseline v2 인덱스 필요)
+  // 3) ABD Number 해소 (검증 sidecar 인덱스가 무결성 검증을 통과한 경우에만)
   let unresolved = 0;
   if (!baseline.abdIndex) {
     issues.push(
