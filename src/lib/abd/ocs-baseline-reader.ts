@@ -4,7 +4,9 @@ import JSZip from "jszip";
 import {
   ABD_ITEMS_INDEX_SCHEMA,
   BASELINE_ABD_INDEX_PATH,
+  BASELINE_DATASETS,
   BASELINE_SCHEMA_VERSIONS_READABLE,
+  sha256Hex,
 } from "@/lib/abd/ocs-baseline-shared";
 import { normalizeAbdNumber } from "@/lib/abd/ocs-number-normalize";
 
@@ -23,7 +25,10 @@ export type BaselineRead = {
   core_hash: string;
   core_table_hashes: Record<string, string>;
   generated_at: string | null;
-  /** v2 만 존재. v1 Baseline 은 null → ABD 번호 존재 검증을 로컬에서 할 수 없다. */
+  /**
+   * 검증 sidecar 가 존재하고 무결성 검증을 통과했을 때만 채워진다.
+   * null 이면 브라우저 ABD 번호 검증 불가 (schema_version 과 무관).
+   */
   abdIndex: AbdIndexRow[] | null;
   /** normalized key → canonical rows (active 만) */
   byNormalized: Map<string, AbdIndexRow[]>;
@@ -63,22 +68,81 @@ export async function readBaselineZip(file: File): Promise<BaselineRead> {
     );
   }
 
+  // 1) 운영 데이터셋 10종 계약 확인 (선언 기준)
+  const declaredFiles = Array.isArray(m["files"])
+    ? (m["files"] as Record<string, unknown>[])
+    : [];
+  const declaredNames = new Set(declaredFiles.map((f) => str(f["relative_path"])));
+  const missingDatasets = BASELINE_DATASETS.filter((d) => !declaredNames.has(`${d}.json`));
+  if (missingDatasets.length > 0) {
+    blockers.push(`manifest.files 데이터셋 누락: ${missingDatasets.join(", ")}`);
+  }
+
+  // 2) 검증 sidecar 선언 → 3~4) 실제 파일 독립 검증
+  const validationFiles = Array.isArray(m["validation_files"])
+    ? (m["validation_files"] as Record<string, unknown>[])
+    : [];
+  const decl = validationFiles.find(
+    (f) => str(f["relative_path"]) === BASELINE_ABD_INDEX_PATH,
+  );
+
   let abdIndex: AbdIndexRow[] | null = null;
   const idxFile = zip.file(BASELINE_ABD_INDEX_PATH);
+  if (decl && !idxFile) {
+    blockers.push(
+      `manifest 가 ${BASELINE_ABD_INDEX_PATH} 를 선언했으나 ZIP 에 파일이 없습니다.`,
+    );
+  }
   if (idxFile) {
     let parsed: Record<string, unknown> = {};
+    let ok = true;
+    const text = await idxFile.async("string");
     try {
-      parsed = JSON.parse(await idxFile.async("string")) as Record<string, unknown>;
+      parsed = JSON.parse(text) as Record<string, unknown>;
     } catch (e) {
       blockers.push(`${BASELINE_ABD_INDEX_PATH} 파싱 실패: ${(e as Error).message}`);
+      ok = false;
     }
-    if (str(parsed["schema_version"]) && str(parsed["schema_version"]) !== ABD_ITEMS_INDEX_SCHEMA) {
+    if (str(parsed["schema_version"]) !== ABD_ITEMS_INDEX_SCHEMA) {
       blockers.push(
-        `ABD 인덱스 schema_version 불일치: ${str(parsed["schema_version"])} ≠ ${ABD_ITEMS_INDEX_SCHEMA}`,
+        `ABD 인덱스 schema_version 불일치: ${str(parsed["schema_version"]) || "(없음)"} ≠ ${ABD_ITEMS_INDEX_SCHEMA}`,
       );
+      ok = false;
     }
     const rows = Array.isArray(parsed["rows"]) ? (parsed["rows"] as Record<string, unknown>[]) : [];
-    abdIndex = rows.map((r) => {
+    const declaredRowCount = Number(parsed["row_count"] ?? NaN);
+    if (!Number.isFinite(declaredRowCount) || declaredRowCount !== rows.length) {
+      blockers.push(
+        `ABD 인덱스 row_count 불일치: 선언 ${String(parsed["row_count"] ?? "(없음)")} ≠ rows ${rows.length}`,
+      );
+      ok = false;
+    }
+    if (decl) {
+      const byteSize = new TextEncoder().encode(text).byteLength;
+      if (Number(decl["byte_size"]) !== byteSize) {
+        blockers.push(
+          `ABD 인덱스 byte size 불일치: 선언 ${String(decl["byte_size"])} ≠ 실제 ${byteSize}`,
+        );
+        ok = false;
+      }
+      const actualHash = await sha256Hex(text);
+      if (str(decl["sha256"]).toLowerCase() !== actualHash) {
+        blockers.push("ABD 인덱스 SHA-256 불일치 — Baseline 이 변조되었을 수 있습니다.");
+        ok = false;
+      }
+      if (Number(decl["row_count"]) !== rows.length) {
+        blockers.push(
+          `validation_files.row_count 불일치: 선언 ${String(decl["row_count"])} ≠ rows ${rows.length}`,
+        );
+        ok = false;
+      }
+    } else {
+      blockers.push(
+        `manifest 에 ${BASELINE_ABD_INDEX_PATH} 의 validation_files 무결성 선언이 없습니다.`,
+      );
+      ok = false;
+    }
+    const mapped = rows.map((r) => {
       const num = str(r["abd_number"]);
       return {
         abd_item_id: str(r["abd_item_id"]),
@@ -87,6 +151,11 @@ export async function readBaselineZip(file: File): Promise<BaselineRead> {
         is_active: r["is_active"] !== false,
       };
     });
+    if (mapped.some((r) => !r.abd_item_id || !r.abd_number)) {
+      blockers.push("ABD 인덱스에 필수 필드(abd_item_id / abd_number)가 누락된 행이 있습니다.");
+      ok = false;
+    }
+    abdIndex = ok ? mapped : null;
   }
 
   const byNormalized = new Map<string, AbdIndexRow[]>();
