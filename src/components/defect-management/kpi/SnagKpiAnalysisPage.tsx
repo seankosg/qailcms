@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
+
 import { DeSnagRoomGroupFilterBar } from "@/components/defect-management/dashboard/DeSnagRoomGroupFilterBar";
 import { useDefectLatestDataDate } from "@/hooks/useDefectLatestDataDate";
 import { useDefectFacet } from "@/hooks/useDefectItems";
@@ -24,16 +27,14 @@ import {
   GROUP_LABELS,
   GROUP_QUERY_PARAM,
   STAGE_LABELS,
+  addDays,
   todayIso,
   type Bucket,
   type GroupBy,
   type PlanMode,
   type Stage,
 } from "@/lib/defect-management/progress-utils";
-import {
-  SnagKpiPlanVsActualCard,
-  type SnagCurveUnit,
-} from "./SnagKpiPlanVsActualCard";
+import { SnagKpiPlanVsActualCard, type SnagCurveUnit } from "./SnagKpiPlanVsActualCard";
 import { SnagGroupProgressChart } from "./SnagGroupProgressChart";
 
 const routeApi = getRouteApi("/_authenticated/closure/snag-management/kpi-analysis");
@@ -54,7 +55,16 @@ export function SnagKpiAnalysisPage() {
   const navigate = useNavigate({ from: "/closure/snag-management/kpi-analysis" });
 
   const setSearch = (patch: Record<string, unknown>) =>
-    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }) as any, replace: true });
+    navigate({
+      search: (prev: Record<string, unknown>) => {
+        const next = { ...prev, ...patch };
+        for (const k of Object.keys(patch)) {
+          if (patch[k] === undefined) delete next[k];
+        }
+        return next as any;
+      },
+      replace: true,
+    });
 
   const plot: PlotKey = search.plot as PlotKey;
   const teams = parseCsv<TeamKey>(search.teams, ALL_TEAMS);
@@ -65,17 +75,26 @@ export function SnagKpiAnalysisPage() {
     .filter(Boolean);
   const bucket: Bucket = search.bucket as Bucket;
   const planMode: PlanMode = search.planMode as PlanMode;
-  const stage: Stage = (STAGE_OPTIONS.includes(search.stageView as Stage)
-    ? (search.stageView as Stage)
-    : "closure") as Stage;
-  const groupBy: GroupBy = (ALL_GROUP_BY.includes(search.groupBy as GroupBy)
-    ? (search.groupBy as GroupBy)
-    : "team") as GroupBy;
+  const stage: Stage = (
+    STAGE_OPTIONS.includes(search.stageView as Stage) ? (search.stageView as Stage) : "closure"
+  ) as Stage;
+  const groupBy: GroupBy = (
+    ALL_GROUP_BY.includes(search.groupBy as GroupBy) ? (search.groupBy as GroupBy) : "team"
+  ) as GroupBy;
   const unit: SnagCurveUnit = search.unit === "pct" ? "pct" : "cnt";
   const rangeDays = search.range as number;
 
   const today = todayIso();
+  const defaultChartStart = addDays(today, -14);
+  const chartEnd = addDays(today, rangeDays);
+  const requestedChartStart = (search.chartStart as string) || "";
+  const chartStart =
+    /^\d{4}-\d{2}-\d{2}$/.test(requestedChartStart) && requestedChartStart <= chartEnd
+      ? requestedChartStart
+      : defaultChartStart;
+
   const { options: dataDateOptions, latest: latestDataDate } = useDefectLatestDataDate();
+
   const [sharedAsOf, setSharedAsOf] = useSnagAsOf();
   const asOfDate = (search.dataDate as string) || sharedAsOf || today;
   useEffect(() => {
@@ -115,10 +134,10 @@ export function SnagKpiAnalysisPage() {
     groupBy,
     asOfDate,
     rangeDays,
+    startDate: chartStart,
   });
 
   const [curveOpen, setCurveOpen] = useState(true);
-
 
   const handleGroupClick = (dim: GroupBy, key: string) => {
     const params = new URLSearchParams();
@@ -132,7 +151,6 @@ export function SnagKpiAnalysisPage() {
     params.set("asOf", asOfDate);
     window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
   };
-
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -170,6 +188,43 @@ export function SnagKpiAnalysisPage() {
                 onChange={(v) => setSearch({ dataDate: v === today ? "" : v })}
                 onReset={() => setSearch({ dataDate: "" })}
               />
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Chart start
+                      </span>
+                      <div className="relative flex items-center">
+                        <Calendar className="absolute left-2 h-3.5 w-3.5 text-muted-foreground" />
+                        <input
+                          type="date"
+                          value={chartStart}
+                          max={chartEnd}
+                          onChange={(e) => setSearch({ chartStart: e.target.value })}
+                          className="h-8 rounded-md border border-input bg-background pl-7 pr-2 text-xs"
+                        />
+                      </div>
+                      {search.chartStart && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => setSearch({ chartStart: undefined })}
+                        >
+                          Reset
+                        </Button>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p className="text-xs">Day: starts from the selected date.</p>
+                    <p className="text-xs">Week: starts from Monday of the selected week.</p>
+                    <p className="text-xs">Month: starts from the 1st of the selected month.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
               <span className="h-5 w-px bg-border" aria-hidden />
 

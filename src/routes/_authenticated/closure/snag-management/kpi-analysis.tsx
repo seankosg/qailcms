@@ -15,6 +15,7 @@ const searchSchema = z.object({
   planMode: fallback(z.enum(["baseline", "remaining"]), "remaining").default("remaining"),
   unit: fallback(z.enum(["cnt", "pct"]), "cnt").default("cnt"),
   dataDate: fallback(z.string(), "").default(""),
+  chartStart: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/snag-management/kpi-analysis")({
