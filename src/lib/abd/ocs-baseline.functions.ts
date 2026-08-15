@@ -431,7 +431,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       baseline_id: baselineId,
       core_hash: coreHashBefore,
       core_table_hashes: (before["core_table_hashes"] ?? {}) as Record<string, string>,
-      schema_version: BASELINE_SCHEMA_VERSION,
+      schema_version: schemaVersion,
       latest_success_import_run_id: latestRunId,
       latest_success_at: (baselineInfo["latest_success_at"] ?? null) as string | null,
       core_last_changed_at: (before["core_last_changed_at"] ?? null) as string | null,
