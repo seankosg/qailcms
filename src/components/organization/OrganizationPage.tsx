@@ -17,6 +17,7 @@ import { ArrowRight, Users, UserCog, CalendarClock, CheckCircle2, Pencil } from 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { DelegationEditDialog } from "./DelegationEditDialog";
 import { OrgChartTab } from "./OrgChartTab";
+import { DemobPlanTab } from "./DemobPlanTab";
 
 interface Row {
   id: string;
@@ -52,7 +53,7 @@ function todayIso() {
 }
 
 export function OrganizationPage() {
-  const [mainTab, setMainTab] = useState<"delegation" | "chart">("delegation");
+  const [mainTab, setMainTab] = useState<"delegation" | "chart" | "demob">("delegation");
   const [asOf, setAsOf] = useState(todayIso());
   const [q, setQ] = useState("");
   const [phase, setPhase] = useState<Phase | "all">("active");
@@ -146,11 +147,18 @@ export function OrganizationPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "delegation" | "chart")}>
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "delegation" | "chart" | "demob")}>
         <TabsList>
           <TabsTrigger value="delegation">업무 이관</TabsTrigger>
           {canReadChart ? <TabsTrigger value="chart">Organization Chart</TabsTrigger> : null}
+          {canSeeDemob ? <TabsTrigger value="demob">Demob Plan</TabsTrigger> : null}
         </TabsList>
+
+        {canSeeDemob ? (
+          <TabsContent value="demob" className="mt-4">
+            <DemobPlanTab />
+          </TabsContent>
+        ) : null}
 
         {canReadChart ? (
           <TabsContent value="chart" className="mt-4">
