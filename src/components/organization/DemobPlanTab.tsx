@@ -61,8 +61,10 @@ export function DemobPlanTab() {
       DEMOB_MODULES.forEach((m) => {
         if (!mods.has(m)) return;
         const c = r.per_module?.[m];
-        if (c?.start && (!first || c.start < first)) first = c.start;
-        if (c?.end && (!demob || c.end > demob)) demob = c.end;
+        const s: string | null = c?.start ?? null;
+        const e: string | null = c?.end ?? null;
+        if (s && (first === null || s < first)) first = s;
+        if (e && (demob === null || e > demob)) demob = e;
       });
       return { ...r, first_date: first, demob_date: demob };
     });
