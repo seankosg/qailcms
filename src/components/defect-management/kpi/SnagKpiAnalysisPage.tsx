@@ -205,7 +205,7 @@ export function SnagKpiAnalysisPage() {
                           variant="ghost"
                           size="sm"
                           className="h-8 px-2 text-xs"
-                          onClick={() => setSearch({ chartStart: "" })}
+                          onClick={() => setSearch({ chartStart: undefined })}
                         >
                           Reset
                         </Button>
