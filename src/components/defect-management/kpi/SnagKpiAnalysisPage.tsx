@@ -83,7 +83,16 @@ export function SnagKpiAnalysisPage() {
   const rangeDays = search.range as number;
 
   const today = todayIso();
+  const defaultChartStart = addDays(today, -14);
+  const chartEnd = addDays(today, rangeDays);
+  const requestedChartStart = (search.chartStart as string) || "";
+  const chartStart =
+    /^\d{4}-\d{2}-\d{2}$/.test(requestedChartStart) && requestedChartStart <= chartEnd
+      ? requestedChartStart
+      : defaultChartStart;
+
   const { options: dataDateOptions, latest: latestDataDate } = useDefectLatestDataDate();
+
   const [sharedAsOf, setSharedAsOf] = useSnagAsOf();
   const asOfDate = (search.dataDate as string) || sharedAsOf || today;
   useEffect(() => {
