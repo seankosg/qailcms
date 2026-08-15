@@ -133,6 +133,7 @@ export function SnagKpiAnalysisPage() {
     groupBy,
     asOfDate,
     rangeDays,
+    startDate: chartStart,
   });
 
   const [curveOpen, setCurveOpen] = useState(true);
