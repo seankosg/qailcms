@@ -304,9 +304,9 @@ export function DemobPlanTab() {
                           </div>
                         </div>
 
-                        {/* 모듈 행 — 한 행에 한 모듈 */}
-                        {isOpen && DEMOB_MODULES.filter((m) => mods.has(m)).map((m) => {
-                          const c = r.per_module?.[m];
+                        {/* 모듈 행 — 한 행에 한 모듈(데이터가 있는 모듈만 표시) */}
+                        {isOpen && DEMOB_MODULES.filter((m) => mods.has(m) && !!r.per_module?.[m]?.end).map((m) => {
+                          const c = r.per_module?.[m]!;
                           return (
                             <div key={m} className="flex items-center border-b bg-muted/20">
                               <div className="w-44 shrink-0 bg-card py-1 pl-7 pr-2 text-[11px] text-muted-foreground">
@@ -314,31 +314,23 @@ export function DemobPlanTab() {
                                 {MODULE_LABEL[m]}
                               </div>
                               <div className="relative h-6 flex-1">
-                                {c?.end ? (
-                                  <>
-                                    <div
-                                      className={cn("absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full", MODULE_BAR[m])}
-                                      style={{
-                                        left: `${axis.pct(dayNum(c.start ?? c.end))}%`,
-                                        width: `${Math.max(axis.pct(dayNum(c.end)) - axis.pct(dayNum(c.start ?? c.end)), 0.4)}%`,
-                                      }}
-                                      title={`${MODULE_LABEL[m]} ${c.start ? formatDdMmmYyyy(c.start) : "?"} ~ ${formatDdMmmYyyy(c.end)} · ${c.count}건`}
-                                    />
-                                    <span
-                                      className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1"
-                                      style={{ left: `${axis.pct(dayNum(c.end))}%` }}
-                                    >
-                                      <span className={cn("-ml-1 h-2 w-2 rounded-full ring-2 ring-background", MODULE_BAR[m])} />
-                                      <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">
-                                        {formatDdMmmYyyy(c.end)}
-                                      </span>
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/70">
-                                    — 해당 없음
+                                <div
+                                  className={cn("absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full", MODULE_BAR[m])}
+                                  style={{
+                                    left: `${axis.pct(dayNum(c.start ?? c.end))}%`,
+                                    width: `${Math.max(axis.pct(dayNum(c.end)) - axis.pct(dayNum(c.start ?? c.end)), 0.4)}%`,
+                                  }}
+                                  title={`${MODULE_LABEL[m]} ${c.start ? formatDdMmmYyyy(c.start) : "?"} ~ ${formatDdMmmYyyy(c.end)} · ${c.count}건`}
+                                />
+                                <span
+                                  className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1"
+                                  style={{ left: `${axis.pct(dayNum(c.end))}%` }}
+                                >
+                                  <span className={cn("-ml-1 h-2 w-2 rounded-full ring-2 ring-background", MODULE_BAR[m])} />
+                                  <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">
+                                    {formatDdMmmYyyy(c.end)}
                                   </span>
-                                )}
+                                </span>
                               </div>
                             </div>
                           );
