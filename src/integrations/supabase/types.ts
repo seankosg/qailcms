@@ -6319,6 +6319,39 @@ export type Database = {
         }
         Relationships: []
       }
+      spl_plan_from_actual_snapshot_20260815: {
+        Row: {
+          actual_finish: string | null
+          actual_start: string | null
+          id: string | null
+          item_id: string | null
+          plan_finish: string | null
+          plan_start: string | null
+          snapshot_at: string
+          stage_code: string | null
+        }
+        Insert: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          id?: string | null
+          item_id?: string | null
+          plan_finish?: string | null
+          plan_start?: string | null
+          snapshot_at?: string
+          stage_code?: string | null
+        }
+        Update: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          id?: string | null
+          item_id?: string | null
+          plan_finish?: string | null
+          plan_start?: string | null
+          snapshot_at?: string
+          stage_code?: string | null
+        }
+        Relationships: []
+      }
       spl_rsp_items: {
         Row: {
           created_at: string
