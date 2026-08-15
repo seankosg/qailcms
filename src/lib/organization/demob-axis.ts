@@ -14,7 +14,7 @@ export function dayNum(iso: string | null | undefined): number {
 export interface DemobAxis {
   minDay: number;
   maxDay: number;
-  ticks: { day: number; label: string }[];
+  ticks: { day: number; label: string; major: boolean }[];
   pct: (day: number) => number;
 }
 
@@ -27,28 +27,35 @@ export function buildDemobAxis(days: number[], todayNum: number): DemobAxis {
   const minDay = rawMin - pad;
   const maxDay = rawMax + pad;
 
-  const ticks: { day: number; label: string }[] = [];
+  const ticks: { day: number; label: string; major: boolean }[] = [];
   const start = new Date((minDay + pad) * DAY_MS);
   let y = start.getUTCFullYear();
   let m = start.getUTCMonth();
-  for (let i = 0; i < 240; i++) {
+  // 월 눈금 개수에 따라 라벨 표시 간격을 조절해 겹침을 방지한다.
+  const months = Math.max(Math.round((maxDay - minDay) / 30.44), 1);
+  const every = months <= 18 ? 1 : months <= 36 ? 2 : months <= 72 ? 3 : 6;
+  let idx = 0;
+  for (let i = 0; i < 2400; i++) {
     const day = Math.floor(Date.UTC(y, m, 1) / DAY_MS);
     if (day > maxDay) break;
     if (day >= minDay) {
       ticks.push({
         day,
+        major: idx % every === 0,
         label: new Date(Date.UTC(y, m, 1)).toLocaleDateString("en-US", {
           month: "short",
           year: "2-digit",
           timeZone: "UTC",
         }),
       });
+      idx += 1;
     }
     m += 1;
     if (m > 11) { m = 0; y += 1; }
   }
 
   const span = Math.max(maxDay - minDay, 1);
-  const pct = (day: number) => ((day - minDay) / span) * 100;
+  const pct = (day: number) =>
+    Number.isFinite(day) ? Math.min(100, Math.max(0, ((day - minDay) / span) * 100)) : 0;
   return { minDay, maxDay, ticks, pct };
 }
