@@ -56,17 +56,21 @@ export function DemobPlanTab() {
   /** 모듈 토글을 반영해 철수일을 재계산한다(끈 모듈은 계산에서 제외). */
   const rows = useMemo(() => {
     return allRows.map((r) => {
-      let first: string | null = null;
-      let demob: string | null = null;
-      DEMOB_MODULES.forEach((m) => {
-        if (!mods.has(m)) return;
+      const starts: string[] = [];
+      const ends: string[] = [];
+      for (const m of DEMOB_MODULES) {
+        if (!mods.has(m)) continue;
         const c = r.per_module?.[m];
-        const s: string | null = c?.start ?? null;
-        const e: string | null = c?.end ?? null;
-        if (s && (first === null || s < first)) first = s;
-        if (e && (demob === null || e > demob)) demob = e;
-      });
-      return { ...r, first_date: first, demob_date: demob };
+        if (c?.start) starts.push(c.start);
+        if (c?.end) ends.push(c.end);
+      }
+      starts.sort();
+      ends.sort();
+      return {
+        ...r,
+        first_date: starts[0] ?? null,
+        demob_date: ends[ends.length - 1] ?? null,
+      };
     });
   }, [allRows, mods]);
 
