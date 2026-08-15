@@ -9181,6 +9181,7 @@ export type Database = {
         Returns: boolean
       }
       is_system_admin: { Args: { _user_id?: string }; Returns: boolean }
+      org_demob_can_view: { Args: never; Returns: boolean }
       org_demob_plan: { Args: never; Returns: Json }
       plot_module_team_last_date: {
         Args: never
