@@ -1,16 +1,13 @@
 import { useMemo } from "react";
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 import { todayInDoha } from "@/lib/time/doha";
-import { getSplRowsAsOf, getSplEstimatedCells, type SplCatalogEntry } from "@/lib/spl/rows.functions";
-import { splJudgmentLabel } from "@/components/spl/raw-data/spl-columns";
-import { SplKpiCard } from "./SplKpiCard";
+import { getSplRowsAsOf, type SplCatalogEntry } from "@/lib/spl/rows.functions";
 import { SplBreakdownCards } from "./SplBreakdownCards";
 import { SplPlanVsActualCard } from "./SplPlanVsActualCard";
 import { splSeriesColor, type SplBucket, type SplPlanMode, type SplSeriesGroup } from "@/lib/spl/scurve";
@@ -23,8 +20,6 @@ const BAND_LABEL: Record<string, string> = {
   DOCUMENTATION: "Documentation Stage",
   PO: "PO Stage",
 };
-
-const JUDGMENTS = ["제외", "완료", "정상", "지연", "미착수", "미분류"] as const;
 
 const BUCKETS: Array<{ v: SplBucket; label: string }> = [
   { v: "day", label: "Day" },
@@ -54,7 +49,6 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 export function SplDashboardPage() {
   const search = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
-  const rootNavigate = useNavigate();
   const today = todayInDoha();
   const asOf = search.asOf || today;
 
@@ -62,12 +56,6 @@ export function SplDashboardPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["spl-rows-as-of", asOf],
     queryFn: () => fetchRows({ data: { as_of: asOf } }),
-  });
-
-  const fetchEstimated = useServerFn(getSplEstimatedCells);
-  const { data: estimated } = useQuery({
-    queryKey: ["spl-estimated-cells"],
-    queryFn: () => fetchEstimated({ data: undefined as never }),
   });
 
   const rows = data?.rows ?? [];
@@ -145,36 +133,9 @@ export function SplDashboardPage() {
     { label: "Items", value: filteredRows.length.toLocaleString() },
   ];
 
-  const delayBands = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const s of catalog) if (!s.chain_excluded) m.set(s.band, m.get(s.band) ?? 0);
-    for (const r of filteredRows)
-      if (r.primary_delay) m.set(r.primary_delay.band, (m.get(r.primary_delay.band) ?? 0) + 1);
-    return [...m.entries()];
-  }, [filteredRows, catalog]);
-
-  const reqDoc = useMemo(() => {
-    const full = filteredRows.filter((r) => r.req_doc_total > 0 && r.req_doc_done === r.req_doc_total).length;
-    const sum = filteredRows.reduce((a, r) => a + r.req_doc_done, 0);
-    const denom = filteredRows.reduce((a, r) => a + r.req_doc_total, 0);
-    return { full, pct: denom === 0 ? 0 : Math.round((sum * 1000) / denom) / 10 };
-  }, [filteredRows]);
-
-  /** 필터가 걸리면 판정 카운트도 같은 모집단에서 다시 센다 (합계 = 모집단 검산 유지) */
-  const counts = useMemo(() => {
-    if (plot === "all" && team === "all") return data?.judgment_counts ?? {};
-    const m: Record<string, number> = {};
-    for (const r of filteredRows) m[r.judgment] = (m[r.judgment] ?? 0) + 1;
-    return m;
-  }, [data?.judgment_counts, filteredRows, plot, team]);
-  const countsSum = JUDGMENTS.reduce((a, j) => a + (counts[j] ?? 0), 0);
-  const population = plot === "all" && team === "all" ? (data?.total_count ?? 0) : filteredRows.length;
-  const reconOk = countsSum === population;
-  const viol = data?.violations;
-
   /** 카드 = 드릴다운 — Raw Data 로 이동하며 동일 술어를 검색 파라미터로 전달 */
   const drill = (patch: Record<string, unknown>) =>
-    (rootNavigate as (opts: unknown) => void)({
+    (navigate as (opts: unknown) => void)({
       to: "/closure/spare-part/raw-data",
       search: {
         asOf: search.asOf ?? "",
@@ -213,93 +174,6 @@ export function SplDashboardPage() {
         <div className="p-6 text-sm text-destructive">{(error as Error).message}</div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
-            <SplKpiCard
-              label="Population (documents)"
-              value={population}
-              onClick={() => drill({ judgment: "all" })}
-              note={reconOk ? "Sum = population ✓" : `Reconciliation mismatch: sum ${countsSum}`}
-              tone={reconOk ? undefined : "warn"}
-            />
-            {JUDGMENTS.map((j) => (
-              <SplKpiCard
-                key={j}
-                label={splJudgmentLabel(j)}
-                value={counts[j] ?? 0}
-                onClick={() => drill({ judgment: j })}
-                note={
-                  j === "미분류"
-                    ? "No plan and no actual (denominator 0)"
-                    : j === "지연"
-                      ? "Documents with a primary delay"
-                      : j === "미착수"
-                        ? "No judgeable stage in the active band"
-                        : j === "완료"
-                          ? `No HDEC actual: ${data?.hdec_missing_done ?? 0}`
-                          : undefined
-                }
-                tone={j === "지연" ? "bad" : j === "미분류" ? "warn" : undefined}
-              />
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-muted-foreground">Primary delay by band</span>
-            {delayBands.map(([band, n]) => (
-              <Button
-                key={band}
-                size="sm"
-                variant="outline"
-                className="h-7 text-[11px]"
-                onClick={() => drill({ delayBand: band })}
-              >
-                {BAND_LABEL[band] ?? band} {n}
-              </Button>
-            ))}
-            <Badge variant="outline" className="text-[11px]">
-              Required documents ready {reqDoc.pct}% · fully ready {reqDoc.full} (not part of the judgment population)
-            </Badge>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-[11px]"
-              onClick={() => drill({ hdecMissing: true })}
-            >
-              No HDEC actual: {data?.hdec_missing_items ?? 0}
-            </Button>
-            {viol && (
-              <>
-                <Badge variant={viol.total > 0 ? "destructive" : "outline"} className="gap-1 text-[11px]">
-                  <AlertTriangle className="h-3 w-3" />
-                  선후관계 위반 {viol.total}건
-                  {viol.total > 0 && (
-                    <span className="opacity-80">· 최근 임포트 발생 {viol.from_last_import}건</span>
-                  )}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="text-[11px]"
-                  title="No progress row exists for the preceding stage — HDEC import incomplete, not an actual sequence reversal"
-                >
-                  Data not loaded {viol.import_incomplete ?? 0}
-                </Badge>
-              </>
-            )}
-            {(data?.plan_items ?? 0) === 0 && (
-              <Badge variant="secondary" className="text-[11px]">
-                No HDEC plan dates loaded — delay judgment not applied (items with a plan date: {data?.plan_items ?? 0})
-              </Badge>
-            )}
-            {!reconOk && (
-              <Badge variant="outline" className="text-[11px] text-amber-600">
-                Reconciliation mismatch: sum {countsSum} / population {population}
-              </Badge>
-            )}
-            <Badge variant="outline" className="text-[11px]">
-              Estimated actuals: {estimated?.items ?? 0} documents (back-filled · shown in italics)
-            </Badge>
-          </div>
-
           <SplBreakdownCards
             rows={filteredRows}
             catalog={orderedCatalog}
