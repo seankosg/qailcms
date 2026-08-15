@@ -64,8 +64,12 @@ export function OrganizationPage() {
   const canReadChart =
     !!me && (me.isStrictAdmin || me.userType === "hdec_pic" || !!me.hdec_pic_name);
 
-  /** Demob Plan 열람 = System Administrator 전용. */
-  const canSeeDemob = !!me && me.isSystemAdmin;
+  /** Demob Plan 열람 = System Administrator + 지정 사용자(정본은 RPC 내부 게이트). */
+  const DEMOB_ALLOW = ["신원재", "채홍욱", "성영광", "김영서", "김대수", "정경호"];
+  const canSeeDemob =
+    !!me &&
+    (me.isSystemAdmin ||
+      DEMOB_ALLOW.includes(((me.hdec_pic_name ?? me.name) ?? "").trim()));
 
   /** 수정·삭제 게이트 — 본인(등록자/인계자) 또는 Superuser 이상. 정본은 서버 RLS. */
   const canManage = (r: Row) => {
