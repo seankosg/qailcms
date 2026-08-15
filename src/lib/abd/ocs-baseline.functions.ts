@@ -456,7 +456,6 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       })),
       // 기존 로컬 프로그램은 알 수 없는 필드를 무시한다 — files/total_rows 계약 불변.
       validation_files: validationFiles,
-      zip_object_name: "",
     };
     zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 

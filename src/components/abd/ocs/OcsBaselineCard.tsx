@@ -26,14 +26,13 @@ export function OcsBaselineCard() {
   const signFn = useServerFn(signOcsBaseline);
   const [busy, setBusy] = useState<string | null>(null);
   const [res, setRes] = useState<BaselineResult | null>(null);
-  const [compat, setCompat] = useState<"v2" | "v1">("v2");
 
   if (!canAccessAbdOcs({ userType: me?.userType, team: me?.team, isStrictAdmin: me?.isStrictAdmin })) return null;
 
   async function onCreate() {
     setBusy("Baseline 생성 중… (정본 추출 → 해시 대조 → ZIP)");
     try {
-      const out = (await createFn({ data: { compat } })) as BaselineResult;
+      const out = (await createFn({})) as BaselineResult;
       setRes(out);
       toast.success(out.reused ? "동일 core — 기존 Baseline 재사용" : "Baseline 생성 완료");
     } catch (e) {
@@ -62,31 +61,12 @@ export function OcsBaselineCard() {
           <Database className="h-4 w-4" /> Latest OCS Baseline
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          로컬 증분 패키지 제작용 정본 스냅샷({compat === "v1" ? "JSON 10종" : "JSON 11종"})입니다.
-          이미지·Excel 바이너리는 제외되며 metadata·storage_path·content_hash 만 포함합니다.
+          기존 QAIL OCS Increment 프로그램과 브라우저 로컬 검증에서 함께 사용하는 단일
+          Baseline입니다. 이미지·Excel 바이너리는 제외되며 metadata·storage_path·content_hash 만
+          포함합니다.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">생성 규격</span>
-          <Button
-            size="sm"
-            variant={compat === "v2" ? "default" : "outline"}
-            disabled={!!busy}
-            onClick={() => setCompat("v2")}
-          >
-            기본 (v2 · 로컬 검증 인덱스 포함)
-          </Button>
-          <Button
-            size="sm"
-            variant={compat === "v1" ? "default" : "outline"}
-            disabled={!!busy}
-            onClick={() => setCompat("v1")}
-          >
-            로컬 도구 호환 (v1)
-          </Button>
-        </div>
-
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" disabled={!!busy} onClick={() => void onCreate()}>
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -118,6 +98,12 @@ export function OcsBaselineCard() {
             <div className="rounded-md border p-3">
               <Row label="baseline_id (short)" value={shortId(res.baseline_id)} />
               <Row label="schema_version" value={res.schema_version} />
+              <Row label="운영 데이터셋" value={`${res.files.length}종`} />
+              <Row
+                label="Browser validation index"
+                value={res.validation_files.length > 0 ? "포함" : "없음"}
+              />
+              <Row label="index row count" value={res.validation_row_count.toLocaleString()} />
               <Row label="core_hash (short)" value={shortId(res.core_hash)} />
               <Row label="generated_at" value={formatDdMmmYyyyHm(res.generated_at)} />
               <Row label="data_date (Doha)" value={res.data_date} />
