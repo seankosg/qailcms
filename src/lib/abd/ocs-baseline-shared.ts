@@ -1,15 +1,19 @@
 // ABD OCS Latest Baseline — 클라이언트/서버 공용 상수·산식.
 // baseline_id 산식은 여기 하나에만 존재한다. (증분 Import precheck 도 동일 산식을 쓴다)
 
-/** 현재 생성 계약. v2 = 기존 10개 데이터셋 + validation/abd_items_index.json */
-export const BASELINE_SCHEMA_VERSION = "ocs-baseline-v2";
-/** 읽기 호환을 유지하는 구 계약 */
-export const BASELINE_SCHEMA_VERSION_V1 = "ocs-baseline-v1";
+/**
+ * 신규 생성 정본 계약 — 단일 호환 규격.
+ * manifest.files 는 데이터셋 10종만 선언하고, 브라우저 검증 인덱스는
+ * validation_files sidecar 로만 선언한다. (기존 로컬 프로그램 계약 유지)
+ */
+export const BASELINE_SCHEMA_VERSION = "ocs-baseline-v1";
+/** 과거 생성분 읽기 호환 전용. 신규 생성에는 사용하지 않는다. */
+export const BASELINE_SCHEMA_VERSION_LEGACY_V2 = "ocs-baseline-v2";
 export const BASELINE_SCHEMA_VERSIONS_READABLE = [
   BASELINE_SCHEMA_VERSION,
-  BASELINE_SCHEMA_VERSION_V1,
+  BASELINE_SCHEMA_VERSION_LEGACY_V2,
 ] as const;
-/** 로컬 검증 참조 인덱스 (v2 전용, 읽기 전용 최소 필드) */
+/** 로컬 검증 참조 인덱스 sidecar (읽기 전용 최소 필드) */
 export const BASELINE_ABD_INDEX_PATH = "validation/abd_items_index.json";
 export const ABD_ITEMS_INDEX_SCHEMA = "abd-items-index/1";
 export const BASELINE_BUCKET = "db-backups";
@@ -81,8 +85,8 @@ export async function computeBaselineIdCandidates(
   coreHash: string,
   latestRunId: string,
 ): Promise<{ v2: string; v1: string; all: string[] }> {
-  const v2 = await computeBaselineId(BASELINE_SCHEMA_VERSION, coreHash, latestRunId);
-  const v1 = await computeBaselineId(BASELINE_SCHEMA_VERSION_V1, coreHash, latestRunId);
+  const v1 = await computeBaselineId(BASELINE_SCHEMA_VERSION, coreHash, latestRunId);
+  const v2 = await computeBaselineId(BASELINE_SCHEMA_VERSION_LEGACY_V2, coreHash, latestRunId);
   return { v2, v1, all: [v2, v1] };
 }
 
