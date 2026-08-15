@@ -64,6 +64,9 @@ export function OrganizationPage() {
   const canReadChart =
     !!me && (me.isStrictAdmin || me.userType === "hdec_pic" || !!me.hdec_pic_name);
 
+  /** Demob Plan 열람 = System Administrator 전용. */
+  const canSeeDemob = !!me && me.isSystemAdmin;
+
   /** 수정·삭제 게이트 — 본인(등록자/인계자) 또는 Superuser 이상. 정본은 서버 RLS. */
   const canManage = (r: Row) => {
     if (!me) return false;
