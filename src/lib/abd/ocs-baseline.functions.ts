@@ -7,6 +7,7 @@ import {
   BASELINE_BUCKET,
   BASELINE_DATASETS,
   BASELINE_SCHEMA_VERSION,
+  BASELINE_SCHEMA_VERSION_V1,
   BASELINE_SIGNED_URL_SECONDS,
   BASELINE_ABD_INDEX_PATH,
   ABD_ITEMS_INDEX_SCHEMA,
@@ -211,8 +212,18 @@ async function readSidecar(admin: unknown, baselineId: string): Promise<StoredMa
 
 export const createOcsBaseline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<BaselineResult> => {
+  .inputValidator((data: unknown) => {
+    const raw = (data ?? {}) as { compat?: unknown };
+    const compat = raw.compat === "v1" ? "v1" : "v2";
+    return { compat } as { compat: "v1" | "v2" };
+  })
+  .handler(async ({ context, data }): Promise<BaselineResult> => {
     await assertAdmin(context.supabase, context.userId);
+
+    // 생성 규격 — v1 은 로컬 도구(ocs_increment_tool) 호환용: 인덱스 파일을 넣지 않는다.
+    const schemaVersion =
+      data.compat === "v1" ? BASELINE_SCHEMA_VERSION_V1 : BASELINE_SCHEMA_VERSION;
+    const withAbdIndex = data.compat !== "v1";
 
     // 1) core hash before + 최신 성공 Import run
     const before = await rpc(context.supabase, "abd_ocs_baseline_core_hash");
@@ -222,7 +233,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
     const coreHashBefore = String(before["core_hash"] ?? "");
     const latestRunId = (baselineInfo["latest_success_import_run_id"] ?? null) as string | null;
     const baselineId = await computeBaselineId(
-      BASELINE_SCHEMA_VERSION,
+      schemaVersion,
       coreHashBefore,
       latestRunId ?? "",
     );
@@ -255,7 +266,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         core_table_hashes: (stored.base_core_table_hashes ??
           before["core_table_hashes"] ??
           {}) as Record<string, string>,
-        schema_version: BASELINE_SCHEMA_VERSION,
+        schema_version: schemaVersion,
         latest_success_import_run_id: latestRunId,
         latest_success_at: (stored.latest_success_at ??
           baselineInfo["latest_success_at"] ??
@@ -333,7 +344,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
     }
 
     // 5-1) v2 — 로컬 검증용 ABD 번호 인덱스 (읽기 전용, core hash 의미는 바뀌지 않는다)
-    {
+    if (withAbdIndex) {
       const indexRows = await buildAbdItemsIndex(context.supabase);
       const text = JSON.stringify(
         {
@@ -355,7 +366,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
 
     const generatedAt = new Date();
     const manifest = {
-      schema_version: BASELINE_SCHEMA_VERSION,
+      schema_version: schemaVersion,
       baseline_id: baselineId,
       base_baseline_id: baselineId,
       base_import_run_id: latestRunId,
