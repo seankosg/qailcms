@@ -402,26 +402,28 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       zip.file(name, text);
     }
 
-    // 5-1) v2 — 로컬 검증용 ABD 번호 인덱스 (읽기 전용, core hash 의미는 바뀌지 않는다)
-    if (withAbdIndex) {
-      const indexRows = await buildAbdItemsIndex(context.supabase);
-      const text = JSON.stringify(
-        {
-          schema_version: ABD_ITEMS_INDEX_SCHEMA,
-          generated_at: new Date().toISOString(),
-          rows: indexRows,
-        },
-        null,
-        0,
-      );
-      files.push({
-        name: BASELINE_ABD_INDEX_PATH,
-        byte_size: new TextEncoder().encode(text).byteLength,
-        sha256: await sha256Hex(text),
+    // 5-1) 브라우저 검증 sidecar — 운영 files 배열·total_rows 에는 절대 넣지 않는다.
+    //      core hash 의미는 바뀌지 않는다 (읽기 전용 인덱스).
+    const indexRows = await buildAbdItemsIndex(context.supabase);
+    const indexText = JSON.stringify(
+      {
+        schema_version: ABD_ITEMS_INDEX_SCHEMA,
+        generated_at: new Date().toISOString(),
         row_count: indexRows.length,
-      });
-      zip.file(BASELINE_ABD_INDEX_PATH, text);
-    }
+        rows: indexRows,
+      },
+      null,
+      0,
+    );
+    const validationFiles: BaselineValidationFileInfo[] = [
+      {
+        relative_path: BASELINE_ABD_INDEX_PATH,
+        byte_size: new TextEncoder().encode(indexText).byteLength,
+        sha256: await sha256Hex(indexText),
+        row_count: indexRows.length,
+      },
+    ];
+    zip.file(BASELINE_ABD_INDEX_PATH, indexText);
 
     const generatedAt = new Date();
     const manifest = {
@@ -452,6 +454,9 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         sha256: f.sha256,
         row_count: f.row_count,
       })),
+      // 기존 로컬 프로그램은 알 수 없는 필드를 무시한다 — files/total_rows 계약 불변.
+      validation_files: validationFiles,
+      zip_object_name: "",
     };
     zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 
@@ -476,7 +481,9 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       .from(BASELINE_BUCKET)
       .upload(
         sidecarPath(baselineId),
-        new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" }),
+        new Blob([JSON.stringify({ ...manifest, zip_object_name: fileName }, null, 2)], {
+          type: "application/json",
+        }),
         { upsert: true, contentType: "application/json" },
       );
     if (sideErr) throw new Error(`manifest sidecar 저장 실패: ${sideErr.message}`);
@@ -500,6 +507,8 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       zip_byte_size: zipBytes.byteLength,
       total_rows: manifest.total_rows,
       files,
+      validation_files: validationFiles,
+      validation_row_count: indexRows.length,
       reused: false,
       signed_url: signed?.signedUrl ?? "",
       signed_url_expires_in: BASELINE_SIGNED_URL_SECONDS,
