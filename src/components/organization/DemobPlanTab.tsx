@@ -289,12 +289,12 @@ export function DemobPlanTab() {
                             )}
                             {r.demob_date && (
                               <div
-                                className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1"
+                                className="absolute inset-y-0 flex -translate-x-1/2 flex-col items-center justify-center leading-none"
                                 style={{ left: `${axis.pct(dayNum(r.demob_date))}%` }}
                               >
-                                <span className="-ml-1.5 h-3 w-3 rotate-45 rounded-[2px] bg-primary" />
+                                <span className="h-3 w-3 rotate-45 rounded-[2px] bg-primary" />
                                 <button
-                                  className="whitespace-nowrap font-mono text-[10px] font-semibold text-primary underline-offset-2 hover:underline"
+                                  className="mt-0.5 whitespace-nowrap font-mono text-[10px] font-semibold text-primary underline-offset-2 hover:underline"
                                   onClick={(e) => { e.stopPropagation(); setDetail(r); }}
                                 >
                                   {formatDdMmmYyyy(r.demob_date)}
@@ -323,11 +323,11 @@ export function DemobPlanTab() {
                                   title={`${MODULE_LABEL[m]} ${c.start ? formatDdMmmYyyy(c.start) : "?"} ~ ${formatDdMmmYyyy(c.end)} · ${c.count}건`}
                                 />
                                 <span
-                                  className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1"
+                                  className="absolute inset-y-0 flex -translate-x-1/2 flex-col items-center justify-center leading-none"
                                   style={{ left: `${axis.pct(dayNum(c.end))}%` }}
                                 >
-                                  <span className={cn("-ml-1 h-2 w-2 rounded-full ring-2 ring-background", MODULE_BAR[m])} />
-                                  <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">
+                                  <span className={cn("h-2 w-2 rounded-full ring-2 ring-background", MODULE_BAR[m])} />
+                                  <span className="mt-0.5 whitespace-nowrap font-mono text-[10px] text-muted-foreground">
                                     {formatDdMmmYyyy(c.end)}
                                   </span>
                                 </span>
