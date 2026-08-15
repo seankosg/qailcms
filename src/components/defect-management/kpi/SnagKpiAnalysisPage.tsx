@@ -56,7 +56,13 @@ export function SnagKpiAnalysisPage() {
 
   const setSearch = (patch: Record<string, unknown>) =>
     navigate({
-      search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }) as any,
+      search: (prev: Record<string, unknown>) => {
+        const next = { ...prev, ...patch };
+        for (const k of Object.keys(patch)) {
+          if (patch[k] === undefined) delete next[k];
+        }
+        return next as any;
+      },
       replace: true,
     });
 
