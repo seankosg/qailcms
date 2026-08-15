@@ -7,7 +7,6 @@ import {
   BASELINE_BUCKET,
   BASELINE_DATASETS,
   BASELINE_SCHEMA_VERSION,
-  BASELINE_SCHEMA_VERSION_V1,
   BASELINE_SIGNED_URL_SECONDS,
   BASELINE_ABD_INDEX_PATH,
   ABD_ITEMS_INDEX_SCHEMA,
@@ -59,6 +58,14 @@ function dohaStampCompact(d: Date): string {
 
 export type BaselineFileInfo = {
   name: string;
+  byte_size: number;
+  sha256: string;
+  row_count: number;
+};
+
+/** 브라우저 검증 sidecar 선언 (manifest.validation_files) */
+export type BaselineValidationFileInfo = {
+  relative_path: string;
   byte_size: number;
   sha256: string;
   row_count: number;
@@ -154,13 +161,15 @@ export type BaselineResult = {
   zip_byte_size: number;
   total_rows: number;
   files: BaselineFileInfo[];
+  validation_files: BaselineValidationFileInfo[];
+  validation_row_count: number;
   reused: boolean;
   signed_url: string;
   signed_url_expires_in: number;
 };
 
-/** 기존 baseline_id 폴더에 zip 이 있으면 재사용 (첫 객체) */
-async function findExisting(admin: unknown, baselineId: string) {
+/** baseline_id 폴더의 ZIP 목록에서 sidecar 가 가리키는 최신 object 를 우선 반환 */
+async function findExisting(admin: unknown, baselineId: string, preferName?: string | null) {
   const client = admin as {
     storage: {
       from: (b: string) => {
@@ -177,7 +186,12 @@ async function findExisting(admin: unknown, baselineId: string) {
   const { data } = await client.storage.from(BASELINE_BUCKET).list(baselineFolder(baselineId), {
     limit: 100,
   });
-  return (data ?? []).find((f) => f.name.endsWith(".zip")) ?? null;
+  const zips = (data ?? []).filter((f) => f.name.endsWith(".zip"));
+  if (preferName) {
+    const hit = zips.find((f) => f.name === preferName);
+    if (hit) return hit;
+  }
+  return zips[0] ?? null;
 }
 
 /** 재사용 시 원래 metadata 를 되살리기 위한 manifest sidecar 경로 */
@@ -191,6 +205,8 @@ type StoredManifest = {
   latest_success_at?: string | null;
   core_last_changed_at?: string | null;
   files?: { relative_path: string; byte_size: number; sha256: string; row_count: number }[];
+  validation_files?: BaselineValidationFileInfo[];
+  zip_object_name?: string;
 };
 
 async function readSidecar(admin: unknown, baselineId: string): Promise<StoredManifest | null> {
@@ -210,20 +226,48 @@ async function readSidecar(admin: unknown, baselineId: string): Promise<StoredMa
   }
 }
 
+/**
+ * 기존 object 재사용 가능 여부 — sidecar 선언과 ZIP 내부 실제 파일을 독립 검증한다.
+ * 하나라도 어긋나면 재사용하지 않고 새 object 를 생성한다(기존 object 는 보존).
+ */
+async function existingZipHasValidSidecar(
+  admin: unknown,
+  path: string,
+  stored: StoredManifest | null,
+): Promise<boolean> {
+  const decl = stored?.validation_files?.find((f) => f.relative_path === BASELINE_ABD_INDEX_PATH);
+  if (!decl || !decl.sha256 || !Number.isFinite(decl.byte_size)) return false;
+  const client = admin as {
+    storage: {
+      from: (b: string) => { download: (p: string) => Promise<{ data: Blob | null }> };
+    };
+  };
+  const { data } = await client.storage.from(BASELINE_BUCKET).download(path);
+  if (!data) return false;
+  try {
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(await data.arrayBuffer());
+    const entry = zip.file(BASELINE_ABD_INDEX_PATH);
+    if (!entry) return false;
+    const text = await entry.async("string");
+    if (new TextEncoder().encode(text).byteLength !== decl.byte_size) return false;
+    if ((await sha256Hex(text)) !== decl.sha256.toLowerCase()) return false;
+    const parsed = JSON.parse(text) as { schema_version?: string; row_count?: number; rows?: unknown[] };
+    if (parsed.schema_version !== ABD_ITEMS_INDEX_SCHEMA) return false;
+    const rows = Array.isArray(parsed.rows) ? parsed.rows.length : -1;
+    return rows >= 0 && rows === parsed.row_count && rows === decl.row_count;
+  } catch {
+    return false;
+  }
+}
+
 export const createOcsBaseline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => {
-    const raw = (data ?? {}) as { compat?: unknown };
-    const compat = raw.compat === "v1" ? "v1" : "v2";
-    return { compat } as { compat: "v1" | "v2" };
-  })
-  .handler(async ({ context, data }): Promise<BaselineResult> => {
+  .handler(async ({ context }): Promise<BaselineResult> => {
     await assertAdmin(context.supabase, context.userId);
 
-    // 생성 규격 — v1 은 로컬 도구(ocs_increment_tool) 호환용: 인덱스 파일을 넣지 않는다.
-    const schemaVersion =
-      data.compat === "v1" ? BASELINE_SCHEMA_VERSION_V1 : BASELINE_SCHEMA_VERSION;
-    const withAbdIndex = data.compat !== "v1";
+    // 단일 호환 규격 — manifest 는 v1, 데이터셋 10종, 브라우저 검증 인덱스는 sidecar 로 항상 포함.
+    const schemaVersion = BASELINE_SCHEMA_VERSION;
 
     // 1) core hash before + 최신 성공 Import run
     const before = await rpc(context.supabase, "abd_ocs_baseline_core_hash");
@@ -240,15 +284,27 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 2) 동일 baseline_id 재사용
-    const existing = await findExisting(supabaseAdmin, baselineId);
-    if (existing) {
+    // 2) 동일 baseline_id 재사용 — sidecar 무결성을 만족할 때만
+    const storedForReuse = await readSidecar(supabaseAdmin, baselineId);
+    const existing = await findExisting(
+      supabaseAdmin,
+      baselineId,
+      storedForReuse?.zip_object_name ?? null,
+    );
+    const reusable =
+      existing != null &&
+      (await existingZipHasValidSidecar(
+        supabaseAdmin,
+        `${baselineFolder(baselineId)}/${existing.name}`,
+        storedForReuse,
+      ));
+    if (existing && reusable) {
       const path = `${baselineFolder(baselineId)}/${existing.name}`;
       const { data: signed, error: signErr } = await supabaseAdmin.storage
         .from(BASELINE_BUCKET)
         .createSignedUrl(path, BASELINE_SIGNED_URL_SECONDS);
       if (signErr) throw new Error(signErr.message);
-      const stored = await readSidecar(supabaseAdmin, baselineId);
+      const stored = storedForReuse;
       if (!stored) {
         throw new Error(
           "BASELINE_SIDECAR_MISSING: 기존 ZIP 의 manifest sidecar 를 읽지 못했습니다. 해당 폴더를 정리한 뒤 다시 생성하십시오.",
@@ -260,6 +316,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         sha256: f.sha256,
         row_count: f.row_count,
       }));
+      const storedValidation = stored.validation_files ?? [];
       return {
         baseline_id: baselineId,
         core_hash: coreHashBefore,
@@ -280,6 +337,8 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         zip_byte_size: existing.metadata?.size ?? 0,
         total_rows: stored.total_rows ?? storedFiles.reduce((s, f) => s + (f.row_count ?? 0), 0),
         files: storedFiles,
+        validation_files: storedValidation,
+        validation_row_count: storedValidation[0]?.row_count ?? 0,
         reused: true,
         signed_url: signed?.signedUrl ?? "",
         signed_url_expires_in: BASELINE_SIGNED_URL_SECONDS,
