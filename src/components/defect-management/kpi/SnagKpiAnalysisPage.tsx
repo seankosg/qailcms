@@ -6,12 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DataDatePicker } from "@/components/task-management/shared/DataDatePicker";
 
 import { DeSnagRoomGroupFilterBar } from "@/components/defect-management/dashboard/DeSnagRoomGroupFilterBar";
@@ -39,10 +34,7 @@ import {
   type PlanMode,
   type Stage,
 } from "@/lib/defect-management/progress-utils";
-import {
-  SnagKpiPlanVsActualCard,
-  type SnagCurveUnit,
-} from "./SnagKpiPlanVsActualCard";
+import { SnagKpiPlanVsActualCard, type SnagCurveUnit } from "./SnagKpiPlanVsActualCard";
 import { SnagGroupProgressChart } from "./SnagGroupProgressChart";
 
 const routeApi = getRouteApi("/_authenticated/closure/snag-management/kpi-analysis");
@@ -63,7 +55,10 @@ export function SnagKpiAnalysisPage() {
   const navigate = useNavigate({ from: "/closure/snag-management/kpi-analysis" });
 
   const setSearch = (patch: Record<string, unknown>) =>
-    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }) as any, replace: true });
+    navigate({
+      search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }) as any,
+      replace: true,
+    });
 
   const plot: PlotKey = search.plot as PlotKey;
   const teams = parseCsv<TeamKey>(search.teams, ALL_TEAMS);
@@ -74,12 +69,12 @@ export function SnagKpiAnalysisPage() {
     .filter(Boolean);
   const bucket: Bucket = search.bucket as Bucket;
   const planMode: PlanMode = search.planMode as PlanMode;
-  const stage: Stage = (STAGE_OPTIONS.includes(search.stageView as Stage)
-    ? (search.stageView as Stage)
-    : "closure") as Stage;
-  const groupBy: GroupBy = (ALL_GROUP_BY.includes(search.groupBy as GroupBy)
-    ? (search.groupBy as GroupBy)
-    : "team") as GroupBy;
+  const stage: Stage = (
+    STAGE_OPTIONS.includes(search.stageView as Stage) ? (search.stageView as Stage) : "closure"
+  ) as Stage;
+  const groupBy: GroupBy = (
+    ALL_GROUP_BY.includes(search.groupBy as GroupBy) ? (search.groupBy as GroupBy) : "team"
+  ) as GroupBy;
   const unit: SnagCurveUnit = search.unit === "pct" ? "pct" : "cnt";
   const rangeDays = search.range as number;
 
@@ -138,7 +133,6 @@ export function SnagKpiAnalysisPage() {
 
   const [curveOpen, setCurveOpen] = useState(true);
 
-
   const handleGroupClick = (dim: GroupBy, key: string) => {
     const params = new URLSearchParams();
     params.set("source", "kpi-analysis");
@@ -151,7 +145,6 @@ export function SnagKpiAnalysisPage() {
     params.set("asOf", asOfDate);
     window.location.assign(`/closure/snag-management/raw-data?${params.toString()}`);
   };
-
 
   return (
     <div className="flex flex-col gap-4 p-4">
