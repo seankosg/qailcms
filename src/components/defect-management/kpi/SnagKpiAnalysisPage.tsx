@@ -190,6 +190,43 @@ export function SnagKpiAnalysisPage() {
                 onReset={() => setSearch({ dataDate: "" })}
               />
 
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Chart start
+                      </span>
+                      <div className="relative flex items-center">
+                        <Calendar className="absolute left-2 h-3.5 w-3.5 text-muted-foreground" />
+                        <input
+                          type="date"
+                          value={chartStart}
+                          max={chartEnd}
+                          onChange={(e) => setSearch({ chartStart: e.target.value })}
+                          className="h-8 rounded-md border border-input bg-background pl-7 pr-2 text-xs"
+                        />
+                      </div>
+                      {search.chartStart && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => setSearch({ chartStart: "" })}
+                        >
+                          Reset
+                        </Button>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p className="text-xs">Day: starts from the selected date.</p>
+                    <p className="text-xs">Week: starts from Monday of the selected week.</p>
+                    <p className="text-xs">Month: starts from the 1st of the selected month.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               <span className="h-5 w-px bg-border" aria-hidden />
 
               <div className="flex items-center gap-1">
