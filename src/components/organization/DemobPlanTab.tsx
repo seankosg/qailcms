@@ -1,7 +1,7 @@
 /**
  * Organization > Demob Plan
  * HDEC PIC 개인별 모듈(TM·SM·ABD·SPL·WRT) 최종 종결일 기준 철수 시점 타임라인.
- * 열람 권한: System Administrator 전용(정본은 RPC 내부 게이트).
+ * 열람 권한: System Administrator + 지정 사용자(정본은 RPC 내부 게이트).
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";

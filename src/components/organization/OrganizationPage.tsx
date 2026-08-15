@@ -65,7 +65,7 @@ export function OrganizationPage() {
     !!me && (me.isStrictAdmin || me.userType === "hdec_pic" || !!me.hdec_pic_name);
 
   /** Demob Plan 열람 = System Administrator + 지정 사용자(정본은 RPC 내부 게이트). */
-  const DEMOB_ALLOW = ["신원재", "채홍욱", "성영광", "김영서", "김대수", "정경호"];
+  const DEMOB_ALLOW = ["신원재", "채홍욱", "성영광", "김영서", "김대수", "정경호", "고현봉"];
   const canSeeDemob =
     !!me &&
     (me.isSystemAdmin ||
