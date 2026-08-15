@@ -177,6 +177,7 @@ export function SplDashboardPage() {
           <SplBreakdownCards
             rows={filteredRows}
             catalog={orderedCatalog}
+            asOf={data?.as_of ?? today}
             onTeam={(t) => setSearch({ team: t })}
             onDrill={drill}
           />
