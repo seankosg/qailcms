@@ -104,7 +104,7 @@ export function DemobPlanTab() {
   const axis = useMemo(() => {
     const days: number[] = [];
     filtered.forEach((r) => {
-      if (r.first_date) days.push(dayNum(r.first_date));
+      // 축 범위는 철수일(종결일) 기준. 비정상적으로 이른 시작일이 축 전체를 압축하지 않도록 제외.
       if (r.demob_date) days.push(dayNum(r.demob_date));
     });
     if (days.length === 0) days.push(todayNum);
@@ -220,15 +220,20 @@ export function DemobPlanTab() {
             {/* 헤더 축 */}
             <div className="flex">
               <div className="w-44 shrink-0 bg-card" />
-              <div className="relative h-6 flex-1 border-b">
+              <div className="relative h-8 flex-1 border-b">
                 {axis.ticks.map((t) => (
-                  <span
+                  <div
                     key={t.day}
-                    className="absolute top-0 -translate-x-1/2 whitespace-nowrap font-mono text-[10px] text-muted-foreground"
-                    style={{ left: `${axis.pct(t.day)}%` }}
+                    className="absolute bottom-0 top-0 flex flex-col items-center justify-end"
+                    style={{ left: `${axis.pct(t.day)}%`, transform: "translateX(-50%)" }}
                   >
-                    {t.label}
-                  </span>
+                    {t.major && (
+                      <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">
+                        {t.label}
+                      </span>
+                    )}
+                    <span className={cn("w-px bg-border", t.major ? "h-2" : "h-1")} />
+                  </div>
                 ))}
               </div>
             </div>
@@ -239,7 +244,11 @@ export function DemobPlanTab() {
                 <div className="w-44 shrink-0" />
                 <div className="relative flex-1">
                   {axis.ticks.map((t) => (
-                    <div key={t.day} className="absolute inset-y-0 w-px bg-border/60" style={{ left: `${axis.pct(t.day)}%` }} />
+                    <div
+                      key={t.day}
+                      className={cn("absolute inset-y-0 w-px", t.major ? "bg-border/60" : "bg-border/30")}
+                      style={{ left: `${axis.pct(t.day)}%` }}
+                    />
                   ))}
                   <div className="absolute inset-y-0 w-0.5 bg-primary/60" style={{ left: `${axis.pct(todayNum)}%` }} />
                 </div>
