@@ -594,7 +594,9 @@ export const getLatestOcsBaselineInfo = createServerFn({ method: "POST" })
     );
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const existing = await findExisting(supabaseAdmin, baselineId);
+    const stored = await readSidecar(supabaseAdmin, baselineId);
+    // 포인터가 가리키는 ZIP 만 최신 후보로 인정한다 (폴더 첫 ZIP fallback 금지).
+    const existing = await findExisting(supabaseAdmin, baselineId, stored?.zip_object_name ?? null);
     if (!existing) {
       return {
         exists: false,
@@ -612,13 +614,20 @@ export const getLatestOcsBaselineInfo = createServerFn({ method: "POST" })
       };
     }
 
-    const stored = await readSidecar(supabaseAdmin, baselineId);
     const files: BaselineFileInfo[] = (stored?.files ?? []).map((f) => ({
       name: f.relative_path,
       byte_size: f.byte_size,
       sha256: f.sha256,
       row_count: f.row_count,
     }));
+    // 현재 abd_items_raw 인덱스 지문과 다르면 최신이 아니다 (재생성 필요).
+    const currentIndexDigest = await abdIndexDigest(await buildAbdItemsIndex(context.supabase));
+    const isLatest = await existingZipHasValidSidecar(
+      supabaseAdmin,
+      `${baselineFolder(baselineId)}/${existing.name}`,
+      stored,
+      currentIndexDigest,
+    );
     return {
       exists: true,
       baseline_id: baselineId,
@@ -631,9 +640,9 @@ export const getLatestOcsBaselineInfo = createServerFn({ method: "POST" })
       zip_byte_size: existing.metadata?.size ?? null,
       total_rows: stored?.total_rows ?? files.reduce((s, f) => s + (f.row_count ?? 0), 0),
       files,
-      // 현재 core 로 산출한 baseline_id 폴더에 ZIP 이 존재하므로 정본과 일치한다.
-      is_latest: true,
+      is_latest: isLatest,
     };
+
   });
 
 export const signOcsBaseline = createServerFn({ method: "POST" })
