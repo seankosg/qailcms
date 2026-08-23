@@ -3,7 +3,9 @@ import {
   normalizeAconexBatch,
   resolveTerminationAction,
   type BatchRowLike,
-  assertTerminationFieldAllowed,
+  assertTerminationFieldsAllowed,
+  assertNoSameDateConflict,
+  TERMINATION_REQUIRED_FIELDS,
 } from "./aconex-termination";
 
 const row = (o: Partial<BatchRowLike> & { document_no: string }): BatchRowLike => ({
@@ -174,14 +176,134 @@ describe("normalizeAconexBatch", () => {
   });
 });
 
-describe("assertTerminationFieldAllowed", () => {
+describe("assertTerminationFieldsAllowed", () => {
+  const full = new Set<string>(TERMINATION_REQUIRED_FIELDS);
+
   it("11. allowed 에 is_terminated 없음 → 명시적 blocker", () => {
-    expect(() => assertTerminationFieldAllowed(["A", "B"], new Set(["latest_status"]))).toThrowError(
-      /TERMINATION_FIELD_NOT_ALLOWED/,
+    expect(() => assertTerminationFieldsAllowed(["A", "B"], new Set(["latest_status"]))).toThrowError(
+      /TERMINATION_FIELDS_NOT_ALLOWED/,
     );
+    expect(() => assertTerminationFieldsAllowed(["A"], full)).not.toThrow();
+    expect(() => assertTerminationFieldsAllowed([], new Set())).not.toThrow();
+  });
+
+  it("6*. 필수 4개 중 하나라도 누락 → 누락 필드·표본 포함 blocker", () => {
+    for (const f of TERMINATION_REQUIRED_FIELDS) {
+      const partial = new Set<string>(TERMINATION_REQUIRED_FIELDS);
+      partial.delete(f);
+      try {
+        assertTerminationFieldsAllowed(["A", "B", "C"], partial);
+        throw new Error("should have thrown");
+      } catch (e: any) {
+        expect(e.message).toContain("TERMINATION_FIELDS_NOT_ALLOWED");
+        expect(e.message).toContain(f);
+        expect(e.message).toContain("A, B, C");
+        expect(e.message).toContain("3행");
+      }
+    }
+  });
+});
+
+describe("Termination 설정 방향 (§3.1/§3.2)", () => {
+  it("2*. 과거 Terminated 사건 → set 금지", () => {
+    const a = resolveTerminationAction({
+      row: row({ document_no: "A", semantic: "EXCLUDED_TERMINATED", date_modified: "2026-07-01" }),
+      existing: existing({ is_terminated: false }),
+      sameDateUnambiguous: true,
+    });
+    expect(a.kind).toBe("none");
+  });
+
+  it("3*. 더 최신 Terminated 사건 → set", () => {
+    expect(
+      resolveTerminationAction({
+        row: row({ document_no: "A", semantic: "EXCLUDED_TERMINATED", date_modified: "2026-09-01" }),
+        existing: existing({ is_terminated: false }),
+        sameDateUnambiguous: true,
+      }),
+    ).toEqual({ kind: "set" });
+  });
+
+  it("동일 날짜 + 단일 Terminated → set / 상충이면 금지", () => {
+    expect(
+      resolveTerminationAction({
+        row: row({ document_no: "A", semantic: "EXCLUDED_TERMINATED", date_modified: "2026-08-01" }),
+        existing: existing({ is_terminated: false }),
+        sameDateUnambiguous: true,
+      }),
+    ).toEqual({ kind: "set" });
+    expect(
+      resolveTerminationAction({
+        row: row({ document_no: "A", semantic: "EXCLUDED_TERMINATED", date_modified: "2026-08-01" }),
+        existing: existing({ is_terminated: false }),
+        sameDateUnambiguous: false,
+      }).kind,
+    ).toBe("none");
+  });
+
+  it("5*. inactive → 설정 금지", () => {
+    expect(
+      resolveTerminationAction({
+        row: row({ document_no: "A", semantic: "EXCLUDED_TERMINATED", date_modified: "2026-09-01" }),
+        existing: existing({ is_active: false, is_terminated: false }),
+        sameDateUnambiguous: true,
+      }).kind,
+    ).toBe("none");
+  });
+
+  it("Terminated 입력 날짜 없음 → warning, 설정 금지", () => {
+    expect(
+      resolveTerminationAction({
+        row: row({ document_no: "A", semantic: "EXCLUDED_TERMINATED", date_modified: null }),
+        existing: existing({ is_terminated: false }),
+        sameDateUnambiguous: true,
+      }),
+    ).toEqual({ kind: "none", warning: "missing_date" });
+  });
+
+  it("멱등: 이미 true 인데 같은 날짜 Terminated 재수신 → set(no-op)", () => {
+    expect(
+      resolveTerminationAction({
+        row: row({ document_no: "A", semantic: "EXCLUDED_TERMINATED", date_modified: "2026-08-01" }),
+        existing: existing(),
+        sameDateUnambiguous: true,
+      }),
+    ).toEqual({ kind: "set" });
+  });
+});
+
+describe("4*. 같은 날짜 Terminated + SUBMITTED → blocker (처리 제외)", () => {
+  it("blocker 로 분류되고 rows 에서 빠진다", () => {
+    const res = normalizeAconexBatch([
+      row({ document_no: "A", semantic: "EXCLUDED_TERMINATED", date_modified: "2026-08-09", excel_row: 2 }),
+      row({ document_no: "A", semantic: "SUBMITTED", date_modified: "2026-08-09", excel_row: 3 }),
+      row({ document_no: "B", semantic: "SUBMITTED", date_modified: "2026-08-09", excel_row: 4 }),
+    ]);
+    expect(res.blockers.map((b) => b.document_no)).toEqual(["A"]);
+    expect(res.rows.map((r) => r.document_no)).toEqual(["B"]);
+  });
+
+  it("7*. blocker 없는 일반 배치 → 축약/판정 결과 불변", () => {
+    const res = normalizeAconexBatch([
+      row({ document_no: "A", semantic: "SUBMITTED", date_modified: "2026-08-09", excel_row: 2 }),
+      row({ document_no: "B", semantic: "DAR_APPROVED_A", date_modified: "2026-08-10", excel_row: 3 }),
+    ]);
+    expect(res.blockers).toHaveLength(0);
+    expect(res.rows).toHaveLength(2);
+    expect(res.collapsedDuplicates).toBe(0);
+  });
+});
+
+describe("1*. assertNoSameDateConflict (apply=true 최종 관문)", () => {
+  it("blocker 있으면 예외 — 로그/UPDATE 이전 차단", () => {
     expect(() =>
-      assertTerminationFieldAllowed(["A"], new Set(["latest_status", "is_terminated"])),
-    ).not.toThrow();
-    expect(() => assertTerminationFieldAllowed([], new Set())).not.toThrow();
+      assertNoSameDateConflict([
+        { document_no: "A", date_modified: "2026-08-09", semantics: ["EXCLUDED_TERMINATED", "SUBMITTED"] },
+      ]),
+    ).toThrowError(/ACONEX_SAME_DATE_SEMANTIC_CONFLICT/);
+  });
+
+  it("blocker 없으면 통과", () => {
+    expect(() => assertNoSameDateConflict([])).not.toThrow();
   });
 });

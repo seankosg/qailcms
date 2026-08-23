@@ -362,6 +362,12 @@ export function AbdAconexImportPage() {
     [entries],
   );
   const readyCount = readyEntries.length;
+  /** §2.2 동일 날짜 상충 사건이 하나라도 있으면 Import 자체를 잠근다. */
+  const blockedEntries = useMemo(
+    () => entries.filter((e) => (e.preview?.same_date_blockers?.length ?? 0) > 0),
+    [entries],
+  );
+  const hasBlockers = blockedEntries.length > 0;
 
   const startImport = async () => {
     setBusy(true);
@@ -453,7 +459,7 @@ export function AbdAconexImportPage() {
               <Button variant="outline" size="sm" onClick={clearAll} disabled={busy}>
                 Clear all
               </Button>
-              <Button size="sm" onClick={startImport} disabled={busy || readyCount === 0}>
+              <Button size="sm" onClick={startImport} disabled={busy || readyCount === 0 || hasBlockers}>
                 {busy ? (
                   <>
                     <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Syncing…
@@ -465,6 +471,14 @@ export function AbdAconexImportPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            {hasBlockers && (
+              <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-xs text-destructive">
+                <div className="font-semibold">Import 차단 — 같은 도면·같은 날짜에 서로 다른 Aconex 상태</div>
+                <p className="mt-1">
+                  상태의 실제 순서를 확인할 수 없어 Import를 차단했습니다. 원본 파일을 확인한 뒤 다시 선택하십시오.
+                </p>
+              </div>
+            )}
             {entries.map((e) => (
               <div key={e.id} className="rounded border p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -599,6 +613,33 @@ export function AbdAconexImportPage() {
                               <li key={d}>{d}</li>
                             ))}
                           </ul>
+                        </details>
+                      )}
+                      {e.preview && (e.preview.same_date_blockers?.length ?? 0) > 0 && (
+                        <details className="mt-2 rounded border border-destructive bg-destructive/10 p-2 text-[11px]" open>
+                          <summary className="cursor-pointer font-medium text-destructive">
+                            동일 날짜 상충 사건 ({e.preview.same_date_blockers.length}건) — Import 차단
+                          </summary>
+                          <div className="mt-1 max-h-56 overflow-auto">
+                            <table className="w-full border-collapse text-[10px]">
+                              <thead className="sticky top-0 bg-background">
+                                <tr className="border-b">
+                                  <th className="p-1 text-left">ABD Number</th>
+                                  <th className="p-1 text-left">Date</th>
+                                  <th className="p-1 text-left">Semantics</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {e.preview.same_date_blockers.map((b) => (
+                                  <tr key={`${b.document_no}-${b.date_modified ?? "nd"}`} className="border-b last:border-0">
+                                    <td className="p-1 font-mono">{b.document_no}</td>
+                                    <td className="p-1 font-mono">{b.date_modified ?? "-"}</td>
+                                    <td className="p-1 font-mono">{b.semantics.join(" / ")}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </details>
                       )}
                       {e.preview && (e.preview.terminated_reset?.length ?? 0) > 0 && (

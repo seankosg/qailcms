@@ -6,7 +6,8 @@ import { assertImportScope } from "@/lib/import/rcl-import-gate";
 import {
   normalizeAconexBatch,
   resolveTerminationAction,
-  assertTerminationFieldAllowed,
+  assertTerminationFieldsAllowed,
+  assertNoSameDateConflict,
   TERMINATION_CLEAR_REASON,
   TERMINATION_SAME_DATE_DETAIL,
   type BatchBlocker,
@@ -294,6 +295,9 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     const normalized = normalizeAconexBatch(inScope);
     const blockerDocs = new Set(normalized.blockers.map((b) => b.document_no));
 
+    // §2.3 서버 최종 관문 — apply 시 부분 반영조차 금지한다(로그/UPDATE 이전).
+    if (data.apply) assertNoSameDateConflict(normalized.blockers);
+
     // §3.2~3.4 Termination 전환 사전 판정 — preset 누락 시 조용한 스킵 금지.
     const termActions = new Map<string, TerminationAction>();
     for (const r of normalized.rows) {
@@ -310,7 +314,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       const a = termActions.get(r.document_no);
       return a?.kind === "set" || a?.kind === "clear";
     });
-    assertTerminationFieldAllowed(termTouching.map((r) => r.document_no), allowed);
+    assertTerminationFieldsAllowed(termTouching.map((r) => r.document_no), allowed);
 
     const terminationCleared: AconexImportPreview["termination_cleared"] = [];
     const terminationWarnings: AconexImportPreview["termination_warnings"] = [];
