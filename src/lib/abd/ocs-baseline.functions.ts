@@ -206,6 +206,10 @@ async function findExisting(admin: unknown, baselineId: string, pointerName?: st
 const sidecarPath = (baselineId: string) => `${baselineFolder(baselineId)}/manifest.json`;
 
 type StoredManifest = {
+  schema_version?: string;
+  baseline_id?: string;
+  base_core_hash?: string;
+  base_import_run_id?: string | null;
   generated_at?: string;
   data_date?: string;
   total_rows?: number;
@@ -214,6 +218,7 @@ type StoredManifest = {
   core_last_changed_at?: string | null;
   files?: { relative_path: string; byte_size: number; sha256: string; row_count: number }[];
   validation_files?: BaselineValidationFileInfo[];
+  abd_index_digest?: string;
   zip_object_name?: string;
 };
 
@@ -235,16 +240,19 @@ async function readSidecar(admin: unknown, baselineId: string): Promise<StoredMa
 }
 
 /**
- * 기존 object 재사용 가능 여부 — sidecar 선언과 ZIP 내부 실제 파일을 독립 검증한다.
- * 하나라도 어긋나면 재사용하지 않고 새 object 를 생성한다(기존 object 는 보존).
+ * 기존 object 재사용 가능 여부.
+ * (1) sidecar 선언 존재 (2) ZIP 내부 manifest 와 외부 sidecar 대조 (3) sidecar 실제 파일 무결성
+ * (4) 현재 abd_items_raw 인덱스 지문과 동일. 하나라도 어긋나면 새 object 를 만든다(기존 보존).
  */
 async function existingZipHasValidSidecar(
   admin: unknown,
   path: string,
   stored: StoredManifest | null,
+  currentIndexDigest: string,
 ): Promise<boolean> {
   const decl = stored?.validation_files?.find((f) => f.relative_path === BASELINE_ABD_INDEX_PATH);
   if (!decl || !decl.sha256 || !Number.isFinite(decl.byte_size)) return false;
+  if (!stored?.abd_index_digest || stored.abd_index_digest !== currentIndexDigest) return false;
   const client = admin as {
     storage: {
       from: (b: string) => { download: (p: string) => Promise<{ data: Blob | null }> };
@@ -255,19 +263,31 @@ async function existingZipHasValidSidecar(
   try {
     const JSZip = (await import("jszip")).default;
     const zip = await JSZip.loadAsync(await data.arrayBuffer());
+    const mf = zip.file("manifest.json");
+    if (!mf) return false;
+    const innerManifest = JSON.parse(await mf.async("string")) as Record<string, unknown>;
+    if (crossCheckManifests(innerManifest, stored as unknown as Record<string, unknown>).length > 0) {
+      return false;
+    }
     const entry = zip.file(BASELINE_ABD_INDEX_PATH);
     if (!entry) return false;
     const text = await entry.async("string");
     if (new TextEncoder().encode(text).byteLength !== decl.byte_size) return false;
     if ((await sha256Hex(text)) !== decl.sha256.toLowerCase()) return false;
-    const parsed = JSON.parse(text) as { schema_version?: string; row_count?: number; rows?: unknown[] };
+    const parsed = JSON.parse(text) as {
+      schema_version?: string;
+      row_count?: number;
+      rows?: unknown[];
+    };
     if (parsed.schema_version !== ABD_ITEMS_INDEX_SCHEMA) return false;
     const rows = Array.isArray(parsed.rows) ? parsed.rows.length : -1;
-    return rows >= 0 && rows === parsed.row_count && rows === decl.row_count;
+    if (!(rows >= 0 && rows === parsed.row_count && rows === decl.row_count)) return false;
+    return (await abdIndexDigest((parsed.rows ?? []) as never)) === currentIndexDigest;
   } catch {
     return false;
   }
 }
+
 
 export const createOcsBaseline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
