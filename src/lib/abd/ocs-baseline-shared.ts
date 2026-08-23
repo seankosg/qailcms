@@ -94,5 +94,20 @@ export const shortId = (v: string | null | undefined) => (v ? v.slice(0, 16) : "
 
 export const baselineFolder = (baselineId: string) => `${BASELINE_PREFIX}/${baselineId}`;
 
-export const baselineFileName = (stampCompact: string, baselineId: string) =>
-  `OCS_Baseline_${stampCompact}_${shortId(baselineId)}.zip`;
+/**
+ * ZIP object 이름 — 같은 분(minute)에 두 번 생성해도 경로가 충돌하지 않도록
+ * 초·밀리초 + 랜덤 접미사를 포함한다. 기존 object 는 절대 덮어쓰지 않는다.
+ */
+export const baselineFileName = (stampCompact: string, baselineId: string, unique: string) =>
+  `OCS_Baseline_${stampCompact}_${shortId(baselineId)}_${unique}.zip`;
+
+/** 초·밀리초 + 랜덤 6자 — object 이름 고유화 토큰 */
+export const baselineUniqueToken = (d: Date = new Date()) => {
+  const ms = String(d.getUTCSeconds()).padStart(2, "0") + String(d.getUTCMilliseconds()).padStart(3, "0");
+  const rand =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID().replace(/-/g, "").slice(0, 6)
+      : Math.random().toString(36).slice(2, 8);
+  return `${ms}${rand}`;
+};
+
