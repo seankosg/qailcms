@@ -179,3 +179,19 @@ export function resolveTerminationAction({
   }
   return { kind: "none" };
 }
+
+/**
+ * §3.4 preset 누락 blocker — 배치가 is_terminated 를 건드리는데 preset 에 필드가 없으면
+ * 조용히 건너뛰지 않고 명시적으로 차단한다.
+ */
+export function assertTerminationFieldAllowed(
+  touchingDocs: string[],
+  allowed: ReadonlySet<string>,
+): void {
+  if (touchingDocs.length === 0 || allowed.has("is_terminated")) return;
+  throw new Error(
+    `TERMINATION_FIELD_NOT_ALLOWED: Termination 설정/해제 사건 ${touchingDocs.length}건이 있으나 ` +
+      `임포트 대상 필드에 'is_terminated' 가 포함되지 않았습니다. ` +
+      `표본: ${touchingDocs.slice(0, 5).join(", ")}`,
+  );
+}

@@ -6,6 +6,7 @@ import { assertImportScope } from "@/lib/import/rcl-import-gate";
 import {
   normalizeAconexBatch,
   resolveTerminationAction,
+  assertTerminationFieldAllowed,
   TERMINATION_CLEAR_REASON,
   TERMINATION_SAME_DATE_DETAIL,
   type BatchBlocker,
@@ -309,13 +310,7 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       const a = termActions.get(r.document_no);
       return a?.kind === "set" || a?.kind === "clear";
     });
-    if (termTouching.length > 0 && !allowed.has("is_terminated")) {
-      throw new Error(
-        `TERMINATION_FIELD_NOT_ALLOWED: Termination 설정/해제 사건 ${termTouching.length}건이 있으나 ` +
-          `임포트 대상 필드에 'is_terminated' 가 포함되지 않았습니다. ` +
-          `표본: ${termTouching.slice(0, 5).map((r) => r.document_no).join(", ")}`,
-      );
-    }
+    assertTerminationFieldAllowed(termTouching.map((r) => r.document_no), allowed);
 
     const terminationCleared: AconexImportPreview["termination_cleared"] = [];
     const terminationWarnings: AconexImportPreview["termination_warnings"] = [];

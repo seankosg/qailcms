@@ -3,6 +3,7 @@ import {
   normalizeAconexBatch,
   resolveTerminationAction,
   type BatchRowLike,
+  assertTerminationFieldAllowed,
 } from "./aconex-termination";
 
 const row = (o: Partial<BatchRowLike> & { document_no: string }): BatchRowLike => ({
@@ -170,5 +171,17 @@ describe("normalizeAconexBatch", () => {
     ]);
     expect(res.rows[0].semantic).toBe("DAR_APPROVED_A");
     expect(res.blockers).toHaveLength(0);
+  });
+});
+
+describe("assertTerminationFieldAllowed", () => {
+  it("11. allowed 에 is_terminated 없음 → 명시적 blocker", () => {
+    expect(() => assertTerminationFieldAllowed(["A", "B"], new Set(["latest_status"]))).toThrowError(
+      /TERMINATION_FIELD_NOT_ALLOWED/,
+    );
+    expect(() =>
+      assertTerminationFieldAllowed(["A"], new Set(["latest_status", "is_terminated"])),
+    ).not.toThrow();
+    expect(() => assertTerminationFieldAllowed([], new Set())).not.toThrow();
   });
 });
