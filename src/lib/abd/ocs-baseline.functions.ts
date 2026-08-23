@@ -312,7 +312,11 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 2) 동일 baseline_id 재사용 — sidecar 무결성을 만족할 때만
+    // 1-1) 재사용 판정 전에 현재 abd_items_raw 로 인덱스를 먼저 만들고 지문을 계산한다.
+    const indexRows = await buildAbdItemsIndex(context.supabase);
+    const currentIndexDigest = await abdIndexDigest(indexRows);
+
+    // 2) 동일 baseline_id 재사용 — sidecar 포인터 ZIP + 무결성 + 인덱스 지문이 모두 맞을 때만
     const storedForReuse = await readSidecar(supabaseAdmin, baselineId);
     const existing = await findExisting(
       supabaseAdmin,
@@ -325,7 +329,9 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         supabaseAdmin,
         `${baselineFolder(baselineId)}/${existing.name}`,
         storedForReuse,
+        currentIndexDigest,
       ));
+
     if (existing && reusable) {
       const path = `${baselineFolder(baselineId)}/${existing.name}`;
       const { data: signed, error: signErr } = await supabaseAdmin.storage
