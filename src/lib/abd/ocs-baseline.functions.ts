@@ -168,8 +168,12 @@ export type BaselineResult = {
   signed_url_expires_in: number;
 };
 
-/** baseline_id 폴더의 ZIP 목록에서 sidecar 가 가리키는 최신 object 를 우선 반환 */
-async function findExisting(admin: unknown, baselineId: string, preferName?: string | null) {
+/**
+ * sidecar 포인터(zip_object_name)가 가리키는 ZIP 만 정본으로 선택한다.
+ * 폴더의 임의 첫 ZIP 을 최신으로 승격하지 않는다.
+ */
+async function findExisting(admin: unknown, baselineId: string, pointerName?: string | null) {
+  if (!pointerName) return null;
   const client = admin as {
     storage: {
       from: (b: string) => {
@@ -184,15 +188,11 @@ async function findExisting(admin: unknown, baselineId: string, preferName?: str
     };
   };
   const { data } = await client.storage.from(BASELINE_BUCKET).list(baselineFolder(baselineId), {
-    limit: 100,
+    limit: 1000,
   });
-  const zips = (data ?? []).filter((f) => f.name.endsWith(".zip"));
-  if (preferName) {
-    const hit = zips.find((f) => f.name === preferName);
-    if (hit) return hit;
-  }
-  return zips[0] ?? null;
+  return pickZipByPointer(data ?? [], pointerName);
 }
+
 
 /** 재사용 시 원래 metadata 를 되살리기 위한 manifest sidecar 경로 */
 const sidecarPath = (baselineId: string) => `${baselineFolder(baselineId)}/manifest.json`;
