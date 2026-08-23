@@ -159,18 +159,30 @@ export function resolveTerminationAction({
   sameDateUnambiguous,
 }: TerminationInput): TerminationAction {
   const semantic = String(row.semantic ?? "UNKNOWN");
-
-  if (semantic === "EXCLUDED_TERMINATED") return { kind: "set" };
-  if (semantic === "EXCLUDED_CANCELLED") return { kind: "none" };
-
-  // 해제 경로
-  if (existing?.is_terminated !== true) return { kind: "none" };
-  if (existing?.is_active === false) return { kind: "none" }; // Cancelled 자동 복구 금지
-  if (!TERMINATION_CLEAR_SEMANTICS.has(semantic)) return { kind: "none" };
-  if (isDCodeRow(row)) return { kind: "none" };
-
   const incoming = normDate(row.date_modified);
   const current = normDate(existing?.aconex_date_modified);
+
+  // Cancelled(is_active=false) 는 어느 방향으로도 자동 변경하지 않는다.
+  if (existing?.is_active === false) return { kind: "none" };
+
+  // ---- 설정 경로 (§3.1/§3.2) — 과거 Terminated 파일이 최신 상태를 되돌리지 못하게 한다.
+  if (semantic === "EXCLUDED_TERMINATED") {
+    if (incoming == null) return { kind: "none", warning: "missing_date" };
+    if (current == null) return { kind: "set" }; // 비교 기준 없음 = 최초 사건
+    if (incoming > current) return { kind: "set" };
+    if (incoming === current) {
+      // 같은 날짜에 다른 semantic 이 섞여 있으면 순서를 알 수 없다 → 설정 금지(blocker 처리).
+      if (!sameDateUnambiguous) return { kind: "none" };
+      return { kind: "set" }; // 기존이 이미 true 면 멱등 no-op
+    }
+    return { kind: "none" }; // 과거 사건
+  }
+  if (semantic === "EXCLUDED_CANCELLED") return { kind: "none" };
+
+  // ---- 해제 경로 (§3.3)
+  if (existing?.is_terminated !== true) return { kind: "none" };
+  if (!TERMINATION_CLEAR_SEMANTICS.has(semantic)) return { kind: "none" };
+  if (isDCodeRow(row)) return { kind: "none" };
   if (incoming == null || current == null) return { kind: "none", warning: "missing_date" };
 
   if (incoming > current) return { kind: "clear", sameDate: false };
@@ -181,17 +193,28 @@ export function resolveTerminationAction({
 }
 
 /**
- * §3.4 preset 누락 blocker — 배치가 is_terminated 를 건드리는데 preset 에 필드가 없으면
- * 조용히 건너뛰지 않고 명시적으로 차단한다.
+ * Termination 관련 preset 필드는 원자적 필수 묶음이다.
+ * 플래그만 바뀌고 최신 날짜/원문 상태가 갱신되지 않는 부분 반영을 금지한다.
  */
-export function assertTerminationFieldAllowed(
+export const TERMINATION_REQUIRED_FIELDS = [
+  "is_terminated",
+  "aconex_date_modified",
+  "aconex_status_raw",
+  "aconex_review_status_raw",
+] as const;
+
+export function assertTerminationFieldsAllowed(
   touchingDocs: string[],
   allowed: ReadonlySet<string>,
 ): void {
-  if (touchingDocs.length === 0 || allowed.has("is_terminated")) return;
+  if (touchingDocs.length === 0) return;
+  const missing = TERMINATION_REQUIRED_FIELDS.filter((f) => !allowed.has(f));
+  if (missing.length === 0) return;
   throw new Error(
-    `TERMINATION_FIELD_NOT_ALLOWED: Termination 설정/해제 사건 ${touchingDocs.length}건이 있으나 ` +
-      `임포트 대상 필드에 'is_terminated' 가 포함되지 않았습니다. ` +
+    `TERMINATION_FIELDS_NOT_ALLOWED: Termination 설정/해제 사건 ${touchingDocs.length}행이 있으나 ` +
+      `임포트 대상 필드에서 누락됨: ${missing.join(", ")}. ` +
+      `필요한 필드 전체: ${TERMINATION_REQUIRED_FIELDS.join(", ")}. ` +
       `표본: ${touchingDocs.slice(0, 5).join(", ")}`,
   );
 }
+
