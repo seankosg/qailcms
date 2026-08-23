@@ -102,7 +102,8 @@ export const ocsIncPrecheck = createServerFn({ method: "POST" })
       data.base_core_hash || currentCoreHash,
       data.base_import_run_id || latestRunId,
     );
-    const expectedBaselineId = baselineCandidates.v2;
+    // 신규 정본은 v1 — 표시용 expected 는 v1 산식 값 (v2 는 읽기 호환 후보로만 유지).
+    const expectedBaselineId = baselineCandidates.v1;
     // 테이블별 해시 전수 대조는 브라우저 로컬 검증으로 이관했다(중복 검증 제거).
 
     return {

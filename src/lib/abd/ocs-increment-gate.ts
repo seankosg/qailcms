@@ -61,7 +61,8 @@ export async function assertBaselineGate(
   // 서버는 core_hash 단일 대조(위)로 운영 정본 변경 여부만 판정한다.
   // v1/v2 Baseline 계약 모두 읽기 호환 — 산식은 동일하고 schema_version 만 다르다.
   const cand = await computeBaselineIdCandidates(currentCoreHash, claim.base_import_run_id);
-  const expected = cand.v2;
+  // 신규 정본은 v1 — 표시용 expected 는 항상 v1 산식 값 (v2 는 읽기 호환 후보로만 인정).
+  const expected = cand.v1;
   if (!cand.all.includes(claim.base_baseline_id)) {
     throw new Error(
       `BASELINE_ID_MISMATCH: 서버 재계산 baseline_id 가 패키지 값과 다릅니다 (${expected.slice(

@@ -12,11 +12,19 @@ import {
   ABD_ITEMS_INDEX_SCHEMA,
   baselineFileName,
   baselineFolder,
+  baselineUniqueToken,
   computeBaselineId,
   sha256Hex,
   type BaselineDataset,
 } from "@/lib/abd/ocs-baseline-shared";
+import {
+  abdIndexDigest,
+  assertUploadSucceeded,
+  crossCheckManifests,
+  pickZipByPointer,
+} from "@/lib/abd/ocs-baseline-store";
 import { normalizeAbdNumber } from "@/lib/abd/ocs-number-normalize";
+
 
 type LooseClient = {
   rpc: (
@@ -168,8 +176,12 @@ export type BaselineResult = {
   signed_url_expires_in: number;
 };
 
-/** baseline_id 폴더의 ZIP 목록에서 sidecar 가 가리키는 최신 object 를 우선 반환 */
-async function findExisting(admin: unknown, baselineId: string, preferName?: string | null) {
+/**
+ * sidecar 포인터(zip_object_name)가 가리키는 ZIP 만 정본으로 선택한다.
+ * 폴더의 임의 첫 ZIP 을 최신으로 승격하지 않는다.
+ */
+async function findExisting(admin: unknown, baselineId: string, pointerName?: string | null) {
+  if (!pointerName) return null;
   const client = admin as {
     storage: {
       from: (b: string) => {
@@ -184,20 +196,20 @@ async function findExisting(admin: unknown, baselineId: string, preferName?: str
     };
   };
   const { data } = await client.storage.from(BASELINE_BUCKET).list(baselineFolder(baselineId), {
-    limit: 100,
+    limit: 1000,
   });
-  const zips = (data ?? []).filter((f) => f.name.endsWith(".zip"));
-  if (preferName) {
-    const hit = zips.find((f) => f.name === preferName);
-    if (hit) return hit;
-  }
-  return zips[0] ?? null;
+  return pickZipByPointer(data ?? [], pointerName);
 }
+
 
 /** 재사용 시 원래 metadata 를 되살리기 위한 manifest sidecar 경로 */
 const sidecarPath = (baselineId: string) => `${baselineFolder(baselineId)}/manifest.json`;
 
 type StoredManifest = {
+  schema_version?: string;
+  baseline_id?: string;
+  base_core_hash?: string;
+  base_import_run_id?: string | null;
   generated_at?: string;
   data_date?: string;
   total_rows?: number;
@@ -206,6 +218,7 @@ type StoredManifest = {
   core_last_changed_at?: string | null;
   files?: { relative_path: string; byte_size: number; sha256: string; row_count: number }[];
   validation_files?: BaselineValidationFileInfo[];
+  abd_index_digest?: string;
   zip_object_name?: string;
 };
 
@@ -227,16 +240,19 @@ async function readSidecar(admin: unknown, baselineId: string): Promise<StoredMa
 }
 
 /**
- * 기존 object 재사용 가능 여부 — sidecar 선언과 ZIP 내부 실제 파일을 독립 검증한다.
- * 하나라도 어긋나면 재사용하지 않고 새 object 를 생성한다(기존 object 는 보존).
+ * 기존 object 재사용 가능 여부.
+ * (1) sidecar 선언 존재 (2) ZIP 내부 manifest 와 외부 sidecar 대조 (3) sidecar 실제 파일 무결성
+ * (4) 현재 abd_items_raw 인덱스 지문과 동일. 하나라도 어긋나면 새 object 를 만든다(기존 보존).
  */
 async function existingZipHasValidSidecar(
   admin: unknown,
   path: string,
   stored: StoredManifest | null,
+  currentIndexDigest: string,
 ): Promise<boolean> {
   const decl = stored?.validation_files?.find((f) => f.relative_path === BASELINE_ABD_INDEX_PATH);
   if (!decl || !decl.sha256 || !Number.isFinite(decl.byte_size)) return false;
+  if (!stored?.abd_index_digest || stored.abd_index_digest !== currentIndexDigest) return false;
   const client = admin as {
     storage: {
       from: (b: string) => { download: (p: string) => Promise<{ data: Blob | null }> };
@@ -247,19 +263,31 @@ async function existingZipHasValidSidecar(
   try {
     const JSZip = (await import("jszip")).default;
     const zip = await JSZip.loadAsync(await data.arrayBuffer());
+    const mf = zip.file("manifest.json");
+    if (!mf) return false;
+    const innerManifest = JSON.parse(await mf.async("string")) as Record<string, unknown>;
+    if (crossCheckManifests(innerManifest, stored as unknown as Record<string, unknown>).length > 0) {
+      return false;
+    }
     const entry = zip.file(BASELINE_ABD_INDEX_PATH);
     if (!entry) return false;
     const text = await entry.async("string");
     if (new TextEncoder().encode(text).byteLength !== decl.byte_size) return false;
     if ((await sha256Hex(text)) !== decl.sha256.toLowerCase()) return false;
-    const parsed = JSON.parse(text) as { schema_version?: string; row_count?: number; rows?: unknown[] };
+    const parsed = JSON.parse(text) as {
+      schema_version?: string;
+      row_count?: number;
+      rows?: unknown[];
+    };
     if (parsed.schema_version !== ABD_ITEMS_INDEX_SCHEMA) return false;
     const rows = Array.isArray(parsed.rows) ? parsed.rows.length : -1;
-    return rows >= 0 && rows === parsed.row_count && rows === decl.row_count;
+    if (!(rows >= 0 && rows === parsed.row_count && rows === decl.row_count)) return false;
+    return (await abdIndexDigest((parsed.rows ?? []) as never)) === currentIndexDigest;
   } catch {
     return false;
   }
 }
+
 
 export const createOcsBaseline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -284,7 +312,11 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 2) 동일 baseline_id 재사용 — sidecar 무결성을 만족할 때만
+    // 1-1) 재사용 판정 전에 현재 abd_items_raw 로 인덱스를 먼저 만들고 지문을 계산한다.
+    const indexRows = await buildAbdItemsIndex(context.supabase);
+    const currentIndexDigest = await abdIndexDigest(indexRows);
+
+    // 2) 동일 baseline_id 재사용 — sidecar 포인터 ZIP + 무결성 + 인덱스 지문이 모두 맞을 때만
     const storedForReuse = await readSidecar(supabaseAdmin, baselineId);
     const existing = await findExisting(
       supabaseAdmin,
@@ -297,7 +329,9 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         supabaseAdmin,
         `${baselineFolder(baselineId)}/${existing.name}`,
         storedForReuse,
+        currentIndexDigest,
       ));
+
     if (existing && reusable) {
       const path = `${baselineFolder(baselineId)}/${existing.name}`;
       const { data: signed, error: signErr } = await supabaseAdmin.storage
@@ -403,8 +437,8 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
     }
 
     // 5-1) 브라우저 검증 sidecar — 운영 files 배열·total_rows 에는 절대 넣지 않는다.
-    //      core hash 의미는 바뀌지 않는다 (읽기 전용 인덱스).
-    const indexRows = await buildAbdItemsIndex(context.supabase);
+    //      core hash 의미는 바뀌지 않는다 (읽기 전용 인덱스). indexRows 는 1-1 에서 이미 생성됨.
+
     const indexText = JSON.stringify(
       {
         schema_version: ABD_ITEMS_INDEX_SCHEMA,
@@ -456,6 +490,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       })),
       // 기존 로컬 프로그램은 알 수 없는 필드를 무시한다 — files/total_rows 계약 불변.
       validation_files: validationFiles,
+      abd_index_digest: currentIndexDigest,
     };
     zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 
@@ -465,7 +500,12 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       compressionOptions: { level: 6 },
     })) as Uint8Array;
 
-    const fileName = baselineFileName(dohaStampCompact(generatedAt), baselineId);
+    // object 이름은 초·밀리초+랜덤을 포함해 항상 새 경로 — 기존 object 는 덮어쓰지 않는다.
+    const fileName = baselineFileName(
+      dohaStampCompact(generatedAt),
+      baselineId,
+      baselineUniqueToken(generatedAt),
+    );
     const path = `${baselineFolder(baselineId)}/${fileName}`;
     const { error: upErr } = await supabaseAdmin.storage
       .from(BASELINE_BUCKET)
@@ -473,7 +513,9 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         upsert: false,
         contentType: "application/zip",
       });
-    if (upErr && !/exists/i.test(upErr.message)) throw new Error(upErr.message);
+    // already exists 도 성공으로 넘기지 않는다 — sidecar 포인터 갱신 전에 즉시 실패.
+    assertUploadSucceeded(upErr, path);
+
 
     // manifest sidecar — 재사용 응답에서 원래 metadata 를 그대로 되돌려주기 위해 저장
     const { error: sideErr } = await supabaseAdmin.storage
@@ -552,7 +594,9 @@ export const getLatestOcsBaselineInfo = createServerFn({ method: "POST" })
     );
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const existing = await findExisting(supabaseAdmin, baselineId);
+    const stored = await readSidecar(supabaseAdmin, baselineId);
+    // 포인터가 가리키는 ZIP 만 최신 후보로 인정한다 (폴더 첫 ZIP fallback 금지).
+    const existing = await findExisting(supabaseAdmin, baselineId, stored?.zip_object_name ?? null);
     if (!existing) {
       return {
         exists: false,
@@ -570,13 +614,20 @@ export const getLatestOcsBaselineInfo = createServerFn({ method: "POST" })
       };
     }
 
-    const stored = await readSidecar(supabaseAdmin, baselineId);
     const files: BaselineFileInfo[] = (stored?.files ?? []).map((f) => ({
       name: f.relative_path,
       byte_size: f.byte_size,
       sha256: f.sha256,
       row_count: f.row_count,
     }));
+    // 현재 abd_items_raw 인덱스 지문과 다르면 최신이 아니다 (재생성 필요).
+    const currentIndexDigest = await abdIndexDigest(await buildAbdItemsIndex(context.supabase));
+    const isLatest = await existingZipHasValidSidecar(
+      supabaseAdmin,
+      `${baselineFolder(baselineId)}/${existing.name}`,
+      stored,
+      currentIndexDigest,
+    );
     return {
       exists: true,
       baseline_id: baselineId,
@@ -589,9 +640,9 @@ export const getLatestOcsBaselineInfo = createServerFn({ method: "POST" })
       zip_byte_size: existing.metadata?.size ?? null,
       total_rows: stored?.total_rows ?? files.reduce((s, f) => s + (f.row_count ?? 0), 0),
       files,
-      // 현재 core 로 산출한 baseline_id 폴더에 ZIP 이 존재하므로 정본과 일치한다.
-      is_latest: true,
+      is_latest: isLatest,
     };
+
   });
 
 export const signOcsBaseline = createServerFn({ method: "POST" })
