@@ -490,6 +490,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       })),
       // 기존 로컬 프로그램은 알 수 없는 필드를 무시한다 — files/total_rows 계약 불변.
       validation_files: validationFiles,
+      abd_index_digest: currentIndexDigest,
     };
     zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 
@@ -499,7 +500,12 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       compressionOptions: { level: 6 },
     })) as Uint8Array;
 
-    const fileName = baselineFileName(dohaStampCompact(generatedAt), baselineId);
+    // object 이름은 초·밀리초+랜덤을 포함해 항상 새 경로 — 기존 object 는 덮어쓰지 않는다.
+    const fileName = baselineFileName(
+      dohaStampCompact(generatedAt),
+      baselineId,
+      baselineUniqueToken(generatedAt),
+    );
     const path = `${baselineFolder(baselineId)}/${fileName}`;
     const { error: upErr } = await supabaseAdmin.storage
       .from(BASELINE_BUCKET)
@@ -507,7 +513,9 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         upsert: false,
         contentType: "application/zip",
       });
-    if (upErr && !/exists/i.test(upErr.message)) throw new Error(upErr.message);
+    // already exists 도 성공으로 넘기지 않는다 — sidecar 포인터 갱신 전에 즉시 실패.
+    assertUploadSucceeded(upErr, path);
+
 
     // manifest sidecar — 재사용 응답에서 원래 metadata 를 그대로 되돌려주기 위해 저장
     const { error: sideErr } = await supabaseAdmin.storage
