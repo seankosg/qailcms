@@ -12,11 +12,19 @@ import {
   ABD_ITEMS_INDEX_SCHEMA,
   baselineFileName,
   baselineFolder,
+  baselineUniqueToken,
   computeBaselineId,
   sha256Hex,
   type BaselineDataset,
 } from "@/lib/abd/ocs-baseline-shared";
+import {
+  abdIndexDigest,
+  assertUploadSucceeded,
+  crossCheckManifests,
+  pickZipByPointer,
+} from "@/lib/abd/ocs-baseline-store";
 import { normalizeAbdNumber } from "@/lib/abd/ocs-number-normalize";
+
 
 type LooseClient = {
   rpc: (
