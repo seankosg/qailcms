@@ -19,6 +19,7 @@ import {
 } from "@/lib/abd/ocs-baseline-shared";
 import {
   abdIndexDigest,
+  assertAbdIndexUnchanged,
   assertUploadSucceeded,
   crossCheckManifests,
   pickZipByPointer,
@@ -416,6 +417,11 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       throw new Error("BASELINE_RACE_DETECTED: 추출 도중 OCS 정본이 변경되었습니다.");
     }
 
+    // 4-1) ABD 인덱스 재검증 — 시작/종료 지문이 다르면 upload·sidecar·signed URL 이전에 즉시 중단.
+    const finalIndexRows = await buildAbdItemsIndex(context.supabase);
+    assertAbdIndexUnchanged(currentIndexDigest, await abdIndexDigest(finalIndexRows));
+
+
     // 5) ZIP 조립
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
@@ -437,14 +443,15 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
     }
 
     // 5-1) 브라우저 검증 sidecar — 운영 files 배열·total_rows 에는 절대 넣지 않는다.
-    //      core hash 의미는 바뀌지 않는다 (읽기 전용 인덱스). indexRows 는 1-1 에서 이미 생성됨.
+    //      core hash 의미는 바뀌지 않는다 (읽기 전용 인덱스).
+    //      ZIP 에는 4-1 에서 재검증을 통과한 종료 시점 인덱스만 담는다.
 
     const indexText = JSON.stringify(
       {
         schema_version: ABD_ITEMS_INDEX_SCHEMA,
         generated_at: new Date().toISOString(),
-        row_count: indexRows.length,
-        rows: indexRows,
+        row_count: finalIndexRows.length,
+        rows: finalIndexRows,
       },
       null,
       0,
@@ -454,7 +461,7 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
         relative_path: BASELINE_ABD_INDEX_PATH,
         byte_size: new TextEncoder().encode(indexText).byteLength,
         sha256: await sha256Hex(indexText),
-        row_count: indexRows.length,
+        row_count: finalIndexRows.length,
       },
     ];
     zip.file(BASELINE_ABD_INDEX_PATH, indexText);

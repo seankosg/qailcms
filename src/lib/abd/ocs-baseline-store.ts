@@ -85,3 +85,15 @@ export function assertUploadSucceeded(err: { message: string } | null, path: str
   if (!err) return;
   throw new Error(`BASELINE_UPLOAD_FAILED: ${path} — ${err.message}`);
 }
+
+/** ABD 인덱스 경쟁 감지 오류 코드 (생성 시작/종료 지문 대조) */
+export const ABD_INDEX_RACE_ERROR =
+  "BASELINE_ABD_INDEX_RACE_DETECTED: Baseline 생성 중 ABD Raw Data가 변경되었습니다. 다시 생성하십시오.";
+
+/**
+ * 생성 시작 시점과 종료 시점의 ABD 인덱스 지문을 대조한다.
+ * 다르면 즉시 throw — 호출부는 이 지점 이후에만 upload/sidecar/signed URL 을 수행한다.
+ */
+export function assertAbdIndexUnchanged(startDigest: string, endDigest: string): void {
+  if (startDigest !== endDigest) throw new Error(ABD_INDEX_RACE_ERROR);
+}
