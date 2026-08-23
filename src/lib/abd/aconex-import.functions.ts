@@ -3,6 +3,14 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildFieldLog, classifyChange, flushFieldLogs, type PendingFieldLog } from "@/lib/import/field-log";
 import { assertImportScope } from "@/lib/import/rcl-import-gate";
+import {
+  normalizeAconexBatch,
+  resolveTerminationAction,
+  TERMINATION_CLEAR_REASON,
+  TERMINATION_SAME_DATE_DETAIL,
+  type BatchBlocker,
+  type TerminationAction,
+} from "@/lib/abd/aconex-termination";
 
 /**
  * Aconex Export 임포트 - 기존 abd_items_raw 행에 대해 UPDATE 전용.
@@ -98,6 +106,20 @@ export type AconexImportPreview = {
     date_modified: string | null;
     semantic: "EXCLUDED_TERMINATED" | "EXCLUDED_CANCELLED";
   }>;
+  /** §3.1 동일 문서+동일 날짜+상충 semantic — 자동 판정 금지 대상 */
+  same_date_blockers: BatchBlocker[];
+  /** 결정론적 축약으로 제거된 중복 입력 행수 */
+  collapsed_duplicates: number;
+  /** Termination 자동 해제 대상 */
+  termination_cleared: Array<{
+    document_no: string;
+    semantic: string;
+    existing_date: string | null;
+    incoming_date: string | null;
+    same_date: boolean;
+  }>;
+  /** 날짜 없음/파싱 불가로 해제하지 않은 건 */
+  termination_warnings: Array<{ document_no: string; semantic: string; reason: "missing_date" }>;
   /** Round attribution 방어 카운터 */
   round_guard: {
     skipped_r2_no_sb: number;
@@ -267,9 +289,58 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
       legacy_r1_attribution: 0,
       skipped_samples: [] as string[],
     };
-    for (const r of inScope) {
+    // §3.1 입력 배치 결정론: 문서당 1행으로 축약, 동일 날짜 상충 semantic 은 blocker.
+    const normalized = normalizeAconexBatch(inScope);
+    const blockerDocs = new Set(normalized.blockers.map((b) => b.document_no));
+
+    // §3.2~3.4 Termination 전환 사전 판정 — preset 누락 시 조용한 스킵 금지.
+    const termActions = new Map<string, TerminationAction>();
+    for (const r of normalized.rows) {
+      termActions.set(
+        r.document_no,
+        resolveTerminationAction({
+          row: r,
+          existing: existingRows.get(r.document_no) ?? null,
+          sameDateUnambiguous: normalized.unambiguous.get(r.document_no) === true,
+        }),
+      );
+    }
+    const termTouching = normalized.rows.filter((r) => {
+      const a = termActions.get(r.document_no);
+      return a?.kind === "set" || a?.kind === "clear";
+    });
+    if (termTouching.length > 0 && !allowed.has("is_terminated")) {
+      throw new Error(
+        `TERMINATION_FIELD_NOT_ALLOWED: Termination 설정/해제 사건 ${termTouching.length}건이 있으나 ` +
+          `임포트 대상 필드에 'is_terminated' 가 포함되지 않았습니다. ` +
+          `표본: ${termTouching.slice(0, 5).map((r) => r.document_no).join(", ")}`,
+      );
+    }
+
+    const terminationCleared: AconexImportPreview["termination_cleared"] = [];
+    const terminationWarnings: AconexImportPreview["termination_warnings"] = [];
+
+    for (const r of normalized.rows) {
+      if (blockerDocs.has(r.document_no)) continue;
       const existing = existingRows.get(r.document_no) ?? {};
-      const { patch, guard } = computePatch(r, existing, allowed);
+      const termAction = termActions.get(r.document_no) ?? { kind: "none" as const };
+      if (termAction.kind === "none" && termAction.warning === "missing_date") {
+        terminationWarnings.push({
+          document_no: r.document_no,
+          semantic: r.semantic ?? "UNKNOWN",
+          reason: "missing_date",
+        });
+      }
+      const { patch, guard } = computePatch(r, existing, allowed, termAction);
+      if (termAction.kind === "clear" && patch.is_terminated === false) {
+        terminationCleared.push({
+          document_no: r.document_no,
+          semantic: r.semantic ?? "UNKNOWN",
+          existing_date: existing.aconex_date_modified ?? null,
+          incoming_date: r.date_modified ?? null,
+          same_date: termAction.sameDate,
+        });
+      }
       if (guard === "skipped_r2_no_sb") {
         roundGuard.skipped_r2_no_sb += 1;
         if (roundGuard.skipped_samples.length < 20) roundGuard.skipped_samples.push(r.document_no);
@@ -342,6 +413,10 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
           changes,
         })),
       terminated_reset: terminatedReset,
+      same_date_blockers: normalized.blockers,
+      collapsed_duplicates: normalized.collapsedDuplicates,
+      termination_cleared: terminationCleared,
+      termination_warnings: terminationWarnings,
       round_guard: roundGuard,
     };
 
@@ -412,8 +487,19 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
             raw: ch.next,
             applied: ch.next,
             previous: ch.previous,
-            code: "aconex_sync",
-            detail: `document_no=${d.document_no} semantic=${d.semantic}`,
+            code: ch.field === "is_terminated" && ch.next === "false" ? TERMINATION_CLEAR_REASON : "aconex_sync",
+            detail:
+              ch.field === "is_terminated" && ch.next === "false"
+                ? `document_no=${d.document_no} semantic=${d.semantic} prev_date=${
+                    terminationCleared.find((t) => t.document_no === d.document_no)?.existing_date ?? "null"
+                  } incoming_date=${
+                    terminationCleared.find((t) => t.document_no === d.document_no)?.incoming_date ?? "null"
+                  }${
+                    terminationCleared.find((t) => t.document_no === d.document_no)?.same_date
+                      ? ` ${TERMINATION_SAME_DATE_DETAIL}`
+                      : ""
+                  }`
+                : `document_no=${d.document_no} semantic=${d.semantic}`,
           }),
         );
       }
@@ -525,6 +611,7 @@ function computePatch(
   r: z.infer<typeof RowSchema>,
   existing: any,
   allowed: Set<string>,
+  termAction: TerminationAction = { kind: "none" },
 ): { patch: Record<string, any>; guard: null | "skipped_r2_no_sb" | "skipped_r3_no_sb" | "legacy_r1_attribution" } {
   const patch: Record<string, any> = {};
   let guard: null | "skipped_r2_no_sb" | "skipped_r3_no_sb" | "legacy_r1_attribution" = null;
@@ -548,7 +635,7 @@ function computePatch(
     //   ⑤ 통계에는 포함 (재제출 예정 물량)
     // §1(c) Cancelled: HDEC 자체 폐기 → 통계 완전 제외. latest_status 이력 보존.
     if (semantic === "EXCLUDED_TERMINATED") {
-      if (allowed.has("is_terminated")) patch.is_terminated = true;
+      if (allowed.has("is_terminated") && termAction.kind === "set") patch.is_terminated = true;
     } else {
       // Cancelled: 통계 완전 제외 플래그 (is_active=false).
       patch.is_active = false;
@@ -556,6 +643,11 @@ function computePatch(
     }
     // latest_status / approval_date: 두 케이스 모두 덮어쓰기 금지 (§1(b)③, §1(c))
     return { patch, guard };
+  }
+
+  // §3.3 Termination 자동 해제 — 정본 전환은 resolveTerminationAction() 이 판정한다.
+  if (termAction.kind === "clear" && allowed.has("is_terminated")) {
+    patch.is_terminated = false;
   }
 
   const n = resolveActiveRound(existing);
