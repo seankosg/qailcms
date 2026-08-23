@@ -416,6 +416,11 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
       throw new Error("BASELINE_RACE_DETECTED: 추출 도중 OCS 정본이 변경되었습니다.");
     }
 
+    // 4-1) ABD 인덱스 재검증 — 시작/종료 지문이 다르면 upload·sidecar·signed URL 이전에 즉시 중단.
+    const finalIndexRows = await buildAbdItemsIndex(context.supabase);
+    assertAbdIndexUnchanged(currentIndexDigest, await abdIndexDigest(finalIndexRows));
+
+
     // 5) ZIP 조립
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
