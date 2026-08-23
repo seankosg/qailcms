@@ -437,8 +437,8 @@ export const createOcsBaseline = createServerFn({ method: "POST" })
     }
 
     // 5-1) 브라우저 검증 sidecar — 운영 files 배열·total_rows 에는 절대 넣지 않는다.
-    //      core hash 의미는 바뀌지 않는다 (읽기 전용 인덱스).
-    const indexRows = await buildAbdItemsIndex(context.supabase);
+    //      core hash 의미는 바뀌지 않는다 (읽기 전용 인덱스). indexRows 는 1-1 에서 이미 생성됨.
+
     const indexText = JSON.stringify(
       {
         schema_version: ABD_ITEMS_INDEX_SCHEMA,
