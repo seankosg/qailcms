@@ -218,3 +218,19 @@ export function assertTerminationFieldsAllowed(
   );
 }
 
+
+/**
+ * §2.3 apply 최종 관문 — 동일 날짜 상충 사건이 하나라도 있으면
+ * Import log 생성/UPDATE 이전에 전체를 차단한다(부분 반영 금지).
+ */
+export function assertNoSameDateConflict(blockers: BatchBlocker[]): void {
+  if (blockers.length === 0) return;
+  const sample = blockers
+    .slice(0, 5)
+    .map((b) => `${b.document_no}(${b.date_modified ?? "no-date"}: ${b.semantics.join("/")})`)
+    .join(", ");
+  throw new Error(
+    `ACONEX_SAME_DATE_SEMANTIC_CONFLICT: 같은 도면·같은 날짜에 서로 다른 Aconex 상태가 ` +
+      `${blockers.length}건 있습니다. 순서를 확정할 수 없어 Import 를 차단했습니다. 표본: ${sample}`,
+  );
+}

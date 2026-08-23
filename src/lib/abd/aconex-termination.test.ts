@@ -4,6 +4,7 @@ import {
   resolveTerminationAction,
   type BatchRowLike,
   assertTerminationFieldsAllowed,
+  assertNoSameDateConflict,
   TERMINATION_REQUIRED_FIELDS,
 } from "./aconex-termination";
 
@@ -290,5 +291,19 @@ describe("4*. 같은 날짜 Terminated + SUBMITTED → blocker (처리 제외)",
     expect(res.blockers).toHaveLength(0);
     expect(res.rows).toHaveLength(2);
     expect(res.collapsedDuplicates).toBe(0);
+  });
+});
+
+describe("1*. assertNoSameDateConflict (apply=true 최종 관문)", () => {
+  it("blocker 있으면 예외 — 로그/UPDATE 이전 차단", () => {
+    expect(() =>
+      assertNoSameDateConflict([
+        { document_no: "A", date_modified: "2026-08-09", semantics: ["EXCLUDED_TERMINATED", "SUBMITTED"] },
+      ]),
+    ).toThrowError(/ACONEX_SAME_DATE_SEMANTIC_CONFLICT/);
+  });
+
+  it("blocker 없으면 통과", () => {
+    expect(() => assertNoSameDateConflict([])).not.toThrow();
   });
 });

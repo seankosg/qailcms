@@ -7,6 +7,7 @@ import {
   normalizeAconexBatch,
   resolveTerminationAction,
   assertTerminationFieldsAllowed,
+  assertNoSameDateConflict,
   TERMINATION_CLEAR_REASON,
   TERMINATION_SAME_DATE_DETAIL,
   type BatchBlocker,
@@ -294,17 +295,8 @@ export const importAbdAconexBatch = createServerFn({ method: "POST" })
     const normalized = normalizeAconexBatch(inScope);
     const blockerDocs = new Set(normalized.blockers.map((b) => b.document_no));
 
-    // §2.3 서버 최종 관문 — apply 시에는 부분 반영조차 금지한다(로그/UPDATE 이전).
-    if (data.apply && normalized.blockers.length > 0) {
-      const sample = normalized.blockers
-        .slice(0, 5)
-        .map((b) => `${b.document_no}(${b.date_modified ?? "no-date"}: ${b.semantics.join("/")})`)
-        .join(", ");
-      throw new Error(
-        `ACONEX_SAME_DATE_SEMANTIC_CONFLICT: 같은 도면·같은 날짜에 서로 다른 Aconex 상태가 ` +
-          `${normalized.blockers.length}건 있습니다. 순서를 확정할 수 없어 Import 를 차단했습니다. 표본: ${sample}`,
-      );
-    }
+    // §2.3 서버 최종 관문 — apply 시 부분 반영조차 금지한다(로그/UPDATE 이전).
+    if (data.apply) assertNoSameDateConflict(normalized.blockers);
 
     // §3.2~3.4 Termination 전환 사전 판정 — preset 누락 시 조용한 스킵 금지.
     const termActions = new Map<string, TerminationAction>();
