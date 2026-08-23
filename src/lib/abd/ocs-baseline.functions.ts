@@ -19,6 +19,7 @@ import {
 } from "@/lib/abd/ocs-baseline-shared";
 import {
   abdIndexDigest,
+  assertAbdIndexUnchanged,
   assertUploadSucceeded,
   crossCheckManifests,
   pickZipByPointer,
