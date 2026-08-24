@@ -2482,6 +2482,39 @@ export type Database = {
         }
         Relationships: []
       }
+      abd_termination_fix_snapshot_20260824: {
+        Row: {
+          abd_number: string | null
+          aconex_date_modified: string | null
+          aconex_review_status_raw: string | null
+          aconex_status_raw: string | null
+          captured_at: string
+          id: string
+          is_active: boolean | null
+          is_terminated: boolean | null
+        }
+        Insert: {
+          abd_number?: string | null
+          aconex_date_modified?: string | null
+          aconex_review_status_raw?: string | null
+          aconex_status_raw?: string | null
+          captured_at?: string
+          id: string
+          is_active?: boolean | null
+          is_terminated?: boolean | null
+        }
+        Update: {
+          abd_number?: string | null
+          aconex_date_modified?: string | null
+          aconex_review_status_raw?: string | null
+          aconex_status_raw?: string | null
+          captured_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_terminated?: boolean | null
+        }
+        Relationships: []
+      }
       backup_config: {
         Row: {
           id: string
