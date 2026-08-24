@@ -206,9 +206,26 @@ export const deleteSnapshot = createServerFn({ method: "POST" })
     await assertSystemAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const core = await import("./backup-core.server");
-    await core.deleteSnapshot(supabaseAdmin, data.snapshot_id);
-    return { ok: true };
+    const result = await core.deleteSnapshotCanonical(supabaseAdmin, data.snapshot_id);
+    return { ok: true, ...result };
   });
+
+/** 선택 일괄삭제 — 개별삭제와 동일한 권한 정책, 동일한 삭제 정본. */
+export const deleteSnapshotsBulk = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { snapshot_ids: string[] }) => {
+    const ids = Array.from(new Set((input.snapshot_ids ?? []).filter((v) => typeof v === "string" && v)));
+    if (ids.length === 0) throw new Error("삭제할 백업을 선택하십시오.");
+    if (ids.length > 100) throw new Error("한 번에 최대 100개까지만 삭제할 수 있습니다.");
+    return { snapshot_ids: ids };
+  })
+  .handler(async ({ data, context }) => {
+    await assertSystemAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const core = await import("./backup-core.server");
+    return await core.deleteSnapshotsBulk(supabaseAdmin, data.snapshot_ids);
+  });
+
 
 export const lockSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -277,6 +294,16 @@ export const restoreSnapshot = createServerFn({ method: "POST" })
     }
   });
 
+/** 보관기간 정리 미리보기(읽기 전용) — 실제 실행과 동일한 후보 계산 함수를 사용. */
+export const previewCleanupOldSnapshots = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const core = await import("./backup-core.server");
+    return await core.previewCleanupOldSnapshots(supabaseAdmin);
+  });
+
 export const cleanupOldSnapshots = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -285,6 +312,7 @@ export const cleanupOldSnapshots = createServerFn({ method: "POST" })
     const core = await import("./backup-core.server");
     return await core.cleanupOldSnapshots(supabaseAdmin);
   });
+
 
 // ===== OCS 이미지(미디어) 백업 =====
 
