@@ -294,6 +294,16 @@ export const restoreSnapshot = createServerFn({ method: "POST" })
     }
   });
 
+/** 보관기간 정리 미리보기(읽기 전용) — 실제 실행과 동일한 후보 계산 함수를 사용. */
+export const previewCleanupOldSnapshots = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const core = await import("./backup-core.server");
+    return await core.previewCleanupOldSnapshots(supabaseAdmin);
+  });
+
 export const cleanupOldSnapshots = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -302,6 +312,7 @@ export const cleanupOldSnapshots = createServerFn({ method: "POST" })
     const core = await import("./backup-core.server");
     return await core.cleanupOldSnapshots(supabaseAdmin);
   });
+
 
 // ===== OCS 이미지(미디어) 백업 =====
 
