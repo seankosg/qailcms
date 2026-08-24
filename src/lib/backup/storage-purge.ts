@@ -67,7 +67,12 @@ export async function listAllStorageFiles(
   folder: string,
   depth = 0,
 ): Promise<string[]> {
-  if (depth > 8) return [];
+  if (depth > STORAGE_MAX_DEPTH) {
+    fail(
+      "SNAPSHOT_STORAGE_DEPTH_EXCEEDED",
+      `경로=${folder}, 허용 최대 깊이=${STORAGE_MAX_DEPTH}`,
+    );
+  }
   const base = normalizeFolder(folder);
   const paths: string[] = [];
   let offset = 0;
