@@ -23,6 +23,16 @@ export type AbdStatusGroup =
   | "delayed"
   | "resubmit"
   | "cancelled"
+  // Dashboard Status Mix 드릴다운 (정본 술어 = abd_dashboard_judgment_mix 와 동일)
+  | "mix_approved"
+  | "mix_ur"
+  | "mix_ds"
+  // Dashboard 자동 판정 분포 드릴다운
+  | "jdg_done"
+  | "jdg_normal"
+  | "jdg_caution"
+  | "jdg_delayed"
+  | "jdg_critical"
   // stage_group 축 (Progress KPI 스트립): 재고 sg_*, 지연 sgd_*
   | "sg_ns"
   | "sg_ds"
