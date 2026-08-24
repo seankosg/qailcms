@@ -606,9 +606,16 @@ export async function restoreSnapshot(
   return { restoredTables, totalRows };
 }
 
-export async function cleanupOldSnapshots(
-  supabaseAdmin: SupabaseClient<Database>,
-): Promise<{ deleted: string[] }> {
+export type SnapshotDeleteFailure = { id: string; name?: string | null; code: string; message: string };
+export type BulkDeleteResult = {
+  success: SnapshotDeleteResult[];
+  failed: SnapshotDeleteFailure[];
+  deleted_files: number;
+  freed_bytes: number;
+  executed_at: string;
+};
+
+async function loadRetentionPlan(supabaseAdmin: SupabaseClient<Database>) {
   const { data: config, error: configError } = await supabaseAdmin
     .from("backup_config")
     .select("retention_days, keep_minimum_count")
@@ -617,34 +624,75 @@ export async function cleanupOldSnapshots(
     .single();
   if (configError) throw new Error(`Failed to read backup config: ${configError.message}`);
 
-  const retentionDays = config?.retention_days ?? 30;
-  const keepMinimum = config?.keep_minimum_count ?? 3;
-  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
-
   const { data: snapshots, error: listError } = await supabaseAdmin
     .from("database_snapshots")
-    .select("id, created_at, is_locked")
+    .select("id, name, created_at, size_bytes, is_locked")
     .order("created_at", { ascending: true });
   if (listError) throw new Error(`Failed to list snapshots: ${listError.message}`);
 
-  const candidates = (snapshots ?? []).filter((s) => !s.is_locked && s.created_at < cutoff);
-  const lockedCount = (snapshots ?? []).filter((s) => s.is_locked).length;
-  const unprotectedCount = (snapshots ?? []).length - lockedCount;
-
-  const toDelete: string[] = [];
-  let remainingAfterDelete = unprotectedCount;
-  for (const s of candidates) {
-    if (remainingAfterDelete <= keepMinimum) break;
-    toDelete.push(s.id);
-    remainingAfterDelete--;
-  }
-
-  for (const id of toDelete) {
-    await deleteSnapshot(supabaseAdmin, id);
-  }
-
-  return { deleted: toDelete };
+  return planRetentionCleanup(snapshots ?? [], {
+    retentionDays: config?.retention_days ?? 30,
+    keepMinimum: config?.keep_minimum_count ?? 3,
+  });
 }
+
+/** 읽기 전용 미리보기 — 실제 실행과 동일한 후보 계산 함수를 사용한다. */
+export async function previewCleanupOldSnapshots(supabaseAdmin: SupabaseClient<Database>) {
+  const plan = await loadRetentionPlan(supabaseAdmin);
+  return {
+    retention_days: plan.retention_days,
+    keep_minimum_count: plan.keep_minimum_count,
+    cutoff: plan.cutoff,
+    candidates: plan.candidates.map((s) => ({
+      id: s.id,
+      name: s.name ?? null,
+      created_at: s.created_at,
+      size_bytes: s.size_bytes ?? 0,
+    })),
+    candidate_count: plan.candidate_count,
+    estimated_bytes: plan.estimated_bytes,
+    locked_excluded_count: plan.locked_excluded_count,
+    remaining_unlocked_after: plan.remaining_unlocked_after,
+  };
+}
+
+/** 여러 스냅샷을 삭제 정본으로 처리한다. 한 건 실패해도 계속 진행한다. */
+export async function deleteSnapshotsBulk(
+  supabaseAdmin: SupabaseClient<Database>,
+  ids: string[],
+): Promise<BulkDeleteResult> {
+  const success: SnapshotDeleteResult[] = [];
+  const failed: SnapshotDeleteFailure[] = [];
+  for (const id of ids) {
+    try {
+      success.push(await deleteSnapshotCanonical(supabaseAdmin, id));
+    } catch (err) {
+      failed.push(toFailure(id, err));
+    }
+  }
+  return {
+    success,
+    failed,
+    deleted_files: success.reduce((n, s) => n + s.deleted_files, 0),
+    freed_bytes: success.reduce((n, s) => n + s.freed_bytes, 0),
+    executed_at: new Date().toISOString(),
+  };
+}
+
+export async function cleanupOldSnapshots(
+  supabaseAdmin: SupabaseClient<Database>,
+): Promise<BulkDeleteResult & { deleted: string[]; retention_days: number; keep_minimum_count: number }> {
+  // 확인창 이후에도 서버가 대상을 다시 계산한다(클라이언트 목록 불신).
+  const plan = await loadRetentionPlan(supabaseAdmin);
+  const result = await deleteSnapshotsBulk(supabaseAdmin, plan.candidates.map((s) => s.id));
+  return {
+    ...result,
+    deleted: result.success.map((s) => s.id),
+    retention_days: plan.retention_days,
+    keep_minimum_count: plan.keep_minimum_count,
+  };
+}
+
 
 async function readAllRows<T extends Record<string, unknown>>(
   supabaseAdmin: SupabaseClient<Database>,
