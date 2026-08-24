@@ -230,6 +230,9 @@ const DEEP_LINK_STATUS_VALUES: Array<Exclude<AbdStatusGroup, "all">> = [
   // stage_group 축 (Progress KPI 스트립 드릴다운): 재고 sg_*, 지연 sgd_*
   "sg_ns", "sg_ds", "sg_df", "sg_sb", "sg_rs", "sg_resubmit", "sg_approved",
   "sgd_ns", "sgd_ds", "sgd_df", "sgd_sb", "sgd_rs",
+  // Dashboard Status Mix · 자동 판정 분포 드릴다운
+  "mix_approved", "mix_ur", "mix_ds",
+  "jdg_done", "jdg_normal", "jdg_caution", "jdg_delayed", "jdg_critical",
 ];
 // 딥링크 status 값 → 사용자에게 보여줄 판정 라벨 (필터 칩)
 const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
