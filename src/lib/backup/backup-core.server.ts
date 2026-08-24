@@ -473,33 +473,24 @@ export async function createSnapshot(
   };
 }
 
+/**
+ * 삭제 정본. 개별삭제/일괄삭제/보관기간 정리 모두 이 경로를 사용한다.
+ * 실제 구현은 storage-purge.ts(순수·mock 가능)에 있다.
+ */
+export async function deleteSnapshotCanonical(
+  supabaseAdmin: SupabaseClient<Database>,
+  snapshotId: string,
+): Promise<SnapshotDeleteResult> {
+  return await purgeSnapshot(supabaseAdmin as unknown as MinimalSnapshotClient, snapshotId, BUCKET);
+}
+
 export async function deleteSnapshot(
   supabaseAdmin: SupabaseClient<Database>,
   snapshotId: string,
-): Promise<void> {
-  const { data: snapshot, error: findError } = await supabaseAdmin
-    .from("database_snapshots")
-    .select("storage_path")
-    .eq("id", snapshotId)
-    .single();
-  if (findError) throw new Error(`Snapshot not found: ${findError.message}`);
-
-  const folder = snapshot?.storage_path ?? `snapshots/${snapshotId}/`;
-  const { data: files, error: listError } = await supabaseAdmin.storage.from(BUCKET).list(folder);
-  if (listError) throw new Error(`Failed to list snapshot files: ${listError.message}`);
-
-  const paths = (files ?? []).map((f) => `${folder}${f.name}`);
-  if (paths.length) {
-    const { error: deleteError } = await supabaseAdmin.storage.from(BUCKET).remove(paths);
-    if (deleteError) throw new Error(`Failed to delete snapshot files: ${deleteError.message}`);
-  }
-
-  const { error: removeError } = await supabaseAdmin
-    .from("database_snapshots")
-    .delete()
-    .eq("id", snapshotId);
-  if (removeError) throw new Error(`Failed to remove snapshot record: ${removeError.message}`);
+): Promise<SnapshotDeleteResult> {
+  return await deleteSnapshotCanonical(supabaseAdmin, snapshotId);
 }
+
 
 export async function buildSnapshotZip(
   supabaseAdmin: SupabaseClient<Database>,
