@@ -51,6 +51,8 @@ const MESSAGES: Record<string, string> = {
   SNAPSHOT_LOCKED: "잠금된 백업은 삭제할 수 없습니다. 먼저 잠금을 해제하십시오.",
   SNAPSHOT_STORAGE_NOT_EMPTY: "Storage 파일이 남아 있어 백업 목록을 삭제하지 않았습니다.",
   SNAPSHOT_STORAGE_LIST_FAILED: "Storage 파일 목록 조회에 실패했습니다.",
+  SNAPSHOT_STORAGE_DEPTH_EXCEEDED:
+    "Storage 하위 폴더가 허용 깊이를 초과하여 삭제를 중단했습니다. 파일과 백업 목록은 그대로 유지됩니다.",
   SNAPSHOT_STORAGE_DELETE_FAILED: "Storage 파일 삭제에 실패했습니다.",
   SNAPSHOT_ROW_DELETE_FAILED: "백업 목록 행 삭제에 실패했습니다.",
 };
