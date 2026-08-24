@@ -13,6 +13,8 @@
 
 export const STORAGE_LIST_PAGE = 100;
 export const STORAGE_REMOVE_CHUNK = 100;
+/** 허용 재귀 탐색 깊이. 초과 시 조용히 빈 목록을 반환하지 않고 명시적으로 차단한다. */
+export const STORAGE_MAX_DEPTH = 8;
 
 export type MinimalStorageObject = { name: string; id?: string | null };
 
