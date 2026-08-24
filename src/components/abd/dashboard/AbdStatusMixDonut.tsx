@@ -8,13 +8,21 @@ import { getAbdDashboardJudgmentMix } from "@/lib/abd/dashboard.functions";
 
 type Seg = "Approved" | "UR" | "DS";
 
-const ORDER: { key: Seg; label: string; color: string }[] = [
-  { key: "Approved", label: "Approved", color: "var(--schedule-actual)" },
-  { key: "UR", label: "UR", color: "var(--warning)" },
-  { key: "DS", label: "DS", color: "var(--schedule-plan)" },
+const ORDER: { key: Seg; label: string; color: string; status: string }[] = [
+  { key: "Approved", label: "Approved", color: "var(--schedule-actual)", status: "mix_approved" },
+  { key: "UR", label: "UR", color: "var(--warning)", status: "mix_ur" },
+  { key: "DS", label: "DS", color: "var(--schedule-plan)", status: "mix_ds" },
 ];
 
-export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; plots?: string[] }) {
+export function AbdStatusMixDonut({
+  batchNo,
+  plots = [],
+  onOpenRaw,
+}: {
+  batchNo: string[];
+  plots?: string[];
+  onOpenRaw?: (params: Record<string, string>) => void;
+}) {
   const fn = useServerFn(getAbdDashboardJudgmentMix);
   const [asOf] = useAbdDataDate();
   const q = useQuery({
@@ -45,6 +53,8 @@ export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; 
     return { ...s, v, dash, off };
   });
 
+  const openSeg = (status: string) => onOpenRaw?.({ status });
+
   return (
     <Card className="@container flex h-full flex-col">
       <CardHeader className="pb-2">
@@ -67,7 +77,11 @@ export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; 
                   strokeDasharray={`${s.dash} ${CIRC - s.dash}`}
                   strokeDashoffset={s.off}
                   transform={`rotate(-90 ${CX} ${CY})`}
-                />
+                  onClick={onOpenRaw ? () => openSeg(s.status) : undefined}
+                  style={onOpenRaw ? { cursor: "pointer" } : undefined}
+                >
+                  <title>{`${s.label} ${s.v.toLocaleString()} — 클릭 시 Raw Data`}</title>
+                </circle>
               ),
           )}
           <text x={CX} y={CY - 4} textAnchor="middle" className="fill-foreground" style={{ font: "600 20px sans-serif" }}>
@@ -81,7 +95,16 @@ export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; 
           {segs.map((s) => {
             const pct = total > 0 ? (s.v / total) * 100 : 0;
             return (
-              <div key={s.key} className="flex min-w-0 items-center justify-between gap-2 rounded px-1 py-0.5">
+              <button
+                key={s.key}
+                type="button"
+                onClick={onOpenRaw ? () => openSeg(s.status) : undefined}
+                disabled={!onOpenRaw}
+                className={
+                  "flex min-w-0 items-center justify-between gap-2 rounded px-1 py-0.5 text-left transition-colors " +
+                  (onOpenRaw ? "cursor-pointer hover:bg-muted/70" : "cursor-default")
+                }
+              >
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ background: s.color }} />
                   <Badge variant="outline" className="truncate px-2 py-0 font-medium">
@@ -92,7 +115,7 @@ export function AbdStatusMixDonut({ batchNo, plots = [] }: { batchNo: string[]; 
                   {s.v.toLocaleString()}
                   {total > 0 && <span className="ml-1 text-[10px]">({pct.toFixed(0)}%)</span>}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>

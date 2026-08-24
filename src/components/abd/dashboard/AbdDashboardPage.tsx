@@ -238,8 +238,8 @@ export function AbdDashboardPage() {
 
       {/* Row 2.5 — Status Mix / 자동 판정 분포 / 스테이지별 판정 스택 (TM 이식) */}
       <div className="grid gap-4 xl:grid-cols-3">
-        <AbdStatusMixDonut plots={plotFilter} batchNo={batchFilter} />
-        <AbdJudgmentDonut plots={plotFilter} batchNo={batchFilter} />
+        <AbdStatusMixDonut plots={plotFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
+        <AbdJudgmentDonut plots={plotFilter} batchNo={batchFilter} onOpenRaw={openRawData} />
         <AbdJudgmentStageBreakdown plots={plotFilter} batchNo={batchFilter} />
       </div>
 
