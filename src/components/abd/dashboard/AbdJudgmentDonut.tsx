@@ -9,6 +9,14 @@ import { cn } from "@/lib/utils";
 import { getAbdDashboardJudgmentMix, type AbdJudgmentMixRow } from "@/lib/abd/dashboard.functions";
 
 const ORDER = ["완료", "정상", "주의", "지연", "악화"] as const;
+/** 판정 라벨 → Raw Data 딥링크 status (정본 술어 = abd_dashboard_judgment_mix 와 동일) */
+const JDG_STATUS: Record<string, string> = {
+  완료: "jdg_done",
+  정상: "jdg_normal",
+  주의: "jdg_caution",
+  지연: "jdg_delayed",
+  악화: "jdg_critical",
+};
 const SEG_COLOR: Record<string, string> = {
   완료: "var(--schedule-actual)",
   정상: "var(--schedule-plan)",
@@ -29,7 +37,15 @@ export function sumJudgmentMix(rows: AbdJudgmentMixRow[] | undefined): Record<st
   return out;
 }
 
-export function AbdJudgmentDonut({ batchNo, plots = [] }: { batchNo: string[]; plots?: string[] }) {
+export function AbdJudgmentDonut({
+  batchNo,
+  plots = [],
+  onOpenRaw,
+}: {
+  batchNo: string[];
+  plots?: string[];
+  onOpenRaw?: (params: Record<string, string>) => void;
+}) {
   const fn = useServerFn(getAbdDashboardJudgmentMix);
   const [asOf] = useAbdDataDate();
   const q = useQuery({
@@ -50,6 +66,8 @@ export function AbdJudgmentDonut({ batchNo, plots = [] }: { batchNo: string[]; p
     acc += dash;
     return { k, v, dash, off };
   });
+
+  const openSeg = (k: string) => onOpenRaw?.({ status: JDG_STATUS[k] });
 
   return (
     <Card className="@container flex h-full flex-col">
@@ -73,7 +91,11 @@ export function AbdJudgmentDonut({ batchNo, plots = [] }: { batchNo: string[]; p
                   strokeDasharray={`${s.dash} ${CIRC - s.dash}`}
                   strokeDashoffset={s.off}
                   transform={`rotate(-90 ${CX} ${CY})`}
-                />
+                  onClick={onOpenRaw ? () => openSeg(s.k) : undefined}
+                  style={onOpenRaw ? { cursor: "pointer" } : undefined}
+                >
+                  <title>{`${s.k} ${s.v.toLocaleString()} — 클릭 시 Raw Data`}</title>
+                </circle>
               ),
           )}
           <text x={CX} y={CY - 4} textAnchor="middle" className="fill-foreground" style={{ font: "600 20px sans-serif" }}>
@@ -85,7 +107,16 @@ export function AbdJudgmentDonut({ batchNo, plots = [] }: { batchNo: string[]; p
         </svg>
         <div className="flex w-full min-w-0 flex-1 flex-col gap-1 text-xs">
           {ORDER.map((k) => (
-            <div key={k} className="flex min-w-0 items-center justify-between gap-2">
+            <button
+              key={k}
+              type="button"
+              onClick={onOpenRaw ? () => openSeg(k) : undefined}
+              disabled={!onOpenRaw}
+              className={cn(
+                "flex min-w-0 items-center justify-between gap-2 rounded px-1 py-0.5 text-left transition-colors",
+                onOpenRaw ? "cursor-pointer hover:bg-muted/70" : "cursor-default",
+              )}
+            >
               <div className="flex min-w-0 items-center gap-1.5">
                 <span className="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ background: SEG_COLOR[k] }} />
                 <Badge className={cn("truncate px-2 py-0", AUTO_JUDGMENT_COLORS[k])}>{k}</Badge>
@@ -98,7 +129,7 @@ export function AbdJudgmentDonut({ batchNo, plots = [] }: { batchNo: string[]; p
                   </span>
                 )}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       </CardContent>
