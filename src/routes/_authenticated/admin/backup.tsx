@@ -679,20 +679,72 @@ function BackupConfigCard({ config, onUpdated }: { config: any; onUpdated: () =>
   );
 }
 
-function SnapshotTable({ snapshots, loading, onChange }: { snapshots: any[]; loading: boolean; onChange: () => void }) {
+function SnapshotTable({
+  snapshots,
+  loading,
+  onChange,
+  onResult,
+}: {
+  snapshots: any[];
+  loading: boolean;
+  onChange: () => void;
+  onResult: (r: DeleteResult) => void;
+}) {
   const del = useServerFn(deleteSnapshot);
+  const bulkDel = useServerFn(deleteSnapshotsBulk);
   const lock = useServerFn(lockSnapshot);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [unlockId, setUnlockId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+
+  const unlockedIds = useMemo(
+    () => snapshots.filter((s) => !s.is_locked).map((s) => s.id as string),
+    [snapshots],
+  );
+
+  // 목록 새로고침·잠금 변경 후 존재하지 않거나 잠긴 ID를 선택에서 자동 제거한다.
+  useEffect(() => {
+    setSelected((prev) => {
+      const next = prev.filter((id) => unlockedIds.includes(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [unlockedIds]);
+
+  const selectedRows = snapshots.filter((s) => selected.includes(s.id));
+  const selectedBytes = selectedRows.reduce((sum, s) => sum + (s.size_bytes ?? 0), 0);
+  const allSelected = unlockedIds.length > 0 && unlockedIds.every((id) => selected.includes(id));
+
+  const toggleRow = (id: string, checked: boolean) =>
+    setSelected((prev) => (checked ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)));
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base">스냅샷 목록</CardTitle>
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={selected.length === 0}
+          onClick={() => setBulkOpen(true)}
+        >
+          <Trash2 className="h-4 w-4 mr-1.5" />
+          선택한 백업 삭제 ({selected.length})
+        </Button>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  aria-label="전체 선택 (잠금 제외)"
+                  checked={allSelected}
+                  disabled={unlockedIds.length === 0}
+                  onCheckedChange={(c) => setSelected(c === true ? unlockedIds : [])}
+                />
+              </TableHead>
               <TableHead>이름</TableHead>
               <TableHead>시점</TableHead>
               <TableHead>트리거</TableHead>
@@ -705,15 +757,23 @@ function SnapshotTable({ snapshots, loading, onChange }: { snapshots: any[]; loa
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">불러오는 중…</TableCell>
+                <TableCell colSpan={8} className="text-center text-muted-foreground">불러오는 중…</TableCell>
               </TableRow>
             ) : snapshots.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">스냅샷이 없습니다.</TableCell>
+                <TableCell colSpan={8} className="text-center text-muted-foreground">스냅샷이 없습니다.</TableCell>
               </TableRow>
             ) : (
               snapshots.map((s) => (
                 <TableRow key={s.id}>
+                  <TableCell>
+                    <Checkbox
+                      aria-label={s.is_locked ? "잠금된 백업은 삭제할 수 없습니다." : `${s.name} 선택`}
+                      checked={selected.includes(s.id)}
+                      disabled={!!s.is_locked}
+                      onCheckedChange={(c) => toggleRow(s.id, c === true)}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{s.name}</TableCell>
                   <TableCell>{formatDateTime(s.created_at)}</TableCell>
                   <TableCell>
@@ -736,10 +796,16 @@ function SnapshotTable({ snapshots, loading, onChange }: { snapshots: any[]; loa
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
+                        title={s.is_locked ? "보호 잠금 해제" : "이 백업 보호하기"}
+                        aria-label={s.is_locked ? "보호 잠금 해제" : "이 백업 보호하기"}
                         onClick={async () => {
+                          if (s.is_locked) {
+                            setUnlockId(s.id);
+                            return;
+                          }
                           try {
-                            await lock({ data: { snapshot_id: s.id, is_locked: !s.is_locked } });
-                            toast.success(s.is_locked ? "잠금을 해제했습니다." : "스냅샷을 잠금 처리했습니다.");
+                            await lock({ data: { snapshot_id: s.id, is_locked: true } });
+                            toast.success("스냅샷을 잠금 처리했습니다.");
                             onChange();
                           } catch (err) {
                             toast.error(`잠금 변경 실패: ${(err as Error).message}`);
@@ -752,6 +818,9 @@ function SnapshotTable({ snapshots, loading, onChange }: { snapshots: any[]; loa
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
+                        disabled={!!s.is_locked}
+                        title={s.is_locked ? "잠금된 백업은 삭제할 수 없습니다." : "백업 삭제"}
+                        aria-label={s.is_locked ? "잠금된 백업은 삭제할 수 없습니다." : "백업 삭제"}
                         onClick={() => setDeleteId(s.id)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -793,9 +862,92 @@ function SnapshotTable({ snapshots, loading, onChange }: { snapshots: any[]; loa
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!unlockId} onOpenChange={(open) => !open && setUnlockId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>백업 보호 잠금 해제</AlertDialogTitle>
+            <AlertDialogDescription>
+              잠금을 해제하면 이 백업은 수동 삭제 및 보관기간 정리 대상이 될 수 있습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setUnlockId(null)}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!unlockId) return;
+                try {
+                  await lock({ data: { snapshot_id: unlockId, is_locked: false } });
+                  toast.success("잠금을 해제했습니다.");
+                  setUnlockId(null);
+                  onChange();
+                } catch (err) {
+                  toast.error(`잠금 변경 실패: ${(err as Error).message}`);
+                }
+              }}
+            >
+              잠금 해제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={bulkOpen} onOpenChange={(o) => !bulkRunning && setBulkOpen(o)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              선택한 백업 삭제
+            </DialogTitle>
+            <DialogDescription>
+              선택 {selectedRows.length}개 / 합산 {bytesToHuman(selectedBytes)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="max-h-56 overflow-y-auto rounded-md border p-2 text-xs space-y-0.5">
+              {selectedRows.map((s) => (
+                <div key={s.id} className="flex justify-between gap-2">
+                  <span className="truncate">{s.name ?? s.id}</span>
+                  <span className="text-muted-foreground whitespace-nowrap">{formatDateTime(s.created_at)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-destructive font-medium">
+              Storage의 실제 백업 파일도 영구 삭제되며 복구할 수 없습니다.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkOpen(false)} disabled={bulkRunning}>취소</Button>
+            <Button
+              variant="destructive"
+              disabled={bulkRunning || selectedRows.length === 0}
+              onClick={async () => {
+                setBulkRunning(true);
+                try {
+                  const res: any = await bulkDel({ data: { snapshot_ids: selected } });
+                  onResult({ kind: "bulk", ...res });
+                  if (res.failed.length === 0) toast.success(`${res.success.length}개 백업을 삭제했습니다.`);
+                  else toast.warning(`부분 실패 — 성공 ${res.success.length}건 / 실패 ${res.failed.length}건`);
+                  setSelected(res.failed.map((f: any) => f.id));
+                  setBulkOpen(false);
+                  onChange();
+                } catch (err) {
+                  toast.error(`삭제 실패: ${(err as Error).message}`);
+                } finally {
+                  setBulkRunning(false);
+                }
+              }}
+            >
+              {bulkRunning && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+              선택한 {selectedRows.length}개 영구 삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
+
 
 function LogPanel({ backup, restore }: { backup: any[]; restore: any[] }) {
   return (
