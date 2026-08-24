@@ -169,12 +169,15 @@ function BackupPage() {
       <div className="flex flex-wrap items-center gap-2">
         <DownloadArchiveButton snapshots={snapshots} />
         <RestoreButton snapshots={snapshots} onRestored={invalidate} />
-        <CleanupButton onCleaned={invalidate} />
+        <CleanupButton onCleaned={invalidate} onResult={setDeleteResult} />
       </div>
 
+      <DeleteResultCard result={deleteResult} />
+
       <BackupConfigCard config={config} onUpdated={invalidate} />
-      <SnapshotTable snapshots={snapshots} loading={listLoading} onChange={invalidate} />
+      <SnapshotTable snapshots={snapshots} loading={listLoading} onChange={invalidate} onResult={setDeleteResult} />
       <LogPanel backup={logsData?.backup ?? []} restore={logsData?.restore ?? []} />
+
     </div>
   );
 }
