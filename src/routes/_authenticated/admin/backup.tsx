@@ -10,9 +10,12 @@ import {
   updateBackupConfig,
   createManualSnapshot,
   deleteSnapshot,
+  deleteSnapshotsBulk,
   lockSnapshot,
   restoreSnapshot,
   cleanupOldSnapshots,
+  previewCleanupOldSnapshots,
+
   backupOcsMediaBatch,
   finalizeOcsMediaManifest,
   verifyOcsMedia,
