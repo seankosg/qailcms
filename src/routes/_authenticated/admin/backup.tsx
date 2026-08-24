@@ -473,33 +473,149 @@ function RestoreButton({ snapshots, onRestored }: { snapshots: any[]; onRestored
   );
 }
 
-function CleanupButton({ onCleaned }: { onCleaned: () => void }) {
-  const cleanup = useServerFn(cleanupOldSnapshots);
-  const [loading, setLoading] = useState(false);
+type DeleteResult = {
+  kind: "cleanup" | "bulk";
+  success: { id: string; name: string | null; deleted_files: number; freed_bytes: number }[];
+  failed: { id: string; name?: string | null; code: string; message: string }[];
+  deleted_files: number;
+  freed_bytes: number;
+  executed_at: string;
+};
 
+function DeleteResultCard({ result }: { result: DeleteResult | null }) {
+  if (!result) return null;
+  const partial = result.failed.length > 0;
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={loading}
-      onClick={async () => {
-        setLoading(true);
-        try {
-          const result = await cleanup({});
-          toast.success(`${result.deleted.length}개의 오래된 스냅샷을 정리했습니다.`);
-          onCleaned();
-        } catch (err) {
-          toast.error(`정리 실패: ${(err as Error).message}`);
-        } finally {
-          setLoading(false);
-        }
-      }}
-    >
-      {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
-      오래된 백업 정리
-    </Button>
+    <Card className={partial ? "border-destructive/50" : undefined}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          {partial ? <AlertTriangle className="h-4 w-4 text-destructive" /> : <ShieldCheck className="h-4 w-4 text-primary" />}
+          {result.kind === "cleanup" ? "보관기간 지난 백업 정리 결과" : "선택 백업 삭제 결과"}
+          <Badge variant={partial ? "destructive" : "default"}>{partial ? "부분 실패" : "성공"}</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <div className="grid gap-1 sm:grid-cols-5">
+          <div>성공: <b>{result.success.length}</b>개</div>
+          <div>실패: <b className={partial ? "text-destructive" : ""}>{result.failed.length}</b>개</div>
+          <div>삭제 파일: <b>{result.deleted_files.toLocaleString()}</b>개</div>
+          <div>확보 용량: <b>{bytesToHuman(result.freed_bytes)}</b></div>
+          <div>실행 시각: <b>{formatDateTime(result.executed_at)}</b></div>
+        </div>
+        {partial && (
+          <div className="rounded-md border border-destructive/40 p-2 space-y-0.5 max-h-40 overflow-y-auto text-xs">
+            {result.failed.map((f) => (
+              <div key={f.id}>
+                <b>{f.name ?? f.id}</b> — {f.code}: {f.message}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
+
+function CleanupButton({ onCleaned, onResult }: { onCleaned: () => void; onResult: (r: DeleteResult) => void }) {
+  const cleanup = useServerFn(cleanupOldSnapshots);
+  const preview = useServerFn(previewCleanupOldSnapshots);
+  const [open, setOpen] = useState(false);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [plan, setPlan] = useState<any>(null);
+
+  const openPreview = async () => {
+    setLoadingPreview(true);
+    setPlan(null);
+    setOpen(true);
+    try {
+      setPlan(await preview({}));
+    } catch (err) {
+      toast.error(`미리보기 실패: ${(err as Error).message}`);
+      setOpen(false);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const count = plan?.candidate_count ?? 0;
+
+  return (
+    <>
+      <Button variant="outline" size="sm" disabled={loadingPreview || running} onClick={openPreview}>
+        {loadingPreview || running ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
+        보관기간 지난 백업 정리
+      </Button>
+
+      <Dialog open={open} onOpenChange={(o) => !running && setOpen(o)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              보관기간 지난 백업 정리
+            </DialogTitle>
+            <DialogDescription>삭제 예정 목록을 확인한 뒤 실행하십시오.</DialogDescription>
+          </DialogHeader>
+
+          {loadingPreview || !plan ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin inline mr-1.5" />불러오는 중…
+            </div>
+          ) : (
+            <div className="space-y-3 py-1 text-sm">
+              <div className="grid gap-1 sm:grid-cols-2">
+                <div>적용 기준: <b>{plan.retention_days}일 초과</b></div>
+                <div>최소 보관: <b>{plan.keep_minimum_count}개</b></div>
+                <div>잠금으로 제외: <b>{plan.locked_excluded_count}개</b></div>
+                <div>삭제 예정: <b>{count}개 / 예상 {bytesToHuman(plan.estimated_bytes)}</b></div>
+              </div>
+              {count === 0 ? (
+                <div className="rounded-md border p-3 text-muted-foreground">정리할 백업이 없습니다.</div>
+              ) : (
+                <div className="max-h-56 overflow-y-auto rounded-md border p-2 text-xs space-y-0.5">
+                  {plan.candidates.map((c: any) => (
+                    <div key={c.id} className="flex justify-between gap-2">
+                      <span className="truncate">{c.name ?? c.id}</span>
+                      <span className="text-muted-foreground whitespace-nowrap">{formatDateTime(c.created_at)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-destructive font-medium">삭제된 백업은 복원할 수 없습니다.</p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={running}>취소</Button>
+            <Button
+              variant="destructive"
+              disabled={running || count === 0}
+              onClick={async () => {
+                setRunning(true);
+                try {
+                  const res: any = await cleanup({});
+                  onResult({ kind: "cleanup", ...res });
+                  if (res.failed.length === 0) toast.success(`${res.success.length}개 백업을 정리했습니다.`);
+                  else toast.warning(`부분 실패 — 성공 ${res.success.length}건 / 실패 ${res.failed.length}건`);
+                  setOpen(false);
+                  onCleaned();
+                } catch (err) {
+                  toast.error(`정리 실패: ${(err as Error).message}`);
+                } finally {
+                  setRunning(false);
+                }
+              }}
+            >
+              {running && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+              {count}개 백업 영구 삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 
 function BackupConfigCard({ config, onUpdated }: { config: any; onUpdated: () => void }) {
   const update = useServerFn(updateBackupConfig);
