@@ -263,6 +263,14 @@ const DEEP_LINK_STATUS_LABEL: Record<string, string> = {
   sgd_df: "Draft Finish · 지연",
   sgd_sb: "Submission · 지연",
   sgd_rs: "Response · 지연",
+  mix_approved: "Status Mix · Approved",
+  mix_ur: "Status Mix · UR",
+  mix_ds: "Status Mix · DS",
+  jdg_done: "판정 · 완료",
+  jdg_normal: "판정 · 정상",
+  jdg_caution: "판정 · 주의",
+  jdg_delayed: "판정 · 지연",
+  jdg_critical: "판정 · 악화",
 };
 const ALL_STATUS_VALUES = [
   ...STATUS_TABS.map((s) => s.value),
