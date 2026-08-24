@@ -153,3 +153,62 @@ describe("deleteSnapshotCanonical", () => {
     expect(results.failed).toEqual([{ id: "locked", code: "SNAPSHOT_LOCKED" }]);
   });
 });
+
+describe("깊이 제한 초과 시 안전 중단", () => {
+  function makeDeepBucket(objectPath: string) {
+    const listCalls: string[] = [];
+    const removeCalls: string[][] = [];
+    const bucket = {
+      list: async (folder: string, o: { limit: number; offset: number }) => {
+        listCalls.push(folder);
+        if (o.offset > 0) return { data: [], error: null };
+        const prefix = `${folder}/`;
+        if (!objectPath.startsWith(prefix)) return { data: [], error: null };
+        const rest = objectPath.slice(prefix.length).split("/");
+        const name = rest[0]!;
+        // 하위 경로가 더 있으면 폴더(id=null), 아니면 실제 object
+        return { data: [{ name, id: rest.length > 1 ? null : "obj" }], error: null };
+      },
+      remove: async (paths: string[]) => {
+        removeCalls.push(paths);
+        return { error: null };
+      },
+    };
+    return { bucket, listCalls, removeCalls };
+  }
+
+  const deepObject =
+    "snapshots/deep/" + Array.from({ length: 12 }, (_, i) => `d${i}`).join("/") + "/f.json";
+
+  it("허용 깊이 초과 시 SNAPSHOT_STORAGE_DEPTH_EXCEEDED 로 중단하고 아무것도 삭제하지 않는다", async () => {
+    const s = makeDeepBucket(deepObject);
+    const { client, deletedRows } = makeClient(
+      { id: "deep", storage_path: "snapshots/deep/", is_locked: false, size_bytes: 7, name: "deep" },
+      s.bucket,
+    );
+    await expect(deleteSnapshotCanonical(client, "deep", BUCKET)).rejects.toMatchObject({
+      code: "SNAPSHOT_STORAGE_DEPTH_EXCEEDED",
+    });
+    expect(s.removeCalls.length).toBe(0);
+    expect(deletedRows).toEqual([]);
+  });
+
+  it("일괄삭제에서 깊이 초과 건은 failed 에 담기고 다음 대상은 계속 삭제된다", async () => {
+    const ok: string[] = [];
+    const failed: { id: string; code: string }[] = [];
+    for (const id of ["deep", "ok2"]) {
+      const s = id === "deep" ? makeDeepBucket(deepObject) : makeBucket(["snapshots/ok2/f.json"]);
+      const { client } = makeClient(
+        { id, storage_path: `snapshots/${id}/`, is_locked: false, size_bytes: 1, name: id },
+        s.bucket,
+      );
+      try {
+        ok.push((await deleteSnapshotCanonical(client, id, BUCKET)).id);
+      } catch (err) {
+        failed.push({ id, code: (err as SnapshotDeleteError).code });
+      }
+    }
+    expect(ok).toEqual(["ok2"]);
+    expect(failed).toEqual([{ id: "deep", code: "SNAPSHOT_STORAGE_DEPTH_EXCEEDED" }]);
+  });
+});
