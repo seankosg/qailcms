@@ -99,9 +99,11 @@ function BackupPage() {
     qc.invalidateQueries({ queryKey: [...QUERY_KEY, "config"] });
   };
 
+  const [deleteResult, setDeleteResult] = useState<DeleteResult | null>(null);
   const totalSize = useMemo(() => snapshots.reduce((sum, s) => sum + (s.size_bytes ?? 0), 0), [snapshots]);
   const lastBackup = snapshots[0] ?? null;
   const lastLog = logsData?.backup?.[0] ?? null;
+
 
   return (
     <div className="space-y-4">
