@@ -346,6 +346,195 @@ describe("runRestorePreflight", () => {
   });
 });
 
+describe("복원 대상이 아닌 표까지 실측한 overall hash", () => {
+  it("non-target part 를 변조하면 전체 검증이 차단된다", async () => {
+    const f = await buildFixture();
+    const files = filesOf(f);
+    files[`${FOLDER}${OTHER_TABLE}.part-000.json`] = enc(JSON.stringify([{ id: "tampered" }]));
+    const admin = fakeAdmin({ manifest: f.manifest, files });
+    const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
+    expect(codes(r)).toContain("PART_HASH_MISMATCH");
+    expect(codes(r)).toContain("SNAPSHOT_OVERALL_HASH_MISMATCH");
+    expect(r.hashes.overall_matches).toBe(false);
+    expect(r.ok).toBe(false);
+  });
+
+  it("모든 파트를 실측한 뒤 overall hash 를 계산한다", async () => {
+    const f = await buildFixture();
+    const admin = fakeAdmin({ manifest: f.manifest, files: filesOf(f) });
+    const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
+    // 대상(dmr_entries) + 비대상(team_master) 모두 다운로드·검증되었다.
+    expect(r.parts.map((p) => p.table).sort()).toEqual([OTHER_TABLE, TABLE].sort());
+    expect(r.hashes.recomputed_overall).toBe(f.overall);
+    expect(r.hashes.overall_matches).toBe(true);
+    expect(r.manifest_sha256).toHaveLength(64);
+    expect(r.part_contract).toHaveLength(1);
+    expect(r.part_contract[0]).toMatchObject({ table: TABLE, part_index: 0 });
+  });
+});
+
+type StageOpts = {
+  manifestBytes: Uint8Array;
+  files: Record<string, Uint8Array>;
+  run: Record<string, unknown>;
+  failRunUpdate?: boolean;
+};
+
+function fakeStageAdmin(o: StageOpts) {
+  const updates: Record<string, unknown>[] = [];
+  const inserted: Record<string, unknown>[] = [];
+  const admin = {
+    from: (t: string) => {
+      if (t === "restore_runs") {
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: o.run, error: null }) }) }),
+          update: (v: Record<string, unknown>) => {
+            updates.push(v);
+            return {
+              eq: async () => ({
+                error:
+                  o.failRunUpdate && v.status === "failed" ? { message: "audit update denied" } : null,
+              }),
+            };
+          },
+        };
+      }
+      if (t === "restore_staging_rows") {
+        return {
+          delete: () => ({ eq: async () => ({ error: null }) }),
+          insert: async (rows: Record<string, unknown>[]) => {
+            inserted.push(...rows);
+            return { error: null };
+          },
+        };
+      }
+      // database_snapshots
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: { id: SNAPSHOT_ID, name: "fixture", created_at: null, storage_path: FOLDER, sha256_hash: null, tables_included: [], metadata: null },
+              error: null,
+            }),
+          }),
+        }),
+      };
+    },
+    storage: {
+      from: () => ({
+        download: async (path: string) => {
+          if (path === `${FOLDER}manifest.json`) return { data: new Blob([o.manifestBytes as unknown as BlobPart]), error: null };
+          const fl = o.files[path];
+          if (!fl) return { data: null, error: { message: "not found" } };
+          return { data: new Blob([fl as unknown as BlobPart]), error: null };
+        },
+      }),
+    },
+    rpc: async () => ({ data: { ok: true, issues: [] }, error: null }),
+  };
+  return { admin: admin as never, updates, inserted };
+}
+
+async function stageFixture() {
+  const f = await buildFixture();
+  const manifestBytes = enc(JSON.stringify(f.manifest));
+  const manifestSha = await sha256Hex(manifestBytes);
+  const run = {
+    id: "run-1",
+    snapshot_id: SNAPSHOT_ID,
+    final_restore_tables: [TABLE],
+    expected_rows: { [TABLE]: 2 },
+    status: "preflight_clean",
+    manifest_sha256: manifestSha,
+    preflight_result: {
+      part_contract: [
+        {
+          table: TABLE,
+          part_index: 0,
+          path: `${TABLE}.part-000.json`,
+          full_path: `${FOLDER}${TABLE}.part-000.json`,
+          rows: 2,
+          size_bytes: f.bytes.length,
+          sha256: f.partHash,
+        },
+      ],
+    },
+  };
+  return { f, manifestBytes, manifestSha, run };
+}
+
+describe("staging 은 preflight 계약에 고정된다", () => {
+  it("동일 manifest/part 는 준비 영역 적재에 성공한다", async () => {
+    const { f, manifestBytes, run } = await stageFixture();
+    const { admin, inserted } = fakeStageAdmin({ manifestBytes, files: filesOf(f), run });
+    const r = await stageRestoreRun(admin, "run-1");
+    expect(r.status).toBe("staging_verified");
+    expect(r.staged_rows[TABLE]).toBe(2);
+    expect(inserted).toHaveLength(2);
+  });
+
+  it("preflight 이후 manifest bytes 가 1글자라도 바뀌면 차단한다", async () => {
+    const { f, manifestBytes, run } = await stageFixture();
+    const tampered = enc(`${new TextDecoder().decode(manifestBytes)} `);
+    const { admin } = fakeStageAdmin({ manifestBytes: tampered, files: filesOf(f), run });
+    await expect(stageRestoreRun(admin, "run-1")).rejects.toThrow(
+      /RESTORE_MANIFEST_CHANGED_AFTER_PREFLIGHT/,
+    );
+  });
+
+  it("part 와 manifest hash 를 함께 교체해도 차단한다", async () => {
+    const { f, run } = await stageFixture();
+    // 공격자가 part 를 바꾸고 manifest 의 hash 도 함께 맞춘 상황
+    const evilBytes = enc(JSON.stringify([{ id: "evil" }, { id: "evil2" }]));
+    const evilPartHash = await sha256Hex(evilBytes);
+    const evilTableHash = await combineHashes([evilPartHash]);
+    const evilManifest = JSON.parse(JSON.stringify(f.manifest)) as SnapshotManifest;
+    evilManifest.tables[0].sha256 = evilTableHash;
+    evilManifest.tables[0].parts![0].sha256 = evilPartHash;
+    evilManifest.tables[0].parts![0].size_bytes = evilBytes.length;
+    const files = filesOf(f);
+    files[`${FOLDER}${TABLE}.part-000.json`] = evilBytes;
+    const { admin } = fakeStageAdmin({
+      manifestBytes: enc(JSON.stringify(evilManifest)),
+      files,
+      run,
+    });
+    await expect(stageRestoreRun(admin, "run-1")).rejects.toThrow(
+      /RESTORE_MANIFEST_CHANGED_AFTER_PREFLIGHT/,
+    );
+  });
+
+  it("manifest 는 그대로여도 part 파일만 바뀌면 차단한다", async () => {
+    const { f, manifestBytes, run } = await stageFixture();
+    const files = filesOf(f);
+    files[`${FOLDER}${TABLE}.part-000.json`] = enc(JSON.stringify([{ id: "x" }, { id: "y" }]));
+    const { admin } = fakeStageAdmin({ manifestBytes, files, run });
+    await expect(stageRestoreRun(admin, "run-1")).rejects.toThrow(
+      /RESTORE_PART_CHANGED_AFTER_PREFLIGHT/,
+    );
+  });
+
+  it("고정된 manifest 검증값이 없으면 적재하지 않는다", async () => {
+    const { f, manifestBytes, run } = await stageFixture();
+    const { admin } = fakeStageAdmin({
+      manifestBytes,
+      files: filesOf(f),
+      run: { ...run, manifest_sha256: null },
+    });
+    await expect(stageRestoreRun(admin, "run-1")).rejects.toThrow(/RESTORE_MANIFEST_PIN_MISSING/);
+  });
+
+  it("실패 기록 갱신 실패를 조용히 무시하지 않는다", async () => {
+    const { f, manifestBytes, run } = await stageFixture();
+    const files = filesOf(f);
+    delete files[`${FOLDER}${TABLE}.part-000.json`];
+    const { admin } = fakeStageAdmin({ manifestBytes, files, run, failRunUpdate: true });
+    await expect(stageRestoreRun(admin, "run-1")).rejects.toThrow(
+      /STAGING_FAILED_AND_AUDIT_UPDATE_FAILED[\s\S]*audit update denied/,
+    );
+  });
+});
+
 describe("복원 범위 계약", () => {
   it("dmr 범위가 존재하고 dmr_entries 를 포함한다", () => {
     expect(RESTORE_SCOPE_KEYS).toContain("dmr");
