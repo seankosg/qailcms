@@ -33,21 +33,23 @@ function fakeAdmin(opts: {
         return { error: null };
       },
       update: (payload: RunRow) => {
-        const chain = {
+        const conds: Record<string, unknown> = {};
+        const chain: any = {
           eq: (col: string, val: unknown) => {
-            if (col === "status" && opts.run && (opts.run as any).status !== val) {
-              // 조건부 UPDATE 불일치 → 0행 갱신
-              return { ...chain, then: undefined } as never;
-            }
+            conds[col] = val;
             return chain;
           },
           then: (resolve: (v: unknown) => unknown) => {
-            updates.push({ table, ...payload });
+            const matches = Object.entries(conds).every(
+              ([col, val]) => col === "id" || (opts.run as any)?.[col] === val,
+            );
+            if (matches) updates.push({ table, ...payload });
             return Promise.resolve({ error: opts.updateError ?? null }).then(resolve);
           },
-        } as any;
+        };
         return chain;
       },
+
 
     }),
     rpc: async (fn: string, args: unknown) => {
