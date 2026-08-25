@@ -2,7 +2,7 @@
  * Holding Point 2 — 복원 사전검증(Preflight) · Staging 정본.
  *
  * 이 모듈은 **운영 테이블을 절대 변경하지 않는다.**
- * - 읽기: 스냅샷 매니페스트, Storage 파트 파일, 스키마 계약/의존관계(읽기 전용 RPC)
+ * - 읽기: Storage manifest.json, 스냅샷 파트 파일, 스키마 계약/의존관계(읽기 전용 RPC)
  * - 쓰기: restore_runs / restore_staging_rows (준비 영역) 뿐
  *
  * TRUNCATE / INSERT INTO 운영테이블 / 트리거 비활성화는 이 파일에 존재하지 않으며,
@@ -12,11 +12,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import {
   BUCKET,
-  resolveTablePartPaths,
-  sha256Hex,
   SNAPSHOT_SCHEMA_VERSION,
   type SnapshotManifest,
 } from "./backup-core.server";
+import { combineHashes, normalizePartPath, sha256Hex } from "./manifest-hash";
 import { resolveRestoreScope, type BackupTableName, type RestoreScope } from "./backup-shared";
 
 const STAGING_INSERT_CHUNK = 500;
@@ -53,16 +52,34 @@ export type PreflightResult = {
     schema_version: string | null;
     is_legacy: boolean;
     tables_in_snapshot: string[];
+    /** Storage manifest.json 을 정본으로 사용했는지 여부 */
+    manifest_source: "storage" | "none";
   };
   scope: string;
   dependency: RestoreDependency;
   expected_rows: Record<string, number>;
-  parts: { table: string; path: string; rows: number; manifest_sha256: string; actual_sha256: string }[];
+  parts: {
+    table: string;
+    path: string;
+    rows: number;
+    bytes: number;
+    manifest_sha256: string;
+    actual_sha256: string;
+  }[];
+  hashes: {
+    manifest_overall: string | null;
+    recomputed_overall: string | null;
+    db_recorded_overall: string | null;
+    overall_matches: boolean;
+    table_hash_mismatches: string[];
+  };
   schema: {
     snapshot_fingerprint: string | null;
     current_fingerprint: string | null;
-    matches: boolean | null;
+    matches: boolean;
     changed_tables: string[];
+    missing_digest_tables: string[];
+    missing_current_tables: string[];
   };
   blockers: PreflightIssue[];
   warnings: PreflightIssue[];
@@ -80,6 +97,43 @@ async function loadSnapshot(admin: SupabaseClient<Database>, snapshotId: string)
   return data;
 }
 
+type ManifestTable = NonNullable<SnapshotManifest["tables"]>[number];
+
+function tableContractKey(t: ManifestTable | undefined | null): string {
+  if (!t) return "";
+  const parts = (t.parts ?? [])
+    .map((p) => `${p.path}:${p.rows}:${p.size_bytes}:${p.sha256}`)
+    .join("|");
+  return `${t.rows}:${t.size_bytes}:${t.sha256}:${parts}`;
+}
+
+/** DB metadata 와 Storage manifest 의 핵심 계약이 완전히 같은지 대조한다. */
+function diffManifests(db: SnapshotManifest | null, storage: SnapshotManifest): string[] {
+  const diffs: string[] = [];
+  if (!db) return ["db_metadata_missing"];
+  if (String(db.id) !== String(storage.id)) diffs.push("id");
+  if ((db.total_rows ?? null) !== (storage.total_rows ?? null)) diffs.push("total_rows");
+  if ((db.sha256 ?? null) !== (storage.sha256 ?? null)) diffs.push("sha256");
+  if ((db.schema_version ?? null) !== (storage.schema_version ?? null)) diffs.push("schema_version");
+  if ((db.schema_fingerprint ?? null) !== (storage.schema_fingerprint ?? null))
+    diffs.push("schema_fingerprint");
+  if (JSON.stringify(db.schema_contract ?? null) !== JSON.stringify(storage.schema_contract ?? null))
+    diffs.push("schema_contract");
+
+  const dbTables = new Map((db.tables ?? []).map((t) => [String(t.name), t]));
+  const stTables = new Map((storage.tables ?? []).map((t) => [String(t.name), t]));
+  for (const name of new Set([...dbTables.keys(), ...stTables.keys()])) {
+    if (!dbTables.has(name) || !stTables.has(name)) {
+      diffs.push(`tables:${name}`);
+      continue;
+    }
+    if (tableContractKey(dbTables.get(name)) !== tableContractKey(stTables.get(name))) {
+      diffs.push(`tables:${name}`);
+    }
+  }
+  return diffs;
+}
+
 /**
  * 복원 사전검증 정본. 읽기만 수행하고 결과를 그대로 돌려준다.
  * blockers 가 하나라도 있으면 어떤 다음 단계도 진행할 수 없다.
@@ -90,10 +144,66 @@ export async function runRestorePreflight(
 ): Promise<PreflightResult> {
   const requested = resolveRestoreScope(String(opts.scope));
   const snapshot = await loadSnapshot(admin, opts.snapshotId);
-  const manifest = (snapshot.metadata ?? null) as SnapshotManifest | null;
+  const dbManifest = (snapshot.metadata ?? null) as SnapshotManifest | null;
+  const folder = snapshot.storage_path ?? `snapshots/${snapshot.id}/`;
 
   const blockers: PreflightIssue[] = [];
   const warnings: PreflightIssue[] = [];
+
+  // ── 1) Storage manifest.json 을 사전검증 정본으로 로드 ────────────────────
+  let manifest: SnapshotManifest | null = null;
+  let manifestSource: "storage" | "none" = "none";
+  const manifestPath = `${folder.endsWith("/") ? folder : `${folder}/`}manifest.json`;
+  const { data: mBlob, error: mErr } = await admin.storage.from(BUCKET).download(manifestPath);
+  if (mErr || !mBlob) {
+    blockers.push({
+      code: "STORAGE_MANIFEST_MISSING",
+      message: "백업 폴더에 목록 파일(manifest.json)이 없어 안전하게 복원할 수 없습니다.",
+      detail: { path: manifestPath, error: mErr?.message ?? null },
+    });
+  } else {
+    try {
+      manifest = JSON.parse(new TextDecoder().decode(new Uint8Array(await mBlob.arrayBuffer()))) as SnapshotManifest;
+      manifestSource = "storage";
+    } catch (err) {
+      blockers.push({
+        code: "STORAGE_MANIFEST_PARSE_FAILED",
+        message: "백업 목록 파일을 해석할 수 없습니다.",
+        detail: { path: manifestPath, error: (err as Error).message },
+      });
+    }
+  }
+
+  if (manifest) {
+    if (String(manifest.id ?? "") !== String(snapshot.id)) {
+      blockers.push({
+        code: "SNAPSHOT_ID_MISMATCH",
+        message: "백업 목록 파일이 선택한 백업의 것이 아닙니다.",
+        detail: { manifest_id: String(manifest.id ?? ""), snapshot_id: String(snapshot.id) },
+      });
+    }
+    const diffs = diffManifests(dbManifest, manifest);
+    if (diffs.length > 0) {
+      blockers.push({
+        code: "DB_STORAGE_MANIFEST_MISMATCH",
+        message: "저장된 백업 기록과 실제 백업 파일 목록이 서로 다릅니다.",
+        detail: { fields: diffs },
+      });
+    }
+    if ((snapshot.sha256_hash ?? null) !== (manifest.sha256 ?? null)) {
+      blockers.push({
+        code: "SNAPSHOT_OVERALL_HASH_MISMATCH",
+        message: "백업 전체 검증값이 기록과 다릅니다.",
+        detail: { db: snapshot.sha256_hash ?? null, manifest: manifest.sha256 ?? null },
+      });
+    }
+    if (!Array.isArray(manifest.tables) || manifest.tables.length === 0) {
+      blockers.push({
+        code: "MANIFEST_MISSING",
+        message: "이 백업에는 검증 가능한 표 목록이 없어 안전하게 복원할 수 없습니다.",
+      });
+    }
+  }
 
   const tablesInSnapshot: string[] = Array.isArray(manifest?.tables)
     ? manifest!.tables.map((t) => String(t.name))
@@ -101,14 +211,7 @@ export async function runRestorePreflight(
       ? (snapshot.tables_included as unknown[]).map((t) => String(t))
       : [];
 
-  if (!manifest || !Array.isArray(manifest.tables) || manifest.tables.length === 0) {
-    blockers.push({
-      code: "MANIFEST_MISSING",
-      message: "이 백업에는 검증 가능한 목록(매니페스트)이 없어 안전하게 복원할 수 없습니다.",
-    });
-  }
-
-  const schemaVersion = manifest?.schema_version ?? null;
+  const schemaVersion = manifest?.schema_version ?? dbManifest?.schema_version ?? null;
   const isLegacy = schemaVersion !== SNAPSHOT_SCHEMA_VERSION;
   if (isLegacy) {
     blockers.push({
@@ -119,7 +222,7 @@ export async function runRestorePreflight(
     });
   }
 
-  // 1) FK 의존관계 + 화이트리스트 + 스냅샷 포함 여부
+  // ── 2) FK 의존관계 + 화이트리스트 + 스냅샷 포함 여부 ─────────────────────
   const { data: depRaw, error: depError } = await (admin as any).rpc("backup_dependency_closure", {
     _requested: requested,
     _snapshot_tables: tablesInSnapshot,
@@ -130,15 +233,30 @@ export async function runRestorePreflight(
 
   const finalTables = (dependency.final_restore_tables ?? []) as string[];
 
-  // 2) 스키마 지문 대조 (스냅샷 시점 vs 현재)
+  // ── 3) 스키마 계약 완결성 + 변경 감지 ───────────────────────────────────
   const { data: currentFp, error: fpError } = await (admin as any).rpc("backup_schema_fingerprint", {
     _tables: finalTables,
   });
   if (fpError) throw new Error(`스키마 지문 산출 실패: ${fpError.message}`);
 
+  const snapshotFingerprint = manifest?.schema_fingerprint ?? null;
   const snapshotContract = Array.isArray(manifest?.schema_contract)
     ? (manifest!.schema_contract as { name: string; schema_digest: string | null }[])
-    : [];
+    : null;
+
+  if (!isLegacy && !snapshotFingerprint) {
+    blockers.push({
+      code: "SCHEMA_CONTRACT_MISSING",
+      message: "백업에 스키마 지문이 없어 구조 변경 여부를 확인할 수 없습니다.",
+    });
+  }
+  if (!isLegacy && (!snapshotContract || snapshotContract.length === 0)) {
+    blockers.push({
+      code: "SCHEMA_CONTRACT_MISSING",
+      message: "백업에 표 구조 계약 정보가 없어 안전하게 복원할 수 없습니다.",
+    });
+  }
+
   const { data: currentContract, error: ccError } = await (admin as any).rpc(
     "backup_table_schema_contract",
     { _tables: finalTables },
@@ -150,11 +268,30 @@ export async function runRestorePreflight(
       c.schema_digest,
     ]),
   );
+
   const changedTables: string[] = [];
+  const missingDigestTables: string[] = [];
+  const missingCurrentTables: string[] = [];
   for (const t of finalTables) {
-    const before = snapshotContract.find((c) => c.name === t)?.schema_digest ?? null;
+    const before = snapshotContract?.find((c) => c.name === t)?.schema_digest ?? null;
     const after = currentByName.get(t) ?? null;
-    if (before !== null && after !== null && before !== after) changedTables.push(t);
+    if (!before) missingDigestTables.push(t);
+    if (!after) missingCurrentTables.push(t);
+    if (before && after && before !== after) changedTables.push(t);
+  }
+  if (!isLegacy && missingDigestTables.length > 0) {
+    blockers.push({
+      code: "TABLE_SCHEMA_DIGEST_MISSING",
+      message: "백업에 일부 표의 구조 정보가 없어 복원할 수 없습니다.",
+      detail: { tables: missingDigestTables },
+    });
+  }
+  if (missingCurrentTables.length > 0) {
+    blockers.push({
+      code: "CURRENT_TABLE_SCHEMA_MISSING",
+      message: "현재 데이터베이스에 없는 표가 복원 대상에 포함되어 있습니다.",
+      detail: { tables: missingCurrentTables },
+    });
   }
   if (changedTables.length > 0) {
     blockers.push({
@@ -164,39 +301,64 @@ export async function runRestorePreflight(
     });
   }
 
-  // 스냅샷 전체 지문은 백업 대상 전체 기준이라 부분 범위와 직접 비교할 수 없다.
-  // 따라서 테이블 단위 digest 대조(위)를 정본으로 쓰고, 전체 지문은 참고값으로만 남긴다.
-  const snapshotFingerprint = manifest?.schema_fingerprint ?? null;
-
-  // 3) 파트 파일 존재 + 해시 검증 + 행수 집계
-  const folder = snapshot.storage_path ?? `snapshots/${snapshot.id}/`;
+  // ── 4) 경로 검증 + 파트 실측(size/hash/rows) + 계층 해시 재계산 ─────────
   const expectedRows: Record<string, number> = {};
   const parts: PreflightResult["parts"] = [];
+  const tableHashMismatches: string[] = [];
+  const seenPaths = new Set<string>();
+  const recomputedTableHashes: string[] = [];
 
-  for (const table of finalTables) {
-    const entry = manifest?.tables?.find((t) => String(t.name) === table) ?? null;
-    if (!entry) {
-      blockers.push({
-        code: "TABLE_MISSING_IN_MANIFEST",
-        message: "복원 대상 표가 백업 목록에 없습니다.",
-        table,
-      });
-      continue;
-    }
-    if (!Array.isArray(entry.parts) || entry.parts.length === 0) {
-      blockers.push({
-        code: "PART_HASH_UNAVAILABLE",
-        message: "이 표의 백업 파일에는 검증용 해시가 없어 복원할 수 없습니다.",
-        table,
-      });
-      continue;
-    }
-
+  for (const entry of manifest?.tables ?? []) {
+    const table = String(entry.name);
+    const isTarget = finalTables.includes(table);
+    const partHashes: string[] = [];
     let rowsFromParts = 0;
+    let bytesFromParts = 0;
+    let tableUsable = true;
+
+    if (!Array.isArray(entry.parts) || entry.parts.length === 0) {
+      if (isTarget) {
+        blockers.push({
+          code: "PART_HASH_UNAVAILABLE",
+          message: "이 표의 백업 파일에는 검증용 해시가 없어 복원할 수 없습니다.",
+          table,
+        });
+      }
+      recomputedTableHashes.push(entry.sha256);
+      continue;
+    }
+
     for (const part of entry.parts) {
-      const path = `${folder}${part.path}`;
-      const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(path);
+      const check = normalizePartPath(folder, part.path);
+      if (!check.ok) {
+        tableUsable = false;
+        blockers.push({
+          code: check.code,
+          message: "백업 파일 경로가 안전하지 않습니다.",
+          table,
+          detail: { path: String(part.path), reason: check.reason },
+        });
+        continue;
+      }
+      if (seenPaths.has(check.fullPath)) {
+        tableUsable = false;
+        blockers.push({
+          code: "PART_PATH_DUPLICATE",
+          message: "같은 백업 파일 경로가 중복 기재되어 있습니다.",
+          table,
+          detail: { path: check.fullPath },
+        });
+        continue;
+      }
+      seenPaths.add(check.fullPath);
+      partHashes.push(part.sha256);
+
+      // 복원 대상이 아닌 표는 경로 안전성만 확인하고 다운로드하지 않는다.
+      if (!isTarget) continue;
+
+      const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(check.fullPath);
       if (dlError || !blob) {
+        tableUsable = false;
         blockers.push({
           code: "PART_FILE_MISSING",
           message: "백업 파일 일부를 읽을 수 없습니다.",
@@ -208,11 +370,21 @@ export async function runRestorePreflight(
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const actual = await sha256Hex(bytes);
       if (actual !== part.sha256) {
+        tableUsable = false;
         blockers.push({
           code: "PART_HASH_MISMATCH",
           message: "백업 파일이 손상되었거나 변경되었습니다(무결성 검증 실패).",
           table,
           detail: { path: part.path, expected: part.sha256, actual },
+        });
+      }
+      if (bytes.length !== part.size_bytes) {
+        tableUsable = false;
+        blockers.push({
+          code: "PART_SIZE_MISMATCH",
+          message: "백업 파일 크기가 기록과 다릅니다.",
+          table,
+          detail: { path: part.path, expected: part.size_bytes, actual: bytes.length },
         });
       }
       let rowCount = part.rows;
@@ -221,6 +393,7 @@ export async function runRestorePreflight(
         if (!Array.isArray(parsed)) throw new Error("배열이 아님");
         rowCount = parsed.length;
         if (rowCount !== part.rows) {
+          tableUsable = false;
           blockers.push({
             code: "PART_ROW_COUNT_MISMATCH",
             message: "백업 파일의 실제 행 수가 기록된 행 수와 다릅니다.",
@@ -229,6 +402,7 @@ export async function runRestorePreflight(
           });
         }
       } catch (err) {
+        tableUsable = false;
         blockers.push({
           code: "PART_PARSE_FAILED",
           message: "백업 파일을 해석할 수 없습니다.",
@@ -237,16 +411,32 @@ export async function runRestorePreflight(
         });
       }
       rowsFromParts += rowCount;
+      bytesFromParts += bytes.length;
       parts.push({
         table,
         path: part.path,
         rows: rowCount,
+        bytes: bytes.length,
         manifest_sha256: part.sha256,
         actual_sha256: actual,
       });
     }
 
-    if (rowsFromParts !== entry.rows) {
+    // 테이블 해시 재계산은 생성 시와 동일한 산식(manifest-hash.ts)을 사용한다.
+    const recomputedTableHash = await combineHashes(partHashes);
+    recomputedTableHashes.push(recomputedTableHash);
+    if (recomputedTableHash !== entry.sha256) {
+      tableHashMismatches.push(table);
+      blockers.push({
+        code: "TABLE_HASH_MISMATCH",
+        message: "표 단위 검증값이 백업 기록과 다릅니다.",
+        table,
+        detail: { expected: entry.sha256, actual: recomputedTableHash },
+      });
+    }
+
+    if (!isTarget) continue;
+    if (tableUsable && rowsFromParts !== entry.rows) {
       blockers.push({
         code: "TABLE_ROW_COUNT_MISMATCH",
         message: "표 단위 행 수 합계가 백업 기록과 다릅니다.",
@@ -254,7 +444,40 @@ export async function runRestorePreflight(
         detail: { manifest_rows: entry.rows, parts_rows: rowsFromParts },
       });
     }
+    if (tableUsable && bytesFromParts !== entry.size_bytes) {
+      blockers.push({
+        code: "TABLE_SIZE_MISMATCH",
+        message: "표 단위 파일 크기 합계가 백업 기록과 다릅니다.",
+        table,
+        detail: { manifest_size: entry.size_bytes, parts_size: bytesFromParts },
+      });
+    }
     expectedRows[table] = rowsFromParts;
+  }
+
+  const recomputedOverall = manifest ? await combineHashes(recomputedTableHashes) : null;
+  const overallMatches =
+    !!manifest && recomputedOverall === (manifest.sha256 ?? null) && recomputedOverall === (snapshot.sha256_hash ?? null);
+  if (manifest && !overallMatches) {
+    blockers.push({
+      code: "SNAPSHOT_OVERALL_HASH_MISMATCH",
+      message: "백업 전체 검증값 재계산 결과가 기록과 다릅니다.",
+      detail: {
+        manifest: manifest.sha256 ?? null,
+        db: snapshot.sha256_hash ?? null,
+        recomputed: recomputedOverall,
+      },
+    });
+  }
+
+  for (const t of finalTables) {
+    if (!(t in expectedRows) && !(manifest?.tables ?? []).some((e) => String(e.name) === t)) {
+      blockers.push({
+        code: "TABLE_MISSING_IN_MANIFEST",
+        message: "복원 대상 표가 백업 목록에 없습니다.",
+        table: t,
+      });
+    }
   }
 
   if ((dependency.auto_included_tables ?? []).length > 0) {
@@ -279,6 +502,13 @@ export async function runRestorePreflight(
     });
   }
 
+  const schemaComplete =
+    !isLegacy &&
+    !!snapshotFingerprint &&
+    !!snapshotContract &&
+    missingDigestTables.length === 0 &&
+    missingCurrentTables.length === 0;
+
   return {
     snapshot: {
       id: snapshot.id,
@@ -287,16 +517,26 @@ export async function runRestorePreflight(
       schema_version: schemaVersion,
       is_legacy: isLegacy,
       tables_in_snapshot: tablesInSnapshot,
+      manifest_source: manifestSource,
     },
     scope: String(opts.scope),
     dependency,
     expected_rows: expectedRows,
     parts,
+    hashes: {
+      manifest_overall: manifest?.sha256 ?? null,
+      recomputed_overall: recomputedOverall,
+      db_recorded_overall: snapshot.sha256_hash ?? null,
+      overall_matches: overallMatches,
+      table_hash_mismatches: tableHashMismatches,
+    },
     schema: {
       snapshot_fingerprint: snapshotFingerprint,
       current_fingerprint: (currentFp as string | null) ?? null,
-      matches: changedTables.length === 0 ? true : false,
+      matches: schemaComplete && changedTables.length === 0,
       changed_tables: changedTables,
+      missing_digest_tables: missingDigestTables,
+      missing_current_tables: missingCurrentTables,
     },
     blockers,
     warnings,
@@ -322,12 +562,15 @@ export async function createRestoreRun(
       blockers: pf.blockers,
       warnings: pf.warnings,
       schema: pf.schema,
-      parts: pf.parts.map((p) => ({ table: p.table, path: p.path, rows: p.rows })),
+      hashes: pf.hashes,
+      manifest_source: pf.snapshot.manifest_source,
+      parts: pf.parts.map((p) => ({ table: p.table, path: p.path, rows: p.rows, bytes: p.bytes })),
     } as any,
     expected_rows: pf.expected_rows as any,
     schema_fingerprint: pf.schema.current_fingerprint,
     status: pf.ok ? "preflight_clean" : "preflight_blocked",
     initiated_by: opts.userId,
+    // preflight_blocked 는 최종 종료 상태이므로 종료 시각을 남긴다.
     finished_at: pf.ok ? null : new Date().toISOString(),
     error_code: pf.ok ? null : (pf.blockers[0]?.code ?? "PREFLIGHT_BLOCKED"),
     error_message: pf.ok ? null : (pf.blockers[0]?.message ?? null),
@@ -357,40 +600,52 @@ export async function stageRestoreRun(
     );
   }
 
-  await admin.from("restore_runs").update({ status: "staging" }).eq("id", runId);
+  const { error: statusError } = await admin
+    .from("restore_runs")
+    .update({ status: "staging" })
+    .eq("id", runId);
+  if (statusError) throw new Error(`상태 갱신 실패: ${statusError.message}`);
+
   // 재시도 안전성: 같은 작업의 기존 준비 데이터를 먼저 비운다(준비 영역 한정).
-  await admin.from("restore_staging_rows").delete().eq("restore_run_id", runId);
+  const { error: clearError } = await admin
+    .from("restore_staging_rows")
+    .delete()
+    .eq("restore_run_id", runId);
+  if (clearError) throw new Error(`준비 영역 초기화 실패: ${clearError.message}`);
 
   const snapshot = await loadSnapshot(admin, run.snapshot_id);
   const folder = snapshot.storage_path ?? `snapshots/${run.snapshot_id}/`;
   const staged: Record<string, number> = {};
 
   try {
+    // 준비 영역 적재도 Storage manifest 를 정본으로 쓴다(DB metadata 단독 신뢰 금지).
+    const manifestPath = `${folder.endsWith("/") ? folder : `${folder}/`}manifest.json`;
+    const { data: mBlob, error: mErr } = await admin.storage.from(BUCKET).download(manifestPath);
+    if (mErr || !mBlob) throw new Error("백업 목록 파일(manifest.json)을 읽을 수 없습니다.");
+    const manifest = JSON.parse(
+      new TextDecoder().decode(new Uint8Array(await mBlob.arrayBuffer())),
+    ) as SnapshotManifest;
+
     for (const table of (run.final_restore_tables ?? []) as string[]) {
-      const partPaths = await resolveTablePartPaths(
-        admin,
-        snapshot as any,
-        folder,
-        table as BackupTableName,
-      );
+      const entry = (manifest.tables ?? []).find((t) => String(t.name) === table);
+      if (!entry || !Array.isArray(entry.parts) || entry.parts.length === 0) {
+        throw new Error(`백업 목록에 표 정보가 없습니다: ${table}`);
+      }
       let sequence = 0;
       let partIndex = 0;
-      for (const partPath of partPaths) {
-        const { data: blob, error: dlError } = await admin.storage
-          .from(BUCKET)
-          .download(`${folder}${partPath}`);
-        if (dlError || !blob) throw new Error(`백업 파일 읽기 실패(${table} / ${partPath})`);
+      for (const part of entry.parts) {
+        const check = normalizePartPath(folder, part.path);
+        if (!check.ok) throw new Error(`안전하지 않은 백업 파일 경로(${table}): ${check.reason}`);
+        const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(check.fullPath);
+        if (dlError || !blob) throw new Error(`백업 파일 읽기 실패(${table} / ${part.path})`);
         const bytes = new Uint8Array(await blob.arrayBuffer());
-        const actual = await sha256Hex(bytes);
-        const manifest = (snapshot.metadata ?? null) as SnapshotManifest | null;
-        const expectedHash = manifest?.tables
-          ?.find((t) => String(t.name) === table)
-          ?.parts?.find((p) => p.path === partPath)?.sha256;
-        if (expectedHash && expectedHash !== actual) {
-          throw new Error(`무결성 검증 실패(${table} / ${partPath})`);
+        if (bytes.length !== part.size_bytes) {
+          throw new Error(`파일 크기 불일치(${table} / ${part.path})`);
         }
+        const actual = await sha256Hex(bytes);
+        if (actual !== part.sha256) throw new Error(`무결성 검증 실패(${table} / ${part.path})`);
         const rows = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>[];
-        if (!Array.isArray(rows)) throw new Error(`백업 파일 형식 오류(${table} / ${partPath})`);
+        if (!Array.isArray(rows)) throw new Error(`백업 파일 형식 오류(${table} / ${part.path})`);
 
         for (let i = 0; i < rows.length; i += STAGING_INSERT_CHUNK) {
           const chunk = rows.slice(i, i + STAGING_INSERT_CHUNK);
@@ -398,7 +653,7 @@ export async function stageRestoreRun(
             restore_run_id: runId,
             table_name: table,
             part_index: partIndex,
-            part_path: partPath,
+            part_path: part.path,
             row_sequence: sequence++,
             row_data: row as any,
           }));
@@ -418,20 +673,24 @@ export async function stageRestoreRun(
     const verify = verifyRaw as { ok: boolean; issues: PreflightIssue[] };
 
     const status = verify.ok ? "staging_verified" : "failed";
-    await admin
+    const { error: updateError } = await admin
       .from("restore_runs")
       .update({
         staged_rows: staged as any,
         status,
-        finished_at: new Date().toISOString(),
-        preflight_result: { staging_verify: verify } as any,
+        // staging_verified 는 최종 완료 상태가 아니므로 종료 시각을 남기지 않는다.
+        finished_at: verify.ok ? null : new Date().toISOString(),
+        // 기존 preflight 감사 증거는 보존하고, 검산 결과는 별도 컬럼에 기록한다.
+        staging_verify: verify as any,
         error_code: verify.ok ? null : (verify.issues?.[0]?.code ?? "STAGING_VERIFY_FAILED"),
         error_message: verify.ok ? null : "준비 영역 검산에서 불일치가 발견되었습니다.",
       } as any)
       .eq("id", runId);
+    if (updateError) throw new Error(`복원 작업 기록 갱신 실패: ${updateError.message}`);
 
     return { run_id: runId, staged_rows: staged, status };
   } catch (err) {
+    // 실패해도 preflight_result 는 절대 덮어쓰지 않는다.
     await admin
       .from("restore_runs")
       .update({
@@ -448,5 +707,11 @@ export async function stageRestoreRun(
 export async function verifyRestoreStaging(admin: SupabaseClient<Database>, runId: string) {
   const { data, error } = await (admin as any).rpc("restore_staging_verify", { _run_id: runId });
   if (error) throw new Error(error.message);
-  return data as { ok: boolean; run_id: string; tables: JsonValue[]; issues: PreflightIssue[] };
+  return data as {
+    ok: boolean;
+    run_id: string;
+    tables: JsonValue[];
+    issues: PreflightIssue[];
+    unsupported_constraints: JsonValue[];
+  };
 }
