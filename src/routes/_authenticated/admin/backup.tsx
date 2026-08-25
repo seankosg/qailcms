@@ -383,13 +383,12 @@ function DownloadArchiveButton({ snapshots }: { snapshots: any[] }) {
   );
 }
 
-function RestoreButton({ snapshots, onRestored }: { snapshots: any[]; onRestored: () => void }) {
-  const restore = useServerFn(restoreSnapshot);
+/**
+ * Holding Point 1: 운영 DB 복원은 안전성 보완 중이므로 실행 경로 전체를 잠근다.
+ * 기존 테이블 선택 UI·파괴적 복원 체크박스·복원 실행 버튼은 모두 비활성 상태로만 표시한다.
+ */
+function RestoreButton({ snapshots }: { snapshots: any[]; onRestored: () => void }) {
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<string>("");
-  const [tables, setTables] = useState<BackupTableName[]>(["abd_items_raw", "defect_items_raw", "task_management_raw", "spl_items", "spl_stage_progress", "dmr_entries"]);
-  const [destructive, setDestructive] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   return (
     <>
@@ -402,72 +401,46 @@ function RestoreButton({ snapshots, onRestored }: { snapshots: any[]; onRestored
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              스냅샷 복원
+              복원 기능 안전성 보완 중
             </DialogTitle>
             <DialogDescription>
-              선택한 스냅샷 시점으로 데이터를 되돌립니다. 복원 전 반드시 사용자 가이드를 확인하세요.
+              현재 백업 생성·조회·다운로드는 사용할 수 있지만 운영 DB 복원은 실행할 수 없습니다.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div>
-              <Label>스냅샷 선택</Label>
-              <select
-                className="w-full mt-1 border rounded-md p-2 text-sm bg-background"
-                value={selected}
-                onChange={(e) => setSelected(e.target.value)}
-              >
-                <option value="">선택하세요</option>
-                {snapshots.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({formatDateTime(s.created_at)}) — {s.triggered_by}
-                  </option>
-                ))}
-              </select>
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              기존 복원 방식은 안전성 보완 중이므로 사용할 수 없습니다. 안전한 신규 복원 경로가 완성되면 다시 열립니다.
             </div>
-            <div>
-              <Label>복원할 테이블</Label>
-              <div className="mt-1 grid grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-2">
-                {BACKUP_TABLES.map((t) => (
-                  <label key={t} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={tables.includes(t)}
-                      onCheckedChange={(checked) => {
-                        setTables((prev) => (checked ? [...prev, t] : prev.filter((x) => x !== t)));
-                      }}
-                    />
-                    {t}
-                  </label>
-                ))}
+            <div className="opacity-50 pointer-events-none select-none space-y-4" aria-disabled>
+              <div>
+                <Label>스냅샷 선택</Label>
+                <select className="w-full mt-1 border rounded-md p-2 text-sm bg-background" value="" disabled>
+                  <option value="">복원 실행 잠금 ({snapshots.length}건 보관)</option>
+                </select>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox id="destructive" checked={destructive} onCheckedChange={(c) => setDestructive(c === true)} />
-              <Label htmlFor="destructive" className="text-destructive font-medium">
-                파괴적 복원 (Admin 전용 — 대상 테이블을 먼저 비우고 복원)
-              </Label>
+              <details>
+                <summary className="text-sm text-muted-foreground cursor-default">복원할 테이블 선택 (비활성)</summary>
+                <div className="mt-1 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-2">
+                  {BACKUP_TABLES.map((t) => (
+                    <label key={t} className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={false} disabled />
+                      {t}
+                    </label>
+                  ))}
+                </div>
+              </details>
+              <div className="flex items-center gap-2">
+                <Checkbox id="destructive" checked={false} disabled />
+                <Label htmlFor="destructive" className="text-destructive font-medium">
+                  파괴적 복원 (비활성)
+                </Label>
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>취소</Button>
-            <Button
-              variant="destructive"
-              disabled={!selected || loading || tables.length === 0}
-              onClick={async () => {
-                setLoading(true);
-                try {
-                  await restore({ data: { snapshot_id: selected, tables, destructive } });
-                  toast.success("복원을 완료했습니다.");
-                  setOpen(false);
-                  onRestored();
-                } catch (err) {
-                  toast.error(`복원 실패: ${(err as Error).message}`);
-                } finally {
-                  setLoading(false);
-                }
-              }}
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
-              복원 실행
+            <Button variant="outline" onClick={() => setOpen(false)}>닫기</Button>
+            <Button variant="destructive" disabled>
+              복원 실행 (잠금)
             </Button>
           </DialogFooter>
         </DialogContent>
