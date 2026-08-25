@@ -28,6 +28,11 @@ export function assertApplyAllowed(
   if (run.status !== "staging_verified") {
     throw new Error(`RESTORE_APPLY_NOT_CLAIMABLE: status=${run.status}`);
   }
+  // 반영 요청 기록이 이미 있으면 결과가 확정될 때까지 재실행을 금지한다.
+  if (run.apply_requested_at) {
+    throw new Error("RESTORE_APPLY_ALREADY_REQUESTED");
+  }
+
   const expected = buildRestoreConfirmation(String(run.requested_scope ?? ""), String(run.id));
   if (String(input.confirmation ?? "").trim() !== expected) {
     throw new Error("RESTORE_CONFIRMATION_MISMATCH");

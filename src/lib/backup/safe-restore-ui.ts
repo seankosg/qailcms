@@ -15,6 +15,8 @@ export type RestoreRunStatusView = {
   staging_verify: { ok?: boolean } | null;
   apply_result: any | null;
   apply_attempted: boolean;
+  /** 반영 요청이 DB 에 기록된 시각. 통신 오류가 나도 지워지지 않는다. */
+  apply_requested_at?: string | null;
   error_code: string | null;
   error_message: string | null;
 };
@@ -102,6 +104,16 @@ export function deriveWizardState(
       };
 
     case "staging_verified": {
+      // 반영 요청 기록이 남아 있으면 status 와 무관하게 결과 미확정이다.
+      if (view.apply_requested_at || view.apply_attempted === true) {
+        return {
+          ...recheck,
+          phase: "result",
+          unresolved: true,
+          resultKind: "unknown",
+          notice: "반영 요청 기록이 있으나 결과가 확정되지 않았습니다. 재실행하지 마십시오.",
+        };
+      }
       if (!view.staging_overall_digest) {
         return { ...recheck, phase: "stage", allowStage: true };
       }
@@ -109,7 +121,7 @@ export function deriveWizardState(
       return {
         ...recheck,
         phase: "review",
-        // 이전 apply 요청 여부를 확정할 수 없으면 상태 재확인만 허용한다.
+        // 반영 요청 기록이 없어도 세션 중 상태 재확인을 먼저 요구한다.
         allowApply: opts?.recheckedInSession === true,
         notice:
           opts?.recheckedInSession === true
@@ -159,4 +171,25 @@ export function canStartNewRun(
   if (localUnresolved) return false;
   if (!view) return true;
   return deriveWizardState(view).canStartNew;
+}
+
+/**
+ * 새로고침 복구 시 Wizard 의 preflight 렌더링 계약을 서버 상태로 재구성한다.
+ * 렌더링은 항상 preflight.preflight.dependency 를 읽으므로 그 위치에 저장한다.
+ */
+export function hydrateWizardPreflight(s: any) {
+  return {
+    run_id: s.run_id,
+    preflight: {
+      blockers: s.preflight_summary?.blockers ?? [],
+      warnings: s.preflight_summary?.warnings ?? [],
+      expected_rows: s.expected_rows ?? {},
+      dependency: {
+        final_restore_tables: s.final_restore_tables ?? [],
+        auto_included_tables: s.auto_included_tables ?? [],
+        keep_current_parent_tables: s.keep_current_parent_tables ?? [],
+        required_parent_tables: s.required_parent_tables ?? [],
+      },
+    },
+  };
 }

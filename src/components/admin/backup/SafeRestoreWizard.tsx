@@ -41,6 +41,7 @@ import {
   classifyApplyResponse,
   classifyApplyThrow,
   deriveWizardState,
+  hydrateWizardPreflight,
   isConfirmedRollback,
   type RestoreRunStatusView,
 } from "@/lib/backup/safe-restore-ui";
@@ -160,15 +161,9 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
     setServerStatus(s as RestoreRunStatusView);
     setScope(s.requested_scope ?? "");
     setSnapshotId(s.snapshot_id ?? "");
-    setPreflight({
-      run_id: s.run_id,
-      preflight: {
-        blockers: s.preflight_summary?.blockers ?? [],
-        warnings: s.preflight_summary?.warnings ?? [],
-        expected_rows: s.expected_rows ?? {},
-      },
-      dependency: { final_restore_tables: s.final_restore_tables ?? [] },
-    });
+    // 렌더링 계약과 동일한 위치(preflight.preflight.dependency)에 저장한다.
+    setPreflight(hydrateWizardPreflight(s));
+
     if (s.staged_rows && Object.keys(s.staged_rows).length > 0) setStaged({ staged_rows: s.staged_rows });
     if (s.staging_verify) setVerify(s.staging_verify);
     if (s.staging_overall_digest) setDigest(s.staging_overall_digest);
@@ -176,7 +171,7 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
     if (s.status === "success") setResult(s.apply_result ?? { ok: true });
     else if (s.status === "apply_failed" && isConfirmedRollback(s)) {
       setFailure({ kind: "rollback", code: s.error_code ?? "RESTORE_APPLY_FAILED", message: s.error_message ?? "" });
-    } else if (s.status === "applying") {
+    } else if (s.status === "applying" || (s.apply_requested_at && s.status !== "apply_failed")) {
       setFailure({ kind: "unknown", code: "RESTORE_APPLY_IN_PROGRESS", message: "복원 결과가 확정되지 않았습니다." });
     }
   }
