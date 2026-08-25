@@ -131,7 +131,7 @@ export type PreflightResult = {
 async function loadSnapshot(admin: SupabaseClient<Database>, snapshotId: string) {
   const { data, error } = await admin
     .from("database_snapshots")
-    .select("id, name, created_at, storage_path, sha256_hash, tables_included, metadata")
+    .select("id, name, created_at, storage_path, sha256_hash, size_bytes, tables_included, metadata")
     .eq("id", snapshotId)
     .maybeSingle();
   if (error) throw new Error(error.message);
