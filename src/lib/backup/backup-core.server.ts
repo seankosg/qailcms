@@ -780,7 +780,7 @@ async function* iterRowsInParts(
 /**
  * 매니페스트의 parts 배열을 반환하고, 매니페스트가 신 포맷이 아니면 레거시 단일 파일로 폴백.
  */
-async function resolveTablePartPaths(
+export async function resolveTablePartPaths(
   supabaseAdmin: SupabaseClient<Database>,
   snapshot: { metadata?: unknown; storage_path?: string | null },
   folder: string,
@@ -806,7 +806,7 @@ async function resolveTablePartPaths(
   return [`${tableName}.json`];
 }
 
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
