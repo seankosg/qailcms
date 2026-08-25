@@ -9,17 +9,13 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  assertApplyAllowed,
+  assertSystemAdmin,
+  buildRestoreConfirmation,
+} from "./safe-restore-guards";
 
-async function assertSystemAdmin(supabase: any, userId: string) {
-  const { data, error } = await supabase.rpc("is_system_admin", { _user_id: userId });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("안전 복원은 System Administrator 계정만 수행할 수 있습니다.");
-}
-
-/** 최종 확인 문자열 정본: `RESTORE <scope> <run_id 앞 8자리>` */
-export function buildRestoreConfirmation(scope: string, runId: string): string {
-  return `RESTORE ${scope} ${runId.slice(0, 8)}`;
-}
+export { buildRestoreConfirmation };
 
 async function loadRun(admin: any, runId: string) {
   const { data, error } = await admin
@@ -31,6 +27,7 @@ async function loadRun(admin: any, runId: string) {
   if (!data) throw new Error("RESTORE_RUN_NOT_FOUND");
   return data as any;
 }
+
 
 /** 3.1 준비 영역 지문 고정 — 운영 표 미변경. */
 export const pinRestoreStagingDigest = createServerFn({ method: "POST" })
