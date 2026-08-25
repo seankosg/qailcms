@@ -172,3 +172,24 @@ export function canStartNewRun(
   if (!view) return true;
   return deriveWizardState(view).canStartNew;
 }
+
+/**
+ * 새로고침 복구 시 Wizard 의 preflight 렌더링 계약을 서버 상태로 재구성한다.
+ * 렌더링은 항상 preflight.preflight.dependency 를 읽으므로 그 위치에 저장한다.
+ */
+export function hydrateWizardPreflight(s: any) {
+  return {
+    run_id: s.run_id,
+    preflight: {
+      blockers: s.preflight_summary?.blockers ?? [],
+      warnings: s.preflight_summary?.warnings ?? [],
+      expected_rows: s.expected_rows ?? {},
+      dependency: {
+        final_restore_tables: s.final_restore_tables ?? [],
+        auto_included_tables: s.auto_included_tables ?? [],
+        keep_current_parent_tables: s.keep_current_parent_tables ?? [],
+        required_parent_tables: s.required_parent_tables ?? [],
+      },
+    },
+  };
+}
