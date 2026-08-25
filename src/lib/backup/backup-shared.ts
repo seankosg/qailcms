@@ -30,6 +30,14 @@ export type BackupTableName =
   | "abd_import_presets"
   | "abd_comments"
   | "abd_change_log"
+  // 영구 감사·행단위 임포트 기록 (복원 범위의 하위 종속 테이블이므로 백업 정본에 포함)
+  | "abd_audit_log"
+  | "abd_import_row_logs"
+  | "abd_mf_change_log"
+  | "task_management_import_row_logs"
+  | "tm_pic_delegations"
+  | "spl_import_row_logs"
+  | "wrt_import_row_logs"
   // === SPL ===
   | "spl_items"
   | "spl_stage_catalog"
@@ -130,6 +138,13 @@ export const BACKUP_TABLES: BackupTableName[] = [
   "abd_import_presets",
   "abd_comments",
   "abd_change_log",
+  "abd_audit_log",
+  "abd_import_row_logs",
+  "abd_mf_change_log",
+  "task_management_import_row_logs",
+  "tm_pic_delegations",
+  "spl_import_row_logs",
+  "wrt_import_row_logs",
   "spl_items",
   "spl_stage_catalog",
   "spl_stage_progress",
@@ -209,7 +224,10 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
   abd: [
     "abd_items_raw",
     "abd_import_logs",
+    "abd_import_row_logs",
     "abd_change_log",
+    "abd_audit_log",
+    "abd_mf_change_log",
     "abd_ocs_import_logs",
     "abd_ocs_comments",
     "abd_ocs_comment_groups",
@@ -227,6 +245,8 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
   tm: [
     "task_management_raw",
     "task_management_import_logs",
+    "task_management_import_row_logs",
+    "tm_pic_delegations",
     "task_schedule_change_audit",
     "task_management_status_history",
   ],
@@ -235,6 +255,7 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "spl_stage_progress",
     "spl_change_log",
     "spl_import_logs",
+    "spl_import_row_logs",
     "spl_ocs_import_logs",
     "spl_rsp_items",
     "spl_ocs_comment_groups",
@@ -253,7 +274,7 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "spl_document_pages",
     "spl_ocs_comment_document_links",
   ],
-  wrt: ["wrt_items", "wrt_stage_progress", "wrt_change_log", "wrt_import_logs"],
+  wrt: ["wrt_items", "wrt_stage_progress", "wrt_change_log", "wrt_import_logs", "wrt_import_row_logs"],
 };
 
 // ===========================================================================
@@ -273,6 +294,7 @@ export type RestoreScope =
   | "spl"
   | "spl_ocs"
   | "wrt"
+  | "dmr"
   | "masters"
   | "permissions";
 
@@ -284,12 +306,23 @@ export const RESTORE_SCOPE_LABELS: Record<RestoreScope, string> = {
   spl: "Spare Parts List",
   spl_ocs: "SPL OCS·문서",
   wrt: "Witness / Test Report",
+  dmr: "Daily Manpower Report",
   masters: "마스터·설정",
   permissions: "권한(RCL)·사용자 설정",
 };
 
 export const RESTORE_SCOPES: Record<RestoreScope, BackupTableName[]> = {
-  abd: ["abd_items_raw", "abd_import_logs", "abd_change_log", "abd_comments", "abd_settings", "abd_import_presets"],
+  abd: [
+    "abd_items_raw",
+    "abd_import_logs",
+    "abd_import_row_logs",
+    "abd_change_log",
+    "abd_audit_log",
+    "abd_mf_change_log",
+    "abd_comments",
+    "abd_settings",
+    "abd_import_presets",
+  ],
   abd_ocs: [
     "abd_ocs_import_logs",
     "abd_ocs_comment_groups",
@@ -308,11 +341,21 @@ export const RESTORE_SCOPES: Record<RestoreScope, BackupTableName[]> = {
   tm: [
     "task_management_raw",
     "task_management_import_logs",
+    "task_management_import_row_logs",
+    "tm_pic_delegations",
     "task_management_status_history",
     "task_schedule_change_audit",
     "task_comments",
   ],
-  spl: ["spl_items", "spl_stage_catalog", "spl_stage_progress", "spl_change_log", "spl_import_logs", "spl_settings"],
+  spl: [
+    "spl_items",
+    "spl_stage_catalog",
+    "spl_stage_progress",
+    "spl_change_log",
+    "spl_import_logs",
+    "spl_import_row_logs",
+    "spl_settings",
+  ],
   spl_ocs: [
     "spl_ocs_import_logs",
     "spl_rsp_items",
@@ -332,7 +375,18 @@ export const RESTORE_SCOPES: Record<RestoreScope, BackupTableName[]> = {
     "spl_document_pages",
     "spl_ocs_comment_document_links",
   ],
-  wrt: ["wrt_items", "wrt_stage_catalog", "wrt_stage_progress", "wrt_change_log", "wrt_import_logs", "wrt_settings"],
+  wrt: [
+    "wrt_items",
+    "wrt_stage_catalog",
+    "wrt_stage_progress",
+    "wrt_change_log",
+    "wrt_import_logs",
+    "wrt_import_row_logs",
+    "wrt_settings",
+  ],
+  // DMR: 일일 인력 실적. 참조하는 마스터(dmr_contractor_master / dmr_system_master / team_master)는
+  // 복원하지 않고 "현재값 유지 부모"로 dependency 결과에 표시된다.
+  dmr: ["dmr_entries"],
   masters: [
     "team_master",
     "subcontractor_master",
