@@ -405,7 +405,12 @@ function fakeStageAdmin(o: StageOpts) {
       }
       if (t === "restore_staging_rows") {
         return {
-          delete: () => ({ eq: async () => ({ error: null }) }),
+          delete: () => ({
+            eq: async (_c: string, v: string) => {
+              deletes.push(String(v ?? ""));
+              return { error: null };
+            },
+          }),
           insert: async (rows: Record<string, unknown>[]) => {
             inserted.push(...rows);
             return { error: null };
