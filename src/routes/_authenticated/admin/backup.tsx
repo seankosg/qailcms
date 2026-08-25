@@ -21,6 +21,8 @@ import {
   verifyOcsMedia,
 } from "@/lib/backup/backup.functions";
 import { BackupHelpDialog } from "@/components/admin/backup/BackupHelpDialog";
+import { SafeRestoreWizard } from "@/components/admin/backup/SafeRestoreWizard";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -82,6 +84,7 @@ function BackupPage() {
   const logs = useServerFn(getBackupLogs);
   const configFn = useServerFn(getBackupConfig);
   const qc = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
 
   const { data: snapshots = [], isLoading: listLoading } = useQuery({
     queryKey: [...QUERY_KEY, "snapshots"],
@@ -174,6 +177,7 @@ function BackupPage() {
       <div className="flex flex-wrap items-center gap-2">
         <DownloadArchiveButton snapshots={snapshots} />
         <RestoreButton snapshots={snapshots} onRestored={invalidate} />
+        {currentUser?.isSystemAdmin ? <SafeRestoreWizard snapshots={snapshots as any} /> : null}
         <CleanupButton onCleaned={invalidate} onResult={setDeleteResult} />
       </div>
 
