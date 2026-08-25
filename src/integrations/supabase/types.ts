@@ -9483,6 +9483,14 @@ export type Database = {
         }
         Returns: Json
       }
+      restore_assert_order_contract: {
+        Args: { _run_id: string }
+        Returns: Json
+      }
+      restore_assert_safety_snapshot: {
+        Args: { _run_id: string; _snapshot_id: string }
+        Returns: Json
+      }
       restore_bind_safety_snapshot: {
         Args: { _run_id: string; _snapshot_id: string }
         Returns: Json
