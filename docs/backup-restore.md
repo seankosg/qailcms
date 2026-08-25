@@ -112,3 +112,36 @@ size/rows/hash 를 실측한 뒤, 실측 파트 해시 → 실측 테이블 해�
 - `spl` — `spl_import_row_logs`
 - `wrt` — `wrt_import_row_logs`
 - `masters` — `tm_pic_delegations`
+
+## 안전 복원 — Holding Point 3 (원자적 반영 엔진, 실행 잠금 유지)
+
+이 단계는 **엔진과 테스트만** 추가한다. 실제 운영 복원 실행·UI 활성화·`LEGACY_RESTORE_DISABLED` 해제는 하지 않는다.
+Storage 파일, `auth.users`, DB 구조(migration/함수/view/trigger/RLS), 외부 원본은 복원 범위가 아니다.
+
+### DB 함수 (service_role 전용, PUBLIC/anon/authenticated 실행권한 없음)
+- `restore_row_digest(_run_id, _table, _source)` — 준비 영역(jsonb→typed row) 과 운영 표를 동일 정규형으로 환산한 표 단위 행수·SHA-256 지문. 생성 컬럼은 제외.
+- `restore_staging_digest(_run_id)` — 표 단위 지문 + `overall` 지문.
+- `restore_pin_staging_digest(_run_id)` — `staging_verified` 상태에서만 지문을 고정. 고정 후 값이 달라지면 `RESTORE_STAGING_CHANGED_AFTER_PIN`.
+- `restore_bind_safety_snapshot(_run_id, _snapshot_id)` — 복원 직전 안전 스냅샷 결속(성공 로그·v2 규격·대상 표 포함·검산 이후 생성 여부 확인, 결속 시 스냅샷 잠금).
+- `restore_apply_atomic(_run_id, _expected_overall_digest, _actor)` — 단일 트랜잭션 반영.
+
+### `restore_apply_atomic` 보장
+1. `pg_try_advisory_xact_lock` 으로 동시 반영 차단(`RESTORE_APPLY_ALREADY_RUNNING`).
+2. `staging_verified → applying` 원자 점유로 중복 실행 차단(`RESTORE_APPLY_NOT_CLAIMABLE`).
+3. 관문: 안전 스냅샷 결속, 고정 지문 일치, 준비 검산 ok, 스키마 지문 불변, 준비 영역 지문 재검증.
+4. 순서는 사전검증의 `insert_order`/`remove_order` 계약만 사용(`RESTORE_ORDER_CONTRACT_MISSING`/`_MISMATCH`).
+5. 대상 표 `ACCESS EXCLUSIVE` 잠금 → `DELETE`(remove_order) → `INSERT`(insert_order).
+   `TRUNCATE`·`TRUNCATE CASCADE` 미사용, 트리거·FK·CHECK·UNIQUE 유지, `session_replication_role` 미변경.
+6. 사후 검산: 표별 행수 = `expected_rows`, 운영 지문 = 준비 영역 지문(`RESTORE_APPLY_ROW_COUNT_MISMATCH` / `RESTORE_APPLY_DIGEST_MISMATCH`).
+7. 범위 밖 `profiles`·`user_roles`·`rcl_permissions`·`rcl_module_config` 지문 불변 확인(`RESTORE_OUT_OF_SCOPE_TABLE_CHANGED`).
+8. identity/serial 소유 시퀀스 재조정 후 `success` + `apply_result` 기록. 한 건이라도 실패하면 전체 롤백.
+
+### 서버 엔진 래퍼 — `src/lib/backup/restore-apply.server.ts`
+`pinStagingDigest`, `readStagingDigest`, `createAndBindSafetySnapshot`(안전 스냅샷 생성 + `backup_run_log` 기록 + 결속), `applyRestoreAtomic`.
+반영 실패는 트랜잭션 롤백이므로 감사 기록을 **별도 문장**으로 남기며, 그 갱신까지 실패하면
+`RESTORE_APPLY_FAILED_AND_AUDIT_UPDATE_FAILED` 로 두 오류를 함께 표면화한다.
+노출 서버 함수(createServerFn)는 아직 없다 — Holding Point 4 에서 승인 후 추가한다.
+
+### `restore_runs` 추가 항목
+`staging_verified_at`, `staging_digest`, `staging_overall_digest`, `safety_snapshot_id`,
+`safety_snapshot_bound_at`, `apply_result`, `applied_by`, `applied_at`.

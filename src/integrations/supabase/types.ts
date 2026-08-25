@@ -4342,6 +4342,9 @@ export type Database = {
       }
       restore_runs: {
         Row: {
+          applied_at: string | null
+          applied_by: string | null
+          apply_result: Json | null
           created_at: string
           dependency_result: Json | null
           error_code: string | null
@@ -4355,15 +4358,23 @@ export type Database = {
           preflight_result: Json | null
           requested_scope: string
           requested_tables: string[]
+          safety_snapshot_bound_at: string | null
+          safety_snapshot_id: string | null
           schema_fingerprint: string | null
           snapshot_id: string
           staged_rows: Json
+          staging_digest: Json | null
+          staging_overall_digest: string | null
+          staging_verified_at: string | null
           staging_verify: Json | null
           started_at: string
           status: string
           updated_at: string
         }
         Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          apply_result?: Json | null
           created_at?: string
           dependency_result?: Json | null
           error_code?: string | null
@@ -4377,15 +4388,23 @@ export type Database = {
           preflight_result?: Json | null
           requested_scope: string
           requested_tables?: string[]
+          safety_snapshot_bound_at?: string | null
+          safety_snapshot_id?: string | null
           schema_fingerprint?: string | null
           snapshot_id: string
           staged_rows?: Json
+          staging_digest?: Json | null
+          staging_overall_digest?: string | null
+          staging_verified_at?: string | null
           staging_verify?: Json | null
           started_at?: string
           status?: string
           updated_at?: string
         }
         Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          apply_result?: Json | null
           created_at?: string
           dependency_result?: Json | null
           error_code?: string | null
@@ -4399,9 +4418,14 @@ export type Database = {
           preflight_result?: Json | null
           requested_scope?: string
           requested_tables?: string[]
+          safety_snapshot_bound_at?: string | null
+          safety_snapshot_id?: string | null
           schema_fingerprint?: string | null
           snapshot_id?: string
           staged_rows?: Json
+          staging_digest?: Json | null
+          staging_overall_digest?: string | null
+          staging_verified_at?: string | null
           staging_verify?: Json | null
           started_at?: string
           status?: string
@@ -9451,7 +9475,25 @@ export type Database = {
       resolve_login_email: { Args: { _login_id: string }; Returns: string }
       resolve_owner_by_name: { Args: { _name: string }; Returns: string }
       resolve_user_by_name: { Args: { _name: string }; Returns: string }
+      restore_apply_atomic: {
+        Args: {
+          _actor?: string
+          _expected_overall_digest: string
+          _run_id: string
+        }
+        Returns: Json
+      }
+      restore_bind_safety_snapshot: {
+        Args: { _run_id: string; _snapshot_id: string }
+        Returns: Json
+      }
       restore_claim_staging: { Args: { _run_id: string }; Returns: Json }
+      restore_pin_staging_digest: { Args: { _run_id: string }; Returns: Json }
+      restore_row_digest: {
+        Args: { _run_id: string; _source: string; _table: string }
+        Returns: Json
+      }
+      restore_staging_digest: { Args: { _run_id: string }; Returns: Json }
       restore_staging_verify: { Args: { _run_id: string }; Returns: Json }
       rollback_abd_import: {
         Args: { _batch_id: string; _force?: boolean }

@@ -849,6 +849,8 @@ export async function stageRestoreRun(
       .update({
         staged_rows: staged as any,
         status,
+        // 반영 단계 관문에서 쓰는 검산 완료 시각(안전 스냅샷 신선도 판정 기준).
+        staging_verified_at: verify.ok ? new Date().toISOString() : null,
         // staging_verified 는 최종 완료 상태가 아니므로 종료 시각을 남기지 않는다.
         finished_at: verify.ok ? null : new Date().toISOString(),
         // 기존 preflight 감사 증거는 보존하고, 검산 결과는 별도 컬럼에 기록한다.
