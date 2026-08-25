@@ -4344,6 +4344,8 @@ export type Database = {
         Row: {
           applied_at: string | null
           applied_by: string | null
+          apply_requested_at: string | null
+          apply_requested_by: string | null
           apply_result: Json | null
           created_at: string
           dependency_result: Json | null
@@ -4374,6 +4376,8 @@ export type Database = {
         Insert: {
           applied_at?: string | null
           applied_by?: string | null
+          apply_requested_at?: string | null
+          apply_requested_by?: string | null
           apply_result?: Json | null
           created_at?: string
           dependency_result?: Json | null
@@ -4404,6 +4408,8 @@ export type Database = {
         Update: {
           applied_at?: string | null
           applied_by?: string | null
+          apply_requested_at?: string | null
+          apply_requested_by?: string | null
           apply_result?: Json | null
           created_at?: string
           dependency_result?: Json | null
@@ -9494,6 +9500,10 @@ export type Database = {
       restore_bind_safety_snapshot: {
         Args: { _run_id: string; _snapshot_id: string }
         Returns: Json
+      }
+      restore_claim_apply: {
+        Args: { _actor: string; _run_id: string }
+        Returns: boolean
       }
       restore_claim_staging: { Args: { _run_id: string }; Returns: Json }
       restore_pin_staging_digest: { Args: { _run_id: string }; Returns: Json }
