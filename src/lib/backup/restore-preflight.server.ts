@@ -16,7 +16,7 @@ import {
   type SnapshotManifest,
 } from "./backup-core.server";
 import { combineHashes, normalizePartPath, sha256Hex } from "./manifest-hash";
-import { resolveRestoreScope, type BackupTableName, type RestoreScope } from "./backup-shared";
+import { resolveRestoreScope, type RestoreScope } from "./backup-shared";
 
 const STAGING_INSERT_CHUNK = 500;
 
