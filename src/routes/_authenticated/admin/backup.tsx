@@ -84,6 +84,7 @@ function BackupPage() {
   const logs = useServerFn(getBackupLogs);
   const configFn = useServerFn(getBackupConfig);
   const qc = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
 
   const { data: snapshots = [], isLoading: listLoading } = useQuery({
     queryKey: [...QUERY_KEY, "snapshots"],
