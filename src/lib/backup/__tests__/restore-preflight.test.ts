@@ -383,6 +383,10 @@ type StageOpts = {
 function fakeStageAdmin(o: StageOpts) {
   const updates: Record<string, unknown>[] = [];
   const inserted: Record<string, unknown>[] = [];
+  const deletes: string[] = [];
+  const claims: { claimed: boolean; status: string | null }[] = [];
+  /** DB 의 원자적 claim 을 모사한다: preflight_clean 인 1건만 성공. */
+  let runStatus = String(o.run.status ?? "");
   const admin = {
     from: (t: string) => {
       if (t === "restore_runs") {
