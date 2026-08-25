@@ -184,7 +184,7 @@ describe("runRestorePreflight", () => {
     const f = await buildFixture();
     const admin = fakeAdmin({
       manifest: f.manifest,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toEqual([]);
@@ -208,7 +208,7 @@ describe("runRestorePreflight", () => {
     const admin = fakeAdmin({
       manifest: f.manifest,
       dbManifest,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("DB_STORAGE_MANIFEST_MISMATCH");
@@ -220,7 +220,7 @@ describe("runRestorePreflight", () => {
     const admin = fakeAdmin({
       manifest,
       dbManifest: manifest,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("SNAPSHOT_ID_MISMATCH");
@@ -241,7 +241,7 @@ describe("runRestorePreflight", () => {
     manifest.tables[0].parts![0].size_bytes = 1;
     const admin = fakeAdmin({
       manifest,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("PART_SIZE_MISMATCH");
@@ -253,7 +253,7 @@ describe("runRestorePreflight", () => {
     manifest.tables[0].parts![0].sha256 = "0".repeat(64);
     const admin = fakeAdmin({
       manifest,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("PART_HASH_MISMATCH");
@@ -265,7 +265,7 @@ describe("runRestorePreflight", () => {
     manifest.tables[0].parts![0].rows = 5;
     const admin = fakeAdmin({
       manifest,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("PART_ROW_COUNT_MISMATCH");
@@ -277,7 +277,7 @@ describe("runRestorePreflight", () => {
     manifest.tables[0].sha256 = "1".repeat(64);
     const admin = fakeAdmin({
       manifest,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("TABLE_HASH_MISMATCH");
@@ -291,7 +291,7 @@ describe("runRestorePreflight", () => {
       manifest,
       dbManifest: manifest,
       dbHash: "2".repeat(64),
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("SNAPSHOT_OVERALL_HASH_MISMATCH");
@@ -304,7 +304,7 @@ describe("runRestorePreflight", () => {
     const admin = fakeAdmin({
       manifest,
       dbManifest: manifest,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("SCHEMA_CONTRACT_MISSING");
@@ -316,7 +316,7 @@ describe("runRestorePreflight", () => {
     const admin = fakeAdmin({
       manifest: f.manifest,
       currentDigest: null,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("CURRENT_TABLE_SCHEMA_MISSING");
@@ -327,7 +327,7 @@ describe("runRestorePreflight", () => {
     const admin = fakeAdmin({
       manifest: f.manifest,
       currentDigest: "digest-changed",
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("SCHEMA_CHANGED_SINCE_SNAPSHOT");
@@ -339,7 +339,7 @@ describe("runRestorePreflight", () => {
     const admin = fakeAdmin({
       manifest,
       dbManifest: manifest,
-      files: { [`${FOLDER}${TABLE}.part-000.json`]: f.bytes },
+      files: filesOf(f),
     });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
     expect(codes(r)).toContain("SNAPSHOT_SCHEMA_VERSION_UNSUPPORTED");
