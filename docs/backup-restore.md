@@ -158,3 +158,27 @@ HP4(운영 복원 개방) 시작 전에 다음 중 하나를 선택해야 한다
 
 1. 복원 직전 **쓰기 정지 창**을 운영 절차로 둔다(공지 → 쓰기 차단 → 안전 스냅샷 → 반영 → 해제).
 2. **DB 단일 시점 안전 사본**(예: 시점 복구/스냅샷 기반 물리 사본)을 추가해 표 간 일관성을 보장한다.
+
+## HP3 최종 교정 (2026-08-25)
+
+### 순서 계약 완전 검증 — `restore_assert_order_contract(_run_id)`
+반영 RPC 는 운영 표를 잠그거나 지우기 전에 이 함수를 호출한다. 하나라도 어긋나면 즉시 중단한다.
+1. `insert_order`·`remove_order` 각각이 `final_restore_tables` 와 **정확히 같은 집합**(`RESTORE_ORDER_CONTRACT_MISMATCH`).
+2. 세 배열에 빈 값·중복 없음(`RESTORE_ORDER_CONTRACT_EMPTY_TABLE_NAME` / `_DUPLICATE`).
+3. 모든 표가 `public.get_backup_tables()` 화이트리스트 포함(`RESTORE_TABLE_NOT_WHITELISTED`).
+4. 모든 표가 실제 `public` 일반 테이블(`RESTORE_TABLE_NOT_FOUND`).
+
+### 안전 스냅샷 결속 강화 — `restore_assert_safety_snapshot(_run_id, _snapshot_id)`
+결속 시(`restore_bind_safety_snapshot`)와 반영 직전 두 번 확인한다.
+`metadata.schema_version = 'qail-snapshot-v2'`, `trigger_metadata.kind = 'pre-safe-restore'`,
+`trigger_metadata.restore_run_id = 대상 run`, `backup_run_log` 에 같은 스냅샷의 `success` 기록,
+스냅샷 잠금(`is_locked`), source 스냅샷과 다름, 준비 검산(`staging_verified_at`) 이후 생성,
+백업 정본 표 **전체 포함**(대상 표만 담긴 사본은 거부).
+
+### 통신 오류를 실패로 단정하지 않음
+`applyRestoreAtomic` 은 RPC 오류를 두 갈래로 분류한다(`classifyRpcError`).
+- `confirmed_rollback`: SQLSTATE 또는 구조화된 오류 코드가 있는 DB 응답 → 실패 감사기록 대상.
+  기록은 `id = runId AND status = 'staging_verified'` **조건부 UPDATE** 로만 수행한다.
+- `unknown`: timeout, `Failed to fetch`, connection reset, 응답 파싱 실패·유실, 던져진 예외 →
+  상태를 바꾸지 않고 `{ ok: false, state: "unknown", run_id, recheck_required: true }` 를 반환한다.
+  **재실행 금지**, run ID 로 실제 반영 결과를 확인해야 한다.
