@@ -111,16 +111,13 @@ export const applySafeRestore = createServerFn({ method: "POST" })
     await assertSystemAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 서버가 run 을 다시 조회해 상태·확인문자열을 판정한다(브라우저 값 불신).
+    // 서버가 run 을 다시 조회해 상태·확인문자열·지문을 판정한다(브라우저 값 불신).
     const run = await loadRun(supabaseAdmin, data.run_id);
-    if (run.status !== "staging_verified") {
-      throw new Error(`RESTORE_APPLY_NOT_CLAIMABLE: status=${run.status}`);
-    }
-    const expected = buildRestoreConfirmation(String(run.requested_scope ?? ""), String(run.id));
-    if (data.confirmation.trim() !== expected) {
-      throw new Error("RESTORE_CONFIRMATION_MISMATCH");
-    }
-    if (!run.safety_snapshot_id) throw new Error("RESTORE_SAFETY_SNAPSHOT_MISSING");
+    assertApplyAllowed(run, {
+      confirmation: data.confirmation,
+      expected_overall_digest: data.expected_overall_digest,
+    });
+
 
     const apply = await import("./restore-apply.server");
     return await apply.applyRestoreAtomic(supabaseAdmin as any, {
