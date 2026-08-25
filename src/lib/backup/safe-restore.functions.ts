@@ -118,6 +118,13 @@ export const applySafeRestore = createServerFn({ method: "POST" })
       expected_overall_digest: data.expected_overall_digest,
     });
 
+    // 반영 시도 사실을 DB 에 먼저 영구 기록한다(원자적 claim, 1회만 성공).
+    const { data: claimed, error: claimError } = await (supabaseAdmin as any).rpc("restore_claim_apply", {
+      _run_id: data.run_id,
+      _actor: context.userId,
+    });
+    if (claimError) throw new Error(claimError.message);
+    if (claimed !== true) throw new Error("RESTORE_APPLY_ALREADY_REQUESTED");
 
     const apply = await import("./restore-apply.server");
     return await apply.applyRestoreAtomic(supabaseAdmin as any, {
@@ -126,6 +133,7 @@ export const applySafeRestore = createServerFn({ method: "POST" })
       actorId: context.userId,
     });
   });
+
 
 /** 3.4 상태 재확인 — 읽기 전용. */
 export const getRestoreRunStatus = createServerFn({ method: "POST" })
