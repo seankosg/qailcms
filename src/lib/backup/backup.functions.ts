@@ -263,6 +263,110 @@ export const restoreSnapshot = createServerFn({ method: "POST" })
     throw new Error(`LEGACY_RESTORE_DISABLED: ${LEGACY_RESTORE_DISABLED_MESSAGE}`);
   });
 
+// ===== 안전 복원 (Holding Point 2) — 사전검증 / 준비 영역까지만 =====
+// 이 경로는 운영 테이블을 변경하지 않는다. 실제 반영은 다음 단계에서 별도 승인 후 추가한다.
+
+/** 복원 범위 목록(읽기 전용). */
+export const listRestoreScopes = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const shared = await import("./backup-shared");
+    return shared.RESTORE_SCOPE_KEYS.map((key) => ({
+      key,
+      label: shared.RESTORE_SCOPE_LABELS[key],
+      tables: shared.RESTORE_SCOPES[key],
+    }));
+  });
+
+/** 복원 미리보기(사전검증). 읽기 전용이며 어떤 데이터도 변경하지 않는다. */
+export const previewSafeRestore = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { snapshot_id: string; scope: string }) => {
+    if (!input?.snapshot_id) throw new Error("백업을 선택하십시오.");
+    if (!input?.scope) throw new Error("복원 범위를 선택하십시오.");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const pre = await import("./restore-preflight.server");
+    return await pre.runRestorePreflight(supabaseAdmin, {
+      snapshotId: data.snapshot_id,
+      scope: data.scope,
+    });
+  });
+
+/** 사전검증 실행 + restore_runs 기록. 운영 테이블 변경 없음. */
+export const startRestorePreflight = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { snapshot_id: string; scope: string }) => {
+    if (!input?.snapshot_id) throw new Error("백업을 선택하십시오.");
+    if (!input?.scope) throw new Error("복원 범위를 선택하십시오.");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    await assertSystemAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const pre = await import("./restore-preflight.server");
+    const preflight = await pre.runRestorePreflight(supabaseAdmin, {
+      snapshotId: data.snapshot_id,
+      scope: data.scope,
+    });
+    const run = await pre.createRestoreRun(supabaseAdmin, {
+      snapshotId: data.snapshot_id,
+      scope: data.scope,
+      userId: context.userId,
+      preflight,
+    });
+    return { ...run, preflight };
+  });
+
+/** 백업 행을 준비 영역에만 적재한다(운영 테이블 미변경). */
+export const stageRestoreRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { run_id: string }) => {
+    if (!input?.run_id) throw new Error("복원 준비 작업을 지정하십시오.");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    await assertSystemAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const pre = await import("./restore-preflight.server");
+    return await pre.stageRestoreRun(supabaseAdmin, data.run_id);
+  });
+
+/** 준비 영역 검산(읽기 전용). */
+export const verifyRestoreStaging = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { run_id: string }) => {
+    if (!input?.run_id) throw new Error("복원 준비 작업을 지정하십시오.");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const pre = await import("./restore-preflight.server");
+    return await pre.verifyRestoreStaging(supabaseAdmin, data.run_id);
+  });
+
+/** 복원 준비 작업 목록/상태(읽기 전용). */
+export const listRestoreRuns = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdminOrSuper(context.supabase, context.userId);
+    const { data, error } = await context.supabase
+      .from("restore_runs")
+      .select(
+        "id, snapshot_id, requested_scope, final_restore_tables, status, expected_rows, staged_rows, error_code, error_message, started_at, finished_at",
+      )
+      .order("started_at", { ascending: false })
+      .limit(20);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+
 /** 보관기간 정리 미리보기(읽기 전용) — 실제 실행과 동일한 후보 계산 함수를 사용. */
 export const previewCleanupOldSnapshots = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
