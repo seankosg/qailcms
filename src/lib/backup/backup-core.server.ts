@@ -19,7 +19,7 @@ import { planRetentionCleanup } from "./retention";
 
 export { BACKUP_TABLES, type BackupTableName } from "./backup-shared";
 
-const BUCKET = "db-backups";
+export const BUCKET = "db-backups";
 const CHUNK_SIZE = 1000;
 // 파트당 최대 행 수: 대용량 raw 테이블을 여러 파일로 분할해 Worker 메모리/응답 시간 한도를 회피
 const ROWS_PER_PART = 10_000;
