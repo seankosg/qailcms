@@ -357,6 +357,11 @@ export async function runRestorePreflight(
   const tableHashMismatches: string[] = [];
   const seenPaths = new Set<string>();
   const recomputedTableHashes: string[] = [];
+  /** manifest 전체(대상·비대상 무관) 실측 합계. */
+  let allTablesRows = 0;
+  let allTablesBytes = 0;
+  /** 표 하나라도 실측 검증에 실패하면 overall 검증은 성립하지 않는다. */
+  let allTablesVerified = true;
 
   for (const entry of manifest?.tables ?? []) {
     const table = String(entry.name);
@@ -365,15 +370,15 @@ export async function runRestorePreflight(
     let bytesFromParts = 0;
     let tableUsable = true;
 
+    // 대상 여부와 무관하게 parts 가 비어 있으면 검증 불가 → 선언된 table hash 를
+    // overall 계산에 대신 넣어 통과시키지 않는다.
     if (!Array.isArray(entry.parts) || entry.parts.length === 0) {
-      if (isTarget) {
-        blockers.push({
-          code: "PART_HASH_UNAVAILABLE",
-          message: "이 표의 백업 파일에는 검증용 해시가 없어 복원할 수 없습니다.",
-          table,
-        });
-      }
-      recomputedTableHashes.push(entry.sha256);
+      allTablesVerified = false;
+      blockers.push({
+        code: "PART_HASH_UNAVAILABLE",
+        message: "이 표의 백업 파일에는 검증용 해시가 없어 복원할 수 없습니다.",
+        table,
+      });
       continue;
     }
 
