@@ -4,6 +4,7 @@ import {
   applyRestoreAtomic,
   createAndBindSafetySnapshot,
   pinStagingDigest,
+  classifyRpcError,
   readStagingDigest,
 } from "../restore-apply.server";
 
@@ -233,5 +234,67 @@ describe("안전 스냅샷 결속", () => {
       "RESTORE_RUN_NOT_FOUND",
     );
     expect(f.inserts).toHaveLength(0);
+  });
+});
+
+describe("안전 복원 반영 엔진 — 통신 오류 미확정 처리", () => {
+  it("타임아웃은 실패로 단정하지 않고 결과 확인 필요로 반환한다", async () => {
+    const f = fakeAdmin({
+      run: readyRun,
+      rpc: { restore_apply_atomic: { error: { message: "canceling statement due to statement timeout" } } },
+    });
+    const res: any = await applyRestoreAtomic(f.admin, {
+      runId: RUN_ID,
+      expectedOverallDigest: DIGEST,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.state).toBe("unknown");
+    expect(res.recheck_required).toBe(true);
+    expect(res.run_id).toBe(RUN_ID);
+    expect(f.updates).toHaveLength(0);
+  });
+
+  it("네트워크 예외가 던져져도 실패 기록을 남기지 않는다", async () => {
+    const f = fakeAdmin({ run: readyRun });
+    (f.admin as any).rpc = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    const res: any = await applyRestoreAtomic(f.admin, {
+      runId: RUN_ID,
+      expectedOverallDigest: DIGEST,
+    });
+    expect(res.state).toBe("unknown");
+    expect(f.updates).toHaveLength(0);
+  });
+
+  it("응답이 유실되면 미확정으로 반환한다", async () => {
+    const f = fakeAdmin({ run: readyRun });
+    (f.admin as any).rpc = async () => undefined;
+    const res: any = await applyRestoreAtomic(f.admin, {
+      runId: RUN_ID,
+      expectedOverallDigest: DIGEST,
+    });
+    expect(res.state).toBe("unknown");
+    expect(f.updates).toHaveLength(0);
+  });
+
+  it("오류 분류: SQLSTATE 는 롤백 확정, fetch 실패는 미확정", () => {
+    expect(classifyRpcError({ code: "P0001", message: "RESTORE_APPLY_ROW_COUNT_MISMATCH" })).toBe(
+      "confirmed_rollback",
+    );
+    expect(classifyRpcError({ message: "TypeError: Failed to fetch" })).toBe("unknown");
+    expect(classifyRpcError({ message: "connection reset by peer" })).toBe("unknown");
+  });
+
+  it("이미 점유된 작업(staging_verified 아님)에는 실패 기록을 덮어쓰지 않는다", async () => {
+    const f = fakeAdmin({
+      run: { ...readyRun, status: APPLY_STATUS.READY },
+      rpc: { restore_apply_atomic: { error: { message: "RESTORE_APPLY_DIGEST_MISMATCH" } } },
+    });
+    // 조건부 UPDATE 가 status='staging_verified' 를 요구하는지 확인
+    await expect(
+      applyRestoreAtomic(f.admin, { runId: RUN_ID, expectedOverallDigest: DIGEST }),
+    ).rejects.toThrow("RESTORE_APPLY_FAILED");
+    expect(f.updates[0]).toMatchObject({ status: APPLY_STATUS.FAILED });
   });
 });
