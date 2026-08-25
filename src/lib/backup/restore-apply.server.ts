@@ -102,7 +102,7 @@ export async function createAndBindSafetySnapshot(
         requested_by: opts.userId ?? null,
       },
     });
-    await admin
+    const { error: successLogError } = await admin
       .from("backup_run_log")
       .update({
         status: "success",
@@ -111,6 +111,11 @@ export async function createAndBindSafetySnapshot(
         duration_ms: Date.now() - startedAt,
       } as any)
       .eq("id", logId);
+    // 성공 기록이 남지 않으면 결속 관문(성공 로그 확인)을 통과할 수 없으므로 즉시 실패시킨다.
+    if (successLogError) {
+      throw new Error(`SAFETY_SNAPSHOT_LOG_UPDATE_FAILED: ${successLogError.message}`);
+    }
+
   } catch (err) {
     await admin
       .from("backup_run_log")
