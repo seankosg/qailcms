@@ -166,9 +166,16 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
         blockers: s.preflight_summary?.blockers ?? [],
         warnings: s.preflight_summary?.warnings ?? [],
         expected_rows: s.expected_rows ?? {},
+        // 렌더링 계약과 동일한 위치에 저장한다(preflight.preflight.dependency).
+        dependency: {
+          final_restore_tables: s.final_restore_tables ?? [],
+          auto_included_tables: s.auto_included_tables ?? [],
+          keep_current_parent_tables: s.keep_current_parent_tables ?? [],
+          required_parent_tables: s.required_parent_tables ?? [],
+        },
       },
-      dependency: { final_restore_tables: s.final_restore_tables ?? [] },
     });
+
     if (s.staged_rows && Object.keys(s.staged_rows).length > 0) setStaged({ staged_rows: s.staged_rows });
     if (s.staging_verify) setVerify(s.staging_verify);
     if (s.staging_overall_digest) setDigest(s.staging_overall_digest);
