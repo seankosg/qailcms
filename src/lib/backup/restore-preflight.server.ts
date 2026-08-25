@@ -509,6 +509,7 @@ export async function runRestorePreflight(
     recomputedTableHashes.push(recomputedTableHash);
     if (recomputedTableHash !== entry.sha256) {
       tableHashMismatches.push(table);
+      allTablesVerified = false;
       blockers.push({
         code: "TABLE_HASH_MISMATCH",
         message: "표 단위 검증값이 백업 기록과 다릅니다.",
@@ -517,8 +518,10 @@ export async function runRestorePreflight(
       });
     }
 
-    if (!isTarget) continue;
+    // 표 단위 rows/size 대조는 **대상 여부와 무관하게** 모든 표에 적용한다.
+    if (!tableUsable) allTablesVerified = false;
     if (tableUsable && rowsFromParts !== entry.rows) {
+      allTablesVerified = false;
       blockers.push({
         code: "TABLE_ROW_COUNT_MISMATCH",
         message: "표 단위 행 수 합계가 백업 기록과 다릅니다.",
@@ -527,6 +530,7 @@ export async function runRestorePreflight(
       });
     }
     if (tableUsable && bytesFromParts !== entry.size_bytes) {
+      allTablesVerified = false;
       blockers.push({
         code: "TABLE_SIZE_MISMATCH",
         message: "표 단위 파일 크기 합계가 백업 기록과 다릅니다.",
@@ -534,13 +538,39 @@ export async function runRestorePreflight(
         detail: { manifest_size: entry.size_bytes, parts_size: bytesFromParts },
       });
     }
-    expectedRows[table] = rowsFromParts;
+    allTablesRows += rowsFromParts;
+    allTablesBytes += bytesFromParts;
+    // 복원 대상 여부는 expected_rows / part_contract 산출에만 사용한다.
+    if (isTarget) expectedRows[table] = rowsFromParts;
   }
 
+  // manifest total_rows 대조(모든 표 실측 합계).
+  if (manifest && typeof manifest.total_rows === "number" && manifest.total_rows !== allTablesRows) {
+    allTablesVerified = false;
+    blockers.push({
+      code: "MANIFEST_TOTAL_ROWS_MISMATCH",
+      message: "백업 전체 행 수 합계가 기록과 다릅니다.",
+      detail: { manifest_total_rows: manifest.total_rows, actual_total_rows: allTablesRows },
+    });
+  }
+
+  // DB 에 기록된 전체 크기도 실측 byte 합계와 대조한다(값이 있을 때만).
+  const dbSizeBytes = (snapshot as { size_bytes?: number | null }).size_bytes ?? null;
+  if (manifest && typeof dbSizeBytes === "number" && dbSizeBytes > 0 && dbSizeBytes !== allTablesBytes) {
+    allTablesVerified = false;
+    blockers.push({
+      code: "SNAPSHOT_SIZE_MISMATCH",
+      message: "백업 전체 파일 크기가 기록과 다릅니다.",
+      detail: { db_size_bytes: dbSizeBytes, actual_size_bytes: allTablesBytes },
+    });
+  }
 
   const recomputedOverall = manifest ? await combineHashes(recomputedTableHashes) : null;
   const overallMatches =
-    !!manifest && recomputedOverall === (manifest.sha256 ?? null) && recomputedOverall === (snapshot.sha256_hash ?? null);
+    !!manifest &&
+    allTablesVerified &&
+    recomputedOverall === (manifest.sha256 ?? null) &&
+    recomputedOverall === (snapshot.sha256_hash ?? null);
   if (manifest && !overallMatches) {
     blockers.push({
       code: "SNAPSHOT_OVERALL_HASH_MISMATCH",
