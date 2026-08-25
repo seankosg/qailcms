@@ -37,6 +37,13 @@ import {
 } from "@/components/ui/dialog";
 import { AlertTriangle, Loader2, RotateCcw, ShieldCheck, Copy } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
+import {
+  classifyApplyResponse,
+  classifyApplyThrow,
+  deriveWizardState,
+  isConfirmedRollback,
+  type RestoreRunStatusView,
+} from "@/lib/backup/safe-restore-ui";
 
 const RUN_STORAGE_KEY = "qail.safe-restore.run_id";
 
@@ -137,7 +144,8 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [, forceTick] = useState(0);
-  const [serverStatus, setServerStatus] = useState<any>(null);
+  const [serverStatus, setServerStatus] = useState<RestoreRunStatusView | null>(null);
+  const [recheckedInSession, setRecheckedInSession] = useState(false);
 
   const lock = useRef(false);
 
@@ -147,16 +155,62 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
     return () => clearInterval(t);
   }, [busy]);
 
+  /** 서버 run 상태를 정본으로 삼아 Wizard 단계 데이터를 재구성한다. */
+  function hydrateFromServer(s: any) {
+    setServerStatus(s as RestoreRunStatusView);
+    setScope(s.requested_scope ?? "");
+    setSnapshotId(s.snapshot_id ?? "");
+    setPreflight({
+      run_id: s.run_id,
+      preflight: {
+        blockers: s.preflight_summary?.blockers ?? [],
+        warnings: s.preflight_summary?.warnings ?? [],
+        expected_rows: s.expected_rows ?? {},
+      },
+      dependency: { final_restore_tables: s.final_restore_tables ?? [] },
+    });
+    if (s.staged_rows && Object.keys(s.staged_rows).length > 0) setStaged({ staged_rows: s.staged_rows });
+    if (s.staging_verify) setVerify(s.staging_verify);
+    if (s.staging_overall_digest) setDigest(s.staging_overall_digest);
+    if (s.safety_snapshot_id) setSafety({ safety_snapshot_id: s.safety_snapshot_id, is_locked: true });
+    if (s.status === "success") setResult(s.apply_result ?? { ok: true });
+    else if (s.status === "apply_failed" && isConfirmedRollback(s)) {
+      setFailure({ kind: "rollback", code: s.error_code ?? "RESTORE_APPLY_FAILED", message: s.error_message ?? "" });
+    } else if (s.status === "applying") {
+      setFailure({ kind: "unknown", code: "RESTORE_APPLY_IN_PROGRESS", message: "복원 결과가 확정되지 않았습니다." });
+    }
+  }
+
   // 새로고침 복구: 남아 있는 run 은 상태 조회만 수행한다(자동 재실행 없음).
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.localStorage.getItem(RUN_STORAGE_KEY) : null;
     if (!saved) return;
     setRunId(saved);
     statusFn({ data: { run_id: saved } })
-      .then((s) => setServerStatus(s))
+      .then((s) => hydrateFromServer(s))
       .catch(() => void 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function resetWizard() {
+    if (typeof window !== "undefined") window.localStorage.removeItem(RUN_STORAGE_KEY);
+    setRunId(null);
+    setSnapshotId("");
+    setScope("");
+    setPreflight(null);
+    setStaged(null);
+    setVerify(null);
+    setDigest(null);
+    setDigestTables([]);
+    setSafety(null);
+    setAckOthers(false);
+    setAckStay(false);
+    setConfirmation("");
+    setResult(null);
+    setFailure(null);
+    setServerStatus(null);
+    setRecheckedInSession(false);
+  }
 
   const selectedSnapshot = useMemo(
     () => snapshots.find((s) => s.id === snapshotId) ?? null,
@@ -171,10 +225,9 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
   const dependency = preflight?.preflight?.dependency ?? null;
   const expectedRows: Record<string, number> = preflight?.preflight?.expected_rows ?? {};
 
-  const unresolved =
-    failure?.kind === "unknown" ||
-    serverStatus?.rerun_blocked === true ||
-    serverStatus?.status === "applying";
+  const wizard = deriveWizardState(serverStatus, { recheckedInSession });
+  const unresolved = failure?.kind === "unknown" || wizard.unresolved;
+  const canStartNew = !!serverStatus && wizard.canStartNew && !unresolved;
 
   const expectedConfirmation = runId && scope ? `RESTORE ${scope} ${runId.slice(0, 8)}` : "";
 
@@ -231,25 +284,20 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
 
   const doApply = () =>
     guarded("apply", async () => {
+      // 브라우저 예외는 DB 트랜잭션 결과를 증명하지 못한다 → 항상 미확정 처리.
       try {
         const res: any = await applyFn({
           data: { run_id: runId!, expected_overall_digest: digest!, confirmation },
         });
-        if (res?.ok) {
+        const verdict = classifyApplyResponse(res);
+        if (verdict.kind === "success") {
           setResult(res);
-        } else if (res?.state === "unknown") {
-          setFailure({ kind: "unknown", code: res.code, message: res.message });
         } else {
-          setFailure({ kind: "rollback", code: "RESTORE_APPLY_RESULT_INVALID", message: "반영 결과를 해석할 수 없습니다." });
+          setFailure({ kind: "unknown", code: verdict.code!, message: verdict.message! });
         }
-      } catch (err: any) {
-        const msg = String(err?.message ?? "");
-        const transport = /failed to fetch|network|timeout|timed out|aborted|load failed/i.test(msg);
-        setFailure({
-          kind: transport ? "unknown" : "rollback",
-          code: /^[A-Z][A-Z0-9_]*/.exec(msg)?.[0] ?? "RESTORE_APPLY_FAILED",
-          message: msg,
-        });
+      } catch (err) {
+        const verdict = classifyApplyThrow(err);
+        setFailure({ kind: "unknown", code: verdict.code, message: verdict.message });
       }
     });
 
@@ -257,10 +305,12 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
     guarded("recheck", async () => {
       const s: any = await statusFn({ data: { run_id: runId! } });
       setServerStatus(s);
+      setRecheckedInSession(true);
       if (s.status === "success") {
         setResult(s.apply_result ?? { ok: true });
         setFailure(null);
-      } else if (s.status === "apply_failed") {
+      } else if (s.status === "apply_failed" && isConfirmedRollback(s)) {
+        // 「롤백 확정」 표시는 서버 기록이 apply_failed + 오류 기록일 때만 허용한다.
         setFailure({ kind: "rollback", code: s.error_code ?? "RESTORE_APPLY_FAILED", message: s.error_message ?? "" });
       }
     });
@@ -269,7 +319,9 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
   const step2Ok = !!preflight && blockers.length === 0;
   const step3Ok = verify?.ok === true && !!digest;
   const step4Ok = !!safety?.safety_snapshot_id;
-  const step5Ok = step4Ok && confirmation.trim() === expectedConfirmation && !unresolved;
+  const serverBlocksApply = !!serverStatus && !wizard.allowApply;
+  const step5Ok =
+    step4Ok && confirmation.trim() === expectedConfirmation && !unresolved && !serverBlocksApply;
 
   return (
     <div className="space-y-5 py-1">
@@ -277,6 +329,19 @@ function WizardBody({ snapshots }: { snapshots: Snapshot[] }) {
         <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
           <div className="font-medium text-destructive">복원 결과 확인 필요</div>
           <div>결과가 확정될 때까지 새 복원을 시작할 수 없습니다.</div>
+        </div>
+      )}
+
+      {wizard.notice && !unresolved && (
+        <div className="rounded-md border p-3 text-xs text-muted-foreground">{wizard.notice}</div>
+      )}
+
+      {canStartNew && (
+        <div className="flex items-center justify-between rounded-md border p-3 text-xs">
+          <span>이 복원 작업은 종료되었습니다. 기존 기록·로그·Snapshot 은 그대로 보존됩니다.</span>
+          <Button size="sm" variant="outline" onClick={resetWizard}>
+            새 안전 복원 시작
+          </Button>
         </div>
       )}
 
