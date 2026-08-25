@@ -1,0 +1,2 @@
+ALTER TABLE public.restore_runs ADD COLUMN IF NOT EXISTS manifest_sha256 text;
+COMMENT ON COLUMN public.restore_runs.manifest_sha256 IS '사전검증 시점 Storage manifest.json 원본 bytes 의 SHA-256. staging 은 이 값과 일치할 때만 진행한다.';

@@ -63,23 +63,43 @@ RPC를 통해 특정 import batch만 취소 가능. 임포트 로그 페이지�
 - `backup_table_schema_contract(_tables)` — 컬럼/PK/FK/UNIQUE + 테이블 단위 `schema_digest`.
 - `backup_schema_fingerprint(_tables)` — 위 digest 를 합친 지문.
 - `restore_staging_verify(_run_id)` — 준비 영역 행수/미지 컬럼/PK NULL·중복/NOT NULL/UNIQUE 중복/FK 고아 검산.
+  단, **지원 제약만 검증 완료**로 본다. 배열·복합 타입, CHECK 제약, partial/expression unique index 는
+  검증하지 않고 `unsupported_constraints` 에 남긴다. "모든 타입·제약 검증 완료"로 표기하지 않는다.
 
 ### 스냅샷 규격 v2
 신규 스냅샷 매니페스트에 `schema_version: "qail-snapshot-v2"`, `schema_fingerprint`, `schema_contract` 를 기록한다.
 v2 미만(레거시) 스냅샷은 사전검증에서 `SNAPSHOT_SCHEMA_VERSION_UNSUPPORTED` 로 차단된다.
 
 ### Preflight 차단 코드
-`MANIFEST_MISSING`, `SNAPSHOT_SCHEMA_VERSION_UNSUPPORTED`, `TABLE_NOT_IN_WHITELIST`,
+`MANIFEST_MISSING`, `STORAGE_MANIFEST_MISSING`, `DB_STORAGE_MANIFEST_MISMATCH`, `SNAPSHOT_ID_MISMATCH`,
+`SNAPSHOT_SCHEMA_VERSION_UNSUPPORTED`, `TABLE_NOT_IN_WHITELIST`,
 `DEPENDENT_TABLE_NOT_WHITELISTED`, `REQUIRED_TABLE_MISSING_IN_SNAPSHOT`, `FK_CYCLE_DETECTED`,
-`SCHEMA_CHANGED_SINCE_SNAPSHOT`, `TABLE_MISSING_IN_MANIFEST`, `PART_HASH_UNAVAILABLE`,
-`PART_FILE_MISSING`, `PART_HASH_MISMATCH`, `PART_ROW_COUNT_MISMATCH`, `PART_PARSE_FAILED`,
-`TABLE_ROW_COUNT_MISMATCH`.
+`SCHEMA_CONTRACT_MISSING`, `CURRENT_TABLE_SCHEMA_MISSING`, `SCHEMA_CHANGED_SINCE_SNAPSHOT`,
+`TABLE_MISSING_IN_MANIFEST`, `PART_HASH_UNAVAILABLE`, `PART_PATH_INVALID`, `PART_PATH_ABSOLUTE`,
+`PART_PATH_TRAVERSAL`, `PART_FILE_MISSING`, `PART_SIZE_MISMATCH`, `PART_HASH_MISMATCH`,
+`PART_ROW_COUNT_MISMATCH`, `PART_PARSE_FAILED`, `TABLE_ROW_COUNT_MISMATCH`, `TABLE_HASH_MISMATCH`,
+`SNAPSHOT_OVERALL_HASH_MISMATCH`.
 차단이 하나라도 있으면 준비 영역 적재로 넘어갈 수 없다.
+
+경로 규칙: 파트 경로는 **단순 상대경로 정규형**만 허용한다. `..`·`.` segment, 빈 segment,
+절대경로/드라이브/UNC/역슬래시/NUL 은 모두 차단하며, percent-encoding 은 임의로 디코드하지 않고 원문 그대로 사용한다.
+
+전체 무결성: 사전검증은 복원 대상이 아닌 표를 포함해 **매니페스트의 모든 파트 파일을 실제로 내려받아**
+size/rows/hash 를 실측한 뒤, 실측 파트 해시 → 실측 테이블 해시 → 실측 overall 해시 순으로 재계산한다.
+실측 overall 이 매니페스트와 DB `sha256_hash` 양쪽과 같을 때만 `overall_matches=true` 다.
 
 ### Staging
 `restore_runs`(작업 상태) + `restore_staging_rows`(백업 행 임시 적재).
-`stageRestoreRun` 은 `preflight_clean` 상태에서만 동작하고, 파트별 해시를 재검증한 뒤 준비 영역에만 INSERT 한다.
+`stageRestoreRun` 은 `preflight_clean` 상태에서만 동작하며, **사전검증이 승인한 동일 bytes 에 고정**된다.
+1. `restore_runs.manifest_sha256`(사전검증 시점 manifest.json 원본 bytes 의 SHA-256)와 현재 Storage 값을 대조하고,
+   다르면 `RESTORE_MANIFEST_CHANGED_AFTER_PREFLIGHT` 로 중단한다.
+2. 적재 대상 파일 목록은 재다운로드한 manifest 가 아니라 `preflight_result.part_contract`
+   (table, path, full_path, part_index, rows, size_bytes, sha256)를 기준으로 삼는다.
+3. 계약과 경로/크기/해시/행수가 하나라도 다르면 `RESTORE_PART_CHANGED_AFTER_PREFLIGHT` 로 중단한다.
+   고정값 자체가 없으면 `RESTORE_MANIFEST_PIN_MISSING` / `RESTORE_PART_CONTRACT_MISSING`.
 적재 후 `restore_staging_verify` 를 실행해 `staging_verified` 또는 `failed` 로 마감한다.
+적재 실패 시 실패 기록 UPDATE 까지 실패하면 `STAGING_FAILED_AND_AUDIT_UPDATE_FAILED` 로 두 오류를 함께 표면화한다.
+
 
 ### 서버 함수 (Admin 전용)
 `listRestoreScopes`, `previewSafeRestore`(읽기), `startRestorePreflight`(System Administrator),

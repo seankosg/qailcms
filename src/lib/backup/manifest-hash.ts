@@ -26,46 +26,48 @@ export type PartPathCheck = { ok: true; fullPath: string } | { ok: false; code: 
 
 /**
  * 스냅샷 파트 경로 정규화·검증.
- * 절대경로 / 드라이브 / UNC / `..` / 폴더 이탈을 모두 차단한다.
- * `folder` 는 `snapshots/<id>/` 형태(마지막 슬래시 포함)여야 한다.
+ *
+ * manifest 계약은 **단순 상대경로만** 허용한다.
+ * - `..` 세그먼트가 하나라도 있으면 무조건 차단(최종 결과가 폴더 안이어도 차단)
+ * - `.` 세그먼트·빈 세그먼트(`a//b`)·후행 슬래시 등 비정규형도 차단
+ * - 절대경로 / 드라이브 문자 / UNC / 역슬래시 / NUL 차단
+ * - percent-encoding 은 디코드하지 않고 원문 그대로 Storage 호출에 사용한다.
+ *
+ * `folder` 는 `snapshots/<id>/` 형태여야 한다.
  */
 export function normalizePartPath(folder: string, rawPath: unknown): PartPathCheck {
-  if (typeof rawPath !== "string" || rawPath.trim() === "") {
+  if (typeof rawPath !== "string" || rawPath === "" || rawPath.trim() === "") {
     return { ok: false, code: "PART_PATH_INVALID", reason: "경로가 비어 있습니다." };
   }
-  const p = rawPath.trim();
+  const p = rawPath;
+  if (p !== p.trim()) {
+    return { ok: false, code: "PART_PATH_INVALID", reason: "경로 앞뒤 공백은 허용하지 않습니다." };
+  }
   if (p.includes("\\")) {
     return { ok: false, code: "PART_PATH_INVALID", reason: "역슬래시 경로는 허용하지 않습니다." };
-  }
-  if (p.startsWith("/") || /^[A-Za-z]:/.test(p) || p.startsWith("//")) {
-    return { ok: false, code: "PART_PATH_ABSOLUTE", reason: "절대경로는 허용하지 않습니다." };
   }
   if (p.includes("\0")) {
     return { ok: false, code: "PART_PATH_INVALID", reason: "허용되지 않는 문자가 있습니다." };
   }
+  if (p.startsWith("/") || /^[A-Za-z]:/.test(p) || p.startsWith("//")) {
+    return { ok: false, code: "PART_PATH_ABSOLUTE", reason: "절대경로는 허용하지 않습니다." };
+  }
+
+  const segments = p.split("/");
+  for (const seg of segments) {
+    if (seg === "..") {
+      return { ok: false, code: "PART_PATH_TRAVERSAL", reason: "상위 폴더 이동(..)은 허용하지 않습니다." };
+    }
+    if (seg === "." || seg === "") {
+      return { ok: false, code: "PART_PATH_INVALID", reason: "정규형이 아닌 경로입니다." };
+    }
+  }
 
   const base = folder.endsWith("/") ? folder : `${folder}/`;
-  const segments: string[] = [];
-  for (const seg of `${base}${p}`.split("/")) {
-    if (seg === "" || seg === ".") continue;
-    if (seg === "..") {
-      if (segments.length === 0) {
-        return { ok: false, code: "PART_PATH_ESCAPES_FOLDER", reason: "상위 폴더로 이동할 수 없습니다." };
-      }
-      segments.pop();
-      continue;
-    }
-    segments.push(seg);
+  const baseSegments = base.split("/").filter((s) => s !== "");
+  if (baseSegments.length === 0) {
+    return { ok: false, code: "PART_PATH_INVALID", reason: "백업 폴더 경로가 올바르지 않습니다." };
   }
-  const normalized = segments.join("/");
-  const baseSegments = base.split("/").filter((s) => s !== "" && s !== ".");
-  const basePrefix = `${baseSegments.join("/")}/`;
-  if (!normalized.startsWith(basePrefix) || normalized.length <= basePrefix.length) {
-    return {
-      ok: false,
-      code: "PART_PATH_ESCAPES_FOLDER",
-      reason: "스냅샷 폴더 밖 경로입니다.",
-    };
-  }
-  return { ok: true, fullPath: normalized };
+  return { ok: true, fullPath: `${baseSegments.join("/")}/${segments.join("/")}` };
 }
+

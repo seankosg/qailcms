@@ -19,6 +19,25 @@ import { combineHashes, normalizePartPath, sha256Hex } from "./manifest-hash";
 import { resolveRestoreScope, type RestoreScope } from "./backup-shared";
 
 const STAGING_INSERT_CHUNK = 500;
+/** Storage 파트 동시 다운로드 상한(3~5 범위). */
+const DOWNLOAD_CONCURRENCY = 4;
+
+/** 입력 순서를 보존하면서 동시 실행 수를 제한하는 map. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    for (;;) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
@@ -28,6 +47,24 @@ export type PreflightIssue = {
   table?: string;
   detail?: { [key: string]: JsonValue };
 };
+
+/**
+ * 사전검증이 실측으로 확정한 파트 계약.
+ * staging 은 재다운로드한 manifest 가 아니라 이 계약만을 기준으로 검증·적재한다.
+ */
+export type PartContract = {
+  table: string;
+  part_index: number;
+  /** manifest 원문 상대경로 */
+  path: string;
+  /** 검증된 정규 전체 경로(Storage 호출에 사용) */
+  full_path: string;
+  rows: number;
+  size_bytes: number;
+  sha256: string;
+};
+
+
 
 export type RestoreDependency = {
   requested_tables: string[];
@@ -58,6 +95,10 @@ export type PreflightResult = {
   scope: string;
   dependency: RestoreDependency;
   expected_rows: Record<string, number>;
+  /** Storage manifest.json 원본 bytes 의 SHA-256(사전검증 시점 고정값). */
+  manifest_sha256: string | null;
+  /** 사전검증이 실측으로 확정한 복원 대상 파트 계약. staging 은 이 계약에만 고정된다. */
+  part_contract: PartContract[];
   parts: {
     table: string;
     path: string;
@@ -66,6 +107,7 @@ export type PreflightResult = {
     manifest_sha256: string;
     actual_sha256: string;
   }[];
+
   hashes: {
     manifest_overall: string | null;
     recomputed_overall: string | null;
@@ -153,6 +195,7 @@ export async function runRestorePreflight(
   // ── 1) Storage manifest.json 을 사전검증 정본으로 로드 ────────────────────
   let manifest: SnapshotManifest | null = null;
   let manifestSource: "storage" | "none" = "none";
+  let manifestSha256: string | null = null;
   const manifestPath = `${folder.endsWith("/") ? folder : `${folder}/`}manifest.json`;
   const { data: mBlob, error: mErr } = await admin.storage.from(BUCKET).download(manifestPath);
   if (mErr || !mBlob) {
@@ -162,8 +205,10 @@ export async function runRestorePreflight(
       detail: { path: manifestPath, error: mErr?.message ?? null },
     });
   } else {
+    const manifestBytes = new Uint8Array(await mBlob.arrayBuffer());
+    manifestSha256 = await sha256Hex(manifestBytes);
     try {
-      manifest = JSON.parse(new TextDecoder().decode(new Uint8Array(await mBlob.arrayBuffer()))) as SnapshotManifest;
+      manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as SnapshotManifest;
       manifestSource = "storage";
     } catch (err) {
       blockers.push({
@@ -173,6 +218,7 @@ export async function runRestorePreflight(
       });
     }
   }
+
 
   if (manifest) {
     if (String(manifest.id ?? "") !== String(snapshot.id)) {
@@ -301,9 +347,13 @@ export async function runRestorePreflight(
     });
   }
 
-  // ── 4) 경로 검증 + 파트 실측(size/hash/rows) + 계층 해시 재계산 ─────────
+  // ── 4) 경로 검증 + 전체 파트 실측(size/hash/rows) + 계층 해시 재계산 ─────
+  //
+  // 복원 대상이 아닌 표도 **모두 다운로드**하여 실제 bytes 로 해시를 재계산한다.
+  // 그래야 overall hash 가 "manifest 선언값 재조합"이 아닌 실제 무결성 검증이 된다.
   const expectedRows: Record<string, number> = {};
   const parts: PreflightResult["parts"] = [];
+  const partContract: PartContract[] = [];
   const tableHashMismatches: string[] = [];
   const seenPaths = new Set<string>();
   const recomputedTableHashes: string[] = [];
@@ -311,7 +361,6 @@ export async function runRestorePreflight(
   for (const entry of manifest?.tables ?? []) {
     const table = String(entry.name);
     const isTarget = finalTables.includes(table);
-    const partHashes: string[] = [];
     let rowsFromParts = 0;
     let bytesFromParts = 0;
     let tableUsable = true;
@@ -328,7 +377,11 @@ export async function runRestorePreflight(
       continue;
     }
 
-    for (const part of entry.parts) {
+    // 4-1) 경로 검증(다운로드 전)
+    type Planned = { index: number; part: (typeof entry.parts)[number]; fullPath: string };
+    const planned: Planned[] = [];
+    for (let i = 0; i < entry.parts.length; i++) {
+      const part = entry.parts[i];
       const check = normalizePartPath(folder, part.path);
       if (!check.ok) {
         tableUsable = false;
@@ -351,31 +404,42 @@ export async function runRestorePreflight(
         continue;
       }
       seenPaths.add(check.fullPath);
-      partHashes.push(part.sha256);
+      planned.push({ index: i, part, fullPath: check.fullPath });
+    }
 
-      // 복원 대상이 아닌 표는 경로 안전성만 확인하고 다운로드하지 않는다.
-      if (!isTarget) continue;
+    // 4-2) 동시성 제한 다운로드(3~5개 범위)
+    const results = await mapLimit(planned, DOWNLOAD_CONCURRENCY, async (p) => {
+      const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(p.fullPath);
+      if (dlError || !blob) return { p, bytes: null as Uint8Array | null, error: dlError?.message ?? "다운로드 실패" };
+      return { p, bytes: new Uint8Array(await blob.arrayBuffer()), error: null as string | null };
+    });
 
-      const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(check.fullPath);
-      if (dlError || !blob) {
+    // 4-3) manifest 순서대로 실측 검증
+    const partHashes: string[] = [];
+    for (const r of results) {
+      const { part, fullPath, index } = r.p;
+      if (!r.bytes) {
         tableUsable = false;
         blockers.push({
           code: "PART_FILE_MISSING",
           message: "백업 파일 일부를 읽을 수 없습니다.",
           table,
-          detail: { path: part.path, error: dlError?.message ?? null },
+          detail: { path: String(part.path), error: r.error },
         });
         continue;
       }
-      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const bytes = r.bytes;
       const actual = await sha256Hex(bytes);
+      // 실제 해시를 계층 해시 재계산에 사용한다(선언값 재조합 금지).
+      partHashes.push(actual);
+
       if (actual !== part.sha256) {
         tableUsable = false;
         blockers.push({
           code: "PART_HASH_MISMATCH",
           message: "백업 파일이 손상되었거나 변경되었습니다(무결성 검증 실패).",
           table,
-          detail: { path: part.path, expected: part.sha256, actual },
+          detail: { path: String(part.path), expected: part.sha256, actual },
         });
       }
       if (bytes.length !== part.size_bytes) {
@@ -384,10 +448,11 @@ export async function runRestorePreflight(
           code: "PART_SIZE_MISMATCH",
           message: "백업 파일 크기가 기록과 다릅니다.",
           table,
-          detail: { path: part.path, expected: part.size_bytes, actual: bytes.length },
+          detail: { path: String(part.path), expected: part.size_bytes, actual: bytes.length },
         });
       }
       let rowCount = part.rows;
+      let parsedOk = true;
       try {
         const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
         if (!Array.isArray(parsed)) throw new Error("배열이 아님");
@@ -398,28 +463,40 @@ export async function runRestorePreflight(
             code: "PART_ROW_COUNT_MISMATCH",
             message: "백업 파일의 실제 행 수가 기록된 행 수와 다릅니다.",
             table,
-            detail: { path: part.path, manifest_rows: part.rows, actual_rows: rowCount },
+            detail: { path: String(part.path), manifest_rows: part.rows, actual_rows: rowCount },
           });
         }
       } catch (err) {
+        parsedOk = false;
         tableUsable = false;
         blockers.push({
           code: "PART_PARSE_FAILED",
           message: "백업 파일을 해석할 수 없습니다.",
           table,
-          detail: { path: part.path, error: (err as Error).message },
+          detail: { path: String(part.path), error: (err as Error).message },
         });
       }
       rowsFromParts += rowCount;
       bytesFromParts += bytes.length;
       parts.push({
         table,
-        path: part.path,
+        path: String(part.path),
         rows: rowCount,
         bytes: bytes.length,
         manifest_sha256: part.sha256,
         actual_sha256: actual,
       });
+      if (isTarget && parsedOk) {
+        partContract.push({
+          table,
+          part_index: index,
+          path: String(part.path),
+          full_path: fullPath,
+          rows: rowCount,
+          size_bytes: bytes.length,
+          sha256: actual,
+        });
+      }
     }
 
     // 테이블 해시 재계산은 생성 시와 동일한 산식(manifest-hash.ts)을 사용한다.
@@ -454,6 +531,7 @@ export async function runRestorePreflight(
     }
     expectedRows[table] = rowsFromParts;
   }
+
 
   const recomputedOverall = manifest ? await combineHashes(recomputedTableHashes) : null;
   const overallMatches =
@@ -522,7 +600,10 @@ export async function runRestorePreflight(
     scope: String(opts.scope),
     dependency,
     expected_rows: expectedRows,
+    manifest_sha256: manifestSha256,
+    part_contract: partContract,
     parts,
+
     hashes: {
       manifest_overall: manifest?.sha256 ?? null,
       recomputed_overall: recomputedOverall,
@@ -564,10 +645,15 @@ export async function createRestoreRun(
       schema: pf.schema,
       hashes: pf.hashes,
       manifest_source: pf.snapshot.manifest_source,
+      manifest_sha256: pf.manifest_sha256,
+      // staging 이 고정될 계약(경로·순서·행수·크기·해시). 이후 단계는 이 값만 신뢰한다.
+      part_contract: pf.part_contract,
       parts: pf.parts.map((p) => ({ table: p.table, path: p.path, rows: p.rows, bytes: p.bytes })),
     } as any,
     expected_rows: pf.expected_rows as any,
+    manifest_sha256: pf.manifest_sha256,
     schema_fingerprint: pf.schema.current_fingerprint,
+
     status: pf.ok ? "preflight_clean" : "preflight_blocked",
     initiated_by: opts.userId,
     // preflight_blocked 는 최종 종료 상태이므로 종료 시각을 남긴다.
@@ -589,9 +675,12 @@ export async function stageRestoreRun(
 ): Promise<{ run_id: string; staged_rows: Record<string, number>; status: string }> {
   const { data: run, error: runError } = await admin
     .from("restore_runs")
-    .select("id, snapshot_id, final_restore_tables, expected_rows, status")
+    .select(
+      "id, snapshot_id, final_restore_tables, expected_rows, status, manifest_sha256, preflight_result",
+    )
     .eq("id", runId)
     .maybeSingle();
+
   if (runError) throw new Error(runError.message);
   if (!run) throw new Error("복원 준비 작업을 찾을 수 없습니다.");
   if (run.status !== "preflight_clean") {
@@ -618,41 +707,81 @@ export async function stageRestoreRun(
   const staged: Record<string, number> = {};
 
   try {
-    // 준비 영역 적재도 Storage manifest 를 정본으로 쓴다(DB metadata 단독 신뢰 금지).
+    // ── (1) manifest bytes 고정 대조 ────────────────────────────────────────
+    // 사전검증 시점에 계산한 manifest.json 원본 bytes 의 SHA-256 과 지금 값이
+    // 다르면, 승인받은 payload 가 아니므로 즉시 중단한다.
+    const pinnedManifestSha = (run as any).manifest_sha256 as string | null;
+    if (!pinnedManifestSha) {
+      throw new Error(
+        "RESTORE_MANIFEST_PIN_MISSING: 사전검증이 고정한 목록 파일 검증값이 없습니다. 사전검증을 다시 실행하십시오.",
+      );
+    }
     const manifestPath = `${folder.endsWith("/") ? folder : `${folder}/`}manifest.json`;
     const { data: mBlob, error: mErr } = await admin.storage.from(BUCKET).download(manifestPath);
     if (mErr || !mBlob) throw new Error("백업 목록 파일(manifest.json)을 읽을 수 없습니다.");
-    const manifest = JSON.parse(
-      new TextDecoder().decode(new Uint8Array(await mBlob.arrayBuffer())),
-    ) as SnapshotManifest;
+    const currentManifestSha = await sha256Hex(new Uint8Array(await mBlob.arrayBuffer()));
+    if (currentManifestSha !== pinnedManifestSha) {
+      throw new Error(
+        `RESTORE_MANIFEST_CHANGED_AFTER_PREFLIGHT: 사전검증 이후 백업 목록 파일이 바뀌었습니다(expected=${pinnedManifestSha}, actual=${currentManifestSha}).`,
+      );
+    }
+
+    // ── (2) 적재는 사전검증이 고정한 계약에만 근거한다 ───────────────────────
+    const contract = ((run as any).preflight_result?.part_contract ?? []) as PartContract[];
+    if (!Array.isArray(contract) || contract.length === 0) {
+      throw new Error(
+        "RESTORE_PART_CONTRACT_MISSING: 사전검증이 고정한 파트 계약이 없습니다. 사전검증을 다시 실행하십시오.",
+      );
+    }
 
     for (const table of (run.final_restore_tables ?? []) as string[]) {
-      const entry = (manifest.tables ?? []).find((t) => String(t.name) === table);
-      if (!entry || !Array.isArray(entry.parts) || entry.parts.length === 0) {
-        throw new Error(`백업 목록에 표 정보가 없습니다: ${table}`);
+      const tableParts = contract
+        .filter((c) => c.table === table)
+        .sort((a, b) => a.part_index - b.part_index);
+      if (tableParts.length === 0) {
+        throw new Error(`RESTORE_PART_CONTRACT_MISSING: 사전검증 계약에 표 정보가 없습니다: ${table}`);
       }
       let sequence = 0;
-      let partIndex = 0;
-      for (const part of entry.parts) {
+      for (const part of tableParts) {
+        // 계약에 기록된 정규 경로를 다시 검증한 뒤 그대로 사용한다.
         const check = normalizePartPath(folder, part.path);
-        if (!check.ok) throw new Error(`안전하지 않은 백업 파일 경로(${table}): ${check.reason}`);
-        const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(check.fullPath);
-        if (dlError || !blob) throw new Error(`백업 파일 읽기 실패(${table} / ${part.path})`);
+        if (!check.ok || check.fullPath !== part.full_path) {
+          throw new Error(
+            `RESTORE_PART_CHANGED_AFTER_PREFLIGHT: 파일 경로가 사전검증 계약과 다릅니다(${table} / ${part.path}).`,
+          );
+        }
+        const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(part.full_path);
+        if (dlError || !blob) {
+          throw new Error(
+            `RESTORE_PART_CHANGED_AFTER_PREFLIGHT: 백업 파일을 읽을 수 없습니다(${table} / ${part.path}).`,
+          );
+        }
         const bytes = new Uint8Array(await blob.arrayBuffer());
         if (bytes.length !== part.size_bytes) {
-          throw new Error(`파일 크기 불일치(${table} / ${part.path})`);
+          throw new Error(
+            `RESTORE_PART_CHANGED_AFTER_PREFLIGHT: 파일 크기가 사전검증 값과 다릅니다(${table} / ${part.path}).`,
+          );
         }
         const actual = await sha256Hex(bytes);
-        if (actual !== part.sha256) throw new Error(`무결성 검증 실패(${table} / ${part.path})`);
+        if (actual !== part.sha256) {
+          throw new Error(
+            `RESTORE_PART_CHANGED_AFTER_PREFLIGHT: 파일 내용이 사전검증 이후 변경되었습니다(${table} / ${part.path}).`,
+          );
+        }
         const rows = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>[];
         if (!Array.isArray(rows)) throw new Error(`백업 파일 형식 오류(${table} / ${part.path})`);
+        if (rows.length !== part.rows) {
+          throw new Error(
+            `RESTORE_PART_CHANGED_AFTER_PREFLIGHT: 행 수가 사전검증 값과 다릅니다(${table} / ${part.path}).`,
+          );
+        }
 
         for (let i = 0; i < rows.length; i += STAGING_INSERT_CHUNK) {
           const chunk = rows.slice(i, i + STAGING_INSERT_CHUNK);
           const payload = chunk.map((row) => ({
             restore_run_id: runId,
             table_name: table,
-            part_index: partIndex,
+            part_index: part.part_index,
             part_path: part.path,
             row_sequence: sequence++,
             row_data: row as any,
@@ -660,10 +789,10 @@ export async function stageRestoreRun(
           const { error: insertError } = await admin.from("restore_staging_rows").insert(payload as any);
           if (insertError) throw new Error(`준비 영역 적재 실패(${table}): ${insertError.message}`);
         }
-        partIndex++;
       }
       staged[table] = sequence;
     }
+
 
     const { data: verifyRaw, error: verifyError } = await (admin as any).rpc(
       "restore_staging_verify",
@@ -691,17 +820,27 @@ export async function stageRestoreRun(
     return { run_id: runId, staged_rows: staged, status };
   } catch (err) {
     // 실패해도 preflight_result 는 절대 덮어쓰지 않는다.
-    await admin
+    const message = (err as Error).message;
+    const { error: logError } = await admin
       .from("restore_runs")
       .update({
         status: "failed",
         finished_at: new Date().toISOString(),
         error_code: "STAGING_FAILED",
-        error_message: (err as Error).message,
+        error_message: message,
       } as any)
       .eq("id", runId);
+    if (logError) {
+      // 감사기록 갱신 실패는 조용히 넘기지 않는다. 원래 오류와 함께 표면화한다.
+      const combined = new Error(
+        `STAGING_FAILED_AND_AUDIT_UPDATE_FAILED: 준비 영역 적재 실패(${message}) / 실패 기록 갱신도 실패(${logError.message})`,
+      );
+      (combined as Error & { cause?: unknown }).cause = err;
+      throw combined;
+    }
     throw err;
   }
+
 }
 
 export async function verifyRestoreStaging(admin: SupabaseClient<Database>, runId: string) {
