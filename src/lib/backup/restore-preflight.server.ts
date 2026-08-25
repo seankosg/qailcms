@@ -645,10 +645,15 @@ export async function createRestoreRun(
       schema: pf.schema,
       hashes: pf.hashes,
       manifest_source: pf.snapshot.manifest_source,
+      manifest_sha256: pf.manifest_sha256,
+      // staging 이 고정될 계약(경로·순서·행수·크기·해시). 이후 단계는 이 값만 신뢰한다.
+      part_contract: pf.part_contract,
       parts: pf.parts.map((p) => ({ table: p.table, path: p.path, rows: p.rows, bytes: p.bytes })),
     } as any,
     expected_rows: pf.expected_rows as any,
+    manifest_sha256: pf.manifest_sha256,
     schema_fingerprint: pf.schema.current_fingerprint,
+
     status: pf.ok ? "preflight_clean" : "preflight_blocked",
     initiated_by: opts.userId,
     // preflight_blocked 는 최종 종료 상태이므로 종료 시각을 남긴다.
