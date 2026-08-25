@@ -145,8 +145,10 @@ export const getRestoreRunStatus = createServerFn({ method: "POST" })
       ["applying", "success", "apply_failed"].includes(status) ||
       !!run.applied_at ||
       !!run.apply_result;
-
+    return {
+      apply_attempted: applyAttempted,
       run_id: run.id as string,
+
       status,
       requested_scope: run.requested_scope as string,
       confirmation_phrase: buildRestoreConfirmation(String(run.requested_scope ?? ""), String(run.id)),
