@@ -281,6 +281,9 @@ export async function assertBackupTableParity(
   if (!result.ok) throw new Error(parityErrorMessage(result));
 }
 
+/** 신규 스냅샷 매니페스트 버전. v2 부터 스키마 계약(지문)을 함께 기록한다. */
+export const SNAPSHOT_SCHEMA_VERSION = "qail-snapshot-v2" as const;
+
 export type SnapshotManifest = {
   id: string;
   name: string;
@@ -296,7 +299,14 @@ export type SnapshotManifest = {
   }[];
   total_rows: number;
   sha256: string;
+  /** v2 이상에서만 존재. 없으면 레거시(v1) 스냅샷이다. */
+  schema_version?: string;
+  /** 대상 테이블 전체 스키마 지문. 복원 전 현재 DB 지문과 대조한다. */
+  schema_fingerprint?: string;
+  /** 테이블별 컬럼/PK/FK 계약 + 테이블 단위 지문. */
+  schema_contract?: unknown;
 };
+
 
 export type CreateSnapshotOptions = {
   snapshotId: string;
