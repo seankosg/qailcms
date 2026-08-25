@@ -4357,6 +4357,7 @@ export type Database = {
           schema_fingerprint: string | null
           snapshot_id: string
           staged_rows: Json
+          staging_verify: Json | null
           started_at: string
           status: string
           updated_at: string
@@ -4377,6 +4378,7 @@ export type Database = {
           schema_fingerprint?: string | null
           snapshot_id: string
           staged_rows?: Json
+          staging_verify?: Json | null
           started_at?: string
           status?: string
           updated_at?: string
@@ -4397,6 +4399,7 @@ export type Database = {
           schema_fingerprint?: string | null
           snapshot_id?: string
           staged_rows?: Json
+          staging_verify?: Json | null
           started_at?: string
           status?: string
           updated_at?: string
