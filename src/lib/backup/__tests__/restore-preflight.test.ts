@@ -232,7 +232,7 @@ describe("runRestorePreflight", () => {
     manifest.tables[0].parts![0].path = "../evil.json";
     const admin = fakeAdmin({ manifest, files: {} });
     const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
-    expect(codes(r)).toContain("PART_PATH_ESCAPES_FOLDER");
+    expect(codes(r)).toContain("PART_PATH_TRAVERSAL");
   });
 
   it("파트 크기 변조를 차단한다", async () => {
