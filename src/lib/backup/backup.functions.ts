@@ -240,6 +240,14 @@ export const lockSnapshot = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * Holding Point 1: 기존(레거시) 복원 실행 경로는 안전성 보완 중이므로 완전 차단한다.
+ * 어떤 운영 데이터도 건드리기 전(트리거 비활성/TRUNCATE/Storage 다운로드 전)에 즉시 중단하며,
+ * restore_run_log 에 성공 기록을 남기지 않는다. 기존 복원 함수/마이그레이션/로그는 그대로 보존한다.
+ */
+export const LEGACY_RESTORE_DISABLED_MESSAGE =
+  "기존 복원 방식은 안전성 보완 중이므로 사용할 수 없습니다. 백업 생성·조회·다운로드는 정상적으로 사용할 수 있습니다.";
+
 export const restoreSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: {
@@ -247,51 +255,12 @@ export const restoreSnapshot = createServerFn({ method: "POST" })
     tables?: BackupTableName[];
     destructive?: boolean;
   }) => input)
-  .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await assertAdminOrSuper(context.supabase, context.userId);
-    if (data.destructive) {
-      await assertAdmin(context.supabase, context.userId);
-    }
-
-    const tables = data.tables ?? BACKUP_TABLES;
-    const runId = crypto.randomUUID();
-    const { error: logError } = await supabaseAdmin.from("restore_run_log").insert({
-      id: runId,
-      status: "running",
-      snapshot_id: data.snapshot_id,
-      restored_tables: tables,
-      destructive: !!data.destructive,
-      initiated_by: context.userId,
-    });
-    if (logError) throw new Error(logError.message);
-
-    const core = await import("./backup-core.server");
-    const started = Date.now();
-    try {
-      const result = await core.restoreSnapshot(supabaseAdmin, data.snapshot_id, tables, !!data.destructive);
-      await supabaseAdmin
-        .from("restore_run_log")
-        .update({
-          status: "success",
-          finished_at: new Date().toISOString(),
-          duration_ms: Date.now() - started,
-          restored_tables: result.restoredTables,
-        })
-        .eq("id", runId);
-      return result;
-    } catch (err) {
-      await supabaseAdmin
-        .from("restore_run_log")
-        .update({
-          status: "failed",
-          finished_at: new Date().toISOString(),
-          duration_ms: Date.now() - started,
-          error_message: (err as Error).message,
-        })
-        .eq("id", runId);
-      throw err;
-    }
+  .handler(async () => {
+    // === LEGACY_RESTORE_DISABLED ===
+    // 트리거 비활성화 / TRUNCATE / Storage 백업 파일 다운로드 이전 단계에서 즉시 차단한다.
+    // restore_run_log 기록도 남기지 않으며 운영 테이블 변경은 0건이다.
+    // 기존 복원 정본(backup-core.server.ts restoreSnapshot)과 DB 함수·로그는 보존한다.
+    throw new Error(`LEGACY_RESTORE_DISABLED: ${LEGACY_RESTORE_DISABLED_MESSAGE}`);
   });
 
 /** 보관기간 정리 미리보기(읽기 전용) — 실제 실행과 동일한 후보 계산 함수를 사용. */
