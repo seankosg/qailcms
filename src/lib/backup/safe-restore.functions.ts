@@ -140,7 +140,12 @@ export const getRestoreRunStatus = createServerFn({ method: "POST" })
     const run = await loadRun(supabaseAdmin, data.run_id);
     const status = String(run.status ?? "");
     const unresolved = status === "applying";
-    return {
+    /** 반영을 한 번이라도 시도했는지 — 서버 기록만 근거로 판정한다. */
+    const applyAttempted =
+      ["applying", "success", "apply_failed"].includes(status) ||
+      !!run.applied_at ||
+      !!run.apply_result;
+
       run_id: run.id as string,
       status,
       requested_scope: run.requested_scope as string,
