@@ -19,6 +19,25 @@ import { combineHashes, normalizePartPath, sha256Hex } from "./manifest-hash";
 import { resolveRestoreScope, type RestoreScope } from "./backup-shared";
 
 const STAGING_INSERT_CHUNK = 500;
+/** Storage 파트 동시 다운로드 상한(3~5 범위). */
+const DOWNLOAD_CONCURRENCY = 4;
+
+/** 입력 순서를 보존하면서 동시 실행 수를 제한하는 map. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    for (;;) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
