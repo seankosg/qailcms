@@ -131,7 +131,7 @@ export type PreflightResult = {
 async function loadSnapshot(admin: SupabaseClient<Database>, snapshotId: string) {
   const { data, error } = await admin
     .from("database_snapshots")
-    .select("id, name, created_at, storage_path, sha256_hash, tables_included, metadata")
+    .select("id, name, created_at, storage_path, sha256_hash, size_bytes, tables_included, metadata")
     .eq("id", snapshotId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -357,6 +357,11 @@ export async function runRestorePreflight(
   const tableHashMismatches: string[] = [];
   const seenPaths = new Set<string>();
   const recomputedTableHashes: string[] = [];
+  /** manifest 전체(대상·비대상 무관) 실측 합계. */
+  let allTablesRows = 0;
+  let allTablesBytes = 0;
+  /** 표 하나라도 실측 검증에 실패하면 overall 검증은 성립하지 않는다. */
+  let allTablesVerified = true;
 
   for (const entry of manifest?.tables ?? []) {
     const table = String(entry.name);
@@ -365,15 +370,15 @@ export async function runRestorePreflight(
     let bytesFromParts = 0;
     let tableUsable = true;
 
+    // 대상 여부와 무관하게 parts 가 비어 있으면 검증 불가 → 선언된 table hash 를
+    // overall 계산에 대신 넣어 통과시키지 않는다.
     if (!Array.isArray(entry.parts) || entry.parts.length === 0) {
-      if (isTarget) {
-        blockers.push({
-          code: "PART_HASH_UNAVAILABLE",
-          message: "이 표의 백업 파일에는 검증용 해시가 없어 복원할 수 없습니다.",
-          table,
-        });
-      }
-      recomputedTableHashes.push(entry.sha256);
+      allTablesVerified = false;
+      blockers.push({
+        code: "PART_HASH_UNAVAILABLE",
+        message: "이 표의 백업 파일에는 검증용 해시가 없어 복원할 수 없습니다.",
+        table,
+      });
       continue;
     }
 
@@ -504,6 +509,7 @@ export async function runRestorePreflight(
     recomputedTableHashes.push(recomputedTableHash);
     if (recomputedTableHash !== entry.sha256) {
       tableHashMismatches.push(table);
+      allTablesVerified = false;
       blockers.push({
         code: "TABLE_HASH_MISMATCH",
         message: "표 단위 검증값이 백업 기록과 다릅니다.",
@@ -512,8 +518,10 @@ export async function runRestorePreflight(
       });
     }
 
-    if (!isTarget) continue;
+    // 표 단위 rows/size 대조는 **대상 여부와 무관하게** 모든 표에 적용한다.
+    if (!tableUsable) allTablesVerified = false;
     if (tableUsable && rowsFromParts !== entry.rows) {
+      allTablesVerified = false;
       blockers.push({
         code: "TABLE_ROW_COUNT_MISMATCH",
         message: "표 단위 행 수 합계가 백업 기록과 다릅니다.",
@@ -522,6 +530,7 @@ export async function runRestorePreflight(
       });
     }
     if (tableUsable && bytesFromParts !== entry.size_bytes) {
+      allTablesVerified = false;
       blockers.push({
         code: "TABLE_SIZE_MISMATCH",
         message: "표 단위 파일 크기 합계가 백업 기록과 다릅니다.",
@@ -529,13 +538,39 @@ export async function runRestorePreflight(
         detail: { manifest_size: entry.size_bytes, parts_size: bytesFromParts },
       });
     }
-    expectedRows[table] = rowsFromParts;
+    allTablesRows += rowsFromParts;
+    allTablesBytes += bytesFromParts;
+    // 복원 대상 여부는 expected_rows / part_contract 산출에만 사용한다.
+    if (isTarget) expectedRows[table] = rowsFromParts;
   }
 
+  // manifest total_rows 대조(모든 표 실측 합계).
+  if (manifest && typeof manifest.total_rows === "number" && manifest.total_rows !== allTablesRows) {
+    allTablesVerified = false;
+    blockers.push({
+      code: "MANIFEST_TOTAL_ROWS_MISMATCH",
+      message: "백업 전체 행 수 합계가 기록과 다릅니다.",
+      detail: { manifest_total_rows: manifest.total_rows, actual_total_rows: allTablesRows },
+    });
+  }
+
+  // DB 에 기록된 전체 크기도 실측 byte 합계와 대조한다(값이 있을 때만).
+  const dbSizeBytes = (snapshot as { size_bytes?: number | null }).size_bytes ?? null;
+  if (manifest && typeof dbSizeBytes === "number" && dbSizeBytes > 0 && dbSizeBytes !== allTablesBytes) {
+    allTablesVerified = false;
+    blockers.push({
+      code: "SNAPSHOT_SIZE_MISMATCH",
+      message: "백업 전체 파일 크기가 기록과 다릅니다.",
+      detail: { db_size_bytes: dbSizeBytes, actual_size_bytes: allTablesBytes },
+    });
+  }
 
   const recomputedOverall = manifest ? await combineHashes(recomputedTableHashes) : null;
   const overallMatches =
-    !!manifest && recomputedOverall === (manifest.sha256 ?? null) && recomputedOverall === (snapshot.sha256_hash ?? null);
+    !!manifest &&
+    allTablesVerified &&
+    recomputedOverall === (manifest.sha256 ?? null) &&
+    recomputedOverall === (snapshot.sha256_hash ?? null);
   if (manifest && !overallMatches) {
     blockers.push({
       code: "SNAPSHOT_OVERALL_HASH_MISMATCH",
@@ -683,17 +718,24 @@ export async function stageRestoreRun(
 
   if (runError) throw new Error(runError.message);
   if (!run) throw new Error("복원 준비 작업을 찾을 수 없습니다.");
-  if (run.status !== "preflight_clean") {
+
+  // 동시 요청 방어: 상태 판정은 SELECT→UPDATE 가 아니라 원자적 claim RPC 가 정본이다.
+  // claim 에 실패하면 준비 영역을 비우지도, 파일을 내려받지도 않는다.
+  const { data: claimRaw, error: claimError } = await admin.rpc("restore_claim_staging", {
+    _run_id: runId,
+  });
+  if (claimError) throw new Error(`준비 영역 점유 실패: ${claimError.message}`);
+  const claim = (claimRaw ?? {}) as { claimed?: boolean; status?: string | null; reason?: string | null };
+  if (!claim.claimed) {
+    if (claim.reason === "RESTORE_STAGING_ALREADY_IN_PROGRESS") {
+      throw new Error(
+        `RESTORE_STAGING_ALREADY_IN_PROGRESS: 이 복원 준비 작업은 이미 진행 중입니다(현재 상태: ${claim.status}).`,
+      );
+    }
     throw new Error(
-      `사전검증을 통과한 작업만 준비 영역에 적재할 수 있습니다. 현재 상태: ${run.status}`,
+      `RESTORE_STAGING_NOT_CLAIMABLE: 사전검증을 통과한 작업만 준비 영역에 적재할 수 있습니다. 현재 상태: ${claim.status ?? run.status}`,
     );
   }
-
-  const { error: statusError } = await admin
-    .from("restore_runs")
-    .update({ status: "staging" })
-    .eq("id", runId);
-  if (statusError) throw new Error(`상태 갱신 실패: ${statusError.message}`);
 
   // 재시도 안전성: 같은 작업의 기존 준비 데이터를 먼저 비운다(준비 영역 한정).
   const { error: clearError } = await admin

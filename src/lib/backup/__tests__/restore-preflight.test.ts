@@ -383,6 +383,10 @@ type StageOpts = {
 function fakeStageAdmin(o: StageOpts) {
   const updates: Record<string, unknown>[] = [];
   const inserted: Record<string, unknown>[] = [];
+  const deletes: string[] = [];
+  const claims: { claimed: boolean; status: string | null }[] = [];
+  /** DB 의 원자적 claim 을 모사한다: preflight_clean 인 1건만 성공. */
+  let runStatus = String(o.run.status ?? "");
   const admin = {
     from: (t: string) => {
       if (t === "restore_runs") {
@@ -401,7 +405,12 @@ function fakeStageAdmin(o: StageOpts) {
       }
       if (t === "restore_staging_rows") {
         return {
-          delete: () => ({ eq: async () => ({ error: null }) }),
+          delete: () => ({
+            eq: async (_c: string, v: string) => {
+              deletes.push(String(v ?? ""));
+              return { error: null };
+            },
+          }),
           insert: async (rows: Record<string, unknown>[]) => {
             inserted.push(...rows);
             return { error: null };
@@ -430,9 +439,26 @@ function fakeStageAdmin(o: StageOpts) {
         },
       }),
     },
-    rpc: async () => ({ data: { ok: true, issues: [] }, error: null }),
+    rpc: async (fn: string) => {
+      if (fn === "restore_claim_staging") {
+        const claimed = runStatus === "preflight_clean";
+        if (claimed) runStatus = "staging";
+        const res = {
+          claimed,
+          status: runStatus,
+          reason: claimed
+            ? null
+            : runStatus === "staging"
+              ? "RESTORE_STAGING_ALREADY_IN_PROGRESS"
+              : "RESTORE_STAGING_NOT_CLAIMABLE",
+        };
+        claims.push({ claimed, status: runStatus });
+        return { data: res, error: null };
+      }
+      return { data: { ok: true, issues: [] }, error: null };
+    },
   };
-  return { admin: admin as never, updates, inserted };
+  return { admin: admin as never, updates, inserted, deletes, claims };
 }
 
 async function stageFixture() {
@@ -560,6 +586,88 @@ describe("복원 범위 계약", () => {
       "wrt_import_row_logs",
     ]) {
       expect(BACKUP_TABLES).toContain(t);
+    }
+  });
+});
+
+describe("모든 manifest table 의 집계 계약 검증", () => {
+  it("비대상 표의 rows 변조를 차단한다", async () => {
+    const f = await buildFixture();
+    const m = JSON.parse(JSON.stringify(f.manifest)) as SnapshotManifest;
+    m.tables[1].rows = 99;
+    const admin = fakeAdmin({ manifest: m, dbManifest: m, files: filesOf(f) });
+    const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
+    expect(codes(r)).toContain("TABLE_ROW_COUNT_MISMATCH");
+    expect(r.hashes.overall_matches).toBe(false);
+  });
+
+  it("비대상 표의 size_bytes 변조를 차단한다", async () => {
+    const f = await buildFixture();
+    const m = JSON.parse(JSON.stringify(f.manifest)) as SnapshotManifest;
+    m.tables[1].size_bytes = 12345;
+    const admin = fakeAdmin({ manifest: m, dbManifest: m, files: filesOf(f) });
+    const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
+    expect(codes(r)).toContain("TABLE_SIZE_MISMATCH");
+    expect(r.hashes.overall_matches).toBe(false);
+  });
+
+  it("비대상 표의 parts 가 비면 차단하고 선언 해시로 통과시키지 않는다", async () => {
+    const f = await buildFixture();
+    const m = JSON.parse(JSON.stringify(f.manifest)) as SnapshotManifest;
+    m.tables[1].parts = [];
+    const admin = fakeAdmin({ manifest: m, dbManifest: m, files: filesOf(f) });
+    const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
+    expect(codes(r)).toContain("PART_HASH_UNAVAILABLE");
+    expect(r.hashes.overall_matches).toBe(false);
+    expect(r.ok).toBe(false);
+  });
+
+  it("manifest total_rows 변조를 차단한다", async () => {
+    const f = await buildFixture();
+    const m = JSON.parse(JSON.stringify(f.manifest)) as SnapshotManifest;
+    m.total_rows = 777;
+    const admin = fakeAdmin({ manifest: m, dbManifest: m, files: filesOf(f) });
+    const r = await runRestorePreflight(admin, { snapshotId: SNAPSHOT_ID, scope: "dmr" });
+    expect(codes(r)).toContain("MANIFEST_TOTAL_ROWS_MISMATCH");
+    expect(r.hashes.overall_matches).toBe(false);
+  });
+});
+
+describe("staging 은 원자적으로 claim 된다", () => {
+  it("동시 2요청 중 1건만 claim 하고 적재도 1회만 실행한다", async () => {
+    const { f, manifestBytes, run } = await stageFixture();
+    const { admin, inserted, claims, deletes } = fakeStageAdmin({
+      manifestBytes,
+      files: filesOf(f),
+      run,
+    });
+    const results = await Promise.allSettled([
+      stageRestoreRun(admin, "run-1"),
+      stageRestoreRun(admin, "run-1"),
+    ]);
+    const ok = results.filter((r) => r.status === "fulfilled");
+    const failed = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+    expect(ok).toHaveLength(1);
+    expect(failed).toHaveLength(1);
+    expect(String(failed[0].reason)).toMatch(/RESTORE_STAGING_ALREADY_IN_PROGRESS/);
+    expect(claims.filter((c) => c.claimed)).toHaveLength(1);
+    expect(inserted).toHaveLength(2);
+    // 두 번째 요청은 준비 영역을 비우지 않는다.
+    expect(deletes).toHaveLength(1);
+  });
+
+  it("이미 검증 완료·실패한 작업은 재적재를 차단한다", async () => {
+    for (const status of ["staging_verified", "failed", "preflight_blocked"]) {
+      const { f, manifestBytes, run } = await stageFixture();
+      const { admin, deletes } = fakeStageAdmin({
+        manifestBytes,
+        files: filesOf(f),
+        run: { ...run, status },
+      });
+      await expect(stageRestoreRun(admin, "run-1")).rejects.toThrow(
+        /RESTORE_STAGING_NOT_CLAIMABLE/,
+      );
+      expect(deletes).toHaveLength(0);
     }
   });
 });

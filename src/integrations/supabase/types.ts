@@ -9451,6 +9451,7 @@ export type Database = {
       resolve_login_email: { Args: { _login_id: string }; Returns: string }
       resolve_owner_by_name: { Args: { _name: string }; Returns: string }
       resolve_user_by_name: { Args: { _name: string }; Returns: string }
+      restore_claim_staging: { Args: { _run_id: string }; Returns: Json }
       restore_staging_verify: { Args: { _run_id: string }; Returns: Json }
       rollback_abd_import: {
         Args: { _batch_id: string; _force?: boolean }
