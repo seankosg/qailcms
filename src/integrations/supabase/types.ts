@@ -4340,6 +4340,113 @@ export type Database = {
           },
         ]
       }
+      restore_runs: {
+        Row: {
+          created_at: string
+          dependency_result: Json | null
+          error_code: string | null
+          error_message: string | null
+          expected_rows: Json
+          final_restore_tables: string[]
+          finished_at: string | null
+          id: string
+          initiated_by: string | null
+          preflight_result: Json | null
+          requested_scope: string
+          requested_tables: string[]
+          schema_fingerprint: string | null
+          snapshot_id: string
+          staged_rows: Json
+          started_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dependency_result?: Json | null
+          error_code?: string | null
+          error_message?: string | null
+          expected_rows?: Json
+          final_restore_tables?: string[]
+          finished_at?: string | null
+          id: string
+          initiated_by?: string | null
+          preflight_result?: Json | null
+          requested_scope: string
+          requested_tables?: string[]
+          schema_fingerprint?: string | null
+          snapshot_id: string
+          staged_rows?: Json
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dependency_result?: Json | null
+          error_code?: string | null
+          error_message?: string | null
+          expected_rows?: Json
+          final_restore_tables?: string[]
+          finished_at?: string | null
+          id?: string
+          initiated_by?: string | null
+          preflight_result?: Json | null
+          requested_scope?: string
+          requested_tables?: string[]
+          schema_fingerprint?: string | null
+          snapshot_id?: string
+          staged_rows?: Json
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      restore_staging_rows: {
+        Row: {
+          created_at: string
+          id: number
+          part_index: number
+          part_path: string
+          restore_run_id: string
+          row_data: Json
+          row_hash: string | null
+          row_sequence: number
+          table_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          part_index: number
+          part_path: string
+          restore_run_id: string
+          row_data: Json
+          row_hash?: string | null
+          row_sequence: number
+          table_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          part_index?: number
+          part_path?: string
+          restore_run_id?: string
+          row_data?: Json
+          row_hash?: string | null
+          row_sequence?: number
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restore_staging_rows_restore_run_id_fkey"
+            columns: ["restore_run_id"]
+            isOneToOne: false
+            referencedRelation: "restore_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spare_part_change_log_archived: {
         Row: {
           change_source: string
@@ -8883,6 +8990,10 @@ export type Database = {
         Args: { _metadata?: Json; _run_id: string }
         Returns: Json
       }
+      backup_dependency_closure: {
+        Args: { _requested: string[]; _snapshot_tables?: string[] }
+        Returns: Json
+      }
       backup_disable_triggers: {
         Args: { _table_name: string }
         Returns: undefined
@@ -8894,6 +9005,14 @@ export type Database = {
       backup_insert_rows_from_json: {
         Args: { _rows_json: Json; _table_name: string }
         Returns: number
+      }
+      backup_schema_fingerprint: {
+        Args: { _tables: string[] }
+        Returns: string
+      }
+      backup_table_schema_contract: {
+        Args: { _tables: string[] }
+        Returns: Json
       }
       backup_truncate_table: {
         Args: { _table_name: string }
@@ -9326,6 +9445,7 @@ export type Database = {
       resolve_login_email: { Args: { _login_id: string }; Returns: string }
       resolve_owner_by_name: { Args: { _name: string }; Returns: string }
       resolve_user_by_name: { Args: { _name: string }; Returns: string }
+      restore_staging_verify: { Args: { _run_id: string }; Returns: Json }
       rollback_abd_import: {
         Args: { _batch_id: string; _force?: boolean }
         Returns: Json
