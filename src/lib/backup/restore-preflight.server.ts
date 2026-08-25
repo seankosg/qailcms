@@ -21,11 +21,13 @@ import { resolveRestoreScope, type BackupTableName, type RestoreScope } from "./
 
 const STAGING_INSERT_CHUNK = 500;
 
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
 export type PreflightIssue = {
   code: string;
   message: string;
   table?: string;
-  detail?: Record<string, unknown>;
+  detail?: { [key: string]: JsonValue };
 };
 
 export type RestoreDependency = {
@@ -446,5 +448,5 @@ export async function stageRestoreRun(
 export async function verifyRestoreStaging(admin: SupabaseClient<Database>, runId: string) {
   const { data, error } = await (admin as any).rpc("restore_staging_verify", { _run_id: runId });
   if (error) throw new Error(error.message);
-  return data as { ok: boolean; run_id: string; tables: unknown[]; issues: PreflightIssue[] };
+  return data as { ok: boolean; run_id: string; tables: JsonValue[]; issues: PreflightIssue[] };
 }
