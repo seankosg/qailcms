@@ -15,6 +15,9 @@ import {
   type SnapshotDeleteResult,
 } from "./storage-purge";
 import { planRetentionCleanup } from "./retention";
+import { combineHashes, sha256Hex } from "./manifest-hash";
+
+export { sha256Hex, combineHashes, normalizePartPath } from "./manifest-hash";
 
 
 export { BACKUP_TABLES, type BackupTableName } from "./backup-shared";
@@ -57,6 +60,13 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   abd_import_presets: ["id"],
   abd_comments: ["id"],
   abd_change_log: ["id"],
+  abd_audit_log: ["id"],
+  abd_import_row_logs: ["id"],
+  abd_mf_change_log: ["id"],
+  task_management_import_row_logs: ["id"],
+  tm_pic_delegations: ["id"],
+  spl_import_row_logs: ["id"],
+  wrt_import_row_logs: ["id"],
   spl_items: ["id"],
   spl_stage_catalog: ["stage_code"],
   spl_stage_progress: ["id"],
@@ -157,6 +167,13 @@ export const RESTORE_ORDER = new Map<BackupTableName, number>([
   ["task_management_raw", 24],
   ["dmr_entries", 25],
   ["abd_import_logs", 26],
+  ["abd_import_row_logs", 26.5],
+  ["abd_audit_log", 21.6],
+  ["abd_mf_change_log", 21.7],
+  ["task_management_import_row_logs", 23.5],
+  ["tm_pic_delegations", 24.5],
+  ["spl_import_row_logs", 32.5],
+  ["wrt_import_row_logs", 37.5],
   ["defect_import_logs", 27],
   ["spl_items", 28],
   ["spl_stage_progress", 29],
@@ -378,7 +395,7 @@ export async function createSnapshot(
   const tableManifests: SnapshotManifest["tables"] = [];
   let totalRows = 0;
   let totalSize = 0;
-  const overallHasher = new Hasher();
+  const tableHashHex: string[] = [];
 
   for (const tableName of tablesToBackup) {
     await report(tableName, tablesToBackup.indexOf(tableName), "start");
@@ -429,8 +446,9 @@ export async function createSnapshot(
     }
 
     // 테이블 단위 sha256 = sha256( 각 파트 sha256 hex를 이어붙인 문자열 )
-    const tableHash = await sha256Hex(new TextEncoder().encode(tablePartHashHex.join("")));
-    overallHasher.update(new TextEncoder().encode(tableHash));
+    // 계층 해시 산식 정본은 manifest-hash.ts 에만 둔다(복원 검증과 동일 코드 사용).
+    const tableHash = await combineHashes(tablePartHashHex);
+    tableHashHex.push(tableHash);
 
     tableManifests.push({
       name: tableName,
@@ -444,7 +462,7 @@ export async function createSnapshot(
     await report(tableName, tablesToBackup.indexOf(tableName), "done");
   }
 
-  const overallHash = await overallHasher.digest();
+  const overallHash = await combineHashes(tableHashHex);
 
   // v2 스키마 계약: 복원 시점에 컬럼/PK/FK 가 바뀌었는지 대조할 수 있도록 지문을 함께 남긴다.
   const { data: contract, error: contractError } = await (supabaseAdmin as any).rpc(
@@ -806,28 +824,4 @@ export async function resolveTablePartPaths(
   return [`${tableName}.json`];
 }
 
-export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
-class Hasher {
-  private chunks: Uint8Array[] = [];
-
-  update(bytes: Uint8Array) {
-    this.chunks.push(bytes);
-  }
-
-  async digest(): Promise<string> {
-    const totalLength = this.chunks.reduce((sum, c) => sum + c.length, 0);
-    const combined = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const c of this.chunks) {
-      combined.set(c, offset);
-      offset += c.length;
-    }
-    return sha256Hex(combined);
-  }
-}
