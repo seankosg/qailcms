@@ -439,9 +439,26 @@ function fakeStageAdmin(o: StageOpts) {
         },
       }),
     },
-    rpc: async () => ({ data: { ok: true, issues: [] }, error: null }),
+    rpc: async (fn: string) => {
+      if (fn === "restore_claim_staging") {
+        const claimed = runStatus === "preflight_clean";
+        if (claimed) runStatus = "staging";
+        const res = {
+          claimed,
+          status: runStatus,
+          reason: claimed
+            ? null
+            : runStatus === "staging"
+              ? "RESTORE_STAGING_ALREADY_IN_PROGRESS"
+              : "RESTORE_STAGING_NOT_CLAIMABLE",
+        };
+        claims.push({ claimed, status: runStatus });
+        return { data: res, error: null };
+      }
+      return { data: { ok: true, issues: [] }, error: null };
+    },
   };
-  return { admin: admin as never, updates, inserted };
+  return { admin: admin as never, updates, inserted, deletes, claims };
 }
 
 async function stageFixture() {
