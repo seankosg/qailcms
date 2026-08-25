@@ -328,9 +328,13 @@ export async function runRestorePreflight(
     });
   }
 
-  // ── 4) 경로 검증 + 파트 실측(size/hash/rows) + 계층 해시 재계산 ─────────
+  // ── 4) 경로 검증 + 전체 파트 실측(size/hash/rows) + 계층 해시 재계산 ─────
+  //
+  // 복원 대상이 아닌 표도 **모두 다운로드**하여 실제 bytes 로 해시를 재계산한다.
+  // 그래야 overall hash 가 "manifest 선언값 재조합"이 아닌 실제 무결성 검증이 된다.
   const expectedRows: Record<string, number> = {};
   const parts: PreflightResult["parts"] = [];
+  const partContract: PartContract[] = [];
   const tableHashMismatches: string[] = [];
   const seenPaths = new Set<string>();
   const recomputedTableHashes: string[] = [];
@@ -338,7 +342,6 @@ export async function runRestorePreflight(
   for (const entry of manifest?.tables ?? []) {
     const table = String(entry.name);
     const isTarget = finalTables.includes(table);
-    const partHashes: string[] = [];
     let rowsFromParts = 0;
     let bytesFromParts = 0;
     let tableUsable = true;
@@ -355,7 +358,11 @@ export async function runRestorePreflight(
       continue;
     }
 
-    for (const part of entry.parts) {
+    // 4-1) 경로 검증(다운로드 전)
+    type Planned = { index: number; part: (typeof entry.parts)[number]; fullPath: string };
+    const planned: Planned[] = [];
+    for (let i = 0; i < entry.parts.length; i++) {
+      const part = entry.parts[i];
       const check = normalizePartPath(folder, part.path);
       if (!check.ok) {
         tableUsable = false;
@@ -378,31 +385,42 @@ export async function runRestorePreflight(
         continue;
       }
       seenPaths.add(check.fullPath);
-      partHashes.push(part.sha256);
+      planned.push({ index: i, part, fullPath: check.fullPath });
+    }
 
-      // 복원 대상이 아닌 표는 경로 안전성만 확인하고 다운로드하지 않는다.
-      if (!isTarget) continue;
+    // 4-2) 동시성 제한 다운로드(3~5개 범위)
+    const results = await mapLimit(planned, DOWNLOAD_CONCURRENCY, async (p) => {
+      const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(p.fullPath);
+      if (dlError || !blob) return { p, bytes: null as Uint8Array | null, error: dlError?.message ?? "다운로드 실패" };
+      return { p, bytes: new Uint8Array(await blob.arrayBuffer()), error: null as string | null };
+    });
 
-      const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(check.fullPath);
-      if (dlError || !blob) {
+    // 4-3) manifest 순서대로 실측 검증
+    const partHashes: string[] = [];
+    for (const r of results) {
+      const { part, fullPath, index } = r.p;
+      if (!r.bytes) {
         tableUsable = false;
         blockers.push({
           code: "PART_FILE_MISSING",
           message: "백업 파일 일부를 읽을 수 없습니다.",
           table,
-          detail: { path: part.path, error: dlError?.message ?? null },
+          detail: { path: String(part.path), error: r.error },
         });
         continue;
       }
-      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const bytes = r.bytes;
       const actual = await sha256Hex(bytes);
+      // 실제 해시를 계층 해시 재계산에 사용한다(선언값 재조합 금지).
+      partHashes.push(actual);
+
       if (actual !== part.sha256) {
         tableUsable = false;
         blockers.push({
           code: "PART_HASH_MISMATCH",
           message: "백업 파일이 손상되었거나 변경되었습니다(무결성 검증 실패).",
           table,
-          detail: { path: part.path, expected: part.sha256, actual },
+          detail: { path: String(part.path), expected: part.sha256, actual },
         });
       }
       if (bytes.length !== part.size_bytes) {
@@ -411,10 +429,11 @@ export async function runRestorePreflight(
           code: "PART_SIZE_MISMATCH",
           message: "백업 파일 크기가 기록과 다릅니다.",
           table,
-          detail: { path: part.path, expected: part.size_bytes, actual: bytes.length },
+          detail: { path: String(part.path), expected: part.size_bytes, actual: bytes.length },
         });
       }
       let rowCount = part.rows;
+      let parsedOk = true;
       try {
         const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
         if (!Array.isArray(parsed)) throw new Error("배열이 아님");
@@ -425,28 +444,40 @@ export async function runRestorePreflight(
             code: "PART_ROW_COUNT_MISMATCH",
             message: "백업 파일의 실제 행 수가 기록된 행 수와 다릅니다.",
             table,
-            detail: { path: part.path, manifest_rows: part.rows, actual_rows: rowCount },
+            detail: { path: String(part.path), manifest_rows: part.rows, actual_rows: rowCount },
           });
         }
       } catch (err) {
+        parsedOk = false;
         tableUsable = false;
         blockers.push({
           code: "PART_PARSE_FAILED",
           message: "백업 파일을 해석할 수 없습니다.",
           table,
-          detail: { path: part.path, error: (err as Error).message },
+          detail: { path: String(part.path), error: (err as Error).message },
         });
       }
       rowsFromParts += rowCount;
       bytesFromParts += bytes.length;
       parts.push({
         table,
-        path: part.path,
+        path: String(part.path),
         rows: rowCount,
         bytes: bytes.length,
         manifest_sha256: part.sha256,
         actual_sha256: actual,
       });
+      if (isTarget && parsedOk) {
+        partContract.push({
+          table,
+          part_index: index,
+          path: String(part.path),
+          full_path: fullPath,
+          rows: rowCount,
+          size_bytes: bytes.length,
+          sha256: actual,
+        });
+      }
     }
 
     // 테이블 해시 재계산은 생성 시와 동일한 산식(manifest-hash.ts)을 사용한다.
@@ -481,6 +512,7 @@ export async function runRestorePreflight(
     }
     expectedRows[table] = rowsFromParts;
   }
+
 
   const recomputedOverall = manifest ? await combineHashes(recomputedTableHashes) : null;
   const overallMatches =
