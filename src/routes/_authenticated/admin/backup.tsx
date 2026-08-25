@@ -12,7 +12,7 @@ import {
   deleteSnapshot,
   deleteSnapshotsBulk,
   lockSnapshot,
-  restoreSnapshot,
+  
   cleanupOldSnapshots,
   previewCleanupOldSnapshots,
 
