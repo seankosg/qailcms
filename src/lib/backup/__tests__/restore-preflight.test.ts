@@ -1,21 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { combineHashes, normalizePartPath, sha256Hex } from "../manifest-hash";
-import { runRestorePreflight } from "../restore-preflight.server";
+import { runRestorePreflight, stageRestoreRun, createRestoreRun } from "../restore-preflight.server";
 import { RESTORE_SCOPES, RESTORE_SCOPE_KEYS, resolveRestoreScope, BACKUP_TABLES } from "../backup-shared";
 import { SNAPSHOT_SCHEMA_VERSION, type SnapshotManifest } from "../backup-core.server";
 
 const SNAPSHOT_ID = "11111111-1111-1111-1111-111111111111";
 const FOLDER = `snapshots/${SNAPSHOT_ID}/`;
 const TABLE = "dmr_entries";
+/** 복원 대상이 아닌 표(전체 무결성 검증에는 포함되어야 한다). */
+const OTHER_TABLE = "team_master";
 
 const enc = (s: string) => new TextEncoder().encode(s);
 
-async function buildFixture(rows: unknown[] = [{ id: "a" }, { id: "b" }]) {
-  const json = JSON.stringify(rows);
-  const bytes = enc(json);
+async function buildFixture(rows: unknown[] = [{ id: "a" }, { id: "b" }], otherRows: unknown[] = [{ id: "t1" }]) {
+  const bytes = enc(JSON.stringify(rows));
   const partHash = await sha256Hex(bytes);
   const tableHash = await combineHashes([partHash]);
-  const overall = await combineHashes([tableHash]);
+
+  const otherBytes = enc(JSON.stringify(otherRows));
+  const otherPartHash = await sha256Hex(otherBytes);
+  const otherTableHash = await combineHashes([otherPartHash]);
+
+  const overall = await combineHashes([tableHash, otherTableHash]);
   const manifest: SnapshotManifest = {
     id: SNAPSHOT_ID,
     name: "fixture",
@@ -30,14 +36,38 @@ async function buildFixture(rows: unknown[] = [{ id: "a" }, { id: "b" }]) {
         size_bytes: bytes.length,
         parts: [{ path: `${TABLE}.part-000.json`, rows: rows.length, sha256: partHash, size_bytes: bytes.length }],
       },
+      {
+        name: OTHER_TABLE as never,
+        rows: otherRows.length,
+        sha256: otherTableHash,
+        size_bytes: otherBytes.length,
+        parts: [
+          {
+            path: `${OTHER_TABLE}.part-000.json`,
+            rows: otherRows.length,
+            sha256: otherPartHash,
+            size_bytes: otherBytes.length,
+          },
+        ],
+      },
     ],
-    total_rows: rows.length,
+    total_rows: rows.length + otherRows.length,
     sha256: overall,
     schema_version: SNAPSHOT_SCHEMA_VERSION,
     schema_fingerprint: "fp-current",
-    schema_contract: [{ name: TABLE, schema_digest: "digest-current" }],
+    schema_contract: [
+      { name: TABLE, schema_digest: "digest-current" },
+      { name: OTHER_TABLE, schema_digest: "digest-other" },
+    ],
   };
-  return { manifest, bytes, partHash, tableHash, overall };
+  return { manifest, bytes, otherBytes, partHash, tableHash, overall };
+}
+
+function filesOf(f: Awaited<ReturnType<typeof buildFixture>>): Record<string, Uint8Array> {
+  return {
+    [`${FOLDER}${TABLE}.part-000.json`]: f.bytes,
+    [`${FOLDER}${OTHER_TABLE}.part-000.json`]: f.otherBytes,
+  };
 }
 
 type FakeOpts = {
@@ -60,7 +90,7 @@ function fakeAdmin(o: FakeOpts) {
               created_at: "2026-08-25T00:00:00.000Z",
               storage_path: FOLDER,
               sha256_hash: o.dbHash ?? o.manifest?.sha256 ?? null,
-              tables_included: [TABLE],
+              tables_included: [TABLE, OTHER_TABLE],
               metadata: o.dbManifest === undefined ? o.manifest : o.dbManifest,
             },
             error: null,
@@ -122,20 +152,32 @@ describe("manifest 경로 검증", () => {
   it("정상 파트 경로를 통과시킨다", () => {
     const r = normalizePartPath(FOLDER, "dmr_entries.part-000.json");
     expect(r.ok).toBe(true);
+    if (r.ok) expect(r.fullPath).toBe(`${FOLDER}dmr_entries.part-000.json`);
   });
   it.each([
     ["/etc/passwd", "PART_PATH_ABSOLUTE"],
     ["C:\\x.json", "PART_PATH_INVALID"],
     ["//host/share/x.json", "PART_PATH_ABSOLUTE"],
-    ["../other/x.json", "PART_PATH_ESCAPES_FOLDER"],
-    ["a/../../x.json", "PART_PATH_ESCAPES_FOLDER"],
+    ["../other/x.json", "PART_PATH_TRAVERSAL"],
+    ["a/../../x.json", "PART_PATH_TRAVERSAL"],
+    // 최종 결과가 폴더 안이어도 `..` 는 무조건 차단한다.
+    ["a/../b.json", "PART_PATH_TRAVERSAL"],
+    ["./a.json", "PART_PATH_INVALID"],
+    ["a//b.json", "PART_PATH_INVALID"],
+    ["a/b.json/", "PART_PATH_INVALID"],
     ["", "PART_PATH_INVALID"],
   ])("%s 를 차단한다", (p, code) => {
     const r = normalizePartPath(FOLDER, p);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe(code);
   });
+  it("percent-encoded traversal 을 디코드하지 않고 원문 그대로 둔다", () => {
+    const r = normalizePartPath(FOLDER, "%2e%2e/x.json");
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.fullPath).toBe(`${FOLDER}%2e%2e/x.json`);
+  });
 });
+
 
 describe("runRestorePreflight", () => {
   it("정상 v2 fixture 는 blocker 없이 통과한다", async () => {
