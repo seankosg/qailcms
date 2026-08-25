@@ -58,6 +58,10 @@ export type PreflightResult = {
   scope: string;
   dependency: RestoreDependency;
   expected_rows: Record<string, number>;
+  /** Storage manifest.json 원본 bytes 의 SHA-256(사전검증 시점 고정값). */
+  manifest_sha256: string | null;
+  /** 사전검증이 실측으로 확정한 복원 대상 파트 계약. staging 은 이 계약에만 고정된다. */
+  part_contract: PartContract[];
   parts: {
     table: string;
     path: string;
@@ -66,6 +70,7 @@ export type PreflightResult = {
     manifest_sha256: string;
     actual_sha256: string;
   }[];
+
   hashes: {
     manifest_overall: string | null;
     recomputed_overall: string | null;
