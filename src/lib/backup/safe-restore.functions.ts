@@ -147,14 +147,19 @@ export const getRestoreRunStatus = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const run = await loadRun(supabaseAdmin, data.run_id);
     const status = String(run.status ?? "");
-    const unresolved = status === "applying";
     /** 반영을 한 번이라도 시도했는지 — 서버 기록만 근거로 판정한다. */
     const applyAttempted =
+      !!run.apply_requested_at ||
       ["applying", "success", "apply_failed"].includes(status) ||
       !!run.applied_at ||
       !!run.apply_result;
+    /** 시도 기록이 있으나 성공·롤백으로 확정되지 않은 경우는 모두 미확정이다. */
+    const unresolved = applyAttempted && !["success", "apply_failed"].includes(status);
+    const dependency = (run.dependency_result ?? {}) as any;
     return {
       apply_attempted: applyAttempted,
+      apply_requested_at: (run.apply_requested_at ?? null) as string | null,
+      apply_requested_by: (run.apply_requested_by ?? null) as string | null,
       run_id: run.id as string,
 
       status,
@@ -162,7 +167,10 @@ export const getRestoreRunStatus = createServerFn({ method: "POST" })
       confirmation_phrase: buildRestoreConfirmation(String(run.requested_scope ?? ""), String(run.id)),
       snapshot_id: run.snapshot_id as string | null,
       safety_snapshot_id: (run.safety_snapshot_id ?? null) as string | null,
-      final_restore_tables: (run.final_restore_tables ?? []) as string[],
+      final_restore_tables: (run.final_restore_tables ?? dependency.final_restore_tables ?? []) as string[],
+      auto_included_tables: (dependency.auto_included_tables ?? []) as string[],
+      keep_current_parent_tables: (dependency.keep_current_parent_tables ?? []) as string[],
+      required_parent_tables: (dependency.required_parent_tables ?? []) as string[],
       expected_rows: (run.expected_rows ?? {}) as Record<string, number>,
       staged_rows: (run.staged_rows ?? {}) as Record<string, number>,
       preflight_summary: {
@@ -178,7 +186,8 @@ export const getRestoreRunStatus = createServerFn({ method: "POST" })
       started_at: (run.started_at ?? null) as string | null,
       applied_at: (run.applied_at ?? null) as string | null,
       finished_at: (run.finished_at ?? null) as string | null,
-      /** applying 상태는 결과 미확정이므로 새 복원 실행을 금지한다. */
+      /** 결과 미확정 상태에서는 새 복원 실행을 금지한다. */
       rerun_blocked: unresolved,
     };
   });
+
