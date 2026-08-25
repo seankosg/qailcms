@@ -4351,6 +4351,7 @@ export type Database = {
           finished_at: string | null
           id: string
           initiated_by: string | null
+          manifest_sha256: string | null
           preflight_result: Json | null
           requested_scope: string
           requested_tables: string[]
@@ -4372,6 +4373,7 @@ export type Database = {
           finished_at?: string | null
           id: string
           initiated_by?: string | null
+          manifest_sha256?: string | null
           preflight_result?: Json | null
           requested_scope: string
           requested_tables?: string[]
@@ -4393,6 +4395,7 @@ export type Database = {
           finished_at?: string | null
           id?: string
           initiated_by?: string | null
+          manifest_sha256?: string | null
           preflight_result?: Json | null
           requested_scope?: string
           requested_tables?: string[]
